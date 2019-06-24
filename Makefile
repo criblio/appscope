@@ -5,7 +5,7 @@ LD_FLAGS=-Wl, $(STATIC_CPP) -ldl
 
 .PHONY: all
 all: CXXFLAGS += -O2 -s
-all: build
+all: libwrap.so
 
 debug: CXXFLAGS += -ggdb
 debug: clean build tester 

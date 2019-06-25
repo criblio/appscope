@@ -1,19 +1,15 @@
 
-CC=gcc
-CFLAGS=-fPIC -shared -ldl -g -Wall
-LD_FLAGS=-Wl, $(STATIC_CPP) -ldl
+CWD=$(shell pwd)
+PLATFORM=$(shell $(CWD)/platform)
 
-.PHONY: all
-all: CXXFLAGS += -O2 -s
-all: libwrap.so
+ifeq ($(PLATFORM),Linux)
+	include os/linux/Makefile
+else
+	ifeq ($(PLATFORM),macOS)
+		include os/macOS/Makefile
+	else
+$(info ERROR not a valid platform: "$(PLATFORM)")
+endif
+endif
 
-debug: CXXFLAGS += -ggdb
-debug: clean build tester 
 
-
-libwrap.so: src/wrap.c
-	@echo "Building libwrap.so ..."
-	$(CC) $(CFLAGS) -o $@ $^ -Wl,-e,prog_version $(LD_FLAGS)
-
-clean:
-	rm -f libwrap.so

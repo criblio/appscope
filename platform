@@ -1,0 +1,11 @@
+#! /bin/bash
+
+if cat /etc/os-release 2> /dev/null | grep -i centos > /dev/null
+then
+    echo "Linux"
+elif uname -s 2> /dev/null | grep -i darwin > /dev/null
+then
+    echo "macOS"
+else
+    echo "Error"
+fi

@@ -4,19 +4,19 @@
 #define EXPORT __attribute__((visibility("default")))
 
 // Use these only if a config file is not accesible
-#define PORT 8888
+#define PORT 8125
 #define SERVER "127.0.0.1"
 
-#define STATSD_READ "cribl.scope.calls.read.bytes:%d|c"
-#define STATSD_WRITE "cribl.scope.calls.write.bytes:%d|c"
-#define STATSD_VSYSLOG "cribl.scope.calls.vsyslog|c"
-#define STATSD_SOCKET "cribl.scope.calls.socket|c"
-#define STATSD_SEND "cribl.scope.calls.send.bytes:%d|c"
-#define STATSD_SENDTO "cribl.scope.calls.sendto.bytes:%d|c"
-#define STATSD_SENDMSG "cribl.scope.calls.sendmsg|c"
-#define STATSD_RECV "cribl.scope.calls.recv.bytes:%d|c"
-#define STATSD_RECVFROM "cribl.scope.calls.recvfrom.bytes:%d|c"
-#define STATSD_RECVMSG "cribl.scope.calls.recvmsg|c"
+#define STATSD_READ "cribl.scope.calls.read.bytes:%d|c\n"
+#define STATSD_WRITE "cribl.scope.calls.write.bytes:%d|c\n"
+#define STATSD_VSYSLOG "cribl.scope.calls.vsyslog|c\n"
+#define STATSD_SOCKET "cribl.scope.calls.socket|c\n"
+#define STATSD_SEND "cribl.scope.calls.send.bytes:%d|c\n"
+#define STATSD_SENDTO "cribl.scope.calls.sendto.bytes:%d|c\n"
+#define STATSD_SENDMSG "cribl.scope.calls.sendmsg|c\n"
+#define STATSD_RECV "cribl.scope.calls.recv.bytes:%d|c\n"
+#define STATSD_RECVFROM "cribl.scope.calls.recvfrom.bytes:%d|c\n"
+#define STATSD_RECVMSG "cribl.scope.calls.recvmsg|c\n"
 
 static void (*real_vsyslog)(int, const char *, va_list);
 static int (*real_socket)(int, int, int);

@@ -4,12 +4,12 @@ if [ -z "$CRIBL_HOME" ]; then
    export CRIBL_HOME=`pwd`
 fi
 
-PLATFORM=`$CRIBL_HOME/platform`
+PLATFORM=`"$CRIBL_HOME"/platform`
 
 if [ $PLATFORM == "macOS" ]; then 
-   DYLD_INSERT_LIBRARIES=$CRIBL_HOME/lib/macOS/libwrap.so DYLD_FORCE_FLAT_NAMESPACE=1 $@
+   DYLD_INSERT_LIBRARIES="$CRIBL_HOME/lib/macOS/libwrap.so" DYLD_FORCE_FLAT_NAMESPACE=1 $@
 elif [ $PLATFORM == "Linux" ]; then
-     LD_PRELOAD=$CRIBL_HOME/lib/linux/libwrap.so $@
+     LD_PRELOAD="$CRIBL_HOME/lib/linux/libwrap.so" $@
 else
     echo "ERROR: bad platform: $PLATFORM"
 fi

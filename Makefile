@@ -1,6 +1,6 @@
 
 CWD=$(shell pwd)
-PLATFORM=$(shell $(CWD)/platform)
+PLATFORM=$(shell "$(CWD)"/platform)
 
 ifeq ($(PLATFORM),Linux)
 	include os/linux/Makefile

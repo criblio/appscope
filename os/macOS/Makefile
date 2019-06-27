@@ -1,12 +1,12 @@
 
 CC=gcc
-CFLAGS=-fPIC -shared -g -Wall
+CFLAGS=-fPIC -shared -g -Wall -D__MACOS__
 LD_FLAGS=-Wl, -ldl
 
 .PHONY: all test
 all: libwrap.so
 
-libwrap.so: src/wrap.c
+libwrap.so: src/wrap.c os/macOS/os.c
 	@echo "Building libwrap.so ..."
 	$(CC) $(CFLAGS) -o ./lib/macOS/$@ $^ -e,prog_version $(LD_FLAGS)
 

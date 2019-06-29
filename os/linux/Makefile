@@ -16,11 +16,11 @@ clean:
 	rm -f ./lib/linux/libwrap.so
 	rm -f test/linux/test
 
-test: test/test.c contrib/libyaml/src/.libs/libyaml.a test/scopecfgtest.c src/scopecfg.c
+test: test/test.c contrib/libyaml/src/.libs/libyaml.a test/cfgtest.c src/cfg.c
 	@echo "Building Tests"
 	$(CC) -Wall -g -o test/linux/test test/test.c
-	$(CC) -Wall -g -o test/linux/scopecfgtest -I./src -I./contrib/libyaml/include test/scopecfgtest.c src/scopecfg.c contrib/libyaml/src/.libs/libyaml.a 
-	test/linux/scopecfgtest
+	$(CC) -Wall -g -o test/linux/cfgtest -I./src -I./contrib/libyaml/include test/cfgtest.c src/cfg.c contrib/libyaml/src/.libs/libyaml.a 
+	test/linux/cfgtest
 
 contrib/libyaml/src/.libs/libyaml.a:
 	@echo "Building libyaml"

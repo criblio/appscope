@@ -3,11 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include "scopecfg.h"
-
-// gcc -g scopecfgtest.c scopecfg.c ./libyaml/src/.libs/libyaml.a -o scopecfgtest && ./scopecfgtest
-// or to remove one dependency (and the ability to read yaml files)
-// gcc -g scopecfgtest.c scopecfg.c -DNO_YAML -o scopecfgtest && ./scopecfgtest
+#include "cfg.h"
 
 void
 testDefaults(config_t* config)

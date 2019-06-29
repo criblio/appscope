@@ -14,11 +14,11 @@ clean:
 	rm -f ./lib/macOS/libwrap.so
 	rm -f test/macOS/test
 
-test: test/test.c contrib/libyaml/src/.libs/libyaml.a test/scopecfgtest.c src/scopecfg.c
+test: test/test.c contrib/libyaml/src/.libs/libyaml.a test/cfgtest.c src/cfg.c
 	@echo "Building Tests"	
 	$(CC) -Wall -g -o test/macOS/test test/test.c 
-	$(CC) -Wall -g -o test/macOS/scopecfgtest -I./src -I./contrib/libyaml/include contrib/libyaml/src/.libs/libyaml.a test/scopecfgtest.c src/scopecfg.c
-	test/macOS/scopecfgtest
+	$(CC) -Wall -g -o test/macOS/cfgtest -I./src -I./contrib/libyaml/include contrib/libyaml/src/.libs/libyaml.a test/cfgtest.c src/cfg.c
+	test/macOS/cfgtest
 
 contrib/libyaml/src/.libs/libyaml.a:
 	@echo "Building libyaml"

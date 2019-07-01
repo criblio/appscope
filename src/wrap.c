@@ -148,9 +148,30 @@ __attribute__((constructor)) void init(void)
     g_close = dlsym(RTLD_NEXT, "close");
     g_close$NOCANCEL = dlsym(RTLD_NEXT, "close$NOCANCEL");
     g_close_nocancel = dlsym(RTLD_NEXT, "close_nocancel");
-    g_guarded_close_np = dlsym(RTLD_NEXT, "guarded_close_np");
     g_shutdown = dlsym(RTLD_NEXT, "shutdown");
     g_bind = dlsym(RTLD_NEXT, "bind");
+    //g_guarded_close_np = dlsym(RTLD_NEXT, "guarded_close_np");
+    
+    {
+        char buf[128];
+
+        g_guarded_close_np = dlsym(RTLD_NEXT, "guarded_close_np");
+        snprintf(buf, sizeof(buf), "guarded_close_np: NEXT: 0x%x\n", (unsigned int)g_guarded_close_np);
+        log(buf, -1);
+
+        g_guarded_close_np = dlsym(RTLD_SELF, "guarded_close_np");
+        snprintf(buf, sizeof(buf), "guarded_close_np: SELF: 0x%x\n", (unsigned int)g_guarded_close_np);
+        log(buf, -1);
+
+        g_guarded_close_np = dlsym(RTLD_MAIN_ONLY, "guarded_close_np");
+        snprintf(buf, sizeof(buf), "guarded_close_np: MAIN: 0x%x\n", (unsigned int)g_guarded_close_np);
+        log(buf, -1);
+
+        g_guarded_close_np = dlsym(RTLD_DEFAULT, "guarded_close_np");
+        snprintf(buf, sizeof(buf), "guarded_close_np: DEFAULT: 0x%x\n", (unsigned int)g_guarded_close_np);
+        log(buf, -1);
+
+    }
 
     if ((g_netinfo = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
             g_ops.init_errors++;
@@ -234,7 +255,7 @@ int guarded_close_np(int fd, void *guard) {
         log("ERROR: guarded_close_np:NULL\n", fd);
         return -1;
     }
-    
+
     if (g_netinfo && (g_netinfo[fd].fd == fd)) {
         log("guarded_close_np\n", fd);
 

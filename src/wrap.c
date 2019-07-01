@@ -1,6 +1,6 @@
 #include "wrap.h"
 
-static void log(char *msg, int fd)
+static void scopeLog(char *msg, int fd)
 {
     size_t len;
     
@@ -54,16 +54,22 @@ static void initSocket(void)
 static void postMetric(const char *metric)
 {
     ssize_t rc;
-    
-    rc = g_sendto(g_sock, metric, strlen(metric), 0, 
-                (struct sockaddr *)&g_saddr, sizeof(g_saddr));
-    if (rc < 0) {
-        switch (errno) {
-        case EWOULDBLOCK:
-            g_ops.udp_blocks++;
-            break;
-        default:
-            g_ops.udp_errors++;
+
+    if (g_socket == 0) {
+        initSocket();
+    }
+
+    if (g_sendto) {
+        rc = g_sendto(g_sock, metric, strlen(metric), 0, 
+                      (struct sockaddr *)&g_saddr, sizeof(g_saddr));
+        if (rc < 0) {
+            switch (errno) {
+            case EWOULDBLOCK:
+                g_ops.udp_blocks++;
+                break;
+            default:
+                g_ops.udp_errors++;
+            }
         }
     }
 }
@@ -71,7 +77,7 @@ static void postMetric(const char *metric)
 static void addSock(int fd, int type) {
     if (g_netinfo) {
         if (g_netinfo[fd].fd == fd) {
-            log("addSock: duplicate\n", fd);
+            scopeLog("addSock: duplicate\n", fd);
             atomicSub(&g_openPorts, 1);
             return;
         }
@@ -88,7 +94,7 @@ static void addSock(int fd, int type) {
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].fd = fd;
         g_netinfo[fd].type = type;
-        log("addSocket\n", fd);
+        scopeLog("addSocket\n", fd);
     }
 }
 
@@ -150,38 +156,15 @@ __attribute__((constructor)) void init(void)
     g_close_nocancel = dlsym(RTLD_NEXT, "close_nocancel");
     g_shutdown = dlsym(RTLD_NEXT, "shutdown");
     g_bind = dlsym(RTLD_NEXT, "bind");
-    //g_guarded_close_np = dlsym(RTLD_NEXT, "guarded_close_np");
-    
-    {
-        char buf[128];
-
-        g_guarded_close_np = dlsym(RTLD_NEXT, "guarded_close_np");
-        snprintf(buf, sizeof(buf), "guarded_close_np: NEXT: 0x%x\n", (unsigned int)g_guarded_close_np);
-        log(buf, -1);
-
-        g_guarded_close_np = dlsym(RTLD_SELF, "guarded_close_np");
-        snprintf(buf, sizeof(buf), "guarded_close_np: SELF: 0x%x\n", (unsigned int)g_guarded_close_np);
-        log(buf, -1);
-
-        g_guarded_close_np = dlsym(RTLD_MAIN_ONLY, "guarded_close_np");
-        snprintf(buf, sizeof(buf), "guarded_close_np: MAIN: 0x%x\n", (unsigned int)g_guarded_close_np);
-        log(buf, -1);
-
-        g_guarded_close_np = dlsym(RTLD_DEFAULT, "guarded_close_np");
-        snprintf(buf, sizeof(buf), "guarded_close_np: DEFAULT: 0x%x\n", (unsigned int)g_guarded_close_np);
-        log(buf, -1);
-
-    }
+    g_guarded_close_np = dlsym(RTLD_NEXT, "guarded_close_np");
 
     if ((g_netinfo = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
-            g_ops.init_errors++;
-            strncpy((char *)g_ops.errMsg, "constructor:malloc", sizeof(g_ops.errMsg));
+        scopeLog("ERROR:Constructor:Malloc\n", -1);
     }
 
     g_numNinfo = NET_ENTRIES;
     if (gethostname(g_hostname, sizeof(g_hostname)) != 0) {
-        g_ops.init_errors++;
-        strncpy((char *)g_ops.errMsg, "constructor:gethostname", sizeof(g_ops.errMsg));
+        scopeLog("ERROR:Constructor:gethostname\n", -1);
     }
 
     osGetProcname(g_procname, sizeof(g_procname));
@@ -191,51 +174,44 @@ __attribute__((constructor)) void init(void)
 
 EXPORTON
 int close(int fd) {
-    if (g_socket == 0) {
-        initSocket();
-    }
-    
     if (g_close == NULL) {
-        log("ERROR: close:NULL\n", fd);
+        scopeLog("ERROR: close:NULL\n", fd);
         return -1;
     }
 
     if (g_netinfo && (g_netinfo[fd].fd == fd)) {
-/*        
         if (g_netinfo[fd].listen == TRUE) {
             // Gauge tracking number of open ports
             atomicSub(&g_openPorts, 1);
             doOpenPorts(fd);
-            log("close:sub port\n", fd);
+            scopeLog("close:sub port\n", fd);
         } else if (g_netinfo[fd].accept == TRUE) {
             // Gauge tracking number of active TCP connections
             atomicSub(&g_activeConnections, 1);
             //doActiveConns(fd);
         }
-*/
-        atomicSub(&g_openPorts, 1);
-        doOpenPorts(fd);
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
     }
     
     return g_close(fd);
 }
 
+#ifdef __MACOS__
 EXPORTON
 int close$NOCANCEL(int fd) {
     if (g_close$NOCANCEL == NULL) {
-        log("ERROR: close$NOCANCEL:NULL\n", fd);
+        scopeLog("ERROR: close$NOCANCEL:NULL\n", fd);
         return -1;
     }
     
     if (g_netinfo && (g_netinfo[fd].fd == fd)) {
-        log("close$NOCANCEL\n", fd);
+        scopeLog("close$NOCANCEL\n", fd);
 
         if (g_netinfo[fd].listen == TRUE) {
             // Gauge tracking number of open ports
             atomicSub(&g_openPorts, 1);
             doOpenPorts(fd);
-            log("close$NOCANCEL:port\n", fd);
+            scopeLog("close$NOCANCEL:port\n", fd);
         } else if (g_netinfo[fd].accept == TRUE) {
             // Gauge tracking number of active TCP connections
             atomicSub(&g_activeConnections, 1);
@@ -252,18 +228,18 @@ int close$NOCANCEL(int fd) {
 EXPORTON
 int guarded_close_np(int fd, void *guard) {
     if (g_guarded_close_np == NULL) {
-        log("ERROR: guarded_close_np:NULL\n", fd);
+        scopeLog("ERROR: guarded_close_np:NULL\n", fd);
         return -1;
     }
 
     if (g_netinfo && (g_netinfo[fd].fd == fd)) {
-        log("guarded_close_np\n", fd);
+        scopeLog("guarded_close_np\n", fd);
 
         if (g_netinfo[fd].listen == TRUE) {
             // Gauge tracking number of open ports
             atomicSub(&g_openPorts, 1);
             doOpenPorts(fd);
-            log("guarded_close_np:port\n", fd);
+            scopeLog("guarded_close_np:port\n", fd);
         } else if (g_netinfo[fd].accept == TRUE) {
             // Gauge tracking number of active TCP connections
             atomicSub(&g_activeConnections, 1);
@@ -276,20 +252,48 @@ int guarded_close_np(int fd, void *guard) {
     return g_guarded_close_np(fd, guard);
 }
 
-EXPORTON
-int shutdown(int sockfd, int how) {
-    if (g_shutdown == NULL) {
-        log("ERROR: shutdown:NULL\n", sockfd);
+EXPORTOFF
+int close_nocancel(int fd) {
+    if (g_close_nocancel == NULL) {
+        scopeLog("ERROR: close_nocancel:NULL\n", fd);
         return -1;
     }
 
-    log("shutdown\n", sockfd);
+    if (g_netinfo && (g_netinfo[fd].fd == fd)) {
+        scopeLog("close_nocancel\n", fd);
+        if (g_netinfo[fd].listen == TRUE) {
+            // Gauge tracking number of open ports
+            atomicSub(&g_openPorts, 1);
+            doOpenPorts(fd);
+            scopeLog("close:sub port\n", fd);
+        } else if (g_netinfo[fd].accept == TRUE) {
+            // Gauge tracking number of active TCP connections
+            atomicSub(&g_activeConnections, 1);
+            //doActiveConns(fd);
+        }
+
+        memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
+    }
+
+    return g_close_nocancel(fd);
+}
+
+#endif // __MACOS__
+
+EXPORTON
+int shutdown(int sockfd, int how) {
+    if (g_shutdown == NULL) {
+        scopeLog("ERROR: shutdown:NULL\n", sockfd);
+        return -1;
+    }
+
+    scopeLog("shutdown\n", sockfd);
     if (g_netinfo && (g_netinfo[sockfd].fd == sockfd)) {
         if (g_netinfo[sockfd].listen == TRUE) {
             // Gauge tracking number of open ports
             atomicSub(&g_openPorts, 1);
             doOpenPorts(sockfd);
-            log("shutdown:sub port\n", sockfd);
+            scopeLog("shutdown:sub port\n", sockfd);
         } else if (g_netinfo[sockfd].accept == TRUE) {
             // Gauge tracking number of active TCP connections
             atomicSub(&g_activeConnections, 1);
@@ -303,37 +307,10 @@ int shutdown(int sockfd, int how) {
 }
 
 EXPORTOFF
-int close_nocancel(int fd) {
-    if (g_close_nocancel == NULL) {
-        log("ERROR: close_nocancel:NULL\n", fd);
-        return -1;
-    }
-
-    if (g_netinfo && (g_netinfo[fd].fd == fd)) {
-        log("close_nocancel\n", fd);
-        if (g_netinfo[fd].listen == TRUE) {
-            // Gauge tracking number of open ports
-            atomicSub(&g_openPorts, 1);
-            doOpenPorts(fd);
-            log("close:sub port\n", fd);
-        } else if (g_netinfo[fd].accept == TRUE) {
-            // Gauge tracking number of active TCP connections
-            atomicSub(&g_activeConnections, 1);
-            //doActiveConns(fd);
-        }
-
-        memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
-    }
-
-    return g_close_nocancel(fd);
-}
-
-EXPORTOFF
 ssize_t write(int fd, const void *buf, size_t count)
 {
     if (g_write == NULL) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "write:NULL", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: write:NULL\n", fd);
         return -1;
     }
 
@@ -343,11 +320,10 @@ ssize_t write(int fd, const void *buf, size_t count)
         char metric[strlen(STATSD_WRITE) + 16];
         
         if (snprintf(metric, sizeof(metric), STATSD_WRITE, (int)count) <= 0) {
-            g_ops.interpose_errors++;
-            strncpy((char *)g_ops.errMsg, "write:snprintf", sizeof(g_ops.errMsg));
+            scopeLog("ERROR: write: snprintf\n", fd);
+        } else {
+            postMetric(metric);
         }
-        
-        postMetric(metric);
     }
 
     return g_write(fd, buf, count);
@@ -358,22 +334,17 @@ ssize_t read(int fd, void *buf, size_t count)
 {
     char metric[strlen(STATSD_READ) + 16];
     
-    if (g_sock == 0) {
-        initSocket();
-    }
-    
     if (g_read == NULL) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "read:NULL", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: read:NULL\n", fd);
         return -1;
     }
 
     if (snprintf(metric, sizeof(metric), STATSD_READ, (int)count) <= 0) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "read:snprintf", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: read:snprintf\n", fd);
+    } else {
+        postMetric(metric);
     }
     
-    postMetric(metric);
     return g_read(fd, buf, count);
 }
 
@@ -382,24 +353,17 @@ void vsyslog(int priority, const char *format, va_list ap)
 {
     char metric[strlen(STATSD_VSYSLOG)];
     
-    if (g_sock == 0) {
-        initSocket();
-    }
-
-    if (DEBUG == 3) write(STDOUT_FILENO, "vsyslog\n", 8);
-
     if (g_vsyslog == NULL) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "vsyslog:NULL", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: vsyslog:NULL\n", -1);
         return;
     }
 
     if (snprintf(metric, sizeof(metric), STATSD_VSYSLOG) <= 0) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "vsyslog:snprintf", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: vsyslog:NULL\n", -1);
+    } else {
+        postMetric(metric);
     }
     
-    postMetric(metric);
     g_vsyslog(priority, format, ap);
     return;
 }
@@ -410,13 +374,12 @@ int socket(int socket_family, int socket_type, int protocol)
     int sd;
     
     if (g_socket == NULL) {
-        log("ERROR: socket:NULL\n", -1);
+        scopeLog("ERROR: socket:NULL\n", -1);
         return -1;
     }
 
     sd = g_socket(socket_family, socket_type, protocol);
     if (sd != -1) {
-        log("Socket\n", sd);
         addSock(sd, socket_type);
         
         if (g_netinfo &&
@@ -446,20 +409,13 @@ int socket(int socket_family, int socket_type, int protocol)
 EXPORTON
 int listen(int sockfd, int backlog)
 {
-    if (g_sock == 0) {
-        initSocket();
-    }
-    
-    if (DEBUG == 5) write(STDOUT_FILENO, "listen\n", 7);
-
     if (g_listen == NULL) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "listen:NULL", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: listen:NULL\n", -1);
         return -1;
     }
 
     // Tracking number of open ports
-    //atomicAdd(&g_openPorts, 1);
+    atomicAdd(&g_openPorts, 1);
 
     if (g_netinfo && (g_netinfo[sockfd].fd == sockfd)) {
         doOpenPorts(sockfd);
@@ -471,15 +427,8 @@ int listen(int sockfd, int backlog)
 EXPORTON
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
-    if (g_sock == 0) {
-        initSocket();
-    }
-    
-    if (DEBUG == 12) write(STDOUT_FILENO, "listen\n", 7);
-
     if (g_bind == NULL) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "bind:NULL", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: bind:NULL\n", -1);
         return -1;
     }
 
@@ -499,24 +448,16 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 {
     char metric[strlen(STATSD_SEND) + 16];
 
-    if (g_sock == 0) {
-        initSocket();
-    }
-    
-    if (DEBUG == 6) write(STDOUT_FILENO, "send\n", 5);
-
     if (g_send == NULL) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "send:NULL", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: send:NULL\n", -1);
         return -1;
     }
 
     if (snprintf(metric, sizeof(metric), STATSD_SEND, (int)len) <= 0) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "send:snprintf", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: send:snprintf\n", -1);
+    } else {
+        postMetric(metric);
     }
-    
-    postMetric(metric);
 
     return g_send(sockfd, buf, len, flags);
 }
@@ -525,11 +466,8 @@ EXPORTOFF
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
                const struct sockaddr *dest_addr, socklen_t addrlen)
 {
-    if (DEBUG == 7) write(STDOUT_FILENO, "sendto\n", 7);
-
     if (g_sendto == NULL) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "sendto:NULL", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: sendto:NULL\n", -1);
         return -1;
     }
 
@@ -537,11 +475,10 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
         char metric[strlen(STATSD_SENDTO) + 16];
 
         if (snprintf(metric, sizeof(metric), STATSD_SENDTO, (int)len) <= 0) {
-            g_ops.interpose_errors++;
-            strncpy((char *)g_ops.errMsg, "sendto:snprintf", sizeof(g_ops.errMsg));
+            scopeLog("ERROR: sendto:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-    
-        postMetric(metric);
     }
 
     return g_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
@@ -550,11 +487,8 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
 EXPORTOFF
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
 {
-    if (DEBUG == 8) write(STDOUT_FILENO, "sendmsg\n", 8);
-
     if (g_sendmsg == NULL) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "sendmsg:NULL", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: sendmsg:NULL\n", -1);
         return -1;
     }
 
@@ -562,11 +496,10 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
         char metric[strlen(STATSD_SENDMSG) + 16];
 
         if (snprintf(metric, sizeof(metric), STATSD_SENDMSG) <= 0) {
-            g_ops.interpose_errors++;
-            strncpy((char *)g_ops.errMsg, "sendmsg:snprintf", sizeof(g_ops.errMsg));
+            scopeLog("ERROR: sendmsg:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-    
-        postMetric(metric);
     }
 
     return g_sendmsg(sockfd, msg, flags);
@@ -575,11 +508,8 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
 EXPORTOFF
 ssize_t recv(int sockfd, void *buf, size_t len, int flags)
 {
-    if (DEBUG == 9) write(STDOUT_FILENO, "recv\n", 5);
-
     if (g_recv == NULL) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "recv:NULL", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: recv:NULL\n", -1);
         return -1;
     }
 
@@ -587,11 +517,10 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags)
         char metric[strlen(STATSD_RECV) + 16];
 
         if (snprintf(metric, sizeof(metric), STATSD_RECV, (int)len) <= 0) {
-            g_ops.interpose_errors++;
-            strncpy((char *)g_ops.errMsg, "recv:snprintf", sizeof(g_ops.errMsg));
+            scopeLog("ERROR: recv:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-    
-        postMetric(metric);
     }
 
     return g_recv(sockfd, buf, len, flags);
@@ -601,15 +530,8 @@ EXPORTOFF
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
                  struct sockaddr *src_addr, socklen_t *addrlen)
 {
-    if (g_sock == 0) {
-        initSocket();
-    }
-
-    if (DEBUG == 10) write(STDOUT_FILENO, "recvfrom\n", 9);
-
     if (g_recvfrom == NULL) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "recvfrom:NULL", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: recvfrom:NULL\n", -1);
         return -1;
     }
 
@@ -619,11 +541,8 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
 EXPORTOFF
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags)
 {
-    if (DEBUG == 11) write(STDOUT_FILENO, "recvmsg\n", 8);
-
     if (g_recvmsg == NULL) {
-        g_ops.interpose_errors++;
-        strncpy((char *)g_ops.errMsg, "recvmsg:NULL", sizeof(g_ops.errMsg));
+        scopeLog("ERROR: recvmsg:NULL\n", -1);
         return -1;
     }
 

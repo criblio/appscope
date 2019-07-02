@@ -106,7 +106,12 @@ void addSock(int fd, int type)
                 atomicSub(&g_openPorts, 1);
             }
             
+            if (g_activeConnections > 0) {
+                atomicSub(&g_activeConnections, 1);
+            }
+            
             scopeLog("decr\n", g_openPorts);
+            scopeLog("decr conn\n", g_activeConnections);
             return;
         }
         
@@ -167,6 +172,30 @@ void doOpenPorts(int fd)
     postMetric(metric);
 }
 
+static
+void doActiveConns(int fd)
+{
+    char proto[PROTOCOL_STR];
+    char metric[strlen(STATSD_ACTIVECONNS) +
+                sizeof(unsigned int) +
+                strlen(g_hostname) +
+                strlen(g_procname) +
+                PROTOCOL_STR  +
+                sizeof(unsigned int) +
+                sizeof(unsigned int) +
+                sizeof(unsigned int) + 1];
+        
+    getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
+    
+    if (snprintf(metric, sizeof(metric), STATSD_ACTIVECONNS,
+                 g_openPorts, g_procname, getpid(), fd, g_hostname, proto,
+                 g_netinfo[fd].port) <= 0) {
+        scopeLog("ERROR: doActiveConns:snprintf\n", -1);
+    }
+    
+    postMetric(metric);
+}
+
 __attribute__((constructor)) void init(void)
 {
     g_fn.vsyslog = dlsym(RTLD_NEXT, "vsyslog");
@@ -179,6 +208,7 @@ __attribute__((constructor)) void init(void)
     g_fn.accept = dlsym(RTLD_NEXT, "accept");
     g_fn.accept4 = dlsym(RTLD_NEXT, "accept4");
     g_fn.bind = dlsym(RTLD_NEXT, "bind");
+    g_fn.connect = dlsym(RTLD_NEXT, "connect");    
     g_fn.send = dlsym(RTLD_NEXT, "send");
     g_fn.sendto = dlsym(RTLD_NEXT, "sendto");
     g_fn.sendmsg = dlsym(RTLD_NEXT, "sendmsg");
@@ -222,7 +252,8 @@ void doClose(int fd, char *func)
         if (g_netinfo[fd].accept == TRUE) {
             // Gauge tracking number of active TCP connections
             atomicSub(&g_activeConnections, 1);
-            //doActiveConns(fd);
+            scopeLog("decr conn\n", g_activeConnections);
+            doActiveConns(fd);
             scopeLog("decr connection\n", fd);
         }
 
@@ -233,51 +264,75 @@ void doClose(int fd, char *func)
 EXPORTON
 int close(int fd)
 {
+    int rc;
+    
     if (g_fn.close == NULL) {
         scopeLog("ERROR: close:NULL\n", fd);
         return -1;
     }
 
-    doClose(fd, "close\n");
-    return g_fn.close(fd);
+    rc = g_fn.close(fd);
+    if (rc != -1) {
+        doClose(fd, "close\n");
+    }
+    
+    return rc;
 }
 
 #ifdef __MACOS__
 EXPORTON
 int close$NOCANCEL(int fd)
 {
+    int rc;
+    
     if (g_fn.close$NOCANCEL == NULL) {
         scopeLog("ERROR: close$NOCANCEL:NULL\n", fd);
         return -1;
     }
 
-    doClose(fd, "close$NOCANCEL\n");
-    return g_fn.close$NOCANCEL(fd);
+    rc = g_fn.close$NOCANCEL(fd);
+    if (rc != -1) {
+        doClose(fd, "close$NOCANCEL\n");
+    }
+    
+    return rc;
 }
 
 
 EXPORTON
 int guarded_close_np(int fd, void *guard)
 {
+    int rc;
+    
     if (g_fn.guarded_close_np == NULL) {
         scopeLog("ERROR: guarded_close_np:NULL\n", fd);
         return -1;
     }
 
-    doClose(fd, "guarded_close_np\n");
-    return g_fn.guarded_close_np(fd, guard);
+    rc = g_fn.guarded_close_np(fd, guard);
+    if (rc != -1) {
+        doClose(fd, "guarded_close_np\n");
+    }
+    
+    return rc;
 }
 
 EXPORTOFF
 int close_nocancel(int fd)
 {
+    int rc;
+    
     if (g_fn.close_nocancel == NULL) {
         scopeLog("ERROR: close_nocancel:NULL\n", fd);
         return -1;
     }
 
-    doClose(fd, "close_nocancel\n");
-    return g_fn.close_nocancel(fd);
+    rc = g_fn.close_nocancel(fd);
+    if (rc != -1) {
+        doClose(fd, "close_nocancel\n");
+    }
+    
+    return rc;
 }
 
 #endif // __MACOS__
@@ -386,51 +441,85 @@ int socket(int socket_family, int socket_type, int protocol)
 EXPORTON
 int shutdown(int sockfd, int how)
 {
+    int rc;
+    
     if (g_fn.shutdown == NULL) {
         scopeLog("ERROR: shutdown:NULL\n", sockfd);
         return -1;
     }
 
-    doClose(sockfd, "shutdown\n");
-    return g_fn.shutdown(sockfd, how);
+    rc = g_fn.shutdown(sockfd, how);
+    if (rc != -1) {
+        doClose(sockfd, "shutdown\n");
+    }
+    
+    return rc;
 }
 
 EXPORTON
 int listen(int sockfd, int backlog)
 {
+    int rc;
+    
     if (g_fn.listen == NULL) {
         scopeLog("ERROR: listen:NULL\n", -1);
         return -1;
     }
 
-    // Tracking number of open ports
-    atomicAdd(&g_openPorts, 1);
-    scopeLog("incr\n", g_openPorts);
-    scopeLog("listen\n", sockfd);
+    rc = g_fn.listen(sockfd, backlog);
+    if (rc != -1) {
+        scopeLog("listen\n", sockfd);
+        
+        // Tracking number of open ports
+        atomicAdd(&g_openPorts, 1);
+        scopeLog("incr\n", g_openPorts);
+        
+        if (g_netinfo && (g_netinfo[sockfd].fd == sockfd)) {
+            g_netinfo[sockfd].listen = TRUE;
+            g_netinfo[sockfd].accept = TRUE;
+            doOpenPorts(sockfd);
 
-    if (g_netinfo && (g_netinfo[sockfd].fd == sockfd)) {
-        doOpenPorts(sockfd);
+            if (g_netinfo[sockfd].type & SOCK_STREAM) {
+                atomicAdd(&g_activeConnections, 1);
+                g_netinfo[sockfd].accept = TRUE;                            
+                scopeLog("incr conn\n", g_activeConnections);
+                doActiveConns(sockfd);
+            }
+        }
     }
     
-    return g_fn.listen(sockfd, backlog);
+    return rc;
+}
+
+static
+void doGetPort(int sd, const struct sockaddr *addr)
+{
+    if (g_netinfo &&
+        (g_netinfo[sd].fd == sd) &&
+        (addr->sa_family == AF_INET)) {
+        // Deal with IPV6 later
+        g_netinfo[sd].port = ((struct sockaddr_in *)addr)->sin_port;
+    }
 }
 
 static
 void doAccept(int sd, struct sockaddr *addr, char *func)
 {
+
     scopeLog(func, sd);
     addSock(sd, SOCK_STREAM);
-    g_netinfo[sd].listen = TRUE;
-    g_netinfo[sd].accept = TRUE;
-    atomicAdd(&g_openPorts, 1);
-    scopeLog("incr\n", g_openPorts);
-
-    if (addr->sa_family == AF_INET) {
-        // Deal with IPV6 later
-        g_netinfo[sd].port = ((struct sockaddr_in *)addr)->sin_port;
-    }
     
-    doOpenPorts(sd);
+    if (g_netinfo && (g_netinfo[sd].fd == sd)) {
+        g_netinfo[sd].listen = TRUE;
+        g_netinfo[sd].accept = TRUE;
+        atomicAdd(&g_openPorts, 1);
+        atomicAdd(&g_activeConnections, 1);
+        scopeLog("incr conn\n", g_activeConnections);
+        scopeLog("incr\n", g_openPorts);
+        doGetPort(sd, addr);
+        doOpenPorts(sd);
+        doActiveConns(sd);
+    }
 }
 
 EXPORTON
@@ -472,19 +561,50 @@ int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
 EXPORTON
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
+    int rc;
+    
     if (g_fn.bind == NULL) {
         scopeLog("ERROR: bind:NULL\n", -1);
         return -1;
     }
 
-    if (g_netinfo && (g_netinfo[sockfd].fd == sockfd) &&
-        (addr->sa_family == AF_INET)) {
-        // Deal with IPV6 later
-        g_netinfo[sockfd].port = ((struct sockaddr_in *)addr)->sin_port;
+    rc = g_fn.bind(sockfd, addr, addrlen);
+    if (rc != -1) { 
+        doGetPort(sockfd, addr);
         scopeLog("bind\n", sockfd);
     }
     
-    return g_fn.bind(sockfd, addr, addrlen);
+    return rc;
+
+}
+
+EXPORTON
+int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+{
+    int rc;
+    
+    if (g_fn.connect == NULL) {
+        scopeLog("ERROR: connect:NULL\n", -1);
+        return -1;
+    }
+
+    rc = g_fn.connect(sockfd, addr, addrlen);
+    if ((rc != -1) &&
+        (g_netinfo) &&
+        (g_netinfo[sockfd].fd == sockfd)) {
+        doGetPort(sockfd, addr);
+        g_netinfo[sockfd].accept = TRUE;
+
+        if (g_netinfo[sockfd].type & SOCK_STREAM) {
+            atomicAdd(&g_activeConnections, 1);
+            g_netinfo[sockfd].accept = TRUE;            
+            scopeLog("incr conn\n", g_activeConnections);
+            doActiveConns(sockfd);
+        }
+        scopeLog("connect\n", sockfd);
+    }
+    
+    return rc;
 
 }
 
@@ -571,16 +691,23 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags)
     return g_fn.recv(sockfd, buf, len, flags);
 }
 
-EXPORTOFF
+EXPORTON
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
                  struct sockaddr *src_addr, socklen_t *addrlen)
 {
+    ssize_t rc;
+    
     if (g_fn.recvfrom == NULL) {
         scopeLog("ERROR: recvfrom:NULL\n", -1);
         return -1;
     }
 
-    return g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+    rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+    if (rc != -1) {
+        doGetPort(sockfd, src_addr);
+    }
+    
+    return rc;
 }
 
 EXPORTOFF

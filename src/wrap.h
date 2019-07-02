@@ -41,6 +41,7 @@
 #define MAX_PROCNAME 128
 
 #define STATSD_OPENPORTS "net.port:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
+#define STATSD_ACTIVECONNS "net.conn:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
 
 /*
  * NOTE: The following constants are ALL going away
@@ -84,6 +85,7 @@ typedef struct interposed_funcs_t {
     int (*socket)(int, int, int);
     int (*listen)(int, int);
     int (*bind)(int, const struct sockaddr *, socklen_t);
+    int (*connect)(int, const struct sockaddr *, socklen_t);
     int (*accept)(int, struct sockaddr *, socklen_t *);
     int (*accept4)(int, struct sockaddr *, socklen_t *, int);
     ssize_t (*read)(int, void *, size_t);
@@ -100,7 +102,6 @@ typedef struct interposed_funcs_t {
     int (*close$NOCANCEL)(int);
     int (*close_nocancel)(int);
     int (*guarded_close_np)(int, void *);
-    int (*open_socket)(int type, const char *, size_t);
 } interposed_funcs;
     
 static inline void atomicAdd(int *ptr, int val) {

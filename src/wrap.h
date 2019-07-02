@@ -1,3 +1,6 @@
+#ifndef _CONFIG_H_
+#define _CONFIG_H_
+
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stddef.h>
@@ -27,8 +30,8 @@
 #define EXPORTON __attribute__((visibility("default")))
 
 // Use these only if a config file is not accesible
-#define PORT 8888 //8125
-#define SERVER "127.0.0.1"
+#define PORT 8125
+#define SERVER "172.16.198.1" //"127.0.0.1"
 
 // Initial size of net array for state
 #define NET_ENTRIES 1024
@@ -74,6 +77,32 @@ typedef struct net_info_t {
     in_port_t port;
 } net_info;
 
+typedef struct interposed_funcs_t {
+    void (*vsyslog)(int, const char *, va_list);
+    int (*close)(int);
+    int (*shutdown)(int, int);
+    int (*socket)(int, int, int);
+    int (*listen)(int, int);
+    int (*bind)(int, const struct sockaddr *, socklen_t);
+    int (*accept)(int, struct sockaddr *, socklen_t *);
+    int (*accept4)(int, struct sockaddr *, socklen_t *, int);
+    ssize_t (*read)(int, void *, size_t);
+    ssize_t (*write)(int, const void *, size_t);
+    ssize_t (*send)(int, const void *, size_t, int);
+    ssize_t (*sendto)(int, const void *, size_t, int,
+                              const struct sockaddr *, socklen_t);
+    ssize_t (*sendmsg)(int, const struct msghdr *, int);
+    ssize_t (*recv)(int, void *, size_t, int);
+    ssize_t (*recvfrom)(int sockfd, void *buf, size_t len, int flags,
+                                struct sockaddr *src_addr, socklen_t *addrlen);
+    ssize_t (*recvmsg)(int, struct msghdr *, int);
+    // macOS
+    int (*close$NOCANCEL)(int);
+    int (*close_nocancel)(int);
+    int (*guarded_close_np)(int, void *);
+    int (*open_socket)(int type, const char *, size_t);
+} interposed_funcs;
+    
 static inline void atomicAdd(int *ptr, int val) {
     (void)__sync_add_and_fetch(ptr, val);
 }
@@ -85,42 +114,6 @@ static inline void atomicSub(int *ptr, int val)
 
 extern int close$NOCANCEL(int);
 extern int guarded_close_np(int, void *);
-    
-static void (*g_vsyslog)(int, const char *, va_list);
-static int (*g_close)(int);
-static int (*g_close$NOCANCEL)(int);
-static int (*g_close_nocancel)(int);
-static int (*g_guarded_close_np)(int, void *);
-static int (*g_shutdown)(int, int);
-static int (*g_socket)(int, int, int);
-static int (*g_listen)(int, int);
-static int (*g_bind)(int, const struct sockaddr *, socklen_t);
-static ssize_t (*g_read)(int, void *, size_t);
-static ssize_t (*g_write)(int, const void *, size_t);
-static ssize_t (*g_send)(int, const void *, size_t, int);
-static ssize_t (*g_sendto)(int, const void *, size_t, int,
-                              const struct sockaddr *, socklen_t);
-static ssize_t (*g_sendmsg)(int, const struct msghdr *, int);
-static ssize_t (*g_recv)(int, void *, size_t, int);
-static ssize_t (*g_recvfrom)(int sockfd, void *buf, size_t len, int flags,
-                                struct sockaddr *src_addr, socklen_t *addrlen);
-static ssize_t (*g_recvmsg)(int, struct msghdr *, int);
-
 extern int osGetProcname(char *, int);
 
-static int g_sock = 0;
-static struct sockaddr_in g_saddr;
-static operations_info g_ops;
-static net_info *g_netinfo;
-static int g_numNinfo;
-static char g_hostname[MAX_HOSTNAME];
-static char g_procname[MAX_PROCNAME];
-static int g_openPorts = 0;
-static int g_activeConnections = 0;
-
-// These need to come from a config file
-#define LOG_FILE 1  // eventually an enum for file, syslog, shared memory 
-static bool g_log = TRUE;
-static const char g_logFile[] = "/tmp/scope.log";
-static unsigned int g_logOp = LOG_FILE;
-static int g_logfd = -1;
+#endif // _CONFIG_H_

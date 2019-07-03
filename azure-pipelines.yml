@@ -19,7 +19,7 @@ jobs:
   - task: ShellScript@2
     displayName: Install dependencies
     inputs:
-      scriptPath ./install_build_tools.sh
+      scriptPath: ./install_build_tools.sh
   - script: make all
     displayName: Build all
   - script: make test

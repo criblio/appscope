@@ -1,6 +1,6 @@
 
 CWD=$(shell pwd)
-PLATFORM=$(shell "$(CWD)"/platform)
+PLATFORM=$(shell "$(CWD)"/scope.sh platform)
 
 ifeq ($(PLATFORM),Linux)
 	include os/linux/Makefile

@@ -9,7 +9,7 @@
 
 echo "Running install_build_tools.sh."
 
-PLATFORM=$(./platform)
+PLATFORM=$(./scope.sh platform)
 if [ ${PLATFORM} = "Error" ]; then
     echo "Exiting.  install_build_tools.sh does not support this platform type."
     exit 1

@@ -1,0 +1,25 @@
+
+bs:
+- job: BuildBaseExe
+  timeoutInMinutes: 120
+  strategy:
+    matrix:
+      linux:
+        imageName: 'ubuntu-16.04'
+      mac:
+        imageName: 'macos-10.13'
+#      windows_2017:
+#        imageName: 'vs2017-win2016'
+#      windows_2015:
+#        imageName: 'vs2017-win2016'
+#      alpine:
+#        imageName: 'ubuntu-16.04'
+  pool:
+    vmImage: $(imageName)
+  steps:
+  - script: install_build_tools.sh
+    displayName: Install dependencies
+  - script: make all
+    displayName: Build all
+  - script: make test
+    displayName: Run tests

@@ -44,13 +44,10 @@
 #define STATSD_OPENPORTS "net.port:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
 #define STATSD_ACTIVECONNS "net.conn:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
 
-//#ifdef __MACOS__
-//#define STATSD_PROCMEM "proc.mem:%llu|g|#proc:%s,pid:%d,host:%s\n"
-//#define STATSD_PROCCPU "proc.cpu:%llu|g|#proc:%s,pid:%d,host:%s\n"
-//#else
 #define STATSD_PROCMEM "proc.mem:%lu|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCPU "proc.cpu:%lu|g|#proc:%s,pid:%d,host:%s\n"
-//#endif // __MACOS__
+#define STATSD_PROCTHREAD "proc.thread:%d|g|#proc:%s,pid:%d,host:%s\n"
+
 /*
  * NOTE: The following constants are ALL going away
  * They were used for initial signs of life in OSX
@@ -74,7 +71,8 @@ enum metric_t {
     OPEN_PORTS,
     ACTIVE_CONNECTIONS,
     PROC_CPU,
-    PROC_MEM
+    PROC_MEM,
+    PROC_THREAD
 };
 
 typedef struct operations_info_t {

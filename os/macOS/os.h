@@ -11,3 +11,4 @@
 #include <sys/resource.h>
 
 extern int osGetProcname(char *, size_t);
+extern int osGetNumThreads(pid_t);

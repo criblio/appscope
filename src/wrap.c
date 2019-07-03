@@ -190,6 +190,25 @@ void doProcMetric(enum metric_t type, long measurement)
     }
     break;
 
+    case PROC_THREAD:
+    {
+        char metric[strlen(STATSD_PROCTHREAD) +
+                    sizeof(int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    sizeof(unsigned int) + 1];
+        if (snprintf(metric, sizeof(metric), STATSD_PROCTHREAD,
+                     (int)measurement,
+                     g_procname,
+                     getpid(),
+                     g_hostname) <= 0) {
+            scopeLog("ERROR: doProcMetric:THREAD:snprintf\n", -1);
+        }
+        scopeLog(metric, -1);
+        postMetric(metric);
+    }
+    break;
+
     default:
         scopeLog("ERROR: doMetric:metric type\n", -1);
     }
@@ -275,6 +294,7 @@ void *
 periodic(void *arg)
 {
     long cpu, mem;
+    int nthread;
 
     while (1) {
         cpu = doGetProcCPU(getpid());
@@ -282,6 +302,9 @@ periodic(void *arg)
         
         mem = doGetProcMem(getpid());
         doProcMetric(PROC_MEM, mem);
+
+        nthread = osGetNumThreads(getpid());
+        doProcMetric(PROC_THREAD, nthread);
 
         // Needs to be defined in a config file
         sleep(10);
@@ -334,6 +357,13 @@ __attribute__((constructor)) void init(void)
     }
 
     scopeLog("Constructor\n", -1);
+    {
+        int nthread;
+
+        nthread = osGetNumThreads(getpid());
+        scopeLog("Threads\n", nthread);
+        //doProcMetric(PROC_THREAD, nthread);
+    }
 }
 
 static

@@ -1,5 +1,4 @@
-
-bs:
+jobs:
 - job: BuildBaseExe
   timeoutInMinutes: 120
   strategy:

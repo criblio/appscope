@@ -15,6 +15,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 #ifdef __MACOS__
 #include "../os/macOS/os.h"
@@ -43,6 +44,13 @@
 #define STATSD_OPENPORTS "net.port:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
 #define STATSD_ACTIVECONNS "net.conn:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
 
+//#ifdef __MACOS__
+//#define STATSD_PROCMEM "proc.mem:%llu|g|#proc:%s,pid:%d,host:%s\n"
+//#define STATSD_PROCCPU "proc.cpu:%llu|g|#proc:%s,pid:%d,host:%s\n"
+//#else
+#define STATSD_PROCMEM "proc.mem:%lu|g|#proc:%s,pid:%d,host:%s\n"
+#define STATSD_PROCCPU "proc.cpu:%lu|g|#proc:%s,pid:%d,host:%s\n"
+//#endif // __MACOS__
 /*
  * NOTE: The following constants are ALL going away
  * They were used for initial signs of life in OSX
@@ -61,6 +69,13 @@
 #ifndef bool
 typedef unsigned int bool;
 #endif
+
+enum metric_t {
+    OPEN_PORTS,
+    ACTIVE_CONNECTIONS,
+    PROC_CPU,
+    PROC_MEM
+};
 
 typedef struct operations_info_t {
     unsigned int udp_blocks;
@@ -115,6 +130,5 @@ static inline void atomicSub(int *ptr, int val)
 
 extern int close$NOCANCEL(int);
 extern int guarded_close_np(int, void *);
-extern int osGetProcname(char *, int);
 
 #endif // _CONFIG_H_

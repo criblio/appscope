@@ -149,6 +149,53 @@ int getProtocol(int type, char *proto, size_t len)
 }
 
 static
+void doProcMetric(enum metric_t type, long measurement)
+{
+    switch (type) {
+    case PROC_CPU:
+    {
+        char metric[strlen(STATSD_PROCCPU) +
+                    sizeof(long) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    sizeof(unsigned int) + 1];
+        if (snprintf(metric, sizeof(metric), STATSD_PROCCPU,
+                     measurement,
+                     g_procname,
+                     getpid(),
+                     g_hostname) <= 0) {
+            scopeLog("ERROR: doProcMetric:CPU:snprintf\n", -1);
+        }
+        scopeLog(metric, -1);
+        postMetric(metric);
+    }
+    break;
+
+    case PROC_MEM:
+    {
+        char metric[strlen(STATSD_PROCMEM) +
+                    sizeof(long) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    sizeof(unsigned int) + 1];
+        if (snprintf(metric, sizeof(metric), STATSD_PROCMEM,
+                     measurement,
+                     g_procname,
+                     getpid(),
+                     g_hostname) <= 0) {
+            scopeLog("ERROR: doProcMetric:MEM:snprintf\n", -1);
+        }
+        scopeLog(metric, -1);
+        postMetric(metric);
+    }
+    break;
+
+    default:
+        scopeLog("ERROR: doMetric:metric type\n", -1);
+    }
+}
+
+static
 void doOpenPorts(int fd)
 {
     char proto[PROTOCOL_STR];
@@ -196,8 +243,55 @@ void doActiveConns(int fd)
     postMetric(metric);
 }
 
+// Return process specific CPU usage in microseconds
+long doGetProcCPU(pid_t pid) {
+    struct rusage ruse;
+    
+    if (getrusage(RUSAGE_SELF, &ruse) != 0) {
+        return (long)-1;
+    }
+
+    return (long)((ruse.ru_utime.tv_sec * (1024 * 1024)) + ruse.ru_utime.tv_usec) +
+        ((ruse.ru_stime.tv_sec * (1024 * 1024)) + ruse.ru_stime.tv_usec);
+}
+
+// Return process specific memory usage in kilobytes
+long doGetProcMem(pid_t pid) {
+    struct rusage ruse;
+    
+    if (getrusage(RUSAGE_SELF, &ruse) != 0) {
+        return (long)-1;
+    }
+
+    // macOS returns bytes, Linux returns kilobytes
+#ifdef __MACOS__    
+    return ruse.ru_maxrss / 1024;
+#else
+    return ruse.ru_maxrss;
+#endif // __MACOS__        
+}
+
+void *
+periodic(void *arg)
+{
+    long cpu, mem;
+
+    while (1) {
+        cpu = doGetProcCPU(getpid());
+        doProcMetric(PROC_CPU, cpu);
+        
+        mem = doGetProcMem(getpid());
+        doProcMetric(PROC_MEM, mem);
+
+        // Needs to be defined in a config file
+        sleep(10);
+    }
+}
+
 __attribute__((constructor)) void init(void)
 {
+    pthread_t periodicTID;
+    
     g_fn.vsyslog = dlsym(RTLD_NEXT, "vsyslog");
     g_fn.close = dlsym(RTLD_NEXT, "close");
     g_fn.read = dlsym(RTLD_NEXT, "read");
@@ -234,6 +328,11 @@ __attribute__((constructor)) void init(void)
     osGetProcname(g_procname, sizeof(g_procname));
         
     initSocket();
+
+    if (pthread_create(&periodicTID, NULL, periodic, NULL) != 0) {
+        scopeLog("ERROR: Constructor:pthread_create\n", -1);
+    }
+
     scopeLog("Constructor\n", -1);
 }
 

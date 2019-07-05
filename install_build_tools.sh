@@ -28,7 +28,7 @@ FAILED=0
 #      Homebrew 2.1.6
 #      autoconf (GNU Autoconf) 2.69
 #      automake (GNU automake) 1.16.1
-#      Apple Inc. version cctools-927.0.2
+#      glibtool (GNU libtool) 2.4.6
 #      cmake version 3.14.5
 #      lcov: LCOV version 1.14
 #
@@ -94,22 +94,22 @@ macOS_automake_install() {
     fi
 }
 
-macOS_libtool_exists() {
-    if libtool -V &>/dev/null; then
-        echo "libtool is already installed; doing nothing for libtool."
+macOS_glibtool_exists() {
+    if glibtool --version &>/dev/null; then
+        echo "glibtool is already installed; doing nothing for glibtool."
     else
-        echo "libtool is not already installed."
+        echo "glibtool is not already installed."
         return 1
     fi
 }
 
-macOS_libtool_install() {
-    echo "Installing libtool."
+macOS_glibtool_install() {
+    echo "Installing glibtool."
     brew install libtool
     if [ $? = 0 ]; then
-        echo "Installation of libtool successful."
+        echo "Installation of glibtool successful."
     else
-        echo "Installation of libtool failed."
+        echo "Installation of glibtool failed."
         FAILED=1
     fi
 }
@@ -160,7 +160,7 @@ macOS_dump_versions() {
     brew --version | head -n1 | sed 's/^/      /'
     autoconf --version | head -n1 | sed 's/^/      /'
     automake --version | head -n1 | sed 's/^/      /'
-    libtool -V | head -n1 | sed 's/^/      /'
+    glibtool --version | head -n1 | sed 's/^/      /'
     cmake --version | head -n1 | sed 's/^/      /'
     lcov --version | head -n1 | sed 's/^/      /'
 }
@@ -175,8 +175,8 @@ if [ ${PLATFORM} = "macOS" ]; then
     if ! macOS_automake_exists; then
         macOS_automake_install
     fi
-    if ! macOS_libtool_exists; then
-        macOS_libtool_install
+    if ! macOS_glibtool_exists; then
+        macOS_glibtool_install
     fi
     if ! macOS_cmake_exists; then
         macOS_cmake_install

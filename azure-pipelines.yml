@@ -4,11 +4,11 @@ jobs:
   strategy:
     matrix:
       ubuntu:
-        imageName: 'ubuntu-18.04'
-      centos:
-        imageName: 'OpenLogic:CentOS:7.5:latest'
+        imageName: 'ubuntu-16.04'
       mac:
         imageName: 'macos-10.14'
+      centos:
+        containerImage: 'OpenLogic:CentOS:7.5:latest'
 #      windows_2017:
 #        imageName: 'vs2017-win2016'
 #      windows_2015:
@@ -17,6 +17,7 @@ jobs:
 #        imageName: 'ubuntu-16.04'
   pool:
     vmImage: $(imageName)
+  container: $[ variables['containerImage'] ]
   steps:
   - task: ShellScript@2
     displayName: Install dependencies

@@ -17,7 +17,7 @@ jobs:
 #        imageName: 'ubuntu-16.04'
   pool:
     vmImage: $(imageName)
-  container: $[ variables['containerImage'] ]
+  container: OpenLogic:CentOS:7.5:latest
   steps:
   - task: ShellScript@2
     displayName: Install dependencies

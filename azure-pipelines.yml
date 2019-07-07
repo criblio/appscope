@@ -3,8 +3,10 @@ jobs:
   timeoutInMinutes: 120
   strategy:
     matrix:
-      linux:
-        imageName: 'ubuntu-16.04'
+      ubuntu:
+        imageName: 'ubuntu-18.04'
+      centos:
+        imageName: 'OpenLogic:CentOS:7.5:latest'
       mac:
         imageName: 'macos-10.14'
 #      windows_2017:

@@ -201,6 +201,7 @@ fi
 #  This was originally developed and tested on CentOS with:
 #      CentOS Linux release 7.6.1810 (Core) 
 #      yum 3.4.3
+#      Sudo version 1.8.23
 #      autoconf (GNU Autoconf) 2.69
 #      automake (GNU automake) 1.13.4
 #      libtool (GNU libtool) 2.4.2
@@ -219,6 +220,26 @@ linux_determine_pkg_mgr() {
         return 1
     fi
     return 0
+}
+
+yum_sudo_exists() {
+    if sudo --version &>/dev/null; then
+        echo "sudo is already installed; doing nothing for sudo."
+    else
+        echo "sudo is not already installed."
+        return 1
+    fi
+}
+
+yum_sudo_install() {
+    echo "Installing sudo."
+    yum install sudo
+    if [ $? = 0 ]; then
+        echo "Installation of sudo successful."
+    else
+        echo "Installation of sudo failed."
+        FAILED=1
+    fi
 }
 
 yum_autoconf_exists() {
@@ -325,7 +346,7 @@ yum_lcov_install() {
     if [ $? = 0 ]; then
         echo "Installation of lcov successful."
     else
-        echo "Installation of lcov."
+        echo "Installation of lcov failed."
         FAILED=1
     fi
 }
@@ -341,6 +362,7 @@ yum_dump_versions() {
         grep PRETTY_NAME /etc/os-release | cut -d \" -f2 |  sed 's/^/      /'
     fi
     yum --version | head -n1 | sed 's/^/      yum /'
+    sudo --version | head -n1 | sed 's/^/      /'
     autoconf --version | head -n1 | sed 's/^/      /'
     automake --version | head -n1 | sed 's/^/      /'
     libtool --version | head -n1 | sed 's/^/      /'
@@ -351,6 +373,9 @@ yum_dump_versions() {
 yum_install() {
     echo "Running the yum install."
 
+    if ! yum_sudo_exists; then
+        yum_sudo_install
+    fi
     if ! yum_autoconf_exists; then
         yum_autoconf_install
     fi
@@ -383,12 +408,33 @@ yum_install() {
 #  This was originally developed and tested on ubuntu with:
 #      Ubuntu 18.04.2 LTS
 #      apt 1.6.11 (amd64)
+#      Sudo version 1.8.21p2
 #      GNU Make 4.1
 #      autoconf (GNU Autoconf) 2.69
 #      libtool (GNU libtool) 2.4.6
 #      cmake version 3.10.2
 #      lcov: LCOV version 1.13
 #
+
+apt_sudo_exists() {
+    if sudo --version &>/dev/null; then
+        echo "sudo is already installed; doing nothing for sudo."
+    else
+        echo "sudo is not already installed."
+        return 1
+    fi
+}
+
+apt_sudo_install() {
+    echo "Installing sudo."
+    apt-get update && apt-get install sudo
+    if [ $? = 0 ]; then
+        echo "Installation of sudo successful."
+    else
+        echo "Installation of sudo failed."
+        FAILED=1
+    fi
+}
 
 apt_make_exists() {
     if make --version &>/dev/null; then
@@ -405,7 +451,7 @@ apt_make_install() {
     if [ $? = 0 ]; then
         echo "Installation of make successful."
     else
-        echo "Installation of make."
+        echo "Installation of make failed."
         FAILED=1
     fi
 }
@@ -425,7 +471,7 @@ apt_autoconf_install() {
     if [ $? = 0 ]; then
         echo "Installation of autoconf successful."
     else
-        echo "Installation of autoconf."
+        echo "Installation of autoconf failed."
         FAILED=1
     fi
 }
@@ -445,7 +491,7 @@ apt_libtool_install() {
     if [ $? = 0 ]; then
         echo "Installation of libtool successful."
     else
-        echo "Installation of libtool."
+        echo "Installation of libtool failed."
         FAILED=1
     fi
 }
@@ -465,7 +511,7 @@ apt_cmake_install() {
     if [ $? = 0 ]; then
         echo "Installation of cmake successful."
     else
-        echo "Installation of cmake."
+        echo "Installation of cmake failed."
         FAILED=1
     fi
 }
@@ -485,7 +531,7 @@ apt_lcov_install() {
     if [ $? = 0 ]; then
         echo "Installation of lcov successful."
     else
-        echo "Installation of lcov."
+        echo "Installation of lcov failed."
         FAILED=1
     fi
 }
@@ -498,6 +544,7 @@ apt_dump_versions() {
         grep DISTRIB_DESCRIPTION /etc/lsb-release | cut -d \" -f2 | sed 's/^/      /'
     fi
     apt-get --version | head -n1 | sed 's/^/      /'
+    sudo --version | head -n1 | sed 's/^/      /'
     make --version | head -n1 | sed 's/^/      /'
     autoconf --version | head -n1 | sed 's/^/      /'
     libtool --version | head -n1 | sed 's/^/      /'
@@ -508,6 +555,9 @@ apt_dump_versions() {
 apt_install() {
     echo "Running the apt-get install."
 
+    if ! apt_sudo_exists; then
+        apt_sudo_install
+    fi
     if ! apt_make_exists; then
         apt_make_install
     fi

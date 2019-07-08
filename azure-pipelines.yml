@@ -1,6 +1,6 @@
 jobs:
-- job: BuildBaseExe
-  timeoutInMinutes: 120
+- job: BuildInVM
+  timeoutInMinutes: 10
   strategy:
     matrix:
       ubuntu:
@@ -24,3 +24,17 @@ jobs:
     displayName: Build all
   - script: make test
     displayName: Run tests
+- job: BuildInContainer
+  timeoutInMinutes: 10
+  pool:
+    vmImage: 'ubuntu-16.04'
+  strategy:
+    matrix:
+      centos:
+        containerImage: OpenLogic:CentOS:7.5:latest
+      ubuntu1804:
+        containerImage: Canonical:UbuntuServer:18.04-LTS:latest
+  container: $[ variables['containerImage'] ]
+  steps:
+  - script: ./scope.sh build
+    displayName: scope.sh build

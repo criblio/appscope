@@ -1,0 +1,40 @@
+jobs:
+- job: BuildInVM
+  timeoutInMinutes: 10
+  strategy:
+    matrix:
+      ubuntu16_04:
+        imageName: 'ubuntu-16.04'
+      mac10_14:
+        imageName: 'macos-10.14'
+#      windows_2017:
+#        imageName: 'vs2017-win2016'
+#      windows_2015:
+#        imageName: 'vs2017-win2016'
+#      alpine:
+#        imageName: 'ubuntu-16.04'
+  pool:
+    vmImage: $(imageName)
+  steps:
+  - task: ShellScript@2
+    displayName: Install dependencies
+    inputs:
+      scriptPath: ./install_build_tools.sh
+  - script: make all
+    displayName: Build all
+  - script: make test
+    displayName: Run tests
+- job: BuildInContainer
+  timeoutInMinutes: 10
+  pool:
+    vmImage: 'ubuntu-16.04'
+  strategy:
+    matrix:
+      centos7_6:
+        containerImage: centos:centos7.6.1810 #https://hub.docker.com/_/centos/
+      ubuntu18_04:
+        containerImage: ubuntu:bionic-20190612 #https://hub.docker.com/_/ubuntu/
+  container: $[ variables['containerImage'] ]
+  steps:
+  - script: ./scope.sh build
+    displayName: scope.sh build

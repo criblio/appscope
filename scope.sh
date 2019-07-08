@@ -62,7 +62,7 @@ install_sudo() {
         "yum")
             if ! sudo --version &>/dev/null; then
                 echo "Install of sudo is required."
-                if yum install sudo; then
+                if su -c "yum install sudo"; then
                     echo "Install of sudo was successful."
                 else
                     echo "Install of sudo was unsuccessful.  Exiting."
@@ -73,7 +73,7 @@ install_sudo() {
         "apt-get")
             if ! sudo --version &>/dev/null; then
                 echo "Install of sudo is required."
-                if apt-get update && apt-get install sudo; then
+                if su -c "apt-get update && apt-get install sudo"; then
                     echo "Install of sudo was successful."
                 else
                     echo "Install of sudo was unsuccesful.  Exiting."

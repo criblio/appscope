@@ -57,6 +57,36 @@ platform_and_pkgmgr_defined() {
     return 0
 }
 
+install_sudo() {
+    case $PKG_MGR in
+        "yum")
+            if ! sudo --version &>/dev/null; then
+                echo "Install of sudo is required."
+                if yum install sudo; then
+                    echo "Install of sudo was successful."
+                else
+                    echo "Install of sudo was unsuccessful.  Exiting."
+                    exit 1
+                fi
+            fi
+            ;;
+        "apt-get")
+            if ! sudo --version &>/dev/null; then
+                echo "Install of sudo is required."
+                if apt-get update && apt-get install sudo; then
+                    echo "Install of sudo was successful."
+                else
+                    echo "Install of sudo was unsuccesful.  Exiting."
+                    exit 1
+                fi
+            fi
+            ;;
+        "brew")
+            ;;
+    esac
+    return 0
+}
+
 install_git() {
     case $PKG_MGR in
         "yum")
@@ -163,6 +193,7 @@ build_scope() {
         fi
     fi
     platform_and_pkgmgr_defined
+    install_sudo
     install_git
     clone_scope
     install_build_tools

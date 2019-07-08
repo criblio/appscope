@@ -17,3 +17,15 @@ int osGetNumThreads(pid_t pid)
 
     return task.pti_threadnum;
 }
+
+int osGetNumFds(pid_t pid)
+{
+    int bufferSize = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, 0, 0);
+    return bufferSize / PROC_PIDLISTFD_SIZE;
+}
+
+int osGetNumChildProcs(pid_t pid)
+{
+    int bufferSize = proc_listchildpids(pid, (void *)NULL, 0);
+    return bufferSize / PROC_PIDTASKINFO_SIZE;
+}

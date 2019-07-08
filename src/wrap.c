@@ -209,6 +209,44 @@ void doProcMetric(enum metric_t type, long measurement)
     }
     break;
 
+    case PROC_FD:
+    {
+        char metric[strlen(STATSD_PROCFD) +
+                    sizeof(int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    sizeof(unsigned int) + 1];
+        if (snprintf(metric, sizeof(metric), STATSD_PROCFD,
+                     (int)measurement,
+                     g_procname,
+                     getpid(),
+                     g_hostname) <= 0) {
+            scopeLog("ERROR: doProcMetric:FD:snprintf\n", -1);
+        }
+        scopeLog(metric, -1);
+        postMetric(metric);
+    }
+    break;
+
+    case PROC_CHILD:
+    {
+        char metric[strlen(STATSD_PROCCHILD) +
+                    sizeof(int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    sizeof(unsigned int) + 1];
+        if (snprintf(metric, sizeof(metric), STATSD_PROCCHILD,
+                     (int)measurement,
+                     g_procname,
+                     getpid(),
+                     g_hostname) <= 0) {
+            scopeLog("ERROR: doProcMetric:CHILD:snprintf\n", -1);
+        }
+        scopeLog(metric, -1);
+        postMetric(metric);
+    }
+    break;
+
     default:
         scopeLog("ERROR: doMetric:metric type\n", -1);
     }
@@ -294,18 +332,25 @@ void *
 periodic(void *arg)
 {
     long cpu, mem;
-    int nthread;
+    int nthread, nfds, children;
+    pid_t pid = getpid();
 
     while (1) {
-        cpu = doGetProcCPU(getpid());
+        cpu = doGetProcCPU(pid);
         doProcMetric(PROC_CPU, cpu);
         
-        mem = doGetProcMem(getpid());
+        mem = doGetProcMem(pid);
         doProcMetric(PROC_MEM, mem);
 
-        nthread = osGetNumThreads(getpid());
+        nthread = osGetNumThreads(pid);
         doProcMetric(PROC_THREAD, nthread);
 
+        nfds = osGetNumFds(pid);
+        doProcMetric(PROC_FD, nfds);
+
+        children = osGetNumChildProcs(pid);
+        doProcMetric(PROC_CHILD, children);
+                
         // Needs to be defined in a config file
         sleep(10);
     }
@@ -357,13 +402,6 @@ __attribute__((constructor)) void init(void)
     }
 
     scopeLog("Constructor\n", -1);
-    {
-        int nthread;
-
-        nthread = osGetNumThreads(getpid());
-        scopeLog("Threads\n", nthread);
-        //doProcMetric(PROC_THREAD, nthread);
-    }
 }
 
 static

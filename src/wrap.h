@@ -47,6 +47,8 @@
 #define STATSD_PROCMEM "proc.mem:%lu|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCPU "proc.cpu:%lu|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCTHREAD "proc.thread:%d|g|#proc:%s,pid:%d,host:%s\n"
+#define STATSD_PROCFD "proc.fd:%d|g|#proc:%s,pid:%d,host:%s\n"
+#define STATSD_PROCCHILD "proc.child:%d|g|#proc:%s,pid:%d,host:%s\n"
 
 /*
  * NOTE: The following constants are ALL going away
@@ -72,7 +74,9 @@ enum metric_t {
     ACTIVE_CONNECTIONS,
     PROC_CPU,
     PROC_MEM,
-    PROC_THREAD
+    PROC_THREAD,
+    PROC_FD,
+    PROC_CHILD
 };
 
 typedef struct operations_info_t {

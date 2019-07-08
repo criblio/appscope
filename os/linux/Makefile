@@ -1,7 +1,7 @@
 
 CC=gcc
 CFLAGS=-fPIC -shared -g -Wall -D__LINUX__
-LD_FLAGS=-ldl
+LD_FLAGS=-ldl -lpthread
 
 .PHONY: all test
 all: libwrap.so

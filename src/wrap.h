@@ -30,10 +30,6 @@
 #define EXPORTOFF  __attribute__((visibility("hidden")))
 #define EXPORTON __attribute__((visibility("default")))
 
-// Use these only if a config file is not accesible
-#define PORT 8125
-#define SERVER "172.16.198.1" //"127.0.0.1"
-
 // Initial size of net array for state
 #define NET_ENTRIES 1024
 #define MAX_FDS 4096

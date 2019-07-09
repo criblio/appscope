@@ -1,4 +1,5 @@
 #include "wrap.h"
+#include "cfg.h"
 
 static int g_sock = 0;
 static struct sockaddr_in g_saddr;
@@ -43,10 +44,15 @@ void scopeLog(char *msg, int fd)
 }
 
 static
-void initSocket(void)
+void initSocket(config_t* cfg)
 {
     int flags;
-    char server[sizeof(SERVER) + 1];
+
+    // JRC TBD: We eventually need to support UNIX, FILE, and SYSLOG too...
+    if (cfgOutTransportType(cfg) != CFG_UDP) {
+        scopeLog("initSocket: unsupported TransportType\n", -1);
+        return;
+    }
 
     // Create a UDP socket
     g_sock = g_fn.socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -59,12 +65,10 @@ void initSocket(void)
     fcntl(g_sock, F_SETFL, flags | O_NONBLOCK);
 
     // Create the address to send to
-    strncpy(server, SERVER, sizeof(SERVER));
-        
     memset(&g_saddr, 0, sizeof(g_saddr));
     g_saddr.sin_family = AF_INET;
-    g_saddr.sin_port = htons(PORT);
-    if (inet_aton(server, &g_saddr.sin_addr) == 0) {
+    g_saddr.sin_port = htons(cfgOutTransportPort(cfg));
+    if (inet_aton(cfgOutTransportHost(cfg), &g_saddr.sin_addr) == 0) {
         scopeLog("ERROR: initSocket:inet_aton\n", -1);
     }
 }
@@ -74,8 +78,10 @@ void postMetric(const char *metric)
 {
     ssize_t rc;
 
-    if (g_fn.socket == 0) {
-        initSocket();
+    if (!g_fn.socket) {
+        // initSocket must have failed during the constructor
+        scopeLog("postMetric: uninitialized socket\n", -1);
+        return;
     }
 
     scopeLog((char *)metric, -1);
@@ -394,8 +400,11 @@ __attribute__((constructor)) void init(void)
     }
 
     osGetProcname(g_procname, sizeof(g_procname));
-        
-    initSocket();
+
+    // JRC TBD: Don't just hardcode the config file path... use env variable too
+    config_t* cfg = cfgRead("./conf/scope.cfg");
+    initSocket(cfg);
+    cfgDestroy(&cfg);
 
     if (pthread_create(&periodicTID, NULL, periodic, NULL) != 0) {
         scopeLog("ERROR: Constructor:pthread_create\n", -1);

@@ -38,11 +38,12 @@
 #define NET_ENTRIES 1024
 #define MAX_FDS 4096
 #define PROTOCOL_STR 8
-#define MAX_HOSTNAME 128
+#define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
 
 #define STATSD_OPENPORTS "net.port:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
-#define STATSD_ACTIVECONNS "net.conn:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
+#define STATSD_TCPCONNS "net.tcp:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
+#define STATSD_ACTIVECONNS "net.conn:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
 
 #define STATSD_PROCMEM "proc.mem:%lu|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCPU "proc.cpu:%lu|g|#proc:%s,pid:%d,host:%s\n"
@@ -71,6 +72,7 @@ typedef unsigned int bool;
 
 enum metric_t {
     OPEN_PORTS,
+    TCP_CONNECTIONS,
     ACTIVE_CONNECTIONS,
     PROC_CPU,
     PROC_MEM,

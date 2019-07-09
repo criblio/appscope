@@ -1,5 +1,7 @@
 #include "wrap.h"
 
+interposed_funcs g_fn;
+
 static int g_sock = 0;
 static struct sockaddr_in g_saddr;
 static operations_info g_ops;
@@ -8,8 +10,8 @@ static int g_numNinfo;
 static char g_hostname[MAX_HOSTNAME];
 static char g_procname[MAX_PROCNAME];
 static int g_openPorts = 0;
+static int g_TCPConnections = 0;
 static int g_activeConnections = 0;
-static interposed_funcs g_fn;
 
 // These need to come from a config file
 #define LOG_FILE 1  // eventually an enum for file, syslog, shared memory 
@@ -92,6 +94,9 @@ void postMetric(const char *metric)
                 g_ops.udp_errors++;
             }
         }
+
+        //DEBUG: config
+        scopeLog((char *)metric, -1);
     }
 }
 
@@ -106,12 +111,12 @@ void addSock(int fd, int type)
                 atomicSub(&g_openPorts, 1);
             }
             
-            if (g_activeConnections > 0) {
-                atomicSub(&g_activeConnections, 1);
+            if (g_TCPConnections > 0) {
+                atomicSub(&g_TCPConnections, 1);
             }
             
             scopeLog("decr\n", g_openPorts);
-            scopeLog("decr conn\n", g_activeConnections);
+            scopeLog("decr conn\n", g_TCPConnections);
             return;
         }
         
@@ -165,9 +170,9 @@ void doProcMetric(enum metric_t type, long measurement)
                      getpid(),
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:CPU:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-        scopeLog(metric, -1);
-        postMetric(metric);
     }
     break;
 
@@ -184,9 +189,9 @@ void doProcMetric(enum metric_t type, long measurement)
                      getpid(),
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:MEM:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-        scopeLog(metric, -1);
-        postMetric(metric);
     }
     break;
 
@@ -203,9 +208,9 @@ void doProcMetric(enum metric_t type, long measurement)
                      getpid(),
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:THREAD:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-        scopeLog(metric, -1);
-        postMetric(metric);
     }
     break;
 
@@ -222,9 +227,9 @@ void doProcMetric(enum metric_t type, long measurement)
                      getpid(),
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:FD:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-        scopeLog(metric, -1);
-        postMetric(metric);
     }
     break;
 
@@ -241,63 +246,91 @@ void doProcMetric(enum metric_t type, long measurement)
                      getpid(),
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:CHILD:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-        scopeLog(metric, -1);
-        postMetric(metric);
     }
     break;
 
     default:
-        scopeLog("ERROR: doMetric:metric type\n", -1);
+        scopeLog("ERROR: doProcMetric:metric type\n", -1);
     }
 }
 
 static
-void doOpenPorts(int fd)
+void doNetMetric(enum metric_t type, int fd)
 {
     char proto[PROTOCOL_STR];
-    char metric[strlen(STATSD_OPENPORTS) +
-                sizeof(unsigned int) +
-                strlen(g_hostname) +
-                strlen(g_procname) +
-                PROTOCOL_STR  +
-                sizeof(unsigned int) +
-                sizeof(unsigned int) +
-                sizeof(unsigned int) + 1];
-        
-    getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
-    
-    if (snprintf(metric, sizeof(metric), STATSD_OPENPORTS,
-                 g_openPorts, g_procname, getpid(), fd, g_hostname, proto,
-                 g_netinfo[fd].port) <= 0) {
-        scopeLog("ERROR: doOpenPorts:snprintf\n", -1);
-    }
-    
-    postMetric(metric);
-}
 
-static
-void doActiveConns(int fd)
-{
-    char proto[PROTOCOL_STR];
-    char metric[strlen(STATSD_ACTIVECONNS) +
-                sizeof(unsigned int) +
-                strlen(g_hostname) +
-                strlen(g_procname) +
-                PROTOCOL_STR  +
-                sizeof(unsigned int) +
-                sizeof(unsigned int) +
-                sizeof(unsigned int) + 1];
-        
     getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
-    
-    if (snprintf(metric, sizeof(metric), STATSD_ACTIVECONNS,
-                 g_openPorts, g_procname, getpid(), fd, g_hostname, proto,
-                 g_netinfo[fd].port) <= 0) {
-        scopeLog("ERROR: doActiveConns:snprintf\n", -1);
+
+    switch (type) {
+    case OPEN_PORTS:
+    {
+        char metric[strlen(STATSD_OPENPORTS) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    PROTOCOL_STR  +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) + 1];
+            
+        if (snprintf(metric, sizeof(metric), STATSD_OPENPORTS,
+                     g_openPorts, g_procname, getpid(), fd, g_hostname, proto,
+                     g_netinfo[fd].port) <= 0) {
+            scopeLog("ERROR: doNetMetric:OPENPORTS:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
     }
-    
-    postMetric(metric);
+
+    case TCP_CONNECTIONS:
+    {
+        char metric[strlen(STATSD_TCPCONNS) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    PROTOCOL_STR  +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) + 1];
+            
+        if (snprintf(metric, sizeof(metric), STATSD_TCPCONNS,
+                     g_TCPConnections, g_procname, getpid(), fd, g_hostname, proto,
+                     g_netinfo[fd].port) <= 0) {
+            scopeLog("ERROR: doNetMetric:TCPCONNS:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
+    }
+
+    case ACTIVE_CONNECTIONS:
+    {
+        char metric[strlen(STATSD_ACTIVECONNS) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    PROTOCOL_STR  +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) + 1];
+            
+        if (snprintf(metric, sizeof(metric), STATSD_ACTIVECONNS,
+                     g_activeConnections, g_procname, getpid(), fd, g_hostname, proto,
+                     g_netinfo[fd].port) <= 0) {
+            scopeLog("ERROR: doNetMetric:ACTIVECONNS:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
+    }
+
+    default:
+        scopeLog("ERROR: doNetMetric:metric type\n", -1);
+    }
 }
 
 // Return process specific CPU usage in microseconds
@@ -412,15 +445,15 @@ void doClose(int fd, char *func)
         if (g_netinfo[fd].listen == TRUE) {
             // Gauge tracking number of open ports
             atomicSub(&g_openPorts, 1);
-            doOpenPorts(fd);
+            doNetMetric(OPEN_PORTS, fd);
             scopeLog("decr port\n", fd);
         }
 
         if (g_netinfo[fd].accept == TRUE) {
             // Gauge tracking number of active TCP connections
-            atomicSub(&g_activeConnections, 1);
-            scopeLog("decr conn\n", g_activeConnections);
-            doActiveConns(fd);
+            atomicSub(&g_TCPConnections, 1);
+            scopeLog("decr conn\n", g_TCPConnections);
+            doNetMetric(TCP_CONNECTIONS, fd);
             scopeLog("decr connection\n", fd);
         }
 
@@ -598,7 +631,7 @@ int socket(int socket_family, int socket_type, int protocol)
              * a UDP socket is closed we say the port is closed
              */
             g_netinfo[sd].listen = TRUE;
-            doOpenPorts(sd);
+            doNetMetric(OPEN_PORTS, sd);
         }
     }
 
@@ -644,13 +677,13 @@ int listen(int sockfd, int backlog)
         if (g_netinfo && (g_netinfo[sockfd].fd == sockfd)) {
             g_netinfo[sockfd].listen = TRUE;
             g_netinfo[sockfd].accept = TRUE;
-            doOpenPorts(sockfd);
+            doNetMetric(OPEN_PORTS, sockfd);
 
             if (g_netinfo[sockfd].type & SOCK_STREAM) {
-                atomicAdd(&g_activeConnections, 1);
+                atomicAdd(&g_TCPConnections, 1);
                 g_netinfo[sockfd].accept = TRUE;                            
-                scopeLog("incr conn\n", g_activeConnections);
-                doActiveConns(sockfd);
+                scopeLog("incr conn\n", g_TCPConnections);
+                doNetMetric(TCP_CONNECTIONS, sockfd);
             }
         }
     }
@@ -680,12 +713,14 @@ void doAccept(int sd, struct sockaddr *addr, char *func)
         g_netinfo[sd].listen = TRUE;
         g_netinfo[sd].accept = TRUE;
         atomicAdd(&g_openPorts, 1);
+        atomicAdd(&g_TCPConnections, 1);
         atomicAdd(&g_activeConnections, 1);
-        scopeLog("incr conn\n", g_activeConnections);
+        scopeLog("incr conn\n", g_TCPConnections);
         scopeLog("incr\n", g_openPorts);
         doGetPort(sd, addr);
-        doOpenPorts(sd);
-        doActiveConns(sd);
+        doNetMetric(OPEN_PORTS, sd);
+        doNetMetric(TCP_CONNECTIONS, sd);
+        doNetMetric(ACTIVE_CONNECTIONS, sd);
     }
 }
 
@@ -761,12 +796,13 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
         (g_netinfo[sockfd].fd == sockfd)) {
         doGetPort(sockfd, addr);
         g_netinfo[sockfd].accept = TRUE;
+        atomicAdd(&g_activeConnections, 1);
+        doNetMetric(ACTIVE_CONNECTIONS, sockfd);
 
         if (g_netinfo[sockfd].type & SOCK_STREAM) {
-            atomicAdd(&g_activeConnections, 1);
-            g_netinfo[sockfd].accept = TRUE;            
-            scopeLog("incr conn\n", g_activeConnections);
-            doActiveConns(sockfd);
+            atomicAdd(&g_TCPConnections, 1);
+            scopeLog("incr conn\n", g_TCPConnections);
+            doNetMetric(TCP_CONNECTIONS, sockfd);
         }
         scopeLog("connect\n", sockfd);
     }

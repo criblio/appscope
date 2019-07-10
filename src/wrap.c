@@ -12,6 +12,8 @@ static char g_procname[MAX_PROCNAME];
 static int g_openPorts = 0;
 static int g_TCPConnections = 0;
 static int g_activeConnections = 0;
+static int g_netrx = 0;
+//static int g_nettx = 0;
 
 // These need to come from a config file
 #define LOG_FILE 1  // eventually an enum for file, syslog, shared memory 
@@ -80,7 +82,6 @@ void postMetric(const char *metric)
         initSocket();
     }
 
-    scopeLog((char *)metric, -1);
     if (g_fn.sendto) {
         rc = g_fn.sendto(g_sock, metric, strlen(metric), 0, 
                          (struct sockaddr *)&g_saddr, sizeof(g_saddr));
@@ -131,7 +132,6 @@ void addSock(int fd, int type)
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].fd = fd;
         g_netinfo[fd].type = type;
-        scopeLog("addSock\n", fd);
     }
 }
 
@@ -142,10 +142,19 @@ int getProtocol(int type, char *proto, size_t len)
         return -1;
     }
     
-    if (type & SOCK_STREAM) {
+    if (type == SOCK_STREAM) {
         strncpy(proto, "TCP", len);
-    } else if (type & SOCK_DGRAM) {
+    } else if (type == SOCK_DGRAM) {
         strncpy(proto, "UDP", len);
+    } else if (type == SCOPE_UNIX) {
+        // added, not a socket type, want to know if it's a UNIX socket
+        strncpy(proto, "UNIX", len);
+    } else if (type == SOCK_RAW) {
+        strncpy(proto, "RAW", len);
+    } else if (type == SOCK_RDM) {
+        strncpy(proto, "RDM", len);
+    } else if (type == SOCK_SEQPACKET) {
+        strncpy(proto, "SEQPACKET", len);
     } else {
         strncpy(proto, "OTHER", len);
     }
@@ -278,7 +287,7 @@ void doNetMetric(enum metric_t type, int fd)
             
         if (snprintf(metric, sizeof(metric), STATSD_OPENPORTS,
                      g_openPorts, g_procname, getpid(), fd, g_hostname, proto,
-                     g_netinfo[fd].port) <= 0) {
+                     g_netinfo[fd].localPort) <= 0) {
             scopeLog("ERROR: doNetMetric:OPENPORTS:snprintf\n", -1);
         } else {
             postMetric(metric);
@@ -299,7 +308,7 @@ void doNetMetric(enum metric_t type, int fd)
             
         if (snprintf(metric, sizeof(metric), STATSD_TCPCONNS,
                      g_TCPConnections, g_procname, getpid(), fd, g_hostname, proto,
-                     g_netinfo[fd].port) <= 0) {
+                     g_netinfo[fd].localPort) <= 0) {
             scopeLog("ERROR: doNetMetric:TCPCONNS:snprintf\n", -1);
         } else {
             postMetric(metric);
@@ -320,8 +329,36 @@ void doNetMetric(enum metric_t type, int fd)
             
         if (snprintf(metric, sizeof(metric), STATSD_ACTIVECONNS,
                      g_activeConnections, g_procname, getpid(), fd, g_hostname, proto,
-                     g_netinfo[fd].port) <= 0) {
+                     g_netinfo[fd].localPort) <= 0) {
             scopeLog("ERROR: doNetMetric:ACTIVECONNS:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
+    }
+
+    case NETRX:
+    {
+        char data[16];
+        char metric[strlen(STATSD_NETRX) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    PROTOCOL_STR  +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) + 1];
+
+        if ((g_netinfo[fd].localPort == 443) || (g_netinfo[fd].remotePort == 443)) {
+            strncpy(data, "ssl", sizeof(data));
+        } else {
+            strncpy(data, "clear", sizeof(data));
+        }
+        
+        if (snprintf(metric, sizeof(metric), STATSD_NETRX,
+                     g_netrx, g_procname, getpid(), fd, g_hostname, proto,
+                     g_netinfo[fd].localPort, g_netinfo[fd].remotePort, data) <= 0) {
+            scopeLog("ERROR: doNetMetric:NETRX:snprintf\n", -1);
         } else {
             postMetric(metric);
         }
@@ -334,6 +371,7 @@ void doNetMetric(enum metric_t type, int fd)
 }
 
 // Return process specific CPU usage in microseconds
+static
 long doGetProcCPU(pid_t pid) {
     struct rusage ruse;
     
@@ -346,6 +384,7 @@ long doGetProcCPU(pid_t pid) {
 }
 
 // Return process specific memory usage in kilobytes
+static
 long doGetProcMem(pid_t pid) {
     struct rusage ruse;
     
@@ -361,8 +400,50 @@ long doGetProcMem(pid_t pid) {
 #endif // __MACOS__        
 }
 
-void *
-periodic(void *arg)
+static
+void doSetPort(int sd, const struct sockaddr *addr, bool local)
+{
+    if (g_netinfo && (g_netinfo[sd].fd == sd)) {
+        if (addr->sa_family == AF_INET) {
+            if (local == TRUE) {
+                g_netinfo[sd].localPort = ((struct sockaddr_in *)addr)->sin_port;
+            } else {
+                g_netinfo[sd].remotePort = ((struct sockaddr_in *)addr)->sin_port;
+            }
+        } else if (addr->sa_family == AF_INET6) {
+            if (local == TRUE) {
+                g_netinfo[sd].localPort = ((struct sockaddr_in6 *)addr)->sin6_port;
+            } else {
+                g_netinfo[sd].remotePort = ((struct sockaddr_in6 *)addr)->sin6_port;
+            } // else port # is 0
+        }
+    }
+}
+
+static
+void doAccept(int sd, struct sockaddr *addr, char *func)
+{
+
+    scopeLog(func, sd);
+    addSock(sd, SOCK_STREAM);
+    
+    if (g_netinfo && (g_netinfo[sd].fd == sd)) {
+        g_netinfo[sd].listen = TRUE;
+        g_netinfo[sd].accept = TRUE;
+        atomicAdd(&g_openPorts, 1);
+        atomicAdd(&g_TCPConnections, 1);
+        atomicAdd(&g_activeConnections, 1);
+        scopeLog("incr conn\n", g_TCPConnections);
+        scopeLog("incr\n", g_openPorts);
+        doSetPort(sd, addr, FALSE);
+        doNetMetric(OPEN_PORTS, sd);
+        doNetMetric(TCP_CONNECTIONS, sd);
+        doNetMetric(ACTIVE_CONNECTIONS, sd);
+    }
+}
+
+static
+void * periodic(void *arg)
 {
     long cpu, mem;
     int nthread, nfds, children;
@@ -387,6 +468,8 @@ periodic(void *arg)
         // Needs to be defined in a config file
         sleep(10);
     }
+
+    return NULL;
 }
 
 __attribute__((constructor)) void init(void)
@@ -415,6 +498,7 @@ __attribute__((constructor)) void init(void)
     g_fn.close$NOCANCEL = dlsym(RTLD_NEXT, "close$NOCANCEL");
     g_fn.close_nocancel = dlsym(RTLD_NEXT, "close_nocancel");
     g_fn.guarded_close_np = dlsym(RTLD_NEXT, "guarded_close_np");
+    g_fn.accept$NOCANCEL = dlsym(RTLD_NEXT, "accept$NOCANCEL");
 #endif // __MACOS__
 
     if ((g_netinfo = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
@@ -533,6 +617,24 @@ int close_nocancel(int fd)
     }
     
     return rc;
+}
+
+EXPORTON
+int accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+{
+    int sd;
+    
+    if (g_fn.accept$NOCANCEL == NULL) {
+        scopeLog("ERROR: accept$NOCANCEL:NULL\n", -1);
+        return -1;
+    }
+
+    sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
+    if (sd != -1) {
+        doAccept(sd, addr, "accept$NOCANCEL\n");
+    }
+
+    return sd;
 }
 
 #endif // __MACOS__
@@ -691,39 +793,6 @@ int listen(int sockfd, int backlog)
     return rc;
 }
 
-static
-void doGetPort(int sd, const struct sockaddr *addr)
-{
-    if (g_netinfo &&
-        (g_netinfo[sd].fd == sd) &&
-        (addr->sa_family == AF_INET)) {
-        // Deal with IPV6 later
-        g_netinfo[sd].port = ((struct sockaddr_in *)addr)->sin_port;
-    }
-}
-
-static
-void doAccept(int sd, struct sockaddr *addr, char *func)
-{
-
-    scopeLog(func, sd);
-    addSock(sd, SOCK_STREAM);
-    
-    if (g_netinfo && (g_netinfo[sd].fd == sd)) {
-        g_netinfo[sd].listen = TRUE;
-        g_netinfo[sd].accept = TRUE;
-        atomicAdd(&g_openPorts, 1);
-        atomicAdd(&g_TCPConnections, 1);
-        atomicAdd(&g_activeConnections, 1);
-        scopeLog("incr conn\n", g_TCPConnections);
-        scopeLog("incr\n", g_openPorts);
-        doGetPort(sd, addr);
-        doNetMetric(OPEN_PORTS, sd);
-        doNetMetric(TCP_CONNECTIONS, sd);
-        doNetMetric(ACTIVE_CONNECTIONS, sd);
-    }
-}
-
 EXPORTON
 int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
@@ -772,7 +841,7 @@ int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
     rc = g_fn.bind(sockfd, addr, addrlen);
     if (rc != -1) { 
-        doGetPort(sockfd, addr);
+        doSetPort(sockfd, addr, TRUE);
         scopeLog("bind\n", sockfd);
     }
     
@@ -782,6 +851,7 @@ int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
 EXPORTON
 int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+
 {
     int rc;
     
@@ -794,7 +864,7 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     if ((rc != -1) &&
         (g_netinfo) &&
         (g_netinfo[sockfd].fd == sockfd)) {
-        doGetPort(sockfd, addr);
+        doSetPort(sockfd, addr, TRUE);
         g_netinfo[sockfd].accept = TRUE;
         atomicAdd(&g_activeConnections, 1);
         doNetMetric(ACTIVE_CONNECTIONS, sockfd);
@@ -873,25 +943,89 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
     return g_fn.sendmsg(sockfd, msg, flags);
 }
 
-EXPORTOFF
+static
+int doRecv(int sockfd, ssize_t rc)
+{
+    atomicAdd(&g_netrx, rc);
+    if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
+        struct sockaddr addr;
+        socklen_t addrlen = sizeof(struct sockaddr);
+        
+        // We missed an accept...most likely
+        // Or.. we are a child proc that inherited a socket
+        if (getsockname(sockfd, &addr, &addrlen) != -1) {
+            if ((addr.sa_family == AF_INET) || (addr.sa_family == AF_INET6)) {
+                addSock(sockfd, SOCK_STREAM);
+            } else if (addr.sa_family == AF_UNIX) {
+                // added, not a socket type, want to know if it's a UNIX socket
+                addSock(sockfd, SCOPE_UNIX);
+            } else {
+                // is RAW a viable default?
+                addSock(sockfd, SOCK_RAW);
+            }
+            doSetPort(sockfd, &addr, TRUE);
+        } else {
+            addSock(sockfd, SOCK_RAW);
+        }
+        
+        addrlen = sizeof(struct sockaddr);
+        if (getpeername(sockfd, &addr, &addrlen) != -1) {
+            doSetPort(sockfd, &addr, FALSE);
+        }
+    }
+
+    doNetMetric(NETRX, sockfd);
+    return 0;
+}
+
+EXPORTON
 ssize_t recv(int sockfd, void *buf, size_t len, int flags)
 {
+    ssize_t rc;
+    
     if (g_fn.recv == NULL) {
         scopeLog("ERROR: recv:NULL\n", -1);
         return -1;
     }
 
-    if (g_sock != 0) {
-        char metric[strlen(STATSD_RECV) + 16];
+    scopeLog("recv\n", sockfd);
+    rc = g_fn.recv(sockfd, buf, len, flags);
+    if (rc != -1) {
+        doRecv(sockfd, rc);
+/*
+        atomicAdd(&g_netrx, rc);
+        if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
+            struct sockaddr addr;
+            socklen_t addrlen = sizeof(struct sockaddr);
+            
+            // We missed an accept...most likely
+            // Or.. we are a child proc that inherited a socket
+            if (getsockname(sockfd, &addr, &addrlen) != -1) {
+                if ((addr.sa_family == AF_INET) || (addr.sa_family == AF_INET6)) {
+                    addSock(sockfd, SOCK_STREAM);
+                } else if (addr.sa_family == AF_UNIX) {
+                    // added, not a socket type, want to know if it's a UNIX socket
+                    addSock(sockfd, SCOPE_UNIX);
+                } else {
+                    // is RAW a viable default?
+                    addSock(sockfd, SOCK_RAW);
+                }
+                doSetPort(sockfd, &addr, TRUE);
+            } else {
+                addSock(sockfd, SOCK_RAW);
+            }
 
-        if (snprintf(metric, sizeof(metric), STATSD_RECV, (int)len) <= 0) {
-            scopeLog("ERROR: recv:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+            addrlen = sizeof(struct sockaddr);
+            if (getpeername(sockfd, &addr, &addrlen) != -1) {
+                doSetPort(sockfd, &addr, FALSE);
+            }
+        
+            doNetMetric(NETRX, sockfd);
         }
+*/
     }
-
-    return g_fn.recv(sockfd, buf, len, flags);
+    
+    return rc;
 }
 
 EXPORTON
@@ -905,21 +1039,45 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
         return -1;
     }
 
+    scopeLog("recvfrom\n", sockfd);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
-        doGetPort(sockfd, src_addr);
+        atomicAdd(&g_netrx, rc);
+        if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
+            // We missed an accept...most likely
+            // Or.. we are a child proc that inherited a socket
+            if ((src_addr->sa_family == AF_INET) || (src_addr->sa_family == AF_INET6)) {
+                addSock(sockfd, SOCK_DGRAM);
+            } else if (src_addr->sa_family == AF_UNIX) {
+                // added, not a socket type, want to know if it's a UNIX socket
+                addSock(sockfd, SCOPE_UNIX);
+            } else {
+                // is RAW a viable default?
+                addSock(sockfd, SOCK_RAW);
+            }
+        }
+
+        doSetPort(sockfd, src_addr, FALSE);
+        doNetMetric(NETRX, sockfd);
     }
-    
     return rc;
 }
 
-EXPORTOFF
+EXPORTON
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags)
 {
+    ssize_t rc;
+    
     if (g_fn.recvmsg == NULL) {
         scopeLog("ERROR: recvmsg:NULL\n", -1);
         return -1;
     }
 
-    return g_fn.recvmsg(sockfd, msg, flags);
+    scopeLog("recvmsg\n", sockfd);
+    rc = g_fn.recvmsg(sockfd, msg, flags);
+    if (rc != -1) {
+        doRecv(sockfd, rc);
+    }
+    
+    return rc;
 }

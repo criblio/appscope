@@ -40,10 +40,12 @@
 #define PROTOCOL_STR 8
 #define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
+#define SCOPE_UNIX 99
 
 #define STATSD_OPENPORTS "net.port:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
 #define STATSD_TCPCONNS "net.tcp:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
 #define STATSD_ACTIVECONNS "net.conn:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
+#define STATSD_NETRX "net.rx:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,localp:%d,remotep:%d,data:%s,\n"
 
 #define STATSD_PROCMEM "proc.mem:%lu|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCPU "proc.cpu:%lu|g|#proc:%s,pid:%d,host:%s\n"
@@ -78,7 +80,9 @@ enum metric_t {
     PROC_MEM,
     PROC_THREAD,
     PROC_FD,
-    PROC_CHILD
+    PROC_CHILD,
+    NETRX,
+    NETTX
 };
 
 typedef struct operations_info_t {
@@ -94,7 +98,8 @@ typedef struct net_info_t {
     int type;
     bool listen;
     bool accept;
-    in_port_t port;
+    in_port_t localPort;
+    in_port_t remotePort;
 } net_info;
 
 typedef struct interposed_funcs_t {
@@ -107,6 +112,7 @@ typedef struct interposed_funcs_t {
     int (*connect)(int, const struct sockaddr *, socklen_t);
     int (*accept)(int, struct sockaddr *, socklen_t *);
     int (*accept4)(int, struct sockaddr *, socklen_t *, int);
+    int (*accept$NOCANCEL)(int, struct sockaddr *, socklen_t *);
     ssize_t (*read)(int, void *, size_t);
     ssize_t (*write)(int, const void *, size_t);
     ssize_t (*send)(int, const void *, size_t, int);

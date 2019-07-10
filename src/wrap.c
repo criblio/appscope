@@ -49,7 +49,7 @@ void initSocket(config_t* cfg)
     int flags;
 
     // JRC TBD: We eventually need to support UNIX, FILE, and SYSLOG too...
-    if (cfgOutTransportType(cfg) != CFG_UDP) {
+    if (cfgTransportType(cfg, CFG_OUT) != CFG_UDP) {
         scopeLog("initSocket: unsupported TransportType\n", -1);
         return;
     }
@@ -67,8 +67,8 @@ void initSocket(config_t* cfg)
     // Create the address to send to
     memset(&g_saddr, 0, sizeof(g_saddr));
     g_saddr.sin_family = AF_INET;
-    g_saddr.sin_port = htons(cfgOutTransportPort(cfg));
-    if (inet_aton(cfgOutTransportHost(cfg), &g_saddr.sin_addr) == 0) {
+    g_saddr.sin_port = htons(cfgTransportPort(cfg, CFG_OUT));
+    if (inet_aton(cfgTransportHost(cfg, CFG_OUT), &g_saddr.sin_addr) == 0) {
         scopeLog("ERROR: initSocket:inet_aton\n", -1);
     }
 }

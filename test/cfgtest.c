@@ -5,36 +5,21 @@
 
 #include "test.h"
 
-// gcc -g cfgtest.c cfg.c ./libyaml/src/.libs/libyaml.a -o cfgtest && ./cfgtest
-// or to remove one dependency (and the ability to read yaml files)
-// gcc -g cfgtest.c cfg.c -DNO_YAML -o cfgtest && ./cfgtest
-
-// with cmocka now:
-// gcc -Wall -g -o test/macOS/cfgtest -I./src -I./contrib/libyaml/include -Icontrib/cmocka/include test/cfgtest.c src/cfg.c contrib/libyaml/src/.libs/libyaml.a -lcmocka -L contrib/cmocka/build/src/
-// DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/macOS/cfgtest
-//
-// Coverage:
-// brew install lcov
-// <build with gcc options "-O0 -coverage">
-// lcov --capture --directory . --output-file coverage.info
-// genhtml coverage.info --output-directory out
-// file:///Users/cribl/scope/out/index.html
-
 static void
 verifyDefaults(config_t* config)
 {
     assert_int_equal       (cfgOutFormat(config), CFG_EXPANDED_STATSD);
     assert_null            (cfgOutStatsDPrefix(config));
-    assert_int_equal       (cfgOutTransportType(config), CFG_UDP);
-    assert_string_equal    (cfgOutTransportHost(config), "localhost");
-    assert_int_equal       (cfgOutTransportPort(config), 8125);
-    assert_null            (cfgOutTransportPath(config));
+    assert_int_equal       (cfgTransportType(config, CFG_OUT), CFG_UDP);
+    assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
+    assert_int_equal       (cfgTransportPort(config, CFG_OUT), 8125);
+    assert_null            (cfgTransportPath(config, CFG_OUT));
+    assert_int_equal       (cfgTransportType(config, CFG_LOG), CFG_FILE);
+    assert_string_equal    (cfgTransportHost(config, CFG_LOG), "127.0.0.1");
+    assert_int_equal       (cfgTransportPort(config, CFG_LOG), 8125);
+    assert_string_equal    (cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
     assert_null            (cfgFuncFilters(config));
     assert_false           (cfgFuncIsFiltered(config, "read"));
-    assert_false           (cfgLoggingEnabled(config));
-    assert_false           (cfgLogTransportEnabled(config, CFG_LOG_UDP));
-    assert_false           (cfgLogTransportEnabled(config, CFG_LOG_SYSLOG));
-    assert_false           (cfgLogTransportEnabled(config, CFG_LOG_SHM));
     assert_int_equal       (cfgLogLevel(config), CFG_LOG_NONE);
 }
 
@@ -116,52 +101,58 @@ cfgOutStatsDPrefixSetAndGet(void** state)
 }
 
 static void
-cfgOutTransportTypeSetAndGet(void** state)
+cfgTransportTypeSetAndGet(void** state)
 {
+    which_transport_t t = *(which_transport_t*)*state;
     config_t* config = cfgCreateDefault();
-    cfgOutTransportTypeSet(config, CFG_SYSLOG);
-    assert_int_equal(cfgOutTransportType(config), CFG_SYSLOG);
-    cfgOutTransportTypeSet(config, CFG_FILE);
-    assert_int_equal(cfgOutTransportType(config), CFG_FILE);
-    cfgOutTransportTypeSet(config, CFG_UNIX);
-    assert_int_equal(cfgOutTransportType(config), CFG_UNIX);
-    cfgOutTransportTypeSet(config, CFG_UDP);
-    assert_int_equal(cfgOutTransportType(config), CFG_UDP);
+    cfgTransportTypeSet(config, t, CFG_UDP);
+    assert_int_equal(cfgTransportType(config, t), CFG_UDP);
+    cfgTransportTypeSet(config, t, CFG_UNIX);
+    assert_int_equal(cfgTransportType(config, t), CFG_UNIX);
+    cfgTransportTypeSet(config, t, CFG_FILE);
+    assert_int_equal(cfgTransportType(config, t), CFG_FILE);
+    cfgTransportTypeSet(config, t, CFG_SYSLOG);
+    assert_int_equal(cfgTransportType(config, t), CFG_SYSLOG);
+    cfgTransportTypeSet(config, t, CFG_SHM);
+    assert_int_equal(cfgTransportType(config, t), CFG_SHM);
     cfgDestroy(&config);
 }
 
 static void
-cfgOutTransportHostSetAndGet(void** state)
+cfgTransportHostSetAndGet(void** state)
 {
+    which_transport_t t = *(which_transport_t*)*state;
     config_t* config = cfgCreateDefault();
-    cfgOutTransportHostSet(config, "larrysComputer");
-    assert_string_equal(cfgOutTransportHost(config), "larrysComputer");
-    cfgOutTransportHostSet(config, "bobsComputer");
-    assert_string_equal(cfgOutTransportHost(config), "bobsComputer");
-    cfgOutTransportHostSet(config, NULL);
-    assert_null(cfgOutTransportHost(config));
+    cfgTransportHostSet(config, t, "larrysComputer");
+    assert_string_equal(cfgTransportHost(config, t), "larrysComputer");
+    cfgTransportHostSet(config, t, "bobsComputer");
+    assert_string_equal(cfgTransportHost(config, t), "bobsComputer");
+    cfgTransportHostSet(config, t, NULL);
+    assert_null(cfgTransportHost(config, t));
     cfgDestroy(&config);
 }
 
 static void
-cfgOutTransportPortSetAndGet(void** state)
+cfgTransportPortSetAndGet(void** state)
 {
+    which_transport_t t = *(which_transport_t*)*state;
     config_t* config = cfgCreateDefault();
-    cfgOutTransportPortSet(config, 54321);
-    assert_int_equal(cfgOutTransportPort(config), 54321);
-    cfgOutTransportPortSet(config, 12345);
-    assert_int_equal(cfgOutTransportPort(config), 12345);
+    cfgTransportPortSet(config, t, 54321);
+    assert_int_equal(cfgTransportPort(config, t), 54321);
+    cfgTransportPortSet(config, t, 12345);
+    assert_int_equal(cfgTransportPort(config, t), 12345);
     cfgDestroy(&config);
 }
 
 static void
-cfgOutTransportPathSetAndGet(void** state)
+cfgTransportPathSetAndGet(void** state)
 {
+    which_transport_t t = *(which_transport_t*)*state;
     config_t* config = cfgCreateDefault();
-    cfgOutTransportPathSet(config, "/tmp/mysock");
-    assert_string_equal(cfgOutTransportPath(config), "/tmp/mysock");
-    cfgOutTransportPathSet(config, NULL);
-    assert_null(cfgOutTransportPath(config));
+    cfgTransportPathSet(config, t, "/tmp/mysock");
+    assert_string_equal(cfgTransportPath(config, t), "/tmp/mysock");
+    cfgTransportPathSet(config, t, NULL);
+    assert_null(cfgTransportPath(config, t));
     cfgDestroy(&config);
 }
 
@@ -188,26 +179,8 @@ static void
 cfgLoggingSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
-    assert_false(cfgLoggingEnabled(config));
-    cfgLogTransportEnabledSet(config, CFG_LOG_UDP, 1);
-    assert_false(cfgLoggingEnabled(config));
     cfgLogLevelSet(config, CFG_LOG_DEBUG);
     assert_int_equal(cfgLogLevel(config), CFG_LOG_DEBUG);
-    assert_true(cfgLoggingEnabled(config));
-    assert_true(cfgLogTransportEnabled(config, CFG_LOG_UDP));
-    assert_false(cfgLogTransportEnabled(config, CFG_LOG_SYSLOG));
-    assert_false(cfgLogTransportEnabled(config, CFG_LOG_SHM));
-
-    cfgLogTransportEnabledSet(config, CFG_LOG_UDP, 0);
-    assert_false(cfgLoggingEnabled(config));
-    assert_false(cfgLogTransportEnabled(config, CFG_LOG_UDP));
-
-    cfgLogTransportEnabledSet(config, CFG_LOG_SYSLOG, 1);
-    cfgLogTransportEnabledSet(config, CFG_LOG_SHM, 1);
-    assert_true(cfgLoggingEnabled(config));
-    assert_false(cfgLogTransportEnabled(config, CFG_LOG_UDP));
-    assert_true(cfgLogTransportEnabled(config, CFG_LOG_SYSLOG));
-    assert_true(cfgLogTransportEnabled(config, CFG_LOG_SHM));
     cfgDestroy(&config);
 }
 
@@ -246,10 +219,8 @@ cfgReadGoodYaml(void** state)
         "  - accept\n" 
         "logging:\n"
         "  level: debug                      # debug, info, warning, error, none\n"
-        "  transports:\n"
-        "    - udp\n" 
-        "    - syslog\n"
-        "    - shm\n" 
+        "  transport:\n"
+        "    type: syslog\n"
         "...\n";
     char* path = "./scope.cfg";
     writeFile(path, yamlText);
@@ -257,18 +228,18 @@ cfgReadGoodYaml(void** state)
     assert_non_null(config);
     assert_int_equal(cfgOutFormat(config), CFG_NEWLINE_DELIMITED);
     assert_string_equal(cfgOutStatsDPrefix(config), "cribl.scope.");
-    assert_int_equal(cfgOutTransportType(config), CFG_FILE);
-    assert_string_equal(cfgOutTransportHost(config), "localhost");
-    assert_int_equal(cfgOutTransportPort(config), 8125);
-    assert_string_equal(cfgOutTransportPath(config), "/var/log/scope.log");
+    assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
+    assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
+    assert_int_equal(cfgTransportPort(config, CFG_OUT), 8125);
+    assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
+    assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_SYSLOG);
+    assert_string_equal(cfgTransportHost(config, CFG_LOG), "127.0.0.1");
+    assert_int_equal(cfgTransportPort(config, CFG_LOG), 8125);
+    assert_string_equal(cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
     assert_non_null(cfgFuncFilters(config));
     assert_true(cfgFuncIsFiltered(config, "read"));
     assert_true(cfgFuncIsFiltered(config, "write"));
     assert_true(cfgFuncIsFiltered(config, "accept"));
-    assert_true(cfgLoggingEnabled(config));
-    assert_true(cfgLogTransportEnabled(config, CFG_LOG_UDP));
-    assert_true(cfgLogTransportEnabled(config, CFG_LOG_SYSLOG));
-    assert_true(cfgLogTransportEnabled(config, CFG_LOG_SHM));
     assert_int_equal(cfgLogLevel(config), CFG_LOG_DEBUG);
     cfgDestroy(&config);
     deleteFile(path);
@@ -309,7 +280,9 @@ cfgReadEveryTransportType(void** state)
         "    path: '/var/log/scope.log'\n";
     char* syslog_str =
         "    type: syslog\n";
-    char* transport_lines[] = {udp_str, unix_str, file_str, syslog_str};
+    char* shm_str =
+        "    type: shm\n";
+    char* transport_lines[] = {udp_str, unix_str, file_str, syslog_str, shm_str};
 
     char* path = "./scope.cfg";
 
@@ -320,18 +293,20 @@ cfgReadEveryTransportType(void** state)
         config_t* config = cfgRead(path);
 
         if (transport_lines[i] == udp_str) {
-                assert_int_equal(cfgOutTransportType(config), CFG_UDP);
-                assert_string_equal(cfgOutTransportHost(config), "labmachine8235");
-                assert_int_equal(cfgOutTransportPort(config), 235);
+                assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UDP);
+                assert_string_equal(cfgTransportHost(config, CFG_OUT), "labmachine8235");
+                assert_int_equal(cfgTransportPort(config, CFG_OUT), 235);
         } else if (transport_lines[i] == unix_str) {
-                assert_int_equal(cfgOutTransportType(config), CFG_UNIX);
-                assert_string_equal(cfgOutTransportPath(config), "/var/run/scope.sock");
+                assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
+                assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
         } else if (transport_lines[i] == file_str) {
-                assert_int_equal(cfgOutTransportType(config), CFG_FILE);
-                assert_string_equal(cfgOutTransportPath(config), "/var/log/scope.log");
+                assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
+                assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
         } else if (transport_lines[i] == syslog_str) {
-                assert_int_equal(cfgOutTransportType(config), CFG_SYSLOG);
-        }
+                assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_SYSLOG);
+        } else if (transport_lines[i] == shm_str) {
+                assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_SHM);
+         }
 
         deleteFile(path);
         cfgDestroy(&config);
@@ -383,11 +358,9 @@ cfgReadGoodJson(void** state)
         "  ],\n"
         "  'logging': {\n"
         "    'level': 'debug',\n"
-        "    'transports': [\n"
-        "      'udp',\n"
-        "      'syslog',\n"
-        "      'shm'\n"
-        "    ]\n"
+        "    'transport': {\n"
+        "      'type': 'shm'\n"
+        "    }\n"
         "  }\n"
         "}\n";
     char* path = "./scope.cfg";
@@ -396,18 +369,18 @@ cfgReadGoodJson(void** state)
     assert_non_null(config);
     assert_int_equal(cfgOutFormat(config), CFG_NEWLINE_DELIMITED);
     assert_string_equal(cfgOutStatsDPrefix(config), "cribl.scope.");
-    assert_int_equal(cfgOutTransportType(config), CFG_FILE);
-    assert_string_equal(cfgOutTransportHost(config), "localhost");
-    assert_int_equal(cfgOutTransportPort(config), 8125);
-    assert_string_equal(cfgOutTransportPath(config), "/var/log/scope.log");
+    assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
+    assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
+    assert_int_equal(cfgTransportPort(config, CFG_OUT), 8125);
+    assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
+    assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_SHM);
+    assert_string_equal(cfgTransportHost(config, CFG_LOG), "127.0.0.1");
+    assert_int_equal(cfgTransportPort(config, CFG_LOG), 8125);
+    assert_string_equal(cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
     assert_non_null(cfgFuncFilters(config));
     assert_true(cfgFuncIsFiltered(config, "read"));
     assert_true(cfgFuncIsFiltered(config, "write"));
     assert_true(cfgFuncIsFiltered(config, "accept"));
-    assert_true(cfgLoggingEnabled(config));
-    assert_true(cfgLogTransportEnabled(config, CFG_LOG_UDP));
-    assert_true(cfgLogTransportEnabled(config, CFG_LOG_SYSLOG));
-    assert_true(cfgLogTransportEnabled(config, CFG_LOG_SHM));
     assert_int_equal(cfgLogLevel(config), CFG_LOG_DEBUG);
     cfgDestroy(&config);
     deleteFile(path);
@@ -436,8 +409,8 @@ cfgReadBadYamlReturnsDefaults(void** state)
         "  - read\n"
         "logging:\n"
         "      level: debug                  # <--- Extra indention!  bad!\n"
-        "  transports:\n"
-        "    - syslog\n"
+        "  transport:\n"
+        "    type: syslog\n"
         "...\n";
     char* path = "./scope.cfg";
     writeFile(path, yamlText);
@@ -475,11 +448,10 @@ cfgReadExtraFieldsAreHarmless(void** state)
     assert_non_null(config);
     assert_int_equal(cfgOutFormat(config), CFG_EXPANDED_STATSD);
     assert_null(cfgOutStatsDPrefix(config));
-    assert_int_equal(cfgOutTransportType(config), CFG_UNIX);
-    assert_string_equal(cfgOutTransportPath(config), "/var/run/scope.sock");
+    assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
+    assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
     assert_non_null(cfgFuncFilters(config));
     assert_true(cfgFuncIsFiltered(config, "read"));
-    assert_false(cfgLoggingEnabled(config));
     assert_int_equal(cfgLogLevel(config), CFG_LOG_INFO);
 
     cfgDestroy(&config);
@@ -508,11 +480,10 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_non_null(config);
     assert_int_equal(cfgOutFormat(config), CFG_EXPANDED_STATSD);
     assert_null(cfgOutStatsDPrefix(config));
-    assert_int_equal(cfgOutTransportType(config), CFG_UNIX);
-    assert_string_equal(cfgOutTransportPath(config), "/var/run/scope.sock");
+    assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
+    assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
     assert_non_null(cfgFuncFilters(config));
     assert_true(cfgFuncIsFiltered(config, "read"));
-    assert_false(cfgLoggingEnabled(config));
     assert_int_equal(cfgLogLevel(config), CFG_LOG_INFO);
 
     cfgDestroy(&config);
@@ -523,6 +494,10 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
+    which_transport_t out = CFG_OUT;
+    void* out_state = &out;
+    which_transport_t log = CFG_LOG;
+    void* log_state = &log;
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(cfgCreateDefaultReturnsValidPtr),
@@ -530,10 +505,17 @@ main(int argc, char* argv[])
         cmocka_unit_test(accessorsReturnDefaultsWhenConfigIsNull),
         cmocka_unit_test(cfgOutFormatSetAndGet),
         cmocka_unit_test(cfgOutStatsDPrefixSetAndGet),
-        cmocka_unit_test(cfgOutTransportTypeSetAndGet),
-        cmocka_unit_test(cfgOutTransportHostSetAndGet),
-        cmocka_unit_test(cfgOutTransportPortSetAndGet),
-        cmocka_unit_test(cfgOutTransportPathSetAndGet),
+
+        cmocka_unit_test_prestate(cfgTransportTypeSetAndGet, out_state),
+        cmocka_unit_test_prestate(cfgTransportHostSetAndGet, out_state),
+        cmocka_unit_test_prestate(cfgTransportPortSetAndGet, out_state),
+        cmocka_unit_test_prestate(cfgTransportPathSetAndGet, out_state),
+
+        cmocka_unit_test_prestate(cfgTransportTypeSetAndGet, log_state),
+        cmocka_unit_test_prestate(cfgTransportHostSetAndGet, log_state),
+        cmocka_unit_test_prestate(cfgTransportPortSetAndGet, log_state),
+        cmocka_unit_test_prestate(cfgTransportPathSetAndGet, log_state),
+
         cmocka_unit_test(cfgFuncFiltersSetAndGet),
         cmocka_unit_test(cfgLoggingSetAndGet),
         cmocka_unit_test(cfgLogLevelSetAndGet),

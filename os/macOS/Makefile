@@ -1,7 +1,7 @@
 
 CC=gcc
 CFLAGS=-fPIC -shared -g -Wall -D__MACOS__
-LD_FLAGS=-Wl, -ldl
+LD_FLAGS=-Wl, -ldl -lpthread
 
 .PHONY: all test
 all: libwrap.so

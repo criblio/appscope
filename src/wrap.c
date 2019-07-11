@@ -1,9 +1,8 @@
-#include "wrap.h"
 #include "cfg.h"
+#include "log.h"
+#include "out.h"
+#include "wrap.h"
 
-static int g_sock = 0;
-static struct sockaddr_in g_saddr;
-static operations_info g_ops;
 static net_info *g_netinfo;
 static int g_numNinfo;
 static char g_hostname[MAX_HOSTNAME];
@@ -12,94 +11,82 @@ static int g_openPorts = 0;
 static int g_activeConnections = 0;
 static interposed_funcs g_fn;
 
-// These need to come from a config file
-#define LOG_FILE 1  // eventually an enum for file, syslog, shared memory 
-static bool g_log = TRUE;
-static const char g_logFile[] = "/tmp/scope.log";
-static unsigned int g_logOp = LOG_FILE;
-static int g_logfd = -1;
+static log_t* g_log = NULL;
+static out_t* g_out = NULL;
 
-static
-void scopeLog(char *msg, int fd)
+static void
+scopeLog(char* msg, int fd)
 {
-    size_t len;
-    
-    if ((g_log == FALSE) || (!msg)) {
-        return;
-    }
+    if (!g_log || !msg) return;
 
-    if (g_logOp & LOG_FILE) {
-        char buf[strlen(msg) + 128];
-        
-        if ((g_logfd == -1) && 
-            (strlen(g_logFile) > 0)) {
-                g_logfd = open(g_logFile, O_RDWR|O_APPEND);
-        }
-
-        len = sizeof(buf) - strlen(buf);
-        snprintf(buf, sizeof(buf), "Scope: %s(%d): ", g_procname, fd);
-        strncat(buf, msg, len);
-        g_fn.write(g_logfd, buf, strlen(buf));
-    }        
+    char buf[strlen(msg) + 128];
+    snprintf(buf, sizeof(buf), "Scope: %s(%d): %s\n", g_procname, fd, msg);
+    logSend(g_log, buf);
 }
 
-static
-void initSocket(config_t* cfg)
+static void
+postMetric(char* metric)
 {
-    int flags;
-
-    // JRC TBD: We eventually need to support UNIX, FILE, and SYSLOG too...
-    if (cfgTransportType(cfg, CFG_OUT) != CFG_UDP) {
-        scopeLog("initSocket: unsupported TransportType\n", -1);
-        return;
-    }
-
-    // Create a UDP socket
-    g_sock = g_fn.socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (g_sock < 0)	{
-        scopeLog("ERROR: initSocket:socket\n", -1);
-    }
-
-    // Set the socket to non blocking
-    flags = fcntl(g_sock, F_GETFL, 0);
-    fcntl(g_sock, F_SETFL, flags | O_NONBLOCK);
-
-    // Create the address to send to
-    memset(&g_saddr, 0, sizeof(g_saddr));
-    g_saddr.sin_family = AF_INET;
-    g_saddr.sin_port = htons(cfgTransportPort(cfg, CFG_OUT));
-    if (inet_aton(cfgTransportHost(cfg, CFG_OUT), &g_saddr.sin_addr) == 0) {
-        scopeLog("ERROR: initSocket:inet_aton\n", -1);
-    }
+    if (!g_out || !metric) return;
+    scopeLog(metric, -1);
+    outSend(g_out, metric);
 }
 
-static
-void postMetric(const char *metric)
+static transport_t*
+initTransport(config_t* cfg, which_transport_t t)
 {
-    ssize_t rc;
+    transport_t* transport = NULL;
 
-    if (!g_fn.socket) {
-        // initSocket must have failed during the constructor
-        scopeLog("postMetric: uninitialized socket\n", -1);
-        return;
+    switch (cfgTransportType(cfg, t)) {
+        case CFG_SYSLOG:
+            transport = transportCreateSyslog();
+            break;
+        case CFG_FILE:
+            transport = transportCreateFile(cfgTransportPath(cfg, t));
+            break;
+        case CFG_UNIX:
+            transport = transportCreateUnix(cfgTransportPath(cfg, t));
+            break;
+        case CFG_UDP:
+            transport = transportCreateUdp(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
+            break;
+        case CFG_SHM:
+            transport = transportCreateShm();
+            break;
     }
-
-    scopeLog((char *)metric, -1);
-    if (g_fn.sendto) {
-        rc = g_fn.sendto(g_sock, metric, strlen(metric), 0, 
-                         (struct sockaddr *)&g_saddr, sizeof(g_saddr));
-        if (rc < 0) {
-            scopeLog("ERROR: sendto\n", g_sock);
-            switch (errno) {
-            case EWOULDBLOCK:
-                g_ops.udp_blocks++;
-                break;
-            default:
-                g_ops.udp_errors++;
-            }
-        }
-    }
+    return transport;
 }
+
+static out_t*
+initOut(config_t* cfg)
+{
+    out_t* out = outCreate();
+    if (!out) return out;
+    transport_t* t = initTransport(cfg, CFG_OUT);
+    if (!t) {
+        outDestroy(&out);
+        return out;
+    }
+    outSetTransport(out, t);
+    outStatsDPrefixSet(out, cfgOutStatsDPrefix(cfg));
+    return out;
+}
+
+static log_t*
+initLog(config_t* cfg)
+{
+    log_t* log = logCreate();
+    if (!log) return log;
+    transport_t* t = initTransport(cfg, CFG_LOG);
+    if (!t) {
+        logDestroy(&log);
+        return log;
+    }
+    logSetTransport(log, t);
+    logLevelSet(log, cfgLogLevel(cfg));
+    return log;
+}
+
 
 static
 void addSock(int fd, int type)
@@ -403,7 +390,8 @@ __attribute__((constructor)) void init(void)
 
     // JRC TBD: Don't just hardcode the config file path... use env variable too
     config_t* cfg = cfgRead("./conf/scope.cfg");
-    initSocket(cfg);
+    g_log = initLog(cfg);
+    g_out = initOut(cfg);
     cfgDestroy(&cfg);
 
     if (pthread_create(&periodicTID, NULL, periodic, NULL) != 0) {
@@ -523,7 +511,7 @@ ssize_t write(int fd, const void *buf, size_t count)
 
     // Don't init the socket from write; starts early
     // Delay posts until init is complete
-    if (g_sock != 0) {
+    if (g_out != 0) {
         char metric[strlen(STATSD_WRITE) + 16];
         
         if (snprintf(metric, sizeof(metric), STATSD_WRITE, (int)count) <= 0) {
@@ -812,7 +800,7 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
         return -1;
     }
 
-    if (g_sock != 0) {
+    if (g_out != 0) {
         char metric[strlen(STATSD_SENDTO) + 16];
 
         if (snprintf(metric, sizeof(metric), STATSD_SENDTO, (int)len) <= 0) {
@@ -833,7 +821,7 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
         return -1;
     }
 
-    if (g_sock != 0) {
+    if (g_out != 0) {
         char metric[strlen(STATSD_SENDMSG) + 16];
 
         if (snprintf(metric, sizeof(metric), STATSD_SENDMSG) <= 0) {
@@ -854,7 +842,7 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags)
         return -1;
     }
 
-    if (g_sock != 0) {
+    if (g_out != 0) {
         char metric[strlen(STATSD_RECV) + 16];
 
         if (snprintf(metric, sizeof(metric), STATSD_RECV, (int)len) <= 0) {

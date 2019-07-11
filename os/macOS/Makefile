@@ -10,7 +10,7 @@ TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka
 .PHONY: all clean test
 all: $(YAML_AR) libwrap.so
 
-libwrap.so: src/wrap.c src/cfg.c os/macOS/os.c
+libwrap.so: src/wrap.c src/cfg.c os/macOS/os.c src/log.c src/out.c src/transport.c
 	@echo "Building libwrap.so ..."
 	$(CC) $(CFLAGS) -o ./lib/macOS/$@ $(INCLUDES) $^ -e,prog_version $(LD_FLAGS) $(YAML_AR)
 

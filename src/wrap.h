@@ -45,7 +45,7 @@
 #define STATSD_OPENPORTS "net.port:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
 #define STATSD_TCPCONNS "net.tcp:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
 #define STATSD_ACTIVECONNS "net.conn:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
-#define STATSD_NETRX "net.rx:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,localp:%d,remotep:%d,data:%s,\n"
+#define STATSD_NETRX "net.rx:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,localip:%s,localp:%d,remoteip:%s,remotep:%d,data:%s,\n"
 
 #define STATSD_PROCMEM "proc.mem:%lu|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCPU "proc.cpu:%lu|g|#proc:%s,pid:%d,host:%s\n"
@@ -96,10 +96,16 @@ typedef struct operations_info_t {
 typedef struct net_info_t {
     int fd;
     int type;
+    int addrType;
+    bool network;
     bool listen;
     bool accept;
     in_port_t localPort;
     in_port_t remotePort;
+    struct in_addr local4Addr;
+    struct in6_addr local6Addr;
+    struct in_addr remote4Addr;
+    struct in6_addr remote6Addr;
 } net_info;
 
 typedef struct interposed_funcs_t {

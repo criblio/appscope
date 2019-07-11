@@ -339,6 +339,8 @@ void doNetMetric(enum metric_t type, int fd)
 
     case NETRX:
     {
+        char lip[INET6_ADDRSTRLEN];
+        char rip[INET6_ADDRSTRLEN];
         char data[16];
         char metric[strlen(STATSD_NETRX) +
                     sizeof(unsigned int) +
@@ -354,10 +356,39 @@ void doNetMetric(enum metric_t type, int fd)
         } else {
             strncpy(data, "clear", sizeof(data));
         }
+
+        if (g_netinfo[fd].type == SCOPE_UNIX) {
+            strncpy(lip, " ", sizeof(lip));
+            strncpy(rip, " ", sizeof(rip));
+        } else {
+            if (g_netinfo[fd].addrType == AF_INET) {
+                if (inet_ntop(AF_INET, &g_netinfo[fd].local4Addr, 
+                              lip, sizeof(lip)) == NULL) {
+                    strncpy(lip, " ", sizeof(lip));
+                }
+                
+                if (inet_ntop(AF_INET, &g_netinfo[fd].remote4Addr, 
+                              rip, sizeof(rip)) == NULL) {
+                    strncpy(rip, " ", sizeof(rip));
+                }
+            } else if (g_netinfo[fd].addrType == AF_INET6) {
+                if (inet_ntop(AF_INET6, &g_netinfo[fd].local6Addr, 
+                              lip, sizeof(lip)) == NULL) {
+                    strncpy(lip, " ", sizeof(lip));
+                }
+                
+                if (inet_ntop(AF_INET6, &g_netinfo[fd].remote6Addr, 
+                              rip, sizeof(rip)) == NULL) {
+                    strncpy(rip, " ", sizeof(rip));
+                }
+            }
+        }
         
         if (snprintf(metric, sizeof(metric), STATSD_NETRX,
-                     g_netrx, g_procname, getpid(), fd, g_hostname, proto,
-                     g_netinfo[fd].localPort, g_netinfo[fd].remotePort, data) <= 0) {
+                     g_netrx, g_procname, getpid(),
+                     fd, g_hostname, proto,
+                     lip, g_netinfo[fd].localPort,
+                     rip, g_netinfo[fd].remotePort, data) <= 0) {
             scopeLog("ERROR: doNetMetric:NETRX:snprintf\n", -1);
         } else {
             postMetric(metric);
@@ -401,21 +432,31 @@ long doGetProcMem(pid_t pid) {
 }
 
 static
-void doSetPort(int sd, const struct sockaddr *addr, bool local)
+void doSetConnection(int sd, const struct sockaddr *addr, bool local)
 {
     if (g_netinfo && (g_netinfo[sd].fd == sd)) {
         if (addr->sa_family == AF_INET) {
+            g_netinfo[sd].addrType = AF_INET;
             if (local == TRUE) {
                 g_netinfo[sd].localPort = ((struct sockaddr_in *)addr)->sin_port;
+                g_netinfo[sd].local4Addr.s_addr = ((struct sockaddr_in *)addr)->sin_addr.s_addr;
             } else {
                 g_netinfo[sd].remotePort = ((struct sockaddr_in *)addr)->sin_port;
+                g_netinfo[sd].remote4Addr.s_addr = ((struct sockaddr_in *)addr)->sin_addr.s_addr;
             }
         } else if (addr->sa_family == AF_INET6) {
+            g_netinfo[sd].addrType = AF_INET6;
             if (local == TRUE) {
                 g_netinfo[sd].localPort = ((struct sockaddr_in6 *)addr)->sin6_port;
+                memcpy(g_netinfo[sd].local6Addr.s6_addr,
+                       ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr,
+                       sizeof(struct in6_addr));
             } else {
                 g_netinfo[sd].remotePort = ((struct sockaddr_in6 *)addr)->sin6_port;
-            } // else port # is 0
+                memcpy(g_netinfo[sd].remote6Addr.s6_addr,
+                       ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr,
+                       sizeof(struct in6_addr));
+            } // else port & IP are 0
         }
     }
 }
@@ -435,7 +476,7 @@ void doAccept(int sd, struct sockaddr *addr, char *func)
         atomicAdd(&g_activeConnections, 1);
         scopeLog("incr conn\n", g_TCPConnections);
         scopeLog("incr\n", g_openPorts);
-        doSetPort(sd, addr, FALSE);
+        doSetConnection(sd, addr, FALSE);
         doNetMetric(OPEN_PORTS, sd);
         doNetMetric(TCP_CONNECTIONS, sd);
         doNetMetric(ACTIVE_CONNECTIONS, sd);
@@ -841,7 +882,7 @@ int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
     rc = g_fn.bind(sockfd, addr, addrlen);
     if (rc != -1) { 
-        doSetPort(sockfd, addr, TRUE);
+        doSetConnection(sockfd, addr, TRUE);
         scopeLog("bind\n", sockfd);
     }
     
@@ -864,7 +905,7 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     if ((rc != -1) &&
         (g_netinfo) &&
         (g_netinfo[sockfd].fd == sockfd)) {
-        doSetPort(sockfd, addr, TRUE);
+        doSetConnection(sockfd, addr, TRUE);
         g_netinfo[sockfd].accept = TRUE;
         atomicAdd(&g_activeConnections, 1);
         doNetMetric(ACTIVE_CONNECTIONS, sockfd);
@@ -963,14 +1004,14 @@ int doRecv(int sockfd, ssize_t rc)
                 // is RAW a viable default?
                 addSock(sockfd, SOCK_RAW);
             }
-            doSetPort(sockfd, &addr, TRUE);
+            doSetConnection(sockfd, &addr, TRUE);
         } else {
             addSock(sockfd, SOCK_RAW);
         }
         
         addrlen = sizeof(struct sockaddr);
         if (getpeername(sockfd, &addr, &addrlen) != -1) {
-            doSetPort(sockfd, &addr, FALSE);
+            doSetConnection(sockfd, &addr, FALSE);
         }
     }
 
@@ -992,37 +1033,6 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags)
     rc = g_fn.recv(sockfd, buf, len, flags);
     if (rc != -1) {
         doRecv(sockfd, rc);
-/*
-        atomicAdd(&g_netrx, rc);
-        if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
-            struct sockaddr addr;
-            socklen_t addrlen = sizeof(struct sockaddr);
-            
-            // We missed an accept...most likely
-            // Or.. we are a child proc that inherited a socket
-            if (getsockname(sockfd, &addr, &addrlen) != -1) {
-                if ((addr.sa_family == AF_INET) || (addr.sa_family == AF_INET6)) {
-                    addSock(sockfd, SOCK_STREAM);
-                } else if (addr.sa_family == AF_UNIX) {
-                    // added, not a socket type, want to know if it's a UNIX socket
-                    addSock(sockfd, SCOPE_UNIX);
-                } else {
-                    // is RAW a viable default?
-                    addSock(sockfd, SOCK_RAW);
-                }
-                doSetPort(sockfd, &addr, TRUE);
-            } else {
-                addSock(sockfd, SOCK_RAW);
-            }
-
-            addrlen = sizeof(struct sockaddr);
-            if (getpeername(sockfd, &addr, &addrlen) != -1) {
-                doSetPort(sockfd, &addr, FALSE);
-            }
-        
-            doNetMetric(NETRX, sockfd);
-        }
-*/
     }
     
     return rc;
@@ -1057,7 +1067,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
             }
         }
 
-        doSetPort(sockfd, src_addr, FALSE);
+        doSetConnection(sockfd, src_addr, FALSE);
         doNetMetric(NETRX, sockfd);
     }
     return rc;
@@ -1077,6 +1087,22 @@ ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags)
     rc = g_fn.recvmsg(sockfd, msg, flags);
     if (rc != -1) {
         doRecv(sockfd, rc);
+/* Need to work on this.... it's not consistent
+        if ((g_netinfo) && (g_netinfo[sockfd].fd == sockfd)) {
+            if ((msg->msg_name != NULL) && (msg->msg_namelen == sizeof(struct sockaddr_in6))) {
+                // We might have a remote IPV6 addr.
+                struct sockaddr_in6 *ip = (struct sockaddr_in6 *)msg->msg_name;
+                memcpy(g_netinfo[sockfd].remote6Addr.s6_addr,
+                       ip->sin6_addr.s6_addr, sizeof(struct in6_addr));
+                g_netinfo[sockfd].remotePort = ip->sin6_port;
+            } else if ((msg->msg_name != NULL) && (msg->msg_namelen == sizeof(struct sockaddr_in))) {
+                // We might have a remote IPV4 addr.
+                struct sockaddr_in *ip = (struct sockaddr_in *)msg->msg_name;
+                g_netinfo[sockfd].remote4Addr.s_addr = ip->sin_addr.s_addr;
+                g_netinfo[sockfd].remotePort = ip->sin_port;
+            }
+        }
+*/
     }
     
     return rc;

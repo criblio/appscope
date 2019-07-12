@@ -47,6 +47,9 @@
 #define STATSD_ACTIVECONNS "net.conn:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
 #define STATSD_NETRX "net.rx:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,localip:%s,localp:%d,remoteip:%s,remotep:%d,data:%s\n"
 #define STATSD_NETTX "net.tx:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,localip:%s,localp:%d,remoteip:%s,remotep:%d,data:%s\n"    
+#define STATSD_NETRX_PROC "net.rx:%d|c|#proc:%s,pid:%d,host:%s\n"
+#define STATSD_NETTX_PROC "net.tx:%d|c|#proc:%s,pid:%d,host:%s\n"    
+
 
 #define STATSD_PROCMEM "proc.mem:%lu|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCPU "proc.cpu:%lu|g|#proc:%s,pid:%d,host:%s\n"
@@ -54,24 +57,17 @@
 #define STATSD_PROCFD "proc.fd:%d|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCHILD "proc.child:%d|g|#proc:%s,pid:%d,host:%s\n"
 
-/*
- * NOTE: The following constants are ALL going away
- * They were used for initial signs of life in OSX
- * Left here so that compilations works
- * Using them if we want to see if a function is interposed or called
- */
-#define STATSD_READ "cribl.scope.calls.read.bytes:%d|c\n"
-#define STATSD_WRITE "cribl.scope.calls.write.bytes:%d|c\n"
-#define STATSD_VSYSLOG "cribl.scope.calls.vsyslog|c\n"
-#define STATSD_SEND "cribl.scope.calls.send.bytes:%d|c\n"
-#define STATSD_SENDTO "cribl.scope.calls.sendto.bytes:%d|c\n"
-#define STATSD_SENDMSG "cribl.scope.calls.sendmsg|c\n"
-#define STATSD_RECV "cribl.scope.calls.recv.bytes:%d|c\n"
-
-
 #ifndef bool
 typedef unsigned int bool;
 #endif
+
+// Several control types, used in several areas
+enum control_type_t {
+    LOCAL,
+    REMOTE,
+    PERIODIC,
+    EVENT_BASED
+};
 
 enum metric_t {
     OPEN_PORTS,
@@ -83,7 +79,9 @@ enum metric_t {
     PROC_FD,
     PROC_CHILD,
     NETRX,
-    NETTX
+    NETTX,
+    NETRX_PROC,
+    NETTX_PROC
 };
 
 typedef struct operations_info_t {

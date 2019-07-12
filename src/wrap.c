@@ -13,7 +13,7 @@ static int g_openPorts = 0;
 static int g_TCPConnections = 0;
 static int g_activeConnections = 0;
 static int g_netrx = 0;
-//static int g_nettx = 0;
+static int g_nettx = 0;
 
 // These need to come from a config file
 #define LOG_FILE 1  // eventually an enum for file, syslog, shared memory 
@@ -396,6 +396,65 @@ void doNetMetric(enum metric_t type, int fd)
         break;
     }
 
+    case NETTX:
+    {
+        char lip[INET6_ADDRSTRLEN];
+        char rip[INET6_ADDRSTRLEN];
+        char data[16];
+        char metric[strlen(STATSD_NETTX) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    PROTOCOL_STR  +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) + 1];
+
+        if ((g_netinfo[fd].localPort == 443) || (g_netinfo[fd].remotePort == 443)) {
+            strncpy(data, "ssl", sizeof(data));
+        } else {
+            strncpy(data, "clear", sizeof(data));
+        }
+
+        if (g_netinfo[fd].type == SCOPE_UNIX) {
+            strncpy(lip, " ", sizeof(lip));
+            strncpy(rip, " ", sizeof(rip));
+        } else {
+            if (g_netinfo[fd].addrType == AF_INET) {
+                if (inet_ntop(AF_INET, &g_netinfo[fd].local4Addr, 
+                              lip, sizeof(lip)) == NULL) {
+                    strncpy(lip, " ", sizeof(lip));
+                }
+                
+                if (inet_ntop(AF_INET, &g_netinfo[fd].remote4Addr, 
+                              rip, sizeof(rip)) == NULL) {
+                    strncpy(rip, " ", sizeof(rip));
+                }
+            } else if (g_netinfo[fd].addrType == AF_INET6) {
+                if (inet_ntop(AF_INET6, &g_netinfo[fd].local6Addr, 
+                              lip, sizeof(lip)) == NULL) {
+                    strncpy(lip, " ", sizeof(lip));
+                }
+                
+                if (inet_ntop(AF_INET6, &g_netinfo[fd].remote6Addr, 
+                              rip, sizeof(rip)) == NULL) {
+                    strncpy(rip, " ", sizeof(rip));
+                }
+            }
+        }
+        
+        if (snprintf(metric, sizeof(metric), STATSD_NETTX,
+                     g_nettx, g_procname, getpid(),
+                     fd, g_hostname, proto,
+                     lip, g_netinfo[fd].localPort,
+                     rip, g_netinfo[fd].remotePort, data) <= 0) {
+            scopeLog("ERROR: doNetMetric:NETTX:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
+    }
+
     default:
         scopeLog("ERROR: doNetMetric:metric type\n", -1);
     }
@@ -459,6 +518,76 @@ void doSetConnection(int sd, const struct sockaddr *addr, bool local)
             } // else port & IP are 0
         }
     }
+}
+
+static
+int doRecv(int sockfd, ssize_t rc)
+{
+    atomicAdd(&g_netrx, rc);
+    if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
+        struct sockaddr addr;
+        socklen_t addrlen = sizeof(struct sockaddr);
+        
+        // We missed an accept...most likely
+        // Or.. we are a child proc that inherited a socket
+        if (getsockname(sockfd, &addr, &addrlen) != -1) {
+            if ((addr.sa_family == AF_INET) || (addr.sa_family == AF_INET6)) {
+                addSock(sockfd, SOCK_STREAM);
+            } else if (addr.sa_family == AF_UNIX) {
+                // added, not a socket type, want to know if it's a UNIX socket
+                addSock(sockfd, SCOPE_UNIX);
+            } else {
+                // is RAW a viable default?
+                addSock(sockfd, SOCK_RAW);
+            }
+            doSetConnection(sockfd, &addr, TRUE);
+        } else {
+            addSock(sockfd, SOCK_RAW);
+        }
+        
+        addrlen = sizeof(struct sockaddr);
+        if (getpeername(sockfd, &addr, &addrlen) != -1) {
+            doSetConnection(sockfd, &addr, FALSE);
+        }
+    }
+
+    doNetMetric(NETRX, sockfd);
+    return 0;
+}
+
+static
+int doSend(int sockfd, ssize_t rc)
+{
+    atomicAdd(&g_nettx, rc);
+    if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
+        struct sockaddr addr;
+        socklen_t addrlen = sizeof(struct sockaddr);
+        
+        // We missed an accept...most likely
+        // Or.. we are a child proc that inherited a socket
+        if (getsockname(sockfd, &addr, &addrlen) != -1) {
+            if ((addr.sa_family == AF_INET) || (addr.sa_family == AF_INET6)) {
+                addSock(sockfd, SOCK_STREAM);
+            } else if (addr.sa_family == AF_UNIX) {
+                // added, not a socket type, want to know if it's a UNIX socket
+                addSock(sockfd, SCOPE_UNIX);
+            } else {
+                // is RAW a viable default?
+                addSock(sockfd, SOCK_RAW);
+            }
+            doSetConnection(sockfd, &addr, TRUE);
+        } else {
+            addSock(sockfd, SOCK_RAW);
+        }
+        
+        addrlen = sizeof(struct sockaddr);
+        if (getpeername(sockfd, &addr, &addrlen) != -1) {
+            doSetConnection(sockfd, &addr, FALSE);
+        }
+    }
+
+    doNetMetric(NETTX, sockfd);
+    return 0;
 }
 
 static
@@ -680,46 +809,44 @@ int accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 #endif // __MACOS__
 
-EXPORTOFF
+EXPORTON
 ssize_t write(int fd, const void *buf, size_t count)
 {
+    ssize_t rc;
+    
     if (g_fn.write == NULL) {
         scopeLog("ERROR: write:NULL\n", fd);
         return -1;
     }
 
-    // Don't init the socket from write; starts early
-    // Delay posts until init is complete
-    if (g_sock != 0) {
-        char metric[strlen(STATSD_WRITE) + 16];
-        
-        if (snprintf(metric, sizeof(metric), STATSD_WRITE, (int)count) <= 0) {
-            scopeLog("ERROR: write: snprintf\n", fd);
-        } else {
-            postMetric(metric);
-        }
+    rc = g_fn.write(fd, buf, count);
+    if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
+        // This is a network descriptor
+        scopeLog("write\n", fd);
+        doSend(fd, rc);
     }
-
-    return g_fn.write(fd, buf, count);
+    
+    return rc;
 }
 
-EXPORTOFF
+EXPORTON
 ssize_t read(int fd, void *buf, size_t count)
 {
-    char metric[strlen(STATSD_READ) + 16];
+    ssize_t rc;
     
     if (g_fn.read == NULL) {
         scopeLog("ERROR: read:NULL\n", fd);
         return -1;
     }
 
-    if (snprintf(metric, sizeof(metric), STATSD_READ, (int)count) <= 0) {
-        scopeLog("ERROR: read:snprintf\n", fd);
-    } else {
-        postMetric(metric);
+    rc = g_fn.read(fd, buf, count);
+    if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
+        // This is a network descriptor
+        scopeLog("read\n", fd);
+        doRecv(fd, rc);
     }
     
-    return g_fn.read(fd, buf, count);
+    return rc;
 }
 
 EXPORTOFF
@@ -905,7 +1032,7 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     if ((rc != -1) &&
         (g_netinfo) &&
         (g_netinfo[sockfd].fd == sockfd)) {
-        doSetConnection(sockfd, addr, TRUE);
+        doSetConnection(sockfd, addr, FALSE);
         g_netinfo[sockfd].accept = TRUE;
         atomicAdd(&g_activeConnections, 1);
         doNetMetric(ACTIVE_CONNECTIONS, sockfd);
@@ -922,101 +1049,62 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
 }
 
-EXPORTOFF
+EXPORTON
 ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 {
-    char metric[strlen(STATSD_SEND) + 16];
+    ssize_t rc;
 
     if (g_fn.send == NULL) {
         scopeLog("ERROR: send:NULL\n", -1);
         return -1;
     }
 
-    if (snprintf(metric, sizeof(metric), STATSD_SEND, (int)len) <= 0) {
-        scopeLog("ERROR: send:snprintf\n", -1);
-    } else {
-        postMetric(metric);
+    rc = g_fn.send(sockfd, buf, len, flags);
+    if (rc != -1) {
+        scopeLog("send\n", sockfd);
+        doSend(sockfd, rc);
     }
-
-    return g_fn.send(sockfd, buf, len, flags);
+    
+    return rc;
 }
 
-EXPORTOFF
+EXPORTON
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
                const struct sockaddr *dest_addr, socklen_t addrlen)
 {
+    ssize_t rc;
+    
     if (g_fn.sendto == NULL) {
         scopeLog("ERROR: sendto:NULL\n", -1);
         return -1;
     }
 
-    if (g_sock != 0) {
-        char metric[strlen(STATSD_SENDTO) + 16];
-
-        if (snprintf(metric, sizeof(metric), STATSD_SENDTO, (int)len) <= 0) {
-            scopeLog("ERROR: sendto:snprintf\n", -1);
-        } else {
-            postMetric(metric);
-        }
+    rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+    if (rc != -1) {
+        scopeLog("sendto\n", sockfd);
+        doSend(sockfd, rc);
     }
-
-    return g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+    
+    return rc;
 }
 
-EXPORTOFF
+EXPORTON
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
 {
+    ssize_t rc;
+    
     if (g_fn.sendmsg == NULL) {
         scopeLog("ERROR: sendmsg:NULL\n", -1);
         return -1;
     }
 
-    if (g_sock != 0) {
-        char metric[strlen(STATSD_SENDMSG) + 16];
-
-        if (snprintf(metric, sizeof(metric), STATSD_SENDMSG) <= 0) {
-            scopeLog("ERROR: sendmsg:snprintf\n", -1);
-        } else {
-            postMetric(metric);
-        }
+    rc = g_fn.sendmsg(sockfd, msg, flags);
+    if (rc != -1) {
+        scopeLog("sendmsg\n", sockfd);
+        doSend(sockfd, rc);
     }
-
-    return g_fn.sendmsg(sockfd, msg, flags);
-}
-
-static
-int doRecv(int sockfd, ssize_t rc)
-{
-    atomicAdd(&g_netrx, rc);
-    if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
-        struct sockaddr addr;
-        socklen_t addrlen = sizeof(struct sockaddr);
-        
-        // We missed an accept...most likely
-        // Or.. we are a child proc that inherited a socket
-        if (getsockname(sockfd, &addr, &addrlen) != -1) {
-            if ((addr.sa_family == AF_INET) || (addr.sa_family == AF_INET6)) {
-                addSock(sockfd, SOCK_STREAM);
-            } else if (addr.sa_family == AF_UNIX) {
-                // added, not a socket type, want to know if it's a UNIX socket
-                addSock(sockfd, SCOPE_UNIX);
-            } else {
-                // is RAW a viable default?
-                addSock(sockfd, SOCK_RAW);
-            }
-            doSetConnection(sockfd, &addr, TRUE);
-        } else {
-            addSock(sockfd, SOCK_RAW);
-        }
-        
-        addrlen = sizeof(struct sockaddr);
-        if (getpeername(sockfd, &addr, &addrlen) != -1) {
-            doSetConnection(sockfd, &addr, FALSE);
-        }
-    }
-
-    doNetMetric(NETRX, sockfd);
-    return 0;
+    
+    return rc;
 }
 
 EXPORTON

@@ -103,7 +103,7 @@ cfgOutStatsDPrefixSetAndGet(void** state)
 static void
 cfgTransportTypeSetAndGet(void** state)
 {
-    which_transport_t t = *(which_transport_t*)*state;
+    which_transport_t t = *(which_transport_t*)state[0];
     config_t* config = cfgCreateDefault();
     cfgTransportTypeSet(config, t, CFG_UDP);
     assert_int_equal(cfgTransportType(config, t), CFG_UDP);
@@ -121,7 +121,7 @@ cfgTransportTypeSetAndGet(void** state)
 static void
 cfgTransportHostSetAndGet(void** state)
 {
-    which_transport_t t = *(which_transport_t*)*state;
+    which_transport_t t = *(which_transport_t*)state[0];
     config_t* config = cfgCreateDefault();
     cfgTransportHostSet(config, t, "larrysComputer");
     assert_string_equal(cfgTransportHost(config, t), "larrysComputer");
@@ -135,7 +135,7 @@ cfgTransportHostSetAndGet(void** state)
 static void
 cfgTransportPortSetAndGet(void** state)
 {
-    which_transport_t t = *(which_transport_t*)*state;
+    which_transport_t t = *(which_transport_t*)state[0];
     config_t* config = cfgCreateDefault();
     cfgTransportPortSet(config, t, 54321);
     assert_int_equal(cfgTransportPort(config, t), 54321);
@@ -147,7 +147,7 @@ cfgTransportPortSetAndGet(void** state)
 static void
 cfgTransportPathSetAndGet(void** state)
 {
-    which_transport_t t = *(which_transport_t*)*state;
+    which_transport_t t = *(which_transport_t*)state[0];
     config_t* config = cfgCreateDefault();
     cfgTransportPathSet(config, t, "/tmp/mysock");
     assert_string_equal(cfgTransportPath(config, t), "/tmp/mysock");
@@ -494,10 +494,8 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
-    which_transport_t out = CFG_OUT;
-    void* out_state = &out;
-    which_transport_t log = CFG_LOG;
-    void* log_state = &log;
+    void* out_state[] = {(void*)CFG_OUT, NULL};
+    void* log_state[] = {(void*)CFG_LOG, NULL};
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(cfgCreateDefaultReturnsValidPtr),

@@ -1,149 +1,194 @@
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include "scopetypes.h"
 #include "transport.h"
 
-typedef enum {TX_UDP, TX_UNIX, TX_FILE, TX_SYSLOG, TX_SHM} tx_t;
+typedef struct operations_info_t {
+    unsigned int udp_blocks;
+    unsigned int udp_errors;
+    unsigned int init_errors;
+    unsigned int interpose_errors;
+    char *errMsg[64];
+} operations_info;
 
 struct _transport_t
 {
-    tx_t type;
-    
+    cfg_transport_t type;
+    union {
+        struct {
+            int sock;
+            struct sockaddr_in saddr;
+            operations_info ops;
+        } udp;
+        struct {
+            char* path;
+            int fd;
+        } file;
+    };
 };
 
 transport_t*
 transportCreateUdp(char* host, int port)
 {
-    return NULL;
-}
+    if (!host) return NULL;
+    transport_t* t = calloc(1, sizeof(transport_t));
+    if (!t) return NULL;
 
-transport_t*
-transportCreateUnix(char* path)
-{
-    return NULL;
+    t->type = CFG_UDP;
+
+    // Create a UDP socket
+    t->udp.sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (t->udp.sock == -1)     {
+        transportDestroy(&t);
+        return t;
+    }
+
+    // Set the socket to non blocking, and close on exec
+    int flags = fcntl(t->udp.sock, F_GETFL, 0);
+    if (fcntl(t->udp.sock, F_SETFL, flags | O_NONBLOCK) == -1) {
+        // TBD do something here too.
+    }
+    flags = fcntl(t->udp.sock, F_GETFD, 0);
+    if (fcntl(t->udp.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
+        // TBD do something here.
+    }
+
+    // Create the address to send to
+    memset(&t->udp.saddr, 0, sizeof(t->udp.saddr));
+    t->udp.saddr.sin_family = AF_INET;
+    t->udp.saddr.sin_port = htons(port);
+    if (inet_aton(host, &t->udp.saddr.sin_addr) == 0) {
+        close(t->udp.sock);
+        free(t);
+        return NULL;
+    }
+    return t;
 }
 
 transport_t*
 transportCreateFile(char* path)
 {
-    return NULL;
+    if (!path) return NULL;
+    transport_t* t = calloc(1, sizeof(transport_t));
+    if (!t) return NULL;
+
+    t->type = CFG_FILE;
+    t->file.path = strdup(path);
+    if (!t->file.path) {
+        transportDestroy(&t);
+        return t;
+    }
+
+    t->file.fd = open(t->file.path, O_CREAT|O_RDWR|O_APPEND|O_CLOEXEC, 0666);
+    if (t->file.fd == -1) {
+        transportDestroy(&t);
+        return t;
+    }
+    return t;
+}
+
+transport_t*
+transportCreateUnix(char* path)
+{
+    if (!path) return NULL;
+    transport_t* t = calloc(1, sizeof(transport_t));
+    if (!t) return NULL;
+
+    t->type = CFG_UNIX;
+
+    return t;
 }
 
 transport_t*
 transportCreateSyslog(void)
 {
-    return NULL;
+    transport_t* t = calloc(1, sizeof(transport_t));
+    if (!t) return NULL;
+
+    t->type = CFG_SYSLOG;
+
+    return t;
 }
 
 transport_t*
 transportCreateShm()
 {
-    return NULL;
+    transport_t* t = calloc(1, sizeof(transport_t));
+    if (!t) return NULL;
+
+    t->type = CFG_SHM;
+
+    return t;
 }
 
 void
 transportDestroy(transport_t** transport)
 {
+    if (!transport || !*transport) return;
 
+    transport_t* t = *transport;
+    switch (t->type) {
+        case CFG_UDP:
+            if (t->udp.sock != -1) close(t->udp.sock);
+            break;
+        case CFG_UNIX:
+            break;
+        case CFG_FILE:
+            if (t->file.path) free(t->file.path);
+            if (t->file.fd != -1) close(t->file.fd);
+            break;
+        case CFG_SYSLOG:
+            break;
+        case CFG_SHM:
+            break;
+    }
+    free(t);
+    *transport = NULL;
 }
 
 int
-transportSend(transport_t* transport, char* msg)
+transportSend(transport_t* t, char* msg)
 {
-    return -1;
-}
+    // strlen(msg)+1 is so we send the null delimiter too
 
-
-/*
-
-// These need to come from a config file 
-#define LOG_FILE 1  // eventually an enum for file, syslog, shared memory  
-static bool g_log = TRUE; 
-static const char g_logFile[] = "/tmp/scope.log"; 
-static unsigned int g_logOp = LOG_FILE; 
-static int g_logfd = -1;
-
-void scopeLog(char *msg, int fd)
-{
-    size_t len;
-
-    if ((g_log == FALSE) || (!msg)) {
-        return;
-    }
-
-    if (g_logOp & LOG_FILE) {
-        char buf[strlen(msg) + 128];
-
-        if ((g_logfd == -1) &&
-            (strlen(g_logFile) > 0)) {
-                g_logfd = open(g_logFile, O_RDWR|O_APPEND);
-        }
-
-        len = sizeof(buf) - strlen(buf);
-        snprintf(buf, sizeof(buf), "Scope: %s(%d): ", g_procname, fd);
-        strncat(buf, msg, len);
-        g_fn.write(g_logfd, buf, strlen(buf));
-    }
-}
-
-static int g_sock = 0;
-static struct sockaddr_in g_saddr;
-static operations_info g_ops;
-
-static
-void initSocket(config_t* cfg)
-{
-    int flags;
-
-    // JRC TBD: We eventually need to support UNIX, FILE, and SYSLOG too...
-    if (cfgOutTransportType(cfg) != CFG_UDP) {
-        scopeLog("initSocket: unsupported TransportType\n", -1);
-        return;
-    }
-
-    // Create a UDP socket
-    g_sock = g_fn.socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (g_sock < 0)     {
-        scopeLog("ERROR: initSocket:socket\n", -1);
-    }
-
-    // Set the socket to non blocking
-    flags = fcntl(g_sock, F_GETFL, 0);
-    fcntl(g_sock, F_SETFL, flags | O_NONBLOCK);
-
-    // Create the address to send to
-    memset(&g_saddr, 0, sizeof(g_saddr));
-    g_saddr.sin_family = AF_INET;
-    g_saddr.sin_port = htons(cfgOutTransportPort(cfg));
-    if (inet_aton(cfgOutTransportHost(cfg), &g_saddr.sin_addr) == 0) {
-        scopeLog("ERROR: initSocket:inet_aton\n", -1);
-    }
-}
-
-static
-void postMetric(const char *metric)
-{
-    ssize_t rc;
-
-    if (!g_fn.socket) {
-        // initSocket must have failed during the constructor
-        scopeLog("postMetric: uninitialized socket\n", -1);
-        return;
-    }
-
-    scopeLog((char *)metric, -1);
-    if (g_fn.sendto) {
-        rc = g_fn.sendto(g_sock, metric, strlen(metric), 0,
-                         (struct sockaddr *)&g_saddr, sizeof(g_saddr));
-        if (rc < 0) {
-            scopeLog("ERROR: sendto\n", g_sock);
-            switch (errno) {
-            case EWOULDBLOCK:
-                g_ops.udp_blocks++;
-                break;
-            default:
-                g_ops.udp_errors++;
+    if (!t || !msg) return -1;
+    switch (t->type) {
+        case CFG_UDP:
+            if (t->udp.sock != -1) {
+                int rc = sendto(t->udp.sock, msg, strlen(msg)+1, 0,
+                                 (struct sockaddr *)&t->udp.saddr, sizeof(t->udp.saddr));
+                if (rc < 0) {
+                    switch (errno) {
+                    case EWOULDBLOCK:
+                        t->udp.ops.udp_blocks++;
+                        break;
+                    default:
+                        t->udp.ops.udp_errors++;
+                    }
+                }
             }
-        }
+            break;
+        case CFG_FILE:
+            if (t->file.fd != -1) {
+                int bytes = write(t->file.fd, msg, strlen(msg)+1);
+                if (bytes < 0) {
+                    // TBD do something here
+                } else {
+                    fsync(t->file.fd);
+                }
+            }
+            break;
+        case CFG_UNIX:
+        case CFG_SYSLOG:
+        case CFG_SHM:
+            return -1;
+            break;
     }
+     return 0;
 }
-
-*/

@@ -75,14 +75,6 @@ enum metric_t {
     PROC_CHILD
 };
 
-typedef struct operations_info_t {
-    unsigned int udp_blocks;
-    unsigned int udp_errors;
-    unsigned int init_errors;
-    unsigned int interpose_errors;
-    char *errMsg[64];
-} operations_info;
-
 typedef struct net_info_t {
     int fd;
     int type;

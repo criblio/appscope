@@ -13,7 +13,7 @@ int                 outSend(out_t*, char* msg);
 char*               outStatsDPrefix(out_t*);
 
 // Setters (modifies out_t, but does not persist modifications)
-void                outSetTransport(out_t*, transport_t*);
+void                outTransportSet(out_t*, transport_t*);
 void                outStatsDPrefixSet(out_t*, char*);
 
 #endif // __OUT_H__

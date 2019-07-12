@@ -14,7 +14,7 @@ int                 logSend(log_t*, char* msg);
 cfg_log_level_t     logLevel(log_t*);
 
 // Setters (modifies log_t, but does not persist modifications)
-void                logSetTransport(log_t*, transport_t*);
+void                logTransportSet(log_t*, transport_t*);
 void                logLevelSet(log_t*, cfg_log_level_t);
 
 #endif // __LOG_H__

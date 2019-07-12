@@ -46,11 +46,11 @@ logLevel(log_t* log)
 }
 
 void
-logSetTransport(log_t* log, transport_t* transport)
+logTransportSet(log_t* log, transport_t* transport)
 {
     if (!log) return;
 
-    // Don't leak if logSetTransport is called repeatedly
+    // Don't leak if logtTransportSe is called repeatedly
     transportDestroy(&log->transport);
     log->transport = transport;
 }

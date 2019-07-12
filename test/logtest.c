@@ -36,7 +36,7 @@ logSendForNullMessageDoesntCrash(void** state)
     assert_non_null(log);
     transport_t* t = transportCreateSyslog();
     assert_non_null(t);
-    logSetTransport(log, t);
+    logTransportSet(log, t);
     assert_int_equal(logSend(log, NULL), -1);
     logDestroy(&log);
 }
@@ -74,7 +74,7 @@ fileEndPosition(char* path)
 }
 
 static void
-logLevelTranportSetAndLogSend(void** state)
+logTranportSetAndLogSend(void** state)
 {
     char* file_path = "/tmp/my.path";
     log_t* log = logCreate();
@@ -84,11 +84,11 @@ logLevelTranportSetAndLogSend(void** state)
     transport_t* t3 = transportCreateSyslog();
     transport_t* t4 = transportCreateShm();
     transport_t* t5 = transportCreateFile(file_path);
-    logSetTransport(log, t1);
-    logSetTransport(log, t2);
-    logSetTransport(log, t3);
-    logSetTransport(log, t4);
-    logSetTransport(log, t5);
+    logTransportSet(log, t1);
+    logTransportSet(log, t2);
+    logTransportSet(log, t3);
+    logTransportSet(log, t4);
+    logTransportSet(log, t5);
 
     // Test that transport is set by testing side effects of logSend
     // affecting the file at file_path when connected to a file transport.
@@ -98,7 +98,7 @@ logLevelTranportSetAndLogSend(void** state)
     assert_int_not_equal(file_pos_before, file_pos_after);
 
     // Test that transport is cleared by seeing no side effects.
-    logSetTransport(log, NULL);
+    logTransportSet(log, NULL);
     file_pos_before = fileEndPosition(file_path);
     assert_int_equal(logSend(log, "Something to send\n"), -1);
     file_pos_after = fileEndPosition(file_path);
@@ -123,7 +123,7 @@ main (int argc, char* argv[])
         cmocka_unit_test(logSendForNullMessageDoesntCrash),
         cmocka_unit_test(logLevelVerifyDefaultLevel),
         cmocka_unit_test(logLevelSetAndGet),
-        cmocka_unit_test(logLevelTranportSetAndLogSend),
+        cmocka_unit_test(logTranportSetAndLogSend),
     };
 
     cmocka_run_group_tests(tests, NULL, NULL);

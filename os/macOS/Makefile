@@ -26,9 +26,11 @@ test: $(YAML_AR) $(TEST_LIB) test/test.c test/cfgtest.c src/cfg.c
 	@echo "Building cfgtest with YAML to inspect size and for real testing"
 	$(CC) -Wall -g -O0 -coverage -o test/macOS/cfgtest $(INCLUDES) $(TEST_INCLUDES) test/cfgtest.c src/cfg.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/macOS/cfgtest
 	$(CC) -Wall -g -O0 -coverage -o test/macOS/transporttest $(INCLUDES) $(TEST_INCLUDES) test/transporttest.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/macOS/transporttest
+	$(CC) -Wall -g -O0 -coverage -o test/macOS/logtest $(INCLUDES) $(TEST_INCLUDES) test/logtest.c src/log.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/macOS/logtest
 	@echo "Running Tests"
 	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/macOS/cfgtest
 	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/macOS/transporttest
+	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/macOS/logtest
 	@echo "Testing Coverage"
 	lcov --capture --directory . --output-file coverage.info
 	genhtml coverage.info --output-directory out

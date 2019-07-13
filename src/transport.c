@@ -155,13 +155,11 @@ transportDestroy(transport_t** transport)
 int
 transportSend(transport_t* t, char* msg)
 {
-    // strlen(msg)+1 is so we send the null delimiter too
-
     if (!t || !msg) return -1;
     switch (t->type) {
         case CFG_UDP:
             if (t->udp.sock != -1) {
-                int rc = sendto(t->udp.sock, msg, strlen(msg)+1, 0,
+                int rc = sendto(t->udp.sock, msg, strlen(msg), 0,
                                  (struct sockaddr *)&t->udp.saddr, sizeof(t->udp.saddr));
                 if (rc < 0) {
                     switch (errno) {
@@ -176,7 +174,7 @@ transportSend(transport_t* t, char* msg)
             break;
         case CFG_FILE:
             if (t->file.fd != -1) {
-                int bytes = write(t->file.fd, msg, strlen(msg)+1);
+                int bytes = write(t->file.fd, msg, strlen(msg));
                 if (bytes < 0) {
                     // TBD do something here
                 } else {

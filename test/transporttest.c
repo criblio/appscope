@@ -181,13 +181,13 @@ transportSendForUdpTransmitsMsg(void** state)
     transport_t* t = transportCreateUdp(hostname, atoi(portname));
     assert_non_null(t);
     char msg[] = "This is the payload message to transfer.\n";
-    char buf[sizeof(msg)] = {0};
+    char buf[sizeof(msg)] = {0};  // Has room for a null at the end
     assert_int_equal(transportSend(t, msg), 0);
 
     struct sockaddr from = {0};
     socklen_t len = {0};
     int byteCount=0;
-    if ((byteCount = recvfrom(sd, buf, sizeof(buf), 0, &from, &len)) != sizeof(msg)) {
+    if ((byteCount = recvfrom(sd, buf, sizeof(buf), 0, &from, &len)) != strlen(msg)) {
         fail_msg("Couldn't recvfrom");
     }
     assert_string_equal(msg, buf);
@@ -214,7 +214,8 @@ transportSendForFileWritesToFile(void** state)
 
     // Since we're at the end, nothing should be there
     char buf[1024];
-    size_t bytesRead = fread(buf, 1, sizeof(buf), f);
+    const int maxReadSize = sizeof(buf)-1;
+    size_t bytesRead = fread(buf, 1, maxReadSize, f);
     assert_int_equal(bytesRead, 0);
     assert_true(feof(f));
     assert_false(ferror(f));
@@ -224,8 +225,11 @@ transportSendForFileWritesToFile(void** state)
     assert_int_equal(transportSend(t, msg), 0);
 
     // Test that after the transportSend, that the msg got there.
-    bytesRead = fread(buf, 1, sizeof(buf), f);
-    assert_int_equal(bytesRead, strlen(msg)+1);
+    bytesRead = fread(buf, 1, maxReadSize, f);
+    // Provide the null ourselves.  Safe because of maxReadSize
+    buf[bytesRead] = '\0';
+
+    assert_int_equal(bytesRead, strlen(msg));
     assert_true(feof(f));
     assert_false(ferror(f));
     assert_string_equal(msg, buf);

@@ -67,7 +67,7 @@ initOut(config_t* cfg)
         outDestroy(&out);
         return out;
     }
-    outSetTransport(out, t);
+    outTransportSet(out, t);
     outStatsDPrefixSet(out, cfgOutStatsDPrefix(cfg));
     return out;
 }
@@ -82,7 +82,7 @@ initLog(config_t* cfg)
         logDestroy(&log);
         return log;
     }
-    logSetTransport(log, t);
+    logTransportSet(log, t);
     logLevelSet(log, cfgLogLevel(cfg));
     return log;
 }

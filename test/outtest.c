@@ -59,16 +59,16 @@ outStatsDPrefixSetAndGet(void** state)
     assert_string_equal(outStatsDPrefix(out), "huh");
     outStatsDPrefixSet(out, NULL);
     assert_null(outStatsDPrefix(out));
+    outDestroy(&out);
 }
 
-static fpos_t
+static long
 fileEndPosition(char* path)
 {
     FILE* f;
     if ((f = fopen(path, "r"))) {
         fseek(f, 0, SEEK_END);
-        fpos_t pos;
-        fgetpos(f, &pos);
+        long pos = ftell(f);
         fclose(f);
         return pos;
     }

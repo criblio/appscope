@@ -184,8 +184,8 @@ transportSendForUdpTransmitsMsg(void** state)
     char buf[sizeof(msg)] = {0};
     assert_int_equal(transportSend(t, msg), 0);
 
-    struct sockaddr from;
-    socklen_t len;
+    struct sockaddr from = {0};
+    socklen_t len = {0};
     int byteCount=0;
     if ((byteCount = recvfrom(sd, buf, sizeof(buf), 0, &from, &len)) != sizeof(msg)) {
         fail_msg("Couldn't recvfrom");

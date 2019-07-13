@@ -57,16 +57,16 @@ logLevelSetAndGet(void** state)
     assert_int_equal(logLevel(log), CFG_LOG_NONE);
     logLevelSet(log, CFG_LOG_DEBUG);
     assert_int_equal(logLevel(log), CFG_LOG_DEBUG);
+    logDestroy(&log);
 }
 
-static fpos_t
+static long
 fileEndPosition(char* path)
 {
     FILE* f;
     if ((f = fopen(path, "r"))) {
         fseek(f, 0, SEEK_END);
-        fpos_t pos;
-        fgetpos(f, &pos);
+        long pos = ftell(f);
         fclose(f);
         return pos;
     }

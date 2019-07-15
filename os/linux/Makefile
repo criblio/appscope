@@ -12,7 +12,7 @@ TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka
 .PHONY: all clean test
 all: $(YAML_AR) libwrap.so
 
-libwrap.so: src/wrap.c src/cfg.c os/$(OS)/os.c src/log.c src/out.c src/transport.c
+libwrap.so: src/wrap.c src/cfg.c os/$(OS)/os.c src/log.c src/out.c src/transport.c src/cfgutils.c
 	@echo "Building libwrap.so ..."
 	$(CC) $(CFLAGS) -o ./lib/$(OS)/$@ $(INCLUDES) $^ $(LD_FLAGS) $(YAML_OBJS)
 
@@ -30,11 +30,13 @@ test: $(YAML_AR) $(TEST_LIB) test/test.c test/cfgtest.c src/cfg.c
 	$(CC) -Wall -g -O0 -coverage -o test/$(OS)/transporttest $(INCLUDES) $(TEST_INCLUDES) test/transporttest.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) -Wall -g -O0 -coverage -o test/$(OS)/logtest $(INCLUDES) $(TEST_INCLUDES) test/logtest.c src/log.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) -Wall -g -O0 -coverage -o test/$(OS)/outtest $(INCLUDES) $(TEST_INCLUDES) test/outtest.c src/out.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) -Wall -g -O0 -coverage -o test/$(OS)/cfgutilstest $(INCLUDES) $(TEST_INCLUDES) test/cfgutilstest.c src/cfgutils.c src/cfg.c src/out.c src/log.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
 	@echo "Running Tests"
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/cfgtest
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/transporttest
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/logtest
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/outtest
+	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/cfgutilstest
 	lcov --capture --directory . --output-file coverage.info
 	genhtml coverage.info --output-directory out
 	# see file:///Users/cribl/scope/out/index.html

@@ -10,5 +10,7 @@ typedef enum {CFG_LOG_DEBUG,
               CFG_LOG_ERROR,
               CFG_LOG_NONE} cfg_log_level_t;
 
+#define CFG_FILE_NAME "scope.cfg"
+
 #endif // __SCOPETYPES_H__
 

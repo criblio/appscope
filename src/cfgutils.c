@@ -1,0 +1,127 @@
+#include <pwd.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include "cfgutils.h"
+#include "scopetypes.h"
+
+char* 
+cfgPath(char* cfgname)
+{
+    // in priority order:
+    //   1) $SCOPE_HOME/conf/scope.cfg
+    //   2) $SCOPE_HOME/scope.cfg
+    //   3) /etc/scope/scope.cfg
+    //   4) ~/conf/scope.cfg
+    //   5) ~/scope.cfg
+    //   6) ./conf/scope.cfg
+    //   7) ./scope.cfg
+
+    char path[1024]; // Somewhat arbitrary choice for MAX_PATH
+
+    char homedir[1024] = {0};
+    {
+        char   username[16]    = {0};
+        getlogin_r(username, sizeof(username));
+        if(username[0]) {
+            struct passwd* pUserInfo = getpwnam(username);
+            if (pUserInfo) {
+                strncpy(homedir, pUserInfo->pw_dir, sizeof(homedir) - 1);
+            }
+        }
+    }
+
+    const char* scope_home = getenv("SCOPE_HOME");
+    if (scope_home &&
+       (snprintf(path, sizeof(path), "%s/conf/%s", scope_home, cfgname) > 0) &&
+        !access(path, R_OK)) {
+        return realpath(path, NULL);
+    }
+    if (scope_home &&
+       (snprintf(path, sizeof(path), "%s/%s", scope_home, cfgname) > 0) &&
+        !access(path, R_OK)) {
+        return realpath(path, NULL);
+    }
+    if ((snprintf(path, sizeof(path), "/etc/scope/%s", cfgname) > 0 ) &&
+        !access(path, R_OK)) {
+        return realpath(path, NULL);
+    }
+    if (homedir[0] &&
+       (snprintf(path, sizeof(path), "%s/conf/%s", homedir, cfgname) > 0) &&
+        !access(path, R_OK)) {
+        return realpath(path, NULL);
+    }
+    if (homedir[0] &&
+       (snprintf(path, sizeof(path), "%s/%s", homedir, cfgname) > 0) &&
+        !access(path, R_OK)) {
+        return realpath(path, NULL);
+    }
+    if ((snprintf(path, sizeof(path), "./conf/%s", cfgname) > 0) &&
+        !access(path, R_OK)) {
+        return realpath(path, NULL);
+    }
+    if ((snprintf(path, sizeof(path), "./%s", cfgname) > 0) &&
+        !access(path, R_OK)) {
+        return realpath(path, NULL);
+    }
+
+    return NULL;
+}
+
+static transport_t*
+initTransport(config_t* cfg, which_transport_t t)
+{
+    transport_t* transport = NULL;
+
+    switch (cfgTransportType(cfg, t)) {
+        case CFG_SYSLOG:
+            transport = transportCreateSyslog();
+            break;
+        case CFG_FILE:
+            transport = transportCreateFile(cfgTransportPath(cfg, t));
+            break;
+        case CFG_UNIX:
+            transport = transportCreateUnix(cfgTransportPath(cfg, t));
+            break;
+        case CFG_UDP:
+            transport = transportCreateUdp(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
+            break;
+        case CFG_SHM:
+            transport = transportCreateShm();
+            break;
+    }
+    return transport;
+}
+
+out_t*
+initOut(config_t* cfg)
+{
+    out_t* out = outCreate();
+    if (!out) return out;
+    transport_t* t = initTransport(cfg, CFG_OUT);
+    if (!t) {
+        outDestroy(&out);
+        return out;
+    }
+    outTransportSet(out, t);
+    outStatsDPrefixSet(out, cfgOutStatsDPrefix(cfg));
+    return out;
+}
+
+log_t*
+initLog(config_t* cfg)
+{
+    log_t* log = logCreate();
+    if (!log) return log;
+    transport_t* t = initTransport(cfg, CFG_LOG);
+    if (!t) {
+        logDestroy(&log);
+        return log;
+    }
+    logTransportSet(log, t);
+    logLevelSet(log, cfgLogLevel(cfg));
+    return log;
+}

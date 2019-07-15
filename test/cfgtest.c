@@ -222,7 +222,7 @@ cfgReadGoodYaml(void** state)
         "  transport:\n"
         "    type: syslog\n"
         "...\n";
-    char* path = "./scope.cfg";
+    char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
     config_t* config = cfgRead(path);
     assert_non_null(config);
@@ -284,7 +284,7 @@ cfgReadEveryTransportType(void** state)
         "    type: shm\n";
     char* transport_lines[] = {udp_str, unix_str, file_str, syslog_str, shm_str};
 
-    char* path = "./scope.cfg";
+    char* path = CFG_FILE_NAME;
 
     int i;
     for (i = 0; i<sizeof(transport_lines) / sizeof(transport_lines[0]); i++) {
@@ -323,7 +323,7 @@ cfgReadEveryProcessLevel(void** state)
         "  level: %s\n"
         "...\n";
 
-    char* path = "./scope.cfg";
+    char* path = CFG_FILE_NAME;
     char* level[] = {"debug", "info", "warning", "error", "none"};
     cfg_log_level_t value[] = {CFG_LOG_DEBUG, CFG_LOG_INFO, CFG_LOG_WARN, CFG_LOG_ERROR, CFG_LOG_NONE};
     int i;
@@ -363,7 +363,7 @@ cfgReadGoodJson(void** state)
         "    }\n"
         "  }\n"
         "}\n";
-    char* path = "./scope.cfg";
+    char* path = CFG_FILE_NAME;
     writeFile(path, jsonText);
     config_t* config = cfgRead(path);
     assert_non_null(config);
@@ -412,7 +412,7 @@ cfgReadBadYamlReturnsDefaults(void** state)
         "  transport:\n"
         "    type: syslog\n"
         "...\n";
-    char* path = "./scope.cfg";
+    char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     config_t* config = cfgRead(path);
@@ -441,7 +441,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "logging:\n"
         "  level: info\n"
         "...\n";
-    char* path = "./scope.cfg";
+    char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     config_t* config = cfgRead(path);
@@ -473,7 +473,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    type: unix\n"
         "  format: expandedstatsd\n"
         "...\n";
-    char* path = "./scope.cfg";
+    char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     config_t* config = cfgRead(path);

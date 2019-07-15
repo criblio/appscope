@@ -1,4 +1,5 @@
 #include "cfg.h"
+#include "cfgutils.h"
 #include "log.h"
 #include "out.h"
 #include "wrap.h"
@@ -31,62 +32,6 @@ postMetric(char* metric)
     scopeLog(metric, -1);
     outSend(g_out, metric);
 }
-
-static transport_t*
-initTransport(config_t* cfg, which_transport_t t)
-{
-    transport_t* transport = NULL;
-
-    switch (cfgTransportType(cfg, t)) {
-        case CFG_SYSLOG:
-            transport = transportCreateSyslog();
-            break;
-        case CFG_FILE:
-            transport = transportCreateFile(cfgTransportPath(cfg, t));
-            break;
-        case CFG_UNIX:
-            transport = transportCreateUnix(cfgTransportPath(cfg, t));
-            break;
-        case CFG_UDP:
-            transport = transportCreateUdp(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
-            break;
-        case CFG_SHM:
-            transport = transportCreateShm();
-            break;
-    }
-    return transport;
-}
-
-static out_t*
-initOut(config_t* cfg)
-{
-    out_t* out = outCreate();
-    if (!out) return out;
-    transport_t* t = initTransport(cfg, CFG_OUT);
-    if (!t) {
-        outDestroy(&out);
-        return out;
-    }
-    outTransportSet(out, t);
-    outStatsDPrefixSet(out, cfgOutStatsDPrefix(cfg));
-    return out;
-}
-
-static log_t*
-initLog(config_t* cfg)
-{
-    log_t* log = logCreate();
-    if (!log) return log;
-    transport_t* t = initTransport(cfg, CFG_LOG);
-    if (!t) {
-        logDestroy(&log);
-        return log;
-    }
-    logTransportSet(log, t);
-    logLevelSet(log, cfgLogLevel(cfg));
-    return log;
-}
-
 
 static
 void addSock(int fd, int type)
@@ -388,11 +333,14 @@ __attribute__((constructor)) void init(void)
 
     osGetProcname(g_procname, sizeof(g_procname));
 
-    // JRC TBD: Don't just hardcode the config file path... use env variable too
-    config_t* cfg = cfgRead("./conf/scope.cfg");
-    g_log = initLog(cfg);
-    g_out = initOut(cfg);
-    cfgDestroy(&cfg);
+    {
+        char * path = cfgPath(CFG_FILE_NAME);
+        config_t* cfg = cfgRead(path);
+        g_log = initLog(cfg);
+        g_out = initOut(cfg);
+        cfgDestroy(&cfg);
+        if (path) free(path);
+    }
 
     if (pthread_create(&periodicTID, NULL, periodic, NULL) != 0) {
         scopeLog("ERROR: Constructor:pthread_create\n", -1);

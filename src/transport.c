@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -31,6 +32,9 @@ struct _transport_t
             int fd;
         } file;
     };
+    ssize_t (*write)(int, const void *, size_t);
+    ssize_t (*sendto)(int, const void *, size_t, int,
+                              const struct sockaddr *, socklen_t);
 };
 
 transport_t*
@@ -156,10 +160,16 @@ int
 transportSend(transport_t* t, char* msg)
 {
     if (!t || !msg) return -1;
+
+    // Use these to avoid infinite recursion...
+    if (!t->write) t->write = dlsym(RTLD_NEXT, "write");
+    if (!t->sendto) t->sendto = dlsym(RTLD_NEXT, "sendto");
+    if (!t->write || !t->sendto) return -1;
+
     switch (t->type) {
         case CFG_UDP:
             if (t->udp.sock != -1) {
-                int rc = sendto(t->udp.sock, msg, strlen(msg), 0,
+                int rc = t->sendto(t->udp.sock, msg, strlen(msg), 0,
                                  (struct sockaddr *)&t->udp.saddr, sizeof(t->udp.saddr));
                 if (rc < 0) {
                     switch (errno) {
@@ -174,7 +184,7 @@ transportSend(transport_t* t, char* msg)
             break;
         case CFG_FILE:
             if (t->file.fd != -1) {
-                int bytes = write(t->file.fd, msg, strlen(msg));
+                int bytes = t->write(t->file.fd, msg, strlen(msg));
                 if (bytes < 0) {
                     // TBD do something here
                 } else {

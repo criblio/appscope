@@ -578,11 +578,13 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
                     sizeof(unsigned int) +
                     strlen(g_hostname) +
                     strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
+                    sizeof(unsigned int) +
+                    strlen(g_netinfo[fd].dnsName) + 1];
 
         if (snprintf(metric, sizeof(metric), STATSD_DNS,
                      g_dns, g_procname, pid,
-                     g_hostname) <= 0) {
+                     g_hostname,
+                     g_netinfo[fd].dnsName) <= 0) {
             scopeLog("ERROR: doNetMetric:DNS:snprintf\n", -1);
         } else {
             postMetric(metric);
@@ -634,15 +636,6 @@ void doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum co
         } else {
             memcpy(&g_netinfo[sd].remoteConn, addr, len);
         }
-
-        if (GET_PORT(sd, g_netinfo[sd].localConn.ss_family, REMOTE) == DNS_PORT) {
-            scopeLog("DNS Remote\n", sd);
-        }
-
-        if (GET_PORT(sd, g_netinfo[sd].localConn.ss_family, LOCAL) == DNS_PORT) {
-            scopeLog("DNS Local\n", sd);
-        }
-
     }
 }
 
@@ -713,6 +706,43 @@ int doAddNewSock(int sockfd)
     return 0;
 }
 
+/*
+ * Dereference a DNS packet and
+ * extract the domain name.
+ *
+ * Example:
+ * This converts "\003www\006google\003com"
+ * in DNS format to www.google.com
+ */
+
+static
+int getDNSName(int sd, void *pkt, int pktlen)
+{
+    dns_query *query;
+    char *aname, *dname;
+
+    query = (struct dns_query_t *)pkt;
+    if ((dname = (char *)&query->name) == NULL) {
+        return -1;
+    }
+
+    // TODO: add size check!
+    aname = g_netinfo[sd].dnsName;
+    dname++; // ignore the ETX
+    while (*dname != '\0') {
+        if (isprint(*dname) != 0) {
+            *aname++ = *dname;
+        } else {
+            *aname++ = '.';
+        }
+        dname++;
+    }
+    *aname = '\0';
+
+    return 0;
+}
+
+
 static
 int doRecv(int sockfd, ssize_t rc)
 {
@@ -734,14 +764,14 @@ int doSend(int sockfd, ssize_t rc)
         doAddNewSock(sockfd);
     }
 
-    //doSetAddrs(sockfd);
+    doSetAddrs(sockfd);
     doNetMetric(NETTX, sockfd, EVENT_BASED);
 
-    if (GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+    if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
         atomicAdd(&g_dns, 1);
         doNetMetric(DNS, sockfd, EVENT_BASED);
     }
-    
+
     return 0;
 }
 
@@ -1262,8 +1292,13 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
     if (rc != -1) {
         dataLog("sendto\n", sockfd);
         doSetConnection(sockfd, dest_addr, addrlen, REMOTE);
+        dumpAddrs(sockfd, REMOTE);
+
+        if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+            getDNSName(sockfd, (void *)buf, len);
+        }
+
         doSend(sockfd, rc);
-        //dumpAddrs(sockfd, REMOTE);
     }
 
     return rc;
@@ -1284,7 +1319,7 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
         dataLog("sendmsg\n", sockfd);
 
         // For UDP connections the msg is a remote addr
-        if (msg && (g_netinfo[sockfd].type != SOCK_STREAM)) {
+        if (g_netinfo && msg && (g_netinfo[sockfd].type != SOCK_STREAM)) {
             if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
                 doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
                                 sizeof(struct sockaddr_in6), REMOTE);
@@ -1293,21 +1328,11 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
                                 sizeof(struct sockaddr_in), REMOTE);
             }
         }
-/*
-        if (GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
-            //char buf[256];
-            //dns_question_t *dns_parse_question(const char *buf, uint32_t len);
-            dns_question_t *question;
 
-            question = dns_parse_question((const char *)msg->msg_iov->iov_base,
-                                          (uint32_t)msg->msg_iov->iov_len);
-            if (question == NULL) {
-                scopeLog("ERROR: sendto:dns_parse_question\n", sockfd);
-            }
-            
-            scopeLog(question->name, sockfd);
+        if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+            getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
         }
-*/
+
         doSend(sockfd, rc);
     }
     

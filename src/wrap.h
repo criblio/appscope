@@ -17,7 +17,9 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <pthread.h>
-//#include <dns_util.h>
+#include <ctype.h>
+
+#include "dns.h"
 
 #ifdef __MACOS__
 #include "../os/macOS/os.h"
@@ -52,7 +54,7 @@
 #define STATSD_NETTX "net.tx:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,localip:%s,localp:%d,remoteip:%s,remotep:%d,data:%s\n"    
 #define STATSD_NETRX_PROC "net.rx:%d|c|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_NETTX_PROC "net.tx:%d|c|#proc:%s,pid:%d,host:%s\n"
-#define STATSD_DNS "net.dns:%d|c|#proc:%s,pid:%d,host:%s\n"
+#define STATSD_DNS "net.dns:%d|c|#proc:%s,pid:%d,host:%s,domain=%s\n"
 
 #define STATSD_PROCMEM "proc.mem:%lu|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCPU "proc.cpu:%lu|g|#proc:%s,pid:%d,host:%s\n"
@@ -103,6 +105,7 @@ typedef struct net_info_t {
     bool network;
     bool listen;
     bool accept;
+    char dnsName[MAX_HOSTNAME];
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;
 } net_info;

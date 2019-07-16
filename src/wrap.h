@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <dlfcn.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -16,6 +17,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <pthread.h>
+//#include <dns_util.h>
 
 #ifdef __MACOS__
 #include "../os/macOS/os.h"
@@ -33,6 +35,7 @@
 // Use these only if a config file is not accesible
 #define PORT 8125
 #define SERVER "172.16.198.1" //"127.0.0.1"
+#define DNS_PORT 53
 
 // Initial size of net array for state
 #define NET_ENTRIES 1024
@@ -48,8 +51,8 @@
 #define STATSD_NETRX "net.rx:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,localip:%s,localp:%d,remoteip:%s,remotep:%d,data:%s\n"
 #define STATSD_NETTX "net.tx:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,localip:%s,localp:%d,remoteip:%s,remotep:%d,data:%s\n"    
 #define STATSD_NETRX_PROC "net.rx:%d|c|#proc:%s,pid:%d,host:%s\n"
-#define STATSD_NETTX_PROC "net.tx:%d|c|#proc:%s,pid:%d,host:%s\n"    
-
+#define STATSD_NETTX_PROC "net.tx:%d|c|#proc:%s,pid:%d,host:%s\n"
+#define STATSD_DNS "net.dns:%d|c|#proc:%s,pid:%d,host:%s\n"
 
 #define STATSD_PROCMEM "proc.mem:%lu|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCPU "proc.cpu:%lu|g|#proc:%s,pid:%d,host:%s\n"
@@ -81,7 +84,8 @@ enum metric_t {
     NETRX,
     NETTX,
     NETRX_PROC,
-    NETTX_PROC
+    NETTX_PROC,
+    DNS
 };
 
 typedef struct operations_info_t {
@@ -99,12 +103,8 @@ typedef struct net_info_t {
     bool network;
     bool listen;
     bool accept;
-    in_port_t localPort;
-    in_port_t remotePort;
-    struct in_addr local4Addr;
-    struct in6_addr local6Addr;
-    struct in_addr remote4Addr;
-    struct in6_addr remote6Addr;
+    struct sockaddr_storage localConn;
+    struct sockaddr_storage remoteConn;
 } net_info;
 
 typedef struct interposed_funcs_t {
@@ -121,6 +121,7 @@ typedef struct interposed_funcs_t {
     ssize_t (*read)(int, void *, size_t);
     ssize_t (*write)(int, const void *, size_t);
     ssize_t (*send)(int, const void *, size_t, int);
+    int (*fcntl)(int, int, ...);
     ssize_t (*sendto)(int, const void *, size_t, int,
                               const struct sockaddr *, socklen_t);
     ssize_t (*sendmsg)(int, const struct msghdr *, int);
@@ -145,5 +146,47 @@ static inline void atomicSub(int *ptr, int val)
 
 extern int close$NOCANCEL(int);
 extern int guarded_close_np(int, void *);
+
+#define GET_PORT(fd, type, which) ({                  \
+        in_port_t port; \
+        switch (type) { \
+    case AF_INET: \
+        if (which == LOCAL) {                                           \
+            port = ((struct sockaddr_in *)&g_netinfo[fd].localConn)->sin_port; \
+        } else {                                                        \
+            port = ((struct sockaddr_in *)&g_netinfo[fd].remoteConn)->sin_port; \
+        }                                                               \
+        break;\
+    case AF_INET6:\
+        if (which == LOCAL) {                                           \
+            port = ((struct sockaddr_in6 *)&g_netinfo[fd].localConn)->sin6_port; \
+        } else {                                                        \
+            port = ((struct sockaddr_in6 *)&g_netinfo[fd].remoteConn)->sin6_port; \
+        } \
+        break; \
+    default: \
+        port = (in_port_t)0; \
+        break; \
+    } \
+        htons(port);})
+
+// struct to hold the next 6 numeric (int/ptr etc) variadic arguments
+// use LOAD_FUNC_ARGS_VALIST to populate this structure
+struct FuncArgs{
+    uint64_t arg[6]; // pick the first 6 args
+};
+
+#define LOAD_FUNC_ARGS_VALIST(a, lastNamedArg)  \
+    do{                                     \
+        va_list __args;                     \
+        va_start(__args, lastNamedArg);     \
+        a.arg[0] = va_arg(__args, uint64_t); \
+        a.arg[1] = va_arg(__args, uint64_t); \
+        a.arg[2] = va_arg(__args, uint64_t); \
+        a.arg[3] = va_arg(__args, uint64_t); \
+        a.arg[4] = va_arg(__args, uint64_t); \
+        a.arg[5] = va_arg(__args, uint64_t); \
+        va_end(__args);                     \
+    }while(0)
 
 #endif // _CONFIG_H_

@@ -1,13 +1,14 @@
 OS=linux
 CC=gcc
-CFLAGS=-fPIC -shared -g -Wall -D__LINUX__
+CFLAGS=-fPIC -shared -g -Wall -Wno-nonnull -D__LINUX__
+TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage
 LD_FLAGS=-ldl -lpthread
 INCLUDES=-I./contrib/libyaml/include
 YAML_AR=contrib/libyaml/src/.libs/libyaml.a
 YAML_OBJS=$(wildcard contrib/libyaml/src/.libs/*.o)
 TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
-TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka
+TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
 
 .PHONY: all clean test
 all: $(YAML_AR) libwrap.so
@@ -24,13 +25,13 @@ test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/
 	@echo "Building Tests"
 	$(CC) -Wall -g -o test/$(OS)/test test/test.c
 	@echo "Building cfgtest without YAML only to inspect size"
-	$(CC) -Wall -g -DNO_YAML -o test/$(OS)/cfgtest $(INCLUDES) $(TEST_INCLUDES) test/cfgtest.c src/cfg.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/$(OS)/cfgtest
-	$(CC) -Wall -g -O0 -coverage -o test/$(OS)/cfgutilstest $(INCLUDES) $(TEST_INCLUDES) test/cfgutilstest.c src/cfgutils.c src/cfg.c src/out.c src/log.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -DNO_YAML -o test/$(OS)/cfgtest $(INCLUDES) $(TEST_INCLUDES) test/cfgtest.c src/cfg.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/$(OS)/cfgtest
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest $(INCLUDES) $(TEST_INCLUDES) test/cfgutilstest.c src/cfgutils.c src/cfg.c src/out.c src/log.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
 	@echo "Building cfgtest with YAML to inspect size and for real testing"
-	$(CC) -Wall -g -O0 -coverage -o test/$(OS)/cfgtest $(INCLUDES) $(TEST_INCLUDES) test/cfgtest.c src/cfg.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/$(OS)/cfgtest
-	$(CC) -Wall -g -O0 -coverage -o test/$(OS)/transporttest $(INCLUDES) $(TEST_INCLUDES) test/transporttest.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
-	$(CC) -Wall -g -O0 -coverage -o test/$(OS)/logtest $(INCLUDES) $(TEST_INCLUDES) test/logtest.c src/log.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
-	$(CC) -Wall -g -O0 -coverage -o test/$(OS)/outtest $(INCLUDES) $(TEST_INCLUDES) test/outtest.c src/out.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest $(INCLUDES) $(TEST_INCLUDES) test/cfgtest.c src/cfg.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/$(OS)/cfgtest
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/transporttest $(INCLUDES) $(TEST_INCLUDES) test/transporttest.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/logtest $(INCLUDES) $(TEST_INCLUDES) test/logtest.c src/log.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/outtest $(INCLUDES) $(TEST_INCLUDES) test/outtest.c src/out.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
 	@echo "Running Tests"
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/cfgutilstest
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/cfgtest

@@ -494,7 +494,7 @@ ssize_t read(int fd, void *buf, size_t count)
 EXPORTOFF
 void vsyslog(int priority, const char *format, va_list ap)
 {
-    char metric[strlen(STATSD_VSYSLOG)];
+    char metric[strlen(STATSD_VSYSLOG)+1];
     
     if (g_fn.vsyslog == NULL) {
         scopeLog("ERROR: vsyslog:NULL\n", -1);

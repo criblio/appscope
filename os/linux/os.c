@@ -19,16 +19,17 @@ int osGetNumThreads(pid_t pid)
         return -1;
     }
 
-     if (read(fd, buf, sizeof(buf)) == -1) {
+    if (read(fd, buf, sizeof(buf)) == -1) {
+        close(fd);
         return -1;
     }
 
-     entry = strtok(buf, delim);
-     for (i = 1; i < 20; i++) {
+    entry = strtok(buf, delim);
+    for (i = 1; i < 20; i++) {
         entry = strtok(NULL, delim);
     }
-
-     return atoi((const char *)entry);
+    close(fd);
+    return atoi((const char *)entry);
 }
 
 int osGetNumFds(pid_t pid)
@@ -50,7 +51,7 @@ int osGetNumFds(pid_t pid)
     }
 
     closedir(dirp);
-    return nfile;
+    return nfile - 1; // we opened one fd to read /fd :)
 }
 
 int osGetNumChildProcs(pid_t pid)

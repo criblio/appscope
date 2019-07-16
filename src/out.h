@@ -9,12 +9,12 @@ out_t*              outCreate();
 void                outDestroy(out_t**);
 
 // Accessors
-int                 outSend(out_t*, char* msg);
-char*               outStatsDPrefix(out_t*);
+int                 outSend(out_t*, const char* msg);
+const char*         outStatsDPrefix(out_t*);
 
 // Setters (modifies out_t, but does not persist modifications)
 void                outTransportSet(out_t*, transport_t*);
-void                outStatsDPrefixSet(out_t*, char*);
+void                outStatsDPrefixSet(out_t*, const char*);
 
 #endif // __OUT_H__
 

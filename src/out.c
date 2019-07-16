@@ -34,14 +34,14 @@ outDestroy(out_t** out)
 }
 
 int
-outSend(out_t* out, char* msg)
+outSend(out_t* out, const char* msg)
 {
     if (!out || !msg) return -1;
 
     return transportSend(out->transport, msg);
 }
 
-char*
+const char*
 outStatsDPrefix(out_t* out)
 {
     return (out) ? out->prefix : DEFAULT_PREFIX;
@@ -58,7 +58,7 @@ outTransportSet(out_t* out, transport_t* transport)
 }
 
 void
-outStatsDPrefixSet(out_t* out, char* prefix)
+outStatsDPrefixSet(out_t* out, const char* prefix)
 {
     if (!out) return;
 

@@ -16,14 +16,14 @@ void
 cfgPathHonorsPriorityOrder(void** state)
 {
     // Get HOME env variable
-    char* home = getenv("HOME");
+    const char* home = getenv("HOME");
     assert_non_null(home);
     char homeConfDir[MAX_PATH];
     int rv = snprintf(homeConfDir, sizeof(homeConfDir), "%s/conf", home);
     assert_int_not_equal(rv, -1);
 
     // Create temp directories
-    char* newdir[] = {"testtempdir1", "testtempdir2", 
+    const char* newdir[] = {"testtempdir1", "testtempdir2", 
                       "testtempdir1/conf", "testtempdir2/conf", 
                       homeConfDir};
     int i;
@@ -46,7 +46,7 @@ cfgPathHonorsPriorityOrder(void** state)
     assert_int_equal(setenv("SCOPE_HOME", scopeHome, 1), 0);
 
     // Create the paths we want to test
-    char file[] = CFG_FILE_NAME ".test"; // scope.cfg.test
+    const char file[] = CFG_FILE_NAME ".test"; // scope.cfg.test
     char path[6][MAX_PATH];
     // Lowest priority first
     snprintf(path[0], sizeof(path[0]), "%s/%s", cwd, file);

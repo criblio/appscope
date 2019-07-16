@@ -9,7 +9,7 @@
 #include "scopetypes.h"
 
 char* 
-cfgPath(char* cfgname)
+cfgPath(const char* cfgname)
 {
     // in priority order:
     //   1) $SCOPE_HOME/conf/scope.cfg

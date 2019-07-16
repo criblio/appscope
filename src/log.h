@@ -10,7 +10,7 @@ log_t*              logCreate();
 void                logDestroy(log_t**);
 
 // Accessors
-int                 logSend(log_t*, char* msg);
+int                 logSend(log_t*, const char* msg);
 cfg_log_level_t     logLevel(log_t*);
 
 // Setters (modifies log_t, but does not persist modifications)

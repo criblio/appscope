@@ -25,7 +25,7 @@ logDestroyNullLogDoesntCrash(void** state)
 static void
 logSendForNullLogDoesntCrash(void** state)
 {
-    char* msg = "Hey, this is cool!\n";
+    const char* msg = "Hey, this is cool!\n";
     assert_int_equal(logSend(NULL, msg), -1);
 }
 
@@ -61,7 +61,7 @@ logLevelSetAndGet(void** state)
 }
 
 static long
-fileEndPosition(char* path)
+fileEndPosition(const char* path)
 {
     FILE* f;
     if ((f = fopen(path, "r"))) {
@@ -76,7 +76,7 @@ fileEndPosition(char* path)
 static void
 logTranportSetAndLogSend(void** state)
 {
-    char* file_path = "/tmp/my.path";
+    const char* file_path = "/tmp/my.path";
     log_t* log = logCreate();
     assert_non_null(log);
     transport_t* t1 = transportCreateUdp("127.0.0.1", 12345);

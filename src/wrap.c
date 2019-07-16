@@ -21,7 +21,7 @@ scopeLog(char* msg, int fd)
     if (!g_log || !msg) return;
 
     char buf[strlen(msg) + 128];
-    snprintf(buf, sizeof(buf), "Scope: %s(%d): %s\n", g_procname, fd, msg);
+    snprintf(buf, sizeof(buf), "Scope: %s(%d): %s", g_procname, fd, msg);
     logSend(g_log, buf);
 }
 
@@ -104,7 +104,6 @@ void doProcMetric(enum metric_t type, long measurement)
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:CPU:snprintf\n", -1);
         }
-        scopeLog(metric, -1);
         postMetric(metric);
     }
     break;
@@ -123,7 +122,6 @@ void doProcMetric(enum metric_t type, long measurement)
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:MEM:snprintf\n", -1);
         }
-        scopeLog(metric, -1);
         postMetric(metric);
     }
     break;
@@ -142,7 +140,6 @@ void doProcMetric(enum metric_t type, long measurement)
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:THREAD:snprintf\n", -1);
         }
-        scopeLog(metric, -1);
         postMetric(metric);
     }
     break;
@@ -161,7 +158,6 @@ void doProcMetric(enum metric_t type, long measurement)
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:FD:snprintf\n", -1);
         }
-        scopeLog(metric, -1);
         postMetric(metric);
     }
     break;
@@ -180,7 +176,6 @@ void doProcMetric(enum metric_t type, long measurement)
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:CHILD:snprintf\n", -1);
         }
-        scopeLog(metric, -1);
         postMetric(metric);
     }
     break;
@@ -334,7 +329,7 @@ __attribute__((constructor)) void init(void)
     osGetProcname(g_procname, sizeof(g_procname));
 
     {
-        char * path = cfgPath(CFG_FILE_NAME);
+        char* path = cfgPath(CFG_FILE_NAME);
         config_t* cfg = cfgRead(path);
         g_log = initLog(cfg);
         g_out = initOut(cfg);

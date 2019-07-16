@@ -296,7 +296,7 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
 }
 
 config_t*
-cfgRead(char* path)
+cfgRead(const char* path)
 {
     FILE* f = NULL;
     config_t* config = NULL;
@@ -330,7 +330,7 @@ cleanup:
 }
 #else
 config_t*
-cfgRead(char* path)
+cfgRead(const char* path)
 {
     return cfgCreateDefault();
 }
@@ -365,7 +365,7 @@ cfgOutFormat(config_t* cfg)
     return (cfg) ? cfg->out.format : DEFAULT_FORMAT;
 }
 
-char*
+const char*
 cfgOutStatsDPrefix(config_t* cfg)
 {
     return (cfg) ? cfg->out.statsd_prefix : DEFAULT_STATSD_PREFIX;
@@ -387,7 +387,7 @@ cfgTransportType(config_t* cfg, which_transport_t t)
     }
 }
 
-char*
+const char*
 cfgTransportHost(config_t* cfg, which_transport_t t)
 {
     if (cfg && t < CFG_WHICH_MAX) {
@@ -419,7 +419,7 @@ cfgTransportPort(config_t* cfg, which_transport_t t)
     }
 }
 
-char*
+const char*
 cfgTransportPath(config_t* cfg, which_transport_t t)
 {
     if (cfg && t  < CFG_WHICH_MAX) {
@@ -442,7 +442,7 @@ cfgFuncFilters(config_t* cfg)
 }
 
 int
-cfgFuncIsFiltered(config_t* cfg, char* funcName)
+cfgFuncIsFiltered(config_t* cfg, const char* funcName)
 {
     if (!funcName) return 0;              // I guess?
     if (!cfg || !cfg->filters) return 0;
@@ -475,7 +475,7 @@ cfgOutFormatSet(config_t* cfg, cfg_out_format_t fmt)
 }
 
 void
-cfgOutStatsDPrefixSet(config_t* cfg, char* prefix)
+cfgOutStatsDPrefixSet(config_t* cfg, const char* prefix)
 {
     if (!cfg) return;
     if (cfg->out.statsd_prefix) free(cfg->out.statsd_prefix);
@@ -507,7 +507,7 @@ cfgTransportTypeSet(config_t* cfg, which_transport_t t, cfg_transport_t type)
 }
 
 void
-cfgTransportHostSet(config_t* cfg, which_transport_t t, char* host)
+cfgTransportHostSet(config_t* cfg, which_transport_t t, const char* host)
 {
     if (!cfg || t >= CFG_WHICH_MAX) return;
     if (cfg->transport[t].udp.host) free(cfg->transport[t].udp.host);
@@ -522,7 +522,7 @@ cfgTransportPortSet(config_t* cfg, which_transport_t t, int port)
 }
 
 void
-cfgTransportPathSet(config_t* cfg, which_transport_t t, char* path)
+cfgTransportPathSet(config_t* cfg, which_transport_t t, const char* path)
 {
     if (!cfg || t >= CFG_WHICH_MAX) return;
     if (cfg->transport[t].path) free(cfg->transport[t].path);
@@ -530,7 +530,7 @@ cfgTransportPathSet(config_t* cfg, which_transport_t t, char* path)
 }
 
 void
-cfgFuncFiltersAdd(config_t* c, char* funcname)
+cfgFuncFiltersAdd(config_t* c, const char* funcname)
 {
     if (!c || !funcname) return;
 

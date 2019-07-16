@@ -32,7 +32,7 @@ logDestroy(log_t** log)
 }
 
 int
-logSend(log_t* log, char* msg)
+logSend(log_t* log, const char* msg)
 {
     if (!log || !msg) return -1;
 

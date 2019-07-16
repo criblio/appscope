@@ -32,13 +32,20 @@ struct _transport_t
             int fd;
         } file;
     };
+
+    // These fields are used to avoid infinite recursion since we call
+    // write and sendto from write and sendto.
+    //
+    // We *could* remove them and use fields from g_fn from wrap.c instead.
+    // However, I don't want to do this because it would create a dependency
+    // from transport to wrap.  (A dep the other way is fine)
     ssize_t (*write)(int, const void *, size_t);
     ssize_t (*sendto)(int, const void *, size_t, int,
                               const struct sockaddr *, socklen_t);
 };
 
 transport_t*
-transportCreateUdp(char* host, int port)
+transportCreateUdp(const char* host, int port)
 {
     if (!host) return NULL;
     transport_t* t = calloc(1, sizeof(transport_t));
@@ -76,7 +83,7 @@ transportCreateUdp(char* host, int port)
 }
 
 transport_t*
-transportCreateFile(char* path)
+transportCreateFile(const char* path)
 {
     if (!path) return NULL;
     transport_t* t = calloc(1, sizeof(transport_t));
@@ -98,7 +105,7 @@ transportCreateFile(char* path)
 }
 
 transport_t*
-transportCreateUnix(char* path)
+transportCreateUnix(const char* path)
 {
     if (!path) return NULL;
     transport_t* t = calloc(1, sizeof(transport_t));
@@ -157,7 +164,7 @@ transportDestroy(transport_t** transport)
 }
 
 int
-transportSend(transport_t* t, char* msg)
+transportSend(transport_t* t, const char* msg)
 {
     if (!t || !msg) return -1;
 

@@ -31,10 +31,11 @@ transportCreateUdpReturnsNullPtrForInvalidHost()
 static void
 transportCreateUdpHandlesGoodHostArguments()
 {
-    char* host_values[] = {"localhost", "www.google.com",
-                         "127.0.0.1", "0.0.0.0", "8.8.4.4",
-                         "::1", "::ffff:127.0.0.1", "::", "2001:4860:4860::8844",
-                         NULL };
+    char* const host_values[] = {
+           "localhost", "www.google.com",
+           "127.0.0.1", "0.0.0.0", "8.8.4.4",
+           "::1", "::ffff:127.0.0.1", "::", "2001:4860:4860::8844",
+           NULL };
 
     // These don't work yet, but should before we're done
     // Until then, stick to a string with IPv4 style notation.
@@ -126,14 +127,14 @@ transportDestroyNullTransportDoesNothing(void** state)
 static void
 transportSendForNullTransportDoesNothing(void** state)
 {
-    char* msg = "Hey, this is cool!\n";
+    const char* msg = "Hey, this is cool!\n";
     assert_int_equal(transportSend(NULL, msg), -1);
 }
 
 static void
 transportSendForNullMessageDoesNothing(void** state)
 {
-    char* path = "/tmp/path";
+    const char* path = "/tmp/path";
     transport_t* t = transportCreateFile(path);
     assert_non_null(t);
     assert_int_equal(transportSend(t, NULL), -1);
@@ -161,8 +162,8 @@ transportSendForUnimplementedTransportTypesIsHarmless(void** state)
 static void
 transportSendForUdpTransmitsMsg(void** state)
 {
-    char* hostname = "127.0.0.1";
-    char* portname = "8126";
+    const char* hostname = "127.0.0.1";
+    const char* portname = "8126";
     struct addrinfo hints = {0};
     hints.ai_family=AF_UNSPEC;
     hints.ai_socktype=SOCK_DGRAM;
@@ -180,7 +181,7 @@ transportSendForUdpTransmitsMsg(void** state)
 
     transport_t* t = transportCreateUdp(hostname, atoi(portname));
     assert_non_null(t);
-    char msg[] = "This is the payload message to transfer.\n";
+    const char msg[] = "This is the payload message to transfer.\n";
     char buf[sizeof(msg)] = {0};  // Has room for a null at the end
     assert_int_equal(transportSend(t, msg), 0);
 
@@ -201,7 +202,7 @@ transportSendForUdpTransmitsMsg(void** state)
 static void
 transportSendForFileWritesToFile(void** state)
 {
-    char* path = "/tmp/mypath";
+    const char* path = "/tmp/mypath";
     transport_t* t = transportCreateFile(path);
     assert_non_null(t);
 
@@ -221,7 +222,7 @@ transportSendForFileWritesToFile(void** state)
     assert_false(ferror(f));
     clearerr(f);
 
-    char msg[] = "This is the payload message to transfer.\n";
+    const char msg[] = "This is the payload message to transfer.\n";
     assert_int_equal(transportSend(t, msg), 0);
 
     // Test that after the transportSend, that the msg got there.

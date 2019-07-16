@@ -1,5 +1,5 @@
-#ifndef _CONFIG_H_
-#define _CONFIG_H_
+#ifndef __WRAP_H__
+#define __WRAP_H__
 
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -121,4 +121,4 @@ static inline void atomicSub(int *ptr, int val)
 extern int close$NOCANCEL(int);
 extern int guarded_close_np(int, void *);
 
-#endif // _CONFIG_H_
+#endif // __WRAP_H__

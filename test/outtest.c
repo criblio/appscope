@@ -25,7 +25,7 @@ outDestroyNullOutDoesntCrash(void** state)
 static void
 outSendForNullOutDoesntCrash(void** state)
 {
-    char* msg = "Hey, this is cool!\n";
+    const char* msg = "Hey, this is cool!\n";
     assert_int_equal(outSend(NULL, msg), -1);
 }
 
@@ -63,7 +63,7 @@ outStatsDPrefixSetAndGet(void** state)
 }
 
 static long
-fileEndPosition(char* path)
+fileEndPosition(const char* path)
 {
     FILE* f;
     if ((f = fopen(path, "r"))) {
@@ -78,7 +78,7 @@ fileEndPosition(char* path)
 static void
 outTranportSetAndOutSend(void** state)
 {
-    char* file_path = "/tmp/my.path";
+    const char* file_path = "/tmp/my.path";
     out_t* out = outCreate();
     assert_non_null(out);
     transport_t* t1 = transportCreateUdp("127.0.0.1", 12345);

@@ -4,7 +4,9 @@
 #include "log.h"
 #include "out.h"
 
-char* cfgPath(char* cfgname);
+// cfgPath returns a pointer to a malloc()'d buffer.
+// The caller is responsible for deallocating with free().
+char* cfgPath(const char* cfgname);
 
 out_t* initOut(config_t* cfg);
 log_t* initLog(config_t* cfg);

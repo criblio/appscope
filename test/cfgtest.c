@@ -24,7 +24,7 @@ verifyDefaults(config_t* config)
 }
 
 int
-writeFile(char* path, char* text)
+writeFile(const char* path, const char* text)
 {
     FILE* f = fopen(path, "w");
     if (!f)
@@ -40,7 +40,7 @@ writeFile(char* path, char* text)
 }
 
 int
-deleteFile(char* path)
+deleteFile(const char* path)
 {
     return unlink(path);
 }
@@ -205,7 +205,7 @@ static void
 cfgReadGoodYaml(void** state)
 {
     // Test file config (yaml)
-    char* yamlText = 
+    const char* yamlText =
         "---\n" 
         "output:\n" 
         "  format: newlinedelimited          # expandedstatsd, newlinedelimited\n" 
@@ -222,7 +222,7 @@ cfgReadGoodYaml(void** state)
         "  transport:\n"
         "    type: syslog\n"
         "...\n";
-    char* path = CFG_FILE_NAME;
+    const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
     config_t* config = cfgRead(path);
     assert_non_null(config);
@@ -246,7 +246,7 @@ cfgReadGoodYaml(void** state)
 }
 
 static void
-writeFileWithSubstitution(char* path, char* base, char* variable)
+writeFileWithSubstitution(const char* path, const char* base, const char* variable)
 {
     char buf[4096];
     int n = snprintf(buf, sizeof(buf), base, variable);
@@ -261,30 +261,30 @@ writeFileWithSubstitution(char* path, char* base, char* variable)
 static void
 cfgReadEveryTransportType(void** state)
 {
-    char* yamlText =
+    const char* yamlText =
         "---\n"
         "output:\n"
         "  transport:\n"
         "%s"
         "...\n";
 
-    char* udp_str =
+    const char* udp_str =
         "    type: udp\n"
         "    host: 'labmachine8235'\n"
         "    port: 235\n";
-    char* unix_str =
+    const char* unix_str =
         "    type: unix\n"
         "    path: '/var/run/scope.sock'\n";
-    char* file_str =
+    const char* file_str =
         "    type: file\n"
         "    path: '/var/log/scope.log'\n";
-    char* syslog_str =
+    const char* syslog_str =
         "    type: syslog\n";
-    char* shm_str =
+    const char* shm_str =
         "    type: shm\n";
-    char* transport_lines[] = {udp_str, unix_str, file_str, syslog_str, shm_str};
+    const char* transport_lines[] = {udp_str, unix_str, file_str, syslog_str, shm_str};
 
-    char* path = CFG_FILE_NAME;
+    const char* path = CFG_FILE_NAME;
 
     int i;
     for (i = 0; i<sizeof(transport_lines) / sizeof(transport_lines[0]); i++) {
@@ -317,14 +317,14 @@ cfgReadEveryTransportType(void** state)
 static void
 cfgReadEveryProcessLevel(void** state)
 {
-    char* yamlText =
+    const char* yamlText =
         "---\n"
         "logging:\n"
         "  level: %s\n"
         "...\n";
 
-    char* path = CFG_FILE_NAME;
-    char* level[] = {"debug", "info", "warning", "error", "none"};
+    const char* path = CFG_FILE_NAME;
+    const char* level[] = {"debug", "info", "warning", "error", "none"};
     cfg_log_level_t value[] = {CFG_LOG_DEBUG, CFG_LOG_INFO, CFG_LOG_WARN, CFG_LOG_ERROR, CFG_LOG_NONE};
     int i;
     for (i = 0; i< sizeof(level)/sizeof(level[0]); i++) {
@@ -341,7 +341,7 @@ static void
 cfgReadGoodJson(void** state)
 {
     // Test file config (json)
-    char* jsonText =
+    const char* jsonText =
         "{\n"
         "  'output': {\n"
         "    'format': 'newlinedelimited',\n"
@@ -363,7 +363,7 @@ cfgReadGoodJson(void** state)
         "    }\n"
         "  }\n"
         "}\n";
-    char* path = CFG_FILE_NAME;
+    const char* path = CFG_FILE_NAME;
     writeFile(path, jsonText);
     config_t* config = cfgRead(path);
     assert_non_null(config);
@@ -397,7 +397,7 @@ cfgReadNonExistentFileReturnsDefaults(void** state)
 static void
 cfgReadBadYamlReturnsDefaults(void** state)
 {
-    char* yamlText =
+    const char* yamlText =
         "---\n"
         "output:\n"
         "  format: newlinedelimited\n"
@@ -412,7 +412,7 @@ cfgReadBadYamlReturnsDefaults(void** state)
         "  transport:\n"
         "    type: syslog\n"
         "...\n";
-    char* path = CFG_FILE_NAME;
+    const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     config_t* config = cfgRead(path);
@@ -425,7 +425,7 @@ cfgReadBadYamlReturnsDefaults(void** state)
 static void
 cfgReadExtraFieldsAreHarmless(void** state)
 {
-    char* yamlText =
+    const char* yamlText =
         "---\n"
         "momsApplePieRecipe:                # has possibilities...\n"
         "  [apples,sugar,flour,dirt]        # dirt mom?  Really?\n"
@@ -441,7 +441,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "logging:\n"
         "  level: info\n"
         "...\n";
-    char* path = CFG_FILE_NAME;
+    const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     config_t* config = cfgRead(path);
@@ -461,7 +461,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
 static void
 cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
 {
-    char* yamlText =
+    const char* yamlText =
         "---\n"
         "logging:\n"
         "  level: info\n"
@@ -473,7 +473,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    type: unix\n"
         "  format: expandedstatsd\n"
         "...\n";
-    char* path = CFG_FILE_NAME;
+    const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     config_t* config = cfgRead(path);

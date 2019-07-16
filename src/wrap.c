@@ -1,8 +1,9 @@
+#include "cfg.h"
+#include "cfgutils.h"
+#include "log.h"
+#include "out.h"
 #include "wrap.h"
 
-static int g_sock = 0;
-static struct sockaddr_in g_saddr;
-static operations_info g_ops;
 static net_info *g_netinfo;
 static int g_numNinfo;
 static char g_hostname[MAX_HOSTNAME];
@@ -11,88 +12,25 @@ static int g_openPorts = 0;
 static int g_activeConnections = 0;
 static interposed_funcs g_fn;
 
-// These need to come from a config file
-#define LOG_FILE 1  // eventually an enum for file, syslog, shared memory 
-static bool g_log = TRUE;
-static const char g_logFile[] = "/tmp/scope.log";
-static unsigned int g_logOp = LOG_FILE;
-static int g_logfd = -1;
+static log_t* g_log = NULL;
+static out_t* g_out = NULL;
 
-static
-void scopeLog(char *msg, int fd)
+static void
+scopeLog(char* msg, int fd)
 {
-    size_t len;
-    
-    if ((g_log == FALSE) || (!msg)) {
-        return;
-    }
+    if (!g_log || !msg) return;
 
-    if (g_logOp & LOG_FILE) {
-        char buf[strlen(msg) + 128];
-        
-        if ((g_logfd == -1) && 
-            (strlen(g_logFile) > 0)) {
-                g_logfd = open(g_logFile, O_RDWR|O_APPEND);
-        }
-
-        len = sizeof(buf) - strlen(buf);
-        snprintf(buf, sizeof(buf), "Scope: %s(%d): ", g_procname, fd);
-        strncat(buf, msg, len);
-        g_fn.write(g_logfd, buf, strlen(buf));
-    }        
+    char buf[strlen(msg) + 128];
+    snprintf(buf, sizeof(buf), "Scope: %s(%d): %s", g_procname, fd, msg);
+    logSend(g_log, buf);
 }
 
-static
-void initSocket(void)
+static void
+postMetric(char* metric)
 {
-    int flags;
-    char server[sizeof(SERVER) + 1];
-
-    // Create a UDP socket
-    g_sock = g_fn.socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (g_sock < 0)	{
-        scopeLog("ERROR: initSocket:socket\n", -1);
-    }
-
-    // Set the socket to non blocking
-    flags = fcntl(g_sock, F_GETFL, 0);
-    fcntl(g_sock, F_SETFL, flags | O_NONBLOCK);
-
-    // Create the address to send to
-    strncpy(server, SERVER, sizeof(SERVER));
-        
-    memset(&g_saddr, 0, sizeof(g_saddr));
-    g_saddr.sin_family = AF_INET;
-    g_saddr.sin_port = htons(PORT);
-    if (inet_aton(server, &g_saddr.sin_addr) == 0) {
-        scopeLog("ERROR: initSocket:inet_aton\n", -1);
-    }
-}
-
-static
-void postMetric(const char *metric)
-{
-    ssize_t rc;
-
-    if (g_fn.socket == 0) {
-        initSocket();
-    }
-
-    scopeLog((char *)metric, -1);
-    if (g_fn.sendto) {
-        rc = g_fn.sendto(g_sock, metric, strlen(metric), 0, 
-                         (struct sockaddr *)&g_saddr, sizeof(g_saddr));
-        if (rc < 0) {
-            scopeLog("ERROR: sendto\n", g_sock);
-            switch (errno) {
-            case EWOULDBLOCK:
-                g_ops.udp_blocks++;
-                break;
-            default:
-                g_ops.udp_errors++;
-            }
-        }
-    }
+    if (!g_out || !metric) return;
+    scopeLog(metric, -1);
+    outSend(g_out, metric);
 }
 
 static
@@ -166,7 +104,6 @@ void doProcMetric(enum metric_t type, long measurement)
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:CPU:snprintf\n", -1);
         }
-        scopeLog(metric, -1);
         postMetric(metric);
     }
     break;
@@ -185,7 +122,6 @@ void doProcMetric(enum metric_t type, long measurement)
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:MEM:snprintf\n", -1);
         }
-        scopeLog(metric, -1);
         postMetric(metric);
     }
     break;
@@ -204,7 +140,6 @@ void doProcMetric(enum metric_t type, long measurement)
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:THREAD:snprintf\n", -1);
         }
-        scopeLog(metric, -1);
         postMetric(metric);
     }
     break;
@@ -223,7 +158,6 @@ void doProcMetric(enum metric_t type, long measurement)
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:FD:snprintf\n", -1);
         }
-        scopeLog(metric, -1);
         postMetric(metric);
     }
     break;
@@ -242,7 +176,6 @@ void doProcMetric(enum metric_t type, long measurement)
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:CHILD:snprintf\n", -1);
         }
-        scopeLog(metric, -1);
         postMetric(metric);
     }
     break;
@@ -394,8 +327,15 @@ __attribute__((constructor)) void init(void)
     }
 
     osGetProcname(g_procname, sizeof(g_procname));
-        
-    initSocket();
+
+    {
+        char* path = cfgPath(CFG_FILE_NAME);
+        config_t* cfg = cfgRead(path);
+        g_log = initLog(cfg);
+        g_out = initOut(cfg);
+        cfgDestroy(&cfg);
+        if (path) free(path);
+    }
 
     if (pthread_create(&periodicTID, NULL, periodic, NULL) != 0) {
         scopeLog("ERROR: Constructor:pthread_create\n", -1);
@@ -514,7 +454,7 @@ ssize_t write(int fd, const void *buf, size_t count)
 
     // Don't init the socket from write; starts early
     // Delay posts until init is complete
-    if (g_sock != 0) {
+    if (g_out != 0) {
         char metric[strlen(STATSD_WRITE) + 16];
         
         if (snprintf(metric, sizeof(metric), STATSD_WRITE, (int)count) <= 0) {
@@ -549,7 +489,7 @@ ssize_t read(int fd, void *buf, size_t count)
 EXPORTOFF
 void vsyslog(int priority, const char *format, va_list ap)
 {
-    char metric[strlen(STATSD_VSYSLOG)];
+    char metric[strlen(STATSD_VSYSLOG)+1];
     
     if (g_fn.vsyslog == NULL) {
         scopeLog("ERROR: vsyslog:NULL\n", -1);
@@ -803,7 +743,7 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
         return -1;
     }
 
-    if (g_sock != 0) {
+    if (g_out != 0) {
         char metric[strlen(STATSD_SENDTO) + 16];
 
         if (snprintf(metric, sizeof(metric), STATSD_SENDTO, (int)len) <= 0) {
@@ -824,7 +764,7 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
         return -1;
     }
 
-    if (g_sock != 0) {
+    if (g_out != 0) {
         char metric[strlen(STATSD_SENDMSG) + 16];
 
         if (snprintf(metric, sizeof(metric), STATSD_SENDMSG) <= 0) {
@@ -845,7 +785,7 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags)
         return -1;
     }
 
-    if (g_sock != 0) {
+    if (g_out != 0) {
         char metric[strlen(STATSD_RECV) + 16];
 
         if (snprintf(metric, sizeof(metric), STATSD_RECV, (int)len) <= 0) {

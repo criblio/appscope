@@ -1,5 +1,5 @@
-#ifndef _CONFIG_H_
-#define _CONFIG_H_
+#ifndef __WRAP_H__
+#define __WRAP_H__
 
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -29,10 +29,6 @@
 #define EXPORT __attribute__((visibility("default")))
 #define EXPORTOFF  __attribute__((visibility("hidden")))
 #define EXPORTON __attribute__((visibility("default")))
-
-// Use these only if a config file is not accesible
-#define PORT 8125
-#define SERVER "172.16.198.1" //"127.0.0.1"
 
 // Initial size of net array for state
 #define NET_ENTRIES 1024
@@ -78,14 +74,6 @@ enum metric_t {
     PROC_FD,
     PROC_CHILD
 };
-
-typedef struct operations_info_t {
-    unsigned int udp_blocks;
-    unsigned int udp_errors;
-    unsigned int init_errors;
-    unsigned int interpose_errors;
-    char *errMsg[64];
-} operations_info;
 
 typedef struct net_info_t {
     int fd;
@@ -133,4 +121,4 @@ static inline void atomicSub(int *ptr, int val)
 extern int close$NOCANCEL(int);
 extern int guarded_close_np(int, void *);
 
-#endif // _CONFIG_H_
+#endif // __WRAP_H__

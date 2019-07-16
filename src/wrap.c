@@ -23,7 +23,7 @@ static bool g_log = TRUE;
 static const char g_logFile[] = "/tmp/scope.log";
 static unsigned int g_logOp = LOG_FILE;
 static int g_logfd = -1;
-static bool g_logDataPath = TRUE;
+static bool g_logDataPath = FALSE;
 static bool cfgNETRXTXPeriodic = TRUE;
 static int cfgPeriod = 10;
 
@@ -127,7 +127,7 @@ void postMetric(const char *metric)
         rc = g_fn.sendto(g_sock, metric, strlen(metric), 0, 
                          (struct sockaddr *)&g_saddr, sizeof(g_saddr));
         if (rc < 0) {
-            scopeLog("ERROR: psotMetric:sendto\n", g_sock);
+            scopeLog("ERROR: postMetric:sendto\n", g_sock);
             switch (errno) {
             case EWOULDBLOCK:
                 g_ops.udp_blocks++;
@@ -630,7 +630,9 @@ long doGetProcMem(pid_t pid) {
 static
 void doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control_type_t endp)
 {
-    if (g_netinfo && (g_netinfo[sd].fd == sd)) {
+    // Should we check for at least the size of sockaddr_in?
+    if (g_netinfo && (g_netinfo[sd].fd == sd) &&
+        addr && (len > 0)) {
         if (endp == LOCAL) {
             memcpy(&g_netinfo[sd].localConn, addr, len);
         } else {
@@ -753,6 +755,7 @@ int doRecv(int sockfd, ssize_t rc)
 
     doSetAddrs(sockfd);
     doNetMetric(NETRX, sockfd, EVENT_BASED);
+
     return 0;
 }
 
@@ -1292,7 +1295,7 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
     if (rc != -1) {
         dataLog("sendto\n", sockfd);
         doSetConnection(sockfd, dest_addr, addrlen, REMOTE);
-        dumpAddrs(sockfd, REMOTE);
+        //dumpAddrs(sockfd, REMOTE);
 
         if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
             getDNSName(sockfd, (void *)buf, len);

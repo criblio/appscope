@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <dlfcn.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -16,6 +17,9 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <ctype.h>
+
+#include "dns.h"
 
 #ifdef __MACOS__
 #include "../os/macOS/os.h"
@@ -29,16 +33,24 @@
 #define EXPORT __attribute__((visibility("default")))
 #define EXPORTOFF  __attribute__((visibility("hidden")))
 #define EXPORTON __attribute__((visibility("default")))
+#define DNS_PORT 53
 
 // Initial size of net array for state
 #define NET_ENTRIES 1024
 #define MAX_FDS 4096
 #define PROTOCOL_STR 8
-#define MAX_HOSTNAME 128
+#define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
+#define SCOPE_UNIX 99
 
 #define STATSD_OPENPORTS "net.port:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
-#define STATSD_ACTIVECONNS "net.conn:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
+#define STATSD_TCPCONNS "net.tcp:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
+#define STATSD_ACTIVECONNS "net.conn:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
+#define STATSD_NETRX "net.rx:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,localip:%s,localp:%d,remoteip:%s,remotep:%d,data:%s\n"
+#define STATSD_NETTX "net.tx:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,localip:%s,localp:%d,remoteip:%s,remotep:%d,data:%s\n"    
+#define STATSD_NETRX_PROC "net.rx:%d|c|#proc:%s,pid:%d,host:%s\n"
+#define STATSD_NETTX_PROC "net.tx:%d|c|#proc:%s,pid:%d,host:%s\n"
+#define STATSD_DNS "net.dns:%d|c|#proc:%s,pid:%d,host:%s,domain=%s\n"
 
 #define STATSD_PROCMEM "proc.mem:%lu|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCPU "proc.cpu:%lu|g|#proc:%s,pid:%d,host:%s\n"
@@ -46,41 +58,44 @@
 #define STATSD_PROCFD "proc.fd:%d|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCHILD "proc.child:%d|g|#proc:%s,pid:%d,host:%s\n"
 
-/*
- * NOTE: The following constants are ALL going away
- * They were used for initial signs of life in OSX
- * Left here so that compilations works
- * Using them if we want to see if a function is interposed or called
- */
-#define STATSD_READ "cribl.scope.calls.read.bytes:%d|c\n"
-#define STATSD_WRITE "cribl.scope.calls.write.bytes:%d|c\n"
-#define STATSD_VSYSLOG "cribl.scope.calls.vsyslog|c\n"
-#define STATSD_SEND "cribl.scope.calls.send.bytes:%d|c\n"
-#define STATSD_SENDTO "cribl.scope.calls.sendto.bytes:%d|c\n"
-#define STATSD_SENDMSG "cribl.scope.calls.sendmsg|c\n"
-#define STATSD_RECV "cribl.scope.calls.recv.bytes:%d|c\n"
-
-
 #ifndef bool
 typedef unsigned int bool;
 #endif
 
+// Several control types, used in several areas
+enum control_type_t {
+    LOCAL,
+    REMOTE,
+    PERIODIC,
+    EVENT_BASED
+};
+
 enum metric_t {
     OPEN_PORTS,
+    TCP_CONNECTIONS,
     ACTIVE_CONNECTIONS,
     PROC_CPU,
     PROC_MEM,
     PROC_THREAD,
     PROC_FD,
-    PROC_CHILD
+    PROC_CHILD,
+    NETRX,
+    NETTX,
+    NETRX_PROC,
+    NETTX_PROC,
+    DNS
 };
 
 typedef struct net_info_t {
     int fd;
     int type;
+    int addrType;
+    bool network;
     bool listen;
     bool accept;
-    in_port_t port;
+    char dnsName[MAX_HOSTNAME];
+    struct sockaddr_storage localConn;
+    struct sockaddr_storage remoteConn;
 } net_info;
 
 typedef struct interposed_funcs_t {
@@ -93,9 +108,11 @@ typedef struct interposed_funcs_t {
     int (*connect)(int, const struct sockaddr *, socklen_t);
     int (*accept)(int, struct sockaddr *, socklen_t *);
     int (*accept4)(int, struct sockaddr *, socklen_t *, int);
+    int (*accept$NOCANCEL)(int, struct sockaddr *, socklen_t *);
     ssize_t (*read)(int, void *, size_t);
     ssize_t (*write)(int, const void *, size_t);
     ssize_t (*send)(int, const void *, size_t, int);
+    int (*fcntl)(int, int, ...);
     ssize_t (*sendto)(int, const void *, size_t, int,
                               const struct sockaddr *, socklen_t);
     ssize_t (*sendmsg)(int, const struct msghdr *, int);
@@ -120,5 +137,47 @@ static inline void atomicSub(int *ptr, int val)
 
 extern int close$NOCANCEL(int);
 extern int guarded_close_np(int, void *);
+
+#define GET_PORT(fd, type, which) ({                  \
+        in_port_t port; \
+        switch (type) { \
+    case AF_INET: \
+        if (which == LOCAL) {                                           \
+            port = ((struct sockaddr_in *)&g_netinfo[fd].localConn)->sin_port; \
+        } else {                                                        \
+            port = ((struct sockaddr_in *)&g_netinfo[fd].remoteConn)->sin_port; \
+        }                                                               \
+        break;\
+    case AF_INET6:\
+        if (which == LOCAL) {                                           \
+            port = ((struct sockaddr_in6 *)&g_netinfo[fd].localConn)->sin6_port; \
+        } else {                                                        \
+            port = ((struct sockaddr_in6 *)&g_netinfo[fd].remoteConn)->sin6_port; \
+        } \
+        break; \
+    default: \
+        port = (in_port_t)0; \
+        break; \
+    } \
+        htons(port);})
+
+// struct to hold the next 6 numeric (int/ptr etc) variadic arguments
+// use LOAD_FUNC_ARGS_VALIST to populate this structure
+struct FuncArgs{
+    uint64_t arg[6]; // pick the first 6 args
+};
+
+#define LOAD_FUNC_ARGS_VALIST(a, lastNamedArg)  \
+    do{                                     \
+        va_list __args;                     \
+        va_start(__args, lastNamedArg);     \
+        a.arg[0] = va_arg(__args, uint64_t); \
+        a.arg[1] = va_arg(__args, uint64_t); \
+        a.arg[2] = va_arg(__args, uint64_t); \
+        a.arg[3] = va_arg(__args, uint64_t); \
+        a.arg[4] = va_arg(__args, uint64_t); \
+        a.arg[5] = va_arg(__args, uint64_t); \
+        va_end(__args);                     \
+    }while(0)
 
 #endif // __WRAP_H__

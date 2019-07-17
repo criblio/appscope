@@ -4,14 +4,24 @@
 #include "out.h"
 #include "wrap.h"
 
+interposed_funcs g_fn;
+
 static net_info *g_netinfo;
 static int g_numNinfo;
 static char g_hostname[MAX_HOSTNAME];
 static char g_procname[MAX_PROCNAME];
 static int g_openPorts = 0;
+static int g_TCPConnections = 0;
 static int g_activeConnections = 0;
-static interposed_funcs g_fn;
+static int g_netrx = 0;
+static int g_nettx = 0;
+static int g_dns = 0;
 
+// These need to come from a config file
+// Do we like the g_ or the cfg prefix?
+static bool g_logDataPath = FALSE;
+static bool cfgNETRXTXPeriodic = TRUE;
+static int cfgPeriod = 10;
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
 
@@ -23,6 +33,42 @@ scopeLog(char* msg, int fd)
     char buf[strlen(msg) + 128];
     snprintf(buf, sizeof(buf), "Scope: %s(%d): %s", g_procname, fd, msg);
     logSend(g_log, buf);
+}
+
+static
+void dataLog(char *msg, int fd)
+{
+
+    if (g_logDataPath == TRUE) {
+        scopeLog(msg, fd);
+    }
+}
+
+// DEBUG
+EXPORTOFF
+void dumpAddrs(int sd, enum control_type_t endp)
+{
+    in_port_t port;
+    char ip[INET6_ADDRSTRLEN];                                                                                         
+    char buf[1024];
+
+    inet_ntop(AF_INET,                                                                                               
+              &((struct sockaddr_in *)&g_netinfo[sd].localConn)->sin_addr,
+              ip, sizeof(ip));
+    port = GET_PORT(sd, g_netinfo[sd].localConn.ss_family, LOCAL);
+    snprintf(buf, sizeof(buf), "%s:%d LOCAL: %s:%d\n", __FUNCTION__, __LINE__, ip, port);
+    scopeLog(buf, sd);
+
+    inet_ntop(AF_INET,                                          
+              &((struct sockaddr_in *)&g_netinfo[sd].remoteConn)->sin_addr,
+              ip, sizeof(ip));
+    port = GET_PORT(sd, g_netinfo[sd].remoteConn.ss_family, REMOTE);
+    snprintf(buf, sizeof(buf), "%s:%d REMOTE:%s:%d\n", __FUNCTION__, __LINE__, ip, port);
+    scopeLog(buf, sd);
+    
+    if (GET_PORT(sd, g_netinfo[sd].localConn.ss_family, REMOTE) == DNS_PORT) {
+        scopeLog("DNS\n", sd);
+    }
 }
 
 static void
@@ -44,12 +90,12 @@ void addSock(int fd, int type)
                 atomicSub(&g_openPorts, 1);
             }
             
-            if (g_activeConnections > 0) {
-                atomicSub(&g_activeConnections, 1);
+            if (g_TCPConnections > 0) {
+                atomicSub(&g_TCPConnections, 1);
             }
             
             scopeLog("decr\n", g_openPorts);
-            scopeLog("decr conn\n", g_activeConnections);
+            scopeLog("decr conn\n", g_TCPConnections);
             return;
         }
         
@@ -64,7 +110,6 @@ void addSock(int fd, int type)
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].fd = fd;
         g_netinfo[fd].type = type;
-        scopeLog("addSock\n", fd);
     }
 }
 
@@ -75,10 +120,19 @@ int getProtocol(int type, char *proto, size_t len)
         return -1;
     }
     
-    if (type & SOCK_STREAM) {
+    if (type == SOCK_STREAM) {
         strncpy(proto, "TCP", len);
-    } else if (type & SOCK_DGRAM) {
+    } else if (type == SOCK_DGRAM) {
         strncpy(proto, "UDP", len);
+    } else if (type == SCOPE_UNIX) {
+        // added, not a socket type, want to know if it's a UNIX socket
+        strncpy(proto, "UNIX", len);
+    } else if (type == SOCK_RAW) {
+        strncpy(proto, "RAW", len);
+    } else if (type == SOCK_RDM) {
+        strncpy(proto, "RDM", len);
+    } else if (type == SOCK_SEQPACKET) {
+        strncpy(proto, "SEQPACKET", len);
     } else {
         strncpy(proto, "OTHER", len);
     }
@@ -103,8 +157,9 @@ void doProcMetric(enum metric_t type, long measurement)
                      getpid(),
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:CPU:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-        postMetric(metric);
     }
     break;
 
@@ -121,8 +176,9 @@ void doProcMetric(enum metric_t type, long measurement)
                      getpid(),
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:MEM:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-        postMetric(metric);
     }
     break;
 
@@ -139,8 +195,9 @@ void doProcMetric(enum metric_t type, long measurement)
                      getpid(),
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:THREAD:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-        postMetric(metric);
     }
     break;
 
@@ -157,8 +214,9 @@ void doProcMetric(enum metric_t type, long measurement)
                      getpid(),
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:FD:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-        postMetric(metric);
     }
     break;
 
@@ -175,65 +233,309 @@ void doProcMetric(enum metric_t type, long measurement)
                      getpid(),
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:CHILD:snprintf\n", -1);
+        } else {
+            postMetric(metric);
         }
-        postMetric(metric);
     }
     break;
 
     default:
-        scopeLog("ERROR: doMetric:metric type\n", -1);
+        scopeLog("ERROR: doProcMetric:metric type\n", -1);
     }
 }
 
 static
-void doOpenPorts(int fd)
+void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
 {
+    pid_t pid = getpid();
     char proto[PROTOCOL_STR];
-    char metric[strlen(STATSD_OPENPORTS) +
-                sizeof(unsigned int) +
-                strlen(g_hostname) +
-                strlen(g_procname) +
-                PROTOCOL_STR  +
-                sizeof(unsigned int) +
-                sizeof(unsigned int) +
-                sizeof(unsigned int) + 1];
+    in_port_t localPort, remotePort;
         
-    getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
-    
-    if (snprintf(metric, sizeof(metric), STATSD_OPENPORTS,
-                 g_openPorts, g_procname, getpid(), fd, g_hostname, proto,
-                 g_netinfo[fd].port) <= 0) {
-        scopeLog("ERROR: doOpenPorts:snprintf\n", -1);
+    if (g_netinfo == NULL) {
+        return;
     }
-    
-    postMetric(metric);
-}
 
-static
-void doActiveConns(int fd)
-{
-    char proto[PROTOCOL_STR];
-    char metric[strlen(STATSD_ACTIVECONNS) +
-                sizeof(unsigned int) +
-                strlen(g_hostname) +
-                strlen(g_procname) +
-                PROTOCOL_STR  +
-                sizeof(unsigned int) +
-                sizeof(unsigned int) +
-                sizeof(unsigned int) + 1];
-        
-    getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
-    
-    if (snprintf(metric, sizeof(metric), STATSD_ACTIVECONNS,
-                 g_openPorts, g_procname, getpid(), fd, g_hostname, proto,
-                 g_netinfo[fd].port) <= 0) {
-        scopeLog("ERROR: doActiveConns:snprintf\n", -1);
+    if ((source == EVENT_BASED) && (fd > 0)) {
+        getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
+        localPort = GET_PORT(fd, g_netinfo[fd].localConn.ss_family, LOCAL);
+        remotePort = GET_PORT(fd, g_netinfo[fd].remoteConn.ss_family, REMOTE);
     }
     
-    postMetric(metric);
+    switch (type) {
+    case OPEN_PORTS:
+    {
+        char metric[strlen(STATSD_OPENPORTS) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    PROTOCOL_STR  +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) + 1];
+            
+        if (snprintf(metric, sizeof(metric), STATSD_OPENPORTS,
+                     g_openPorts, g_procname, pid, fd, g_hostname, proto,
+                     localPort) <= 0) {
+            scopeLog("ERROR: doNetMetric:OPENPORTS:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
+    }
+
+    case TCP_CONNECTIONS:
+    {
+        char metric[strlen(STATSD_TCPCONNS) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    PROTOCOL_STR  +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) + 1];
+            
+        if (snprintf(metric, sizeof(metric), STATSD_TCPCONNS,
+                     g_TCPConnections, g_procname, pid, fd, g_hostname, proto,
+                     localPort) <= 0) {
+            scopeLog("ERROR: doNetMetric:TCPCONNS:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
+    }
+
+    case ACTIVE_CONNECTIONS:
+    {
+        char metric[strlen(STATSD_ACTIVECONNS) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    PROTOCOL_STR  +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) + 1];
+            
+        if (snprintf(metric, sizeof(metric), STATSD_ACTIVECONNS,
+                     g_activeConnections, g_procname, pid, fd, g_hostname, proto,
+                     localPort) <= 0) {
+            scopeLog("ERROR: doNetMetric:ACTIVECONNS:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
+    }
+
+    case NETRX:
+    {
+        char lip[INET6_ADDRSTRLEN];
+        char rip[INET6_ADDRSTRLEN];
+        char data[16];
+        char metric[strlen(STATSD_NETRX) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    PROTOCOL_STR  +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) + 1];
+
+        if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+            break;
+        }
+
+        if ((localPort == 443) || (remotePort == 443)) {
+            strncpy(data, "ssl", sizeof(data));
+        } else {
+            strncpy(data, "clear", sizeof(data));
+        }
+
+        if (g_netinfo[fd].type == SCOPE_UNIX) {
+            strncpy(lip, " ", sizeof(lip));
+            strncpy(rip, " ", sizeof(rip));
+        } else {
+            if (g_netinfo[fd].localConn.ss_family == AF_INET) {
+                if (inet_ntop(AF_INET,
+                              &((struct sockaddr_in *)&g_netinfo[fd].localConn)->sin_addr,
+                              lip, sizeof(lip)) == NULL) {
+                    strncpy(lip, " ", sizeof(lip));
+                }
+            } else if (g_netinfo[fd].localConn.ss_family == AF_INET6) {
+                if (inet_ntop(AF_INET6,
+                              &((struct sockaddr_in6 *)&g_netinfo[fd].localConn)->sin6_addr,
+                              lip, sizeof(lip)) == NULL) {
+                    strncpy(lip, " ", sizeof(lip));
+                }
+
+            } else {
+                strncpy(lip, " ", sizeof(lip));
+            }
+
+            if (g_netinfo[fd].remoteConn.ss_family == AF_INET) {
+                if (inet_ntop(AF_INET,
+                              &((struct sockaddr_in *)&g_netinfo[fd].remoteConn)->sin_addr,
+                              rip, sizeof(rip)) == NULL) {
+                    strncpy(rip, " ", sizeof(rip));
+                }
+            } else if (g_netinfo[fd].remoteConn.ss_family == AF_INET6) {
+                if (inet_ntop(AF_INET6,
+                              &((struct sockaddr_in6 *)&g_netinfo[fd].remoteConn)->sin6_addr,
+                              rip, sizeof(rip)) == NULL) {
+                    strncpy(rip, " ", sizeof(rip));
+                }
+            } else {
+                strncpy(rip, " ", sizeof(rip));
+            }
+        }
+        
+        if (snprintf(metric, sizeof(metric), STATSD_NETRX,
+                     g_netrx, g_procname, pid,
+                     fd, g_hostname, proto,
+                     lip, localPort,
+                     rip, remotePort, data) <= 0) {
+            scopeLog("ERROR: doNetMetric:NETRX:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
+    }
+
+    case NETTX:
+    {
+        char lip[INET6_ADDRSTRLEN];
+        char rip[INET6_ADDRSTRLEN];
+        char data[16];
+        char metric[strlen(STATSD_NETTX) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    PROTOCOL_STR  +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) +
+                    sizeof(unsigned int) + 1];
+
+        if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+            break;
+        }
+
+        if ((localPort == 443) || (remotePort == 443)) {
+            strncpy(data, "ssl", sizeof(data));
+        } else {
+            strncpy(data, "clear", sizeof(data));
+        }
+
+        if (g_netinfo[fd].type == SCOPE_UNIX) {
+            strncpy(lip, " ", sizeof(lip));
+            strncpy(rip, " ", sizeof(rip));
+        } else {
+            if (g_netinfo[fd].localConn.ss_family == AF_INET) {
+                if (inet_ntop(AF_INET,
+                              &((struct sockaddr_in *)&g_netinfo[fd].localConn)->sin_addr,
+                              lip, sizeof(lip)) == NULL) {
+                    strncpy(lip, " ", sizeof(lip));
+                }
+            } else if (g_netinfo[fd].localConn.ss_family == AF_INET6) {
+                if (inet_ntop(AF_INET6,
+                              &((struct sockaddr_in6 *)&g_netinfo[fd].localConn)->sin6_addr,
+                              lip, sizeof(lip)) == NULL) {
+                    strncpy(lip, " ", sizeof(lip));
+                }
+
+            } else {
+                strncpy(lip, " ", sizeof(lip));
+            }
+
+            if (g_netinfo[fd].remoteConn.ss_family == AF_INET) {
+                if (inet_ntop(AF_INET,
+                              &((struct sockaddr_in *)&g_netinfo[fd].remoteConn)->sin_addr,
+                              rip, sizeof(rip)) == NULL) {
+                    strncpy(rip, " ", sizeof(rip));
+                }
+            } else if (g_netinfo[fd].remoteConn.ss_family == AF_INET6) {
+                if (inet_ntop(AF_INET6,
+                              &((struct sockaddr_in6 *)&g_netinfo[fd].remoteConn)->sin6_addr,
+                              rip, sizeof(rip)) == NULL) {
+                    strncpy(rip, " ", sizeof(rip));
+                }
+            } else {
+                strncpy(rip, " ", sizeof(rip));
+            }
+        }
+        
+        if (snprintf(metric, sizeof(metric), STATSD_NETTX,
+                     g_nettx, g_procname, pid,
+                     fd, g_hostname, proto,
+                     lip, localPort,
+                     rip, remotePort, data) <= 0) {
+            scopeLog("ERROR: doNetMetric:NETTX:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
+    }
+
+    case NETRX_PROC:
+    {
+        char metric[strlen(STATSD_NETRX_PROC) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    sizeof(unsigned int) + 1];
+
+        if (snprintf(metric, sizeof(metric), STATSD_NETRX_PROC,
+                     g_netrx, g_procname, pid,
+                     g_hostname) <= 0) {
+            scopeLog("ERROR: doNetMetric:NETRX_PROC:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
+    }
+
+    case NETTX_PROC:
+    {
+        char metric[strlen(STATSD_NETTX_PROC) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    sizeof(unsigned int) + 1];
+
+        if (snprintf(metric, sizeof(metric), STATSD_NETTX_PROC,
+                     g_nettx, g_procname, pid,
+                     g_hostname) <= 0) {
+            scopeLog("ERROR: doNetMetric:NETTX_PROC:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
+    }
+
+    case DNS:
+    {
+        char metric[strlen(STATSD_DNS) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    sizeof(unsigned int) +
+                    strlen(g_netinfo[fd].dnsName) + 1];
+
+        if (snprintf(metric, sizeof(metric), STATSD_DNS,
+                     g_dns, g_procname, pid,
+                     g_hostname,
+                     g_netinfo[fd].dnsName) <= 0) {
+            scopeLog("ERROR: doNetMetric:DNS:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+        break;
+    }
+
+    default:
+        scopeLog("ERROR: doNetMetric:metric type\n", -1);
+    }
 }
 
 // Return process specific CPU usage in microseconds
+static
 long doGetProcCPU(pid_t pid) {
     struct rusage ruse;
     
@@ -246,6 +548,7 @@ long doGetProcCPU(pid_t pid) {
 }
 
 // Return process specific memory usage in kilobytes
+static
 long doGetProcMem(pid_t pid) {
     struct rusage ruse;
     
@@ -261,8 +564,181 @@ long doGetProcMem(pid_t pid) {
 #endif // __MACOS__        
 }
 
-void *
-periodic(void *arg)
+static
+void doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control_type_t endp)
+{
+    // Should we check for at least the size of sockaddr_in?
+    if (g_netinfo && (g_netinfo[sd].fd == sd) &&
+        addr && (len > 0)) {
+        if (endp == LOCAL) {
+            memcpy(&g_netinfo[sd].localConn, addr, len);
+        } else {
+            memcpy(&g_netinfo[sd].remoteConn, addr, len);
+        }
+    }
+}
+
+static
+int doSetAddrs(int sockfd)
+{
+    if (g_netinfo[sockfd].localConn.ss_family == AF_UNSPEC) {
+        struct sockaddr_storage addr;
+        socklen_t addrlen = sizeof(struct sockaddr_storage);
+        
+        if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+            doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
+        }
+    }
+    
+    if (g_netinfo[sockfd].remoteConn.ss_family == AF_UNSPEC) {
+        struct sockaddr_storage addr;
+        socklen_t addrlen = sizeof(struct sockaddr_storage);
+        
+        if (getpeername(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+            doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * We missed an accept
+ * A socket was dup'd
+ * We are a child proc that inherited a socket
+ */
+static
+int doAddNewSock(int sockfd)
+{
+    struct sockaddr addr;
+    socklen_t addrlen = sizeof(struct sockaddr);
+        
+    scopeLog("doAddNewSock: adding socket\n", sockfd);
+    if (getsockname(sockfd, &addr, &addrlen) != -1) {
+        if ((addr.sa_family == AF_INET) || (addr.sa_family == AF_INET6)) {
+            int type;
+            socklen_t len = sizeof(socklen_t);
+                
+            if (getsockopt(sockfd, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
+                addSock(sockfd, type);
+            } else {
+                // Really can't add the socket at this point
+                scopeLog("ERROR: doRecv:getsockopt\n", sockfd);
+            }
+        } else if (addr.sa_family == AF_UNIX) {
+            // added, not a socket type, want to know if it's a UNIX socket
+            addSock(sockfd, SCOPE_UNIX);
+        } else {
+            // is RAW a viable default?
+            addSock(sockfd, SOCK_RAW);
+        }
+        doSetConnection(sockfd, &addr, addrlen, LOCAL);
+    } else {
+        addSock(sockfd, SOCK_RAW);
+    }
+    
+    addrlen = sizeof(struct sockaddr);
+    if (getpeername(sockfd, &addr, &addrlen) != -1) {
+        doSetConnection(sockfd, &addr, addrlen, REMOTE);
+    }
+
+    return 0;
+}
+
+/*
+ * Dereference a DNS packet and
+ * extract the domain name.
+ *
+ * Example:
+ * This converts "\003www\006google\003com"
+ * in DNS format to www.google.com
+ */
+
+static
+int getDNSName(int sd, void *pkt, int pktlen)
+{
+    dns_query *query;
+    char *aname, *dname;
+
+    query = (struct dns_query_t *)pkt;
+    if ((dname = (char *)&query->name) == NULL) {
+        return -1;
+    }
+
+    // TODO: add size check!
+    aname = g_netinfo[sd].dnsName;
+    dname++; // ignore the ETX
+    while (*dname != '\0') {
+        if (isprint(*dname) != 0) {
+            *aname++ = *dname;
+        } else {
+            *aname++ = '.';
+        }
+        dname++;
+    }
+    *aname = '\0';
+
+    return 0;
+}
+
+
+static
+int doRecv(int sockfd, ssize_t rc)
+{
+    atomicAdd(&g_netrx, rc);
+    if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
+        doAddNewSock(sockfd);
+    }
+
+    doSetAddrs(sockfd);
+    doNetMetric(NETRX, sockfd, EVENT_BASED);
+
+    return 0;
+}
+
+static
+int doSend(int sockfd, ssize_t rc)
+{
+    atomicAdd(&g_nettx, rc);
+    if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
+        doAddNewSock(sockfd);
+    }
+
+    doSetAddrs(sockfd);
+    doNetMetric(NETTX, sockfd, EVENT_BASED);
+
+    if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+        atomicAdd(&g_dns, 1);
+        doNetMetric(DNS, sockfd, EVENT_BASED);
+    }
+
+    return 0;
+}
+
+static
+void doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
+{
+
+    scopeLog(func, sd);
+    addSock(sd, SOCK_STREAM);
+    
+    if (g_netinfo && (g_netinfo[sd].fd == sd)) {
+        g_netinfo[sd].listen = TRUE;
+        g_netinfo[sd].accept = TRUE;
+        atomicAdd(&g_openPorts, 1);
+        atomicAdd(&g_TCPConnections, 1);
+        atomicAdd(&g_activeConnections, 1);
+        scopeLog("incr conn\n", g_TCPConnections);
+        scopeLog("incr\n", g_openPorts);
+        doSetConnection(sd, addr, addrlen, REMOTE);
+        doNetMetric(OPEN_PORTS, sd, EVENT_BASED);
+        doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED);
+        doNetMetric(ACTIVE_CONNECTIONS, sd, EVENT_BASED);
+    }
+}
+
+static
+void * periodic(void *arg)
 {
     long cpu, mem;
     int nthread, nfds, children;
@@ -283,10 +759,15 @@ periodic(void *arg)
 
         children = osGetNumChildProcs(pid);
         doProcMetric(PROC_CHILD, children);
-                
+
+        doNetMetric(NETRX_PROC, -1, PERIODIC);
+        doNetMetric(NETTX_PROC, -1, PERIODIC);
+        
         // Needs to be defined in a config file
-        sleep(10);
+        sleep(cfgPeriod);
     }
+
+    return NULL;
 }
 
 __attribute__((constructor)) void init(void)
@@ -297,6 +778,7 @@ __attribute__((constructor)) void init(void)
     g_fn.close = dlsym(RTLD_NEXT, "close");
     g_fn.read = dlsym(RTLD_NEXT, "read");
     g_fn.write = dlsym(RTLD_NEXT, "write");
+    g_fn.fcntl = dlsym(RTLD_NEXT, "fcntl");
     g_fn.socket = dlsym(RTLD_NEXT, "socket");
     g_fn.shutdown = dlsym(RTLD_NEXT, "shutdown");
     g_fn.listen = dlsym(RTLD_NEXT, "listen");
@@ -315,6 +797,7 @@ __attribute__((constructor)) void init(void)
     g_fn.close$NOCANCEL = dlsym(RTLD_NEXT, "close$NOCANCEL");
     g_fn.close_nocancel = dlsym(RTLD_NEXT, "close_nocancel");
     g_fn.guarded_close_np = dlsym(RTLD_NEXT, "guarded_close_np");
+    g_fn.accept$NOCANCEL = dlsym(RTLD_NEXT, "accept$NOCANCEL");
 #endif // __MACOS__
 
     if ((g_netinfo = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
@@ -352,15 +835,15 @@ void doClose(int fd, char *func)
         if (g_netinfo[fd].listen == TRUE) {
             // Gauge tracking number of open ports
             atomicSub(&g_openPorts, 1);
-            doOpenPorts(fd);
+            doNetMetric(OPEN_PORTS, fd, EVENT_BASED);
             scopeLog("decr port\n", fd);
         }
 
         if (g_netinfo[fd].accept == TRUE) {
             // Gauge tracking number of active TCP connections
-            atomicSub(&g_activeConnections, 1);
-            scopeLog("decr conn\n", g_activeConnections);
-            doActiveConns(fd);
+            atomicSub(&g_TCPConnections, 1);
+            scopeLog("decr conn\n", g_TCPConnections);
+            doNetMetric(TCP_CONNECTIONS, fd, EVENT_BASED);
             scopeLog("decr connection\n", fd);
         }
 
@@ -442,66 +925,101 @@ int close_nocancel(int fd)
     return rc;
 }
 
+EXPORTON
+int accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+{
+    int sd;
+    
+    if (g_fn.accept$NOCANCEL == NULL) {
+        scopeLog("ERROR: accept$NOCANCEL:NULL\n", -1);
+        return -1;
+    }
+
+    sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
+    if (sd != -1) {
+        doAccept(sd, addr, *addrlen, "accept$NOCANCEL\n");
+    }
+
+    return sd;
+}
+
 #endif // __MACOS__
 
-EXPORTOFF
+EXPORTON
 ssize_t write(int fd, const void *buf, size_t count)
 {
+    ssize_t rc;
+    
     if (g_fn.write == NULL) {
         scopeLog("ERROR: write:NULL\n", fd);
         return -1;
     }
 
-    // Don't init the socket from write; starts early
-    // Delay posts until init is complete
-    if (g_out != 0) {
-        char metric[strlen(STATSD_WRITE) + 16];
-        
-        if (snprintf(metric, sizeof(metric), STATSD_WRITE, (int)count) <= 0) {
-            scopeLog("ERROR: write: snprintf\n", fd);
-        } else {
-            postMetric(metric);
-        }
+    rc = g_fn.write(fd, buf, count);
+    if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
+        // This is a network descriptor
+        dataLog("write\n", fd);
+        doSetAddrs(fd);
+        doSend(fd, rc);
     }
-
-    return g_fn.write(fd, buf, count);
+    
+    return rc;
 }
 
-EXPORTOFF
+EXPORTON
 ssize_t read(int fd, void *buf, size_t count)
 {
-    char metric[strlen(STATSD_READ) + 16];
+    ssize_t rc;
     
     if (g_fn.read == NULL) {
         scopeLog("ERROR: read:NULL\n", fd);
         return -1;
     }
 
-    if (snprintf(metric, sizeof(metric), STATSD_READ, (int)count) <= 0) {
-        scopeLog("ERROR: read:snprintf\n", fd);
-    } else {
-        postMetric(metric);
+    rc = g_fn.read(fd, buf, count);
+    if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
+        // This is a network descriptor
+        dataLog("read\n", fd);
+        doSetAddrs(fd);
+        doRecv(fd, rc);
     }
     
-    return g_fn.read(fd, buf, count);
+    return rc;
+}
+
+EXPORTON
+int fcntl(int fd, int cmd, ...)
+{
+    int rc;
+    struct FuncArgs fArgs;
+
+    if (g_fn.fcntl == NULL ) {
+        scopeLog("ERROR: rcntl:NULL\n", fd);
+        return -1;
+    }
+
+    LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
+    rc = g_fn.fcntl(fd, cmd, fArgs.arg[0], fArgs.arg[1],
+                    fArgs.arg[2], fArgs.arg[3]);
+    if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd) &&
+        (cmd == F_DUPFD)) {
+        // This is a network descriptor
+        scopeLog("fcntl\n", rc);
+        doAddNewSock(rc);
+    }
+    
+    return rc;
 }
 
 EXPORTOFF
 void vsyslog(int priority, const char *format, va_list ap)
 {
-    char metric[strlen(STATSD_VSYSLOG)+1];
-    
     if (g_fn.vsyslog == NULL) {
         scopeLog("ERROR: vsyslog:NULL\n", -1);
         return;
     }
 
-    if (snprintf(metric, sizeof(metric), STATSD_VSYSLOG) <= 0) {
-        scopeLog("ERROR: vsyslog:NULL\n", -1);
-    } else {
-        postMetric(metric);
-    }
-    
+    scopeLog("vsyslog\n", -1);
     g_fn.vsyslog(priority, format, ap);
     return;
 }
@@ -518,6 +1036,7 @@ int socket(int socket_family, int socket_type, int protocol)
 
     sd = g_fn.socket(socket_family, socket_type, protocol);
     if (sd != -1) {
+        scopeLog("socket\n", sd);
         addSock(sd, socket_type);
         
         if (g_netinfo &&
@@ -538,7 +1057,7 @@ int socket(int socket_family, int socket_type, int protocol)
              * a UDP socket is closed we say the port is closed
              */
             g_netinfo[sd].listen = TRUE;
-            doOpenPorts(sd);
+            doNetMetric(OPEN_PORTS, sd, EVENT_BASED);
         }
     }
 
@@ -584,49 +1103,18 @@ int listen(int sockfd, int backlog)
         if (g_netinfo && (g_netinfo[sockfd].fd == sockfd)) {
             g_netinfo[sockfd].listen = TRUE;
             g_netinfo[sockfd].accept = TRUE;
-            doOpenPorts(sockfd);
+            doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED);
 
-            if (g_netinfo[sockfd].type & SOCK_STREAM) {
-                atomicAdd(&g_activeConnections, 1);
+            if (g_netinfo[sockfd].type == SOCK_STREAM) {
+                atomicAdd(&g_TCPConnections, 1);
                 g_netinfo[sockfd].accept = TRUE;                            
-                scopeLog("incr conn\n", g_activeConnections);
-                doActiveConns(sockfd);
+                scopeLog("incr conn\n", g_TCPConnections);
+                doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED);
             }
         }
     }
     
     return rc;
-}
-
-static
-void doGetPort(int sd, const struct sockaddr *addr)
-{
-    if (g_netinfo &&
-        (g_netinfo[sd].fd == sd) &&
-        (addr->sa_family == AF_INET)) {
-        // Deal with IPV6 later
-        g_netinfo[sd].port = ((struct sockaddr_in *)addr)->sin_port;
-    }
-}
-
-static
-void doAccept(int sd, struct sockaddr *addr, char *func)
-{
-
-    scopeLog(func, sd);
-    addSock(sd, SOCK_STREAM);
-    
-    if (g_netinfo && (g_netinfo[sd].fd == sd)) {
-        g_netinfo[sd].listen = TRUE;
-        g_netinfo[sd].accept = TRUE;
-        atomicAdd(&g_openPorts, 1);
-        atomicAdd(&g_activeConnections, 1);
-        scopeLog("incr conn\n", g_activeConnections);
-        scopeLog("incr\n", g_openPorts);
-        doGetPort(sd, addr);
-        doOpenPorts(sd);
-        doActiveConns(sd);
-    }
 }
 
 EXPORTON
@@ -641,7 +1129,7 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
     sd = g_fn.accept(sockfd, addr, addrlen);
     if (sd != -1) {
-        doAccept(sd, addr, "accept\n");
+        doAccept(sd, addr, *addrlen, "accept\n");
     }
 
     return sd;
@@ -659,7 +1147,7 @@ int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
 
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
     if (sd != -1) {
-        doAccept(sd, addr, "accept4\n");
+        doAccept(sd, addr, *addrlen, "accept4\n");
     }
 
     return sd;
@@ -677,7 +1165,7 @@ int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
     rc = g_fn.bind(sockfd, addr, addrlen);
     if (rc != -1) { 
-        doGetPort(sockfd, addr);
+        doSetConnection(sockfd, addr, addrlen, LOCAL);
         scopeLog("bind\n", sockfd);
     }
     
@@ -687,6 +1175,7 @@ int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
 EXPORTON
 int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+
 {
     int rc;
     
@@ -699,14 +1188,15 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     if ((rc != -1) &&
         (g_netinfo) &&
         (g_netinfo[sockfd].fd == sockfd)) {
-        doGetPort(sockfd, addr);
+        doSetConnection(sockfd, addr, addrlen, REMOTE);
         g_netinfo[sockfd].accept = TRUE;
+        atomicAdd(&g_activeConnections, 1);
+        doNetMetric(ACTIVE_CONNECTIONS, sockfd, EVENT_BASED);
 
-        if (g_netinfo[sockfd].type & SOCK_STREAM) {
-            atomicAdd(&g_activeConnections, 1);
-            g_netinfo[sockfd].accept = TRUE;            
-            scopeLog("incr conn\n", g_activeConnections);
-            doActiveConns(sockfd);
+        if (g_netinfo[sockfd].type == SOCK_STREAM) {
+            atomicAdd(&g_TCPConnections, 1);
+            scopeLog("incr conn\n", g_TCPConnections);
+            doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED);
         }
         scopeLog("connect\n", sockfd);
     }
@@ -715,87 +1205,103 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
 }
 
-EXPORTOFF
+EXPORTON
 ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 {
-    char metric[strlen(STATSD_SEND) + 16];
+    ssize_t rc;
 
     if (g_fn.send == NULL) {
         scopeLog("ERROR: send:NULL\n", -1);
         return -1;
     }
 
-    if (snprintf(metric, sizeof(metric), STATSD_SEND, (int)len) <= 0) {
-        scopeLog("ERROR: send:snprintf\n", -1);
-    } else {
-        postMetric(metric);
+    rc = g_fn.send(sockfd, buf, len, flags);
+    if (rc != -1) {
+        dataLog("send\n", sockfd);
+        doSend(sockfd, rc);
     }
-
-    return g_fn.send(sockfd, buf, len, flags);
+    
+    return rc;
 }
 
-EXPORTOFF
+EXPORTON
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
                const struct sockaddr *dest_addr, socklen_t addrlen)
 {
+    ssize_t rc;
+    
     if (g_fn.sendto == NULL) {
         scopeLog("ERROR: sendto:NULL\n", -1);
         return -1;
     }
 
-    if (g_out != 0) {
-        char metric[strlen(STATSD_SENDTO) + 16];
+    rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+    if (rc != -1) {
+        dataLog("sendto\n", sockfd);
+        doSetConnection(sockfd, dest_addr, addrlen, REMOTE);
 
-        if (snprintf(metric, sizeof(metric), STATSD_SENDTO, (int)len) <= 0) {
-            scopeLog("ERROR: sendto:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+            getDNSName(sockfd, (void *)buf, len);
         }
+
+        doSend(sockfd, rc);
     }
 
-    return g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+    return rc;
 }
 
-EXPORTOFF
+EXPORTON
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
 {
+    ssize_t rc;
+    
     if (g_fn.sendmsg == NULL) {
         scopeLog("ERROR: sendmsg:NULL\n", -1);
         return -1;
     }
 
-    if (g_out != 0) {
-        char metric[strlen(STATSD_SENDMSG) + 16];
+    rc = g_fn.sendmsg(sockfd, msg, flags);
+    if (rc != -1) {
+        dataLog("sendmsg\n", sockfd);
 
-        if (snprintf(metric, sizeof(metric), STATSD_SENDMSG) <= 0) {
-            scopeLog("ERROR: sendmsg:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        // For UDP connections the msg is a remote addr
+        if (g_netinfo && msg && (g_netinfo[sockfd].type != SOCK_STREAM)) {
+            if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
+                                sizeof(struct sockaddr_in6), REMOTE);
+            } else if (msg->msg_namelen >= sizeof(struct sockaddr_in)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
+                                sizeof(struct sockaddr_in), REMOTE);
+            }
         }
-    }
 
-    return g_fn.sendmsg(sockfd, msg, flags);
+        if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+            getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
+        }
+
+        doSend(sockfd, rc);
+    }
+    
+    return rc;
 }
 
-EXPORTOFF
+EXPORTON
 ssize_t recv(int sockfd, void *buf, size_t len, int flags)
 {
+    ssize_t rc;
+    
     if (g_fn.recv == NULL) {
         scopeLog("ERROR: recv:NULL\n", -1);
         return -1;
     }
 
-    if (g_out != 0) {
-        char metric[strlen(STATSD_RECV) + 16];
-
-        if (snprintf(metric, sizeof(metric), STATSD_RECV, (int)len) <= 0) {
-            scopeLog("ERROR: recv:snprintf\n", -1);
-        } else {
-            postMetric(metric);
-        }
+    dataLog("recv\n", sockfd);
+    rc = g_fn.recv(sockfd, buf, len, flags);
+    if (rc != -1) {
+        doRecv(sockfd, rc);
     }
-
-    return g_fn.recv(sockfd, buf, len, flags);
+    
+    return rc;
 }
 
 EXPORTON
@@ -809,21 +1315,57 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
         return -1;
     }
 
+    dataLog("recvfrom\n", sockfd);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
-        doGetPort(sockfd, src_addr);
+        atomicAdd(&g_netrx, rc);
+        if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
+            // We missed an accept...most likely
+            // Or.. we are a child proc that inherited a socket
+            int type;
+            socklen_t len = sizeof(socklen_t);
+                
+            if (getsockopt(sockfd, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
+                addSock(sockfd, type);
+            } else {
+                // Really can't add the socket at this point
+                scopeLog("ERROR: recvfrom:getsockopt\n", sockfd);
+            }
+        }
+
+        doSetConnection(sockfd, src_addr, *addrlen, REMOTE);
+        doNetMetric(NETRX, sockfd, EVENT_BASED);
     }
-    
     return rc;
 }
 
-EXPORTOFF
+EXPORTON
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags)
 {
+    ssize_t rc;
+    
     if (g_fn.recvmsg == NULL) {
         scopeLog("ERROR: recvmsg:NULL\n", -1);
         return -1;
     }
 
-    return g_fn.recvmsg(sockfd, msg, flags);
+    rc = g_fn.recvmsg(sockfd, msg, flags);
+    if (rc != -1) {
+        dataLog("recvmsg\n", sockfd);
+
+        // For UDP connections the msg is a remote addr
+        if (msg && (g_netinfo[sockfd].type != SOCK_STREAM)) {
+            if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
+                                sizeof(struct sockaddr_in6), REMOTE);
+            } else if (msg->msg_namelen >= sizeof(struct sockaddr_in)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
+                                sizeof(struct sockaddr_in), REMOTE);
+            }
+        }
+        
+        doRecv(sockfd, rc);
+    }
+    
+    return rc;
 }

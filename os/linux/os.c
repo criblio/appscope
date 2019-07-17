@@ -9,7 +9,8 @@ int osGetProcname(char *pname, int len)
 int osGetNumThreads(pid_t pid)
 {
     int fd, i;
-    char *entry;
+    long result;
+    char *entry, *last;
     const char delim[] = " ";
     char buf[1024];
 
@@ -19,17 +20,21 @@ int osGetNumThreads(pid_t pid)
         return -1;
     }
 
-    if (read(fd, buf, sizeof(buf)) == -1) {
-        close(fd);
+    if (g_fn.read(fd, buf, sizeof(buf)) == -1) {
+        g_fn.close(fd);
         return -1;
     }
 
-    entry = strtok(buf, delim);
+    entry = strtok_r(buf, delim, &last);
     for (i = 1; i < 20; i++) {
-        entry = strtok(NULL, delim);
+        entry = strtok_r(NULL, delim, &last);
     }
-    close(fd);
-    return atoi((const char *)entry);
+    g_fn.close(fd);
+
+    if ((result = strtol(entry, NULL, 0)) == (long)0) {
+        return -1;
+    }
+    return (int)result;
 }
 
 int osGetNumFds(pid_t pid)

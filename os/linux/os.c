@@ -21,18 +21,20 @@ int osGetNumThreads(pid_t pid)
     }
 
     if (g_fn.read(fd, buf, sizeof(buf)) == -1) {
+        g_fn.close(fd);
         return -1;
     }
 
-     entry = strtok_r(buf, delim, &last);
-     for (i = 1; i < 20; i++) {
-         entry = strtok_r(NULL, delim, &last);
+    entry = strtok_r(buf, delim, &last);
+    for (i = 1; i < 20; i++) {
+        entry = strtok_r(NULL, delim, &last);
     }
+    g_fn.close(fd);
 
-     if ((result = strtol(entry, NULL, 0)) == (long)0) {
-         return -1;
-     }
-     return (int)result;
+    if ((result = strtol(entry, NULL, 0)) == (long)0) {
+        return -1;
+    }
+    return (int)result;
 }
 
 int osGetNumFds(pid_t pid)

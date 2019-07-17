@@ -20,7 +20,7 @@ int osGetNumThreads(pid_t pid)
         return -1;
     }
 
-     if (g_fn.read(fd, buf, sizeof(buf)) == -1) {
+    if (g_fn.read(fd, buf, sizeof(buf)) == -1) {
         return -1;
     }
 
@@ -54,7 +54,7 @@ int osGetNumFds(pid_t pid)
     }
 
     closedir(dirp);
-    return nfile;
+    return nfile - 1; // we opened one fd to read /fd :)
 }
 
 int osGetNumChildProcs(pid_t pid)

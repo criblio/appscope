@@ -1,10 +1,11 @@
+#include "cfg.h"
+#include "cfgutils.h"
+#include "log.h"
+#include "out.h"
 #include "wrap.h"
 
 interposed_funcs g_fn;
 
-static int g_sock = 0;
-static struct sockaddr_in g_saddr;
-static operations_info g_ops;
 static net_info *g_netinfo;
 static int g_numNinfo;
 static char g_hostname[MAX_HOSTNAME];
@@ -18,37 +19,20 @@ static int g_dns = 0;
 
 // These need to come from a config file
 // Do we like the g_ or the cfg prefix?
-#define LOG_FILE 1  // eventually an enum for file, syslog, shared memory 
-static bool g_log = TRUE;
-static const char g_logFile[] = "/tmp/scope.log";
-static unsigned int g_logOp = LOG_FILE;
-static int g_logfd = -1;
 static bool g_logDataPath = FALSE;
 static bool cfgNETRXTXPeriodic = TRUE;
 static int cfgPeriod = 10;
+static log_t* g_log = NULL;
+static out_t* g_out = NULL;
 
-static
-void scopeLog(char *msg, int fd)
+static void
+scopeLog(char* msg, int fd)
 {
-    size_t len;
-    
-    if ((g_log == FALSE) || (!msg)) {
-        return;
-    }
+    if (!g_log || !msg) return;
 
-    if (g_logOp & LOG_FILE) {
-        char buf[strlen(msg) + 128];
-        
-        if ((g_logfd == -1) && 
-            (strlen(g_logFile) > 0)) {
-                g_logfd = open(g_logFile, O_RDWR|O_APPEND);
-        }
-
-        len = sizeof(buf) - strlen(buf);
-        snprintf(buf, sizeof(buf), "Scope: %s(%d): ", g_procname, fd);
-        strncat(buf, msg, len);
-        g_fn.write(g_logfd, buf, strlen(buf));
-    }        
+    char buf[strlen(msg) + 128];
+    snprintf(buf, sizeof(buf), "Scope: %s(%d): %s", g_procname, fd, msg);
+    logSend(g_log, buf);
 }
 
 static
@@ -87,59 +71,12 @@ void dumpAddrs(int sd, enum control_type_t endp)
     }
 }
 
-static
-void initSocket(void)
+static void
+postMetric(char* metric)
 {
-    int flags;
-    char server[sizeof(SERVER) + 1];
-
-    // Create a UDP socket
-    g_sock = g_fn.socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (g_sock < 0)	{
-        scopeLog("ERROR: initSocket:socket\n", -1);
-    }
-
-    // Set the socket to non blocking
-    flags = g_fn.fcntl(g_sock, F_GETFL, 0);
-    g_fn.fcntl(g_sock, F_SETFL, flags | O_NONBLOCK);
-
-    // Create the address to send to
-    strncpy(server, SERVER, sizeof(SERVER));
-        
-    memset(&g_saddr, 0, sizeof(g_saddr));
-    g_saddr.sin_family = AF_INET;
-    g_saddr.sin_port = htons(PORT);
-    if (inet_aton(server, &g_saddr.sin_addr) == 0) {
-        scopeLog("ERROR: initSocket:inet_aton\n", -1);
-    }
-}
-
-static
-void postMetric(const char *metric)
-{
-    ssize_t rc;
-
-    if (g_fn.socket == 0) {
-        initSocket();
-    }
-
-    if (g_fn.sendto) {
-        rc = g_fn.sendto(g_sock, metric, strlen(metric), 0, 
-                         (struct sockaddr *)&g_saddr, sizeof(g_saddr));
-        if (rc < 0) {
-            scopeLog("ERROR: postMetric:sendto\n", g_sock);
-            switch (errno) {
-            case EWOULDBLOCK:
-                g_ops.udp_blocks++;
-                break;
-            default:
-                g_ops.udp_errors++;
-            }
-        }
-
-        //DEBUG: config
-        scopeLog((char *)metric, -1);
-    }
+    if (!g_out || !metric) return;
+    scopeLog(metric, -1);
+    outSend(g_out, metric);
 }
 
 static
@@ -873,8 +810,15 @@ __attribute__((constructor)) void init(void)
     }
 
     osGetProcname(g_procname, sizeof(g_procname));
-        
-    initSocket();
+
+    {
+        char* path = cfgPath(CFG_FILE_NAME);
+        config_t* cfg = cfgRead(path);
+        g_log = initLog(cfg);
+        g_out = initOut(cfg);
+        cfgDestroy(&cfg);
+        if (path) free(path);
+    }
 
     if (pthread_create(&periodicTID, NULL, periodic, NULL) != 0) {
         scopeLog("ERROR: Constructor:pthread_create\n", -1);
@@ -1295,7 +1239,6 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
     if (rc != -1) {
         dataLog("sendto\n", sockfd);
         doSetConnection(sockfd, dest_addr, addrlen, REMOTE);
-        //dumpAddrs(sockfd, REMOTE);
 
         if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
             getDNSName(sockfd, (void *)buf, len);

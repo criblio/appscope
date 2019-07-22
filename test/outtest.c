@@ -41,27 +41,6 @@ outSendForNullMessageDoesntCrash(void** state)
     outDestroy(&out);
 }
 
-static void
-outStatsDPrefixVerifyDefault(void** state)
-{
-    out_t* out = outCreate();
-    assert_null(outStatsDPrefix(out));
-    outDestroy(&out);
-}
-
-static void
-outStatsDPrefixSetAndGet(void** state)
-{
-    out_t* out = outCreate();
-    outStatsDPrefixSet(out, "cribl.io");
-    assert_string_equal(outStatsDPrefix(out), "cribl.io");
-    outStatsDPrefixSet(out, "huh");
-    assert_string_equal(outStatsDPrefix(out), "huh");
-    outStatsDPrefixSet(out, NULL);
-    assert_null(outStatsDPrefix(out));
-    outDestroy(&out);
-}
-
 static long
 fileEndPosition(const char* path)
 {
@@ -112,6 +91,39 @@ outTranportSetAndOutSend(void** state)
     outDestroy(&out);
 }
 
+static void
+outFormatSetAndOutSendEvent(void** state)
+{
+    const char* file_path = "/tmp/my.path";
+    out_t* out = outCreate();
+    assert_non_null(out);
+    transport_t* t = transportCreateFile(file_path);
+    outTransportSet(out, t);
+
+    event_t e = {"A", 1, DELTA, NULL};
+    format_t* f = fmtCreate(CFG_EXPANDED_STATSD);
+    outFormatSet(out, f);
+
+    // Test that format is set by testing side effects of outSendEvent
+    // affecting the file at file_path when connected to format.
+    long file_pos_before = fileEndPosition(file_path);
+    assert_int_equal(outSendEvent(out, &e), 0);
+    long file_pos_after = fileEndPosition(file_path);
+    assert_int_not_equal(file_pos_before, file_pos_after);
+
+    // Test that format is cleared by seeing no side effects.
+    outFormatSet(out, NULL);
+    file_pos_before = fileEndPosition(file_path);
+    assert_int_equal(outSendEvent(out, &e), -1);
+    file_pos_after = fileEndPosition(file_path);
+    assert_int_equal(file_pos_before, file_pos_after);
+
+    if (unlink(file_path))
+        fail_msg("Couldn't delete file %s", file_path);
+
+    outDestroy(&out);
+}
+
 
 int
 main (int argc, char* argv[])
@@ -123,9 +135,8 @@ main (int argc, char* argv[])
         cmocka_unit_test(outDestroyNullOutDoesntCrash),
         cmocka_unit_test(outSendForNullOutDoesntCrash),
         cmocka_unit_test(outSendForNullMessageDoesntCrash),
-        cmocka_unit_test(outStatsDPrefixVerifyDefault),
-        cmocka_unit_test(outStatsDPrefixSetAndGet),
         cmocka_unit_test(outTranportSetAndOutSend),
+        cmocka_unit_test(outFormatSetAndOutSendEvent),
     };
 
     cmocka_run_group_tests(tests, NULL, NULL);

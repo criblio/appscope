@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "cfgutils.h"
+#include "format.h"
 #include "scopetypes.h"
 
 char* 
@@ -96,18 +97,38 @@ initTransport(config_t* cfg, which_transport_t t)
     return transport;
 }
 
+static format_t*
+initFormat(config_t* cfg)
+{
+    format_t* fmt = fmtCreate(cfgOutFormat(cfg));
+    if (!fmt) return NULL;
+
+    fmtStatsDPrefixSet(fmt, cfgOutStatsDPrefix(cfg));
+    fmtStatsDMaxLenSet(fmt, cfgOutStatsDMaxLen(cfg));
+    fmtOutVerbositySet(fmt, cfgOutVerbosity(cfg));
+    return fmt;
+}
+
 out_t*
 initOut(config_t* cfg)
 {
     out_t* out = outCreate();
     if (!out) return out;
+
     transport_t* t = initTransport(cfg, CFG_OUT);
     if (!t) {
         outDestroy(&out);
         return out;
     }
     outTransportSet(out, t);
-    outStatsDPrefixSet(out, cfgOutStatsDPrefix(cfg));
+
+    format_t* f = initFormat(cfg);
+    if (!f) {
+        outDestroy(&out);
+        return out;
+    }
+    outFormatSet(out, f);
+
     return out;
 }
 

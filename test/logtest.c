@@ -45,7 +45,7 @@ static void
 logLevelVerifyDefaultLevel(void** state)
 {
     log_t* log = logCreate();
-    assert_int_equal(logLevel(log), CFG_LOG_ERROR);
+    assert_int_equal(logLevel(log), DEFAULT_LOG_LEVEL);
     logDestroy(&log);
 }
 

@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -8,8 +9,11 @@
 static void
 verifyDefaults(config_t* config)
 {
-    assert_int_equal       (cfgOutFormat(config), CFG_EXPANDED_STATSD);
-    assert_null            (cfgOutStatsDPrefix(config));
+    assert_int_equal       (cfgOutFormat(config), DEFAULT_OUT_FORMAT);
+    assert_string_equal    (cfgOutStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
+    assert_int_equal       (cfgOutStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
+    assert_int_equal       (cfgOutVerbosity(config), DEFAULT_OUT_VERBOSITY);
+    assert_int_equal       (cfgOutPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_int_equal       (cfgTransportType(config, CFG_OUT), CFG_UDP);
     assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_int_equal       (cfgTransportPort(config, CFG_OUT), 8125);
@@ -20,7 +24,7 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
     assert_null            (cfgFuncFilters(config));
     assert_false           (cfgFuncIsFiltered(config, "read"));
-    assert_int_equal       (cfgLogLevel(config), CFG_LOG_NONE);
+    assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
 }
 
 int
@@ -96,7 +100,48 @@ cfgOutStatsDPrefixSetAndGet(void** state)
     cfgOutStatsDPrefixSet(config, "heywithoutdot");
     assert_string_equal(cfgOutStatsDPrefix(config), "heywithoutdot.");
     cfgOutStatsDPrefixSet(config, NULL);
-    assert_null(cfgOutStatsDPrefix(config));
+    assert_string_equal(cfgOutStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
+    cfgOutStatsDPrefixSet(config, "");
+    assert_string_equal(cfgOutStatsDPrefix(config), "");
+    cfgDestroy(&config);
+}
+
+static void
+cfgOutStatsDMaxLenSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgOutStatsDMaxLenSet(config, 0);
+    assert_int_equal(cfgOutStatsDMaxLen(config), 0);
+    cfgOutStatsDMaxLenSet(config, UINT_MAX);
+    assert_int_equal(cfgOutStatsDMaxLen(config), UINT_MAX);
+    cfgDestroy(&config);
+}
+
+static void
+cfgOutVerbositySetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    int i;
+    for (i=0; i<=CFG_MAX_VERBOSITY+1; i++) {
+        cfgOutVerbositySet(config, i);
+        if (i > CFG_MAX_VERBOSITY)
+            assert_int_equal(cfgOutVerbosity(config), CFG_MAX_VERBOSITY);
+        else
+            assert_int_equal(cfgOutVerbosity(config), i);
+    }
+    cfgOutVerbositySet(config, UINT_MAX);
+    assert_int_equal(cfgOutVerbosity(config), CFG_MAX_VERBOSITY);
+    cfgDestroy(&config);
+}
+
+static void
+cfgOutPeriodSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgOutPeriodSet(config, 0);
+    assert_int_equal(cfgOutPeriod(config), 0);
+    cfgOutPeriodSet(config, UINT_MAX);
+    assert_int_equal(cfgOutPeriod(config), UINT_MAX);
     cfgDestroy(&config);
 }
 
@@ -208,11 +253,15 @@ cfgReadGoodYaml(void** state)
     const char* yamlText =
         "---\n" 
         "output:\n" 
-        "  format: newlinedelimited          # expandedstatsd, newlinedelimited\n" 
-        "  statsdprefix : 'cribl.scope'      # prepends each statsd metric\n" 
+        "  format:\n"
+        "    type: newlinedelimited          # expandedstatsd, newlinedelimited\n"
+        "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
+        "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
+        "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
         "  transport:                        # defines how scope output is sent\n" 
         "    type: file                      # udp, unix, file, syslog\n" 
-        "    path: '/var/log/scope.log'\n" 
+        "    path: '/var/log/scope.log'\n"
+        "  summaryperiod: 11                 # in seconds\n"
         "filteredFunctions:                  # keep Scope from processing these\n" 
         "  - read                            # specific intercepted functions\n" 
         "  - write\n" 
@@ -228,6 +277,9 @@ cfgReadGoodYaml(void** state)
     assert_non_null(config);
     assert_int_equal(cfgOutFormat(config), CFG_NEWLINE_DELIMITED);
     assert_string_equal(cfgOutStatsDPrefix(config), "cribl.scope.");
+    assert_int_equal(cfgOutStatsDMaxLen(config), 1024);
+    assert_int_equal(cfgOutVerbosity(config), 3);
+    assert_int_equal(cfgOutPeriod(config), 11);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
     assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_int_equal(cfgTransportPort(config, CFG_OUT), 8125);
@@ -344,12 +396,17 @@ cfgReadGoodJson(void** state)
     const char* jsonText =
         "{\n"
         "  'output': {\n"
-        "    'format': 'newlinedelimited',\n"
-        "    'statsdprefix': 'cribl.scope',\n"
+        "    'format': {\n"
+        "      'type': 'newlinedelimited',\n"
+        "      'statsdprefix': 'cribl.scope',\n"
+        "      'statsdmaxlen': '42',\n"
+        "      'verbosity': '0'\n"
+        "    },\n"
         "    'transport': {\n"
         "      'type': 'file',\n"
         "      'path': '/var/log/scope.log'\n"
-        "    }\n"
+        "    },\n"
+        "    'summaryperiod': '13'\n"
         "  },\n"
         "  'filteredFunctions': [\n"
         "    'read',\n"
@@ -369,6 +426,9 @@ cfgReadGoodJson(void** state)
     assert_non_null(config);
     assert_int_equal(cfgOutFormat(config), CFG_NEWLINE_DELIMITED);
     assert_string_equal(cfgOutStatsDPrefix(config), "cribl.scope.");
+    assert_int_equal(cfgOutStatsDMaxLen(config), 42);
+    assert_int_equal(cfgOutVerbosity(config), 0);
+    assert_int_equal(cfgOutPeriod(config), 13);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
     assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_int_equal(cfgTransportPort(config, CFG_OUT), 8125);
@@ -430,7 +490,8 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "momsApplePieRecipe:                # has possibilities...\n"
         "  [apples,sugar,flour,dirt]        # dirt mom?  Really?\n"
         "output:\n"
-        "  format: expandedstatsd\n"
+        "  format:\n"
+        "    type: expandedstatsd\n"
         "  request: 'make it snappy'        # Extra.\n"
         "  transport:\n"
         "    type: unix\n"
@@ -447,7 +508,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgOutFormat(config), CFG_EXPANDED_STATSD);
-    assert_null(cfgOutStatsDPrefix(config));
+    assert_string_equal(cfgOutStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
     assert_non_null(cfgFuncFilters(config));
@@ -468,10 +529,15 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "filteredFunctions:\n"
         "  - read\n"
         "output:\n"
+        "  summaryperiod: 42\n"
         "  transport:\n"
         "    path: '/var/run/scope.sock'\n"
         "    type: unix\n"
-        "  format: expandedstatsd\n"
+        "  format:\n"
+        "    verbosity: 4294967295\n"
+        "    statsdmaxlen: 4294967295\n"
+        "    statsdprefix: 'cribl.scope'\n"
+        "    type:  expandedstatsd\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -479,7 +545,10 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgOutFormat(config), CFG_EXPANDED_STATSD);
-    assert_null(cfgOutStatsDPrefix(config));
+    assert_string_equal(cfgOutStatsDPrefix(config), "cribl.scope.");
+    assert_int_equal(cfgOutStatsDMaxLen(config), 4294967295);
+    assert_int_equal(cfgOutVerbosity(config), CFG_MAX_VERBOSITY);
+    assert_int_equal(cfgOutPeriod(config), 42);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
     assert_non_null(cfgFuncFilters(config));
@@ -503,6 +572,9 @@ main(int argc, char* argv[])
         cmocka_unit_test(accessorsReturnDefaultsWhenConfigIsNull),
         cmocka_unit_test(cfgOutFormatSetAndGet),
         cmocka_unit_test(cfgOutStatsDPrefixSetAndGet),
+        cmocka_unit_test(cfgOutStatsDMaxLenSetAndGet),
+        cmocka_unit_test(cfgOutVerbositySetAndGet),
+        cmocka_unit_test(cfgOutPeriodSetAndGet),
 
         cmocka_unit_test_prestate(cfgTransportTypeSetAndGet, out_state),
         cmocka_unit_test_prestate(cfgTransportHostSetAndGet, out_state),

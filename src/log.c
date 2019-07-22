@@ -8,15 +8,13 @@ struct _log_t
     cfg_log_level_t level;
 };
 
-#define DEFAULT_LEVEL CFG_LOG_ERROR
-
 log_t*
 logCreate()
 {
     log_t* log = calloc(1, sizeof(log_t));
     if (!log) return NULL;
 
-    log->level = DEFAULT_LEVEL;
+    log->level = DEFAULT_LOG_LEVEL;
 
     return log;
 }
@@ -42,7 +40,7 @@ logSend(log_t* log, const char* msg)
 cfg_log_level_t
 logLevel(log_t* log)
 {
-    return (log) ? log->level : DEFAULT_LEVEL;
+    return (log) ? log->level : DEFAULT_LOG_LEVEL;
 }
 
 void

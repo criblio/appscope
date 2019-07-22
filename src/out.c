@@ -6,18 +6,14 @@
 struct _out_t
 {
     transport_t* transport;
-    char* prefix;
+    format_t* format;
 };
-
-#define DEFAULT_PREFIX NULL
 
 out_t*
 outCreate()
 {
     out_t* out = calloc(1, sizeof(out_t));
     if (!out) return NULL;
-
-    out->prefix = (DEFAULT_PREFIX) ? strdup(DEFAULT_PREFIX) : NULL;
 
     return out;
 }
@@ -28,7 +24,7 @@ outDestroy(out_t** out)
     if (!out || !*out) return;
     out_t* o = *out;
     transportDestroy(&o->transport);
-    if (o->prefix) free(o->prefix);
+    fmtDestroy(&o->format);
     free(o);
     *out = NULL;
 }
@@ -41,10 +37,15 @@ outSend(out_t* out, const char* msg)
     return transportSend(out->transport, msg);
 }
 
-const char*
-outStatsDPrefix(out_t* out)
+int
+outSendEvent(out_t* out, event_t* e)
 {
-    return (out) ? out->prefix : DEFAULT_PREFIX;
+    if (!out || !e) return -1;
+
+    char* msg = fmtString(out->format, e);
+    int rv = outSend(out, msg);
+    if (msg) free(msg);
+    return rv;
 }
 
 void
@@ -58,13 +59,11 @@ outTransportSet(out_t* out, transport_t* transport)
 }
 
 void
-outStatsDPrefixSet(out_t* out, const char* prefix)
+outFormatSet(out_t* out, format_t* format)
 {
     if (!out) return;
 
-    // Don't leak on repeated sets
-    if (out->prefix) free(out->prefix);
-    out->prefix = (prefix) ? strdup(prefix) : NULL;
+    // Don't leak if outFormatSet is called repeatedly
+    fmtDestroy(&out->format);
+    out->format = format;
 }
-
-

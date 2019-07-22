@@ -1,6 +1,8 @@
 #ifndef __OUT_H__
 #define __OUT_H__
+#include "format.h"
 #include "transport.h"
+#include "format.h"
 
 typedef struct _out_t out_t;
 
@@ -10,11 +12,11 @@ void                outDestroy(out_t**);
 
 // Accessors
 int                 outSend(out_t*, const char* msg);
-const char*         outStatsDPrefix(out_t*);
+int                 outSendEvent(out_t*, event_t*);
 
 // Setters (modifies out_t, but does not persist modifications)
 void                outTransportSet(out_t*, transport_t*);
-void                outStatsDPrefixSet(out_t*, const char*);
+void                outFormatSet(out_t*, format_t*);
 
 #endif // __OUT_H__
 

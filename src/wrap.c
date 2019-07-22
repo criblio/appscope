@@ -21,7 +21,7 @@ static int g_dns = 0;
 // Do we like the g_ or the cfg prefix?
 static bool g_logDataPath = FALSE;
 static bool cfgNETRXTXPeriodic = TRUE;
-static int cfgPeriod = 10;
+
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
 
@@ -740,6 +740,7 @@ void doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
 static
 void * periodic(void *arg)
 {
+    unsigned seconds = (unsigned)(uintptr_t)arg;
     long cpu, mem;
     int nthread, nfds, children;
     pid_t pid = getpid();
@@ -763,8 +764,8 @@ void * periodic(void *arg)
         doNetMetric(NETRX_PROC, -1, PERIODIC);
         doNetMetric(NETTX_PROC, -1, PERIODIC);
         
-        // Needs to be defined in a config file
-        sleep(cfgPeriod);
+        // From the config file
+        sleep(seconds);
     }
 
     return NULL;
@@ -814,15 +815,21 @@ __attribute__((constructor)) void init(void)
     {
         char* path = cfgPath(CFG_FILE_NAME);
         config_t* cfg = cfgRead(path);
+
         g_log = initLog(cfg);
         g_out = initOut(cfg);
+
+        void* seconds = (void*)(uintptr_t)cfgOutPeriod(cfg);
+        if (seconds) {
+            if (pthread_create(&periodicTID, NULL, periodic, seconds) != 0) {
+                scopeLog("ERROR: Constructor:pthread_create\n", -1);
+            }
+        }
+
         cfgDestroy(&cfg);
         if (path) free(path);
     }
 
-    if (pthread_create(&periodicTID, NULL, periodic, NULL) != 0) {
-        scopeLog("ERROR: Constructor:pthread_create\n", -1);
-    }
 
     scopeLog("Constructor\n", -1);
 }

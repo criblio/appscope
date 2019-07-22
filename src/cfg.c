@@ -22,7 +22,12 @@ struct _config_t
 {
     struct {
         cfg_out_format_t format;
-        char* statsd_prefix;  // For format = CFG_EXPANDED_STATSD
+        struct {
+            char* prefix;
+            unsigned maxlen;
+        } statsd;
+        unsigned period;
+        unsigned verbosity;
     } out;
 
     // CFG_OUT or CFG_LOG
@@ -31,12 +36,10 @@ struct _config_t
 
     filters_t filters;
     unsigned max_filters;
-    int logging;
     cfg_log_level_t level;
 };
 
-#define DEFAULT_FORMAT CFG_EXPANDED_STATSD
-#define DEFAULT_STATSD_PREFIX NULL
+#define DEFAULT_SUMMARY_PERIOD 10
 #define DEFAULT_OUT_TYPE CFG_UDP
 #define DEFAULT_OUT_HOST "127.0.0.1"
 #define DEFAULT_OUT_PORT 8125
@@ -47,8 +50,6 @@ struct _config_t
 #define DEFAULT_LOG_PATH "/tmp/scope.log"
 #define DEFAULT_FILTERS NULL
 #define DEFAULT_NUM_FILTERS 8
-#define DEFAULT_LOGGING 0
-#define DEFAULT_LEVEL CFG_LOG_NONE
 
     
 ///////////////////////////////////
@@ -59,8 +60,11 @@ cfgCreateDefault()
 { 
     config_t* c = calloc(1, sizeof(config_t));
     if (!c) return NULL;
-    c->out.format = DEFAULT_FORMAT;
-    c->out.statsd_prefix = DEFAULT_STATSD_PREFIX;
+    c->out.format = DEFAULT_OUT_FORMAT;
+    c->out.statsd.prefix = (DEFAULT_STATSD_PREFIX) ? strdup(DEFAULT_STATSD_PREFIX) : NULL;
+    c->out.statsd.maxlen = DEFAULT_STATSD_MAX_LEN;
+    c->out.period = DEFAULT_SUMMARY_PERIOD;
+    c->out.verbosity = DEFAULT_OUT_VERBOSITY;
     c->transport[CFG_OUT].type = DEFAULT_OUT_TYPE;
     c->transport[CFG_OUT].udp.host = (DEFAULT_OUT_HOST) ? strdup(DEFAULT_OUT_HOST) : NULL;
     c->transport[CFG_OUT].udp.port = DEFAULT_OUT_PORT;
@@ -71,8 +75,7 @@ cfgCreateDefault()
     c->transport[CFG_LOG].path = (DEFAULT_LOG_PATH) ? strdup(DEFAULT_LOG_PATH) : NULL;
     c->filters = DEFAULT_FILTERS;
     c->max_filters = DEFAULT_NUM_FILTERS;
-    c->logging = DEFAULT_LOGGING;
-    c->level = DEFAULT_LEVEL;
+    c->level = DEFAULT_LOG_LEVEL;
 
     return c;
 }
@@ -132,7 +135,7 @@ processLevel(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processTransportType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
     char* v_str = (char *)node->data.scalar.value;
@@ -188,7 +191,7 @@ processTransport(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "type",       processType},
+        {YAML_SCALAR_NODE,  "type",       processTransportType},
         {YAML_SCALAR_NODE,  "host",       processHost},
         {YAML_SCALAR_NODE,  "port",       processPort},
         {YAML_SCALAR_NODE,  "path",       processPath},
@@ -236,7 +239,7 @@ processFilters(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processFormatType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
     char* v_str = (char *)node->data.scalar.value;
@@ -248,11 +251,70 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processStatsdPrefix(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processStatsDPrefix(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
     char* v_str = (char *)node->data.scalar.value;
     cfgOutStatsDPrefixSet(config, v_str);
+}
+
+static void
+processStatsDMaxLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) return;
+    char* v_str = (char *)node->data.scalar.value;
+
+    errno = 0;
+    unsigned long x = strtoul(v_str, NULL, 10);
+    if (!errno) {
+        cfgOutStatsDMaxLenSet(config, x);
+    }
+}
+
+static void
+processVerbosity(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) return;
+    char* v_str = (char *)node->data.scalar.value;
+
+    errno = 0;
+    unsigned long x = strtoul(v_str, NULL, 10);
+    if (!errno) {
+        cfgOutVerbositySet(config, x);
+    }
+}
+
+static void
+processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE,  "type",            processFormatType},
+        {YAML_SCALAR_NODE,  "statsdprefix",    processStatsDPrefix},
+        {YAML_SCALAR_NODE,  "statsdmaxlen",    processStatsDMaxLen},
+        {YAML_SCALAR_NODE,  "verbosity",       processVerbosity},
+        {YAML_NO_NODE, NULL, NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+
+}
+
+static void
+processSummaryPeriod(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) return;
+    char* v_str = (char *)node->data.scalar.value;
+
+    errno = 0;
+    unsigned long x = strtoul(v_str, NULL, 10);
+    if (!errno) {
+        cfgOutPeriodSet(config, x);
+    }
 }
 
 static void
@@ -261,9 +323,9 @@ processOutput(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "format",          processFormat},
-        {YAML_SCALAR_NODE,  "statsdprefix",    processStatsdPrefix},
+        {YAML_MAPPING_NODE, "format",          processFormat},
         {YAML_MAPPING_NODE, "transport",       processTransport},
+        {YAML_SCALAR_NODE,  "summaryperiod",   processSummaryPeriod},
         {YAML_NO_NODE, NULL, NULL}
     };
 
@@ -341,7 +403,7 @@ cfgDestroy(config_t** cfg)
 {
     if (!cfg || !*cfg) return;
     config_t* c = *cfg;
-    if (c->out.statsd_prefix) free(c->out.statsd_prefix);
+    if (c->out.statsd.prefix) free(c->out.statsd.prefix);
     which_transport_t t;
     for (t=CFG_OUT; t<CFG_WHICH_MAX; t++) {
         if (c->transport[t].udp.host) free(c->transport[t].udp.host);
@@ -362,13 +424,31 @@ cfgDestroy(config_t** cfg)
 cfg_out_format_t
 cfgOutFormat(config_t* cfg)
 {
-    return (cfg) ? cfg->out.format : DEFAULT_FORMAT;
+    return (cfg) ? cfg->out.format : DEFAULT_OUT_FORMAT;
 }
 
 const char*
 cfgOutStatsDPrefix(config_t* cfg)
 {
-    return (cfg) ? cfg->out.statsd_prefix : DEFAULT_STATSD_PREFIX;
+    return (cfg && cfg->out.statsd.prefix) ? cfg->out.statsd.prefix : DEFAULT_STATSD_PREFIX;
+}
+
+unsigned
+cfgOutStatsDMaxLen(config_t* cfg)
+{
+    return (cfg) ? cfg->out.statsd.maxlen : DEFAULT_STATSD_MAX_LEN;
+}
+
+unsigned
+cfgOutPeriod(config_t* cfg)
+{
+    return (cfg) ? cfg->out.period : DEFAULT_SUMMARY_PERIOD;
+}
+
+unsigned
+cfgOutVerbosity(config_t* cfg)
+{
+    return (cfg) ? cfg->out.verbosity : DEFAULT_OUT_VERBOSITY;
 }
 
 cfg_transport_t
@@ -461,7 +541,7 @@ cfgFuncIsFiltered(config_t* cfg, const char* funcName)
 cfg_log_level_t
 cfgLogLevel(config_t* cfg)
 {
-    return (cfg) ? cfg->level : DEFAULT_LEVEL;
+    return (cfg) ? cfg->level : DEFAULT_LOG_LEVEL;
 }
 
 ///////////////////////////////////
@@ -478,9 +558,9 @@ void
 cfgOutStatsDPrefixSet(config_t* cfg, const char* prefix)
 {
     if (!cfg) return;
-    if (cfg->out.statsd_prefix) free(cfg->out.statsd_prefix);
-    if (!prefix) {
-        cfg->out.statsd_prefix = NULL;
+    if (cfg->out.statsd.prefix) free(cfg->out.statsd.prefix);
+    if (!prefix || prefix[0] == '\0') {
+        cfg->out.statsd.prefix = strdup(DEFAULT_STATSD_PREFIX);
         return;
     }
 
@@ -493,10 +573,32 @@ cfgOutStatsDPrefixSet(config_t* cfg, const char* prefix)
             temp[n] = '.';
             temp[n+1] = '\0';
         }
-        cfg->out.statsd_prefix = temp;
+        cfg->out.statsd.prefix = temp;
     } else {
-        cfg->out.statsd_prefix = strdup(prefix);
+        cfg->out.statsd.prefix = strdup(prefix);
     }
+}
+
+void
+cfgOutStatsDMaxLenSet(config_t* cfg, unsigned len)
+{
+    if (!cfg) return;
+    cfg->out.statsd.maxlen = len;
+}
+
+void
+cfgOutPeriodSet(config_t* cfg, unsigned val)
+{
+    if (!cfg) return;
+    cfg->out.period = val;
+}
+
+void
+cfgOutVerbositySet(config_t* cfg, unsigned val)
+{
+    if (!cfg) return;
+    if (val > CFG_MAX_VERBOSITY) val = CFG_MAX_VERBOSITY;
+    cfg->out.verbosity = val;
 }
 
 void

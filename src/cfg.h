@@ -12,6 +12,9 @@ void                cfgDestroy(config_t**);
 // Accessors
 cfg_out_format_t    cfgOutFormat(config_t*);
 const char*         cfgOutStatsDPrefix(config_t*);
+unsigned            cfgOutStatsDMaxLen(config_t*);
+unsigned            cfgOutPeriod(config_t*);
+unsigned            cfgOutVerbosity(config_t*);
 cfg_transport_t     cfgTransportType(config_t*, which_transport_t);
 const char*         cfgTransportHost(config_t*, which_transport_t);
 int                 cfgTransportPort(config_t*, which_transport_t);
@@ -24,6 +27,9 @@ cfg_log_level_t     cfgLogLevel(config_t*);
 // Setters (modifies config_t, but does not persist modifications)
 void                cfgOutFormatSet(config_t*, cfg_out_format_t);
 void                cfgOutStatsDPrefixSet(config_t*, const char*);
+void                cfgOutStatsDMaxLenSet(config_t*, unsigned);
+void                cfgOutPeriodSet(config_t*, unsigned);
+void                cfgOutVerbositySet(config_t*, unsigned);
 void                cfgTransportTypeSet(config_t*, which_transport_t, cfg_transport_t);
 void                cfgTransportHostSet(config_t*, which_transport_t, const char*);
 void                cfgTransportPortSet(config_t*, which_transport_t, int);

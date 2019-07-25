@@ -52,8 +52,8 @@
 #define STATSD_NETTX_PROC "net.tx:%d|c|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_DNS "net.dns:%d|c|#proc:%s,pid:%d,host:%s,domain=%s\n"
 
-#define STATSD_PROCMEM "proc.mem:%lu|g|#proc:%s,pid:%d,host:%s\n"
-#define STATSD_PROCCPU "proc.cpu:%lu|g|#proc:%s,pid:%d,host:%s\n"
+#define STATSD_PROCMEM "proc.mem:%lu|c|#proc:%s,pid:%d,host:%s\n"
+#define STATSD_PROCCPU "proc.cpu:%ld.%06ld|c|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCTHREAD "proc.thread:%d|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCFD "proc.fd:%d|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCHILD "proc.child:%d|g|#proc:%s,pid:%d,host:%s\n"

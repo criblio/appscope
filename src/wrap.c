@@ -21,9 +21,11 @@ static int g_dns = 0;
 // Do we like the g_ or the cfg prefix?
 static bool g_logDataPath = FALSE;
 static bool cfgNETRXTXPeriodic = TRUE;
+static config_t* g_cfg;
 
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
+static bool g_threadOnce = FALSE;
 
 static void
 scopeLog(char* msg, int fd)
@@ -141,7 +143,7 @@ int getProtocol(int type, char *proto, size_t len)
 }
 
 static
-void doProcMetric(enum metric_t type, long measurement)
+void doProcMetric(enum metric_t type, void *measurement)
 {
     switch (type) {
     case PROC_CPU:
@@ -151,8 +153,9 @@ void doProcMetric(enum metric_t type, long measurement)
                     strlen(g_hostname) +
                     strlen(g_procname) +
                     sizeof(unsigned int) + 1];
+        struct timeval *cpu = (struct timeval *)measurement;
         if (snprintf(metric, sizeof(metric), STATSD_PROCCPU,
-                     measurement,
+                     cpu->tv_sec, cpu->tv_usec,
                      g_procname,
                      getpid(),
                      g_hostname) <= 0) {
@@ -170,8 +173,9 @@ void doProcMetric(enum metric_t type, long measurement)
                     strlen(g_hostname) +
                     strlen(g_procname) +
                     sizeof(unsigned int) + 1];
+        long *mem = (long *)measurement;
         if (snprintf(metric, sizeof(metric), STATSD_PROCMEM,
-                     measurement,
+                     *mem,
                      g_procname,
                      getpid(),
                      g_hostname) <= 0) {
@@ -189,8 +193,9 @@ void doProcMetric(enum metric_t type, long measurement)
                     strlen(g_hostname) +
                     strlen(g_procname) +
                     sizeof(unsigned int) + 1];
+        int *val = (int *)measurement;
         if (snprintf(metric, sizeof(metric), STATSD_PROCTHREAD,
-                     (int)measurement,
+                     *val,
                      g_procname,
                      getpid(),
                      g_hostname) <= 0) {
@@ -208,8 +213,9 @@ void doProcMetric(enum metric_t type, long measurement)
                     strlen(g_hostname) +
                     strlen(g_procname) +
                     sizeof(unsigned int) + 1];
+        int *val = (int *)measurement;
         if (snprintf(metric, sizeof(metric), STATSD_PROCFD,
-                     (int)measurement,
+                     *val,
                      g_procname,
                      getpid(),
                      g_hostname) <= 0) {
@@ -227,8 +233,9 @@ void doProcMetric(enum metric_t type, long measurement)
                     strlen(g_hostname) +
                     strlen(g_procname) +
                     sizeof(unsigned int) + 1];
+        int *val = (int *)measurement;
         if (snprintf(metric, sizeof(metric), STATSD_PROCCHILD,
-                     (int)measurement,
+                     *val,
                      g_procname,
                      getpid(),
                      g_hostname) <= 0) {
@@ -536,15 +543,20 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
 
 // Return process specific CPU usage in microseconds
 static
-long doGetProcCPU(pid_t pid) {
+long doGetProcCPU(pid_t pid, struct timeval *tv) {
     struct rusage ruse;
+    
+    if (!tv) {
+        return -1;
+    }
     
     if (getrusage(RUSAGE_SELF, &ruse) != 0) {
         return (long)-1;
     }
 
-    return (long)((ruse.ru_utime.tv_sec * (1024 * 1024)) + ruse.ru_utime.tv_usec) +
-        ((ruse.ru_stime.tv_sec * (1024 * 1024)) + ruse.ru_stime.tv_usec);
+    tv->tv_sec = ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec;
+    tv->tv_usec = ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec;
+    return 0;
 }
 
 // Return process specific memory usage in kilobytes
@@ -741,25 +753,26 @@ static
 void * periodic(void *arg)
 {
     unsigned seconds = (unsigned)(uintptr_t)arg;
-    long cpu, mem;
+    long mem;
     int nthread, nfds, children;
     pid_t pid = getpid();
+    struct timeval cpu;
 
     while (1) {
-        cpu = doGetProcCPU(pid);
-        doProcMetric(PROC_CPU, cpu);
+        doGetProcCPU(pid, &cpu);
+        doProcMetric(PROC_CPU, &cpu);
         
         mem = doGetProcMem(pid);
-        doProcMetric(PROC_MEM, mem);
+        doProcMetric(PROC_MEM, &mem);
 
         nthread = osGetNumThreads(pid);
-        doProcMetric(PROC_THREAD, nthread);
+        doProcMetric(PROC_THREAD, &nthread);
 
         nfds = osGetNumFds(pid);
-        doProcMetric(PROC_FD, nfds);
+        doProcMetric(PROC_FD, &nfds);
 
         children = osGetNumChildProcs(pid);
-        doProcMetric(PROC_CHILD, children);
+        doProcMetric(PROC_CHILD, &children);
 
         doNetMetric(NETRX_PROC, -1, PERIODIC);
         doNetMetric(NETTX_PROC, -1, PERIODIC);
@@ -773,7 +786,8 @@ void * periodic(void *arg)
 
 __attribute__((constructor)) void init(void)
 {
-    pthread_t periodicTID;
+    char* path = cfgPath(CFG_FILE_NAME);
+    g_cfg = cfgRead(path);
     
     g_fn.vsyslog = dlsym(RTLD_NEXT, "vsyslog");
     g_fn.close = dlsym(RTLD_NEXT, "close");
@@ -811,7 +825,10 @@ __attribute__((constructor)) void init(void)
     }
 
     osGetProcname(g_procname, sizeof(g_procname));
-
+    g_log = initLog(g_cfg);
+    g_out = initOut(g_cfg);
+    if (path) free(path);
+/*
     {
         char* path = cfgPath(CFG_FILE_NAME);
         config_t* cfg = cfgRead(path);
@@ -820,7 +837,7 @@ __attribute__((constructor)) void init(void)
         g_out = initOut(cfg);
 
         void* seconds = (void*)(uintptr_t)cfgOutPeriod(cfg);
-        if (seconds) {
+        if (0) {
             if (pthread_create(&periodicTID, NULL, periodic, seconds) != 0) {
                 scopeLog("ERROR: Constructor:pthread_create\n", -1);
             }
@@ -829,10 +846,26 @@ __attribute__((constructor)) void init(void)
         cfgDestroy(&cfg);
         if (path) free(path);
     }
-
+*/
 
     scopeLog("Constructor\n", -1);
 }
+
+static
+void doThread()
+{
+    pthread_t periodicTID;
+    void* seconds = (void*)(uintptr_t)cfgOutPeriod(g_cfg);
+    
+    if (seconds) {
+        if (pthread_create(&periodicTID, NULL, periodic, seconds) != 0) {
+            scopeLog("ERROR: doThread:pthread_create\n", -1);
+        }
+    }
+
+    cfgDestroy(&g_cfg);
+}
+
 
 static
 void doClose(int fd, char *func)
@@ -1220,6 +1253,11 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags)
     if (g_fn.send == NULL) {
         scopeLog("ERROR: send:NULL\n", -1);
         return -1;
+    }
+
+    if (g_threadOnce == FALSE) {
+        g_threadOnce = TRUE;
+        doThread();
     }
 
     rc = g_fn.send(sockfd, buf, len, flags);

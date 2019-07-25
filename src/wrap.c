@@ -27,7 +27,9 @@ static log_t* g_log = NULL;
 static out_t* g_out = NULL;
 static bool g_threadOnce = FALSE;
 
-static void
+static void doThread(void);
+
+EXPORTON void
 scopeLog(char* msg, int fd)
 {
     if (!g_log || !msg) return;
@@ -664,32 +666,47 @@ int doAddNewSock(int sockfd)
  * Example:
  * This converts "\003www\006google\003com"
  * in DNS format to www.google.com
+ *
+ * name format:
+ * octet of len followed by a label of len octets
+ * len is <=63 and total len octets + labels <= 255
  */
 
 static
 int getDNSName(int sd, void *pkt, int pktlen)
 {
+    int llen;
     dns_query *query;
+    struct question *q;
     char *aname, *dname;
 
+    if (g_netinfo && (g_netinfo[sd].type == SOCK_STREAM)) {
+        return 0;
+    }
+    
     query = (struct dns_query_t *)pkt;
     if ((dname = (char *)&query->name) == NULL) {
         return -1;
     }
 
-    // TODO: add size check!
-    aname = g_netinfo[sd].dnsName;
-    dname++; // ignore the ETX
-    while (*dname != '\0') {
-        if (isprint(*dname) != 0) {
-            *aname++ = *dname;
-        } else {
-            *aname++ = '.';
-        }
-        dname++;
+    q = (struct question *)(pkt + sizeof(struct dns_header) + strlen(dname));
+    if (q->qclass != 1) {
+        return 0;
     }
-    *aname = '\0';
 
+    aname = g_netinfo[sd].dnsName;
+
+    while (*dname != '\0') {
+        // handle one label
+        for (llen = (int)*dname++; llen > 0; llen--) {
+            *aname++ = *dname++;
+        }
+        
+        *aname++ = '.';
+    }
+
+    aname--;
+    *aname = '\0';
     return 0;
 }
 
@@ -828,26 +845,7 @@ __attribute__((constructor)) void init(void)
     g_log = initLog(g_cfg);
     g_out = initOut(g_cfg);
     if (path) free(path);
-/*
-    {
-        char* path = cfgPath(CFG_FILE_NAME);
-        config_t* cfg = cfgRead(path);
-
-        g_log = initLog(cfg);
-        g_out = initOut(cfg);
-
-        void* seconds = (void*)(uintptr_t)cfgOutPeriod(cfg);
-        if (0) {
-            if (pthread_create(&periodicTID, NULL, periodic, seconds) != 0) {
-                scopeLog("ERROR: Constructor:pthread_create\n", -1);
-            }
-        }
-
-        cfgDestroy(&cfg);
-        if (path) free(path);
-    }
-*/
-
+    //doThread();
     scopeLog("Constructor\n", -1);
 }
 
@@ -1034,7 +1032,7 @@ int fcntl(int fd, int cmd, ...)
     struct FuncArgs fArgs;
 
     if (g_fn.fcntl == NULL ) {
-        scopeLog("ERROR: rcntl:NULL\n", fd);
+        scopeLog("ERROR: fcntl:NULL\n", fd);
         return -1;
     }
 
@@ -1263,6 +1261,10 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags)
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
         dataLog("send\n", sockfd);
+        if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+            getDNSName(sockfd, (void *)buf, len);
+        }
+
         doSend(sockfd, rc);
     }
     
@@ -1323,7 +1325,7 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
         if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
             getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
         }
-
+        
         doSend(sockfd, rc);
     }
     

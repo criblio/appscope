@@ -147,6 +147,7 @@ int getProtocol(int type, char *proto, size_t len)
 static
 void doProcMetric(enum metric_t type, void *measurement)
 {
+    pid_t pid = getpid();
     switch (type) {
     case PROC_CPU:
     {
@@ -159,7 +160,7 @@ void doProcMetric(enum metric_t type, void *measurement)
         if (snprintf(metric, sizeof(metric), STATSD_PROCCPU,
                      cpu->tv_sec, (int)cpu->tv_usec,
                      g_procname,
-                     getpid(),
+                     pid,
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:CPU:snprintf\n", -1);
         } else {
@@ -179,7 +180,7 @@ void doProcMetric(enum metric_t type, void *measurement)
         if (snprintf(metric, sizeof(metric), STATSD_PROCMEM,
                      *mem,
                      g_procname,
-                     getpid(),
+                     pid,
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:MEM:snprintf\n", -1);
         } else {
@@ -199,7 +200,7 @@ void doProcMetric(enum metric_t type, void *measurement)
         if (snprintf(metric, sizeof(metric), STATSD_PROCTHREAD,
                      *val,
                      g_procname,
-                     getpid(),
+                     pid,
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:THREAD:snprintf\n", -1);
         } else {
@@ -219,7 +220,7 @@ void doProcMetric(enum metric_t type, void *measurement)
         if (snprintf(metric, sizeof(metric), STATSD_PROCFD,
                      *val,
                      g_procname,
-                     getpid(),
+                     pid,
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:FD:snprintf\n", -1);
         } else {
@@ -239,7 +240,7 @@ void doProcMetric(enum metric_t type, void *measurement)
         if (snprintf(metric, sizeof(metric), STATSD_PROCCHILD,
                      *val,
                      g_procname,
-                     getpid(),
+                     pid,
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:CHILD:snprintf\n", -1);
         } else {
@@ -545,7 +546,7 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
 
 // Return process specific CPU usage in microseconds
 static
-long doGetProcCPU(pid_t pid, struct timeval *tv) {
+long doGetProcCPU(struct timeval *tv) {
     struct rusage ruse;
     
     if (!tv) {
@@ -563,7 +564,7 @@ long doGetProcCPU(pid_t pid, struct timeval *tv) {
 
 // Return process specific memory usage in kilobytes
 static
-long doGetProcMem(pid_t pid) {
+long doGetProcMem() {
     struct rusage ruse;
     
     if (getrusage(RUSAGE_SELF, &ruse) != 0) {
@@ -776,10 +777,10 @@ void * periodic(void *arg)
     struct timeval cpu;
 
     while (1) {
-        doGetProcCPU(pid, &cpu);
+        doGetProcCPU(&cpu);
         doProcMetric(PROC_CPU, &cpu);
         
-        mem = doGetProcMem(pid);
+        mem = doGetProcMem();
         doProcMetric(PROC_MEM, &mem);
 
         nthread = osGetNumThreads(pid);

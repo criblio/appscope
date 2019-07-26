@@ -134,6 +134,7 @@ static inline void atomicAdd(int *ptr, int val) {
 
 static inline void atomicSub(int *ptr, int val)
 {
+    if (ptr && (*ptr == 0)) return;
 	(void)__sync_sub_and_fetch(ptr, val);
 }
 

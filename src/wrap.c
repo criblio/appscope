@@ -16,7 +16,7 @@ static int g_activeConnections = 0;
 static int g_netrx = 0;
 static int g_nettx = 0;
 static int g_dns = 0;
-static time_t g_timer;
+static time_t g_timer = 0;
 
 // These need to come from a config file
 // Do we like the g_ or the cfg prefix?
@@ -143,6 +143,13 @@ int getProtocol(int type, char *proto, size_t len)
     }
 
     return 0;
+}
+
+static
+void doReset()
+{
+    g_openPorts = g_TCPConnections = g_activeConnections = g_netrx = g_nettx = g_dns = 0;
+    g_timer = time(NULL);
 }
 
 static
@@ -838,6 +845,7 @@ __attribute__((constructor)) void init(void)
     g_cfg = cfgRead(path);
     
     g_fn.vsyslog = dlsym(RTLD_NEXT, "vsyslog");
+    g_fn.fork = dlsym(RTLD_NEXT, "fork");
     g_fn.close = dlsym(RTLD_NEXT, "close");
     g_fn.read = dlsym(RTLD_NEXT, "read");
     g_fn.write = dlsym(RTLD_NEXT, "write");
@@ -1076,6 +1084,26 @@ void vsyslog(int priority, const char *format, va_list ap)
     scopeLog("vsyslog\n", -1);
     g_fn.vsyslog(priority, format, ap);
     return;
+}
+
+EXPORTON
+pid_t fork()
+{
+    pid_t rc;
+    
+    if (g_fn.fork == NULL) {
+        scopeLog("ERROR: fork:NULL\n", -1);
+        return -1;
+    }
+
+    scopeLog("fork\n", -1);
+    rc = g_fn.fork();
+    if (rc == 0) {
+        // We are the child proc
+        doReset();
+    }
+    
+    return rc;
 }
 
 EXPORTON

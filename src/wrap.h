@@ -101,6 +101,7 @@ typedef struct net_info_t {
 
 typedef struct interposed_funcs_t {
     void (*vsyslog)(int, const char *, va_list);
+    pid_t (*fork)(void);
     int (*close)(int);
     int (*shutdown)(int, int);
     int (*socket)(int, int, int);

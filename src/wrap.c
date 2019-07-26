@@ -1002,7 +1002,7 @@ int accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     }
 
     sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
-    if ((sd != -1) && addr && addrlen)) {
+    if ((sd != -1) && addr && addrlen) {
         doAccept(sd, addr, *addrlen, "accept$NOCANCEL\n");
     }
 

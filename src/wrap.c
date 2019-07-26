@@ -619,6 +619,10 @@ long doGetProcMem() {
 static
 void doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control_type_t endp)
 {
+    if (!addr || (len <= 0)) {
+        return;
+    }
+    
     // Should we check for at least the size of sockaddr_in?
     if (g_netinfo && (g_netinfo[sd].fd == sd) &&
         addr && (len > 0)) {
@@ -998,7 +1002,7 @@ int accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     }
 
     sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
-    if (sd != -1) {
+    if ((sd != -1) && addr && addrlen)) {
         doAccept(sd, addr, *addrlen, "accept$NOCANCEL\n");
     }
 
@@ -1210,7 +1214,7 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     }
 
     sd = g_fn.accept(sockfd, addr, addrlen);
-    if (sd != -1) {
+    if ((sd != -1) && addr && addrlen) {
         doAccept(sd, addr, *addrlen, "accept\n");
     }
 
@@ -1228,7 +1232,7 @@ int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     }
 
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
-    if (sd != -1) {
+    if ((sd != -1) && addr && addrlen) {
         doAccept(sd, addr, *addrlen, "accept4\n");
     }
 
@@ -1419,7 +1423,10 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
             }
         }
 
-        doSetConnection(sockfd, src_addr, *addrlen, REMOTE);
+        if (src_addr && addrlen) {
+            doSetConnection(sockfd, src_addr, *addrlen, REMOTE);
+        }
+
         doNetMetric(NETRX, sockfd, EVENT_BASED);
     }
     return rc;

@@ -16,6 +16,7 @@ static int g_activeConnections = 0;
 static int g_netrx = 0;
 static int g_nettx = 0;
 static int g_dns = 0;
+static time_t g_timer;
 
 // These need to come from a config file
 // Do we like the g_ or the cfg prefix?
@@ -27,8 +28,8 @@ static log_t* g_log = NULL;
 static out_t* g_out = NULL;
 static bool g_threadOnce = FALSE;
 
-static void doThread(void);
-
+static void * periodic(void *);
+    
 EXPORTON void
 scopeLog(char* msg, int fd)
 {
@@ -142,6 +143,31 @@ int getProtocol(int type, char *proto, size_t len)
     }
 
     return 0;
+}
+
+static
+void doThread()
+{
+    /*
+     * g_timer is the start time, set in the constructor.
+     * If we have waited DELAY_START seconds then 
+     * start the thread. This is put in place to 
+     * work around one of the Chrome sandbox limits.
+     * Shouldn't hurt anything else.  
+     */
+    if ((time(NULL) - g_timer) >= DELAY_START) {
+        pthread_t periodicTID;
+        void* seconds = (void*)(uintptr_t)cfgOutPeriod(g_cfg);
+
+        g_threadOnce = TRUE;
+        if (seconds) {
+            if (pthread_create(&periodicTID, NULL, periodic, seconds) != 0) {
+                scopeLog("ERROR: doThread:pthread_create\n", -1);
+            }
+        }
+        
+        cfgDestroy(&g_cfg);
+    }
 }
 
 static
@@ -261,6 +287,10 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
     char proto[PROTOCOL_STR];
     in_port_t localPort, remotePort;
         
+    if (g_threadOnce == FALSE) {
+        doThread();
+    }
+
     if (g_netinfo == NULL) {
         return;
     }
@@ -843,28 +873,13 @@ __attribute__((constructor)) void init(void)
     }
 
     osGetProcname(g_procname, sizeof(g_procname));
+    g_timer = time(NULL);
     g_log = initLog(g_cfg);
     g_out = initOut(g_cfg);
     if (path) free(path);
     //doThread();
     scopeLog("Constructor\n", -1);
 }
-
-static
-void doThread()
-{
-    pthread_t periodicTID;
-    void* seconds = (void*)(uintptr_t)cfgOutPeriod(g_cfg);
-    
-    if (seconds) {
-        if (pthread_create(&periodicTID, NULL, periodic, seconds) != 0) {
-            scopeLog("ERROR: doThread:pthread_create\n", -1);
-        }
-    }
-
-    cfgDestroy(&g_cfg);
-}
-
 
 static
 void doClose(int fd, char *func)
@@ -1252,11 +1267,6 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags)
     if (g_fn.send == NULL) {
         scopeLog("ERROR: send:NULL\n", -1);
         return -1;
-    }
-
-    if (g_threadOnce == FALSE) {
-        g_threadOnce = TRUE;
-        doThread();
     }
 
     rc = g_fn.send(sockfd, buf, len, flags);

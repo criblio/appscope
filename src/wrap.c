@@ -157,7 +157,7 @@ void doProcMetric(enum metric_t type, void *measurement)
                     sizeof(unsigned int) + 1];
         struct timeval *cpu = (struct timeval *)measurement;
         if (snprintf(metric, sizeof(metric), STATSD_PROCCPU,
-                     cpu->tv_sec, cpu->tv_usec,
+                     cpu->tv_sec, (int)cpu->tv_usec,
                      g_procname,
                      getpid(),
                      g_hostname) <= 0) {

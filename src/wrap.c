@@ -307,63 +307,54 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
     switch (type) {
     case OPEN_PORTS:
     {
-        char metric[strlen(STATSD_OPENPORTS) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    PROTOCOL_STR  +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) + 1];
-            
-        if (snprintf(metric, sizeof(metric), STATSD_OPENPORTS,
-                     g_openPorts, g_procname, pid, fd, g_hostname, proto,
-                     localPort) <= 0) {
-            scopeLog("ERROR: doNetMetric:OPENPORTS:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("proto",            proto,                 1),
+            NUMFIELD("port",             localPort,             5),
+            FIELDEND
+        };
+        event_t e = {"net.port", g_openPorts, CURRENT, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:OPENPORTS:outSendEvent\n", -1);
         }
         break;
     }
 
     case TCP_CONNECTIONS:
     {
-        char metric[strlen(STATSD_TCPCONNS) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    PROTOCOL_STR  +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) + 1];
-            
-        if (snprintf(metric, sizeof(metric), STATSD_TCPCONNS,
-                     g_TCPConnections, g_procname, pid, fd, g_hostname, proto,
-                     localPort) <= 0) {
-            scopeLog("ERROR: doNetMetric:TCPCONNS:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("proto",            proto,                 1),
+            NUMFIELD("port",             localPort,             5),
+            FIELDEND
+        };
+        event_t e = {"net.tcp", g_TCPConnections, CURRENT, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:TCPCONNS:outSendEvent\n", -1);
         }
         break;
     }
 
     case ACTIVE_CONNECTIONS:
     {
-        char metric[strlen(STATSD_ACTIVECONNS) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    PROTOCOL_STR  +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) + 1];
-            
-        if (snprintf(metric, sizeof(metric), STATSD_ACTIVECONNS,
-                     g_activeConnections, g_procname, pid, fd, g_hostname, proto,
-                     localPort) <= 0) {
-            scopeLog("ERROR: doNetMetric:ACTIVECONNS:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("proto",            proto,                 1),
+            NUMFIELD("port",             localPort,             5),
+            FIELDEND
+        };
+        event_t e = {"net.conn", g_activeConnections, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:ACTIVECONNS:outSendEvent\n", -1);
         }
         break;
     }
@@ -373,14 +364,6 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char lip[INET6_ADDRSTRLEN];
         char rip[INET6_ADDRSTRLEN];
         char data[16];
-        char metric[strlen(STATSD_NETRX) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    PROTOCOL_STR  +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) + 1];
 
         if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
             break;
@@ -430,14 +413,22 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             }
         }
         
-        if (snprintf(metric, sizeof(metric), STATSD_NETRX,
-                     g_netrx, g_procname, pid,
-                     fd, g_hostname, proto,
-                     lip, localPort,
-                     rip, remotePort, data) <= 0) {
-            scopeLog("ERROR: doNetMetric:NETRX:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("proto",            proto,                 1),
+            STRFIELD("localip",          lip,                   5),
+            NUMFIELD("localp",           localPort,             5),
+            STRFIELD("remoteip",         rip,                   5),
+            NUMFIELD("remotep",          remotePort,            5),
+            STRFIELD("data",             data,                  9),
+            FIELDEND
+        };
+        event_t e = {"net.rx", g_netrx, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:NETRX:outSendEvent\n", -1);
         }
         break;
     }
@@ -447,14 +438,6 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char lip[INET6_ADDRSTRLEN];
         char rip[INET6_ADDRSTRLEN];
         char data[16];
-        char metric[strlen(STATSD_NETTX) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    PROTOCOL_STR  +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) + 1];
 
         if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
             break;
@@ -503,71 +486,69 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
                 strncpy(rip, " ", sizeof(rip));
             }
         }
-        
-        if (snprintf(metric, sizeof(metric), STATSD_NETTX,
-                     g_nettx, g_procname, pid,
-                     fd, g_hostname, proto,
-                     lip, localPort,
-                     rip, remotePort, data) <= 0) {
-            scopeLog("ERROR: doNetMetric:NETTX:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("proto",            proto,                 1),
+            STRFIELD("localip",          lip,                   5),
+            NUMFIELD("localp",           localPort,             5),
+            STRFIELD("remoteip",         rip,                   5),
+            NUMFIELD("remotep",          remotePort,            5),
+            STRFIELD("data",             data,                  9),
+            FIELDEND
+        };
+        event_t e = {"net.tx", g_nettx, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:NETTX:outSendEvent\n", -1);
         }
         break;
     }
 
     case NETRX_PROC:
     {
-        char metric[strlen(STATSD_NETRX_PROC) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-
-        if (snprintf(metric, sizeof(metric), STATSD_NETRX_PROC,
-                     g_netrx, g_procname, pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doNetMetric:NETRX_PROC:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            FIELDEND
+        };
+        event_t e = {"net.rx", g_netrx, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:NETRX_PROC:outSendEvent\n", -1);
         }
         break;
     }
 
     case NETTX_PROC:
     {
-        char metric[strlen(STATSD_NETTX_PROC) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-
-        if (snprintf(metric, sizeof(metric), STATSD_NETTX_PROC,
-                     g_nettx, g_procname, pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doNetMetric:NETTX_PROC:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            FIELDEND
+        };
+        event_t e = {"net.tx", g_nettx, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:NETTX_PROC:outSendEvent\n", -1);
         }
         break;
     }
 
     case DNS:
     {
-        char metric[strlen(STATSD_DNS) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) +
-                    strlen(g_netinfo[fd].dnsName) + 1];
-
-        if (snprintf(metric, sizeof(metric), STATSD_DNS,
-                     g_dns, g_procname, pid,
-                     g_hostname,
-                     g_netinfo[fd].dnsName) <= 0) {
-            scopeLog("ERROR: doNetMetric:DNS:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("domain",           g_netinfo[fd].dnsName, 6),
+            FIELDEND
+        };
+        event_t e = {"net.dns", g_dns, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:DNS:outSendEvent\n", -1);
         }
         break;
     }

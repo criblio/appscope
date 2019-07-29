@@ -44,15 +44,6 @@
 #define SCOPE_UNIX 99
 #define DELAY_START 1
 
-#define STATSD_OPENPORTS "net.port:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
-#define STATSD_TCPCONNS "net.tcp:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
-#define STATSD_ACTIVECONNS "net.conn:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
-#define STATSD_NETRX "net.rx:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,localip:%s,localp:%d,remoteip:%s,remotep:%d,data:%s\n"
-#define STATSD_NETTX "net.tx:%d|c|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,localip:%s,localp:%d,remoteip:%s,remotep:%d,data:%s\n"    
-#define STATSD_NETRX_PROC "net.rx:%d|c|#proc:%s,pid:%d,host:%s\n"
-#define STATSD_NETTX_PROC "net.tx:%d|c|#proc:%s,pid:%d,host:%s\n"
-#define STATSD_DNS "net.dns:%d|c|#proc:%s,pid:%d,host:%s,domain=%s\n"
-
 #define STATSD_PROCMEM "proc.mem:%lu|c|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCPU "proc.cpu:%ld.%06d|c|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCTHREAD "proc.thread:%d|g|#proc:%s,pid:%d,host:%s\n"

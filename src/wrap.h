@@ -42,6 +42,7 @@
 #define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
 #define SCOPE_UNIX 99
+#define DELAY_START 1
 
 #define STATSD_OPENPORTS "net.port:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
 #define STATSD_TCPCONNS "net.tcp:%d|g|#proc:%s,pid:%d,fd:%d,host:%s,proto:%s,port:%d\n"
@@ -52,8 +53,8 @@
 #define STATSD_NETTX_PROC "net.tx:%d|c|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_DNS "net.dns:%d|c|#proc:%s,pid:%d,host:%s,domain=%s\n"
 
-#define STATSD_PROCMEM "proc.mem:%lu|g|#proc:%s,pid:%d,host:%s\n"
-#define STATSD_PROCCPU "proc.cpu:%lu|g|#proc:%s,pid:%d,host:%s\n"
+#define STATSD_PROCMEM "proc.mem:%lu|c|#proc:%s,pid:%d,host:%s\n"
+#define STATSD_PROCCPU "proc.cpu:%ld.%06d|c|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCTHREAD "proc.thread:%d|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCFD "proc.fd:%d|g|#proc:%s,pid:%d,host:%s\n"
 #define STATSD_PROCCHILD "proc.child:%d|g|#proc:%s,pid:%d,host:%s\n"
@@ -100,6 +101,7 @@ typedef struct net_info_t {
 
 typedef struct interposed_funcs_t {
     void (*vsyslog)(int, const char *, va_list);
+    pid_t (*fork)(void);
     int (*close)(int);
     int (*shutdown)(int, int);
     int (*socket)(int, int, int);
@@ -132,6 +134,7 @@ static inline void atomicAdd(int *ptr, int val) {
 
 static inline void atomicSub(int *ptr, int val)
 {
+    if (ptr && (*ptr == 0)) return;
 	(void)__sync_sub_and_fetch(ptr, val);
 }
 

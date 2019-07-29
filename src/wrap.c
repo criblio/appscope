@@ -16,16 +16,21 @@ static int g_activeConnections = 0;
 static int g_netrx = 0;
 static int g_nettx = 0;
 static int g_dns = 0;
+static time_t g_timer = 0;
 
 // These need to come from a config file
 // Do we like the g_ or the cfg prefix?
 static bool g_logDataPath = FALSE;
 static bool cfgNETRXTXPeriodic = TRUE;
+static config_t* g_cfg;
 
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
+static bool g_threadOnce = FALSE;
 
-static void
+static void * periodic(void *);
+    
+EXPORTON void
 scopeLog(char* msg, int fd)
 {
     if (!g_log || !msg) return;
@@ -141,8 +146,41 @@ int getProtocol(int type, char *proto, size_t len)
 }
 
 static
-void doProcMetric(enum metric_t type, long measurement)
+void doReset()
 {
+    g_openPorts = g_TCPConnections = g_activeConnections = g_netrx = g_nettx = g_dns = 0;
+    g_timer = time(NULL);
+}
+
+static
+void doThread()
+{
+    /*
+     * g_timer is the start time, set in the constructor.
+     * If we have waited DELAY_START seconds then 
+     * start the thread. This is put in place to 
+     * work around one of the Chrome sandbox limits.
+     * Shouldn't hurt anything else.  
+     */
+    if ((time(NULL) - g_timer) >= DELAY_START) {
+        pthread_t periodicTID;
+        void* seconds = (void*)(uintptr_t)cfgOutPeriod(g_cfg);
+
+        g_threadOnce = TRUE;
+        if (seconds) {
+            if (pthread_create(&periodicTID, NULL, periodic, seconds) != 0) {
+                scopeLog("ERROR: doThread:pthread_create\n", -1);
+            }
+        }
+        
+        cfgDestroy(&g_cfg);
+    }
+}
+
+static
+void doProcMetric(enum metric_t type, void *measurement)
+{
+    pid_t pid = getpid();
     switch (type) {
     case PROC_CPU:
     {
@@ -151,10 +189,11 @@ void doProcMetric(enum metric_t type, long measurement)
                     strlen(g_hostname) +
                     strlen(g_procname) +
                     sizeof(unsigned int) + 1];
+        struct timeval *cpu = (struct timeval *)measurement;
         if (snprintf(metric, sizeof(metric), STATSD_PROCCPU,
-                     measurement,
+                     cpu->tv_sec, (int)cpu->tv_usec,
                      g_procname,
-                     getpid(),
+                     pid,
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:CPU:snprintf\n", -1);
         } else {
@@ -170,10 +209,11 @@ void doProcMetric(enum metric_t type, long measurement)
                     strlen(g_hostname) +
                     strlen(g_procname) +
                     sizeof(unsigned int) + 1];
+        long *mem = (long *)measurement;
         if (snprintf(metric, sizeof(metric), STATSD_PROCMEM,
-                     measurement,
+                     *mem,
                      g_procname,
-                     getpid(),
+                     pid,
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:MEM:snprintf\n", -1);
         } else {
@@ -189,10 +229,11 @@ void doProcMetric(enum metric_t type, long measurement)
                     strlen(g_hostname) +
                     strlen(g_procname) +
                     sizeof(unsigned int) + 1];
+        int *val = (int *)measurement;
         if (snprintf(metric, sizeof(metric), STATSD_PROCTHREAD,
-                     (int)measurement,
+                     *val,
                      g_procname,
-                     getpid(),
+                     pid,
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:THREAD:snprintf\n", -1);
         } else {
@@ -208,10 +249,11 @@ void doProcMetric(enum metric_t type, long measurement)
                     strlen(g_hostname) +
                     strlen(g_procname) +
                     sizeof(unsigned int) + 1];
+        int *val = (int *)measurement;
         if (snprintf(metric, sizeof(metric), STATSD_PROCFD,
-                     (int)measurement,
+                     *val,
                      g_procname,
-                     getpid(),
+                     pid,
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:FD:snprintf\n", -1);
         } else {
@@ -227,10 +269,11 @@ void doProcMetric(enum metric_t type, long measurement)
                     strlen(g_hostname) +
                     strlen(g_procname) +
                     sizeof(unsigned int) + 1];
+        int *val = (int *)measurement;
         if (snprintf(metric, sizeof(metric), STATSD_PROCCHILD,
-                     (int)measurement,
+                     *val,
                      g_procname,
-                     getpid(),
+                     pid,
                      g_hostname) <= 0) {
             scopeLog("ERROR: doProcMetric:CHILD:snprintf\n", -1);
         } else {
@@ -536,20 +579,25 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
 
 // Return process specific CPU usage in microseconds
 static
-long doGetProcCPU(pid_t pid) {
+long doGetProcCPU(struct timeval *tv) {
     struct rusage ruse;
+    
+    if (!tv) {
+        return -1;
+    }
     
     if (getrusage(RUSAGE_SELF, &ruse) != 0) {
         return (long)-1;
     }
 
-    return (long)((ruse.ru_utime.tv_sec * (1024 * 1024)) + ruse.ru_utime.tv_usec) +
-        ((ruse.ru_stime.tv_sec * (1024 * 1024)) + ruse.ru_stime.tv_usec);
+    tv->tv_sec = ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec;
+    tv->tv_usec = ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec;
+    return 0;
 }
 
 // Return process specific memory usage in kilobytes
 static
-long doGetProcMem(pid_t pid) {
+long doGetProcMem() {
     struct rusage ruse;
     
     if (getrusage(RUSAGE_SELF, &ruse) != 0) {
@@ -567,6 +615,10 @@ long doGetProcMem(pid_t pid) {
 static
 void doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control_type_t endp)
 {
+    if (!addr || (len <= 0)) {
+        return;
+    }
+    
     // Should we check for at least the size of sockaddr_in?
     if (g_netinfo && (g_netinfo[sd].fd == sd) &&
         addr && (len > 0)) {
@@ -652,32 +704,47 @@ int doAddNewSock(int sockfd)
  * Example:
  * This converts "\003www\006google\003com"
  * in DNS format to www.google.com
+ *
+ * name format:
+ * octet of len followed by a label of len octets
+ * len is <=63 and total len octets + labels <= 255
  */
 
 static
 int getDNSName(int sd, void *pkt, int pktlen)
 {
+    int llen;
     dns_query *query;
+    struct question *q;
     char *aname, *dname;
 
+    if (g_netinfo && (g_netinfo[sd].type == SOCK_STREAM)) {
+        return 0;
+    }
+    
     query = (struct dns_query_t *)pkt;
     if ((dname = (char *)&query->name) == NULL) {
         return -1;
     }
 
-    // TODO: add size check!
-    aname = g_netinfo[sd].dnsName;
-    dname++; // ignore the ETX
-    while (*dname != '\0') {
-        if (isprint(*dname) != 0) {
-            *aname++ = *dname;
-        } else {
-            *aname++ = '.';
-        }
-        dname++;
+    q = (struct question *)(pkt + sizeof(struct dns_header) + strlen(dname));
+    if (q->qclass != 1) {
+        return 0;
     }
-    *aname = '\0';
 
+    aname = g_netinfo[sd].dnsName;
+
+    while (*dname != '\0') {
+        // handle one label
+        for (llen = (int)*dname++; llen > 0; llen--) {
+            *aname++ = *dname++;
+        }
+        
+        *aname++ = '.';
+    }
+
+    aname--;
+    *aname = '\0';
     return 0;
 }
 
@@ -741,25 +808,26 @@ static
 void * periodic(void *arg)
 {
     unsigned seconds = (unsigned)(uintptr_t)arg;
-    long cpu, mem;
+    long mem;
     int nthread, nfds, children;
     pid_t pid = getpid();
+    struct timeval cpu;
 
     while (1) {
-        cpu = doGetProcCPU(pid);
-        doProcMetric(PROC_CPU, cpu);
+        doGetProcCPU(&cpu);
+        doProcMetric(PROC_CPU, &cpu);
         
-        mem = doGetProcMem(pid);
-        doProcMetric(PROC_MEM, mem);
+        mem = doGetProcMem();
+        doProcMetric(PROC_MEM, &mem);
 
         nthread = osGetNumThreads(pid);
-        doProcMetric(PROC_THREAD, nthread);
+        doProcMetric(PROC_THREAD, &nthread);
 
         nfds = osGetNumFds(pid);
-        doProcMetric(PROC_FD, nfds);
+        doProcMetric(PROC_FD, &nfds);
 
         children = osGetNumChildProcs(pid);
-        doProcMetric(PROC_CHILD, children);
+        doProcMetric(PROC_CHILD, &children);
 
         doNetMetric(NETRX_PROC, -1, PERIODIC);
         doNetMetric(NETTX_PROC, -1, PERIODIC);
@@ -773,9 +841,11 @@ void * periodic(void *arg)
 
 __attribute__((constructor)) void init(void)
 {
-    pthread_t periodicTID;
+    char* path = cfgPath(CFG_FILE_NAME);
+    g_cfg = cfgRead(path);
     
     g_fn.vsyslog = dlsym(RTLD_NEXT, "vsyslog");
+    g_fn.fork = dlsym(RTLD_NEXT, "fork");
     g_fn.close = dlsym(RTLD_NEXT, "close");
     g_fn.read = dlsym(RTLD_NEXT, "read");
     g_fn.write = dlsym(RTLD_NEXT, "write");
@@ -811,26 +881,11 @@ __attribute__((constructor)) void init(void)
     }
 
     osGetProcname(g_procname, sizeof(g_procname));
-
-    {
-        char* path = cfgPath(CFG_FILE_NAME);
-        config_t* cfg = cfgRead(path);
-
-        g_log = initLog(cfg);
-        g_out = initOut(cfg);
-
-        void* seconds = (void*)(uintptr_t)cfgOutPeriod(cfg);
-        if (seconds) {
-            if (pthread_create(&periodicTID, NULL, periodic, seconds) != 0) {
-                scopeLog("ERROR: Constructor:pthread_create\n", -1);
-            }
-        }
-
-        cfgDestroy(&cfg);
-        if (path) free(path);
-    }
-
-
+    g_timer = time(NULL);
+    g_log = initLog(g_cfg);
+    g_out = initOut(g_cfg);
+    if (path) free(path);
+    //doThread();
     scopeLog("Constructor\n", -1);
 }
 
@@ -866,6 +921,10 @@ int close(int fd)
     if (g_fn.close == NULL) {
         scopeLog("ERROR: close:NULL\n", fd);
         return -1;
+    }
+
+    if (g_threadOnce == FALSE) {
+        doThread();
     }
 
     rc = g_fn.close(fd);
@@ -943,7 +1002,7 @@ int accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     }
 
     sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
-    if (sd != -1) {
+    if ((sd != -1) && addr && addrlen) {
         doAccept(sd, addr, *addrlen, "accept$NOCANCEL\n");
     }
 
@@ -1001,7 +1060,7 @@ int fcntl(int fd, int cmd, ...)
     struct FuncArgs fArgs;
 
     if (g_fn.fcntl == NULL ) {
-        scopeLog("ERROR: rcntl:NULL\n", fd);
+        scopeLog("ERROR: fcntl:NULL\n", fd);
         return -1;
     }
 
@@ -1029,6 +1088,26 @@ void vsyslog(int priority, const char *format, va_list ap)
     scopeLog("vsyslog\n", -1);
     g_fn.vsyslog(priority, format, ap);
     return;
+}
+
+EXPORTON
+pid_t fork()
+{
+    pid_t rc;
+    
+    if (g_fn.fork == NULL) {
+        scopeLog("ERROR: fork:NULL\n", -1);
+        return -1;
+    }
+
+    scopeLog("fork\n", -1);
+    rc = g_fn.fork();
+    if (rc == 0) {
+        // We are the child proc
+        doReset();
+    }
+    
+    return rc;
 }
 
 EXPORTON
@@ -1135,7 +1214,7 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     }
 
     sd = g_fn.accept(sockfd, addr, addrlen);
-    if (sd != -1) {
+    if ((sd != -1) && addr && addrlen) {
         doAccept(sd, addr, *addrlen, "accept\n");
     }
 
@@ -1153,7 +1232,7 @@ int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     }
 
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
-    if (sd != -1) {
+    if ((sd != -1) && addr && addrlen) {
         doAccept(sd, addr, *addrlen, "accept4\n");
     }
 
@@ -1225,6 +1304,10 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags)
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
         dataLog("send\n", sockfd);
+        if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+            getDNSName(sockfd, (void *)buf, len);
+        }
+
         doSend(sockfd, rc);
     }
     
@@ -1285,7 +1368,7 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
         if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
             getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
         }
-
+        
         doSend(sockfd, rc);
     }
     
@@ -1340,7 +1423,10 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
             }
         }
 
-        doSetConnection(sockfd, src_addr, *addrlen, REMOTE);
+        if (src_addr && addrlen) {
+            doSetConnection(sockfd, src_addr, *addrlen, REMOTE);
+        }
+
         doNetMetric(NETRX, sockfd, EVENT_BASED);
     }
     return rc;

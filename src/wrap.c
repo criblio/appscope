@@ -294,10 +294,6 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
     char proto[PROTOCOL_STR];
     in_port_t localPort, remotePort;
         
-    if (g_threadOnce == FALSE) {
-        doThread();
-    }
-
     if (g_netinfo == NULL) {
         return;
     }
@@ -925,6 +921,10 @@ int close(int fd)
     if (g_fn.close == NULL) {
         scopeLog("ERROR: close:NULL\n", fd);
         return -1;
+    }
+
+    if (g_threadOnce == FALSE) {
+        doThread();
     }
 
     rc = g_fn.close(fd);

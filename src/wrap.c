@@ -850,6 +850,7 @@ __attribute__((constructor)) void init(void)
     g_fn.read = dlsym(RTLD_NEXT, "read");
     g_fn.write = dlsym(RTLD_NEXT, "write");
     g_fn.fcntl = dlsym(RTLD_NEXT, "fcntl");
+    g_fn.fcntl64 = dlsym(RTLD_NEXT, "fcntl64");
     g_fn.socket = dlsym(RTLD_NEXT, "socket");
     g_fn.shutdown = dlsym(RTLD_NEXT, "shutdown");
     g_fn.listen = dlsym(RTLD_NEXT, "listen");
@@ -869,6 +870,7 @@ __attribute__((constructor)) void init(void)
     g_fn.close_nocancel = dlsym(RTLD_NEXT, "close_nocancel");
     g_fn.guarded_close_np = dlsym(RTLD_NEXT, "guarded_close_np");
     g_fn.accept$NOCANCEL = dlsym(RTLD_NEXT, "accept$NOCANCEL");
+    g_fn.DNSServiceQueryRecord = dlsym(RTLD_NEXT, "DNSServiceQueryRecord");
 #endif // __MACOS__
 
     if ((g_netinfo = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
@@ -1009,6 +1011,42 @@ int accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     return sd;
 }
 
+EXPORTON
+uint32_t DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
+                               const char *fullname, uint16_t rrtype, uint16_t rrclass,
+                               void *callback, void *context)
+{
+    uint32_t rc;
+
+    if (g_fn.DNSServiceQueryRecord == NULL) {
+        scopeLog("ERROR: DNSServiceQueryRecord:NULL\n", -1);
+        return -1;
+    }
+
+    rc = g_fn.DNSServiceQueryRecord(sdRef, flags, interfaceIndex, fullname,
+                                    rrtype, rrclass, callback, context);
+    if (rc == 0) {
+        char metric[strlen(STATSD_DNS) +
+                    sizeof(unsigned int) +
+                    strlen(g_hostname) +
+                    strlen(g_procname) +
+                    sizeof(unsigned int) +
+                    strlen(fullname) + 1];
+
+	scopeLog("DNSServiceQueryRecord\n", -1);
+        atomicAdd(&g_dns, 1);
+        if (snprintf(metric, sizeof(metric), STATSD_DNS,
+                     g_dns, g_procname, getpid(),
+                     g_hostname, fullname) <= 0) {
+            scopeLog("ERROR: doNetMetricDNSServiceQueryRecord:DNS:snprintf\n", -1);
+        } else {
+            postMetric(metric);
+        }
+    }
+
+    return rc;
+}
+
 #endif // __MACOS__
 
 EXPORTON
@@ -1067,6 +1105,30 @@ int fcntl(int fd, int cmd, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
     rc = g_fn.fcntl(fd, cmd, fArgs.arg[0], fArgs.arg[1],
                     fArgs.arg[2], fArgs.arg[3]);
+    if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd) &&
+        (cmd == F_DUPFD)) {
+        // This is a network descriptor
+        scopeLog("fcntl\n", rc);
+        doAddNewSock(rc);
+    }
+    
+    return rc;
+}
+
+EXPORTON
+int fcntl64(int fd, int cmd, ...)
+{
+    int rc;
+    struct FuncArgs fArgs;
+
+    if (g_fn.fcntl64 == NULL ) {
+        scopeLog("ERROR: fcntl64:NULL\n", fd);
+        return -1;
+    }
+
+    LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
+    rc = g_fn.fcntl64(fd, cmd, fArgs.arg[0], fArgs.arg[1],
+                      fArgs.arg[2], fArgs.arg[3]);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd) &&
         (cmd == F_DUPFD)) {
         // This is a network descriptor

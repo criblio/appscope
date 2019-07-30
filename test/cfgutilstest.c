@@ -92,25 +92,6 @@ cfgPathHonorsPriorityOrder(void** state)
 }
 
 void
-initOutReturnsPtr(void** state)
-{
-    config_t* cfg = cfgCreateDefault();
-    assert_non_null(cfg);
-
-    cfg_transport_t t;
-    for (t=CFG_UDP; t<=CFG_SHM; t++) {
-        cfgTransportTypeSet(cfg, CFG_OUT, t);
-        if (t==CFG_UNIX || t==CFG_FILE) {
-            cfgTransportPathSet(cfg, CFG_OUT, "/tmp/scope.log");
-        }
-        out_t* out = initOut(cfg);
-        assert_non_null(out);
-        outDestroy(&out);
-    }
-    cfgDestroy(&cfg);
-}
-
-void
 initLogReturnsPtr(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -126,6 +107,47 @@ initLogReturnsPtr(void** state)
     cfgDestroy(&cfg);
 }
 
+void
+initOutReturnsPtrWithNullLogReference(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+
+    cfg_transport_t t;
+    for (t=CFG_UDP; t<=CFG_SHM; t++) {
+        cfgTransportTypeSet(cfg, CFG_OUT, t);
+        if (t==CFG_UNIX || t==CFG_FILE) {
+            cfgTransportPathSet(cfg, CFG_OUT, "/tmp/scope.log");
+        }
+        out_t* out = initOut(cfg, NULL);
+        assert_non_null(out);
+        outDestroy(&out);
+    }
+    cfgDestroy(&cfg);
+}
+
+void
+initOutReturnsPtrWithLogReference(void** state)
+{
+    // Create cfg
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    cfgTransportTypeSet(cfg, CFG_OUT, CFG_FILE);
+    cfgTransportPathSet(cfg, CFG_OUT, "/tmp/scope.log");
+
+    // Create log
+    log_t* log = logCreate();
+
+    // Run the test
+    out_t* out = initOut(cfg, log);
+    assert_non_null(out);
+
+    // Cleanup
+    logDestroy(&log);
+    outDestroy(&out);
+    cfgDestroy(&cfg);
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -133,8 +155,9 @@ main(int argc, char* argv[])
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(cfgPathHonorsPriorityOrder),
-        cmocka_unit_test(initOutReturnsPtr),
         cmocka_unit_test(initLogReturnsPtr),
+        cmocka_unit_test(initOutReturnsPtrWithNullLogReference),
+        cmocka_unit_test(initOutReturnsPtrWithLogReference),
     };
     cmocka_run_group_tests(tests, NULL, NULL);
 

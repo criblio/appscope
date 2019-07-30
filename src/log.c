@@ -48,7 +48,7 @@ logTransportSet(log_t* log, transport_t* transport)
 {
     if (!log) return;
 
-    // Don't leak if logtTransportSe is called repeatedly
+    // Don't leak if logTransportSet is called repeatedly
     transportDestroy(&log->transport);
     log->transport = transport;
 }

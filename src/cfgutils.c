@@ -109,8 +109,23 @@ initFormat(config_t* cfg)
     return fmt;
 }
 
+log_t*
+initLog(config_t* cfg)
+{
+    log_t* log = logCreate();
+    if (!log) return log;
+    transport_t* t = initTransport(cfg, CFG_LOG);
+    if (!t) {
+        logDestroy(&log);
+        return log;
+    }
+    logTransportSet(log, t);
+    logLevelSet(log, cfgLogLevel(cfg));
+    return log;
+}
+
 out_t*
-initOut(config_t* cfg)
+initOut(config_t* cfg, log_t* log)
 {
     out_t* out = outCreate();
     if (!out) return out;
@@ -129,20 +144,8 @@ initOut(config_t* cfg)
     }
     outFormatSet(out, f);
 
-    return out;
-}
+    // out can have a reference to log for debugging
+    outLogReferenceSet(out, log);
 
-log_t*
-initLog(config_t* cfg)
-{
-    log_t* log = logCreate();
-    if (!log) return log;
-    transport_t* t = initTransport(cfg, CFG_LOG);
-    if (!t) {
-        logDestroy(&log);
-        return log;
-    }
-    logTransportSet(log, t);
-    logLevelSet(log, cfgLogLevel(cfg));
-    return log;
+    return out;
 }

@@ -16,18 +16,24 @@ static int g_activeConnections = 0;
 static int g_netrx = 0;
 static int g_nettx = 0;
 static int g_dns = 0;
-static time_t g_timer = 0;
+
+typedef struct {
+    unsigned interval;                   // in seconds
+    time_t startTime; 
+    bool once;
+    pthread_t periodicTID;
+} thread_timing_t;
+static thread_timing_t g_thread = {0};
 
 // These need to come from a config file
 // Do we like the g_ or the cfg prefix?
 static bool g_logDataPath = FALSE;
 static bool cfgNETRXTXPeriodic = TRUE;
-static config_t* g_cfg;
 
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
-static bool g_threadOnce = FALSE;
 
+// Forward declaration
 static void * periodic(void *);
     
 EXPORTON void
@@ -74,14 +80,6 @@ void dumpAddrs(int sd, enum control_type_t endp)
     if (GET_PORT(sd, g_netinfo[sd].localConn.ss_family, REMOTE) == DNS_PORT) {
         scopeLog("DNS\n", sd);
     }
-}
-
-static void
-postMetric(char* metric)
-{
-    if (!g_out || !metric) return;
-    scopeLog(metric, -1);
-    outSend(g_out, metric);
 }
 
 static
@@ -149,138 +147,117 @@ static
 void doReset()
 {
     g_openPorts = g_TCPConnections = g_activeConnections = g_netrx = g_nettx = g_dns = 0;
-    g_timer = time(NULL);
+    g_thread.startTime = time(NULL) + g_thread.interval;
 }
 
 static
 void doThread()
 {
+    // Create one thread at most
+    if (g_thread.once == TRUE) return;
+
     /*
-     * g_timer is the start time, set in the constructor.
-     * If we have waited DELAY_START seconds then 
-     * start the thread. This is put in place to 
-     * work around one of the Chrome sandbox limits.
+     * g_thread.startTime is the start time, set in the constructor.
+     * This is put in place to work around one of the Chrome sandbox limits.
      * Shouldn't hurt anything else.  
      */
-    if ((time(NULL) - g_timer) >= DELAY_START) {
-        pthread_t periodicTID;
-        void* seconds = (void*)(uintptr_t)cfgOutPeriod(g_cfg);
+    if (time(NULL) >= g_thread.startTime) {
+        void* seconds = (void*)(uintptr_t)g_thread.interval;
 
-        g_threadOnce = TRUE;
+        g_thread.once = TRUE;
         if (seconds) {
-            if (pthread_create(&periodicTID, NULL, periodic, seconds) != 0) {
+            if (pthread_create(&g_thread.periodicTID, NULL, periodic, seconds) != 0) {
                 scopeLog("ERROR: doThread:pthread_create\n", -1);
             }
         }
         
-        cfgDestroy(&g_cfg);
     }
 }
 
 static
-void doProcMetric(enum metric_t type, void *measurement)
+void doProcMetric(enum metric_t type, long long measurement)
 {
     pid_t pid = getpid();
     switch (type) {
     case PROC_CPU:
     {
-        char metric[strlen(STATSD_PROCCPU) +
-                    sizeof(long) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-        struct timeval *cpu = (struct timeval *)measurement;
-        if (snprintf(metric, sizeof(metric), STATSD_PROCCPU,
-                     cpu->tv_sec, (int)cpu->tv_usec,
-                     g_procname,
-                     pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doProcMetric:CPU:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "microsecond",         1),
+            FIELDEND
+        };
+        event_t e = {"proc.cpu", measurement, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doProcMetric:CPU:outSendEvent\n", -1);
         }
+        break;
     }
-    break;
 
     case PROC_MEM:
     {
-        char metric[strlen(STATSD_PROCMEM) +
-                    sizeof(long) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-        long *mem = (long *)measurement;
-        if (snprintf(metric, sizeof(metric), STATSD_PROCMEM,
-                     *mem,
-                     g_procname,
-                     pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doProcMetric:MEM:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "kibibyte",            1),
+            FIELDEND
+        };
+        event_t e = {"proc.mem", measurement, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doProcMetric:MEM:outSendEvent\n", -1);
         }
+        break;
     }
-    break;
 
     case PROC_THREAD:
     {
-        char metric[strlen(STATSD_PROCTHREAD) +
-                    sizeof(int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-        int *val = (int *)measurement;
-        if (snprintf(metric, sizeof(metric), STATSD_PROCTHREAD,
-                     *val,
-                     g_procname,
-                     pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doProcMetric:THREAD:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "thread",              1),
+            FIELDEND
+        };
+        event_t e = {"proc.thread", measurement, CURRENT, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doProcMetric:THREAD:outSendEvent\n", -1);
         }
+        break;
     }
-    break;
 
     case PROC_FD:
     {
-        char metric[strlen(STATSD_PROCFD) +
-                    sizeof(int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-        int *val = (int *)measurement;
-        if (snprintf(metric, sizeof(metric), STATSD_PROCFD,
-                     *val,
-                     g_procname,
-                     pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doProcMetric:FD:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "file",                1),
+            FIELDEND
+        };
+        event_t e = {"proc.fd", measurement, CURRENT, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doProcMetric:FD:outSendEvent\n", -1);
         }
+        break;
     }
-    break;
 
     case PROC_CHILD:
     {
-        char metric[strlen(STATSD_PROCCHILD) +
-                    sizeof(int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-        int *val = (int *)measurement;
-        if (snprintf(metric, sizeof(metric), STATSD_PROCCHILD,
-                     *val,
-                     g_procname,
-                     pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doProcMetric:CHILD:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "process",             1),
+            FIELDEND
+        };
+        event_t e = {"proc.child", measurement, CURRENT, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doProcMetric:CHILD:outSendEvent\n", -1);
         }
+        break;
     }
-    break;
 
     default:
         scopeLog("ERROR: doProcMetric:metric type\n", -1);
@@ -307,63 +284,57 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
     switch (type) {
     case OPEN_PORTS:
     {
-        char metric[strlen(STATSD_OPENPORTS) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    PROTOCOL_STR  +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) + 1];
-            
-        if (snprintf(metric, sizeof(metric), STATSD_OPENPORTS,
-                     g_openPorts, g_procname, pid, fd, g_hostname, proto,
-                     localPort) <= 0) {
-            scopeLog("ERROR: doNetMetric:OPENPORTS:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("proto",            proto,                 1),
+            NUMFIELD("port",             localPort,             5),
+            STRFIELD("unit",             "instance",            1),
+            FIELDEND
+        };
+        event_t e = {"net.port", g_openPorts, CURRENT, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:OPENPORTS:outSendEvent\n", -1);
         }
         break;
     }
 
     case TCP_CONNECTIONS:
     {
-        char metric[strlen(STATSD_TCPCONNS) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    PROTOCOL_STR  +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) + 1];
-            
-        if (snprintf(metric, sizeof(metric), STATSD_TCPCONNS,
-                     g_TCPConnections, g_procname, pid, fd, g_hostname, proto,
-                     localPort) <= 0) {
-            scopeLog("ERROR: doNetMetric:TCPCONNS:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("proto",            proto,                 1),
+            NUMFIELD("port",             localPort,             5),
+            STRFIELD("unit",             "session",             1),
+            FIELDEND
+        };
+        event_t e = {"net.tcp", g_TCPConnections, CURRENT, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:TCPCONNS:outSendEvent\n", -1);
         }
         break;
     }
 
     case ACTIVE_CONNECTIONS:
     {
-        char metric[strlen(STATSD_ACTIVECONNS) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    PROTOCOL_STR  +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) + 1];
-            
-        if (snprintf(metric, sizeof(metric), STATSD_ACTIVECONNS,
-                     g_activeConnections, g_procname, pid, fd, g_hostname, proto,
-                     localPort) <= 0) {
-            scopeLog("ERROR: doNetMetric:ACTIVECONNS:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("proto",            proto,                 1),
+            NUMFIELD("port",             localPort,             5),
+            STRFIELD("unit",             "connection",          1),
+            FIELDEND
+        };
+        event_t e = {"net.conn", g_activeConnections, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:ACTIVECONNS:outSendEvent\n", -1);
         }
         break;
     }
@@ -373,14 +344,6 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char lip[INET6_ADDRSTRLEN];
         char rip[INET6_ADDRSTRLEN];
         char data[16];
-        char metric[strlen(STATSD_NETRX) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    PROTOCOL_STR  +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) + 1];
 
         if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
             break;
@@ -430,14 +393,23 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             }
         }
         
-        if (snprintf(metric, sizeof(metric), STATSD_NETRX,
-                     g_netrx, g_procname, pid,
-                     fd, g_hostname, proto,
-                     lip, localPort,
-                     rip, remotePort, data) <= 0) {
-            scopeLog("ERROR: doNetMetric:NETRX:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("proto",            proto,                 1),
+            STRFIELD("localip",          lip,                   5),
+            NUMFIELD("localp",           localPort,             5),
+            STRFIELD("remoteip",         rip,                   5),
+            NUMFIELD("remotep",          remotePort,            5),
+            STRFIELD("data",             data,                  9),
+            STRFIELD("unit",             "byte",                1),
+            FIELDEND
+        };
+        event_t e = {"net.rx", g_netrx, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:NETRX:outSendEvent\n", -1);
         }
         break;
     }
@@ -447,14 +419,6 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char lip[INET6_ADDRSTRLEN];
         char rip[INET6_ADDRSTRLEN];
         char data[16];
-        char metric[strlen(STATSD_NETTX) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    PROTOCOL_STR  +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) +
-                    sizeof(unsigned int) + 1];
 
         if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
             break;
@@ -503,71 +467,73 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
                 strncpy(rip, " ", sizeof(rip));
             }
         }
-        
-        if (snprintf(metric, sizeof(metric), STATSD_NETTX,
-                     g_nettx, g_procname, pid,
-                     fd, g_hostname, proto,
-                     lip, localPort,
-                     rip, remotePort, data) <= 0) {
-            scopeLog("ERROR: doNetMetric:NETTX:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("proto",            proto,                 1),
+            STRFIELD("localip",          lip,                   5),
+            NUMFIELD("localp",           localPort,             5),
+            STRFIELD("remoteip",         rip,                   5),
+            NUMFIELD("remotep",          remotePort,            5),
+            STRFIELD("data",             data,                  9),
+            STRFIELD("unit",             "byte",                1),
+            FIELDEND
+        };
+        event_t e = {"net.tx", g_nettx, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:NETTX:outSendEvent\n", -1);
         }
         break;
     }
 
     case NETRX_PROC:
     {
-        char metric[strlen(STATSD_NETRX_PROC) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-
-        if (snprintf(metric, sizeof(metric), STATSD_NETRX_PROC,
-                     g_netrx, g_procname, pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doNetMetric:NETRX_PROC:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "byte",                1),
+            FIELDEND
+        };
+        event_t e = {"net.rx", g_netrx, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:NETRX_PROC:outSendEvent\n", -1);
         }
         break;
     }
 
     case NETTX_PROC:
     {
-        char metric[strlen(STATSD_NETTX_PROC) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-
-        if (snprintf(metric, sizeof(metric), STATSD_NETTX_PROC,
-                     g_nettx, g_procname, pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doNetMetric:NETTX_PROC:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "byte",                1),
+            FIELDEND
+        };
+        event_t e = {"net.tx", g_nettx, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:NETTX_PROC:outSendEvent\n", -1);
         }
         break;
     }
 
     case DNS:
     {
-        char metric[strlen(STATSD_DNS) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) +
-                    strlen(g_netinfo[fd].dnsName) + 1];
-
-        if (snprintf(metric, sizeof(metric), STATSD_DNS,
-                     g_dns, g_procname, pid,
-                     g_hostname,
-                     g_netinfo[fd].dnsName) <= 0) {
-            scopeLog("ERROR: doNetMetric:DNS:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("domain",           g_netinfo[fd].dnsName, 6),
+            STRFIELD("unit",             "request",             1),
+            FIELDEND
+        };
+        event_t e = {"net.dns", g_dns, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:DNS:outSendEvent\n", -1);
         }
         break;
     }
@@ -579,20 +545,16 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
 
 // Return process specific CPU usage in microseconds
 static
-long doGetProcCPU(struct timeval *tv) {
+long long doGetProcCPU() {
     struct rusage ruse;
     
-    if (!tv) {
-        return -1;
-    }
-    
     if (getrusage(RUSAGE_SELF, &ruse) != 0) {
-        return (long)-1;
+        return (long long)-1;
     }
 
-    tv->tv_sec = ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec;
-    tv->tv_usec = ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec;
-    return 0;
+    return
+        (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1000 * 1000) +
+        ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
 }
 
 // Return process specific memory usage in kilobytes
@@ -811,23 +773,23 @@ void * periodic(void *arg)
     long mem;
     int nthread, nfds, children;
     pid_t pid = getpid();
-    struct timeval cpu;
+    long long cpu;
 
     while (1) {
-        doGetProcCPU(&cpu);
-        doProcMetric(PROC_CPU, &cpu);
+        cpu = doGetProcCPU();
+        doProcMetric(PROC_CPU, cpu);
         
         mem = doGetProcMem();
-        doProcMetric(PROC_MEM, &mem);
+        doProcMetric(PROC_MEM, mem);
 
         nthread = osGetNumThreads(pid);
-        doProcMetric(PROC_THREAD, &nthread);
+        doProcMetric(PROC_THREAD, nthread);
 
         nfds = osGetNumFds(pid);
-        doProcMetric(PROC_FD, &nfds);
+        doProcMetric(PROC_FD, nfds);
 
         children = osGetNumChildProcs(pid);
-        doProcMetric(PROC_CHILD, &children);
+        doProcMetric(PROC_CHILD, children);
 
         doNetMetric(NETRX_PROC, -1, PERIODIC);
         doNetMetric(NETTX_PROC, -1, PERIODIC);
@@ -841,9 +803,6 @@ void * periodic(void *arg)
 
 __attribute__((constructor)) void init(void)
 {
-    char* path = cfgPath(CFG_FILE_NAME);
-    g_cfg = cfgRead(path);
-    
     g_fn.vsyslog = dlsym(RTLD_NEXT, "vsyslog");
     g_fn.fork = dlsym(RTLD_NEXT, "fork");
     g_fn.close = dlsym(RTLD_NEXT, "close");
@@ -883,11 +842,19 @@ __attribute__((constructor)) void init(void)
     }
 
     osGetProcname(g_procname, sizeof(g_procname));
-    g_timer = time(NULL);
-    g_log = initLog(g_cfg);
-    g_out = initOut(g_cfg);
-    if (path) free(path);
-    //doThread();
+
+    {
+        char* path = cfgPath(CFG_FILE_NAME);
+        config_t* cfg = cfgRead(path);
+        log_t* log = initLog(cfg);
+        g_out = initOut(cfg, log);
+        g_log = log; // Set after initOut to avoid infinite loop with socket
+        g_thread.interval = cfgOutPeriod(cfg);
+        g_thread.startTime = time(NULL) + g_thread.interval;
+        cfgDestroy(&cfg);
+        if (path) free(path);
+    }
+
     scopeLog("Constructor\n", -1);
 }
 
@@ -925,9 +892,7 @@ int close(int fd)
         return -1;
     }
 
-    if (g_threadOnce == FALSE) {
-        doThread();
-    }
+    doThread(); // Will do nothing if a thread already exists
 
     rc = g_fn.close(fd);
     if (rc != -1) {

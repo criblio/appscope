@@ -1,6 +1,7 @@
 #ifndef __OUT_H__
 #define __OUT_H__
 #include "format.h"
+#include "log.h"
 #include "transport.h"
 #include "format.h"
 
@@ -17,6 +18,7 @@ int                 outSendEvent(out_t*, event_t*);
 // Setters (modifies out_t, but does not persist modifications)
 void                outTransportSet(out_t*, transport_t*);
 void                outFormatSet(out_t*, format_t*);
+void                outLogReferenceSet(out_t*, log_t*);
 
 #endif // __OUT_H__
 

@@ -16,18 +16,24 @@ static int g_activeConnections = 0;
 static int g_netrx = 0;
 static int g_nettx = 0;
 static int g_dns = 0;
-static time_t g_timer = 0;
+
+typedef struct {
+    unsigned interval;                   // in seconds
+    time_t startTime; 
+    bool once;
+    pthread_t periodicTID;
+} thread_timing_t;
+static thread_timing_t g_thread = {0};
 
 // These need to come from a config file
 // Do we like the g_ or the cfg prefix?
 static bool g_logDataPath = FALSE;
 static bool cfgNETRXTXPeriodic = TRUE;
-static config_t* g_cfg;
 
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
-static bool g_threadOnce = FALSE;
 
+// Forward declaration
 static void * periodic(void *);
     
 EXPORTON void
@@ -141,31 +147,30 @@ static
 void doReset()
 {
     g_openPorts = g_TCPConnections = g_activeConnections = g_netrx = g_nettx = g_dns = 0;
-    g_timer = time(NULL);
+    g_thread.startTime = time(NULL) + g_thread.interval;
 }
 
 static
 void doThread()
 {
+    // Create one thread at most
+    if (g_thread.once == TRUE) return;
+
     /*
-     * g_timer is the start time, set in the constructor.
-     * If we have waited DELAY_START seconds then 
-     * start the thread. This is put in place to 
-     * work around one of the Chrome sandbox limits.
+     * g_thread.startTime is the start time, set in the constructor.
+     * This is put in place to work around one of the Chrome sandbox limits.
      * Shouldn't hurt anything else.  
      */
-    if ((time(NULL) - g_timer) >= DELAY_START) {
-        pthread_t periodicTID;
-        void* seconds = (void*)(uintptr_t)cfgOutPeriod(g_cfg);
+    if (time(NULL) >= g_thread.startTime) {
+        void* seconds = (void*)(uintptr_t)g_thread.interval;
 
-        g_threadOnce = TRUE;
+        g_thread.once = TRUE;
         if (seconds) {
-            if (pthread_create(&periodicTID, NULL, periodic, seconds) != 0) {
+            if (pthread_create(&g_thread.periodicTID, NULL, periodic, seconds) != 0) {
                 scopeLog("ERROR: doThread:pthread_create\n", -1);
             }
         }
         
-        cfgDestroy(&g_cfg);
     }
 }
 
@@ -761,9 +766,6 @@ void * periodic(void *arg)
 
 __attribute__((constructor)) void init(void)
 {
-    char* path = cfgPath(CFG_FILE_NAME);
-    g_cfg = cfgRead(path);
-    
     g_fn.vsyslog = dlsym(RTLD_NEXT, "vsyslog");
     g_fn.fork = dlsym(RTLD_NEXT, "fork");
     g_fn.close = dlsym(RTLD_NEXT, "close");
@@ -801,11 +803,19 @@ __attribute__((constructor)) void init(void)
     }
 
     osGetProcname(g_procname, sizeof(g_procname));
-    g_timer = time(NULL);
-    g_log = initLog(g_cfg);
-    g_out = initOut(g_cfg, g_log);
-    if (path) free(path);
-    //doThread();
+
+    {
+        char* path = cfgPath(CFG_FILE_NAME);
+        config_t* cfg = cfgRead(path);
+        log_t* log = initLog(cfg);
+        g_out = initOut(cfg, log);
+        g_log = log; // Set after initOut to avoid infinite loop with socket
+        g_thread.interval = cfgOutPeriod(cfg);
+        g_thread.startTime = time(NULL) + g_thread.interval;
+        cfgDestroy(&cfg);
+        if (path) free(path);
+    }
+
     scopeLog("Constructor\n", -1);
 }
 
@@ -843,9 +853,7 @@ int close(int fd)
         return -1;
     }
 
-    if (g_threadOnce == FALSE) {
-        doThread();
-    }
+    doThread(); // Will do nothing if a thread already exists
 
     rc = g_fn.close(fd);
     if (rc != -1) {

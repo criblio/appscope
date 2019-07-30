@@ -42,7 +42,6 @@
 #define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
 #define SCOPE_UNIX 99
-#define DELAY_START 1
 
 #ifndef bool
 typedef unsigned int bool;

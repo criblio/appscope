@@ -810,6 +810,9 @@ __attribute__((constructor)) void init(void)
     g_fn.write = dlsym(RTLD_NEXT, "write");
     g_fn.fcntl = dlsym(RTLD_NEXT, "fcntl");
     g_fn.fcntl64 = dlsym(RTLD_NEXT, "fcntl64");
+    g_fn.dup = dlsym(RTLD_NEXT, "dup");
+    g_fn.dup2 = dlsym(RTLD_NEXT, "dup2");
+    g_fn.dup3 = dlsym(RTLD_NEXT, "dup3");
     g_fn.socket = dlsym(RTLD_NEXT, "socket");
     g_fn.shutdown = dlsym(RTLD_NEXT, "shutdown");
     g_fn.listen = dlsym(RTLD_NEXT, "listen");
@@ -829,6 +832,7 @@ __attribute__((constructor)) void init(void)
     g_fn.close_nocancel = dlsym(RTLD_NEXT, "close_nocancel");
     g_fn.guarded_close_np = dlsym(RTLD_NEXT, "guarded_close_np");
     g_fn.accept$NOCANCEL = dlsym(RTLD_NEXT, "accept$NOCANCEL");
+    g_fn.__sendto_nocancel = dlsym(RTLD_NEXT, "__sendto_nocancel");
     g_fn.DNSServiceQueryRecord = dlsym(RTLD_NEXT, "DNSServiceQueryRecord");
 #endif // __MACOS__
 
@@ -977,6 +981,33 @@ int accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 }
 
 EXPORTON
+ssize_t __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
+                          const struct sockaddr *dest_addr, socklen_t addrlen)
+{
+    ssize_t rc;
+
+    if (g_fn.__sendto_nocancel == NULL) {
+        scopeLog("ERROR: __sendto_nocancel:NULL\n", -1);
+        return -1;
+    }
+
+    rc = g_fn.__sendto_nocancel(sockfd, buf, len, flags, dest_addr, addrlen);
+    if (rc != -1) {
+        dataLog("__sendto_nocancel\n", sockfd);
+
+        doSetAddrs(sockfd);
+
+        if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+            getDNSName(sockfd, (void *)buf, len);
+        }
+        
+        doSend(sockfd, rc);
+    }
+
+    return rc;
+}
+
+EXPORTON
 uint32_t DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
                                const char *fullname, uint16_t rrtype, uint16_t rrclass,
                                void *callback, void *context)
@@ -991,21 +1022,21 @@ uint32_t DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIn
     rc = g_fn.DNSServiceQueryRecord(sdRef, flags, interfaceIndex, fullname,
                                     rrtype, rrclass, callback, context);
     if (rc == 0) {
-        char metric[strlen(STATSD_DNS) +
-                    sizeof(unsigned int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) +
-                    strlen(fullname) + 1];
-
-	scopeLog("DNSServiceQueryRecord\n", -1);
+        scopeLog("DNSServiceQueryRecord\n", -1);
         atomicAdd(&g_dns, 1);
-        if (snprintf(metric, sizeof(metric), STATSD_DNS,
-                     g_dns, g_procname, getpid(),
-                     g_hostname, fullname) <= 0) {
-            scopeLog("ERROR: doNetMetricDNSServiceQueryRecord:DNS:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              getpid(),              7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("domain",           (char *)fullname,      6),
+            STRFIELD("unit",             "request",             1),
+            FIELDEND
+        };
+
+        event_t e = {"net.dns", g_dns, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: DNSServiceQueryRecord:DNS:outSendEvent\n", -1);
         }
     }
 
@@ -1101,6 +1132,66 @@ int fcntl64(int fd, int cmd, ...)
         doAddNewSock(rc);
     }
     
+    return rc;
+}
+
+EXPORTON
+int dup(int fd)
+{
+    int rc;
+
+    if (g_fn.dup == NULL ) {
+        scopeLog("ERROR: dup:NULL\n", fd);
+        return -1;
+    }
+
+    rc = g_fn.dup(fd);
+    if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
+        // This is a network descriptor
+        scopeLog("dup\n", rc);
+        doAddNewSock(rc);
+    }
+
+    return rc;
+}
+
+EXPORTON
+int dup2(int oldfd, int newfd)
+{
+    int rc;
+
+    if (g_fn.dup2 == NULL ) {
+        scopeLog("ERROR: dup2:NULL\n", oldfd);
+        return -1;
+    }
+
+    rc = g_fn.dup2(oldfd, newfd);
+    if ((rc != -1) && (g_netinfo) && (g_netinfo[oldfd].fd == oldfd)) {
+        // This is a network descriptor
+        scopeLog("dup2\n", rc);
+        doAddNewSock(rc);
+    }
+
+    return rc;
+}
+
+EXPORTON
+int dup3(int oldfd, int newfd, int flags)
+{
+    int rc;
+
+    if (g_fn.dup3 == NULL ) {
+        scopeLog("ERROR: dup3:NULL\n", oldfd);
+        return -1;
+    }
+
+    rc = g_fn.dup3(oldfd, newfd, flags);
+    if ((rc != -1) && (g_netinfo) && (g_netinfo[oldfd].fd == oldfd)) {
+        // This is a network descriptor
+        scopeLog("dup3\n", rc);
+        doAddNewSock(rc);
+    }
+
     return rc;
 }
 

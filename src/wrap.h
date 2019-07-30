@@ -100,6 +100,9 @@ typedef struct interposed_funcs_t {
     ssize_t (*send)(int, const void *, size_t, int);
     int (*fcntl)(int, int, ...);
     int (*fcntl64)(int, int, ...);
+    int (*dup)(int);
+    int (*dup2)(int, int);
+    int (*dup3)(int, int, int);
     ssize_t (*sendto)(int, const void *, size_t, int,
                               const struct sockaddr *, socklen_t);
     ssize_t (*sendmsg)(int, const struct msghdr *, int);
@@ -111,7 +114,10 @@ typedef struct interposed_funcs_t {
     int (*close$NOCANCEL)(int);
     int (*close_nocancel)(int);
     int (*guarded_close_np)(int, void *);
-    uint32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *, uint16_t, uint16_t, void *, void *);
+    ssize_t (*__sendto_nocancel)(int, const void *, size_t, int,
+                                 const struct sockaddr *, socklen_t);
+    uint32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
+                                      uint16_t, uint16_t, void *, void *);
 } interposed_funcs;
     
 static inline void atomicAdd(int *ptr, int val) {

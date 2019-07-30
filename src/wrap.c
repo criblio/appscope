@@ -178,15 +178,16 @@ static
 void doProcMetric(enum metric_t type, long long measurement)
 {
     pid_t pid = getpid();
-    event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
-            NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_hostname,            2),
-            FIELDEND
-    };
     switch (type) {
     case PROC_CPU:
     {
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "microsecond",         1),
+            FIELDEND
+        };
         event_t e = {"proc.cpu", measurement, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doProcMetric:CPU:outSendEvent\n", -1);
@@ -196,6 +197,13 @@ void doProcMetric(enum metric_t type, long long measurement)
 
     case PROC_MEM:
     {
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "kibibyte",            1),
+            FIELDEND
+        };
         event_t e = {"proc.mem", measurement, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doProcMetric:MEM:outSendEvent\n", -1);
@@ -205,6 +213,13 @@ void doProcMetric(enum metric_t type, long long measurement)
 
     case PROC_THREAD:
     {
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "thread",              1),
+            FIELDEND
+        };
         event_t e = {"proc.thread", measurement, CURRENT, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doProcMetric:THREAD:outSendEvent\n", -1);
@@ -214,6 +229,13 @@ void doProcMetric(enum metric_t type, long long measurement)
 
     case PROC_FD:
     {
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "file",                1),
+            FIELDEND
+        };
         event_t e = {"proc.fd", measurement, CURRENT, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doProcMetric:FD:outSendEvent\n", -1);
@@ -223,6 +245,13 @@ void doProcMetric(enum metric_t type, long long measurement)
 
     case PROC_CHILD:
     {
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "process",             1),
+            FIELDEND
+        };
         event_t e = {"proc.child", measurement, CURRENT, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doProcMetric:CHILD:outSendEvent\n", -1);
@@ -262,6 +291,7 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("host",             g_hostname,            2),
             STRFIELD("proto",            proto,                 1),
             NUMFIELD("port",             localPort,             5),
+            STRFIELD("unit",             "instance",            1),
             FIELDEND
         };
         event_t e = {"net.port", g_openPorts, CURRENT, fields};
@@ -280,6 +310,7 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("host",             g_hostname,            2),
             STRFIELD("proto",            proto,                 1),
             NUMFIELD("port",             localPort,             5),
+            STRFIELD("unit",             "session",             1),
             FIELDEND
         };
         event_t e = {"net.tcp", g_TCPConnections, CURRENT, fields};
@@ -298,6 +329,7 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("host",             g_hostname,            2),
             STRFIELD("proto",            proto,                 1),
             NUMFIELD("port",             localPort,             5),
+            STRFIELD("unit",             "connection",          1),
             FIELDEND
         };
         event_t e = {"net.conn", g_activeConnections, DELTA, fields};
@@ -372,6 +404,7 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("remoteip",         rip,                   5),
             NUMFIELD("remotep",          remotePort,            5),
             STRFIELD("data",             data,                  9),
+            STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
         event_t e = {"net.rx", g_netrx, DELTA, fields};
@@ -446,6 +479,7 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("remoteip",         rip,                   5),
             NUMFIELD("remotep",          remotePort,            5),
             STRFIELD("data",             data,                  9),
+            STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
         event_t e = {"net.tx", g_nettx, DELTA, fields};
@@ -461,6 +495,7 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("proc",             g_procname,            2),
             NUMFIELD("pid",              pid,                   7),
             STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
         event_t e = {"net.rx", g_netrx, DELTA, fields};
@@ -476,6 +511,7 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("proc",             g_procname,            2),
             NUMFIELD("pid",              pid,                   7),
             STRFIELD("host",             g_hostname,            2),
+            STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
         event_t e = {"net.tx", g_nettx, DELTA, fields};
@@ -492,6 +528,7 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             NUMFIELD("pid",              pid,                   7),
             STRFIELD("host",             g_hostname,            2),
             STRFIELD("domain",           g_netinfo[fd].dnsName, 6),
+            STRFIELD("unit",             "request",             1),
             FIELDEND
         };
         event_t e = {"net.dns", g_dns, DELTA, fields};
@@ -516,7 +553,7 @@ long long doGetProcCPU() {
     }
 
     return
-        (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1024 * 1024) +
+        (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1000 * 1000) +
         ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
 }
 

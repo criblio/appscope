@@ -125,6 +125,77 @@ outFormatSetAndOutSendEvent(void** state)
 }
 
 
+
+
+static void
+outLogReferenceSetCausesOutSendEventToRouteToLog(void** state)
+{
+    // Create out, with transport1 and format
+    out_t* out = outCreate();
+    assert_non_null(out);
+    const char* file_path1 = "/tmp/my.path1";
+    transport_t* t1 = transportCreateFile(file_path1);
+    outTransportSet(out, t1);
+    format_t* f = fmtCreate(CFG_EXPANDED_STATSD);
+    outFormatSet(out, f);
+
+    // Create log, with transport2
+    log_t* log = logCreate();
+    const char* file_path2 = "/tmp/my.path2";
+    transport_t* t2 = transportCreateFile(file_path2);
+    logTransportSet(log, t2);
+
+    // send an event to out, verify that it only goes to t1
+    {
+        long file_pos_before1 = fileEndPosition(file_path1);
+        long file_pos_before2 = fileEndPosition(file_path2);
+        event_t e = {"A", 1, DELTA, NULL};
+        outSendEvent(out, &e);
+        long file_pos_after1 = fileEndPosition(file_path1);
+        long file_pos_after2 = fileEndPosition(file_path2);
+        assert_int_not_equal(file_pos_before1, file_pos_after1);
+        assert_int_equal(file_pos_before2, file_pos_after2);
+    }
+
+    // call outLogReferenceSet with log, then send another event.
+    // verify that it goes to t1 and t2
+    outLogReferenceSet(out, log);
+    {
+        long file_pos_before1 = fileEndPosition(file_path1);
+        long file_pos_before2 = fileEndPosition(file_path2);
+        event_t e = {"B", 1, DELTA, NULL};
+        outSendEvent(out, &e);
+        long file_pos_after1 = fileEndPosition(file_path1);
+        long file_pos_after2 = fileEndPosition(file_path2);
+        assert_int_not_equal(file_pos_before1, file_pos_after1);
+        assert_int_not_equal(file_pos_before2, file_pos_after2);
+    }
+
+    // call outLogReferenceSet with null, then send another event.
+    // verify that it only goes to t1
+    outLogReferenceSet(out, NULL);
+    {
+        long file_pos_before1 = fileEndPosition(file_path1);
+        long file_pos_before2 = fileEndPosition(file_path2);
+        event_t e = {"C", 1, DELTA, NULL};
+        outSendEvent(out, &e);
+        long file_pos_after1 = fileEndPosition(file_path1);
+        long file_pos_after2 = fileEndPosition(file_path2);
+        assert_int_not_equal(file_pos_before1, file_pos_after1);
+        assert_int_equal(file_pos_before2, file_pos_after2);
+    }
+
+
+    // Clean up
+    if (unlink(file_path1))
+        fail_msg("Couldn't delete file %s", file_path1);
+    if (unlink(file_path2))
+        fail_msg("Couldn't delete file %s", file_path2);
+
+    outDestroy(&out);
+    logDestroy(&log);
+}
+
 int
 main (int argc, char* argv[])
 {
@@ -137,6 +208,7 @@ main (int argc, char* argv[])
         cmocka_unit_test(outSendForNullMessageDoesntCrash),
         cmocka_unit_test(outTranportSetAndOutSend),
         cmocka_unit_test(outFormatSetAndOutSendEvent),
+        cmocka_unit_test(outLogReferenceSetCausesOutSendEventToRouteToLog),
     };
 
     cmocka_run_group_tests(tests, NULL, NULL);

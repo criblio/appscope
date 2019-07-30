@@ -44,12 +44,6 @@
 #define SCOPE_UNIX 99
 #define DELAY_START 1
 
-#define STATSD_PROCMEM "proc.mem:%lu|c|#proc:%s,pid:%d,host:%s\n"
-#define STATSD_PROCCPU "proc.cpu:%ld.%06d|c|#proc:%s,pid:%d,host:%s\n"
-#define STATSD_PROCTHREAD "proc.thread:%d|g|#proc:%s,pid:%d,host:%s\n"
-#define STATSD_PROCFD "proc.fd:%d|g|#proc:%s,pid:%d,host:%s\n"
-#define STATSD_PROCCHILD "proc.child:%d|g|#proc:%s,pid:%d,host:%s\n"
-
 #ifndef bool
 typedef unsigned int bool;
 #endif

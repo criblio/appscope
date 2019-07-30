@@ -8,8 +8,8 @@
 // The caller is responsible for deallocating with free().
 char* cfgPath(const char* cfgname);
 
-out_t* initOut(config_t* cfg);
 log_t* initLog(config_t* cfg);
+out_t* initOut(config_t* cfg, log_t* log);
 
 
 #endif // __CFGUTILS_H__

@@ -76,14 +76,6 @@ void dumpAddrs(int sd, enum control_type_t endp)
     }
 }
 
-static void
-postMetric(char* metric)
-{
-    if (!g_out || !metric) return;
-    scopeLog(metric, -1);
-    outSend(g_out, metric);
-}
-
 static
 void addSock(int fd, int type)
 {
@@ -178,109 +170,60 @@ void doThread()
 }
 
 static
-void doProcMetric(enum metric_t type, void *measurement)
+void doProcMetric(enum metric_t type, long long measurement)
 {
     pid_t pid = getpid();
+    event_field_t fields[] = {
+            STRFIELD("proc",             g_procname,            2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_hostname,            2),
+            FIELDEND
+    };
     switch (type) {
     case PROC_CPU:
     {
-        char metric[strlen(STATSD_PROCCPU) +
-                    sizeof(long) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-        struct timeval *cpu = (struct timeval *)measurement;
-        if (snprintf(metric, sizeof(metric), STATSD_PROCCPU,
-                     cpu->tv_sec, (int)cpu->tv_usec,
-                     g_procname,
-                     pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doProcMetric:CPU:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_t e = {"proc.cpu", measurement, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doProcMetric:CPU:outSendEvent\n", -1);
         }
+        break;
     }
-    break;
 
     case PROC_MEM:
     {
-        char metric[strlen(STATSD_PROCMEM) +
-                    sizeof(long) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-        long *mem = (long *)measurement;
-        if (snprintf(metric, sizeof(metric), STATSD_PROCMEM,
-                     *mem,
-                     g_procname,
-                     pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doProcMetric:MEM:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_t e = {"proc.mem", measurement, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doProcMetric:MEM:outSendEvent\n", -1);
         }
+        break;
     }
-    break;
 
     case PROC_THREAD:
     {
-        char metric[strlen(STATSD_PROCTHREAD) +
-                    sizeof(int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-        int *val = (int *)measurement;
-        if (snprintf(metric, sizeof(metric), STATSD_PROCTHREAD,
-                     *val,
-                     g_procname,
-                     pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doProcMetric:THREAD:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_t e = {"proc.thread", measurement, CURRENT, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doProcMetric:THREAD:outSendEvent\n", -1);
         }
+        break;
     }
-    break;
 
     case PROC_FD:
     {
-        char metric[strlen(STATSD_PROCFD) +
-                    sizeof(int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-        int *val = (int *)measurement;
-        if (snprintf(metric, sizeof(metric), STATSD_PROCFD,
-                     *val,
-                     g_procname,
-                     pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doProcMetric:FD:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_t e = {"proc.fd", measurement, CURRENT, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doProcMetric:FD:outSendEvent\n", -1);
         }
+        break;
     }
-    break;
 
     case PROC_CHILD:
     {
-        char metric[strlen(STATSD_PROCCHILD) +
-                    sizeof(int) +
-                    strlen(g_hostname) +
-                    strlen(g_procname) +
-                    sizeof(unsigned int) + 1];
-        int *val = (int *)measurement;
-        if (snprintf(metric, sizeof(metric), STATSD_PROCCHILD,
-                     *val,
-                     g_procname,
-                     pid,
-                     g_hostname) <= 0) {
-            scopeLog("ERROR: doProcMetric:CHILD:snprintf\n", -1);
-        } else {
-            postMetric(metric);
+        event_t e = {"proc.child", measurement, CURRENT, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doProcMetric:CHILD:outSendEvent\n", -1);
         }
+        break;
     }
-    break;
 
     default:
         scopeLog("ERROR: doProcMetric:metric type\n", -1);
@@ -560,20 +503,16 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
 
 // Return process specific CPU usage in microseconds
 static
-long doGetProcCPU(struct timeval *tv) {
+long long doGetProcCPU() {
     struct rusage ruse;
     
-    if (!tv) {
-        return -1;
-    }
-    
     if (getrusage(RUSAGE_SELF, &ruse) != 0) {
-        return (long)-1;
+        return (long long)-1;
     }
 
-    tv->tv_sec = ruse.ru_utime.tv_sec + ruse.ru_stime.tv_sec;
-    tv->tv_usec = ruse.ru_utime.tv_usec + ruse.ru_stime.tv_usec;
-    return 0;
+    return
+        (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1024 * 1024) +
+        ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
 }
 
 // Return process specific memory usage in kilobytes
@@ -792,23 +731,23 @@ void * periodic(void *arg)
     long mem;
     int nthread, nfds, children;
     pid_t pid = getpid();
-    struct timeval cpu;
+    long long cpu;
 
     while (1) {
-        doGetProcCPU(&cpu);
-        doProcMetric(PROC_CPU, &cpu);
+        cpu = doGetProcCPU();
+        doProcMetric(PROC_CPU, cpu);
         
         mem = doGetProcMem();
-        doProcMetric(PROC_MEM, &mem);
+        doProcMetric(PROC_MEM, mem);
 
         nthread = osGetNumThreads(pid);
-        doProcMetric(PROC_THREAD, &nthread);
+        doProcMetric(PROC_THREAD, nthread);
 
         nfds = osGetNumFds(pid);
-        doProcMetric(PROC_FD, &nfds);
+        doProcMetric(PROC_FD, nfds);
 
         children = osGetNumChildProcs(pid);
-        doProcMetric(PROC_CHILD, &children);
+        doProcMetric(PROC_CHILD, children);
 
         doNetMetric(NETRX_PROC, -1, PERIODIC);
         doNetMetric(NETTX_PROC, -1, PERIODIC);
@@ -864,7 +803,7 @@ __attribute__((constructor)) void init(void)
     osGetProcname(g_procname, sizeof(g_procname));
     g_timer = time(NULL);
     g_log = initLog(g_cfg);
-    g_out = initOut(g_cfg);
+    g_out = initOut(g_cfg, g_log);
     if (path) free(path);
     //doThread();
     scopeLog("Constructor\n", -1);

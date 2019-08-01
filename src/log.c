@@ -30,10 +30,12 @@ logDestroy(log_t** log)
 }
 
 int
-logSend(log_t* log, const char* msg)
+logSend(log_t* log, const char* msg, cfg_log_level_t mlevel)
 {
     if (!log || !msg) return -1;
 
+    if ((log->level == CFG_LOG_NONE) || (log->level > mlevel)) return 0;
+    
     return transportSend(log->transport, msg);
 }
 

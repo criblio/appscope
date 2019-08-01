@@ -13,7 +13,7 @@ typedef struct {
     const char* const name;
     const value_t value_type;
     union {
-        char* const str;
+        const char* str;
         long long num;
     } value;
     const unsigned cardinality;   // verbosity uses this

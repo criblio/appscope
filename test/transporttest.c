@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include "transport.h"
@@ -52,10 +53,32 @@ transportCreateUdpHandlesGoodHostArguments()
 static void
 transportCreateFileReturnsValidPtrInHappyPath(void** state)
 {
-    transport_t* t = transportCreateFile("/tmp/scope.log");
+    const char* path = "/tmp/myscope.log";
+    transport_t* t = transportCreateFile(path);
     assert_non_null(t);
     transportDestroy(&t);
     assert_null(t);
+    if (unlink(path))
+        fail_msg("Couldn't delete test file %s", path);
+}
+
+static void
+transportCreateFileCreatesFileWithRWPermissionsForAll(void** state)
+{
+    const char* path = "/tmp/myscope.log";
+    transport_t* t = transportCreateFile(path);
+    assert_non_null(t);
+    transportDestroy(&t);
+
+    // test permissions are 0666
+    struct stat buf;
+    if (stat(path, &buf))
+        fail_msg("Couldn't test permissions for file %s", path);
+    assert_true((buf.st_mode & 0777) == 0666);
+
+    // Clean up
+    if (unlink(path))
+        fail_msg("Couldn't delete test file %s", path);
 }
 
 static void
@@ -139,7 +162,8 @@ transportSendForNullMessageDoesNothing(void** state)
     assert_non_null(t);
     assert_int_equal(transportSend(t, NULL), -1);
     transportDestroy(&t);
-    unlink(path);
+    if (unlink(path))
+        fail_msg("Couldn't delete test file %s", path);
 }
 
 static void
@@ -253,6 +277,7 @@ main (int argc, char* argv[])
         cmocka_unit_test(transportCreateUdpReturnsNullPtrForInvalidHost),
         cmocka_unit_test(transportCreateUdpHandlesGoodHostArguments),
         cmocka_unit_test(transportCreateFileReturnsValidPtrInHappyPath),
+        cmocka_unit_test(transportCreateFileCreatesFileWithRWPermissionsForAll),
         cmocka_unit_test(transportCreateFileReturnsNullForInvalidPath),
         cmocka_unit_test(transportCreateFileCreatesDirectoriesAsNeeded),
         cmocka_unit_test(transportCreateUnixReturnsValidPtrInHappyPath),

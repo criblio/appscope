@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include "scopetypes.h"
 #include "transport.h"
@@ -101,6 +102,11 @@ transportCreateFile(const char* path)
     if (t->file.fd == -1) {
         transportDestroy(&t);
         return t;
+    } else {
+        // Needed because umask affects open permissions
+        if (fchmod(t->file.fd, 0666) == -1) {
+            // TBD do something awesome.
+        }
     }
     return t;
 }

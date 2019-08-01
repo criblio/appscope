@@ -110,6 +110,64 @@ logTranportSetAndLogSend(void** state)
     logDestroy(&log);
 }
 
+static void
+logSendWithLogLevelFilter(void** state)
+{
+    const char* file_path = "/tmp/my.path";
+    log_t* log = logCreate();
+    assert_non_null(log);
+    transport_t* t = transportCreateFile(file_path);
+    logTransportSet(log, t);
+
+    // Test logLevel filtering by testing side effects of logSend
+    // affecting the file at file_path.
+
+    // Set the log level to CFG_LOG_TRACE and verify that every logSend
+    // level results in something being added to the file
+    logLevelSet(log, CFG_LOG_TRACE);
+    cfg_log_level_t level;
+    for (level = CFG_LOG_TRACE; level <= CFG_LOG_NONE + 1; level++) {
+        long file_pos_before = fileEndPosition(file_path);
+        assert_int_equal(logSend(log, "Something to send\n", level), 0);
+        long file_pos_after = fileEndPosition(file_path);
+        assert_int_not_equal(file_pos_before, file_pos_after);
+    }
+
+    // Set the log level to CFG_LOG_NONE and verify that no logSend
+    // level results in something being added to the file.
+    logLevelSet(log, CFG_LOG_NONE);
+    for (level = CFG_LOG_TRACE; level <= CFG_LOG_NONE + 1; level++) {
+        long file_pos_before = fileEndPosition(file_path);
+        assert_int_equal(logSend(log, "Something to send\n", level), 0);
+        long file_pos_after = fileEndPosition(file_path);
+        assert_int_equal(file_pos_before, file_pos_after);
+    }
+
+    // Set the log level to CFG_LOG_INFO and verify that logSend
+    // of INFO, WARN, or ERROR results in something being added to the file.
+    logLevelSet(log, CFG_LOG_INFO);
+    for (level = CFG_LOG_TRACE; level <= CFG_LOG_NONE + 1; level++) {
+        long file_pos_before = fileEndPosition(file_path);
+        assert_int_equal(logSend(log, "Something to send\n", level), 0);
+        long file_pos_after = fileEndPosition(file_path);
+        switch (level) {
+            case CFG_LOG_TRACE:
+            case CFG_LOG_DEBUG:
+                assert_int_equal(file_pos_before, file_pos_after);
+                break;
+            case CFG_LOG_INFO:
+            case CFG_LOG_WARN:
+            case CFG_LOG_ERROR:
+            case CFG_LOG_NONE:
+                assert_int_not_equal(file_pos_before, file_pos_after);
+        }
+    }
+
+    if (unlink(file_path))
+        fail_msg("Couldn't delete file %s", file_path);
+
+    logDestroy(&log);
+}
 
 int
 main (int argc, char* argv[])
@@ -124,6 +182,7 @@ main (int argc, char* argv[])
         cmocka_unit_test(logLevelVerifyDefaultLevel),
         cmocka_unit_test(logLevelSetAndGet),
         cmocka_unit_test(logTranportSetAndLogSend),
+        cmocka_unit_test(logSendWithLogLevelFilter),
     };
 
     cmocka_run_group_tests(tests, NULL, NULL);

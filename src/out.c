@@ -46,7 +46,7 @@ outSendEvent(out_t* out, event_t* e)
 
     char* msg = fmtString(out->format, e);
     int rv = outSend(out, msg);
-    if (out->log_ref) logSend(out->log_ref, msg);
+    if (out->log_ref) logSend(out->log_ref, msg, CFG_LOG_DEBUG);
     if (msg) free(msg);
     return rv;
 }

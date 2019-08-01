@@ -141,6 +141,7 @@ outLogReferenceSetCausesOutSendEventToRouteToLog(void** state)
 
     // Create log, with transport2
     log_t* log = logCreate();
+    logLevelSet(log, CFG_LOG_TRACE);
     const char* file_path2 = "/tmp/my.path2";
     transport_t* t2 = transportCreateFile(file_path2);
     logTransportSet(log, t2);

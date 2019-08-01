@@ -376,8 +376,8 @@ cfgReadEveryProcessLevel(void** state)
         "...\n";
 
     const char* path = CFG_FILE_NAME;
-    const char* level[] = {"debug", "info", "warning", "error", "none", "dpath"};
-    cfg_log_level_t value[] = {CFG_LOG_DPATH, CFG_LOG_DEBUG, CFG_LOG_INFO, CFG_LOG_WARN, CFG_LOG_ERROR, CFG_LOG_NONE};
+    const char* level[] = { "trace", "debug", "info", "warning", "error", "none"};
+    cfg_log_level_t value[] = {CFG_LOG_TRACE, CFG_LOG_DEBUG, CFG_LOG_INFO, CFG_LOG_WARN, CFG_LOG_ERROR, CFG_LOG_NONE};
     int i;
     for (i = 0; i< sizeof(level)/sizeof(level[0]); i++) {
         writeFileWithSubstitution(path, yamlText, level[i]);

@@ -4,7 +4,7 @@
 typedef enum {CFG_EXPANDED_STATSD, CFG_NEWLINE_DELIMITED, CFG_FORMAT_MAX} cfg_out_format_t;
 typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_SYSLOG, CFG_SHM} cfg_transport_t;
 typedef enum {CFG_OUT, CFG_LOG, CFG_WHICH_MAX} which_transport_t;
-typedef enum {CFG_LOG_DPATH,
+typedef enum {CFG_LOG_TRACE,
               CFG_LOG_DEBUG,
               CFG_LOG_INFO,
               CFG_LOG_WARN,

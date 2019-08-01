@@ -130,8 +130,8 @@ processLevel(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         cfgLogLevelSet(config, CFG_LOG_ERROR);
     } else if (!strcmp(v_str, "none")) {
         cfgLogLevelSet(config, CFG_LOG_NONE);
-    } else if (!strcmp(v_str, "dpath")) {
-        cfgLogLevelSet(config, CFG_LOG_DPATH);
+    } else if (!strcmp(v_str, "trace")) {
+        cfgLogLevelSet(config, CFG_LOG_TRACE);
     }
 }
 

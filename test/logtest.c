@@ -26,7 +26,7 @@ static void
 logSendForNullLogDoesntCrash(void** state)
 {
     const char* msg = "Hey, this is cool!\n";
-    assert_int_equal(logSend(NULL, msg), -1);
+    assert_int_equal(logSend(NULL, msg, DEFAULT_LOG_LEVEL), -1);
 }
 
 static void
@@ -37,7 +37,7 @@ logSendForNullMessageDoesntCrash(void** state)
     transport_t* t = transportCreateSyslog();
     assert_non_null(t);
     logTransportSet(log, t);
-    assert_int_equal(logSend(log, NULL), -1);
+    assert_int_equal(logSend(log, NULL, DEFAULT_LOG_LEVEL), -1);
     logDestroy(&log);
 }
 
@@ -93,14 +93,14 @@ logTranportSetAndLogSend(void** state)
     // Test that transport is set by testing side effects of logSend
     // affecting the file at file_path when connected to a file transport.
     long file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(logSend(log, "Something to send\n"), 0);
+    assert_int_equal(logSend(log, "Something to send\n", DEFAULT_LOG_LEVEL), 0);
     long file_pos_after = fileEndPosition(file_path);
     assert_int_not_equal(file_pos_before, file_pos_after);
 
     // Test that transport is cleared by seeing no side effects.
     logTransportSet(log, NULL);
     file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(logSend(log, "Something to send\n"), -1);
+    assert_int_equal(logSend(log, "Something to send\n", DEFAULT_LOG_LEVEL), -1);
     file_pos_after = fileEndPosition(file_path);
     assert_int_equal(file_pos_before, file_pos_after);
 

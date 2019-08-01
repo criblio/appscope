@@ -984,7 +984,7 @@ ssize_t __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
     doThread();
     rc = g_fn.__sendto_nocancel(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
-        scopeLog("__sendto_nocancel\n", sockfd, CFG_LOG_DPATH);
+        scopeLog("__sendto_nocancel\n", sockfd, CFG_LOG_TRACE);
 
         doSetAddrs(sockfd);
 
@@ -1020,7 +1020,7 @@ uint32_t DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIn
             STRFIELD("proc",             g_procname,            2),
             NUMFIELD("pid",              getpid(),              7),
             STRFIELD("host",             g_hostname,            2),
-            STRFIELD("domain",           (char *)fullname,      6),
+            STRFIELD("domain",           fullname,              6),
             STRFIELD("unit",             "request",             1),
             FIELDEND
         };
@@ -1050,7 +1050,7 @@ ssize_t write(int fd, const void *buf, size_t count)
     rc = g_fn.write(fd, buf, count);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
         // This is a network descriptor
-        scopeLog("write\n", fd, CFG_LOG_DPATH);
+        scopeLog("write\n", fd, CFG_LOG_TRACE);
         doSetAddrs(fd);
         doSend(fd, rc);
     }
@@ -1072,7 +1072,7 @@ ssize_t read(int fd, void *buf, size_t count)
     rc = g_fn.read(fd, buf, count);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
         // This is a network descriptor
-        scopeLog("read\n", fd, CFG_LOG_DPATH);
+        scopeLog("read\n", fd, CFG_LOG_TRACE);
         doSetAddrs(fd);
         doRecv(fd, rc);
     }
@@ -1424,7 +1424,7 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags)
     doThread();
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
-        scopeLog("send\n", sockfd, CFG_LOG_DPATH);
+        scopeLog("send\n", sockfd, CFG_LOG_TRACE);
         if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
             getDNSName(sockfd, (void *)buf, len);
         }
@@ -1449,7 +1449,7 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
     doThread();
     rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
-        scopeLog("sendto\n", sockfd, CFG_LOG_DPATH);
+        scopeLog("sendto\n", sockfd, CFG_LOG_TRACE);
         doSetConnection(sockfd, dest_addr, addrlen, REMOTE);
 
         if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
@@ -1475,7 +1475,7 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
     doThread();
     rc = g_fn.sendmsg(sockfd, msg, flags);
     if (rc != -1) {
-        scopeLog("sendmsg\n", sockfd, CFG_LOG_DPATH);
+        scopeLog("sendmsg\n", sockfd, CFG_LOG_TRACE);
 
         // For UDP connections the msg is a remote addr
         if (g_netinfo && msg && (g_netinfo[sockfd].type != SOCK_STREAM)) {
@@ -1509,7 +1509,7 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags)
     }
 
     doThread();
-    scopeLog("recv\n", sockfd, CFG_LOG_DPATH);
+    scopeLog("recv\n", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recv(sockfd, buf, len, flags);
     if (rc != -1) {
         doRecv(sockfd, rc);
@@ -1530,7 +1530,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
     }
 
     doThread();
-    scopeLog("recvfrom\n", sockfd, CFG_LOG_DPATH);
+    scopeLog("recvfrom\n", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
         atomicAdd(&g_netrx, rc);
@@ -1570,7 +1570,7 @@ ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags)
     doThread();
     rc = g_fn.recvmsg(sockfd, msg, flags);
     if (rc != -1) {
-        scopeLog("recvmsg\n", sockfd, CFG_LOG_DPATH);
+        scopeLog("recvmsg\n", sockfd, CFG_LOG_TRACE);
 
         // For UDP connections the msg is a remote addr
         if (msg && (g_netinfo[sockfd].type != SOCK_STREAM)) {

@@ -146,13 +146,23 @@ int getProtocol(int type, char *proto, size_t len)
 static
 void doReset()
 {
-    g_openPorts = g_TCPConnections = g_activeConnections = g_netrx = g_nettx = g_dns = 0;
+    g_openPorts = g_TCPConnections = g_activeConnections = g_netrx = g_nettx = g_dns = g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
 }
 
 static
 void doThread()
 {
+    /*
+     * If we try to start the perioidic thread before the constructor
+     * is executed and our config is not set, we are able to start the
+     * thread too early. Some apps, most notably Chrome, check to 
+     * ensure that no extra threads are created before it is fully 
+     * initialized. This check is intended to ensure that we don't 
+     * start the thread until after we have our config. 
+     */
+    if (!g_out) return;
+    
     // Create one thread at most
     if (g_thread.once == TRUE) return;
 
@@ -162,15 +172,10 @@ void doThread()
      * Shouldn't hurt anything else.  
      */
     if (time(NULL) >= g_thread.startTime) {
-        void* seconds = (void*)(uintptr_t)g_thread.interval;
-
         g_thread.once = TRUE;
-        if (seconds) {
-            if (pthread_create(&g_thread.periodicTID, NULL, periodic, seconds) != 0) {
-                scopeLog("ERROR: doThread:pthread_create\n", -1);
-            }
+        if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
+            scopeLog("ERROR: doThread:pthread_create\n", -1);
         }
-        
     }
 }
 
@@ -769,7 +774,6 @@ void doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
 static
 void * periodic(void *arg)
 {
-    unsigned seconds = (unsigned)(uintptr_t)arg;
     long mem;
     int nthread, nfds, children;
     pid_t pid = getpid();
@@ -795,7 +799,7 @@ void * periodic(void *arg)
         doNetMetric(NETTX_PROC, -1, PERIODIC);
         
         // From the config file
-        sleep(seconds);
+        sleep(g_thread.interval);
     }
 
     return NULL;
@@ -850,11 +854,11 @@ __attribute__((constructor)) void init(void)
     {
         char* path = cfgPath(CFG_FILE_NAME);
         config_t* cfg = cfgRead(path);
+        g_thread.interval = cfgOutPeriod(cfg);
+        g_thread.startTime = time(NULL) + g_thread.interval;
         log_t* log = initLog(cfg);
         g_out = initOut(cfg, log);
         g_log = log; // Set after initOut to avoid infinite loop with socket
-        g_thread.interval = cfgOutPeriod(cfg);
-        g_thread.startTime = time(NULL) + g_thread.interval;
         cfgDestroy(&cfg);
         if (path) free(path);
     }
@@ -917,6 +921,7 @@ int close$NOCANCEL(int fd)
         return -1;
     }
 
+    doThread();
     rc = g_fn.close$NOCANCEL(fd);
     if (rc != -1) {
         doClose(fd, "close$NOCANCEL\n");
@@ -936,6 +941,7 @@ int guarded_close_np(int fd, void *guard)
         return -1;
     }
 
+    doThread();
     rc = g_fn.guarded_close_np(fd, guard);
     if (rc != -1) {
         doClose(fd, "guarded_close_np\n");
@@ -972,6 +978,7 @@ int accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
         return -1;
     }
 
+    doThread();
     sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
         doAccept(sd, addr, *addrlen, "accept$NOCANCEL\n");
@@ -991,6 +998,7 @@ ssize_t __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
         return -1;
     }
 
+    doThread();
     rc = g_fn.__sendto_nocancel(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
         dataLog("__sendto_nocancel\n", sockfd);
@@ -1055,6 +1063,7 @@ ssize_t write(int fd, const void *buf, size_t count)
         return -1;
     }
 
+    doThread();
     rc = g_fn.write(fd, buf, count);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
         // This is a network descriptor
@@ -1076,6 +1085,7 @@ ssize_t read(int fd, void *buf, size_t count)
         return -1;
     }
 
+    doThread();
     rc = g_fn.read(fd, buf, count);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
         // This is a network descriptor
@@ -1098,6 +1108,7 @@ int fcntl(int fd, int cmd, ...)
         return -1;
     }
 
+    doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
     rc = g_fn.fcntl(fd, cmd, fArgs.arg[0], fArgs.arg[1],
                     fArgs.arg[2], fArgs.arg[3]);
@@ -1122,6 +1133,7 @@ int fcntl64(int fd, int cmd, ...)
         return -1;
     }
 
+    doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
     rc = g_fn.fcntl64(fd, cmd, fArgs.arg[0], fArgs.arg[1],
                       fArgs.arg[2], fArgs.arg[3]);
@@ -1145,6 +1157,7 @@ int dup(int fd)
         return -1;
     }
 
+    doThread();
     rc = g_fn.dup(fd);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
         // This is a network descriptor
@@ -1165,6 +1178,7 @@ int dup2(int oldfd, int newfd)
         return -1;
     }
 
+    doThread();
     rc = g_fn.dup2(oldfd, newfd);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[oldfd].fd == oldfd)) {
         // This is a network descriptor
@@ -1185,6 +1199,7 @@ int dup3(int oldfd, int newfd, int flags)
         return -1;
     }
 
+    doThread();
     rc = g_fn.dup3(oldfd, newfd, flags);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[oldfd].fd == oldfd)) {
         // This is a network descriptor
@@ -1218,6 +1233,7 @@ pid_t fork()
         return -1;
     }
 
+    doThread();
     scopeLog("fork\n", -1);
     rc = g_fn.fork();
     if (rc == 0) {
@@ -1238,6 +1254,7 @@ int socket(int socket_family, int socket_type, int protocol)
         return -1;
     }
 
+    doThread();
     sd = g_fn.socket(socket_family, socket_type, protocol);
     if (sd != -1) {
         scopeLog("socket\n", sd);
@@ -1278,6 +1295,7 @@ int shutdown(int sockfd, int how)
         return -1;
     }
 
+    doThread();
     rc = g_fn.shutdown(sockfd, how);
     if (rc != -1) {
         doClose(sockfd, "shutdown\n");
@@ -1296,6 +1314,7 @@ int listen(int sockfd, int backlog)
         return -1;
     }
 
+    doThread();
     rc = g_fn.listen(sockfd, backlog);
     if (rc != -1) {
         scopeLog("listen\n", sockfd);
@@ -1331,6 +1350,7 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
         return -1;
     }
 
+    doThread();
     sd = g_fn.accept(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
         doAccept(sd, addr, *addrlen, "accept\n");
@@ -1349,6 +1369,7 @@ int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
         return -1;
     }
 
+    doThread();
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
     if ((sd != -1) && addr && addrlen) {
         doAccept(sd, addr, *addrlen, "accept4\n");
@@ -1367,6 +1388,7 @@ int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
         return -1;
     }
 
+    doThread();
     rc = g_fn.bind(sockfd, addr, addrlen);
     if (rc != -1) { 
         doSetConnection(sockfd, addr, addrlen, LOCAL);
@@ -1388,6 +1410,7 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
         return -1;
     }
 
+    doThread();
     rc = g_fn.connect(sockfd, addr, addrlen);
     if ((rc != -1) &&
         (g_netinfo) &&
@@ -1419,6 +1442,7 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags)
         return -1;
     }
 
+    doThread();
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
         dataLog("send\n", sockfd);
@@ -1443,6 +1467,7 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
         return -1;
     }
 
+    doThread();
     rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
         dataLog("sendto\n", sockfd);
@@ -1468,6 +1493,7 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
         return -1;
     }
 
+    doThread();
     rc = g_fn.sendmsg(sockfd, msg, flags);
     if (rc != -1) {
         dataLog("sendmsg\n", sockfd);
@@ -1503,6 +1529,7 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags)
         return -1;
     }
 
+    doThread();
     dataLog("recv\n", sockfd);
     rc = g_fn.recv(sockfd, buf, len, flags);
     if (rc != -1) {
@@ -1523,6 +1550,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
         return -1;
     }
 
+    doThread();
     dataLog("recvfrom\n", sockfd);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
@@ -1560,6 +1588,7 @@ ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags)
         return -1;
     }
 
+    doThread();
     rc = g_fn.recvmsg(sockfd, msg, flags);
     if (rc != -1) {
         dataLog("recvmsg\n", sockfd);

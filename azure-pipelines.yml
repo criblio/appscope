@@ -38,3 +38,12 @@ jobs:
 #  steps:
 #  - script: ./scope.sh build
 #    displayName: scope.sh build
+  - task: S3Upload@1
+    inputs:
+      awsCredentials: 'azure-pipeline-aws'
+      regionName: 'us-west-2'
+      bucketName: 'cdn.cribl.io'
+      sourceFolder: 'out/'
+      globExpressions: '**/*.so'
+      targetFolder: 'dl/scope/latest/'
+      filesAcl: 'public-read'

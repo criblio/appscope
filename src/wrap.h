@@ -120,11 +120,13 @@ typedef struct interposed_funcs_t {
                                       uint16_t, uint16_t, void *, void *);
 } interposed_funcs;
     
-static inline void atomicAdd(int *ptr, int val) {
+static inline void
+atomicAdd(int *ptr, int val) {
     (void)__sync_add_and_fetch(ptr, val);
 }
 
-static inline void atomicSub(int *ptr, int val)
+static inline void
+atomicSub(int *ptr, int val)
 {
     if (ptr && (*ptr == 0)) return;
 	(void)__sync_sub_and_fetch(ptr, val);

@@ -10,12 +10,23 @@ static net_info *g_netinfo;
 static int g_numNinfo;
 static char g_hostname[MAX_HOSTNAME];
 static char g_procname[MAX_PROCNAME];
+
+/*
+ * We use static globals here as we
+ * track the number of instances
+ * and report the values as they occur.
+ */
 static int g_openPorts = 0;
 static int g_TCPConnections = 0;
 static int g_activeConnections = 0;
+
+/*
+ * We use static globals for this as we
+ * accumulate the byte count and upload
+ * in a periodic thread.
+ */
 static int g_netrx = 0;
 static int g_nettx = 0;
-static int g_dns = 0;
 
 typedef struct {
     unsigned interval;                   // in seconds
@@ -134,7 +145,7 @@ getProtocol(int type, char *proto, size_t len)
 static void
 doReset()
 {
-    g_openPorts = g_TCPConnections = g_activeConnections = g_netrx = g_nettx = g_dns = g_thread.once = 0;
+    g_openPorts = g_TCPConnections = g_activeConnections = g_netrx = g_nettx = g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
 }
 
@@ -404,6 +415,12 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETRX:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
+
+        /*
+         * This creates DELTA behavior by uploading the number of bytes
+         * since the last time the metric was uploaded.
+         */
+        atomicSet(&g_netrx, 0);
         break;
     }
 
@@ -479,6 +496,8 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETTX:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
+
+        atomicSet(&g_nettx, 0);
         break;
     }
 
@@ -524,7 +543,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("unit",             "request",             1),
             FIELDEND
         };
-        event_t e = {"net.dns", g_dns, DELTA, fields};
+
+        // Increment the DNS counter by one for each event
+        event_t e = {"net.dns", 1, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:DNS:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
@@ -730,7 +751,6 @@ doSend(int sockfd, ssize_t rc)
     doNetMetric(NETTX, sockfd, EVENT_BASED);
 
     if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
-        atomicAdd(&g_dns, 1);
         doNetMetric(DNS, sockfd, EVENT_BASED);
     }
 
@@ -763,11 +783,13 @@ periodic(void *arg)
     long mem;
     int nthread, nfds, children;
     pid_t pid = getpid();
-    long long cpu;
+    long long cpu, cpuState = 0;
 
     while (1) {
+        // We report CPU time for this period.
         cpu = doGetProcCPU();
-        doProcMetric(PROC_CPU, cpu);
+        doProcMetric(PROC_CPU, cpu - cpuState);
+        cpuState = cpu;
         
         mem = doGetProcMem();
         doProcMetric(PROC_MEM, mem);
@@ -1015,7 +1037,6 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
                                     rrtype, rrclass, callback, context);
     if (rc == 0) {
         scopeLog("DNSServiceQueryRecord\n", -1, CFG_LOG_DEBUG);
-        atomicAdd(&g_dns, 1);
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_procname,            2),
@@ -1026,7 +1047,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
             FIELDEND
         };
 
-        event_t e = {"net.dns", g_dns, DELTA, fields};
+        event_t e = {"net.dns", 1, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: DNSServiceQueryRecord:DNS:outSendEvent\n", -1, CFG_LOG_ERROR);
         }

@@ -340,6 +340,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:ACTIVECONNS:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
+        atomicSet(&g_activeConnections, 0);
         break;
     }
 

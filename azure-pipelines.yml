@@ -44,6 +44,6 @@ jobs:
       regionName: 'us-west-2'
       bucketName: 'cdn.cribl.io'
       sourceFolder: 'lib/'
-      globExpressions: '**'
+      globExpressions: '**/*.so'
       targetFolder: 'dl/scope/latest/'
       filesAcl: 'public-read'

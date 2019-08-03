@@ -43,7 +43,7 @@ jobs:
       awsCredentials: 'azure-pipeline-aws'
       regionName: 'us-west-2'
       bucketName: 'cdn.cribl.io'
-      sourceFolder: 'out/'
+      sourceFolder: 'lib/'
       globExpressions: '**'
       targetFolder: 'dl/scope/latest/'
       filesAcl: 'public-read'

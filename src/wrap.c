@@ -514,6 +514,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETRX_PROC:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
+        atomicSet(&g_netrx, 0);
         break;
     }
 
@@ -530,6 +531,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETTX_PROC:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
+        atomicSet(&g_nettx, 0);
         break;
     }
 

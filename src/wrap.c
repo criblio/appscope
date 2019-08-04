@@ -602,9 +602,9 @@ doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control
     if (g_netinfo && (g_netinfo[sd].fd == sd) &&
         addr && (len > 0)) {
         if (endp == LOCAL) {
-            memcpy(&g_netinfo[sd].localConn, addr, len);
+            memmove(&g_netinfo[sd].localConn, addr, len);
         } else {
-            memcpy(&g_netinfo[sd].remoteConn, addr, len);
+            memmove(&g_netinfo[sd].remoteConn, addr, len);
         }
     }
 }

@@ -158,7 +158,7 @@ char *get_anchor(char sigil, char *line, char *anchor)
     start++;
     if ((end = strchr(start, ' ')) == NULL)
         end = line + strlen(line);
-    memcpy(anchor, start, end - start);
+    memmove(anchor, start, end - start);
     anchor[end - start] = '\0';
     return anchor;
 }
@@ -171,7 +171,7 @@ char *get_tag(char *line, char *tag)
         return NULL;
     if ((end = strchr(line, '>')) == NULL)
         return NULL;
-    memcpy(tag, start + 1, end - start - 1);
+    memmove(tag, start + 1, end - start - 1);
     tag[end - start - 1] = '\0';
     return tag;
 }

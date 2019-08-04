@@ -105,7 +105,7 @@ yaml_string_join(
             return 0;
     }
 
-    memcpy(*a_pointer, *b_start, *b_pointer - *b_start);
+    memmove(*a_pointer, *b_start, *b_pointer - *b_start);
     *a_pointer += *b_pointer - *b_start;
 
     return 1;
@@ -261,7 +261,7 @@ yaml_string_read_handler(void *data, unsigned char *buffer, size_t size,
         size = parser->input.string.end - parser->input.string.current;
     }
 
-    memcpy(buffer, parser->input.string.current, size);
+    memmove(buffer, parser->input.string.current, size);
     parser->input.string.current += size;
     *size_read = size;
     return 1;
@@ -423,7 +423,7 @@ yaml_string_write_handler(void *data, unsigned char *buffer, size_t size)
 
     if (emitter->output.string.size - *emitter->output.string.size_written
             < size) {
-        memcpy(emitter->output.string.buffer
+        memmove(emitter->output.string.buffer
                 + *emitter->output.string.size_written,
                 buffer,
                 emitter->output.string.size
@@ -432,7 +432,7 @@ yaml_string_write_handler(void *data, unsigned char *buffer, size_t size)
         return 0;
     }
 
-    memcpy(emitter->output.string.buffer
+    memmove(emitter->output.string.buffer
             + *emitter->output.string.size_written, buffer, size);
     *emitter->output.string.size_written += size;
     return 1;
@@ -851,7 +851,7 @@ yaml_scalar_event_initialize(yaml_event_t *event,
     if (!yaml_check_utf8(value, length)) goto error;
     value_copy = YAML_MALLOC(length+1);
     if (!value_copy) goto error;
-    memcpy(value_copy, value, length);
+    memmove(value_copy, value, length);
     value_copy[length] = '\0';
 
     SCALAR_EVENT_INIT(*event, anchor_copy, tag_copy, value_copy, length,
@@ -1222,7 +1222,7 @@ yaml_document_add_scalar(yaml_document_t *document,
     if (!yaml_check_utf8(value, length)) goto error;
     value_copy = YAML_MALLOC(length+1);
     if (!value_copy) goto error;
-    memcpy(value_copy, value, length);
+    memmove(value_copy, value, length);
     value_copy[length] = '\0';
 
     SCALAR_NODE_INIT(node, tag_copy, value_copy, length, style, mark, mark);

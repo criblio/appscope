@@ -610,8 +610,8 @@ yaml_parser_parse_node(yaml_parser_t *parser, yaml_event_t *event,
                             parser->error = YAML_MEMORY_ERROR;
                             goto error;
                         }
-                        memcpy(tag, tag_directive->prefix, prefix_len);
-                        memcpy(tag+prefix_len, tag_suffix, suffix_len);
+                        memmove(tag, tag_directive->prefix, prefix_len);
+                        memmove(tag+prefix_len, tag_suffix, suffix_len);
                         tag[prefix_len+suffix_len] = '\0';
                         yaml_free(tag_handle);
                         yaml_free(tag_suffix);

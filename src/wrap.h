@@ -210,7 +210,7 @@ extern void *_dl_sym(void *, const char *, void *);
 #ifdef __LINUX__
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
-        if ((g_fn.func = _dl_sym(RTLD_NEXT, #func)) == NULL) {           \
+        if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {        \
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
             return;                                                    \
        }                                                               \

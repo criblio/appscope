@@ -819,6 +819,8 @@ periodic(void *arg)
 __attribute__((constructor)) void
 init(void)
 {
+    uint64_t startTime;
+    
     g_fn.vsyslog = dlsym(RTLD_NEXT, "vsyslog");
     g_fn.fork = dlsym(RTLD_NEXT, "fork");
     g_fn.close = dlsym(RTLD_NEXT, "close");
@@ -862,6 +864,7 @@ init(void)
     }
 
     osGetProcname(g_procname, sizeof(g_procname));
+    startTime = getTSC();
 
     {
         char* path = cfgPath(CFG_FILE_NAME);

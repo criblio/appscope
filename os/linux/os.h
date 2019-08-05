@@ -14,6 +14,9 @@
 
 #include "../../src/wrap.h"
 
+// Anecdotal evidence that a proc entry should be max 4096 bytes
+#define MAX_PROC 4096
+
 extern char *program_invocation_short_name;
 extern struct interposed_funcs_t g_fn;
 extern int osGetProcname(char *, int);

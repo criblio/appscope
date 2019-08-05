@@ -1,12 +1,14 @@
 #include "os.h"
 
-int osGetProcname(char *pname, int len)
+int
+osGetProcname(char *pname, int len)
 {
     strncpy(pname, program_invocation_short_name, len);
     return 0;
 }
 
-int osGetNumThreads(pid_t pid)
+int
+osGetNumThreads(pid_t pid)
 {
     int fd, i;
     long result;
@@ -37,7 +39,8 @@ int osGetNumThreads(pid_t pid)
     return (int)result;
 }
 
-int osGetNumFds(pid_t pid)
+int
+osGetNumFds(pid_t pid)
 {
     int nfile = 0;
     DIR * dirp;
@@ -59,7 +62,8 @@ int osGetNumFds(pid_t pid)
     return nfile - 1; // we opened one fd to read /fd :)
 }
 
-int osGetNumChildProcs(pid_t pid)
+int
+osGetNumChildProcs(pid_t pid)
 {
     int nchild = 0;
     DIR * dirp;
@@ -77,4 +81,56 @@ int osGetNumChildProcs(pid_t pid)
 
     closedir(dirp);
     return nchild - 3; // Not including the parent proc itself and ., ..
+}
+
+uint64_t
+osGetClockFreq()
+{
+    int fd;
+    uint64_t freq;
+    char *entry, *last;
+    const char delim[] = ":";
+    const char path[] = "/proc/cpuinfo";
+    const char freqStr[] = "cpu MHz";
+    char *buf;
+
+    if ((fd = open(path, O_RDONLY)) == -1) {
+        return (uint64_t)-1;
+    }
+    
+    /*
+     * Anecdotal evidence that there is a max size to proc entrires.
+     * In any case this should be big enough.
+     */    
+    if ((buf = malloc(MAX_PROC)) == NULL) {
+        return (uint64_t)-1;
+    }
+    
+    if (g_fn.read(fd, buf, MAX_PROC) == -1) {
+        g_fn.close(fd);
+        free(buf);
+        return (uint64_t)-1;
+    }
+
+    entry = strtok_r(buf, delim, &last);
+    while (1) {
+        if ((entry = strtok_r(NULL, delim, &last)) == NULL) {
+            freq = (uint64_t)-1;
+            break;
+        }
+
+        if (strcasestr((const char *)entry, freqStr) != NULL) {
+            // The next token should be what we want
+            if ((entry = strtok_r(NULL, delim, &last)) != NULL) {
+                if ((freq = (uint64_t)strtoll(entry, NULL, 0)) == (long long)0) {
+                    freq = (uint64_t)-1;
+                }
+                break;
+            }
+        }
+    }
+    
+    g_fn.close(fd);
+    free(buf);
+    return freq;
 }

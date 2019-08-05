@@ -143,6 +143,13 @@ atomicSet(int *ptr, int val)
     return __sync_lock_test_and_set(ptr, val);
 }
 
+static inline uint64_t
+getTSC() {
+    unsigned low, high;
+    asm volatile("rdtsc" : "=a" (low), "=d" (high));
+    return ((uint64_t)low) | (((uint64_t)high) << 32);
+}
+
 extern int close$NOCANCEL(int);
 extern int guarded_close_np(int, void *);
 

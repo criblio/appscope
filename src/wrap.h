@@ -188,15 +188,15 @@ struct FuncArgs{
         va_end(__args);                         \
     }while(0)
 
-extern void *_dl_sym(void *, const char *, void *);
 #define WRAP_CHECK_ONLY(func)                                          \
     if (g_fn.func == NULL ) {                                          \
-        if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) { \
+        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) { \
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
             return -1;                                                 \
        }                                                               \
     } 
-
+#ifdef __LINUX__
+extern void *_dl_sym(void *, const char *, void *);
 #define WRAP_CHECK(func)                                               \
     if (g_fn.func == NULL ) {                                          \
         if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {   \
@@ -204,6 +204,15 @@ extern void *_dl_sym(void *, const char *, void *);
             return -1;                                                 \
        }                                                               \
     } 
+#else
+#define WRAP_CHECK(func)                                               \
+    if (g_fn.func == NULL ) {                                          \
+        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {     \
+            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
+            return -1;                                                 \
+       }                                                               \
+    } 
+#endif // __LINUX__
 
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \

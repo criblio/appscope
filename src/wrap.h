@@ -146,27 +146,27 @@ atomicSet(int *ptr, int val)
 extern int close$NOCANCEL(int);
 extern int guarded_close_np(int, void *);
 
-#define GET_PORT(fd, type, which) ({                  \
-        in_port_t port; \
-        switch (type) { \
-    case AF_INET: \
+#define GET_PORT(fd, type, which) ({            \
+     in_port_t port;                     \
+     switch (type) {                     \
+     case AF_INET:                                                      \
         if (which == LOCAL) {                                           \
             port = ((struct sockaddr_in *)&g_netinfo[fd].localConn)->sin_port; \
         } else {                                                        \
             port = ((struct sockaddr_in *)&g_netinfo[fd].remoteConn)->sin_port; \
         }                                                               \
-        break;\
-    case AF_INET6:\
+        break;                                                          \
+     case AF_INET6:                                                     \
         if (which == LOCAL) {                                           \
             port = ((struct sockaddr_in6 *)&g_netinfo[fd].localConn)->sin6_port; \
         } else {                                                        \
             port = ((struct sockaddr_in6 *)&g_netinfo[fd].remoteConn)->sin6_port; \
-        } \
-        break; \
-    default: \
-        port = (in_port_t)0; \
-        break; \
-    } \
+        }                                                               \
+        break;                                                          \
+     default:                                                           \
+         port = (in_port_t)0;                                           \
+         break;                                                         \
+     }                                                                  \
         htons(port);})
 
 // struct to hold the next 6 numeric (int/ptr etc) variadic arguments
@@ -176,16 +176,41 @@ struct FuncArgs{
 };
 
 #define LOAD_FUNC_ARGS_VALIST(a, lastNamedArg)  \
-    do{                                     \
-        va_list __args;                     \
-        va_start(__args, lastNamedArg);     \
-        a.arg[0] = va_arg(__args, uint64_t); \
-        a.arg[1] = va_arg(__args, uint64_t); \
-        a.arg[2] = va_arg(__args, uint64_t); \
-        a.arg[3] = va_arg(__args, uint64_t); \
-        a.arg[4] = va_arg(__args, uint64_t); \
-        a.arg[5] = va_arg(__args, uint64_t); \
-        va_end(__args);                     \
+    do{                                         \
+        va_list __args;                         \
+        va_start(__args, lastNamedArg);         \
+        a.arg[0] = va_arg(__args, uint64_t);    \
+        a.arg[1] = va_arg(__args, uint64_t);    \
+        a.arg[2] = va_arg(__args, uint64_t);    \
+        a.arg[3] = va_arg(__args, uint64_t);    \
+        a.arg[4] = va_arg(__args, uint64_t);    \
+        a.arg[5] = va_arg(__args, uint64_t);    \
+        va_end(__args);                         \
     }while(0)
+
+extern void *_dl_sym(void *, const char *, void *);
+#define WRAP_CHECK_ONLY(func)                                          \
+    if (g_fn.func == NULL ) {                                          \
+        if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) { \
+            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
+            return -1;                                                 \
+       }                                                               \
+    } 
+
+#define WRAP_CHECK(func)                                               \
+    if (g_fn.func == NULL ) {                                          \
+        if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {   \
+            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
+            return -1;                                                 \
+       }                                                               \
+    } 
+
+#define WRAP_CHECK_VOID(func)                                          \
+    if (g_fn.func == NULL ) {                                          \
+        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
+            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
+            return;                                                    \
+       }                                                               \
+    } 
 
 #endif // __WRAP_H__

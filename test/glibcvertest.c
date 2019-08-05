@@ -113,7 +113,7 @@ testEachLineInStreamWorksWithCannedData(void** state)
     if (!f) fail_msg("Couldn't create file");
     int i;
     for (i=0; i<sizeof(sample_nm_output)/sizeof(sample_nm_output[0]); i++) {
-        if (!fwrite(sample_nm_output[i], strlen(sample_nm_output[i], 1, f))
+        if (!fwrite(sample_nm_output[i], strlen(sample_nm_output[i]), 1, f))
             fail_msg("Couldn't write file");
     }
     if (fclose(f)) fail_msg("Couldn't close file");

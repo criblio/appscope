@@ -904,7 +904,7 @@ close(int fd)
 {
     int rc;
 
-    WRAP_CHECK_ONLY(close);
+    WRAP_CHECK(close);
     doThread(); // Will do nothing if a thread already exists
 
     rc = g_fn.close(fd);
@@ -1056,7 +1056,7 @@ read(int fd, void *buf, size_t count)
 {
     ssize_t rc;
 
-    WRAP_CHECK_ONLY(read);
+    WRAP_CHECK(read);
     doThread();
     rc = g_fn.read(fd, buf, count);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {

@@ -91,7 +91,7 @@ testEachLineInStream(FILE* input, const char* libcVerThreshold, results_t* resul
     if (result->lines_failed) {
         fprintf(output, "test failed with %lu glibc symbols that are too new.\n", result->lines_failed);
     } else {
-        fprintf(output, "test passed; all %lu glibc symbols have acceptible versions\n", result->lines_glibc);
+        fprintf(output, "test passed; all %lu glibc symbols have acceptable versions\n", result->lines_glibc);
     }
 }
 

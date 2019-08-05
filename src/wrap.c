@@ -10,12 +10,23 @@ static net_info *g_netinfo;
 static int g_numNinfo;
 static char g_hostname[MAX_HOSTNAME];
 static char g_procname[MAX_PROCNAME];
+
+/*
+ * We use static globals here as we
+ * track the number of instances
+ * and report the values as they occur.
+ */
 static int g_openPorts = 0;
 static int g_TCPConnections = 0;
 static int g_activeConnections = 0;
+
+/*
+ * We use static globals for this as we
+ * accumulate the byte count and upload
+ * in a periodic thread.
+ */
 static int g_netrx = 0;
 static int g_nettx = 0;
-static int g_dns = 0;
 
 typedef struct {
     unsigned interval;                   // in seconds
@@ -46,8 +57,8 @@ scopeLog(char* msg, int fd, cfg_log_level_t level)
 }
 
 // DEBUG
-EXPORTOFF
-void dumpAddrs(int sd, enum control_type_t endp)
+EXPORTOFF void
+dumpAddrs(int sd, enum control_type_t endp)
 {
     in_port_t port;
     char ip[INET6_ADDRSTRLEN];                                                                                         
@@ -72,8 +83,8 @@ void dumpAddrs(int sd, enum control_type_t endp)
     }
 }
 
-static
-void addSock(int fd, int type)
+static void
+addSock(int fd, int type)
 {
     if (g_netinfo) {
         if (g_netinfo[fd].fd == fd) {
@@ -104,8 +115,8 @@ void addSock(int fd, int type)
     }
 }
 
-static
-int getProtocol(int type, char *proto, size_t len)
+static int
+getProtocol(int type, char *proto, size_t len)
 {
     if (!proto) {
         return -1;
@@ -131,15 +142,15 @@ int getProtocol(int type, char *proto, size_t len)
     return 0;
 }
 
-static
-void doReset()
+static void
+doReset()
 {
-    g_openPorts = g_TCPConnections = g_activeConnections = g_netrx = g_nettx = g_dns = g_thread.once = 0;
+    g_openPorts = g_TCPConnections = g_activeConnections = g_netrx = g_nettx = g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
 }
 
-static
-void doThread()
+static void
+doThread()
 {
     /*
      * If we try to start the perioidic thread before the constructor
@@ -167,8 +178,8 @@ void doThread()
     }
 }
 
-static
-void doProcMetric(enum metric_t type, long long measurement)
+static void
+doProcMetric(enum metric_t type, long long measurement)
 {
     pid_t pid = getpid();
     switch (type) {
@@ -257,8 +268,8 @@ void doProcMetric(enum metric_t type, long long measurement)
     }
 }
 
-static
-void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
+static void
+doNetMetric(enum metric_t type, int fd, enum control_type_t source)
 {
     pid_t pid = getpid();
     char proto[PROTOCOL_STR];
@@ -329,6 +340,7 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:ACTIVECONNS:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
+        atomicSet(&g_activeConnections, 0);
         break;
     }
 
@@ -404,6 +416,12 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETRX:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
+
+        /*
+         * This creates DELTA behavior by uploading the number of bytes
+         * since the last time the metric was uploaded.
+         */
+        atomicSet(&g_netrx, 0);
         break;
     }
 
@@ -479,6 +497,8 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETTX:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
+
+        atomicSet(&g_nettx, 0);
         break;
     }
 
@@ -495,6 +515,7 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETRX_PROC:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
+        atomicSet(&g_netrx, 0);
         break;
     }
 
@@ -511,6 +532,7 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETTX_PROC:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
+        atomicSet(&g_nettx, 0);
         break;
     }
 
@@ -524,7 +546,9 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("unit",             "request",             1),
             FIELDEND
         };
-        event_t e = {"net.dns", g_dns, DELTA, fields};
+
+        // Increment the DNS counter by one for each event
+        event_t e = {"net.dns", 1, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:DNS:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
@@ -537,8 +561,8 @@ void doNetMetric(enum metric_t type, int fd, enum control_type_t source)
 }
 
 // Return process specific CPU usage in microseconds
-static
-long long doGetProcCPU() {
+static long long
+doGetProcCPU() {
     struct rusage ruse;
     
     if (getrusage(RUSAGE_SELF, &ruse) != 0) {
@@ -551,8 +575,8 @@ long long doGetProcCPU() {
 }
 
 // Return process specific memory usage in kilobytes
-static
-long doGetProcMem() {
+static long
+doGetProcMem() {
     struct rusage ruse;
     
     if (getrusage(RUSAGE_SELF, &ruse) != 0) {
@@ -567,8 +591,8 @@ long doGetProcMem() {
 #endif // __MACOS__        
 }
 
-static
-void doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control_type_t endp)
+static void
+doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control_type_t endp)
 {
     if (!addr || (len <= 0)) {
         return;
@@ -578,15 +602,15 @@ void doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum co
     if (g_netinfo && (g_netinfo[sd].fd == sd) &&
         addr && (len > 0)) {
         if (endp == LOCAL) {
-            memcpy(&g_netinfo[sd].localConn, addr, len);
+            memmove(&g_netinfo[sd].localConn, addr, len);
         } else {
-            memcpy(&g_netinfo[sd].remoteConn, addr, len);
+            memmove(&g_netinfo[sd].remoteConn, addr, len);
         }
     }
 }
 
-static
-int doSetAddrs(int sockfd)
+static int
+doSetAddrs(int sockfd)
 {
     if (g_netinfo[sockfd].localConn.ss_family == AF_UNSPEC) {
         struct sockaddr_storage addr;
@@ -614,8 +638,8 @@ int doSetAddrs(int sockfd)
  * A socket was dup'd
  * We are a child proc that inherited a socket
  */
-static
-int doAddNewSock(int sockfd)
+static int
+doAddNewSock(int sockfd)
 {
     struct sockaddr addr;
     socklen_t addrlen = sizeof(struct sockaddr);
@@ -665,8 +689,8 @@ int doAddNewSock(int sockfd)
  * len is <=63 and total len octets + labels <= 255
  */
 
-static
-int getDNSName(int sd, void *pkt, int pktlen)
+static int
+getDNSName(int sd, void *pkt, int pktlen)
 {
     int llen;
     dns_query *query;
@@ -704,8 +728,8 @@ int getDNSName(int sd, void *pkt, int pktlen)
 }
 
 
-static
-int doRecv(int sockfd, ssize_t rc)
+static int
+doRecv(int sockfd, ssize_t rc)
 {
     atomicAdd(&g_netrx, rc);
     if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
@@ -718,8 +742,8 @@ int doRecv(int sockfd, ssize_t rc)
     return 0;
 }
 
-static
-int doSend(int sockfd, ssize_t rc)
+static int
+doSend(int sockfd, ssize_t rc)
 {
     atomicAdd(&g_nettx, rc);
     if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
@@ -730,15 +754,14 @@ int doSend(int sockfd, ssize_t rc)
     doNetMetric(NETTX, sockfd, EVENT_BASED);
 
     if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
-        atomicAdd(&g_dns, 1);
         doNetMetric(DNS, sockfd, EVENT_BASED);
     }
 
     return 0;
 }
 
-static
-void doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
+static void
+doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
 {
 
     scopeLog(func, sd, CFG_LOG_DEBUG);
@@ -757,17 +780,19 @@ void doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
     }
 }
 
-static
-void * periodic(void *arg)
+static void *
+periodic(void *arg)
 {
     long mem;
     int nthread, nfds, children;
     pid_t pid = getpid();
-    long long cpu;
+    long long cpu, cpuState = 0;
 
     while (1) {
+        // We report CPU time for this period.
         cpu = doGetProcCPU();
-        doProcMetric(PROC_CPU, cpu);
+        doProcMetric(PROC_CPU, cpu - cpuState);
+        cpuState = cpu;
         
         mem = doGetProcMem();
         doProcMetric(PROC_MEM, mem);
@@ -791,7 +816,8 @@ void * periodic(void *arg)
     return NULL;
 }
 
-__attribute__((constructor)) void init(void)
+__attribute__((constructor)) void
+init(void)
 {
     g_fn.vsyslog = dlsym(RTLD_NEXT, "vsyslog");
     g_fn.fork = dlsym(RTLD_NEXT, "fork");
@@ -852,8 +878,8 @@ __attribute__((constructor)) void init(void)
     scopeLog("Constructor\n", -1, CFG_LOG_INFO);
 }
 
-static
-void doClose(int fd, char *func)
+static void
+doClose(int fd, char *func)
 {
     if (g_netinfo && (g_netinfo[fd].fd == fd)) {
         scopeLog(func, fd, CFG_LOG_DEBUG);
@@ -873,8 +899,8 @@ void doClose(int fd, char *func)
     }
 }
 
-EXPORTON
-int close(int fd)
+EXPORTON int
+close(int fd)
 {
     int rc;
     
@@ -894,8 +920,8 @@ int close(int fd)
 }
 
 #ifdef __MACOS__
-EXPORTON
-int close$NOCANCEL(int fd)
+EXPORTON int
+close$NOCANCEL(int fd)
 {
     int rc;
     
@@ -914,8 +940,8 @@ int close$NOCANCEL(int fd)
 }
 
 
-EXPORTON
-int guarded_close_np(int fd, void *guard)
+EXPORTON int
+guarded_close_np(int fd, void *guard)
 {
     int rc;
     
@@ -933,8 +959,8 @@ int guarded_close_np(int fd, void *guard)
     return rc;
 }
 
-EXPORTOFF
-int close_nocancel(int fd)
+EXPORTOFF int
+close_nocancel(int fd)
 {
     int rc;
     
@@ -951,8 +977,8 @@ int close_nocancel(int fd)
     return rc;
 }
 
-EXPORTON
-int accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+EXPORTON int
+accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
     int sd;
     
@@ -970,8 +996,8 @@ int accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     return sd;
 }
 
-EXPORTON
-ssize_t __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
+EXPORTON ssize_t
+__sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
                           const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
@@ -998,8 +1024,8 @@ ssize_t __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
     return rc;
 }
 
-EXPORTON
-uint32_t DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
+EXPORTON uint32_t
+DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
                                const char *fullname, uint16_t rrtype, uint16_t rrclass,
                                void *callback, void *context)
 {
@@ -1014,7 +1040,6 @@ uint32_t DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIn
                                     rrtype, rrclass, callback, context);
     if (rc == 0) {
         scopeLog("DNSServiceQueryRecord\n", -1, CFG_LOG_DEBUG);
-        atomicAdd(&g_dns, 1);
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_procname,            2),
@@ -1025,7 +1050,7 @@ uint32_t DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIn
             FIELDEND
         };
 
-        event_t e = {"net.dns", g_dns, DELTA, fields};
+        event_t e = {"net.dns", 1, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: DNSServiceQueryRecord:DNS:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
@@ -1036,8 +1061,8 @@ uint32_t DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIn
 
 #endif // __MACOS__
 
-EXPORTON
-ssize_t write(int fd, const void *buf, size_t count)
+EXPORTON ssize_t
+write(int fd, const void *buf, size_t count)
 {
     ssize_t rc;
     
@@ -1058,8 +1083,8 @@ ssize_t write(int fd, const void *buf, size_t count)
     return rc;
 }
 
-EXPORTON
-ssize_t read(int fd, void *buf, size_t count)
+EXPORTON ssize_t
+read(int fd, void *buf, size_t count)
 {
     ssize_t rc;
     
@@ -1080,8 +1105,8 @@ ssize_t read(int fd, void *buf, size_t count)
     return rc;
 }
 
-EXPORTON
-int fcntl(int fd, int cmd, ...)
+EXPORTON int
+fcntl(int fd, int cmd, ...)
 {
     int rc;
     struct FuncArgs fArgs;
@@ -1105,8 +1130,8 @@ int fcntl(int fd, int cmd, ...)
     return rc;
 }
 
-EXPORTON
-int fcntl64(int fd, int cmd, ...)
+EXPORTON int
+fcntl64(int fd, int cmd, ...)
 {
     int rc;
     struct FuncArgs fArgs;
@@ -1130,8 +1155,8 @@ int fcntl64(int fd, int cmd, ...)
     return rc;
 }
 
-EXPORTON
-int dup(int fd)
+EXPORTON int
+dup(int fd)
 {
     int rc;
 
@@ -1151,8 +1176,8 @@ int dup(int fd)
     return rc;
 }
 
-EXPORTON
-int dup2(int oldfd, int newfd)
+EXPORTON int
+dup2(int oldfd, int newfd)
 {
     int rc;
 
@@ -1172,8 +1197,8 @@ int dup2(int oldfd, int newfd)
     return rc;
 }
 
-EXPORTON
-int dup3(int oldfd, int newfd, int flags)
+EXPORTON int
+dup3(int oldfd, int newfd, int flags)
 {
     int rc;
 
@@ -1193,8 +1218,8 @@ int dup3(int oldfd, int newfd, int flags)
     return rc;
 }
 
-EXPORTOFF
-void vsyslog(int priority, const char *format, va_list ap)
+EXPORTOFF void
+vsyslog(int priority, const char *format, va_list ap)
 {
     if (g_fn.vsyslog == NULL) {
         scopeLog("ERROR: vsyslog:NULL\n", -1, CFG_LOG_ERROR);
@@ -1206,8 +1231,8 @@ void vsyslog(int priority, const char *format, va_list ap)
     return;
 }
 
-EXPORTON
-pid_t fork()
+EXPORTON pid_t
+fork()
 {
     pid_t rc;
     
@@ -1227,8 +1252,8 @@ pid_t fork()
     return rc;
 }
 
-EXPORTON
-int socket(int socket_family, int socket_type, int protocol)
+EXPORTON int
+socket(int socket_family, int socket_type, int protocol)
 {
     int sd;
     
@@ -1267,8 +1292,8 @@ int socket(int socket_family, int socket_type, int protocol)
     return sd;
 }
 
-EXPORTON
-int shutdown(int sockfd, int how)
+EXPORTON int
+shutdown(int sockfd, int how)
 {
     int rc;
     
@@ -1286,8 +1311,8 @@ int shutdown(int sockfd, int how)
     return rc;
 }
 
-EXPORTON
-int listen(int sockfd, int backlog)
+EXPORTON int
+listen(int sockfd, int backlog)
 {
     int rc;
     
@@ -1320,8 +1345,8 @@ int listen(int sockfd, int backlog)
     return rc;
 }
 
-EXPORTON
-int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+EXPORTON int
+accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
     int sd;
     
@@ -1339,8 +1364,8 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     return sd;
 }
 
-EXPORTON
-int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
+EXPORTON int
+accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
 {
     int sd;
     
@@ -1358,8 +1383,8 @@ int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     return sd;
 }
 
-EXPORTON
-int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+EXPORTON int
+bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int rc;
     
@@ -1379,8 +1404,8 @@ int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
 }
 
-EXPORTON
-int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+EXPORTON int
+connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
 {
     int rc;
@@ -1411,8 +1436,8 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
 }
 
-EXPORTON
-ssize_t send(int sockfd, const void *buf, size_t len, int flags)
+EXPORTON ssize_t
+send(int sockfd, const void *buf, size_t len, int flags)
 {
     ssize_t rc;
 
@@ -1435,8 +1460,8 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags)
     return rc;
 }
 
-EXPORTON
-ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
+EXPORTON ssize_t
+sendto(int sockfd, const void *buf, size_t len, int flags,
                const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
@@ -1462,8 +1487,8 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
     return rc;
 }
 
-EXPORTON
-ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
+EXPORTON ssize_t
+sendmsg(int sockfd, const struct msghdr *msg, int flags)
 {
     ssize_t rc;
     
@@ -1498,8 +1523,8 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
     return rc;
 }
 
-EXPORTON
-ssize_t recv(int sockfd, void *buf, size_t len, int flags)
+EXPORTON ssize_t
+recv(int sockfd, void *buf, size_t len, int flags)
 {
     ssize_t rc;
     
@@ -1518,8 +1543,8 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags)
     return rc;
 }
 
-EXPORTON
-ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
+EXPORTON ssize_t
+recvfrom(int sockfd, void *buf, size_t len, int flags,
                  struct sockaddr *src_addr, socklen_t *addrlen)
 {
     ssize_t rc;
@@ -1557,8 +1582,8 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
     return rc;
 }
 
-EXPORTON
-ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags)
+EXPORTON ssize_t
+recvmsg(int sockfd, struct msghdr *msg, int flags)
 {
     ssize_t rc;
     

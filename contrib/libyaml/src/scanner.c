@@ -2589,7 +2589,7 @@ yaml_parser_scan_tag_uri(yaml_parser_t *parser, int directive,
      */
 
     if (length > 1) {
-        memcpy(string.start, head+1, length-1);
+        memmove(string.start, head+1, length-1);
         string.pointer += length-1;
     }
 

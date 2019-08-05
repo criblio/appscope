@@ -120,14 +120,27 @@ typedef struct interposed_funcs_t {
                                       uint16_t, uint16_t, void *, void *);
 } interposed_funcs;
     
-static inline void atomicAdd(int *ptr, int val) {
+static inline void
+atomicAdd(int *ptr, int val) {
     (void)__sync_add_and_fetch(ptr, val);
 }
 
-static inline void atomicSub(int *ptr, int val)
+static inline void
+atomicSub(int *ptr, int val)
 {
     if (ptr && (*ptr == 0)) return;
 	(void)__sync_sub_and_fetch(ptr, val);
+}
+
+/*
+ * As described by Intel, this is not a traditional test-and-set operation,
+ * but rather an atomic exchange operation.
+ * It writes val into *ptr, and returns the previous contents of *ptr.
+ */
+static inline int
+atomicSet(int *ptr, int val)
+{
+    return __sync_lock_test_and_set(ptr, val);
 }
 
 extern int close$NOCANCEL(int);

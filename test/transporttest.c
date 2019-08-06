@@ -22,7 +22,7 @@ transportCreateUdpReturnsValidPtrInHappyPath(void** state)
     assert_non_null(t);
     transportDestroy(&t);
 
-    t = transportCreateUdp("www.google.com", NULL);
+    t = transportCreateUdp("localhost", NULL);
     assert_non_null(t);
     transportDestroy(&t);
 }

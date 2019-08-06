@@ -99,6 +99,21 @@ initLogReturnsPtr(void** state)
 
     cfg_transport_t t;
     for (t=CFG_UDP; t<=CFG_SHM; t++) {
+	    switch (t) {
+            case CFG_UDP:
+                cfgTransportHostSet(cfg, CFG_LOG, "localhost");
+                cfgTransportPortSet(cfg, CFG_LOG, "4444");
+                break;
+            case CFG_UNIX:
+				cfgTransportPathSet(cfg, CFG_LOG, "/var/run/scope.sock");
+                break;
+            case CFG_FILE:
+				cfgTransportPathSet(cfg, CFG_LOG, "/tmp/scope.log");
+                break;
+            case CFG_SYSLOG:
+            case CFG_SHM:
+                break;
+	    }
         cfgTransportTypeSet(cfg, CFG_LOG, t);
         log_t* log = initLog(cfg);
         assert_non_null(log);

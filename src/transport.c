@@ -183,7 +183,7 @@ transportSend(transport_t* t, const char* msg)
     switch (t->type) {
         case CFG_UDP:
             if (t->udp.sock != -1) {
-                int rc = t->send(t->udp.sock, msg, strlen(msg), 0);
+                int rc = send(t->udp.sock, msg, strlen(msg), 0);
                 if (rc < 0) {
                     switch (errno) {
                     case EWOULDBLOCK:

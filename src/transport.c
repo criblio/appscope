@@ -27,7 +27,7 @@ struct _transport_t
     union {
         struct {
             int sock;
-            struct sockaddr* addr;
+            struct sockaddr_storage addr;
             socklen_t addr_len;
             operations_info ops;
         } udp;
@@ -38,14 +38,13 @@ struct _transport_t
     };
 
     // These fields are used to avoid infinite recursion since we call
-    // write and sendto from write and sendto.
+    // write and send from write and send.
     //
     // We *could* remove them and use fields from g_fn from wrap.c instead.
     // However, I don't want to do this because it would create a dependency
     // from transport to wrap.  (A dep the other way is fine)
     ssize_t (*write)(int, const void *, size_t);
-    ssize_t (*sendto)(int, const void *, size_t, int,
-                              const struct sockaddr *, socklen_t);
+    ssize_t (*send)(int, const void *, size_t, int);
 };
 
 transport_t*
@@ -54,7 +53,7 @@ transportCreateUdp(const char* host, const char* port)
     transport_t* t = NULL;
     struct addrinfo* addr_list = NULL;
 
-    if (!host && !port) goto out;
+    if (!host || !port) goto out;
 
     t = calloc(1, sizeof(transport_t));
     if (!t) goto out;
@@ -74,21 +73,20 @@ transportCreateUdp(const char* host, const char* port)
     for (addr = addr_list; addr; addr = addr->ai_next) {
         t->udp.sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
         if (t->udp.sock == -1) continue;
-        if (connect(t->udp.sock, addr->ai_addr, addr->ai_addrlen) != -1) {
-            break; // success; we connected!
+        if (connect(t->udp.sock, addr->ai_addr, addr->ai_addrlen) == -1) {
+            // We could create a sock, but not connect.  Clean up.
+            close(t->udp.sock);
+            t->udp.sock = -1;
+            continue;
         }
-        // We could create a sock, but not connect.  Clean up.
-        close(t->udp.sock);
-        t->udp.sock = -1;
+        break; // Success!
     }
 
     // If none worked, get out
     if (t->udp.sock == -1) goto out;
 
     // Save the address for later
-    t->udp.addr = malloc(addr->ai_addrlen);
-    if (!t->udp.addr) goto out;
-    memmove(t->udp.addr, addr->ai_addr, addr->ai_addrlen);
+    memmove(&t->udp.addr, addr->ai_addr, addr->ai_addrlen);
     t->udp.addr_len = addr->ai_addrlen;
 
     // Set the socket to non blocking, and close on exec
@@ -103,8 +101,7 @@ transportCreateUdp(const char* host, const char* port)
 
 out:
     if (addr_list) freeaddrinfo(addr_list);
-    if (t && ((t->udp.sock == -1) || !t->udp.addr))
-        transportDestroy(&t);
+    if (t && t->udp.sock == -1) transportDestroy(&t);
     return t;
 }
 
@@ -178,7 +175,6 @@ transportDestroy(transport_t** transport)
     switch (t->type) {
         case CFG_UDP:
             if (t->udp.sock != -1) close(t->udp.sock);
-            if (t->udp.addr) free(t->udp.addr);
             break;
         case CFG_UNIX:
             break;
@@ -202,14 +198,13 @@ transportSend(transport_t* t, const char* msg)
 
     // Use these to avoid infinite recursion...
     if (!t->write) t->write = dlsym(RTLD_NEXT, "write");
-    if (!t->sendto) t->sendto = dlsym(RTLD_NEXT, "sendto");
-    if (!t->write || !t->sendto) return -1;
+    if (!t->send) t->send = dlsym(RTLD_NEXT, "send");
+    if (!t->write || !t->send) return -1;
 
     switch (t->type) {
         case CFG_UDP:
             if (t->udp.sock != -1) {
-                int rc = t->sendto(t->udp.sock, msg, strlen(msg), 0,
-                                 t->udp.addr, t->udp.addr_len);
+                int rc = t->send(t->udp.sock, msg, strlen(msg), 0);
                 if (rc < 0) {
                     switch (errno) {
                     case EWOULDBLOCK:

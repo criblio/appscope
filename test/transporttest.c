@@ -16,30 +16,38 @@ transportCreateUdpReturnsValidPtrInHappyPath(void** state)
     transport_t* t = transportCreateUdp("127.0.0.1", "8126");
     assert_non_null(t);
     transportDestroy(&t);
-
-    // Only host or port need to be valid
-    t = transportCreateUdp(NULL, "8127");
-    assert_non_null(t);
-    transportDestroy(&t);
-
-    t = transportCreateUdp("localhost", NULL);
-    assert_non_null(t);
-    transportDestroy(&t);
 }
 
 static void
-transportCreateUdpReturnsNullPtrForInvalidHost()
+transportCreateUdpReturnsNullPtrForInvalidHost(void** state)
+{
+    // This is a valid test, but it hangs for as long as 30s.
+    // (It depends on dns more than a unit test should.)
+/*
+    t = transportCreateUdp("-tota11y bogus hostname", "666");
+    assert_null(t);
+*/
+
+    transport_t* t;
+    t = transportCreateUdp(NULL, "8128");
+    assert_null(t);
+}
+
+static void
+transportCreateUdpReturnsNullPtrForInvalidPort(void** state)
 {
     transport_t* t;
-    t = transportCreateUdp("this is not a good looking host name", "8126");
+    t = transportCreateUdp("127.0.0.1", "mom's apple pie recipe");
     assert_null(t);
+    transportDestroy(&t);
 
-    t = transportCreateUdp(NULL, NULL);
+    t = transportCreateUdp("127.0.0.1", NULL);
     assert_null(t);
+    transportDestroy(&t);
 }
 
 static void
-transportCreateUdpHandlesGoodHostArguments()
+transportCreateUdpHandlesGoodHostArguments(void** state)
 {
     const char* host_values[] = {
            "localhost", "www.google.com",
@@ -48,7 +56,7 @@ transportCreateUdpHandlesGoodHostArguments()
            // These will work only if machine supports ipv6
            //"2001:4860:4860::8844",
            //"ipv6.google.com",
-           NULL };
+    };
 
     int i;
     for (i=0; i<sizeof(host_values)/sizeof(host_values[0]); i++) {
@@ -219,10 +227,10 @@ transportSendForUdpTransmitsMsg(void** state)
     char buf[sizeof(msg)] = {0};  // Has room for a null at the end
     assert_int_equal(transportSend(t, msg), 0);
 
-    struct sockaddr from = {0};
-    socklen_t len = {0};
+    struct sockaddr_storage from = {0};
+    socklen_t len = sizeof(from);
     int byteCount=0;
-    if ((byteCount = recvfrom(sd, buf, sizeof(buf), 0, &from, &len)) != strlen(msg)) {
+    if ((byteCount = recvfrom(sd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &len)) != strlen(msg)) {
         fail_msg("Couldn't recvfrom");
     }
     assert_string_equal(msg, buf);
@@ -284,6 +292,7 @@ main (int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(transportCreateUdpReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportCreateUdpReturnsNullPtrForInvalidHost),
+        cmocka_unit_test(transportCreateUdpReturnsNullPtrForInvalidPort),
         cmocka_unit_test(transportCreateUdpHandlesGoodHostArguments),
         cmocka_unit_test(transportCreateFileReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportCreateFileCreatesFileWithRWPermissionsForAll),

@@ -83,11 +83,10 @@ osGetNumChildProcs(pid_t pid)
     return nchild - 3; // Not including the parent proc itself and ., ..
 }
 
-uint64_t
-osGetClockFreq()
+int
+osInitTSC(struct config_t *cfg)
 {
     int fd;
-    uint64_t freq;
     char *entry, *last;
     const char delim[] = ":";
     const char path[] = "/proc/cpuinfo";
@@ -95,7 +94,7 @@ osGetClockFreq()
     char *buf;
 
     if ((fd = open(path, O_RDONLY)) == -1) {
-        return (uint64_t)-1;
+        return -1;
     }
     
     /*
@@ -103,27 +102,39 @@ osGetClockFreq()
      * In any case this should be big enough.
      */    
     if ((buf = malloc(MAX_PROC)) == NULL) {
-        return (uint64_t)-1;
+        return -1;
     }
     
     if (g_fn.read(fd, buf, MAX_PROC) == -1) {
         g_fn.close(fd);
         free(buf);
-        return (uint64_t)-1;
+        return -1;
     }
 
+    if (strstr(buf, "rdtscp") == NULL) {
+        cfg->tsc_rdtscp = FALSE;
+    } else {
+        cfg->tsc_rdtscp = TRUE;
+    }
+    
+    if (strstr(buf, "tsc_reliable") == NULL) {
+        cfg->tsc_invariant = FALSE;
+    } else {
+        cfg->tsc_invariant = TRUE;
+    }
+    
     entry = strtok_r(buf, delim, &last);
     while (1) {
         if ((entry = strtok_r(NULL, delim, &last)) == NULL) {
-            freq = (uint64_t)-1;
+            cfg->freq = (uint64_t)-1;
             break;
         }
 
-        if (strcasestr((const char *)entry, freqStr) != NULL) {
+        if (strstr((const char *)entry, freqStr) != NULL) {
             // The next token should be what we want
             if ((entry = strtok_r(NULL, delim, &last)) != NULL) {
-                if ((freq = (uint64_t)strtoll(entry, NULL, 0)) == (long long)0) {
-                    freq = (uint64_t)-1;
+                if ((cfg->freq = (uint64_t)strtoll(entry, NULL, 0)) == (long long)0) {
+                    cfg->freq = (uint64_t)-1;
                 }
                 break;
             }
@@ -132,5 +143,8 @@ osGetClockFreq()
     
     g_fn.close(fd);
     free(buf);
-    return freq;
+    if (cfg->freq == (uint64_t)-1) {
+        return -1;
+    }
+    return 0;
 }

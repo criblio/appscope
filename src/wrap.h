@@ -1,3 +1,4 @@
+
 #ifndef __WRAP_H__
 #define __WRAP_H__
 
@@ -18,6 +19,9 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <ctype.h>
+#include <limits.h>
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 
 #include "dns.h"
 
@@ -70,6 +74,30 @@ enum metric_t {
     NETTX_PROC,
     DNS
 };
+
+typedef struct metric_counters_t {
+    int openPorts;
+    int TCPConnections;
+    int activeConnections;
+    int netrx;
+    int nettx;
+} metric_counters;
+
+typedef struct config_t {
+    int numNinfo;
+    bool tsc_invariant;
+    bool tsc_rdtscp;
+    uint64_t freq;
+    char hostname[MAX_HOSTNAME];
+    char procname[MAX_PROCNAME];
+} config;
+
+typedef struct thread_timing_t {
+    unsigned interval;                   // in seconds
+    time_t startTime; 
+    bool once;
+    pthread_t periodicTID;
+} thread_timing;
 
 typedef struct net_info_t {
     int fd;
@@ -143,10 +171,37 @@ atomicSet(int *ptr, int val)
     return __sync_lock_test_and_set(ptr, val);
 }
 
+extern config g_cfg;
 static inline uint64_t
-getTSC() {
+getTime() {
     unsigned low, high;
-    asm volatile("rdtsc" : "=a" (low), "=d" (high));
+
+    /*
+     * Newer CPUs support a second TSC read instruction.
+     * The new instruction, rdtscp, performes a serialization
+     * instruction before calling RDTSC. Specifically, rdtscp
+     * performs a cpuid instruction then an rdtsc. This is 
+     * intended to flush the instruction pipeline befiore
+     * calling rdtsc.
+     *
+     * A serializing instruction is used as the order of 
+     * execution is not guaranteed. It's described as 
+     * "Out ofOrder Execution". In some cases the read 
+     * of the TSC can come before the instruction being 
+     * measured. That scenario is not very likely for us
+     * as we tend to measure functions as opposed to 
+     * statements.
+     *
+     * If the rdtscp instruction is available, we use it.
+     * It takes a bit longer to execute due to the extra
+     * serialization instruction (cpuid). However, it's
+     * supposed to be more accurate.
+     */
+    if (g_cfg.tsc_rdtscp == TRUE) {
+        asm volatile("rdtscp" : "=a" (low), "=d" (high));
+    } else {
+        asm volatile("rdtsc" : "=a" (low), "=d" (high));
+    }
     return ((uint64_t)low) | (((uint64_t)high) << 32);
 }
 

@@ -20,7 +20,7 @@ clean:
 	rm -f ./lib/$(OS)/libwrap.so
 	rm -f test/$(OS)/test
 
-test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/cfg.c test/cfgtest.c src/transport.c test/transporttest.c src/log.c test/logtest.c src/out.c test/outtest.c src/format.c test/formattest.c
+test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/cfg.c test/cfgtest.c src/transport.c test/transporttest.c src/log.c test/logtest.c src/out.c test/outtest.c src/format.c test/formattest.c test/wraptest.c
 	@echo "Building Tests"
 	$(CC) -Wall -g -o test/$(OS)/test test/test.c
 	@echo "Building cfgtest without YAML only to inspect size"
@@ -32,6 +32,7 @@ test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/logtest $(INCLUDES) $(TEST_INCLUDES) test/logtest.c src/log.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/outtest $(INCLUDES) $(TEST_INCLUDES) test/outtest.c src/out.c src/log.c src/transport.c src/format.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/formattest $(INCLUDES) $(TEST_INCLUDES) test/formattest.c src/format.c $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/wraptest $(INCLUDES) $(TEST_INCLUDES) test/wraptest.c $(YAML_AR) $(TEST_LD_FLAGS) -Llib/$(OS)/ -lwrap
 	@echo "Running Tests"
 	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/cfgutilstest
 	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/cfgtest
@@ -39,6 +40,7 @@ test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/
 	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/logtest
 	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/outtest
 	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/formattest
+	DYLD_LIBRARY_PATH=lib/$(OS)/:contrib/cmocka/build/src/ test/$(OS)/wraptest
 	@echo "Testing Coverage"
 	lcov --capture --directory . --output-file coverage.info
 	genhtml coverage.info --output-directory out

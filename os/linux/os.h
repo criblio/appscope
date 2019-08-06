@@ -19,7 +19,10 @@
 
 extern char *program_invocation_short_name;
 extern struct interposed_funcs_t g_fn;
+extern struct config_t g_cfg;
+
 extern int osGetProcname(char *, int);
 extern int osGetNumThreads(pid_t);
 extern int osGetNumFds(pid_t);
 extern int osGetNumChildProcs(pid_t);
+extern int osInitTSC(struct config_t *);

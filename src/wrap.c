@@ -5,36 +5,10 @@
 #include "wrap.h"
 
 interposed_funcs g_fn;
-
+config g_cfg = {0};
 static net_info *g_netinfo;
-static int g_numNinfo;
-static char g_hostname[MAX_HOSTNAME];
-static char g_procname[MAX_PROCNAME];
-
-/*
- * We use static globals here as we
- * track the number of instances
- * and report the values as they occur.
- */
-static int g_openPorts = 0;
-static int g_TCPConnections = 0;
-static int g_activeConnections = 0;
-
-/*
- * We use static globals for this as we
- * accumulate the byte count and upload
- * in a periodic thread.
- */
-static int g_netrx = 0;
-static int g_nettx = 0;
-
-typedef struct {
-    unsigned interval;                   // in seconds
-    time_t startTime; 
-    bool once;
-    pthread_t periodicTID;
-} thread_timing_t;
-static thread_timing_t g_thread = {0};
+static metric_counters g_ctrs = {0};
+static thread_timing g_thread = {0};
 
 // These need to come from a config file
 // Do we like the g_ or the cfg prefix?
@@ -52,7 +26,7 @@ scopeLog(char* msg, int fd, cfg_log_level_t level)
     if (!g_log || !msg) return;
 
     char buf[strlen(msg) + 128];
-    snprintf(buf, sizeof(buf), "Scope: %s(%d): %s", g_procname, fd, msg);
+    snprintf(buf, sizeof(buf), "Scope: %s(%d): %s", g_cfg.procname, fd, msg);
     logSend(g_log, buf, level);
 }
 
@@ -83,6 +57,28 @@ dumpAddrs(int sd, enum control_type_t endp)
     }
 }
 
+// Return the time delta from start to now in nanoseconds
+EXPORTON uint64_t
+getDuration(uint64_t start)
+{
+    /*
+     * The clock frequency is in Mhz.
+     * In order to get NS resolution we
+     * multiply the difference by 1000.
+     *
+     * If the counter rolls over we adjust
+     * by using the max value of the counter.
+     * A roll over is rare. But, we should handle it.  
+     */
+    uint64_t now = getTime();
+    if (start < now) {
+        return ((now - start) * 1000) / g_cfg.freq;
+    } else {
+        return (((ULONG_MAX - start) + now) * 1000) / g_cfg.freq;
+    }
+    
+}
+
 static void
 addSock(int fd, int type)
 {
@@ -90,23 +86,23 @@ addSock(int fd, int type)
         if (g_netinfo[fd].fd == fd) {
             scopeLog("addSock: duplicate\n", fd, CFG_LOG_DEBUG);
 
-            if (g_openPorts > 0) {
-                atomicSub(&g_openPorts, 1);
+            if (g_ctrs.openPorts > 0) {
+                atomicSub(&g_ctrs.openPorts, 1);
             }
             
-            if (g_TCPConnections > 0) {
-                atomicSub(&g_TCPConnections, 1);
+            if (g_ctrs.TCPConnections > 0) {
+                atomicSub(&g_ctrs.TCPConnections, 1);
             }
           
             return;
         }
         
-        if ((fd > g_numNinfo) && (fd < MAX_FDS))  {
+        if ((fd > g_cfg.numNinfo) && (fd < MAX_FDS))  {
             // Need to realloc
             if ((g_netinfo = realloc(g_netinfo, sizeof(struct net_info_t) * fd)) == NULL) {
                 scopeLog("ERROR: addSock:realloc\n", fd, CFG_LOG_ERROR);
             }
-            g_numNinfo = fd;
+            g_cfg.numNinfo = fd;
         }
 
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
@@ -145,8 +141,9 @@ getProtocol(int type, char *proto, size_t len)
 static void
 doReset()
 {
-    g_openPorts = g_TCPConnections = g_activeConnections = g_netrx = g_nettx = g_thread.once = 0;
+    g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
+    memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
 }
 
 static void
@@ -186,9 +183,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_CPU:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "microsecond",         1),
             FIELDEND
         };
@@ -202,9 +199,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_MEM:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "kibibyte",            1),
             FIELDEND
         };
@@ -218,9 +215,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_THREAD:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "thread",              1),
             FIELDEND
         };
@@ -234,9 +231,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_FD:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "file",                1),
             FIELDEND
         };
@@ -250,9 +247,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_CHILD:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "process",             1),
             FIELDEND
         };
@@ -289,16 +286,16 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
     case OPEN_PORTS:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
             NUMFIELD("port",             localPort,             5),
             STRFIELD("unit",             "instance",            1),
             FIELDEND
         };
-        event_t e = {"net.port", g_openPorts, CURRENT, fields};
+        event_t e = {"net.port", g_ctrs.openPorts, CURRENT, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:OPENPORTS:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
@@ -308,16 +305,16 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
     case TCP_CONNECTIONS:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
             NUMFIELD("port",             localPort,             5),
             STRFIELD("unit",             "session",             1),
             FIELDEND
         };
-        event_t e = {"net.tcp", g_TCPConnections, CURRENT, fields};
+        event_t e = {"net.tcp", g_ctrs.TCPConnections, CURRENT, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:TCPCONNS:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
@@ -327,20 +324,20 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
     case ACTIVE_CONNECTIONS:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
             NUMFIELD("port",             localPort,             5),
             STRFIELD("unit",             "connection",          1),
             FIELDEND
         };
-        event_t e = {"net.conn", g_activeConnections, DELTA, fields};
+        event_t e = {"net.conn", g_ctrs.activeConnections, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:ACTIVECONNS:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
-        atomicSet(&g_activeConnections, 0);
+        atomicSet(&g_ctrs.activeConnections, 0);
         break;
     }
 
@@ -399,10 +396,10 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         }
         
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
             STRFIELD("localip",          lip,                   5),
             NUMFIELD("localp",           localPort,             5),
@@ -412,7 +409,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {"net.rx", g_netrx, DELTA, fields};
+        event_t e = {"net.rx", g_ctrs.netrx, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETRX:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
@@ -421,7 +418,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
          * This creates DELTA behavior by uploading the number of bytes
          * since the last time the metric was uploaded.
          */
-        atomicSet(&g_netrx, 0);
+        atomicSet(&g_ctrs.netrx, 0);
         break;
     }
 
@@ -480,10 +477,10 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         }
 
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
             STRFIELD("localip",          lip,                   5),
             NUMFIELD("localp",           localPort,             5),
@@ -493,55 +490,55 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {"net.tx", g_nettx, DELTA, fields};
+        event_t e = {"net.tx", g_ctrs.nettx, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETTX:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
 
-        atomicSet(&g_nettx, 0);
+        atomicSet(&g_ctrs.nettx, 0);
         break;
     }
 
     case NETRX_PROC:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {"net.rx", g_netrx, DELTA, fields};
+        event_t e = {"net.rx", g_ctrs.netrx, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETRX_PROC:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
-        atomicSet(&g_netrx, 0);
+        atomicSet(&g_ctrs.netrx, 0);
         break;
     }
 
     case NETTX_PROC:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {"net.tx", g_nettx, DELTA, fields};
+        event_t e = {"net.tx", g_ctrs.nettx, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETTX_PROC:outSendEvent\n", -1, CFG_LOG_ERROR);
         }
-        atomicSet(&g_nettx, 0);
+        atomicSet(&g_ctrs.nettx, 0);
         break;
     }
 
     case DNS:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("domain",           g_netinfo[fd].dnsName, 6),
             STRFIELD("unit",             "request",             1),
             FIELDEND
@@ -731,7 +728,7 @@ getDNSName(int sd, void *pkt, int pktlen)
 static int
 doRecv(int sockfd, ssize_t rc)
 {
-    atomicAdd(&g_netrx, rc);
+    atomicAdd(&g_ctrs.netrx, rc);
     if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
         doAddNewSock(sockfd);
     }
@@ -745,7 +742,7 @@ doRecv(int sockfd, ssize_t rc)
 static int
 doSend(int sockfd, ssize_t rc)
 {
-    atomicAdd(&g_nettx, rc);
+    atomicAdd(&g_ctrs.nettx, rc);
     if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
         doAddNewSock(sockfd);
     }
@@ -770,9 +767,9 @@ doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
     if (g_netinfo && (g_netinfo[sd].fd == sd)) {
         g_netinfo[sd].listen = TRUE;
         g_netinfo[sd].accept = TRUE;
-        atomicAdd(&g_openPorts, 1);
-        atomicAdd(&g_TCPConnections, 1);
-        atomicAdd(&g_activeConnections, 1);
+        atomicAdd(&g_ctrs.openPorts, 1);
+        atomicAdd(&g_ctrs.TCPConnections, 1);
+        atomicAdd(&g_ctrs.activeConnections, 1);
         doSetConnection(sd, addr, addrlen, REMOTE);
         doNetMetric(OPEN_PORTS, sd, EVENT_BASED);
         doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED);
@@ -819,8 +816,7 @@ periodic(void *arg)
 __attribute__((constructor)) void
 init(void)
 {
-    uint64_t startTime;
-    
+   
     g_fn.vsyslog = dlsym(RTLD_NEXT, "vsyslog");
     g_fn.fork = dlsym(RTLD_NEXT, "fork");
     g_fn.close = dlsym(RTLD_NEXT, "close");
@@ -858,14 +854,18 @@ init(void)
         scopeLog("ERROR: Constructor:Malloc\n", -1, CFG_LOG_ERROR);
     }
 
-    g_numNinfo = NET_ENTRIES;
-    if (gethostname(g_hostname, sizeof(g_hostname)) != 0) {
+    g_cfg.numNinfo = NET_ENTRIES;
+    if (gethostname(g_cfg.hostname, sizeof(g_cfg.hostname)) != 0) {
         scopeLog("ERROR: Constructor:gethostname\n", -1, CFG_LOG_ERROR);
     }
 
-    osGetProcname(g_procname, sizeof(g_procname));
-    startTime = getTSC();
-
+    osGetProcname(g_cfg.procname, sizeof(g_cfg.procname));
+    osInitTSC(&g_cfg);
+    if (g_cfg.tsc_invariant == FALSE) {
+        scopeLog("ERROR: TSC is not invariant\n", -1, CFG_LOG_ERROR);
+    }
+    
+    
     {
         char* path = cfgPath(CFG_FILE_NAME);
         config_t* cfg = cfgRead(path);
@@ -888,13 +888,13 @@ doClose(int fd, char *func)
         scopeLog(func, fd, CFG_LOG_DEBUG);
         if (g_netinfo[fd].listen == TRUE) {
             // Gauge tracking number of open ports
-            atomicSub(&g_openPorts, 1);
+            atomicSub(&g_ctrs.openPorts, 1);
             doNetMetric(OPEN_PORTS, fd, EVENT_BASED);
         }
 
         if (g_netinfo[fd].accept == TRUE) {
             // Gauge tracking number of active TCP connections
-            atomicSub(&g_TCPConnections, 1);
+            atomicSub(&g_ctrs.TCPConnections, 1);
             doNetMetric(TCP_CONNECTIONS, fd, EVENT_BASED);
         }
 
@@ -1017,9 +1017,9 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
         scopeLog("DNSServiceQueryRecord\n", -1, CFG_LOG_DEBUG);
 
         event_field_t fields[] = {
-            STRFIELD("proc",             g_procname,            2),
+            STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              getpid(),              7),
-            STRFIELD("host",             g_hostname,            2),
+            STRFIELD("host",             g_cfg.hostname         2),
             STRFIELD("domain",           fullname,              6),
             STRFIELD("unit",             "request",             1),
             FIELDEND
@@ -1209,7 +1209,7 @@ socket(int socket_family, int socket_type, int protocol)
              (socket_family == AF_INET6)) &&            
             (socket_type == SOCK_DGRAM)) {
             // Tracking number of open ports
-            atomicAdd(&g_openPorts, 1);
+            atomicAdd(&g_ctrs.openPorts, 1);
             
             /*
              * State used in close()
@@ -1254,7 +1254,7 @@ listen(int sockfd, int backlog)
         scopeLog("listen\n", sockfd, CFG_LOG_DEBUG);
         
         // Tracking number of open ports
-        atomicAdd(&g_openPorts, 1);
+        atomicAdd(&g_ctrs.openPorts, 1);
         
         if (g_netinfo && (g_netinfo[sockfd].fd == sockfd)) {
             g_netinfo[sockfd].listen = TRUE;
@@ -1262,7 +1262,7 @@ listen(int sockfd, int backlog)
             doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED);
 
             if (g_netinfo[sockfd].type == SOCK_STREAM) {
-                atomicAdd(&g_TCPConnections, 1);
+                atomicAdd(&g_ctrs.TCPConnections, 1);
                 g_netinfo[sockfd].accept = TRUE;                            
                 doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED);
             }
@@ -1332,11 +1332,11 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
         (g_netinfo[sockfd].fd == sockfd)) {
         doSetConnection(sockfd, addr, addrlen, REMOTE);
         g_netinfo[sockfd].accept = TRUE;
-        atomicAdd(&g_activeConnections, 1);
+        atomicAdd(&g_ctrs.activeConnections, 1);
         doNetMetric(ACTIVE_CONNECTIONS, sockfd, EVENT_BASED);
 
         if (g_netinfo[sockfd].type == SOCK_STREAM) {
-            atomicAdd(&g_TCPConnections, 1);
+            atomicAdd(&g_ctrs.TCPConnections, 1);
             doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED);
         }
         scopeLog("connect\n", sockfd, CFG_LOG_DEBUG);
@@ -1448,7 +1448,7 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
     scopeLog("recvfrom\n", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
-        atomicAdd(&g_netrx, rc);
+        atomicAdd(&g_ctrs.netrx, rc);
         if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
             // We missed an accept...most likely
             // Or.. we are a child proc that inherited a socket

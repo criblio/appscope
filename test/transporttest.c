@@ -13,7 +13,16 @@
 static void
 transportCreateUdpReturnsValidPtrInHappyPath(void** state)
 {
-    transport_t* t = transportCreateUdp("127.0.0.1", 8126);
+    transport_t* t = transportCreateUdp("127.0.0.1", "8126");
+    assert_non_null(t);
+    transportDestroy(&t);
+
+    // Only host or port need to be valid
+    t = transportCreateUdp(NULL, "8127");
+    assert_non_null(t);
+    transportDestroy(&t);
+
+    t = transportCreateUdp("www.google.com", NULL);
     assert_non_null(t);
     transportDestroy(&t);
 }
@@ -22,29 +31,28 @@ static void
 transportCreateUdpReturnsNullPtrForInvalidHost()
 {
     transport_t* t;
-    t = transportCreateUdp(NULL, 8126);
+    t = transportCreateUdp("this is not a good looking host name", "8126");
     assert_null(t);
 
-    t = transportCreateUdp("this is not a good looking host name", 8126);
+    t = transportCreateUdp(NULL, NULL);
     assert_null(t);
 }
 
 static void
 transportCreateUdpHandlesGoodHostArguments()
 {
-    char* const host_values[] = {
+    const char* host_values[] = {
            "localhost", "www.google.com",
            "127.0.0.1", "0.0.0.0", "8.8.4.4",
-           "::1", "::ffff:127.0.0.1", "::", "2001:4860:4860::8844",
+           "::1", "::ffff:127.0.0.1", "::", 
+           // These will work only if machine supports ipv6
+           //"2001:4860:4860::8844",
+           //"ipv6.google.com",
            NULL };
 
-    // These don't work yet, but should before we're done
-    // Until then, stick to a string with IPv4 style notation.
-    skip();
-
-    char* host;
-    for (host = host_values[0]; host; host++) {
-        transport_t* t = transportCreateUdp(host, 1234);
+    int i;
+    for (i=0; i<sizeof(host_values)/sizeof(host_values[0]); i++) {
+        transport_t* t = transportCreateUdp(host_values[i], "1234");
         assert_non_null(t);
         transportDestroy(&t);
     }
@@ -196,14 +204,16 @@ transportSendForUdpTransmitsMsg(void** state)
     if (getaddrinfo(hostname, portname, &hints, &res)) {
         fail_msg("Couldn't create address for socket");
     }
-    int sd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (!sd) fail_msg("Couldn't create socket");
+    int sd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (sd == -1) {
+        fail_msg("Couldn't create socket");
+    }
     if (bind(sd, res->ai_addr, res->ai_addrlen) == -1) {
         fail_msg("Couldn't bind socket");
     }
     freeaddrinfo(res);
 
-    transport_t* t = transportCreateUdp(hostname, atoi(portname));
+    transport_t* t = transportCreateUdp(hostname, portname);
     assert_non_null(t);
     const char msg[] = "This is the payload message to transfer.\n";
     char buf[sizeof(msg)] = {0};  // Has room for a null at the end
@@ -220,7 +230,6 @@ transportSendForUdpTransmitsMsg(void** state)
     transportDestroy(&t);
 
     close(sd);
-
 }
 
 static void

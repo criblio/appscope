@@ -60,7 +60,7 @@ outTranportSetAndOutSend(void** state)
     const char* file_path = "/tmp/my.path";
     out_t* out = outCreate();
     assert_non_null(out);
-    transport_t* t1 = transportCreateUdp("127.0.0.1", 12345);
+    transport_t* t1 = transportCreateUdp("127.0.0.1", "12345");
     transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
     transport_t* t3 = transportCreateSyslog();
     transport_t* t4 = transportCreateShm();

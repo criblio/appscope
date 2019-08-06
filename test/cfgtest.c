@@ -16,11 +16,11 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgOutPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_int_equal       (cfgTransportType(config, CFG_OUT), CFG_UDP);
     assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
-    assert_int_equal       (cfgTransportPort(config, CFG_OUT), 8125);
+    assert_string_equal    (cfgTransportPort(config, CFG_OUT), "8125");
     assert_null            (cfgTransportPath(config, CFG_OUT));
     assert_int_equal       (cfgTransportType(config, CFG_LOG), CFG_FILE);
-    assert_string_equal    (cfgTransportHost(config, CFG_LOG), "127.0.0.1");
-    assert_int_equal       (cfgTransportPort(config, CFG_LOG), 8125);
+    assert_null            (cfgTransportHost(config, CFG_LOG));
+    assert_null            (cfgTransportPort(config, CFG_LOG));
     assert_string_equal    (cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
     assert_null            (cfgFuncFilters(config));
     assert_false           (cfgFuncIsFiltered(config, "read"));
@@ -182,10 +182,10 @@ cfgTransportPortSetAndGet(void** state)
 {
     which_transport_t t = *(which_transport_t*)state[0];
     config_t* config = cfgCreateDefault();
-    cfgTransportPortSet(config, t, 54321);
-    assert_int_equal(cfgTransportPort(config, t), 54321);
-    cfgTransportPortSet(config, t, 12345);
-    assert_int_equal(cfgTransportPort(config, t), 12345);
+    cfgTransportPortSet(config, t, "54321");
+    assert_string_equal(cfgTransportPort(config, t), "54321");
+    cfgTransportPortSet(config, t, "12345");
+    assert_string_equal(cfgTransportPort(config, t), "12345");
     cfgDestroy(&config);
 }
 
@@ -282,11 +282,11 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgOutPeriod(config), 11);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
     assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
-    assert_int_equal(cfgTransportPort(config, CFG_OUT), 8125);
+    assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
     assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_SYSLOG);
-    assert_string_equal(cfgTransportHost(config, CFG_LOG), "127.0.0.1");
-    assert_int_equal(cfgTransportPort(config, CFG_LOG), 8125);
+    assert_null(cfgTransportHost(config, CFG_LOG));
+    assert_null(cfgTransportPort(config, CFG_LOG));
     assert_string_equal(cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
     assert_non_null(cfgFuncFilters(config));
     assert_true(cfgFuncIsFiltered(config, "read"));
@@ -323,7 +323,7 @@ cfgReadEveryTransportType(void** state)
     const char* udp_str =
         "    type: udp\n"
         "    host: 'labmachine8235'\n"
-        "    port: 235\n";
+        "    port: 'ntp'\n";
     const char* unix_str =
         "    type: unix\n"
         "    path: '/var/run/scope.sock'\n";
@@ -347,7 +347,7 @@ cfgReadEveryTransportType(void** state)
         if (transport_lines[i] == udp_str) {
                 assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UDP);
                 assert_string_equal(cfgTransportHost(config, CFG_OUT), "labmachine8235");
-                assert_int_equal(cfgTransportPort(config, CFG_OUT), 235);
+                assert_string_equal(cfgTransportPort(config, CFG_OUT), "ntp");
         } else if (transport_lines[i] == unix_str) {
                 assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
                 assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
@@ -431,11 +431,11 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgOutPeriod(config), 13);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
     assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
-    assert_int_equal(cfgTransportPort(config, CFG_OUT), 8125);
+    assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
     assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_SHM);
-    assert_string_equal(cfgTransportHost(config, CFG_LOG), "127.0.0.1");
-    assert_int_equal(cfgTransportPort(config, CFG_LOG), 8125);
+    assert_null(cfgTransportHost(config, CFG_LOG));
+    assert_null(cfgTransportPort(config, CFG_LOG));
     assert_string_equal(cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
     assert_non_null(cfgFuncFilters(config));
     assert_true(cfgFuncIsFiltered(config, "read"));

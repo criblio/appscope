@@ -27,8 +27,6 @@ struct _transport_t
     union {
         struct {
             int sock;
-            struct sockaddr_storage addr;
-            socklen_t addr_len;
             operations_info ops;
         } udp;
         struct {
@@ -84,10 +82,6 @@ transportCreateUdp(const char* host, const char* port)
 
     // If none worked, get out
     if (t->udp.sock == -1) goto out;
-
-    // Save the address for later
-    memmove(&t->udp.addr, addr->ai_addr, addr->ai_addrlen);
-    t->udp.addr_len = addr->ai_addrlen;
 
     // Set the socket to non blocking, and close on exec
     int flags = fcntl(t->udp.sock, F_GETFL, 0);

@@ -108,6 +108,11 @@ addSock(int fd, int type)
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].fd = fd;
         g_netinfo[fd].type = type;
+#ifdef __LINUX__
+        // Clear these bits so comparisons of type will work
+        g_netinfo[fd].type &= ~SOCK_CLOEXEC;
+        g_netinfo[fd].type &= ~SOCK_NONBLOCK;
+#endif // __LINUX__
     }
 }
 

@@ -13,38 +13,54 @@
 static void
 transportCreateUdpReturnsValidPtrInHappyPath(void** state)
 {
-    transport_t* t = transportCreateUdp("127.0.0.1", 8126);
+    transport_t* t = transportCreateUdp("127.0.0.1", "8126");
     assert_non_null(t);
     transportDestroy(&t);
 }
 
 static void
-transportCreateUdpReturnsNullPtrForInvalidHost()
+transportCreateUdpReturnsNullPtrForInvalidHost(void** state)
 {
-    transport_t* t;
-    t = transportCreateUdp(NULL, 8126);
+    // This is a valid test, but it hangs for as long as 30s.
+    // (It depends on dns more than a unit test should.)
+/*
+    t = transportCreateUdp("-tota11y bogus hostname", "666");
     assert_null(t);
+*/
 
-    t = transportCreateUdp("this is not a good looking host name", 8126);
+    transport_t* t;
+    t = transportCreateUdp(NULL, "8128");
     assert_null(t);
 }
 
 static void
-transportCreateUdpHandlesGoodHostArguments()
+transportCreateUdpReturnsNullPtrForInvalidPort(void** state)
 {
-    char* const host_values[] = {
+    transport_t* t;
+    t = transportCreateUdp("127.0.0.1", "mom's apple pie recipe");
+    assert_null(t);
+    transportDestroy(&t);
+
+    t = transportCreateUdp("127.0.0.1", NULL);
+    assert_null(t);
+    transportDestroy(&t);
+}
+
+static void
+transportCreateUdpHandlesGoodHostArguments(void** state)
+{
+    const char* host_values[] = {
            "localhost", "www.google.com",
            "127.0.0.1", "0.0.0.0", "8.8.4.4",
-           "::1", "::ffff:127.0.0.1", "::", "2001:4860:4860::8844",
-           NULL };
+           "::1", "::ffff:127.0.0.1", "::", 
+           // These will work only if machine supports ipv6
+           //"2001:4860:4860::8844",
+           //"ipv6.google.com",
+    };
 
-    // These don't work yet, but should before we're done
-    // Until then, stick to a string with IPv4 style notation.
-    skip();
-
-    char* host;
-    for (host = host_values[0]; host; host++) {
-        transport_t* t = transportCreateUdp(host, 1234);
+    int i;
+    for (i=0; i<sizeof(host_values)/sizeof(host_values[0]); i++) {
+        transport_t* t = transportCreateUdp(host_values[i], "1234");
         assert_non_null(t);
         transportDestroy(&t);
     }
@@ -196,23 +212,25 @@ transportSendForUdpTransmitsMsg(void** state)
     if (getaddrinfo(hostname, portname, &hints, &res)) {
         fail_msg("Couldn't create address for socket");
     }
-    int sd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (!sd) fail_msg("Couldn't create socket");
+    int sd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (sd == -1) {
+        fail_msg("Couldn't create socket");
+    }
     if (bind(sd, res->ai_addr, res->ai_addrlen) == -1) {
         fail_msg("Couldn't bind socket");
     }
     freeaddrinfo(res);
 
-    transport_t* t = transportCreateUdp(hostname, atoi(portname));
+    transport_t* t = transportCreateUdp(hostname, portname);
     assert_non_null(t);
     const char msg[] = "This is the payload message to transfer.\n";
     char buf[sizeof(msg)] = {0};  // Has room for a null at the end
     assert_int_equal(transportSend(t, msg), 0);
 
-    struct sockaddr from = {0};
-    socklen_t len = {0};
+    struct sockaddr_storage from = {0};
+    socklen_t len = sizeof(from);
     int byteCount=0;
-    if ((byteCount = recvfrom(sd, buf, sizeof(buf), 0, &from, &len)) != strlen(msg)) {
+    if ((byteCount = recvfrom(sd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &len)) != strlen(msg)) {
         fail_msg("Couldn't recvfrom");
     }
     assert_string_equal(msg, buf);
@@ -220,7 +238,6 @@ transportSendForUdpTransmitsMsg(void** state)
     transportDestroy(&t);
 
     close(sd);
-
 }
 
 static void
@@ -275,6 +292,7 @@ main (int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(transportCreateUdpReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportCreateUdpReturnsNullPtrForInvalidHost),
+        cmocka_unit_test(transportCreateUdpReturnsNullPtrForInvalidPort),
         cmocka_unit_test(transportCreateUdpHandlesGoodHostArguments),
         cmocka_unit_test(transportCreateFileReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportCreateFileCreatesFileWithRWPermissionsForAll),

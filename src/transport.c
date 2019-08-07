@@ -1,8 +1,8 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
-#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -26,7 +26,6 @@ struct _transport_t
     union {
         struct {
             int sock;
-            struct sockaddr_in saddr;
             operations_info ops;
         } udp;
         struct {
@@ -34,33 +33,45 @@ struct _transport_t
             int fd;
         } file;
     };
-
-    // These fields are used to avoid infinite recursion since we call
-    // write and sendto from write and sendto.
-    //
-    // We *could* remove them and use fields from g_fn from wrap.c instead.
-    // However, I don't want to do this because it would create a dependency
-    // from transport to wrap.  (A dep the other way is fine)
-    ssize_t (*write)(int, const void *, size_t);
-    ssize_t (*sendto)(int, const void *, size_t, int,
-                              const struct sockaddr *, socklen_t);
 };
 
 transport_t*
-transportCreateUdp(const char* host, int port)
+transportCreateUdp(const char* host, const char* port)
 {
-    if (!host) return NULL;
-    transport_t* t = calloc(1, sizeof(transport_t));
-    if (!t) return NULL;
+    transport_t* t = NULL;
+    struct addrinfo* addr_list = NULL;
+
+    if (!host || !port) goto out;
+
+    t = calloc(1, sizeof(transport_t));
+    if (!t) goto out;
 
     t->type = CFG_UDP;
+    t->udp.sock = -1;
 
-    // Create a UDP socket
-    t->udp.sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (t->udp.sock == -1)     {
-        transportDestroy(&t);
-        return t;
+    // Get some addresses to try
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
+    hints.ai_socktype = SOCK_DGRAM;  // For udp
+    hints.ai_protocol = IPPROTO_UDP; // For udp
+    if (getaddrinfo(host, port, &hints, &addr_list)) goto out;
+
+    // Loop through the addresses until one works
+    struct addrinfo* addr;
+    for (addr = addr_list; addr; addr = addr->ai_next) {
+        t->udp.sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+        if (t->udp.sock == -1) continue;
+        if (connect(t->udp.sock, addr->ai_addr, addr->ai_addrlen) == -1) {
+            // We could create a sock, but not connect.  Clean up.
+            close(t->udp.sock);
+            t->udp.sock = -1;
+            continue;
+        }
+        break; // Success!
     }
+
+    // If none worked, get out
+    if (t->udp.sock == -1) goto out;
 
     // Set the socket to non blocking, and close on exec
     int flags = fcntl(t->udp.sock, F_GETFL, 0);
@@ -72,15 +83,9 @@ transportCreateUdp(const char* host, int port)
         // TBD do something here.
     }
 
-    // Create the address to send to
-    memset(&t->udp.saddr, 0, sizeof(t->udp.saddr));
-    t->udp.saddr.sin_family = AF_INET;
-    t->udp.saddr.sin_port = htons(port);
-    if (inet_aton(host, &t->udp.saddr.sin_addr) == 0) {
-        close(t->udp.sock);
-        free(t);
-        return NULL;
-    }
+out:
+    if (addr_list) freeaddrinfo(addr_list);
+    if (t && t->udp.sock == -1) transportDestroy(&t);
     return t;
 }
 
@@ -175,16 +180,10 @@ transportSend(transport_t* t, const char* msg)
 {
     if (!t || !msg) return -1;
 
-    // Use these to avoid infinite recursion...
-    if (!t->write) t->write = dlsym(RTLD_NEXT, "write");
-    if (!t->sendto) t->sendto = dlsym(RTLD_NEXT, "sendto");
-    if (!t->write || !t->sendto) return -1;
-
     switch (t->type) {
         case CFG_UDP:
             if (t->udp.sock != -1) {
-                int rc = t->sendto(t->udp.sock, msg, strlen(msg), 0,
-                                 (struct sockaddr *)&t->udp.saddr, sizeof(t->udp.saddr));
+                int rc = send(t->udp.sock, msg, strlen(msg), 0);
                 if (rc < 0) {
                     switch (errno) {
                     case EWOULDBLOCK:
@@ -198,7 +197,7 @@ transportSend(transport_t* t, const char* msg)
             break;
         case CFG_FILE:
             if (t->file.fd != -1) {
-                int bytes = t->write(t->file.fd, msg, strlen(msg));
+                int bytes = write(t->file.fd, msg, strlen(msg));
                 if (bytes < 0) {
                     // TBD do something here
                 } else {

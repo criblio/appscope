@@ -31,6 +31,11 @@
 #define LATEST_LIBC_VER_NEEDED "2.4"
 #define LIBC "GLIBC_"
 
+#define PRIVATE "PRIVATE"
+static const char* ok_private_funcs[] = {
+    "_dl_sym",
+};
+
 static const char*
 getNextLine(FILE* input, char* line, int len)
 {
@@ -66,6 +71,7 @@ verFromLine(const char* line)
 typedef struct {
     unsigned long lines_tested;
     unsigned long lines_glibc;
+    unsigned long lines_glibc_private;
     unsigned long lines_failed;
 } results_t;
 
@@ -79,8 +85,27 @@ testEachLineInStream(FILE* input, const char* libcVerThreshold, results_t* resul
         const char* lineVer = verFromLine(line);
         if (!lineVer) continue;
 
-        // If we get here, there is a glibc version on this line
+        // If we get here, GLIBC_ appears, but it might be GLIBC_PRIVATE.
+        // If so, make sure the GLIBC_PRIVATE function is one we've seen before.
         result->lines_glibc++;
+        if (!strcmp(lineVer, PRIVATE)) {
+            result->lines_glibc_private++;
+            int allowed = 0;
+            int i;
+            for (i=0; i<sizeof(ok_private_funcs)/sizeof(ok_private_funcs[0]); i++) {
+                if (strstr(line, ok_private_funcs[i])) {
+                    allowed = 1;
+                    break;
+                }
+            }
+            if (!allowed) {
+                fprintf(output, "glibc symbol: '%s' is a private function we haven't seen before\n", line);
+                result->lines_failed++;
+            }
+            continue;
+        }
+
+        // If we get here, there is a glibc version number on this line
         if (strverscmp(lineVer, libcVerThreshold) <= 0) continue;
 
         // If we get here, the glibc version on this line is too new.
@@ -101,6 +126,7 @@ testEachLineInStreamWorksWithCannedData(void** state)
     const char* path = "/tmp/nmStyleOutput.txt";
 
     const char* sample_nm_output[] = {
+	"                 U __libc_dlsym@@GLIBC_PRIVATE\n"
         "                 U time@@GLIBC_2.2.5\n",
         "                 U realpath@@GLIBC_2.3\n",
         "000000000000eed5 T cfgRead\n",
@@ -123,9 +149,10 @@ testEachLineInStreamWorksWithCannedData(void** state)
     FILE* f_in = fopen(path, "r");
     FILE* f_out = fopen("/dev/null", "a");
     testEachLineInStream(f_in, "2.3", &result, f_out);
-    assert_int_equal(result.lines_tested, 5);
-    assert_int_equal(result.lines_glibc,  4);
-    assert_int_equal(result.lines_failed, 2); // __sprintf_chk, __stack_chk_fail
+    assert_int_equal(result.lines_tested, 6);
+    assert_int_equal(result.lines_glibc,  5);
+    assert_int_equal(result.lines_glibc_private,  1); // __libc_dlsym
+    assert_int_equal(result.lines_failed, 3); // __sprintf_chk, __stack_chk_fail, __libc_dlsym
     fclose(f_in);
     fclose(f_out);
 
@@ -140,8 +167,9 @@ testEachLineInStreamWithActualLibraryData(void** state)
     FILE* f_in = popen("nm ./lib/linux/libwrap.so", "r");
     results_t result = {0};
     testEachLineInStream(f_in, LATEST_LIBC_VER_NEEDED, &result, stdout);
-    assert_true(result.lines_tested > 350);         // 383 when written
-    assert_true(result.lines_tested > 40);          // 54 when written
+    assert_true(result.lines_tested > 350);            // 383 when written
+    assert_true(result.lines_glibc > 40);              // 54 when written
+    assert_int_equal(result.lines_glibc_private,  1);  // _dl_sym
     assert_int_equal(result.lines_failed, 0);
     pclose(f_in);
 }

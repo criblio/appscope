@@ -1,6 +1,5 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
-#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -34,15 +33,6 @@ struct _transport_t
             int fd;
         } file;
     };
-
-    // These fields are used to avoid infinite recursion since we call
-    // write and send from write and send.
-    //
-    // We *could* remove them and use fields from g_fn from wrap.c instead.
-    // However, I don't want to do this because it would create a dependency
-    // from transport to wrap.  (A dep the other way is fine)
-    ssize_t (*write)(int, const void *, size_t);
-    ssize_t (*send)(int, const void *, size_t, int);
 };
 
 transport_t*
@@ -190,15 +180,10 @@ transportSend(transport_t* t, const char* msg)
 {
     if (!t || !msg) return -1;
 
-    // Use these to avoid infinite recursion...
-    if (!t->write) t->write = dlsym(RTLD_NEXT, "write");
-    if (!t->send) t->send = dlsym(RTLD_NEXT, "send");
-    if (!t->write || !t->send) return -1;
-
     switch (t->type) {
         case CFG_UDP:
             if (t->udp.sock != -1) {
-                int rc = t->send(t->udp.sock, msg, strlen(msg), 0);
+                int rc = send(t->udp.sock, msg, strlen(msg), 0);
                 if (rc < 0) {
                     switch (errno) {
                     case EWOULDBLOCK:
@@ -212,7 +197,7 @@ transportSend(transport_t* t, const char* msg)
             break;
         case CFG_FILE:
             if (t->file.fd != -1) {
-                int bytes = t->write(t->file.fd, msg, strlen(msg));
+                int bytes = write(t->file.fd, msg, strlen(msg));
                 if (bytes < 0) {
                     // TBD do something here
                 } else {

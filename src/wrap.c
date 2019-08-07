@@ -908,12 +908,8 @@ EXPORTON int
 close(int fd)
 {
     int rc;
-    
-    if (g_fn.close == NULL) {
-        scopeLog("ERROR: close:NULL\n", fd, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(close);
     doThread(); // Will do nothing if a thread already exists
 
     rc = g_fn.close(fd);
@@ -929,12 +925,8 @@ EXPORTON int
 close$NOCANCEL(int fd)
 {
     int rc;
-    
-    if (g_fn.close$NOCANCEL == NULL) {
-        scopeLog("ERROR: close$NOCANCEL:NULL\n", fd, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(close$NOCANCEL);
     doThread();
     rc = g_fn.close$NOCANCEL(fd);
     if (rc != -1) {
@@ -949,12 +941,8 @@ EXPORTON int
 guarded_close_np(int fd, void *guard)
 {
     int rc;
-    
-    if (g_fn.guarded_close_np == NULL) {
-        scopeLog("ERROR: guarded_close_np:NULL\n", fd, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(guarded_close_np);
     doThread();
     rc = g_fn.guarded_close_np(fd, guard);
     if (rc != -1) {
@@ -968,12 +956,8 @@ EXPORTOFF int
 close_nocancel(int fd)
 {
     int rc;
-    
-    if (g_fn.close_nocancel == NULL) {
-        scopeLog("ERROR: close_nocancel:NULL\n", fd, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(close_nocancel);
     rc = g_fn.close_nocancel(fd);
     if (rc != -1) {
         doClose(fd, "close_nocancel\n");
@@ -986,12 +970,8 @@ EXPORTON int
 accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
     int sd;
-    
-    if (g_fn.accept$NOCANCEL == NULL) {
-        scopeLog("ERROR: accept$NOCANCEL:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(accept$NOCANCEL);
     doThread();
     sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
@@ -1003,15 +983,11 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 EXPORTON ssize_t
 __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
-                          const struct sockaddr *dest_addr, socklen_t addrlen)
+                  const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
 
-    if (g_fn.__sendto_nocancel == NULL) {
-        scopeLog("ERROR: __sendto_nocancel:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
-
+    WRAP_CHECK(__sendto_nocancel);
     doThread();
     rc = g_fn.__sendto_nocancel(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
@@ -1031,16 +1007,12 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
 
 EXPORTON uint32_t
 DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
-                               const char *fullname, uint16_t rrtype, uint16_t rrclass,
-                               void *callback, void *context)
+                      const char *fullname, uint16_t rrtype, uint16_t rrclass,
+                      void *callback, void *context)
 {
     uint32_t rc;
 
-    if (g_fn.DNSServiceQueryRecord == NULL) {
-        scopeLog("ERROR: DNSServiceQueryRecord:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
-
+    WRAP_CHECK(DNSServiceQueryRecord);
     rc = g_fn.DNSServiceQueryRecord(sdRef, flags, interfaceIndex, fullname,
                                     rrtype, rrclass, callback, context);
     if (rc == 0) {
@@ -1070,12 +1042,8 @@ EXPORTON ssize_t
 write(int fd, const void *buf, size_t count)
 {
     ssize_t rc;
-    
-    if (g_fn.write == NULL) {
-        scopeLog("ERROR: write:NULL\n", fd, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(write);
     doThread();
     rc = g_fn.write(fd, buf, count);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
@@ -1092,12 +1060,8 @@ EXPORTON ssize_t
 read(int fd, void *buf, size_t count)
 {
     ssize_t rc;
-    
-    if (g_fn.read == NULL) {
-        scopeLog("ERROR: read:NULL\n", fd, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(read);
     doThread();
     rc = g_fn.read(fd, buf, count);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
@@ -1116,11 +1080,7 @@ fcntl(int fd, int cmd, ...)
     int rc;
     struct FuncArgs fArgs;
 
-    if (g_fn.fcntl == NULL ) {
-        scopeLog("ERROR: fcntl:NULL\n", fd, CFG_LOG_ERROR);
-        return -1;
-    }
-
+    WRAP_CHECK(fcntl);
     doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
     rc = g_fn.fcntl(fd, cmd, fArgs.arg[0], fArgs.arg[1],
@@ -1141,11 +1101,7 @@ fcntl64(int fd, int cmd, ...)
     int rc;
     struct FuncArgs fArgs;
 
-    if (g_fn.fcntl64 == NULL ) {
-        scopeLog("ERROR: fcntl64:NULL\n", fd, CFG_LOG_ERROR);
-        return -1;
-    }
-
+    WRAP_CHECK(fcntl64);
     doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
     rc = g_fn.fcntl64(fd, cmd, fArgs.arg[0], fArgs.arg[1],
@@ -1165,11 +1121,7 @@ dup(int fd)
 {
     int rc;
 
-    if (g_fn.dup == NULL ) {
-        scopeLog("ERROR: dup:NULL\n", fd, CFG_LOG_ERROR);
-        return -1;
-    }
-
+    WRAP_CHECK(dup);
     doThread();
     rc = g_fn.dup(fd);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
@@ -1186,11 +1138,7 @@ dup2(int oldfd, int newfd)
 {
     int rc;
 
-    if (g_fn.dup2 == NULL ) {
-        scopeLog("ERROR: dup2:NULL\n", oldfd, CFG_LOG_ERROR);
-        return -1;
-    }
-
+    WRAP_CHECK(dup2);
     doThread();
     rc = g_fn.dup2(oldfd, newfd);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[oldfd].fd == oldfd)) {
@@ -1207,11 +1155,7 @@ dup3(int oldfd, int newfd, int flags)
 {
     int rc;
 
-    if (g_fn.dup3 == NULL ) {
-        scopeLog("ERROR: dup3:NULL\n", oldfd, CFG_LOG_ERROR);
-        return -1;
-    }
-
+    WRAP_CHECK(dup3);
     doThread();
     rc = g_fn.dup3(oldfd, newfd, flags);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[oldfd].fd == oldfd)) {
@@ -1226,11 +1170,7 @@ dup3(int oldfd, int newfd, int flags)
 EXPORTOFF void
 vsyslog(int priority, const char *format, va_list ap)
 {
-    if (g_fn.vsyslog == NULL) {
-        scopeLog("ERROR: vsyslog:NULL\n", -1, CFG_LOG_ERROR);
-        return;
-    }
-
+    WRAP_CHECK_VOID(vsyslog);
     scopeLog("vsyslog\n", -1, CFG_LOG_DEBUG);
     g_fn.vsyslog(priority, format, ap);
     return;
@@ -1240,12 +1180,8 @@ EXPORTON pid_t
 fork()
 {
     pid_t rc;
-    
-    if (g_fn.fork == NULL) {
-        scopeLog("ERROR: fork:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(fork);
     doThread();
     scopeLog("fork\n", -1, CFG_LOG_DEBUG);
     rc = g_fn.fork();
@@ -1261,12 +1197,8 @@ EXPORTON int
 socket(int socket_family, int socket_type, int protocol)
 {
     int sd;
-    
-    if (g_fn.socket == NULL) {
-        scopeLog("ERROR: socket:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(socket);
     doThread();
     sd = g_fn.socket(socket_family, socket_type, protocol);
     if (sd != -1) {
@@ -1301,12 +1233,8 @@ EXPORTON int
 shutdown(int sockfd, int how)
 {
     int rc;
-    
-    if (g_fn.shutdown == NULL) {
-        scopeLog("ERROR: shutdown:NULL\n", sockfd, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(shutdown);
     doThread();
     rc = g_fn.shutdown(sockfd, how);
     if (rc != -1) {
@@ -1320,12 +1248,8 @@ EXPORTON int
 listen(int sockfd, int backlog)
 {
     int rc;
-    
-    if (g_fn.listen == NULL) {
-        scopeLog("ERROR: listen:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(listen);
     doThread();
     rc = g_fn.listen(sockfd, backlog);
     if (rc != -1) {
@@ -1354,12 +1278,8 @@ EXPORTON int
 accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
     int sd;
-    
-    if (g_fn.accept == NULL) {
-        scopeLog("ERROR: accept:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(accept);
     doThread();
     sd = g_fn.accept(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
@@ -1373,12 +1293,8 @@ EXPORTON int
 accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
 {
     int sd;
-    
-    if (g_fn.accept4 == NULL) {
-        scopeLog("ERROR: accept:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(accept4);
     doThread();
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
     if ((sd != -1) && addr && addrlen) {
@@ -1392,12 +1308,8 @@ EXPORTON int
 bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int rc;
-    
-    if (g_fn.bind == NULL) {
-        scopeLog("ERROR: bind:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(bind);
     doThread();
     rc = g_fn.bind(sockfd, addr, addrlen);
     if (rc != -1) { 
@@ -1411,15 +1323,10 @@ bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
 EXPORTON int
 connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
-
 {
     int rc;
-    
-    if (g_fn.connect == NULL) {
-        scopeLog("ERROR: connect:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(connect);
     doThread();
     rc = g_fn.connect(sockfd, addr, addrlen);
     if ((rc != -1) &&
@@ -1446,11 +1353,7 @@ send(int sockfd, const void *buf, size_t len, int flags)
 {
     ssize_t rc;
 
-    if (g_fn.send == NULL) {
-        scopeLog("ERROR: send:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
-
+    WRAP_CHECK(send);
     doThread();
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
@@ -1470,12 +1373,8 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
                const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
-    
-    if (g_fn.sendto == NULL) {
-        scopeLog("ERROR: sendto:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(sendto);
     doThread();
     rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
@@ -1496,12 +1395,8 @@ EXPORTON ssize_t
 sendmsg(int sockfd, const struct msghdr *msg, int flags)
 {
     ssize_t rc;
-    
-    if (g_fn.sendmsg == NULL) {
-        scopeLog("ERROR: sendmsg:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(sendmsg);
     doThread();
     rc = g_fn.sendmsg(sockfd, msg, flags);
     if (rc != -1) {
@@ -1532,12 +1427,8 @@ EXPORTON ssize_t
 recv(int sockfd, void *buf, size_t len, int flags)
 {
     ssize_t rc;
-    
-    if (g_fn.recv == NULL) {
-        scopeLog("ERROR: recv:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(recv);
     doThread();
     scopeLog("recv\n", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recv(sockfd, buf, len, flags);
@@ -1550,15 +1441,11 @@ recv(int sockfd, void *buf, size_t len, int flags)
 
 EXPORTON ssize_t
 recvfrom(int sockfd, void *buf, size_t len, int flags,
-                 struct sockaddr *src_addr, socklen_t *addrlen)
+         struct sockaddr *src_addr, socklen_t *addrlen)
 {
     ssize_t rc;
-    
-    if (g_fn.recvfrom == NULL) {
-        scopeLog("ERROR: recvfrom:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(recvfrom);
     doThread();
     scopeLog("recvfrom\n", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
@@ -1591,12 +1478,8 @@ EXPORTON ssize_t
 recvmsg(int sockfd, struct msghdr *msg, int flags)
 {
     ssize_t rc;
-    
-    if (g_fn.recvmsg == NULL) {
-        scopeLog("ERROR: recvmsg:NULL\n", -1, CFG_LOG_ERROR);
-        return -1;
-    }
 
+    WRAP_CHECK(recvmsg);
     doThread();
     rc = g_fn.recvmsg(sockfd, msg, flags);
     if (rc != -1) {

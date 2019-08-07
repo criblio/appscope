@@ -694,8 +694,8 @@ getDNSName(int sd, void *pkt, int pktlen)
     struct question *q;
     char *aname, *dname;
 
-    if (g_netinfo && (g_netinfo[sd].type == SOCK_STREAM)) {
-        return 0;
+    if (!g_netinfo) {
+        return -1;
     }
     
     query = (struct dns_query_t *)pkt;
@@ -703,8 +703,46 @@ getDNSName(int sd, void *pkt, int pktlen)
         return -1;
     }
 
+/*    
+      An opcode appears to be represented in a query packet 
+      in what we define as a queston type; q->qtype. 
+      Based on the table below we want to only handle a type of 0.
+      OpCode 	Name 	Reference 
+      0	Query	[RFC1035]
+      1	IQuery (Inverse Query, OBSOLETE)	[RFC3425]
+      2	Status	[RFC1035]
+      3	Unassigned	
+      4	Notify	[RFC1996]
+      5	Update	[RFC2136]
+      6	DNS Stateful Operations (DSO)	[RFC8490]
+      7-15	Unassigned	
+
+      Note that these types are a subset of QTYPEs.
+      The type appears to be represented in a query packet
+      in what we define as a question class; q->qclass. 
+      We think a class of 1-16 should be valid.
+      NOTE: We have not seen/tested all of these class
+      types. We have seen a 1 and a 12. 
+      TYPE            value and meaning
+      A               1 a host address
+      NS              2 an authoritative name server
+      MD              3 a mail destination (Obsolete - use MX)
+      MF              4 a mail forwarder (Obsolete - use MX)
+      CNAME           5 the canonical name for an alias
+      SOA             6 marks the start of a zone of authority
+      MB              7 a mailbox domain name (EXPERIMENTAL)
+      MG              8 a mail group member (EXPERIMENTAL)
+      MR              9 a mail rename domain name (EXPERIMENTAL)
+      NULL            10 a null RR (EXPERIMENTAL)
+      WKS             11 a well known service description
+      PTR             12 a domain name pointer
+      HINFO           13 host information
+      MINFO           14 mailbox or mail list information
+      MX              15 mail exchange
+      TXT             16 text strings
+*/
     q = (struct question *)(pkt + sizeof(struct dns_header) + strlen(dname));
-    if (q->qclass != 1) {
+    if ((q->qtype != 0) || ((q->qclass < 1) || (q->qclass > 16))) {
         return 0;
     }
 

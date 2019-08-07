@@ -130,7 +130,7 @@ osInitTSC(struct config_t *cfg)
             break;
         }
 
-        if (strstr((const char *)entry, freqStr) != NULL) {
+        if (strcasestr((const char *)entry, freqStr) != NULL) {
             // The next token should be what we want
             if ((entry = strtok_r(NULL, delim, &last)) != NULL) {
                 if ((cfg->freq = (uint64_t)strtoll(entry, NULL, 0)) == (long long)0) {

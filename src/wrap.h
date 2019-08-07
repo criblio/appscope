@@ -63,6 +63,7 @@ enum metric_t {
     OPEN_PORTS,
     TCP_CONNECTIONS,
     ACTIVE_CONNECTIONS,
+    CONNECTION_DURATION,
     PROC_CPU,
     PROC_MEM,
     PROC_THREAD,
@@ -106,6 +107,8 @@ typedef struct net_info_t {
     bool network;
     bool listen;
     bool accept;
+    uint64_t startTime;
+    uint64_t duration;
     char dnsName[MAX_HOSTNAME];
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;

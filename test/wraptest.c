@@ -14,6 +14,14 @@ extern uint64_t getDuration(uint64_t);
 config g_cfg = {0};
 
 static void
+testTSCInit(void** state)
+{
+    config cfg;
+    
+    assert_int_equal(osInitTSC(&cfg), 0);
+}
+
+static void
 testTSCRollover(void** state)
 {
     uint64_t elapsed, now = ULONG_MAX -2;
@@ -42,6 +50,7 @@ main (int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(testTSCRollover),
         cmocka_unit_test(testTSCValue),
+        cmocka_unit_test(testTSCInit),
     };
     cmocka_run_group_tests(tests, NULL, NULL);
     return 0;

@@ -341,6 +341,25 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         break;
     }
 
+    case CONNECTION_DURATION:
+    {
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_cfg.procname,        2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("proto",            proto,                 1),
+            NUMFIELD("port",             localPort,             5),
+            STRFIELD("unit",             "nanoseconds",         1),
+            FIELDEND
+        };
+        event_t e = {"net.conn_duration", g_netinfo[fd].duration, DELTA_MS, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:outSendEvent\n", fd, CFG_LOG_ERROR);
+        }
+        break;
+    }
+
     case NETRX:
     {
         char lip[INET6_ADDRSTRLEN];
@@ -812,6 +831,7 @@ doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
         doNetMetric(OPEN_PORTS, sd, EVENT_BASED);
         doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED);
         doNetMetric(ACTIVE_CONNECTIONS, sd, EVENT_BASED);
+        g_netinfo[sd].startTime = getTime();
     }
 }
 
@@ -934,6 +954,12 @@ doClose(int fd, char *func)
             // Gauge tracking number of active TCP connections
             atomicSub(&g_ctrs.TCPConnections, 1);
             doNetMetric(TCP_CONNECTIONS, fd, EVENT_BASED);
+
+            if (g_netinfo[fd].startTime != 0) {
+                // Duration is in NS, the metric wants to be in MS
+                g_netinfo[fd].duration = getDuration(g_netinfo[fd].startTime)  / 1000000;
+                doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED);
+            }
         }
 
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
@@ -1377,11 +1403,13 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
             atomicAdd(&g_ctrs.TCPConnections, 1);
             doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED);
         }
+
+        // Start the duration timer
+        g_netinfo[sockfd].startTime = getTime();
         scopeLog("connect\n", sockfd, CFG_LOG_DEBUG);
     }
     
     return rc;
-
 }
 
 EXPORTON ssize_t

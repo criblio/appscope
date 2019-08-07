@@ -10,7 +10,12 @@
 #include <libproc.h>
 #include <sys/resource.h>
 
+#include "../../src/wrap.h"
+
+extern struct config_t g_cfg;
+
 extern int osGetProcname(char *, size_t);
 extern int osGetNumThreads(pid_t);
 extern int osGetNumFds(pid_t);
 extern int osGetNumChildProcs(pid_t);
+extern int osInitTSC(struct config_t *);

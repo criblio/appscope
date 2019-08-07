@@ -29,3 +29,27 @@ int osGetNumChildProcs(pid_t pid)
     int bufferSize = proc_listchildpids(pid, (void *)NULL, 0);
     return bufferSize / PROC_PIDTASKINFO_SIZE;
 }
+
+// For consistency, return the TSC freq in Mhz
+int
+osInitTSC(struct config_t *cfg)
+{
+    uint64_t freq;
+    size_t size = sizeof(uint64_t);
+
+    if (sysctlbyname("machdep.tsc.frequency", &freq, &size, NULL, 0) != 0) {
+        perror("sysctlbyname");
+        return -1;
+    }
+
+    printf("%s:%d freq: %lld and %lld\n", __FUNCTION__, __LINE__, freq, freq/1000000);
+    cfg->freq = freq / 1000000;
+
+    // TODO: Get these values from a CPU register. For now, default.
+    // Default to a newer CPU with an invariant TSC
+    cfg->tsc_invariant = TRUE;
+
+    // Default to the safer instruction; all CPUs have rdtsc
+    cfg->tsc_rdtscp = FALSE;
+    return 0;
+}

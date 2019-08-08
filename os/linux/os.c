@@ -84,7 +84,7 @@ osGetNumChildProcs(pid_t pid)
 }
 
 int
-osInitTSC(struct config_t *cfg)
+osInitTSC(struct rtconfig_t *cfg)
 {
     int fd;
     char *entry, *last;

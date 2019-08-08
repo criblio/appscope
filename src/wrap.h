@@ -84,14 +84,14 @@ typedef struct metric_counters_t {
     int nettx;
 } metric_counters;
 
-typedef struct config_t {
+typedef struct rtconfig_t {
     int numNinfo;
     bool tsc_invariant;
     bool tsc_rdtscp;
     uint64_t freq;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];
-} config;
+} rtconfig;
 
 typedef struct thread_timing_t {
     unsigned interval;                   // in seconds
@@ -174,7 +174,7 @@ atomicSet(int *ptr, int val)
     return __sync_lock_test_and_set(ptr, val);
 }
 
-extern config g_cfg;
+extern rtconfig g_cfg;
 static inline uint64_t
 getTime() {
     unsigned low, high;

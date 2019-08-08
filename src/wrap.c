@@ -5,7 +5,7 @@
 #include "wrap.h"
 
 interposed_funcs g_fn;
-config g_cfg = {0};
+rtconfig g_cfg = {0};
 static net_info *g_netinfo;
 static metric_counters g_ctrs = {0};
 static thread_timing g_thread = {0};

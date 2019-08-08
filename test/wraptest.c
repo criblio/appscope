@@ -13,13 +13,13 @@
 #include "wrap.h"
 
 extern uint64_t getDuration(uint64_t);
-extern int osInitTSC(struct config_t *);
+extern int osInitTSC(struct rtconfig_t *);
 
 // A port that is not likely to be used
 #define PORT1 65430
 #define PORT2 65431
 
-config g_cfg = {0};
+rtconfig g_cfg = {0};
 
 static void
 testConnDuration(void** state)
@@ -73,8 +73,8 @@ testConnDuration(void** state)
     assert_non_null(fs);
 
     size_t len = fread(buf, sizeof(buf), (size_t)1, fs);
-    printf("len %d %s\n", len, buf);
-    //assert_int_not_equal(len, 0);
+    printf("len %ld %s\n", len, buf);
+    assert_int_equal(len, 0);
 
     log = strtok_r(buf, delim, &last);
     assert_non_null(log);
@@ -83,13 +83,13 @@ testConnDuration(void** state)
     int duration = strtol(log, NULL, 0);
     printf("Duration: %d\n", duration);
     assert_int_not_equal(duration, 0);
-    assert_true((duration > 1000) && (duration < 2000));
+    assert_true((duration > 1000) && (duration < 1100));
 }
 
 static void
 testTSCInit(void** state)
 {
-    config cfg;
+    rtconfig cfg;
     
     assert_int_equal(osInitTSC(&cfg), 0);
 }

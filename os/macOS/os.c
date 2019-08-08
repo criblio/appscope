@@ -32,7 +32,7 @@ int osGetNumChildProcs(pid_t pid)
 
 // For consistency, return the TSC freq in Mhz
 int
-osInitTSC(struct config_t *cfg)
+osInitTSC(struct rtconfig_t *cfg)
 {
     uint64_t freq;
     size_t size = sizeof(uint64_t);
@@ -42,7 +42,6 @@ osInitTSC(struct config_t *cfg)
         return -1;
     }
 
-    printf("%s:%d freq: %lld and %lld\n", __FUNCTION__, __LINE__, freq, freq/1000000);
     cfg->freq = freq / 1000000;
 
     // TODO: Get these values from a CPU register. For now, default.

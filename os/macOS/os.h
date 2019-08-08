@@ -12,10 +12,10 @@
 
 #include "../../src/wrap.h"
 
-extern struct config_t g_cfg;
+extern struct rtconfig_t g_cfg;
 
 extern int osGetProcname(char *, size_t);
 extern int osGetNumThreads(pid_t);
 extern int osGetNumFds(pid_t);
 extern int osGetNumChildProcs(pid_t);
-extern int osInitTSC(struct config_t *);
+extern int osInitTSC(struct rtconfig_t *);

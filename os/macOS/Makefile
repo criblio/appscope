@@ -1,7 +1,7 @@
 OS=macOS
 CC=gcc
 CFLAGS=-fPIC -shared -g -Wall -Wno-nonnull -D__MACOS__
-TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage
+TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -D__MACOS__
 LD_FLAGS=-Wl, -ldl -lpthread
 INCLUDES=-I./contrib/libyaml/include
 YAML_AR=contrib/libyaml/src/.libs/libyaml.a

@@ -1088,7 +1088,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              getpid(),              7),
-            STRFIELD("host",             g_cfg.hostname         2),
+            STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("domain",           fullname,              6),
             STRFIELD("unit",             "request",             1),
             FIELDEND

@@ -24,6 +24,10 @@ rtconfig g_cfg = {0};
 static void
 testConnDuration(void** state)
 {
+#ifdef __MACOS__
+    skip();
+#endif
+
     int rc, sdl, sds;
     struct sockaddr_in saddr;
     char *log, *last;

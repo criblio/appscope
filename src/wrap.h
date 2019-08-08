@@ -41,6 +41,7 @@
 
 // Initial size of net array for state
 #define NET_ENTRIES 1024
+#define FS_ENTRIES 1024
 #define MAX_FDS 4096
 #define PROTOCOL_STR 8
 #define MAX_HOSTNAME 255
@@ -73,7 +74,8 @@ enum metric_t {
     NETTX,
     NETRX_PROC,
     NETTX_PROC,
-    DNS
+    DNS,
+    FS_DURATION
 };
 
 typedef struct metric_counters_t {
@@ -86,6 +88,7 @@ typedef struct metric_counters_t {
 
 typedef struct rtconfig_t {
     int numNinfo;
+    int numFSInfo;
     bool tsc_invariant;
     bool tsc_rdtscp;
     uint64_t freq;
@@ -114,9 +117,21 @@ typedef struct net_info_t {
     struct sockaddr_storage remoteConn;
 } net_info;
 
+typedef struct fs_info_t {
+    int fd;
+    int type;
+    uint64_t startTime;
+    uint64_t duration;
+    char path[PATH_MAX];
+} fs_info;
+
 typedef struct interposed_funcs_t {
     void (*vsyslog)(int, const char *, va_list);
     pid_t (*fork)(void);
+    int (*open)(const char *, int, ...);
+    int (*openat)(int, const char *, int, ...);
+    FILE *(*fopen)(const char *, const char *);
+    FILE *(*freopen)(const char *, const char *, FILE *);
     int (*close)(int);
     int (*shutdown)(int, int);
     int (*socket)(int, int, int);

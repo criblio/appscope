@@ -18,7 +18,7 @@ osGetNumThreads(pid_t pid)
 
     // Get the size of the file with stat, malloc buf then free
     snprintf(buf, sizeof(buf), "/proc/%d/stat", pid);
-    if ((fd = open(buf, O_RDONLY)) == -1) {
+    if ((fd = g_fn.open(buf, O_RDONLY)) == -1) {
         return -1;
     }
 
@@ -93,7 +93,7 @@ osInitTSC(struct rtconfig_t *cfg)
     const char freqStr[] = "cpu MHz";
     char *buf;
 
-    if ((fd = open(path, O_RDONLY)) == -1) {
+    if ((fd = g_fn.open(path, O_RDONLY)) == -1) {
         return -1;
     }
     

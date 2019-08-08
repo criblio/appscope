@@ -7,6 +7,7 @@
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
 static net_info *g_netinfo;
+static fs_info *g_fsinfo;
 static metric_counters g_ctrs = {0};
 static thread_timing g_thread = {0};
 
@@ -23,7 +24,7 @@ static void * periodic(void *);
 EXPORTON void
 scopeLog(char* msg, int fd, cfg_log_level_t level)
 {
-    if (!g_log || !msg) return;
+    if (!g_log || !msg || !g_cfg.procname) return;
 
     char buf[strlen(msg) + 128];
     snprintf(buf, sizeof(buf), "Scope: %s(%d): %s", g_cfg.procname, fd, msg);
@@ -267,6 +268,39 @@ doProcMetric(enum metric_t type, long long measurement)
 
     default:
         scopeLog("ERROR: doProcMetric:metric type\n", -1, CFG_LOG_ERROR);
+    }
+}
+
+static void
+doFSMetric(enum metric_t type, int fd, enum control_type_t source)
+{
+    pid_t pid = getpid();
+        
+    if (g_fsinfo == NULL) {
+        return;
+    }
+
+    switch (type) {
+    case FS_DURATION:
+    {
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_cfg.procname,        2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("file",             g_fsinfo[fd].path,     1),
+            STRFIELD("unit",             "milliseconds",        3),
+            FIELDEND
+        };
+        event_t e = {"fs.duration", g_fsinfo[fd].duration, HISTOGRAM, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doFSMetric:FS_DURATION:outSendEvent\n", fd, CFG_LOG_ERROR);
+        }
+        break;        
+    }
+    
+    default:
+        scopeLog("ERROR: doFSMetric:metric type\n", fd, CFG_LOG_ERROR);
     }
 }
 
@@ -882,6 +916,10 @@ init(void)
    
     g_fn.vsyslog = dlsym(RTLD_NEXT, "vsyslog");
     g_fn.fork = dlsym(RTLD_NEXT, "fork");
+    g_fn.open = dlsym(RTLD_NEXT, "open");
+    g_fn.openat = dlsym(RTLD_NEXT, "openat");
+    g_fn.fopen = dlsym(RTLD_NEXT, "fopen");
+    g_fn.freopen = dlsym(RTLD_NEXT, "freopen");
     g_fn.close = dlsym(RTLD_NEXT, "close");
     g_fn.read = dlsym(RTLD_NEXT, "read");
     g_fn.write = dlsym(RTLD_NEXT, "write");
@@ -918,6 +956,14 @@ init(void)
     }
 
     g_cfg.numNinfo = NET_ENTRIES;
+
+    if ((g_fsinfo = (fs_info *)malloc(sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
+        scopeLog("ERROR: Constructor:Malloc\n", -1, CFG_LOG_ERROR);
+    }
+
+    g_cfg.numFSInfo = FS_ENTRIES;
+    if (g_fsinfo) memset(g_fsinfo, 0, sizeof(struct fs_info_t) * FS_ENTRIES);
+
     if (gethostname(g_cfg.hostname, sizeof(g_cfg.hostname)) != 0) {
         scopeLog("ERROR: Constructor:gethostname\n", -1, CFG_LOG_ERROR);
     }
@@ -945,10 +991,33 @@ init(void)
 }
 
 static void
+doOpen(int fd, const char *path, char *func)
+{
+    if (g_fsinfo) {
+        if (g_fsinfo[fd].fd == fd) {
+            scopeLog("doOpen: duplicate\n", fd, CFG_LOG_DEBUG);
+            return;
+        }
+        
+        if ((fd > g_cfg.numFSInfo) && (fd < MAX_FDS))  {
+            // Need to realloc
+            if ((g_fsinfo = realloc(g_fsinfo, sizeof(struct fs_info_t) * fd)) == NULL) {
+                scopeLog("ERROR: doOpen:realloc\n", fd, CFG_LOG_ERROR);
+            }
+            g_cfg.numFSInfo = fd;
+        }
+
+        memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
+        g_fsinfo[fd].fd = fd;
+        strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
+        scopeLog(func, fd, CFG_LOG_DEBUG);
+    }
+}
+
+static void
 doClose(int fd, char *func)
 {
     if (g_netinfo && (g_netinfo[fd].fd == fd)) {
-        scopeLog(func, fd, CFG_LOG_DEBUG);
         if (g_netinfo[fd].listen == TRUE) {
             // Gauge tracking number of open ports
             atomicSub(&g_ctrs.openPorts, 1);
@@ -966,9 +1035,52 @@ doClose(int fd, char *func)
                 doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED);
             }
         }
-
+        
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
+        scopeLog(func, fd, CFG_LOG_DEBUG);
+    } else if (g_fsinfo && (g_fsinfo[fd].fd == fd)) {
+        // If we've done a read or write operation on this fd
+        if (g_fsinfo[fd].startTime > 0) {
+            scopeLog(func, fd, CFG_LOG_DEBUG);
+            g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+            doFSMetric(FS_DURATION, fd, EVENT_BASED);
+            memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
+        }
     }
+}
+
+EXPORTON int
+open(const char *pathname, int flags, ...)
+{
+    int fd;
+    struct FuncArgs fArgs;
+    
+    WRAP_CHECK(open);
+    doThread(); // Will do nothing if a thread already exists
+    LOAD_FUNC_ARGS_VALIST(fArgs, flags);
+    fd = g_fn.open(pathname, flags, fArgs.arg[0]);
+    if (fd != -1) {
+        doOpen(fd, pathname, "open\n");
+    }
+    
+    return fd;
+}
+
+EXPORTON int
+openat(int dirfd, const char *pathname, int flags, ...)
+{
+    int fd;
+    struct FuncArgs fArgs;
+    
+    WRAP_CHECK(openat);
+    doThread();
+    LOAD_FUNC_ARGS_VALIST(fArgs, flags);
+    fd = g_fn.openat(dirfd, pathname, flags, fArgs.arg[0]);
+    if (fd != -1) {
+        doOpen(fd, pathname, "openat\n");
+    }
+    
+    return fd;
 }
 
 EXPORTON int
@@ -1118,6 +1230,9 @@ write(int fd, const void *buf, size_t count)
         scopeLog("write\n", fd, CFG_LOG_TRACE);
         doSetAddrs(fd);
         doSend(fd, rc);
+    } else if (g_fsinfo && (g_fsinfo[fd].fd == fd)) {
+            g_fsinfo[fd].startTime = getTime();
+            // TODO: add counters, may need a helper func
     }
     
     return rc;
@@ -1131,11 +1246,16 @@ read(int fd, void *buf, size_t count)
     WRAP_CHECK(read);
     doThread();
     rc = g_fn.read(fd, buf, count);
-    if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
-        // This is a network descriptor
-        scopeLog("read\n", fd, CFG_LOG_TRACE);
-        doSetAddrs(fd);
-        doRecv(fd, rc);
+    if (rc != -1) {
+        if (g_netinfo && (g_netinfo[fd].fd == fd)) {
+            // This is a network descriptor
+            scopeLog("read\n", fd, CFG_LOG_TRACE);
+            doSetAddrs(fd);
+            doRecv(fd, rc);
+        } else if (g_fsinfo && (g_fsinfo[fd].fd == fd)) {
+            g_fsinfo[fd].startTime = getTime();
+            // TODO: add counters, may need a helper func
+        }
     }
     
     return rc;

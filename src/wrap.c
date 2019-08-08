@@ -355,7 +355,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
             NUMFIELD("port",             localPort,             5),
-            STRFIELD("unit",             "nanoseconds",         1),
+            STRFIELD("unit",             "milliseconds",         1),
             FIELDEND
         };
         event_t e = {"net.conn_duration", g_netinfo[fd].duration, DELTA_MS, fields};

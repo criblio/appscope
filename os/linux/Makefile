@@ -1,3 +1,4 @@
+CWD = $(shell pwd)
 OS=linux
 CC=gcc
 CFLAGS=-fPIC -shared -g -Wall -Wno-nonnull -D__LINUX__
@@ -43,7 +44,7 @@ test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/outtest
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/formattest
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/glibcvertest
-	LD_LIBRARY_PATH=lib/$(OS)/:contrib/cmocka/build/src/ test/$(OS)/wraptest
+	SCOPE_HOME=$(CWD)/test/ LD_LIBRARY_PATH=lib/$(OS)/:contrib/cmocka/build/src/ test/$(OS)/wraptest
 	@echo "Testing Coverage"
 	lcov --capture --directory . --output-file coverage.info
 	genhtml coverage.info --output-directory out

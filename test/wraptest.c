@@ -18,8 +18,68 @@ extern int osInitTSC(struct rtconfig_t *);
 // A port that is not likely to be used
 #define PORT1 65430
 #define PORT2 65431
+#define LOG_PATH "/test/conf/scope.log"
 
 rtconfig g_cfg = {0};
+
+static void
+testFSDuration(void** state)
+{
+#ifdef __MACOS__
+    skip();
+#endif
+
+    int rc, fd;
+    char *log, *last;
+    const char delim[] = ":";
+    char buf[1024];
+    char path[PATH_MAX];
+
+    /*
+     * The env var SCOPE_HOME is set in
+     * the Makefile or script that runs 
+     * this test. It points to a config
+     * file in scope/test/conf/scope.cfg.
+     * Using a config file for test we ensure
+     * we have debug logs enabled and that 
+     * we know the path to the log file. 
+     */
+
+    // Now get the path to the log file
+    last = getcwd(path, sizeof(path));
+    assert_non_null(last);
+    strcat(path, LOG_PATH);
+
+    // Start the duration timer with a read
+    fd = open("./scope.sh", O_RDONLY);
+    assert_return_code(fd, errno);
+
+    rc = read(fd, buf, 16);
+    assert_return_code(rc, errno);
+    
+    // Create some time
+    sleep(1);
+    
+    // Stop the duration timer
+    rc = close(fd);
+    assert_return_code(rc, errno);
+    snprintf(buf, strlen(path) + 128, "grep wraptest %s | grep duration | tail -n 1", path);
+    FILE *fs = popen(buf, "r");
+    assert_non_null(fs);
+
+    size_t len = fread(buf, sizeof(buf), (size_t)1, fs);
+    printf("len %ld %s\n", len, buf);
+    assert_int_equal(len, 0);
+
+    log = strtok_r(buf, delim, &last);
+    assert_non_null(log);
+    log = strtok_r(NULL, delim, &last);
+    assert_non_null(log);
+    int duration = strtol(log, NULL, 0);
+    printf("Duration: %d\n", duration);
+    assert_int_not_equal(duration, 0);
+    assert_true((duration > 1000) && (duration < 1100));
+}
 
 static void
 testConnDuration(void** state)
@@ -33,8 +93,24 @@ testConnDuration(void** state)
     char *log, *last;
     const char* hostname = "127.0.0.1";
     const char delim[] = ":";
-    char buf[128];
-    
+    char buf[1024];
+    char path[PATH_MAX];
+
+    /*
+     * The env var SCOPE_HOME is set in
+     * the Makefile or script that runs 
+     * this test. It points to a config
+     * file in scope/test/conf/scope.cfg.
+     * Using a config file for test we ensure
+     * we have debug logs enabled and that 
+     * we know the path to the log file. 
+     */
+
+    // Now get the path to the log file
+    last = getcwd(path, sizeof(path));
+    assert_non_null(last);
+    strcat(path, LOG_PATH);
+
     saddr.sin_family = AF_INET;
     saddr.sin_port = htons(PORT1);
     saddr.sin_addr.s_addr = inet_addr(hostname);
@@ -73,7 +149,8 @@ testConnDuration(void** state)
     rc = close(sdl);
     assert_return_code(rc, errno);
 
-    FILE *fs = popen("grep wraptest /tmp/scope.log | grep duration | tail -n 1", "r");
+    snprintf(buf, strlen(path) + 128, "grep wraptest %s | grep duration | tail -n 1", path);
+    FILE *fs = popen(buf, "r");
     assert_non_null(fs);
 
     size_t len = fread(buf, sizeof(buf), (size_t)1, fs);
@@ -129,6 +206,7 @@ main (int argc, char* argv[])
         cmocka_unit_test(testTSCValue),
         cmocka_unit_test(testTSCInit),
         cmocka_unit_test(testConnDuration),
+        cmocka_unit_test(testFSDuration),
     };
     cmocka_run_group_tests(tests, NULL, NULL);
     return 0;

@@ -78,6 +78,12 @@ enum metric_t {
     FS_DURATION
 };
 
+// File types; stream or fd
+enum fs_type_t {
+    FD,
+    STREAM
+};
+
 typedef struct metric_counters_t {
     int openPorts;
     int TCPConnections;
@@ -132,7 +138,10 @@ typedef struct interposed_funcs_t {
     int (*openat)(int, const char *, int, ...);
     FILE *(*fopen)(const char *, const char *);
     FILE *(*freopen)(const char *, const char *, FILE *);
+    int (*creat)(const char *, mode_t);
     int (*close)(int);
+    int (*fclose)(FILE *);
+    int (*fcloseall)(void);
     int (*shutdown)(int, int);
     int (*socket)(int, int, int);
     int (*listen)(int, int);
@@ -270,37 +279,19 @@ struct FuncArgs{
 
 #ifdef __LINUX__
 extern void *_dl_sym(void *, const char *, void *);
-#define WRAP_CHECK(func)                                               \
+#define WRAP_CHECK(func, rc)                                           \
     if (g_fn.func == NULL ) {                                          \
         if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {   \
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
-            return -1;                                                 \
+            return rc;                                                 \
        }                                                               \
     } 
 #else
-#define WRAP_CHECK(func)                                               \
-    if (g_fn.func == NULL ) {                                          \
-        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {     \
-            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
-            return -1;                                                 \
-       }                                                               \
-    } 
-#endif // __LINUX__
-
-#ifdef __LINUX__
-#define WRAP_CHECK_VOID(func)                                          \
-    if (g_fn.func == NULL ) {                                          \
-        if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {        \
-            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
-            return;                                                    \
-       }                                                               \
-    } 
-#else
-#define WRAP_CHECK_VOID(func)                                          \
+#define WRAP_CHECK(func, rc)                                           \
     if (g_fn.func == NULL ) {                                          \
         if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
-            return;                                                    \
+            return rc;                                                 \
        }                                                               \
     } 
 #endif // __LINUX__

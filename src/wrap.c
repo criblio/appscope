@@ -920,7 +920,10 @@ init(void)
     g_fn.openat = dlsym(RTLD_NEXT, "openat");
     g_fn.fopen = dlsym(RTLD_NEXT, "fopen");
     g_fn.freopen = dlsym(RTLD_NEXT, "freopen");
+    g_fn.creat = dlsym(RTLD_NEXT, "creat");
     g_fn.close = dlsym(RTLD_NEXT, "close");
+    g_fn.fclose = dlsym(RTLD_NEXT, "fclose");
+    g_fn.fcloseall = dlsym(RTLD_NEXT, "fcloseall");
     g_fn.read = dlsym(RTLD_NEXT, "read");
     g_fn.write = dlsym(RTLD_NEXT, "write");
     g_fn.fcntl = dlsym(RTLD_NEXT, "fcntl");
@@ -991,7 +994,7 @@ init(void)
 }
 
 static void
-doOpen(int fd, const char *path, char *func)
+doOpen(int fd, const char *path, enum fs_type_t type, char *func)
 {
     if (g_fsinfo) {
         if (g_fsinfo[fd].fd == fd) {
@@ -1009,6 +1012,7 @@ doOpen(int fd, const char *path, char *func)
 
         memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
         g_fsinfo[fd].fd = fd;
+        g_fsinfo[fd].type = type;
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
         scopeLog(func, fd, CFG_LOG_DEBUG);
     }
@@ -1055,12 +1059,12 @@ open(const char *pathname, int flags, ...)
     int fd;
     struct FuncArgs fArgs;
     
-    WRAP_CHECK(open);
+    WRAP_CHECK(open, -1);
     doThread(); // Will do nothing if a thread already exists
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.open(pathname, flags, fArgs.arg[0]);
     if (fd != -1) {
-        doOpen(fd, pathname, "open\n");
+        doOpen(fd, pathname, FD, "open\n");
     }
     
     return fd;
@@ -1072,15 +1076,63 @@ openat(int dirfd, const char *pathname, int flags, ...)
     int fd;
     struct FuncArgs fArgs;
     
-    WRAP_CHECK(openat);
+    WRAP_CHECK(openat, -1);
     doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.openat(dirfd, pathname, flags, fArgs.arg[0]);
     if (fd != -1) {
-        doOpen(fd, pathname, "openat\n");
+        doOpen(fd, pathname, FD, "openat\n");
     }
     
     return fd;
+}
+
+// Note: creat64 is defined to be obsolete
+EXPORTON int
+creat(const char *pathname, mode_t mode)
+{
+    int fd;
+    
+    WRAP_CHECK(creat, -1);
+    doThread();
+    fd = g_fn.creat(pathname, mode);
+    if (fd != -1) {
+        doOpen(fd, pathname, FD, "creat\n");
+    }
+    
+    return fd;
+}
+
+EXPORTON FILE *
+fopen(const char *pathname, const char *mode)
+{
+    FILE *stream;
+    
+    WRAP_CHECK(fopen, NULL);
+    doThread();
+    stream = g_fn.fopen(pathname, mode);
+    if (stream != NULL) {
+        doOpen(fileno(stream), pathname, STREAM, "fopen\n");
+    }
+    
+    return stream;
+}
+
+EXPORTON FILE *
+freopen(const char *pathname, const char *mode, FILE *orig_stream)
+{
+    FILE *stream;
+    
+    WRAP_CHECK(freopen, NULL);
+    doThread();
+    stream = g_fn.freopen(pathname, mode, orig_stream);
+    // freopen just changes the mode if pathname is null
+    if ((stream != NULL) &&(pathname != NULL)) {
+        doOpen(fileno(stream), pathname, STREAM, "freopen\n");
+        doClose(fileno(orig_stream), "freopen");
+    }
+    
+    return stream;
 }
 
 EXPORTON int
@@ -1088,12 +1140,52 @@ close(int fd)
 {
     int rc;
 
-    WRAP_CHECK(close);
+    WRAP_CHECK(close, -1);
     doThread(); // Will do nothing if a thread already exists
 
     rc = g_fn.close(fd);
     if (rc != -1) {
         doClose(fd, "close\n");
+    }
+    
+    return rc;
+}
+
+EXPORTON int
+fclose(FILE *stream)
+{
+    int rc;
+
+    WRAP_CHECK(fclose, EOF);
+    doThread(); // Will do nothing if a thread already exists
+
+    rc = g_fn.fclose(stream);
+    if (rc != EOF) {
+        doClose(fileno(stream), "fclose\n");
+    }
+    
+    return rc;
+}
+
+EXPORTON int
+fcloseall(void)
+{
+    int rc;
+
+    WRAP_CHECK(close, EOF);
+    doThread(); // Will do nothing if a thread already exists
+
+    rc = g_fn.fcloseall();
+    if (rc != EOF) {
+        if (g_fsinfo) {
+            int i;
+            for (i = 0; i < g_cfg.numFSInfo; i++) {
+                if ((g_fsinfo[i].fd != 0) &&
+                    (g_fsinfo[i].type == STREAM)) {
+                    doClose(i, "fcloseall\n");
+                }
+            }
+        }
     }
     
     return rc;
@@ -1105,7 +1197,7 @@ close$NOCANCEL(int fd)
 {
     int rc;
 
-    WRAP_CHECK(close$NOCANCEL);
+    WRAP_CHECK(close$NOCANCEL, -1);
     doThread();
     rc = g_fn.close$NOCANCEL(fd);
     if (rc != -1) {
@@ -1121,7 +1213,7 @@ guarded_close_np(int fd, void *guard)
 {
     int rc;
 
-    WRAP_CHECK(guarded_close_np);
+    WRAP_CHECK(guarded_close_np, -1);
     doThread();
     rc = g_fn.guarded_close_np(fd, guard);
     if (rc != -1) {
@@ -1136,7 +1228,7 @@ close_nocancel(int fd)
 {
     int rc;
 
-    WRAP_CHECK(close_nocancel);
+    WRAP_CHECK(close_nocancel, -1);
     rc = g_fn.close_nocancel(fd);
     if (rc != -1) {
         doClose(fd, "close_nocancel\n");
@@ -1150,7 +1242,7 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
     int sd;
 
-    WRAP_CHECK(accept$NOCANCEL);
+    WRAP_CHECK(accept$NOCANCEL, -1);
     doThread();
     sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
@@ -1166,7 +1258,7 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
 {
     ssize_t rc;
 
-    WRAP_CHECK(__sendto_nocancel);
+    WRAP_CHECK(__sendto_nocancel, -1);
     doThread();
     rc = g_fn.__sendto_nocancel(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
@@ -1191,7 +1283,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
 {
     uint32_t rc;
 
-    WRAP_CHECK(DNSServiceQueryRecord);
+    WRAP_CHECK(DNSServiceQueryRecord, -1);
     rc = g_fn.DNSServiceQueryRecord(sdRef, flags, interfaceIndex, fullname,
                                     rrtype, rrclass, callback, context);
     if (rc == 0) {
@@ -1222,7 +1314,7 @@ write(int fd, const void *buf, size_t count)
 {
     ssize_t rc;
 
-    WRAP_CHECK(write);
+    WRAP_CHECK(write, -1);
     doThread();
     rc = g_fn.write(fd, buf, count);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
@@ -1243,7 +1335,7 @@ read(int fd, void *buf, size_t count)
 {
     ssize_t rc;
 
-    WRAP_CHECK(read);
+    WRAP_CHECK(read, -1);
     doThread();
     rc = g_fn.read(fd, buf, count);
     if (rc != -1) {
@@ -1267,7 +1359,7 @@ fcntl(int fd, int cmd, ...)
     int rc;
     struct FuncArgs fArgs;
 
-    WRAP_CHECK(fcntl);
+    WRAP_CHECK(fcntl, -1);
     doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
     rc = g_fn.fcntl(fd, cmd, fArgs.arg[0], fArgs.arg[1],
@@ -1288,7 +1380,7 @@ fcntl64(int fd, int cmd, ...)
     int rc;
     struct FuncArgs fArgs;
 
-    WRAP_CHECK(fcntl64);
+    WRAP_CHECK(fcntl64, -1);
     doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
     rc = g_fn.fcntl64(fd, cmd, fArgs.arg[0], fArgs.arg[1],
@@ -1308,7 +1400,7 @@ dup(int fd)
 {
     int rc;
 
-    WRAP_CHECK(dup);
+    WRAP_CHECK(dup, -1);
     doThread();
     rc = g_fn.dup(fd);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
@@ -1325,7 +1417,7 @@ dup2(int oldfd, int newfd)
 {
     int rc;
 
-    WRAP_CHECK(dup2);
+    WRAP_CHECK(dup2, -1);
     doThread();
     rc = g_fn.dup2(oldfd, newfd);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[oldfd].fd == oldfd)) {
@@ -1342,7 +1434,7 @@ dup3(int oldfd, int newfd, int flags)
 {
     int rc;
 
-    WRAP_CHECK(dup3);
+    WRAP_CHECK(dup3, -1);
     doThread();
     rc = g_fn.dup3(oldfd, newfd, flags);
     if ((rc != -1) && (g_netinfo) && (g_netinfo[oldfd].fd == oldfd)) {
@@ -1357,7 +1449,6 @@ dup3(int oldfd, int newfd, int flags)
 EXPORTOFF void
 vsyslog(int priority, const char *format, va_list ap)
 {
-    WRAP_CHECK_VOID(vsyslog);
     scopeLog("vsyslog\n", -1, CFG_LOG_DEBUG);
     g_fn.vsyslog(priority, format, ap);
     return;
@@ -1368,7 +1459,7 @@ fork()
 {
     pid_t rc;
 
-    WRAP_CHECK(fork);
+    WRAP_CHECK(fork, -1);
     doThread();
     scopeLog("fork\n", -1, CFG_LOG_DEBUG);
     rc = g_fn.fork();
@@ -1385,7 +1476,7 @@ socket(int socket_family, int socket_type, int protocol)
 {
     int sd;
 
-    WRAP_CHECK(socket);
+    WRAP_CHECK(socket, -1);
     doThread();
     sd = g_fn.socket(socket_family, socket_type, protocol);
     if (sd != -1) {
@@ -1421,7 +1512,7 @@ shutdown(int sockfd, int how)
 {
     int rc;
 
-    WRAP_CHECK(shutdown);
+    WRAP_CHECK(shutdown, -1);
     doThread();
     rc = g_fn.shutdown(sockfd, how);
     if (rc != -1) {
@@ -1436,7 +1527,7 @@ listen(int sockfd, int backlog)
 {
     int rc;
 
-    WRAP_CHECK(listen);
+    WRAP_CHECK(listen, -1);
     doThread();
     rc = g_fn.listen(sockfd, backlog);
     if (rc != -1) {
@@ -1466,7 +1557,7 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
     int sd;
 
-    WRAP_CHECK(accept);
+    WRAP_CHECK(accept, -1);
     doThread();
     sd = g_fn.accept(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
@@ -1481,7 +1572,7 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
 {
     int sd;
 
-    WRAP_CHECK(accept4);
+    WRAP_CHECK(accept4, -1);
     doThread();
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
     if ((sd != -1) && addr && addrlen) {
@@ -1496,7 +1587,7 @@ bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int rc;
 
-    WRAP_CHECK(bind);
+    WRAP_CHECK(bind, -1);
     doThread();
     rc = g_fn.bind(sockfd, addr, addrlen);
     if (rc != -1) { 
@@ -1513,7 +1604,7 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int rc;
 
-    WRAP_CHECK(connect);
+    WRAP_CHECK(connect, -1);
     doThread();
     rc = g_fn.connect(sockfd, addr, addrlen);
     if ((rc != -1) &&
@@ -1542,7 +1633,7 @@ send(int sockfd, const void *buf, size_t len, int flags)
 {
     ssize_t rc;
 
-    WRAP_CHECK(send);
+    WRAP_CHECK(send, -1);
     doThread();
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
@@ -1563,7 +1654,7 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
 {
     ssize_t rc;
 
-    WRAP_CHECK(sendto);
+    WRAP_CHECK(sendto, -1);
     doThread();
     rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
@@ -1585,7 +1676,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
 {
     ssize_t rc;
 
-    WRAP_CHECK(sendmsg);
+    WRAP_CHECK(sendmsg, -1);
     doThread();
     rc = g_fn.sendmsg(sockfd, msg, flags);
     if (rc != -1) {
@@ -1617,7 +1708,7 @@ recv(int sockfd, void *buf, size_t len, int flags)
 {
     ssize_t rc;
 
-    WRAP_CHECK(recv);
+    WRAP_CHECK(recv, -1);
     doThread();
     scopeLog("recv\n", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recv(sockfd, buf, len, flags);
@@ -1634,7 +1725,7 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
 {
     ssize_t rc;
 
-    WRAP_CHECK(recvfrom);
+    WRAP_CHECK(recvfrom, -1);
     doThread();
     scopeLog("recvfrom\n", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
@@ -1668,7 +1759,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
 {
     ssize_t rc;
 
-    WRAP_CHECK(recvmsg);
+    WRAP_CHECK(recvmsg, -1);
     doThread();
     rc = g_fn.recvmsg(sockfd, msg, flags);
     if (rc != -1) {

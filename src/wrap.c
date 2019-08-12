@@ -967,7 +967,7 @@ init(void)
     g_fn.pread64 = dlsym(RTLD_NEXT, "pread64");
     g_fn.preadv = dlsym(RTLD_NEXT, "preadv");
     g_fn.preadv2 = dlsym(RTLD_NEXT, "preadv2");
-    g_fn.preadv264 = dlsym(RTLD_NEXT, "preadv264");
+    g_fn.preadv64v2 = dlsym(RTLD_NEXT, "preadv64v2");
 #endif // __LINUX__
     
     if ((g_netinfo = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
@@ -1340,7 +1340,7 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     }
     
     if (rc != -1) {
-        scopeLog("preadv2\n", fd, CFG_LOG_TRACE);
+        scopeLog("preadv64v2\n", fd, CFG_LOG_TRACE);
         if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -1542,7 +1542,7 @@ write(int fd, const void *buf, size_t count)
     
     rc = g_fn.write(fd, buf, count);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) &&  && (g_fsinfo[fd].fd == fd)) {
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
         g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
     }
     
@@ -1658,6 +1658,7 @@ EXPORTON size_t
 fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     ssize_t rc;
+    int fd = fileno(stream);
 
     WRAP_CHECK(fread, -1);
     doThread();
@@ -1665,7 +1666,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
         g_fsinfo[fd].startTime = getTime();
     }
     
-    rc = g_fn.fread(fd, size, nmemb, stream);
+    rc = g_fn.fread(ptr, size, nmemb, stream);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
         g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;

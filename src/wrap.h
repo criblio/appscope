@@ -152,10 +152,11 @@ typedef struct interposed_funcs_t {
     ssize_t (*pread64)(int, void *, size_t, off_t);
     ssize_t (*preadv)(int, const struct iovec *, int, off_t);
     ssize_t (*preadv2)(int, const struct iovec *, int, off_t, int);
-    ssize_t (*preadv264)(int, const struct iovec *, int, off_t, int);
+    ssize_t (*preadv64v2)(int, const struct iovec *, int, off_t, int);
     ssize_t (*readv)(int, const struct iovec *, int);
     size_t (*fread)(void *, size_t, size_t, FILE *);
     ssize_t (*write)(int, const void *, size_t);
+    ssize_t (*pwrite)(int, const void *, size_t, off_t);
     int (*shutdown)(int, int);
     int (*socket)(int, int, int);
     int (*listen)(int, int);

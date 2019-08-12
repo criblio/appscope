@@ -163,6 +163,14 @@ typedef struct interposed_funcs_t {
     ssize_t (*pwritev)(int, const struct iovec *, int, off_t);
     ssize_t (*pwritev2)(int, const struct iovec *, int, off_t, int);
     ssize_t (*pwritev64v2)(int, const struct iovec *, int, off_t, int);
+    off_t (*lseek)(int, off_t, int);
+    off_t (*lseek64)(int, off_t, int);
+    int (*fseeko)(FILE *, off_t, int);
+    int (*fseeko64)(FILE *, off_t, int);
+    long (*ftell)(FILE *);
+    off_t (*ftello)(FILE *);
+    off_t (*ftello64)(FILE *);
+    void (*rewind)(FILE *);
     int (*shutdown)(int, int);
     int (*socket)(int, int, int);
     int (*listen)(int, int);
@@ -305,12 +313,29 @@ extern void *_dl_sym(void *, const char *, void *);
             return rc;                                                 \
        }                                                               \
     } 
+
+#define WRAP_CHECK_VOID(func)                                          \
+    if (g_fn.func == NULL ) {                                          \
+        if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {   \
+            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
+            return;                                                    \
+       }                                                               \
+    } 
+
 #else
 #define WRAP_CHECK(func, rc)                                           \
     if (g_fn.func == NULL ) {                                          \
         if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
             return rc;                                                 \
+       }                                                               \
+    } 
+
+#define WRAP_CHECK_VOID(func)                                          \
+    if (g_fn.func == NULL ) {                                          \
+        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
+            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
+            return;                                                    \
        }                                                               \
     } 
 #endif // __LINUX__

@@ -1479,6 +1479,62 @@ pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
     }
     return rc;
 }
+
+EXPORTON off_t
+lseek64(int fd, off_t offset, int whence)
+{
+    off_t rc;
+
+    WRAP_CHECK(lseek64, -1);
+    doThread();
+    rc = g_fn.lseek64(fd, offset, whence);
+    
+    if (rc != -1) {
+        scopeLog("lseek64\n", fd, CFG_LOG_DEBUG);
+        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            //doFSMetric(FS_XXX, fd, EVENT_BASED, "lseek64");
+        }
+    }
+    return rc;
+}
+
+EXPORTON int
+fseeko64(FILE *stream, off_t offset, int whence)
+{
+    off_t rc;
+    int fd = fileno(stream);
+
+    WRAP_CHECK(fseeko64, -1);
+    doThread();
+    rc = g_fn.fseeko64(stream, offset, whence);
+    
+    if (rc != -1) {
+        scopeLog("fseeko64\n", fd, CFG_LOG_DEBUG);
+        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            //doFSMetric(FS_XXX, fd, EVENT_BASED, "fseeko64");
+        }
+    }
+    return rc;
+}
+
+EXPORTON off_t
+ftello64(FILE *stream)
+{
+    off_t rc;
+    int fd = fileno(stream);
+
+    WRAP_CHECK(ftello64, -1);
+    doThread();
+    rc = g_fn.ftello64(stream);
+    
+    if (rc != -1) {
+        scopeLog("ftello64\n", fd, CFG_LOG_DEBUG);
+        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            //doFSMetric(FS_XXX, fd, EVENT_BASED, "ftello64");
+        }
+    }
+    return rc;
+}
 #endif // __LINUX__
 
 EXPORTON int
@@ -1654,6 +1710,97 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
 }
 
 #endif // __MACOS__
+
+EXPORTON off_t
+lseek(int fd, off_t offset, int whence)
+{
+    off_t rc;
+
+    WRAP_CHECK(lseek, -1);
+    doThread();
+    rc = g_fn.lseek(fd, offset, whence);
+    
+    if (rc != -1) {
+        scopeLog("lseek\n", fd, CFG_LOG_DEBUG);
+        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            //doFSMetric(FS_XXX, fd, EVENT_BASED, "lseek");
+        }
+    }
+    return rc;
+}
+
+EXPORTON int
+fseeko(FILE *stream, off_t offset, int whence)
+{
+    off_t rc;
+    int fd = fileno(stream);
+
+    WRAP_CHECK(fseeko, -1);
+    doThread();
+    rc = g_fn.fseeko(stream, offset, whence);
+    
+    if (rc != -1) {
+        scopeLog("fseeko\n", fd, CFG_LOG_DEBUG);
+        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            //doFSMetric(FS_XXX, fd, EVENT_BASED, "fseeko");
+        }
+    }
+    return rc;
+}
+
+EXPORTON long
+ftell(FILE *stream)
+{
+    long rc;
+    int fd = fileno(stream);
+
+    WRAP_CHECK(ftell, -1);
+    doThread();
+    rc = g_fn.ftell(stream);
+    
+    if (rc != -1) {
+        scopeLog("ftell\n", fd, CFG_LOG_DEBUG);
+        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            //doFSMetric(FS_XXX, fd, EVENT_BASED, "ftell");
+        }
+    }
+    return rc;
+}
+
+EXPORTON off_t
+ftello(FILE *stream)
+{
+    off_t rc;
+    int fd = fileno(stream);
+
+    WRAP_CHECK(ftello, -1);
+    doThread();
+    rc = g_fn.ftello(stream);
+    
+    if (rc != -1) {
+        scopeLog("ftello\n", fd, CFG_LOG_DEBUG);
+        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            //doFSMetric(FS_XXX, fd, EVENT_BASED, "ftello");
+        }
+    }
+    return rc;
+}
+
+EXPORTON void
+rewind(FILE *stream)
+{
+    int fd = fileno(stream);
+
+    WRAP_CHECK_VOID(rewind);
+    doThread();
+    g_fn.rewind(stream);
+    
+    scopeLog("rewind\n", fd, CFG_LOG_DEBUG);
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        //doFSMetric(FS_XXX, fd, EVENT_BASED, "rewind");
+    }
+    return;
+}
 
 EXPORTON ssize_t
 write(int fd, const void *buf, size_t count)
@@ -1999,6 +2146,8 @@ dup3(int oldfd, int newfd, int flags)
 EXPORTOFF void
 vsyslog(int priority, const char *format, va_list ap)
 {
+    WRAP_CHECK_VOID(vsyslog);
+    doThread();
     scopeLog("vsyslog\n", -1, CFG_LOG_DEBUG);
     g_fn.vsyslog(priority, format, ap);
     return;

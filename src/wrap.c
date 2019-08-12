@@ -933,6 +933,12 @@ init(void)
     g_fn.pwrite = dlsym(RTLD_NEXT, "pwrite");
     g_fn.writev = dlsym(RTLD_NEXT, "writev");
     g_fn.fwrite = dlsym(RTLD_NEXT, "fwrite");
+    g_fn.lseek = dlsym(RTLD_NEXT, "lseek");
+    g_fn.fseeko = dlsym(RTLD_NEXT, "fseeko");
+    g_fn.ftell = dlsym(RTLD_NEXT, "ftell");
+    g_fn.ftello = dlsym(RTLD_NEXT, "ftello");
+    g_fn.fgetpos = dlsym(RTLD_NEXT, "fgetpos");
+    g_fn.fsetpos = dlsym(RTLD_NEXT, "fsetpos");
     g_fn.fcntl = dlsym(RTLD_NEXT, "fcntl");
     g_fn.fcntl64 = dlsym(RTLD_NEXT, "fcntl64");
     g_fn.dup = dlsym(RTLD_NEXT, "dup");
@@ -975,6 +981,9 @@ init(void)
     g_fn.pwritev = dlsym(RTLD_NEXT, "pwritev");
     g_fn.pwritev2 = dlsym(RTLD_NEXT, "pwritev2");
     g_fn.pwritev64v2 = dlsym(RTLD_NEXT, "pwritev64v2");
+    g_fn.lseek64 = dlsym(RTLD_NEXT, "lseek64");
+    g_fn.fseeko64 = dlsym(RTLD_NEXT, "fseeko64");
+    g_fn.ftello64 = dlsym(RTLD_NEXT, "ftello64");
 #endif // __LINUX__
     
     if ((g_netinfo = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
@@ -1800,6 +1809,44 @@ rewind(FILE *stream)
         //doFSMetric(FS_XXX, fd, EVENT_BASED, "rewind");
     }
     return;
+}
+
+EXPORTON int
+fsetpos(FILE *stream,  const fpos_t *pos)
+{
+    int rc;
+    int fd = fileno(stream);
+
+    WRAP_CHECK(fsetpos, -1);
+    doThread();
+    rc = g_fn.fsetpos(stream, pos);
+
+    if (rc == 0) {
+        scopeLog("fsetpos\n", fd, CFG_LOG_DEBUG);
+        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            //doFSMetric(FS_XXX, fd, EVENT_BASED, "fsetpos");
+        }
+    }
+    return rc;
+}
+
+EXPORTON int
+fgetpos(FILE *stream,  fpos_t *pos)
+{
+    int rc;
+    int fd = fileno(stream);
+
+    WRAP_CHECK(fgetpos, -1);
+    doThread();
+    rc = g_fn.fgetpos(stream, pos);
+
+    if (rc == 0) {
+        scopeLog("fgetpos\n", fd, CFG_LOG_DEBUG);
+        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            //doFSMetric(FS_XXX, fd, EVENT_BASED, "fgetpos");
+        }
+    }
+    return rc;
 }
 
 EXPORTON ssize_t

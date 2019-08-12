@@ -170,6 +170,8 @@ typedef struct interposed_funcs_t {
     long (*ftell)(FILE *);
     off_t (*ftello)(FILE *);
     off_t (*ftello64)(FILE *);
+    int (*fgetpos)(FILE *, fpos_t *);
+    int (*fsetpos)(FILE *, const fpos_t *);
     void (*rewind)(FILE *);
     int (*shutdown)(int, int);
     int (*socket)(int, int, int);

@@ -33,6 +33,7 @@ test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/logtest $(INCLUDES) $(TEST_INCLUDES) test/logtest.c src/log.c src/transport.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/outtest $(INCLUDES) $(TEST_INCLUDES) test/outtest.c src/out.c src/log.c src/transport.c src/format.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/formattest $(INCLUDES) $(TEST_INCLUDES) test/formattest.c src/format.c $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dbgtest $(INCLUDES) $(TEST_INCLUDES) test/dbgtest.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/glibcvertest $(INCLUDES) $(TEST_INCLUDES) test/glibcvertest.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/wraptest $(INCLUDES) $(TEST_INCLUDES) test/wraptest.c $(YAML_AR) $(TEST_LD_FLAGS) -Llib/$(OS)/ -lwrap
 	@echo "Running Tests"
@@ -42,6 +43,7 @@ test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/logtest
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/outtest
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/formattest
+	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/dbgtest
 	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/glibcvertest
 	LD_LIBRARY_PATH=lib/$(OS)/:contrib/cmocka/build/src/ test/$(OS)/wraptest
 	@echo "Testing Coverage"

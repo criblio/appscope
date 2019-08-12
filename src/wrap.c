@@ -930,6 +930,9 @@ init(void)
     g_fn.readv = dlsym(RTLD_NEXT, "readv");
     g_fn.fread = dlsym(RTLD_NEXT, "fread");
     g_fn.write = dlsym(RTLD_NEXT, "write");
+    g_fn.pwrite = dlsym(RTLD_NEXT, "pwrite");
+    g_fn.writev = dlsym(RTLD_NEXT, "writev");
+    g_fn.fwrite = dlsym(RTLD_NEXT, "fwrite");
     g_fn.fcntl = dlsym(RTLD_NEXT, "fcntl");
     g_fn.fcntl64 = dlsym(RTLD_NEXT, "fcntl64");
     g_fn.dup = dlsym(RTLD_NEXT, "dup");
@@ -968,6 +971,10 @@ init(void)
     g_fn.preadv = dlsym(RTLD_NEXT, "preadv");
     g_fn.preadv2 = dlsym(RTLD_NEXT, "preadv2");
     g_fn.preadv64v2 = dlsym(RTLD_NEXT, "preadv64v2");
+    g_fn.pwrite64 = dlsym(RTLD_NEXT, "pwrite64");
+    g_fn.pwritev = dlsym(RTLD_NEXT, "pwritev");
+    g_fn.pwritev2 = dlsym(RTLD_NEXT, "pwritev2");
+    g_fn.pwritev64v2 = dlsym(RTLD_NEXT, "pwritev64v2");
 #endif // __LINUX__
     
     if ((g_netinfo = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
@@ -1353,6 +1360,125 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     return rc;
 }
 
+EXPORTON ssize_t
+pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(pwrite64, -1);
+    doThread();
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].startTime = getTime();
+    }
+    
+    rc = g_fn.pwrite64(fd, buf, nbyte, offset);
+    
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+    }
+    
+    if (rc != -1) {
+        scopeLog("pwrite64\n", fd, CFG_LOG_TRACE);
+        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+            // This is a network descriptor
+            doSetAddrs(fd);
+            doSend(fd, rc);
+        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite64");
+        }
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(pwritev, -1);
+    doThread();
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].startTime = getTime();
+    }
+    
+    rc = g_fn.pwritev(fd, iov, iovcnt, offset);
+    
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+    }
+    
+    if (rc != -1) {
+        scopeLog("pwritev\n", fd, CFG_LOG_TRACE);
+        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+            // This is a network descriptor
+            doSetAddrs(fd);
+            doSend(fd, rc);
+        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev");
+        }
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(pwritev2, -1);
+    doThread();
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].startTime = getTime();
+    }
+    
+    rc = g_fn.pwritev2(fd, iov, iovcnt, offset, flags);
+    
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+    }
+    
+    if (rc != -1) {
+        scopeLog("pwritev2\n", fd, CFG_LOG_TRACE);
+        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+            // This is a network descriptor
+            doSetAddrs(fd);
+            doSend(fd, rc);
+        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev2");
+        }
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(pwritev64v2, -1);
+    doThread();
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].startTime = getTime();
+    }
+    
+    rc = g_fn.pwritev64v2(fd, iov, iovcnt, offset, flags);
+    
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+    }
+    
+    if (rc != -1) {
+        scopeLog("pwritev64v2\n", fd, CFG_LOG_TRACE);
+        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+            // This is a network descriptor
+            doSetAddrs(fd);
+            doSend(fd, rc);
+        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev64v2");
+        }
+    }
+    return rc;
+}
 #endif // __LINUX__
 
 EXPORTON int
@@ -1554,6 +1680,97 @@ write(int fd, const void *buf, size_t count)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "write");
+        }
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(pwrite, -1);
+    doThread();
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].startTime = getTime();
+    }
+    
+    rc = g_fn.pwrite(fd, buf, nbyte, offset);
+    
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+    }
+    
+    if (rc != -1) {
+        scopeLog("pwrite\n", fd, CFG_LOG_TRACE);
+        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+            // This is a network descriptor
+            doSetAddrs(fd);
+            doSend(fd, rc);
+        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite");
+        }
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+writev(int fd, const struct iovec *iov, int iovcnt)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(writev, -1);
+    doThread();
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].startTime = getTime();
+    }
+    
+    rc = g_fn.writev(fd, iov, iovcnt);
+    
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+    }
+    
+    if (rc != -1) {
+        scopeLog("writev\n", fd, CFG_LOG_TRACE);
+        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+            // This is a network descriptor
+            doSetAddrs(fd);
+            doSend(fd, rc);
+        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "writev");
+        }
+    }
+    return rc;
+}
+
+EXPORTON size_t
+fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stream)
+{
+    ssize_t rc;
+    int fd = fileno(stream);
+    
+    WRAP_CHECK(fwrite, -1);
+    doThread();
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].startTime = getTime();
+    }
+    
+    rc = g_fn.fwrite(ptr, size, nitems, stream);
+    
+    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+    }
+    
+    if (rc != -1) {
+        scopeLog("fwrite\n", fd, CFG_LOG_TRACE);
+        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+            // This is a network descriptor
+            doSetAddrs(fd);
+            doSend(fd, rc);
+        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "fwrite");
         }
     }
     return rc;

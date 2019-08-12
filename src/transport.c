@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <dlfcn.h>
 #include "scopetypes.h"
 #include "transport.h"
 
@@ -23,6 +24,7 @@ typedef struct operations_info_t {
 struct _transport_t
 {
     cfg_transport_t type;
+    ssize_t (*write)(int, const void *, size_t);
     union {
         struct {
             int sock;
@@ -96,6 +98,7 @@ transportCreateFile(const char* path)
     transport_t* t = calloc(1, sizeof(transport_t));
     if (!t) return NULL;
 
+    t->write = dlsym(RTLD_NEXT, "write");
     t->type = CFG_FILE;
     t->file.path = strdup(path);
     if (!t->file.path) {
@@ -197,7 +200,8 @@ transportSend(transport_t* t, const char* msg)
             break;
         case CFG_FILE:
             if (t->file.fd != -1) {
-                int bytes = write(t->file.fd, msg, strlen(msg));
+                int bytes;
+                if (t->write) bytes = t->write(t->file.fd, msg, strlen(msg));
                 if (bytes < 0) {
                     // TBD do something here
                 } else {

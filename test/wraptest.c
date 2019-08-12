@@ -57,12 +57,9 @@ testFSDuration(void** state)
     rc = read(fd, buf, 16);
     assert_return_code(rc, errno);
     
-    // Create some time
-    sleep(1);
-    
-    // Stop the duration timer
     rc = close(fd);
     assert_return_code(rc, errno);
+
     snprintf(buf, strlen(path) + 128, "grep wraptest %s | grep duration | tail -n 1", path);
     FILE *fs = popen(buf, "r");
     assert_non_null(fs);
@@ -78,7 +75,7 @@ testFSDuration(void** state)
     int duration = strtol(log, NULL, 0);
     printf("Duration: %d\n", duration);
     assert_int_not_equal(duration, 0);
-    assert_true((duration > 1000) && (duration < 1100));
+    assert_true((duration > 0) && (duration < 10));
 }
 
 static void

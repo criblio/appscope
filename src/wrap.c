@@ -1025,6 +1025,26 @@ init(void)
     scopeLog("Constructor\n", -1, CFG_LOG_INFO);
 }
 
+static net_info *
+getNetEntry(int fd)
+{
+    if (g_netinfo && (fd > 0) && (fd <= g_cfg.numNinfo) &&
+        (g_netinfo[fd].fd == fd)) {
+        return &g_netinfo[fd];
+    }
+    return NULL;    
+}
+
+static fs_info *
+getFSEntry(int fd)
+{
+    if (g_fsinfo && (fd > 0) && (fd <= g_cfg.numFSInfo) &&
+        (g_fsinfo[fd].fd == fd)) {
+        return &g_fsinfo[fd];
+    }
+    return NULL;    
+}
+
 static void
 doOpen(int fd, const char *path, enum fs_type_t type, char *func)
 {
@@ -1053,30 +1073,34 @@ doOpen(int fd, const char *path, enum fs_type_t type, char *func)
 static void
 doClose(int fd, char *func)
 {
-    if (g_netinfo && (g_netinfo[fd].fd == fd)) {
-        if (g_netinfo[fd].listen == TRUE) {
+    struct net_info_t *ninfo;
+    struct fs_info_t *fsinfo;
+    
+    if ((ninfo = getNetEntry(fd)) != NULL) {
+
+        if (ninfo->listen == TRUE) {
             // Gauge tracking number of open ports
             atomicSub(&g_ctrs.openPorts, 1);
             doNetMetric(OPEN_PORTS, fd, EVENT_BASED);
         }
 
-        if (g_netinfo[fd].accept == TRUE) {
+        if (ninfo->accept == TRUE) {
             // Gauge tracking number of active TCP connections
             atomicSub(&g_ctrs.TCPConnections, 1);
             doNetMetric(TCP_CONNECTIONS, fd, EVENT_BASED);
 
-            if (g_netinfo[fd].startTime != 0) {
+            if (ninfo->startTime != 0) {
                 // Duration is in NS, the metric wants to be in MS
-                g_netinfo[fd].duration = getDuration(g_netinfo[fd].startTime)  / 1000000;
+                ninfo->duration = getDuration(ninfo->startTime)  / 1000000;
                 doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED);
             }
         }
         
-        memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
+        memset(ninfo, 0, sizeof(struct net_info_t));
         scopeLog(func, fd, CFG_LOG_DEBUG);
-    } else if (g_fsinfo && (g_fsinfo[fd].fd == fd)) {
+    } else if ((fsinfo = getFSEntry(fd)) != NULL) {
         scopeLog(func, fd, CFG_LOG_DEBUG);
-        memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
+        memset(fsinfo, 0, sizeof(struct fs_info_t));
     }
 }
 
@@ -1259,7 +1283,7 @@ pread64(int fd, void *buf, size_t count, off_t offset)
     rc = g_fn.pread64(fd, buf, count, offset);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -1290,7 +1314,7 @@ preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
     rc = g_fn.preadv(fd, iov, iovcnt, offset);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -1321,7 +1345,7 @@ preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     rc = g_fn.preadv2(fd, iov, iovcnt, offset, flags);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -1352,7 +1376,7 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     rc = g_fn.preadv64v2(fd, iov, iovcnt, offset, flags);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -1383,7 +1407,7 @@ pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
     rc = g_fn.pwrite64(fd, buf, nbyte, offset);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -1413,7 +1437,7 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
     rc = g_fn.pwritev(fd, iov, iovcnt, offset);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -1443,7 +1467,7 @@ pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     rc = g_fn.pwritev2(fd, iov, iovcnt, offset, flags);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -1473,7 +1497,7 @@ pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
     rc = g_fn.pwritev64v2(fd, iov, iovcnt, offset, flags);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -1863,7 +1887,7 @@ write(int fd, const void *buf, size_t count)
     rc = g_fn.write(fd, buf, count);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -1893,7 +1917,7 @@ pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
     rc = g_fn.pwrite(fd, buf, nbyte, offset);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -1923,7 +1947,7 @@ writev(int fd, const struct iovec *iov, int iovcnt)
     rc = g_fn.writev(fd, iov, iovcnt);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -1954,7 +1978,7 @@ fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stre
     rc = g_fn.fwrite(ptr, size, nitems, stream);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -1984,7 +2008,7 @@ read(int fd, void *buf, size_t count)
     rc = g_fn.read(fd, buf, count);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -2016,7 +2040,7 @@ readv(int fd, const struct iovec *iov, int iovcnt)
     rc = g_fn.readv(fd, iov, iovcnt);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -2048,7 +2072,7 @@ pread(int fd, void *buf, size_t count, off_t offset)
     rc = g_fn.pread(fd, buf, count, offset);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {
@@ -2080,7 +2104,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     rc = g_fn.fread(ptr, size, nmemb, stream);
     
     if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000000;
+        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
     }
     
     if (rc != -1) {

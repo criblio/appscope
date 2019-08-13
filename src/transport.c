@@ -9,16 +9,9 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "dbg.h"
 #include "scopetypes.h"
 #include "transport.h"
-
-typedef struct operations_info_t {
-    unsigned int udp_blocks;
-    unsigned int udp_errors;
-    unsigned int init_errors;
-    unsigned int interpose_errors;
-    char *errMsg[64];
-} operations_info;
 
 struct _transport_t
 {
@@ -26,7 +19,6 @@ struct _transport_t
     union {
         struct {
             int sock;
-            operations_info ops;
         } udp;
         struct {
             char* path;
@@ -187,10 +179,10 @@ transportSend(transport_t* t, const char* msg)
                 if (rc < 0) {
                     switch (errno) {
                     case EWOULDBLOCK:
-                        t->udp.ops.udp_blocks++;
+                        DBG(NULL);
                         break;
                     default:
-                        t->udp.ops.udp_errors++;
+                        DBG(NULL);
                     }
                 }
             }

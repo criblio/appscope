@@ -80,6 +80,27 @@ getDuration(uint64_t start)
     
 }
 
+
+static net_info *
+getNetEntry(int fd)
+{
+    if (g_netinfo && (fd > 0) && (fd <= g_cfg.numNinfo) &&
+        (g_netinfo[fd].fd == fd)) {
+        return &g_netinfo[fd];
+    }
+    return NULL;    
+}
+
+static fs_info *
+getFSEntry(int fd)
+{
+    if (g_fsinfo && (fd > 0) && (fd <= g_cfg.numFSInfo) &&
+        (g_fsinfo[fd].fd == fd)) {
+        return &g_fsinfo[fd];
+    }
+    return NULL;    
+}
+
 static void
 addSock(int fd, int type)
 {
@@ -275,8 +296,9 @@ static void
 doFSMetric(enum metric_t type, int fd, enum control_type_t source, const char *op)
 {
     pid_t pid = getpid();
-        
-    if (g_fsinfo == NULL) {
+    fs_info *fs;
+    
+    if ((fs = getFSEntry(fd)) == NULL) {
         return;
     }
 
@@ -293,7 +315,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source, const char *o
             STRFIELD("unit",             "milliseconds",        3),
             FIELDEND
         };
-        event_t e = {"fs.duration", g_fsinfo[fd].duration, HISTOGRAM, fields};
+        event_t e = {"fs.duration", fs->duration, HISTOGRAM, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doFSMetric:FS_DURATION:outSendEvent\n", fd, CFG_LOG_ERROR);
         }
@@ -1023,26 +1045,6 @@ init(void)
     }
 
     scopeLog("Constructor\n", -1, CFG_LOG_INFO);
-}
-
-static net_info *
-getNetEntry(int fd)
-{
-    if (g_netinfo && (fd > 0) && (fd <= g_cfg.numNinfo) &&
-        (g_netinfo[fd].fd == fd)) {
-        return &g_netinfo[fd];
-    }
-    return NULL;    
-}
-
-static fs_info *
-getFSEntry(int fd)
-{
-    if (g_fsinfo && (fd > 0) && (fd <= g_cfg.numFSInfo) &&
-        (g_fsinfo[fd].fd == fd)) {
-        return &g_fsinfo[fd];
-    }
-    return NULL;    
 }
 
 static void

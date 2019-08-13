@@ -42,7 +42,7 @@ test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/
 	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/outtest
 	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/formattest
 	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/dbgtest
-	DYLD_LIBRARY_PATH=lib/$(OS)/:contrib/cmocka/build/src/ test/$(OS)/wraptest
+	SCOPE_HOME=$(CWD)/test/ DYLD_LIBRARY_PATH=lib/$(OS)/:contrib/cmocka/build/src/ DYLD_INSERT_LIBRARIES="$(CWD)/lib/macOS/libwrap.so" DYLD_FORCE_FLAT_NAMESPACE=1 test/$(OS)/wraptest
 	@echo "Testing Coverage"
 	lcov --capture --directory . --output-file coverage.info
 	genhtml coverage.info --output-directory out

@@ -25,10 +25,6 @@ rtconfig g_cfg = {0};
 static void
 testFSDuration(void** state)
 {
-#ifdef __MACOS__
-    skip();
-#endif
-
     int rc, fd;
     char *log, *last;
     const char delim[] = ":";
@@ -60,7 +56,10 @@ testFSDuration(void** state)
     rc = close(fd);
     assert_return_code(rc, errno);
 
-    snprintf(buf, strlen(path) + 128, "grep wraptest %s | grep duration | tail -n 1", path);
+    // In macOS, the makefile is setting DYLD_INSERT_LIBRARIES.  We need to 
+    // clear it to avoid an infinite loop where by reading the log file, 
+    // grep adds to the log file.  On linux, unset should be harmless.
+    snprintf(buf, strlen(path) + 128, "unset DYLD_INSERT_LIBRARIES ; grep wraptest %s | grep duration | tail -n 1", path);
     FILE *fs = popen(buf, "r");
     assert_non_null(fs);
 
@@ -81,10 +80,6 @@ testFSDuration(void** state)
 static void
 testConnDuration(void** state)
 {
-#ifdef __MACOS__
-    skip();
-#endif
-
     int rc, sdl, sds;
     struct sockaddr_in saddr;
     char *log, *last;
@@ -146,7 +141,10 @@ testConnDuration(void** state)
     rc = close(sdl);
     assert_return_code(rc, errno);
 
-    snprintf(buf, strlen(path) + 128, "grep wraptest %s | grep duration | tail -n 1", path);
+    // In macOS, the makefile is setting DYLD_INSERT_LIBRARIES.  We need to 
+    // clear it to avoid an infinite loop where by reading the log file, 
+    // grep adds to the log file.  On linux, unset should be harmless.
+    snprintf(buf, strlen(path) + 128, "unset DYLD_INSERT_LIBRARIES ; grep wraptest %s | grep duration | tail -n 1", path);
     FILE *fs = popen(buf, "r");
     assert_non_null(fs);
 
@@ -199,12 +197,11 @@ main (int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
     const struct CMUnitTest tests[] = {
+        cmocka_unit_test(testFSDuration),
+        cmocka_unit_test(testConnDuration),
+        cmocka_unit_test(testTSCInit),
         cmocka_unit_test(testTSCRollover),
         cmocka_unit_test(testTSCValue),
-        cmocka_unit_test(testTSCInit),
-        cmocka_unit_test(testConnDuration),
-        cmocka_unit_test(testFSDuration),
     };
-    cmocka_run_group_tests(tests, NULL, NULL);
-    return 0;
+    return cmocka_run_group_tests(tests, NULL, NULL);
 }

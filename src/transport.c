@@ -198,9 +198,11 @@ transportSend(transport_t* t, const char* msg)
             if (t->file.fd != -1) {
                 int bytes = t->write(t->file.fd, msg, strlen(msg));
                 if (bytes < 0) {
-                    DBG("%d", bytes);
+                    DBG("%d %d", t->file.fd, bytes);
                 } else {
-                    fsync(t->file.fd);
+                    if (fsync(t->file.fd) == -1) {
+                        DBG("%d", t->file.fd);
+                    }
                 }
             }
             break;

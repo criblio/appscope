@@ -226,7 +226,7 @@ dbgAddLine(const char* key, const char* fmt, ...)
         int tmp_max_lines = g_dbg->max_lines * 2;  // double each time
         line_t** temp = realloc(g_dbg->lines, sizeof(line_t*) * tmp_max_lines);
         if (!temp) {
-            free(str);
+            if (str) free(str);
             return;
         }
         // Yeah!  We have more space!  init it, and set our state to remember it

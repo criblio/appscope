@@ -70,11 +70,11 @@ transportCreateUdp(const char* host, const char* port)
     // Set the socket to non blocking, and close on exec
     int flags = fcntl(t->udp.sock, F_GETFL, 0);
     if (fcntl(t->udp.sock, F_SETFL, flags | O_NONBLOCK) == -1) {
-        // TBD do something here too.
+        DBG("%d %s %s", t->udp.sock, host, port);
     }
     flags = fcntl(t->udp.sock, F_GETFD, 0);
     if (fcntl(t->udp.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
-        // TBD do something here.
+        DBG("%d %s %s", t->udp.sock, host, port);
     }
 
 out:
@@ -105,7 +105,7 @@ transportCreateFile(const char* path)
     } else {
         // Needed because umask affects open permissions
         if (fchmod(t->file.fd, 0666) == -1) {
-            // TBD do something awesome.
+            DBG("%s", path);
         }
     }
     return t;
@@ -191,11 +191,14 @@ transportSend(transport_t* t, const char* msg)
             }
             break;
         case CFG_FILE:
+            if (!t->write) {
+                DBG(NULL);
+                break;
+            }
             if (t->file.fd != -1) {
-                int bytes;
-                if (t->write) bytes = t->write(t->file.fd, msg, strlen(msg));
+                int bytes = t->write(t->file.fd, msg, strlen(msg));
                 if (bytes < 0) {
-                    // TBD do something here
+                    DBG("%d", bytes);
                 } else {
                     fsync(t->file.fd);
                 }

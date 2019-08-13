@@ -24,7 +24,7 @@ static void * periodic(void *);
 EXPORTON void
 scopeLog(char* msg, int fd, cfg_log_level_t level)
 {
-    if (!g_log || !msg || !g_cfg.procname) return;
+    if (!g_log || !msg || !g_cfg.procname[0]) return;
 
     char buf[strlen(msg) + 128];
     snprintf(buf, sizeof(buf), "Scope: %s(%d): %s", g_cfg.procname, fd, msg);

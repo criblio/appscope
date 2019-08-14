@@ -1408,7 +1408,7 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv64v2", 0);
-            doFSMetric(FS_READ_SIZE, fd, EVENT_BASED, "preadv64v2", rc);
+            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv64v2", rc);
         }
     }
     

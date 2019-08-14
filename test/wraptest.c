@@ -64,7 +64,7 @@ testFSDuration(void** state)
     assert_non_null(fs);
 
     size_t len = fread(buf, sizeof(buf), (size_t)1, fs);
-    printf("len %ld %s\n", len, buf);
+    //printf("len %ld %s\n", len, buf);
     assert_int_equal(len, 0);
 
     log = strtok_r(buf, delim, &last);
@@ -72,9 +72,9 @@ testFSDuration(void** state)
     log = strtok_r(NULL, delim, &last);
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
-    printf("Duration: %d\n", duration);
+    //printf("Duration: %d\n", duration);
     assert_int_not_equal(duration, 0);
-    assert_true((duration > 0) && (duration < 10));
+    assert_true((duration > 0) && (duration < 100));
 }
 
 static void
@@ -149,7 +149,7 @@ testConnDuration(void** state)
     assert_non_null(fs);
 
     size_t len = fread(buf, sizeof(buf), (size_t)1, fs);
-    printf("len %ld %s\n", len, buf);
+    //printf("len %ld %s\n", len, buf);
     assert_int_equal(len, 0);
 
     log = strtok_r(buf, delim, &last);
@@ -157,9 +157,9 @@ testConnDuration(void** state)
     log = strtok_r(NULL, delim, &last);
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
-    printf("Duration: %d\n", duration);
+    //printf("Duration: %d\n", duration);
     assert_int_not_equal(duration, 0);
-    assert_true((duration > 1000) && (duration < 1100));
+    assert_true((duration > 1000) && (duration < 1300));
 }
 
 static void
@@ -176,7 +176,7 @@ testTSCRollover(void** state)
     uint64_t elapsed, now = ULONG_MAX -2;
     elapsed = getDuration(now);
     assert_non_null(elapsed);
-    printf("Now %"PRIu64" Elapsed %"PRIu64"\n", now, elapsed);
+    //printf("Now %"PRIu64" Elapsed %"PRIu64"\n", now, elapsed);
     assert_true(elapsed > 250000);
 }
 
@@ -188,8 +188,8 @@ testTSCValue(void** state)
     now = getTime();
     elapsed = getDuration(now);
     assert_non_null(elapsed);
-    printf("Now %"PRIu64" Elapsed %"PRIu64"\n", now, elapsed);
-    assert_true((elapsed < 250) && (elapsed > 20));
+    //printf("Now %"PRIu64" Elapsed %"PRIu64"\n", now, elapsed);
+    assert_true((elapsed < 350) && (elapsed > 20));
 }
 
 int

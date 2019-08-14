@@ -35,14 +35,7 @@ test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dbgtest $(INCLUDES) $(TEST_INCLUDES) test/dbgtest.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/wraptest $(INCLUDES) $(TEST_INCLUDES) test/wraptest.c $(YAML_AR) $(TEST_LD_FLAGS) -Llib/$(OS)/ -lwrap
 	@echo "Running Tests"
-	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/cfgutilstest
-	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/cfgtest
-	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/transporttest
-	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/logtest
-	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/outtest
-	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/formattest
-	DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/dbgtest
-	SCOPE_HOME=$(CWD)/test/ DYLD_LIBRARY_PATH=lib/$(OS)/:contrib/cmocka/build/src/ DYLD_INSERT_LIBRARIES="$(CWD)/lib/macOS/libwrap.so" DYLD_FORCE_FLAT_NAMESPACE=1 test/$(OS)/wraptest
+	test/execute.sh
 	@echo "Testing Coverage"
 	lcov --capture --directory . --output-file coverage.info
 	genhtml coverage.info --output-directory out

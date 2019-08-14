@@ -72,9 +72,8 @@ testFSDuration(void** state)
     log = strtok_r(NULL, delim, &last);
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
-    //printf("Duration: %d\n", duration);
-    assert_int_not_equal(duration, 0);
-    assert_true((duration > 0) && (duration < 100));
+    if ((duration < 1) || (duration > 100))
+        fail_msg("Duration %d is outside of allowed bounds (1, 100)", duration);
 }
 
 static void
@@ -157,9 +156,8 @@ testConnDuration(void** state)
     log = strtok_r(NULL, delim, &last);
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
-    //printf("Duration: %d\n", duration);
-    assert_int_not_equal(duration, 0);
-    assert_true((duration > 1000) && (duration < 1300));
+    if ((duration < 1000) || (duration > 1300))
+        fail_msg("Duration %d is outside of allowed bounds (1000, 1300)", duration);
 }
 
 static void
@@ -175,9 +173,8 @@ testTSCRollover(void** state)
 {
     uint64_t elapsed, now = ULONG_MAX -2;
     elapsed = getDuration(now);
-    assert_non_null(elapsed);
-    //printf("Now %"PRIu64" Elapsed %"PRIu64"\n", now, elapsed);
-    assert_true(elapsed > 250000);
+    if (elapsed < 250000)
+        fail_msg("Elapsed %" PRIu64 " is less than allowed 250000", elapsed);
 }
 
 static void
@@ -187,9 +184,8 @@ testTSCValue(void** state)
 
     now = getTime();
     elapsed = getDuration(now);
-    assert_non_null(elapsed);
-    //printf("Now %"PRIu64" Elapsed %"PRIu64"\n", now, elapsed);
-    assert_true((elapsed < 350) && (elapsed > 20));
+    if ((elapsed < 20) || (elapsed > 350))
+        fail_msg("Elapsed %" PRIu64 " is outside of allowed bounds (20, 350)", elapsed);
 }
 
 int

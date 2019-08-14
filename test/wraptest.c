@@ -25,10 +25,6 @@ rtconfig g_cfg = {0};
 static void
 testFSDuration(void** state)
 {
-#ifdef __MACOS__
-    skip();
-#endif
-
     int rc, fd;
     char *log, *last;
     const char delim[] = ":";
@@ -60,12 +56,15 @@ testFSDuration(void** state)
     rc = close(fd);
     assert_return_code(rc, errno);
 
-    snprintf(buf, strlen(path) + 128, "grep wraptest %s | grep duration | tail -n 1", path);
+    // In macOS, the makefile is setting DYLD_INSERT_LIBRARIES.  We need to 
+    // clear it to avoid an infinite loop where by reading the log file, 
+    // grep adds to the log file.  On linux, unset should be harmless.
+    snprintf(buf, strlen(path) + 128, "unset DYLD_INSERT_LIBRARIES ; grep wraptest %s | grep duration | tail -n 1", path);
     FILE *fs = popen(buf, "r");
     assert_non_null(fs);
 
     size_t len = fread(buf, sizeof(buf), (size_t)1, fs);
-    printf("len %ld %s\n", len, buf);
+    //printf("len %ld %s\n", len, buf);
     assert_int_equal(len, 0);
 
     log = strtok_r(buf, delim, &last);
@@ -73,18 +72,13 @@ testFSDuration(void** state)
     log = strtok_r(NULL, delim, &last);
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
-    printf("Duration: %d\n", duration);
-    assert_int_not_equal(duration, 0);
-    assert_true((duration > 0) && (duration < 10));
+    if ((duration < 1) || (duration > 100))
+        fail_msg("Duration %d is outside of allowed bounds (1, 100)", duration);
 }
 
 static void
 testConnDuration(void** state)
 {
-#ifdef __MACOS__
-    skip();
-#endif
-
     int rc, sdl, sds;
     struct sockaddr_in saddr;
     char *log, *last;
@@ -146,12 +140,15 @@ testConnDuration(void** state)
     rc = close(sdl);
     assert_return_code(rc, errno);
 
-    snprintf(buf, strlen(path) + 128, "grep wraptest %s | grep duration | tail -n 1", path);
+    // In macOS, the makefile is setting DYLD_INSERT_LIBRARIES.  We need to 
+    // clear it to avoid an infinite loop where by reading the log file, 
+    // grep adds to the log file.  On linux, unset should be harmless.
+    snprintf(buf, strlen(path) + 128, "unset DYLD_INSERT_LIBRARIES ; grep wraptest %s | grep duration | tail -n 1", path);
     FILE *fs = popen(buf, "r");
     assert_non_null(fs);
 
     size_t len = fread(buf, sizeof(buf), (size_t)1, fs);
-    printf("len %ld %s\n", len, buf);
+    //printf("len %ld %s\n", len, buf);
     assert_int_equal(len, 0);
 
     log = strtok_r(buf, delim, &last);
@@ -159,9 +156,8 @@ testConnDuration(void** state)
     log = strtok_r(NULL, delim, &last);
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
-    printf("Duration: %d\n", duration);
-    assert_int_not_equal(duration, 0);
-    assert_true((duration > 1000) && (duration < 1100));
+    if ((duration < 1000) || (duration > 1300))
+        fail_msg("Duration %d is outside of allowed bounds (1000, 1300)", duration);
 }
 
 static void
@@ -177,9 +173,8 @@ testTSCRollover(void** state)
 {
     uint64_t elapsed, now = ULONG_MAX -2;
     elapsed = getDuration(now);
-    assert_non_null(elapsed);
-    printf("Now %"PRIu64" Elapsed %"PRIu64"\n", now, elapsed);
-    assert_true(elapsed > 250000);
+    if (elapsed < 250000)
+        fail_msg("Elapsed %" PRIu64 " is less than allowed 250000", elapsed);
 }
 
 static void
@@ -189,9 +184,8 @@ testTSCValue(void** state)
 
     now = getTime();
     elapsed = getDuration(now);
-    assert_non_null(elapsed);
-    printf("Now %"PRIu64" Elapsed %"PRIu64"\n", now, elapsed);
-    assert_true((elapsed < 250) && (elapsed > 20));
+    if ((elapsed < 20) || (elapsed > 350))
+        fail_msg("Elapsed %" PRIu64 " is outside of allowed bounds (20, 350)", elapsed);
 }
 
 int
@@ -199,12 +193,11 @@ main (int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
     const struct CMUnitTest tests[] = {
+        cmocka_unit_test(testFSDuration),
+        cmocka_unit_test(testConnDuration),
+        cmocka_unit_test(testTSCInit),
         cmocka_unit_test(testTSCRollover),
         cmocka_unit_test(testTSCValue),
-        cmocka_unit_test(testTSCInit),
-        cmocka_unit_test(testConnDuration),
-        cmocka_unit_test(testFSDuration),
     };
-    cmocka_run_group_tests(tests, NULL, NULL);
-    return 0;
+    return cmocka_run_group_tests(tests, NULL, NULL);
 }

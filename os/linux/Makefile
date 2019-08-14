@@ -38,15 +38,7 @@ test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/glibcvertest $(INCLUDES) $(TEST_INCLUDES) test/glibcvertest.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/wraptest $(INCLUDES) $(TEST_INCLUDES) test/wraptest.c $(YAML_AR) $(TEST_LD_FLAGS) -Llib/$(OS)/ -lwrap
 	@echo "Running Tests"
-	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/cfgutilstest
-	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/cfgtest
-	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/transporttest
-	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/logtest
-	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/outtest
-	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/formattest
-	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/dbgtest
-	LD_LIBRARY_PATH=contrib/cmocka/build/src/ test/$(OS)/glibcvertest
-	SCOPE_HOME=$(CWD)/test/ LD_LIBRARY_PATH=lib/$(OS)/:contrib/cmocka/build/src/ test/$(OS)/wraptest
+	test/execute.sh
 	@echo "Testing Coverage"
 	lcov --capture --directory . --output-file coverage.info
 	genhtml coverage.info --output-directory out

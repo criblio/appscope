@@ -75,7 +75,9 @@ enum metric_t {
     NETRX_PROC,
     NETTX_PROC,
     DNS,
-    FS_DURATION
+    FS_DURATION,
+    FS_SIZE_READ,
+    FS_SIZE_WRITE,
 };
 
 // File types; stream or fd

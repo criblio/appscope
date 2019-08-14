@@ -23,18 +23,7 @@ cfgPath(const char* cfgname)
 
     char path[1024]; // Somewhat arbitrary choice for MAX_PATH
 
-    char homedir[1024] = {0};
-    {
-        char   username[16]    = {0};
-        getlogin_r(username, sizeof(username));
-        if(username[0]) {
-            struct passwd* pUserInfo = getpwnam(username);
-            if (pUserInfo) {
-                strncpy(homedir, pUserInfo->pw_dir, sizeof(homedir) - 1);
-            }
-        }
-    }
-
+    const char* homedir = getenv("HOME");
     const char* scope_home = getenv("SCOPE_HOME");
     if (scope_home &&
        (snprintf(path, sizeof(path), "%s/conf/%s", scope_home, cfgname) > 0) &&
@@ -50,12 +39,12 @@ cfgPath(const char* cfgname)
         !access(path, R_OK)) {
         return realpath(path, NULL);
     }
-    if (homedir[0] &&
+    if (homedir &&
        (snprintf(path, sizeof(path), "%s/conf/%s", homedir, cfgname) > 0) &&
         !access(path, R_OK)) {
         return realpath(path, NULL);
     }
-    if (homedir[0] &&
+    if (homedir &&
        (snprintf(path, sizeof(path), "%s/%s", homedir, cfgname) > 0) &&
         !access(path, R_OK)) {
         return realpath(path, NULL);

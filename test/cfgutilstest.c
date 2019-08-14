@@ -73,7 +73,10 @@ cfgPathHonorsPriorityOrder(void** state)
         assert_int_not_equal(fd, -1);
         assert_int_equal(close(fd), 0);
         char* result = cfgPath(file);
-        assert_string_equal(result, path[i]);
+        assert_non_null(result);
+	if (strcmp(result, path[i])) {
+            fail_msg("Expected %s but found %s for i=%d", path[i], result, i);
+	}
         if (result) free(result);
     }
 
@@ -174,9 +177,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(initOutReturnsPtrWithNullLogReference),
         cmocka_unit_test(initOutReturnsPtrWithLogReference),
     };
-    cmocka_run_group_tests(tests, NULL, NULL);
-
-    return 0;
+    return cmocka_run_group_tests(tests, NULL, NULL);
 }
 
 

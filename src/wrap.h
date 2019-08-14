@@ -125,7 +125,7 @@ typedef struct net_info_t {
 
 typedef struct fs_info_t {
     int fd;
-    int type;
+    enum fs_type_t type;
     uint64_t startTime;
     uint64_t duration;
     char path[PATH_MAX];

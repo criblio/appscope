@@ -80,6 +80,25 @@ getDuration(uint64_t start)
     
 }
 
+static bool
+checkNetEntry(int fd)
+{
+    if (g_netinfo && (fd > 0) && (fd <= g_cfg.numNinfo)) {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static bool
+checkFSEntry(int fd)
+{
+    if (g_fsinfo && (fd > 0) && (fd <= g_cfg.numFSInfo)) {
+        return TRUE;
+    }
+
+    return FALSE;
+}
 
 static net_info *
 getNetEntry(int fd)
@@ -104,7 +123,7 @@ getFSEntry(int fd)
 static void
 addSock(int fd, int type)
 {
-    if (g_netinfo) {
+    if (checkNetEntry(fd) == TRUE) {
         if (g_netinfo[fd].fd == fd) {
             scopeLog("addSock: duplicate\n", fd, CFG_LOG_DEBUG);
 
@@ -334,7 +353,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
     char proto[PROTOCOL_STR];
     in_port_t localPort, remotePort;
         
-    if (g_netinfo == NULL) {
+    if (getNetEntry(fd) == NULL) {
         return;
     }
 
@@ -677,8 +696,7 @@ doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control
     }
     
     // Should we check for at least the size of sockaddr_in?
-    if (g_netinfo && (g_netinfo[sd].fd == sd) &&
-        addr && (len > 0)) {
+    if ((getNetEntry(sd) != NULL) && addr && (len > 0)) {
         if (endp == LOCAL) {
             memmove(&g_netinfo[sd].localConn, addr, len);
         } else {
@@ -690,6 +708,10 @@ doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control
 static int
 doSetAddrs(int sockfd)
 {
+    if (getNetEntry(sockfd) == NULL) {
+        return -1;
+    }
+    
     if (g_netinfo[sockfd].localConn.ss_family == AF_UNSPEC) {
         struct sockaddr_storage addr;
         socklen_t addrlen = sizeof(struct sockaddr_storage);
@@ -775,7 +797,7 @@ getDNSName(int sd, void *pkt, int pktlen)
     struct question *q;
     char *aname, *dname;
 
-    if (!g_netinfo) {
+    if (getNetEntry(sd) == NULL) {
         return -1;
     }
     
@@ -843,18 +865,18 @@ getDNSName(int sd, void *pkt, int pktlen)
     return 0;
 }
 
-
 static int
 doRecv(int sockfd, ssize_t rc)
 {
     atomicAdd(&g_ctrs.netrx, rc);
-    if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
-        doAddNewSock(sockfd);
+    if (checkNetEntry(sockfd) == TRUE) {
+        if (g_netinfo[sockfd].fd != sockfd) {
+            doAddNewSock(sockfd);
+        }
+
+        doSetAddrs(sockfd);
+        doNetMetric(NETRX, sockfd, EVENT_BASED);
     }
-
-    doSetAddrs(sockfd);
-    doNetMetric(NETRX, sockfd, EVENT_BASED);
-
     return 0;
 }
 
@@ -862,17 +884,18 @@ static int
 doSend(int sockfd, ssize_t rc)
 {
     atomicAdd(&g_ctrs.nettx, rc);
-    if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
-        doAddNewSock(sockfd);
+    if (checkNetEntry(sockfd) == TRUE) {
+        if (g_netinfo[sockfd].fd != sockfd) {
+            doAddNewSock(sockfd);
+        }
+
+        doSetAddrs(sockfd);
+        doNetMetric(NETTX, sockfd, EVENT_BASED);
+
+        if (GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+            doNetMetric(DNS, sockfd, EVENT_BASED);
+        }
     }
-
-    doSetAddrs(sockfd);
-    doNetMetric(NETTX, sockfd, EVENT_BASED);
-
-    if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
-        doNetMetric(DNS, sockfd, EVENT_BASED);
-    }
-
     return 0;
 }
 
@@ -883,7 +906,7 @@ doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
     scopeLog(func, sd, CFG_LOG_DEBUG);
     addSock(sd, SOCK_STREAM);
     
-    if (g_netinfo && (g_netinfo[sd].fd == sd)) {
+    if (getNetEntry(sd) != NULL) {
         g_netinfo[sd].listen = TRUE;
         g_netinfo[sd].accept = TRUE;
         atomicAdd(&g_ctrs.openPorts, 1);
@@ -1013,6 +1036,7 @@ init(void)
     }
 
     g_cfg.numNinfo = NET_ENTRIES;
+    if (g_netinfo) memset(g_netinfo, 0, sizeof(struct net_info_t) * NET_ENTRIES);
 
     if ((g_fsinfo = (fs_info *)malloc(sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
         scopeLog("ERROR: Constructor:Malloc\n", -1, CFG_LOG_ERROR);
@@ -1050,9 +1074,12 @@ init(void)
 static void
 doOpen(int fd, const char *path, enum fs_type_t type, char *func)
 {
-    if (g_fsinfo) {
+    if (checkFSEntry(fd) == TRUE) {
         if (g_fsinfo[fd].fd == fd) {
-            scopeLog("doOpen: duplicate\n", fd, CFG_LOG_DEBUG);
+            char buf[128];
+
+            snprintf(buf, sizeof(buf), "%s:doOpen: duplicate\n", func);
+            scopeLog(buf, fd, CFG_LOG_DEBUG);
             return;
         }
         
@@ -1068,7 +1095,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, char *func)
         g_fsinfo[fd].fd = fd;
         g_fsinfo[fd].type = type;
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
-        scopeLog(func, fd, CFG_LOG_DEBUG);
+        scopeLog(func, fd, CFG_LOG_TRACE);
     }
 }
 
@@ -1099,9 +1126,9 @@ doClose(int fd, char *func)
         }
         
         memset(ninfo, 0, sizeof(struct net_info_t));
-        scopeLog(func, fd, CFG_LOG_DEBUG);
+        if (func) scopeLog(func, fd, CFG_LOG_DEBUG);
     } else if ((fsinfo = getFSEntry(fd)) != NULL) {
-        scopeLog(func, fd, CFG_LOG_DEBUG);
+        if (func) scopeLog(func, fd, CFG_LOG_TRACE);
         memset(fsinfo, 0, sizeof(struct fs_info_t));
     }
 }
@@ -1182,7 +1209,7 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
     // freopen just changes the mode if pathname is null
     if ((stream != NULL) &&(pathname != NULL)) {
         doOpen(fileno(stream), pathname, STREAM, "freopen\n");
-        doClose(fileno(orig_stream), "freopen");
+        doClose(fileno(orig_stream), "freopen\n");
     }
     
     return stream;
@@ -1263,9 +1290,9 @@ freopen64(const char *pathname, const char *mode, FILE *orig_stream)
     doThread();
     stream = g_fn.freopen64(pathname, mode, orig_stream);
     // freopen just changes the mode if pathname is null
-    if ((stream != NULL) &&(pathname != NULL)) {
+    if ((stream != NULL) && (pathname != NULL)) {
         doOpen(fileno(stream), pathname, STREAM, "freopen64\n");
-        doClose(fileno(orig_stream), "freopen64");
+        doClose(fileno(orig_stream), "freopen64\n");
     }
     
     return stream;
@@ -1275,26 +1302,27 @@ EXPORTON ssize_t
 pread64(int fd, void *buf, size_t count, off_t offset)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(pread64, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.pread64(fd, buf, count, offset);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("pread64\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd) != NULL) {
             // This is a network descriptor
             doSetAddrs(fd);
             doRecv(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread64");
         }
     }
@@ -1306,26 +1334,27 @@ EXPORTON ssize_t
 preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
     ssize_t rc;
+    struct fs_info_t *fs = getFSEntry(fd);
 
     WRAP_CHECK(preadv, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.preadv(fd, iov, iovcnt, offset);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("preadv\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd) != NULL) {
             // This is a network descriptor
             doSetAddrs(fd);
             doRecv(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv");
         }
     }
@@ -1337,26 +1366,27 @@ EXPORTON ssize_t
 preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(preadv2, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.preadv2(fd, iov, iovcnt, offset, flags);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("preadv2\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doRecv(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv2");
         }
     }
@@ -1368,26 +1398,27 @@ EXPORTON ssize_t
 preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(preadv64v2, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.preadv64v2(fd, iov, iovcnt, offset, flags);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("preadv64v2\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doRecv(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv64v2");
         }
     }
@@ -1399,26 +1430,27 @@ EXPORTON ssize_t
 pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(pwrite64, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.pwrite64(fd, buf, nbyte, offset);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("pwrite64\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doSend(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite64");
         }
     }
@@ -1429,26 +1461,27 @@ EXPORTON ssize_t
 pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(pwritev, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.pwritev(fd, iov, iovcnt, offset);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("pwritev\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doSend(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev");
         }
     }
@@ -1459,26 +1492,27 @@ EXPORTON ssize_t
 pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(pwritev2, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.pwritev2(fd, iov, iovcnt, offset, flags);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("pwritev2\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doSend(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev2");
         }
     }
@@ -1489,26 +1523,27 @@ EXPORTON ssize_t
 pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(pwritev64v2, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.pwritev64v2(fd, iov, iovcnt, offset, flags);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("pwritev64v2\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doSend(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev64v2");
         }
     }
@@ -1519,14 +1554,15 @@ EXPORTON off_t
 lseek64(int fd, off_t offset, int whence)
 {
     off_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(lseek64, -1);
     doThread();
     rc = g_fn.lseek64(fd, offset, whence);
     
     if (rc != -1) {
         scopeLog("lseek64\n", fd, CFG_LOG_DEBUG);
-        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "lseek64");
         }
     }
@@ -1538,6 +1574,7 @@ fseeko64(FILE *stream, off_t offset, int whence)
 {
     off_t rc;
     int fd = fileno(stream);
+    struct fs_info_t *fs = getFSEntry(fd);
 
     WRAP_CHECK(fseeko64, -1);
     doThread();
@@ -1545,7 +1582,7 @@ fseeko64(FILE *stream, off_t offset, int whence)
     
     if (rc != -1) {
         scopeLog("fseeko64\n", fd, CFG_LOG_DEBUG);
-        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "fseeko64");
         }
     }
@@ -1557,14 +1594,15 @@ ftello64(FILE *stream)
 {
     off_t rc;
     int fd = fileno(stream);
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(ftello64, -1);
     doThread();
     rc = g_fn.ftello64(stream);
     
     if (rc != -1) {
         scopeLog("ftello64\n", fd, CFG_LOG_DEBUG);
-        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "ftello64");
         }
     }
@@ -1576,7 +1614,7 @@ EXPORTON int
 close(int fd)
 {
     int rc;
-
+    
     WRAP_CHECK(close, -1);
     doThread(); // Will do nothing if a thread already exists
 
@@ -1703,7 +1741,8 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
 
         doSetAddrs(sockfd);
 
-        if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+        if ((getNetEntry(fd) != NULL) &&
+            GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
             getDNSName(sockfd, (void *)buf, len);
         }
         
@@ -1750,6 +1789,7 @@ EXPORTON off_t
 lseek(int fd, off_t offset, int whence)
 {
     off_t rc;
+    struct fs_info_t *fs = getFSEntry(fd);
 
     WRAP_CHECK(lseek, -1);
     doThread();
@@ -1757,7 +1797,7 @@ lseek(int fd, off_t offset, int whence)
     
     if (rc != -1) {
         scopeLog("lseek\n", fd, CFG_LOG_DEBUG);
-        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "lseek");
         }
     }
@@ -1769,14 +1809,15 @@ fseeko(FILE *stream, off_t offset, int whence)
 {
     off_t rc;
     int fd = fileno(stream);
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(fseeko, -1);
     doThread();
     rc = g_fn.fseeko(stream, offset, whence);
     
     if (rc != -1) {
         scopeLog("fseeko\n", fd, CFG_LOG_DEBUG);
-        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "fseeko");
         }
     }
@@ -1788,6 +1829,7 @@ ftell(FILE *stream)
 {
     long rc;
     int fd = fileno(stream);
+    struct fs_info_t *fs = getFSEntry(fd);
 
     WRAP_CHECK(ftell, -1);
     doThread();
@@ -1795,7 +1837,7 @@ ftell(FILE *stream)
     
     if (rc != -1) {
         scopeLog("ftell\n", fd, CFG_LOG_DEBUG);
-        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "ftell");
         }
     }
@@ -1807,14 +1849,15 @@ ftello(FILE *stream)
 {
     off_t rc;
     int fd = fileno(stream);
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(ftello, -1);
     doThread();
     rc = g_fn.ftello(stream);
     
     if (rc != -1) {
         scopeLog("ftello\n", fd, CFG_LOG_DEBUG);
-        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "ftello");
         }
     }
@@ -1825,13 +1868,14 @@ EXPORTON void
 rewind(FILE *stream)
 {
     int fd = fileno(stream);
+    struct fs_info_t *fs = getFSEntry(fd);
 
     WRAP_CHECK_VOID(rewind);
     doThread();
     g_fn.rewind(stream);
     
     scopeLog("rewind\n", fd, CFG_LOG_DEBUG);
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+    if (fs) {
         //doFSMetric(FS_XXX, fd, EVENT_BASED, "rewind");
     }
     return;
@@ -1842,14 +1886,15 @@ fsetpos(FILE *stream,  const fpos_t *pos)
 {
     int rc;
     int fd = fileno(stream);
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(fsetpos, -1);
     doThread();
     rc = g_fn.fsetpos(stream, pos);
 
     if (rc == 0) {
         scopeLog("fsetpos\n", fd, CFG_LOG_DEBUG);
-        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "fsetpos");
         }
     }
@@ -1861,6 +1906,7 @@ fgetpos(FILE *stream,  fpos_t *pos)
 {
     int rc;
     int fd = fileno(stream);
+    struct fs_info_t *fs = getFSEntry(fd);
 
     WRAP_CHECK(fgetpos, -1);
     doThread();
@@ -1868,7 +1914,7 @@ fgetpos(FILE *stream,  fpos_t *pos)
 
     if (rc == 0) {
         scopeLog("fgetpos\n", fd, CFG_LOG_DEBUG);
-        if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "fgetpos");
         }
     }
@@ -1879,26 +1925,27 @@ EXPORTON ssize_t
 write(int fd, const void *buf, size_t count)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(write, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.write(fd, buf, count);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("write\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doSend(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "write");
         }
     }
@@ -1909,26 +1956,27 @@ EXPORTON ssize_t
 pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(pwrite, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.pwrite(fd, buf, nbyte, offset);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("pwrite\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doSend(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite");
         }
     }
@@ -1939,26 +1987,27 @@ EXPORTON ssize_t
 writev(int fd, const struct iovec *iov, int iovcnt)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(writev, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.writev(fd, iov, iovcnt);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("writev\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd) != NULL) {
             // This is a network descriptor
             doSetAddrs(fd);
             doSend(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "writev");
         }
     }
@@ -1970,26 +2019,27 @@ fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stre
 {
     ssize_t rc;
     int fd = fileno(stream);
+    struct fs_info_t *fs = getFSEntry(fd);
     
     WRAP_CHECK(fwrite, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.fwrite(ptr, size, nitems, stream);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("fwrite\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doSend(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "fwrite");
         }
     }
@@ -2000,26 +2050,27 @@ EXPORTON ssize_t
 read(int fd, void *buf, size_t count)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(read, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.read(fd, buf, count);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("read\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doRecv(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "read");
             // TODO: add counters, may need a helper func
         }
@@ -2032,26 +2083,27 @@ EXPORTON ssize_t
 readv(int fd, const struct iovec *iov, int iovcnt)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(readv, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.readv(fd, iov, iovcnt);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("readv\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doRecv(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "readv");
             // TODO: add counters, may need a helper func
         }
@@ -2064,26 +2116,27 @@ EXPORTON ssize_t
 pread(int fd, void *buf, size_t count, off_t offset)
 {
     ssize_t rc;
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(pread, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.pread(fd, buf, count, offset);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("pread\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doRecv(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread");
         }
     }
@@ -2096,26 +2149,27 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     ssize_t rc;
     int fd = fileno(stream);
-
+    struct fs_info_t *fs = getFSEntry(fd);
+    
     WRAP_CHECK(fread, -1);
     doThread();
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].startTime = getTime();
+    if (fs) {
+        fs->startTime = getTime();
     }
     
     rc = g_fn.fread(ptr, size, nmemb, stream);
     
-    if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-        g_fsinfo[fd].duration = getDuration(g_fsinfo[fd].startTime) / 1000;
+    if (fs) {
+        fs->duration = getDuration(fs->startTime) / 1000;
     }
     
     if (rc != -1) {
         scopeLog("fread\n", fd, CFG_LOG_TRACE);
-        if (g_netinfo && (fd <= g_cfg.numFSInfo) && (g_netinfo[fd].fd == fd)) {
+        if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
             doRecv(fd, rc);
-        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+        } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "fread");
         }
     }
@@ -2134,8 +2188,7 @@ fcntl(int fd, int cmd, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
     rc = g_fn.fcntl(fd, cmd, fArgs.arg[0], fArgs.arg[1],
                     fArgs.arg[2], fArgs.arg[3]);
-    if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd) &&
-        (cmd == F_DUPFD)) {
+    if ((rc != -1) && getNetEntry(fd) && (cmd == F_DUPFD)) {
         // This is a network descriptor
         scopeLog("fcntl\n", rc, CFG_LOG_DEBUG);
         doAddNewSock(rc);
@@ -2155,8 +2208,7 @@ fcntl64(int fd, int cmd, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
     rc = g_fn.fcntl64(fd, cmd, fArgs.arg[0], fArgs.arg[1],
                       fArgs.arg[2], fArgs.arg[3]);
-    if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd) &&
-        (cmd == F_DUPFD)) {
+    if ((rc != -1) && getNetEntry(fd) && (cmd == F_DUPFD)) {
         // This is a network descriptor
         scopeLog("fcntl\n", rc, CFG_LOG_DEBUG);
         doAddNewSock(rc);
@@ -2173,7 +2225,7 @@ dup(int fd)
     WRAP_CHECK(dup, -1);
     doThread();
     rc = g_fn.dup(fd);
-    if ((rc != -1) && (g_netinfo) && (g_netinfo[fd].fd == fd)) {
+    if ((rc != -1) && getNetEntry(fd)) {
         // This is a network descriptor
         scopeLog("dup\n", rc, CFG_LOG_DEBUG);
         doAddNewSock(rc);
@@ -2190,7 +2242,7 @@ dup2(int oldfd, int newfd)
     WRAP_CHECK(dup2, -1);
     doThread();
     rc = g_fn.dup2(oldfd, newfd);
-    if ((rc != -1) && (g_netinfo) && (g_netinfo[oldfd].fd == oldfd)) {
+    if ((rc != -1) && getNetEntry(rc)) {
         // This is a network descriptor
         scopeLog("dup2\n", rc, CFG_LOG_DEBUG);
         doAddNewSock(rc);
@@ -2207,7 +2259,7 @@ dup3(int oldfd, int newfd, int flags)
     WRAP_CHECK(dup3, -1);
     doThread();
     rc = g_fn.dup3(oldfd, newfd, flags);
-    if ((rc != -1) && (g_netinfo) && (g_netinfo[oldfd].fd == oldfd)) {
+    if ((rc != -1) && getNetEntry(rc)) {
         // This is a network descriptor
         scopeLog("dup3\n", rc, CFG_LOG_DEBUG);
         doAddNewSock(rc);
@@ -2252,11 +2304,12 @@ socket(int socket_family, int socket_type, int protocol)
     doThread();
     sd = g_fn.socket(socket_family, socket_type, protocol);
     if (sd != -1) {
+        struct net_info_t *net;
+        
         scopeLog("socket\n", sd, CFG_LOG_DEBUG);
         addSock(sd, socket_type);
         
-        if (g_netinfo &&
-            (g_netinfo[sd].fd == sd) &&
+        if (((net  = getNetEntry(sd)) != NULL) &&
             ((socket_family == AF_INET) ||
              (socket_family == AF_INET6)) &&            
             (socket_type == SOCK_DGRAM)) {
@@ -2271,7 +2324,7 @@ socket(int socket_family, int socket_type, int protocol)
              * a UDP socket is open we say the port is open
              * a UDP socket is closed we say the port is closed
              */
-            g_netinfo[sd].listen = TRUE;
+            net->listen = TRUE;
             doNetMetric(OPEN_PORTS, sd, EVENT_BASED);
         }
     }
@@ -2298,7 +2351,8 @@ EXPORTON int
 listen(int sockfd, int backlog)
 {
     int rc;
-
+    struct net_info_t *net = getNetEntry(sockfd);
+    
     WRAP_CHECK(listen, -1);
     doThread();
     rc = g_fn.listen(sockfd, backlog);
@@ -2308,14 +2362,14 @@ listen(int sockfd, int backlog)
         // Tracking number of open ports
         atomicAdd(&g_ctrs.openPorts, 1);
         
-        if (g_netinfo && (g_netinfo[sockfd].fd == sockfd)) {
-            g_netinfo[sockfd].listen = TRUE;
-            g_netinfo[sockfd].accept = TRUE;
+        if (net) {
+            net->listen = TRUE;
+            net-> accept = TRUE;
             doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED);
 
-            if (g_netinfo[sockfd].type == SOCK_STREAM) {
+            if (net->type == SOCK_STREAM) {
                 atomicAdd(&g_ctrs.TCPConnections, 1);
-                g_netinfo[sockfd].accept = TRUE;                            
+                net->accept = TRUE;                            
                 doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED);
             }
         }
@@ -2375,25 +2429,24 @@ EXPORTON int
 connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int rc;
-
+    struct net_info_t *net = getNetEntry(sockfd);
+    
     WRAP_CHECK(connect, -1);
     doThread();
     rc = g_fn.connect(sockfd, addr, addrlen);
-    if ((rc != -1) &&
-        (g_netinfo) &&
-        (g_netinfo[sockfd].fd == sockfd)) {
+    if ((rc != -1) && net) {
         doSetConnection(sockfd, addr, addrlen, REMOTE);
-        g_netinfo[sockfd].accept = TRUE;
+        net->accept = TRUE;
         atomicAdd(&g_ctrs.activeConnections, 1);
         doNetMetric(ACTIVE_CONNECTIONS, sockfd, EVENT_BASED);
 
-        if (g_netinfo[sockfd].type == SOCK_STREAM) {
+        if (net->type == SOCK_STREAM) {
             atomicAdd(&g_ctrs.TCPConnections, 1);
             doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED);
         }
 
         // Start the duration timer
-        g_netinfo[sockfd].startTime = getTime();
+        net->startTime = getTime();
         scopeLog("connect\n", sockfd, CFG_LOG_DEBUG);
     }
     
@@ -2404,13 +2457,15 @@ EXPORTON ssize_t
 send(int sockfd, const void *buf, size_t len, int flags)
 {
     ssize_t rc;
-
+    struct net_info_t *net = getNetEntry(sockfd);
+    
     WRAP_CHECK(send, -1);
     doThread();
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
         scopeLog("send\n", sockfd, CFG_LOG_TRACE);
-        if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+        if (net &&
+            GET_PORT(sockfd, net->remoteConn.ss_family, REMOTE) == DNS_PORT) {
             getDNSName(sockfd, (void *)buf, len);
         }
 
@@ -2422,10 +2477,11 @@ send(int sockfd, const void *buf, size_t len, int flags)
 
 EXPORTON ssize_t
 sendto(int sockfd, const void *buf, size_t len, int flags,
-               const struct sockaddr *dest_addr, socklen_t addrlen)
+       const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
-
+    struct net_info_t *net = getNetEntry(sockfd);
+    
     WRAP_CHECK(sendto, -1);
     doThread();
     rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
@@ -2433,7 +2489,8 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
         scopeLog("sendto\n", sockfd, CFG_LOG_TRACE);
         doSetConnection(sockfd, dest_addr, addrlen, REMOTE);
 
-        if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+        if (net &&
+            GET_PORT(sockfd, net->remoteConn.ss_family, REMOTE) == DNS_PORT) {
             getDNSName(sockfd, (void *)buf, len);
         }
 
@@ -2447,7 +2504,8 @@ EXPORTON ssize_t
 sendmsg(int sockfd, const struct msghdr *msg, int flags)
 {
     ssize_t rc;
-
+    struct net_info_t *net = getNetEntry(sockfd);
+    
     WRAP_CHECK(sendmsg, -1);
     doThread();
     rc = g_fn.sendmsg(sockfd, msg, flags);
@@ -2455,7 +2513,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
         scopeLog("sendmsg\n", sockfd, CFG_LOG_TRACE);
 
         // For UDP connections the msg is a remote addr
-        if (g_netinfo && msg && (g_netinfo[sockfd].type != SOCK_STREAM)) {
+        if (net && msg && (net->type != SOCK_STREAM)) {
             if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
                 doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
                                 sizeof(struct sockaddr_in6), REMOTE);
@@ -2465,7 +2523,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
             }
         }
 
-        if (g_netinfo && GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+        if (net && GET_PORT(sockfd, net->remoteConn.ss_family, REMOTE) == DNS_PORT) {
             getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
         }
         
@@ -2503,7 +2561,7 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
         atomicAdd(&g_ctrs.netrx, rc);
-        if (g_netinfo && (g_netinfo[sockfd].fd != sockfd)) {
+        if (getNetEntry(sockfd)) {
             // We missed an accept...most likely
             // Or.. we are a child proc that inherited a socket
             int type;
@@ -2530,7 +2588,7 @@ EXPORTON ssize_t
 recvmsg(int sockfd, struct msghdr *msg, int flags)
 {
     ssize_t rc;
-
+    
     WRAP_CHECK(recvmsg, -1);
     doThread();
     rc = g_fn.recvmsg(sockfd, msg, flags);
@@ -2538,7 +2596,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
         scopeLog("recvmsg\n", sockfd, CFG_LOG_TRACE);
 
         // For UDP connections the msg is a remote addr
-        if (msg && (g_netinfo[sockfd].type != SOCK_STREAM)) {
+        if (msg && getNetEntry(sockfd)) {
             if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
                 doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
                                 sizeof(struct sockaddr_in6), REMOTE);

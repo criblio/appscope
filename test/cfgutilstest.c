@@ -73,8 +73,12 @@ cfgPathHonorsPriorityOrder(void** state)
         assert_int_not_equal(fd, -1);
         assert_int_equal(close(fd), 0);
         char* result = cfgPath(file);
-        assert_string_equal(result, path[i]);
+        assert_non_null(result);
+        char* realpath_result = realpath(result, NULL);
+        assert_non_null(realpath_result);
+        assert_string_equal(realpath_result, path[i]);
         if (result) free(result);
+        if (realpath_result) free(realpath_result);
     }
 
     // Delete the files we just created

@@ -74,11 +74,10 @@ cfgPathHonorsPriorityOrder(void** state)
         assert_int_equal(close(fd), 0);
         char* result = cfgPath(file);
         assert_non_null(result);
-        char* realpath_result = realpath(result, NULL);
-        assert_non_null(realpath_result);
-        assert_string_equal(realpath_result, path[i]);
+	if (strcmp(result, path[i])) {
+            fail_msg("Expected %s but found %s for i=%d", path[i], result, i);
+	}
         if (result) free(result);
-        if (realpath_result) free(realpath_result);
     }
 
     // Delete the files we just created

@@ -20,8 +20,16 @@
 #include <pthread.h>
 #include <ctype.h>
 #include <limits.h>
+#include <sys/stat.h>
+#include <sys/statvfs.h>
+#include <sys/param.h>
+#include <sys/mount.h>
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
+
+#ifdef __LINUX__
+#include <sys/vfs.h>
+#endif 
 
 #include "dns.h"
 
@@ -175,6 +183,16 @@ typedef struct interposed_funcs_t {
     int (*fgetpos)(FILE *, fpos_t *);
     int (*fsetpos)(FILE *, const fpos_t *);
     void (*rewind)(FILE *);
+    int (*stat)(const char *, struct stat *);
+    int (*lstat)(const char *, struct stat *);
+    int (*fstat)(int, struct stat *);
+    int (*statfs)(const char *, struct statfs *);
+    int (*statfs64)(const char *, struct statfs64 *);
+    int (*fstatfs)(int, struct statfs *);
+    int (*fstatfs64)(int, struct statfs64 *);
+    int (*statvfs)(const char *, struct statvfs *);
+    int (*fstatvfs)(int, struct statvfs *);
+    int (*fstatat)(int, const char *, struct stat *, int);
     int (*shutdown)(int, int);
     int (*socket)(int, int, int);
     int (*listen)(int, int);
@@ -204,6 +222,9 @@ typedef struct interposed_funcs_t {
                                  const struct sockaddr *, socklen_t);
     uint32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
                                       uint16_t, uint16_t, void *, void *);
+#ifdef __LINUX__
+    int (*statx)(int, const char *, int, unsigned int, struct statx *);
+#endif // __LINUX__
 } interposed_funcs;
     
 static inline void

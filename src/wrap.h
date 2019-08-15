@@ -86,6 +86,12 @@ enum metric_t {
     FS_DURATION,
     FS_SIZE_READ,
     FS_SIZE_WRITE,
+    FS_OPEN,
+    FS_CLOSE,
+    FS_SEEK,
+    FS_READ,
+    FS_WRITE,
+    FS_STAT,
 };
 
 // File types; stream or fd

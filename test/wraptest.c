@@ -46,6 +46,8 @@ testFSDuration(void** state)
     last = getcwd(path, sizeof(path));
     assert_non_null(last);
     strcat(path, LOG_PATH);
+    if ( access(path, F_OK | W_OK) != -1)
+        assert_return_code(unlink(path), errno);
 
     // Start the duration timer with a read
     fd = open("./scope.sh", O_RDONLY);
@@ -103,6 +105,9 @@ testConnDuration(void** state)
     last = getcwd(path, sizeof(path));
     assert_non_null(last);
     strcat(path, LOG_PATH);
+    // Delete the file so we can get deterministic results
+    if ( access(path, F_OK | W_OK) != -1)
+        assert_return_code(unlink(path), errno);
 
     saddr.sin_family = AF_INET;
     saddr.sin_port = htons(PORT1);

@@ -1182,7 +1182,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, char *func)
         g_fsinfo[fd].fd = fd;
         g_fsinfo[fd].type = type;
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
-        //doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0);
+        doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0);
         scopeLog(func, fd, CFG_LOG_TRACE);
     }
 }

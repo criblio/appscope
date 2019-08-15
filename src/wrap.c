@@ -1735,7 +1735,7 @@ statfs64(const char *path, struct statfs64 *buf)
     rc = g_fn.statfs64(path, buf);
 
     if (rc != -1) {
-        scopeLog("statfs64\n", -1, CFG_LOG_DEBUG);
+        scopeLog("statfs64", -1, CFG_LOG_DEBUG);
         if (path) {
             //doFSMetric(FS_XXX, -1, path, EVENT_BASED, "statfs64");
         }
@@ -1753,7 +1753,7 @@ fstatfs64(int fd, struct statfs64 *buf)
     rc = g_fn.fstatfs64(fd, buf);
 
     if (rc != -1) {
-        scopeLog("fstatfs64\n", fd, CFG_LOG_DEBUG);
+        scopeLog("fstatfs64", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
             //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstatfs64");
         }
@@ -1772,7 +1772,7 @@ statx(int dirfd, const char *pathname, int flags,
     rc = g_fn.statx(dirfd, pathname, flags, mask, statxbuf);
 
     if (rc != -1) {
-        scopeLog("statx\n", -1, CFG_LOG_DEBUG);
+        scopeLog("statx", -1, CFG_LOG_DEBUG);
         if (pathname) {
             //doFSMetric(FS_XXX, -1, pathname, EVENT_BASED, "statx");
         }
@@ -1965,7 +1965,7 @@ fstatat(int fd, const char *path, struct stat *buf, int flag)
     rc = g_fn.fstatat(fd, path, buf, flag);
 
     if (rc != -1) {
-        scopeLog("fstatat\n", fd, CFG_LOG_DEBUG);
+        scopeLog("fstatat", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
             //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstatat");
         }
@@ -2121,7 +2121,7 @@ stat(const char *pathname, struct stat *statbuf)
     rc = g_fn.stat(pathname, statbuf);
 
     if (rc != -1) {
-        scopeLog("stat\n", -1, CFG_LOG_DEBUG);
+        scopeLog("stat", -1, CFG_LOG_DEBUG);
         if (pathname) {
             //doFSMetric(FS_XXX, -1, pathname, EVENT_BASED, "stat");
         }
@@ -2139,7 +2139,7 @@ lstat(const char *pathname, struct stat *statbuf)
     rc = g_fn.lstat(pathname, statbuf);
 
     if (rc != -1) {
-        scopeLog("lstat\n", -1, CFG_LOG_DEBUG);
+        scopeLog("lstat", -1, CFG_LOG_DEBUG);
         if (pathname) {
             //doFSMetric(FS_XXX, -1, pathname, EVENT_BASED, "lstat");
         }
@@ -2157,7 +2157,7 @@ fstat(int fd, struct stat *statbuf)
     rc = g_fn.fstat(fd, statbuf);
 
     if (rc != -1) {
-        scopeLog("fstat\n", fd, CFG_LOG_DEBUG);
+        scopeLog("fstat", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
             //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstat");
         }
@@ -2175,7 +2175,7 @@ statfs(const char *path, struct statfs *buf)
     rc = g_fn.statfs(path, buf);
 
     if (rc != -1) {
-        scopeLog("statfs\n", -1, CFG_LOG_DEBUG);
+        scopeLog("statfs", -1, CFG_LOG_DEBUG);
         if (path) {
             //doFSMetric(FS_XXX, -1, path, EVENT_BASED, "statfs");
         }
@@ -2193,7 +2193,7 @@ fstatfs(int fd, struct statfs *buf)
     rc = g_fn.fstatfs(fd, buf);
 
     if (rc != -1) {
-        scopeLog("fstatfs\n", fd, CFG_LOG_DEBUG);
+        scopeLog("fstatfs", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
             //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstatfs");
         }
@@ -2211,7 +2211,7 @@ statvfs(const char *path, struct statvfs *buf)
     rc = g_fn.statvfs(path, buf);
 
     if (rc != -1) {
-        scopeLog("statvfs\n", -1, CFG_LOG_DEBUG);
+        scopeLog("statvfs", -1, CFG_LOG_DEBUG);
         if (path) {
             //doFSMetric(FS_XXX, -1, path, EVENT_BASED, "statvfs");
         }
@@ -2229,7 +2229,7 @@ fstatvfs(int fd, struct statvfs *buf)
     rc = g_fn.fstatvfs(fd, buf);
 
     if (rc != -1) {
-        scopeLog("fstatvfs\n", fd, CFG_LOG_DEBUG);
+        scopeLog("fstatvfs", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
             //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstatvfs");
         }

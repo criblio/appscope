@@ -1670,7 +1670,7 @@ lseek64(int fd, off_t offset, int whence)
     if (rc != -1) {
         scopeLog("lseek64", fd, CFG_LOG_DEBUG);
         if (fs) {
-            //doFSMetric(FS_XXX, fd, EVENT_BASED, "lseek64");
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek64", (ssize_t)offset);
         }
     }
     return rc;
@@ -1690,7 +1690,7 @@ fseeko64(FILE *stream, off_t offset, int whence)
     if (rc != -1) {
         scopeLog("fseeko64", fd, CFG_LOG_DEBUG);
         if (fs) {
-            //doFSMetric(FS_XXX, fd, EVENT_BASED, "fseeko64");
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko64", (ssize_t)offset);
         }
     }
     return rc;
@@ -1710,7 +1710,7 @@ ftello64(FILE *stream)
     if (rc != -1) {
         scopeLog("ftello64", fd, CFG_LOG_DEBUG);
         if (fs) {
-            //doFSMetric(FS_XXX, fd, EVENT_BASED, "ftello64");
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftello64", (ssize_t)rc);
         }
     }
     return rc;
@@ -1728,7 +1728,7 @@ statfs64(const char *path, struct statfs64 *buf)
     if (rc != -1) {
         scopeLog("statfs64\n", -1, CFG_LOG_DEBUG);
         if (path) {
-            //doFSMetric(FS_XXX, -1, path, EVENT_BASED, "statfs64");
+            //doFSMetric(FS_SEEK, -1, path, EVENT_BASED, "statfs64", sizeof(struct statfs64));
         }
     }
     return rc;
@@ -1766,6 +1766,132 @@ statx(int dirfd, const char *pathname, int flags,
         scopeLog("statx\n", -1, CFG_LOG_DEBUG);
         if (pathname) {
             //doFSMetric(FS_XXX, -1, pathname, EVENT_BASED, "statx");
+        }
+    }
+    return rc;
+}
+
+EXPORTON int
+stat(const char *pathname, struct stat *statbuf)
+{
+    int rc;
+
+    WRAP_CHECK(stat, -1);
+    doThread();
+    rc = g_fn.stat(pathname, statbuf);
+
+    if (rc != -1) {
+        scopeLog("stat\n", -1, CFG_LOG_DEBUG);
+        if (pathname) {
+            //doFSMetric(FS_XXX, -1, pathname, EVENT_BASED, "stat");
+        }
+    }
+    return rc;
+}
+
+EXPORTON int
+lstat(const char *pathname, struct stat *statbuf)
+{
+    int rc;
+
+    WRAP_CHECK(lstat, -1);
+    doThread();
+    rc = g_fn.lstat(pathname, statbuf);
+
+    if (rc != -1) {
+        scopeLog("lstat\n", -1, CFG_LOG_DEBUG);
+        if (pathname) {
+            //doFSMetric(FS_XXX, -1, pathname, EVENT_BASED, "lstat");
+        }
+    }
+    return rc;
+}
+
+EXPORTON int
+fstat(int fd, struct stat *statbuf)
+{
+    int rc;
+
+    WRAP_CHECK(fstat, -1);
+    doThread();
+    rc = g_fn.fstat(fd, statbuf);
+
+    if (rc != -1) {
+        scopeLog("fstat\n", fd, CFG_LOG_DEBUG);
+        if (checkFSEntry(fd)) {
+            //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstat");
+        }
+    }
+    return rc;
+}
+
+EXPORTON int
+statfs(const char *path, struct statfs *buf)
+{
+    int rc;
+
+    WRAP_CHECK(statfs, -1);
+    doThread();
+    rc = g_fn.statfs(path, buf);
+
+    if (rc != -1) {
+        scopeLog("statfs\n", -1, CFG_LOG_DEBUG);
+        if (path) {
+            //doFSMetric(FS_XXX, -1, path, EVENT_BASED, "statfs");
+        }
+    }
+    return rc;
+}
+
+EXPORTON int
+fstatfs(int fd, struct statfs *buf)
+{
+    int rc;
+
+    WRAP_CHECK(fstatfs, -1);
+    doThread();
+    rc = g_fn.fstatfs(fd, buf);
+
+    if (rc != -1) {
+        scopeLog("fstatfs\n", fd, CFG_LOG_DEBUG);
+        if (checkFSEntry(fd)) {
+            //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstatfs");
+        }
+    }
+    return rc;
+}
+
+EXPORTON int
+statvfs(const char *path, struct statvfs *buf)
+{
+    int rc;
+
+    WRAP_CHECK(statvfs, -1);
+    doThread();
+    rc = g_fn.statvfs(path, buf);
+
+    if (rc != -1) {
+        scopeLog("statvfs\n", -1, CFG_LOG_DEBUG);
+        if (path) {
+            //doFSMetric(FS_XXX, -1, path, EVENT_BASED, "statvfs");
+        }
+    }
+    return rc;
+}
+
+EXPORTON int
+fstatvfs(int fd, struct statvfs *buf)
+{
+    int rc;
+
+    WRAP_CHECK(fstatvfs, -1);
+    doThread();
+    rc = g_fn.fstatvfs(fd, buf);
+
+    if (rc != -1) {
+        scopeLog("fstatvfs\n", fd, CFG_LOG_DEBUG);
+        if (checkFSEntry(fd)) {
+            //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstatvfs");
         }
     }
     return rc;
@@ -1946,7 +2072,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fstatat(int fd, const char *path, struct stat *buf, int flag)
 {
     int rc;
@@ -1979,7 +2105,7 @@ lseek(int fd, off_t offset, int whence)
     if (rc != -1) {
         scopeLog("lseek", fd, CFG_LOG_DEBUG);
         if (fs) {
-            //doFSMetric(FS_XXX, fd, EVENT_BASED, "lseek");
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek", (ssize_t)offset);
         }
     }
     return rc;
@@ -1999,7 +2125,7 @@ fseeko(FILE *stream, off_t offset, int whence)
     if (rc != -1) {
         scopeLog("fseeko", fd, CFG_LOG_DEBUG);
         if (fs) {
-            //doFSMetric(FS_XXX, fd, EVENT_BASED, "fseeko");
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko", (ssize_t)offset);
         }
     }
     return rc;
@@ -2019,7 +2145,7 @@ ftell(FILE *stream)
     if (rc != -1) {
         scopeLog("ftell", fd, CFG_LOG_DEBUG);
         if (fs) {
-            //doFSMetric(FS_XXX, fd, EVENT_BASED, "ftell");
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftell", (ssize_t)rc);
         }
     }
     return rc;
@@ -2039,7 +2165,7 @@ ftello(FILE *stream)
     if (rc != -1) {
         scopeLog("ftello", fd, CFG_LOG_DEBUG);
         if (fs) {
-            //doFSMetric(FS_XXX, fd, EVENT_BASED, "ftello");
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftello", (ssize_t)rc);
         }
     }
     return rc;
@@ -2057,13 +2183,13 @@ rewind(FILE *stream)
     
     scopeLog("rewind", fd, CFG_LOG_DEBUG);
     if (fs) {
-        //doFSMetric(FS_XXX, fd, EVENT_BASED, "rewind");
+        doFSMetric(FS_SEEK, fd, EVENT_BASED, "rewind", (ssize_t)1);
     }
     return;
 }
 
 EXPORTON int
-fsetpos(FILE *stream,  const fpos_t *pos)
+fsetpos(FILE *stream, const fpos_t *pos)
 {
     int rc;
     int fd = fileno(stream);
@@ -2076,7 +2202,7 @@ fsetpos(FILE *stream,  const fpos_t *pos)
     if (rc == 0) {
         scopeLog("fsetpos", fd, CFG_LOG_DEBUG);
         if (fs) {
-            //doFSMetric(FS_XXX, fd, EVENT_BASED, "fsetpos");
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fsetpos", (ssize_t)1);
         }
     }
     return rc;
@@ -2096,133 +2222,7 @@ fgetpos(FILE *stream,  fpos_t *pos)
     if (rc == 0) {
         scopeLog("fgetpos", fd, CFG_LOG_DEBUG);
         if (fs) {
-            //doFSMetric(FS_XXX, fd, EVENT_BASED, "fgetpos");
-        }
-    }
-    return rc;
-}
-
-EXPORTON int
-stat(const char *pathname, struct stat *statbuf)
-{
-    int rc;
-
-    WRAP_CHECK(stat, -1);
-    doThread();
-    rc = g_fn.stat(pathname, statbuf);
-
-    if (rc != -1) {
-        scopeLog("stat\n", -1, CFG_LOG_DEBUG);
-        if (pathname) {
-            //doFSMetric(FS_XXX, -1, pathname, EVENT_BASED, "stat");
-        }
-    }
-    return rc;
-}
-
-EXPORTON int
-lstat(const char *pathname, struct stat *statbuf)
-{
-    int rc;
-
-    WRAP_CHECK(lstat, -1);
-    doThread();
-    rc = g_fn.lstat(pathname, statbuf);
-
-    if (rc != -1) {
-        scopeLog("lstat\n", -1, CFG_LOG_DEBUG);
-        if (pathname) {
-            //doFSMetric(FS_XXX, -1, pathname, EVENT_BASED, "lstat");
-        }
-    }
-    return rc;
-}
-
-EXPORTON int
-fstat(int fd, struct stat *statbuf)
-{
-    int rc;
-
-    WRAP_CHECK(fstat, -1);
-    doThread();
-    rc = g_fn.fstat(fd, statbuf);
-
-    if (rc != -1) {
-        scopeLog("fstat\n", fd, CFG_LOG_DEBUG);
-        if (checkFSEntry(fd)) {
-            //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstat");
-        }
-    }
-    return rc;
-}
-
-EXPORTON int
-statfs(const char *path, struct statfs *buf)
-{
-    int rc;
-
-    WRAP_CHECK(statfs, -1);
-    doThread();
-    rc = g_fn.statfs(path, buf);
-
-    if (rc != -1) {
-        scopeLog("statfs\n", -1, CFG_LOG_DEBUG);
-        if (path) {
-            //doFSMetric(FS_XXX, -1, path, EVENT_BASED, "statfs");
-        }
-    }
-    return rc;
-}
-
-EXPORTON int
-fstatfs(int fd, struct statfs *buf)
-{
-    int rc;
-
-    WRAP_CHECK(fstatfs, -1);
-    doThread();
-    rc = g_fn.fstatfs(fd, buf);
-
-    if (rc != -1) {
-        scopeLog("fstatfs\n", fd, CFG_LOG_DEBUG);
-        if (checkFSEntry(fd)) {
-            //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstatfs");
-        }
-    }
-    return rc;
-}
-
-EXPORTON int
-statvfs(const char *path, struct statvfs *buf)
-{
-    int rc;
-
-    WRAP_CHECK(statvfs, -1);
-    doThread();
-    rc = g_fn.statvfs(path, buf);
-
-    if (rc != -1) {
-        scopeLog("statvfs\n", -1, CFG_LOG_DEBUG);
-        if (path) {
-            //doFSMetric(FS_XXX, -1, path, EVENT_BASED, "statvfs");
-        }
-    }
-    return rc;
-}
-
-EXPORTON int
-fstatvfs(int fd, struct statvfs *buf)
-{
-    int rc;
-
-    WRAP_CHECK(fstatvfs, -1);
-    doThread();
-    rc = g_fn.fstatvfs(fd, buf);
-
-    if (rc != -1) {
-        scopeLog("fstatvfs\n", fd, CFG_LOG_DEBUG);
-        if (checkFSEntry(fd)) {
-            //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstatvfs");
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fgetpos", (ssize_t)1);
         }
     }
     return rc;

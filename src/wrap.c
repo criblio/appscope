@@ -1228,6 +1228,7 @@ doClose(int fd, char *func)
         if (func) scopeLog(func, fd, CFG_LOG_DEBUG);
     } else if ((fsinfo = getFSEntry(fd)) != NULL) {
         if (func) scopeLog(func, fd, CFG_LOG_TRACE);
+        doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 0);
         memset(fsinfo, 0, sizeof(struct fs_info_t));
     }
 }

@@ -2358,7 +2358,6 @@ fstatvfs(int fd, struct statvfs *buf)
         scopeLog("fstatvfs", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
             //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstatvfs");
->>>>>>> ad8025bbc98d2620b654f296ab4e19c91144a8cb
         }
     }
     return rc;

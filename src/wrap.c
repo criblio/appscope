@@ -2237,24 +2237,6 @@ fgetpos(FILE *stream,  fpos_t *pos)
     return rc;
 }
 
-EXPORTON int
-stat(const char *pathname, struct stat *statbuf)
-{
-    int rc;
-
-    WRAP_CHECK(stat, -1);
-    doThread();
-    rc = g_fn.stat(pathname, statbuf);
-
-    if (rc != -1) {
-        scopeLog("stat", -1, CFG_LOG_DEBUG);
-        if (pathname) {
-            //doFSMetric(FS_XXX, -1, pathname, EVENT_BASED, "stat");
-        }
-    }
-    return rc;
-}
-
 EXPORTON ssize_t
 write(int fd, const void *buf, size_t count)
 {

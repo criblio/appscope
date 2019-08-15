@@ -27,7 +27,7 @@ scopeLog(const char* msg, int fd, cfg_log_level_t level)
     if (!g_log || !msg || !g_cfg.procname[0]) return;
 
     char buf[strlen(msg) + 128];
-    snprintf(buf, sizeof(buf), "Scope: %s(%d): %s", g_cfg.procname, fd, msg);
+    snprintf(buf, sizeof(buf), "Scope: %s(%d): %s\n", g_cfg.procname, fd, msg);
     logSend(g_log, buf, level);
 }
 
@@ -43,18 +43,18 @@ dumpAddrs(int sd, enum control_type_t endp)
               &((struct sockaddr_in *)&g_netinfo[sd].localConn)->sin_addr,
               ip, sizeof(ip));
     port = GET_PORT(sd, g_netinfo[sd].localConn.ss_family, LOCAL);
-    snprintf(buf, sizeof(buf), "%s:%d LOCAL: %s:%d\n", __FUNCTION__, __LINE__, ip, port);
+    snprintf(buf, sizeof(buf), "%s:%d LOCAL: %s:%d", __FUNCTION__, __LINE__, ip, port);
     scopeLog(buf, sd, CFG_LOG_DEBUG);
 
     inet_ntop(AF_INET,                                          
               &((struct sockaddr_in *)&g_netinfo[sd].remoteConn)->sin_addr,
               ip, sizeof(ip));
     port = GET_PORT(sd, g_netinfo[sd].remoteConn.ss_family, REMOTE);
-    snprintf(buf, sizeof(buf), "%s:%d REMOTE:%s:%d\n", __FUNCTION__, __LINE__, ip, port);
+    snprintf(buf, sizeof(buf), "%s:%d REMOTE:%s:%d", __FUNCTION__, __LINE__, ip, port);
     scopeLog(buf, sd, CFG_LOG_DEBUG);
     
     if (GET_PORT(sd, g_netinfo[sd].localConn.ss_family, REMOTE) == DNS_PORT) {
-        scopeLog("DNS\n", sd, CFG_LOG_DEBUG);
+        scopeLog("DNS", sd, CFG_LOG_DEBUG);
     }
 }
 
@@ -125,7 +125,7 @@ addSock(int fd, int type)
 {
     if (checkNetEntry(fd) == TRUE) {
         if (g_netinfo[fd].fd == fd) {
-            scopeLog("addSock: duplicate\n", fd, CFG_LOG_DEBUG);
+            scopeLog("addSock: duplicate", fd, CFG_LOG_DEBUG);
 
             if (g_ctrs.openPorts > 0) {
                 atomicSub(&g_ctrs.openPorts, 1);
@@ -141,7 +141,7 @@ addSock(int fd, int type)
         if ((fd > g_cfg.numNinfo) && (fd < MAX_FDS))  {
             // Need to realloc
             if ((g_netinfo = realloc(g_netinfo, sizeof(struct net_info_t) * fd)) == NULL) {
-                scopeLog("ERROR: addSock:realloc\n", fd, CFG_LOG_ERROR);
+                scopeLog("ERROR: addSock:realloc", fd, CFG_LOG_ERROR);
             }
             g_cfg.numNinfo = fd;
         }
@@ -216,7 +216,7 @@ doThread()
     if (time(NULL) >= g_thread.startTime) {
         g_thread.once = TRUE;
         if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
-            scopeLog("ERROR: doThread:pthread_create\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doThread:pthread_create", -1, CFG_LOG_ERROR);
         }
     }
 }
@@ -237,7 +237,7 @@ doProcMetric(enum metric_t type, long long measurement)
         };
         event_t e = {"proc.cpu", measurement, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:CPU:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doProcMetric:CPU:outSendEvent", -1, CFG_LOG_ERROR);
         }
         break;
     }
@@ -253,7 +253,7 @@ doProcMetric(enum metric_t type, long long measurement)
         };
         event_t e = {"proc.mem", measurement, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:MEM:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doProcMetric:MEM:outSendEvent", -1, CFG_LOG_ERROR);
         }
         break;
     }
@@ -269,7 +269,7 @@ doProcMetric(enum metric_t type, long long measurement)
         };
         event_t e = {"proc.thread", measurement, CURRENT, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:THREAD:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doProcMetric:THREAD:outSendEvent", -1, CFG_LOG_ERROR);
         }
         break;
     }
@@ -285,7 +285,7 @@ doProcMetric(enum metric_t type, long long measurement)
         };
         event_t e = {"proc.fd", measurement, CURRENT, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:FD:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doProcMetric:FD:outSendEvent", -1, CFG_LOG_ERROR);
         }
         break;
     }
@@ -301,13 +301,13 @@ doProcMetric(enum metric_t type, long long measurement)
         };
         event_t e = {"proc.child", measurement, CURRENT, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:CHILD:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doProcMetric:CHILD:outSendEvent", -1, CFG_LOG_ERROR);
         }
         break;
     }
 
     default:
-        scopeLog("ERROR: doProcMetric:metric type\n", -1, CFG_LOG_ERROR);
+        scopeLog("ERROR: doProcMetric:metric type", -1, CFG_LOG_ERROR);
     }
 }
 
@@ -337,7 +337,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source, const char *o
         };
         event_t e = {"fs.duration", g_fsinfo[fd].duration, HISTOGRAM, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doFSMetric:FS_DURATION:outSendEvent\n", fd, CFG_LOG_ERROR);
+            scopeLog("ERROR: doFSMetric:FS_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
         }
         break;        
     }
@@ -359,11 +359,11 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source, const char *o
         switch (type) {
             case FS_SIZE_READ:
                 metric = "fs.read";
-                err_str = "ERROR: doFSMetric:FS_SIZE_READ:outSendEvent\n";
+                err_str = "ERROR: doFSMetric:FS_SIZE_READ:outSendEvent";
                 break;
             case FS_SIZE_WRITE:
                 metric = "fs.write";
-                err_str = "ERROR: doFSMetric:FS_SIZE_WRITE:outSendEvent\n";
+                err_str = "ERROR: doFSMetric:FS_SIZE_WRITE:outSendEvent";
                 break;
             default:
                 break;
@@ -396,27 +396,27 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source, const char *o
         switch (type) {
             case FS_OPEN:
                 metric = "fs.op.open";
-                err_str = "ERROR: doFSMetric:FS_OPEN:outSendEvent\n";
+                err_str = "ERROR: doFSMetric:FS_OPEN:outSendEvent";
                 break;
             case FS_CLOSE:
                 metric = "fs.op.close";
-                err_str = "ERROR: doFSMetric:FS_CLOSE:outSendEvent\n";
+                err_str = "ERROR: doFSMetric:FS_CLOSE:outSendEvent";
                 break;
             case FS_SEEK:
                 metric = "fs.op.seek";
-                err_str = "ERROR: doFSMetric:FS_SEEK:outSendEvent\n";
+                err_str = "ERROR: doFSMetric:FS_SEEK:outSendEvent";
                 break;
             case FS_READ:
                 metric = "fs.op.read";
-                err_str = "ERROR: doFSMetric:FS_READ:outSendEvent\n";
+                err_str = "ERROR: doFSMetric:FS_READ:outSendEvent";
                 break;
             case FS_WRITE:
                 metric = "fs.op.write";
-                err_str = "ERROR: doFSMetric:FS_WRITE:outSendEvent\n";
+                err_str = "ERROR: doFSMetric:FS_WRITE:outSendEvent";
                 break;
             case FS_STAT:
                 metric = "fs.op.stat";
-                err_str = "ERROR: doFSMetric:FS_STAT:outSendEvent\n";
+                err_str = "ERROR: doFSMetric:FS_STAT:outSendEvent";
                 break;
             default:
                 break;
@@ -429,7 +429,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source, const char *o
     }
     
     default:
-        scopeLog("ERROR: doFSMetric:metric type\n", fd, CFG_LOG_ERROR);
+        scopeLog("ERROR: doFSMetric:metric type", fd, CFG_LOG_ERROR);
     }
 }
 
@@ -465,7 +465,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         };
         event_t e = {"net.port", g_ctrs.openPorts, CURRENT, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:OPENPORTS:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doNetMetric:OPENPORTS:outSendEvent", -1, CFG_LOG_ERROR);
         }
         break;
     }
@@ -484,7 +484,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         };
         event_t e = {"net.tcp", g_ctrs.TCPConnections, CURRENT, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:TCPCONNS:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doNetMetric:TCPCONNS:outSendEvent", -1, CFG_LOG_ERROR);
         }
         break;
     }
@@ -503,7 +503,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         };
         event_t e = {"net.conn", g_ctrs.activeConnections, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:ACTIVECONNS:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doNetMetric:ACTIVECONNS:outSendEvent", -1, CFG_LOG_ERROR);
         }
         atomicSet(&g_ctrs.activeConnections, 0);
         break;
@@ -523,7 +523,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         };
         event_t e = {"net.conn_duration", g_netinfo[fd].duration, DELTA_MS, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:outSendEvent\n", fd, CFG_LOG_ERROR);
+            scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
         }
         break;
     }
@@ -598,7 +598,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         };
         event_t e = {"net.rx", g_ctrs.netrx, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:NETRX:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doNetMetric:NETRX:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
         /*
@@ -679,7 +679,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         };
         event_t e = {"net.tx", g_ctrs.nettx, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:NETTX:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doNetMetric:NETTX:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
         atomicSet(&g_ctrs.nettx, 0);
@@ -697,7 +697,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         };
         event_t e = {"net.rx", g_ctrs.netrx, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:NETRX_PROC:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doNetMetric:NETRX_PROC:outSendEvent", -1, CFG_LOG_ERROR);
         }
         atomicSet(&g_ctrs.netrx, 0);
         break;
@@ -714,7 +714,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         };
         event_t e = {"net.tx", g_ctrs.nettx, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:NETTX_PROC:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doNetMetric:NETTX_PROC:outSendEvent", -1, CFG_LOG_ERROR);
         }
         atomicSet(&g_ctrs.nettx, 0);
         break;
@@ -734,13 +734,13 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         // Increment the DNS counter by one for each event
         event_t e = {"net.dns", 1, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:DNS:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doNetMetric:DNS:outSendEvent", -1, CFG_LOG_ERROR);
         }
         break;
     }
 
     default:
-        scopeLog("ERROR: doNetMetric:metric type\n", -1, CFG_LOG_ERROR);
+        scopeLog("ERROR: doNetMetric:metric type", -1, CFG_LOG_ERROR);
     }
 }
 
@@ -831,7 +831,7 @@ doAddNewSock(int sockfd)
     struct sockaddr addr;
     socklen_t addrlen = sizeof(struct sockaddr);
         
-    scopeLog("doAddNewSock: adding socket\n", sockfd, CFG_LOG_DEBUG);
+    scopeLog("doAddNewSock: adding socket", sockfd, CFG_LOG_DEBUG);
     if (getsockname(sockfd, &addr, &addrlen) != -1) {
         if ((addr.sa_family == AF_INET) || (addr.sa_family == AF_INET6)) {
             int type;
@@ -841,7 +841,7 @@ doAddNewSock(int sockfd)
                 addSock(sockfd, type);
             } else {
                 // Really can't add the socket at this point
-                scopeLog("ERROR: doRecv:getsockopt\n", sockfd, CFG_LOG_ERROR);
+                scopeLog("ERROR: doRecv:getsockopt", sockfd, CFG_LOG_ERROR);
             }
         } else if (addr.sa_family == AF_UNIX) {
             // added, not a socket type, want to know if it's a UNIX socket
@@ -1119,27 +1119,27 @@ init(void)
 #endif // __LINUX__
     
     if ((g_netinfo = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
-        scopeLog("ERROR: Constructor:Malloc\n", -1, CFG_LOG_ERROR);
+        scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
     }
 
     g_cfg.numNinfo = NET_ENTRIES;
     if (g_netinfo) memset(g_netinfo, 0, sizeof(struct net_info_t) * NET_ENTRIES);
 
     if ((g_fsinfo = (fs_info *)malloc(sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
-        scopeLog("ERROR: Constructor:Malloc\n", -1, CFG_LOG_ERROR);
+        scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
     }
 
     g_cfg.numFSInfo = FS_ENTRIES;
     if (g_fsinfo) memset(g_fsinfo, 0, sizeof(struct fs_info_t) * FS_ENTRIES);
 
     if (gethostname(g_cfg.hostname, sizeof(g_cfg.hostname)) != 0) {
-        scopeLog("ERROR: Constructor:gethostname\n", -1, CFG_LOG_ERROR);
+        scopeLog("ERROR: Constructor:gethostname", -1, CFG_LOG_ERROR);
     }
 
     osGetProcname(g_cfg.procname, sizeof(g_cfg.procname));
     osInitTSC(&g_cfg);
     if (g_cfg.tsc_invariant == FALSE) {
-        scopeLog("ERROR: TSC is not invariant\n", -1, CFG_LOG_ERROR);
+        scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
     
     
@@ -1155,7 +1155,7 @@ init(void)
         if (path) free(path);
     }
 
-    scopeLog("Constructor\n", -1, CFG_LOG_INFO);
+    scopeLog("Constructor", -1, CFG_LOG_INFO);
 }
 
 static void
@@ -1165,7 +1165,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, char *func)
         if (g_fsinfo[fd].fd == fd) {
             char buf[128];
 
-            snprintf(buf, sizeof(buf), "%s:doOpen: duplicate\n", func);
+            snprintf(buf, sizeof(buf), "%s:doOpen: duplicate", func);
             scopeLog(buf, fd, CFG_LOG_DEBUG);
             return;
         }
@@ -1173,7 +1173,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, char *func)
         if ((fd > g_cfg.numFSInfo) && (fd < MAX_FDS))  {
             // Need to realloc
             if ((g_fsinfo = realloc(g_fsinfo, sizeof(struct fs_info_t) * fd)) == NULL) {
-                scopeLog("ERROR: doOpen:realloc\n", fd, CFG_LOG_ERROR);
+                scopeLog("ERROR: doOpen:realloc", fd, CFG_LOG_ERROR);
             }
             g_cfg.numFSInfo = fd;
         }
@@ -1232,7 +1232,7 @@ open(const char *pathname, int flags, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.open(pathname, flags, fArgs.arg[0]);
     if (fd != -1) {
-        doOpen(fd, pathname, FD, "open\n");
+        doOpen(fd, pathname, FD, "open");
     }
     
     return fd;
@@ -1249,7 +1249,7 @@ openat(int dirfd, const char *pathname, int flags, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.openat(dirfd, pathname, flags, fArgs.arg[0]);
     if (fd != -1) {
-        doOpen(fd, pathname, FD, "openat\n");
+        doOpen(fd, pathname, FD, "openat");
     }
     
     return fd;
@@ -1265,7 +1265,7 @@ creat(const char *pathname, mode_t mode)
     doThread();
     fd = g_fn.creat(pathname, mode);
     if (fd != -1) {
-        doOpen(fd, pathname, FD, "creat\n");
+        doOpen(fd, pathname, FD, "creat");
     }
     
     return fd;
@@ -1280,7 +1280,7 @@ fopen(const char *pathname, const char *mode)
     doThread();
     stream = g_fn.fopen(pathname, mode);
     if (stream != NULL) {
-        doOpen(fileno(stream), pathname, STREAM, "fopen\n");
+        doOpen(fileno(stream), pathname, STREAM, "fopen");
     }
     
     return stream;
@@ -1296,8 +1296,8 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
     stream = g_fn.freopen(pathname, mode, orig_stream);
     // freopen just changes the mode if pathname is null
     if ((stream != NULL) &&(pathname != NULL)) {
-        doOpen(fileno(stream), pathname, STREAM, "freopen\n");
-        doClose(fileno(orig_stream), "freopen\n");
+        doOpen(fileno(stream), pathname, STREAM, "freopen");
+        doClose(fileno(orig_stream), "freopen");
     }
     
     return stream;
@@ -1315,7 +1315,7 @@ open64(const char *pathname, int flags, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.open64(pathname, flags, fArgs.arg[0]);
     if (fd != -1) {
-        doOpen(fd, pathname, FD, "open64\n");
+        doOpen(fd, pathname, FD, "open64");
     }
     
     return fd;
@@ -1332,7 +1332,7 @@ openat64(int dirfd, const char *pathname, int flags, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.openat64(dirfd, pathname, flags, fArgs.arg[0]);
     if (fd != -1) {
-        doOpen(fd, pathname, FD, "openat64\n");
+        doOpen(fd, pathname, FD, "openat64");
     }
     
     return fd;
@@ -1348,7 +1348,7 @@ creat64(const char *pathname, mode_t mode)
     doThread();
     fd = g_fn.creat64(pathname, mode);
     if (fd != -1) {
-        doOpen(fd, pathname, FD, "creat64\n");
+        doOpen(fd, pathname, FD, "creat64");
     }
     
     return fd;
@@ -1363,7 +1363,7 @@ fopen64(const char *pathname, const char *mode)
     doThread();
     stream = g_fn.fopen64(pathname, mode);
     if (stream != NULL) {
-        doOpen(fileno(stream), pathname, STREAM, "fopen64\n");
+        doOpen(fileno(stream), pathname, STREAM, "fopen64");
     }
     
     return stream;
@@ -1379,8 +1379,8 @@ freopen64(const char *pathname, const char *mode, FILE *orig_stream)
     stream = g_fn.freopen64(pathname, mode, orig_stream);
     // freopen just changes the mode if pathname is null
     if ((stream != NULL) && (pathname != NULL)) {
-        doOpen(fileno(stream), pathname, STREAM, "freopen64\n");
-        doClose(fileno(orig_stream), "freopen64\n");
+        doOpen(fileno(stream), pathname, STREAM, "freopen64");
+        doClose(fileno(orig_stream), "freopen64");
     }
     
     return stream;
@@ -1405,7 +1405,7 @@ pread64(int fd, void *buf, size_t count, off_t offset)
     }
     
     if (rc != -1) {
-        scopeLog("pread64\n", fd, CFG_LOG_TRACE);
+        scopeLog("pread64", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd) != NULL) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -1438,7 +1438,7 @@ preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
     }
     
     if (rc != -1) {
-        scopeLog("preadv\n", fd, CFG_LOG_TRACE);
+        scopeLog("preadv", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd) != NULL) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -1471,7 +1471,7 @@ preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     }
     
     if (rc != -1) {
-        scopeLog("preadv2\n", fd, CFG_LOG_TRACE);
+        scopeLog("preadv2", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -1504,7 +1504,7 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     }
     
     if (rc != -1) {
-        scopeLog("preadv64v2\n", fd, CFG_LOG_TRACE);
+        scopeLog("preadv64v2", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -1537,7 +1537,7 @@ pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
     }
     
     if (rc != -1) {
-        scopeLog("pwrite64\n", fd, CFG_LOG_TRACE);
+        scopeLog("pwrite64", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -1569,7 +1569,7 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
     }
     
     if (rc != -1) {
-        scopeLog("pwritev\n", fd, CFG_LOG_TRACE);
+        scopeLog("pwritev", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -1601,7 +1601,7 @@ pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     }
     
     if (rc != -1) {
-        scopeLog("pwritev2\n", fd, CFG_LOG_TRACE);
+        scopeLog("pwritev2", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -1633,7 +1633,7 @@ pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
     }
     
     if (rc != -1) {
-        scopeLog("pwritev64v2\n", fd, CFG_LOG_TRACE);
+        scopeLog("pwritev64v2", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -1657,7 +1657,7 @@ lseek64(int fd, off_t offset, int whence)
     rc = g_fn.lseek64(fd, offset, whence);
     
     if (rc != -1) {
-        scopeLog("lseek64\n", fd, CFG_LOG_DEBUG);
+        scopeLog("lseek64", fd, CFG_LOG_DEBUG);
         if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "lseek64");
         }
@@ -1677,7 +1677,7 @@ fseeko64(FILE *stream, off_t offset, int whence)
     rc = g_fn.fseeko64(stream, offset, whence);
     
     if (rc != -1) {
-        scopeLog("fseeko64\n", fd, CFG_LOG_DEBUG);
+        scopeLog("fseeko64", fd, CFG_LOG_DEBUG);
         if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "fseeko64");
         }
@@ -1697,7 +1697,7 @@ ftello64(FILE *stream)
     rc = g_fn.ftello64(stream);
     
     if (rc != -1) {
-        scopeLog("ftello64\n", fd, CFG_LOG_DEBUG);
+        scopeLog("ftello64", fd, CFG_LOG_DEBUG);
         if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "ftello64");
         }
@@ -1716,7 +1716,7 @@ close(int fd)
 
     rc = g_fn.close(fd);
     if (rc != -1) {
-        doClose(fd, "close\n");
+        doClose(fd, "close");
     }
     
     return rc;
@@ -1732,7 +1732,7 @@ fclose(FILE *stream)
 
     rc = g_fn.fclose(stream);
     if (rc != EOF) {
-        doClose(fileno(stream), "fclose\n");
+        doClose(fileno(stream), "fclose");
     }
     
     return rc;
@@ -1753,7 +1753,7 @@ fcloseall(void)
             for (i = 0; i < g_cfg.numFSInfo; i++) {
                 if ((g_fsinfo[i].fd != 0) &&
                     (g_fsinfo[i].type == STREAM)) {
-                    doClose(i, "fcloseall\n");
+                    doClose(i, "fcloseall");
                 }
             }
         }
@@ -1772,7 +1772,7 @@ close$NOCANCEL(int fd)
     doThread();
     rc = g_fn.close$NOCANCEL(fd);
     if (rc != -1) {
-        doClose(fd, "close$NOCANCEL\n");
+        doClose(fd, "close$NOCANCEL");
     }
     
     return rc;
@@ -1788,7 +1788,7 @@ guarded_close_np(int fd, void *guard)
     doThread();
     rc = g_fn.guarded_close_np(fd, guard);
     if (rc != -1) {
-        doClose(fd, "guarded_close_np\n");
+        doClose(fd, "guarded_close_np");
     }
     
     return rc;
@@ -1802,7 +1802,7 @@ close_nocancel(int fd)
     WRAP_CHECK(close_nocancel, -1);
     rc = g_fn.close_nocancel(fd);
     if (rc != -1) {
-        doClose(fd, "close_nocancel\n");
+        doClose(fd, "close_nocancel");
     }
     
     return rc;
@@ -1817,7 +1817,7 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     doThread();
     sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
-        doAccept(sd, addr, *addrlen, "accept$NOCANCEL\n");
+        doAccept(sd, addr, *addrlen, "accept$NOCANCEL");
     }
 
     return sd;
@@ -1833,7 +1833,7 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
     doThread();
     rc = g_fn.__sendto_nocancel(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
-        scopeLog("__sendto_nocancel\n", sockfd, CFG_LOG_TRACE);
+        scopeLog("__sendto_nocancel", sockfd, CFG_LOG_TRACE);
 
         doSetAddrs(sockfd);
 
@@ -1859,7 +1859,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
     rc = g_fn.DNSServiceQueryRecord(sdRef, flags, interfaceIndex, fullname,
                                     rrtype, rrclass, callback, context);
     if (rc == 0) {
-        scopeLog("DNSServiceQueryRecord\n", -1, CFG_LOG_DEBUG);
+        scopeLog("DNSServiceQueryRecord", -1, CFG_LOG_DEBUG);
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
@@ -1872,7 +1872,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
 
         event_t e = {"net.dns", 1, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: DNSServiceQueryRecord:DNS:outSendEvent\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: DNSServiceQueryRecord:DNS:outSendEvent", -1, CFG_LOG_ERROR);
         }
     }
 
@@ -1892,7 +1892,7 @@ lseek(int fd, off_t offset, int whence)
     rc = g_fn.lseek(fd, offset, whence);
     
     if (rc != -1) {
-        scopeLog("lseek\n", fd, CFG_LOG_DEBUG);
+        scopeLog("lseek", fd, CFG_LOG_DEBUG);
         if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "lseek");
         }
@@ -1912,7 +1912,7 @@ fseeko(FILE *stream, off_t offset, int whence)
     rc = g_fn.fseeko(stream, offset, whence);
     
     if (rc != -1) {
-        scopeLog("fseeko\n", fd, CFG_LOG_DEBUG);
+        scopeLog("fseeko", fd, CFG_LOG_DEBUG);
         if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "fseeko");
         }
@@ -1932,7 +1932,7 @@ ftell(FILE *stream)
     rc = g_fn.ftell(stream);
     
     if (rc != -1) {
-        scopeLog("ftell\n", fd, CFG_LOG_DEBUG);
+        scopeLog("ftell", fd, CFG_LOG_DEBUG);
         if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "ftell");
         }
@@ -1952,7 +1952,7 @@ ftello(FILE *stream)
     rc = g_fn.ftello(stream);
     
     if (rc != -1) {
-        scopeLog("ftello\n", fd, CFG_LOG_DEBUG);
+        scopeLog("ftello", fd, CFG_LOG_DEBUG);
         if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "ftello");
         }
@@ -1970,7 +1970,7 @@ rewind(FILE *stream)
     doThread();
     g_fn.rewind(stream);
     
-    scopeLog("rewind\n", fd, CFG_LOG_DEBUG);
+    scopeLog("rewind", fd, CFG_LOG_DEBUG);
     if (fs) {
         //doFSMetric(FS_XXX, fd, EVENT_BASED, "rewind");
     }
@@ -1989,7 +1989,7 @@ fsetpos(FILE *stream,  const fpos_t *pos)
     rc = g_fn.fsetpos(stream, pos);
 
     if (rc == 0) {
-        scopeLog("fsetpos\n", fd, CFG_LOG_DEBUG);
+        scopeLog("fsetpos", fd, CFG_LOG_DEBUG);
         if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "fsetpos");
         }
@@ -2009,7 +2009,7 @@ fgetpos(FILE *stream,  fpos_t *pos)
     rc = g_fn.fgetpos(stream, pos);
 
     if (rc == 0) {
-        scopeLog("fgetpos\n", fd, CFG_LOG_DEBUG);
+        scopeLog("fgetpos", fd, CFG_LOG_DEBUG);
         if (fs) {
             //doFSMetric(FS_XXX, fd, EVENT_BASED, "fgetpos");
         }
@@ -2036,7 +2036,7 @@ write(int fd, const void *buf, size_t count)
     }
     
     if (rc != -1) {
-        scopeLog("write\n", fd, CFG_LOG_TRACE);
+        scopeLog("write", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -2068,7 +2068,7 @@ pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
     }
     
     if (rc != -1) {
-        scopeLog("pwrite\n", fd, CFG_LOG_TRACE);
+        scopeLog("pwrite", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -2100,7 +2100,7 @@ writev(int fd, const struct iovec *iov, int iovcnt)
     }
     
     if (rc != -1) {
-        scopeLog("writev\n", fd, CFG_LOG_TRACE);
+        scopeLog("writev", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd) != NULL) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -2133,7 +2133,7 @@ fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stre
     }
     
     if (rc != 0) {
-        scopeLog("fwrite\n", fd, CFG_LOG_TRACE);
+        scopeLog("fwrite", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -2165,7 +2165,7 @@ read(int fd, void *buf, size_t count)
     }
     
     if (rc != -1) {
-        scopeLog("read\n", fd, CFG_LOG_TRACE);
+        scopeLog("read", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -2199,7 +2199,7 @@ readv(int fd, const struct iovec *iov, int iovcnt)
     }
     
     if (rc != -1) {
-        scopeLog("readv\n", fd, CFG_LOG_TRACE);
+        scopeLog("readv", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -2233,7 +2233,7 @@ pread(int fd, void *buf, size_t count, off_t offset)
     }
     
     if (rc != -1) {
-        scopeLog("pread\n", fd, CFG_LOG_TRACE);
+        scopeLog("pread", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -2267,7 +2267,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     }
     
     if (rc != 0) {
-        scopeLog("fread\n", fd, CFG_LOG_TRACE);
+        scopeLog("fread", fd, CFG_LOG_TRACE);
         if (getNetEntry(fd)) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -2294,7 +2294,7 @@ fcntl(int fd, int cmd, ...)
                     fArgs.arg[2], fArgs.arg[3]);
     if ((rc != -1) && getNetEntry(fd) && (cmd == F_DUPFD)) {
         // This is a network descriptor
-        scopeLog("fcntl\n", rc, CFG_LOG_DEBUG);
+        scopeLog("fcntl", rc, CFG_LOG_DEBUG);
         doAddNewSock(rc);
     }
     
@@ -2314,7 +2314,7 @@ fcntl64(int fd, int cmd, ...)
                       fArgs.arg[2], fArgs.arg[3]);
     if ((rc != -1) && getNetEntry(fd) && (cmd == F_DUPFD)) {
         // This is a network descriptor
-        scopeLog("fcntl\n", rc, CFG_LOG_DEBUG);
+        scopeLog("fcntl", rc, CFG_LOG_DEBUG);
         doAddNewSock(rc);
     }
     
@@ -2331,7 +2331,7 @@ dup(int fd)
     rc = g_fn.dup(fd);
     if ((rc != -1) && getNetEntry(fd)) {
         // This is a network descriptor
-        scopeLog("dup\n", rc, CFG_LOG_DEBUG);
+        scopeLog("dup", rc, CFG_LOG_DEBUG);
         doAddNewSock(rc);
     }
 
@@ -2348,7 +2348,7 @@ dup2(int oldfd, int newfd)
     rc = g_fn.dup2(oldfd, newfd);
     if ((rc != -1) && getNetEntry(rc)) {
         // This is a network descriptor
-        scopeLog("dup2\n", rc, CFG_LOG_DEBUG);
+        scopeLog("dup2", rc, CFG_LOG_DEBUG);
         doAddNewSock(rc);
     }
 
@@ -2365,7 +2365,7 @@ dup3(int oldfd, int newfd, int flags)
     rc = g_fn.dup3(oldfd, newfd, flags);
     if ((rc != -1) && getNetEntry(rc)) {
         // This is a network descriptor
-        scopeLog("dup3\n", rc, CFG_LOG_DEBUG);
+        scopeLog("dup3", rc, CFG_LOG_DEBUG);
         doAddNewSock(rc);
     }
 
@@ -2377,7 +2377,7 @@ vsyslog(int priority, const char *format, va_list ap)
 {
     WRAP_CHECK_VOID(vsyslog);
     doThread();
-    scopeLog("vsyslog\n", -1, CFG_LOG_DEBUG);
+    scopeLog("vsyslog", -1, CFG_LOG_DEBUG);
     g_fn.vsyslog(priority, format, ap);
     return;
 }
@@ -2389,7 +2389,7 @@ fork()
 
     WRAP_CHECK(fork, -1);
     doThread();
-    scopeLog("fork\n", -1, CFG_LOG_DEBUG);
+    scopeLog("fork", -1, CFG_LOG_DEBUG);
     rc = g_fn.fork();
     if (rc == 0) {
         // We are the child proc
@@ -2410,7 +2410,7 @@ socket(int socket_family, int socket_type, int protocol)
     if (sd != -1) {
         struct net_info_t *net;
         
-        scopeLog("socket\n", sd, CFG_LOG_DEBUG);
+        scopeLog("socket", sd, CFG_LOG_DEBUG);
         addSock(sd, socket_type);
         
         if (((net  = getNetEntry(sd)) != NULL) &&
@@ -2445,7 +2445,7 @@ shutdown(int sockfd, int how)
     doThread();
     rc = g_fn.shutdown(sockfd, how);
     if (rc != -1) {
-        doClose(sockfd, "shutdown\n");
+        doClose(sockfd, "shutdown");
     }
     
     return rc;
@@ -2461,7 +2461,7 @@ listen(int sockfd, int backlog)
     doThread();
     rc = g_fn.listen(sockfd, backlog);
     if (rc != -1) {
-        scopeLog("listen\n", sockfd, CFG_LOG_DEBUG);
+        scopeLog("listen", sockfd, CFG_LOG_DEBUG);
         
         // Tracking number of open ports
         atomicAdd(&g_ctrs.openPorts, 1);
@@ -2491,7 +2491,7 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     doThread();
     sd = g_fn.accept(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
-        doAccept(sd, addr, *addrlen, "accept\n");
+        doAccept(sd, addr, *addrlen, "accept");
     }
 
     return sd;
@@ -2506,7 +2506,7 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     doThread();
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
     if ((sd != -1) && addr && addrlen) {
-        doAccept(sd, addr, *addrlen, "accept4\n");
+        doAccept(sd, addr, *addrlen, "accept4");
     }
 
     return sd;
@@ -2522,7 +2522,7 @@ bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     rc = g_fn.bind(sockfd, addr, addrlen);
     if (rc != -1) { 
         doSetConnection(sockfd, addr, addrlen, LOCAL);
-        scopeLog("bind\n", sockfd, CFG_LOG_DEBUG);
+        scopeLog("bind", sockfd, CFG_LOG_DEBUG);
     }
     
     return rc;
@@ -2551,7 +2551,7 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
         // Start the duration timer
         net->startTime = getTime();
-        scopeLog("connect\n", sockfd, CFG_LOG_DEBUG);
+        scopeLog("connect", sockfd, CFG_LOG_DEBUG);
     }
     
     return rc;
@@ -2567,7 +2567,7 @@ send(int sockfd, const void *buf, size_t len, int flags)
     doThread();
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
-        scopeLog("send\n", sockfd, CFG_LOG_TRACE);
+        scopeLog("send", sockfd, CFG_LOG_TRACE);
         if (net &&
             GET_PORT(sockfd, net->remoteConn.ss_family, REMOTE) == DNS_PORT) {
             getDNSName(sockfd, (void *)buf, len);
@@ -2590,7 +2590,7 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
     doThread();
     rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
-        scopeLog("sendto\n", sockfd, CFG_LOG_TRACE);
+        scopeLog("sendto", sockfd, CFG_LOG_TRACE);
         doSetConnection(sockfd, dest_addr, addrlen, REMOTE);
 
         if (net &&
@@ -2614,7 +2614,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
     doThread();
     rc = g_fn.sendmsg(sockfd, msg, flags);
     if (rc != -1) {
-        scopeLog("sendmsg\n", sockfd, CFG_LOG_TRACE);
+        scopeLog("sendmsg", sockfd, CFG_LOG_TRACE);
 
         // For UDP connections the msg is a remote addr
         if (net && msg && (net->type != SOCK_STREAM)) {
@@ -2644,7 +2644,7 @@ recv(int sockfd, void *buf, size_t len, int flags)
 
     WRAP_CHECK(recv, -1);
     doThread();
-    scopeLog("recv\n", sockfd, CFG_LOG_TRACE);
+    scopeLog("recv", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recv(sockfd, buf, len, flags);
     if (rc != -1) {
         doRecv(sockfd, rc);
@@ -2661,7 +2661,7 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
 
     WRAP_CHECK(recvfrom, -1);
     doThread();
-    scopeLog("recvfrom\n", sockfd, CFG_LOG_TRACE);
+    scopeLog("recvfrom", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
         atomicAdd(&g_ctrs.netrx, rc);
@@ -2675,7 +2675,7 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
                 addSock(sockfd, type);
             } else {
                 // Really can't add the socket at this point
-                scopeLog("ERROR: recvfrom:getsockopt\n", sockfd, CFG_LOG_ERROR);
+                scopeLog("ERROR: recvfrom:getsockopt", sockfd, CFG_LOG_ERROR);
             }
         }
 
@@ -2697,7 +2697,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     doThread();
     rc = g_fn.recvmsg(sockfd, msg, flags);
     if (rc != -1) {
-        scopeLog("recvmsg\n", sockfd, CFG_LOG_TRACE);
+        scopeLog("recvmsg", sockfd, CFG_LOG_TRACE);
 
         // For UDP connections the msg is a remote addr
         if (msg && getNetEntry(sockfd)) {

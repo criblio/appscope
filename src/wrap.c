@@ -1767,7 +1767,7 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
 
         doSetAddrs(sockfd);
 
-        if ((getNetEntry(fd) != NULL) &&
+        if ((getNetEntry(sockfd) != NULL) &&
             GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
             getDNSName(sockfd, (void *)buf, len);
         }

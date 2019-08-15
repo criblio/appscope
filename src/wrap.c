@@ -22,7 +22,7 @@ static out_t* g_out = NULL;
 static void * periodic(void *);
     
 EXPORTON void
-scopeLog(char* msg, int fd, cfg_log_level_t level)
+scopeLog(const char* msg, int fd, cfg_log_level_t level)
 {
     if (!g_log || !msg || !g_cfg.procname[0]) return;
 
@@ -321,7 +321,11 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source, const char *o
         return;
     }
 
-    event_field_t fields[] = {
+
+    switch (type) {
+    case FS_DURATION:
+    {
+        event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
             NUMFIELD("fd",               fd,                    7),
@@ -330,11 +334,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source, const char *o
             STRFIELD("file",             g_fsinfo[fd].path,     6),
             STRFIELD("unit",             "millisecond",         1),
             FIELDEND
-    };
-
-    switch (type) {
-    case FS_DURATION:
-    {
+        };
         event_t e = {"fs.duration", g_fsinfo[fd].duration, HISTOGRAM, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doFSMetric:FS_DURATION:outSendEvent\n", fd, CFG_LOG_ERROR);
@@ -342,22 +342,91 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source, const char *o
         break;        
     }
     case FS_SIZE_READ:
-    {
-        event_t e = {"fs.read", size, HISTOGRAM, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doFSMetric:FS_SIZE_READ:outSendEvent\n", fd, CFG_LOG_ERROR);
-        }
-        break;
-    }
     case FS_SIZE_WRITE:
     {
-        event_t e = {"fs.write", size, HISTOGRAM, fields};
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_cfg.procname,        2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("op",               op,                    2),
+            STRFIELD("file",             g_fsinfo[fd].path,     6),
+            STRFIELD("unit",             "byte",                1),
+            FIELDEND
+        };
+        const char* metric = "UNKNOWN";
+        const char* err_str = "UNKNOWN";
+        switch (type) {
+            case FS_SIZE_READ:
+                metric = "fs.read";
+                err_str = "ERROR: doFSMetric:FS_SIZE_READ:outSendEvent\n";
+                break;
+            case FS_SIZE_WRITE:
+                metric = "fs.write";
+                err_str = "ERROR: doFSMetric:FS_SIZE_WRITE:outSendEvent\n";
+                break;
+            default:
+                break;
+        }
+        event_t e = {metric, size, HISTOGRAM, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doFSMetric:FS_SIZE_WRITE:outSendEvent\n", fd, CFG_LOG_ERROR);
+            scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
         break;
     }
-
+    case FS_OPEN:
+    case FS_CLOSE:
+    case FS_SEEK:
+    case FS_READ:
+    case FS_WRITE:
+    case FS_STAT:
+    {
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_cfg.procname,        2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("op",               op,                    2),
+            STRFIELD("file",             g_fsinfo[fd].path,     6),
+            STRFIELD("unit",             "operation",           1),
+            FIELDEND
+        };
+        const char* metric = "UNKNOWN";
+        const char* err_str = "UNKNOWN";
+        switch (type) {
+            case FS_OPEN:
+                metric = "fs.op.open";
+                err_str = "ERROR: doFSMetric:FS_OPEN:outSendEvent\n";
+                break;
+            case FS_CLOSE:
+                metric = "fs.op.close";
+                err_str = "ERROR: doFSMetric:FS_CLOSE:outSendEvent\n";
+                break;
+            case FS_SEEK:
+                metric = "fs.op.seek";
+                err_str = "ERROR: doFSMetric:FS_SEEK:outSendEvent\n";
+                break;
+            case FS_READ:
+                metric = "fs.op.read";
+                err_str = "ERROR: doFSMetric:FS_READ:outSendEvent\n";
+                break;
+            case FS_WRITE:
+                metric = "fs.op.write";
+                err_str = "ERROR: doFSMetric:FS_WRITE:outSendEvent\n";
+                break;
+            case FS_STAT:
+                metric = "fs.op.stat";
+                err_str = "ERROR: doFSMetric:FS_STAT:outSendEvent\n";
+                break;
+            default:
+                break;
+        }
+        event_t e = {metric, 1, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog(err_str, fd, CFG_LOG_ERROR);
+        }
+        break;
+    }
     
     default:
         scopeLog("ERROR: doFSMetric:metric type\n", fd, CFG_LOG_ERROR);
@@ -1113,6 +1182,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, char *func)
         g_fsinfo[fd].fd = fd;
         g_fsinfo[fd].type = type;
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
+        //doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0);
         scopeLog(func, fd, CFG_LOG_TRACE);
     }
 }

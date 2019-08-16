@@ -21,11 +21,10 @@
 #include <ctype.h>
 #include <limits.h>
 
-#ifdef __LINUX__
-#include <linux/stat.h>
-#else
 #include <sys/stat.h>
-#endif // __LINUX__
+#ifdef STRUCT_STATX_MISSING_FROM_SYS_STAT_H
+#include <linux/stat.h>
+#endif // STRUCT_STATX_MISSING_FROM_SYS_STAT_H
 
 #include <sys/statvfs.h>
 #include <sys/param.h>

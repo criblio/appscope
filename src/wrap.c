@@ -312,7 +312,8 @@ doProcMetric(enum metric_t type, long long measurement)
 }
 
 static void
-doFSMetric(enum metric_t type, int fd, enum control_type_t source, const char *op, ssize_t size)
+doFSMetric(enum metric_t type, int fd, enum control_type_t source,
+           const char *op, ssize_t size, const char *pathname)
 {
     pid_t pid = getpid();
     fs_info *fs;
@@ -381,13 +382,21 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source, const char *o
     case FS_WRITE:
     case FS_STAT:
     {
+        const char *path;
+        // This stat func passes a path and not an fd
+        if ((fd == -1) && (pathname)) {
+            path = pathname;
+        } else {
+            path = g_fsinfo[fd].path;
+        }
+        
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
-            STRFIELD("file",             g_fsinfo[fd].path,     6),
+            STRFIELD("file",             path,                  6),
             STRFIELD("unit",             "operation",           1),
             FIELDEND
         };
@@ -1193,7 +1202,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, char *func)
         g_fsinfo[fd].fd = fd;
         g_fsinfo[fd].type = type;
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
-        doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0);
+        doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0, NULL);
         scopeLog(func, fd, CFG_LOG_TRACE);
     }
 }
@@ -1228,7 +1237,7 @@ doClose(int fd, char *func)
         if (func) scopeLog(func, fd, CFG_LOG_DEBUG);
     } else if ((fsinfo = getFSEntry(fd)) != NULL) {
         if (func) scopeLog(func, fd, CFG_LOG_TRACE);
-        doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 0);
+        doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 0, NULL);
         memset(fsinfo, 0, sizeof(struct fs_info_t));
     }
 }
@@ -1423,9 +1432,9 @@ pread64(int fd, void *buf, size_t count, off_t offset)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread64", 0);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "pread64", rc);
-            doFSMetric(FS_READ, fd, EVENT_BASED, "pread64", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread64", 0, NULL);
+            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "pread64", rc, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, "pread64", rc, NULL);
         }
     }
     
@@ -1457,9 +1466,9 @@ preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv", 0);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv", rc);
-            doFSMetric(FS_READ, fd, EVENT_BASED, "preadv", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv", 0, NULL);
+            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv", rc, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, "preadv", rc, NULL);
         }
     }
     
@@ -1491,9 +1500,9 @@ preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv2", 0);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv2", rc);
-            doFSMetric(FS_READ, fd, EVENT_BASED, "preadv2", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv2", 0, NULL);
+            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv2", rc, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, "preadv2", rc, NULL);
         }
     }
     
@@ -1525,9 +1534,9 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv64v2", 0);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv64v2", rc);
-            doFSMetric(FS_READ, fd, EVENT_BASED, "preadv64v2", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv64v2", 0, NULL);
+            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv64v2", rc, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, "preadv64v2", rc, NULL);
         }
     }
     
@@ -1559,9 +1568,9 @@ pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite64", 0);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwrite64", rc);
-            doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwrite64", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite64", 0, NULL);
+            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwrite64", rc, NULL);
+            doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwrite64", rc, NULL);
         }
     }
     return rc;
@@ -1592,9 +1601,9 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev", 0);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwritev", rc);
-            doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev", 0, NULL);
+            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwritev", rc, NULL);
+            doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev", rc, NULL);
         }
     }
     return rc;
@@ -1625,9 +1634,9 @@ pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev2", 0);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwritev2", rc);
-            doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev2", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev2", 0, NULL);
+            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwritev2", rc, NULL);
+            doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev2", rc, NULL);
         }
     }
     return rc;
@@ -1658,9 +1667,9 @@ pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev64v2", 0);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwritev64v2", rc);
-            doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev64v2", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev64v2", 0, NULL);
+            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwritev64v2", rc, NULL);
+            doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev64v2", rc, NULL);
         }
     }
     return rc;
@@ -1679,7 +1688,7 @@ lseek64(int fd, off_t offset, int whence)
     if (rc != -1) {
         scopeLog("lseek64", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek64", (ssize_t)offset);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek64", (ssize_t)offset, NULL);
         }
     }
     return rc;
@@ -1699,7 +1708,7 @@ fseeko64(FILE *stream, off_t offset, int whence)
     if (rc != -1) {
         scopeLog("fseeko64", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko64", (ssize_t)offset);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko64", (ssize_t)offset, NULL);
         }
     }
     return rc;
@@ -1719,7 +1728,7 @@ ftello64(FILE *stream)
     if (rc != -1) {
         scopeLog("ftello64", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftello64", (ssize_t)rc);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftello64", (ssize_t)rc, NULL);
         }
     }
     return rc;
@@ -1736,9 +1745,8 @@ statfs64(const char *path, struct statfs64 *buf)
 
     if (rc != -1) {
         scopeLog("statfs64", -1, CFG_LOG_DEBUG);
-        if (path) {
-            //doFSMetric(FS_SEEK, -1, path, EVENT_BASED, "statfs64", sizeof(struct statfs64));
-        }
+        doFSMetric(FS_STAT, -1, EVENT_BASED, "statfs64",
+                   sizeof(struct statfs64), path);
     }
     return rc;
 }
@@ -1755,7 +1763,8 @@ fstatfs64(int fd, struct statfs64 *buf)
     if (rc != -1) {
         scopeLog("fstatfs64", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
-            //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstatfs64");
+            doFSMetric(FS_STAT, fd, EVENT_BASED, "fstatfs64",
+                       sizeof(struct statfs64), NULL);
         }
     }
     return rc;
@@ -1773,9 +1782,8 @@ statx(int dirfd, const char *pathname, int flags,
 
     if (rc != -1) {
         scopeLog("statx", -1, CFG_LOG_DEBUG);
-        if (pathname) {
-            //doFSMetric(FS_XXX, -1, pathname, EVENT_BASED, "statx");
-        }
+        doFSMetric(FS_STAT, -1, EVENT_BASED, "statx",
+                   sizeof(struct statx), pathname);
     }
     return rc;
 }
@@ -1791,9 +1799,8 @@ stat(const char *pathname, struct stat *statbuf)
 
     if (rc != -1) {
         scopeLog("stat\n", -1, CFG_LOG_DEBUG);
-        if (pathname) {
-            //doFSMetric(FS_XXX, -1, pathname, EVENT_BASED, "stat");
-        }
+        doFSMetric(FS_STAT, -1, EVENT_BASED, "stat",
+                   sizeof(struct stat), pathname);
     }
     return rc;
 }
@@ -1809,9 +1816,8 @@ lstat(const char *pathname, struct stat *statbuf)
 
     if (rc != -1) {
         scopeLog("lstat\n", -1, CFG_LOG_DEBUG);
-        if (pathname) {
-            //doFSMetric(FS_XXX, -1, pathname, EVENT_BASED, "lstat");
-        }
+            doFSMetric(FS_STAT, -1, EVENT_BASED, "lstat",
+                       sizeof(struct stat), pathname);
     }
     return rc;
 }
@@ -1828,7 +1834,8 @@ fstat(int fd, struct stat *statbuf)
     if (rc != -1) {
         scopeLog("fstat\n", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
-            //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstat");
+            doFSMetric(FS_STAT, fd, EVENT_BASED, "fstat",
+                       sizeof(struct stat), NULL);
         }
     }
     return rc;
@@ -1845,9 +1852,8 @@ statfs(const char *path, struct statfs *buf)
 
     if (rc != -1) {
         scopeLog("statfs\n", -1, CFG_LOG_DEBUG);
-        if (path) {
-            //doFSMetric(FS_XXX, -1, path, EVENT_BASED, "statfs");
-        }
+        doFSMetric(FS_STAT, -1, EVENT_BASED, "statfs",
+                   sizeof(struct statfs), path);
     }
     return rc;
 }
@@ -1864,7 +1870,8 @@ fstatfs(int fd, struct statfs *buf)
     if (rc != -1) {
         scopeLog("fstatfs\n", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
-            //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstatfs");
+            doFSMetric(FS_STAT, fd, EVENT_BASED, "fstatfs",
+                       sizeof(struct statfs), NULL);
         }
     }
     return rc;
@@ -1881,9 +1888,8 @@ statvfs(const char *path, struct statvfs *buf)
 
     if (rc != -1) {
         scopeLog("statvfs\n", -1, CFG_LOG_DEBUG);
-        if (path) {
-            //doFSMetric(FS_XXX, -1, path, EVENT_BASED, "statvfs");
-        }
+        doFSMetric(FS_STAT, -1, EVENT_BASED, "statvfs",
+                   sizeof(struct statvfs), path);
     }
     return rc;
 }
@@ -1900,7 +1906,8 @@ fstatvfs(int fd, struct statvfs *buf)
     if (rc != -1) {
         scopeLog("fstatvfs\n", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
-            //doFSMetric(FS_XXX, fd, NULL, EVENT_BASED, "fstatvfs");
+            doFSMetric(FS_STAT, fd, EVENT_BASED, "fstatvfs",
+                       sizeof(struct statvfs), NULL);
         }
     }
     return rc;
@@ -2114,7 +2121,7 @@ lseek(int fd, off_t offset, int whence)
     if (rc != -1) {
         scopeLog("lseek", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek", (ssize_t)offset);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek", (ssize_t)offset, NULL);
         }
     }
     return rc;
@@ -2134,7 +2141,7 @@ fseeko(FILE *stream, off_t offset, int whence)
     if (rc != -1) {
         scopeLog("fseeko", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko", (ssize_t)offset);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko", (ssize_t)offset, NULL);
         }
     }
     return rc;
@@ -2154,7 +2161,7 @@ ftell(FILE *stream)
     if (rc != -1) {
         scopeLog("ftell", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftell", (ssize_t)rc);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftell", (ssize_t)rc, NULL);
         }
     }
     return rc;
@@ -2174,7 +2181,7 @@ ftello(FILE *stream)
     if (rc != -1) {
         scopeLog("ftello", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftello", (ssize_t)rc);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftello", (ssize_t)rc, NULL);
         }
     }
     return rc;
@@ -2192,7 +2199,7 @@ rewind(FILE *stream)
     
     scopeLog("rewind", fd, CFG_LOG_DEBUG);
     if (fs) {
-        doFSMetric(FS_SEEK, fd, EVENT_BASED, "rewind", (ssize_t)1);
+        doFSMetric(FS_SEEK, fd, EVENT_BASED, "rewind", (ssize_t)1, NULL);
     }
     return;
 }
@@ -2211,7 +2218,7 @@ fsetpos(FILE *stream, const fpos_t *pos)
     if (rc == 0) {
         scopeLog("fsetpos", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fsetpos", (ssize_t)1);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fsetpos", (ssize_t)1, NULL);
         }
     }
     return rc;
@@ -2231,7 +2238,7 @@ fgetpos(FILE *stream,  fpos_t *pos)
     if (rc == 0) {
         scopeLog("fgetpos", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fgetpos", (ssize_t)1);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fgetpos", (ssize_t)1, NULL);
         }
     }
     return rc;
@@ -2262,9 +2269,9 @@ write(int fd, const void *buf, size_t count)
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "write", 0);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "write", rc);
-            doFSMetric(FS_WRITE, fd, EVENT_BASED, "write", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "write", 0, NULL);
+            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "write", rc, NULL);
+            doFSMetric(FS_WRITE, fd, EVENT_BASED, "write", rc, NULL);
         }
     }
     return rc;
@@ -2295,9 +2302,9 @@ pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite", 0);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwrite", rc);
-            doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwrite", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite", 0, NULL);
+            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwrite", rc, NULL);
+            doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwrite", rc, NULL);
         }
     }
     return rc;
@@ -2328,9 +2335,9 @@ writev(int fd, const struct iovec *iov, int iovcnt)
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "writev", 0);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "writev", rc);
-            doFSMetric(FS_WRITE, fd, EVENT_BASED, "writev", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "writev", 0, NULL);
+            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "writev", rc, NULL);
+            doFSMetric(FS_WRITE, fd, EVENT_BASED, "writev", rc, NULL);
         }
     }
     return rc;
@@ -2362,9 +2369,9 @@ fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stre
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "fwrite", 0);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "fwrite", rc*size);
-            doFSMetric(FS_WRITE, fd, EVENT_BASED, "fwrite", rc*size);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "fwrite", 0, NULL);
+            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "fwrite", rc*size, NULL);
+            doFSMetric(FS_WRITE, fd, EVENT_BASED, "fwrite", rc*size, NULL);
         }
     }
     return rc;
@@ -2395,9 +2402,9 @@ read(int fd, void *buf, size_t count)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "read", 0);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "read", rc);
-            doFSMetric(FS_READ, fd, EVENT_BASED, "read", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "read", 0, NULL);
+            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "read", rc, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, "read", rc, NULL);
             // TODO: add counters, may need a helper func
         }
     }
@@ -2430,9 +2437,9 @@ readv(int fd, const struct iovec *iov, int iovcnt)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "readv", 0);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "readv", rc);
-            doFSMetric(FS_READ, fd, EVENT_BASED, "readv", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "readv", 0, NULL);
+            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "readv", rc, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, "readv", rc, NULL);
             // TODO: add counters, may need a helper func
         }
     }
@@ -2465,9 +2472,9 @@ pread(int fd, void *buf, size_t count, off_t offset)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread", 0);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "pread", rc);
-            doFSMetric(FS_READ, fd, EVENT_BASED, "pread", rc);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread", 0, NULL);
+            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "pread", rc, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, "pread", rc, NULL);
         }
     }
     
@@ -2500,9 +2507,9 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "fread", 0);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "fread", rc*size);
-            doFSMetric(FS_READ, fd, EVENT_BASED, "fread", rc*size);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "fread", 0, NULL);
+            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "fread", rc*size, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, "fread", rc*size, NULL);
         }
     }
     

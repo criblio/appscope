@@ -20,7 +20,13 @@
 #include <pthread.h>
 #include <ctype.h>
 #include <limits.h>
+
+#ifdef __LINUX__
+#include <linux/stat.h>
+#else
 #include <sys/stat.h>
+#endif // __LINUX__
+
 #include <sys/statvfs.h>
 #include <sys/param.h>
 #include <sys/mount.h>

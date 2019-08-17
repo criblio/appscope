@@ -22,9 +22,9 @@
 #include <limits.h>
 
 #include <sys/stat.h>
-#ifdef STRUCT_STATX_MISSING_FROM_SYS_STAT_H
+#if defined(__LINUX__) && defined(__STATX__) && defined(STRUCT_STATX_MISSING_FROM_SYS_STAT_H)
 #include <linux/stat.h>
-#endif // STRUCT_STATX_MISSING_FROM_SYS_STAT_H
+#endif // __LINUX__ && __STATX__ && STRUCT_STATX_MISSING_FROM_SYS_STAT_H
 
 #include <sys/statvfs.h>
 #include <sys/param.h>
@@ -233,9 +233,9 @@ typedef struct interposed_funcs_t {
                                  const struct sockaddr *, socklen_t);
     uint32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
                                       uint16_t, uint16_t, void *, void *);
-#ifdef __LINUX__
+#if defined(__LINUX__) && defined(__STATX__)
     int (*statx)(int, const char *, int, unsigned int, struct statx *);
-#endif // __LINUX__
+#endif // __LINUX__ && __STATX__
 } interposed_funcs;
     
 static inline void

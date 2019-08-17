@@ -1135,7 +1135,9 @@ init(void)
     g_fn.ftello64 = dlsym(RTLD_NEXT, "ftello64");
     g_fn.statfs64 = dlsym(RTLD_NEXT, "statfs64");
     g_fn.fstatfs64 = dlsym(RTLD_NEXT, "fstatfs64");
+#ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
+#endif // __STATX__
 #endif // __LINUX__
     
     if ((g_netinfo = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
@@ -1770,6 +1772,7 @@ fstatfs64(int fd, struct statfs64 *buf)
     return rc;
 }
 
+#ifdef __STATX__
 EXPORTON int
 statx(int dirfd, const char *pathname, int flags,
       unsigned int mask, struct statx *statxbuf)
@@ -1787,6 +1790,7 @@ statx(int dirfd, const char *pathname, int flags,
     }
     return rc;
 }
+#endif // __STATX__
 
 EXPORTON int
 stat(const char *pathname, struct stat *statbuf)

@@ -166,12 +166,14 @@ testEachLineInStreamWithActualLibraryData(void** state)
 {
     FILE* f_in = popen("nm ./lib/linux/libwrap.so", "r");
     results_t result = {0};
-    testEachLineInStream(f_in, LATEST_LIBC_VER_NEEDED, &result, stdout);
+    FILE* f_out = fopen("/dev/null", "a");
+    testEachLineInStream(f_in, LATEST_LIBC_VER_NEEDED, &result, f_out);
     assert_true(result.lines_tested > 350);            // 383 when written
     assert_true(result.lines_glibc > 40);              // 54 when written
     assert_int_equal(result.lines_glibc_private,  1);  // _dl_sym
     assert_int_equal(result.lines_failed, 0);
     pclose(f_in);
+    fclose(f_out);
 }
 
 int
@@ -182,6 +184,5 @@ main (int argc, char* argv[])
         cmocka_unit_test(testEachLineInStreamWorksWithCannedData),
         cmocka_unit_test(testEachLineInStreamWithActualLibraryData),
     };
-    cmocka_run_group_tests(tests, NULL, NULL);
-    return 0;
+    return cmocka_run_group_tests(tests, NULL, NULL);
 }

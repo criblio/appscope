@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -16,6 +17,7 @@
 struct _transport_t
 {
     cfg_transport_t type;
+    ssize_t (*write)(int, const void *, size_t);
     union {
         struct {
             int sock;
@@ -68,11 +70,11 @@ transportCreateUdp(const char* host, const char* port)
     // Set the socket to non blocking, and close on exec
     int flags = fcntl(t->udp.sock, F_GETFL, 0);
     if (fcntl(t->udp.sock, F_SETFL, flags | O_NONBLOCK) == -1) {
-        // TBD do something here too.
+        DBG("%d %s %s", t->udp.sock, host, port);
     }
     flags = fcntl(t->udp.sock, F_GETFD, 0);
     if (fcntl(t->udp.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
-        // TBD do something here.
+        DBG("%d %s %s", t->udp.sock, host, port);
     }
 
 out:
@@ -88,6 +90,7 @@ transportCreateFile(const char* path)
     transport_t* t = calloc(1, sizeof(transport_t));
     if (!t) return NULL;
 
+    t->write = dlsym(RTLD_NEXT, "write");
     t->type = CFG_FILE;
     t->file.path = strdup(path);
     if (!t->file.path) {
@@ -102,7 +105,7 @@ transportCreateFile(const char* path)
     } else {
         // Needed because umask affects open permissions
         if (fchmod(t->file.fd, 0666) == -1) {
-            // TBD do something awesome.
+            DBG("%s", path);
         }
     }
     return t;
@@ -188,12 +191,18 @@ transportSend(transport_t* t, const char* msg)
             }
             break;
         case CFG_FILE:
+            if (!t->write) {
+                DBG(NULL);
+                break;
+            }
             if (t->file.fd != -1) {
-                int bytes = write(t->file.fd, msg, strlen(msg));
+                int bytes = t->write(t->file.fd, msg, strlen(msg));
                 if (bytes < 0) {
-                    // TBD do something here
+                    DBG("%d %d", t->file.fd, bytes);
                 } else {
-                    fsync(t->file.fd);
+                    if (fsync(t->file.fd) == -1) {
+                        DBG("%d", t->file.fd);
+                    }
                 }
             }
             break;

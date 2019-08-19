@@ -20,8 +20,21 @@
 #include <pthread.h>
 #include <ctype.h>
 #include <limits.h>
+
+#include <sys/stat.h>
+#if defined(__LINUX__) && defined(__STATX__) && defined(STRUCT_STATX_MISSING_FROM_SYS_STAT_H)
+#include <linux/stat.h>
+#endif // __LINUX__ && __STATX__ && STRUCT_STATX_MISSING_FROM_SYS_STAT_H
+
+#include <sys/statvfs.h>
+#include <sys/param.h>
+#include <sys/mount.h>
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
+
+#ifdef __LINUX__
+#include <sys/vfs.h>
+#endif 
 
 #include "dns.h"
 
@@ -41,6 +54,7 @@
 
 // Initial size of net array for state
 #define NET_ENTRIES 1024
+#define FS_ENTRIES 1024
 #define MAX_FDS 4096
 #define PROTOCOL_STR 8
 #define MAX_HOSTNAME 255
@@ -73,7 +87,22 @@ enum metric_t {
     NETTX,
     NETRX_PROC,
     NETTX_PROC,
-    DNS
+    DNS,
+    FS_DURATION,
+    FS_SIZE_READ,
+    FS_SIZE_WRITE,
+    FS_OPEN,
+    FS_CLOSE,
+    FS_SEEK,
+    FS_READ,
+    FS_WRITE,
+    FS_STAT,
+};
+
+// File types; stream or fd
+enum fs_type_t {
+    FD,
+    STREAM
 };
 
 typedef struct metric_counters_t {
@@ -86,6 +115,7 @@ typedef struct metric_counters_t {
 
 typedef struct rtconfig_t {
     int numNinfo;
+    int numFSInfo;
     bool tsc_invariant;
     bool tsc_rdtscp;
     uint64_t freq;
@@ -114,10 +144,66 @@ typedef struct net_info_t {
     struct sockaddr_storage remoteConn;
 } net_info;
 
+typedef struct fs_info_t {
+    int fd;
+    enum fs_type_t type;
+    uint64_t startTime;
+    uint64_t duration;
+    char path[PATH_MAX];
+} fs_info;
+
 typedef struct interposed_funcs_t {
     void (*vsyslog)(int, const char *, va_list);
     pid_t (*fork)(void);
+    int (*open)(const char *, int, ...);
+    int (*open64)(const char *, int, ...);
+    int (*openat)(int, const char *, int, ...);
+    int (*openat64)(int, const char *, int, ...);
+    FILE *(*fopen)(const char *, const char *);
+    FILE *(*fopen64)(const char *, const char *);
+    FILE *(*freopen)(const char *, const char *, FILE *);
+    FILE *(*freopen64)(const char *, const char *, FILE *);
+    int (*creat)(const char *, mode_t);
+    int (*creat64)(const char *, mode_t);
     int (*close)(int);
+    int (*fclose)(FILE *);
+    int (*fcloseall)(void);
+    ssize_t (*read)(int, void *, size_t);
+    ssize_t (*readv)(int, const struct iovec *, int);
+    size_t (*fread)(void *, size_t, size_t, FILE *);
+    ssize_t (*pread)(int, void *, size_t, off_t);
+    ssize_t (*pread64)(int, void *, size_t, off_t);
+    ssize_t (*preadv)(int, const struct iovec *, int, off_t);
+    ssize_t (*preadv2)(int, const struct iovec *, int, off_t, int);
+    ssize_t (*preadv64v2)(int, const struct iovec *, int, off_t, int);
+    ssize_t (*write)(int, const void *, size_t);
+    ssize_t (*writev)(int, const struct iovec *, int);
+    size_t (*fwrite)(const void *, size_t, size_t, FILE *);
+    ssize_t (*pwrite)(int, const void *, size_t, off_t);
+    ssize_t (*pwrite64)(int, const void *, size_t, off_t);
+    ssize_t (*pwritev)(int, const struct iovec *, int, off_t);
+    ssize_t (*pwritev2)(int, const struct iovec *, int, off_t, int);
+    ssize_t (*pwritev64v2)(int, const struct iovec *, int, off_t, int);
+    off_t (*lseek)(int, off_t, int);
+    off_t (*lseek64)(int, off_t, int);
+    int (*fseeko)(FILE *, off_t, int);
+    int (*fseeko64)(FILE *, off_t, int);
+    long (*ftell)(FILE *);
+    off_t (*ftello)(FILE *);
+    off_t (*ftello64)(FILE *);
+    int (*fgetpos)(FILE *, fpos_t *);
+    int (*fsetpos)(FILE *, const fpos_t *);
+    void (*rewind)(FILE *);
+    int (*stat)(const char *, struct stat *);
+    int (*lstat)(const char *, struct stat *);
+    int (*fstat)(int, struct stat *);
+    int (*statfs)(const char *, struct statfs *);
+    int (*statfs64)(const char *, struct statfs64 *);
+    int (*fstatfs)(int, struct statfs *);
+    int (*fstatfs64)(int, struct statfs64 *);
+    int (*statvfs)(const char *, struct statvfs *);
+    int (*fstatvfs)(int, struct statvfs *);
+    int (*fstatat)(int, const char *, struct stat *, int);
     int (*shutdown)(int, int);
     int (*socket)(int, int, int);
     int (*listen)(int, int);
@@ -126,8 +212,6 @@ typedef struct interposed_funcs_t {
     int (*accept)(int, struct sockaddr *, socklen_t *);
     int (*accept4)(int, struct sockaddr *, socklen_t *, int);
     int (*accept$NOCANCEL)(int, struct sockaddr *, socklen_t *);
-    ssize_t (*read)(int, void *, size_t);
-    ssize_t (*write)(int, const void *, size_t);
     ssize_t (*send)(int, const void *, size_t, int);
     int (*fcntl)(int, int, ...);
     int (*fcntl64)(int, int, ...);
@@ -149,6 +233,9 @@ typedef struct interposed_funcs_t {
                                  const struct sockaddr *, socklen_t);
     uint32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
                                       uint16_t, uint16_t, void *, void *);
+#if defined(__LINUX__) && defined(__STATX__)
+    int (*statx)(int, const char *, int, unsigned int, struct statx *);
+#endif // __LINUX__ && __STATX__
 } interposed_funcs;
     
 static inline void
@@ -255,32 +342,31 @@ struct FuncArgs{
 
 #ifdef __LINUX__
 extern void *_dl_sym(void *, const char *, void *);
-#define WRAP_CHECK(func)                                               \
+#define WRAP_CHECK(func, rc)                                           \
     if (g_fn.func == NULL ) {                                          \
         if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {   \
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
-            return -1;                                                 \
+            return rc;                                                 \
        }                                                               \
     } 
-#else
-#define WRAP_CHECK(func)                                               \
-    if (g_fn.func == NULL ) {                                          \
-        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {     \
-            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
-            return -1;                                                 \
-       }                                                               \
-    } 
-#endif // __LINUX__
 
-#ifdef __LINUX__
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
-        if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {        \
+        if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {   \
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
             return;                                                    \
        }                                                               \
     } 
+
 #else
+#define WRAP_CHECK(func, rc)                                           \
+    if (g_fn.func == NULL ) {                                          \
+        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
+            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
+            return rc;                                                 \
+       }                                                               \
+    } 
+
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
         if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \

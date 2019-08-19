@@ -310,7 +310,5 @@ main (int argc, char* argv[])
         cmocka_unit_test(transportSendForFileWritesToFile),
     };
 
-    cmocka_run_group_tests(tests, NULL, NULL);
-
-    return 0;
+    return cmocka_run_group_tests(tests, NULL, NULL);
 }

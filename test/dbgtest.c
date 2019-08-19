@@ -192,6 +192,5 @@ main (int argc, char* argv[])
         cmocka_unit_test(dbgAddLineTestReallocWorks),
         cmocka_unit_test(dbgDumpAllOutputsVersionAndTime),
     };
-    cmocka_run_group_tests(tests, NULL, NULL);
-    return 0;
+    return cmocka_run_group_tests(tests, NULL, NULL);
 }

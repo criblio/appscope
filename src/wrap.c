@@ -13,7 +13,7 @@ static thread_timing g_thread = {0};
 
 // These need to come from a config file
 // Do we like the g_ or the cfg prefix?
-static bool cfgNETRXTXPeriodic = TRUE;
+static bool cfgNETRXTXPeriodic = FALSE;
 
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
@@ -939,12 +939,43 @@ getDNSName(int sd, void *pkt, int pktlen)
       MINFO           14 mailbox or mail list information
       MX              15 mail exchange
       TXT             16 text strings
+
+      *** or on Linux ***
+      The packet could be sent to a local name server hosted by 
+      systemd. If it is, the remote IP should be 127.0.0.53. 
+      So, if we don't find the query type as in a direct DNS 
+      packet we look for a remote IP and dig the domain name out 
+      of that packet.
+      The format of the string sent to a local name server is 
+      of the form:
+      TTP/1.1\r\nHost: wttr.in\r\nUser-Agent: curl/7.64.0\r\nAccept: @/@\r\n\r\nert.` 
+
+      *** or on macOS ***
+      macOS provides a DNS service, a daemon process that acts as a
+      local name server. We interpose the function DNSServiceQueryRecord
+      in order to dig out the domain name. The DNS metric is created
+      directly from that function interposition. 
 */
     q = (struct question *)(pkt + sizeof(struct dns_header) + strlen(dname));
     if ((q->qtype != 0) || ((q->qclass < 1) || (q->qclass > 16))) {
+        // Is this a request to a local name server?
+        char ip[INET6_ADDRSTRLEN];                                                                                         
+
+        inet_ntop(AF_INET,                                          
+                  &((struct sockaddr_in *)&g_netinfo[sd].remoteConn)->sin_addr,
+                  ip, sizeof(ip));
+
+        if (strncmp(ip, LOCAL_NAME_SERVER, sizeof(ip)) == 0) {
+            char *startp;
+
+            startp = strtok(dname, ":");
+            startp = strtok(NULL, "\r");
+            strncpy(g_netinfo[sd].dnsName, startp, strlen(startp));
+        }
         return 0;
     }
 
+    // We think we have a direct DNS request
     aname = g_netinfo[sd].dnsName;
 
     while (*dname != '\0') {

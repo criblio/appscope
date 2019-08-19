@@ -18,6 +18,7 @@ struct _transport_t
 {
     cfg_transport_t type;
     ssize_t (*write)(int, const void *, size_t);
+    ssize_t (*send)(int, const void *, size_t, int);
     union {
         struct {
             int sock;
@@ -42,6 +43,7 @@ transportCreateUdp(const char* host, const char* port)
 
     t->type = CFG_UDP;
     t->udp.sock = -1;
+    t->send = dlsym(RTLD_NEXT, "send");
 
     // Get some addresses to try
     struct addrinfo hints = {0};
@@ -178,7 +180,12 @@ transportSend(transport_t* t, const char* msg)
     switch (t->type) {
         case CFG_UDP:
             if (t->udp.sock != -1) {
-                int rc = send(t->udp.sock, msg, strlen(msg), 0);
+                if (!t->send) {
+                    DBG(NULL);
+                    break;
+                }
+                int rc = t->send(t->udp.sock, msg, strlen(msg), 0);
+
                 if (rc < 0) {
                     switch (errno) {
                     case EWOULDBLOCK:

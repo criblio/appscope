@@ -138,6 +138,7 @@ typedef struct net_info_t {
     bool network;
     bool listen;
     bool accept;
+    bool dnsSend;
     uint64_t startTime;
     uint64_t duration;
     char dnsName[MAX_HOSTNAME];
@@ -226,6 +227,12 @@ typedef struct interposed_funcs_t {
     ssize_t (*recvfrom)(int sockfd, void *buf, size_t len, int flags,
                                 struct sockaddr *src_addr, socklen_t *addrlen);
     ssize_t (*recvmsg)(int, struct msghdr *, int);
+    struct hostent *(*gethostbyname)(const char *);
+    int (*gethostbyname_r)(const char *, struct hostent *, char *, size_t,
+                          struct hostent **, int *);
+    struct hostent *(*gethostbyname2)(const char *, int);
+    int (*getaddrinfo)(const char *, const char *, const struct addrinfo *,
+                       struct addrinfo **);
     // macOS
     int (*close$NOCANCEL)(int);
     int (*close_nocancel)(int);

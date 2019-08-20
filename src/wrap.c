@@ -13,7 +13,7 @@ static thread_timing g_thread = {0};
 
 // These need to come from a config file
 // Do we like the g_ or the cfg prefix?
-static bool cfgNETRXTXPeriodic = FALSE;
+static bool cfgNETRXTXPeriodic = TRUE;
 
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
@@ -218,6 +218,26 @@ doThread()
         if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
             scopeLog("ERROR: doThread:pthread_create", -1, CFG_LOG_ERROR);
         }
+    }
+}
+
+static void
+doDNSMetricName(const char *domain)
+{
+    if (!domain) return;
+
+    event_field_t fields[] = {
+        STRFIELD("proc",             g_cfg.procname,        2),
+        NUMFIELD("pid",              getpid(),              7),
+        STRFIELD("host",             g_cfg.hostname,        2),
+        STRFIELD("domain",           domain,                6),
+        STRFIELD("unit",             "request",             1),
+        FIELDEND
+    };
+
+    event_t e = {"net.dns", 1, DELTA, fields};
+    if (outSendEvent(g_out, &e)) {
+        scopeLog("ERROR: doDNSMetricName:DNS:outSendEvent", -1, CFG_LOG_ERROR);
     }
 }
 
@@ -731,6 +751,13 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
 
     case DNS:
     {
+        if (g_netinfo[fd].dnsSend == FALSE) {
+            break;
+        }
+
+        // For next time
+        g_netinfo[fd].dnsSend = FALSE;
+        
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
@@ -804,26 +831,19 @@ doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control
 static int
 doSetAddrs(int sockfd)
 {
+    struct sockaddr_storage addr;
+    socklen_t addrlen = sizeof(struct sockaddr_storage);
+    
     if (getNetEntry(sockfd) == NULL) {
         return -1;
     }
     
-    if (g_netinfo[sockfd].localConn.ss_family == AF_UNSPEC) {
-        struct sockaddr_storage addr;
-        socklen_t addrlen = sizeof(struct sockaddr_storage);
-        
-        if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
-            doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
-        }
+    if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+        doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
     }
     
-    if (g_netinfo[sockfd].remoteConn.ss_family == AF_UNSPEC) {
-        struct sockaddr_storage addr;
-        socklen_t addrlen = sizeof(struct sockaddr_storage);
-        
-        if (getpeername(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
-            doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
-        }
+    if (getpeername(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+        doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, REMOTE);
     }
 
     return 0;
@@ -892,6 +912,7 @@ getDNSName(int sd, void *pkt, int pktlen)
     dns_query *query;
     struct question *q;
     char *aname, *dname;
+    char dnsName[MAX_HOSTNAME];
 
     if (getNetEntry(sd) == NULL) {
         return -1;
@@ -943,10 +964,9 @@ getDNSName(int sd, void *pkt, int pktlen)
       *** or on Linux ***
       The packet could be sent to a local name server hosted by 
       systemd. If it is, the remote IP should be 127.0.0.53. 
-      So, if we don't find the query type as in a direct DNS 
-      packet we look for a remote IP and dig the domain name out 
-      of that packet.
-      The format of the string sent to a local name server is 
+      We pick up these queries by interposing the various
+      gethostbyname functions, including getaddinfo. 
+      For reference, the format of the string sent to a local name server is 
       of the form:
       TTP/1.1\r\nHost: wttr.in\r\nUser-Agent: curl/7.64.0\r\nAccept: @/@\r\n\r\nert.` 
 
@@ -958,25 +978,11 @@ getDNSName(int sd, void *pkt, int pktlen)
 */
     q = (struct question *)(pkt + sizeof(struct dns_header) + strlen(dname));
     if ((q->qtype != 0) || ((q->qclass < 1) || (q->qclass > 16))) {
-        // Is this a request to a local name server?
-        char ip[INET6_ADDRSTRLEN];                                                                                         
-
-        inet_ntop(AF_INET,                                          
-                  &((struct sockaddr_in *)&g_netinfo[sd].remoteConn)->sin_addr,
-                  ip, sizeof(ip));
-
-        if (strncmp(ip, LOCAL_NAME_SERVER, sizeof(ip)) == 0) {
-            char *startp;
-
-            startp = strtok(dname, ":");
-            startp = strtok(NULL, "\r");
-            strncpy(g_netinfo[sd].dnsName, startp, strlen(startp));
-        }
         return 0;
     }
 
     // We think we have a direct DNS request
-    aname = g_netinfo[sd].dnsName;
+    aname = dnsName;
 
     while (*dname != '\0') {
         // handle one label
@@ -989,6 +995,15 @@ getDNSName(int sd, void *pkt, int pktlen)
 
     aname--;
     *aname = '\0';
+
+    if (strncmp(aname, g_netinfo[sd].dnsName, strlen(aname)) == 0) {
+        // Already sent this from an interposed function
+        g_netinfo[sd].dnsSend = FALSE;
+    } else {
+        strncpy(g_netinfo[sd].dnsName, aname, strlen(aname));
+        g_netinfo[sd].dnsSend = TRUE;
+    }
+    
     return 0;
 }
 
@@ -1136,6 +1151,9 @@ init(void)
     g_fn.recv = dlsym(RTLD_NEXT, "recv");
     g_fn.recvfrom = dlsym(RTLD_NEXT, "recvfrom");
     g_fn.recvmsg = dlsym(RTLD_NEXT, "recvmsg");
+    g_fn.gethostbyname = dlsym(RTLD_NEXT, "gethostbyname");
+    g_fn.gethostbyname2 = dlsym(RTLD_NEXT, "gethostbyname2");
+    g_fn.getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo");
 
 #ifdef __MACOS__
     g_fn.close$NOCANCEL = dlsym(RTLD_NEXT, "close$NOCANCEL");
@@ -1166,6 +1184,7 @@ init(void)
     g_fn.ftello64 = dlsym(RTLD_NEXT, "ftello64");
     g_fn.statfs64 = dlsym(RTLD_NEXT, "statfs64");
     g_fn.fstatfs64 = dlsym(RTLD_NEXT, "fstatfs64");
+    g_fn.gethostbyname_r = dlsym(RTLD_NEXT, "gethostbyname_r");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
@@ -1948,6 +1967,22 @@ fstatvfs(int fd, struct statvfs *buf)
     return rc;
 }
 
+EXPORTON int
+gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
+                struct hostent **result, int *h_errnop)
+{
+    int rc;
+
+    WRAP_CHECK(gethostbyname_r, -1);
+    rc = g_fn.gethostbyname_r(name, ret, buf, buflen, result, h_errnop);
+    if ((rc == 0) && (result != NULL)) {
+        scopeLog("gethostbyname_r", -1, CFG_LOG_DEBUG);
+        doDNSMetricName(name);
+    }
+
+    return rc;
+}
+
 #endif // __LINUX__
 
 EXPORTON int
@@ -2104,20 +2139,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
                                     rrtype, rrclass, callback, context);
     if (rc == 0) {
         scopeLog("DNSServiceQueryRecord", -1, CFG_LOG_DEBUG);
-
-        event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              getpid(),              7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("domain",           fullname,              6),
-            STRFIELD("unit",             "request",             1),
-            FIELDEND
-        };
-
-        event_t e = {"net.dns", 1, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: DNSServiceQueryRecord:DNS:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        doDNSMetricName(fullname);
     }
 
     return rc;
@@ -2983,5 +3005,52 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
         doRecv(sockfd, rc);
     }
     
+    return rc;
+}
+
+EXPORTON struct hostent *
+gethostbyname(const char *name)
+{
+    struct hostent *rc;
+
+    WRAP_CHECK(gethostbyname, NULL);
+    rc = g_fn.gethostbyname(name);
+    if (rc != NULL) {
+        scopeLog("gethostbyname", -1, CFG_LOG_DEBUG);
+        doDNSMetricName(name);
+    }
+
+    return rc;
+}
+
+EXPORTON struct hostent *
+gethostbyname2(const char *name, int af)
+{
+    struct hostent *rc;
+
+    WRAP_CHECK(gethostbyname2, NULL);
+    rc = g_fn.gethostbyname2(name, af);
+    if (rc != NULL) {
+        scopeLog("gethostbyname2", -1, CFG_LOG_DEBUG);
+        doDNSMetricName(name);
+    }
+
+    return rc;
+}
+
+EXPORTON int
+getaddrinfo(const char *node, const char *service,
+            const struct addrinfo *hints,
+            struct addrinfo **res)
+{
+    int rc;
+
+    WRAP_CHECK(getaddrinfo, -1);
+    rc = g_fn.getaddrinfo(node, service, hints, res);
+    if (rc == 0) {
+        scopeLog("getaddrinfo", -1, CFG_LOG_DEBUG);
+        doDNSMetricName(node);
+    }
+
     return rc;
 }

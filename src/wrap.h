@@ -56,7 +56,7 @@
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
 #define MAX_FDS 4096
-#define PROTOCOL_STR 8
+#define PROTOCOL_STR 16
 #define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
 #define SCOPE_UNIX 99
@@ -106,6 +106,14 @@ enum fs_type_t {
     STREAM
 };
 
+// Event types; used to indicate activity for periodic thread
+enum event_type_t {
+    EVENT_TX = 1,
+    EVENT_RX = 2,
+    EVENT_WR = 4,
+    EVENT_RD = 8
+};
+
 typedef struct metric_counters_t {
     int openPorts;
     int TCPConnections;
@@ -135,10 +143,12 @@ typedef struct net_info_t {
     int fd;
     int type;
     int addrType;
-    bool network;
+    int numTX;
+    int numRX;
     bool listen;
     bool accept;
     bool dnsSend;
+    enum event_type_t action;
     uint64_t startTime;
     uint64_t duration;
     char dnsName[MAX_HOSTNAME];
@@ -149,6 +159,7 @@ typedef struct net_info_t {
 typedef struct fs_info_t {
     int fd;
     enum fs_type_t type;
+    enum event_type_t action;
     uint64_t startTime;
     uint64_t duration;
     char path[PATH_MAX];

@@ -386,10 +386,20 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         const char* err_str = "UNKNOWN";
         switch (type) {
             case FS_SIZE_READ:
+                if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+                    g_fsinfo[fd].action |= EVENT_RD;
+                    return;
+                }
+
                 metric = "fs.read";
                 err_str = "ERROR: doFSMetric:FS_SIZE_READ:outSendEvent";
                 break;
             case FS_SIZE_WRITE:
+                if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+                    g_fsinfo[fd].action |= EVENT_WR;
+                    return;
+                }
+
                 metric = "fs.write";
                 err_str = "ERROR: doFSMetric:FS_SIZE_WRITE:outSendEvent";
                 break;
@@ -476,11 +486,11 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
     char proto[PROTOCOL_STR];
     in_port_t localPort, remotePort;
         
-    if (getNetEntry(fd) == NULL) {
+    if ((type != NETRX_PROC) && (type != NETTX_PROC) && getNetEntry(fd) == NULL) {
         return;
     }
 
-    if ((source == EVENT_BASED) && (fd > 0)) {
+    if ((type != NETRX_PROC) && (type != NETTX_PROC)) {
         getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
         localPort = GET_PORT(fd, g_netinfo[fd].localConn.ss_family, LOCAL);
         remotePort = GET_PORT(fd, g_netinfo[fd].remoteConn.ss_family, REMOTE);
@@ -571,6 +581,8 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char data[16];
 
         if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+            g_netinfo[fd].action |= EVENT_RX;
+            atomicAdd(&g_netinfo[fd].numRX, 1);
             break;
         }
 
@@ -580,9 +592,15 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             strncpy(data, "clear", sizeof(data));
         }
 
-        if (g_netinfo[fd].type == SCOPE_UNIX) {
-            strncpy(lip, " ", sizeof(lip));
-            strncpy(rip, " ", sizeof(rip));
+        if ((g_netinfo[fd].type == SCOPE_UNIX) ||
+            (g_netinfo[fd].localConn.ss_family == AF_LOCAL) ||
+            (g_netinfo[fd].localConn.ss_family == AF_NETLINK)) {
+            strncpy(lip, "UNIX", sizeof(lip));
+            strncpy(rip, "UNIX", sizeof(rip));
+            localPort = remotePort = 0;
+            if (g_netinfo[fd].localConn.ss_family == AF_NETLINK) {
+                strncpy(proto, "NETLINK", sizeof(proto));
+            }
         } else {
             if (g_netinfo[fd].localConn.ss_family == AF_INET) {
                 if (inet_ntop(AF_INET,
@@ -632,7 +650,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {"net.rx", g_ctrs.netrx, DELTA, fields};
+        event_t e = {"net.op.rx", g_netinfo[fd].numRX, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETRX:outSendEvent", -1, CFG_LOG_ERROR);
         }
@@ -641,7 +659,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
          * This creates DELTA behavior by uploading the number of bytes
          * since the last time the metric was uploaded.
          */
-        atomicSet(&g_ctrs.netrx, 0);
+        atomicSet(&g_netinfo[fd].numRX, 0);
         break;
     }
 
@@ -652,6 +670,8 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char data[16];
 
         if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+            g_netinfo[fd].action |= EVENT_TX;
+            atomicAdd(&g_netinfo[fd].numTX, 1);
             break;
         }
 
@@ -661,9 +681,15 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             strncpy(data, "clear", sizeof(data));
         }
 
-        if (g_netinfo[fd].type == SCOPE_UNIX) {
-            strncpy(lip, " ", sizeof(lip));
-            strncpy(rip, " ", sizeof(rip));
+        if ((g_netinfo[fd].type == SCOPE_UNIX) ||
+            (g_netinfo[fd].localConn.ss_family == AF_LOCAL) ||
+            (g_netinfo[fd].localConn.ss_family == AF_NETLINK)) {
+            strncpy(lip, "UNIX", sizeof(lip));
+            strncpy(rip, "UNIX", sizeof(rip));
+            localPort = remotePort = 0;
+            if (g_netinfo[fd].localConn.ss_family == AF_NETLINK) {
+                strncpy(proto, "NETLINK", sizeof(proto));
+            }
         } else {
             if (g_netinfo[fd].localConn.ss_family == AF_INET) {
                 if (inet_ntop(AF_INET,
@@ -713,12 +739,12 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {"net.tx", g_ctrs.nettx, DELTA, fields};
+        event_t e = {"net.op.tx", g_netinfo[fd].numTX, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETTX:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
-        atomicSet(&g_ctrs.nettx, 0);
+        atomicSet(&g_netinfo[fd].numTX, 0);
         break;
     }
 
@@ -1073,7 +1099,7 @@ static void *
 periodic(void *arg)
 {
     long mem;
-    int nthread, nfds, children;
+    int i, nthread, nfds, children;
     pid_t pid = getpid();
     long long cpu, cpuState = 0;
 
@@ -1095,8 +1121,20 @@ periodic(void *arg)
         children = osGetNumChildProcs(pid);
         doProcMetric(PROC_CHILD, children);
 
-        doNetMetric(NETRX_PROC, -1, PERIODIC);
-        doNetMetric(NETTX_PROC, -1, PERIODIC);
+        if (g_ctrs.netrx > 0) doNetMetric(NETRX_PROC, -1, PERIODIC);
+        if (g_ctrs.nettx> 0) doNetMetric(NETTX_PROC, -1, PERIODIC);
+
+        for (i = 0; i < g_cfg.numNinfo; i++) {
+            if (g_netinfo[i].action & EVENT_TX) {
+                doNetMetric(NETTX, i, PERIODIC);
+            }
+
+            if (g_netinfo[i].action & EVENT_RX) {
+                doNetMetric(NETRX, i, PERIODIC);
+            }
+
+            g_netinfo[i].action = 0;
+        }
         
         // From the config file
         sleep(g_thread.interval);

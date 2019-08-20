@@ -134,7 +134,14 @@ addSock(int fd, int type)
             if (g_ctrs.TCPConnections > 0) {
                 atomicSub(&g_ctrs.TCPConnections, 1);
             }
-          
+
+            g_netinfo[fd].type = type;
+#ifdef __LINUX__
+            // Clear these bits so comparisons of type will work
+            g_netinfo[fd].type &= ~SOCK_CLOEXEC;
+            g_netinfo[fd].type &= ~SOCK_NONBLOCK;
+#endif // __LINUX__
+
             return;
         }
         
@@ -1237,7 +1244,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, char *func)
         if (g_fsinfo[fd].fd == fd) {
             char buf[128];
 
-            snprintf(buf, sizeof(buf), "%s:doOpen: duplicate", func);
+            snprintf(buf, sizeof(buf), "%s:doOpen: duplicate(%d)", func, fd);
             scopeLog(buf, fd, CFG_LOG_DEBUG);
             return;
         }
@@ -1286,9 +1293,21 @@ doClose(int fd, char *func)
         }
         
         memset(ninfo, 0, sizeof(struct net_info_t));
-        if (func) scopeLog(func, fd, CFG_LOG_DEBUG);
-    } else if ((fsinfo = getFSEntry(fd)) != NULL) {
-        if (func) scopeLog(func, fd, CFG_LOG_TRACE);
+        if (func) {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%s: network", func);
+            scopeLog(buf, fd, CFG_LOG_DEBUG);
+        }
+    }
+
+    // Check both file desriptor tables
+    if ((fsinfo = getFSEntry(fd)) != NULL) {
+        if (func) {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%s: file", func);
+            scopeLog(buf, fd, CFG_LOG_TRACE);
+        }
+        
         doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 0, NULL);
         memset(fsinfo, 0, sizeof(struct fs_info_t));
     }

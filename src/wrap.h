@@ -66,6 +66,10 @@
 typedef unsigned int bool;
 #endif
 
+#ifndef AF_NETLINK
+#define AF_NETLINK 16
+#endif
+
 // Several control types, used in several areas
 enum control_type_t {
     LOCAL,

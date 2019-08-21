@@ -372,6 +372,33 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     case FS_SIZE_READ:
     case FS_SIZE_WRITE:
     {
+        const char* metric = "UNKNOWN";
+        const char* err_str = "UNKNOWN";
+        switch (type) {
+            case FS_SIZE_READ:
+                if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+                    g_fsinfo[fd].action |= EVENT_FS;
+                    atomicAdd(&g_fsinfo[fd].readBytes, size);
+                    return;
+                }
+
+                metric = "fs.read";
+                err_str = "ERROR: doFSMetric:FS_SIZE_READ:outSendEvent";
+                break;
+            case FS_SIZE_WRITE:
+                if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+                    g_fsinfo[fd].action |= EVENT_FS;
+                    atomicAdd(&g_fsinfo[fd].writeBytes, size);
+                    return;
+                }
+
+                metric = "fs.write";
+                err_str = "ERROR: doFSMetric:FS_SIZE_WRITE:outSendEvent";
+                break;
+            default:
+                break;
+        }
+
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
@@ -382,36 +409,13 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        const char* metric = "UNKNOWN";
-        const char* err_str = "UNKNOWN";
-        switch (type) {
-            case FS_SIZE_READ:
-                if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
-                    g_fsinfo[fd].action |= EVENT_RD;
-                    return;
-                }
-
-                metric = "fs.read";
-                err_str = "ERROR: doFSMetric:FS_SIZE_READ:outSendEvent";
-                break;
-            case FS_SIZE_WRITE:
-                if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
-                    g_fsinfo[fd].action |= EVENT_WR;
-                    return;
-                }
-
-                metric = "fs.write";
-                err_str = "ERROR: doFSMetric:FS_SIZE_WRITE:outSendEvent";
-                break;
-            default:
-                break;
-        }
         event_t e = {metric, size, HISTOGRAM, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
         break;
     }
+    
     case FS_OPEN:
     case FS_CLOSE:
     case FS_SEEK:
@@ -419,12 +423,55 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     case FS_WRITE:
     case FS_STAT:
     {
-        const char *path;
+        const char* metric = "UNKNOWN";
+        const char* err_str = "UNKNOWN";
+        switch (type) {
+            case FS_OPEN:
+                metric = "fs.op.open";
+                err_str = "ERROR: doFSMetric:FS_OPEN:outSendEvent";
+                atomicAdd(&g_fsinfo[fd].numOpen, 1);
+                break;
+            case FS_CLOSE:
+                metric = "fs.op.close";
+                err_str = "ERROR: doFSMetric:FS_CLOSE:outSendEvent";
+                atomicAdd(&g_fsinfo[fd].numClose, 1);
+                break;
+            case FS_SEEK:
+                metric = "fs.op.seek";
+                err_str = "ERROR: doFSMetric:FS_SEEK:outSendEvent";
+                atomicAdd(&g_fsinfo[fd].numSeek, 1);
+                break;
+            case FS_READ:
+                metric = "fs.op.read";
+                err_str = "ERROR: doFSMetric:FS_READ:outSendEvent";
+                atomicAdd(&g_fsinfo[fd].numRead, 1);
+                break;
+            case FS_WRITE:
+                metric = "fs.op.write";
+                err_str = "ERROR: doFSMetric:FS_WRITE:outSendEvent";
+                atomicAdd(&g_fsinfo[fd].numWrite, 1);
+                break;
+            case FS_STAT:
+                metric = "fs.op.stat";
+                err_str = "ERROR: doFSMetric:FS_STAT:outSendEvent";
+                atomicAdd(&g_fsinfo[fd].numStat, 1);
+                break;
+            default:
+                break;
+        }
+
+        /*
+         * If called from an event we update counters
+         * If called from the periodic thread we emit metrics
+         */
+        if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+            g_fsinfo[fd].action |= EVENT_FS;
+            break;
+        }
+
         // This stat func passes a path and not an fd
         if ((fd == -1) && (pathname)) {
-            path = pathname;
-        } else {
-            path = g_fsinfo[fd].path;
+            strncpy(g_fsinfo[fd].path, pathname, sizeof(g_fsinfo[fd].path));
         }
         
         event_field_t fields[] = {
@@ -433,41 +480,12 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
-            STRFIELD("file",             path,                  6),
+            STRFIELD("file",             g_fsinfo[fd].path,     6),
             STRFIELD("unit",             "operation",           1),
             FIELDEND
         };
-        const char* metric = "UNKNOWN";
-        const char* err_str = "UNKNOWN";
-        switch (type) {
-            case FS_OPEN:
-                metric = "fs.op.open";
-                err_str = "ERROR: doFSMetric:FS_OPEN:outSendEvent";
-                break;
-            case FS_CLOSE:
-                metric = "fs.op.close";
-                err_str = "ERROR: doFSMetric:FS_CLOSE:outSendEvent";
-                break;
-            case FS_SEEK:
-                metric = "fs.op.seek";
-                err_str = "ERROR: doFSMetric:FS_SEEK:outSendEvent";
-                break;
-            case FS_READ:
-                metric = "fs.op.read";
-                err_str = "ERROR: doFSMetric:FS_READ:outSendEvent";
-                break;
-            case FS_WRITE:
-                metric = "fs.op.write";
-                err_str = "ERROR: doFSMetric:FS_WRITE:outSendEvent";
-                break;
-            case FS_STAT:
-                metric = "fs.op.stat";
-                err_str = "ERROR: doFSMetric:FS_STAT:outSendEvent";
-                break;
-            default:
-                break;
-        }
-        event_t e = {metric, 1, DELTA, fields};
+
+        event_t e = {metric, size, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
@@ -1134,6 +1152,52 @@ periodic(void *arg)
             }
 
             g_netinfo[i].action = 0;
+        }
+        
+        for (i = 0; i < g_cfg.numFSInfo; i++) {
+            if (g_fsinfo[i].action & EVENT_FS) {
+                if (g_fsinfo[i].readBytes > 0) {
+                    doFSMetric(FS_SIZE_READ, i, PERIODIC, "read", g_fsinfo[i].readBytes, NULL);
+                    atomicSet(&g_fsinfo[i].readBytes, 0);
+                }
+
+                if (g_fsinfo[i].writeBytes > 0) {
+                    doFSMetric(FS_SIZE_WRITE, i, PERIODIC, "write", g_fsinfo[i].writeBytes, NULL);
+                    atomicSet(&g_fsinfo[i].writeBytes, 0);
+                }
+
+                if (g_fsinfo[i].numOpen > 0) {
+                    doFSMetric(FS_OPEN, i, PERIODIC, "open", g_fsinfo[i].numOpen, NULL);
+                    atomicSet(&g_fsinfo[i].numOpen, 0);
+                }
+
+                if (g_fsinfo[i].numClose > 0) {
+                    doFSMetric(FS_CLOSE, i, PERIODIC, "close", g_fsinfo[i].numClose, NULL);
+                    atomicSet(&g_fsinfo[i].numClose, 0);
+                }
+
+                if (g_fsinfo[i].numSeek > 0) {
+                    doFSMetric(FS_SEEK, i, PERIODIC, "seek", g_fsinfo[i].numSeek, NULL);
+                    atomicSet(&g_fsinfo[i].numSeek, 0);
+                }
+
+                if (g_fsinfo[i].numStat > 0) {
+                    doFSMetric(FS_STAT, i, PERIODIC, "stat", g_fsinfo[i].numStat, NULL);
+                    atomicSet(&g_fsinfo[i].numStat, 0);
+                }
+
+                if (g_fsinfo[i].numRead > 0) {
+                    doFSMetric(FS_READ, i, PERIODIC, "read", g_fsinfo[i].numRead, NULL);
+                    atomicSet(&g_fsinfo[i].numRead, 0);
+                }
+
+                if (g_fsinfo[i].numWrite > 0) {
+                    doFSMetric(FS_WRITE, i, PERIODIC, "write", g_fsinfo[i].numWrite, NULL);
+                    atomicSet(&g_fsinfo[i].numWrite, 0);
+                }
+            }
+
+            g_fsinfo[i].action = 0;
         }
         
         // From the config file

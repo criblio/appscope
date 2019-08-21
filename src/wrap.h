@@ -114,8 +114,7 @@ enum fs_type_t {
 enum event_type_t {
     EVENT_TX = 1,
     EVENT_RX = 2,
-    EVENT_WR = 4,
-    EVENT_RD = 8
+    EVENT_FS = 4
 };
 
 typedef struct metric_counters_t {
@@ -164,6 +163,14 @@ typedef struct fs_info_t {
     int fd;
     enum fs_type_t type;
     enum event_type_t action;
+    int numOpen;
+    int numClose;
+    int numSeek;
+    int numStat;
+    int numRead;
+    int numWrite;
+    int readBytes;
+    int writeBytes;
     uint64_t startTime;
     uint64_t duration;
     char path[PATH_MAX];

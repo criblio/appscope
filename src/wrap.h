@@ -94,6 +94,7 @@ enum metric_t {
     NETTX_PROC,
     DNS,
     FS_DURATION,
+    FS_DURATION_PROC,
     FS_SIZE_READ,
     FS_SIZE_WRITE,
     FS_OPEN,
@@ -171,6 +172,7 @@ typedef struct fs_info_t {
     int numWrite;
     int readBytes;
     int writeBytes;
+    int totalDuration;
     uint64_t startTime;
     uint64_t duration;
     char path[PATH_MAX];

@@ -353,6 +353,13 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     switch (type) {
     case FS_DURATION:
     {
+        g_fsinfo[fd].action |= EVENT_FS;
+        atomicAdd(&g_fsinfo[fd].totalDuration, g_fsinfo[fd].duration);
+
+        if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+            return;
+        }
+
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
@@ -369,6 +376,26 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
         break;        
     }
+
+    case FS_DURATION_PROC:
+    {
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_cfg.procname,        2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("op",               op,                    2),
+            STRFIELD("file",             g_fsinfo[fd].path,     6),
+            STRFIELD("unit",             "millisecond",         1),
+            FIELDEND
+        };
+        event_t e = {"fs.sum_duration", size, CURRENT, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doFSMetric:FS_DURATION_PROC:outSendEvent", fd, CFG_LOG_ERROR);
+        }
+        break;        
+    }
+    
     case FS_SIZE_READ:
     case FS_SIZE_WRITE:
     {
@@ -376,9 +403,12 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         const char* err_str = "UNKNOWN";
         switch (type) {
             case FS_SIZE_READ:
+                // We do this in all cases as it serves the periodic thread
+                g_fsinfo[fd].action |= EVENT_FS;
+                atomicAdd(&g_fsinfo[fd].readBytes, size);
+
+                // Only do this on events if enabled
                 if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
-                    g_fsinfo[fd].action |= EVENT_FS;
-                    atomicAdd(&g_fsinfo[fd].readBytes, size);
                     return;
                 }
 
@@ -386,9 +416,10 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
                 err_str = "ERROR: doFSMetric:FS_SIZE_READ:outSendEvent";
                 break;
             case FS_SIZE_WRITE:
+                g_fsinfo[fd].action |= EVENT_FS;
+                atomicAdd(&g_fsinfo[fd].writeBytes, size);
+
                 if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
-                    g_fsinfo[fd].action |= EVENT_FS;
-                    atomicAdd(&g_fsinfo[fd].writeBytes, size);
                     return;
                 }
 
@@ -425,6 +456,8 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     {
         const char* metric = "UNKNOWN";
         const char* err_str = "UNKNOWN";
+
+        g_fsinfo[fd].action |= EVENT_FS;
         switch (type) {
             case FS_OPEN:
                 metric = "fs.op.open";
@@ -465,8 +498,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
          * If called from the periodic thread we emit metrics
          */
         if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
-            g_fsinfo[fd].action |= EVENT_FS;
-            break;
+            return;;
         }
 
         // This stat func passes a path and not an fd
@@ -598,10 +630,11 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char rip[INET6_ADDRSTRLEN];
         char data[16];
 
+        g_netinfo[fd].action |= EVENT_RX;
+        atomicAdd(&g_netinfo[fd].numRX, 1);
+
         if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
-            g_netinfo[fd].action |= EVENT_RX;
-            atomicAdd(&g_netinfo[fd].numRX, 1);
-            break;
+            return;
         }
 
         if ((localPort == 443) || (remotePort == 443)) {
@@ -677,7 +710,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
          * This creates DELTA behavior by uploading the number of bytes
          * since the last time the metric was uploaded.
          */
-        atomicSet(&g_netinfo[fd].numRX, 0);
         break;
     }
 
@@ -687,10 +719,11 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char rip[INET6_ADDRSTRLEN];
         char data[16];
 
+        g_netinfo[fd].action |= EVENT_TX;
+        atomicAdd(&g_netinfo[fd].numTX, 1);
+
         if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
-            g_netinfo[fd].action |= EVENT_TX;
-            atomicAdd(&g_netinfo[fd].numTX, 1);
-            break;
+            return;
         }
 
         if ((localPort == 443) || (remotePort == 443)) {
@@ -762,7 +795,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             scopeLog("ERROR: doNetMetric:NETTX:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
-        atomicSet(&g_netinfo[fd].numTX, 0);
         break;
     }
 
@@ -779,7 +811,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETRX_PROC:outSendEvent", -1, CFG_LOG_ERROR);
         }
-        atomicSet(&g_ctrs.netrx, 0);
         break;
     }
 
@@ -796,7 +827,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETTX_PROC:outSendEvent", -1, CFG_LOG_ERROR);
         }
-        atomicSet(&g_ctrs.nettx, 0);
         break;
     }
 
@@ -1141,14 +1171,18 @@ periodic(void *arg)
 
         if (g_ctrs.netrx > 0) doNetMetric(NETRX_PROC, -1, PERIODIC);
         if (g_ctrs.nettx> 0) doNetMetric(NETTX_PROC, -1, PERIODIC);
+        atomicSet(&g_ctrs.netrx, 0);
+        atomicSet(&g_ctrs.nettx, 0);
 
         for (i = 0; i < g_cfg.numNinfo; i++) {
             if (g_netinfo[i].action & EVENT_TX) {
                 doNetMetric(NETTX, i, PERIODIC);
+                atomicSet(&g_netinfo[i].numTX, 0);
             }
 
             if (g_netinfo[i].action & EVENT_RX) {
                 doNetMetric(NETRX, i, PERIODIC);
+                atomicSet(&g_netinfo[i].numRX, 0);
             }
 
             g_netinfo[i].action = 0;
@@ -1164,6 +1198,12 @@ periodic(void *arg)
                 if (g_fsinfo[i].writeBytes > 0) {
                     doFSMetric(FS_SIZE_WRITE, i, PERIODIC, "write", g_fsinfo[i].writeBytes, NULL);
                     atomicSet(&g_fsinfo[i].writeBytes, 0);
+                }
+
+                if (g_fsinfo[i].totalDuration > 0) {
+                    int duration = g_fsinfo[i].totalDuration / (g_fsinfo[i].numRead + g_fsinfo[i].numWrite);
+                    doFSMetric(FS_DURATION_PROC, i, PERIODIC, NULL, duration, NULL);
+                    atomicSet(&g_fsinfo[i].totalDuration, 0);
                 }
 
                 if (g_fsinfo[i].numOpen > 0) {

@@ -12,6 +12,9 @@ typedef enum {CFG_LOG_TRACE,
               CFG_LOG_NONE} cfg_log_level_t;
 
 #define CFG_MAX_VERBOSITY 9
+#define CFG_FS_EVENTS_VERBOSITY 7
+#define CFG_NET_EVENTS_VERBOSITY 8
+#define CFG_NET_FS_EVENTS_VERBOSITY 9
 #define CFG_FILE_NAME "scope.cfg"
 
 #define DEFAULT_OUT_FORMAT CFG_EXPANDED_STATSD

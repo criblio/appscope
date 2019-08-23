@@ -131,6 +131,7 @@ typedef struct rtconfig_t {
     int numFSInfo;
     bool tsc_invariant;
     bool tsc_rdtscp;
+    unsigned verbosity;
     uint64_t freq;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];

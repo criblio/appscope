@@ -10,11 +10,6 @@ static net_info *g_netinfo;
 static fs_info *g_fsinfo;
 static metric_counters g_ctrs = {0};
 static thread_timing g_thread = {0};
-
-// These need to come from a config file
-// Do we like the g_ or the cfg prefix?
-static bool cfgNETRXTXPeriodic = TRUE;
-
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
 
@@ -356,7 +351,9 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         g_fsinfo[fd].action |= EVENT_FS;
         atomicAdd(&g_fsinfo[fd].totalDuration, g_fsinfo[fd].duration);
 
-        if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+        if ((g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
+            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
+            (source == EVENT_BASED)) {
             return;
         }
 
@@ -366,7 +363,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
-            STRFIELD("file",             g_fsinfo[fd].path,     6),
+            STRFIELD("file",             g_fsinfo[fd].path,     2),
             STRFIELD("unit",             "millisecond",         1),
             FIELDEND
         };
@@ -385,7 +382,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
-            STRFIELD("file",             g_fsinfo[fd].path,     6),
+            STRFIELD("file",             g_fsinfo[fd].path,     2),
             STRFIELD("unit",             "millisecond",         1),
             FIELDEND
         };
@@ -408,7 +405,9 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
                 atomicAdd(&g_fsinfo[fd].readBytes, size);
 
                 // Only do this on events if enabled
-                if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+                if ((g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
+                    (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
+                    (source == EVENT_BASED)) {
                     return;
                 }
 
@@ -419,7 +418,9 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
                 g_fsinfo[fd].action |= EVENT_FS;
                 atomicAdd(&g_fsinfo[fd].writeBytes, size);
 
-                if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+                if ((g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
+                    (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
+                    (source == EVENT_BASED)) {
                     return;
                 }
 
@@ -436,7 +437,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
-            STRFIELD("file",             g_fsinfo[fd].path,     6),
+            STRFIELD("file",             g_fsinfo[fd].path,     2),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
@@ -497,8 +498,12 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
          * If called from an event we update counters
          * If called from the periodic thread we emit metrics
          */
-        if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
-            return;;
+        if (((type == FS_READ) || (type == FS_WRITE) ||
+             (type == FS_STAT) || (type == FS_SEEK)) &&
+            (g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
+            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
+            (source == EVENT_BASED)) {
+            return;
         }
 
         // This stat func passes a path and not an fd
@@ -512,7 +517,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
-            STRFIELD("file",             g_fsinfo[fd].path,     6),
+            STRFIELD("file",             g_fsinfo[fd].path,     2),
             STRFIELD("unit",             "operation",           1),
             FIELDEND
         };
@@ -633,7 +638,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         g_netinfo[fd].action |= EVENT_RX;
         atomicAdd(&g_netinfo[fd].numRX, 1);
 
-        if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+        if ((g_cfg.verbosity != CFG_NET_EVENTS_VERBOSITY) &&
+            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
+            (source == EVENT_BASED)) {
             return;
         }
 
@@ -722,7 +729,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         g_netinfo[fd].action |= EVENT_TX;
         atomicAdd(&g_netinfo[fd].numTX, 1);
 
-        if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
+        if ((g_cfg.verbosity != CFG_NET_EVENTS_VERBOSITY) &&
+            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
+            (source == EVENT_BASED)) {
             return;
         }
 
@@ -1201,7 +1210,14 @@ periodic(void *arg)
                 }
 
                 if (g_fsinfo[i].totalDuration > 0) {
-                    int duration = g_fsinfo[i].totalDuration / (g_fsinfo[i].numRead + g_fsinfo[i].numWrite);
+                    int duration;
+
+                    if ((g_fsinfo[i].numRead == 0) && (g_fsinfo[i].numWrite == 0)) {
+                        // possible race condition where thread runs before these are set
+                        duration = g_fsinfo[i].totalDuration;
+                    } else {
+                        duration = g_fsinfo[i].totalDuration / (g_fsinfo[i].numRead + g_fsinfo[i].numWrite);
+                    }
                     doFSMetric(FS_DURATION_PROC, i, PERIODIC, NULL, duration, NULL);
                     atomicSet(&g_fsinfo[i].totalDuration, 0);
                 }
@@ -1367,13 +1383,16 @@ init(void)
     {
         char* path = cfgPath(CFG_FILE_NAME);
         config_t* cfg = cfgRead(path);
+        
         g_thread.interval = cfgOutPeriod(cfg);
         g_thread.startTime = time(NULL) + g_thread.interval;
+        g_cfg.verbosity = cfgOutVerbosity(cfg);
+
         log_t* log = initLog(cfg);
         g_out = initOut(cfg, log);
         g_log = log; // Set after initOut to avoid infinite loop with socket
-        cfgDestroy(&cfg);
         if (path) free(path);
+        cfgDestroy(&cfg);
     }
 
     scopeLog("Constructor", -1, CFG_LOG_INFO);
@@ -2021,23 +2040,6 @@ stat(const char *pathname, struct stat *statbuf)
 }
 
 EXPORTON int
-lstat(const char *pathname, struct stat *statbuf)
-{
-    int rc;
-
-    WRAP_CHECK(lstat, -1);
-    doThread();
-    rc = g_fn.lstat(pathname, statbuf);
-
-    if (rc != -1) {
-        scopeLog("lstat\n", -1, CFG_LOG_DEBUG);
-            doFSMetric(FS_STAT, -1, EVENT_BASED, "lstat",
-                       sizeof(struct stat), pathname);
-    }
-    return rc;
-}
-
-EXPORTON int
 fstat(int fd, struct stat *statbuf)
 {
     int rc;
@@ -2052,6 +2054,23 @@ fstat(int fd, struct stat *statbuf)
             doFSMetric(FS_STAT, fd, EVENT_BASED, "fstat",
                        sizeof(struct stat), NULL);
         }
+    }
+    return rc;
+}
+
+EXPORTON int
+lstat(const char *pathname, struct stat *statbuf)
+{
+    int rc;
+
+    WRAP_CHECK(lstat, -1);
+    doThread();
+    rc = g_fn.lstat(pathname, statbuf);
+
+    if (rc != -1) {
+        scopeLog("lstat\n", -1, CFG_LOG_DEBUG);
+            doFSMetric(FS_STAT, -1, EVENT_BASED, "lstat",
+                       sizeof(struct stat), pathname);
     }
     return rc;
 }

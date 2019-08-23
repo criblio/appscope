@@ -1,7 +1,9 @@
 #include "cfg.h"
+#define _GNU_SOURCE
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dlfcn.h>
 
 #ifndef NO_YAML
 #include "yaml.h"
@@ -362,11 +364,15 @@ cfgRead(const char* path)
     int doc_successful = 0;
     yaml_parser_t parser;
     yaml_document_t doc;
+    FILE *(*fnopen)(const char *, const char *);
 
+    fnopen = dlsym(RTLD_NEXT, "fopen");
+    if (!fnopen) goto cleanup;
+    
     config = cfgCreateDefault();
     if (!config) goto cleanup;
 
-    f = fopen(path, "rb");
+    f = fnopen(path, "rb");
     if (!f) goto cleanup;
 
     parser_successful = yaml_parser_initialize(&parser);

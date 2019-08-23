@@ -232,7 +232,7 @@ doDNSMetricName(const char *domain)
         STRFIELD("proc",             g_cfg.procname,        2),
         NUMFIELD("pid",              getpid(),              7),
         STRFIELD("host",             g_cfg.hostname,        2),
-        STRFIELD("domain",           domain,                6),
+        STRFIELD("domain",           domain,                2),
         STRFIELD("unit",             "request",             1),
         FIELDEND
     };
@@ -852,7 +852,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
             STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("domain",           g_netinfo[fd].dnsName, 6),
+            STRFIELD("domain",           g_netinfo[fd].dnsName, 2),
             STRFIELD("unit",             "request",             1),
             FIELDEND
         };

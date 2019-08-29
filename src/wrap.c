@@ -1,5 +1,8 @@
+#define _GNU_SOURCE
+#include <dlfcn.h>
 #include "cfg.h"
 #include "cfgutils.h"
+#include "dbg.h"
 #include "log.h"
 #include "out.h"
 #include "wrap.h"
@@ -393,42 +396,41 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         break;        
     }
     
-    case FS_SIZE_READ:
-    case FS_SIZE_WRITE:
+    case FS_READ:
+    case FS_WRITE:
     {
         const char* metric = "UNKNOWN";
+        int* numops = NULL;
+        int* sizebytes = NULL;
         const char* err_str = "UNKNOWN";
         switch (type) {
-            case FS_SIZE_READ:
-                // We do this in all cases as it serves the periodic thread
-                g_fsinfo[fd].action |= EVENT_FS;
-                atomicAdd(&g_fsinfo[fd].readBytes, size);
-
-                // Only do this on events if enabled
-                if ((g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
-                    (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
-                    (source == EVENT_BASED)) {
-                    return;
-                }
-
+            case FS_READ:
                 metric = "fs.read";
-                err_str = "ERROR: doFSMetric:FS_SIZE_READ:outSendEvent";
+                numops = &g_fsinfo[fd].numRead;
+                sizebytes = &g_fsinfo[fd].readBytes;
+                err_str = "ERROR: doFSMetric:FS_READ:outSendEvent";
                 break;
-            case FS_SIZE_WRITE:
-                g_fsinfo[fd].action |= EVENT_FS;
-                atomicAdd(&g_fsinfo[fd].writeBytes, size);
-
-                if ((g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
-                    (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
-                    (source == EVENT_BASED)) {
-                    return;
-                }
-
+            case FS_WRITE:
                 metric = "fs.write";
-                err_str = "ERROR: doFSMetric:FS_SIZE_WRITE:outSendEvent";
+                numops = &g_fsinfo[fd].numWrite;
+                sizebytes = &g_fsinfo[fd].writeBytes;
+                err_str = "ERROR: doFSMetric:FS_WRITE:outSendEvent";
                 break;
             default:
-                break;
+                DBG(NULL);
+                return;
+	}
+
+        // Always update the info
+        g_fsinfo[fd].action |= EVENT_FS;
+        atomicAdd(numops, 1);
+        atomicAdd(sizebytes, size);
+
+        // Only report if enabled
+        if ((g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
+            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
+            (source == EVENT_BASED)) {
+            return;
         }
 
         event_field_t fields[] = {
@@ -438,21 +440,25 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
             STRFIELD("file",             g_fsinfo[fd].path,     2),
+            NUMFIELD("numops",           *numops,               7),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {metric, size, HISTOGRAM, fields};
+        event_t e = {metric, *sizebytes, HISTOGRAM, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
+
+        // Reset the info if we tried to report
+        atomicSet(numops, 0);
+        atomicSet(sizebytes, 0);
+
         break;
     }
     
     case FS_OPEN:
     case FS_CLOSE:
     case FS_SEEK:
-    case FS_READ:
-    case FS_WRITE:
     case FS_STAT:
     {
         const char* metric = "UNKNOWN";
@@ -475,16 +481,6 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
                 err_str = "ERROR: doFSMetric:FS_SEEK:outSendEvent";
                 atomicAdd(&g_fsinfo[fd].numSeek, 1);
                 break;
-            case FS_READ:
-                metric = "fs.op.read";
-                err_str = "ERROR: doFSMetric:FS_READ:outSendEvent";
-                atomicAdd(&g_fsinfo[fd].numRead, 1);
-                break;
-            case FS_WRITE:
-                metric = "fs.op.write";
-                err_str = "ERROR: doFSMetric:FS_WRITE:outSendEvent";
-                atomicAdd(&g_fsinfo[fd].numWrite, 1);
-                break;
             case FS_STAT:
                 metric = "fs.op.stat";
                 err_str = "ERROR: doFSMetric:FS_STAT:outSendEvent";
@@ -498,8 +494,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
          * If called from an event we update counters
          * If called from the periodic thread we emit metrics
          */
-        if (((type == FS_READ) || (type == FS_WRITE) ||
-             (type == FS_STAT) || (type == FS_SEEK)) &&
+        if (((type == FS_STAT) || (type == FS_SEEK)) &&
             (g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
             (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
             (source == EVENT_BASED)) {
@@ -1200,13 +1195,11 @@ periodic(void *arg)
         for (i = 0; i < g_cfg.numFSInfo; i++) {
             if (g_fsinfo[i].action & EVENT_FS) {
                 if (g_fsinfo[i].readBytes > 0) {
-                    doFSMetric(FS_SIZE_READ, i, PERIODIC, "read", g_fsinfo[i].readBytes, NULL);
-                    atomicSet(&g_fsinfo[i].readBytes, 0);
+                    doFSMetric(FS_READ, i, PERIODIC, "read", g_fsinfo[i].readBytes, NULL);
                 }
 
                 if (g_fsinfo[i].writeBytes > 0) {
-                    doFSMetric(FS_SIZE_WRITE, i, PERIODIC, "write", g_fsinfo[i].writeBytes, NULL);
-                    atomicSet(&g_fsinfo[i].writeBytes, 0);
+                    doFSMetric(FS_WRITE, i, PERIODIC, "write", g_fsinfo[i].writeBytes, NULL);
                 }
 
                 if (g_fsinfo[i].totalDuration > 0) {
@@ -1240,16 +1233,6 @@ periodic(void *arg)
                 if (g_fsinfo[i].numStat > 0) {
                     doFSMetric(FS_STAT, i, PERIODIC, "stat", g_fsinfo[i].numStat, NULL);
                     atomicSet(&g_fsinfo[i].numStat, 0);
-                }
-
-                if (g_fsinfo[i].numRead > 0) {
-                    doFSMetric(FS_READ, i, PERIODIC, "read", g_fsinfo[i].numRead, NULL);
-                    atomicSet(&g_fsinfo[i].numRead, 0);
-                }
-
-                if (g_fsinfo[i].numWrite > 0) {
-                    doFSMetric(FS_WRITE, i, PERIODIC, "write", g_fsinfo[i].numWrite, NULL);
-                    atomicSet(&g_fsinfo[i].numWrite, 0);
                 }
             }
 
@@ -1665,7 +1648,6 @@ pread64(int fd, void *buf, size_t count, off_t offset)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread64", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "pread64", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "pread64", rc, NULL);
         }
     }
@@ -1699,7 +1681,6 @@ preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "preadv", rc, NULL);
         }
     }
@@ -1733,7 +1714,6 @@ preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv2", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv2", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "preadv2", rc, NULL);
         }
     }
@@ -1767,7 +1747,6 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv64v2", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv64v2", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "preadv64v2", rc, NULL);
         }
     }
@@ -1801,7 +1780,6 @@ pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite64", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwrite64", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwrite64", rc, NULL);
         }
     }
@@ -1834,7 +1812,6 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwritev", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev", rc, NULL);
         }
     }
@@ -1867,7 +1844,6 @@ pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev2", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwritev2", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev2", rc, NULL);
         }
     }
@@ -1900,7 +1876,6 @@ pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev64v2", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwritev64v2", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev64v2", rc, NULL);
         }
     }
@@ -2507,7 +2482,6 @@ write(int fd, const void *buf, size_t count)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "write", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "write", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "write", rc, NULL);
         }
     }
@@ -2540,7 +2514,6 @@ pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwrite", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwrite", rc, NULL);
         }
     }
@@ -2573,7 +2546,6 @@ writev(int fd, const struct iovec *iov, int iovcnt)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "writev", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "writev", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "writev", rc, NULL);
         }
     }
@@ -2607,7 +2579,6 @@ fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stre
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "fwrite", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "fwrite", rc*size, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "fwrite", rc*size, NULL);
         }
     }
@@ -2640,9 +2611,7 @@ read(int fd, void *buf, size_t count)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "read", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "read", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "read", rc, NULL);
-            // TODO: add counters, may need a helper func
         }
     }
     
@@ -2675,9 +2644,7 @@ readv(int fd, const struct iovec *iov, int iovcnt)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "readv", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "readv", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "readv", rc, NULL);
-            // TODO: add counters, may need a helper func
         }
     }
     
@@ -2710,7 +2677,6 @@ pread(int fd, void *buf, size_t count, off_t offset)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "pread", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "pread", rc, NULL);
         }
     }
@@ -2745,7 +2711,6 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "fread", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "fread", rc*size, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "fread", rc*size, NULL);
         }
     }

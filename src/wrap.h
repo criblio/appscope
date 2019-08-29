@@ -95,13 +95,11 @@ enum metric_t {
     DNS,
     FS_DURATION,
     FS_DURATION_PROC,
-    FS_SIZE_READ,
-    FS_SIZE_WRITE,
+    FS_READ,
+    FS_WRITE,
     FS_OPEN,
     FS_CLOSE,
     FS_SEEK,
-    FS_READ,
-    FS_WRITE,
     FS_STAT,
 };
 

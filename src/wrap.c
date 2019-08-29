@@ -229,12 +229,12 @@ doDNSMetricName(const char *domain)
     if (!domain) return;
 
     event_field_t fields[] = {
-        STRFIELD("proc",             g_cfg.procname,        2),
-        NUMFIELD("pid",              getpid(),              7),
-        STRFIELD("host",             g_cfg.hostname,        2),
-        STRFIELD("domain",           domain,                2),
-        STRFIELD("unit",             "request",             1),
-        FIELDEND
+            STRFIELD("proc",             g_cfg.procname,        2),
+            NUMFIELD("pid",              getpid(),              7),
+            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("domain",           domain,                2),
+            STRFIELD("unit",             "request",             1),
+            FIELDEND
     };
 
     event_t e = {"net.dns", 1, DELTA, fields};

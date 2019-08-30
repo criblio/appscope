@@ -8,8 +8,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sched.h>
 
 #include "test.h"
+#include "cfg.h"
+#include "cfgutils.h"
+#include "scopetypes.h"
 #include "wrap.h"
 
 extern uint64_t getDuration(uint64_t);
@@ -18,59 +22,56 @@ extern int osInitTSC(struct rtconfig_t *);
 // A port that is not likely to be used
 #define PORT1 65430
 #define PORT2 65431
-#define LOG_PATH "/test/conf/scope.log"
+#define LIKELY_FILE_SIZE 12000
 
 rtconfig g_cfg = {0};
 
+/*
+ * The env var SCOPE_HOME is set in
+ * the Makefile or script that runs 
+ * this test. It points to a config
+ * file in scope/test/conf/scope.cfg.
+ * Using a config file for test we ensure
+ * we have debug logs enabled and that 
+ * we know the path to the log file
+ * and to a file that contains metrics. 
+ */
 static void
 testFSDuration(void** state)
 {
-    skip();
     int rc, fd;
     char *log, *last;
+    FILE *fs;
     const char delim[] = ":";
     char buf[1024];
-    char path[PATH_MAX];
-
-    /*
-     * The env var SCOPE_HOME is set in
-     * the Makefile or script that runs 
-     * this test. It points to a config
-     * file in scope/test/conf/scope.cfg.
-     * Using a config file for test we ensure
-     * we have debug logs enabled and that 
-     * we know the path to the log file. 
-     */
-
-    // Now get the path to the log file
-    last = getcwd(path, sizeof(path));
-    assert_non_null(last);
-    strcat(path, LOG_PATH);
-    if ( access(path, F_OK | W_OK) != -1)
-        assert_return_code(unlink(path), errno);
-
+    char* cpath = cfgPath(CFG_FILE_NAME);
+    config_t* cfg = cfgRead(cpath);
+    const char *path = cfgTransportPath(cfg, CFG_OUT);
+    assert_int_equal(cfgOutVerbosity(cfg), CFG_NET_FS_EVENTS_VERBOSITY);
+   
     // Start the duration timer with a read
     fd = open("./scope.sh", O_RDONLY);
     assert_return_code(fd, errno);
 
     rc = read(fd, buf, 16);
     assert_return_code(rc, errno);
-    
+
     rc = close(fd);
     assert_return_code(rc, errno);
 
-    // In macOS, the makefile is setting DYLD_INSERT_LIBRARIES.  We need to 
-    // clear it to avoid an infinite loop where by reading the log file, 
-    // grep adds to the log file.  On linux, unset should be harmless.
-    snprintf(buf, strlen(path) + 128, "unset DYLD_INSERT_LIBRARIES ; grep wraptest %s | grep duration | tail -n 1", path);
-    FILE *fs = popen(buf, "r");
+    // Read the metrics file
+    fs = fopen(path, "r");
     assert_non_null(fs);
+    
+    fread(buf, sizeof(buf), (size_t)1, fs);
+    assert_int_equal(ferror(fs), 0);
+    //printf("%s\n", buf);
 
-    size_t len = fread(buf, sizeof(buf), (size_t)1, fs);
-    //printf("len %ld %s\n", len, buf);
-    assert_int_equal(len, 0);
+    rc = fclose(fs);
+    assert_return_code(rc, errno);
 
-    log = strtok_r(buf, delim, &last);
+    char *start = strstr(buf, "duration");
+    log = strtok_r(start, delim, &last);
     assert_non_null(log);
     log = strtok_r(NULL, delim, &last);
     assert_non_null(log);
@@ -79,35 +80,30 @@ testFSDuration(void** state)
         fail_msg("Duration %d is outside of allowed bounds (1, 100)", duration);
 }
 
+/*
+ * The env var SCOPE_HOME is set in
+ * the Makefile or script that runs 
+ * this test. It points to a config
+ * file in scope/test/conf/scope.cfg.
+ * Using a config file for test we ensure
+ * we have debug logs enabled and that 
+ * we know the path to the log file
+ * and a metrics file. 
+ */
 static void
 testConnDuration(void** state)
 {
-    skip();
     int rc, sdl, sds;
     struct sockaddr_in saddr;
     char *log, *last;
+    FILE *fs;
     const char* hostname = "127.0.0.1";
     const char delim[] = ":";
-    char buf[1024];
-    char path[PATH_MAX];
-
-    /*
-     * The env var SCOPE_HOME is set in
-     * the Makefile or script that runs 
-     * this test. It points to a config
-     * file in scope/test/conf/scope.cfg.
-     * Using a config file for test we ensure
-     * we have debug logs enabled and that 
-     * we know the path to the log file. 
-     */
-
-    // Now get the path to the log file
-    last = getcwd(path, sizeof(path));
-    assert_non_null(last);
-    strcat(path, LOG_PATH);
-    // Delete the file so we can get deterministic results
-    if ( access(path, F_OK | W_OK) != -1)
-        assert_return_code(unlink(path), errno);
+    char *buf;
+    char* cpath = cfgPath(CFG_FILE_NAME);
+    config_t* cfg = cfgRead(cpath);
+    const char *path = cfgTransportPath(cfg, CFG_OUT);
+    assert_int_equal(cfgOutVerbosity(cfg), CFG_NET_FS_EVENTS_VERBOSITY);
 
     saddr.sin_family = AF_INET;
     saddr.sin_port = htons(PORT1);
@@ -139,7 +135,7 @@ testConnDuration(void** state)
 
     // Create some time
     sleep(1);
-    
+
     // Stop the duration timer
     rc = close(sds);
     assert_return_code(rc, errno);
@@ -147,24 +143,34 @@ testConnDuration(void** state)
     rc = close(sdl);
     assert_return_code(rc, errno);
 
-    // In macOS, the makefile is setting DYLD_INSERT_LIBRARIES.  We need to 
-    // clear it to avoid an infinite loop where by reading the log file, 
-    // grep adds to the log file.  On linux, unset should be harmless.
-    snprintf(buf, strlen(path) + 128, "unset DYLD_INSERT_LIBRARIES ; grep wraptest %s | grep duration | tail -n 1", path);
-    FILE *fs = popen(buf, "r");
+    fs = fopen(path, "r");
     assert_non_null(fs);
 
-    size_t len = fread(buf, sizeof(buf), (size_t)1, fs);
-    //printf("len %ld %s\n", len, buf);
-    assert_int_equal(len, 0);
+    // Yuck! should stat the file, but issues with stat on Ubuntu 19
+    // Talk to John
+    buf = malloc(LIKELY_FILE_SIZE);
+    assert_non_null(buf);
 
-    log = strtok_r(buf, delim, &last);
+    fread(buf, LIKELY_FILE_SIZE, (size_t)1, fs);
+    assert_int_equal(ferror(fs), 0);
+    //printf("%s\n", buf);
+
+    rc = fclose(fs);
+    assert_return_code(rc, errno);
+
+    char *start = strstr(buf, "conn_duration");
+
+    log = strtok_r(start, delim, &last);
     assert_non_null(log);
     log = strtok_r(NULL, delim, &last);
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
     if ((duration < 1000) || (duration > 1300))
         fail_msg("Duration %d is outside of allowed bounds (1000, 1300)", duration);
+
+    free(buf);
+    // Delete this only after all tests that use the metrics file are done
+    assert_return_code(unlink(path), errno);
 }
 
 static void

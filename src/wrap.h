@@ -56,13 +56,18 @@
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
 #define MAX_FDS 4096
-#define PROTOCOL_STR 8
+#define PROTOCOL_STR 16
 #define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
 #define SCOPE_UNIX 99
+#define LOCAL_NAME_SERVER "127.0.0.53"
 
 #ifndef bool
 typedef unsigned int bool;
+#endif
+
+#ifndef AF_NETLINK
+#define AF_NETLINK 16
 #endif
 
 // Several control types, used in several areas
@@ -89,13 +94,12 @@ enum metric_t {
     NETTX_PROC,
     DNS,
     FS_DURATION,
-    FS_SIZE_READ,
-    FS_SIZE_WRITE,
+    FS_DURATION_PROC,
+    FS_READ,
+    FS_WRITE,
     FS_OPEN,
     FS_CLOSE,
     FS_SEEK,
-    FS_READ,
-    FS_WRITE,
     FS_STAT,
 };
 
@@ -103,6 +107,13 @@ enum metric_t {
 enum fs_type_t {
     FD,
     STREAM
+};
+
+// Event types; used to indicate activity for periodic thread
+enum event_type_t {
+    EVENT_TX = 1,
+    EVENT_RX = 2,
+    EVENT_FS = 4
 };
 
 typedef struct metric_counters_t {
@@ -118,6 +129,7 @@ typedef struct rtconfig_t {
     int numFSInfo;
     bool tsc_invariant;
     bool tsc_rdtscp;
+    unsigned verbosity;
     uint64_t freq;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];
@@ -134,9 +146,12 @@ typedef struct net_info_t {
     int fd;
     int type;
     int addrType;
-    bool network;
+    int numTX;
+    int numRX;
     bool listen;
     bool accept;
+    bool dnsSend;
+    enum event_type_t action;
     uint64_t startTime;
     uint64_t duration;
     char dnsName[MAX_HOSTNAME];
@@ -147,6 +162,16 @@ typedef struct net_info_t {
 typedef struct fs_info_t {
     int fd;
     enum fs_type_t type;
+    enum event_type_t action;
+    int numOpen;
+    int numClose;
+    int numSeek;
+    int numStat;
+    int numRead;
+    int numWrite;
+    int readBytes;
+    int writeBytes;
+    int totalDuration;
     uint64_t startTime;
     uint64_t duration;
     char path[PATH_MAX];
@@ -225,6 +250,12 @@ typedef struct interposed_funcs_t {
     ssize_t (*recvfrom)(int sockfd, void *buf, size_t len, int flags,
                                 struct sockaddr *src_addr, socklen_t *addrlen);
     ssize_t (*recvmsg)(int, struct msghdr *, int);
+    struct hostent *(*gethostbyname)(const char *);
+    int (*gethostbyname_r)(const char *, struct hostent *, char *, size_t,
+                          struct hostent **, int *);
+    struct hostent *(*gethostbyname2)(const char *, int);
+    int (*getaddrinfo)(const char *, const char *, const struct addrinfo *,
+                       struct addrinfo **);
     // macOS
     int (*close$NOCANCEL)(int);
     int (*close_nocancel)(int);

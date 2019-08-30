@@ -1,5 +1,8 @@
+#define _GNU_SOURCE
+#include <dlfcn.h>
 #include "cfg.h"
 #include "cfgutils.h"
+#include "dbg.h"
 #include "log.h"
 #include "out.h"
 #include "wrap.h"
@@ -10,11 +13,6 @@ static net_info *g_netinfo;
 static fs_info *g_fsinfo;
 static metric_counters g_ctrs = {0};
 static thread_timing g_thread = {0};
-
-// These need to come from a config file
-// Do we like the g_ or the cfg prefix?
-static bool cfgNETRXTXPeriodic = TRUE;
-
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
 
@@ -134,7 +132,14 @@ addSock(int fd, int type)
             if (g_ctrs.TCPConnections > 0) {
                 atomicSub(&g_ctrs.TCPConnections, 1);
             }
-          
+
+            g_netinfo[fd].type = type;
+#ifdef __LINUX__
+            // Clear these bits so comparisons of type will work
+            g_netinfo[fd].type &= ~SOCK_CLOEXEC;
+            g_netinfo[fd].type &= ~SOCK_NONBLOCK;
+#endif // __LINUX__
+
             return;
         }
         
@@ -218,6 +223,26 @@ doThread()
         if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
             scopeLog("ERROR: doThread:pthread_create", -1, CFG_LOG_ERROR);
         }
+    }
+}
+
+static void
+doDNSMetricName(const char *domain)
+{
+    if (!domain) return;
+
+    event_field_t fields[] = {
+            STRFIELD("proc",             g_cfg.procname,        2),
+            NUMFIELD("pid",              getpid(),              7),
+            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("domain",           domain,                2),
+            STRFIELD("unit",             "request",             1),
+            FIELDEND
+    };
+
+    event_t e = {"net.dns", 1, DELTA, fields};
+    if (outSendEvent(g_out, &e)) {
+        scopeLog("ERROR: doDNSMetricName:DNS:outSendEvent", -1, CFG_LOG_ERROR);
     }
 }
 
@@ -326,13 +351,22 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     switch (type) {
     case FS_DURATION:
     {
+        g_fsinfo[fd].action |= EVENT_FS;
+        atomicAdd(&g_fsinfo[fd].totalDuration, g_fsinfo[fd].duration);
+
+        if ((g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
+            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
+            (source == EVENT_BASED)) {
+            return;
+        }
+
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
-            STRFIELD("file",             g_fsinfo[fd].path,     6),
+            STRFIELD("file",             g_fsinfo[fd].path,     2),
             STRFIELD("unit",             "millisecond",         1),
             FIELDEND
         };
@@ -342,8 +376,8 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
         break;        
     }
-    case FS_SIZE_READ:
-    case FS_SIZE_WRITE:
+
+    case FS_DURATION_PROC:
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
@@ -351,43 +385,125 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
-            STRFIELD("file",             g_fsinfo[fd].path,     6),
+            STRFIELD("file",             g_fsinfo[fd].path,     2),
+            STRFIELD("unit",             "millisecond",         1),
+            FIELDEND
+        };
+        event_t e = {"fs.sum_duration", size, CURRENT, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doFSMetric:FS_DURATION_PROC:outSendEvent", fd, CFG_LOG_ERROR);
+        }
+        break;        
+    }
+    
+    case FS_READ:
+    case FS_WRITE:
+    {
+        const char* metric = "UNKNOWN";
+        int* numops = NULL;
+        int* sizebytes = NULL;
+        const char* err_str = "UNKNOWN";
+        switch (type) {
+            case FS_READ:
+                metric = "fs.read";
+                numops = &g_fsinfo[fd].numRead;
+                sizebytes = &g_fsinfo[fd].readBytes;
+                err_str = "ERROR: doFSMetric:FS_READ:outSendEvent";
+                break;
+            case FS_WRITE:
+                metric = "fs.write";
+                numops = &g_fsinfo[fd].numWrite;
+                sizebytes = &g_fsinfo[fd].writeBytes;
+                err_str = "ERROR: doFSMetric:FS_WRITE:outSendEvent";
+                break;
+            default:
+                DBG(NULL);
+                return;
+	}
+
+        // Always update the info
+        g_fsinfo[fd].action |= EVENT_FS;
+        atomicAdd(numops, 1);
+        atomicAdd(sizebytes, size);
+
+        // Only report if enabled
+        if ((g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
+            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
+            (source == EVENT_BASED)) {
+            return;
+        }
+
+        event_field_t fields[] = {
+            STRFIELD("proc",             g_cfg.procname,        2),
+            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("fd",               fd,                    7),
+            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("op",               op,                    2),
+            STRFIELD("file",             g_fsinfo[fd].path,     2),
+            NUMFIELD("numops",           *numops,               7),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
+        event_t e = {metric, *sizebytes, HISTOGRAM, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog(err_str, fd, CFG_LOG_ERROR);
+        }
+
+        // Reset the info if we tried to report
+        atomicSet(numops, 0);
+        atomicSet(sizebytes, 0);
+
+        break;
+    }
+    
+    case FS_OPEN:
+    case FS_CLOSE:
+    case FS_SEEK:
+    case FS_STAT:
+    {
         const char* metric = "UNKNOWN";
         const char* err_str = "UNKNOWN";
+
+        g_fsinfo[fd].action |= EVENT_FS;
         switch (type) {
-            case FS_SIZE_READ:
-                metric = "fs.read";
-                err_str = "ERROR: doFSMetric:FS_SIZE_READ:outSendEvent";
+            case FS_OPEN:
+                metric = "fs.op.open";
+                err_str = "ERROR: doFSMetric:FS_OPEN:outSendEvent";
+                atomicAdd(&g_fsinfo[fd].numOpen, 1);
                 break;
-            case FS_SIZE_WRITE:
-                metric = "fs.write";
-                err_str = "ERROR: doFSMetric:FS_SIZE_WRITE:outSendEvent";
+            case FS_CLOSE:
+                metric = "fs.op.close";
+                err_str = "ERROR: doFSMetric:FS_CLOSE:outSendEvent";
+                atomicAdd(&g_fsinfo[fd].numClose, 1);
+                break;
+            case FS_SEEK:
+                metric = "fs.op.seek";
+                err_str = "ERROR: doFSMetric:FS_SEEK:outSendEvent";
+                atomicAdd(&g_fsinfo[fd].numSeek, 1);
+                break;
+            case FS_STAT:
+                metric = "fs.op.stat";
+                err_str = "ERROR: doFSMetric:FS_STAT:outSendEvent";
+                atomicAdd(&g_fsinfo[fd].numStat, 1);
                 break;
             default:
                 break;
         }
-        event_t e = {metric, size, HISTOGRAM, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog(err_str, fd, CFG_LOG_ERROR);
+
+        /*
+         * If called from an event we update counters
+         * If called from the periodic thread we emit metrics
+         */
+        if (((type == FS_STAT) || (type == FS_SEEK)) &&
+            (g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
+            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
+            (source == EVENT_BASED)) {
+            return;
         }
-        break;
-    }
-    case FS_OPEN:
-    case FS_CLOSE:
-    case FS_SEEK:
-    case FS_READ:
-    case FS_WRITE:
-    case FS_STAT:
-    {
-        const char *path;
+
         // This stat func passes a path and not an fd
         if ((fd == -1) && (pathname)) {
-            path = pathname;
-        } else {
-            path = g_fsinfo[fd].path;
+            strncpy(g_fsinfo[fd].path, pathname, sizeof(g_fsinfo[fd].path));
         }
         
         event_field_t fields[] = {
@@ -396,41 +512,12 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
-            STRFIELD("file",             path,                  6),
+            STRFIELD("file",             g_fsinfo[fd].path,     2),
             STRFIELD("unit",             "operation",           1),
             FIELDEND
         };
-        const char* metric = "UNKNOWN";
-        const char* err_str = "UNKNOWN";
-        switch (type) {
-            case FS_OPEN:
-                metric = "fs.op.open";
-                err_str = "ERROR: doFSMetric:FS_OPEN:outSendEvent";
-                break;
-            case FS_CLOSE:
-                metric = "fs.op.close";
-                err_str = "ERROR: doFSMetric:FS_CLOSE:outSendEvent";
-                break;
-            case FS_SEEK:
-                metric = "fs.op.seek";
-                err_str = "ERROR: doFSMetric:FS_SEEK:outSendEvent";
-                break;
-            case FS_READ:
-                metric = "fs.op.read";
-                err_str = "ERROR: doFSMetric:FS_READ:outSendEvent";
-                break;
-            case FS_WRITE:
-                metric = "fs.op.write";
-                err_str = "ERROR: doFSMetric:FS_WRITE:outSendEvent";
-                break;
-            case FS_STAT:
-                metric = "fs.op.stat";
-                err_str = "ERROR: doFSMetric:FS_STAT:outSendEvent";
-                break;
-            default:
-                break;
-        }
-        event_t e = {metric, 1, DELTA, fields};
+
+        event_t e = {metric, size, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
@@ -449,11 +536,11 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
     char proto[PROTOCOL_STR];
     in_port_t localPort, remotePort;
         
-    if (getNetEntry(fd) == NULL) {
+    if ((type != NETRX_PROC) && (type != NETTX_PROC) && getNetEntry(fd) == NULL) {
         return;
     }
 
-    if ((source == EVENT_BASED) && (fd > 0)) {
+    if ((type != NETRX_PROC) && (type != NETTX_PROC)) {
         getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
         localPort = GET_PORT(fd, g_netinfo[fd].localConn.ss_family, LOCAL);
         remotePort = GET_PORT(fd, g_netinfo[fd].remoteConn.ss_family, REMOTE);
@@ -543,8 +630,13 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char rip[INET6_ADDRSTRLEN];
         char data[16];
 
-        if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
-            break;
+        g_netinfo[fd].action |= EVENT_RX;
+        atomicAdd(&g_netinfo[fd].numRX, 1);
+
+        if ((g_cfg.verbosity != CFG_NET_EVENTS_VERBOSITY) &&
+            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
+            (source == EVENT_BASED)) {
+            return;
         }
 
         if ((localPort == 443) || (remotePort == 443)) {
@@ -553,9 +645,15 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             strncpy(data, "clear", sizeof(data));
         }
 
-        if (g_netinfo[fd].type == SCOPE_UNIX) {
-            strncpy(lip, " ", sizeof(lip));
-            strncpy(rip, " ", sizeof(rip));
+        if ((g_netinfo[fd].type == SCOPE_UNIX) ||
+            (g_netinfo[fd].localConn.ss_family == AF_LOCAL) ||
+            (g_netinfo[fd].localConn.ss_family == AF_NETLINK)) {
+            strncpy(lip, "UNIX", sizeof(lip));
+            strncpy(rip, "UNIX", sizeof(rip));
+            localPort = remotePort = 0;
+            if (g_netinfo[fd].localConn.ss_family == AF_NETLINK) {
+                strncpy(proto, "NETLINK", sizeof(proto));
+            }
         } else {
             if (g_netinfo[fd].localConn.ss_family == AF_INET) {
                 if (inet_ntop(AF_INET,
@@ -605,7 +703,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {"net.rx", g_ctrs.netrx, DELTA, fields};
+        event_t e = {"net.op.rx", g_netinfo[fd].numRX, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETRX:outSendEvent", -1, CFG_LOG_ERROR);
         }
@@ -614,7 +712,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
          * This creates DELTA behavior by uploading the number of bytes
          * since the last time the metric was uploaded.
          */
-        atomicSet(&g_ctrs.netrx, 0);
         break;
     }
 
@@ -624,8 +721,13 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char rip[INET6_ADDRSTRLEN];
         char data[16];
 
-        if ((cfgNETRXTXPeriodic == TRUE) && (source == EVENT_BASED)) {
-            break;
+        g_netinfo[fd].action |= EVENT_TX;
+        atomicAdd(&g_netinfo[fd].numTX, 1);
+
+        if ((g_cfg.verbosity != CFG_NET_EVENTS_VERBOSITY) &&
+            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
+            (source == EVENT_BASED)) {
+            return;
         }
 
         if ((localPort == 443) || (remotePort == 443)) {
@@ -634,9 +736,15 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             strncpy(data, "clear", sizeof(data));
         }
 
-        if (g_netinfo[fd].type == SCOPE_UNIX) {
-            strncpy(lip, " ", sizeof(lip));
-            strncpy(rip, " ", sizeof(rip));
+        if ((g_netinfo[fd].type == SCOPE_UNIX) ||
+            (g_netinfo[fd].localConn.ss_family == AF_LOCAL) ||
+            (g_netinfo[fd].localConn.ss_family == AF_NETLINK)) {
+            strncpy(lip, "UNIX", sizeof(lip));
+            strncpy(rip, "UNIX", sizeof(rip));
+            localPort = remotePort = 0;
+            if (g_netinfo[fd].localConn.ss_family == AF_NETLINK) {
+                strncpy(proto, "NETLINK", sizeof(proto));
+            }
         } else {
             if (g_netinfo[fd].localConn.ss_family == AF_INET) {
                 if (inet_ntop(AF_INET,
@@ -686,12 +794,11 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {"net.tx", g_ctrs.nettx, DELTA, fields};
+        event_t e = {"net.op.tx", g_netinfo[fd].numTX, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETTX:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
-        atomicSet(&g_ctrs.nettx, 0);
         break;
     }
 
@@ -708,7 +815,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETRX_PROC:outSendEvent", -1, CFG_LOG_ERROR);
         }
-        atomicSet(&g_ctrs.netrx, 0);
         break;
     }
 
@@ -725,17 +831,23 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETTX_PROC:outSendEvent", -1, CFG_LOG_ERROR);
         }
-        atomicSet(&g_ctrs.nettx, 0);
         break;
     }
 
     case DNS:
     {
+        if (g_netinfo[fd].dnsSend == FALSE) {
+            break;
+        }
+
+        // For next time
+        g_netinfo[fd].dnsSend = FALSE;
+        
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
             STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("domain",           g_netinfo[fd].dnsName, 6),
+            STRFIELD("domain",           g_netinfo[fd].dnsName, 2),
             STRFIELD("unit",             "request",             1),
             FIELDEND
         };
@@ -804,26 +916,19 @@ doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control
 static int
 doSetAddrs(int sockfd)
 {
+    struct sockaddr_storage addr;
+    socklen_t addrlen = sizeof(struct sockaddr_storage);
+    
     if (getNetEntry(sockfd) == NULL) {
         return -1;
     }
     
-    if (g_netinfo[sockfd].localConn.ss_family == AF_UNSPEC) {
-        struct sockaddr_storage addr;
-        socklen_t addrlen = sizeof(struct sockaddr_storage);
-        
-        if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
-            doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
-        }
+    if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+        doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
     }
     
-    if (g_netinfo[sockfd].remoteConn.ss_family == AF_UNSPEC) {
-        struct sockaddr_storage addr;
-        socklen_t addrlen = sizeof(struct sockaddr_storage);
-        
-        if (getpeername(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
-            doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
-        }
+    if (getpeername(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+        doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, REMOTE);
     }
 
     return 0;
@@ -892,6 +997,7 @@ getDNSName(int sd, void *pkt, int pktlen)
     dns_query *query;
     struct question *q;
     char *aname, *dname;
+    char dnsName[MAX_HOSTNAME];
 
     if (getNetEntry(sd) == NULL) {
         return -1;
@@ -939,13 +1045,29 @@ getDNSName(int sd, void *pkt, int pktlen)
       MINFO           14 mailbox or mail list information
       MX              15 mail exchange
       TXT             16 text strings
+
+      *** or on Linux ***
+      The packet could be sent to a local name server hosted by 
+      systemd. If it is, the remote IP should be 127.0.0.53. 
+      We pick up these queries by interposing the various
+      gethostbyname functions, including getaddinfo. 
+      For reference, the format of the string sent to a local name server is 
+      of the form:
+      TTP/1.1\r\nHost: wttr.in\r\nUser-Agent: curl/7.64.0\r\nAccept: @/@\r\n\r\nert.` 
+
+      *** or on macOS ***
+      macOS provides a DNS service, a daemon process that acts as a
+      local name server. We interpose the function DNSServiceQueryRecord
+      in order to dig out the domain name. The DNS metric is created
+      directly from that function interposition. 
 */
     q = (struct question *)(pkt + sizeof(struct dns_header) + strlen(dname));
     if ((q->qtype != 0) || ((q->qclass < 1) || (q->qclass > 16))) {
         return 0;
     }
 
-    aname = g_netinfo[sd].dnsName;
+    // We think we have a direct DNS request
+    aname = dnsName;
 
     while (*dname != '\0') {
         // handle one label
@@ -958,6 +1080,15 @@ getDNSName(int sd, void *pkt, int pktlen)
 
     aname--;
     *aname = '\0';
+
+    if (strncmp(aname, g_netinfo[sd].dnsName, strlen(aname)) == 0) {
+        // Already sent this from an interposed function
+        g_netinfo[sd].dnsSend = FALSE;
+    } else {
+        strncpy(g_netinfo[sd].dnsName, aname, strlen(aname));
+        g_netinfo[sd].dnsSend = TRUE;
+    }
+    
     return 0;
 }
 
@@ -1020,7 +1151,7 @@ static void *
 periodic(void *arg)
 {
     long mem;
-    int nthread, nfds, children;
+    int i, nthread, nfds, children;
     pid_t pid = getpid();
     long long cpu, cpuState = 0;
 
@@ -1042,8 +1173,71 @@ periodic(void *arg)
         children = osGetNumChildProcs(pid);
         doProcMetric(PROC_CHILD, children);
 
-        doNetMetric(NETRX_PROC, -1, PERIODIC);
-        doNetMetric(NETTX_PROC, -1, PERIODIC);
+        if (g_ctrs.netrx > 0) doNetMetric(NETRX_PROC, -1, PERIODIC);
+        if (g_ctrs.nettx> 0) doNetMetric(NETTX_PROC, -1, PERIODIC);
+        atomicSet(&g_ctrs.netrx, 0);
+        atomicSet(&g_ctrs.nettx, 0);
+
+        for (i = 0; i < g_cfg.numNinfo; i++) {
+            if (g_netinfo[i].action & EVENT_TX) {
+                doNetMetric(NETTX, i, PERIODIC);
+                atomicSet(&g_netinfo[i].numTX, 0);
+            }
+
+            if (g_netinfo[i].action & EVENT_RX) {
+                doNetMetric(NETRX, i, PERIODIC);
+                atomicSet(&g_netinfo[i].numRX, 0);
+            }
+
+            g_netinfo[i].action = 0;
+        }
+        
+        for (i = 0; i < g_cfg.numFSInfo; i++) {
+            if (g_fsinfo[i].action & EVENT_FS) {
+                if (g_fsinfo[i].readBytes > 0) {
+                    doFSMetric(FS_READ, i, PERIODIC, "read", g_fsinfo[i].readBytes, NULL);
+                }
+
+                if (g_fsinfo[i].writeBytes > 0) {
+                    doFSMetric(FS_WRITE, i, PERIODIC, "write", g_fsinfo[i].writeBytes, NULL);
+                }
+
+                if (g_fsinfo[i].totalDuration > 0) {
+                    int duration;
+
+                    if ((g_fsinfo[i].numRead == 0) && (g_fsinfo[i].numWrite == 0)) {
+                        // possible race condition where thread runs before these are set
+                        duration = g_fsinfo[i].totalDuration;
+                    } else {
+                        duration = g_fsinfo[i].totalDuration / (g_fsinfo[i].numRead + g_fsinfo[i].numWrite);
+                    }
+                    doFSMetric(FS_DURATION_PROC, i, PERIODIC, NULL, duration, NULL);
+                    atomicSet(&g_fsinfo[i].totalDuration, 0);
+                }
+
+                if (g_fsinfo[i].numOpen > 0) {
+                    doFSMetric(FS_OPEN, i, PERIODIC, "open", g_fsinfo[i].numOpen, NULL);
+                    atomicSet(&g_fsinfo[i].numOpen, 0);
+                }
+
+                if (g_fsinfo[i].numClose > 0) {
+                    doFSMetric(FS_CLOSE, i, PERIODIC, "close", g_fsinfo[i].numClose, NULL);
+                    atomicSet(&g_fsinfo[i].numClose, 0);
+                }
+
+                if (g_fsinfo[i].numSeek > 0) {
+                    doFSMetric(FS_SEEK, i, PERIODIC, "seek", g_fsinfo[i].numSeek, NULL);
+                    atomicSet(&g_fsinfo[i].numSeek, 0);
+                }
+
+                if (g_fsinfo[i].numStat > 0) {
+                    doFSMetric(FS_STAT, i, PERIODIC, "stat", g_fsinfo[i].numStat, NULL);
+                    atomicSet(&g_fsinfo[i].numStat, 0);
+                }
+            }
+
+            g_fsinfo[i].action = 0;
+        }
         
         // From the config file
         sleep(g_thread.interval);
@@ -1105,6 +1299,9 @@ init(void)
     g_fn.recv = dlsym(RTLD_NEXT, "recv");
     g_fn.recvfrom = dlsym(RTLD_NEXT, "recvfrom");
     g_fn.recvmsg = dlsym(RTLD_NEXT, "recvmsg");
+    g_fn.gethostbyname = dlsym(RTLD_NEXT, "gethostbyname");
+    g_fn.gethostbyname2 = dlsym(RTLD_NEXT, "gethostbyname2");
+    g_fn.getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo");
 
 #ifdef __MACOS__
     g_fn.close$NOCANCEL = dlsym(RTLD_NEXT, "close$NOCANCEL");
@@ -1135,6 +1332,7 @@ init(void)
     g_fn.ftello64 = dlsym(RTLD_NEXT, "ftello64");
     g_fn.statfs64 = dlsym(RTLD_NEXT, "statfs64");
     g_fn.fstatfs64 = dlsym(RTLD_NEXT, "fstatfs64");
+    g_fn.gethostbyname_r = dlsym(RTLD_NEXT, "gethostbyname_r");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
@@ -1168,13 +1366,16 @@ init(void)
     {
         char* path = cfgPath(CFG_FILE_NAME);
         config_t* cfg = cfgRead(path);
+        
         g_thread.interval = cfgOutPeriod(cfg);
         g_thread.startTime = time(NULL) + g_thread.interval;
+        g_cfg.verbosity = cfgOutVerbosity(cfg);
+
         log_t* log = initLog(cfg);
         g_out = initOut(cfg, log);
         g_log = log; // Set after initOut to avoid infinite loop with socket
-        cfgDestroy(&cfg);
         if (path) free(path);
+        cfgDestroy(&cfg);
     }
 
     scopeLog("Constructor", -1, CFG_LOG_INFO);
@@ -1187,7 +1388,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, char *func)
         if (g_fsinfo[fd].fd == fd) {
             char buf[128];
 
-            snprintf(buf, sizeof(buf), "%s:doOpen: duplicate", func);
+            snprintf(buf, sizeof(buf), "%s:doOpen: duplicate(%d)", func, fd);
             scopeLog(buf, fd, CFG_LOG_DEBUG);
             return;
         }
@@ -1236,9 +1437,21 @@ doClose(int fd, char *func)
         }
         
         memset(ninfo, 0, sizeof(struct net_info_t));
-        if (func) scopeLog(func, fd, CFG_LOG_DEBUG);
-    } else if ((fsinfo = getFSEntry(fd)) != NULL) {
-        if (func) scopeLog(func, fd, CFG_LOG_TRACE);
+        if (func) {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%s: network", func);
+            scopeLog(buf, fd, CFG_LOG_DEBUG);
+        }
+    }
+
+    // Check both file desriptor tables
+    if ((fsinfo = getFSEntry(fd)) != NULL) {
+        if (func) {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%s: file", func);
+            scopeLog(buf, fd, CFG_LOG_TRACE);
+        }
+        
         doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 0, NULL);
         memset(fsinfo, 0, sizeof(struct fs_info_t));
     }
@@ -1435,7 +1648,6 @@ pread64(int fd, void *buf, size_t count, off_t offset)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread64", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "pread64", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "pread64", rc, NULL);
         }
     }
@@ -1469,7 +1681,6 @@ preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "preadv", rc, NULL);
         }
     }
@@ -1503,7 +1714,6 @@ preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv2", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv2", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "preadv2", rc, NULL);
         }
     }
@@ -1537,7 +1747,6 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv64v2", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "preadv64v2", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "preadv64v2", rc, NULL);
         }
     }
@@ -1571,7 +1780,6 @@ pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite64", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwrite64", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwrite64", rc, NULL);
         }
     }
@@ -1604,7 +1812,6 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwritev", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev", rc, NULL);
         }
     }
@@ -1637,7 +1844,6 @@ pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev2", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwritev2", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev2", rc, NULL);
         }
     }
@@ -1670,7 +1876,6 @@ pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev64v2", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwritev64v2", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev64v2", rc, NULL);
         }
     }
@@ -1810,23 +2015,6 @@ stat(const char *pathname, struct stat *statbuf)
 }
 
 EXPORTON int
-lstat(const char *pathname, struct stat *statbuf)
-{
-    int rc;
-
-    WRAP_CHECK(lstat, -1);
-    doThread();
-    rc = g_fn.lstat(pathname, statbuf);
-
-    if (rc != -1) {
-        scopeLog("lstat\n", -1, CFG_LOG_DEBUG);
-            doFSMetric(FS_STAT, -1, EVENT_BASED, "lstat",
-                       sizeof(struct stat), pathname);
-    }
-    return rc;
-}
-
-EXPORTON int
 fstat(int fd, struct stat *statbuf)
 {
     int rc;
@@ -1841,6 +2029,23 @@ fstat(int fd, struct stat *statbuf)
             doFSMetric(FS_STAT, fd, EVENT_BASED, "fstat",
                        sizeof(struct stat), NULL);
         }
+    }
+    return rc;
+}
+
+EXPORTON int
+lstat(const char *pathname, struct stat *statbuf)
+{
+    int rc;
+
+    WRAP_CHECK(lstat, -1);
+    doThread();
+    rc = g_fn.lstat(pathname, statbuf);
+
+    if (rc != -1) {
+        scopeLog("lstat\n", -1, CFG_LOG_DEBUG);
+            doFSMetric(FS_STAT, -1, EVENT_BASED, "lstat",
+                       sizeof(struct stat), pathname);
     }
     return rc;
 }
@@ -1914,6 +2119,22 @@ fstatvfs(int fd, struct statvfs *buf)
                        sizeof(struct statvfs), NULL);
         }
     }
+    return rc;
+}
+
+EXPORTON int
+gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
+                struct hostent **result, int *h_errnop)
+{
+    int rc;
+
+    WRAP_CHECK(gethostbyname_r, -1);
+    rc = g_fn.gethostbyname_r(name, ret, buf, buflen, result, h_errnop);
+    if ((rc == 0) && (result != NULL)) {
+        scopeLog("gethostbyname_r", -1, CFG_LOG_DEBUG);
+        doDNSMetricName(name);
+    }
+
     return rc;
 }
 
@@ -2073,20 +2294,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
                                     rrtype, rrclass, callback, context);
     if (rc == 0) {
         scopeLog("DNSServiceQueryRecord", -1, CFG_LOG_DEBUG);
-
-        event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              getpid(),              7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("domain",           fullname,              6),
-            STRFIELD("unit",             "request",             1),
-            FIELDEND
-        };
-
-        event_t e = {"net.dns", 1, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: DNSServiceQueryRecord:DNS:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        doDNSMetricName(fullname);
     }
 
     return rc;
@@ -2274,7 +2482,6 @@ write(int fd, const void *buf, size_t count)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "write", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "write", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "write", rc, NULL);
         }
     }
@@ -2307,7 +2514,6 @@ pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "pwrite", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwrite", rc, NULL);
         }
     }
@@ -2340,7 +2546,6 @@ writev(int fd, const struct iovec *iov, int iovcnt)
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "writev", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "writev", rc, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "writev", rc, NULL);
         }
     }
@@ -2374,7 +2579,6 @@ fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stre
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "fwrite", 0, NULL);
-            doFSMetric(FS_SIZE_WRITE, fd, EVENT_BASED, "fwrite", rc*size, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "fwrite", rc*size, NULL);
         }
     }
@@ -2407,9 +2611,7 @@ read(int fd, void *buf, size_t count)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "read", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "read", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "read", rc, NULL);
-            // TODO: add counters, may need a helper func
         }
     }
     
@@ -2442,9 +2644,7 @@ readv(int fd, const struct iovec *iov, int iovcnt)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "readv", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "readv", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "readv", rc, NULL);
-            // TODO: add counters, may need a helper func
         }
     }
     
@@ -2477,7 +2677,6 @@ pread(int fd, void *buf, size_t count, off_t offset)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "pread", rc, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "pread", rc, NULL);
         }
     }
@@ -2512,7 +2711,6 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "fread", 0, NULL);
-            doFSMetric(FS_SIZE_READ, fd, EVENT_BASED, "fread", rc*size, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "fread", rc*size, NULL);
         }
     }
@@ -2952,5 +3150,52 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
         doRecv(sockfd, rc);
     }
     
+    return rc;
+}
+
+EXPORTON struct hostent *
+gethostbyname(const char *name)
+{
+    struct hostent *rc;
+
+    WRAP_CHECK(gethostbyname, NULL);
+    rc = g_fn.gethostbyname(name);
+    if (rc != NULL) {
+        scopeLog("gethostbyname", -1, CFG_LOG_DEBUG);
+        doDNSMetricName(name);
+    }
+
+    return rc;
+}
+
+EXPORTON struct hostent *
+gethostbyname2(const char *name, int af)
+{
+    struct hostent *rc;
+
+    WRAP_CHECK(gethostbyname2, NULL);
+    rc = g_fn.gethostbyname2(name, af);
+    if (rc != NULL) {
+        scopeLog("gethostbyname2", -1, CFG_LOG_DEBUG);
+        doDNSMetricName(name);
+    }
+
+    return rc;
+}
+
+EXPORTON int
+getaddrinfo(const char *node, const char *service,
+            const struct addrinfo *hints,
+            struct addrinfo **res)
+{
+    int rc;
+
+    WRAP_CHECK(getaddrinfo, -1);
+    rc = g_fn.getaddrinfo(node, service, hints, res);
+    if (rc == 0) {
+        scopeLog("getaddrinfo", -1, CFG_LOG_DEBUG);
+        doDNSMetricName(node);
+    }
+
     return rc;
 }

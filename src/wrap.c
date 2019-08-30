@@ -1382,36 +1382,7 @@ init(void)
 }
 
 static void
-doOpen(int fd, const char *path, enum fs_type_t type, char *func)
-{
-    if (checkFSEntry(fd) == TRUE) {
-        if (g_fsinfo[fd].fd == fd) {
-            char buf[128];
-
-            snprintf(buf, sizeof(buf), "%s:doOpen: duplicate(%d)", func, fd);
-            scopeLog(buf, fd, CFG_LOG_DEBUG);
-            return;
-        }
-        
-        if ((fd > g_cfg.numFSInfo) && (fd < MAX_FDS))  {
-            // Need to realloc
-            if ((g_fsinfo = realloc(g_fsinfo, sizeof(struct fs_info_t) * fd)) == NULL) {
-                scopeLog("ERROR: doOpen:realloc", fd, CFG_LOG_ERROR);
-            }
-            g_cfg.numFSInfo = fd;
-        }
-
-        memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
-        g_fsinfo[fd].fd = fd;
-        g_fsinfo[fd].type = type;
-        strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
-        doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0, NULL);
-        scopeLog(func, fd, CFG_LOG_TRACE);
-    }
-}
-
-static void
-doClose(int fd, char *func)
+doClose(int fd, const char *func)
 {
     struct net_info_t *ninfo;
     struct fs_info_t *fsinfo;
@@ -1455,6 +1426,63 @@ doClose(int fd, char *func)
         doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 0, NULL);
         memset(fsinfo, 0, sizeof(struct fs_info_t));
     }
+}
+
+static void
+doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
+{
+    if (checkFSEntry(fd) == TRUE) {
+        if (g_fsinfo[fd].fd == fd) {
+            char buf[128];
+
+            snprintf(buf, sizeof(buf), "%s:doOpen: duplicate(%d)", func, fd);
+            scopeLog(buf, fd, CFG_LOG_DEBUG);
+            doClose(fd, func);
+        }
+        
+        if ((fd > g_cfg.numFSInfo) && (fd < MAX_FDS))  {
+            // Need to realloc
+            if ((g_fsinfo = realloc(g_fsinfo, sizeof(struct fs_info_t) * fd)) == NULL) {
+                scopeLog("ERROR: doOpen:realloc", fd, CFG_LOG_ERROR);
+            }
+            g_cfg.numFSInfo = fd;
+        }
+
+        memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
+        g_fsinfo[fd].fd = fd;
+        g_fsinfo[fd].type = type;
+        strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
+        doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0, NULL);
+        scopeLog(func, fd, CFG_LOG_TRACE);
+    }
+}
+
+EXPORTON int
+doDupFile(int newfd, int oldfd, const char *func)
+{
+    if ((newfd > g_cfg.numFSInfo) || (oldfd > g_cfg.numFSInfo)) {
+        return -1;
+    }
+
+    doOpen(newfd, g_fsinfo[oldfd].path, g_fsinfo[oldfd].type, func);
+    return 0;
+}
+
+EXPORTON int
+doDupSock(int oldfd, int newfd)
+{
+    if ((newfd > g_cfg.numFSInfo) || (oldfd > g_cfg.numFSInfo)) {
+        return -1;
+    }
+
+    bcopy(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct fs_info_t));
+    g_netinfo[newfd].fd = newfd;
+    g_netinfo[newfd].numTX = 0;
+    g_netinfo[newfd].numRX = 0;
+    g_netinfo[newfd].startTime = 0;
+    g_netinfo[newfd].duration = 0;
+
+    return 0;
 }
 
 EXPORTON int
@@ -2766,10 +2794,14 @@ dup(int fd)
     WRAP_CHECK(dup, -1);
     doThread();
     rc = g_fn.dup(fd);
-    if ((rc != -1) && getNetEntry(fd)) {
-        // This is a network descriptor
-        scopeLog("dup", rc, CFG_LOG_DEBUG);
-        doAddNewSock(rc);
+    if (rc != -1) {
+        if (getNetEntry(fd)) {
+            // This is a network descriptor
+            scopeLog("dup", rc, CFG_LOG_DEBUG);
+            doDupSock(fd, rc);
+        } else if(getFSEntry(fd)) {
+            doDupFile(fd, rc, "dup");
+        }
     }
 
     return rc;
@@ -2783,10 +2815,20 @@ dup2(int oldfd, int newfd)
     WRAP_CHECK(dup2, -1);
     doThread();
     rc = g_fn.dup2(oldfd, newfd);
-    if ((rc != -1) && getNetEntry(rc)) {
-        // This is a network descriptor
+    if ((rc != -1) && (oldfd != newfd)) {
         scopeLog("dup2", rc, CFG_LOG_DEBUG);
-        doAddNewSock(rc);
+        if (getNetEntry(oldfd)) {
+            if (getNetEntry(newfd)) {
+                doClose(newfd, "dup2");
+            }
+
+            doDupSock(oldfd, newfd);
+        } else if (getFSEntry(oldfd)) {
+            if (getFSEntry(newfd)) {
+                doClose(newfd, "dup2");
+            }
+            doDupFile(oldfd, newfd, "dup2");
+        }
     }
 
     return rc;
@@ -2800,10 +2842,20 @@ dup3(int oldfd, int newfd, int flags)
     WRAP_CHECK(dup3, -1);
     doThread();
     rc = g_fn.dup3(oldfd, newfd, flags);
-    if ((rc != -1) && getNetEntry(rc)) {
-        // This is a network descriptor
+    if ((rc != -1) && (oldfd != newfd)) {
         scopeLog("dup3", rc, CFG_LOG_DEBUG);
-        doAddNewSock(rc);
+        if (getNetEntry(oldfd)) {
+            if (getNetEntry(newfd)) {
+                doClose(newfd, "dup3");
+            }
+
+            doDupSock(oldfd, newfd);
+        } else if (getFSEntry(oldfd)) {
+            if (getFSEntry(newfd)) {
+                doClose(newfd, "dup3");
+            }
+            doDupFile(oldfd, newfd, "dup3");
+        }
     }
 
     return rc;

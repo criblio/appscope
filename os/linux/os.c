@@ -8,6 +8,51 @@ osGetProcname(char *pname, int len)
 }
 
 int
+osGetProcMemory(pid_t pid)
+{
+    int fd;
+    long result;
+    char *start, *entry, *last;
+    const char delim[] = ":";
+    char buf[2048];
+
+    snprintf(buf, sizeof(buf), "/proc/%d/status", pid);
+    if ((fd = g_fn.open(buf, O_RDONLY)) == -1) {
+        DBG(NULL);
+        return -1;
+    }
+
+    if (g_fn.read(fd, buf, sizeof(buf)) == -1) {
+        DBG(NULL);
+        g_fn.close(fd);
+        return -1;
+    }
+
+    if ((start = strstr(buf, "VmSize")) == NULL) {
+        DBG(NULL);
+        g_fn.close(fd);
+        return -1;        
+    }
+    
+    entry = strtok_r(start, delim, &last);
+    entry = strtok_r(NULL, delim, &last);
+    if (entry == NULL) {
+        DBG(NULL);
+        g_fn.close(fd);
+        return -1;        
+    }
+    
+    if ((result = strtol(entry, NULL, 0)) == (long)0) {
+        DBG(NULL);
+        g_fn.close(fd);
+        return -1;
+    }
+    
+    g_fn.close(fd);
+    return (int)result;
+}
+
+int
 osGetNumThreads(pid_t pid)
 {
     int fd, i;
@@ -19,10 +64,12 @@ osGetNumThreads(pid_t pid)
     // Get the size of the file with stat, malloc buf then free
     snprintf(buf, sizeof(buf), "/proc/%d/stat", pid);
     if ((fd = g_fn.open(buf, O_RDONLY)) == -1) {
+        DBG(NULL);
         return -1;
     }
 
     if (g_fn.read(fd, buf, sizeof(buf)) == -1) {
+        DBG(NULL);
         g_fn.close(fd);
         return -1;
     }
@@ -34,6 +81,7 @@ osGetNumThreads(pid_t pid)
     g_fn.close(fd);
 
     if ((result = strtol(entry, NULL, 0)) == (long)0) {
+        DBG(NULL);
         return -1;
     }
     return (int)result;
@@ -49,6 +97,7 @@ osGetNumFds(pid_t pid)
 
     snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
     if ((dirp = opendir(buf)) == NULL) {
+        DBG(NULL);
         return -1;
     }
     
@@ -72,6 +121,7 @@ osGetNumChildProcs(pid_t pid)
 
     snprintf(buf, sizeof(buf), "/proc/%d/task", pid);
     if ((dirp = opendir(buf)) == NULL) {
+        DBG(NULL);
         return -1;
     }
     
@@ -94,6 +144,7 @@ osInitTSC(struct rtconfig_t *cfg)
     char *buf;
 
     if ((fd = g_fn.open(path, O_RDONLY)) == -1) {
+        DBG(NULL);
         return -1;
     }
     
@@ -102,10 +153,12 @@ osInitTSC(struct rtconfig_t *cfg)
      * In any case this should be big enough.
      */    
     if ((buf = malloc(MAX_PROC)) == NULL) {
+        DBG(NULL);
         return -1;
     }
     
     if (g_fn.read(fd, buf, MAX_PROC) == -1) {
+        DBG(NULL);
         g_fn.close(fd);
         free(buf);
         return -1;
@@ -144,6 +197,7 @@ osInitTSC(struct rtconfig_t *cfg)
     g_fn.close(fd);
     free(buf);
     if (cfg->freq == (uint64_t)-1) {
+        DBG(NULL);
         return -1;
     }
     return 0;

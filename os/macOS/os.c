@@ -6,6 +6,19 @@ int osGetProcname(char *pname, size_t len)
     return 0;
 }
 
+int
+osGetProcMemory(pid_t pid)
+{
+    struct rusage ruse;
+
+    if (getrusage(RUSAGE_SELF, &ruse) != 0) {
+        return (long)-1;
+    }
+
+    // return kb
+    return ruse.ru_maxrss / 1024;
+}
+
 int osGetNumThreads(pid_t pid)
 {
     struct proc_taskinfo task;

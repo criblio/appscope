@@ -879,23 +879,6 @@ doGetProcCPU() {
         ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
 }
 
-// Return process specific memory usage in kilobytes
-static long
-doGetProcMem() {
-    struct rusage ruse;
-    
-    if (getrusage(RUSAGE_SELF, &ruse) != 0) {
-        return (long)-1;
-    }
-
-    // macOS returns bytes, Linux returns kilobytes
-#ifdef __MACOS__    
-    return ruse.ru_maxrss / 1024;
-#else
-    return ruse.ru_maxrss;
-#endif // __MACOS__        
-}
-
 static void
 doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control_type_t endp)
 {
@@ -1161,7 +1144,7 @@ periodic(void *arg)
         doProcMetric(PROC_CPU, cpu - cpuState);
         cpuState = cpu;
         
-        mem = doGetProcMem();
+        mem = osGetProcMemory(pid);
         doProcMetric(PROC_MEM, mem);
 
         nthread = osGetNumThreads(pid);
@@ -1437,6 +1420,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
 
             snprintf(buf, sizeof(buf), "%s:doOpen: duplicate(%d)", func, fd);
             scopeLog(buf, fd, CFG_LOG_DEBUG);
+            DBG(NULL);
             doClose(fd, func);
         }
         

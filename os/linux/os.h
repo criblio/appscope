@@ -14,6 +14,7 @@
 #include <dirent.h>
 
 #include "../../src/wrap.h"
+#include "../../src/dbg.h"
 
 // Anecdotal evidence that a proc entry should be max 4096 bytes
 #define MAX_PROC 4096
@@ -27,3 +28,4 @@ extern int osGetNumThreads(pid_t);
 extern int osGetNumFds(pid_t);
 extern int osGetNumChildProcs(pid_t);
 extern int osInitTSC(struct rtconfig_t *);
+extern int osGetProcMemory(pid_t);

@@ -1130,6 +1130,27 @@ doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
     }
 }
 
+static void
+initSys()
+{
+    char* path = cfgPath(CFG_FILE_NAME);
+    config_t* cfg = cfgRead(path);
+
+    g_thread.interval = cfgOutPeriod(cfg);
+    g_thread.startTime = time(NULL) + g_thread.interval;
+    g_cfg.verbosity = cfgOutVerbosity(cfg);
+
+    if (g_out) outDestroy(&g_out);
+    if (g_log) logDestroy(&g_log);
+    
+    log_t* log = initLog(cfg);
+    g_out = initOut(cfg, log);
+    g_log = log; // Set after initOut to avoid infinite loop with socket
+
+    if (path) free(path);
+    cfgDestroy(&cfg);
+}
+
 static void *
 periodic(void *arg)
 {
@@ -1369,6 +1390,12 @@ doClose(int fd, const char *func)
 {
     struct net_info_t *ninfo;
     struct fs_info_t *fsinfo;
+
+    if (g_out && (fd == outTransportDescriptor(g_out))) {
+        // We are closing the output descriptor
+        initSys();
+        return; // I think this is right; we're done DR
+    }
     
     if ((ninfo = getNetEntry(fd)) != NULL) {
 

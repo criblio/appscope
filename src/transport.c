@@ -221,3 +221,26 @@ transportSend(transport_t* t, const char* msg)
     }
      return 0;
 }
+
+// Getter functions
+int
+transportDescriptor(transport_t *t)
+{
+    if (!t) return -1;
+
+    switch (t->type) {
+    case CFG_UDP:
+        return t->udp.sock;
+        break;
+    case CFG_FILE:
+        return t->file.fd;
+        break;
+    case CFG_UNIX:
+    case CFG_SYSLOG:
+    case CFG_SHM:
+        return -1;
+        break;
+    default:
+        return -1;
+    }
+}

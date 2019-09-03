@@ -159,6 +159,11 @@ typedef struct net_info_t {
     struct sockaddr_storage remoteConn;
 } net_info;
 
+typedef struct {
+    uint64_t initial;
+    uint64_t duration;
+} elapsed_t;
+
 typedef struct fs_info_t {
     int fd;
     enum fs_type_t type;
@@ -171,9 +176,8 @@ typedef struct fs_info_t {
     int numWrite;
     int readBytes;
     int writeBytes;
+    int numDuration;
     int totalDuration;
-    uint64_t startTime;
-    uint64_t duration;
     char path[PATH_MAX];
 } fs_info;
 

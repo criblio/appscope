@@ -90,17 +90,18 @@ enum metric_t {
     PROC_CHILD,
     NETRX,
     NETTX,
-    NETRX_PROC,
-    NETTX_PROC,
     DNS,
     FS_DURATION,
-    FS_DURATION_PROC,
     FS_READ,
     FS_WRITE,
     FS_OPEN,
     FS_CLOSE,
     FS_SEEK,
     FS_STAT,
+    TOT_READ,
+    TOT_WRITE,
+    TOT_RX,
+    TOT_TX,
 };
 
 // File types; stream or fd
@@ -120,8 +121,10 @@ typedef struct metric_counters_t {
     int openPorts;
     int TCPConnections;
     int activeConnections;
-    int netrx;
-    int nettx;
+    int netrxBytes;
+    int nettxBytes;
+    int readBytes;
+    int writeBytes;
 } metric_counters;
 
 typedef struct rtconfig_t {
@@ -148,6 +151,8 @@ typedef struct net_info_t {
     int addrType;
     int numTX;
     int numRX;
+    int txBytes;
+    int rxBytes;
     bool listen;
     bool accept;
     bool dnsSend;

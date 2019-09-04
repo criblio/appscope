@@ -370,7 +370,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
             STRFIELD("file",             g_fsinfo[fd].path,     2),
-            NUMFIELD("numops",        g_fsinfo[fd].numDuration, 7),
+            NUMFIELD("numops",        g_fsinfo[fd].numDuration, 8),
             STRFIELD("unit",             "millisecond",         1),
             FIELDEND
         };
@@ -409,7 +409,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             default:
                 DBG(NULL);
                 return;
-	}
+	    }
 
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
@@ -432,7 +432,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
             STRFIELD("file",             g_fsinfo[fd].path,     2),
-            NUMFIELD("numops",           *numops,               7),
+            NUMFIELD("numops",           *numops,               8),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
@@ -480,7 +480,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
                 err_str = "ERROR: doFSMetric:FS_STAT:outSendEvent";
                 break;
             default:
-		DBG(NULL);
+                DBG(NULL);
                 return;
         }
 
@@ -527,26 +527,75 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     }
     
     default:
+        DBG(NULL);
         scopeLog("ERROR: doFSMetric:metric type", fd, CFG_LOG_ERROR);
     }
 }
 
+
 static void
-doNetMetric(enum metric_t type, int fd, enum control_type_t source)
+doTotal(enum metric_t type, pid_t pid)
+{
+    const char* metric = "UNKNOWN";
+    int* sizebytes = NULL;
+    const char* err_str = "UNKNOWN";
+    switch (type) {
+        case TOT_READ:
+            metric = "fs.read.total";
+            sizebytes = &g_ctrs.readBytes;
+            err_str = "ERROR: doTotal:TOT_READ:outSendEvent";
+            break;
+        case TOT_WRITE:
+            metric = "fs.write.total";
+            sizebytes = &g_ctrs.writeBytes;
+            err_str = "ERROR: doTotal:TOT_WRITE:outSendEvent";
+            break;
+        case TOT_RX:
+            metric = "net.rx.total";
+            sizebytes = &g_ctrs.netrxBytes;
+            err_str = "ERROR: doTotal:TOT_READ:outSendEvent";
+            break;
+        case TOT_TX:
+            metric = "net.tx.total";
+            sizebytes = &g_ctrs.nettxBytes;
+            err_str = "ERROR: doTotal:TOT_READ:outSendEvent";
+            break;
+        default:
+            DBG(NULL);
+            return;
+	}
+
+    event_field_t fields[] = {
+            STRFIELD("proc",             g_cfg.procname,        2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("unit",             "byte",                1),
+            FIELDEND
+    };
+    event_t e = {metric, *sizebytes, DELTA, fields};
+    if (outSendEvent(g_out, &e)) {
+        scopeLog(err_str, -1, CFG_LOG_ERROR);
+    }
+
+    // Reset the info we tried to report
+    atomicSet(sizebytes, 0);
+}
+
+
+static void
+doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size)
 {
     pid_t pid = getpid();
     char proto[PROTOCOL_STR];
     in_port_t localPort, remotePort;
         
-    if ((type != NETRX_PROC) && (type != NETTX_PROC) && getNetEntry(fd) == NULL) {
+    if (getNetEntry(fd) == NULL) {
         return;
     }
 
-    if ((type != NETRX_PROC) && (type != NETTX_PROC)) {
-        getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
-        localPort = GET_PORT(fd, g_netinfo[fd].localConn.ss_family, LOCAL);
-        remotePort = GET_PORT(fd, g_netinfo[fd].remoteConn.ss_family, REMOTE);
-    }
+    getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
+    localPort = GET_PORT(fd, g_netinfo[fd].localConn.ss_family, LOCAL);
+    remotePort = GET_PORT(fd, g_netinfo[fd].remoteConn.ss_family, REMOTE);
     
     switch (type) {
     case OPEN_PORTS:
@@ -632,8 +681,12 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char rip[INET6_ADDRSTRLEN];
         char data[16];
 
-        g_netinfo[fd].action |= EVENT_RX;
-        atomicAdd(&g_netinfo[fd].numRX, 1);
+        if (source == EVENT_BASED) {
+            g_netinfo[fd].action |= EVENT_RX;
+            atomicAdd(&g_netinfo[fd].numRX, 1);
+            atomicAdd(&g_netinfo[fd].rxBytes, size);
+            atomicAdd(&g_ctrs.netrxBytes, size);
+        }
 
         if ((g_cfg.verbosity != CFG_NET_EVENTS_VERBOSITY) &&
             (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
@@ -702,18 +755,21 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("remoteip",         rip,                   5),
             NUMFIELD("remotep",          remotePort,            5),
             STRFIELD("data",             data,                  1),
+            NUMFIELD("numops",           g_netinfo[fd].numRX,   8),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {"net.op.rx", g_netinfo[fd].numRX, DELTA, fields};
+        event_t e = {"net.rx", g_netinfo[fd].rxBytes, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETRX:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
-        /*
-         * This creates DELTA behavior by uploading the number of bytes
-         * since the last time the metric was uploaded.
-         */
+        // Reset the info if we tried to report
+        //g_netinfo[fd].action &= ~EVENT_RX;
+        atomicSet(&g_netinfo[fd].numRX, 0);
+        atomicSet(&g_netinfo[fd].rxBytes, 0);
+        //atomicSet(&g_ctrs.netrx, 0);
+
         break;
     }
 
@@ -723,8 +779,12 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char rip[INET6_ADDRSTRLEN];
         char data[16];
 
-        g_netinfo[fd].action |= EVENT_TX;
-        atomicAdd(&g_netinfo[fd].numTX, 1);
+        if (source == EVENT_BASED) {
+            g_netinfo[fd].action |= EVENT_TX;
+            atomicAdd(&g_netinfo[fd].numTX, 1);
+            atomicAdd(&g_netinfo[fd].txBytes, size);
+            atomicAdd(&g_ctrs.nettxBytes, size);
+        }
 
         if ((g_cfg.verbosity != CFG_NET_EVENTS_VERBOSITY) &&
             (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
@@ -793,46 +853,21 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("remoteip",         rip,                   5),
             NUMFIELD("remotep",          remotePort,            5),
             STRFIELD("data",             data,                  1),
+            NUMFIELD("numops",           g_netinfo[fd].numTX,   8),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {"net.op.tx", g_netinfo[fd].numTX, DELTA, fields};
+        event_t e = {"net.tx", g_netinfo[fd].txBytes, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETTX:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
-        break;
-    }
+        // Reset the info if we tried to report
+        //g_netinfo[fd].action &= ~EVENT_TX;
+        atomicSet(&g_netinfo[fd].numTX, 0);
+        atomicSet(&g_netinfo[fd].txBytes, 0);
+        //atomicSet(&g_ctrs.nettx, 0);
 
-    case NETRX_PROC:
-    {
-        event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("unit",             "byte",                1),
-            FIELDEND
-        };
-        event_t e = {"net.rx", g_ctrs.netrx, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:NETRX_PROC:outSendEvent", -1, CFG_LOG_ERROR);
-        }
-        break;
-    }
-
-    case NETTX_PROC:
-    {
-        event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("unit",             "byte",                1),
-            FIELDEND
-        };
-        event_t e = {"net.tx", g_ctrs.nettx, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:NETTX_PROC:outSendEvent", -1, CFG_LOG_ERROR);
-        }
         break;
     }
 
@@ -1080,14 +1115,13 @@ getDNSName(int sd, void *pkt, int pktlen)
 static int
 doRecv(int sockfd, ssize_t rc)
 {
-    atomicAdd(&g_ctrs.netrx, rc);
     if (checkNetEntry(sockfd) == TRUE) {
         if (g_netinfo[sockfd].fd != sockfd) {
             doAddNewSock(sockfd);
         }
 
         doSetAddrs(sockfd);
-        doNetMetric(NETRX, sockfd, EVENT_BASED);
+        doNetMetric(NETRX, sockfd, EVENT_BASED, rc);
     }
     return 0;
 }
@@ -1095,17 +1129,16 @@ doRecv(int sockfd, ssize_t rc)
 static int
 doSend(int sockfd, ssize_t rc)
 {
-    atomicAdd(&g_ctrs.nettx, rc);
     if (checkNetEntry(sockfd) == TRUE) {
         if (g_netinfo[sockfd].fd != sockfd) {
             doAddNewSock(sockfd);
         }
 
         doSetAddrs(sockfd);
-        doNetMetric(NETTX, sockfd, EVENT_BASED);
+        doNetMetric(NETTX, sockfd, EVENT_BASED, rc);
 
         if (GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
-            doNetMetric(DNS, sockfd, EVENT_BASED);
+            doNetMetric(DNS, sockfd, EVENT_BASED, 0);
         }
     }
     return 0;
@@ -1125,9 +1158,9 @@ doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
         atomicAdd(&g_ctrs.TCPConnections, 1);
         atomicAdd(&g_ctrs.activeConnections, 1);
         doSetConnection(sd, addr, addrlen, REMOTE);
-        doNetMetric(OPEN_PORTS, sd, EVENT_BASED);
-        doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED);
-        doNetMetric(ACTIVE_CONNECTIONS, sd, EVENT_BASED);
+        doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 0);
+        doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED, 0);
+        doNetMetric(ACTIVE_CONNECTIONS, sd, EVENT_BASED, 0);
         g_netinfo[sd].startTime = getTime();
     }
 }
@@ -1187,29 +1220,30 @@ periodic(void *arg)
         children = osGetNumChildProcs(pid);
         doProcMetric(PROC_CHILD, children);
 
-        if (g_ctrs.netrx > 0) doNetMetric(NETRX_PROC, -1, PERIODIC);
-        if (g_ctrs.nettx> 0) doNetMetric(NETTX_PROC, -1, PERIODIC);
-        atomicSet(&g_ctrs.netrx, 0);
-        atomicSet(&g_ctrs.nettx, 0);
+        // report totals (not by file descriptor/socket descriptor)
+        if (g_ctrs.readBytes > 0)  doTotal(TOT_READ, pid);
+        if (g_ctrs.writeBytes > 0) doTotal(TOT_WRITE, pid);
+        if (g_ctrs.netrxBytes > 0) doTotal(TOT_RX, pid);
+        if (g_ctrs.nettxBytes > 0) doTotal(TOT_TX, pid);
 
+        // report net by socket descriptor
         for (i = 0; i < g_cfg.numNinfo; i++) {
             if (g_netinfo[i].action & EVENT_TX) {
-                doNetMetric(NETTX, i, PERIODIC);
-                atomicSet(&g_netinfo[i].numTX, 0);
+                doNetMetric(NETTX, i, PERIODIC, 0);
             }
 
             if (g_netinfo[i].action & EVENT_RX) {
-                doNetMetric(NETRX, i, PERIODIC);
-                atomicSet(&g_netinfo[i].numRX, 0);
+                doNetMetric(NETRX, i, PERIODIC, 0);
             }
 
             g_netinfo[i].action = 0;
         }
         
+        // report file by file descriptor
         for (i = 0; i < g_cfg.numFSInfo; i++) {
             if (g_fsinfo[i].action & EVENT_FS) {
                 if (g_fsinfo[i].totalDuration > 0) {
-                    doFSMetric(FS_DURATION, i, PERIODIC, NULL, 0, NULL);
+                    doFSMetric(FS_DURATION, i, PERIODIC, "read/write", 0, NULL);
                 }
 
                 if (g_fsinfo[i].readBytes > 0) {
@@ -1387,18 +1421,18 @@ doClose(int fd, const char *func)
         if (ninfo->listen == TRUE) {
             // Gauge tracking number of open ports
             atomicSub(&g_ctrs.openPorts, 1);
-            doNetMetric(OPEN_PORTS, fd, EVENT_BASED);
+            doNetMetric(OPEN_PORTS, fd, EVENT_BASED, 0);
         }
 
         if (ninfo->accept == TRUE) {
             // Gauge tracking number of active TCP connections
             atomicSub(&g_ctrs.TCPConnections, 1);
-            doNetMetric(TCP_CONNECTIONS, fd, EVENT_BASED);
+            doNetMetric(TCP_CONNECTIONS, fd, EVENT_BASED, 0);
 
             if (ninfo->startTime != 0) {
                 // Duration is in NS, the metric wants to be in MS
                 ninfo->duration = getDuration(ninfo->startTime)  / 1000000;
-                doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED);
+                doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED, 0);
             }
         }
         
@@ -1475,6 +1509,8 @@ doDupSock(int oldfd, int newfd)
     g_netinfo[newfd].fd = newfd;
     g_netinfo[newfd].numTX = 0;
     g_netinfo[newfd].numRX = 0;
+    g_netinfo[newfd].txBytes = 0;
+    g_netinfo[newfd].rxBytes = 0;
     g_netinfo[newfd].startTime = 0;
     g_netinfo[newfd].duration = 0;
 
@@ -2920,7 +2956,7 @@ socket(int socket_family, int socket_type, int protocol)
              * a UDP socket is closed we say the port is closed
              */
             net->listen = TRUE;
-            doNetMetric(OPEN_PORTS, sd, EVENT_BASED);
+            doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 0);
         }
     }
 
@@ -2960,12 +2996,12 @@ listen(int sockfd, int backlog)
         if (net) {
             net->listen = TRUE;
             net-> accept = TRUE;
-            doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED);
+            doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED, 0);
 
             if (net->type == SOCK_STREAM) {
                 atomicAdd(&g_ctrs.TCPConnections, 1);
                 net->accept = TRUE;                            
-                doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED);
+                doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED, 0);
             }
         }
     }
@@ -3033,11 +3069,11 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
         doSetConnection(sockfd, addr, addrlen, REMOTE);
         net->accept = TRUE;
         atomicAdd(&g_ctrs.activeConnections, 1);
-        doNetMetric(ACTIVE_CONNECTIONS, sockfd, EVENT_BASED);
+        doNetMetric(ACTIVE_CONNECTIONS, sockfd, EVENT_BASED, 0);
 
         if (net->type == SOCK_STREAM) {
             atomicAdd(&g_ctrs.TCPConnections, 1);
-            doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED);
+            doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED, 0);
         }
 
         // Start the duration timer
@@ -3155,7 +3191,6 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
     scopeLog("recvfrom", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
-        atomicAdd(&g_ctrs.netrx, rc);
         if (getNetEntry(sockfd)) {
             // We missed an accept...most likely
             // Or.. we are a child proc that inherited a socket
@@ -3174,7 +3209,7 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
             doSetConnection(sockfd, src_addr, *addrlen, REMOTE);
         }
 
-        doNetMetric(NETRX, sockfd, EVENT_BASED);
+        doNetMetric(NETRX, sockfd, EVENT_BASED, rc);
     }
     return rc;
 }

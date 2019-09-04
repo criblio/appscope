@@ -165,7 +165,7 @@ testConnDuration(void** state)
     log = strtok_r(NULL, delim, &last);
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
-    if ((duration < 1000) || (duration > 1300))
+    if ((duration < 1000) || (duration > 1400))
         fail_msg("Duration %d is outside of allowed bounds (1000, 1300)", duration);
 
     free(buf);

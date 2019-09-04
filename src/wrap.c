@@ -190,14 +190,6 @@ getProtocol(int type, char *proto, size_t len)
 }
 
 static void
-doReset()
-{
-    g_thread.once = 0;
-    g_thread.startTime = time(NULL) + g_thread.interval;
-    memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
-}
-
-static void
 doThread()
 {
     /*
@@ -1161,6 +1153,14 @@ initSys()
     cfgDestroy(&cfg);
 }
 
+static void
+doReset()
+{
+    g_thread.once = 0;
+    g_thread.startTime = time(NULL) + g_thread.interval;
+    memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
+}
+
 static void *
 periodic(void *arg)
 {
@@ -1356,8 +1356,9 @@ init(void)
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
     
-    
-    {
+
+    initSys();
+/*    {
         char* path = cfgPath(CFG_FILE_NAME);
         config_t* cfg = cfgRead(path);
         
@@ -1371,7 +1372,7 @@ init(void)
         if (path) free(path);
         cfgDestroy(&cfg);
     }
-
+*/
     scopeLog("Constructor", -1, CFG_LOG_INFO);
 }
 
@@ -1381,12 +1382,6 @@ doClose(int fd, const char *func)
     struct net_info_t *ninfo;
     struct fs_info_t *fsinfo;
 
-    if (g_out && (fd == outTransportDescriptor(g_out))) {
-        // We are closing the output descriptor
-        initSys();
-        return; // I think this is right; we're done DR
-    }
-    
     if ((ninfo = getNetEntry(fd)) != NULL) {
 
         if (ninfo->listen == TRUE) {

@@ -44,14 +44,19 @@ newTransport()
     t = calloc(1, sizeof(transport_t));
     if (!t) return NULL;
 
-    if ((t->send = dlsym(RTLD_NEXT, "send")) == NULL) return NULL;
-    if ((t->open = dlsym(RTLD_NEXT, "open")) == NULL) return NULL;
-    if ((t->dup2 = dlsym(RTLD_NEXT, "dup2")) == NULL) return NULL;
-    if ((t->close = dlsym(RTLD_NEXT, "close")) == NULL) return NULL;
-    if ((t->fcntl = dlsym(RTLD_NEXT, "fcntl")) == NULL) return NULL;
-    if ((t->socket = dlsym(RTLD_NEXT, "socket")) == NULL) return NULL;
-    if ((t->connect = dlsym(RTLD_NEXT, "connect")) == NULL) return NULL;
+    if ((t->send = dlsym(RTLD_NEXT, "send")) == NULL) goto out;
+    if ((t->open = dlsym(RTLD_NEXT, "open")) == NULL) goto out;
+    if ((t->dup2 = dlsym(RTLD_NEXT, "dup2")) == NULL) goto out;
+    if ((t->close = dlsym(RTLD_NEXT, "close")) == NULL) goto out;
+    if ((t->fcntl = dlsym(RTLD_NEXT, "fcntl")) == NULL) goto out;
+    if ((t->write = dlsym(RTLD_NEXT, "write")) == NULL) goto out;
+    if ((t->socket = dlsym(RTLD_NEXT, "socket")) == NULL) goto out;
+    if ((t->connect = dlsym(RTLD_NEXT, "connect")) == NULL) goto out;
     return t;
+
+  out:
+    free(t);
+    return NULL;
 }
 
 /*
@@ -88,7 +93,8 @@ transportCreateUdp(const char* host, const char* port)
 
     if (!host || !port) goto out;
 
-    if ((t = newTransport()) == NULL) return NULL; 
+    t = newTransport();
+    if (!t) return NULL; 
 
     t->type = CFG_UDP;
     t->udp.sock = -1;
@@ -142,7 +148,8 @@ transportCreateFile(const char* path)
     transport_t *t;
 
     if (!path) return NULL;
-    if ((t = newTransport()) == NULL) return NULL; 
+    t = newTransport();
+    if (!t) return NULL; 
 
     t->type = CFG_FILE;
     t->file.path = strdup(path);
@@ -246,7 +253,7 @@ transportSend(transport_t* t, const char* msg)
                 if (rc < 0) {
                     switch (errno) {
                     case EBADF:
-                        DBG(NULL); // Place holder; be right back
+                        return DEFAULT_BADFD;
                         break;
                     case EWOULDBLOCK:
                         DBG(NULL);
@@ -262,9 +269,12 @@ transportSend(transport_t* t, const char* msg)
                 DBG(NULL);
                 break;
             }
+
             if (t->file.fd != -1) {
                 int bytes = t->write(t->file.fd, msg, strlen(msg));
-                if (bytes < 0) {
+                if ((bytes < 0) && (errno == EBADF)) {
+                    return DEFAULT_BADFD;
+                } else if (bytes < 0) {
                     DBG("%d %d", t->file.fd, bytes);
                 } else {
                     if (fsync(t->file.fd) == -1) {

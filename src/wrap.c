@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include "cfg.h"
+#include "scopetypes.h"
 #include "cfgutils.h"
 #include "dbg.h"
 #include "log.h"
@@ -19,6 +20,32 @@ static out_t* g_out = NULL;
 // Forward declaration
 static void * periodic(void *);
     
+EXPORTOFF void
+reinitLogDescriptor()
+{
+    char* path = cfgPath(CFG_FILE_NAME);
+    config_t* cfg = cfgRead(path);
+
+    logDestroy(&g_log);
+    g_log = initLog(cfg);
+
+    if (path) free(path);
+    cfgDestroy(&cfg);
+}
+
+EXPORTOFF void
+reinitMetricDescriptor()
+{
+    char* path = cfgPath(CFG_FILE_NAME);
+    config_t* cfg = cfgRead(path);
+
+    outDestroy(&g_out);
+    g_out = initOut(cfg, NULL);
+
+    if (path) free(path);
+    cfgDestroy(&cfg);
+}
+
 EXPORTON void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
 {
@@ -26,7 +53,24 @@ scopeLog(const char* msg, int fd, cfg_log_level_t level)
 
     char buf[strlen(msg) + 128];
     snprintf(buf, sizeof(buf), "Scope: %s(%d): %s\n", g_cfg.procname, fd, msg);
-    logSend(g_log, buf, level);
+    if (logSend(g_log, buf, level) == DEFAULT_BADFD) {
+        // We lost our fd, re-open
+        reinitLogDescriptor();
+    }
+}
+
+EXPORTOFF void
+sendEvent(out_t* out, event_t* e)
+{
+    int rc;
+
+    rc = outSendEvent(g_out, e);
+    if (rc == DEFAULT_BADFD) {
+        // We lost our fd, re-open
+        reinitMetricDescriptor();
+    } else if (rc == -1) {
+        scopeLog("ERROR: doProcMetric:CPU:outSendEvent", -1, CFG_LOG_ERROR);
+    }
 }
 
 // DEBUG
@@ -253,9 +297,7 @@ doProcMetric(enum metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = {"proc.cpu", measurement, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:CPU:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        sendEvent(g_out, &e);
         break;
     }
 
@@ -269,9 +311,7 @@ doProcMetric(enum metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = {"proc.mem", measurement, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:MEM:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        sendEvent(g_out, &e);
         break;
     }
 
@@ -285,9 +325,7 @@ doProcMetric(enum metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = {"proc.thread", measurement, CURRENT, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:THREAD:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        sendEvent(g_out, &e);
         break;
     }
 
@@ -301,9 +339,7 @@ doProcMetric(enum metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = {"proc.fd", measurement, CURRENT, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:FD:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        sendEvent(g_out, &e);
         break;
     }
 
@@ -317,9 +353,7 @@ doProcMetric(enum metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = {"proc.child", measurement, CURRENT, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:CHILD:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        sendEvent(g_out, &e);
         break;
     }
 
@@ -1133,27 +1167,6 @@ doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
 }
 
 static void
-initSys()
-{
-    char* path = cfgPath(CFG_FILE_NAME);
-    config_t* cfg = cfgRead(path);
-
-    g_thread.interval = cfgOutPeriod(cfg);
-    g_thread.startTime = time(NULL) + g_thread.interval;
-    g_cfg.verbosity = cfgOutVerbosity(cfg);
-
-    if (g_out) outDestroy(&g_out);
-    if (g_log) logDestroy(&g_log);
-    
-    log_t* log = initLog(cfg);
-    g_out = initOut(cfg, log);
-    g_log = log; // Set after initOut to avoid infinite loop with socket
-
-    if (path) free(path);
-    cfgDestroy(&cfg);
-}
-
-static void
 doReset()
 {
     g_thread.once = 0;
@@ -1357,8 +1370,7 @@ init(void)
     }
     
 
-    initSys();
-/*    {
+    {
         char* path = cfgPath(CFG_FILE_NAME);
         config_t* cfg = cfgRead(path);
         
@@ -1372,7 +1384,7 @@ init(void)
         if (path) free(path);
         cfgDestroy(&cfg);
     }
-*/
+
     scopeLog("Constructor", -1, CFG_LOG_INFO);
 }
 

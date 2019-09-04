@@ -134,7 +134,7 @@ initOut(config_t* cfg, log_t* log)
     outFormatSet(out, f);
 
     // out can have a reference to log for debugging
-    //outLogReferenceSet(out, log);
+    //if (log) outLogReferenceSet(out, log);
 
     return out;
 }

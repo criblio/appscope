@@ -25,6 +25,7 @@ typedef enum {CFG_LOG_TRACE,
 #define DEFAULT_SUMMARY_PERIOD 10
 #define DEFAULT_FD 999
 #define DEFAULT_MIN_FD 200
+#define DEFAULT_BADFD -2
 
 #endif // __SCOPETYPES_H__
 

@@ -1220,6 +1220,43 @@ doReset()
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
 }
 
+static void
+reportFD(pid_t pid, int fd)
+{
+    struct net_info_t *ninfo = getNetEntry(fd);
+    if (ninfo) {
+        if (ninfo->action & EVENT_TX) {
+            doNetMetric(NETTX, fd, PERIODIC, 0);
+        }
+        if (ninfo->action & EVENT_RX) {
+            doNetMetric(NETRX, fd, PERIODIC, 0);
+        }
+        ninfo->action = 0;
+    }
+
+    struct fs_info_t *finfo = getFSEntry(fd);
+    if (finfo) {
+        if (finfo->action & EVENT_FS) {
+            if (finfo->totalDuration > 0) {
+                doFSMetric(FS_DURATION, fd, PERIODIC, "read/write", 0, NULL);
+            }
+            if (finfo->readBytes > 0) {
+                doFSMetric(FS_READ, fd, PERIODIC, "read", 0, NULL);
+            }
+            if (finfo->writeBytes > 0) {
+                doFSMetric(FS_WRITE, fd, PERIODIC, "write", 0, NULL);
+            }
+            if (finfo->numSeek > 0) {
+                doFSMetric(FS_SEEK, fd, PERIODIC, "seek", 0, NULL);
+            }
+            if (finfo->numStat > 0) {
+                doFSMetric(FS_STAT, fd, PERIODIC, "stat", 0, NULL);
+            }
+        }
+        finfo->action = 0;
+    }
+}
+
 static void *
 periodic(void *arg)
 {
@@ -1252,45 +1289,9 @@ periodic(void *arg)
         if (g_ctrs.netrxBytes > 0) doTotal(TOT_RX, pid);
         if (g_ctrs.nettxBytes > 0) doTotal(TOT_TX, pid);
 
-        // report net by socket descriptor
-        for (i = 0; i < g_cfg.numNinfo; i++) {
-            if (g_netinfo[i].action & EVENT_TX) {
-                doNetMetric(NETTX, i, PERIODIC, 0);
-            }
-
-            if (g_netinfo[i].action & EVENT_RX) {
-                doNetMetric(NETRX, i, PERIODIC, 0);
-            }
-
-            g_netinfo[i].action = 0;
-        }
-        
-        // report file by file descriptor
-        for (i = 0; i < g_cfg.numFSInfo; i++) {
-            if (g_fsinfo[i].action & EVENT_FS) {
-                if (g_fsinfo[i].totalDuration > 0) {
-                    doFSMetric(FS_DURATION, i, PERIODIC, "read/write", 0, NULL);
-                }
-
-                if (g_fsinfo[i].readBytes > 0) {
-                    doFSMetric(FS_READ, i, PERIODIC, "read", 0, NULL);
-                }
-
-                if (g_fsinfo[i].writeBytes > 0) {
-                    doFSMetric(FS_WRITE, i, PERIODIC, "write", 0, NULL);
-                }
-
-                if (g_fsinfo[i].numSeek > 0) {
-                    doFSMetric(FS_SEEK, i, PERIODIC, "seek", 0, NULL);
-                }
-
-                if (g_fsinfo[i].numStat > 0) {
-                    doFSMetric(FS_STAT, i, PERIODIC, "stat", 0, NULL);
-                }
-
-            }
-
-            g_fsinfo[i].action = 0;
+        // report net and file by descriptor
+        for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {
+            reportFD(pid, i);
         }
         
         // From the config file
@@ -1441,6 +1442,9 @@ doClose(int fd, const char *func)
     struct net_info_t *ninfo;
     struct fs_info_t *fsinfo;
 
+    // report everything before the info is lost
+    reportFD(getpid(), fd);
+
     if ((ninfo = getNetEntry(fd)) != NULL) {
 
         if (ninfo->listen == TRUE) {
@@ -1460,7 +1464,7 @@ doClose(int fd, const char *func)
                 doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED, 0);
             }
         }
-        
+
         memset(ninfo, 0, sizeof(struct net_info_t));
         if (func) {
             char buf[64];

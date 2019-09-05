@@ -60,7 +60,6 @@
 #define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
 #define SCOPE_UNIX 99
-#define LOCAL_NAME_SERVER "127.0.0.53"
 
 #ifndef bool
 typedef unsigned int bool;

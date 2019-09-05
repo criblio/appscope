@@ -188,11 +188,24 @@ addSock(int fd, int type)
         }
         
         if ((fd > g_cfg.numNinfo) && (fd < MAX_FDS))  {
-            // Need to realloc
-            if ((g_netinfo = realloc(g_netinfo, sizeof(struct net_info_t) * fd)) == NULL) {
-                scopeLog("ERROR: addSock:realloc", fd, CFG_LOG_ERROR);
+            int increase;
+            net_info *temp;
+
+            if (fd < (MAX_FDS / 2)) {
+                increase = MAX_FDS / 2;
+            } else {
+                increase = MAX_FDS;
             }
-            g_cfg.numNinfo = fd;
+
+            // Need to realloc
+            if ((temp = realloc(g_netinfo, sizeof(struct net_info_t) * increase)) == NULL) {
+                scopeLog("ERROR: addSock:realloc", fd, CFG_LOG_ERROR);
+                DBG("re-alloc on Net table failed");
+            } else {
+                memset(&temp[g_cfg.numNinfo], 0, sizeof(struct net_info_t) * (increase - g_cfg.numNinfo));
+                g_cfg.numNinfo = increase;
+                g_netinfo = temp;
+            }
         }
 
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
@@ -1483,11 +1496,24 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
         }
         
         if ((fd > g_cfg.numFSInfo) && (fd < MAX_FDS))  {
-            // Need to realloc
-            if ((g_fsinfo = realloc(g_fsinfo, sizeof(struct fs_info_t) * fd)) == NULL) {
-                scopeLog("ERROR: doOpen:realloc", fd, CFG_LOG_ERROR);
+            int increase;
+            fs_info *temp;
+
+            if (fd < (MAX_FDS / 2)) {
+                increase = MAX_FDS / 2;
+            } else {
+                increase = MAX_FDS;
             }
-            g_cfg.numFSInfo = fd;
+
+            // Need to realloc
+            if ((temp = realloc(g_fsinfo, sizeof(struct fs_info_t) * increase)) == NULL) {
+                scopeLog("ERROR: doOpen:realloc", fd, CFG_LOG_ERROR);
+                DBG("re-alloc on FS table failed");
+            } else {
+                memset(&temp[g_cfg.numFSInfo], 0, sizeof(struct fs_info_t) * (increase - g_cfg.numFSInfo));
+                g_fsinfo = temp;
+                g_cfg.numFSInfo = increase;
+            }
         }
 
         memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));

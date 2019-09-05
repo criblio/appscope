@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include "cfg.h"
+#include "scopetypes.h"
 #include "cfgutils.h"
 #include "dbg.h"
 #include "log.h"
@@ -19,6 +20,32 @@ static out_t* g_out = NULL;
 // Forward declaration
 static void * periodic(void *);
     
+EXPORTOFF void
+reinitLogDescriptor()
+{
+    char* path = cfgPath(CFG_FILE_NAME);
+    config_t* cfg = cfgRead(path);
+
+    logDestroy(&g_log);
+    g_log = initLog(cfg);
+
+    if (path) free(path);
+    cfgDestroy(&cfg);
+}
+
+EXPORTOFF void
+reinitMetricDescriptor()
+{
+    char* path = cfgPath(CFG_FILE_NAME);
+    config_t* cfg = cfgRead(path);
+
+    outDestroy(&g_out);
+    g_out = initOut(cfg, NULL);
+
+    if (path) free(path);
+    cfgDestroy(&cfg);
+}
+
 EXPORTON void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
 {
@@ -26,7 +53,24 @@ scopeLog(const char* msg, int fd, cfg_log_level_t level)
 
     char buf[strlen(msg) + 128];
     snprintf(buf, sizeof(buf), "Scope: %s(%d): %s\n", g_cfg.procname, fd, msg);
-    logSend(g_log, buf, level);
+    if (logSend(g_log, buf, level) == DEFAULT_BADFD) {
+        // We lost our fd, re-open
+        reinitLogDescriptor();
+    }
+}
+
+EXPORTOFF void
+sendEvent(out_t* out, event_t* e)
+{
+    int rc;
+
+    rc = outSendEvent(g_out, e);
+    if (rc == DEFAULT_BADFD) {
+        // We lost our fd, re-open
+        reinitMetricDescriptor();
+    } else if (rc == -1) {
+        scopeLog("ERROR: doProcMetric:CPU:outSendEvent", -1, CFG_LOG_ERROR);
+    }
 }
 
 // DEBUG
@@ -144,11 +188,24 @@ addSock(int fd, int type)
         }
         
         if ((fd > g_cfg.numNinfo) && (fd < MAX_FDS))  {
-            // Need to realloc
-            if ((g_netinfo = realloc(g_netinfo, sizeof(struct net_info_t) * fd)) == NULL) {
-                scopeLog("ERROR: addSock:realloc", fd, CFG_LOG_ERROR);
+            int increase;
+            net_info *temp;
+
+            if (fd < (MAX_FDS / 2)) {
+                increase = MAX_FDS / 2;
+            } else {
+                increase = MAX_FDS;
             }
-            g_cfg.numNinfo = fd;
+
+            // Need to realloc
+            if ((temp = realloc(g_netinfo, sizeof(struct net_info_t) * increase)) == NULL) {
+                scopeLog("ERROR: addSock:realloc", fd, CFG_LOG_ERROR);
+                DBG("re-alloc on Net table failed");
+            } else {
+                memset(&temp[g_cfg.numNinfo], 0, sizeof(struct net_info_t) * (increase - g_cfg.numNinfo));
+                g_cfg.numNinfo = increase;
+                g_netinfo = temp;
+            }
         }
 
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
@@ -187,14 +244,6 @@ getProtocol(int type, char *proto, size_t len)
     }
 
     return 0;
-}
-
-static void
-doReset()
-{
-    g_thread.once = 0;
-    g_thread.startTime = time(NULL) + g_thread.interval;
-    memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
 }
 
 static void
@@ -261,9 +310,7 @@ doProcMetric(enum metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = {"proc.cpu", measurement, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:CPU:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        sendEvent(g_out, &e);
         break;
     }
 
@@ -277,9 +324,7 @@ doProcMetric(enum metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = {"proc.mem", measurement, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:MEM:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        sendEvent(g_out, &e);
         break;
     }
 
@@ -293,9 +338,7 @@ doProcMetric(enum metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = {"proc.thread", measurement, CURRENT, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:THREAD:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        sendEvent(g_out, &e);
         break;
     }
 
@@ -309,9 +352,7 @@ doProcMetric(enum metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = {"proc.fd", measurement, CURRENT, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:FD:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        sendEvent(g_out, &e);
         break;
     }
 
@@ -325,9 +366,7 @@ doProcMetric(enum metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = {"proc.child", measurement, CURRENT, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doProcMetric:CHILD:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        sendEvent(g_out, &e);
         break;
     }
 
@@ -351,15 +390,26 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     switch (type) {
     case FS_DURATION:
     {
-        g_fsinfo[fd].action |= EVENT_FS;
-        atomicAdd(&g_fsinfo[fd].totalDuration, g_fsinfo[fd].duration);
+        // if called from an event, we update counters
+        if (source == EVENT_BASED) {
+            g_fsinfo[fd].action |= EVENT_FS;
+            atomicAdd(&g_fsinfo[fd].numDuration, 1);
+            atomicAdd(&g_fsinfo[fd].totalDuration, size);
+        }
 
+        // Only report if enabled
         if ((g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
             (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
             (source == EVENT_BASED)) {
             return;
         }
 
+        uint64_t d = 0ULL;
+        if (g_fsinfo[fd].numDuration >= 1) {
+            // factor of 1000 converts us to ms.
+            d = g_fsinfo[fd].totalDuration / ( 1000 * g_fsinfo[fd].numDuration);
+        }
+
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
             NUMFIELD("pid",              pid,                   7),
@@ -367,35 +417,22 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
             STRFIELD("file",             g_fsinfo[fd].path,     2),
+            NUMFIELD("numops",        g_fsinfo[fd].numDuration, 8),
             STRFIELD("unit",             "millisecond",         1),
             FIELDEND
         };
-        event_t e = {"fs.duration", g_fsinfo[fd].duration, HISTOGRAM, fields};
+        event_t e = {"fs.duration", d, HISTOGRAM, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doFSMetric:FS_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
         }
+
+        // Reset the info if we tried to report
+        //g_fsinfo[fd].action &= ~EVENT_FS;
+        atomicSet(&g_fsinfo[fd].numDuration, 0);
+        atomicSet(&g_fsinfo[fd].totalDuration, 0);
         break;        
     }
 
-    case FS_DURATION_PROC:
-    {
-        event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
-            NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("op",               op,                    2),
-            STRFIELD("file",             g_fsinfo[fd].path,     2),
-            STRFIELD("unit",             "millisecond",         1),
-            FIELDEND
-        };
-        event_t e = {"fs.sum_duration", size, CURRENT, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doFSMetric:FS_DURATION_PROC:outSendEvent", fd, CFG_LOG_ERROR);
-        }
-        break;        
-    }
-    
     case FS_READ:
     case FS_WRITE:
     {
@@ -419,12 +456,14 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             default:
                 DBG(NULL);
                 return;
-	}
+	    }
 
-        // Always update the info
-        g_fsinfo[fd].action |= EVENT_FS;
-        atomicAdd(numops, 1);
-        atomicAdd(sizebytes, size);
+        // if called from an event, we update counters
+        if (source == EVENT_BASED) {
+            g_fsinfo[fd].action |= EVENT_FS;
+            atomicAdd(numops, 1);
+            atomicAdd(sizebytes, size);
+        }
 
         // Only report if enabled
         if ((g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
@@ -440,7 +479,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
             STRFIELD("file",             g_fsinfo[fd].path,     2),
-            NUMFIELD("numops",           *numops,               7),
+            NUMFIELD("numops",           *numops,               8),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
@@ -450,6 +489,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         // Reset the info if we tried to report
+        //g_fsinfo[fd].action &= ~EVENT_FS;
         atomicSet(numops, 0);
         atomicSet(sizebytes, 0);
 
@@ -462,38 +502,42 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     case FS_STAT:
     {
         const char* metric = "UNKNOWN";
+        int* numops = NULL;
         const char* err_str = "UNKNOWN";
 
-        g_fsinfo[fd].action |= EVENT_FS;
         switch (type) {
             case FS_OPEN:
                 metric = "fs.op.open";
+                numops = &g_fsinfo[fd].numOpen;
                 err_str = "ERROR: doFSMetric:FS_OPEN:outSendEvent";
-                atomicAdd(&g_fsinfo[fd].numOpen, 1);
                 break;
             case FS_CLOSE:
                 metric = "fs.op.close";
+                numops = &g_fsinfo[fd].numClose;
                 err_str = "ERROR: doFSMetric:FS_CLOSE:outSendEvent";
-                atomicAdd(&g_fsinfo[fd].numClose, 1);
                 break;
             case FS_SEEK:
                 metric = "fs.op.seek";
+                numops = &g_fsinfo[fd].numSeek;
                 err_str = "ERROR: doFSMetric:FS_SEEK:outSendEvent";
-                atomicAdd(&g_fsinfo[fd].numSeek, 1);
                 break;
             case FS_STAT:
                 metric = "fs.op.stat";
+                numops = &g_fsinfo[fd].numStat;
                 err_str = "ERROR: doFSMetric:FS_STAT:outSendEvent";
-                atomicAdd(&g_fsinfo[fd].numStat, 1);
                 break;
             default:
-                break;
+                DBG(NULL);
+                return;
         }
 
-        /*
-         * If called from an event we update counters
-         * If called from the periodic thread we emit metrics
-         */
+        // if called from an event, we update counters
+        if (source == EVENT_BASED) {
+            g_fsinfo[fd].action |= EVENT_FS;
+            atomicAdd(numops, 1);
+        }
+
+        // Only report if enabled
         if (((type == FS_STAT) || (type == FS_SEEK)) &&
             (g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
             (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
@@ -517,34 +561,88 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             FIELDEND
         };
 
-        event_t e = {metric, size, DELTA, fields};
+        event_t e = {metric, *numops, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
+
+        // Reset the info if we tried to report
+        //g_fsinfo[fd].action &= ~EVENT_FS;
+        atomicSet(numops, 0);
+
         break;
     }
     
     default:
+        DBG(NULL);
         scopeLog("ERROR: doFSMetric:metric type", fd, CFG_LOG_ERROR);
     }
 }
 
+
 static void
-doNetMetric(enum metric_t type, int fd, enum control_type_t source)
+doTotal(enum metric_t type, pid_t pid)
+{
+    const char* metric = "UNKNOWN";
+    int* sizebytes = NULL;
+    const char* err_str = "UNKNOWN";
+    switch (type) {
+        case TOT_READ:
+            metric = "fs.read.total";
+            sizebytes = &g_ctrs.readBytes;
+            err_str = "ERROR: doTotal:TOT_READ:outSendEvent";
+            break;
+        case TOT_WRITE:
+            metric = "fs.write.total";
+            sizebytes = &g_ctrs.writeBytes;
+            err_str = "ERROR: doTotal:TOT_WRITE:outSendEvent";
+            break;
+        case TOT_RX:
+            metric = "net.rx.total";
+            sizebytes = &g_ctrs.netrxBytes;
+            err_str = "ERROR: doTotal:TOT_READ:outSendEvent";
+            break;
+        case TOT_TX:
+            metric = "net.tx.total";
+            sizebytes = &g_ctrs.nettxBytes;
+            err_str = "ERROR: doTotal:TOT_READ:outSendEvent";
+            break;
+        default:
+            DBG(NULL);
+            return;
+	}
+
+    event_field_t fields[] = {
+            STRFIELD("proc",             g_cfg.procname,        2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("unit",             "byte",                1),
+            FIELDEND
+    };
+    event_t e = {metric, *sizebytes, DELTA, fields};
+    if (outSendEvent(g_out, &e)) {
+        scopeLog(err_str, -1, CFG_LOG_ERROR);
+    }
+
+    // Reset the info we tried to report
+    atomicSet(sizebytes, 0);
+}
+
+
+static void
+doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size)
 {
     pid_t pid = getpid();
     char proto[PROTOCOL_STR];
     in_port_t localPort, remotePort;
         
-    if ((type != NETRX_PROC) && (type != NETTX_PROC) && getNetEntry(fd) == NULL) {
+    if (getNetEntry(fd) == NULL) {
         return;
     }
 
-    if ((type != NETRX_PROC) && (type != NETTX_PROC)) {
-        getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
-        localPort = GET_PORT(fd, g_netinfo[fd].localConn.ss_family, LOCAL);
-        remotePort = GET_PORT(fd, g_netinfo[fd].remoteConn.ss_family, REMOTE);
-    }
+    getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
+    localPort = GET_PORT(fd, g_netinfo[fd].localConn.ss_family, LOCAL);
+    remotePort = GET_PORT(fd, g_netinfo[fd].remoteConn.ss_family, REMOTE);
     
     switch (type) {
     case OPEN_PORTS:
@@ -630,8 +728,12 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char rip[INET6_ADDRSTRLEN];
         char data[16];
 
-        g_netinfo[fd].action |= EVENT_RX;
-        atomicAdd(&g_netinfo[fd].numRX, 1);
+        if (source == EVENT_BASED) {
+            g_netinfo[fd].action |= EVENT_RX;
+            atomicAdd(&g_netinfo[fd].numRX, 1);
+            atomicAdd(&g_netinfo[fd].rxBytes, size);
+            atomicAdd(&g_ctrs.netrxBytes, size);
+        }
 
         if ((g_cfg.verbosity != CFG_NET_EVENTS_VERBOSITY) &&
             (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
@@ -700,18 +802,21 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("remoteip",         rip,                   5),
             NUMFIELD("remotep",          remotePort,            5),
             STRFIELD("data",             data,                  1),
+            NUMFIELD("numops",           g_netinfo[fd].numRX,   8),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {"net.op.rx", g_netinfo[fd].numRX, DELTA, fields};
+        event_t e = {"net.rx", g_netinfo[fd].rxBytes, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETRX:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
-        /*
-         * This creates DELTA behavior by uploading the number of bytes
-         * since the last time the metric was uploaded.
-         */
+        // Reset the info if we tried to report
+        //g_netinfo[fd].action &= ~EVENT_RX;
+        atomicSet(&g_netinfo[fd].numRX, 0);
+        atomicSet(&g_netinfo[fd].rxBytes, 0);
+        //atomicSet(&g_ctrs.netrx, 0);
+
         break;
     }
 
@@ -721,8 +826,12 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
         char rip[INET6_ADDRSTRLEN];
         char data[16];
 
-        g_netinfo[fd].action |= EVENT_TX;
-        atomicAdd(&g_netinfo[fd].numTX, 1);
+        if (source == EVENT_BASED) {
+            g_netinfo[fd].action |= EVENT_TX;
+            atomicAdd(&g_netinfo[fd].numTX, 1);
+            atomicAdd(&g_netinfo[fd].txBytes, size);
+            atomicAdd(&g_ctrs.nettxBytes, size);
+        }
 
         if ((g_cfg.verbosity != CFG_NET_EVENTS_VERBOSITY) &&
             (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
@@ -791,46 +900,21 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source)
             STRFIELD("remoteip",         rip,                   5),
             NUMFIELD("remotep",          remotePort,            5),
             STRFIELD("data",             data,                  1),
+            NUMFIELD("numops",           g_netinfo[fd].numTX,   8),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
         };
-        event_t e = {"net.op.tx", g_netinfo[fd].numTX, DELTA, fields};
+        event_t e = {"net.tx", g_netinfo[fd].txBytes, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:NETTX:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
-        break;
-    }
+        // Reset the info if we tried to report
+        //g_netinfo[fd].action &= ~EVENT_TX;
+        atomicSet(&g_netinfo[fd].numTX, 0);
+        atomicSet(&g_netinfo[fd].txBytes, 0);
+        //atomicSet(&g_ctrs.nettx, 0);
 
-    case NETRX_PROC:
-    {
-        event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("unit",             "byte",                1),
-            FIELDEND
-        };
-        event_t e = {"net.rx", g_ctrs.netrx, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:NETRX_PROC:outSendEvent", -1, CFG_LOG_ERROR);
-        }
-        break;
-    }
-
-    case NETTX_PROC:
-    {
-        event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("unit",             "byte",                1),
-            FIELDEND
-        };
-        event_t e = {"net.tx", g_ctrs.nettx, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:NETTX_PROC:outSendEvent", -1, CFG_LOG_ERROR);
-        }
         break;
     }
 
@@ -877,23 +961,6 @@ doGetProcCPU() {
     return
         (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1000 * 1000) +
         ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
-}
-
-// Return process specific memory usage in kilobytes
-static long
-doGetProcMem() {
-    struct rusage ruse;
-    
-    if (getrusage(RUSAGE_SELF, &ruse) != 0) {
-        return (long)-1;
-    }
-
-    // macOS returns bytes, Linux returns kilobytes
-#ifdef __MACOS__    
-    return ruse.ru_maxrss / 1024;
-#else
-    return ruse.ru_maxrss;
-#endif // __MACOS__        
 }
 
 static void
@@ -1095,14 +1162,13 @@ getDNSName(int sd, void *pkt, int pktlen)
 static int
 doRecv(int sockfd, ssize_t rc)
 {
-    atomicAdd(&g_ctrs.netrx, rc);
     if (checkNetEntry(sockfd) == TRUE) {
         if (g_netinfo[sockfd].fd != sockfd) {
             doAddNewSock(sockfd);
         }
 
         doSetAddrs(sockfd);
-        doNetMetric(NETRX, sockfd, EVENT_BASED);
+        doNetMetric(NETRX, sockfd, EVENT_BASED, rc);
     }
     return 0;
 }
@@ -1110,17 +1176,16 @@ doRecv(int sockfd, ssize_t rc)
 static int
 doSend(int sockfd, ssize_t rc)
 {
-    atomicAdd(&g_ctrs.nettx, rc);
     if (checkNetEntry(sockfd) == TRUE) {
         if (g_netinfo[sockfd].fd != sockfd) {
             doAddNewSock(sockfd);
         }
 
         doSetAddrs(sockfd);
-        doNetMetric(NETTX, sockfd, EVENT_BASED);
+        doNetMetric(NETTX, sockfd, EVENT_BASED, rc);
 
         if (GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
-            doNetMetric(DNS, sockfd, EVENT_BASED);
+            doNetMetric(DNS, sockfd, EVENT_BASED, 0);
         }
     }
     return 0;
@@ -1140,10 +1205,55 @@ doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
         atomicAdd(&g_ctrs.TCPConnections, 1);
         atomicAdd(&g_ctrs.activeConnections, 1);
         doSetConnection(sd, addr, addrlen, REMOTE);
-        doNetMetric(OPEN_PORTS, sd, EVENT_BASED);
-        doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED);
-        doNetMetric(ACTIVE_CONNECTIONS, sd, EVENT_BASED);
+        doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 0);
+        doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED, 0);
+        doNetMetric(ACTIVE_CONNECTIONS, sd, EVENT_BASED, 0);
         g_netinfo[sd].startTime = getTime();
+    }
+}
+
+static void
+doReset()
+{
+    g_thread.once = 0;
+    g_thread.startTime = time(NULL) + g_thread.interval;
+    memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
+}
+
+static void
+reportFD(pid_t pid, int fd)
+{
+    struct net_info_t *ninfo = getNetEntry(fd);
+    if (ninfo) {
+        if (ninfo->action & EVENT_TX) {
+            doNetMetric(NETTX, fd, PERIODIC, 0);
+        }
+        if (ninfo->action & EVENT_RX) {
+            doNetMetric(NETRX, fd, PERIODIC, 0);
+        }
+        ninfo->action = 0;
+    }
+
+    struct fs_info_t *finfo = getFSEntry(fd);
+    if (finfo) {
+        if (finfo->action & EVENT_FS) {
+            if (finfo->totalDuration > 0) {
+                doFSMetric(FS_DURATION, fd, PERIODIC, "read/write", 0, NULL);
+            }
+            if (finfo->readBytes > 0) {
+                doFSMetric(FS_READ, fd, PERIODIC, "read", 0, NULL);
+            }
+            if (finfo->writeBytes > 0) {
+                doFSMetric(FS_WRITE, fd, PERIODIC, "write", 0, NULL);
+            }
+            if (finfo->numSeek > 0) {
+                doFSMetric(FS_SEEK, fd, PERIODIC, "seek", 0, NULL);
+            }
+            if (finfo->numStat > 0) {
+                doFSMetric(FS_STAT, fd, PERIODIC, "stat", 0, NULL);
+            }
+        }
+        finfo->action = 0;
     }
 }
 
@@ -1161,7 +1271,7 @@ periodic(void *arg)
         doProcMetric(PROC_CPU, cpu - cpuState);
         cpuState = cpu;
         
-        mem = doGetProcMem();
+        mem = osGetProcMemory(pid);
         doProcMetric(PROC_MEM, mem);
 
         nthread = osGetNumThreads(pid);
@@ -1173,70 +1283,15 @@ periodic(void *arg)
         children = osGetNumChildProcs(pid);
         doProcMetric(PROC_CHILD, children);
 
-        if (g_ctrs.netrx > 0) doNetMetric(NETRX_PROC, -1, PERIODIC);
-        if (g_ctrs.nettx> 0) doNetMetric(NETTX_PROC, -1, PERIODIC);
-        atomicSet(&g_ctrs.netrx, 0);
-        atomicSet(&g_ctrs.nettx, 0);
+        // report totals (not by file descriptor/socket descriptor)
+        if (g_ctrs.readBytes > 0)  doTotal(TOT_READ, pid);
+        if (g_ctrs.writeBytes > 0) doTotal(TOT_WRITE, pid);
+        if (g_ctrs.netrxBytes > 0) doTotal(TOT_RX, pid);
+        if (g_ctrs.nettxBytes > 0) doTotal(TOT_TX, pid);
 
-        for (i = 0; i < g_cfg.numNinfo; i++) {
-            if (g_netinfo[i].action & EVENT_TX) {
-                doNetMetric(NETTX, i, PERIODIC);
-                atomicSet(&g_netinfo[i].numTX, 0);
-            }
-
-            if (g_netinfo[i].action & EVENT_RX) {
-                doNetMetric(NETRX, i, PERIODIC);
-                atomicSet(&g_netinfo[i].numRX, 0);
-            }
-
-            g_netinfo[i].action = 0;
-        }
-        
-        for (i = 0; i < g_cfg.numFSInfo; i++) {
-            if (g_fsinfo[i].action & EVENT_FS) {
-                if (g_fsinfo[i].readBytes > 0) {
-                    doFSMetric(FS_READ, i, PERIODIC, "read", g_fsinfo[i].readBytes, NULL);
-                }
-
-                if (g_fsinfo[i].writeBytes > 0) {
-                    doFSMetric(FS_WRITE, i, PERIODIC, "write", g_fsinfo[i].writeBytes, NULL);
-                }
-
-                if (g_fsinfo[i].totalDuration > 0) {
-                    int duration;
-
-                    if ((g_fsinfo[i].numRead == 0) && (g_fsinfo[i].numWrite == 0)) {
-                        // possible race condition where thread runs before these are set
-                        duration = g_fsinfo[i].totalDuration;
-                    } else {
-                        duration = g_fsinfo[i].totalDuration / (g_fsinfo[i].numRead + g_fsinfo[i].numWrite);
-                    }
-                    doFSMetric(FS_DURATION_PROC, i, PERIODIC, NULL, duration, NULL);
-                    atomicSet(&g_fsinfo[i].totalDuration, 0);
-                }
-
-                if (g_fsinfo[i].numOpen > 0) {
-                    doFSMetric(FS_OPEN, i, PERIODIC, "open", g_fsinfo[i].numOpen, NULL);
-                    atomicSet(&g_fsinfo[i].numOpen, 0);
-                }
-
-                if (g_fsinfo[i].numClose > 0) {
-                    doFSMetric(FS_CLOSE, i, PERIODIC, "close", g_fsinfo[i].numClose, NULL);
-                    atomicSet(&g_fsinfo[i].numClose, 0);
-                }
-
-                if (g_fsinfo[i].numSeek > 0) {
-                    doFSMetric(FS_SEEK, i, PERIODIC, "seek", g_fsinfo[i].numSeek, NULL);
-                    atomicSet(&g_fsinfo[i].numSeek, 0);
-                }
-
-                if (g_fsinfo[i].numStat > 0) {
-                    doFSMetric(FS_STAT, i, PERIODIC, "stat", g_fsinfo[i].numStat, NULL);
-                    atomicSet(&g_fsinfo[i].numStat, 0);
-                }
-            }
-
-            g_fsinfo[i].action = 0;
+        // report net and file by descriptor
+        for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {
+            reportFD(pid, i);
         }
         
         // From the config file
@@ -1362,7 +1417,7 @@ init(void)
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
     
-    
+
     {
         char* path = cfgPath(CFG_FILE_NAME);
         config_t* cfg = cfgRead(path);
@@ -1382,60 +1437,34 @@ init(void)
 }
 
 static void
-doOpen(int fd, const char *path, enum fs_type_t type, char *func)
-{
-    if (checkFSEntry(fd) == TRUE) {
-        if (g_fsinfo[fd].fd == fd) {
-            char buf[128];
-
-            snprintf(buf, sizeof(buf), "%s:doOpen: duplicate(%d)", func, fd);
-            scopeLog(buf, fd, CFG_LOG_DEBUG);
-            return;
-        }
-        
-        if ((fd > g_cfg.numFSInfo) && (fd < MAX_FDS))  {
-            // Need to realloc
-            if ((g_fsinfo = realloc(g_fsinfo, sizeof(struct fs_info_t) * fd)) == NULL) {
-                scopeLog("ERROR: doOpen:realloc", fd, CFG_LOG_ERROR);
-            }
-            g_cfg.numFSInfo = fd;
-        }
-
-        memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
-        g_fsinfo[fd].fd = fd;
-        g_fsinfo[fd].type = type;
-        strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
-        doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0, NULL);
-        scopeLog(func, fd, CFG_LOG_TRACE);
-    }
-}
-
-static void
-doClose(int fd, char *func)
+doClose(int fd, const char *func)
 {
     struct net_info_t *ninfo;
     struct fs_info_t *fsinfo;
-    
+
+    // report everything before the info is lost
+    reportFD(getpid(), fd);
+
     if ((ninfo = getNetEntry(fd)) != NULL) {
 
         if (ninfo->listen == TRUE) {
             // Gauge tracking number of open ports
             atomicSub(&g_ctrs.openPorts, 1);
-            doNetMetric(OPEN_PORTS, fd, EVENT_BASED);
+            doNetMetric(OPEN_PORTS, fd, EVENT_BASED, 0);
         }
 
         if (ninfo->accept == TRUE) {
             // Gauge tracking number of active TCP connections
             atomicSub(&g_ctrs.TCPConnections, 1);
-            doNetMetric(TCP_CONNECTIONS, fd, EVENT_BASED);
+            doNetMetric(TCP_CONNECTIONS, fd, EVENT_BASED, 0);
 
             if (ninfo->startTime != 0) {
                 // Duration is in NS, the metric wants to be in MS
                 ninfo->duration = getDuration(ninfo->startTime)  / 1000000;
-                doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED);
+                doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED, 0);
             }
         }
-        
+
         memset(ninfo, 0, sizeof(struct net_info_t));
         if (func) {
             char buf[64];
@@ -1455,6 +1484,79 @@ doClose(int fd, char *func)
         doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 0, NULL);
         memset(fsinfo, 0, sizeof(struct fs_info_t));
     }
+}
+
+static void
+doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
+{
+    if (checkFSEntry(fd) == TRUE) {
+        if (g_fsinfo[fd].fd == fd) {
+            char buf[128];
+
+            snprintf(buf, sizeof(buf), "%s:doOpen: duplicate(%d)", func, fd);
+            scopeLog(buf, fd, CFG_LOG_DEBUG);
+            DBG(NULL);
+            doClose(fd, func);
+        }
+        
+        if ((fd > g_cfg.numFSInfo) && (fd < MAX_FDS))  {
+            int increase;
+            fs_info *temp;
+
+            if (fd < (MAX_FDS / 2)) {
+                increase = MAX_FDS / 2;
+            } else {
+                increase = MAX_FDS;
+            }
+
+            // Need to realloc
+            if ((temp = realloc(g_fsinfo, sizeof(struct fs_info_t) * increase)) == NULL) {
+                scopeLog("ERROR: doOpen:realloc", fd, CFG_LOG_ERROR);
+                DBG("re-alloc on FS table failed");
+            } else {
+                memset(&temp[g_cfg.numFSInfo], 0, sizeof(struct fs_info_t) * (increase - g_cfg.numFSInfo));
+                g_fsinfo = temp;
+                g_cfg.numFSInfo = increase;
+            }
+        }
+
+        memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
+        g_fsinfo[fd].fd = fd;
+        g_fsinfo[fd].type = type;
+        strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
+        doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0, NULL);
+        scopeLog(func, fd, CFG_LOG_TRACE);
+    }
+}
+
+EXPORTON int
+doDupFile(int newfd, int oldfd, const char *func)
+{
+    if ((newfd > g_cfg.numFSInfo) || (oldfd > g_cfg.numFSInfo)) {
+        return -1;
+    }
+
+    doOpen(newfd, g_fsinfo[oldfd].path, g_fsinfo[oldfd].type, func);
+    return 0;
+}
+
+EXPORTON int
+doDupSock(int oldfd, int newfd)
+{
+    if ((newfd > g_cfg.numFSInfo) || (oldfd > g_cfg.numFSInfo)) {
+        return -1;
+    }
+
+    bcopy(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct fs_info_t));
+    g_netinfo[newfd].fd = newfd;
+    g_netinfo[newfd].numTX = 0;
+    g_netinfo[newfd].numRX = 0;
+    g_netinfo[newfd].txBytes = 0;
+    g_netinfo[newfd].rxBytes = 0;
+    g_netinfo[newfd].startTime = 0;
+    g_netinfo[newfd].duration = 0;
+
+    return 0;
 }
 
 EXPORTON int
@@ -1627,17 +1729,18 @@ pread64(int fd, void *buf, size_t count, off_t offset)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(pread64, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.pread64(fd, buf, count, offset);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -1647,7 +1750,7 @@ pread64(int fd, void *buf, size_t count, off_t offset)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread64", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread64", time.duration, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "pread64", rc, NULL);
         }
     }
@@ -1660,17 +1763,18 @@ preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
 
     WRAP_CHECK(preadv, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.preadv(fd, iov, iovcnt, offset);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -1680,7 +1784,7 @@ preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv", time.duration, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "preadv", rc, NULL);
         }
     }
@@ -1693,17 +1797,18 @@ preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(preadv2, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.preadv2(fd, iov, iovcnt, offset, flags);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -1713,7 +1818,7 @@ preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv2", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv2", time.duration, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "preadv2", rc, NULL);
         }
     }
@@ -1726,17 +1831,18 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(preadv64v2, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.preadv64v2(fd, iov, iovcnt, offset, flags);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -1746,7 +1852,7 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv64v2", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "preadv64v2", time.duration, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "preadv64v2", rc, NULL);
         }
     }
@@ -1759,17 +1865,18 @@ pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(pwrite64, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.pwrite64(fd, buf, nbyte, offset);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -1779,7 +1886,7 @@ pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite64", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite64", time.duration, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwrite64", rc, NULL);
         }
     }
@@ -1791,17 +1898,18 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(pwritev, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.pwritev(fd, iov, iovcnt, offset);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -1811,7 +1919,7 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev", time.duration, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev", rc, NULL);
         }
     }
@@ -1823,17 +1931,18 @@ pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(pwritev2, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.pwritev2(fd, iov, iovcnt, offset, flags);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -1843,7 +1952,7 @@ pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev2", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev2", time.duration, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev2", rc, NULL);
         }
     }
@@ -1855,17 +1964,18 @@ pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(pwritev64v2, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.pwritev64v2(fd, iov, iovcnt, offset, flags);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -1875,7 +1985,7 @@ pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev64v2", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev64v2", time.duration, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev64v2", rc, NULL);
         }
     }
@@ -1895,7 +2005,7 @@ lseek64(int fd, off_t offset, int whence)
     if (rc != -1) {
         scopeLog("lseek64", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek64", (ssize_t)offset, NULL);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek64", 0, NULL);
         }
     }
     return rc;
@@ -1915,7 +2025,7 @@ fseeko64(FILE *stream, off_t offset, int whence)
     if (rc != -1) {
         scopeLog("fseeko64", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko64", (ssize_t)offset, NULL);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko64", 0, NULL);
         }
     }
     return rc;
@@ -1935,7 +2045,7 @@ ftello64(FILE *stream)
     if (rc != -1) {
         scopeLog("ftello64", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftello64", (ssize_t)rc, NULL);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftello64", 0, NULL);
         }
     }
     return rc;
@@ -1952,8 +2062,7 @@ statfs64(const char *path, struct statfs64 *buf)
 
     if (rc != -1) {
         scopeLog("statfs64", -1, CFG_LOG_DEBUG);
-        doFSMetric(FS_STAT, -1, EVENT_BASED, "statfs64",
-                   sizeof(struct statfs64), path);
+        doFSMetric(FS_STAT, -1, EVENT_BASED, "statfs64", 0, path);
     }
     return rc;
 }
@@ -1970,8 +2079,7 @@ fstatfs64(int fd, struct statfs64 *buf)
     if (rc != -1) {
         scopeLog("fstatfs64", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
-            doFSMetric(FS_STAT, fd, EVENT_BASED, "fstatfs64",
-                       sizeof(struct statfs64), NULL);
+            doFSMetric(FS_STAT, fd, EVENT_BASED, "fstatfs64", 0, NULL);
         }
     }
     return rc;
@@ -1990,8 +2098,7 @@ statx(int dirfd, const char *pathname, int flags,
 
     if (rc != -1) {
         scopeLog("statx", -1, CFG_LOG_DEBUG);
-        doFSMetric(FS_STAT, -1, EVENT_BASED, "statx",
-                   sizeof(struct statx), pathname);
+        doFSMetric(FS_STAT, -1, EVENT_BASED, "statx", 0, pathname);
     }
     return rc;
 }
@@ -2007,9 +2114,8 @@ stat(const char *pathname, struct stat *statbuf)
     rc = g_fn.stat(pathname, statbuf);
 
     if (rc != -1) {
-        scopeLog("stat\n", -1, CFG_LOG_DEBUG);
-        doFSMetric(FS_STAT, -1, EVENT_BASED, "stat",
-                   sizeof(struct stat), pathname);
+        scopeLog("stat", -1, CFG_LOG_DEBUG);
+        doFSMetric(FS_STAT, -1, EVENT_BASED, "stat", 0, pathname);
     }
     return rc;
 }
@@ -2024,10 +2130,9 @@ fstat(int fd, struct stat *statbuf)
     rc = g_fn.fstat(fd, statbuf);
 
     if (rc != -1) {
-        scopeLog("fstat\n", fd, CFG_LOG_DEBUG);
+        scopeLog("fstat", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
-            doFSMetric(FS_STAT, fd, EVENT_BASED, "fstat",
-                       sizeof(struct stat), NULL);
+            doFSMetric(FS_STAT, fd, EVENT_BASED, "fstat", 0, NULL);
         }
     }
     return rc;
@@ -2043,9 +2148,8 @@ lstat(const char *pathname, struct stat *statbuf)
     rc = g_fn.lstat(pathname, statbuf);
 
     if (rc != -1) {
-        scopeLog("lstat\n", -1, CFG_LOG_DEBUG);
-            doFSMetric(FS_STAT, -1, EVENT_BASED, "lstat",
-                       sizeof(struct stat), pathname);
+        scopeLog("lstat", -1, CFG_LOG_DEBUG);
+            doFSMetric(FS_STAT, -1, EVENT_BASED, "lstat", 0, pathname);
     }
     return rc;
 }
@@ -2060,9 +2164,8 @@ statfs(const char *path, struct statfs *buf)
     rc = g_fn.statfs(path, buf);
 
     if (rc != -1) {
-        scopeLog("statfs\n", -1, CFG_LOG_DEBUG);
-        doFSMetric(FS_STAT, -1, EVENT_BASED, "statfs",
-                   sizeof(struct statfs), path);
+        scopeLog("statfs", -1, CFG_LOG_DEBUG);
+        doFSMetric(FS_STAT, -1, EVENT_BASED, "statfs", 0, path);
     }
     return rc;
 }
@@ -2077,10 +2180,9 @@ fstatfs(int fd, struct statfs *buf)
     rc = g_fn.fstatfs(fd, buf);
 
     if (rc != -1) {
-        scopeLog("fstatfs\n", fd, CFG_LOG_DEBUG);
+        scopeLog("fstatfs", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
-            doFSMetric(FS_STAT, fd, EVENT_BASED, "fstatfs",
-                       sizeof(struct statfs), NULL);
+            doFSMetric(FS_STAT, fd, EVENT_BASED, "fstatfs", 0, NULL);
         }
     }
     return rc;
@@ -2096,9 +2198,8 @@ statvfs(const char *path, struct statvfs *buf)
     rc = g_fn.statvfs(path, buf);
 
     if (rc != -1) {
-        scopeLog("statvfs\n", -1, CFG_LOG_DEBUG);
-        doFSMetric(FS_STAT, -1, EVENT_BASED, "statvfs",
-                   sizeof(struct statvfs), path);
+        scopeLog("statvfs", -1, CFG_LOG_DEBUG);
+        doFSMetric(FS_STAT, -1, EVENT_BASED, "statvfs", 0, path);
     }
     return rc;
 }
@@ -2113,10 +2214,9 @@ fstatvfs(int fd, struct statvfs *buf)
     rc = g_fn.fstatvfs(fd, buf);
 
     if (rc != -1) {
-        scopeLog("fstatvfs\n", fd, CFG_LOG_DEBUG);
+        scopeLog("fstatvfs", fd, CFG_LOG_DEBUG);
         if (checkFSEntry(fd)) {
-            doFSMetric(FS_STAT, fd, EVENT_BASED, "fstatvfs",
-                       sizeof(struct statvfs), NULL);
+            doFSMetric(FS_STAT, fd, EVENT_BASED, "fstatvfs", 0, NULL);
         }
     }
     return rc;
@@ -2333,7 +2433,7 @@ lseek(int fd, off_t offset, int whence)
     if (rc != -1) {
         scopeLog("lseek", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek", (ssize_t)offset, NULL);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek", 0, NULL);
         }
     }
     return rc;
@@ -2353,7 +2453,7 @@ fseeko(FILE *stream, off_t offset, int whence)
     if (rc != -1) {
         scopeLog("fseeko", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko", (ssize_t)offset, NULL);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko", 0, NULL);
         }
     }
     return rc;
@@ -2373,7 +2473,7 @@ ftell(FILE *stream)
     if (rc != -1) {
         scopeLog("ftell", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftell", (ssize_t)rc, NULL);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftell", 0, NULL);
         }
     }
     return rc;
@@ -2393,7 +2493,7 @@ ftello(FILE *stream)
     if (rc != -1) {
         scopeLog("ftello", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftello", (ssize_t)rc, NULL);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftello", 0, NULL);
         }
     }
     return rc;
@@ -2411,7 +2511,7 @@ rewind(FILE *stream)
     
     scopeLog("rewind", fd, CFG_LOG_DEBUG);
     if (fs) {
-        doFSMetric(FS_SEEK, fd, EVENT_BASED, "rewind", (ssize_t)1, NULL);
+        doFSMetric(FS_SEEK, fd, EVENT_BASED, "rewind", 0, NULL);
     }
     return;
 }
@@ -2430,7 +2530,7 @@ fsetpos(FILE *stream, const fpos_t *pos)
     if (rc == 0) {
         scopeLog("fsetpos", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fsetpos", (ssize_t)1, NULL);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fsetpos", 0, NULL);
         }
     }
     return rc;
@@ -2450,7 +2550,7 @@ fgetpos(FILE *stream,  fpos_t *pos)
     if (rc == 0) {
         scopeLog("fgetpos", fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fgetpos", (ssize_t)1, NULL);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fgetpos", 0, NULL);
         }
     }
     return rc;
@@ -2461,17 +2561,18 @@ write(int fd, const void *buf, size_t count)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(write, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.write(fd, buf, count);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -2481,7 +2582,7 @@ write(int fd, const void *buf, size_t count)
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "write", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "write", time.duration, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "write", rc, NULL);
         }
     }
@@ -2493,17 +2594,18 @@ pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(pwrite, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.pwrite(fd, buf, nbyte, offset);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -2513,7 +2615,7 @@ pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwrite", time.duration, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwrite", rc, NULL);
         }
     }
@@ -2525,17 +2627,18 @@ writev(int fd, const struct iovec *iov, int iovcnt)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(writev, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.writev(fd, iov, iovcnt);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -2545,7 +2648,7 @@ writev(int fd, const struct iovec *iov, int iovcnt)
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "writev", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "writev", time.duration, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "writev", rc, NULL);
         }
     }
@@ -2558,17 +2661,18 @@ fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stre
     size_t rc;
     int fd = fileno(stream);
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(fwrite, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.fwrite(ptr, size, nitems, stream);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != 0) {
@@ -2578,7 +2682,7 @@ fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stre
             doSetAddrs(fd);
             doSend(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "fwrite", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "fwrite", time.duration, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "fwrite", rc*size, NULL);
         }
     }
@@ -2590,17 +2694,18 @@ read(int fd, void *buf, size_t count)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(read, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.read(fd, buf, count);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -2610,7 +2715,7 @@ read(int fd, void *buf, size_t count)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "read", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "read", time.duration, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "read", rc, NULL);
         }
     }
@@ -2623,17 +2728,18 @@ readv(int fd, const struct iovec *iov, int iovcnt)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(readv, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.readv(fd, iov, iovcnt);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -2643,7 +2749,7 @@ readv(int fd, const struct iovec *iov, int iovcnt)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "readv", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "readv", time.duration, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "readv", rc, NULL);
         }
     }
@@ -2656,17 +2762,18 @@ pread(int fd, void *buf, size_t count, off_t offset)
 {
     ssize_t rc;
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(pread, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.pread(fd, buf, count, offset);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != -1) {
@@ -2676,7 +2783,7 @@ pread(int fd, void *buf, size_t count, off_t offset)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pread", time.duration, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "pread", rc, NULL);
         }
     }
@@ -2690,17 +2797,18 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     size_t rc;
     int fd = fileno(stream);
     struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
     
     WRAP_CHECK(fread, -1);
     doThread();
     if (fs) {
-        fs->startTime = getTime();
+        time.initial = getTime();
     }
     
     rc = g_fn.fread(ptr, size, nmemb, stream);
     
     if (fs) {
-        fs->duration = getDuration(fs->startTime) / 1000;
+        time.duration = getDuration(time.initial);
     }
     
     if (rc != 0) {
@@ -2710,7 +2818,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
             doSetAddrs(fd);
             doRecv(fd, rc);
         } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, "fread", 0, NULL);
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "fread", time.duration, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, "fread", rc*size, NULL);
         }
     }
@@ -2766,10 +2874,14 @@ dup(int fd)
     WRAP_CHECK(dup, -1);
     doThread();
     rc = g_fn.dup(fd);
-    if ((rc != -1) && getNetEntry(fd)) {
-        // This is a network descriptor
-        scopeLog("dup", rc, CFG_LOG_DEBUG);
-        doAddNewSock(rc);
+    if (rc != -1) {
+        if (getNetEntry(fd)) {
+            // This is a network descriptor
+            scopeLog("dup", rc, CFG_LOG_DEBUG);
+            doDupSock(fd, rc);
+        } else if(getFSEntry(fd)) {
+            doDupFile(fd, rc, "dup");
+        }
     }
 
     return rc;
@@ -2783,10 +2895,20 @@ dup2(int oldfd, int newfd)
     WRAP_CHECK(dup2, -1);
     doThread();
     rc = g_fn.dup2(oldfd, newfd);
-    if ((rc != -1) && getNetEntry(rc)) {
-        // This is a network descriptor
+    if ((rc != -1) && (oldfd != newfd)) {
         scopeLog("dup2", rc, CFG_LOG_DEBUG);
-        doAddNewSock(rc);
+        if (getNetEntry(oldfd)) {
+            if (getNetEntry(newfd)) {
+                doClose(newfd, "dup2");
+            }
+
+            doDupSock(oldfd, newfd);
+        } else if (getFSEntry(oldfd)) {
+            if (getFSEntry(newfd)) {
+                doClose(newfd, "dup2");
+            }
+            doDupFile(oldfd, newfd, "dup2");
+        }
     }
 
     return rc;
@@ -2800,10 +2922,20 @@ dup3(int oldfd, int newfd, int flags)
     WRAP_CHECK(dup3, -1);
     doThread();
     rc = g_fn.dup3(oldfd, newfd, flags);
-    if ((rc != -1) && getNetEntry(rc)) {
-        // This is a network descriptor
+    if ((rc != -1) && (oldfd != newfd)) {
         scopeLog("dup3", rc, CFG_LOG_DEBUG);
-        doAddNewSock(rc);
+        if (getNetEntry(oldfd)) {
+            if (getNetEntry(newfd)) {
+                doClose(newfd, "dup3");
+            }
+
+            doDupSock(oldfd, newfd);
+        } else if (getFSEntry(oldfd)) {
+            if (getFSEntry(newfd)) {
+                doClose(newfd, "dup3");
+            }
+            doDupFile(oldfd, newfd, "dup3");
+        }
     }
 
     return rc;
@@ -2866,7 +2998,7 @@ socket(int socket_family, int socket_type, int protocol)
              * a UDP socket is closed we say the port is closed
              */
             net->listen = TRUE;
-            doNetMetric(OPEN_PORTS, sd, EVENT_BASED);
+            doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 0);
         }
     }
 
@@ -2906,12 +3038,12 @@ listen(int sockfd, int backlog)
         if (net) {
             net->listen = TRUE;
             net-> accept = TRUE;
-            doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED);
+            doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED, 0);
 
             if (net->type == SOCK_STREAM) {
                 atomicAdd(&g_ctrs.TCPConnections, 1);
                 net->accept = TRUE;                            
-                doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED);
+                doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED, 0);
             }
         }
     }
@@ -2979,11 +3111,11 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
         doSetConnection(sockfd, addr, addrlen, REMOTE);
         net->accept = TRUE;
         atomicAdd(&g_ctrs.activeConnections, 1);
-        doNetMetric(ACTIVE_CONNECTIONS, sockfd, EVENT_BASED);
+        doNetMetric(ACTIVE_CONNECTIONS, sockfd, EVENT_BASED, 0);
 
         if (net->type == SOCK_STREAM) {
             atomicAdd(&g_ctrs.TCPConnections, 1);
-            doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED);
+            doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED, 0);
         }
 
         // Start the duration timer
@@ -3101,7 +3233,6 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
     scopeLog("recvfrom", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
-        atomicAdd(&g_ctrs.netrx, rc);
         if (getNetEntry(sockfd)) {
             // We missed an accept...most likely
             // Or.. we are a child proc that inherited a socket
@@ -3120,7 +3251,7 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
             doSetConnection(sockfd, src_addr, *addrlen, REMOTE);
         }
 
-        doNetMetric(NETRX, sockfd, EVENT_BASED);
+        doNetMetric(NETRX, sockfd, EVENT_BASED, rc);
     }
     return rc;
 }

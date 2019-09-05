@@ -63,3 +63,11 @@ logLevelSet(log_t* log, cfg_log_level_t level)
 }
 
 
+// Getter funcs
+int
+logTransportDescriptor(log_t *log)
+{
+    if (log) return transportDescriptor(log->transport);
+
+    return -1;
+}

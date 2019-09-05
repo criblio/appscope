@@ -79,3 +79,12 @@ outLogReferenceSet(out_t* out, log_t* log)
     if (!out) return;
     out->log_ref = log;
 }
+
+// Getter funcs
+int
+outTransportDescriptor(out_t *out)
+{
+    if (out) return transportDescriptor(out->transport);
+
+    return -1;
+}

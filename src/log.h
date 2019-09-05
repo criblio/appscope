@@ -17,4 +17,7 @@ cfg_log_level_t     logLevel(log_t*);
 void                logTransportSet(log_t*, transport_t*);
 void                logLevelSet(log_t*, cfg_log_level_t);
 
+// Getters
+int logTransportDescriptor(log_t *);
+    
 #endif // __LOG_H__

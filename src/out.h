@@ -20,5 +20,8 @@ void                outTransportSet(out_t*, transport_t*);
 void                outFormatSet(out_t*, format_t*);
 void                outLogReferenceSet(out_t*, log_t*);
 
+// Getters
+int outTransportDescriptor(out_t *);
+
 #endif // __OUT_H__
 

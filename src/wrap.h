@@ -204,6 +204,8 @@ typedef struct interposed_funcs_t {
     ssize_t (*read)(int, void *, size_t);
     ssize_t (*readv)(int, const struct iovec *, int);
     size_t (*fread)(void *, size_t, size_t, FILE *);
+    char *(*fgets)(char *, int, FILE *);
+    int (*fputs)(const char *, FILE *);
     ssize_t (*pread)(int, void *, size_t, off_t);
     ssize_t (*pread64)(int, void *, size_t, off_t);
     ssize_t (*preadv)(int, const struct iovec *, int, off_t);

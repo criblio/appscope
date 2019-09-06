@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <pwd.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -59,6 +60,149 @@ cfgPath(const char* cfgname)
     }
 
     return NULL;
+}
+
+static void
+processFormatType(config_t* cfg)
+{
+    const char* value = getenv("SCOPE_OUT_FORMAT");
+    if (!cfg || !value) return;
+
+    if (!strcmp(value, "expandedstatsd")) {
+        cfgOutFormatSet(cfg, CFG_EXPANDED_STATSD);
+    } else if (!strcmp(value, "newlinedelimited")) {
+        cfgOutFormatSet(cfg, CFG_NEWLINE_DELIMITED);
+    }
+}
+
+static void
+processStatsDPrefix(config_t* cfg)
+{
+    const char* value = getenv("SCOPE_OUT_PREFIX");
+    if (!cfg || !value) return;
+
+    cfgOutStatsDPrefixSet(cfg, value);
+}
+
+
+static void
+processStatsDMaxLen(config_t* cfg)
+{
+    const char* value = getenv("SCOPE_OUT_LENGTH");
+    if (!cfg || !value) return;
+
+    errno = 0;
+    char* endptr = NULL;
+    unsigned long x = strtoul(value, &endptr, 10);
+    if (errno || *endptr) return;
+
+    cfgOutStatsDMaxLenSet(cfg, x);
+}
+
+static void
+processSummaryPeriod(config_t* cfg)
+{
+    const char* value = getenv("SCOPE_OUT_PERIOD");
+    if (!cfg || !value) return;
+
+    errno = 0;
+    char* endptr = NULL;
+    unsigned long x = strtoul(value, &endptr, 10);
+    if (errno || *endptr) return;
+
+    cfgOutPeriodSet(cfg, x);
+}
+
+static void
+processVerbosity(config_t* cfg)
+{
+    const char* value = getenv("SCOPE_OUT_VERBOSITY");
+    if (!cfg || !value) return;
+
+    errno = 0;
+    char* endptr = NULL;
+    unsigned long x = strtoul(value, &endptr, 10);
+    if (errno || *endptr) return;
+
+    cfgOutVerbositySet(cfg, x);
+}
+
+static void
+processTransport(config_t* cfg, which_transport_t t)
+{
+    char* value = NULL;
+    switch (t) {
+        case CFG_OUT:
+            value = getenv("SCOPE_OUT_DEST");
+            break;
+        case CFG_LOG:
+            value = getenv("SCOPE_LOG_DEST");
+            break;
+        default:
+            return;
+    }
+    if (!cfg || !value) return;
+
+    // see if value starts with udp:// or file://
+    if (value == strstr(value, "udp://")) {
+
+        // copied to avoid directly modifing the process's env variable
+        char value_cpy[1024];
+        strncpy(value_cpy, value, sizeof(value_cpy));
+
+        char* host = value_cpy + strlen("udp://");
+
+        // convert the ':' to a null delimiter for the host
+        // and move port past the null
+        char *port = strrchr(host, ':');
+        if (!port) return;  // port is *required*
+        *port = '\0';
+        port++;
+
+        cfgTransportTypeSet(cfg, t, CFG_UDP);
+        cfgTransportHostSet(cfg, t, host);
+        cfgTransportPortSet(cfg, t, port);
+
+    } else if (value == strstr(value, "file://")) {
+        char* path = value + strlen("file://");
+        cfgTransportTypeSet(cfg, t, CFG_FILE);
+        cfgTransportPathSet(cfg, t, path);
+    }
+}
+
+static void
+processLevel(config_t* cfg)
+{
+    const char* value = getenv("SCOPE_LOG_LEVEL");
+    if (!cfg || !value) return;
+
+    if (!strcmp(value, "debug")) {
+        cfgLogLevelSet(cfg, CFG_LOG_DEBUG);
+    } else if (!strcmp(value, "info")) {
+        cfgLogLevelSet(cfg, CFG_LOG_INFO);
+    } else if (!strcmp(value, "warning")) {
+        cfgLogLevelSet(cfg, CFG_LOG_WARN);
+    } else if (!strcmp(value, "error")) {
+        cfgLogLevelSet(cfg, CFG_LOG_ERROR);
+    } else if (!strcmp(value, "none")) {
+        cfgLogLevelSet(cfg, CFG_LOG_NONE);
+    } else if (!strcmp(value, "trace")) {
+        cfgLogLevelSet(cfg, CFG_LOG_TRACE);
+    }
+}
+
+void
+cfgProcessEnvironment(config_t* cfg)
+{
+    if (!cfg) return;
+    processFormatType(cfg);
+    processStatsDPrefix(cfg);
+    processStatsDMaxLen(cfg);
+    processSummaryPeriod(cfg);
+    processVerbosity(cfg);
+    processTransport(cfg, CFG_OUT);
+    processTransport(cfg, CFG_LOG);
+    processLevel(cfg);
 }
 
 static transport_t*

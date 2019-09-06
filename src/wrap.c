@@ -19,6 +19,7 @@ static out_t* g_out = NULL;
 
 // Forward declaration
 static void * periodic(void *);
+static void doClose(int, const char *);
     
 EXPORTOFF void
 reinitLogDescriptor()
@@ -167,7 +168,6 @@ addSock(int fd, int type)
 {
     if (checkNetEntry(fd) == TRUE) {
         if (g_netinfo[fd].fd == fd) {
-            scopeLog("addSock: duplicate", fd, CFG_LOG_DEBUG);
 
             if (g_ctrs.openPorts > 0) {
                 atomicSub(&g_ctrs.openPorts, 1);
@@ -184,7 +184,7 @@ addSock(int fd, int type)
             g_netinfo[fd].type &= ~SOCK_NONBLOCK;
 #endif // __LINUX__
 
-            return;
+            doClose(fd, "close: DuplicateSocket");
         }
         
         if ((fd > g_cfg.numNinfo) && (fd < MAX_FDS))  {
@@ -3306,7 +3306,7 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
     scopeLog("recvfrom", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
-        if (getNetEntry(sockfd)) {
+        if (getNetEntry(sockfd) == NULL) {
             // We missed an accept...most likely
             // Or.. we are a child proc that inherited a socket
             int type;

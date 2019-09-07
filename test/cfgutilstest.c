@@ -133,21 +133,21 @@ cfgProcessEnvironmentOutPrefix(void** state)
     assert_string_equal(cfgOutStatsDPrefix(cfg), "something.");
 
     // should override current cfg
-    assert_int_equal(setenv("SCOPE_OUT_PREFIX", "blah", 1), 0);
+    assert_int_equal(setenv("SCOPE_STATSD_PREFIX", "blah", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_string_equal(cfgOutStatsDPrefix(cfg), "blah.");
 
-    assert_int_equal(setenv("SCOPE_OUT_PREFIX", "hey", 1), 0);
+    assert_int_equal(setenv("SCOPE_STATSD_PREFIX", "hey", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_string_equal(cfgOutStatsDPrefix(cfg), "hey.");
 
     // if env is not defined, cfg should not be affected
-    assert_int_equal(unsetenv("SCOPE_OUT_PREFIX"), 0);
+    assert_int_equal(unsetenv("SCOPE_STATSD_PREFIX"), 0);
     cfgProcessEnvironment(cfg);
     assert_string_equal(cfgOutStatsDPrefix(cfg), "hey.");
 
     // empty string
-    assert_int_equal(setenv("SCOPE_OUT_PREFIX", "", 1), 0);
+    assert_int_equal(setenv("SCOPE_STATSD_PREFIX", "", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_string_equal(cfgOutStatsDPrefix(cfg), "");
 
@@ -164,21 +164,21 @@ cfgProcessEnvironmentOutMaxLen(void** state)
     assert_int_equal(cfgOutStatsDMaxLen(cfg), 0);
 
     // should override current cfg
-    assert_int_equal(setenv("SCOPE_OUT_LENGTH", "3", 1), 0);
+    assert_int_equal(setenv("SCOPE_STATSD_MAXLEN", "3", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutStatsDMaxLen(cfg), 3);
 
-    assert_int_equal(setenv("SCOPE_OUT_LENGTH", "12", 1), 0);
+    assert_int_equal(setenv("SCOPE_STATSD_MAXLEN", "12", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutStatsDMaxLen(cfg), 12);
 
     // if env is not defined, cfg should not be affected
-    assert_int_equal(unsetenv("SCOPE_OUT_LENGTH"), 0);
+    assert_int_equal(unsetenv("SCOPE_STATSD_MAXLEN"), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutStatsDMaxLen(cfg), 12);
 
     // unrecognised value should not affect cfg
-    assert_int_equal(setenv("SCOPE_OUT_LENGTH", "notEvenANum", 1), 0);
+    assert_int_equal(setenv("SCOPE_STATSD_MAXLEN", "notEvenANum", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutStatsDMaxLen(cfg), 12);
 
@@ -195,21 +195,21 @@ cfgProcessEnvironmentOutPeriod(void** state)
     assert_int_equal(cfgOutPeriod(cfg), 0);
 
     // should override current cfg
-    assert_int_equal(setenv("SCOPE_OUT_PERIOD", "3", 1), 0);
+    assert_int_equal(setenv("SCOPE_OUT_SUM_PERIOD", "3", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutPeriod(cfg), 3);
 
-    assert_int_equal(setenv("SCOPE_OUT_PERIOD", "12", 1), 0);
+    assert_int_equal(setenv("SCOPE_OUT_SUM_PERIOD", "12", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutPeriod(cfg), 12);
 
     // if env is not defined, cfg should not be affected
-    assert_int_equal(unsetenv("SCOPE_OUT_PERIOD"), 0);
+    assert_int_equal(unsetenv("SCOPE_OUT_SUM_PERIOD"), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutPeriod(cfg), 12);
 
     // unrecognised value should not affect cfg
-    assert_int_equal(setenv("SCOPE_OUT_PERIOD", "notEvenANum", 1), 0);
+    assert_int_equal(setenv("SCOPE_OUT_SUM_PERIOD", "notEvenANum", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutPeriod(cfg), 12);
 

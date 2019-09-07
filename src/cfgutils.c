@@ -78,7 +78,7 @@ processFormatType(config_t* cfg)
 static void
 processStatsDPrefix(config_t* cfg)
 {
-    const char* value = getenv("SCOPE_OUT_PREFIX");
+    const char* value = getenv("SCOPE_STATSD_PREFIX");
     if (!cfg || !value) return;
 
     cfgOutStatsDPrefixSet(cfg, value);
@@ -88,7 +88,7 @@ processStatsDPrefix(config_t* cfg)
 static void
 processStatsDMaxLen(config_t* cfg)
 {
-    const char* value = getenv("SCOPE_OUT_LENGTH");
+    const char* value = getenv("SCOPE_STATSD_MAXLEN");
     if (!cfg || !value) return;
 
     errno = 0;
@@ -102,7 +102,7 @@ processStatsDMaxLen(config_t* cfg)
 static void
 processSummaryPeriod(config_t* cfg)
 {
-    const char* value = getenv("SCOPE_OUT_PERIOD");
+    const char* value = getenv("SCOPE_OUT_SUM_PERIOD");
     if (!cfg || !value) return;
 
     errno = 0;

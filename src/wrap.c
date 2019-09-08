@@ -1321,10 +1321,12 @@ init(void)
     g_fn.pread = dlsym(RTLD_NEXT, "pread");
     g_fn.readv = dlsym(RTLD_NEXT, "readv");
     g_fn.fread = dlsym(RTLD_NEXT, "fread");
+    g_fn.fgets = dlsym(RTLD_NEXT, "fgets");
     g_fn.write = dlsym(RTLD_NEXT, "write");
     g_fn.pwrite = dlsym(RTLD_NEXT, "pwrite");
     g_fn.writev = dlsym(RTLD_NEXT, "writev");
     g_fn.fwrite = dlsym(RTLD_NEXT, "fwrite");
+    g_fn.fputs = dlsym(RTLD_NEXT, "fputs");
     g_fn.lseek = dlsym(RTLD_NEXT, "lseek");
     g_fn.fseeko = dlsym(RTLD_NEXT, "fseeko");
     g_fn.ftell = dlsym(RTLD_NEXT, "ftell");
@@ -2262,14 +2264,15 @@ close(int fd)
 EXPORTON int
 fclose(FILE *stream)
 {
-    int rc;
+    int rc, fd;
 
     WRAP_CHECK(fclose, EOF);
     doThread(); // Will do nothing if a thread already exists
+    fd = fileno(stream);
 
     rc = g_fn.fclose(stream);
     if (rc != EOF) {
-        doClose(fileno(stream), "fclose");
+        doClose(fd, "fclose");
     }
     
     return rc;
@@ -2692,6 +2695,41 @@ fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stre
     return rc;
 }
 
+EXPORTON int
+fputs(const char *s, FILE *stream)
+{
+    int rc;
+    int fd = fileno(stream);
+    struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
+
+    WRAP_CHECK(fputs, EOF);
+    doThread();
+    if (fs) {
+        time.initial = getTime();
+    }
+
+    rc = g_fn.fputs(s, stream);
+
+    if (fs) {
+        time.duration = getDuration(time.initial);
+    }
+
+    if (rc != EOF) {
+        scopeLog("fputs", fd, CFG_LOG_TRACE);
+        if (getNetEntry(fd)) {
+            // This is a network descriptor
+            doSetAddrs(fd);
+            doRecv(fd, rc);
+        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "fputs", time.duration, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, "fputs", rc, NULL);
+        }
+    }
+
+    return rc;
+}
+
 EXPORTON ssize_t
 read(int fd, void *buf, size_t count)
 {
@@ -2826,6 +2864,41 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
         }
     }
     
+    return rc;
+}
+
+EXPORTON char *
+fgets(char *s, int n, FILE *stream)
+{
+    char *rc;
+    int fd = fileno(stream);
+    struct fs_info_t *fs = getFSEntry(fd);
+    elapsed_t time = {0};
+
+    WRAP_CHECK(fgets, NULL);
+    doThread();
+    if (fs) {
+        time.initial = getTime();
+    }
+
+    rc = g_fn.fgets(s, n, stream);
+
+    if (fs) {
+        time.duration = getDuration(time.initial);
+    }
+
+    if (rc != NULL) {
+        scopeLog("fgets", fd, CFG_LOG_TRACE);
+        if (getNetEntry(fd)) {
+            // This is a network descriptor
+            doSetAddrs(fd);
+            doRecv(fd, n);
+        } else if (g_fsinfo && (fd <= g_cfg.numFSInfo) && (g_fsinfo[fd].fd == fd)) {
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "fgets", time.duration, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, "fgets", n, NULL);
+        }
+    }
+
     return rc;
 }
 

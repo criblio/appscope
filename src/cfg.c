@@ -263,10 +263,11 @@ processStatsDMaxLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char* v_str = (char *)node->data.scalar.value;
 
     errno = 0;
-    unsigned long x = strtoul(v_str, NULL, 10);
-    if (!errno) {
-        cfgOutStatsDMaxLenSet(config, x);
-    }
+    char* endptr = NULL;
+    unsigned long x = strtoul(v_str, &endptr, 10);
+    if (errno || *endptr) return;
+
+    cfgOutStatsDMaxLenSet(config, x);
 }
 
 static void
@@ -276,10 +277,11 @@ processVerbosity(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char* v_str = (char *)node->data.scalar.value;
 
     errno = 0;
-    unsigned long x = strtoul(v_str, NULL, 10);
-    if (!errno) {
-        cfgOutVerbositySet(config, x);
-    }
+    char* endptr = NULL;
+    unsigned long x = strtoul(v_str, &endptr, 10);
+    if (errno || *endptr) return;
+
+    cfgOutVerbositySet(config, x);
 }
 
 static void
@@ -309,10 +311,11 @@ processSummaryPeriod(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char* v_str = (char *)node->data.scalar.value;
 
     errno = 0;
-    unsigned long x = strtoul(v_str, NULL, 10);
-    if (!errno) {
-        cfgOutPeriodSet(config, x);
-    }
+    char* endptr = NULL;
+    unsigned long x = strtoul(v_str, &endptr, 10);
+    if (errno || *endptr) return;
+
+    cfgOutPeriodSet(config, x);
 }
 
 static void

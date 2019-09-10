@@ -2,7 +2,7 @@ jobs:
 - job: BuildInVM
   timeoutInMinutes: 10
   variables:
-    uploadPath:  ${{ join('', 'dl/scope/', variables['Build.SourceBranchName'], '/' ) }}
+    uploadPath:  ${{ join('', ['dl/scope/', variables['Build.SourceBranchName'], '/'] ) }}
   strategy:
     matrix:
       ubuntu16_04:

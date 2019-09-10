@@ -39,11 +39,14 @@ jobs:
 #  - script: ./scope.sh build
 #    displayName: scope.sh build
   - task: S3Upload@1
+    variables:
+      targetFolder: $[ join('', 'dl/scope/', variables['Build.SourceBranchName'], '/' )]
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'master'))
     inputs:
       awsCredentials: 'azure-pipeline-aws'
       regionName: 'us-west-2'
       bucketName: 'cdn.cribl.io'
       sourceFolder: 'lib/'
       globExpressions: '**/*.so'
-      targetFolder: 'dl/scope/latest/'
+      targetFolder: $(variables['targetFolder'])
       filesAcl: 'public-read'

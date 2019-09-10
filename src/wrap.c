@@ -2249,6 +2249,55 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
     return rc;
 }
 
+// We explicitly don't interpose these stat functions on macOS
+EXPORTON int
+stat(const char *pathname, struct stat *statbuf)
+{
+    int rc;
+
+    WRAP_CHECK(stat, -1);
+    doThread();
+    rc = g_fn.stat(pathname, statbuf);
+
+    if (rc != -1) {
+        scopeLog("stat", -1, CFG_LOG_DEBUG);
+        doStatMetric("stat", pathname);
+    }
+    return rc;
+}
+
+EXPORTON int
+fstat(int fd, struct stat *statbuf)
+{
+    int rc;
+
+    WRAP_CHECK(fstat, -1);
+    doThread();
+    rc = g_fn.fstat(fd, statbuf);
+
+    if (rc != -1) {
+        scopeLog("fstat", fd, CFG_LOG_DEBUG);
+        if (getFSEntry(fd)) doStatMetric("fstat", g_fsinfo[fd].path);
+    }
+    return rc;
+}
+
+EXPORTON int
+lstat(const char *pathname, struct stat *statbuf)
+{
+    int rc;
+
+    WRAP_CHECK(lstat, -1);
+    doThread();
+    rc = g_fn.lstat(pathname, statbuf);
+
+    if (rc != -1) {
+        scopeLog("lstat", -1, CFG_LOG_DEBUG);
+        doStatMetric("lstat", pathname);
+    }
+    return rc;
+}
+
 #endif // __LINUX__
 
 EXPORTON int
@@ -2429,54 +2478,6 @@ fstatat(int fd, const char *path, struct stat *buf, int flag)
 }
 
 #endif // __MACOS__
-
-EXPORTON int
-stat(const char *pathname, struct stat *statbuf)
-{
-    int rc;
-
-    WRAP_CHECK(stat, -1);
-    doThread();
-    rc = g_fn.stat(pathname, statbuf);
-
-    if (rc != -1) {
-        scopeLog("stat", -1, CFG_LOG_DEBUG);
-        doStatMetric("stat", pathname);
-    }
-    return rc;
-}
-
-EXPORTON int
-fstat(int fd, struct stat *statbuf)
-{
-    int rc;
-
-    WRAP_CHECK(fstat, -1);
-    doThread();
-    rc = g_fn.fstat(fd, statbuf);
-
-    if (rc != -1) {
-        scopeLog("fstat", fd, CFG_LOG_DEBUG);
-        if (getFSEntry(fd)) doStatMetric("fstat", g_fsinfo[fd].path);
-    }
-    return rc;
-}
-
-EXPORTON int
-lstat(const char *pathname, struct stat *statbuf)
-{
-    int rc;
-
-    WRAP_CHECK(lstat, -1);
-    doThread();
-    rc = g_fn.lstat(pathname, statbuf);
-
-    if (rc != -1) {
-        scopeLog("lstat", -1, CFG_LOG_DEBUG);
-        doStatMetric("lstat", pathname);
-    }
-    return rc;
-}
 
 EXPORTON off_t
 lseek(int fd, off_t offset, int whence)

@@ -46,5 +46,5 @@ jobs:
       bucketName: 'cdn.cribl.io'
       sourceFolder: 'lib/'
       globExpressions: '**/*.so'
-      targetFolder: 'dl/scope/${{ variables["Build.SourceBranchName"] }}/'
+      targetFolder: ${{ format('dl/scope/${0}/', variables['Build.SourceBranchName'] }}
       filesAcl: 'public-read'

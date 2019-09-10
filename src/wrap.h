@@ -206,6 +206,9 @@ typedef struct interposed_funcs_t {
     size_t (*fread)(void *, size_t, size_t, FILE *);
     char *(*fgets)(char *, int, FILE *);
     int (*fputs)(const char *, FILE *);
+    ssize_t (*getline)(char **, size_t *, FILE *);
+    ssize_t (*getdelim)(char **, size_t *, int, FILE *);
+    ssize_t (*__getdelim)(char **, size_t *, int, FILE *);
     ssize_t (*pread)(int, void *, size_t, off_t);
     ssize_t (*pread64)(int, void *, size_t, off_t);
     ssize_t (*preadv)(int, const struct iovec *, int, off_t);
@@ -239,6 +242,9 @@ typedef struct interposed_funcs_t {
     int (*statvfs)(const char *, struct statvfs *);
     int (*fstatvfs)(int, struct statvfs *);
     int (*fstatat)(int, const char *, struct stat *, int);
+    int (*__xstat)(int, const char *, struct stat *);
+    int (*__xstat64)(int, const char *, struct stat64 *);
+    int (*__fxstat64)(int, int, struct stat64 *);
     int (*shutdown)(int, int);
     int (*socket)(int, int, int);
     int (*listen)(int, int);
@@ -416,5 +422,33 @@ extern void *_dl_sym(void *, const char *, void *);
        }                                                               \
     } 
 #endif // __LINUX__
+
+#define IOSTREAMPRE(func, type)                      \
+    type rc;                                         \
+    int fd = fileno(stream);                         \
+    struct fs_info_t *fs = getFSEntry(fd);           \
+    elapsed_t time = {0};                            \
+    doThread();                                      \
+    if (fs) {                                        \
+        time.initial = getTime();                    \
+    }                                                \
+
+#define IOSTREAMPOST(func, len, type)               \
+    if (fs) {                                       \
+        time.duration = getDuration(time.initial);  \
+    }                                               \
+                                                    \
+    if (rc != type) {                               \
+        scopeLog(#func, fd, CFG_LOG_TRACE);         \
+        if (getNetEntry(fd)) {                      \
+            doSetAddrs(fd);                         \
+            doRecv(fd, len);                        \
+        } else if (fs) {                            \
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, #func, time.duration, NULL); \
+            doFSMetric(FS_READ, fd, EVENT_BASED, #func, len, NULL); \
+        }                                           \
+    }                                               \
+                                                    \
+return rc;
 
 #endif // __WRAP_H__

@@ -539,8 +539,8 @@ cfgCustomTags(config_t* cfg)
     return (cfg) ? cfg->tags : DEFAULT_TAGS;
 }
 
-const char *
-cfgCustomTagValue(config_t* cfg, const char* tagName)
+static custom_tag_t*
+cfgCustomTag(config_t* cfg, const char* tagName)
 {
     if (!tagName) return NULL;
     if (!cfg || !cfg->tags) return NULL;
@@ -549,10 +549,19 @@ cfgCustomTagValue(config_t* cfg, const char* tagName)
     while (cfg->tags[i]) {
         if (!strcmp(tagName, cfg->tags[i]->name)) {
             // tagName appears in the list of tags.
-            return cfg->tags[i]->value;
+            return cfg->tags[i];
         }
         i++;
     }
+    return NULL;
+}
+
+const char *
+cfgCustomTagValue(config_t* cfg, const char* tagName)
+{
+    custom_tag_t* tag = cfgCustomTag(cfg, tagName);
+    if (tag) return tag->value;
+
     return NULL;
 }
 
@@ -655,7 +664,18 @@ cfgCustomTagAdd(config_t* c, const char* name, const char* value)
 {
     if (!c || !name || !value) return;
 
-    if (cfgCustomTagValue(c, name)) return; // Already there.
+    // If name is already there, replace value only.
+    {
+        custom_tag_t* t;
+        if ((t=cfgCustomTag(c, name))) {
+            char* newvalue = strdup(value);
+            if (newvalue) {
+                free(t->value);
+                t->value = newvalue;
+                return;
+            }
+        }
+    }
 
     // Create space if it's the first add
     if (!c->tags) {

@@ -223,9 +223,9 @@ cfgCustomTagsSetAndGet(void** state)
         assert_null(tags[i+1]);
     }
 
-    // test that we don't add duplicate tags
+    // test that a tag can be overridden by a later tag
     cfgCustomTagAdd(config, "name0", "some other value");
-    assert_string_equal(cfgCustomTagValue(config, "name0"), "value0");
+    assert_string_equal(cfgCustomTagValue(config, "name0"), "some other value");
 
     // test that invalid values don't crash
     cfgCustomTagAdd(config, NULL, "something");

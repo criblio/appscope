@@ -27,6 +27,7 @@ reinitLogDescriptor()
 {
     char* path = cfgPath(CFG_FILE_NAME);
     config_t* cfg = cfgRead(path);
+    cfgProcessEnvironment(cfg);
 
     logDestroy(&g_log);
     g_log = initLog(cfg);
@@ -40,6 +41,7 @@ reinitMetricDescriptor()
 {
     char* path = cfgPath(CFG_FILE_NAME);
     config_t* cfg = cfgRead(path);
+    cfgProcessEnvironment(cfg);
 
     outDestroy(&g_out);
     g_out = initOut(cfg, NULL);
@@ -1439,6 +1441,7 @@ init(void)
     {
         char* path = cfgPath(CFG_FILE_NAME);
         config_t* cfg = cfgRead(path);
+        cfgProcessEnvironment(cfg);
         
         g_thread.interval = cfgOutPeriod(cfg);
         g_thread.startTime = time(NULL) + g_thread.interval;

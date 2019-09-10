@@ -18,11 +18,9 @@ libwrap.so: src/wrap.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c sr
 
 clean:
 	rm -f ./lib/$(OS)/libwrap.so
-	rm -f test/$(OS)/test
 
-test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/cfg.c test/cfgtest.c src/transport.c test/transporttest.c src/log.c test/logtest.c src/out.c test/outtest.c src/format.c test/formattest.c src/dbg.c test/dbgtest.c test/wraptest.c
+test: $(YAML_AR) $(TEST_LIB) src/cfgutils.c test/cfgutilstest.c src/cfg.c test/cfgtest.c src/transport.c test/transporttest.c src/log.c test/logtest.c src/out.c test/outtest.c src/format.c test/formattest.c src/dbg.c test/dbgtest.c test/wraptest.c
 	@echo "Building Tests"
-	$(CC) -Wall -g -o test/$(OS)/test test/test.c
 	@echo "Building cfgtest without YAML only to inspect size"
 	$(CC) $(TEST_CFLAGS) -DNO_YAML -o test/$(OS)/cfgtest $(INCLUDES) $(TEST_INCLUDES) test/cfgtest.c src/cfg.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/$(OS)/cfgtest
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest $(INCLUDES) $(TEST_INCLUDES) test/cfgutilstest.c src/cfgutils.c src/cfg.c src/out.c src/log.c src/transport.c src/format.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)

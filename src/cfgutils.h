@@ -8,6 +8,9 @@
 // The caller is responsible for deallocating with free().
 char* cfgPath(const char* cfgname);
 
+// modify cfg per environment variables
+void cfgProcessEnvironment(config_t* cfg);
+
 log_t* initLog(config_t* cfg);
 out_t* initOut(config_t* cfg, log_t* log);
 

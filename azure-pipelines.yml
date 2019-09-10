@@ -1,6 +1,8 @@
 jobs:
 - job: BuildInVM
   timeoutInMinutes: 10
+  variables:
+    uploadPath:  $[ join('', 'dl/scope/', variables['Build.SourceBranchName'], '/' )]
   strategy:
     matrix:
       ubuntu16_04:
@@ -46,5 +48,5 @@ jobs:
       bucketName: 'cdn.cribl.io'
       sourceFolder: 'lib/'
       globExpressions: '**/*.so'
-      targetFolder: $[ join('', 'dl/scope/', variables['Build.SourceBranchName'], '/' )]
+      targetFolder: $(uploadPath)
       filesAcl: 'public-read'

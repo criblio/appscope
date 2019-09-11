@@ -301,6 +301,7 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,  "statsdprefix",    processStatsDPrefix},
         {YAML_SCALAR_NODE,  "statsdmaxlen",    processStatsDMaxLen},
         {YAML_SCALAR_NODE,  "verbosity",       processVerbosity},
+        {YAML_SEQUENCE_NODE, "tags",           processTags},
         {YAML_NO_NODE, NULL, NULL}
     };
 
@@ -334,7 +335,6 @@ processOutput(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_MAPPING_NODE, "format",          processFormat},
         {YAML_MAPPING_NODE, "transport",       processTransport},
         {YAML_SCALAR_NODE,  "summaryperiod",   processSummaryPeriod},
-        {YAML_SEQUENCE_NODE, "tags",           processTags},
         {YAML_NO_NODE, NULL, NULL}
     };
 

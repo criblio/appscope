@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#define __USE_GNU
 #include <unistd.h>
 #include "cfgutils.h"
 #include "format.h"
@@ -127,6 +126,8 @@ processVerbosity(config_t* cfg)
 
     cfgOutVerbositySet(cfg, x);
 }
+
+extern char** environ;
 
 static void
 processTags(config_t* cfg)

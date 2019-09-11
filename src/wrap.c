@@ -104,6 +104,90 @@ dumpAddrs(int sd, enum control_type_t endp)
     }
 }
 
+// Process dynamic config change if they are available
+EXPORTOFF int
+dynConfig(pid_t pid)
+{
+    int fd;
+    bool verbosityAvail, periodAvail, levelAvail;
+    off_t len;
+    char *buf, *section;
+    char path[32];
+
+    snprintf(path, sizeof(path), DYN_CONFIG_PATH, pid);
+    printf("%s:%d pid %d\n", __FUNCTION__, __LINE__, pid);
+    if ((len = osIsFilePresent(pid, path)) == -1) return 0;
+
+    printf("%s:%d %s present and %ld\n", __FUNCTION__, __LINE__, path, len);
+
+    if ((fd = g_fn.open(path, O_RDONLY)) == -1) return -1;
+
+    if ((buf = calloc(1, len)) == NULL) {
+        g_fn.close(fd);
+        unlink(path);
+        return -1;
+    }
+
+    if (g_fn.read(fd, buf, len) == -1) {
+        g_fn.close(fd);
+        free(buf);
+        unlink(path);
+        return -1;
+    }
+    
+    if ((section = strstr((const char *)buf, "output")) == NULL) {
+        verbosityAvail = periodAvail = FALSE;
+    } else {
+        if (strstr((const char *)section, "summaryperiod") != NULL) {
+            periodAvail = TRUE;
+        } else {
+            periodAvail = FALSE;
+        }
+        
+        if (strstr((const char *)section, "format") != NULL &&
+            strstr((const char *)section, "verbosity") != NULL) {
+            verbosityAvail = TRUE;
+        } else {
+            verbosityAvail = FALSE;
+        }
+    }
+
+    if ((section = strstr((const char *)buf, "logging")) == NULL) {
+        levelAvail = FALSE;
+    } else {
+        if (strstr((const char *)section, "level") != NULL) {
+            levelAvail = TRUE;
+        } else {
+            levelAvail = FALSE;
+        }
+    }
+
+    g_fn.close(fd);
+
+    config_t* cfg = cfgRead(path);
+    cfgProcessEnvironment(cfg);
+        
+    if (periodAvail == TRUE) {
+        g_thread.interval = cfgOutPeriod(cfg);
+    }
+    
+    if (verbosityAvail == TRUE) {
+        g_cfg.verbosity = cfgOutVerbosity(cfg);
+    }
+
+    if (levelAvail == TRUE) {
+        cfg_log_level_t level = cfgLogLevel(cfg);
+        logLevelSet(g_log, level);
+    }
+
+    printf("%s:%d interval %d verbosity %d level %d\n", __FUNCTION__, __LINE__,
+           g_thread.interval, g_cfg.verbosity, logLevel(g_log));
+
+    free(buf);
+    unlink(path);
+    return 0;
+}
+
 // Return the time delta from start to now in nanoseconds
 EXPORTON uint64_t
 getDuration(uint64_t start)
@@ -1304,6 +1388,9 @@ periodic(void *arg)
         for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {
             reportFD(pid, i);
         }
+
+        // Process dynamic config changes, if any
+        dynConfig(pid);
         
         // From the config file
         sleep(g_thread.interval);
@@ -2253,7 +2340,7 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
 }
 
 // We explicitly don't interpose these stat functions on macOS
-EXPORTON int
+EXPORTOFF int
 stat(const char *pathname, struct stat *statbuf)
 {
     int rc;
@@ -2269,7 +2356,7 @@ stat(const char *pathname, struct stat *statbuf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fstat(int fd, struct stat *statbuf)
 {
     int rc;
@@ -2285,7 +2372,7 @@ fstat(int fd, struct stat *statbuf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 lstat(const char *pathname, struct stat *statbuf)
 {
     int rc;

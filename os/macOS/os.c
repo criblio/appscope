@@ -65,3 +65,14 @@ osInitTSC(struct rtconfig_t *cfg)
     cfg->tsc_rdtscp = FALSE;
     return 0;
 }
+
+int
+osIsFilePresent(pid_t pid, const char *path)
+{
+    struct stat sb = {};
+    if (stat(path, &sb) != 0) {
+        return -1;
+    } else {
+        return sb.st_size;
+    }
+}

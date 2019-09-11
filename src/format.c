@@ -278,6 +278,21 @@ fmtOutVerbositySet(format_t* fmt, unsigned v)
     fmt->verbosity = v;
 }
 
+static char*
+doEnvVariableSubstitution(char* value)
+{
+    if (!value) return NULL;
+
+    if (value[0] == '$') {
+        // Looks like an env variable to me...
+        char* original = value;
+        original++;
+        char* new = getenv(original);
+        if (new) return (strdup(new));
+    }
+    return strdup(value);
+}
+
 void
 fmtCustomTagsSet(format_t* fmt, custom_tag_t** tags)
 {
@@ -299,7 +314,7 @@ fmtCustomTagsSet(format_t* fmt, custom_tag_t** tags)
     for (i = 0; i<num; i++) {
         custom_tag_t* t = calloc(1, sizeof(custom_tag_t));
         char* n = strdup(tags[i]->name);
-        char* v = strdup(tags[i]->value);
+        char* v = doEnvVariableSubstitution(tags[i]->value);
         if (!t || !n || !v) {
             if (t) free (t);
             if (n) free (n);

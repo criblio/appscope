@@ -23,6 +23,8 @@ extern int osInitTSC(struct rtconfig_t *);
 #define PORT1 65430
 #define PORT2 65431
 #define LIKELY_FILE_SIZE 12000
+#define NET_DURATION 2000
+#define FS_DURATION 100
 
 rtconfig g_cfg = {0};
 
@@ -76,7 +78,7 @@ testFSDuration(void** state)
     log = strtok_r(NULL, delim, &last);
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
-    if ((duration < 1) || (duration > 100))
+    if ((duration < 1) || (duration > FS_DURATION))
         fail_msg("Duration %d is outside of allowed bounds (1, 100)", duration);
 }
 
@@ -165,7 +167,7 @@ testConnDuration(void** state)
     log = strtok_r(NULL, delim, &last);
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
-    if ((duration < 1000) || (duration > 1400))
+    if ((duration < 1000) || (duration > NET_DURATION))
         fail_msg("Duration %d is outside of allowed bounds (1000, 1300)", duration);
 
     free(buf);

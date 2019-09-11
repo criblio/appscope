@@ -39,12 +39,15 @@ jobs:
 #  - script: ./scope.sh build
 #    displayName: scope.sh build
   - task: S3Upload@1
-    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'master'))
+    condition: succeeded()
     inputs:
       awsCredentials: 'azure-pipeline-aws'
       regionName: 'us-west-2'
       bucketName: 'cdn.cribl.io'
       sourceFolder: 'lib/'
       globExpressions: '**/*.so'
-      targetFolder: ${{ format('dl/scope/{0}/', variables['Build.SourceBranchName']) }}
+      ${{ if eq(variables['Build.SourceBranchName'], 'master') }}
+         targetFolder: 'dl/scope/latest/'
+      ${{ if ne(variables['Build.SourceBranchName'], 'master') }}
+         targetFolder: ${{ format('dl/scope/{0}/', variables['Build.SourceBranchName']) }}
       filesAcl: 'public-read'

@@ -36,6 +36,7 @@ verifyDefaults(format_t* fmt)
     assert_string_equal(fmtStatsDPrefix(fmt), DEFAULT_STATSD_PREFIX);
     assert_int_equal(fmtStatsDMaxLen(fmt), DEFAULT_STATSD_MAX_LEN);
     assert_int_equal(fmtOutVerbosity(fmt), DEFAULT_OUT_VERBOSITY);
+    assert_int_equal(fmtCustomTags(fmt), DEFAULT_CUSTOM_TAGS);
 }
 
 static void
@@ -92,6 +93,33 @@ fmtOutVerbositySetAndGet(void** state)
     assert_int_equal(fmtOutVerbosity(fmt), 0);
     fmtOutVerbositySet(fmt, UINT_MAX);
     assert_int_equal(fmtOutVerbosity(fmt), CFG_MAX_VERBOSITY);
+    fmtDestroy(&fmt);
+}
+
+static void
+fmtCustomTagsSetAndGet(void ** state)
+{
+    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    {
+        custom_tag_t t1 = {"name1", "value1"};
+        custom_tag_t t2 = {"name2", "value2"};
+        custom_tag_t* tags[] = { &t1, &t2, NULL };
+        fmtCustomTagsSet(fmt, tags);
+        assert_non_null(fmtCustomTags(fmt));
+        assert_string_equal(fmtCustomTags(fmt)[0]->name, "name1");
+        assert_string_equal(fmtCustomTags(fmt)[0]->value, "value1");
+        assert_string_equal(fmtCustomTags(fmt)[1]->name, "name2");
+        assert_string_equal(fmtCustomTags(fmt)[1]->value, "value2");
+        assert_null(fmtCustomTags(fmt)[2]);
+    }
+
+    custom_tag_t* tags[] = { NULL };
+    fmtCustomTagsSet(fmt, tags);
+    assert_null(fmtCustomTags(fmt));
+
+    fmtCustomTagsSet(fmt, NULL);
+    assert_null(fmtCustomTags(fmt));
+
     fmtDestroy(&fmt);
 }
 
@@ -165,6 +193,52 @@ fmtStringStatsDHappyPath(void** state)
 
     fmtDestroy(&fmt);
     assert_null(fmt);
+}
+
+static void
+fmtStatsDWithCustomFields(void** state)
+{
+
+    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    assert_non_null(fmt);
+
+    custom_tag_t t1 = {"name1", "value1"};
+    custom_tag_t t2 = {"name2", "value2"};
+    custom_tag_t* tags[] = { &t1, &t2, NULL };
+    fmtCustomTagsSet(fmt, tags);
+
+    event_t e = {"statsd.metric", 3, CURRENT, NULL};
+
+    char* msg = fmtString(fmt, &e);
+    assert_non_null(msg);
+
+    assert_string_equal("statsd.metric:3|g|#name1:value1,name2:value2\n", msg);
+    free(msg);
+    fmtDestroy(&fmt);
+}
+
+static void
+fmtStatsDWithCustomAndStatsdFields(void** state)
+{
+    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    assert_non_null(fmt);
+
+    custom_tag_t t1 = {"tag", "value"};
+    custom_tag_t* tags[] = { &t1, NULL };
+    fmtCustomTagsSet(fmt, tags);
+
+    event_field_t fields[] = {
+        STRFIELD("proc",             "test",                2),
+        FIELDEND
+    };
+    event_t e = {"fs.read", 3, CURRENT, fields};
+
+    char* msg = fmtString(fmt, &e);
+    assert_non_null(msg);
+
+    assert_string_equal("fs.read:3|g|#tag:value,proc:test\n", msg);
+    free(msg);
+    fmtDestroy(&fmt);
 }
 
 static void
@@ -338,10 +412,13 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtStatsDPrefixSetAndGet),
         cmocka_unit_test(fmtStatsDMaxLenSetAndGet),
         cmocka_unit_test(fmtOutVerbositySetAndGet),
+        cmocka_unit_test(fmtCustomTagsSetAndGet),
         cmocka_unit_test(fmtStringStatsDNullEventDoesntCrash),
         cmocka_unit_test(fmtStringStatsDNullEventFieldsDoesntCrash),
         cmocka_unit_test(fmtStringNullFmtDoesntCrash),
         cmocka_unit_test(fmtStringStatsDHappyPath),
+        cmocka_unit_test(fmtStatsDWithCustomFields),
+        cmocka_unit_test(fmtStatsDWithCustomAndStatsdFields),
         cmocka_unit_test(fmtStringStatsDReturnsNullIfSpaceIsInsufficient),
         cmocka_unit_test(fmtStringStatsDVerifyEachStatsDType),
         cmocka_unit_test(fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient),

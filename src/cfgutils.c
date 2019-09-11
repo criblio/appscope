@@ -127,6 +127,33 @@ processVerbosity(config_t* cfg)
     cfgOutVerbositySet(cfg, x);
 }
 
+extern char** environ;
+
+static void
+processTags(config_t* cfg)
+{
+    char* e = NULL;
+    int i = 0;
+    while ((e = environ[i++])) {
+        // see if e starts with SCOPE_TAG_
+        if (e == strstr(e, "SCOPE_TAG_")) {
+            char value_cpy[1024];
+            strncpy(value_cpy, e, sizeof(value_cpy));
+
+            char* name = value_cpy + strlen("SCOPE_TAG_");
+
+            // convert the "=" to a null delimiter for the name
+            // and move value past the null
+            char* value = strchr(name, '=');
+            if (value) {
+                *value = '\0';
+                value++;
+                cfgCustomTagAdd(cfg, name, value);
+            }
+        }
+    }
+}
+
 static void
 processTransport(config_t* cfg, which_transport_t t)
 {
@@ -200,6 +227,7 @@ cfgProcessEnvironment(config_t* cfg)
     processStatsDMaxLen(cfg);
     processSummaryPeriod(cfg);
     processVerbosity(cfg);
+    processTags(cfg);
     processTransport(cfg, CFG_OUT);
     processTransport(cfg, CFG_LOG);
     processLevel(cfg);
@@ -239,6 +267,7 @@ initFormat(config_t* cfg)
     fmtStatsDPrefixSet(fmt, cfgOutStatsDPrefix(cfg));
     fmtStatsDMaxLenSet(fmt, cfgOutStatsDMaxLen(cfg));
     fmtOutVerbositySet(fmt, cfgOutVerbosity(cfg));
+    fmtCustomTagsSet(fmt, cfgCustomTags(cfg));
     return fmt;
 }
 

@@ -126,7 +126,7 @@ cfgProcessEnvironmentOutFormat(void** state)
 }
 
 void
-cfgProcessEnvironmentOutPrefix(void** state)
+cfgProcessEnvironmentStatsDPrefix(void** state)
 {
     config_t* cfg = cfgCreateDefault();
     cfgOutStatsDPrefixSet(cfg, "something");
@@ -157,7 +157,7 @@ cfgProcessEnvironmentOutPrefix(void** state)
 }
 
 void
-cfgProcessEnvironmentOutMaxLen(void** state)
+cfgProcessEnvironmentStatsDMaxLen(void** state)
 {
     config_t* cfg = cfgCreateDefault();
     cfgOutStatsDMaxLenSet(cfg, 0);
@@ -243,6 +243,45 @@ cfgProcessEnvironmentOutVerbosity(void** state)
     assert_int_equal(setenv("SCOPE_OUT_VERBOSITY", "notEvenANum", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutVerbosity(cfg), 12);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
+void
+cfgProcessEnvironmentStatsdTags(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    cfgCustomTagAdd(cfg, "NAME1", "val1");
+    assert_non_null(cfgCustomTags(cfg));
+    assert_string_equal(cfgCustomTagValue(cfg, "NAME1"), "val1");
+    assert_string_equal(cfgCustomTags(cfg)[0]->name, "NAME1");
+    assert_string_equal(cfgCustomTags(cfg)[0]->value, "val1");
+    assert_null(cfgCustomTags(cfg)[1]);
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_TAG_NAME1", "newvalue", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgCustomTagValue(cfg, "NAME1"), "newvalue");
+    assert_string_equal(cfgCustomTags(cfg)[0]->name, "NAME1");
+    assert_string_equal(cfgCustomTags(cfg)[0]->value, "newvalue");
+    assert_null(cfgCustomTags(cfg)[1]);
+
+    // should extend current cfg
+    assert_int_equal(setenv("SCOPE_TAG_NAME2", "val2", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgCustomTagValue(cfg, "NAME2"), "val2");
+    assert_string_equal(cfgCustomTags(cfg)[1]->name, "NAME2");
+    assert_string_equal(cfgCustomTags(cfg)[1]->value, "val2");
+    assert_null(cfgCustomTags(cfg)[2]);
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_TAG_NAME1"), 0);
+    assert_int_equal(unsetenv("SCOPE_TAG_NAME2"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgCustomTagValue(cfg, "NAME1"), "newvalue");
+    assert_string_equal(cfgCustomTagValue(cfg, "NAME2"), "val2");
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -446,10 +485,11 @@ main(int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(cfgPathHonorsPriorityOrder),
         cmocka_unit_test(cfgProcessEnvironmentOutFormat),
-        cmocka_unit_test(cfgProcessEnvironmentOutPrefix),
-        cmocka_unit_test(cfgProcessEnvironmentOutMaxLen),
+        cmocka_unit_test(cfgProcessEnvironmentStatsDPrefix),
+        cmocka_unit_test(cfgProcessEnvironmentStatsDMaxLen),
         cmocka_unit_test(cfgProcessEnvironmentOutPeriod),
         cmocka_unit_test(cfgProcessEnvironmentOutVerbosity),
+        cmocka_unit_test(cfgProcessEnvironmentStatsdTags),
         cmocka_unit_test(cfgProcessEnvironmentOutTransport),
         cmocka_unit_test(cfgProcessEnvironmentLogTransport),
         cmocka_unit_test(cfgProcessEnvironmentLogLevel),

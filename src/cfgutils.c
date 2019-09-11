@@ -266,6 +266,7 @@ initFormat(config_t* cfg)
     fmtStatsDPrefixSet(fmt, cfgOutStatsDPrefix(cfg));
     fmtStatsDMaxLenSet(fmt, cfgOutStatsDMaxLen(cfg));
     fmtOutVerbositySet(fmt, cfgOutVerbosity(cfg));
+    fmtCustomTagsSet(fmt, cfgCustomTags(cfg));
     return fmt;
 }
 

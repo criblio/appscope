@@ -1,6 +1,7 @@
 #ifndef __FORMAT_H__
 #define __FORMAT_H__
 #include "scopetypes.h"
+#include "cfg.h"
 
 
 // This event structure is meant to meet our needs w.r.t. statsd,
@@ -43,6 +44,7 @@ void                fmtDestroy(format_t**);
 const char*         fmtStatsDPrefix(format_t*);
 unsigned            fmtStatsDMaxLen(format_t*);
 unsigned            fmtOutVerbosity(format_t*);
+custom_tag_t**      fmtCustomTags(format_t*);
 
 // fmtString returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
@@ -52,5 +54,6 @@ char*               fmtString(format_t*, event_t*);
 void                fmtStatsDPrefixSet(format_t*, const char*);
 void                fmtStatsDMaxLenSet(format_t*, unsigned);
 void                fmtOutVerbositySet(format_t*, unsigned);
+void                fmtCustomTagsSet(format_t*, custom_tag_t**);
 
 #endif // __FORMAT_H__

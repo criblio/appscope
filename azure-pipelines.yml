@@ -49,5 +49,5 @@ jobs:
       ${{ if eq(variables['Build.SourceBranchName'], 'master') }}:
          targetFolder: 'dl/scope/latest/'
       ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:
-         targetFolder: ${{ format('dl/scope/{0}/', variables['Build.SourceBranchName']) }}
+         targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
       filesAcl: 'public-read'

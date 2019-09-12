@@ -63,68 +63,20 @@ cfgPath(const char* cfgname)
 }
 
 static void
-processFormatType(config_t* cfg)
+processCustomTag(config_t* cfg, const char* e, const char* value)
 {
-    const char* value = getenv("SCOPE_OUT_FORMAT");
-    if (!cfg || !value) return;
+    char name_buf[1024];
+    strncpy(name_buf, e, sizeof(name_buf));
 
-    if (!strcmp(value, "expandedstatsd")) {
-        cfgOutFormatSet(cfg, CFG_EXPANDED_STATSD);
-    } else if (!strcmp(value, "newlinedelimited")) {
-        cfgOutFormatSet(cfg, CFG_NEWLINE_DELIMITED);
+    char* name = name_buf + strlen("SCOPE_TAG_");
+
+    // convert the "=" to a null delimiter for the name
+    char* end = strchr(name, '=');
+    if (end) {
+        *end = '\0';
+        cfgCustomTagAddFromStr(cfg, name, value);
     }
-}
 
-static void
-processStatsDPrefix(config_t* cfg)
-{
-    const char* value = getenv("SCOPE_STATSD_PREFIX");
-    if (!cfg || !value) return;
-
-    cfgOutStatsDPrefixSet(cfg, value);
-}
-
-
-static void
-processStatsDMaxLen(config_t* cfg)
-{
-    const char* value = getenv("SCOPE_STATSD_MAXLEN");
-    if (!cfg || !value) return;
-
-    errno = 0;
-    char* endptr = NULL;
-    unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
-
-    cfgOutStatsDMaxLenSet(cfg, x);
-}
-
-static void
-processSummaryPeriod(config_t* cfg)
-{
-    const char* value = getenv("SCOPE_OUT_SUM_PERIOD");
-    if (!cfg || !value) return;
-
-    errno = 0;
-    char* endptr = NULL;
-    unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
-
-    cfgOutPeriodSet(cfg, x);
-}
-
-static void
-processVerbosity(config_t* cfg)
-{
-    const char* value = getenv("SCOPE_OUT_VERBOSITY");
-    if (!cfg || !value) return;
-
-    errno = 0;
-    char* endptr = NULL;
-    unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
-
-    cfgOutVerbositySet(cfg, x);
 }
 
 extern char** environ;
@@ -135,86 +87,28 @@ processTags(config_t* cfg)
     char* e = NULL;
     int i = 0;
     while ((e = environ[i++])) {
-        // see if e starts with SCOPE_TAG_
-        if (e == strstr(e, "SCOPE_TAG_")) {
-            char value_cpy[1024];
-            strncpy(value_cpy, e, sizeof(value_cpy));
-
-            char* name = value_cpy + strlen("SCOPE_TAG_");
-
-            // convert the "=" to a null delimiter for the name
-            // and move value past the null
-            char* value = strchr(name, '=');
-            if (value) {
-                *value = '\0';
-                value++;
-                cfgCustomTagAdd(cfg, name, value);
-            }
+        char* value = strchr(e, '=');
+        if (!value) continue;
+        value++;
+        if (e == strstr(e, "SCOPE_OUT_FORMAT")) {
+            cfgOutFormatSetFromStr(cfg, value);
+        } else if (e == strstr(e, "SCOPE_STATSD_PREFIX")) {
+            cfgOutStatsDPrefixSetFromStr(cfg, value);
+        } else if (e == strstr(e, "SCOPE_STATSD_MAXLEN")) {
+            cfgOutStatsDMaxLenSetFromStr(cfg, value);
+        } else if (e == strstr(e, "SCOPE_OUT_SUM_PERIOD")) {
+            cfgOutPeriodSetFromStr(cfg, value);
+        } else if (e == strstr(e, "SCOPE_OUT_VERBOSITY")) {
+            cfgOutVerbositySetFromStr(cfg, value);
+        } else if (e == strstr(e, "SCOPE_LOG_LEVEL")) {
+            cfgLogLevelSetFromStr(cfg, value);
+        } else if (e == strstr(e, "SCOPE_OUT_DEST")) {
+            cfgTransportSetFromStr(cfg, CFG_OUT, value);
+        } else if (e == strstr(e, "SCOPE_LOG_DEST")) {
+            cfgTransportSetFromStr(cfg, CFG_LOG, value);
+        } else if (e == strstr(e, "SCOPE_TAG_")) {
+            processCustomTag(cfg, e, value);
         }
-    }
-}
-
-static void
-processTransport(config_t* cfg, which_transport_t t)
-{
-    char* value = NULL;
-    switch (t) {
-        case CFG_OUT:
-            value = getenv("SCOPE_OUT_DEST");
-            break;
-        case CFG_LOG:
-            value = getenv("SCOPE_LOG_DEST");
-            break;
-        default:
-            return;
-    }
-    if (!cfg || !value) return;
-
-    // see if value starts with udp:// or file://
-    if (value == strstr(value, "udp://")) {
-
-        // copied to avoid directly modifing the process's env variable
-        char value_cpy[1024];
-        strncpy(value_cpy, value, sizeof(value_cpy));
-
-        char* host = value_cpy + strlen("udp://");
-
-        // convert the ':' to a null delimiter for the host
-        // and move port past the null
-        char *port = strrchr(host, ':');
-        if (!port) return;  // port is *required*
-        *port = '\0';
-        port++;
-
-        cfgTransportTypeSet(cfg, t, CFG_UDP);
-        cfgTransportHostSet(cfg, t, host);
-        cfgTransportPortSet(cfg, t, port);
-
-    } else if (value == strstr(value, "file://")) {
-        char* path = value + strlen("file://");
-        cfgTransportTypeSet(cfg, t, CFG_FILE);
-        cfgTransportPathSet(cfg, t, path);
-    }
-}
-
-static void
-processLevel(config_t* cfg)
-{
-    const char* value = getenv("SCOPE_LOG_LEVEL");
-    if (!cfg || !value) return;
-
-    if (!strcmp(value, "debug")) {
-        cfgLogLevelSet(cfg, CFG_LOG_DEBUG);
-    } else if (!strcmp(value, "info")) {
-        cfgLogLevelSet(cfg, CFG_LOG_INFO);
-    } else if (!strcmp(value, "warning")) {
-        cfgLogLevelSet(cfg, CFG_LOG_WARN);
-    } else if (!strcmp(value, "error")) {
-        cfgLogLevelSet(cfg, CFG_LOG_ERROR);
-    } else if (!strcmp(value, "none")) {
-        cfgLogLevelSet(cfg, CFG_LOG_NONE);
-    } else if (!strcmp(value, "trace")) {
-        cfgLogLevelSet(cfg, CFG_LOG_TRACE);
     }
 }
 
@@ -222,15 +116,7 @@ void
 cfgProcessEnvironment(config_t* cfg)
 {
     if (!cfg) return;
-    processFormatType(cfg);
-    processStatsDPrefix(cfg);
-    processStatsDMaxLen(cfg);
-    processSummaryPeriod(cfg);
-    processVerbosity(cfg);
     processTags(cfg);
-    processTransport(cfg, CFG_OUT);
-    processTransport(cfg, CFG_LOG);
-    processLevel(cfg);
 }
 
 static transport_t*

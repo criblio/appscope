@@ -79,44 +79,69 @@ processCustomTag(config_t* cfg, const char* e, const char* value)
 
 }
 
-extern char** environ;
-
 static void
-processTags(config_t* cfg)
+processEnvStyleInput(config_t* cfg, const char* e)
 {
-    char* e = NULL;
-    int i = 0;
-    while ((e = environ[i++])) {
-        char* value = strchr(e, '=');
-        if (!value) continue;
-        value++;
-        if (e == strstr(e, "SCOPE_OUT_FORMAT")) {
-            cfgOutFormatSetFromStr(cfg, value);
-        } else if (e == strstr(e, "SCOPE_STATSD_PREFIX")) {
-            cfgOutStatsDPrefixSetFromStr(cfg, value);
-        } else if (e == strstr(e, "SCOPE_STATSD_MAXLEN")) {
-            cfgOutStatsDMaxLenSetFromStr(cfg, value);
-        } else if (e == strstr(e, "SCOPE_OUT_SUM_PERIOD")) {
-            cfgOutPeriodSetFromStr(cfg, value);
-        } else if (e == strstr(e, "SCOPE_OUT_VERBOSITY")) {
-            cfgOutVerbositySetFromStr(cfg, value);
-        } else if (e == strstr(e, "SCOPE_LOG_LEVEL")) {
-            cfgLogLevelSetFromStr(cfg, value);
-        } else if (e == strstr(e, "SCOPE_OUT_DEST")) {
-            cfgTransportSetFromStr(cfg, CFG_OUT, value);
-        } else if (e == strstr(e, "SCOPE_LOG_DEST")) {
-            cfgTransportSetFromStr(cfg, CFG_LOG, value);
-        } else if (e == strstr(e, "SCOPE_TAG_")) {
-            processCustomTag(cfg, e, value);
-        }
+    if (!cfg || !e) return;
+
+    char* value = strchr(e, '=');
+    if (!value) return;
+    value++;
+    if (e == strstr(e, "SCOPE_OUT_FORMAT")) {
+        cfgOutFormatSetFromStr(cfg, value);
+    } else if (e == strstr(e, "SCOPE_STATSD_PREFIX")) {
+        cfgOutStatsDPrefixSetFromStr(cfg, value);
+    } else if (e == strstr(e, "SCOPE_STATSD_MAXLEN")) {
+        cfgOutStatsDMaxLenSetFromStr(cfg, value);
+    } else if (e == strstr(e, "SCOPE_OUT_SUM_PERIOD")) {
+        cfgOutPeriodSetFromStr(cfg, value);
+    } else if (e == strstr(e, "SCOPE_OUT_VERBOSITY")) {
+        cfgOutVerbositySetFromStr(cfg, value);
+    } else if (e == strstr(e, "SCOPE_LOG_LEVEL")) {
+        cfgLogLevelSetFromStr(cfg, value);
+    } else if (e == strstr(e, "SCOPE_OUT_DEST")) {
+        cfgTransportSetFromStr(cfg, CFG_OUT, value);
+    } else if (e == strstr(e, "SCOPE_LOG_DEST")) {
+        cfgTransportSetFromStr(cfg, CFG_LOG, value);
+    } else if (e == strstr(e, "SCOPE_TAG_")) {
+        processCustomTag(cfg, e, value);
     }
 }
+
+
+extern char** environ;
 
 void
 cfgProcessEnvironment(config_t* cfg)
 {
     if (!cfg) return;
-    processTags(cfg);
+    char* e = NULL;
+    int i = 0;
+    while ((e = environ[i++])) {
+        if (e[0] != 'S') continue;  // For performance.  All env variables we
+                                    // care about start with a capital 'S'.
+        processEnvStyleInput(cfg, e);
+    }
+}
+
+void
+cfgProcessCommands(config_t* cfg, FILE* file)
+{
+    if (!cfg || !file) return;
+    char* e = NULL;
+    size_t n = 0;
+
+    while (getline(&e, &n, file) != -1) {
+        if (e) {
+            e[strcspn(e, "\r\n")] = '\0'; //overwrite first \r or \n with null
+            processEnvStyleInput(cfg, e);
+            free(e);
+            e = NULL;
+        }
+        n = 0;
+    }
+
+    if (e) free(e);
 }
 
 static transport_t*

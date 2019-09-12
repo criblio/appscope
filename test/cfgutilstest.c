@@ -405,6 +405,95 @@ cfgProcessEnvironmentLogLevel(void** state)
     cfgProcessEnvironment(cfg);
 }
 
+static int
+writeFile(const char* path, const char* text)
+{
+    FILE* f = fopen(path, "w");
+    if (!f)
+        fail_msg("Couldn't open file");
+
+    if (!fwrite(text, strlen(text), 1, f))
+        fail_msg("Couldn't write file");
+
+    if (fclose(f))
+        fail_msg("Couldn't close file");
+
+    return 0;
+}
+
+static int
+deleteFile(const char* path)
+{
+    return unlink(path);
+}
+
+static void
+openFileAndExecuteCfgProcessCommands(const char* path, config_t* cfg)
+{
+    FILE* f = fopen(path, "r");
+    cfgProcessCommands(cfg, f);
+    fclose(f);
+}
+
+void
+cfgProcessCommandsFromFile(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+
+    const char* path = "/tmp/test.file";
+
+    // Just making sure these don't crash us.
+    cfgProcessCommands(NULL, NULL);
+    cfgProcessCommands(cfg, NULL);
+
+
+    // test the basics
+    writeFile(path, "SCOPE_OUT_FORMAT=newlinedelimited");
+    openFileAndExecuteCfgProcessCommands(path, cfg);
+    assert_int_equal(cfgOutFormat(cfg), CFG_NEWLINE_DELIMITED);
+
+    writeFile(path, "\nSCOPE_OUT_FORMAT=expandedstatsd\r\nblah");
+    openFileAndExecuteCfgProcessCommands(path, cfg);
+    assert_int_equal(cfgOutFormat(cfg), CFG_EXPANDED_STATSD);
+
+    writeFile(path, "blah\nSCOPE_OUT_FORMAT=newlinedelimited");
+    openFileAndExecuteCfgProcessCommands(path, cfg);
+    assert_int_equal(cfgOutFormat(cfg), CFG_NEWLINE_DELIMITED);
+
+    // just demonstrating that the "last one wins"
+    writeFile(path, "SCOPE_OUT_FORMAT=newlinedelimited\n"
+                    "SCOPE_OUT_FORMAT=expandedstatsd");
+    openFileAndExecuteCfgProcessCommands(path, cfg);
+    assert_int_equal(cfgOutFormat(cfg), CFG_EXPANDED_STATSD);
+
+
+    // test everything else once
+    writeFile(path,
+        "SCOPE_STATSD_PREFIX=prefix\n"
+        "SCOPE_STATSD_MAXLEN=1024\n"
+        "SCOPE_OUT_SUM_PERIOD=11\n"
+        "SCOPE_OUT_VERBOSITY=1\n"
+        "SCOPE_LOG_LEVEL=trace\n"
+        "SCOPE_OUT_DEST=file:///tmp/file.tmp\n"
+        "SCOPE_LOG_DEST=file:///tmp/file.tmp2\n"
+        "SCOPE_TAG_CUSTOM1=val1\n"
+        "SCOPE_TAG_CUSTOM2=val2");
+    openFileAndExecuteCfgProcessCommands(path, cfg);
+    assert_string_equal(cfgOutStatsDPrefix(cfg), "prefix.");
+    assert_int_equal(cfgOutStatsDMaxLen(cfg), 1024);
+    assert_int_equal(cfgOutPeriod(cfg), 11);
+    assert_int_equal(cfgOutVerbosity(cfg), 1);
+    assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/tmp/file.tmp");
+    assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/file.tmp2");
+    assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM1"), "val1");
+    assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM2"), "val2");
+    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
+
+    deleteFile(path);
+    cfgDestroy(&cfg);
+}
+
 void
 initLogReturnsPtr(void** state)
 {
@@ -493,6 +582,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgProcessEnvironmentOutTransport),
         cmocka_unit_test(cfgProcessEnvironmentLogTransport),
         cmocka_unit_test(cfgProcessEnvironmentLogLevel),
+        cmocka_unit_test(cfgProcessCommandsFromFile),
         cmocka_unit_test(initLogReturnsPtr),
         cmocka_unit_test(initOutReturnsPtrWithNullLogReference),
         cmocka_unit_test(initOutReturnsPtrWithLogReference),

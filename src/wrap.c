@@ -112,6 +112,7 @@ doConfig(config_t *cfg)
 {
     g_thread.interval = cfgOutPeriod(cfg);
     g_cfg.verbosity = cfgOutVerbosity(cfg);
+    g_cfg.cmdpath = cfgOutCmdPath(cfg);
 
     // save the previous objects, they get free'd next period
     g_prevout = g_out;
@@ -127,9 +128,9 @@ EXPORTOFF int
 dynConfig(pid_t pid)
 {
     FILE *fs;
-    char path[32];
+    char path[PATH_MAX];
 
-    snprintf(path, sizeof(path), DYN_CONFIG_PATH, pid);
+    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmdpath, DYN_CONFIG_PREFIX, pid);
 
     // Is there a command file for this pid
     if (osIsFilePresent(pid, path) == -1) return 0;
@@ -1505,6 +1506,7 @@ init(void)
     g_thread.interval = cfgOutPeriod(g_staticfg);
     g_thread.startTime = time(NULL) + g_thread.interval;
     g_cfg.verbosity = cfgOutVerbosity(g_staticfg);
+    g_cfg.cmdpath = cfgOutCmdPath(g_staticfg);
 
     log_t* log = initLog(g_staticfg);
     g_out = initOut(g_staticfg, log);

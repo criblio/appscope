@@ -60,7 +60,7 @@
 #define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
 #define SCOPE_UNIX 99
-#define DYN_CONFIG_PATH "/tmp/%d.cmd"
+#define DYN_CONFIG_PREFIX "scope"
 #ifndef bool
 typedef unsigned int bool;
 #endif
@@ -133,6 +133,7 @@ typedef struct rtconfig_t {
     bool tsc_rdtscp;
     unsigned verbosity;
     uint64_t freq;
+    const char *cmdpath;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];
 } rtconfig;

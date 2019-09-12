@@ -15,13 +15,16 @@ static fs_info *g_fsinfo;
 static metric_counters g_ctrs = {0};
 static thread_timing g_thread = {0};
 static log_t* g_log = NULL;
+static log_t *g_prevlog = NULL;
 static out_t* g_out = NULL;
-__thread int g_getdelim;
+static out_t *g_prevout = NULL;
+static config_t *g_staticfg = NULL;
+__thread int g_getdelim = 0;
 
 // Forward declaration
 static void * periodic(void *);
 static void doClose(int, const char *);
-    
+
 EXPORTOFF void
 reinitLogDescriptor()
 {
@@ -104,86 +107,43 @@ dumpAddrs(int sd, enum control_type_t endp)
     }
 }
 
+EXPORTOFF void
+doConfig(config_t *cfg)
+{
+    g_thread.interval = cfgOutPeriod(cfg);
+    g_cfg.verbosity = cfgOutVerbosity(cfg);
+
+    // save the previous objects, they get free'd next period
+    g_prevout = g_out;
+    g_prevlog = g_log;
+
+    log_t* log = initLog(cfg);
+    g_out = initOut(cfg, log);
+    g_log = log; // Set after initOut to avoid infinite loop with socket
+}
+
 // Process dynamic config change if they are available
 EXPORTOFF int
 dynConfig(pid_t pid)
 {
-    int fd;
-    bool verbosityAvail, periodAvail, levelAvail;
-    off_t len;
-    char *buf, *section;
+    FILE *fs;
     char path[32];
 
     snprintf(path, sizeof(path), DYN_CONFIG_PATH, pid);
-    printf("%s:%d pid %d\n", __FUNCTION__, __LINE__, pid);
-    if ((len = osIsFilePresent(pid, path)) == -1) return 0;
 
-    printf("%s:%d %s present and %ld\n", __FUNCTION__, __LINE__, path, len);
+    // Is there a command file for this pid
+    if (osIsFilePresent(pid, path) == -1) return 0;
 
-    if ((fd = g_fn.open(path, O_RDONLY)) == -1) return -1;
+    // Open the command file
+    if ((fs = g_fn.fopen(path, "r")) == NULL) return -1;
 
-    if ((buf = calloc(1, len)) == NULL) {
-        g_fn.close(fd);
-        unlink(path);
-        return -1;
-    }
+    // Modify the static config from the command file
+    //cfgProcessCommands(g_staticfg, fs);
 
-    if (g_fn.read(fd, buf, len) == -1) {
-        g_fn.close(fd);
-        free(buf);
-        unlink(path);
-        return -1;
-    }
-    
-    if ((section = strstr((const char *)buf, "output")) == NULL) {
-        verbosityAvail = periodAvail = FALSE;
-    } else {
-        if (strstr((const char *)section, "summaryperiod") != NULL) {
-            periodAvail = TRUE;
-        } else {
-            periodAvail = FALSE;
-        }
-        
-        if (strstr((const char *)section, "format") != NULL &&
-            strstr((const char *)section, "verbosity") != NULL) {
-            verbosityAvail = TRUE;
-        } else {
-            verbosityAvail = FALSE;
-        }
-    }
+    // Apply the config
+    //doConfig(g_staticfg);
 
-    if ((section = strstr((const char *)buf, "logging")) == NULL) {
-        levelAvail = FALSE;
-    } else {
-        if (strstr((const char *)section, "level") != NULL) {
-            levelAvail = TRUE;
-        } else {
-            levelAvail = FALSE;
-        }
-    }
-
-    g_fn.close(fd);
-
-    config_t* cfg = cfgRead(path);
-    cfgProcessEnvironment(cfg);
-        
-    if (periodAvail == TRUE) {
-        g_thread.interval = cfgOutPeriod(cfg);
-    }
-    
-    if (verbosityAvail == TRUE) {
-        g_cfg.verbosity = cfgOutVerbosity(cfg);
-    }
-
-    if (levelAvail == TRUE) {
-        cfg_log_level_t level = cfgLogLevel(cfg);
-        logLevelSet(g_log, level);
-    }
-
-    printf("%s:%d interval %d verbosity %d level %d\n", __FUNCTION__, __LINE__,
-           g_thread.interval, g_cfg.verbosity, logLevel(g_log));
-
-    free(buf);
+    g_fn.fclose(fs);
     unlink(path);
     return 0;
 }
@@ -1389,9 +1349,23 @@ periodic(void *arg)
             reportFD(pid, i);
         }
 
+        /*
+         * If the previous period applied dynamic config
+         * then clean up before checking for new config
+         */
+        if (g_prevout) {
+            outDestroy(&g_prevout);
+            g_prevout = NULL;
+        }
+
+        if (g_prevlog) {
+            logDestroy(&g_prevlog);
+            g_prevlog = NULL;
+        }
+
         // Process dynamic config changes, if any
         dynConfig(pid);
-        
+
         // From the config file
         sleep(g_thread.interval);
     }
@@ -1523,25 +1497,20 @@ init(void)
     if (g_cfg.tsc_invariant == FALSE) {
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
-    
 
-    {
-        char* path = cfgPath(CFG_FILE_NAME);
-        config_t* cfg = cfgRead(path);
-        cfgProcessEnvironment(cfg);
-        
-        g_thread.interval = cfgOutPeriod(cfg);
-        g_thread.startTime = time(NULL) + g_thread.interval;
-        g_cfg.verbosity = cfgOutVerbosity(cfg);
+    char* path = cfgPath(CFG_FILE_NAME);
+    g_staticfg = cfgRead(path);
+    cfgProcessEnvironment(g_staticfg);
 
-        log_t* log = initLog(cfg);
-        g_out = initOut(cfg, log);
-        g_log = log; // Set after initOut to avoid infinite loop with socket
-        if (path) free(path);
-        cfgDestroy(&cfg);
-    }
+    g_thread.interval = cfgOutPeriod(g_staticfg);
+    g_thread.startTime = time(NULL) + g_thread.interval;
+    g_cfg.verbosity = cfgOutVerbosity(g_staticfg);
 
-    g_getdelim = 0;
+    log_t* log = initLog(g_staticfg);
+    g_out = initOut(g_staticfg, log);
+    g_log = log; // Set after initOut to avoid infinite loop with socket
+    if (path) free(path);
+
     scopeLog("Constructor", -1, CFG_LOG_INFO);
 }
 

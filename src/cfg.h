@@ -4,6 +4,11 @@
 
 typedef struct _config_t config_t;
 
+typedef struct {
+    char* name;
+    char* value;
+} custom_tag_t;
+
 // Constructors Destructors
 config_t*           cfgCreateDefault();
 config_t*           cfgRead(const char* path);        // reads config from yaml file
@@ -19,8 +24,8 @@ cfg_transport_t     cfgTransportType(config_t*, which_transport_t);
 const char*         cfgTransportHost(config_t*, which_transport_t);
 const char*         cfgTransportPort(config_t*, which_transport_t);
 const char*         cfgTransportPath(config_t*, which_transport_t);
-char**              cfgFuncFilters(config_t*);
-int                 cfgFuncIsFiltered(config_t*, const char* funcName);
+custom_tag_t**      cfgCustomTags(config_t*);
+const char*         cfgCustomTagValue(config_t*, const char*);
 cfg_log_level_t     cfgLogLevel(config_t*);
 
 
@@ -34,7 +39,7 @@ void                cfgTransportTypeSet(config_t*, which_transport_t, cfg_transp
 void                cfgTransportHostSet(config_t*, which_transport_t, const char*);
 void                cfgTransportPortSet(config_t*, which_transport_t, const char*);
 void                cfgTransportPathSet(config_t*, which_transport_t, const char*);
-void                cfgFuncFiltersAdd(config_t*, const char*);
+void                cfgCustomTagAdd(config_t*, const char*, const char*);
 void                cfgLogLevelSet(config_t*, cfg_log_level_t);
 
 #endif // __CFG_H__

@@ -16,6 +16,7 @@ struct _format_t
         unsigned max_len;       // Max length in bytes of a statsd string
     } statsd;
     unsigned verbosity;
+    custom_tag_t** tags;
 };
 
 
@@ -31,7 +32,25 @@ fmtCreate(cfg_out_format_t format)
     f->statsd.prefix = (DEFAULT_STATSD_PREFIX) ? strdup(DEFAULT_STATSD_PREFIX) : NULL;
     f->statsd.max_len = DEFAULT_STATSD_MAX_LEN;
     f->verbosity = DEFAULT_OUT_VERBOSITY;
+    f->tags = DEFAULT_CUSTOM_TAGS;
     return f;
+}
+
+static
+void
+fmtDestroyTags(custom_tag_t*** tags)
+{
+    if (!tags || !*tags) return;
+    custom_tag_t** t = *tags;
+    int i = 0;
+    while (t[i]) {
+        free(t[i]->name);
+        free(t[i]->value);
+        free(t[i]);
+        i++;
+    }
+    free(t);
+    *tags = NULL;
 }
 
 void
@@ -40,6 +59,7 @@ fmtDestroy(format_t** fmt)
     if (!fmt || !*fmt) return;
     format_t* f = *fmt;
     if (f->statsd.prefix) free(f->statsd.prefix);
+    fmtDestroyTags(&f->tags);
     free(f);
     *fmt = NULL;
 }
@@ -63,8 +83,49 @@ statsdType(data_type_t x)
     }
 }
 
+static int
+createStatsFieldString(format_t* fmt, event_field_t* f, char* tag, int sizeoftag)
+{
+    if (!fmt || !f || !tag || sizeoftag <= 0) return -1;
+
+    int sz;
+
+    switch (f->value_type) {
+        case FMT_NUM:
+            sz = snprintf(tag, sizeoftag, "%s:%lli", f->name, f->value.num);
+            break;
+        case FMT_STR:
+            sz = snprintf(tag, sizeoftag, "%s:%s", f->name, f->value.str);
+            break;
+        default:
+            sz = -1;
+    }
+    return sz;
+}
+
 static void
-addStatsdFields(format_t* fmt, event_field_t* fields, char** end, int* bytes)
+appendStatsdFieldString(format_t* fmt, char* tag, int sz, char** end, int* bytes, int* firstTagAdded)
+{
+    if (!*firstTagAdded) {
+        sz += 3; // add space for the |#, and trailing newline
+        if ((*bytes + sz) > fmt->statsd.max_len) return;
+        *end = stpcpy(*end, "|#");
+        *end = stpcpy(*end, tag);
+        strcpy(*end, "\n"); // add newline, but don't advance end
+        *firstTagAdded = 1;
+    } else {
+        sz += 2; // add space for the comma, and trailing newline
+        if ((*bytes + sz) > fmt->statsd.max_len) return;
+        *end = stpcpy(*end, ",");
+        *end = stpcpy(*end, tag);
+        strcpy(*end, "\n"); // add newline, but don't advance end
+    }
+    *bytes += (sz - 1); // Don't count the newline, it's ok to overwrite
+}
+
+
+static void
+addStatsdFields(format_t* fmt, event_field_t* fields, char** end, int* bytes, int* firstTagAdded)
 {
     if (!fmt || !fields || ! end || !*end || !bytes) return;
 
@@ -73,39 +134,37 @@ addStatsdFields(format_t* fmt, event_field_t* fields, char** end, int* bytes)
     int sz;
 
     event_field_t* f;
-    int firstTagAdded = 0;
     for (f = fields; f->value_type != FMT_END; f++) {
 
         // Honor Verbosity
         if (f->cardinality > fmt->verbosity) continue;
 
-        switch (f->value_type) {
-            case FMT_NUM:
-                sz = snprintf(tag, sizeof(tag), "%s:%lli", f->name, f->value.num);
-                break;
-            case FMT_STR:
-                sz = snprintf(tag, sizeof(tag), "%s:%s", f->name, f->value.str);
-                break;
-            default:
-                sz = -1;
-        }
+        sz = createStatsFieldString(fmt, f, tag, sizeof(tag));
         if (sz < 0) break;
 
-        if (!firstTagAdded) {
-            sz += 3; // add space for the |#, and trailing newline
-            if ((*bytes + sz) > fmt->statsd.max_len) break;
-            *end = stpcpy(*end, "|#");
-            *end = stpcpy(*end, tag);
-            strcpy(*end, "\n"); // add newline, but don't advance end
-            firstTagAdded = 1;
-        } else {
-            sz += 2; // add space for the comma, and trailing newline
-            if ((*bytes + sz) > fmt->statsd.max_len) break;
-            *end = stpcpy(*end, ",");
-            *end = stpcpy(*end, tag);
-            strcpy(*end, "\n"); // add newline, but don't advance end
-        }
-        *bytes += (sz - 1); // Don't count the newline, it's ok to overwrite
+        appendStatsdFieldString(fmt, tag, sz, end, bytes, firstTagAdded);
+    }
+}
+
+static void
+addCustomFields(format_t* fmt, custom_tag_t** tags, char** end, int* bytes, int* firstTagAdded)
+{
+    if (!fmt || !tags || !*tags || !end || !*end || !bytes) return;
+
+    char tag[fmt->statsd.max_len+1];
+    tag[fmt->statsd.max_len] = '\0'; // Ensures null termination
+    int sz;
+
+    custom_tag_t* t;
+    int i = 0;
+    while ((t = tags[i++])) {
+
+        // No verbosity setting exists for custom fields.
+
+        sz = snprintf(tag, sizeof(tag), "%s:%s", t->name, t->value);
+        if (sz < 0) break;
+
+        appendStatsdFieldString(fmt, tag, sz, end, bytes, firstTagAdded);
     }
 }
 
@@ -145,7 +204,9 @@ fmtStatsDString(format_t* fmt, event_t* e)
     // strcpy doesn't advance end
     strcpy(end, "\n");
 
-    addStatsdFields(fmt, e->fields, &end, &bytes);
+    int firstTagAdded = 0;
+    addCustomFields(fmt, fmt->tags, &end, &bytes, &firstTagAdded);
+    addStatsdFields(fmt, e->fields, &end, &bytes, &firstTagAdded);
 
     // Now that we're done, we can count the trailing newline
     bytes += 1;
@@ -185,6 +246,12 @@ fmtOutVerbosity(format_t* fmt)
     return (fmt) ? fmt->verbosity : DEFAULT_OUT_VERBOSITY;
 }
 
+custom_tag_t**
+fmtCustomTags(format_t* fmt)
+{
+    return (fmt) ? fmt->tags : DEFAULT_CUSTOM_TAGS;
+}
+
 // Setters
 void
 fmtStatsDPrefixSet(format_t* fmt, const char* prefix)
@@ -211,3 +278,51 @@ fmtOutVerbositySet(format_t* fmt, unsigned v)
     fmt->verbosity = v;
 }
 
+static char*
+doEnvVariableSubstitution(char* value)
+{
+    if (!value) return NULL;
+
+    if (value[0] == '$') {
+        // Looks like an env variable to me...
+        char* original = value;
+        original++;
+        char* new = getenv(original);
+        if (new) return (strdup(new));
+    }
+    return strdup(value);
+}
+
+void
+fmtCustomTagsSet(format_t* fmt, custom_tag_t** tags)
+{
+    if (!fmt) return;
+
+    // Don't leak with multiple set operations
+    fmtDestroyTags(&fmt->tags);
+
+    if (!tags || !*tags) return;
+
+    // get a count of how big to calloc
+    int num = 0;
+    while(tags[num]) num++;
+
+    fmt->tags = calloc(1, sizeof(custom_tag_t*) * (num+1));
+    if (!fmt->tags) return;
+
+    int i, j = 0;
+    for (i = 0; i<num; i++) {
+        custom_tag_t* t = calloc(1, sizeof(custom_tag_t));
+        char* n = strdup(tags[i]->name);
+        char* v = doEnvVariableSubstitution(tags[i]->value);
+        if (!t || !n || !v) {
+            if (t) free (t);
+            if (n) free (n);
+            if (v) free (v);
+            continue;
+        }
+        fmt->tags[j++]=t;
+        t->name = n;
+        t->value = v;
+    }
+}

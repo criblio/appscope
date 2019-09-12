@@ -9,8 +9,6 @@
 #include "yaml.h"
 #endif
 
-typedef char** filters_t;
-
 typedef struct {
     cfg_transport_t type;
     struct {              // For type = CFG_UDP
@@ -36,8 +34,8 @@ struct _config_t
     transport_struct_t transport[CFG_WHICH_MAX]; 
     which_transport_t transport_context; // only used during cfgRead
 
-    filters_t filters;
-    unsigned max_filters;
+    custom_tag_t** tags;
+    unsigned max_tags;
     cfg_log_level_t level;
 };
 
@@ -50,8 +48,8 @@ struct _config_t
 #define DEFAULT_LOG_HOST NULL
 #define DEFAULT_LOG_PORT NULL
 #define DEFAULT_LOG_PATH "/tmp/scope.log"
-#define DEFAULT_FILTERS NULL
-#define DEFAULT_NUM_FILTERS 8
+#define DEFAULT_TAGS NULL
+#define DEFAULT_NUM_TAGS 8
 
     
 ///////////////////////////////////
@@ -75,8 +73,8 @@ cfgCreateDefault()
     c->transport[CFG_LOG].udp.host = (DEFAULT_LOG_HOST) ? strdup(DEFAULT_LOG_HOST) : NULL;
     c->transport[CFG_LOG].udp.port = (DEFAULT_LOG_PORT) ? strdup(DEFAULT_LOG_PORT) : NULL;
     c->transport[CFG_LOG].path = (DEFAULT_LOG_PATH) ? strdup(DEFAULT_LOG_PATH) : NULL;
-    c->filters = DEFAULT_FILTERS;
-    c->max_filters = DEFAULT_NUM_FILTERS;
+    c->tags = DEFAULT_TAGS;
+    c->max_tags = DEFAULT_NUM_TAGS;
     c->level = DEFAULT_LOG_LEVEL;
 
     return c;
@@ -223,16 +221,25 @@ processLogging(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processFilters(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processTags(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SEQUENCE_NODE) return;
 
     yaml_node_item_t* item;
     foreach(item, node->data.sequence.items) {
         yaml_node_t* i = yaml_document_get_node(doc, *item);
-        if (i->type != YAML_SCALAR_NODE) continue;
+        if (i->type != YAML_MAPPING_NODE) continue;
 
-        cfgFuncFiltersAdd(config, (char*)i->data.scalar.value);
+        yaml_node_pair_t* pair = i->data.mapping.pairs.start;
+        yaml_node_t* key = yaml_document_get_node(doc, pair->key);
+        yaml_node_t* value = yaml_document_get_node(doc, pair->value);
+        if (key->type != YAML_SCALAR_NODE) return;
+        if (value->type != YAML_SCALAR_NODE) return;
+
+        const char* key_str = (const char*)key->data.scalar.value;
+        const char* value_str = (const char*)value->data.scalar.value;
+
+        cfgCustomTagAdd(config, key_str, value_str);
     }
 }
 
@@ -294,6 +301,7 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,  "statsdprefix",    processStatsDPrefix},
         {YAML_SCALAR_NODE,  "statsdmaxlen",    processStatsDMaxLen},
         {YAML_SCALAR_NODE,  "verbosity",       processVerbosity},
+        {YAML_SEQUENCE_NODE, "tags",           processTags},
         {YAML_NO_NODE, NULL, NULL}
     };
 
@@ -347,7 +355,6 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
 
     parse_table_t t[] = {
         {YAML_MAPPING_NODE,  "output",             processOutput},
-        {YAML_SEQUENCE_NODE, "filteredFunctions",  processFilters},
         {YAML_MAPPING_NODE,  "logging",            processLogging},
         {YAML_NO_NODE, NULL, NULL}
     };
@@ -415,10 +422,15 @@ cfgDestroy(config_t** cfg)
         if (c->transport[t].udp.port) free(c->transport[t].udp.port);
         if (c->transport[t].path) free(c->transport[t].path);
     }
-    if (c->filters) {
+    if (c->tags) {
         int i = 0;
-        while (c->filters[i]) free(c->filters[i++]);
-        free(c->filters);
+        while (c->tags[i]) {
+            free(c->tags[i]->name);
+            free(c->tags[i]->value);
+            free(c->tags[i]);
+            i++;
+        }
+        free(c->tags);
     }
     free(c);
     *cfg = NULL;
@@ -521,27 +533,36 @@ cfgTransportPath(config_t* cfg, which_transport_t t)
     }
 }
 
-char**
-cfgFuncFilters(config_t* cfg)
+custom_tag_t**
+cfgCustomTags(config_t* cfg)
 {
-    return (cfg) ? cfg->filters : DEFAULT_FILTERS;
+    return (cfg) ? cfg->tags : DEFAULT_TAGS;
 }
 
-int
-cfgFuncIsFiltered(config_t* cfg, const char* funcName)
+static custom_tag_t*
+cfgCustomTag(config_t* cfg, const char* tagName)
 {
-    if (!funcName) return 0;              // I guess?
-    if (!cfg || !cfg->filters) return 0;
+    if (!tagName) return NULL;
+    if (!cfg || !cfg->tags) return NULL;
 
     int i = 0;
-    while (cfg->filters[i]) {
-        if (!strcmp(funcName, cfg->filters[i])) { 
-            // funcName appears in the list of filters.
-            return 1;
+    while (cfg->tags[i]) {
+        if (!strcmp(tagName, cfg->tags[i]->name)) {
+            // tagName appears in the list of tags.
+            return cfg->tags[i];
         }
         i++;
     }
-    return 0;
+    return NULL;
+}
+
+const char *
+cfgCustomTagValue(config_t* cfg, const char* tagName)
+{
+    custom_tag_t* tag = cfgCustomTag(cfg, tagName);
+    if (tag) return tag->value;
+
+    return NULL;
 }
 
 cfg_log_level_t
@@ -639,35 +660,59 @@ cfgTransportPathSet(config_t* cfg, which_transport_t t, const char* path)
 }
 
 void
-cfgFuncFiltersAdd(config_t* c, const char* funcname)
+cfgCustomTagAdd(config_t* c, const char* name, const char* value)
 {
-    if (!c || !funcname) return;
+    if (!c || !name || !value) return;
 
-    if (cfgFuncIsFiltered(c, funcname)) return; // Already there.
+    // If name is already there, replace value only.
+    {
+        custom_tag_t* t;
+        if ((t=cfgCustomTag(c, name))) {
+            char* newvalue = strdup(value);
+            if (newvalue) {
+                free(t->value);
+                t->value = newvalue;
+                return;
+            }
+        }
+    }
 
     // Create space if it's the first add
-    if (!c->filters) {
-        c->filters = calloc(1, sizeof(char*) * c->max_filters);
-        if (!c->filters) return;
+    if (!c->tags) {
+        c->tags = calloc(1, sizeof(custom_tag_t*) * c->max_tags);
+        if (!c->tags) return;
     }
 
     // find the first empty spot
     int i;
-    for (i=0; i<c->max_filters && c->filters[i]; i++); 
+    for (i=0; i<c->max_tags && c->tags[i]; i++); 
 
     // If we're out of space, try to get more space
-    if (i >= c->max_filters-1) {     // null delimiter is always required
-        int tmp_max_filters = c->max_filters * 2;  // double each time
-        filters_t temp = realloc(c->filters, sizeof(char*) * tmp_max_filters);
+    if (i >= c->max_tags-1) {     // null delimiter is always required
+        int tmp_max_tags = c->max_tags * 2;  // double each time
+        custom_tag_t** temp = realloc(c->tags, sizeof(custom_tag_t*) * tmp_max_tags);
         if (!temp) return;
         // Yeah!  We have more space!  init it, and set our state to remember it
-        memset(&temp[c->max_filters], 0, sizeof(char*) * (tmp_max_filters - c->max_filters));
-        c->filters = temp;
-        c->max_filters = tmp_max_filters;
+        memset(&temp[c->max_tags], 0, sizeof(custom_tag_t*) * (tmp_max_tags - c->max_tags));
+        c->tags = temp;
+        c->max_tags = tmp_max_tags;
     }
 
     // save it
-    c->filters[i] = strdup(funcname);
+    {
+        custom_tag_t* t = calloc(1,sizeof(custom_tag_t));
+        char* n = strdup(name);
+        char* v = strdup(value);
+        if (!t || !n || !v) {
+            if (t) free(t);
+            if (n) free(n);
+            if (v) free(v);
+            return;
+        }
+        c->tags[i] = t;
+        t->name = n; 
+        t->value = v;
+    }
 }
 
 void

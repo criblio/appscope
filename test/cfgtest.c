@@ -22,8 +22,8 @@ verifyDefaults(config_t* config)
     assert_null            (cfgTransportHost(config, CFG_LOG));
     assert_null            (cfgTransportPort(config, CFG_LOG));
     assert_string_equal    (cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
-    assert_null            (cfgFuncFilters(config));
-    assert_false           (cfgFuncIsFiltered(config, "read"));
+    assert_null            (cfgCustomTags(config));
+    assert_null            (cfgCustomTagValue(config, "tagname"));
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
 }
 
@@ -202,21 +202,37 @@ cfgTransportPathSetAndGet(void** state)
 }
 
 static void
-cfgFuncFiltersSetAndGet(void** state)
+cfgCustomTagsSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
-    assert_null(cfgFuncFilters(config));
+    assert_null(cfgCustomTags(config));
     int i;
     for (i=0; i<10; i++) {
-        char funcName[64];
-        snprintf(funcName, sizeof(funcName), "myfavoritefunc%d", i);
+        char name[64];
+        char value[64];
+        snprintf(name, sizeof(name), "name%d", i);
+        snprintf(value, sizeof(value), "value%d", i);
 
-        assert_false(cfgFuncIsFiltered(config, funcName));
-        cfgFuncFiltersAdd(config, funcName);
-        assert_true(cfgFuncIsFiltered(config, funcName));
-        assert_string_equal(cfgFuncFilters(config)[i], funcName);
-        assert_null(cfgFuncFilters(config)[i+1]);
+        assert_false(cfgCustomTagValue(config, name));
+        cfgCustomTagAdd(config, name, value);
+        assert_string_equal(cfgCustomTagValue(config, name), value);
+        custom_tag_t** tags = cfgCustomTags(config);
+        assert_non_null(tags[i]);
+        assert_string_equal(tags[i]->name, name);
+        assert_string_equal(tags[i]->value, value);
+        assert_null(tags[i+1]);
     }
+
+    // test that a tag can be overridden by a later tag
+    cfgCustomTagAdd(config, "name0", "some other value");
+    assert_string_equal(cfgCustomTagValue(config, "name0"), "some other value");
+
+    // test that invalid values don't crash
+    cfgCustomTagAdd(config, NULL, "something");
+    cfgCustomTagAdd(config, "something", NULL);
+    cfgCustomTagAdd(config, NULL, NULL);
+    cfgCustomTagAdd(NULL, "something", "something else");
+
     cfgDestroy(&config);
 }
 
@@ -258,14 +274,13 @@ cfgReadGoodYaml(void** state)
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
         "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
         "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
+        "    tags:\n"
+        "    - name1 : value1\n"
+        "    - name2 : value2\n"
         "  transport:                        # defines how scope output is sent\n" 
         "    type: file                      # udp, unix, file, syslog\n" 
         "    path: '/var/log/scope.log'\n"
         "  summaryperiod: 11                 # in seconds\n"
-        "filteredFunctions:                  # keep Scope from processing these\n" 
-        "  - read                            # specific intercepted functions\n" 
-        "  - write\n" 
-        "  - accept\n" 
         "logging:\n"
         "  level: debug                      # debug, info, warning, error, none\n"
         "  transport:\n"
@@ -288,10 +303,9 @@ cfgReadGoodYaml(void** state)
     assert_null(cfgTransportHost(config, CFG_LOG));
     assert_null(cfgTransportPort(config, CFG_LOG));
     assert_string_equal(cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
-    assert_non_null(cfgFuncFilters(config));
-    assert_true(cfgFuncIsFiltered(config, "read"));
-    assert_true(cfgFuncIsFiltered(config, "write"));
-    assert_true(cfgFuncIsFiltered(config, "accept"));
+    assert_non_null(cfgCustomTags(config));
+    assert_string_equal(cfgCustomTagValue(config, "name1"), "value1");
+    assert_string_equal(cfgCustomTagValue(config, "name2"), "value2");
     assert_int_equal(cfgLogLevel(config), CFG_LOG_DEBUG);
     cfgDestroy(&config);
     deleteFile(path);
@@ -400,19 +414,19 @@ cfgReadGoodJson(void** state)
         "      'type': 'newlinedelimited',\n"
         "      'statsdprefix': 'cribl.scope',\n"
         "      'statsdmaxlen': '42',\n"
-        "      'verbosity': '0'\n"
+        "      'verbosity': '0',\n"
+        "      'tags': [\n"
+        "        {'tagA': 'val1'},\n"
+        "        {'tagB': 'val2'},\n"
+        "        {'tagC': 'val3'}\n"
+        "      ]\n"
         "    },\n"
         "    'transport': {\n"
         "      'type': 'file',\n"
         "      'path': '/var/log/scope.log'\n"
         "    },\n"
-        "    'summaryperiod': '13'\n"
+        "    'summaryperiod': '13',\n"
         "  },\n"
-        "  'filteredFunctions': [\n"
-        "    'read',\n"
-        "    'write',\n"
-        "    'accept'\n"
-        "  ],\n"
         "  'logging': {\n"
         "    'level': 'debug',\n"
         "    'transport': {\n"
@@ -437,10 +451,10 @@ cfgReadGoodJson(void** state)
     assert_null(cfgTransportHost(config, CFG_LOG));
     assert_null(cfgTransportPort(config, CFG_LOG));
     assert_string_equal(cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
-    assert_non_null(cfgFuncFilters(config));
-    assert_true(cfgFuncIsFiltered(config, "read"));
-    assert_true(cfgFuncIsFiltered(config, "write"));
-    assert_true(cfgFuncIsFiltered(config, "accept"));
+    assert_non_null(cfgCustomTags(config));
+    assert_string_equal(cfgCustomTagValue(config, "tagA"), "val1");
+    assert_string_equal(cfgCustomTagValue(config, "tagB"), "val2");
+    assert_string_equal(cfgCustomTagValue(config, "tagC"), "val3");
     assert_int_equal(cfgLogLevel(config), CFG_LOG_DEBUG);
     cfgDestroy(&config);
     deleteFile(path);
@@ -465,8 +479,6 @@ cfgReadBadYamlReturnsDefaults(void** state)
         "  transport:\n"
         "    type: file\n"
         "    path: '/var/log/scope.log'\n"
-        "filteredFunctions:\n"
-        "  - read\n"
         "logging:\n"
         "      level: debug                  # <--- Extra indention!  bad!\n"
         "  transport:\n"
@@ -492,13 +504,14 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "output:\n"
         "  format:\n"
         "    type: expandedstatsd\n"
+        "    hey: yeahyou\n"
+        "    tags:\n"
+        "    - brainfarts: 135\n"
         "  request: 'make it snappy'        # Extra.\n"
         "  transport:\n"
         "    type: unix\n"
         "    path: '/var/run/scope.sock'\n"
         "    color: 'puce'                  # Extra.\n"
-        "filteredFunctions:\n"
-        "  - read\n"
         "logging:\n"
         "  level: info\n"
         "...\n";
@@ -511,8 +524,8 @@ cfgReadExtraFieldsAreHarmless(void** state)
     assert_string_equal(cfgOutStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
-    assert_non_null(cfgFuncFilters(config));
-    assert_true(cfgFuncIsFiltered(config, "read"));
+    assert_non_null(cfgCustomTags(config));
+    assert_string_equal(cfgCustomTagValue(config, "brainfarts"), "135");
     assert_int_equal(cfgLogLevel(config), CFG_LOG_INFO);
 
     cfgDestroy(&config);
@@ -526,14 +539,14 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "---\n"
         "logging:\n"
         "  level: info\n"
-        "filteredFunctions:\n"
-        "  - read\n"
         "output:\n"
         "  summaryperiod: 42\n"
         "  transport:\n"
         "    path: '/var/run/scope.sock'\n"
         "    type: unix\n"
         "  format:\n"
+        "    tags:\n"
+        "    - 135: kittens\n"
         "    verbosity: 4294967295\n"
         "    statsdmaxlen: 4294967295\n"
         "    statsdprefix: 'cribl.scope'\n"
@@ -551,8 +564,8 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_int_equal(cfgOutPeriod(config), 42);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
-    assert_non_null(cfgFuncFilters(config));
-    assert_true(cfgFuncIsFiltered(config, "read"));
+    assert_non_null(cfgCustomTags(config));
+    assert_string_equal(cfgCustomTagValue(config, "135"), "kittens");
     assert_int_equal(cfgLogLevel(config), CFG_LOG_INFO);
 
     cfgDestroy(&config);
@@ -586,7 +599,7 @@ main(int argc, char* argv[])
         cmocka_unit_test_prestate(cfgTransportPortSetAndGet, log_state),
         cmocka_unit_test_prestate(cfgTransportPathSetAndGet, log_state),
 
-        cmocka_unit_test(cfgFuncFiltersSetAndGet),
+        cmocka_unit_test(cfgCustomTagsSetAndGet),
         cmocka_unit_test(cfgLoggingSetAndGet),
         cmocka_unit_test(cfgLogLevelSetAndGet),
         cmocka_unit_test(cfgReadGoodYaml),

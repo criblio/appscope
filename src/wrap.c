@@ -1455,7 +1455,7 @@ init(void)
     }
 
     g_getdelim = 0;
-    scopeLog("Constructor", -1, CFG_LOG_INFO);
+    scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
 }
 
 static void
@@ -3404,3 +3404,17 @@ getaddrinfo(const char *node, const char *service,
 
     return rc;
 }
+
+#ifdef __LINUX__
+
+// assumes that we're only building for 64 bit...
+char const __invoke_dynamic_linker__[] __attribute__ ((section (".interp"))) = "/lib64/ld-linux-x86-64.so.2";
+
+void
+__scope_main(void)
+{
+    printf("Scope Version: " SCOPE_VER "\n");
+    exit(0);
+}
+
+#endif // __LINUX__

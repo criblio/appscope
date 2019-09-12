@@ -174,7 +174,21 @@ dbgAddLineTestReallocWorks(void** state)
 static void
 dbgDumpAllOutputsVersionAndTime(void** state)
 {
-    skip();
+    char buf[4096] = {0};
+
+    FILE* f = fmemopen(buf, sizeof(buf), "a+");
+    assert_non_null(f);
+    dbgDumpAll(f);
+    if (fclose(f)) fail_msg("Couldn't close file");
+
+    char version[128] = {0};
+    char date[128] = {0};
+    int rv = sscanf(buf, "Scope Version: %128s   Dump From: %128s\n", version, date);
+
+    assert_int_equal(rv, 2);
+    assert_string_equal(version, SCOPE_VER);
+    assert_string_not_equal(date, "");
+
 }
 
 int

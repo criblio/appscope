@@ -42,4 +42,15 @@ void                cfgTransportPathSet(config_t*, which_transport_t, const char
 void                cfgCustomTagAdd(config_t*, const char*, const char*);
 void                cfgLogLevelSet(config_t*, cfg_log_level_t);
 
+
+// Setters (string-based)
+void                cfgOutFormatSetFromStr(config_t*, const char*);
+void                cfgOutStatsDPrefixSetFromStr(config_t*, const char*);
+void                cfgOutStatsDMaxLenSetFromStr(config_t*, const char*);
+void                cfgOutPeriodSetFromStr(config_t*, const char*);
+void                cfgOutVerbositySetFromStr(config_t*, const char*);
+void                cfgTransportSetFromStr(config_t*, which_transport_t, const char*);
+void                cfgCustomTagAddFromStr(config_t*, const char*, const char*);
+void                cfgLogLevelSetFromStr(config_t*, const char*);
+
 #endif // __CFG_H__

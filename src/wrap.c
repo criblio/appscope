@@ -138,10 +138,10 @@ dynConfig(pid_t pid)
     if ((fs = g_fn.fopen(path, "r")) == NULL) return -1;
 
     // Modify the static config from the command file
-    //cfgProcessCommands(g_staticfg, fs);
+    cfgProcessCommands(g_staticfg, fs);
 
     // Apply the config
-    //doConfig(g_staticfg);
+    doConfig(g_staticfg);
 
     g_fn.fclose(fs);
     unlink(path);

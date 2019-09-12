@@ -202,3 +202,14 @@ osInitTSC(struct rtconfig_t *cfg)
     }
     return 0;
 }
+
+int
+osIsFilePresent(pid_t pid, const char *path)
+{
+    struct stat sb = {};
+    if (g_fn.__xstat(_STAT_VER, path, &sb) != 0) {
+        return -1;
+    } else {
+        return sb.st_size;
+    }
+}

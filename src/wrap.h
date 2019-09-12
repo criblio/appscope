@@ -60,7 +60,7 @@
 #define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
 #define SCOPE_UNIX 99
-
+#define DYN_CONFIG_PATH "/tmp/%d.cmd"
 #ifndef bool
 typedef unsigned int bool;
 #endif

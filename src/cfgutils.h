@@ -1,5 +1,6 @@
 #ifndef __CFGUTILS_H__
 #define __CFGUTILS_H__
+#include <stdio.h>
 #include "cfg.h"
 #include "log.h"
 #include "out.h"
@@ -10,6 +11,9 @@ char* cfgPath(const char* cfgname);
 
 // modify cfg per environment variables
 void cfgProcessEnvironment(config_t* cfg);
+
+// modify cfg per environment variable syntax in a file
+void cfgProcessCommands(config_t* cfg, FILE* file);
 
 log_t* initLog(config_t* cfg);
 out_t* initOut(config_t* cfg, log_t* log);

@@ -20,3 +20,4 @@ extern int osGetNumFds(pid_t);
 extern int osGetNumChildProcs(pid_t);
 extern int osInitTSC(struct rtconfig_t *);
 extern int osGetProcMemory(pid_t);
+extern int osIsFilePresent(pid_t, const char *);

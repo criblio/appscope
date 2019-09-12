@@ -183,6 +183,7 @@ fmtStringStatsDHappyPath(void** state)
 
     format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
     assert_non_null(fmt);
+    fmtOutVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
     char* msg = fmtString(fmt, &e);
     assert_non_null(msg);
@@ -324,6 +325,7 @@ fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient(void** state)
     };
     event_t e = {"metric", 1, DELTA, fields};
     format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    fmtOutVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
     // Note that this test documents that we don't prioritize
     // the lowest cardinality fields when space is scarce.  We

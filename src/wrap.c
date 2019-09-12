@@ -384,13 +384,13 @@ doStatMetric(const char *op, const char *pathname)
     pid_t pid = getpid();
 
     event_field_t fields[] = {
-        STRFIELD("proc",             g_cfg.procname,        2),
-        NUMFIELD("pid",              pid,                   7),
-        STRFIELD("host",             g_cfg.hostname,        2),
-        STRFIELD("op",               op,                    2),
-        STRFIELD("file",             pathname,              2),
-        STRFIELD("unit",             "operation",           1),
-        FIELDEND
+            STRFIELD("proc",             g_cfg.procname,        2),
+            NUMFIELD("pid",              pid,                   7),
+            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("op",               op,                    2),
+            STRFIELD("file",             pathname,              2),
+            STRFIELD("unit",             "operation",           1),
+            FIELDEND
     };
 
     event_t e = {"fs.op.stat", 1, DELTA, fields};

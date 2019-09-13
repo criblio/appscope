@@ -135,6 +135,7 @@ typedef struct rtconfig_t {
     uint64_t freq;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];
+    pid_t pid;
 } rtconfig;
 
 typedef struct thread_timing_t {

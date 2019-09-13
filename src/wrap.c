@@ -15,13 +15,16 @@ static fs_info *g_fsinfo;
 static metric_counters g_ctrs = {0};
 static thread_timing g_thread = {0};
 static log_t* g_log = NULL;
+static log_t *g_prevlog = NULL;
 static out_t* g_out = NULL;
-__thread int g_getdelim;
+static out_t *g_prevout = NULL;
+static config_t *g_staticfg = NULL;
+__thread int g_getdelim = 0;
 
 // Forward declaration
 static void * periodic(void *);
 static void doClose(int, const char *);
-    
+
 EXPORTOFF void
 reinitLogDescriptor()
 {
@@ -106,6 +109,48 @@ dumpAddrs(int sd, enum control_type_t endp)
     if (GET_PORT(sd, g_netinfo[sd].localConn.ss_family, REMOTE) == DNS_PORT) {
         scopeLog("DNS", sd, CFG_LOG_DEBUG);
     }
+}
+
+EXPORTOFF void
+doConfig(config_t *cfg)
+{
+    g_thread.interval = cfgOutPeriod(cfg);
+    g_cfg.verbosity = cfgOutVerbosity(cfg);
+    g_cfg.cmdpath = cfgOutCmdPath(cfg);
+
+    // save the previous objects, they get free'd next period
+    g_prevout = g_out;
+    g_prevlog = g_log;
+
+    log_t* log = initLog(cfg);
+    g_out = initOut(cfg, log);
+    g_log = log; // Set after initOut to avoid infinite loop with socket
+}
+
+// Process dynamic config change if they are available
+EXPORTOFF int
+dynConfig(void)
+{
+    FILE *fs;
+    char path[PATH_MAX];
+
+    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmdpath, DYN_CONFIG_PREFIX, g_cfg.pid);
+
+    // Is there a command file for this pid
+    if (osIsFilePresent(g_cfg.pid, path) == -1) return 0;
+
+    // Open the command file
+    if ((fs = g_fn.fopen(path, "r")) == NULL) return -1;
+
+    // Modify the static config from the command file
+    cfgProcessCommands(g_staticfg, fs);
+
+    // Apply the config
+    doConfig(g_staticfg);
+
+    g_fn.fclose(fs);
+    unlink(path);
+    return 0;
 }
 
 // Return the time delta from start to now in nanoseconds
@@ -1303,7 +1348,24 @@ periodic(void *arg)
         for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {
             reportFD(i);
         }
-        
+
+        /*
+         * If the previous period applied dynamic config
+         * then clean up before checking for new config
+         */
+        if (g_prevout) {
+            outDestroy(&g_prevout);
+            g_prevout = NULL;
+        }
+
+        if (g_prevlog) {
+            logDestroy(&g_prevlog);
+            g_prevlog = NULL;
+        }
+
+        // Process dynamic config changes, if any
+        dynConfig();
+
         // From the config file
         sleep(g_thread.interval);
     }
@@ -1437,23 +1499,20 @@ init(void)
     if (g_cfg.tsc_invariant == FALSE) {
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
-    
 
-    {
-        char* path = cfgPath(CFG_FILE_NAME);
-        config_t* cfg = cfgRead(path);
-        cfgProcessEnvironment(cfg);
-        
-        g_thread.interval = cfgOutPeriod(cfg);
-        g_thread.startTime = time(NULL) + g_thread.interval;
-        g_cfg.verbosity = cfgOutVerbosity(cfg);
+    char* path = cfgPath(CFG_FILE_NAME);
+    g_staticfg = cfgRead(path);
+    cfgProcessEnvironment(g_staticfg);
 
-        log_t* log = initLog(cfg);
-        g_out = initOut(cfg, log);
-        g_log = log; // Set after initOut to avoid infinite loop with socket
-        if (path) free(path);
-        cfgDestroy(&cfg);
-    }
+    g_thread.interval = cfgOutPeriod(g_staticfg);
+    g_thread.startTime = time(NULL) + g_thread.interval;
+    g_cfg.verbosity = cfgOutVerbosity(g_staticfg);
+    g_cfg.cmdpath = cfgOutCmdPath(g_staticfg);
+
+    log_t* log = initLog(g_staticfg);
+    g_out = initOut(g_staticfg, log);
+    g_log = log; // Set after initOut to avoid infinite loop with socket
+    if (path) free(path);
 
     g_getdelim = 0;
     scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
@@ -2254,7 +2313,7 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
 }
 
 // We explicitly don't interpose these stat functions on macOS
-EXPORTON int
+EXPORTOFF int
 stat(const char *pathname, struct stat *statbuf)
 {
     int rc;
@@ -2270,7 +2329,7 @@ stat(const char *pathname, struct stat *statbuf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fstat(int fd, struct stat *statbuf)
 {
     int rc;
@@ -2286,7 +2345,7 @@ fstat(int fd, struct stat *statbuf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 lstat(const char *pathname, struct stat *statbuf)
 {
     int rc;

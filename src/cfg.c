@@ -28,6 +28,7 @@ struct _config_t
         } statsd;
         unsigned period;
         unsigned verbosity;
+        char* commandpath;
     } out;
 
     // CFG_OUT or CFG_LOG
@@ -50,6 +51,7 @@ struct _config_t
 #define DEFAULT_LOG_PATH "/tmp/scope.log"
 #define DEFAULT_TAGS NULL
 #define DEFAULT_NUM_TAGS 8
+#define DEFAULT_COMMAND_PATH "/tmp"
 
     
 ///////////////////////////////////
@@ -65,6 +67,7 @@ cfgCreateDefault()
     c->out.statsd.maxlen = DEFAULT_STATSD_MAX_LEN;
     c->out.period = DEFAULT_SUMMARY_PERIOD;
     c->out.verbosity = DEFAULT_OUT_VERBOSITY;
+    c->out.commandpath = (DEFAULT_COMMAND_PATH) ? strdup(DEFAULT_COMMAND_PATH) : NULL;
     c->transport[CFG_OUT].type = DEFAULT_OUT_TYPE;
     c->transport[CFG_OUT].udp.host = (DEFAULT_OUT_HOST) ? strdup(DEFAULT_OUT_HOST) : NULL;
     c->transport[CFG_OUT].udp.port = (DEFAULT_OUT_PORT) ? strdup(DEFAULT_OUT_PORT) : NULL;
@@ -119,20 +122,8 @@ static void
 processLevel(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
-    if (!strcmp(v_str, "debug")) {
-        cfgLogLevelSet(config, CFG_LOG_DEBUG);
-    } else if (!strcmp(v_str, "info")) {
-        cfgLogLevelSet(config, CFG_LOG_INFO);
-    } else if (!strcmp(v_str, "warning")) {
-        cfgLogLevelSet(config, CFG_LOG_WARN);
-    } else if (!strcmp(v_str, "error")) {
-        cfgLogLevelSet(config, CFG_LOG_ERROR);
-    } else if (!strcmp(v_str, "none")) {
-        cfgLogLevelSet(config, CFG_LOG_NONE);
-    } else if (!strcmp(v_str, "trace")) {
-        cfgLogLevelSet(config, CFG_LOG_TRACE);
-    }
+    const char* value = (char *)node->data.scalar.value;
+    cfgLogLevelSetFromStr(config, value);
 }
 
 static void
@@ -239,7 +230,7 @@ processTags(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         const char* key_str = (const char*)key->data.scalar.value;
         const char* value_str = (const char*)value->data.scalar.value;
 
-        cfgCustomTagAdd(config, key_str, value_str);
+        cfgCustomTagAddFromStr(config, key_str, value_str);
     }
 }
 
@@ -247,48 +238,32 @@ static void
 processFormatType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
-    if (!strcmp(v_str, "expandedstatsd")) {
-        cfgOutFormatSet(config, CFG_EXPANDED_STATSD);
-    } else if (!strcmp(v_str, "newlinedelimited")) {
-        cfgOutFormatSet(config, CFG_NEWLINE_DELIMITED);
-    }
+    const char* value = (const char *)node->data.scalar.value;
+    cfgOutFormatSetFromStr(config, value);
 }
 
 static void
 processStatsDPrefix(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
-    cfgOutStatsDPrefixSet(config, v_str);
+    const char* value = (const char *)node->data.scalar.value;
+    cfgOutStatsDPrefixSetFromStr(config, value);
 }
 
 static void
 processStatsDMaxLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
-
-    errno = 0;
-    char* endptr = NULL;
-    unsigned long x = strtoul(v_str, &endptr, 10);
-    if (errno || *endptr) return;
-
-    cfgOutStatsDMaxLenSet(config, x);
+    const char* value = (const char *)node->data.scalar.value;
+    cfgOutStatsDMaxLenSetFromStr(config, value);
 }
 
 static void
 processVerbosity(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
-
-    errno = 0;
-    char* endptr = NULL;
-    unsigned long x = strtoul(v_str, &endptr, 10);
-    if (errno || *endptr) return;
-
-    cfgOutVerbositySet(config, x);
+    const char* value = (const char *)node->data.scalar.value;
+    cfgOutVerbositySetFromStr(config, value);
 }
 
 static void
@@ -316,14 +291,16 @@ static void
 processSummaryPeriod(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
+    const char* value = (const char *)node->data.scalar.value;
+    cfgOutPeriodSetFromStr(config, value);
+}
 
-    errno = 0;
-    char* endptr = NULL;
-    unsigned long x = strtoul(v_str, &endptr, 10);
-    if (errno || *endptr) return;
-
-    cfgOutPeriodSet(config, x);
+static void
+processCommandPath(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) return;
+    const char* value = (const char *)node->data.scalar.value;
+    cfgOutCmdPathSetFromStr(config, value);
 }
 
 static void
@@ -335,6 +312,7 @@ processOutput(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_MAPPING_NODE, "format",          processFormat},
         {YAML_MAPPING_NODE, "transport",       processTransport},
         {YAML_SCALAR_NODE,  "summaryperiod",   processSummaryPeriod},
+        {YAML_SCALAR_NODE,  "commandpath",     processCommandPath},
         {YAML_NO_NODE, NULL, NULL}
     };
 
@@ -416,6 +394,7 @@ cfgDestroy(config_t** cfg)
     if (!cfg || !*cfg) return;
     config_t* c = *cfg;
     if (c->out.statsd.prefix) free(c->out.statsd.prefix);
+    if (c->out.commandpath) free(c->out.commandpath);
     which_transport_t t;
     for (t=CFG_OUT; t<CFG_WHICH_MAX; t++) {
         if (c->transport[t].udp.host) free(c->transport[t].udp.host);
@@ -461,6 +440,12 @@ unsigned
 cfgOutPeriod(config_t* cfg)
 {
     return (cfg) ? cfg->out.period : DEFAULT_SUMMARY_PERIOD;
+}
+
+const char *
+cfgOutCmdPath(config_t* cfg)
+{
+    return (cfg) ? cfg->out.commandpath : DEFAULT_COMMAND_PATH;
 }
 
 unsigned
@@ -621,6 +606,19 @@ cfgOutPeriodSet(config_t* cfg, unsigned val)
 }
 
 void
+cfgOutCmdPathSet(config_t* cfg, const char* path)
+{
+    if (!cfg) return;
+    if (cfg->out.commandpath) free(cfg->out.commandpath);
+    if (!path || (path[0] == '\0')) {
+        cfg->out.commandpath = strdup(DEFAULT_COMMAND_PATH);
+        return;
+    }
+
+    cfg->out.commandpath = strdup(path);
+}
+
+void
 cfgOutVerbositySet(config_t* cfg, unsigned val)
 {
     if (!cfg) return;
@@ -720,4 +718,125 @@ cfgLogLevelSet(config_t* cfg, cfg_log_level_t level)
 {
     if (!cfg) return;
     cfg->level = level;
+}
+
+void
+cfgOutFormatSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    if (!strcmp(value, "expandedstatsd")) {
+        cfgOutFormatSet(cfg, CFG_EXPANDED_STATSD);
+    } else if (!strcmp(value, "newlinedelimited")) {
+        cfgOutFormatSet(cfg, CFG_NEWLINE_DELIMITED);
+    }
+}
+
+void
+cfgOutStatsDPrefixSetFromStr(config_t* cfg, const char* value)
+{
+    // A little silly to define passthrough function
+    // but this keeps the interface consistent.
+    cfgOutStatsDPrefixSet(cfg, value);
+}
+
+void
+cfgOutStatsDMaxLenSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    errno = 0;
+    char* endptr = NULL;
+    unsigned long x = strtoul(value, &endptr, 10);
+    if (errno || *endptr) return;
+
+    cfgOutStatsDMaxLenSet(cfg, x);
+}
+
+void
+cfgOutPeriodSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    errno = 0;
+    char* endptr = NULL;
+    unsigned long x = strtoul(value, &endptr, 10);
+    if (errno || *endptr) return;
+
+    cfgOutPeriodSet(cfg, x);
+}
+
+void
+cfgOutCmdPathSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgOutCmdPathSet(cfg, value);
+}
+
+void
+cfgOutVerbositySetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    errno = 0;
+    char* endptr = NULL;
+    unsigned long x = strtoul(value, &endptr, 10);
+    if (errno || *endptr) return;
+
+    cfgOutVerbositySet(cfg, x);
+}
+
+void
+cfgTransportSetFromStr(config_t* cfg, which_transport_t t, const char* value)
+{
+    if (!cfg || !value) return;
+
+    // see if value starts with udp:// or file://
+    if (value == strstr(value, "udp://")) {
+
+        // copied to avoid directly modifing the process's env variable
+        char value_cpy[1024];
+        strncpy(value_cpy, value, sizeof(value_cpy));
+
+        char* host = value_cpy + strlen("udp://");
+
+        // convert the ':' to a null delimiter for the host
+        // and move port past the null
+        char *port = strrchr(host, ':');
+        if (!port) return;  // port is *required*
+        *port = '\0';
+        port++;
+
+        cfgTransportTypeSet(cfg, t, CFG_UDP);
+        cfgTransportHostSet(cfg, t, host);
+        cfgTransportPortSet(cfg, t, port);
+
+    } else if (value == strstr(value, "file://")) {
+        const char* path = value + strlen("file://");
+        cfgTransportTypeSet(cfg, t, CFG_FILE);
+        cfgTransportPathSet(cfg, t, path);
+    }
+}
+
+void
+cfgCustomTagAddFromStr(config_t* cfg, const char* name, const char* value)
+{
+    // A little silly to define passthrough function
+    // but this keeps the interface consistent.
+    cfgCustomTagAdd(cfg, name, value);
+}
+
+void
+cfgLogLevelSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    if (!strcmp(value, "debug")) {
+        cfgLogLevelSet(cfg, CFG_LOG_DEBUG);
+    } else if (!strcmp(value, "info")) {
+        cfgLogLevelSet(cfg, CFG_LOG_INFO);
+    } else if (!strcmp(value, "warning")) {
+        cfgLogLevelSet(cfg, CFG_LOG_WARN);
+    } else if (!strcmp(value, "error")) {
+        cfgLogLevelSet(cfg, CFG_LOG_ERROR);
+    } else if (!strcmp(value, "none")) {
+        cfgLogLevelSet(cfg, CFG_LOG_NONE);
+    } else if (!strcmp(value, "trace")) {
+        cfgLogLevelSet(cfg, CFG_LOG_TRACE);
+    }
 }

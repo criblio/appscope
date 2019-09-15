@@ -474,9 +474,10 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         uint64_t d = 0ULL;
-        if (g_fsinfo[fd].numDuration >= 1) {
+        int cachedDuration = g_fsinfo[fd].numDuration; // avoid div by zero
+        if (cachedDuration >= 1) {
             // factor of 1000 converts us to ms.
-            d = g_fsinfo[fd].totalDuration / ( 1000 * g_fsinfo[fd].numDuration);
+            d = g_fsinfo[fd].totalDuration / ( 1000 * cachedDuration);
         }
 
         event_field_t fields[] = {

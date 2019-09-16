@@ -99,28 +99,18 @@ fmtOutVerbositySetAndGet(void** state)
 static void
 fmtCustomTagsSetAndGet(void ** state)
 {
-    // Set an env varible to test indirect substitution
-    assert_int_equal(setenv("VAR1", "longer", 1), 0);
-    assert_int_equal(setenv("MY_ENV_VAR", "shorter", 1), 0);
-
     format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
     {
         custom_tag_t t1 = {"name1", "value1"};
-        custom_tag_t t2 = {"name2", "/$VAR1/$MY_ENV_VAR/!"};
-        custom_tag_t t3 = {"name3", "/\\$VAR1/$MY_ENV_VAR/!"};
-        custom_tag_t t4 = {"whyyoumadbro", "Bill owes me $5.00"};
-        custom_tag_t* tags[] = { &t1, &t2, &t3, &t4, NULL };
+        custom_tag_t t2 = {"name2", "value2"};
+        custom_tag_t* tags[] = { &t1, &t2, NULL };
         fmtCustomTagsSet(fmt, tags);
         assert_non_null(fmtCustomTags(fmt));
         assert_string_equal(fmtCustomTags(fmt)[0]->name, "name1");
         assert_string_equal(fmtCustomTags(fmt)[0]->value, "value1");
         assert_string_equal(fmtCustomTags(fmt)[1]->name, "name2");
-        assert_string_equal(fmtCustomTags(fmt)[1]->value, "/longer/shorter/!");
-        assert_string_equal(fmtCustomTags(fmt)[2]->name, "name3");
-        assert_string_equal(fmtCustomTags(fmt)[2]->value, "/$VAR1/shorter/!");
-        assert_string_equal(fmtCustomTags(fmt)[3]->name, "whyyoumadbro");
-        assert_string_equal(fmtCustomTags(fmt)[3]->value, "Bill owes me $5.00");
-        assert_null(fmtCustomTags(fmt)[4]);
+        assert_string_equal(fmtCustomTags(fmt)[1]->value, "value2");
+        assert_null(fmtCustomTags(fmt)[2]);
     }
 
     custom_tag_t* tags[] = { NULL };
@@ -131,8 +121,6 @@ fmtCustomTagsSetAndGet(void ** state)
     assert_null(fmtCustomTags(fmt));
 
     fmtDestroy(&fmt);
-    unsetenv("VAR1");
-    unsetenv("MY_ENV_VAR");
 }
 
 static void
@@ -211,14 +199,11 @@ fmtStringStatsDHappyPath(void** state)
 static void
 fmtStatsDWithCustomFields(void** state)
 {
-    // Set an env varible to test indirect substitution
-    assert_int_equal(setenv("MY_ENV_VAR", "env_value", 1), 0);
-
     format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
     assert_non_null(fmt);
 
     custom_tag_t t1 = {"name1", "value1"};
-    custom_tag_t t2 = {"name2", "$MY_ENV_VAR/$UNDEFINED"};
+    custom_tag_t t2 = {"name2", "value2"};
     custom_tag_t* tags[] = { &t1, &t2, NULL };
     fmtCustomTagsSet(fmt, tags);
 
@@ -227,10 +212,9 @@ fmtStatsDWithCustomFields(void** state)
     char* msg = fmtString(fmt, &e);
     assert_non_null(msg);
 
-    assert_string_equal("statsd.metric:3|g|#name1:value1,name2:env_value/$UNDEFINED\n", msg);
+    assert_string_equal("statsd.metric:3|g|#name1:value1,name2:value2\n", msg);
     free(msg);
     fmtDestroy(&fmt);
-    unsetenv("MY_ENV_VAR");
 }
 
 static void

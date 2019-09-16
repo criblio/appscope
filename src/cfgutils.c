@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <pwd.h>
+#include <regex.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "cfgutils.h"
+#include "dbg.h"
 #include "format.h"
 #include "scopetypes.h"
 
@@ -79,14 +81,100 @@ processCustomTag(config_t* cfg, const char* e, const char* value)
 
 }
 
+static regex_t* envRegex()
+{
+    static regex_t* regex = NULL;
+
+    if (regex) return regex;
+
+    regex = calloc(1, sizeof(regex_t));
+    if (regex && regcomp(regex, "\\$[a-zA-Z0-9_]+", REG_EXTENDED)) {
+        // regcomp failed.
+        DBG(NULL);
+        free(regex);
+        regex = NULL;
+    }
+    return regex;
+}
+
+static char*
+doEnvVariableSubstitution(char* value)
+{
+    if (!value) return NULL;
+
+    regex_t* re = envRegex();
+    regmatch_t match = {0};
+
+    int out_size = strlen(value) + 1;
+    char* outval = calloc(1, out_size);
+    if (!outval) return NULL;
+
+    char* outptr = outval;  // "tail" pointer where text can be appended
+    char* inptr = value;    // "current" pointer as we scan through value
+
+    while (re && !regexec(re, inptr, 1, &match, 0)) {
+
+        int match_size = match.rm_eo - match.rm_so;
+
+        // if the character before the match is '\', don't do substitution
+        char* escape_indicator = &inptr[match.rm_so - 1];
+        int escaped = (escape_indicator >= value) && (*escape_indicator == '\\');
+
+        if (escaped) {
+            // copy the part before the match, except the escape char '\'
+            outptr = stpncpy(outptr, inptr, match.rm_so - 1);
+            // copy the matching env variable name
+            outptr = stpncpy(outptr, &inptr[match.rm_so], match_size);
+            // move to the next part of the input value
+            inptr = &inptr[match.rm_eo];
+            continue;
+        }
+
+        // lookup the part that matched to see if we can substitute it
+        char env_name[match_size + 1];
+        strncpy(env_name, &inptr[match.rm_so], match_size);
+        env_name[match_size] = '\0';
+        char* env_value = getenv(&env_name[1]); // offset of 1 skips the $
+
+        // Grow outval buffer any time env_value is bigger than env_name
+        int size_growth = (!env_value) ? 0 : strlen(env_value) - match_size;
+        if (size_growth > 0) {
+            char* new_outval = realloc (outval, out_size + size_growth);
+            if (new_outval) {
+                out_size += size_growth;
+                outptr = new_outval + (outptr - outval);
+                outval = new_outval;
+            } else {
+                free(outval);
+                return NULL;
+            }
+        }
+
+        // copy the part before the match
+        outptr = stpncpy(outptr, inptr, match.rm_so);
+        // either copy in the env value or the variable that wasn't found
+        outptr = stpcpy(outptr, (env_value) ? env_value : env_name);
+        // move to the next part of the input value
+        inptr = &inptr[match.rm_eo];
+    }
+
+    // copy whatever is left
+    strcpy(outptr, inptr);
+
+    return outval;
+}
+
+
 static void
 processEnvStyleInput(config_t* cfg, const char* e)
 {
     if (!cfg || !e) return;
 
-    char* value = strchr(e, '=');
+    char* v = strchr(e, '=');
+    if (!v) return;
+    v++;
+    char* value = doEnvVariableSubstitution(v);
     if (!value) return;
-    value++;
     if (e == strstr(e, "SCOPE_OUT_FORMAT")) {
         cfgOutFormatSetFromStr(cfg, value);
     } else if (e == strstr(e, "SCOPE_STATSD_PREFIX")) {
@@ -106,6 +194,7 @@ processEnvStyleInput(config_t* cfg, const char* e)
     } else if (e == strstr(e, "SCOPE_TAG_")) {
         processCustomTag(cfg, e, value);
     }
+    free(value);
 }
 
 

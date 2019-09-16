@@ -59,7 +59,11 @@ scopeLog(const char* msg, int fd, cfg_log_level_t level)
     if (!g_log || !msg || !g_cfg.procname[0]) return;
 
     char buf[strlen(msg) + 128];
-    snprintf(buf, sizeof(buf), "Scope: %s(%d): %s\n", g_cfg.procname, fd, msg);
+    if (fd != -1) {
+        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): fd:%d %s\n", g_cfg.procname, g_cfg.pid, fd, msg);
+    } else {
+        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): %s\n", g_cfg.procname, g_cfg.pid, msg);
+    }
     if (logSend(g_log, buf, level) == DEFAULT_BADFD) {
         // We lost our fd, re-open
         reinitLogDescriptor();
@@ -125,15 +129,15 @@ doConfig(config_t *cfg)
 
 // Process dynamic config change if they are available
 EXPORTOFF int
-dynConfig(pid_t pid)
+dynConfig(void)
 {
     FILE *fs;
     char path[PATH_MAX];
 
-    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmdpath, DYN_CONFIG_PREFIX, pid);
+    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmdpath, DYN_CONFIG_PREFIX, g_cfg.pid);
 
     // Is there a command file for this pid
-    if (osIsFilePresent(pid, path) == -1) return 0;
+    if (osIsFilePresent(g_cfg.pid, path) == -1) return 0;
 
     // Open the command file
     if ((fs = g_fn.fopen(path, "r")) == NULL) return -1;
@@ -330,7 +334,7 @@ doDNSMetricName(const char *domain)
 
     event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              getpid(),              7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("domain",           domain,                2),
             STRFIELD("unit",             "request",             1),
@@ -346,13 +350,12 @@ doDNSMetricName(const char *domain)
 static void
 doProcMetric(enum metric_t type, long long measurement)
 {
-    pid_t pid = getpid();
     switch (type) {
     case PROC_CPU:
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "microsecond",         1),
             FIELDEND
@@ -366,7 +369,7 @@ doProcMetric(enum metric_t type, long long measurement)
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "kibibyte",            1),
             FIELDEND
@@ -380,7 +383,7 @@ doProcMetric(enum metric_t type, long long measurement)
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "thread",              1),
             FIELDEND
@@ -394,7 +397,7 @@ doProcMetric(enum metric_t type, long long measurement)
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "file",                1),
             FIELDEND
@@ -408,7 +411,7 @@ doProcMetric(enum metric_t type, long long measurement)
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "process",             1),
             FIELDEND
@@ -426,11 +429,9 @@ doProcMetric(enum metric_t type, long long measurement)
 static void
 doStatMetric(const char *op, const char *pathname)
 {
-    pid_t pid = getpid();
-
     event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
             STRFIELD("file",             pathname,              2),
@@ -448,7 +449,6 @@ static void
 doFSMetric(enum metric_t type, int fd, enum control_type_t source,
            const char *op, ssize_t size, const char *pathname)
 {
-    pid_t pid = getpid();
     fs_info *fs;
     
     if ((fs = getFSEntry(fd)) == NULL) {
@@ -482,7 +482,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
@@ -544,7 +544,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
@@ -611,7 +611,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
@@ -638,7 +638,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
 
 static void
-doTotal(enum metric_t type, pid_t pid)
+doTotal(enum metric_t type)
 {
     const char* metric = "UNKNOWN";
     int* sizebytes = NULL;
@@ -671,7 +671,7 @@ doTotal(enum metric_t type, pid_t pid)
 
     event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
@@ -689,7 +689,6 @@ doTotal(enum metric_t type, pid_t pid)
 static void
 doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size)
 {
-    pid_t pid = getpid();
     char proto[PROTOCOL_STR];
     in_port_t localPort, remotePort;
         
@@ -706,7 +705,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
@@ -725,7 +724,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
@@ -744,7 +743,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
@@ -764,7 +763,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
@@ -850,7 +849,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
@@ -948,7 +947,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
@@ -986,7 +985,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("domain",           g_netinfo[fd].dnsName, 2),
             STRFIELD("unit",             "request",             1),
@@ -1272,13 +1271,14 @@ doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
 static void
 doReset()
 {
+    g_cfg.pid = getpid();
     g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
 }
 
 static void
-reportFD(pid_t pid, int fd)
+reportFD(int fd)
 {
     struct net_info_t *ninfo = getNetEntry(fd);
     if (ninfo) {
@@ -1319,7 +1319,6 @@ periodic(void *arg)
 {
     long mem;
     int i, nthread, nfds, children;
-    pid_t pid = getpid();
     long long cpu, cpuState = 0;
 
     while (1) {
@@ -1328,27 +1327,27 @@ periodic(void *arg)
         doProcMetric(PROC_CPU, cpu - cpuState);
         cpuState = cpu;
         
-        mem = osGetProcMemory(pid);
+        mem = osGetProcMemory(g_cfg.pid);
         doProcMetric(PROC_MEM, mem);
 
-        nthread = osGetNumThreads(pid);
+        nthread = osGetNumThreads(g_cfg.pid);
         doProcMetric(PROC_THREAD, nthread);
 
-        nfds = osGetNumFds(pid);
+        nfds = osGetNumFds(g_cfg.pid);
         doProcMetric(PROC_FD, nfds);
 
-        children = osGetNumChildProcs(pid);
+        children = osGetNumChildProcs(g_cfg.pid);
         doProcMetric(PROC_CHILD, children);
 
         // report totals (not by file descriptor/socket descriptor)
-        if (g_ctrs.readBytes > 0)  doTotal(TOT_READ, pid);
-        if (g_ctrs.writeBytes > 0) doTotal(TOT_WRITE, pid);
-        if (g_ctrs.netrxBytes > 0) doTotal(TOT_RX, pid);
-        if (g_ctrs.nettxBytes > 0) doTotal(TOT_TX, pid);
+        if (g_ctrs.readBytes > 0)  doTotal(TOT_READ);
+        if (g_ctrs.writeBytes > 0) doTotal(TOT_WRITE);
+        if (g_ctrs.netrxBytes > 0) doTotal(TOT_RX);
+        if (g_ctrs.nettxBytes > 0) doTotal(TOT_TX);
 
         // report net and file by descriptor
         for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {
-            reportFD(pid, i);
+            reportFD(i);
         }
 
         /*
@@ -1366,7 +1365,7 @@ periodic(void *arg)
         }
 
         // Process dynamic config changes, if any
-        dynConfig(pid);
+        dynConfig();
 
         // From the config file
         sleep(g_thread.interval);
@@ -1480,6 +1479,8 @@ init(void)
         scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
     }
 
+    g_cfg.pid = getpid();
+
     g_cfg.numNinfo = NET_ENTRIES;
     if (g_netinfo) memset(g_netinfo, 0, sizeof(struct net_info_t) * NET_ENTRIES);
 
@@ -1514,7 +1515,8 @@ init(void)
     g_log = log; // Set after initOut to avoid infinite loop with socket
     if (path) free(path);
 
-    scopeLog("Constructor", -1, CFG_LOG_INFO);
+    g_getdelim = 0;
+    scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
 }
 
 static void
@@ -1524,7 +1526,7 @@ doClose(int fd, const char *func)
     struct fs_info_t *fsinfo;
 
     // report everything before the info is lost
-    reportFD(getpid(), fd);
+    reportFD(fd);
 
     if ((ninfo = getNetEntry(fd)) != NULL) {
 
@@ -3463,3 +3465,27 @@ getaddrinfo(const char *node, const char *service,
 
     return rc;
 }
+
+#ifdef __LINUX__
+
+// assumes that we're only building for 64 bit...
+char const __invoke_dynamic_linker__[] __attribute__ ((section (".interp"))) = "/lib64/ld-linux-x86-64.so.2";
+
+void
+__scope_main(void)
+{
+    printf("Scope Version: " SCOPE_VER "\n");
+
+    char buf[64];
+    if (snprintf(buf, sizeof(buf), "/proc/%d/exe", getpid()) == -1) exit(0);
+    char path[1024] = {0};
+    if (readlink(buf, path, sizeof(path)) == -1) exit(0);
+    printf("\n");
+    printf("   Usage: LD_PRELOAD=%s <command name>\n ", path);
+    printf("\n");
+    printf("\n");
+    printf("\n");
+    exit(0);
+}
+
+#endif // __LINUX__

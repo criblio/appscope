@@ -7,12 +7,6 @@
 #include <time.h>
 #include "dbg.h"
 
-typedef struct {
-    char gitBranch[256];
-    char gitVersion[256];
-    int localChanges;
-    time_t time;
-} init_t;
 
 #define MAX_INSTANCES_PER_LINE 2
 #define DEFAULT_NUM_LINES 8
@@ -30,7 +24,6 @@ typedef struct {
 } line_t;
 
 struct _dbg_t {
-    init_t init;
     line_t** lines;
     unsigned max_lines;
 };
@@ -45,10 +38,6 @@ dbgInit()
 
     g_dbg = calloc(1, sizeof(dbg_t));
     if (!g_dbg) return;
-    strncpy(g_dbg->init.gitBranch, "Git Branch goes here", sizeof(g_dbg->init.gitBranch));
-    strncpy(g_dbg->init.gitVersion, "Git Version goes here", sizeof(g_dbg->init.gitVersion));
-    g_dbg->init.localChanges = 0;
-    g_dbg->init.time = time(NULL);
     g_dbg->max_lines = DEFAULT_NUM_LINES;
 
 }
@@ -136,26 +125,26 @@ dbgCountMatchingLines(const char* str)
 }
 
 static void
-dbgDumpInit(FILE* f)
+dbgOutputHeaderLine(FILE* f)
 {
     if (!f) return;
-    if (!g_dbg) return;
 
-/*
-    g_dbg.init.gitBranch
-    g_dbg.init.gitVersion
-    g_dbg.init.localChanges
-    g_dbg.init.time
-*/
+    time_t t;
+    time(&t);
+
+    char buf[128] = {0};
+    strftime(buf, sizeof(buf), "%FT%TZ", gmtime(&t));
+    fprintf(f, "Scope Version: %s   Dump From: %s\n", SCOPE_VER, buf);
 }
 
 void
 dbgDumpAll(FILE* f)
 {
     if (!f) return;
-    if (!g_dbg || !g_dbg->lines) return;
 
-    dbgDumpInit(f);
+    dbgOutputHeaderLine(f);
+
+    if (!g_dbg || !g_dbg->lines) return;
 
     int i;
     for (i=0; i<g_dbg->max_lines && g_dbg->lines[i]; i++) {

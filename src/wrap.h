@@ -136,6 +136,7 @@ typedef struct rtconfig_t {
     const char *cmdpath;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];
+    pid_t pid;
 } rtconfig;
 
 typedef struct thread_timing_t {

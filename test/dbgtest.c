@@ -51,6 +51,7 @@ dbgMacroIdentifiesFileAndLine(void** state)
     FILE* f = fmemopen(buf, sizeof(buf), "a+");
     assert_non_null(f);
     dbgDumpAll(f);
+    //dbgDumpAll(stdout);
     if (fclose(f)) fail_msg("Couldn't close file");
 
     assert_non_null(strstr(buf, "test/dbgtest.c:44"));
@@ -179,6 +180,7 @@ dbgDumpAllOutputsVersionAndTime(void** state)
     FILE* f = fmemopen(buf, sizeof(buf), "a+");
     assert_non_null(f);
     dbgDumpAll(f);
+    //dbgDumpAll(stdout);
     if (fclose(f)) fail_msg("Couldn't close file");
 
     char version[128] = {0};

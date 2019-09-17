@@ -12,6 +12,49 @@
 
 #define MAX_PATH 1024
 
+static int
+writeFile(const char* path, const char* text)
+{
+    FILE* f = fopen(path, "w");
+    if (!f)
+        fail_msg("Couldn't open file");
+
+    if (!fwrite(text, strlen(text), 1, f))
+        fail_msg("Couldn't write file");
+
+    if (fclose(f))
+        fail_msg("Couldn't close file");
+
+    return 0;
+}
+
+static int
+deleteFile(const char* path)
+{
+    return unlink(path);
+}
+
+static void
+openFileAndExecuteCfgProcessCommands(const char* path, config_t* cfg)
+{
+    FILE* f = fopen(path, "r");
+    cfgProcessCommands(cfg, f);
+    fclose(f);
+}
+
+static long
+fileEndPosition(const char* path)
+{
+    FILE* f;
+    if ((f = fopen(path, "r"))) {
+        fseek(f, 0, SEEK_END);
+        long pos = ftell(f);
+        fclose(f);
+        return pos;
+    }
+    return -1;
+}
+
 void
 cfgPathHonorsPriorityOrder(void** state)
 {
@@ -281,38 +324,30 @@ cfgProcessEnvironmentOutVerbosity(void** state)
 }
 
 void
-cfgProcessEnvironmentStatsdTags(void** state)
+cfgProcessEnvironmentLogLevel(void** state)
 {
     config_t* cfg = cfgCreateDefault();
-    cfgCustomTagAdd(cfg, "NAME1", "val1");
-    assert_non_null(cfgCustomTags(cfg));
-    assert_string_equal(cfgCustomTagValue(cfg, "NAME1"), "val1");
-    assert_string_equal(cfgCustomTags(cfg)[0]->name, "NAME1");
-    assert_string_equal(cfgCustomTags(cfg)[0]->value, "val1");
-    assert_null(cfgCustomTags(cfg)[1]);
+    cfgLogLevelSet(cfg, CFG_LOG_DEBUG);
+    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_DEBUG);
 
     // should override current cfg
-    assert_int_equal(setenv("SCOPE_TAG_NAME1", "newvalue", 1), 0);
+    assert_int_equal(setenv("SCOPE_LOG_LEVEL", "trace", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgCustomTagValue(cfg, "NAME1"), "newvalue");
-    assert_string_equal(cfgCustomTags(cfg)[0]->name, "NAME1");
-    assert_string_equal(cfgCustomTags(cfg)[0]->value, "newvalue");
-    assert_null(cfgCustomTags(cfg)[1]);
+    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
 
-    // should extend current cfg
-    assert_int_equal(setenv("SCOPE_TAG_NAME2", "val2", 1), 0);
+    assert_int_equal(setenv("SCOPE_LOG_LEVEL", "debug", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgCustomTagValue(cfg, "NAME2"), "val2");
-    assert_string_equal(cfgCustomTags(cfg)[1]->name, "NAME2");
-    assert_string_equal(cfgCustomTags(cfg)[1]->value, "val2");
-    assert_null(cfgCustomTags(cfg)[2]);
+    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_DEBUG);
 
     // if env is not defined, cfg should not be affected
-    assert_int_equal(unsetenv("SCOPE_TAG_NAME1"), 0);
-    assert_int_equal(unsetenv("SCOPE_TAG_NAME2"), 0);
+    assert_int_equal(unsetenv("SCOPE_LOG_LEVEL"), 0);
     cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgCustomTagValue(cfg, "NAME1"), "newvalue");
-    assert_string_equal(cfgCustomTagValue(cfg, "NAME2"), "val2");
+    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_DEBUG);
+
+    // unrecognised value should not affect cfg
+    assert_int_equal(setenv("SCOPE_LOG_LEVEL", "everythingandmore", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_DEBUG);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -406,64 +441,85 @@ cfgProcessEnvironmentLogTransport(void** state)
 }
 
 void
-cfgProcessEnvironmentLogLevel(void** state)
+cfgProcessEnvironmentStatsdTags(void** state)
 {
     config_t* cfg = cfgCreateDefault();
-    cfgLogLevelSet(cfg, CFG_LOG_DEBUG);
-    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_DEBUG);
+    cfgCustomTagAdd(cfg, "NAME1", "val1");
+    assert_non_null(cfgCustomTags(cfg));
+    assert_string_equal(cfgCustomTagValue(cfg, "NAME1"), "val1");
+    assert_string_equal(cfgCustomTags(cfg)[0]->name, "NAME1");
+    assert_string_equal(cfgCustomTags(cfg)[0]->value, "val1");
+    assert_null(cfgCustomTags(cfg)[1]);
 
     // should override current cfg
-    assert_int_equal(setenv("SCOPE_LOG_LEVEL", "trace", 1), 0);
+    assert_int_equal(setenv("SCOPE_TAG_NAME1", "newvalue", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
+    assert_string_equal(cfgCustomTagValue(cfg, "NAME1"), "newvalue");
+    assert_string_equal(cfgCustomTags(cfg)[0]->name, "NAME1");
+    assert_string_equal(cfgCustomTags(cfg)[0]->value, "newvalue");
+    assert_null(cfgCustomTags(cfg)[1]);
 
-    assert_int_equal(setenv("SCOPE_LOG_LEVEL", "debug", 1), 0);
+    // should extend current cfg
+    assert_int_equal(setenv("SCOPE_TAG_NAME2", "val2", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_DEBUG);
+    assert_string_equal(cfgCustomTagValue(cfg, "NAME2"), "val2");
+    assert_string_equal(cfgCustomTags(cfg)[1]->name, "NAME2");
+    assert_string_equal(cfgCustomTags(cfg)[1]->value, "val2");
+    assert_null(cfgCustomTags(cfg)[2]);
 
     // if env is not defined, cfg should not be affected
-    assert_int_equal(unsetenv("SCOPE_LOG_LEVEL"), 0);
+    assert_int_equal(unsetenv("SCOPE_TAG_NAME1"), 0);
+    assert_int_equal(unsetenv("SCOPE_TAG_NAME2"), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_DEBUG);
-
-    // unrecognised value should not affect cfg
-    assert_int_equal(setenv("SCOPE_LOG_LEVEL", "everythingandmore", 1), 0);
-    cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_DEBUG);
+    assert_string_equal(cfgCustomTagValue(cfg, "NAME1"), "newvalue");
+    assert_string_equal(cfgCustomTagValue(cfg, "NAME2"), "val2");
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
     cfgProcessEnvironment(cfg);
 }
 
-static int
-writeFile(const char* path, const char* text)
+void
+cfgProcessEnvironmentCmdDebugIsIgnored(void** state)
 {
-    FILE* f = fopen(path, "w");
-    if (!f)
-        fail_msg("Couldn't open file");
+    const char* path = "/tmp/dbgoutfile.txt";
+    assert_int_equal(setenv("SCOPE_CMD_DEBUG", path, 1), 0);
 
-    if (!fwrite(text, strlen(text), 1, f))
-        fail_msg("Couldn't write file");
+    long file_pos_before = fileEndPosition(path);
 
-    if (fclose(f))
-        fail_msg("Couldn't close file");
+    config_t* cfg = cfgCreateDefault();
+    cfgProcessEnvironment(cfg);
+    cfgDestroy(&cfg);
 
-    return 0;
+    long file_pos_after = fileEndPosition(path);
+
+    // since it's not processed, the file position better not have changed.
+    assert_int_equal(file_pos_before, file_pos_after);
+
+    unsetenv("SCOPE_CMD_DEBUG");
+    if (file_pos_after != -1) unlink(path);
 }
 
-static int
-deleteFile(const char* path)
+void
+cfgProcessCommandsCmdDebugIsProcessed(void** state)
 {
-    return unlink(path);
-}
+    const char* outpath = "/tmp/dbgoutfile.txt";
+    const char* inpath = "/tmp/dbginfile.txt";
 
-static void
-openFileAndExecuteCfgProcessCommands(const char* path, config_t* cfg)
-{
-    FILE* f = fopen(path, "r");
-    cfgProcessCommands(cfg, f);
-    fclose(f);
+    long file_pos_before = fileEndPosition(outpath);
+
+    config_t* cfg = cfgCreateDefault();
+    writeFile(inpath, "SCOPE_CMD_DEBUG=/tmp/dbgoutfile.txt");
+    openFileAndExecuteCfgProcessCommands(inpath, cfg);
+    cfgDestroy(&cfg);
+
+    long file_pos_after = fileEndPosition(outpath);
+
+    // since it's not processed, the file position should be updated
+    assert_int_not_equal(file_pos_before, file_pos_after);
+
+    unlink(inpath);
+    if (file_pos_after != -1) unlink(outpath);
 }
 
 void
@@ -678,6 +734,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgProcessEnvironmentOutTransport),
         cmocka_unit_test(cfgProcessEnvironmentLogTransport),
         cmocka_unit_test(cfgProcessEnvironmentStatsdTags),
+        cmocka_unit_test(cfgProcessEnvironmentCmdDebugIsIgnored),
+        cmocka_unit_test(cfgProcessCommandsCmdDebugIsProcessed),
         cmocka_unit_test(cfgProcessCommandsFromFile),
         cmocka_unit_test(cfgProcessCommandsEnvSubstitution),
         cmocka_unit_test(initLogReturnsPtr),

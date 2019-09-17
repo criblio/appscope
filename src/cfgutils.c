@@ -164,6 +164,17 @@ doEnvVariableSubstitution(char* value)
     return outval;
 }
 
+static void
+processCmdDebug(const char* path)
+{
+    if (!path || !path[0]) return;
+
+    FILE* f;
+    if (!(f = fopen(path, "a"))) return;
+    dbgDumpAll(f);
+    fclose(f);
+}
+
 
 static int
 startsWith(const char* string, const char* substring)
@@ -204,6 +215,8 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgTransportSetFromStr(cfg, CFG_LOG, value);
     } else if (startsWith(env_line, "SCOPE_TAG_")) {
         processCustomTag(cfg, env_line, value);
+    } else if (startsWith(env_line, "SCOPE_CMD_DEBUG")) {
+        processCmdDebug(value);
     }
 
     free(value);
@@ -219,8 +232,15 @@ cfgProcessEnvironment(config_t* cfg)
     char* e = NULL;
     int i = 0;
     while ((e = environ[i++])) {
-        if (e[0] != 'S') continue;  // For performance.  All env variables we
-                                    // care about start with a capital 'S'.
+        // Everything we care about starts with a capital 'S'.  Skip 
+        // everything else for performance.
+        if (e[0] != 'S') continue;
+
+        // Some things should only be processed as commands, not as
+        // environment variables.  Skip them here.
+        if (startsWith(e, "SCOPE_CMD_DEBUG")) continue;
+
+        // Process everything else.
         processEnvStyleInput(cfg, e);
     }
 }

@@ -47,7 +47,7 @@ reinitMetricDescriptor()
     cfgProcessEnvironment(cfg);
 
     outDestroy(&g_out);
-    g_out = initOut(cfg, NULL);
+    g_out = initOut(cfg);
 
     if (path) free(path);
     cfgDestroy(&cfg);
@@ -123,7 +123,7 @@ doConfig(config_t *cfg)
     g_prevlog = g_log;
 
     log_t* log = initLog(cfg);
-    g_out = initOut(cfg, log);
+    g_out = initOut(cfg);
     g_log = log; // Set after initOut to avoid infinite loop with socket
 }
 
@@ -1511,7 +1511,7 @@ init(void)
     g_cfg.cmdpath = cfgOutCmdPath(g_staticfg);
 
     log_t* log = initLog(g_staticfg);
-    g_out = initOut(g_staticfg, log);
+    g_out = initOut(g_staticfg);
     g_log = log; // Set after initOut to avoid infinite loop with socket
     if (path) free(path);
 

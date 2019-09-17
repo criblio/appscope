@@ -315,7 +315,7 @@ initLog(config_t* cfg)
 }
 
 out_t*
-initOut(config_t* cfg, log_t* log)
+initOut(config_t* cfg)
 {
     out_t* out = outCreate();
     if (!out) return out;
@@ -333,9 +333,6 @@ initOut(config_t* cfg, log_t* log)
         return out;
     }
     outFormatSet(out, f);
-
-    // out can have a reference to log for debugging
-    //if (log) outLogReferenceSet(out, log);
 
     return out;
 }

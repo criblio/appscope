@@ -677,7 +677,7 @@ initLogReturnsPtr(void** state)
 }
 
 void
-initOutReturnsPtrWithNullLogReference(void** state)
+initOutReturnsPtr(void** state)
 {
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
@@ -688,34 +688,13 @@ initOutReturnsPtrWithNullLogReference(void** state)
         if (t==CFG_UNIX || t==CFG_FILE) {
             cfgTransportPathSet(cfg, CFG_OUT, "/tmp/scope.log");
         }
-        out_t* out = initOut(cfg, NULL);
+        out_t* out = initOut(cfg);
         assert_non_null(out);
         outDestroy(&out);
     }
     cfgDestroy(&cfg);
 }
 
-void
-initOutReturnsPtrWithLogReference(void** state)
-{
-    // Create cfg
-    config_t* cfg = cfgCreateDefault();
-    assert_non_null(cfg);
-    cfgTransportTypeSet(cfg, CFG_OUT, CFG_FILE);
-    cfgTransportPathSet(cfg, CFG_OUT, "/tmp/scope.log");
-
-    // Create log
-    log_t* log = logCreate();
-
-    // Run the test
-    out_t* out = initOut(cfg, log);
-    assert_non_null(out);
-
-    // Cleanup
-    logDestroy(&log);
-    outDestroy(&out);
-    cfgDestroy(&cfg);
-}
 
 int
 main(int argc, char* argv[])
@@ -739,8 +718,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgProcessCommandsFromFile),
         cmocka_unit_test(cfgProcessCommandsEnvSubstitution),
         cmocka_unit_test(initLogReturnsPtr),
-        cmocka_unit_test(initOutReturnsPtrWithNullLogReference),
-        cmocka_unit_test(initOutReturnsPtrWithLogReference),
+        cmocka_unit_test(initOutReturnsPtr),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

@@ -165,35 +165,47 @@ doEnvVariableSubstitution(char* value)
 }
 
 
-static void
-processEnvStyleInput(config_t* cfg, const char* e)
+static int
+startsWith(const char* string, const char* substring)
 {
-    if (!cfg || !e) return;
+    return (strncmp(string, substring, strlen(substring)) == 0);
+}
 
-    char* v = strchr(e, '=');
-    if (!v) return;
-    v++;
-    char* value = doEnvVariableSubstitution(v);
-    if (!value) return;
-    if (e == strstr(e, "SCOPE_OUT_FORMAT")) {
+//
+// An example of this format: SCOPE_STATSD_MAXLEN=1024
+//
+static void
+processEnvStyleInput(config_t* cfg, const char* env_line)
+{
+
+    if (!cfg || !env_line) return;
+
+    char* env_ptr, *value;
+    if (!(env_ptr = strchr(env_line, '='))) return;
+    if (!(value = doEnvVariableSubstitution(&env_ptr[1]))) return;
+
+    if (startsWith(env_line, "SCOPE_OUT_FORMAT")) {
         cfgOutFormatSetFromStr(cfg, value);
-    } else if (e == strstr(e, "SCOPE_STATSD_PREFIX")) {
+    } else if (startsWith(env_line, "SCOPE_STATSD_PREFIX")) {
         cfgOutStatsDPrefixSetFromStr(cfg, value);
-    } else if (e == strstr(e, "SCOPE_STATSD_MAXLEN")) {
+    } else if (startsWith(env_line, "SCOPE_STATSD_MAXLEN")) {
         cfgOutStatsDMaxLenSetFromStr(cfg, value);
-    } else if (e == strstr(e, "SCOPE_OUT_SUM_PERIOD")) {
+    } else if (startsWith(env_line, "SCOPE_OUT_SUM_PERIOD")) {
         cfgOutPeriodSetFromStr(cfg, value);
-    } else if (e == strstr(e, "SCOPE_OUT_VERBOSITY")) {
+    } else if (startsWith(env_line, "SCOPE_CMD_PATH")) {
+        cfgOutCmdPathSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_OUT_VERBOSITY")) {
         cfgOutVerbositySetFromStr(cfg, value);
-    } else if (e == strstr(e, "SCOPE_LOG_LEVEL")) {
+    } else if (startsWith(env_line, "SCOPE_LOG_LEVEL")) {
         cfgLogLevelSetFromStr(cfg, value);
-    } else if (e == strstr(e, "SCOPE_OUT_DEST")) {
+    } else if (startsWith(env_line, "SCOPE_OUT_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_OUT, value);
-    } else if (e == strstr(e, "SCOPE_LOG_DEST")) {
+    } else if (startsWith(env_line, "SCOPE_LOG_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_LOG, value);
-    } else if (e == strstr(e, "SCOPE_TAG_")) {
-        processCustomTag(cfg, e, value);
+    } else if (startsWith(env_line, "SCOPE_TAG_")) {
+        processCustomTag(cfg, env_line, value);
     }
+
     free(value);
 }
 
@@ -221,13 +233,9 @@ cfgProcessCommands(config_t* cfg, FILE* file)
     size_t n = 0;
 
     while (getline(&e, &n, file) != -1) {
-        if (e) {
-            e[strcspn(e, "\r\n")] = '\0'; //overwrite first \r or \n with null
-            processEnvStyleInput(cfg, e);
-            free(e);
-            e = NULL;
-        }
-        n = 0;
+        e[strcspn(e, "\r\n")] = '\0'; //overwrite first \r or \n with null
+        processEnvStyleInput(cfg, e);
+        e[0] = '\0';
     }
 
     if (e) free(e);

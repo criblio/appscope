@@ -219,6 +219,37 @@ cfgProcessEnvironmentOutPeriod(void** state)
 }
 
 void
+cfgProcessEnvironmentCommandPath(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    cfgOutCmdPathSet(cfg, "/my/favorite/directory");
+    assert_string_equal(cfgOutCmdPath(cfg), "/my/favorite/directory");
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_CMD_PATH", "/my/other/dir", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgOutCmdPath(cfg), "/my/other/dir");
+
+    assert_int_equal(setenv("SCOPE_CMD_PATH", "/my/dir", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgOutCmdPath(cfg), "/my/dir");
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_CMD_PATH"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgOutCmdPath(cfg), "/my/dir");
+
+    // empty string
+    assert_int_equal(setenv("SCOPE_CMD_PATH", "", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgOutCmdPath(cfg), DEFAULT_COMMAND_PATH);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
+void
 cfgProcessEnvironmentOutVerbosity(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -473,6 +504,7 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_STATSD_PREFIX=prefix\n"
         "SCOPE_STATSD_MAXLEN=1024\n"
         "SCOPE_OUT_SUM_PERIOD=11\n"
+        "SCOPE_CMD_PATH=/the/path/\n"
         "SCOPE_OUT_VERBOSITY=1\n"
         "SCOPE_LOG_LEVEL=trace\n"
         "SCOPE_OUT_DEST=file:///tmp/file.tmp\n"
@@ -483,6 +515,7 @@ cfgProcessCommandsFromFile(void** state)
     assert_string_equal(cfgOutStatsDPrefix(cfg), "prefix.");
     assert_int_equal(cfgOutStatsDMaxLen(cfg), 1024);
     assert_int_equal(cfgOutPeriod(cfg), 11);
+    assert_string_equal(cfgOutCmdPath(cfg), "/the/path/");
     assert_int_equal(cfgOutVerbosity(cfg), 1);
     assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/tmp/file.tmp");
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/file.tmp2");
@@ -507,6 +540,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
         "SCOPE_STATSD_PREFIX=$VAR1.$MY_ENV_VAR\n"
         "SCOPE_STATSD_MAXLEN=$MAXLEN\n"
         "SCOPE_OUT_SUM_PERIOD=$PERIOD\n"
+        "SCOPE_CMD_PATH=/$MYHOME/scope/\n"
         "SCOPE_OUT_VERBOSITY=$VERBOSITY\n"
         "SCOPE_LOG_LEVEL=$LOGLEVEL\n"
         "SCOPE_OUT_DEST=file:///\\$VAR1/$MY_ENV_VAR/\n"
@@ -523,6 +557,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_int_equal(setenv("MAXLEN", "1024", 1), 0);
     assert_int_equal(setenv("DEST", "file:///tmp/file.tmp2", 1), 0);
     assert_int_equal(setenv("PERIOD", "11", 1), 0);
+    assert_int_equal(setenv("MYHOME", "home/mydir", 1), 0);
     assert_int_equal(setenv("VERBOSITY", "1", 1), 0);
     assert_int_equal(setenv("LOGLEVEL", "trace", 1), 0);
 
@@ -531,6 +566,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_string_equal(cfgOutStatsDPrefix(cfg), "longer.shorter.");
     assert_int_equal(cfgOutStatsDMaxLen(cfg), 1024);
     assert_int_equal(cfgOutPeriod(cfg), 11);
+    assert_string_equal(cfgOutCmdPath(cfg), "/home/mydir/scope/");
     assert_int_equal(cfgOutVerbosity(cfg), 1);
     // test escaped substitution  (a match preceeded by '\')
     assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/$VAR1/shorter/");
@@ -636,6 +672,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgProcessEnvironmentStatsDPrefix),
         cmocka_unit_test(cfgProcessEnvironmentStatsDMaxLen),
         cmocka_unit_test(cfgProcessEnvironmentOutPeriod),
+        cmocka_unit_test(cfgProcessEnvironmentCommandPath),
         cmocka_unit_test(cfgProcessEnvironmentOutVerbosity),
         cmocka_unit_test(cfgProcessEnvironmentLogLevel),
         cmocka_unit_test(cfgProcessEnvironmentOutTransport),

@@ -81,14 +81,16 @@ processCustomTag(config_t* cfg, const char* e, const char* value)
 
 }
 
-static regex_t* envRegex()
+static regex_t*
+envRegex()
 {
     static regex_t* regex = NULL;
 
     if (regex) return regex;
 
-    regex = calloc(1, sizeof(regex_t));
-    if (regex && regcomp(regex, "\\$[a-zA-Z0-9_]+", REG_EXTENDED)) {
+    if (!(regex = calloc(1, sizeof(regex_t)))) return regex;
+
+    if (regcomp(regex, "\\$[a-zA-Z0-9_]+", REG_EXTENDED)) {
         // regcomp failed.
         DBG(NULL);
         free(regex);

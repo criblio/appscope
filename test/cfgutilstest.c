@@ -562,6 +562,11 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_OUT_SUM_PERIOD=11\n"
         "SCOPE_CMD_PATH=/the/path/\n"
         "SCOPE_OUT_VERBOSITY=1\n"
+        "SCOPE_OUT_VERBOSITY:prefix\n"     // ignored (no '=')
+        "SCOPE_OUT_VERBOSITY=blah\n"       // processed, but 'blah' isn't int)
+        "\n"                               // ignored (no '=')
+        "ignored =  too.\n"                // ignored (not one of our env vars)
+        "SEE_THAT_THIS_IS_HARMLESS=True\n" // ignored (not one of our env vars)
         "SCOPE_LOG_LEVEL=trace\n"
         "SCOPE_OUT_DEST=file:///tmp/file.tmp\n"
         "SCOPE_LOG_DEST=file:///tmp/file.tmp2\n"

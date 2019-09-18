@@ -81,14 +81,16 @@ processCustomTag(config_t* cfg, const char* e, const char* value)
 
 }
 
-static regex_t* envRegex()
+static regex_t*
+envRegex()
 {
     static regex_t* regex = NULL;
 
     if (regex) return regex;
 
-    regex = calloc(1, sizeof(regex_t));
-    if (regex && regcomp(regex, "\\$[a-zA-Z0-9_]+", REG_EXTENDED)) {
+    if (!(regex = calloc(1, sizeof(regex_t)))) return regex;
+
+    if (regcomp(regex, "\\$[a-zA-Z0-9_]+", REG_EXTENDED)) {
         // regcomp failed.
         DBG(NULL);
         free(regex);
@@ -164,36 +166,61 @@ doEnvVariableSubstitution(char* value)
     return outval;
 }
 
-
 static void
-processEnvStyleInput(config_t* cfg, const char* e)
+processCmdDebug(const char* path)
 {
-    if (!cfg || !e) return;
+    if (!path || !path[0]) return;
 
-    char* v = strchr(e, '=');
-    if (!v) return;
-    v++;
-    char* value = doEnvVariableSubstitution(v);
-    if (!value) return;
-    if (e == strstr(e, "SCOPE_OUT_FORMAT")) {
+    FILE* f;
+    if (!(f = fopen(path, "a"))) return;
+    dbgDumpAll(f);
+    fclose(f);
+}
+
+
+static int
+startsWith(const char* string, const char* substring)
+{
+    return (strncmp(string, substring, strlen(substring)) == 0);
+}
+
+//
+// An example of this format: SCOPE_STATSD_MAXLEN=1024
+//
+static void
+processEnvStyleInput(config_t* cfg, const char* env_line)
+{
+
+    if (!cfg || !env_line) return;
+
+    char* env_ptr, *value;
+    if (!(env_ptr = strchr(env_line, '='))) return;
+    if (!(value = doEnvVariableSubstitution(&env_ptr[1]))) return;
+
+    if (startsWith(env_line, "SCOPE_OUT_FORMAT")) {
         cfgOutFormatSetFromStr(cfg, value);
-    } else if (e == strstr(e, "SCOPE_STATSD_PREFIX")) {
+    } else if (startsWith(env_line, "SCOPE_STATSD_PREFIX")) {
         cfgOutStatsDPrefixSetFromStr(cfg, value);
-    } else if (e == strstr(e, "SCOPE_STATSD_MAXLEN")) {
+    } else if (startsWith(env_line, "SCOPE_STATSD_MAXLEN")) {
         cfgOutStatsDMaxLenSetFromStr(cfg, value);
-    } else if (e == strstr(e, "SCOPE_OUT_SUM_PERIOD")) {
+    } else if (startsWith(env_line, "SCOPE_OUT_SUM_PERIOD")) {
         cfgOutPeriodSetFromStr(cfg, value);
-    } else if (e == strstr(e, "SCOPE_OUT_VERBOSITY")) {
+    } else if (startsWith(env_line, "SCOPE_CMD_PATH")) {
+        cfgOutCmdPathSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_OUT_VERBOSITY")) {
         cfgOutVerbositySetFromStr(cfg, value);
-    } else if (e == strstr(e, "SCOPE_LOG_LEVEL")) {
+    } else if (startsWith(env_line, "SCOPE_LOG_LEVEL")) {
         cfgLogLevelSetFromStr(cfg, value);
-    } else if (e == strstr(e, "SCOPE_OUT_DEST")) {
+    } else if (startsWith(env_line, "SCOPE_OUT_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_OUT, value);
-    } else if (e == strstr(e, "SCOPE_LOG_DEST")) {
+    } else if (startsWith(env_line, "SCOPE_LOG_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_LOG, value);
-    } else if (e == strstr(e, "SCOPE_TAG_")) {
-        processCustomTag(cfg, e, value);
+    } else if (startsWith(env_line, "SCOPE_TAG_")) {
+        processCustomTag(cfg, env_line, value);
+    } else if (startsWith(env_line, "SCOPE_CMD_DEBUG")) {
+        processCmdDebug(value);
     }
+
     free(value);
 }
 
@@ -207,8 +234,15 @@ cfgProcessEnvironment(config_t* cfg)
     char* e = NULL;
     int i = 0;
     while ((e = environ[i++])) {
-        if (e[0] != 'S') continue;  // For performance.  All env variables we
-                                    // care about start with a capital 'S'.
+        // Everything we care about starts with a capital 'S'.  Skip 
+        // everything else for performance.
+        if (e[0] != 'S') continue;
+
+        // Some things should only be processed as commands, not as
+        // environment variables.  Skip them here.
+        if (startsWith(e, "SCOPE_CMD_DEBUG")) continue;
+
+        // Process everything else.
         processEnvStyleInput(cfg, e);
     }
 }
@@ -221,13 +255,9 @@ cfgProcessCommands(config_t* cfg, FILE* file)
     size_t n = 0;
 
     while (getline(&e, &n, file) != -1) {
-        if (e) {
-            e[strcspn(e, "\r\n")] = '\0'; //overwrite first \r or \n with null
-            processEnvStyleInput(cfg, e);
-            free(e);
-            e = NULL;
-        }
-        n = 0;
+        e[strcspn(e, "\r\n")] = '\0'; //overwrite first \r or \n with null
+        processEnvStyleInput(cfg, e);
+        e[0] = '\0';
     }
 
     if (e) free(e);
@@ -287,7 +317,7 @@ initLog(config_t* cfg)
 }
 
 out_t*
-initOut(config_t* cfg, log_t* log)
+initOut(config_t* cfg)
 {
     out_t* out = outCreate();
     if (!out) return out;
@@ -305,9 +335,6 @@ initOut(config_t* cfg, log_t* log)
         return out;
     }
     outFormatSet(out, f);
-
-    // out can have a reference to log for debugging
-    //if (log) outLogReferenceSet(out, log);
 
     return out;
 }

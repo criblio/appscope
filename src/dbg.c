@@ -172,7 +172,6 @@ dbgDumpAll(FILE* f)
 void
 dbgAddLine(const char* key, const char* fmt, ...)
 {
-    if (!g_dbg) dbgInit();
     if (!g_dbg) return;
 
     if (!g_dbg->lines) {

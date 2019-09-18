@@ -1515,7 +1515,7 @@ init(void)
     g_out = initOut(g_staticfg, log);
     g_log = log; // Set after initOut to avoid infinite loop with socket
     if (path) free(path);
-
+    if (!g_dbg) dbgInit();
     g_getdelim = 0;
     scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
 }
@@ -2314,7 +2314,12 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
     return rc;
 }
 
-// We explicitly don't interpose these stat functions on macOS
+/*
+ * We explicitly don't interpose these stat functions on macOS
+ * These are not exported symbols in Linux. Therefore, we
+ * have them turned off for now.
+ * stat, fstat, lstat.
+ */
 EXPORTOFF int
 stat(const char *pathname, struct stat *statbuf)
 {
@@ -2363,63 +2368,73 @@ lstat(const char *pathname, struct stat *statbuf)
     return rc;
 }
 
+/*
+ * Note:
+ * The syscall function in libc is called from the loader for
+ * at least mmap, possibly more. The result is that we can not
+ * do any dynamic memory allocation while this executes. Be careful.
+ * The DBG() output is ignored until after the constructor runs.
+ */
 EXPORTON long
 syscall(long number, ...)
 {
-    int rc;
     struct FuncArgs fArgs;
 
     WRAP_CHECK(syscall, -1);
     doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, number);
-    rc = g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
-                      fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
-    if (rc != -1) {
-        scopeLog("syscall", number, CFG_LOG_DEBUG);
-        switch (number) {
-        case SYS_accept4:
-            scopeLog("syscall-accept4", number, CFG_LOG_DEBUG);
+
+    switch (number) {
+    case SYS_accept4:
+    {
+        int rc;
+        rc = g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1],
+                          fArgs.arg[2], fArgs.arg[3]);
+        if (rc != -1) {
             doAccept(rc, (struct sockaddr *)fArgs.arg[1],
                      (socklen_t *)fArgs.arg[2], "accept4");
-            break;
-
-        case SYS_sendmmsg:
-            DBG("syscall-sendmsg");
-            scopeLog("syscall-sendmsg", number, CFG_LOG_DEBUG);
-            break;
-
-        case SYS_recvmmsg:
-            DBG("syscall-recvmsg");
-            scopeLog("syscall-recvmsg", number, CFG_LOG_DEBUG);
-            break;
-
-        case SYS_preadv:
-            DBG("syscall-preadv");
-            scopeLog("syscall-preadv", number, CFG_LOG_DEBUG);
-            break;
-
-        case SYS_pwritev:
-            DBG("syscall-pwritev");
-            scopeLog("syscall-pwritev", number, CFG_LOG_DEBUG);
-            break;
-
-        case SYS_dup3:
-            DBG("syscall-dup3");
-            scopeLog("syscall-dup3", number, CFG_LOG_DEBUG);
-            break;
-#ifdef __STATX__
-        case SYS_statx:
-            DBG("syscall-statx");
-            scopeLog("syscall-statx", number, CFG_LOG_DEBUG);
-            break;
-#endif __STATX__
-        default:
-            DBG(NULL);
-            scopeLog("syscall", number, CFG_LOG_DEBUG);
         }
+        return rc;
     }
 
-    return rc;
+    /*
+     * These messages are in place as they represent
+     * functions that use syscall() in libuv, used with node.js.
+     * These are functions defined in libuv/src/unix/linux-syscalls.c
+     * that we are otherwise interposing. The DBG call allows us to
+     * check to see how many of these are called and therefore
+     * what we are missing. So far, we only see accept4 used.
+     */
+    case SYS_sendmmsg:
+        DBG("syscall-sendmsg");
+        break;
+
+    case SYS_recvmmsg:
+        DBG("syscall-recvmsg");
+        break;
+
+    case SYS_preadv:
+        DBG("syscall-preadv");
+        break;
+
+    case SYS_pwritev:
+        DBG("syscall-pwritev");
+        break;
+
+    case SYS_dup3:
+        DBG("syscall-dup3");
+        break;
+#ifdef __STATX__
+    case SYS_statx:
+        DBG("syscall-statx");
+        break;
+#endif // __STATX__
+    default:
+        DBG(NULL);
+    }
+
+    return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
+                        fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
 
 #endif // __LINUX__

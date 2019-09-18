@@ -2407,12 +2407,12 @@ syscall(long number, ...)
             DBG("syscall-dup3");
             scopeLog("syscall-dup3", number, CFG_LOG_DEBUG);
             break;
-
+#ifdef __STATX__
         case SYS_statx:
             DBG("syscall-statx");
             scopeLog("syscall-statx", number, CFG_LOG_DEBUG);
             break;
-
+#endif __STATX__
         default:
             DBG(NULL);
             scopeLog("syscall", number, CFG_LOG_DEBUG);

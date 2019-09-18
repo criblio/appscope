@@ -15,43 +15,15 @@ static fs_info *g_fsinfo;
 static metric_counters g_ctrs = {0};
 static thread_timing g_thread = {0};
 static log_t* g_log = NULL;
-static log_t *g_prevlog = NULL;
 static out_t* g_out = NULL;
-static out_t *g_prevout = NULL;
 static config_t *g_staticfg = NULL;
 __thread int g_getdelim = 0;
 
 // Forward declaration
 static void * periodic(void *);
 static void doClose(int, const char *);
+static void doConfig(config_t *);
 
-EXPORTOFF void
-reinitLogDescriptor()
-{
-    char* path = cfgPath(CFG_FILE_NAME);
-    config_t* cfg = cfgRead(path);
-    cfgProcessEnvironment(cfg);
-
-    logDestroy(&g_log);
-    g_log = initLog(cfg);
-
-    if (path) free(path);
-    cfgDestroy(&cfg);
-}
-
-EXPORTOFF void
-reinitMetricDescriptor()
-{
-    char* path = cfgPath(CFG_FILE_NAME);
-    config_t* cfg = cfgRead(path);
-    cfgProcessEnvironment(cfg);
-
-    outDestroy(&g_out);
-    g_out = initOut(cfg, NULL);
-
-    if (path) free(path);
-    cfgDestroy(&cfg);
-}
 
 EXPORTON void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
@@ -66,7 +38,8 @@ scopeLog(const char* msg, int fd, cfg_log_level_t level)
     }
     if (logSend(g_log, buf, level) == DEFAULT_BADFD) {
         // We lost our fd, re-open
-        reinitLogDescriptor();
+        // should just do initLog, not everything
+        doConfig(g_staticfg);
     }
 }
 
@@ -78,7 +51,8 @@ sendEvent(out_t* out, event_t* e)
     rc = outSendEvent(g_out, e);
     if (rc == DEFAULT_BADFD) {
         // We lost our fd, re-open
-        reinitMetricDescriptor();
+        // should just do initOut, not everything
+        doConfig(g_staticfg);
     } else if (rc == -1) {
         scopeLog("ERROR: doProcMetric:CPU:outSendEvent", -1, CFG_LOG_ERROR);
     }
@@ -114,16 +88,26 @@ dumpAddrs(int sd, enum control_type_t endp)
 EXPORTOFF void
 doConfig(config_t *cfg)
 {
-    g_thread.interval = cfgOutPeriod(cfg);
-    g_cfg.verbosity = cfgOutVerbosity(cfg);
-    g_cfg.cmdpath = cfgOutCmdPath(cfg);
+    static log_t *g_prevlog = NULL;
+    static out_t *g_prevout = NULL;
 
-    // save the previous objects, they get free'd next period
+    // Clean up previous objects if they exist.
+    if (g_prevout) outDestroy(&g_prevout);
+    if (g_prevlog) logDestroy(&g_prevlog);
+
+    // Save the current objects to get cleaned up next time
     g_prevout = g_out;
     g_prevlog = g_log;
 
+    g_thread.interval = cfgOutPeriod(cfg);
+    if (!g_thread.startTime) {
+        g_thread.startTime = time(NULL) + g_thread.interval;
+    }
+    g_cfg.verbosity = cfgOutVerbosity(cfg);
+    g_cfg.cmdpath = cfgOutCmdPath(cfg);
+
     log_t* log = initLog(cfg);
-    g_out = initOut(cfg, log);
+    g_out = initOut(cfg);
     g_log = log; // Set after initOut to avoid infinite loop with socket
 }
 
@@ -1350,20 +1334,6 @@ periodic(void *arg)
             reportFD(i);
         }
 
-        /*
-         * If the previous period applied dynamic config
-         * then clean up before checking for new config
-         */
-        if (g_prevout) {
-            outDestroy(&g_prevout);
-            g_prevout = NULL;
-        }
-
-        if (g_prevlog) {
-            logDestroy(&g_prevlog);
-            g_prevlog = NULL;
-        }
-
         // Process dynamic config changes, if any
         dynConfig();
 
@@ -1503,17 +1473,10 @@ init(void)
     }
 
     char* path = cfgPath(CFG_FILE_NAME);
-    g_staticfg = cfgRead(path);
-    cfgProcessEnvironment(g_staticfg);
-
-    g_thread.interval = cfgOutPeriod(g_staticfg);
-    g_thread.startTime = time(NULL) + g_thread.interval;
-    g_cfg.verbosity = cfgOutVerbosity(g_staticfg);
-    g_cfg.cmdpath = cfgOutCmdPath(g_staticfg);
-
-    log_t* log = initLog(g_staticfg);
-    g_out = initOut(g_staticfg, log);
-    g_log = log; // Set after initOut to avoid infinite loop with socket
+    config_t* cfg = cfgRead(path);
+    cfgProcessEnvironment(cfg);
+    doConfig(cfg);
+    g_staticfg = cfg;
     if (path) free(path);
     if (!g_dbg) dbgInit();
     g_getdelim = 0;

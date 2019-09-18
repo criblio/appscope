@@ -18,7 +18,6 @@ int                 outSendEvent(out_t*, event_t*);
 // Setters (modifies out_t, but does not persist modifications)
 void                outTransportSet(out_t*, transport_t*);
 void                outFormatSet(out_t*, format_t*);
-void                outLogReferenceSet(out_t*, log_t*);
 
 // Getters
 int outTransportDescriptor(out_t *);

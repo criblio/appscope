@@ -149,22 +149,26 @@ dbgDumpAll(FILE* f)
     int i;
     for (i=0; i<g_dbg->max_lines && g_dbg->lines[i]; i++) {
         line_t* l = g_dbg->lines[i];
-        occurrence_t* o = &l->instance[0];
 
-        struct tm t;
-        if (!gmtime_r(&o->time, &t)) continue;
-        char t_str[64];
-        if (!strftime(t_str, sizeof(t_str), "%s", &t)) continue;
-        fprintf(f, "%llu: %s %s %d(%s) %s\n",
-                l->count, l->key,
-                t_str, o->err, strerror(o->err), o->str);
+        int j;
+        for (j=0; j<MAX_INSTANCES_PER_LINE; j++) {
+            occurrence_t* o = &l->instance[j];
 
-        o = &l->instance[1];
-        if (!o->time) continue;
-        if (!gmtime_r(&o->time, &t)) continue;
-        if (!strftime(t_str, sizeof(t_str), "%s", &t)) continue;
-        fprintf(f, "    %s %d(%s) %s\n",
-                t_str, o->err, strerror(o->err), o->str);
+            struct tm t;
+            char t_str[64];
+            if (!o->time) continue;
+            if (!gmtime_r(&o->time, &t)) continue;
+            if (!strftime(t_str, sizeof(t_str), "%s", &t)) continue;
+
+            if (j==0) {
+                fprintf(f, "%llu: %s %s %d(%s) %s\n",
+                    l->count, l->key,
+                    t_str, o->err, strerror(o->err), o->str);
+            } else {
+                fprintf(f, "    %s %d(%s) %s\n",
+                    t_str, o->err, strerror(o->err), o->str);
+            }
+        }
     }
 }
 

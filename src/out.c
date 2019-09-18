@@ -7,7 +7,6 @@ struct _out_t
 {
     transport_t* transport;
     format_t* format;
-    log_t* log_ref;             // for routing out to log
 };
 
 out_t*
@@ -26,7 +25,6 @@ outDestroy(out_t** out)
     out_t* o = *out;
     transportDestroy(&o->transport);
     fmtDestroy(&o->format);
-    // log_ref isn't owned by us, we just have a ref to it.  Don't destroy it.
     free(o);
     *out = NULL;
 }
@@ -46,7 +44,6 @@ outSendEvent(out_t* out, event_t* e)
 
     char* msg = fmtString(out->format, e);
     int rv = outSend(out, msg);
-    if (out->log_ref) logSend(out->log_ref, msg, CFG_LOG_DEBUG);
     if (msg) free(msg);
     return rv;
 }
@@ -69,15 +66,6 @@ outFormatSet(out_t* out, format_t* format)
     // Don't leak if outFormatSet is called repeatedly
     fmtDestroy(&out->format);
     out->format = format;
-}
-
-// For debugging.  If a reference to the log is set then we'll route all 
-// output events to logs too.
-void
-outLogReferenceSet(out_t* out, log_t* log)
-{
-    if (!out) return;
-    out->log_ref = log;
 }
 
 // Getter funcs

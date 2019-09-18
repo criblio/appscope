@@ -1232,7 +1232,7 @@ doSend(int sockfd, ssize_t rc)
 }
 
 static void
-doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
+doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 {
 
     scopeLog(func, sd, CFG_LOG_DEBUG);
@@ -1244,7 +1244,7 @@ doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
         atomicAdd(&g_ctrs.openPorts, 1);
         atomicAdd(&g_ctrs.TCPConnections, 1);
         atomicAdd(&g_ctrs.activeConnections, 1);
-        doSetConnection(sd, addr, addrlen, REMOTE);
+        if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);
         doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 0);
         doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED, 0);
         doNetMetric(ACTIVE_CONNECTIONS, sd, EVENT_BASED, 0);
@@ -1440,6 +1440,7 @@ init(void)
     g_fn.__xstat64 = dlsym(RTLD_NEXT, "__xstat64");
     g_fn.__fxstat64 = dlsym(RTLD_NEXT, "__fxstat64");
     g_fn.gethostbyname_r = dlsym(RTLD_NEXT, "gethostbyname_r");
+    g_fn.syscall = dlsym(RTLD_NEXT, "syscall");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
@@ -1477,7 +1478,7 @@ init(void)
     doConfig(cfg);
     g_staticfg = cfg;
     if (path) free(path);
-
+    if (!g_dbg) dbgInit();
     g_getdelim = 0;
     scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
 }
@@ -2276,7 +2277,12 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
     return rc;
 }
 
-// We explicitly don't interpose these stat functions on macOS
+/*
+ * We explicitly don't interpose these stat functions on macOS
+ * These are not exported symbols in Linux. Therefore, we
+ * have them turned off for now.
+ * stat, fstat, lstat.
+ */
 EXPORTOFF int
 stat(const char *pathname, struct stat *statbuf)
 {
@@ -2323,6 +2329,75 @@ lstat(const char *pathname, struct stat *statbuf)
         doStatMetric("lstat", pathname);
     }
     return rc;
+}
+
+/*
+ * Note:
+ * The syscall function in libc is called from the loader for
+ * at least mmap, possibly more. The result is that we can not
+ * do any dynamic memory allocation while this executes. Be careful.
+ * The DBG() output is ignored until after the constructor runs.
+ */
+EXPORTON long
+syscall(long number, ...)
+{
+    struct FuncArgs fArgs;
+
+    WRAP_CHECK(syscall, -1);
+    doThread();
+    LOAD_FUNC_ARGS_VALIST(fArgs, number);
+
+    switch (number) {
+    case SYS_accept4:
+    {
+        int rc;
+        rc = g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1],
+                          fArgs.arg[2], fArgs.arg[3]);
+        if (rc != -1) {
+            doAccept(rc, (struct sockaddr *)fArgs.arg[1],
+                     (socklen_t *)fArgs.arg[2], "accept4");
+        }
+        return rc;
+    }
+
+    /*
+     * These messages are in place as they represent
+     * functions that use syscall() in libuv, used with node.js.
+     * These are functions defined in libuv/src/unix/linux-syscalls.c
+     * that we are otherwise interposing. The DBG call allows us to
+     * check to see how many of these are called and therefore
+     * what we are missing. So far, we only see accept4 used.
+     */
+    case SYS_sendmmsg:
+        DBG("syscall-sendmsg");
+        break;
+
+    case SYS_recvmmsg:
+        DBG("syscall-recvmsg");
+        break;
+
+    case SYS_preadv:
+        DBG("syscall-preadv");
+        break;
+
+    case SYS_pwritev:
+        DBG("syscall-pwritev");
+        break;
+
+    case SYS_dup3:
+        DBG("syscall-dup3");
+        break;
+#ifdef __STATX__
+    case SYS_statx:
+        DBG("syscall-statx");
+        break;
+#endif // __STATX__
+    default:
+        DBG(NULL);
+    }
+
+    return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
+                        fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
 
 #endif // __LINUX__
@@ -2439,7 +2514,7 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     doThread();
     sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
-        doAccept(sd, addr, *addrlen, "accept$NOCANCEL");
+        doAccept(sd, addr, addrlen, "accept$NOCANCEL");
     }
 
     return sd;
@@ -3158,7 +3233,7 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     doThread();
     sd = g_fn.accept(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
-        doAccept(sd, addr, *addrlen, "accept");
+        doAccept(sd, addr, addrlen, "accept");
     }
 
     return sd;
@@ -3173,7 +3248,7 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     doThread();
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
     if ((sd != -1) && addr && addrlen) {
-        doAccept(sd, addr, *addrlen, "accept4");
+        doAccept(sd, addr, addrlen, "accept4");
     }
 
     return sd;

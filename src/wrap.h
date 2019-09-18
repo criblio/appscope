@@ -20,6 +20,7 @@
 #include <pthread.h>
 #include <ctype.h>
 #include <limits.h>
+#include <sys/syscall.h>
 
 #include <sys/stat.h>
 #if defined(__LINUX__) && defined(__STATX__) && defined(STRUCT_STATX_MISSING_FROM_SYS_STAT_H)
@@ -274,6 +275,7 @@ typedef struct interposed_funcs_t {
     struct hostent *(*gethostbyname2)(const char *, int);
     int (*getaddrinfo)(const char *, const char *, const struct addrinfo *,
                        struct addrinfo **);
+    long (*syscall)(long, ...);
     // macOS
     int (*close$NOCANCEL)(int);
     int (*close_nocancel)(int);

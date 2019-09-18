@@ -1248,7 +1248,7 @@ doSend(int sockfd, ssize_t rc)
 }
 
 static void
-doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
+doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 {
 
     scopeLog(func, sd, CFG_LOG_DEBUG);
@@ -1260,7 +1260,7 @@ doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
         atomicAdd(&g_ctrs.openPorts, 1);
         atomicAdd(&g_ctrs.TCPConnections, 1);
         atomicAdd(&g_ctrs.activeConnections, 1);
-        doSetConnection(sd, addr, addrlen, REMOTE);
+        if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);
         doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 0);
         doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED, 0);
         doNetMetric(ACTIVE_CONNECTIONS, sd, EVENT_BASED, 0);
@@ -1470,6 +1470,7 @@ init(void)
     g_fn.__xstat64 = dlsym(RTLD_NEXT, "__xstat64");
     g_fn.__fxstat64 = dlsym(RTLD_NEXT, "__fxstat64");
     g_fn.gethostbyname_r = dlsym(RTLD_NEXT, "gethostbyname_r");
+    g_fn.syscall = dlsym(RTLD_NEXT, "syscall");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
@@ -2362,6 +2363,65 @@ lstat(const char *pathname, struct stat *statbuf)
     return rc;
 }
 
+EXPORTON long
+syscall(long number, ...)
+{
+    int rc;
+    struct FuncArgs fArgs;
+
+    WRAP_CHECK(syscall, -1);
+    doThread();
+    LOAD_FUNC_ARGS_VALIST(fArgs, number);
+    rc = g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
+                      fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
+    if (rc != -1) {
+        scopeLog("syscall", number, CFG_LOG_DEBUG);
+        switch (number) {
+        case SYS_accept4:
+            scopeLog("syscall-accept4", number, CFG_LOG_DEBUG);
+            doAccept(rc, (struct sockaddr *)fArgs.arg[1],
+                     (socklen_t *)fArgs.arg[2], "accept4");
+            break;
+
+        case SYS_sendmmsg:
+            DBG("syscall-sendmsg");
+            scopeLog("syscall-sendmsg", number, CFG_LOG_DEBUG);
+            break;
+
+        case SYS_recvmmsg:
+            DBG("syscall-recvmsg");
+            scopeLog("syscall-recvmsg", number, CFG_LOG_DEBUG);
+            break;
+
+        case SYS_preadv:
+            DBG("syscall-preadv");
+            scopeLog("syscall-preadv", number, CFG_LOG_DEBUG);
+            break;
+
+        case SYS_pwritev:
+            DBG("syscall-pwritev");
+            scopeLog("syscall-pwritev", number, CFG_LOG_DEBUG);
+            break;
+
+        case SYS_dup3:
+            DBG("syscall-dup3");
+            scopeLog("syscall-dup3", number, CFG_LOG_DEBUG);
+            break;
+
+        case SYS_statx:
+            DBG("syscall-statx");
+            scopeLog("syscall-statx", number, CFG_LOG_DEBUG);
+            break;
+
+        default:
+            DBG(NULL);
+            scopeLog("syscall", number, CFG_LOG_DEBUG);
+        }
+    }
+
+    return rc;
+}
+
 #endif // __LINUX__
 
 EXPORTON int
@@ -2476,7 +2536,7 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     doThread();
     sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
-        doAccept(sd, addr, *addrlen, "accept$NOCANCEL");
+        doAccept(sd, addr, addrlen, "accept$NOCANCEL");
     }
 
     return sd;
@@ -3195,7 +3255,7 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     doThread();
     sd = g_fn.accept(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
-        doAccept(sd, addr, *addrlen, "accept");
+        doAccept(sd, addr, addrlen, "accept");
     }
 
     return sd;
@@ -3210,7 +3270,7 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     doThread();
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
     if ((sd != -1) && addr && addrlen) {
-        doAccept(sd, addr, *addrlen, "accept4");
+        doAccept(sd, addr, addrlen, "accept4");
     }
 
     return sd;

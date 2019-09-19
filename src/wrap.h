@@ -91,6 +91,7 @@ enum metric_t {
     NETRX,
     NETTX,
     DNS,
+    DNS_DURATION,
     FS_DURATION,
     FS_READ,
     FS_WRITE,
@@ -125,6 +126,12 @@ typedef struct metric_counters_t {
     int nettxBytes;
     int readBytes;
     int writeBytes;
+    int netConnectErrors;
+    int netTxRxErrors;
+    int netDNSErrors;
+    int fsOpenCloseErrors;
+    int fsStatErrors;
+    int fsRdWrErrors;
 } metric_counters;
 
 typedef struct rtconfig_t {
@@ -437,7 +444,7 @@ extern void *_dl_sym(void *, const char *, void *);
         time.initial = getTime();                    \
     }                                                \
 
-#define IOSTREAMPOST(func, len, type)               \
+#define IOSTREAMPOST(func, len, type, errcntr)      \
     if (fs) {                                       \
         time.duration = getDuration(time.initial);  \
     }                                               \
@@ -451,6 +458,8 @@ extern void *_dl_sym(void *, const char *, void *);
             doFSMetric(FS_DURATION, fd, EVENT_BASED, #func, time.duration, NULL); \
             doFSMetric(FS_READ, fd, EVENT_BASED, #func, len, NULL); \
         }                                           \
+    }  else {                                       \
+         atomicAdd(errcntr, 1);                     \
     }                                               \
                                                     \
 return rc;

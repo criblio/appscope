@@ -20,6 +20,7 @@
 #include <pthread.h>
 #include <ctype.h>
 #include <limits.h>
+#include <sys/syscall.h>
 
 #include <sys/stat.h>
 #if defined(__LINUX__) && defined(__STATX__) && defined(STRUCT_STATX_MISSING_FROM_SYS_STAT_H)
@@ -60,7 +61,7 @@
 #define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
 #define SCOPE_UNIX 99
-#define DYN_CONFIG_PATH "/tmp/%d.cmd"
+#define DYN_CONFIG_PREFIX "scope"
 #ifndef bool
 typedef unsigned int bool;
 #endif
@@ -133,8 +134,10 @@ typedef struct rtconfig_t {
     bool tsc_rdtscp;
     unsigned verbosity;
     uint64_t freq;
+    const char *cmdpath;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];
+    pid_t pid;
 } rtconfig;
 
 typedef struct thread_timing_t {
@@ -272,6 +275,7 @@ typedef struct interposed_funcs_t {
     struct hostent *(*gethostbyname2)(const char *, int);
     int (*getaddrinfo)(const char *, const char *, const struct addrinfo *,
                        struct addrinfo **);
+    long (*syscall)(long, ...);
     // macOS
     int (*close$NOCANCEL)(int);
     int (*close_nocancel)(int);

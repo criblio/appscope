@@ -32,38 +32,40 @@ static void
 dbgAddLineSetsGlobalIfNotSet(void** state)
 {
     assert_null(g_dbg);
-    dbgAddLine("file:7", "%d", 123);
+    dbgInit();
     assert_non_null(g_dbg);
+    dbgAddLine("file:7", "%d", 123);
     assert_int_equal(1, dbgCountAllLines());
 }
 
 static void
 dbgMacroIdentifiesFileAndLine(void** state)
 {
-    dbgDestroy();
-    DBG(NULL);                        // test/dbgtest.c:44
-    DBG("blah");                      // test/dbgtest.c:45
-    DBG("%s", "something");           // test/dbgtest.c:46
-    DBG("%d%s", 314159, "something"); // test/dbgtest.c:47
+    dbgInit();
+    DBG(NULL);                        // test/dbgtest.c:45
+    DBG("blah");                      // test/dbgtest.c:46
+    DBG("%s", "something");           // test/dbgtest.c:47
+    DBG("%d%s", 314159, "something"); // test/dbgtest.c:48
 
     char buf[4096] = {0};
 
     FILE* f = fmemopen(buf, sizeof(buf), "a+");
     assert_non_null(f);
     dbgDumpAll(f);
+    //dbgDumpAll(stdout);
     if (fclose(f)) fail_msg("Couldn't close file");
 
-    assert_non_null(strstr(buf, "test/dbgtest.c:44"));
     assert_non_null(strstr(buf, "test/dbgtest.c:45"));
     assert_non_null(strstr(buf, "test/dbgtest.c:46"));
     assert_non_null(strstr(buf, "test/dbgtest.c:47"));
+    assert_non_null(strstr(buf, "test/dbgtest.c:48"));
     assert_int_equal(4, dbgCountAllLines());
 }
 
 static void
 dbgAddLineHasCorrectCount(void** state)
 {
-    dbgDestroy();
+    dbgInit();
     dbgAddLine("key1", NULL);
     int i;
     for (i=0; i<5; i++) {
@@ -89,7 +91,7 @@ dbgAddLineHasCorrectCount(void** state)
 static void
 dbgAddLineCapturesTimeErrnoAndStr(void** state)
 {
-    dbgDestroy();
+    dbgInit();
     errno = EINVAL;
     dbgAddLine("key1", "str1");
     errno = EEXIST;
@@ -136,7 +138,7 @@ dbgAddLineCapturesTimeErrnoAndStr(void** state)
 static void
 dbgAddLineCapturesFirstAndLastInstance(void** state)
 {
-    dbgDestroy();
+    dbgInit();
     errno = 1;
     dbgAddLine("key1", "str1");
     errno = 2;
@@ -159,7 +161,7 @@ dbgAddLineCapturesFirstAndLastInstance(void** state)
 static void
 dbgAddLineTestReallocWorks(void** state)
 {
-    dbgDestroy();
+    dbgInit();
     int i;
     char* key = calloc(1, 128*8); // Create an array big enough for all
     for (i=0; i<128; i++) {
@@ -174,7 +176,22 @@ dbgAddLineTestReallocWorks(void** state)
 static void
 dbgDumpAllOutputsVersionAndTime(void** state)
 {
-    skip();
+    char buf[4096] = {0};
+
+    FILE* f = fmemopen(buf, sizeof(buf), "a+");
+    assert_non_null(f);
+    dbgDumpAll(f);
+    //dbgDumpAll(stdout);
+    if (fclose(f)) fail_msg("Couldn't close file");
+
+    char version[128] = {0};
+    char date[128] = {0};
+    int rv = sscanf(buf, "Scope Version: %128s   Dump From: %128s\n", version, date);
+
+    assert_int_equal(rv, 2);
+    assert_string_equal(version, SCOPE_VER);
+    assert_string_not_equal(date, "");
+
 }
 
 int

@@ -28,6 +28,7 @@ struct _config_t
         } statsd;
         unsigned period;
         unsigned verbosity;
+        char* commandpath;
     } out;
 
     // CFG_OUT or CFG_LOG
@@ -50,6 +51,7 @@ struct _config_t
 #define DEFAULT_LOG_PATH "/tmp/scope.log"
 #define DEFAULT_TAGS NULL
 #define DEFAULT_NUM_TAGS 8
+#define DEFAULT_COMMAND_PATH "/tmp"
 
     
 ///////////////////////////////////
@@ -65,6 +67,7 @@ cfgCreateDefault()
     c->out.statsd.maxlen = DEFAULT_STATSD_MAX_LEN;
     c->out.period = DEFAULT_SUMMARY_PERIOD;
     c->out.verbosity = DEFAULT_OUT_VERBOSITY;
+    c->out.commandpath = (DEFAULT_COMMAND_PATH) ? strdup(DEFAULT_COMMAND_PATH) : NULL;
     c->transport[CFG_OUT].type = DEFAULT_OUT_TYPE;
     c->transport[CFG_OUT].udp.host = (DEFAULT_OUT_HOST) ? strdup(DEFAULT_OUT_HOST) : NULL;
     c->transport[CFG_OUT].udp.port = (DEFAULT_OUT_PORT) ? strdup(DEFAULT_OUT_PORT) : NULL;
@@ -293,6 +296,14 @@ processSummaryPeriod(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
+processCommandPath(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) return;
+    const char* value = (const char *)node->data.scalar.value;
+    cfgOutCmdPathSetFromStr(config, value);
+}
+
+static void
 processOutput(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_MAPPING_NODE) return;
@@ -301,6 +312,7 @@ processOutput(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_MAPPING_NODE, "format",          processFormat},
         {YAML_MAPPING_NODE, "transport",       processTransport},
         {YAML_SCALAR_NODE,  "summaryperiod",   processSummaryPeriod},
+        {YAML_SCALAR_NODE,  "commandpath",     processCommandPath},
         {YAML_NO_NODE, NULL, NULL}
     };
 
@@ -382,6 +394,7 @@ cfgDestroy(config_t** cfg)
     if (!cfg || !*cfg) return;
     config_t* c = *cfg;
     if (c->out.statsd.prefix) free(c->out.statsd.prefix);
+    if (c->out.commandpath) free(c->out.commandpath);
     which_transport_t t;
     for (t=CFG_OUT; t<CFG_WHICH_MAX; t++) {
         if (c->transport[t].udp.host) free(c->transport[t].udp.host);
@@ -427,6 +440,12 @@ unsigned
 cfgOutPeriod(config_t* cfg)
 {
     return (cfg) ? cfg->out.period : DEFAULT_SUMMARY_PERIOD;
+}
+
+const char *
+cfgOutCmdPath(config_t* cfg)
+{
+    return (cfg) ? cfg->out.commandpath : DEFAULT_COMMAND_PATH;
 }
 
 unsigned
@@ -587,6 +606,19 @@ cfgOutPeriodSet(config_t* cfg, unsigned val)
 }
 
 void
+cfgOutCmdPathSet(config_t* cfg, const char* path)
+{
+    if (!cfg) return;
+    if (cfg->out.commandpath) free(cfg->out.commandpath);
+    if (!path || (path[0] == '\0')) {
+        cfg->out.commandpath = strdup(DEFAULT_COMMAND_PATH);
+        return;
+    }
+
+    cfg->out.commandpath = strdup(path);
+}
+
+void
 cfgOutVerbositySet(config_t* cfg, unsigned val)
 {
     if (!cfg) return;
@@ -729,6 +761,13 @@ cfgOutPeriodSetFromStr(config_t* cfg, const char* value)
     if (errno || *endptr) return;
 
     cfgOutPeriodSet(cfg, x);
+}
+
+void
+cfgOutCmdPathSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgOutCmdPathSet(cfg, value);
 }
 
 void

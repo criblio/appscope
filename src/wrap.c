@@ -15,43 +15,15 @@ static fs_info *g_fsinfo;
 static metric_counters g_ctrs = {0};
 static thread_timing g_thread = {0};
 static log_t* g_log = NULL;
-static log_t *g_prevlog = NULL;
 static out_t* g_out = NULL;
-static out_t *g_prevout = NULL;
 static config_t *g_staticfg = NULL;
 __thread int g_getdelim = 0;
 
 // Forward declaration
 static void * periodic(void *);
 static void doClose(int, const char *);
+static void doConfig(config_t *);
 
-EXPORTOFF void
-reinitLogDescriptor()
-{
-    char* path = cfgPath(CFG_FILE_NAME);
-    config_t* cfg = cfgRead(path);
-    cfgProcessEnvironment(cfg);
-
-    logDestroy(&g_log);
-    g_log = initLog(cfg);
-
-    if (path) free(path);
-    cfgDestroy(&cfg);
-}
-
-EXPORTOFF void
-reinitMetricDescriptor()
-{
-    char* path = cfgPath(CFG_FILE_NAME);
-    config_t* cfg = cfgRead(path);
-    cfgProcessEnvironment(cfg);
-
-    outDestroy(&g_out);
-    g_out = initOut(cfg, NULL);
-
-    if (path) free(path);
-    cfgDestroy(&cfg);
-}
 
 EXPORTON void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
@@ -59,10 +31,15 @@ scopeLog(const char* msg, int fd, cfg_log_level_t level)
     if (!g_log || !msg || !g_cfg.procname[0]) return;
 
     char buf[strlen(msg) + 128];
-    snprintf(buf, sizeof(buf), "Scope: %s(%d): %s\n", g_cfg.procname, fd, msg);
+    if (fd != -1) {
+        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): fd:%d %s\n", g_cfg.procname, g_cfg.pid, fd, msg);
+    } else {
+        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): %s\n", g_cfg.procname, g_cfg.pid, msg);
+    }
     if (logSend(g_log, buf, level) == DEFAULT_BADFD) {
         // We lost our fd, re-open
-        reinitLogDescriptor();
+        // should just do initLog, not everything
+        doConfig(g_staticfg);
     }
 }
 
@@ -74,7 +51,8 @@ sendEvent(out_t* out, event_t* e)
     rc = outSendEvent(g_out, e);
     if (rc == DEFAULT_BADFD) {
         // We lost our fd, re-open
-        reinitMetricDescriptor();
+        // should just do initOut, not everything
+        doConfig(g_staticfg);
     } else if (rc == -1) {
         scopeLog("ERROR: doProcMetric:CPU:outSendEvent", -1, CFG_LOG_ERROR);
     }
@@ -110,29 +88,40 @@ dumpAddrs(int sd, enum control_type_t endp)
 EXPORTOFF void
 doConfig(config_t *cfg)
 {
-    g_thread.interval = cfgOutPeriod(cfg);
-    g_cfg.verbosity = cfgOutVerbosity(cfg);
+    static log_t *g_prevlog = NULL;
+    static out_t *g_prevout = NULL;
 
-    // save the previous objects, they get free'd next period
+    // Clean up previous objects if they exist.
+    if (g_prevout) outDestroy(&g_prevout);
+    if (g_prevlog) logDestroy(&g_prevlog);
+
+    // Save the current objects to get cleaned up next time
     g_prevout = g_out;
     g_prevlog = g_log;
 
+    g_thread.interval = cfgOutPeriod(cfg);
+    if (!g_thread.startTime) {
+        g_thread.startTime = time(NULL) + g_thread.interval;
+    }
+    g_cfg.verbosity = cfgOutVerbosity(cfg);
+    g_cfg.cmdpath = cfgOutCmdPath(cfg);
+
     log_t* log = initLog(cfg);
-    g_out = initOut(cfg, log);
+    g_out = initOut(cfg);
     g_log = log; // Set after initOut to avoid infinite loop with socket
 }
 
 // Process dynamic config change if they are available
 EXPORTOFF int
-dynConfig(pid_t pid)
+dynConfig(void)
 {
     FILE *fs;
-    char path[32];
+    char path[PATH_MAX];
 
-    snprintf(path, sizeof(path), DYN_CONFIG_PATH, pid);
+    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmdpath, DYN_CONFIG_PREFIX, g_cfg.pid);
 
     // Is there a command file for this pid
-    if (osIsFilePresent(pid, path) == -1) return 0;
+    if (osIsFilePresent(g_cfg.pid, path) == -1) return 0;
 
     // Open the command file
     if ((fs = g_fn.fopen(path, "r")) == NULL) return -1;
@@ -329,7 +318,7 @@ doDNSMetricName(const char *domain)
 
     event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              getpid(),              7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("domain",           domain,                2),
             STRFIELD("unit",             "request",             1),
@@ -345,13 +334,12 @@ doDNSMetricName(const char *domain)
 static void
 doProcMetric(enum metric_t type, long long measurement)
 {
-    pid_t pid = getpid();
     switch (type) {
     case PROC_CPU:
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "microsecond",         1),
             FIELDEND
@@ -365,7 +353,7 @@ doProcMetric(enum metric_t type, long long measurement)
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "kibibyte",            1),
             FIELDEND
@@ -379,7 +367,7 @@ doProcMetric(enum metric_t type, long long measurement)
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "thread",              1),
             FIELDEND
@@ -393,7 +381,7 @@ doProcMetric(enum metric_t type, long long measurement)
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "file",                1),
             FIELDEND
@@ -407,7 +395,7 @@ doProcMetric(enum metric_t type, long long measurement)
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "process",             1),
             FIELDEND
@@ -425,11 +413,9 @@ doProcMetric(enum metric_t type, long long measurement)
 static void
 doStatMetric(const char *op, const char *pathname)
 {
-    pid_t pid = getpid();
-
     event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
             STRFIELD("file",             pathname,              2),
@@ -447,7 +433,6 @@ static void
 doFSMetric(enum metric_t type, int fd, enum control_type_t source,
            const char *op, ssize_t size, const char *pathname)
 {
-    pid_t pid = getpid();
     fs_info *fs;
     
     if ((fs = getFSEntry(fd)) == NULL) {
@@ -473,14 +458,15 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         uint64_t d = 0ULL;
-        if (g_fsinfo[fd].numDuration >= 1) {
+        int cachedDuration = g_fsinfo[fd].numDuration; // avoid div by zero
+        if (cachedDuration >= 1) {
             // factor of 1000 converts us to ms.
-            d = g_fsinfo[fd].totalDuration / ( 1000 * g_fsinfo[fd].numDuration);
+            d = g_fsinfo[fd].totalDuration / ( 1000 * cachedDuration);
         }
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
@@ -542,7 +528,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
@@ -609,7 +595,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("op",               op,                    2),
@@ -636,7 +622,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
 
 static void
-doTotal(enum metric_t type, pid_t pid)
+doTotal(enum metric_t type)
 {
     const char* metric = "UNKNOWN";
     int* sizebytes = NULL;
@@ -669,7 +655,7 @@ doTotal(enum metric_t type, pid_t pid)
 
     event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
@@ -687,7 +673,6 @@ doTotal(enum metric_t type, pid_t pid)
 static void
 doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size)
 {
-    pid_t pid = getpid();
     char proto[PROTOCOL_STR];
     in_port_t localPort, remotePort;
         
@@ -704,7 +689,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
@@ -723,7 +708,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
@@ -742,7 +727,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
@@ -762,7 +747,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     {
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
@@ -848,7 +833,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
@@ -946,7 +931,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("proto",            proto,                 1),
@@ -984,7 +969,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        2),
-            NUMFIELD("pid",              pid,                   7),
+            NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("domain",           g_netinfo[fd].dnsName, 2),
             STRFIELD("unit",             "request",             1),
@@ -1247,7 +1232,7 @@ doSend(int sockfd, ssize_t rc)
 }
 
 static void
-doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
+doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 {
 
     scopeLog(func, sd, CFG_LOG_DEBUG);
@@ -1259,7 +1244,7 @@ doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
         atomicAdd(&g_ctrs.openPorts, 1);
         atomicAdd(&g_ctrs.TCPConnections, 1);
         atomicAdd(&g_ctrs.activeConnections, 1);
-        doSetConnection(sd, addr, addrlen, REMOTE);
+        if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);
         doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 0);
         doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED, 0);
         doNetMetric(ACTIVE_CONNECTIONS, sd, EVENT_BASED, 0);
@@ -1270,13 +1255,14 @@ doAccept(int sd, struct sockaddr *addr, socklen_t addrlen, char *func)
 static void
 doReset()
 {
+    g_cfg.pid = getpid();
     g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
 }
 
 static void
-reportFD(pid_t pid, int fd)
+reportFD(int fd)
 {
     struct net_info_t *ninfo = getNetEntry(fd);
     if (ninfo) {
@@ -1317,7 +1303,6 @@ periodic(void *arg)
 {
     long mem;
     int i, nthread, nfds, children;
-    pid_t pid = getpid();
     long long cpu, cpuState = 0;
 
     while (1) {
@@ -1326,45 +1311,31 @@ periodic(void *arg)
         doProcMetric(PROC_CPU, cpu - cpuState);
         cpuState = cpu;
         
-        mem = osGetProcMemory(pid);
+        mem = osGetProcMemory(g_cfg.pid);
         doProcMetric(PROC_MEM, mem);
 
-        nthread = osGetNumThreads(pid);
+        nthread = osGetNumThreads(g_cfg.pid);
         doProcMetric(PROC_THREAD, nthread);
 
-        nfds = osGetNumFds(pid);
+        nfds = osGetNumFds(g_cfg.pid);
         doProcMetric(PROC_FD, nfds);
 
-        children = osGetNumChildProcs(pid);
+        children = osGetNumChildProcs(g_cfg.pid);
         doProcMetric(PROC_CHILD, children);
 
         // report totals (not by file descriptor/socket descriptor)
-        if (g_ctrs.readBytes > 0)  doTotal(TOT_READ, pid);
-        if (g_ctrs.writeBytes > 0) doTotal(TOT_WRITE, pid);
-        if (g_ctrs.netrxBytes > 0) doTotal(TOT_RX, pid);
-        if (g_ctrs.nettxBytes > 0) doTotal(TOT_TX, pid);
+        if (g_ctrs.readBytes > 0)  doTotal(TOT_READ);
+        if (g_ctrs.writeBytes > 0) doTotal(TOT_WRITE);
+        if (g_ctrs.netrxBytes > 0) doTotal(TOT_RX);
+        if (g_ctrs.nettxBytes > 0) doTotal(TOT_TX);
 
         // report net and file by descriptor
         for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {
-            reportFD(pid, i);
-        }
-
-        /*
-         * If the previous period applied dynamic config
-         * then clean up before checking for new config
-         */
-        if (g_prevout) {
-            outDestroy(&g_prevout);
-            g_prevout = NULL;
-        }
-
-        if (g_prevlog) {
-            logDestroy(&g_prevlog);
-            g_prevlog = NULL;
+            reportFD(i);
         }
 
         // Process dynamic config changes, if any
-        dynConfig(pid);
+        dynConfig();
 
         // From the config file
         sleep(g_thread.interval);
@@ -1469,6 +1440,7 @@ init(void)
     g_fn.__xstat64 = dlsym(RTLD_NEXT, "__xstat64");
     g_fn.__fxstat64 = dlsym(RTLD_NEXT, "__fxstat64");
     g_fn.gethostbyname_r = dlsym(RTLD_NEXT, "gethostbyname_r");
+    g_fn.syscall = dlsym(RTLD_NEXT, "syscall");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
@@ -1477,6 +1449,8 @@ init(void)
     if ((g_netinfo = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
         scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
     }
+
+    g_cfg.pid = getpid();
 
     g_cfg.numNinfo = NET_ENTRIES;
     if (g_netinfo) memset(g_netinfo, 0, sizeof(struct net_info_t) * NET_ENTRIES);
@@ -1499,19 +1473,14 @@ init(void)
     }
 
     char* path = cfgPath(CFG_FILE_NAME);
-    g_staticfg = cfgRead(path);
-    cfgProcessEnvironment(g_staticfg);
-
-    g_thread.interval = cfgOutPeriod(g_staticfg);
-    g_thread.startTime = time(NULL) + g_thread.interval;
-    g_cfg.verbosity = cfgOutVerbosity(g_staticfg);
-
-    log_t* log = initLog(g_staticfg);
-    g_out = initOut(g_staticfg, log);
-    g_log = log; // Set after initOut to avoid infinite loop with socket
+    config_t* cfg = cfgRead(path);
+    cfgProcessEnvironment(cfg);
+    doConfig(cfg);
+    g_staticfg = cfg;
     if (path) free(path);
-
-    scopeLog("Constructor", -1, CFG_LOG_INFO);
+    if (!g_dbg) dbgInit();
+    g_getdelim = 0;
+    scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
 }
 
 static void
@@ -1521,7 +1490,7 @@ doClose(int fd, const char *func)
     struct fs_info_t *fsinfo;
 
     // report everything before the info is lost
-    reportFD(getpid(), fd);
+    reportFD(fd);
 
     if ((ninfo = getNetEntry(fd)) != NULL) {
 
@@ -2308,7 +2277,12 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
     return rc;
 }
 
-// We explicitly don't interpose these stat functions on macOS
+/*
+ * We explicitly don't interpose these stat functions on macOS
+ * These are not exported symbols in Linux. Therefore, we
+ * have them turned off for now.
+ * stat, fstat, lstat.
+ */
 EXPORTOFF int
 stat(const char *pathname, struct stat *statbuf)
 {
@@ -2355,6 +2329,75 @@ lstat(const char *pathname, struct stat *statbuf)
         doStatMetric("lstat", pathname);
     }
     return rc;
+}
+
+/*
+ * Note:
+ * The syscall function in libc is called from the loader for
+ * at least mmap, possibly more. The result is that we can not
+ * do any dynamic memory allocation while this executes. Be careful.
+ * The DBG() output is ignored until after the constructor runs.
+ */
+EXPORTON long
+syscall(long number, ...)
+{
+    struct FuncArgs fArgs;
+
+    WRAP_CHECK(syscall, -1);
+    doThread();
+    LOAD_FUNC_ARGS_VALIST(fArgs, number);
+
+    switch (number) {
+    case SYS_accept4:
+    {
+        int rc;
+        rc = g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1],
+                          fArgs.arg[2], fArgs.arg[3]);
+        if (rc != -1) {
+            doAccept(rc, (struct sockaddr *)fArgs.arg[1],
+                     (socklen_t *)fArgs.arg[2], "accept4");
+        }
+        return rc;
+    }
+
+    /*
+     * These messages are in place as they represent
+     * functions that use syscall() in libuv, used with node.js.
+     * These are functions defined in libuv/src/unix/linux-syscalls.c
+     * that we are otherwise interposing. The DBG call allows us to
+     * check to see how many of these are called and therefore
+     * what we are missing. So far, we only see accept4 used.
+     */
+    case SYS_sendmmsg:
+        DBG("syscall-sendmsg");
+        break;
+
+    case SYS_recvmmsg:
+        DBG("syscall-recvmsg");
+        break;
+
+    case SYS_preadv:
+        DBG("syscall-preadv");
+        break;
+
+    case SYS_pwritev:
+        DBG("syscall-pwritev");
+        break;
+
+    case SYS_dup3:
+        DBG("syscall-dup3");
+        break;
+#ifdef __STATX__
+    case SYS_statx:
+        DBG("syscall-statx");
+        break;
+#endif // __STATX__
+    default:
+        DBG(NULL);
+    }
+
+    return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
+                        fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
 
 #endif // __LINUX__
@@ -2471,7 +2514,7 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     doThread();
     sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
-        doAccept(sd, addr, *addrlen, "accept$NOCANCEL");
+        doAccept(sd, addr, addrlen, "accept$NOCANCEL");
     }
 
     return sd;
@@ -3190,7 +3233,7 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     doThread();
     sd = g_fn.accept(sockfd, addr, addrlen);
     if ((sd != -1) && addr && addrlen) {
-        doAccept(sd, addr, *addrlen, "accept");
+        doAccept(sd, addr, addrlen, "accept");
     }
 
     return sd;
@@ -3205,7 +3248,7 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     doThread();
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
     if ((sd != -1) && addr && addrlen) {
-        doAccept(sd, addr, *addrlen, "accept4");
+        doAccept(sd, addr, addrlen, "accept4");
     }
 
     return sd;
@@ -3460,3 +3503,27 @@ getaddrinfo(const char *node, const char *service,
 
     return rc;
 }
+
+#ifdef __LINUX__
+
+// assumes that we're only building for 64 bit...
+char const __invoke_dynamic_linker__[] __attribute__ ((section (".interp"))) = "/lib64/ld-linux-x86-64.so.2";
+
+void
+__scope_main(void)
+{
+    printf("Scope Version: " SCOPE_VER "\n");
+
+    char buf[64];
+    if (snprintf(buf, sizeof(buf), "/proc/%d/exe", getpid()) == -1) exit(0);
+    char path[1024] = {0};
+    if (readlink(buf, path, sizeof(path)) == -1) exit(0);
+    printf("\n");
+    printf("   Usage: LD_PRELOAD=%s <command name>\n ", path);
+    printf("\n");
+    printf("\n");
+    printf("\n");
+    exit(0);
+}
+
+#endif // __LINUX__

@@ -1,7 +1,10 @@
 OS=macOS
 CC=gcc
 CFLAGS=-fPIC -shared -g -Wall -Wno-nonnull -D__MACOS__
+SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
+CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage
+TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
 LD_FLAGS=-Wl, -ldl -lpthread
 INCLUDES=-I./contrib/libyaml/include
 YAML_AR=contrib/libyaml/src/.libs/libyaml.a
@@ -22,16 +25,16 @@ clean:
 test: $(YAML_AR) $(TEST_LIB) src/cfgutils.c test/cfgutilstest.c src/cfg.c test/cfgtest.c src/transport.c test/transporttest.c src/log.c test/logtest.c src/out.c test/outtest.c src/format.c test/formattest.c src/dbg.c test/dbgtest.c test/wraptest.c
 	@echo "Building Tests"
 	@echo "Building cfgtest without YAML only to inspect size"
-	$(CC) $(TEST_CFLAGS) -DNO_YAML -o test/$(OS)/cfgtest $(INCLUDES) $(TEST_INCLUDES) test/cfgtest.c src/cfg.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/$(OS)/cfgtest
+	$(CC) $(TEST_CFLAGS) -DNO_YAML -o test/$(OS)/cfgtest $(INCLUDES) $(TEST_INCLUDES) test/cfgtest.c src/cfg.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/$(OS)/cfgtest
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest $(INCLUDES) $(TEST_INCLUDES) test/cfgutilstest.c src/cfgutils.c src/cfg.c src/out.c src/log.c src/transport.c src/format.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
 	@echo "Building cfgtest with YAML to inspect size and for real testing"
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest $(INCLUDES) $(TEST_INCLUDES) test/cfgtest.c src/cfg.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/$(OS)/cfgtest
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest $(INCLUDES) $(TEST_INCLUDES) test/cfgtest.c src/cfg.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/$(OS)/cfgtest
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/transporttest $(INCLUDES) $(TEST_INCLUDES) test/transporttest.c src/transport.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/logtest $(INCLUDES) $(TEST_INCLUDES) test/logtest.c src/log.c src/transport.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/outtest $(INCLUDES) $(TEST_INCLUDES) test/outtest.c src/out.c src/log.c src/transport.c src/format.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/formattest $(INCLUDES) $(TEST_INCLUDES) test/formattest.c src/format.c $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/formattest $(INCLUDES) $(TEST_INCLUDES) test/formattest.c src/format.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dbgtest $(INCLUDES) $(TEST_INCLUDES) test/dbgtest.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/wraptest $(INCLUDES) $(TEST_INCLUDES) test/wraptest.c $(YAML_AR) $(TEST_LD_FLAGS) -Llib/$(OS)/ -lwrap
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/wraptest $(INCLUDES) $(TEST_INCLUDES) test/wraptest.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS) -Llib/$(OS)/ -lwrap
 	@echo "Running Tests"
 	test/execute.sh
 	@echo "Testing Coverage"

@@ -316,6 +316,10 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
 {
     if (!domain) return;
 
+    // Both DNS metrics use duration...
+    uint64_t ldur = 0ULL;
+    ldur = duration / 1000;
+
     switch (type) {
     case DNS:
     {
@@ -324,7 +328,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
             NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        2),
             STRFIELD("domain",           domain,                2),
-            NUMFIELD("duration",         duration,              2),
+            NUMFIELD("duration",         ldur,              2),
             STRFIELD("unit",             "request",             1),
             FIELDEND
         };
@@ -347,7 +351,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
             FIELDEND
         };
 
-        event_t e = {"net.dns.duration", duration, DELTA_MS, fields};
+        event_t e = {"net.dns.duration", ldur, DELTA_MS, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doDNSMetricName:DNS:outSendEvent", -1, CFG_LOG_ERROR);
         }

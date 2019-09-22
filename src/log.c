@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdlib.h>
+#include "dbg.h"
 #include "log.h"
 
 struct _log_t
@@ -12,7 +13,10 @@ log_t*
 logCreate()
 {
     log_t* log = calloc(1, sizeof(log_t));
-    if (!log) return NULL;
+    if (!log) {
+        DBG(NULL);
+        return NULL;
+    }
 
     log->level = DEFAULT_LOG_LEVEL;
 

@@ -42,7 +42,10 @@ newTransport()
     transport_t *t;
 
     t = calloc(1, sizeof(transport_t));
-    if (!t) return NULL;
+    if (!t) {
+        DBG(NULL);
+        return NULL;
+    }
 
     if ((t->send = dlsym(RTLD_NEXT, "send")) == NULL) goto out;
     if ((t->open = dlsym(RTLD_NEXT, "open")) == NULL) goto out;
@@ -55,6 +58,10 @@ newTransport()
     return t;
 
   out:
+    DBG("send=%p open=%p dup2=%p close=%p "
+        "fcntl=%p write=%p socket=%p connect=%p",
+        t->send, t->open, t->dup2, t->close,
+        t->fcntl, t->write, t->socket, t->connect);
     free(t);
     return NULL;
 }
@@ -72,6 +79,8 @@ newTransport()
 static int
 placeDescriptor(int fd, transport_t *t)
 {
+    if (!t) return -1;
+
     int i, dupfd;
 
     for (i = DEFAULT_FD; i >= DEFAULT_MIN_FD; i--) {
@@ -82,6 +91,7 @@ placeDescriptor(int fd, transport_t *t)
             return dupfd;
         }
     }
+    DBG("%d", t->type);
     return -1;
 }
 
@@ -121,7 +131,10 @@ transportCreateUdp(const char* host, const char* port)
     }
 
     // If none worked, get out
-    if (t->udp.sock == -1) goto out;
+    if (t->udp.sock == -1) {
+        DBG("host=%s port=%s", host, port);
+        goto out;
+    }
 
     // Move this descriptor up out of the way
     if ((t->udp.sock = placeDescriptor(t->udp.sock, t)) == -1) goto out;
@@ -154,12 +167,14 @@ transportCreateFile(const char* path)
     t->type = CFG_FILE;
     t->file.path = strdup(path);
     if (!t->file.path) {
+        DBG("%s", path);
         transportDestroy(&t);
         return t;
     }
 
     t->file.fd = t->open(t->file.path, O_CREAT|O_RDWR|O_APPEND|O_CLOEXEC, 0666);
     if (t->file.fd == -1) {
+        DBG("%s", path);
         transportDestroy(&t);
         return t;
     }
@@ -182,7 +197,10 @@ transportCreateUnix(const char* path)
 {
     if (!path) return NULL;
     transport_t* t = calloc(1, sizeof(transport_t));
-    if (!t) return NULL;
+    if (!t) {
+        DBG(NULL);
+        return NULL;
+    }
 
     t->type = CFG_UNIX;
 
@@ -193,7 +211,10 @@ transport_t*
 transportCreateSyslog(void)
 {
     transport_t* t = calloc(1, sizeof(transport_t));
-    if (!t) return NULL;
+    if (!t) {
+        DBG(NULL);
+        return NULL;
+    }
 
     t->type = CFG_SYSLOG;
 
@@ -204,7 +225,10 @@ transport_t*
 transportCreateShm()
 {
     transport_t* t = calloc(1, sizeof(transport_t));
-    if (!t) return NULL;
+    if (!t) {
+        DBG(NULL);
+        return NULL;
+    }
 
     t->type = CFG_SHM;
 
@@ -231,6 +255,8 @@ transportDestroy(transport_t** transport)
             break;
         case CFG_SHM:
             break;
+        default:
+            DBG("%d", t->type);
     }
     free(t);
     *transport = NULL;
@@ -253,6 +279,7 @@ transportSend(transport_t* t, const char* msg)
                 if (rc < 0) {
                     switch (errno) {
                     case EBADF:
+                        DBG(NULL);
                         return DEFAULT_BADFD;
                         break;
                     case EWOULDBLOCK:
@@ -273,6 +300,7 @@ transportSend(transport_t* t, const char* msg)
             if (t->file.fd != -1) {
                 int bytes = t->write(t->file.fd, msg, strlen(msg));
                 if ((bytes < 0) && (errno == EBADF)) {
+                    DBG(NULL);
                     return DEFAULT_BADFD;
                 } else if (bytes < 0) {
                     DBG("%d %d", t->file.fd, bytes);
@@ -288,6 +316,9 @@ transportSend(transport_t* t, const char* msg)
         case CFG_SHM:
             return -1;
             break;
+        default:
+            DBG("%d", t->type);
+            return -1;
     }
      return 0;
 }
@@ -311,6 +342,7 @@ transportDescriptor(transport_t *t)
         return -1;
         break;
     default:
+        DBG("%d", t->type);
         return -1;
     }
 }

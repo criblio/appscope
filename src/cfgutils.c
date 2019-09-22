@@ -88,7 +88,10 @@ envRegex()
 
     if (regex) return regex;
 
-    if (!(regex = calloc(1, sizeof(regex_t)))) return regex;
+    if (!(regex = calloc(1, sizeof(regex_t)))) {
+        DBG(NULL);
+        return regex;
+    }
 
     if (regcomp(regex, "\\$[a-zA-Z0-9_]+", REG_EXTENDED)) {
         // regcomp failed.
@@ -109,7 +112,10 @@ doEnvVariableSubstitution(char* value)
 
     int out_size = strlen(value) + 1;
     char* outval = calloc(1, out_size);
-    if (!outval) return NULL;
+    if (!outval) {
+        DBG("%s", value);
+        return NULL;
+    }
 
     char* outptr = outval;  // "tail" pointer where text can be appended
     char* inptr = value;    // "current" pointer as we scan through value
@@ -147,6 +153,7 @@ doEnvVariableSubstitution(char* value)
                 outptr = new_outval + (outptr - outval);
                 outval = new_outval;
             } else {
+                DBG("%s", value);
                 free(outval);
                 return NULL;
             }
@@ -284,6 +291,8 @@ initTransport(config_t* cfg, which_transport_t t)
         case CFG_SHM:
             transport = transportCreateShm();
             break;
+        default:
+            DBG("%d", cfgTransportType(cfg, t));
     }
     return transport;
 }

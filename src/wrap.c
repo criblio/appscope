@@ -48,7 +48,7 @@ sendEvent(out_t* out, event_t* e)
 {
     int rc;
 
-    rc = outSendEvent(g_out, e);
+    rc = outSendEvent(out, e);
     if (rc == DEFAULT_BADFD) {
         // We lost our fd, re-open
         // should just do initOut, not everything
@@ -2393,7 +2393,7 @@ syscall(long number, ...)
         break;
 #endif // __STATX__
     default:
-        DBG(NULL);
+        DBG("syscall number: %d", number);
     }
 
     return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],

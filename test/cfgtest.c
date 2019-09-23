@@ -28,28 +28,6 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
 }
 
-int
-writeFile(const char* path, const char* text)
-{
-    FILE* f = fopen(path, "w");
-    if (!f)
-        fail_msg("Couldn't open file");
-
-    if (!fwrite(text, strlen(text), 1, f))
-        fail_msg("Couldn't write file");
-
-    if (fclose(f))
-        fail_msg("Couldn't close file");
-
-    return 0;
-}
-
-int
-deleteFile(const char* path)
-{
-    return unlink(path);
-}
-
 static void
 cfgCreateDefaultReturnsValidPtr(void** state)
 {
@@ -584,6 +562,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     deleteFile(path);
 }
 
+
 int
 main(int argc, char* argv[])
 {
@@ -623,8 +602,9 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgReadBadYamlReturnsDefaults),
         cmocka_unit_test(cfgReadExtraFieldsAreHarmless),
         cmocka_unit_test(cfgReadYamlOrderWithinStructureDoesntMatter),
+        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
-    return cmocka_run_group_tests(tests, NULL, NULL);
+    return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }
 
 

@@ -203,8 +203,9 @@ testTSCValue(void** state)
         fail_msg("Elapsed %" PRIu64 " is outside of allowed bounds (20, 350)", elapsed);
 }
 
+
 int
-main (int argc, char* argv[])
+main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
     const struct CMUnitTest tests[] = {
@@ -213,6 +214,7 @@ main (int argc, char* argv[])
         cmocka_unit_test(testTSCInit),
         cmocka_unit_test(testTSCRollover),
         cmocka_unit_test(testTSCValue),
+        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
-    return cmocka_run_group_tests(tests, NULL, NULL);
+    return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

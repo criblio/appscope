@@ -38,9 +38,11 @@ test: $(YAML_AR) $(TEST_LIB) test/test.c src/cfgutils.c test/cfgutilstest.c src/
 	@echo "Running Tests"
 	test/execute.sh
 	@echo "Testing Coverage"
-	lcov --capture --directory . --output-file coverage.info
-	genhtml coverage.info --output-directory out
-	# see file:///Users/cribl/scope/out/index.html
+	mkdir -p coverage
+	lcov --capture --directory . --output-file coverage/coverage.info
+	genhtml coverage/coverage.info --output-directory coverage
+	rm *\.gcda *\.gcno
+	# see file:///Users/cribl/scope/coverage/index.html
 
 $(YAML_AR):
 	@echo "Building libyaml"

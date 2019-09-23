@@ -171,8 +171,10 @@ testConnDuration(void** state)
         fail_msg("Duration %d is outside of allowed bounds (1000, 1300)", duration);
 
     free(buf);
-    // Delete this only after all tests that use the metrics file are done
+
+    // Delete these after tests that use the metrics and log files are done
     assert_return_code(unlink(path), errno);
+    assert_return_code(unlink(cfgTransportPath(cfg, CFG_LOG)), errno);
 }
 
 static void

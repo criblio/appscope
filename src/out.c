@@ -72,11 +72,3 @@ outFormatSet(out_t* out, format_t* format)
     out->format = format;
 }
 
-// Getter funcs
-int
-outTransportDescriptor(out_t *out)
-{
-    if (out) return transportDescriptor(out->transport);
-
-    return -1;
-}

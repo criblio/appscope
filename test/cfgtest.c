@@ -271,6 +271,7 @@ cfgReadGoodYaml(void** state)
         "    type: file                      # udp, unix, file, syslog\n" 
         "    path: '/var/log/scope.log'\n"
         "  summaryperiod: 11                 # in seconds\n"
+        "  commandpath: /tmp\n"
         "logging:\n"
         "  level: debug                      # debug, info, warning, error, none\n"
         "  transport:\n"
@@ -285,6 +286,7 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgOutStatsDMaxLen(config), 1024);
     assert_int_equal(cfgOutVerbosity(config), 3);
     assert_int_equal(cfgOutPeriod(config), 11);
+    assert_string_equal(cfgOutCmdPath(config), "/tmp");
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
     assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");

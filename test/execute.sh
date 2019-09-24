@@ -40,6 +40,11 @@ run_test() {
 
 CWD="$(pwd)"
 
+if [ -d $CWD/coverage ]; then
+    rm -rf $CWD/coverage
+fi
+mkdir $CWD/coverage
+
 if uname -s 2> /dev/null | grep -i "linux" > /dev/null; then
     OS="linux"
     ENVVARS=$ENVVARS"LD_LIBRARY_PATH=contrib/cmocka/build/src/ "

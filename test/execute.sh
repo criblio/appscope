@@ -10,7 +10,7 @@ accumulate_coverage() {
     # info from previous tests (coverage.tmp dir).
 
     FILE=coverage/coverage$NUM.info
-    (unset DYLD_LIBRARY_PATH; lcov --capture --directory . --output-file $FILE)
+    lcov --capture --directory . --output-file $FILE
     INFOLIST=$INFOLIST"$FILE "
     rm *\.gcda
     ((NUM++))
@@ -21,7 +21,7 @@ accumulate_coverage() {
 report_final_coverage() {
 
     genhtml -o coverage $INFOLIST
-    rm *\.gcno
+    rm *\.gcno *\.o
 }
 
 run_test() {

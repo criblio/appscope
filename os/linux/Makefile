@@ -28,26 +28,32 @@ libwrap.so: src/wrap.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c sr
 clean:
 	rm -f ./lib/$(OS)/libwrap.so
 
-test: $(YAML_AR) $(TEST_LIB) src/cfgutils.c test/cfgutilstest.c src/cfg.c test/cfgtest.c src/transport.c test/transporttest.c src/log.c test/logtest.c src/out.c test/outtest.c src/format.c test/formattest.c src/dbg.c test/dbgtest.c test/glibcvertest.c test/wraptest.c
+SRC_C_FILES:=$(wildcard src/*.c)
+SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))
+TEST_C_FILES:=$(wildcard test/*.c)
+TEST_C_FILES:=$(filter-out test/wraptest.c, $(TEST_C_FILES))
+C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES)
+O_FILES:=$(C_FILES:.c=.o)
+
+test: $(C_FILES)
 	@echo "Building Tests"
-	@echo "Building cfgtest without YAML only to inspect size"
-	$(CC) $(TEST_CFLAGS) -DNO_YAML -o test/$(OS)/cfgtest $(INCLUDES) $(TEST_INCLUDES) test/cfgtest.c src/cfg.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/$(OS)/cfgtest
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest $(INCLUDES) $(TEST_INCLUDES) test/cfgutilstest.c src/cfgutils.c src/cfg.c src/out.c src/log.c src/transport.c src/format.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
-	@echo "Building cfgtest with YAML to inspect size and for real testing"
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest $(INCLUDES) $(TEST_INCLUDES) test/cfgtest.c src/cfg.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS) && ls -al test/$(OS)/cfgtest
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/transporttest $(INCLUDES) $(TEST_INCLUDES) test/transporttest.c src/transport.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/logtest $(INCLUDES) $(TEST_INCLUDES) test/logtest.c src/log.c src/transport.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/outtest $(INCLUDES) $(TEST_INCLUDES) test/outtest.c src/out.c src/log.c src/transport.c src/format.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/formattest $(INCLUDES) $(TEST_INCLUDES) test/formattest.c src/format.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dbgtest $(INCLUDES) $(TEST_INCLUDES) test/dbgtest.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/glibcvertest $(INCLUDES) $(TEST_INCLUDES) test/glibcvertest.c $(YAML_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/wraptest $(INCLUDES) $(TEST_INCLUDES) test/wraptest.c src/dbg.c $(YAML_AR) $(TEST_LD_FLAGS) -Llib/$(OS)/ -lwrap
-	@echo "Running Tests"
+	$(CC) -c $(TEST_CFLAGS) $^ $(INCLUDES) $(TEST_INCLUDES)
+	make $(YAML_AR)
+	make $(TEST_LIB)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest cfgutilstest.o cfgutils.o cfg.o out.o log.o transport.o format.o dbg.o test.o $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest cfgtest.o cfg.o dbg.o test.o $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/transporttest transporttest.o transport.o dbg.o test.o $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/logtest logtest.o log.o transport.o dbg.o test.o $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/outtest outtest.o out.o log.o transport.o format.o dbg.o test.o $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/formattest formattest.o format.o dbg.o test.o $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dbgtest dbgtest.o dbg.o $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/glibcvertest glibcvertest.o $(YAML_AR) $(TEST_LD_FLAGS)
+	# wraptest needs more linker flags
+	$(CC) -c $(TEST_CFLAGS) test/wraptest.c $(INCLUDES) $(TEST_INCLUDES)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/wraptest wraptest.o dbg.o test.o $(YAML_AR) $(TEST_LD_FLAGS) -Llib/$(OS)/ -lwrap
+	@echo "Running Tests and Generating Test Coverage"
 	test/execute.sh
-	@echo "Testing Coverage"
-	lcov --capture --directory . --output-file coverage.info
-	genhtml coverage.info --output-directory out
-	# see file:///Users/cribl/scope/out/index.html
+	# see file:///Users/cribl/scope/coverage/index.html
 
 $(YAML_AR):
 	@echo "Building libyaml"

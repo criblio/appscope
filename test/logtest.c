@@ -60,19 +60,6 @@ logLevelSetAndGet(void** state)
     logDestroy(&log);
 }
 
-static long
-fileEndPosition(const char* path)
-{
-    FILE* f;
-    if ((f = fopen(path, "r"))) {
-        fseek(f, 0, SEEK_END);
-        long pos = ftell(f);
-        fclose(f);
-        return pos;
-    }
-    return -1;
-}
-
 static void
 logTranportSetAndLogSend(void** state)
 {
@@ -169,8 +156,9 @@ logSendWithLogLevelFilter(void** state)
     logDestroy(&log);
 }
 
+
 int
-main (int argc, char* argv[])
+main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
 
@@ -183,7 +171,7 @@ main (int argc, char* argv[])
         cmocka_unit_test(logLevelSetAndGet),
         cmocka_unit_test(logTranportSetAndLogSend),
         cmocka_unit_test(logSendWithLogLevelFilter),
+        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
-
-    return cmocka_run_group_tests(tests, NULL, NULL);
+    return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

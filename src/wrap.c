@@ -48,7 +48,7 @@ sendEvent(out_t* out, event_t* e)
 {
     int rc;
 
-    rc = outSendEvent(g_out, e);
+    rc = outSendEvent(out, e);
     if (rc == DEFAULT_BADFD) {
         // We lost our fd, re-open
         // should just do initOut, not everything
@@ -317,10 +317,10 @@ doDNSMetricName(const char *domain)
     if (!domain) return;
 
     event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("domain",           domain,                2),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("domain",           domain,                5),
             STRFIELD("unit",             "request",             1),
             FIELDEND
     };
@@ -338,9 +338,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_CPU:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("host",             g_cfg.hostname,        4),
             STRFIELD("unit",             "microsecond",         1),
             FIELDEND
         };
@@ -352,9 +352,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_MEM:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("host",             g_cfg.hostname,        4),
             STRFIELD("unit",             "kibibyte",            1),
             FIELDEND
         };
@@ -366,9 +366,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_THREAD:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("host",             g_cfg.hostname,        4),
             STRFIELD("unit",             "thread",              1),
             FIELDEND
         };
@@ -380,9 +380,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_FD:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("host",             g_cfg.hostname,        4),
             STRFIELD("unit",             "file",                1),
             FIELDEND
         };
@@ -394,9 +394,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_CHILD:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("host",             g_cfg.hostname,        4),
             STRFIELD("unit",             "process",             1),
             FIELDEND
         };
@@ -414,11 +414,11 @@ static void
 doStatMetric(const char *op, const char *pathname)
 {
     event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("op",               op,                    2),
-            STRFIELD("file",             pathname,              2),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("op",               op,                    3),
+            STRFIELD("file",             pathname,              5),
             STRFIELD("unit",             "operation",           1),
             FIELDEND
     };
@@ -465,12 +465,12 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("op",               op,                    2),
-            STRFIELD("file",             g_fsinfo[fd].path,     2),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("op",               op,                    3),
+            STRFIELD("file",             g_fsinfo[fd].path,     5),
             NUMFIELD("numops",        g_fsinfo[fd].numDuration, 8),
             STRFIELD("unit",             "millisecond",         1),
             FIELDEND
@@ -527,12 +527,12 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("op",               op,                    2),
-            STRFIELD("file",             g_fsinfo[fd].path,     2),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("op",               op,                    3),
+            STRFIELD("file",             g_fsinfo[fd].path,     5),
             NUMFIELD("numops",           *numops,               8),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
@@ -594,12 +594,12 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("op",               op,                    2),
-            STRFIELD("file",             g_fsinfo[fd].path,     2),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("op",               op,                    3),
+            STRFIELD("file",             g_fsinfo[fd].path,     5),
             STRFIELD("unit",             "operation",           1),
             FIELDEND
         };
@@ -654,9 +654,9 @@ doTotal(enum metric_t type)
 	}
 
     event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        2),
+            STRFIELD("host",             g_cfg.hostname,        4),
             STRFIELD("unit",             "byte",                1),
             FIELDEND
     };
@@ -688,12 +688,12 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     case OPEN_PORTS:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("proto",            proto,                 1),
-            NUMFIELD("port",             localPort,             5),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("proto",            proto,                 2),
+            NUMFIELD("port",             localPort,             6),
             STRFIELD("unit",             "instance",            1),
             FIELDEND
         };
@@ -707,12 +707,12 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     case TCP_CONNECTIONS:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("proto",            proto,                 1),
-            NUMFIELD("port",             localPort,             5),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("proto",            proto,                 2),
+            NUMFIELD("port",             localPort,             6),
             STRFIELD("unit",             "session",             1),
             FIELDEND
         };
@@ -726,12 +726,12 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     case ACTIVE_CONNECTIONS:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("proto",            proto,                 1),
-            NUMFIELD("port",             localPort,             5),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("proto",            proto,                 2),
+            NUMFIELD("port",             localPort,             6),
             STRFIELD("unit",             "connection",          1),
             FIELDEND
         };
@@ -746,12 +746,12 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     case CONNECTION_DURATION:
     {
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("proto",            proto,                 1),
-            NUMFIELD("port",             localPort,             5),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("proto",            proto,                 2),
+            NUMFIELD("port",             localPort,             6),
             STRFIELD("unit",             "millisecond",         1),
             FIELDEND
         };
@@ -832,15 +832,15 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
         
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("proto",            proto,                 1),
-            STRFIELD("localip",          lip,                   5),
-            NUMFIELD("localp",           localPort,             5),
-            STRFIELD("remoteip",         rip,                   5),
-            NUMFIELD("remotep",          remotePort,            5),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("proto",            proto,                 2),
+            STRFIELD("localip",          lip,                   6),
+            NUMFIELD("localp",           localPort,             6),
+            STRFIELD("remoteip",         rip,                   6),
+            NUMFIELD("remotep",          remotePort,            6),
             STRFIELD("data",             data,                  1),
             NUMFIELD("numops",           g_netinfo[fd].numRX,   8),
             STRFIELD("unit",             "byte",                1),
@@ -930,15 +930,15 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
             NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("proto",            proto,                 1),
-            STRFIELD("localip",          lip,                   5),
-            NUMFIELD("localp",           localPort,             5),
-            STRFIELD("remoteip",         rip,                   5),
-            NUMFIELD("remotep",          remotePort,            5),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("proto",            proto,                 2),
+            STRFIELD("localip",          lip,                   6),
+            NUMFIELD("localp",           localPort,             6),
+            STRFIELD("remoteip",         rip,                   6),
+            NUMFIELD("remotep",          remotePort,            6),
             STRFIELD("data",             data,                  1),
             NUMFIELD("numops",           g_netinfo[fd].numTX,   8),
             STRFIELD("unit",             "byte",                1),
@@ -968,10 +968,10 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         g_netinfo[fd].dnsSend = FALSE;
         
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("domain",           g_netinfo[fd].dnsName, 2),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("domain",           g_netinfo[fd].dnsName, 5),
             STRFIELD("unit",             "request",             1),
             FIELDEND
         };
@@ -2393,7 +2393,7 @@ syscall(long number, ...)
         break;
 #endif // __STATX__
     default:
-        DBG(NULL);
+        DBG("syscall number: %d", number);
     }
 
     return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],

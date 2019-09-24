@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "dbg.h"
 #include "format.h"
 
 #include "test.h"
@@ -291,11 +292,15 @@ fmtStringStatsDVerifyEachStatsDType(void** state)
         free(msg);
     }
 
+    assert_int_equal(dbgCountMatchingLines("src/format.c"), 0);
+
     // In undefined case, just don't crash...
     event_t e = {"A", 1, SET+1, NULL};
     char* msg = fmtString(fmt, &e);
     if (msg) free(msg);
 
+    assert_int_equal(dbgCountMatchingLines("src/format.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
     fmtDestroy(&fmt);
 }
 
@@ -425,6 +430,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient),
         cmocka_unit_test(fmtStringStatsDHonorsCardinality),
         cmocka_unit_test(fmtStringNewlineDelimitedReturnsNull),
+        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
-    return cmocka_run_group_tests(tests, NULL, NULL);
+    return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

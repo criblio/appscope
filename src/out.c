@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include "dbg.h"
 #include "out.h"
 
 struct _out_t
@@ -13,7 +14,10 @@ out_t*
 outCreate()
 {
     out_t* out = calloc(1, sizeof(out_t));
-    if (!out) return NULL;
+    if (!out) {
+        DBG(NULL);
+        return NULL;
+    }
 
     return out;
 }
@@ -68,11 +72,3 @@ outFormatSet(out_t* out, format_t* format)
     out->format = format;
 }
 
-// Getter funcs
-int
-outTransportDescriptor(out_t *out)
-{
-    if (out) return transportDescriptor(out->transport);
-
-    return -1;
-}

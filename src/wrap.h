@@ -127,12 +127,26 @@ typedef struct metric_counters_t {
     int writeBytes;
 } metric_counters;
 
+typedef struct {
+    struct {
+        int open_close;
+        int read_write;
+        int stat;
+        int seek;
+    } fs;
+    struct {
+        int open_close;
+        int rx_tx;
+        int dns;
+    } net;
+} summary_t;
+
 typedef struct rtconfig_t {
     int numNinfo;
     int numFSInfo;
     bool tsc_invariant;
     bool tsc_rdtscp;
-    unsigned verbosity;
+    summary_t summarize;
     uint64_t freq;
     const char *cmdpath;
     char hostname[MAX_HOSTNAME];
@@ -288,7 +302,7 @@ typedef struct interposed_funcs_t {
     int (*statx)(int, const char *, int, unsigned int, struct statx *);
 #endif // __LINUX__ && __STATX__
 } interposed_funcs;
-    
+
 static inline void
 atomicAdd(int *ptr, int val) {
     (void)__sync_add_and_fetch(ptr, val);

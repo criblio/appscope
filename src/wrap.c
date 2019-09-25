@@ -85,6 +85,28 @@ dumpAddrs(int sd, enum control_type_t endp)
     }
 }
 
+static void
+setVerbosity(rtconfig* c, unsigned verbosity)
+{
+    if (!c) return;
+
+    summary_t* summarize = &c->summarize;
+
+    if (verbosity <= 9) {
+        memset(summarize, 1, sizeof(*summarize));
+    } else if (verbosity == 10) {
+        summarize->fs.read_write = 0;
+        summarize->net.rx_tx = 1;
+    } else if (verbosity == 11) {
+        summarize->fs.read_write = 1;
+        summarize->net.rx_tx = 0;
+    } else if (verbosity == 12) {
+        summarize->fs.read_write = 0;
+        summarize->net.rx_tx = 0;
+    }
+}
+
+
 EXPORTOFF void
 doConfig(config_t *cfg)
 {
@@ -103,7 +125,7 @@ doConfig(config_t *cfg)
     if (!g_thread.startTime) {
         g_thread.startTime = time(NULL) + g_thread.interval;
     }
-    g_cfg.verbosity = cfgOutVerbosity(cfg);
+    setVerbosity(&g_cfg, cfgOutVerbosity(cfg));
     g_cfg.cmdpath = cfgOutCmdPath(cfg);
 
     log_t* log = initLog(cfg);
@@ -451,9 +473,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         // Only report if enabled
-        if ((g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
-            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
-            (source == EVENT_BASED)) {
+        if ((g_cfg.summarize.fs.read_write) && (source == EVENT_BASED)) {
             return;
         }
 
@@ -520,9 +540,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         // Only report if enabled
-        if ((g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
-            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
-            (source == EVENT_BASED)) {
+        if ((g_cfg.summarize.fs.read_write) && (source == EVENT_BASED)) {
             return;
         }
 
@@ -587,9 +605,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         // Only report if enabled
         if ((type == FS_SEEK) &&
-            (g_cfg.verbosity != CFG_FS_EVENTS_VERBOSITY) &&
-            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
-            (source == EVENT_BASED)) {
+            (g_cfg.summarize.fs.read_write && (source == EVENT_BASED))) {
             return;
         }
 
@@ -775,9 +791,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             atomicAdd(&g_ctrs.netrxBytes, size);
         }
 
-        if ((g_cfg.verbosity != CFG_NET_EVENTS_VERBOSITY) &&
-            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
-            (source == EVENT_BASED)) {
+        if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
             return;
         }
 
@@ -873,9 +887,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             atomicAdd(&g_ctrs.nettxBytes, size);
         }
 
-        if ((g_cfg.verbosity != CFG_NET_EVENTS_VERBOSITY) &&
-            (g_cfg.verbosity != CFG_NET_FS_EVENTS_VERBOSITY) &&
-            (source == EVENT_BASED)) {
+        if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
             return;
         }
 

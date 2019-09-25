@@ -303,6 +303,12 @@ typedef struct interposed_funcs_t {
 #endif // __LINUX__ && __STATX__
 } interposed_funcs;
 
+static inline bool
+atomicCas64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
+{
+    return __sync_bool_compare_and_swap(ptr, oldval, newval);
+}
+
 static inline void
 atomicAdd(int *ptr, int val) {
     (void)__sync_add_and_fetch(ptr, val);

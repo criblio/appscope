@@ -1310,41 +1310,57 @@ reportFD(int fd)
     }
 }
 
-static void *
-periodic(void *arg)
+static void
+reportPeriodicStuff(void)
 {
     long mem;
     int i, nthread, nfds, children;
     long long cpu, cpuState = 0;
 
+    // This is called by periodic(), and due to atexit().
+    // If it's actively running for one reason, then skip the second.
+    static uint64_t reentrancy_guard = 0ULL;
+    if (!atomicCas64(&reentrancy_guard, 0ULL, 1ULL)) return;
+
+
+    // We report CPU time for this period.
+    cpu = doGetProcCPU();
+    doProcMetric(PROC_CPU, cpu - cpuState);
+    cpuState = cpu;
+
+    mem = osGetProcMemory(g_cfg.pid);
+    doProcMetric(PROC_MEM, mem);
+
+    nthread = osGetNumThreads(g_cfg.pid);
+    doProcMetric(PROC_THREAD, nthread);
+
+    nfds = osGetNumFds(g_cfg.pid);
+    doProcMetric(PROC_FD, nfds);
+
+    children = osGetNumChildProcs(g_cfg.pid);
+    doProcMetric(PROC_CHILD, children);
+
+    // report totals (not by file descriptor/socket descriptor)
+    if (g_ctrs.readBytes > 0)  doTotal(TOT_READ);
+    if (g_ctrs.writeBytes > 0) doTotal(TOT_WRITE);
+    if (g_ctrs.netrxBytes > 0) doTotal(TOT_RX);
+    if (g_ctrs.nettxBytes > 0) doTotal(TOT_TX);
+
+    // report net and file by descriptor
+    for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {
+        reportFD(i);
+    }
+
+    if (!atomicCas64(&reentrancy_guard, 1ULL, 0ULL)) {
+         DBG(NULL);
+    }
+}
+
+static void *
+periodic(void *arg)
+{
     while (1) {
-        // We report CPU time for this period.
-        cpu = doGetProcCPU();
-        doProcMetric(PROC_CPU, cpu - cpuState);
-        cpuState = cpu;
-        
-        mem = osGetProcMemory(g_cfg.pid);
-        doProcMetric(PROC_MEM, mem);
-
-        nthread = osGetNumThreads(g_cfg.pid);
-        doProcMetric(PROC_THREAD, nthread);
-
-        nfds = osGetNumFds(g_cfg.pid);
-        doProcMetric(PROC_FD, nfds);
-
-        children = osGetNumChildProcs(g_cfg.pid);
-        doProcMetric(PROC_CHILD, children);
-
-        // report totals (not by file descriptor/socket descriptor)
-        if (g_ctrs.readBytes > 0)  doTotal(TOT_READ);
-        if (g_ctrs.writeBytes > 0) doTotal(TOT_WRITE);
-        if (g_ctrs.netrxBytes > 0) doTotal(TOT_RX);
-        if (g_ctrs.nettxBytes > 0) doTotal(TOT_TX);
-
-        // report net and file by descriptor
-        for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {
-            reportFD(i);
-        }
+        reportPeriodicStuff();
 
         // Process dynamic config changes, if any
         dynConfig();
@@ -1493,6 +1509,9 @@ init(void)
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
     scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
+    if (atexit(reportPeriodicStuff)) {
+        DBG(NULL);
+    }
 }
 
 static void

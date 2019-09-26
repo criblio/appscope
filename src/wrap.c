@@ -96,12 +96,15 @@ setVerbosity(rtconfig* c, unsigned verbosity)
         memset(summarize, 1, sizeof(*summarize));
     } else if (verbosity == 10) {
         summarize->fs.read_write = 0;
+        summarize->fs.seek = 0;
         summarize->net.rx_tx = 1;
     } else if (verbosity == 11) {
         summarize->fs.read_write = 1;
+        summarize->fs.seek = 1;
         summarize->net.rx_tx = 0;
     } else if (verbosity == 12) {
         summarize->fs.read_write = 0;
+        summarize->fs.seek = 0;
         summarize->net.rx_tx = 0;
     }
 }
@@ -605,7 +608,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         // Only report if enabled
         if ((type == FS_SEEK) &&
-            (g_cfg.summarize.fs.read_write && (source == EVENT_BASED))) {
+            (g_cfg.summarize.fs.seek && (source == EVENT_BASED))) {
             return;
         }
 

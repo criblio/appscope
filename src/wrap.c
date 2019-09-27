@@ -328,10 +328,10 @@ doErrorMetric(enum metric_t type, int count, enum control_type_t source,
         }
 
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("operation",        func,                  2),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("op",               func,                  3),
             STRFIELD("unit",             "operation",           1),
             FIELDEND
         };
@@ -355,11 +355,11 @@ doErrorMetric(enum metric_t type, int count, enum control_type_t source,
         }
 
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("operation",        func,                  2),
-            STRFIELD("file",             name,                  2),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("op",               func,                  3),
+            STRFIELD("file",             name,                  5),
             STRFIELD("unit",             "operation",           1),
             FIELDEND
         };
@@ -381,11 +381,11 @@ doErrorMetric(enum metric_t type, int count, enum control_type_t source,
          * always. We can change that by adding the test here.
          */
         event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        2),
+            STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        2),
-            STRFIELD("operation",        func,                  2),
-            STRFIELD("domain",           name,                  2),
+            STRFIELD("host",             g_cfg.hostname,        4),
+            STRFIELD("op",               func,                  3),
+            STRFIELD("domain",           name,                  5),
             STRFIELD("unit",             "operation",           1),
             FIELDEND
         };

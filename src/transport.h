@@ -14,7 +14,4 @@ void                transportDestroy(transport_t**);
 // Accessors
 int                 transportSend(transport_t*, const char* msg);
 
-// Getters
-int transportDescriptor(transport_t *);
-
 #endif // __TRANSPORT_H__

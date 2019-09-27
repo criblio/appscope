@@ -1,9 +1,10 @@
-#include "cfg.h"
 #define _GNU_SOURCE
+#include <dlfcn.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <dlfcn.h>
+#include "cfg.h"
+#include "dbg.h"
 
 #ifndef NO_YAML
 #include "yaml.h"
@@ -61,7 +62,10 @@ config_t*
 cfgCreateDefault()
 { 
     config_t* c = calloc(1, sizeof(config_t));
-    if (!c) return NULL;
+    if (!c) {
+        DBG(NULL);
+        return NULL;
+    }
     c->out.format = DEFAULT_OUT_FORMAT;
     c->out.statsd.prefix = (DEFAULT_STATSD_PREFIX) ? strdup(DEFAULT_STATSD_PREFIX) : NULL;
     c->out.statsd.maxlen = DEFAULT_STATSD_MAX_LEN;
@@ -465,7 +469,9 @@ cfgTransportType(config_t* cfg, which_transport_t t)
         case CFG_OUT:
             return DEFAULT_OUT_TYPE;
         case CFG_LOG:
+            return DEFAULT_LOG_TYPE;
         default:
+            DBG("%d", t);
             return DEFAULT_LOG_TYPE;
     }
 }
@@ -481,7 +487,9 @@ cfgTransportHost(config_t* cfg, which_transport_t t)
         case CFG_OUT:
             return DEFAULT_OUT_HOST;
         case CFG_LOG:
+            return DEFAULT_LOG_HOST;
         default:
+            DBG("%d", t);
             return DEFAULT_LOG_HOST;
     }
 }
@@ -497,7 +505,9 @@ cfgTransportPort(config_t* cfg, which_transport_t t)
         case CFG_OUT:
             return DEFAULT_OUT_PORT;
         case CFG_LOG:
+            return DEFAULT_LOG_PORT;
         default:
+            DBG("%d", t);
             return DEFAULT_LOG_PORT;
     }
 }
@@ -513,7 +523,9 @@ cfgTransportPath(config_t* cfg, which_transport_t t)
         case CFG_OUT:
             return DEFAULT_OUT_PATH;
         case CFG_LOG:
+            return DEFAULT_LOG_PATH;
         default:
+            DBG("%d", t);
             return DEFAULT_LOG_PATH;
     }
 }
@@ -584,6 +596,8 @@ cfgOutStatsDPrefixSet(config_t* cfg, const char* prefix)
             strcpy(temp, prefix);
             temp[n] = '.';
             temp[n+1] = '\0';
+        } else {
+            DBG("%s", prefix);
         }
         cfg->out.statsd.prefix = temp;
     } else {
@@ -678,7 +692,10 @@ cfgCustomTagAdd(config_t* c, const char* name, const char* value)
     // Create space if it's the first add
     if (!c->tags) {
         c->tags = calloc(1, sizeof(custom_tag_t*) * c->max_tags);
-        if (!c->tags) return;
+        if (!c->tags) {
+            DBG("%s %s", name, value);
+            return;
+        }
     }
 
     // find the first empty spot
@@ -689,7 +706,10 @@ cfgCustomTagAdd(config_t* c, const char* name, const char* value)
     if (i >= c->max_tags-1) {     // null delimiter is always required
         int tmp_max_tags = c->max_tags * 2;  // double each time
         custom_tag_t** temp = realloc(c->tags, sizeof(custom_tag_t*) * tmp_max_tags);
-        if (!temp) return;
+        if (!temp) {
+            DBG("%s %s", name, value);
+            return;
+        }
         // Yeah!  We have more space!  init it, and set our state to remember it
         memset(&temp[c->max_tags], 0, sizeof(custom_tag_t*) * (tmp_max_tags - c->max_tags));
         c->tags = temp;
@@ -705,6 +725,7 @@ cfgCustomTagAdd(config_t* c, const char* name, const char* value)
             if (t) free(t);
             if (n) free(n);
             if (v) free(v);
+            DBG("t=%p n=%p v=%p", t, n, v);
             return;
         }
         c->tags[i] = t;

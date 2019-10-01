@@ -12,27 +12,6 @@
 
 #define MAX_PATH 1024
 
-static int
-writeFile(const char* path, const char* text)
-{
-    FILE* f = fopen(path, "w");
-    if (!f)
-        fail_msg("Couldn't open file");
-
-    if (!fwrite(text, strlen(text), 1, f))
-        fail_msg("Couldn't write file");
-
-    if (fclose(f))
-        fail_msg("Couldn't close file");
-
-    return 0;
-}
-
-static int
-deleteFile(const char* path)
-{
-    return unlink(path);
-}
 
 static void
 openFileAndExecuteCfgProcessCommands(const char* path, config_t* cfg)
@@ -40,19 +19,6 @@ openFileAndExecuteCfgProcessCommands(const char* path, config_t* cfg)
     FILE* f = fopen(path, "r");
     cfgProcessCommands(cfg, f);
     fclose(f);
-}
-
-static long
-fileEndPosition(const char* path)
-{
-    FILE* f;
-    if ((f = fopen(path, "r"))) {
-        fseek(f, 0, SEEK_END);
-        long pos = ftell(f);
-        fclose(f);
-        return pos;
-    }
-    return -1;
 }
 
 void
@@ -724,8 +690,9 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgProcessCommandsEnvSubstitution),
         cmocka_unit_test(initLogReturnsPtr),
         cmocka_unit_test(initOutReturnsPtr),
+        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
-    return cmocka_run_group_tests(tests, NULL, NULL);
+    return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }
 
 

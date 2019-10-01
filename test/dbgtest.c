@@ -48,12 +48,7 @@ dbgMacroIdentifiesFileAndLine(void** state)
     DBG("%d%s", 314159, "something"); // test/dbgtest.c:48
 
     char buf[4096] = {0};
-
-    FILE* f = fmemopen(buf, sizeof(buf), "a+");
-    assert_non_null(f);
-    dbgDumpAll(f);
-    //dbgDumpAll(stdout);
-    if (fclose(f)) fail_msg("Couldn't close file");
+    dbgDumpAllToBuffer(buf, sizeof(buf));
 
     assert_non_null(strstr(buf, "test/dbgtest.c:45"));
     assert_non_null(strstr(buf, "test/dbgtest.c:46"));
@@ -73,12 +68,7 @@ dbgAddLineHasCorrectCount(void** state)
     }
 
     char buf[4096] = {0};
-
-    FILE* f = fmemopen(buf, sizeof(buf), "a+");
-    assert_non_null(f);
-    dbgDumpAll(f);
-    //dbgDumpAll(stdout);
-    if (fclose(f)) fail_msg("Couldn't close file");
+    dbgDumpAllToBuffer(buf, sizeof(buf));
 
     assert_non_null(strstr(buf, "1: key1 "));
     assert_non_null(strstr(buf, "5: key2 "));
@@ -99,12 +89,7 @@ dbgAddLineCapturesTimeErrnoAndStr(void** state)
     dbgAddLine("key2", "%s", "str2");
 
     char buf[4096] = {0};
-
-    FILE* f = fmemopen(buf, sizeof(buf), "a+");
-    assert_non_null(f);
-    dbgDumpAll(f);
-    //dbgDumpAll(stdout);
-    if (fclose(f)) fail_msg("Couldn't close file");
+    dbgDumpAllToBuffer(buf, sizeof(buf));
 
     unsigned long long count;
     char key[64] = {0};
@@ -147,11 +132,7 @@ dbgAddLineCapturesFirstAndLastInstance(void** state)
     dbgAddLine("key1", "str3");
 
     char buf[4096] = {0};
-    FILE* f = fmemopen(buf, sizeof(buf), "a+");
-    assert_non_null(f);
-    dbgDumpAll(f);
-    //dbgDumpAll(stdout);
-    if (fclose(f)) fail_msg("Couldn't close file");
+    dbgDumpAllToBuffer(buf, sizeof(buf));
 
     assert_non_null(strstr(buf, "str1"));
     assert_null(strstr(buf, "str2"));
@@ -177,12 +158,7 @@ static void
 dbgDumpAllOutputsVersionAndTime(void** state)
 {
     char buf[4096] = {0};
-
-    FILE* f = fmemopen(buf, sizeof(buf), "a+");
-    assert_non_null(f);
-    dbgDumpAll(f);
-    //dbgDumpAll(stdout);
-    if (fclose(f)) fail_msg("Couldn't close file");
+    dbgDumpAllToBuffer(buf, sizeof(buf));
 
     char version[128] = {0};
     char date[128] = {0};
@@ -194,8 +170,9 @@ dbgDumpAllOutputsVersionAndTime(void** state)
 
 }
 
+
 int
-main (int argc, char* argv[])
+main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
     const struct CMUnitTest tests[] = {

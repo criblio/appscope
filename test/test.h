@@ -15,4 +15,18 @@
 #include <stdint.h>
 #include "cmocka.h"
 
+// This is a convenient place to stick some helper functions too...
+
+int groupSetup(void** state);
+int groupTeardown(void** state);
+
+void dbgHasNoUnexpectedFailures(void** state);
+void dbgDumpAllToBuffer(char* buf, int size);
+
+int writeFile(const char* path, const char* text);
+int deleteFile(const char* path);
+long fileEndPosition(const char* path);
+
+
+
 #endif //__TEST_H__

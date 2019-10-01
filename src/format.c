@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "dbg.h"
 #include "format.h"
 #include "scopetypes.h"
 
@@ -27,7 +28,10 @@ fmtCreate(cfg_out_format_t format)
     if (format >= CFG_FORMAT_MAX) return NULL;
 
     format_t* f = calloc(1, sizeof(format_t));
-    if (!f) return NULL;
+    if (!f) {
+        DBG(NULL);
+        return NULL;
+    }
     f->format = format;
     f->statsd.prefix = (DEFAULT_STATSD_PREFIX) ? strdup(DEFAULT_STATSD_PREFIX) : NULL;
     f->statsd.max_len = DEFAULT_STATSD_MAX_LEN;
@@ -80,6 +84,7 @@ statsdType(data_type_t x)
         case SET:
             return "s";
         default:
+            DBG("%d", x);
             return "";
     }
 }
@@ -99,6 +104,7 @@ createStatsFieldString(format_t* fmt, event_field_t* f, char* tag, int sizeoftag
             sz = snprintf(tag, sizeoftag, "%s:%s", f->name, f->value.str);
             break;
         default:
+            DBG("%d %s", f->value_type, f->name);
             sz = -1;
     }
     return sz;
@@ -176,7 +182,10 @@ fmtStatsDString(format_t* fmt, event_t* e)
     if (!fmt || !e) return NULL;
 
     char* end = calloc(1, fmt->statsd.max_len + 1);
-    if (!end) return NULL;
+    if (!end) {
+         DBG("%s", e->name);
+         return NULL;
+    }
 
     char* end_start = end;
 
@@ -224,7 +233,9 @@ fmtString(format_t* fmt, event_t* e)
         case CFG_EXPANDED_STATSD:
             return fmtStatsDString(fmt, e);
         case CFG_NEWLINE_DELIMITED:
+            return NULL;
         default:
+            DBG("%d %s", fmt->format, e->name);
             return NULL;
     }
 }
@@ -294,7 +305,10 @@ fmtCustomTagsSet(format_t* fmt, custom_tag_t** tags)
     while(tags[num]) num++;
 
     fmt->tags = calloc(1, sizeof(custom_tag_t*) * (num+1));
-    if (!fmt->tags) return;
+    if (!fmt->tags) {
+        DBG(NULL);
+        return;
+    }
 
     int i, j = 0;
     for (i = 0; i<num; i++) {
@@ -305,6 +319,7 @@ fmtCustomTagsSet(format_t* fmt, custom_tag_t** tags)
             if (t) free (t);
             if (n) free (n);
             if (v) free (v);
+            DBG("t=%p n=%p v=%p", t, n, v);
             continue;
         }
         t->name = n;

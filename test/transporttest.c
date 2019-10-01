@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include "dbg.h"
 #include "transport.h"
 
 #include "test.h"
@@ -103,8 +104,14 @@ transportCreateFileReturnsNullForInvalidPath(void** state)
     transport_t* t;
     t = transportCreateFile(NULL);
     assert_null(t);
+
+    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 0);
+
     t = transportCreateFile("");
     assert_null(t);
+
+    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
 }
 
 static void
@@ -284,8 +291,9 @@ transportSendForFileWritesToFile(void** state)
         fail_msg("Couldn't delete test file %s", path);
 }
 
+
 int
-main (int argc, char* argv[])
+main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
 
@@ -308,7 +316,7 @@ main (int argc, char* argv[])
         cmocka_unit_test(transportSendForUnimplementedTransportTypesIsHarmless),
         cmocka_unit_test(transportSendForUdpTransmitsMsg),
         cmocka_unit_test(transportSendForFileWritesToFile),
+        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
-
-    return cmocka_run_group_tests(tests, NULL, NULL);
+    return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

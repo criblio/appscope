@@ -2,10 +2,73 @@
 
 print_help() {
     echo "Usage Examples:"
-    echo "    ./scope.sh platform      (returns Linux or macOS)"
-    echo "    ./scope.sh pkg_mgr       (returns yum, apt-get, or brew)"
-    echo "    ./scope.sh build         (clones, installs tools, and builds scope)"
-    echo "    ./scope.sh help          (prints this message)"
+    echo "    ./scope.sh run <cmd and args>     (executes cmd with scope library)"
+    echo "    ./scope.sh version                (identifies the scope library version)"
+    echo "    ./scope.sh platform               (returns Linux or macOS)"
+    echo "    ./scope.sh pkg_mgr                (returns yum, apt-get, or brew)"
+    echo "    ./scope.sh build                  (clones, installs tools, and builds scope)"
+    echo "    ./scope.sh help                   (prints this message)"
+}
+
+determine_lib_path() {
+    if [ -z "$CRIBL_HOME" ]; then
+       export CRIBL_HOME=`pwd`
+    fi
+
+    PLATFORM=$(determine_platform)
+
+    if [ $PLATFORM == "macOS" ]; then
+        echo "$CRIBL_HOME/lib/macOS/libwrap.so"
+    elif [ $PLATFORM == "Linux" ]; then
+        echo "$CRIBL_HOME/lib/linux/libwrap.so"
+    else
+        echo "ERROR"
+    fi
+}
+
+run_scoped_cmd() {
+    if [ -z "$CRIBL_HOME" ]; then
+       export CRIBL_HOME=`pwd`
+    fi
+
+    PLATFORM=$(determine_platform)
+    LIBRARY=$(determine_lib_path)
+
+    if [ $PLATFORM == "macOS" ]; then
+         DYLD_INSERT_LIBRARIES=$LIBRARY DYLD_FORCE_FLAT_NAMESPACE=1 "$@"
+    elif [ $PLATFORM == "Linux" ]; then
+         LD_PRELOAD=$LIBRARY "$@"
+    else
+        echo "ERROR: bad platform: $PLATFORM"
+    fi
+
+    exit $?
+}
+
+print_version() {
+    local ok=1
+    if ! strings --version &>/dev/null; then
+        echo "Error: can't determine version without 'strings' command."
+        ok=0
+    fi
+    if ! grep --version &>/dev/null; then
+        echo "Error: can't determine version without 'grep' command."
+        ok=0
+    fi
+    if ! sed --version &>/dev/null; then
+        echo "Error: can't determine version without 'sed' command."
+        ok=0
+    fi
+
+    if (( ! ok )); then
+        exit 1
+    fi
+
+    LIBRARY=$(determine_lib_path)
+
+    # sed deletes 'Constructor (' from the beginning, and ')' from the end
+    strings $LIBRARY | grep "Constructor (Scope Version" | sed 's/.*(//' | sed 's/.$//'
+    return $?
 }
 
 determine_platform() {
@@ -198,6 +261,7 @@ build_scope() {
     clone_scope
     install_build_tools
     run_make
+    print_version
 }
 
 
@@ -208,6 +272,13 @@ fi
 
 for arg in "$@"; do 
     case $arg in
+    "run")
+        shift;
+        run_scoped_cmd "$@"
+        ;;
+    "version")
+        print_version
+        ;;
     "platform")
         determine_platform
         ;;

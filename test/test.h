@@ -21,6 +21,7 @@ int groupSetup(void** state);
 int groupTeardown(void** state);
 
 void dbgHasNoUnexpectedFailures(void** state);
+void dbgDumpAllToBuffer(char* buf, int size);
 
 int writeFile(const char* path, const char* text);
 int deleteFile(const char* path);

@@ -13,6 +13,7 @@
 #include "test.h"
 #include "cfg.h"
 #include "cfgutils.h"
+#include "dbg.h"
 #include "scopetypes.h"
 #include "wrap.h"
 
@@ -205,6 +206,41 @@ testTSCValue(void** state)
         fail_msg("Elapsed %" PRIu64 " is outside of allowed bounds (20, 350)", elapsed);
 }
 
+/*
+
+This applies to __LINUX__ only.  And isn't like other tests in this file.
+Think about whether this adds enough value to run in conditionally only 
+for linux.
+
+static void
+testSyscallDbg(void** state)
+{
+    const char* path = "/tmp/syscalltestoutput.txt";
+    int fd;
+    struct stat statbuf;
+
+    assert_int_equal(dbgCountMatchingLines("src/wrap.c"), 0);
+
+    assert_return_code(fd = syscall(SYS_openat, AT_FDCWD, path, O_WRONLY|O_CREAT|O_APPEND, 0666), errno);
+    assert_return_code(syscall(SYS_lseek, fd, 0, SEEK_END), errno);
+    assert_return_code(syscall(SYS_fstat, fd, &statbuf), errno);
+    assert_return_code(syscall(SYS_write, fd, "Hey!\n", sizeof("Hey!\n")), errno);
+    assert_return_code(syscall(SYS_close, fd), errno);
+
+    // I expect one DBG statement to be hit 5 times, for the 5 syscalls above.
+    unsigned long long lines = dbgCountMatchingLines("src/wrap.c");
+    char buf[4096] = {0};
+    dbgDumpAllToBuffer(buf, sizeof(buf));
+    if ((lines != 1) || !strstr(buf, "5: src/wrap.c:")) {
+        printf("%s", buf);
+        fail();
+    }
+    dbgInit();
+
+    assert_return_code(unlink(path), errno);
+}
+
+*/
 
 int
 main(int argc, char* argv[])
@@ -216,6 +252,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(testTSCInit),
         cmocka_unit_test(testTSCRollover),
         cmocka_unit_test(testTSCValue),
+        //cmocka_unit_test(testSyscallDbg),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

@@ -97,14 +97,17 @@ setVerbosity(rtconfig* c, unsigned verbosity)
     } else if (verbosity == 10) {
         summarize->fs.read_write = 0;
         summarize->fs.seek = 0;
+        summarize->fs.stat = 0;
         summarize->net.rx_tx = 1;
     } else if (verbosity == 11) {
         summarize->fs.read_write = 1;
         summarize->fs.seek = 1;
+        summarize->fs.stat = 1;
         summarize->net.rx_tx = 0;
     } else if (verbosity == 12) {
         summarize->fs.read_write = 0;
         summarize->fs.seek = 0;
+        summarize->fs.stat = 0;
         summarize->net.rx_tx = 0;
     }
 }
@@ -438,6 +441,9 @@ doProcMetric(enum metric_t type, long long measurement)
 static void
 doStatMetric(const char *op, const char *pathname)
 {
+
+    atomicAdd(&g_ctrs.numStat, 1);
+
     event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
@@ -448,10 +454,18 @@ doStatMetric(const char *op, const char *pathname)
             FIELDEND
     };
 
+
+    // Only report if enabled
+    if (g_cfg.summarize.fs.stat) {
+        return;
+    }
+
     event_t e = {"fs.op.stat", 1, DELTA, fields};
     if (outSendEvent(g_out, &e)) {
         scopeLog("doStatMetric", -1, CFG_LOG_ERROR);
     }
+
+    //atomicSet(&g_ctrs.numStat, 0);
 }
 
 static void
@@ -517,17 +531,20 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         int* numops = NULL;
         int* sizebytes = NULL;
         const char* err_str = "UNKNOWN";
+        int* global_counter = NULL;
         switch (type) {
             case FS_READ:
                 metric = "fs.read";
                 numops = &g_fsinfo[fd].numRead;
                 sizebytes = &g_fsinfo[fd].readBytes;
+                global_counter = &g_ctrs.readBytes;
                 err_str = "ERROR: doFSMetric:FS_READ:outSendEvent";
                 break;
             case FS_WRITE:
                 metric = "fs.write";
                 numops = &g_fsinfo[fd].numWrite;
                 sizebytes = &g_fsinfo[fd].writeBytes;
+                global_counter = &g_ctrs.writeBytes;
                 err_str = "ERROR: doFSMetric:FS_WRITE:outSendEvent";
                 break;
             default:
@@ -540,6 +557,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             g_fsinfo[fd].action |= EVENT_FS;
             atomicAdd(numops, 1);
             atomicAdd(sizebytes, size);
+            atomicAdd(global_counter, size); // not by fd
         }
 
         // Only report if enabled
@@ -567,6 +585,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         //g_fsinfo[fd].action &= ~EVENT_FS;
         atomicSet(numops, 0);
         atomicSet(sizebytes, 0);
+        //atomicSet(global_counter, 0);
 
         break;
     }
@@ -604,6 +623,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         if (source == EVENT_BASED) {
             g_fsinfo[fd].action |= EVENT_FS;
             atomicAdd(numops, 1);
+            if (type == FS_SEEK) atomicAdd(&g_ctrs.numSeek, 1);
         }
 
         // Only report if enabled
@@ -644,48 +664,62 @@ static void
 doTotal(enum metric_t type)
 {
     const char* metric = "UNKNOWN";
-    int* sizebytes = NULL;
+    int* value = NULL;
     const char* err_str = "UNKNOWN";
+    const char* units = "byte";
     switch (type) {
         case TOT_READ:
             metric = "fs.read.total";
-            sizebytes = &g_ctrs.readBytes;
+            value = &g_ctrs.readBytes;
             err_str = "ERROR: doTotal:TOT_READ:outSendEvent";
             break;
         case TOT_WRITE:
             metric = "fs.write.total";
-            sizebytes = &g_ctrs.writeBytes;
+            value = &g_ctrs.writeBytes;
             err_str = "ERROR: doTotal:TOT_WRITE:outSendEvent";
             break;
         case TOT_RX:
             metric = "net.rx.total";
-            sizebytes = &g_ctrs.netrxBytes;
-            err_str = "ERROR: doTotal:TOT_READ:outSendEvent";
+            value = &g_ctrs.netrxBytes;
+            err_str = "ERROR: doTotal:TOT_RX:outSendEvent";
             break;
         case TOT_TX:
             metric = "net.tx.total";
-            sizebytes = &g_ctrs.nettxBytes;
-            err_str = "ERROR: doTotal:TOT_READ:outSendEvent";
+            value = &g_ctrs.nettxBytes;
+            err_str = "ERROR: doTotal:TOT_TX:outSendEvent";
             break;
+        case TOT_SEEK:
+            metric = "fs.seek.total";
+            value = &g_ctrs.numSeek;
+            err_str = "ERROR: doTotal:TOT_SEEK:outSendEvent";
+            units = "operation";
+        case TOT_STAT:
+            metric = "fs.stat.total";
+            value = &g_ctrs.numStat;
+            err_str = "ERROR: doTotal:TOT_STAT:outSendEvent";
+            units = "operation";
         default:
             DBG(NULL);
             return;
 	}
 
+    // Don't report zeros.
+    if (value == 0) return;
+
     event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        4),
-            STRFIELD("unit",             "byte",                1),
+            STRFIELD("unit",             units,                 1),
             FIELDEND
     };
-    event_t e = {metric, *sizebytes, DELTA, fields};
+    event_t e = {metric, *value, DELTA, fields};
     if (outSendEvent(g_out, &e)) {
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
     // Reset the info we tried to report
-    atomicSet(sizebytes, 0);
+    atomicSet(value, 0);
 }
 
 
@@ -1305,9 +1339,6 @@ reportFD(int fd)
             if (finfo->numSeek > 0) {
                 doFSMetric(FS_SEEK, fd, PERIODIC, "seek", 0, NULL);
             }
-            if (finfo->numStat > 0) {
-                doFSMetric(FS_STAT, fd, PERIODIC, "stat", 0, NULL);
-            }
         }
         finfo->action = 0;
     }
@@ -1344,10 +1375,12 @@ reportPeriodicStuff(void)
     doProcMetric(PROC_CHILD, children);
 
     // report totals (not by file descriptor/socket descriptor)
-    if (g_ctrs.readBytes > 0)  doTotal(TOT_READ);
-    if (g_ctrs.writeBytes > 0) doTotal(TOT_WRITE);
-    if (g_ctrs.netrxBytes > 0) doTotal(TOT_RX);
-    if (g_ctrs.nettxBytes > 0) doTotal(TOT_TX);
+    doTotal(TOT_READ);
+    doTotal(TOT_WRITE);
+    doTotal(TOT_RX);
+    doTotal(TOT_TX);
+    doTotal(TOT_SEEK);
+    doTotal(TOT_STAT);
 
     // report net and file by descriptor
     for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {

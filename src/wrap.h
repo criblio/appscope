@@ -97,11 +97,12 @@ enum metric_t {
     FS_OPEN,
     FS_CLOSE,
     FS_SEEK,
-    FS_STAT,
     TOT_READ,
     TOT_WRITE,
     TOT_RX,
     TOT_TX,
+    TOT_SEEK,
+    TOT_STAT,
 };
 
 // File types; stream or fd
@@ -125,6 +126,8 @@ typedef struct metric_counters_t {
     int nettxBytes;
     int readBytes;
     int writeBytes;
+    int numSeek;
+    int numStat;
 } metric_counters;
 
 typedef struct {
@@ -192,7 +195,6 @@ typedef struct fs_info_t {
     int numOpen;
     int numClose;
     int numSeek;
-    int numStat;
     int numRead;
     int numWrite;
     int readBytes;

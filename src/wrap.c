@@ -17,6 +17,8 @@ static thread_timing g_thread = {0};
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
 static config_t *g_staticfg = NULL;
+static log_t *g_prevlog = NULL;
+static out_t *g_prevout = NULL;
 __thread int g_getdelim = 0;
 
 // Forward declaration
@@ -88,14 +90,7 @@ dumpAddrs(int sd, enum control_type_t endp)
 EXPORTOFF void
 doConfig(config_t *cfg)
 {
-    static log_t *g_prevlog = NULL;
-    static out_t *g_prevout = NULL;
-
-    // Clean up previous objects if they exist.
-    if (g_prevout) outDestroy(&g_prevout);
-    if (g_prevlog) logDestroy(&g_prevlog);
-
-    // Save the current objects to get cleaned up next time
+    // Save the current objects to get cleaned up on the periodic thread
     g_prevout = g_out;
     g_prevlog = g_log;
 
@@ -1471,6 +1466,10 @@ periodic(void *arg)
 
         // Process dynamic config changes, if any
         dynConfig();
+
+        // Clean up previous objects if they exist.
+        if (g_prevout) outDestroy(&g_prevout);
+        if (g_prevlog) logDestroy(&g_prevlog);
 
         // From the config file
         sleep(g_thread.interval);

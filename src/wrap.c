@@ -359,6 +359,8 @@ doDNSMetricName(const char *domain)
 {
     if (!domain) return;
 
+    atomicAdd(&g_ctrs.numDNS, 1);
+
     event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
@@ -368,10 +370,17 @@ doDNSMetricName(const char *domain)
             FIELDEND
     };
 
+    // Only report if enabled
+    if (g_cfg.summarize.net.dns) {
+        return;
+    }
+
     event_t e = {"net.dns", 1, DELTA, fields};
     if (outSendEvent(g_out, &e)) {
         scopeLog("ERROR: doDNSMetricName:DNS:outSendEvent", -1, CFG_LOG_ERROR);
     }
+
+    //atomicSet(&g_ctrs.numDNS, 0);
 }
 
 static void
@@ -733,6 +742,12 @@ doTotal(enum metric_t type)
             err_str = "ERROR: doTotal:TOT_CLOSE:outSendEvent";
             units = "operation";
             break;
+        case TOT_DNS:
+            metric = "net.dns.total";
+            value = &g_ctrs.numDNS;
+            err_str = "ERROR: doTotal:TOT_DNS:outSendEvent";
+            units = "operation";
+            break;
         default:
             DBG(NULL);
             return;
@@ -1050,21 +1065,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         // For next time
         g_netinfo[fd].dnsSend = FALSE;
-        
-        event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        4),
-            NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        4),
-            STRFIELD("domain",           g_netinfo[fd].dnsName, 5),
-            STRFIELD("unit",             "request",             1),
-            FIELDEND
-        };
 
-        // Increment the DNS counter by one for each event
-        event_t e = {"net.dns", 1, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:DNS:outSendEvent", -1, CFG_LOG_ERROR);
-        }
+        doDNSMetricName(g_netinfo[fd].dnsName);
+
         break;
     }
 
@@ -1418,6 +1421,7 @@ reportPeriodicStuff(void)
     doTotal(TOT_STAT);
     doTotal(TOT_OPEN);
     doTotal(TOT_CLOSE);
+    doTotal(TOT_DNS);
 
     // report net and file by descriptor
     for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {

@@ -105,6 +105,7 @@ enum metric_t {
     TOT_STAT,
     TOT_OPEN,
     TOT_CLOSE,
+    TOT_DNS,
 };
 
 // File types; stream or fd
@@ -132,6 +133,7 @@ typedef struct metric_counters_t {
     int numStat;
     int numOpen;
     int numClose;
+    int numDNS;
 } metric_counters;
 
 typedef struct {

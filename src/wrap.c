@@ -93,22 +93,37 @@ setVerbosity(rtconfig* c, unsigned verbosity)
     summary_t* summarize = &c->summarize;
 
     if (verbosity <= 9) {
-        memset(summarize, 1, sizeof(*summarize));
-    } else if (verbosity == 10) {
-        summarize->fs.read_write = 0;
-        summarize->fs.seek = 0;
-        summarize->fs.stat = 0;
-        summarize->net.rx_tx = 1;
-    } else if (verbosity == 11) {
+        summarize->fs.open_close = 1;
         summarize->fs.read_write = 1;
         summarize->fs.seek = 1;
         summarize->fs.stat = 1;
-        summarize->net.rx_tx = 0;
-    } else if (verbosity == 12) {
+        summarize->net.open_close = 1;
+        summarize->net.rx_tx = 1;
+        summarize->net.dns = 1;
+    } else if (verbosity == 10) {
+        summarize->fs.open_close = 0;
         summarize->fs.read_write = 0;
         summarize->fs.seek = 0;
         summarize->fs.stat = 0;
+        summarize->net.open_close = 1;
+        summarize->net.rx_tx = 1;
+        summarize->net.dns = 1;
+    } else if (verbosity == 11) {
+        summarize->fs.open_close = 1;
+        summarize->fs.read_write = 1;
+        summarize->fs.seek = 1;
+        summarize->fs.stat = 1;
+        summarize->net.open_close = 0;
         summarize->net.rx_tx = 0;
+        summarize->net.dns = 0;
+    } else if (verbosity == 12) {
+        summarize->fs.open_close = 0;
+        summarize->fs.read_write = 0;
+        summarize->fs.seek = 0;
+        summarize->fs.stat = 0;
+        summarize->net.open_close = 0;
+        summarize->net.rx_tx = 0;
+        summarize->net.dns = 0;
     }
 }
 
@@ -530,8 +545,8 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         const char* metric = "UNKNOWN";
         int* numops = NULL;
         int* sizebytes = NULL;
-        const char* err_str = "UNKNOWN";
         int* global_counter = NULL;
+        const char* err_str = "UNKNOWN";
         switch (type) {
             case FS_READ:
                 metric = "fs.read";
@@ -596,22 +611,29 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     {
         const char* metric = "UNKNOWN";
         int* numops = NULL;
+        int* global_counter = NULL;
+        int* summarize = NULL;
         const char* err_str = "UNKNOWN";
-
         switch (type) {
             case FS_OPEN:
                 metric = "fs.op.open";
                 numops = &g_fsinfo[fd].numOpen;
+                global_counter = &g_ctrs.numOpen;
+                summarize = &g_cfg.summarize.fs.open_close;
                 err_str = "ERROR: doFSMetric:FS_OPEN:outSendEvent";
                 break;
             case FS_CLOSE:
                 metric = "fs.op.close";
                 numops = &g_fsinfo[fd].numClose;
+                global_counter = &g_ctrs.numClose;
+                summarize = &g_cfg.summarize.fs.open_close;
                 err_str = "ERROR: doFSMetric:FS_CLOSE:outSendEvent";
                 break;
             case FS_SEEK:
                 metric = "fs.op.seek";
                 numops = &g_fsinfo[fd].numSeek;
+                global_counter = &g_ctrs.numSeek;
+                summarize = &g_cfg.summarize.fs.seek;
                 err_str = "ERROR: doFSMetric:FS_SEEK:outSendEvent";
                 break;
             default:
@@ -623,12 +645,11 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         if (source == EVENT_BASED) {
             g_fsinfo[fd].action |= EVENT_FS;
             atomicAdd(numops, 1);
-            if (type == FS_SEEK) atomicAdd(&g_ctrs.numSeek, 1);
+            atomicAdd(global_counter, 1);
         }
 
         // Only report if enabled
-        if ((type == FS_SEEK) &&
-            (g_cfg.summarize.fs.seek && (source == EVENT_BASED))) {
+        if ((source == EVENT_BASED) && *summarize) {
             return;
         }
 
@@ -693,18 +714,32 @@ doTotal(enum metric_t type)
             value = &g_ctrs.numSeek;
             err_str = "ERROR: doTotal:TOT_SEEK:outSendEvent";
             units = "operation";
+            break;
         case TOT_STAT:
             metric = "fs.stat.total";
             value = &g_ctrs.numStat;
             err_str = "ERROR: doTotal:TOT_STAT:outSendEvent";
             units = "operation";
+            break;
+        case TOT_OPEN:
+            metric = "fs.open.total";
+            value = &g_ctrs.numOpen;
+            err_str = "ERROR: doTotal:TOT_OPEN:outSendEvent";
+            units = "operation";
+            break;
+        case TOT_CLOSE:
+            metric = "fs.close.total";
+            value = &g_ctrs.numClose;
+            err_str = "ERROR: doTotal:TOT_CLOSE:outSendEvent";
+            units = "operation";
+            break;
         default:
             DBG(NULL);
             return;
 	}
 
     // Don't report zeros.
-    if (value == 0) return;
+    if (*value == 0) return;
 
     event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        4),
@@ -1381,6 +1416,8 @@ reportPeriodicStuff(void)
     doTotal(TOT_TX);
     doTotal(TOT_SEEK);
     doTotal(TOT_STAT);
+    doTotal(TOT_OPEN);
+    doTotal(TOT_CLOSE);
 
     // report net and file by descriptor
     for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {

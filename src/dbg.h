@@ -37,7 +37,6 @@ void                 dbgAddLine(const char* key, const char* fmt, ...);
 //     DBG("Should never get here");                 // Boring string
 //     DBG("Hostname/port: %s:%d", hostname, port)   // Formatted string
 
-//#define DBG(...) dbgAddLine(DBG_FILE_AND_LINE, ## __VA_ARGS__)
-#define DBG(...) 
+#define DBG(...) dbgAddLine(DBG_FILE_AND_LINE, ## __VA_ARGS__)
 
 #endif // __DBG_H__

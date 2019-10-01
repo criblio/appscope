@@ -2759,7 +2759,11 @@ syscall(long number, ...)
         break;
 #endif // __STATX__
     default:
-        DBG("syscall number: %d", number);
+        // Supplying args is fine, but is a touch more work.
+        // On splunk, in a container on my laptop, I saw this statement being
+        // hit every 10-15 microseconds over a 15 minute duration.  Wow.
+        //DBG("syscall-number: %d", number);
+        DBG(NULL);
     }
 
     return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],

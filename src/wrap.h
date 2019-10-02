@@ -91,6 +91,7 @@ enum metric_t {
     NETRX,
     NETTX,
     DNS,
+    DNS_DURATION,
     FS_DURATION,
     FS_READ,
     FS_WRITE,
@@ -102,6 +103,9 @@ enum metric_t {
     TOT_WRITE,
     TOT_RX,
     TOT_TX,
+    NET_ERR,
+    FS_ERR,
+    DNS_ERR
 };
 
 // File types; stream or fd
@@ -125,6 +129,12 @@ typedef struct metric_counters_t {
     int nettxBytes;
     int readBytes;
     int writeBytes;
+    int netConnectErrors;
+    int netTxRxErrors;
+    int netDNSErrors;
+    int fsOpenCloseErrors;
+    int fsStatErrors;
+    int fsRdWrErrors;
 } metric_counters;
 
 typedef struct rtconfig_t {
@@ -431,25 +441,40 @@ extern void *_dl_sym(void *, const char *, void *);
     type rc;                                         \
     int fd = fileno(stream);                         \
     struct fs_info_t *fs = getFSEntry(fd);           \
+    struct net_info_t *net = getNetEntry(fd);        \
     elapsed_t time = {0};                            \
     doThread();                                      \
     if (fs) {                                        \
         time.initial = getTime();                    \
     }                                                \
 
-#define IOSTREAMPOST(func, len, type)               \
+#define IOSTREAMPOST(func, len, type, errcntr, op)  \
     if (fs) {                                       \
         time.duration = getDuration(time.initial);  \
     }                                               \
                                                     \
     if (rc != type) {                               \
         scopeLog(#func, fd, CFG_LOG_TRACE);         \
-        if (getNetEntry(fd)) {                      \
+        if (net) {                                  \
             doSetAddrs(fd);                         \
-            doRecv(fd, len);                        \
+            if (op == (enum event_type_t)EVENT_RX) {\
+               doRecv(fd, len);                     \
+            } else if (op == (enum event_type_t)EVENT_TX) { \
+                doSend(fd, len);                    \
+            } else {                                \
+                DBG(NULL);                          \
+            }                                       \
         } else if (fs) {                            \
             doFSMetric(FS_DURATION, fd, EVENT_BASED, #func, time.duration, NULL); \
             doFSMetric(FS_READ, fd, EVENT_BASED, #func, len, NULL); \
+        }                                           \
+    }  else {                                       \
+        if (fs) {                                   \
+           atomicAdd(errcntr, 1);                   \
+           doErrorMetric(FS_ERR, *errcntr, EVENT_BASED, #func, fs->path); \
+        } else if (net) {                           \
+            atomicAdd(errcntr, 1);                  \
+            doErrorMetric(NET_ERR, *errcntr, EVENT_BASED, #func, "nopath"); \
         }                                           \
     }                                               \
                                                     \

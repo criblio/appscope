@@ -1467,9 +1467,10 @@ periodic(void *arg)
         // Process dynamic config changes, if any
         dynConfig();
 
+        // TODO: need to ensure that the previous object is no longer in use
         // Clean up previous objects if they exist.
-        if (g_prevout) outDestroy(&g_prevout);
-        if (g_prevlog) logDestroy(&g_prevlog);
+        //if (g_prevout) outDestroy(&g_prevout);
+        //if (g_prevlog) logDestroy(&g_prevlog);
 
         // From the config file
         sleep(g_thread.interval);

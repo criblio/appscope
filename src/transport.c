@@ -243,13 +243,13 @@ transportDestroy(transport_t** transport)
     transport_t* t = *transport;
     switch (t->type) {
         case CFG_UDP:
-            if (t->udp.sock != -1) close(t->udp.sock);
+            if (t->udp.sock != -1) t->close(t->udp.sock);
             break;
         case CFG_UNIX:
             break;
         case CFG_FILE:
             if (t->file.path) free(t->file.path);
-            if (t->file.fd != -1) close(t->file.fd);
+            if (t->file.fd != -1) t->close(t->file.fd);
             break;
         case CFG_SYSLOG:
             break;

@@ -19,44 +19,41 @@ class Runner:
         self.__home = home
         self.__include_tests = include_tests
         self.__exclude_tests = exclude_tests
+        self.__test_watcher = w.Watcher()
 
     def run(self):
-        print("Starting...")
 
-        test_failed = 0
+        self.__test_watcher.start()
 
         for test in self.__include_tests:
             if test not in self.__exclude_tests:
                 if os.path.isdir(test):
                     for d in os.listdir(test):
                         if d not in self.__exclude_tests:
-                            if self.__execute_test(self.__home + d) != 0:
-                                test_failed = 1;
+                            self.__execute_test(self.__home + d, self.__test_watcher)
                 else:
-                    if self.__execute_test(self.__home + test) != 0:
-                        test_failed = 1;
+                    self.__execute_test(self.__home + test, self.__test_watcher)
 
-        return test_failed
+        self.__test_watcher.finish()
+        return (0, 1)[self.__test_watcher.has_failures()]
 
-    def __execute_test(self, test_path):
+    def __execute_test(self, test_path, test_watcher):
         if not os.path.isdir(test_path):
             return 0
-
-        print(test_path)
 
         for f in os.listdir(test_path):
             filename = test_path + '/' + f
             if os.path.isfile(filename) and os.access(filename, os.X_OK):
-                print(" " + filename)
                 start = time.time()
                 proc = subprocess.Popen('./' + f, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=test_path)
                 stdout, stderr = proc.communicate()
                 end = time.time()
                 rc = proc.returncode
+
                 if rc == 0:
-                    w.Watcher().test_passed(w.TestResult(f, False, stdout, stderr, end - start, rc))
+                    test_watcher.test_passed(w.TestResult(f, False, stdout, stderr, end - start, rc))
                 else:
-                    w.Watcher().test_failed(w.TestResult(f, False, stdout, stderr, end - start, rc))
+                    test_watcher.test_failed(w.TestResult(f, False, stdout, stderr, end - start, rc))
 
 
         return 0
@@ -67,7 +64,6 @@ def main(args):
     include_tests = []
     exclude_tests = []
 
-    print("!!!!!")
     # parse args
     for i in range(len(args)):
         if args[i] == '--help':

@@ -106,6 +106,9 @@ enum metric_t {
     TOT_OPEN,
     TOT_CLOSE,
     TOT_DNS,
+    TOT_PORTS,
+    TOT_TCP_CONN,
+    TOT_ACTIVE_CONN,
 };
 
 // File types; stream or fd
@@ -123,8 +126,11 @@ enum event_type_t {
 
 typedef struct metric_counters_t {
     int openPorts;
+    int openPortsTot;
     int TCPConnections;
+    int TCPConnectionsTot;
     int activeConnections;
+    int activeConnectionsTot;
     int netrxBytes;
     int nettxBytes;
     int readBytes;
@@ -183,7 +189,8 @@ typedef struct net_info_t {
     bool dnsSend;
     enum event_type_t action;
     uint64_t startTime;
-    uint64_t duration;
+    int numDuration;
+    uint64_t totalDuration;
     char dnsName[MAX_HOSTNAME];
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;

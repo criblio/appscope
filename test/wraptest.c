@@ -78,8 +78,8 @@ testFSDuration(void** state)
     log = strtok_r(NULL, delim, &last);
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
-    if ((duration < 1) || (duration > FS_DURATION))
-        fail_msg("Duration %d is outside of allowed bounds (1, 100)", duration);
+    if ((duration < 0) || (duration > FS_DURATION))
+        fail_msg("Duration %d is outside of allowed bounds (0, 100)", duration);
 
     free(cpath);
     cfgDestroy(&cfg);

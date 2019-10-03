@@ -248,22 +248,8 @@ addSock(int fd, int type)
     if (checkNetEntry(fd) == TRUE) {
         if (g_netinfo[fd].fd == fd) {
 
-            if (g_ctrs.openPorts > 0) {
-                atomicSub(&g_ctrs.openPorts, 1);
-            }
-            
-            if (g_ctrs.TCPConnections > 0) {
-                atomicSub(&g_ctrs.TCPConnections, 1);
-            }
-
-            g_netinfo[fd].type = type;
-#ifdef __LINUX__
-            // Clear these bits so comparisons of type will work
-            g_netinfo[fd].type &= ~SOCK_CLOEXEC;
-            g_netinfo[fd].type &= ~SOCK_NONBLOCK;
-#endif // __LINUX__
-
             doClose(fd, "close: DuplicateSocket");
+
         }
         
         if ((fd > g_cfg.numNinfo) && (fd < MAX_FDS))  {
@@ -521,8 +507,8 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         uint64_t d = 0ULL;
         int cachedDuration = g_fsinfo[fd].numDuration; // avoid div by zero
         if (cachedDuration >= 1) {
-            // factor of 1000 converts us to ms.
-            d = g_fsinfo[fd].totalDuration / ( 1000 * cachedDuration);
+            // factor of 1000000 converts ns to ms.
+            d = g_fsinfo[fd].totalDuration / ( 1000000 * cachedDuration);
         }
 
         event_field_t fields[] = {
@@ -748,6 +734,24 @@ doTotal(enum metric_t type)
             err_str = "ERROR: doTotal:TOT_DNS:outSendEvent";
             units = "operation";
             break;
+        case TOT_PORTS:
+            metric = "net.port.total";
+            value = &g_ctrs.openPortsTot;
+            err_str = "ERROR: doTotal:TOT_PORTS:outSendEvent";
+            units = "instance";
+            break;
+        case TOT_TCP_CONN:
+            metric = "net.tcp.total";
+            value = &g_ctrs.TCPConnectionsTot;
+            err_str = "ERROR: doTotal:TOT_TCP_CONN:outSendEvent";
+            units = "session";
+            break;
+        case TOT_ACTIVE_CONN:
+            metric = "net.conn.total";
+            value = &g_ctrs.activeConnectionsTot;
+            err_str = "ERROR: doTotal:TOT_ACTIVE_CONN:outSendEvent";
+            units = "connection";
+            break;
         default:
             DBG(NULL);
             return;
@@ -786,48 +790,63 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     getProtocol(g_netinfo[fd].type, proto, sizeof(proto));
     localPort = GET_PORT(fd, g_netinfo[fd].localConn.ss_family, LOCAL);
     remotePort = GET_PORT(fd, g_netinfo[fd].remoteConn.ss_family, REMOTE);
-    
+
     switch (type) {
     case OPEN_PORTS:
-    {
-        event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        4),
-            NUMFIELD("pid",              g_cfg.pid,             7),
-            NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_cfg.hostname,        4),
-            STRFIELD("proto",            proto,                 2),
-            NUMFIELD("port",             localPort,             6),
-            STRFIELD("unit",             "instance",            1),
-            FIELDEND
-        };
-        event_t e = {"net.port", g_ctrs.openPorts, CURRENT, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:OPENPORTS:outSendEvent", -1, CFG_LOG_ERROR);
-        }
-        break;
-    }
-
     case TCP_CONNECTIONS:
-    {
-        event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        4),
-            NUMFIELD("pid",              g_cfg.pid,             7),
-            NUMFIELD("fd",               fd,                    7),
-            STRFIELD("host",             g_cfg.hostname,        4),
-            STRFIELD("proto",            proto,                 2),
-            NUMFIELD("port",             localPort,             6),
-            STRFIELD("unit",             "session",             1),
-            FIELDEND
-        };
-        event_t e = {"net.tcp", g_ctrs.TCPConnections, CURRENT, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:TCPCONNS:outSendEvent", -1, CFG_LOG_ERROR);
-        }
-        break;
-    }
-
     case ACTIVE_CONNECTIONS:
     {
+        const char* metric = "UNKNOWN";
+        int* value = NULL;
+        int* total_value = NULL;
+        data_type_t aggregation_type = DELTA;
+        const char* units = "UNKNOWN";
+        const char* err_str = "UNKNOWN";
+        switch (type) {
+        case OPEN_PORTS:
+            metric = "net.port";
+            value = &g_ctrs.openPorts;
+            total_value = &g_ctrs.openPortsTot;
+            aggregation_type = CURRENT;
+            units = "instance";
+            err_str = "ERROR: doNetMetric:OPEN_PORTS:outSendEvent";
+            break;
+        case TCP_CONNECTIONS:
+            metric = "net.tcp";
+            value = &g_ctrs.TCPConnections;
+            total_value = &g_ctrs.TCPConnectionsTot;
+            aggregation_type = CURRENT;
+            units = "session";
+            err_str = "ERROR: doNetMetric:TCP_CONNECTIONS:outSendEvent";
+            break;
+        case ACTIVE_CONNECTIONS:
+            metric = "net.conn";
+            value = &g_ctrs.activeConnections;
+            total_value = &g_ctrs.activeConnectionsTot;
+            aggregation_type = DELTA;
+            units = "connection";
+            err_str = "ERROR: doNetMetric:ACTIVE_CONNECTIONS:outSendEvent";
+            break;
+        default:
+            DBG(NULL);
+            return;
+        }
+
+        // if called from an event, we update counters
+        if (source == EVENT_BASED) {
+            atomicAdd(value, size);        // size can be negative.
+            atomicAdd(total_value, size);
+            if (type == OPEN_PORTS)         g_netinfo[fd].listen = TRUE;
+            if (type == TCP_CONNECTIONS)    g_netinfo[fd].accept = TRUE;
+            if (type == ACTIVE_CONNECTIONS) g_netinfo[fd].accept = TRUE;
+            if (!g_netinfo[fd].startTime)   g_netinfo[fd].startTime = getTime();
+        }
+
+        // Only report if enabled
+        if ((g_cfg.summarize.net.open_close) && (source == EVENT_BASED)) {
+            return;
+        }
+
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
@@ -835,19 +854,41 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             STRFIELD("host",             g_cfg.hostname,        4),
             STRFIELD("proto",            proto,                 2),
             NUMFIELD("port",             localPort,             6),
-            STRFIELD("unit",             "connection",          1),
+            STRFIELD("unit",             units,                 1),
             FIELDEND
         };
-        event_t e = {"net.conn", g_ctrs.activeConnections, DELTA, fields};
+        event_t e = {metric, *value, aggregation_type, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:ACTIVECONNS:outSendEvent", -1, CFG_LOG_ERROR);
+            scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
-        atomicSet(&g_ctrs.activeConnections, 0);
+
+        // Reset the (non-gauge) info if we tried to report
+        if (aggregation_type == DELTA) atomicSet(value, 0);
+
         break;
     }
 
     case CONNECTION_DURATION:
     {
+
+        // if called from an event, we update counters
+        if (source == EVENT_BASED) {
+            atomicAdd(&g_netinfo[fd].totalDuration, size);
+            atomicAdd(&g_netinfo[fd].numDuration, 1);
+        }
+
+        // Only report if enabled
+        if ((g_cfg.summarize.net.open_close) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        uint64_t d = 0ULL;
+        int cachedDuration = g_netinfo[fd].numDuration; // avoid div by zero
+        if (cachedDuration >= 1 ) {
+            // factor of 1000000 converts ns to ms.
+            d = g_netinfo[fd].totalDuration / ( 1000000 * cachedDuration);
+        }
+
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
@@ -858,10 +899,14 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             STRFIELD("unit",             "millisecond",         1),
             FIELDEND
         };
-        event_t e = {"net.conn_duration", g_netinfo[fd].duration, DELTA_MS, fields};
+        event_t e = {"net.conn_duration", d, DELTA_MS, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
         }
+
+        atomicSet(&g_netinfo[fd].totalDuration, 0);
+        atomicSet(&g_netinfo[fd].numDuration, 0);
+
         break;
     }
 
@@ -1326,16 +1371,10 @@ doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
     addSock(sd, SOCK_STREAM);
     
     if (getNetEntry(sd) != NULL) {
-        g_netinfo[sd].listen = TRUE;
-        g_netinfo[sd].accept = TRUE;
-        atomicAdd(&g_ctrs.openPorts, 1);
-        atomicAdd(&g_ctrs.TCPConnections, 1);
-        atomicAdd(&g_ctrs.activeConnections, 1);
         if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);
-        doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 0);
-        doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED, 0);
-        doNetMetric(ACTIVE_CONNECTIONS, sd, EVENT_BASED, 0);
-        g_netinfo[sd].startTime = getTime();
+        doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 1);
+        doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED, 1);
+        doNetMetric(ACTIVE_CONNECTIONS, sd, EVENT_BASED, 1);
     }
 }
 
@@ -1422,6 +1461,10 @@ reportPeriodicStuff(void)
     doTotal(TOT_OPEN);
     doTotal(TOT_CLOSE);
     doTotal(TOT_DNS);
+
+    doTotal(TOT_PORTS);
+    doTotal(TOT_TCP_CONN);
+    doTotal(TOT_ACTIVE_CONN);
 
     // report net and file by descriptor
     for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {
@@ -1604,19 +1647,16 @@ doClose(int fd, const char *func)
 
         if (ninfo->listen == TRUE) {
             // Gauge tracking number of open ports
-            atomicSub(&g_ctrs.openPorts, 1);
-            doNetMetric(OPEN_PORTS, fd, EVENT_BASED, 0);
+            doNetMetric(OPEN_PORTS, fd, EVENT_BASED, -1);
         }
 
         if (ninfo->accept == TRUE) {
             // Gauge tracking number of active TCP connections
-            atomicSub(&g_ctrs.TCPConnections, 1);
-            doNetMetric(TCP_CONNECTIONS, fd, EVENT_BASED, 0);
+            doNetMetric(TCP_CONNECTIONS, fd, EVENT_BASED, -1);
 
             if (ninfo->startTime != 0) {
-                // Duration is in NS, the metric wants to be in MS
-                ninfo->duration = getDuration(ninfo->startTime)  / 1000000;
-                doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED, 0);
+                uint64_t duration = getDuration(ninfo->startTime);
+                doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED, duration);
             }
         }
 
@@ -1709,7 +1749,8 @@ doDupSock(int oldfd, int newfd)
     g_netinfo[newfd].txBytes = 0;
     g_netinfo[newfd].rxBytes = 0;
     g_netinfo[newfd].startTime = 0;
-    g_netinfo[newfd].duration = 0;
+    g_netinfo[newfd].totalDuration = 0;
+    g_netinfo[newfd].numDuration = 0;
 
     return 0;
 }
@@ -3267,8 +3308,6 @@ socket(int socket_family, int socket_type, int protocol)
             ((socket_family == AF_INET) ||
              (socket_family == AF_INET6)) &&            
             (socket_type == SOCK_DGRAM)) {
-            // Tracking number of open ports
-            atomicAdd(&g_ctrs.openPorts, 1);
             
             /*
              * State used in close()
@@ -3278,8 +3317,7 @@ socket(int socket_family, int socket_type, int protocol)
              * a UDP socket is open we say the port is open
              * a UDP socket is closed we say the port is closed
              */
-            net->listen = TRUE;
-            doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 0);
+            doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 1);
         }
     }
 
@@ -3313,18 +3351,11 @@ listen(int sockfd, int backlog)
     if (rc != -1) {
         scopeLog("listen", sockfd, CFG_LOG_DEBUG);
         
-        // Tracking number of open ports
-        atomicAdd(&g_ctrs.openPorts, 1);
-        
         if (net) {
-            net->listen = TRUE;
-            net-> accept = TRUE;
-            doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED, 0);
+            doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED, 1);
 
             if (net->type == SOCK_STREAM) {
-                atomicAdd(&g_ctrs.TCPConnections, 1);
-                net->accept = TRUE;                            
-                doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED, 0);
+                doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED, 1);
             }
         }
     }
@@ -3390,17 +3421,12 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     rc = g_fn.connect(sockfd, addr, addrlen);
     if ((rc != -1) && net) {
         doSetConnection(sockfd, addr, addrlen, REMOTE);
-        net->accept = TRUE;
-        atomicAdd(&g_ctrs.activeConnections, 1);
-        doNetMetric(ACTIVE_CONNECTIONS, sockfd, EVENT_BASED, 0);
+        doNetMetric(ACTIVE_CONNECTIONS, sockfd, EVENT_BASED, 1);
 
         if (net->type == SOCK_STREAM) {
-            atomicAdd(&g_ctrs.TCPConnections, 1);
-            doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED, 0);
+            doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED, 1);
         }
 
-        // Start the duration timer
-        net->startTime = getTime();
         scopeLog("connect", sockfd, CFG_LOG_DEBUG);
     }
     

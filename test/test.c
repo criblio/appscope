@@ -36,6 +36,19 @@ dbgHasNoUnexpectedFailures(void** state)
     assert_false(failures);
 }
 
+void
+dbgDumpAllToBuffer(char* buf, int size)
+{
+    FILE* f = fmemopen(buf, size, "a+");
+    assert_non_null(f);
+    dbgDumpAll(f);
+    if (ftell(f) >= size) {
+        fail_msg("size of %d was inadequate for dbgDumpAllToBuffer, "
+                 "%ld was needed", size, ftell(f));
+    }
+    if (fclose(f)) fail_msg("Couldn't close fmemopen'd file");
+}
+
 int
 writeFile(const char* path, const char* text)
 {

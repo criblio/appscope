@@ -1509,7 +1509,6 @@ init(void)
     g_fn.fscanf = dlsym(RTLD_NEXT, "fscanf");
     g_fn.fputc = dlsym(RTLD_NEXT, "fputc");
     g_fn.fputc_unlocked = dlsym(RTLD_NEXT, "fputc_unlocked");
-    g_fn.putc = dlsym(RTLD_NEXT, "putc");
     g_fn.fputwc = dlsym(RTLD_NEXT, "fputwc");
     g_fn.putwc = dlsym(RTLD_NEXT, "putwc");
     g_fn.getline = dlsym(RTLD_NEXT, "getline");
@@ -4127,15 +4126,6 @@ fputc_unlocked(int c, FILE *stream)
     IOSTREAMPRE(fputc_unlocked, int);
     rc = g_fn.fputc_unlocked(c, stream);
     IOSTREAMPOST(fputc_unlocked, 1, EOF, &g_ctrs.fsRdWrErrors, (enum event_type_t)EVENT_FS);
-}
-
-EXPORTON int
-putc(int c, FILE *stream)
-{
-    WRAP_CHECK(putc, EOF);
-    IOSTREAMPRE(putc, int);
-    rc = g_fn.putc(c, stream);
-    IOSTREAMPOST(putc, 1, EOF, &g_ctrs.fsRdWrErrors, (enum event_type_t)EVENT_FS);
 }
 
 EXPORTON wint_t

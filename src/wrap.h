@@ -239,7 +239,6 @@ typedef struct interposed_funcs_t {
     int (*fgetc)(FILE *);
     int (*fputc)(int, FILE *);
     int (*fputc_unlocked)(int, FILE *);
-    int (*putc)(int, FILE *);
     wint_t (*fputwc)(wchar_t, FILE *);
     wint_t (*putwc)(wchar_t, FILE *);
     ssize_t (*getline)(char **, size_t *, FILE *);

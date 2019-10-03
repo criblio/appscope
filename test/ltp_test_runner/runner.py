@@ -48,7 +48,7 @@ class Runner:
                 self.__execute_test(test_path, f, True)
 
     def __execute_test(self, test_path, test, wrapped):
-        start = time.time()
+        start = self.__now_ms()
         env = dict(os.environ)
 
         if wrapped:
@@ -57,11 +57,16 @@ class Runner:
         p = subprocess.Popen('./' + test, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=test_path, env=env)
         stdout, stderr = p.communicate()
 
-        self.__send_result(w.TestResult(test, wrapped, stdout, stderr, time.time() - start, p.returncode))
+        self.__send_result(w.TestResult(test, wrapped, stdout, stderr, self.__now_ms() - start, p.returncode))
 
     def __send_result(self, result):
-        return (self.__test_watcher.test_failed(result), self.__test_watcher.test_passed(result))[
-            result.return_code == 0]
+        if result.return_code == 0:
+            self.__test_watcher.test_passed(result)
+        else:
+            self.__test_watcher.test_failed(result)
+
+    def __now_ms(self):
+        return int(round(time.time() * 1000))
 
 
 def main(args):

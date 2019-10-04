@@ -527,7 +527,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
 
     // Both DNS metrics use duration...
     uint64_t ldur = 0ULL;
-    ldur = duration / 1000;
+    ldur = duration / 1000000;  // Converts ns to ms
 
     switch (type) {
     case DNS:
@@ -719,9 +719,12 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         uint64_t d = 0ULL;
         int cachedDuration = g_fsinfo[fd].numDuration; // avoid div by zero
         if (cachedDuration >= 1) {
-            // factor of 1000000 converts ns to ms.
-            d = g_fsinfo[fd].totalDuration / ( 1000000 * cachedDuration);
+            // factor of 1000 converts ns to us.
+            d = g_fsinfo[fd].totalDuration / ( 1000 * cachedDuration);
         }
+
+        // Don't report zeros.
+        if (d == 0ULL) return;
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        4),
@@ -731,7 +734,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             STRFIELD("op",               op,                    3),
             STRFIELD("file",             g_fsinfo[fd].path,     5),
             NUMFIELD("numops",        g_fsinfo[fd].numDuration, 8),
-            STRFIELD("unit",             "millisecond",         1),
+            STRFIELD("unit",             "microsecond",         1),
             FIELDEND
         };
         event_t e = {"fs.duration", d, HISTOGRAM, fields};
@@ -786,6 +789,9 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         if ((g_cfg.summarize.fs.read_write) && (source == EVENT_BASED)) {
             return;
         }
+
+        // Don't report zeros.
+        if (*sizebytes == 0ULL) return;
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        4),
@@ -859,6 +865,9 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         if ((source == EVENT_BASED) && *summarize) {
             return;
         }
+
+        // Don't report zeros.
+        if (*numops == 0ULL) return;
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        4),
@@ -1085,9 +1094,15 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     case CONNECTION_DURATION:
     {
 
+        uint64_t new_duration = 0ULL;
+        if (g_netinfo[fd].startTime != 0ULL) {
+            new_duration = getDuration(g_netinfo[fd].startTime);
+            g_netinfo[fd].startTime = 0ULL;
+        }
+
         // if called from an event, we update counters
-        if (source == EVENT_BASED) {
-            atomicAdd(&g_netinfo[fd].totalDuration, size);
+        if ((source == EVENT_BASED) && new_duration) {
+            atomicAdd(&g_netinfo[fd].totalDuration, new_duration);
             atomicAdd(&g_netinfo[fd].numDuration, 1);
         }
 
@@ -1102,6 +1117,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             // factor of 1000000 converts ns to ms.
             d = g_netinfo[fd].totalDuration / ( 1000000 * cachedDuration);
         }
+
+        // Don't report zeros.
+        if (d == 0ULL) return;
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        4),
@@ -1140,6 +1158,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
             return;
         }
+
+        // Don't report zeros.
+        if (g_netinfo[fd].rxBytes == 0ULL) return;
 
         if ((localPort == 443) || (remotePort == 443)) {
             strncpy(data, "ssl", sizeof(data));
@@ -1236,6 +1257,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
             return;
         }
+
+        // Don't report zeros.
+        if (g_netinfo[fd].txBytes == 0ULL) return;
 
         if ((localPort == 443) || (remotePort == 443)) {
             strncpy(data, "ssl", sizeof(data));
@@ -1605,36 +1629,31 @@ doReset()
 }
 
 static void
-reportFD(int fd)
+reportFD(int fd, enum control_type_t source)
 {
     struct net_info_t *ninfo = getNetEntry(fd);
     if (ninfo) {
-        if (ninfo->action & EVENT_TX) {
-            doNetMetric(NETTX, fd, PERIODIC, 0);
+        if (!g_cfg.summarize.net.rx_tx) {
+            doNetMetric(NETTX, fd, source, 0);
+            doNetMetric(NETRX, fd, source, 0);
         }
-        if (ninfo->action & EVENT_RX) {
-            doNetMetric(NETRX, fd, PERIODIC, 0);
+        if (!g_cfg.summarize.net.open_close) {
+            doNetMetric(OPEN_PORTS, fd, source, -1);
+            doNetMetric(TCP_CONNECTIONS, fd, source, -1);
+            doNetMetric(CONNECTION_DURATION, fd, source, -1);
         }
-        ninfo->action = 0;
     }
 
     struct fs_info_t *finfo = getFSEntry(fd);
     if (finfo) {
-        if (finfo->action & EVENT_FS) {
-            if (finfo->totalDuration > 0) {
-                doFSMetric(FS_DURATION, fd, PERIODIC, "read/write", 0, NULL);
-            }
-            if (finfo->readBytes > 0) {
-                doFSMetric(FS_READ, fd, PERIODIC, "read", 0, NULL);
-            }
-            if (finfo->writeBytes > 0) {
-                doFSMetric(FS_WRITE, fd, PERIODIC, "write", 0, NULL);
-            }
-            if (finfo->numSeek > 0) {
-                doFSMetric(FS_SEEK, fd, PERIODIC, "seek", 0, NULL);
-            }
+        if (!g_cfg.summarize.fs.read_write) {
+            doFSMetric(FS_DURATION, fd, source, "read/write", 0, NULL);
+            doFSMetric(FS_READ, fd, source, "read", 0, NULL);
+            doFSMetric(FS_WRITE, fd, source, "write", 0, NULL);
         }
-        finfo->action = 0;
+        if (!g_cfg.summarize.fs.seek) {
+            doFSMetric(FS_SEEK, fd, source, "seek", 0, NULL);
+        }
     }
 }
 
@@ -1693,7 +1712,7 @@ reportPeriodicStuff(void)
 
     // report net and file by descriptor
     for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {
-        reportFD(i);
+        reportFD(i, PERIODIC);
     }
 
     if (!atomicCas64(&reentrancy_guard, 1ULL, 0ULL)) {
@@ -1908,24 +1927,9 @@ doClose(int fd, const char *func)
     struct fs_info_t *fsinfo;
 
     // report everything before the info is lost
-    reportFD(fd);
+    reportFD(fd, EVENT_BASED);
 
     if ((ninfo = getNetEntry(fd)) != NULL) {
-
-        if (ninfo->listen == TRUE) {
-            // Gauge tracking number of open ports
-            doNetMetric(OPEN_PORTS, fd, EVENT_BASED, -1);
-        }
-
-        if (ninfo->accept == TRUE) {
-            // Gauge tracking number of active TCP connections
-            doNetMetric(TCP_CONNECTIONS, fd, EVENT_BASED, -1);
-
-            if (ninfo->startTime != 0) {
-                uint64_t duration = getDuration(ninfo->startTime);
-                doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED, duration);
-            }
-        }
 
         memset(ninfo, 0, sizeof(struct net_info_t));
         if (func) {

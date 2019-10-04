@@ -8,9 +8,6 @@ import datetime
 
 help_text = '''options:
 --help  display help text
---home  tests home dir (by default /opt/test/ltp/testcases/kernel/syscalls/)
---include_tests include tests array or dir
---exclude_tests exclude tests array or dir
 --config config file for tests
 '''
 
@@ -73,47 +70,40 @@ class Runner:
 
 
 def main(args):
-    home = "/opt/test/ltp/testcases/kernel/syscalls/"
-    include_tests = []
-    exclude_tests = []
-    lib_path = "/opt/scope/lib/linux/libwrap.so"
+    configs = []
 
     # parse args
     for i in range(len(args)):
         if args[i] == '--help':
             print(help_text)
 
-        if args[i] == '--home':
-            home = args[i + 1]
-
-        if args[i] == 'include_tests':
-            include_tests = args[i + 1]
-
-        if args[i] == 'exclude_tests':
-            exclude_tests = args[i + 1]
-
-        if args[i] == 'lib_path':
-            lib_path = args[i + 1]
-
         if args[i] == '--config':
             path = args[i + 1]
             with open(path, "rb") as f:
                 config = json.loads(f.read().decode("utf8"))
-                home = config["home"]
-                include_tests = config["include_tests"]
-                exclude_tests = config["exclude_tests"]
-                lib_path = config["lib_path"]
+                configs = config["configs"]
 
-    if not home.endswith('/'):
-        home += '/'
-
-    if not os.path.exists(home):
-        sys.stderr.write("tests home is not valid")
+    if len(configs) == 0:
+        sys.stderr.write("no valid config")
         return 1
 
-    subprocess.call("make", stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd="/opt/scope")
+    test_results = 0
 
-    return Runner(home, include_tests, exclude_tests, lib_path).run()
+    for s in configs:
+        c = configs[s]
+        home = c["home"]
+        include_tests = c["include_tests"]
+        exclude_tests = c["exclude_tests"]
+        lib_path = c["lib_path"]
+
+        if not os.path.exists(home):
+            sys.stderr.write("tests home is not valid")
+            return 1
+
+        if Runner(home, include_tests, exclude_tests, lib_path).run() == 1:
+            test_results = 1
+
+    return test_results
 
 
 if __name__ == "__main__":

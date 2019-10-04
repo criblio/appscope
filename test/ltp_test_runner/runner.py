@@ -19,7 +19,8 @@ class Runner:
         self.__home = home
         self.__include_tests = include_tests
         self.__exclude_tests = exclude_tests
-        self.__test_watcher = w.Watcher()
+        # TODO derive from config
+        self.__test_watcher = w.Watcher("/tmp/")
         self.__lib_path = lib_path
 
     def run(self):

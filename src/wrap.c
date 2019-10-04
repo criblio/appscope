@@ -139,36 +139,36 @@ setVerbosity(rtconfig* c, unsigned verbosity)
         summarize->net.error = 1;
         summarize->net.dnserror = 1;
     } else if (verbosity == 13) {
-        summarize->fs.open_close = 0;
-        summarize->fs.read_write = 0;
-        summarize->fs.seek = 0;
-        summarize->fs.stat = 0;
-        summarize->fs.error = 1;
-        summarize->net.open_close = 0;
-        summarize->net.rx_tx = 0;
-        summarize->net.dns = 0;
-        summarize->net.error = 0;
-        summarize->net.dnserror = 0;
-    } else if (verbosity == 14) {
-        summarize->fs.open_close = 0;
-        summarize->fs.read_write = 0;
-        summarize->fs.seek = 0;
-        summarize->fs.stat = 0;
+        summarize->fs.open_close = 1;
+        summarize->fs.read_write = 1;
+        summarize->fs.seek = 1;
+        summarize->fs.stat = 1;
         summarize->fs.error = 0;
-        summarize->net.open_close = 0;
-        summarize->net.rx_tx = 0;
-        summarize->net.dns = 0;
+        summarize->net.open_close = 1;
+        summarize->net.rx_tx = 1;
+        summarize->net.dns = 1;
         summarize->net.error = 1;
         summarize->net.dnserror = 1;
+    } else if (verbosity == 14) {
+        summarize->fs.open_close = 1;
+        summarize->fs.read_write = 1;
+        summarize->fs.seek = 1;
+        summarize->fs.stat = 1;
+        summarize->fs.error = 1;
+        summarize->net.open_close = 1;
+        summarize->net.rx_tx = 1;
+        summarize->net.dns = 1;
+        summarize->net.error = 0;
+        summarize->net.dnserror = 0;
     } else if (verbosity == 15) {
-        summarize->fs.open_close = 0;
-        summarize->fs.read_write = 0;
-        summarize->fs.seek = 0;
-        summarize->fs.stat = 0;
+        summarize->fs.open_close = 1;
+        summarize->fs.read_write = 1;
+        summarize->fs.seek = 1;
+        summarize->fs.stat = 1;
         summarize->fs.error = 0;
-        summarize->net.open_close = 0;
-        summarize->net.rx_tx = 0;
-        summarize->net.dns = 0;
+        summarize->net.open_close = 1;
+        summarize->net.rx_tx = 1;
+        summarize->net.dns = 1;
         summarize->net.error = 0;
         summarize->net.dnserror = 0;
     }

@@ -1740,7 +1740,20 @@ init(void)
     g_fn.pread = dlsym(RTLD_NEXT, "pread");
     g_fn.readv = dlsym(RTLD_NEXT, "readv");
     g_fn.fread = dlsym(RTLD_NEXT, "fread");
+    g_fn.__fread_chk = dlsym(RTLD_NEXT, "__fread_chk");
+    g_fn.fread_unlocked = dlsym(RTLD_NEXT, "fread_unlocked");
     g_fn.fgets = dlsym(RTLD_NEXT, "fgets");
+    g_fn.__fgets_chk = dlsym(RTLD_NEXT, "__fgets_chk");
+    g_fn.fgets_unlocked = dlsym(RTLD_NEXT, "fgets_unlocked");
+    g_fn.fgetws = dlsym(RTLD_NEXT, "fgetws");
+    g_fn.__fgetws_chk = dlsym(RTLD_NEXT, "fgetws");
+    g_fn.fgetwc = dlsym(RTLD_NEXT, "fgetwc");
+    g_fn.fgetc = dlsym(RTLD_NEXT, "fgetc");
+    g_fn.fscanf = dlsym(RTLD_NEXT, "fscanf");
+    g_fn.fputc = dlsym(RTLD_NEXT, "fputc");
+    g_fn.fputc_unlocked = dlsym(RTLD_NEXT, "fputc_unlocked");
+    g_fn.fputwc = dlsym(RTLD_NEXT, "fputwc");
+    g_fn.putwc = dlsym(RTLD_NEXT, "putwc");
     g_fn.getline = dlsym(RTLD_NEXT, "getline");
     g_fn.getdelim = dlsym(RTLD_NEXT, "getdelim");
     g_fn.__getdelim = dlsym(RTLD_NEXT, "__getdelim");
@@ -1748,20 +1761,28 @@ init(void)
     g_fn.pwrite = dlsym(RTLD_NEXT, "pwrite");
     g_fn.writev = dlsym(RTLD_NEXT, "writev");
     g_fn.fwrite = dlsym(RTLD_NEXT, "fwrite");
+    g_fn.sendfile = dlsym(RTLD_NEXT, "sendfile");
     g_fn.fputs = dlsym(RTLD_NEXT, "fputs");
+    g_fn.fputs_unlocked = dlsym(RTLD_NEXT, "fputs_unlocked");
+    g_fn.fputws = dlsym(RTLD_NEXT, "fputws");
     g_fn.lseek = dlsym(RTLD_NEXT, "lseek");
+    g_fn.fseek = dlsym(RTLD_NEXT, "fseek");
     g_fn.fseeko = dlsym(RTLD_NEXT, "fseeko");
     g_fn.ftell = dlsym(RTLD_NEXT, "ftell");
     g_fn.ftello = dlsym(RTLD_NEXT, "ftello");
     g_fn.fgetpos = dlsym(RTLD_NEXT, "fgetpos");
     g_fn.fsetpos = dlsym(RTLD_NEXT, "fsetpos");
+    g_fn.fsetpos64 = dlsym(RTLD_NEXT, "fsetpos64");
     g_fn.stat = dlsym(RTLD_NEXT, "stat");
     g_fn.lstat = dlsym(RTLD_NEXT, "lstat");
     g_fn.fstat = dlsym(RTLD_NEXT, "fstat");
+    g_fn.fstatat = dlsym(RTLD_NEXT, "fstatat");
     g_fn.statfs = dlsym(RTLD_NEXT, "statfs");
     g_fn.fstatfs = dlsym(RTLD_NEXT, "fstatfs");
     g_fn.statvfs = dlsym(RTLD_NEXT, "statvfs");
     g_fn.fstatvfs = dlsym(RTLD_NEXT, "fstatvfs");
+    g_fn.access = dlsym(RTLD_NEXT, "access");
+    g_fn.faccessat = dlsym(RTLD_NEXT, "faccessat");
     g_fn.rewind = dlsym(RTLD_NEXT, "rewind");
     g_fn.fcntl = dlsym(RTLD_NEXT, "fcntl");
     g_fn.fcntl64 = dlsym(RTLD_NEXT, "fcntl64");
@@ -1792,12 +1813,14 @@ init(void)
     g_fn.accept$NOCANCEL = dlsym(RTLD_NEXT, "accept$NOCANCEL");
     g_fn.__sendto_nocancel = dlsym(RTLD_NEXT, "__sendto_nocancel");
     g_fn.DNSServiceQueryRecord = dlsym(RTLD_NEXT, "DNSServiceQueryRecord");
-    g_fn.fstatat = dlsym(RTLD_NEXT, "fstatat");
 #endif // __MACOS__
 
 #ifdef __LINUX__
     g_fn.open64 = dlsym(RTLD_NEXT, "open64");
     g_fn.openat64 = dlsym(RTLD_NEXT, "openat64");
+    g_fn.__open_2 = dlsym(RTLD_NEXT, "__open_2");
+    g_fn.__open64_2 = dlsym(RTLD_NEXT, "__open64_2");
+    g_fn.__openat_2 = dlsym(RTLD_NEXT, "__openat_2");
     g_fn.fopen64 = dlsym(RTLD_NEXT, "fopen64");
     g_fn.freopen64 = dlsym(RTLD_NEXT, "freopen64");
     g_fn.creat64 = dlsym(RTLD_NEXT, "creat64");
@@ -1805,18 +1828,32 @@ init(void)
     g_fn.preadv = dlsym(RTLD_NEXT, "preadv");
     g_fn.preadv2 = dlsym(RTLD_NEXT, "preadv2");
     g_fn.preadv64v2 = dlsym(RTLD_NEXT, "preadv64v2");
+    g_fn.__pread_chk = dlsym(RTLD_NEXT, "__pread_chk");
+    g_fn.__read_chk = dlsym(RTLD_NEXT, "__read_chk");
+    g_fn.__fread_unlocked_chk = dlsym(RTLD_NEXT, "__fread_unlocked_chk");
     g_fn.pwrite64 = dlsym(RTLD_NEXT, "pwrite64");
     g_fn.pwritev = dlsym(RTLD_NEXT, "pwritev");
+    g_fn.pwritev64 = dlsym(RTLD_NEXT, "pwritev64");
     g_fn.pwritev2 = dlsym(RTLD_NEXT, "pwritev2");
     g_fn.pwritev64v2 = dlsym(RTLD_NEXT, "pwritev64v2");
+    g_fn.fwrite_unlocked = dlsym(RTLD_NEXT, "fwrite_unlocked");
+    g_fn.sendfile64 = dlsym(RTLD_NEXT, "sendfile64");
     g_fn.lseek64 = dlsym(RTLD_NEXT, "lseek64");
     g_fn.fseeko64 = dlsym(RTLD_NEXT, "fseeko64");
     g_fn.ftello64 = dlsym(RTLD_NEXT, "ftello64");
     g_fn.statfs64 = dlsym(RTLD_NEXT, "statfs64");
     g_fn.fstatfs64 = dlsym(RTLD_NEXT, "fstatfs64");
+    g_fn.fstatvfs64 = dlsym(RTLD_NEXT, "fstatvfs64");
+    g_fn.fgetpos64 = dlsym(RTLD_NEXT, "fgetpos64");
+    g_fn.statvfs64 = dlsym(RTLD_NEXT, "statvfs64");
+    g_fn.__lxstat = dlsym(RTLD_NEXT, "__lxstat");
+    g_fn.__lxstat64 = dlsym(RTLD_NEXT, "__lxstat64");
     g_fn.__xstat = dlsym(RTLD_NEXT, "__xstat");
     g_fn.__xstat64 = dlsym(RTLD_NEXT, "__xstat64");
+    g_fn.__fxstat = dlsym(RTLD_NEXT, "__fxstat");
     g_fn.__fxstat64 = dlsym(RTLD_NEXT, "__fxstat64");
+    g_fn.__fxstatat = dlsym(RTLD_NEXT, "__fxstatat");
+    g_fn.__fxstatat64 = dlsym(RTLD_NEXT, "__fxstatat64");
     g_fn.gethostbyname_r = dlsym(RTLD_NEXT, "gethostbyname_r");
     g_fn.syscall = dlsym(RTLD_NEXT, "syscall");
 #ifdef __STATX__
@@ -2118,6 +2155,55 @@ openat64(int dirfd, const char *pathname, int flags, ...)
     return fd;
 }
 
+EXPORTON int
+__open_2(const char *file, int oflag)
+{
+    int fd;
+
+    WRAP_CHECK(__open_2, -1);
+    doThread();
+    fd = g_fn.__open_2(file, oflag);
+    if (fd != -1) {
+        doOpen(fd, file, FD, "__open_2");
+    } else {
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "__open_2", file);
+    }
+
+    return fd;
+}
+
+EXPORTON int
+__open64_2(const char *file, int oflag)
+{
+    int fd;
+
+    WRAP_CHECK(__open64_2, -1);
+    doThread();
+    fd = g_fn.__open64_2(file, oflag);
+    if (fd != -1) {
+        doOpen(fd, file, FD, "__open_2");
+    } else {
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "__open64_2", file);
+    }
+
+    return fd;
+}
+
+EXPORTON int
+__openat_2(int fd, const char *file, int oflag)
+{
+    WRAP_CHECK(__openat_2, -1);
+    doThread();
+    fd = g_fn.__openat_2(fd, file, oflag);
+    if (fd != -1) {
+        doOpen(fd, file, FD, "__openat_2");
+    } else {
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "__openat_2", file);
+    }
+
+    return fd;
+}
+
 // Note: creat64 is defined to be obsolete
 EXPORTON int
 creat64(const char *pathname, mode_t mode)
@@ -2339,6 +2425,100 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 }
 
 EXPORTON ssize_t
+__pread_chk(int fd, void * buf, size_t nbytes, off_t offset, size_t buflen)
+{
+    ssize_t rc;
+    struct fs_info_t *fs = getFSEntry(fd);
+    struct net_info_t *net = getNetEntry(fd);
+    elapsed_t time = {0};
+
+    // TODO: this function aborts & exits on error, add abort functionality
+    WRAP_CHECK(__pread_chk, -1);
+    doThread();
+    if (fs) {
+        time.initial = getTime();
+    }
+
+    rc = g_fn.__pread_chk(fd, buf, nbytes, offset, buflen);
+
+    if (fs) {
+        time.duration = getDuration(time.initial);
+    }
+
+    if (rc != -1) {
+        scopeLog("__pread_chk", fd, CFG_LOG_TRACE);
+        if (net) {
+            // This is a network descriptor
+            doSetAddrs(fd);
+            doRecv(fd, rc);
+        } else if (fs) {
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "__pread_chk", time.duration, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, "__pread_chk", rc, NULL);
+        }
+    } else {
+        if (fs) {
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "__pread_chk", fs->path);
+        } else if (net) {
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "__pread_chk", "nopath");
+        }
+    }
+
+    return rc;
+}
+
+EXPORTOFF ssize_t
+__read_chk(int fd, void *buf, size_t nbytes, size_t buflen)
+{
+    ssize_t rc;
+    struct fs_info_t *fs = getFSEntry(fd);
+    struct net_info_t *net = getNetEntry(fd);
+    elapsed_t time = {0};
+
+    // TODO: this function aborts & exits on error, add abort functionality
+    WRAP_CHECK(__read_chk, -1);
+    doThread();
+    if (fs) {
+        time.initial = getTime();
+    }
+
+    rc = g_fn.__read_chk(fd, buf, nbytes, buflen);
+
+    if (fs) {
+        time.duration = getDuration(time.initial);
+    }
+
+    if (rc != -1) {
+        scopeLog("__read_chk", fd, CFG_LOG_TRACE);
+        if (net) {
+            // This is a network descriptor
+            doSetAddrs(fd);
+            doRecv(fd, rc);
+        } else if (fs) {
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "__read_chk", time.duration, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, "__read_chk", rc, NULL);
+        }
+    } else {
+        if (fs) {
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "__read_chk", fs->path);
+        } else if (net) {
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "__read_chk", "nopath");
+        }
+    }
+
+    return rc;
+}
+
+EXPORTOFF ssize_t
+__fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
+{
+    // TODO: this function aborts & exits on error, add abort functionality
+    WRAP_CHECK(__fread_unlocked_chk, -1);
+    IOSTREAMPRE(__fread_unlocked_chk, size_t);
+    rc = g_fn.__fread_unlocked_chk(ptr, ptrlen, size, nmemb, stream);
+    IOSTREAMPOST(__fread_unlocked_chk, rc * size, 0, (enum event_type_t)EVENT_RX);
+}
+
+EXPORTON ssize_t
 pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
 {
     ssize_t rc;
@@ -2413,6 +2593,46 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
             doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "pwritev", fs->path);
         } else if (net) {
             doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "pwritev", "nopath");
+        }
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+pwritev64(int fd, const struct iovec *iov, int iovcnt, off64_t offset)
+{
+    ssize_t rc;
+    struct fs_info_t *fs = getFSEntry(fd);
+    struct net_info_t *net = getNetEntry(fd);
+    elapsed_t time = {0};
+
+    WRAP_CHECK(pwritev64, -1);
+    doThread();
+    if (fs) {
+        time.initial = getTime();
+    }
+
+    rc = g_fn.pwritev64(fd, iov, iovcnt, offset);
+
+    if (fs) {
+        time.duration = getDuration(time.initial);
+    }
+
+    if (rc != -1) {
+        scopeLog("pwritev64", fd, CFG_LOG_TRACE);
+        if (net) {
+            // This is a network descriptor
+            doSetAddrs(fd);
+            doSend(fd, rc);
+        } else if (fs) {
+            doFSMetric(FS_DURATION, fd, EVENT_BASED, "pwritev64", time.duration, NULL);
+            doFSMetric(FS_WRITE, fd, EVENT_BASED, "pwritev64", rc, NULL);
+        }
+    } else {
+        if (fs) {
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "pwritev64", fs->path);
+        } else if (net) {
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "pwritev64", "nopath");
         }
     }
     return rc;
@@ -2609,6 +2829,29 @@ fstatfs64(int fd, struct statfs64 *buf)
 }
 
 EXPORTON int
+fsetpos64(FILE *stream, const fpos64_t *pos)
+{
+    int rc;
+    int fd = fileno(stream);
+    struct fs_info_t *fs = getFSEntry(fd);
+
+    WRAP_CHECK(fsetpos64, -1);
+    doThread();
+    rc = g_fn.fsetpos64(stream, pos);
+
+    if (rc == 0) {
+        scopeLog("fsetpos64", fd, CFG_LOG_DEBUG);
+        if (fs) {
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fsetpos64", 0, NULL);
+        }
+    } else if (fs) {
+        doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "fsetpos64", fs->path);
+    }
+
+    return rc;
+}
+
+EXPORTON int
 __xstat(int ver, const char *path, struct stat *stat_buf)
 {
     int rc;
@@ -2645,6 +2888,63 @@ __xstat64(int ver, const char *path, struct stat64 *stat_buf)
 }
 
 EXPORTON int
+__lxstat(int ver, const char *path, struct stat *stat_buf)
+{
+    int rc;
+
+    WRAP_CHECK(__lxstat, -1);
+    doThread();
+    rc = g_fn.__lxstat(ver, path, stat_buf);
+
+    if (rc != -1) {
+        scopeLog("__lxstat", -1, CFG_LOG_DEBUG);
+        doStatMetric("__lxstat", path);
+    } else {
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "__lxstat", path);
+    }
+    return rc;
+}
+
+EXPORTON int
+__lxstat64(int ver, const char *path, struct stat64 *stat_buf)
+{
+    int rc;
+
+    WRAP_CHECK(__lxstat64, -1);
+    doThread();
+    rc = g_fn.__lxstat64(ver, path, stat_buf);
+
+    if (rc != -1) {
+        scopeLog("__lxstat64", -1, CFG_LOG_DEBUG);
+        doStatMetric("__lxstat64", path);
+    } else {
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "__lxstat64", path);
+    }
+    return rc;
+}
+
+EXPORTON int
+__fxstat(int ver, int fd, struct stat *stat_buf)
+{
+    int rc;
+    struct fs_info_t *fs = getFSEntry(fd);
+
+    WRAP_CHECK(__fxstat, -1);
+    doThread();
+    rc = g_fn.__fxstat(ver, fd, stat_buf);
+
+    if (rc != -1) {
+        scopeLog("__fxstat", -1, CFG_LOG_DEBUG);
+        if (fs) doStatMetric("__fxstat", fs->path);
+    } else {
+        if (fs) {
+            doErrorMetric(FS_ERR_STAT, EVENT_BASED, "__fxstat", fs->path);
+        }
+    }
+    return rc;
+}
+
+EXPORTON int
 __fxstat64(int ver, int fd, struct stat64 * stat_buf)
 {
     int rc;
@@ -2662,7 +2962,43 @@ __fxstat64(int ver, int fd, struct stat64 * stat_buf)
             doErrorMetric(FS_ERR_STAT, EVENT_BASED, "__xstat64", fs->path);
         }
     }
-    return rc;    
+    return rc;
+}
+
+EXPORTON int
+__fxstatat(int ver, int dirfd, const char *path, struct stat *stat_buf, int flags)
+{
+    int rc;
+
+    WRAP_CHECK(__fxstatat, -1);
+    doThread();
+    rc = g_fn.__fxstatat(ver, dirfd, path, stat_buf, flags);
+
+    if (rc != -1) {
+        scopeLog("__fxstatat", -1, CFG_LOG_DEBUG);
+        doStatMetric("__fxstatat", path);
+    } else {
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "__fxstatat", path);
+    }
+    return rc;
+}
+
+EXPORTON int
+__fxstatat64(int ver, int dirfd, const char * path, struct stat64 * stat_buf, int flags)
+{
+    int rc;
+
+    WRAP_CHECK(__fxstatat64, -1);
+    doThread();
+    rc = g_fn.__fxstatat64(ver, dirfd, path, stat_buf, flags);
+
+    if (rc != -1) {
+        scopeLog("__fxstatat64", -1, CFG_LOG_DEBUG);
+        doStatMetric("__fxstatat64", path);
+    } else {
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "__fxstatat64", path);
+    }
+    return rc;
 }
 
 #ifdef __STATX__
@@ -2744,6 +3080,24 @@ statvfs(const char *path, struct statvfs *buf)
 }
 
 EXPORTON int
+statvfs64(const char *path, struct statvfs64 *buf)
+{
+    int rc;
+
+    WRAP_CHECK(statvfs64, -1);
+    doThread();
+    rc = g_fn.statvfs64(path, buf);
+
+    if (rc != -1) {
+        scopeLog("statvfs64", -1, CFG_LOG_DEBUG);
+        doStatMetric("statvfs64", path);
+    } else {
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "statvfs64", path);
+    }
+    return rc;
+}
+
+EXPORTON int
 fstatvfs(int fd, struct statvfs *buf)
 {
     int rc;
@@ -2758,8 +3112,65 @@ fstatvfs(int fd, struct statvfs *buf)
         if (fs) doStatMetric("fstatvfs", fs->path);
     } else {
         if (fs) {
-            doErrorMetric(FS_ERR_STAT, EVENT_BASED, "statvfs", fs->path);
+            doErrorMetric(FS_ERR_STAT, EVENT_BASED, "fstatvfs", fs->path);
         }
+    }
+    return rc;
+}
+
+EXPORTON int
+fstatvfs64(int fd, struct statvfs64 *buf)
+{
+    int rc;
+    struct fs_info_t *fs = getFSEntry(fd);
+
+    WRAP_CHECK(fstatvfs64, -1);
+    doThread();
+    rc = g_fn.fstatvfs64(fd, buf);
+
+    if (rc != -1) {
+        scopeLog("fstatvfs64", fd, CFG_LOG_DEBUG);
+        if (fs) doStatMetric("fstatvfs64", fs->path);
+    } else {
+        if (fs) {
+            doErrorMetric(FS_ERR_STAT, EVENT_BASED, "fstatvfs64", fs->path);
+        }
+    }
+    return rc;
+}
+
+EXPORTON int
+access(const char *pathname, int mode)
+{
+    int rc;
+
+    WRAP_CHECK(access, -1);
+    doThread();
+    rc = g_fn.access(pathname, mode);
+
+    if (rc != -1) {
+        scopeLog("access", -1, CFG_LOG_DEBUG);
+        doStatMetric("access", pathname);
+    } else {
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "access", pathname);
+    }
+    return rc;
+}
+
+EXPORTON int
+faccessat(int dirfd, const char *pathname, int mode, int flags)
+{
+    int rc;
+
+    WRAP_CHECK(faccessat, -1);
+    doThread();
+    rc = g_fn.faccessat(dirfd, pathname, mode, flags);
+
+    if (rc != -1) {
+        scopeLog("faccessat", -1, CFG_LOG_DEBUG);
+        doStatMetric("faccessat", pathname);
+    } else {
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "faccessat", pathname);
     }
     return rc;
 }
@@ -2851,6 +3262,28 @@ lstat(const char *pathname, struct stat *statbuf)
     return rc;
 }
 
+EXPORTON int
+fstatat(int fd, const char *path, struct stat *buf, int flag)
+{
+    int rc;
+    struct fs_info_t *fs = getFSEntry(fd);
+
+    WRAP_CHECK(fstatat, -1);
+    doThread();
+    rc = g_fn.fstatat(fd, path, buf, flag);
+
+    if (rc != -1) {
+        scopeLog("fstatat", fd, CFG_LOG_DEBUG);
+        if (fs) {
+            doStatMetric("fstatat", path);
+        }
+    } else {
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "fstatat", path);
+    }
+
+    return rc;
+}
+
 /*
  * Note:
  * The syscall function in libc is called from the loader for
@@ -2926,6 +3359,36 @@ syscall(long number, ...)
                         fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
 
+EXPORTON size_t
+fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
+{
+    WRAP_CHECK(fwrite_unlocked, -1);
+    IOSTREAMPRE(fwrite_unlocked, size_t);
+    rc = g_fn.fwrite_unlocked(ptr, size, nitems, stream);
+    IOSTREAMPOST(fwrite_unlocked, rc, 0, (enum event_type_t)EVENT_TX);
+}
+
+/*
+ * Note: in_fd must be a file
+ * out_fd can be a file or a socket
+ *
+ * Not sure is this is the way we want to do this, but:
+ * We emit metrics for the input file that is being sent
+ * We optionally emit metrics if the destination uses a socket
+ * We do not emit a separate metric if the destination is a file
+ */
+EXPORTON ssize_t
+sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
+{
+    doSendfile(sendfile);
+}
+
+EXPORTON ssize_t
+sendfile64(int out_fd, int in_fd, off64_t *offset, size_t count)
+{
+    doSendfile(sendfile64);
+}
+
 #endif // __LINUX__
 
 EXPORTON int
@@ -2991,7 +3454,7 @@ fcloseall(void)
             }
         }
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "fcloseall", "nopath");
     }
 
     return rc;
@@ -3128,28 +3591,6 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
     return rc;
 }
 
-EXPORTOFF int
-fstatat(int fd, const char *path, struct stat *buf, int flag)
-{
-    int rc;
-    struct fs_info_t *fs = getFSEntry(fd);
-
-    WRAP_CHECK(fstatat, -1);
-    doThread();
-    rc = g_fn.fstatat(fd, path, buf, flag);
-
-    if (rc != -1) {
-        scopeLog("fstatat", fd, CFG_LOG_DEBUG);
-        if (fs) {
-            doStatMetric("fstatat", path);
-        }
-    } else {
-        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "fstatat", path);
-    }
-
-    return rc;
-}
-
 #endif // __MACOS__
 
 EXPORTON off_t
@@ -3168,7 +3609,30 @@ lseek(int fd, off_t offset, int whence)
             doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek", 0, NULL);
         }
     } else if (fs) {
-         doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "lseek", fs->path);
+        doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "lseek", fs->path);
+    }
+
+    return rc;
+}
+
+EXPORTON int
+fseek(FILE *stream, long offset, int whence)
+{
+    off_t rc;
+    int fd = fileno(stream);
+    struct fs_info_t *fs = getFSEntry(fd);
+
+    WRAP_CHECK(fseek, -1);
+    doThread();
+    rc = g_fn.fseek(stream, offset, whence);
+
+    if (rc != -1) {
+        scopeLog("fseek", fd, CFG_LOG_DEBUG);
+        if (fs) {
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseek", 0, NULL);
+        }
+    } else if (fs) {
+        doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "fseek", fs->path);
     }
 
     return rc;
@@ -3191,9 +3655,8 @@ fseeko(FILE *stream, off_t offset, int whence)
             doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko", 0, NULL);
         }
     } else if (fs) {
-        doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "lseek", fs->path);
+        doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "fseeko", fs->path);
     }
-
     return rc;
 }
 
@@ -3304,6 +3767,29 @@ fgetpos(FILE *stream,  fpos_t *pos)
         }
     } else if (fs) {
         doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "fgetpos", fs->path);
+    }
+
+    return rc;
+}
+
+EXPORTON int
+fgetpos64(FILE *stream,  fpos64_t *pos)
+{
+    int rc;
+    int fd = fileno(stream);
+    struct fs_info_t *fs = getFSEntry(fd);
+
+    WRAP_CHECK(fgetpos64, -1);
+    doThread();
+    rc = g_fn.fgetpos64(stream, pos);
+
+    if (rc == 0) {
+        scopeLog("fgetpos64", fd, CFG_LOG_DEBUG);
+        if (fs) {
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, "fgetpos64", 0, NULL);
+        }
+    } else if (fs) {
+        doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "fgetpos64", fs->path);
     }
 
     return rc;
@@ -3450,6 +3936,24 @@ fputs(const char *s, FILE *stream)
     IOSTREAMPOST(fputs, rc, EOF, (enum event_type_t)EVENT_TX);
 }
 
+EXPORTON int
+fputs_unlocked(const char *s, FILE *stream)
+{
+    WRAP_CHECK(fputs_unlocked, EOF);
+    IOSTREAMPRE(fputs_unlocked, int);
+    rc = g_fn.fputs_unlocked(s, stream);
+    IOSTREAMPOST(fputs_unlocked, rc, EOF, (enum event_type_t)EVENT_TX);
+}
+
+EXPORTON int
+fputws(const wchar_t *ws, FILE *stream)
+{
+    WRAP_CHECK(fputws, EOF);
+    IOSTREAMPRE(fputws, int);
+    rc = g_fn.fputws(ws, stream);
+    IOSTREAMPOST(fputws, rc, EOF, (enum event_type_t)EVENT_TX);
+}
+
 EXPORTON ssize_t
 read(int fd, void *buf, size_t count)
 {
@@ -3582,13 +4086,138 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     IOSTREAMPOST(fread, rc * size, 0, (enum event_type_t)EVENT_RX);
 }
 
+EXPORTON size_t
+__fread_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
+{
+    // TODO: this function aborts & exits on error, add abort functionality
+    WRAP_CHECK(__fread_chk, -1);
+    IOSTREAMPRE(__fread_chk, size_t);
+    rc = g_fn.__fread_chk(ptr, ptrlen, size, nmemb, stream);
+    IOSTREAMPOST(__fread_chk, rc * size, 0, (enum event_type_t)EVENT_RX);
+}
+
+EXPORTON size_t
+fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+    WRAP_CHECK(fread_unlocked, 0);
+    IOSTREAMPRE(fread_unlocked, size_t);
+    rc = g_fn.fread_unlocked(ptr, size, nmemb, stream);
+    IOSTREAMPOST(fread_unlocked, rc, 0, (enum event_type_t)EVENT_RX);
+}
+
 EXPORTON char *
 fgets(char *s, int n, FILE *stream)
 {
     WRAP_CHECK(fgets, NULL);
     IOSTREAMPRE(fgets, char *);
     rc = g_fn.fgets(s, n, stream);
-    IOSTREAMPOST(getline, n, NULL, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(fgets, n, NULL, (enum event_type_t)EVENT_RX);
+}
+
+EXPORTON char *
+__fgets_chk(char *s, size_t size, int strsize, FILE *stream)
+{
+    // TODO: this function aborts & exits on error, add abort functionality
+    WRAP_CHECK(__fgets_chk, NULL);
+    IOSTREAMPRE(__fgets_chk, char *);
+    rc = g_fn.__fgets_chk(s, size, strsize, stream);
+    IOSTREAMPOST(__fgets_chk, size, NULL, (enum event_type_t)EVENT_RX);
+}
+
+EXPORTON char *
+fgets_unlocked(char *s, int n, FILE *stream)
+{
+    WRAP_CHECK(fgets_unlocked, NULL);
+    IOSTREAMPRE(fgets_unlocked, char *);
+    rc = g_fn.fgets_unlocked(s, n, stream);
+    IOSTREAMPOST(fgets_unlocked, n, NULL, (enum event_type_t)EVENT_RX);
+}
+
+EXPORTON wchar_t *
+__fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
+{
+    // TODO: this function aborts & exits on error, add abort functionality
+    WRAP_CHECK(__fgetws_chk, NULL);
+    IOSTREAMPRE(__fgetws_chk, wchar_t *);
+    rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
+    IOSTREAMPOST(fgetws, size, NULL, (enum event_type_t)EVENT_RX);
+}
+
+EXPORTON wchar_t *
+fgetws(wchar_t *ws, int n, FILE *stream)
+{
+    WRAP_CHECK(fgetws, NULL);
+    IOSTREAMPRE(fgetws, wchar_t *);
+    rc = g_fn.fgetws(ws, n, stream);
+    IOSTREAMPOST(fgetws, n, NULL, (enum event_type_t)EVENT_RX);
+}
+
+EXPORTON wint_t
+fgetwc(FILE *stream)
+{
+    WRAP_CHECK(fgetwc, WEOF);
+    IOSTREAMPRE(fgetwc, wint_t);
+    rc = g_fn.fgetwc(stream);
+    IOSTREAMPOST(fgetwc, 1, WEOF, (enum event_type_t)EVENT_RX);
+}
+
+EXPORTON int
+fgetc(FILE *stream)
+{
+    WRAP_CHECK(fgetc, EOF);
+    IOSTREAMPRE(fgetc, int);
+    rc = g_fn.fgetc(stream);
+    IOSTREAMPOST(fgetc, 1, EOF, (enum event_type_t)EVENT_FS);
+}
+
+EXPORTON int
+fputc(int c, FILE *stream)
+{
+    WRAP_CHECK(fputc, EOF);
+    IOSTREAMPRE(fputc, int);
+    rc = g_fn.fputc(c, stream);
+    IOSTREAMPOST(fputc, 1, EOF, (enum event_type_t)EVENT_FS);
+}
+
+EXPORTON int
+fputc_unlocked(int c, FILE *stream)
+{
+    WRAP_CHECK(fputc_unlocked, EOF);
+    IOSTREAMPRE(fputc_unlocked, int);
+    rc = g_fn.fputc_unlocked(c, stream);
+    IOSTREAMPOST(fputc_unlocked, 1, EOF, (enum event_type_t)EVENT_FS);
+}
+
+EXPORTON wint_t
+putwc(wchar_t wc, FILE *stream)
+{
+    WRAP_CHECK(putwc, WEOF);
+    IOSTREAMPRE(putwc, int);
+    rc = g_fn.putwc(wc, stream);
+    IOSTREAMPOST(putwc, 1, WEOF, (enum event_type_t)EVENT_FS);
+}
+
+EXPORTON wint_t
+fputwc(wchar_t wc, FILE *stream)
+{
+    WRAP_CHECK(fputwc, WEOF);
+    IOSTREAMPRE(fputwc, int);
+    rc = g_fn.fputwc(wc, stream);
+    IOSTREAMPOST(fputwc, 1, WEOF, (enum event_type_t)EVENT_FS);
+}
+
+EXPORTON int
+fscanf(FILE *stream, const char *format, ...)
+{
+    struct FuncArgs fArgs;
+    LOAD_FUNC_ARGS_VALIST(fArgs, format);
+    WRAP_CHECK(fscanf, EOF);
+    IOSTREAMPRE(fscanf, int);
+    rc = g_fn.fscanf(stream, format,
+                     fArgs.arg[0], fArgs.arg[1],
+                     fArgs.arg[2], fArgs.arg[3],
+                     fArgs.arg[4], fArgs.arg[5]);
+    IOSTREAMPOST(fscanf, rc, EOF, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON ssize_t

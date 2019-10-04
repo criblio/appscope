@@ -5,6 +5,7 @@ SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tag
 CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
+TEST_CFLAGS +=-D__MACOS__
 LD_FLAGS=-Wl, -ldl -lpthread
 INCLUDES=-I./contrib/libyaml/include
 YAML_AR=contrib/libyaml/src/.libs/libyaml.a

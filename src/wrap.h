@@ -21,6 +21,7 @@
 #include <ctype.h>
 #include <limits.h>
 #include <sys/syscall.h>
+#include <wchar.h>
 
 #include <sys/stat.h>
 #if defined(__LINUX__) && defined(__STATX__) && defined(STRUCT_STATX_MISSING_FROM_SYS_STAT_H)
@@ -65,6 +66,24 @@
 #ifndef bool
 typedef unsigned int bool;
 #endif
+
+/*
+ * OK; this is not cool. But, we are holding off making structural changes right now 
+ * We'll move things into a Linux only build. Until then we need these for the macOS build
+ */
+#ifdef __MACOS__
+#ifndef off64_t
+typedef uint64_t off64_t; 
+#endif
+#ifndef fpos64_t 
+typedef uint64_t fpos64_t; 
+#endif
+#ifndef statvfs64
+struct statvfs64 {
+    uint64_t x;
+};
+#endif
+#endif // __MACOS__
 
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
@@ -202,15 +221,10 @@ typedef struct interposed_funcs_t {
     void (*vsyslog)(int, const char *, va_list);
     pid_t (*fork)(void);
     int (*open)(const char *, int, ...);
-    int (*open64)(const char *, int, ...);
     int (*openat)(int, const char *, int, ...);
-    int (*openat64)(int, const char *, int, ...);
     FILE *(*fopen)(const char *, const char *);
-    FILE *(*fopen64)(const char *, const char *);
     FILE *(*freopen)(const char *, const char *, FILE *);
-    FILE *(*freopen64)(const char *, const char *, FILE *);
     int (*creat)(const char *, mode_t);
-    int (*creat64)(const char *, mode_t);
     int (*close)(int);
     int (*fclose)(FILE *);
     int (*fcloseall)(void);
@@ -218,30 +232,28 @@ typedef struct interposed_funcs_t {
     ssize_t (*readv)(int, const struct iovec *, int);
     size_t (*fread)(void *, size_t, size_t, FILE *);
     char *(*fgets)(char *, int, FILE *);
+    int (*fscanf)(FILE *, const char *, ...);
     int (*fputs)(const char *, FILE *);
+    int (*fputs_unlocked)(const char *, FILE *);
+    int (*fputws)(const wchar_t *, FILE *);
+    int (*fgetc)(FILE *);
+    int (*fputc)(int, FILE *);
+    int (*fputc_unlocked)(int, FILE *);
+    wint_t (*fputwc)(wchar_t, FILE *);
+    wint_t (*putwc)(wchar_t, FILE *);
     ssize_t (*getline)(char **, size_t *, FILE *);
     ssize_t (*getdelim)(char **, size_t *, int, FILE *);
-    ssize_t (*__getdelim)(char **, size_t *, int, FILE *);
     ssize_t (*pread)(int, void *, size_t, off_t);
-    ssize_t (*pread64)(int, void *, size_t, off_t);
-    ssize_t (*preadv)(int, const struct iovec *, int, off_t);
-    ssize_t (*preadv2)(int, const struct iovec *, int, off_t, int);
-    ssize_t (*preadv64v2)(int, const struct iovec *, int, off_t, int);
     ssize_t (*write)(int, const void *, size_t);
     ssize_t (*writev)(int, const struct iovec *, int);
     size_t (*fwrite)(const void *, size_t, size_t, FILE *);
     ssize_t (*pwrite)(int, const void *, size_t, off_t);
-    ssize_t (*pwrite64)(int, const void *, size_t, off_t);
-    ssize_t (*pwritev)(int, const struct iovec *, int, off_t);
-    ssize_t (*pwritev2)(int, const struct iovec *, int, off_t, int);
-    ssize_t (*pwritev64v2)(int, const struct iovec *, int, off_t, int);
+    ssize_t (*sendfile)(int, int, off_t *, size_t);
     off_t (*lseek)(int, off_t, int);
-    off_t (*lseek64)(int, off_t, int);
+    int (*fseek)(FILE *, long, int);
     int (*fseeko)(FILE *, off_t, int);
-    int (*fseeko64)(FILE *, off_t, int);
     long (*ftell)(FILE *);
     off_t (*ftello)(FILE *);
-    off_t (*ftello64)(FILE *);
     int (*fgetpos)(FILE *, fpos_t *);
     int (*fsetpos)(FILE *, const fpos_t *);
     void (*rewind)(FILE *);
@@ -249,15 +261,16 @@ typedef struct interposed_funcs_t {
     int (*lstat)(const char *, struct stat *);
     int (*fstat)(int, struct stat *);
     int (*statfs)(const char *, struct statfs *);
-    int (*statfs64)(const char *, struct statfs64 *);
     int (*fstatfs)(int, struct statfs *);
-    int (*fstatfs64)(int, struct statfs64 *);
     int (*statvfs)(const char *, struct statvfs *);
     int (*fstatvfs)(int, struct statvfs *);
     int (*fstatat)(int, const char *, struct stat *, int);
-    int (*__xstat)(int, const char *, struct stat *);
-    int (*__xstat64)(int, const char *, struct stat64 *);
-    int (*__fxstat64)(int, int, struct stat64 *);
+    int (*access)(const char *, int);
+    int (*faccessat)(int, const char *, int, int);
+    int (*fcntl)(int, int, ...);
+    int (*dup)(int);
+    int (*dup2)(int, int);
+    int (*dup3)(int, int, int);
     int (*shutdown)(int, int);
     int (*socket)(int, int, int);
     int (*listen)(int, int);
@@ -265,13 +278,7 @@ typedef struct interposed_funcs_t {
     int (*connect)(int, const struct sockaddr *, socklen_t);
     int (*accept)(int, struct sockaddr *, socklen_t *);
     int (*accept4)(int, struct sockaddr *, socklen_t *, int);
-    int (*accept$NOCANCEL)(int, struct sockaddr *, socklen_t *);
     ssize_t (*send)(int, const void *, size_t, int);
-    int (*fcntl)(int, int, ...);
-    int (*fcntl64)(int, int, ...);
-    int (*dup)(int);
-    int (*dup2)(int, int);
-    int (*dup3)(int, int, int);
     ssize_t (*sendto)(int, const void *, size_t, int,
                               const struct sockaddr *, socklen_t);
     ssize_t (*sendmsg)(int, const struct msghdr *, int);
@@ -285,18 +292,75 @@ typedef struct interposed_funcs_t {
     struct hostent *(*gethostbyname2)(const char *, int);
     int (*getaddrinfo)(const char *, const char *, const struct addrinfo *,
                        struct addrinfo **);
+    // __LINUX__
+    /* 
+     * We need to make these Linux only, but we're holding off until structiural changes are done.
+     */
+    int (*open64)(const char *, int, ...);
+    int (*openat64)(int, const char *, int, ...);
+    int (*__open_2)(const char *, int);
+    int (*__open64_2)(const char *, int);
+    int (*__openat_2)(int, const char *, int);
+    FILE *(*fopen64)(const char *, const char *);
+    FILE *(*freopen64)(const char *, const char *, FILE *);
+    int (*creat64)(const char *, mode_t);
+    ssize_t (*__read_chk)(int, void *, size_t, size_t);
+    char *(*__fgets_chk)(char *, size_t, int, FILE *);
+    char *(*fgets_unlocked)(char *, int, FILE *);
+    wchar_t *(*fgetws)(wchar_t *, int, FILE *);
+    wint_t (*fgetwc)(FILE *);
+    wchar_t *(*__fgetws_chk)(wchar_t *, size_t, int, FILE *);
+    size_t (*__fread_chk)(void *, size_t, size_t, size_t, FILE *);
+    size_t (*fread_unlocked)(void *, size_t, size_t, FILE *);
+    size_t (*__fread_unlocked_chk)(void *, size_t, size_t, size_t, FILE *);
+    ssize_t (*__getdelim)(char **, size_t *, int, FILE *);
+    ssize_t (*pread64)(int, void *, size_t, off_t);
+    ssize_t (*preadv)(int, const struct iovec *, int, off_t);
+    ssize_t (*preadv2)(int, const struct iovec *, int, off_t, int);
+    ssize_t (*preadv64v2)(int, const struct iovec *, int, off_t, int);
+    ssize_t (*__pread_chk)(int, void *, size_t, off_t, size_t);
+    ssize_t (*pwrite64)(int, const void *, size_t, off_t);
+    ssize_t (*pwritev)(int, const struct iovec *, int, off_t);
+    ssize_t (*pwritev64)(int, const struct iovec *, int, off64_t);
+    ssize_t (*pwritev2)(int, const struct iovec *, int, off_t, int);
+    ssize_t (*pwritev64v2)(int, const struct iovec *, int, off_t, int);
+    size_t (*fwrite_unlocked)(const void *, size_t, size_t, FILE *);
+    ssize_t (*sendfile64)(int, int, off64_t *, size_t);
+    off_t (*lseek64)(int, off_t, int);
+    int (*fseeko64)(FILE *, off_t, int);
+    off_t (*ftello64)(FILE *);
+    int (*fgetpos64)(FILE *, fpos64_t *);
+    int (*fsetpos64)(FILE *stream, const fpos64_t *pos);
+    int (*statfs64)(const char *, struct statfs64 *);
+    int (*fstatfs64)(int, struct statfs64 *);
+    int (*statvfs64)(const char *, struct statvfs64 *);
+    int (*fstatvfs64)(int, struct statvfs64 *);
+    int (*fstatat64)(int, const char *, struct stat64 *, int);
+    int (*__xstat)(int, const char *, struct stat *);
+    int (*__xstat64)(int, const char *, struct stat64 *);
+    int (*__fxstat)(int, int, struct stat *);
+    int (*__fxstat64)(int, int, struct stat64 *);
+    int (*__fxstatat)(int, int, const char *, struct stat *, int);
+    int (*__fxstatat64)(int, int, const char *, struct stat64 *, int);
+    int (*__lxstat)(int, const char *, struct stat *);
+    int (*__lxstat64)(int, const char *, struct stat64 *);
+    int (*fcntl64)(int, int, ...);
     long (*syscall)(long, ...);
-    // macOS
+
+#if defined(__LINUX__) && defined(__STATX__)
+    int (*statx)(int, const char *, int, unsigned int, struct statx *);
+#endif // __LINUX__ && __STATX__
+
+#ifdef __MACOS__
+    int (*accept$NOCANCEL)(int, struct sockaddr *, socklen_t *);
     int (*close$NOCANCEL)(int);
     int (*close_nocancel)(int);
     int (*guarded_close_np)(int, void *);
     ssize_t (*__sendto_nocancel)(int, const void *, size_t, int,
                                  const struct sockaddr *, socklen_t);
     uint32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
-                                      uint16_t, uint16_t, void *, void *);
-#if defined(__LINUX__) && defined(__STATX__)
-    int (*statx)(int, const char *, int, unsigned int, struct statx *);
-#endif // __LINUX__ && __STATX__
+                                      uint16_t, uint16_t, void *, void *);    
+#endif // __MACOS__
 } interposed_funcs;
     
 static inline void
@@ -479,5 +543,52 @@ extern void *_dl_sym(void *, const char *, void *);
     }                                               \
                                                     \
 return rc;
+
+#define doSendfile(func)                                \
+    ssize_t rc;                                         \
+    struct fs_info_t *fsrd = getFSEntry(in_fd);         \
+    struct net_info_t *nettx = getNetEntry(out_fd);     \
+    elapsed_t time = {0};                               \
+    WRAP_CHECK(func, -1);                                   \
+    doThread();                                         \
+    if (fsrd) {                                         \
+        time.initial = getTime();                       \
+    }                                                   \
+                                                        \
+    rc = g_fn.func(out_fd, in_fd, offset, count); \
+                                                        \
+    if (fsrd) {                                         \
+        time.duration = getDuration(time.initial);      \
+    }                                                   \
+                                                        \
+    if (rc != -1) {                                     \
+        scopeLog(#func, in_fd, CFG_LOG_TRACE);     \
+        if (nettx) {                                    \
+            doSetAddrs(out_fd);                         \
+            doSend(out_fd, rc);                         \
+        }                                               \
+                                                        \
+        if (fsrd) {                                                     \
+            doFSMetric(FS_DURATION, in_fd, EVENT_BASED, #func, time.duration, NULL); \
+            doFSMetric(FS_WRITE, in_fd, EVENT_BASED, #func, rc, NULL);  \
+        }                                                               \
+    } else {                                                            \
+        /*                                                              \
+         * We don't want to increment an error twice                    \
+         * We don't know which fd the error is associated with          \
+         * We emit one metric with the input pathname                   \
+         */                                                             \
+        if (fsrd) {                                                     \
+            atomicAdd(&g_ctrs.fsRdWrErrors, 1);                         \
+            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,     \
+                          #func, fsrd->path);                           \
+        }                                                               \
+                                                                        \
+        if (nettx) {                                                    \
+            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,   \
+                          #func, "nopath");                             \
+        }                                                               \
+    }                                                                   \
+    return rc;
 
 #endif // __WRAP_H__

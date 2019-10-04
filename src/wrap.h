@@ -110,9 +110,12 @@ enum metric_t {
     TOT_PORTS,
     TOT_TCP_CONN,
     TOT_ACTIVE_CONN,
-    NET_ERR,
-    FS_ERR,
-    DNS_ERR
+    NET_ERR_CONN,
+    NET_ERR_RX_TX,
+    NET_ERR_DNS,
+    FS_ERR_OPEN_CLOSE,
+    FS_ERR_STAT,
+    FS_ERR_READ_WRITE,
 };
 
 // File types; stream or fd
@@ -148,8 +151,8 @@ typedef struct metric_counters_t {
     int netTxRxErrors;
     int netDNSErrors;
     int fsOpenCloseErrors;
-    int fsStatErrors;
     int fsRdWrErrors;
+    int fsStatErrors;
 } metric_counters;
 
 typedef struct {
@@ -158,11 +161,14 @@ typedef struct {
         int read_write;
         int stat;
         int seek;
+        int error;
     } fs;
     struct {
         int open_close;
         int rx_tx;
         int dns;
+        int error;
+        int dnserror;
     } net;
 } summary_t;
 
@@ -483,7 +489,7 @@ extern void *_dl_sym(void *, const char *, void *);
         time.initial = getTime();                    \
     }                                                \
 
-#define IOSTREAMPOST(func, len, type, errcntr, op)  \
+#define IOSTREAMPOST(func, len, type, op)           \
     if (fs) {                                       \
         time.duration = getDuration(time.initial);  \
     }                                               \
@@ -505,11 +511,9 @@ extern void *_dl_sym(void *, const char *, void *);
         }                                           \
     }  else {                                       \
         if (fs) {                                   \
-           atomicAdd(errcntr, 1);                   \
-           doErrorMetric(FS_ERR, *errcntr, EVENT_BASED, #func, fs->path); \
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, #func, fs->path); \
         } else if (net) {                           \
-            atomicAdd(errcntr, 1);                  \
-            doErrorMetric(NET_ERR, *errcntr, EVENT_BASED, #func, "nopath"); \
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, #func, "nopath"); \
         }                                           \
     }                                               \
                                                     \

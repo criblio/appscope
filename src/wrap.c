@@ -99,33 +99,78 @@ setVerbosity(rtconfig* c, unsigned verbosity)
         summarize->fs.read_write = 1;
         summarize->fs.seek = 1;
         summarize->fs.stat = 1;
+        summarize->fs.error = 1;
         summarize->net.open_close = 1;
         summarize->net.rx_tx = 1;
         summarize->net.dns = 1;
+        summarize->net.error = 1;
+        summarize->net.dnserror = 1;
     } else if (verbosity == 10) {
         summarize->fs.open_close = 0;
         summarize->fs.read_write = 0;
         summarize->fs.seek = 0;
         summarize->fs.stat = 0;
+        summarize->fs.error = 1;
         summarize->net.open_close = 1;
         summarize->net.rx_tx = 1;
         summarize->net.dns = 1;
+        summarize->net.error = 1;
+        summarize->net.dnserror = 1;
     } else if (verbosity == 11) {
         summarize->fs.open_close = 1;
         summarize->fs.read_write = 1;
         summarize->fs.seek = 1;
         summarize->fs.stat = 1;
+        summarize->fs.error = 1;
         summarize->net.open_close = 0;
         summarize->net.rx_tx = 0;
         summarize->net.dns = 0;
+        summarize->net.error = 1;
+        summarize->net.dnserror = 1;
     } else if (verbosity == 12) {
         summarize->fs.open_close = 0;
         summarize->fs.read_write = 0;
         summarize->fs.seek = 0;
         summarize->fs.stat = 0;
+        summarize->fs.error = 1;
         summarize->net.open_close = 0;
         summarize->net.rx_tx = 0;
         summarize->net.dns = 0;
+        summarize->net.error = 1;
+        summarize->net.dnserror = 1;
+    } else if (verbosity == 13) {
+        summarize->fs.open_close = 0;
+        summarize->fs.read_write = 0;
+        summarize->fs.seek = 0;
+        summarize->fs.stat = 0;
+        summarize->fs.error = 1;
+        summarize->net.open_close = 0;
+        summarize->net.rx_tx = 0;
+        summarize->net.dns = 0;
+        summarize->net.error = 0;
+        summarize->net.dnserror = 0;
+    } else if (verbosity == 14) {
+        summarize->fs.open_close = 0;
+        summarize->fs.read_write = 0;
+        summarize->fs.seek = 0;
+        summarize->fs.stat = 0;
+        summarize->fs.error = 0;
+        summarize->net.open_close = 0;
+        summarize->net.rx_tx = 0;
+        summarize->net.dns = 0;
+        summarize->net.error = 1;
+        summarize->net.dnserror = 1;
+    } else if (verbosity == 15) {
+        summarize->fs.open_close = 0;
+        summarize->fs.read_write = 0;
+        summarize->fs.seek = 0;
+        summarize->fs.stat = 0;
+        summarize->fs.error = 0;
+        summarize->net.open_close = 0;
+        summarize->net.rx_tx = 0;
+        summarize->net.dns = 0;
+        summarize->net.error = 0;
+        summarize->net.dnserror = 0;
     }
 }
 
@@ -336,89 +381,136 @@ doThread()
 }
 
 static void
-doErrorMetric(enum metric_t type, int count, enum control_type_t source,
+doErrorMetric(enum metric_t type, enum control_type_t source,
               const char *func, const char *name)
 {
     if (!func || !name) return;
 
     switch (type) {
-    case NET_ERR:
+    case NET_ERR_CONN:
+    case NET_ERR_RX_TX:
     {
+        int* value = NULL;
+        const char* class = "UNKNOWN";
+        switch (type) {
+            case NET_ERR_CONN:
+                value = &g_ctrs.netConnectErrors;
+                class = "connection";
+                break;
+            case NET_ERR_RX_TX:
+                value = &g_ctrs.netTxRxErrors;
+                class = "rx/tx";
+                break;
+            default:
+                DBG(NULL);
+                return;
+        }
+
+        if (source == EVENT_BASED) {
+            atomicAdd(value, 1);
+        }
+
         // Only report if enabled
-        if ((g_cfg.verbosity != CFG_NET_ERRORS_VERBOSITY) &&
-            (g_cfg.verbosity != CFG_ALL_ERRORS_VERBOSITY) &&
-            (source == EVENT_BASED)) {
+        if ((g_cfg.summarize.net.error) && (source == EVENT_BASED)) {
             return;
         }
+
+        // Don't report zeros.
+        if (*value == 0) return;
 
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        4),
             STRFIELD("op",               func,                  3),
+            STRFIELD("class",            class,                 2),
             STRFIELD("unit",             "operation",           1),
             FIELDEND
         };
 
-        event_t e = {"net.error", count, DELTA, fields};
+        event_t e = {"net.error", *value, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doErrorMetric:NET:outSendEvent", -1, CFG_LOG_ERROR);
         }
-        atomicSet(&g_ctrs.netConnectErrors, 0);
-        atomicSet(&g_ctrs.netTxRxErrors, 0);
+
+        atomicSet(value, 0);
         break;
     }
 
-    case FS_ERR:
+    case FS_ERR_OPEN_CLOSE:
+    case FS_ERR_READ_WRITE:
+    case FS_ERR_STAT:
+    case NET_ERR_DNS:
     {
+
+        const char* metric = NULL;
+        int* value = NULL;
+        const char* class = "UNKNOWN";
+        int* summarize = NULL;
+        const char* name_label = "UNKNOWN";
+        switch (type) {
+            case FS_ERR_OPEN_CLOSE:
+                metric = "fs.error";
+                value = &g_ctrs.fsOpenCloseErrors;
+                class = "open/close";
+                summarize = &g_cfg.summarize.fs.error;
+                name_label = "file";
+                break;
+            case FS_ERR_READ_WRITE:
+                metric = "fs.error";
+                value = &g_ctrs.fsRdWrErrors;
+                class = "read/write";
+                summarize = &g_cfg.summarize.fs.error;
+                name_label = "file";
+                break;
+            case FS_ERR_STAT:
+                metric = "fs.error";
+                value = &g_ctrs.fsStatErrors;
+                class = "stat";
+                summarize = &g_cfg.summarize.fs.error;
+                name_label = "file";
+                break;
+            case NET_ERR_DNS:
+                metric = "net.error";
+                value = &g_ctrs.netDNSErrors;
+                class = "dns";
+                summarize = &g_cfg.summarize.net.dnserror;
+                name_label = "domain";
+                break;
+            default:
+                DBG(NULL);
+                return;
+        }
+
+        if (source == EVENT_BASED) {
+            atomicAdd(value, 1);
+        }
+
         // Only report if enabled
-        if ((g_cfg.verbosity != CFG_FS_ERRORS_VERBOSITY) &&
-            (g_cfg.verbosity != CFG_ALL_ERRORS_VERBOSITY) &&
-            (source == EVENT_BASED)) {
+        if (*summarize && (source == EVENT_BASED)) {
             return;
         }
 
+        // Don't report zeros.
+        if (*value == 0) return;
+
         event_field_t fields[] = {
             STRFIELD("proc",             g_cfg.procname,        4),
             NUMFIELD("pid",              g_cfg.pid,             7),
             STRFIELD("host",             g_cfg.hostname,        4),
             STRFIELD("op",               func,                  3),
-            STRFIELD("file",             name,                  5),
+            STRFIELD(name_label,         name,                  5),
+            STRFIELD("class",            class,                 2),
             STRFIELD("unit",             "operation",           1),
             FIELDEND
         };
 
-        event_t e = {"fs.error", count, DELTA, fields};
+        event_t e = {metric, *value, DELTA, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doErrorMetric:FS_ERR:outSendEvent", -1, CFG_LOG_ERROR);
         }
-        atomicSet(&g_ctrs.fsOpenCloseErrors, 0);
-        atomicSet(&g_ctrs.fsRdWrErrors, 0);
-        atomicSet(&g_ctrs.fsStatErrors, 0);
-        break;
-    }
 
-    case DNS_ERR:
-    {
-        /* 
-         * By current convention we emit DNS metrics as events
-         * always. We can change that by adding the test here.
-         */
-        event_field_t fields[] = {
-            STRFIELD("proc",             g_cfg.procname,        4),
-            NUMFIELD("pid",              g_cfg.pid,             7),
-            STRFIELD("host",             g_cfg.hostname,        4),
-            STRFIELD("op",               func,                  3),
-            STRFIELD("domain",           name,                  5),
-            STRFIELD("unit",             "operation",           1),
-            FIELDEND
-        };
-
-        event_t e = {"net.dns.err", count, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doErrorMetric:DNS_ERR:outSendEvent", -1, CFG_LOG_ERROR);
-        }
-        atomicSet(&g_ctrs.netDNSErrors, 0);
+        atomicSet(value, 0);
         break;
     }
 
@@ -958,7 +1050,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             atomicAdd(total_value, size);
             if (((type == OPEN_PORTS) && (g_netinfo[fd].type == SOCK_DGRAM)) || 
                  (type == TCP_CONNECTIONS)) {
-                g_netinfo[fs].listen = TRUE;
+                g_netinfo[fd].listen = TRUE;
             }
             if (type == ACTIVE_CONNECTIONS) g_netinfo[fd].accept = TRUE;
             if (!g_netinfo[fd].startTime)   g_netinfo[fd].startTime = getTime();
@@ -1233,7 +1325,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         // For next time
         g_netinfo[fd].dnsSend = FALSE;
 
-        doDNSMetricName(g_netinfo[fd].dnsName);
+        // TBD - this is only called by doSend.  Consider calling this directly
+        // from there?
+        doDNSMetricName(DNS, g_netinfo[fd].dnsName, 0);
 
         break;
     }
@@ -1479,6 +1573,7 @@ doSend(int sockfd, ssize_t rc)
         doNetMetric(NETTX, sockfd, EVENT_BASED, rc);
 
         if (GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+            // tbd - consider calling doDNSMetricName instead...
             doNetMetric(DNS, sockfd, EVENT_BASED, 0);
         }
     }
@@ -1588,6 +1683,14 @@ reportPeriodicStuff(void)
     doTotal(TOT_TCP_CONN);
     doTotal(TOT_ACTIVE_CONN);
 
+    // Report errors
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary");
+
     // report net and file by descriptor
     for (i = 0; i < MAX(g_cfg.numNinfo, g_cfg.numFSInfo); i++) {
         reportFD(i);
@@ -1603,17 +1706,6 @@ periodic(void *arg)
 {
     while (1) {
         reportPeriodicStuff();
-
-        // Report errors
-        int fserrs = g_ctrs.fsOpenCloseErrors + g_ctrs.fsRdWrErrors +
-            g_ctrs.fsStatErrors;
-        if (fserrs) doErrorMetric(FS_ERR, fserrs, PERIODIC, "summary", "summary");
-
-        int neterrs = g_ctrs.netConnectErrors + g_ctrs.netTxRxErrors;
-        if (neterrs) doErrorMetric(NET_ERR, neterrs, PERIODIC, "summary", "summary");
-
-        if (g_ctrs.netDNSErrors) doErrorMetric(DNS_ERR, g_ctrs.netDNSErrors,
-                                               PERIODIC, "summary", "summary");
 
         // Process dynamic config changes, if any
         dynConfig();
@@ -1906,9 +1998,7 @@ open(const char *pathname, int flags, ...)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "open");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                      "open", pathname);
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "open", pathname);
     }
 
     return fd;
@@ -1927,9 +2017,7 @@ openat(int dirfd, const char *pathname, int flags, ...)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "openat");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                      "openat", pathname);
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "openat", pathname);
     }
 
     return fd;
@@ -1947,9 +2035,7 @@ creat(const char *pathname, mode_t mode)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "creat");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                      "vreat", pathname);
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "creat", pathname);
     }
 
     return fd;
@@ -1966,9 +2052,7 @@ fopen(const char *pathname, const char *mode)
     if (stream != NULL) {
         doOpen(fileno(stream), pathname, STREAM, "fopen");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                      "fopen", pathname);
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "fopen", pathname);
     }
 
     return stream;
@@ -1989,9 +2073,7 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
             doClose(fileno(orig_stream), "freopen");
         }
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                      "freopen", pathname);
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "freopen", pathname);
     }
 
     return stream;
@@ -2011,9 +2093,7 @@ open64(const char *pathname, int flags, ...)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "open64");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                      "open64", pathname);
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "open64", pathname);
     }
 
     return fd;
@@ -2032,9 +2112,7 @@ openat64(int dirfd, const char *pathname, int flags, ...)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "openat64");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                      "openat64", pathname);
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "openat64", pathname);
     }
 
     return fd;
@@ -2052,9 +2130,7 @@ creat64(const char *pathname, mode_t mode)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "creat64");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                      "creat64", pathname);
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "creat64", pathname);
     }
 
     return fd;
@@ -2071,9 +2147,7 @@ fopen64(const char *pathname, const char *mode)
     if (stream != NULL) {
         doOpen(fileno(stream), pathname, STREAM, "fopen64");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                      "fopen64", pathname);
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "fopen64", pathname);
     }
 
     return stream;
@@ -2094,9 +2168,7 @@ freopen64(const char *pathname, const char *mode, FILE *orig_stream)
             doClose(fileno(orig_stream), "freopen64");
         }
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                      "freopen64", pathname);
+        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "freopen64", pathname);
     }
 
     return stream;
@@ -2134,13 +2206,9 @@ pread64(int fd, void *buf, size_t count, off_t offset)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "pread64", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "pread64", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "pread64", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "pread64", "nopath");
         }
     }
 
@@ -2179,13 +2247,9 @@ preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "preadv", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "preadv", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "preadv", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "preadv", "nopath");
         }
     }
 
@@ -2224,13 +2288,9 @@ preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "preadv2", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "preadv2", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "preadv2", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "preadv2", "nopath");
         }
     }
     
@@ -2269,13 +2329,9 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "preadv64v2", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "preadv64v2", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "preadv64v2", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "preadv64v2", "nopath");
         }
     }
     
@@ -2314,13 +2370,9 @@ pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "pwrite64", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "pwrite64", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "pwrite64", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "pwrite64", "nopath");
         }
     }
     return rc;
@@ -2358,13 +2410,9 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "pwritev", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "pwritev", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "pwritev", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "pwritev", "nopath");
         }
     }
     return rc;
@@ -2402,13 +2450,9 @@ pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "pwritev2", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "pwritev2", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "pwritev2", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "pwritev2", "nopath");
         }
     }
     return rc;
@@ -2446,13 +2490,9 @@ pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "pwritev64v2", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "pwritev64v2", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "pwritev64v2", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "pwritev64v2", "nopath");
         }
     }
     return rc;
@@ -2474,10 +2514,8 @@ lseek64(int fd, off_t offset, int whence)
             doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek64", 0, NULL);
         }
     } else {
-        atomicAdd(&g_ctrs.fsRdWrErrors, 1);
         if (fs) {
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "lseek64", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "lseek64", fs->path);
         }
     }
     return rc;
@@ -2500,10 +2538,8 @@ fseeko64(FILE *stream, off_t offset, int whence)
             doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko64", 0, NULL);
         }
     } else {
-        atomicAdd(&g_ctrs.fsRdWrErrors, 1);
         if (fs) {
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "fseek64", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "fseek64", fs->path);
         }
     }
     return rc;
@@ -2526,10 +2562,8 @@ ftello64(FILE *stream)
             doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftello64", 0, NULL);
         }
     } else {
-        atomicAdd(&g_ctrs.fsRdWrErrors, 1);
         if (fs) {
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "ftello64", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "ftello64", fs->path);
         }
     }
     return rc;
@@ -2548,9 +2582,7 @@ statfs64(const char *path, struct statfs64 *buf)
         scopeLog("statfs64", -1, CFG_LOG_DEBUG);
         doStatMetric("statfs64", path);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                      "statfs64", path);
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "statfs64", path);
     }
     return rc;
 }
@@ -2569,10 +2601,8 @@ fstatfs64(int fd, struct statfs64 *buf)
         scopeLog("fstatfs64", fd, CFG_LOG_DEBUG);
         if (fs) doStatMetric("fstatfs64", fs->path);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
         if (fs) {
-            doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                          "fstatfs64", fs->path);
+            doErrorMetric(FS_ERR_STAT, EVENT_BASED, "fstatfs64", fs->path);
         }
     }
     return rc;
@@ -2591,9 +2621,7 @@ __xstat(int ver, const char *path, struct stat *stat_buf)
         scopeLog("__xstat", -1, CFG_LOG_DEBUG);
         doStatMetric("__xstat", path);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                      "__xstat", path);
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "__xstat", path);
     }
     return rc;    
 }
@@ -2611,9 +2639,7 @@ __xstat64(int ver, const char *path, struct stat64 *stat_buf)
         scopeLog("__xstat64", -1, CFG_LOG_DEBUG);
         doStatMetric("__xstat64", path);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                      "__xstat64", path);
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "__xstat64", path);
     }
     return rc;    
 }
@@ -2632,10 +2658,8 @@ __fxstat64(int ver, int fd, struct stat64 * stat_buf)
         scopeLog("__fxstat64", -1, CFG_LOG_DEBUG);
         if (fs) doStatMetric("__fxstat64", fs->path);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
         if (fs) {
-            doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                          "__xstat64", fs->path);
+            doErrorMetric(FS_ERR_STAT, EVENT_BASED, "__xstat64", fs->path);
         }
     }
     return rc;    
@@ -2656,9 +2680,7 @@ statx(int dirfd, const char *pathname, int flags,
         scopeLog("statx", -1, CFG_LOG_DEBUG);
         doStatMetric("statx", pathname);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                      "xstatx", pathname);
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "xstatx", pathname);
     }
     return rc;
 }
@@ -2677,9 +2699,7 @@ statfs(const char *path, struct statfs *buf)
         scopeLog("statfs", -1, CFG_LOG_DEBUG);
         doStatMetric("statfs", path);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                      "fstatfs", path);
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "fstatfs", path);
     }
     return rc;
 }
@@ -2698,10 +2718,8 @@ fstatfs(int fd, struct statfs *buf)
         scopeLog("fstatfs", fd, CFG_LOG_DEBUG);
         if (fs) doStatMetric("fstatfs", fs->path);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
         if (fs) {
-            doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                          "fstatfs", fs->path);
+            doErrorMetric(FS_ERR_STAT, EVENT_BASED, "fstatfs", fs->path);
         }
     }
     return rc;
@@ -2720,9 +2738,7 @@ statvfs(const char *path, struct statvfs *buf)
         scopeLog("statvfs", -1, CFG_LOG_DEBUG);
         doStatMetric("statvfs", path);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                      "statvfs", path);
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "statvfs", path);
     }
     return rc;
 }
@@ -2741,10 +2757,8 @@ fstatvfs(int fd, struct statvfs *buf)
         scopeLog("fstatvfs", fd, CFG_LOG_DEBUG);
         if (fs) doStatMetric("fstatvfs", fs->path);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
         if (fs) {
-            doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                          "statvfs", fs->path);
+            doErrorMetric(FS_ERR_STAT, EVENT_BASED, "statvfs", fs->path);
         }
     }
     return rc;
@@ -2767,9 +2781,7 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
         doDNSMetricName(DNS, name, time.duration);
         doDNSMetricName(DNS_DURATION, name, time.duration);
     }  else {
-        atomicAdd(&g_ctrs.netDNSErrors, 1);
-        doErrorMetric(DNS_ERR, g_ctrs.netDNSErrors, EVENT_BASED,
-                      "gethostbyname_r", name);
+        doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname_r", name);
         doDNSMetricName(DNS_DURATION, name, time.duration);
     }
 
@@ -2795,9 +2807,7 @@ stat(const char *pathname, struct stat *statbuf)
         scopeLog("stat", -1, CFG_LOG_DEBUG);
         doStatMetric("stat", pathname);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                      "stat", pathname);
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "stat", pathname);
     }
     return rc;
 }
@@ -2816,10 +2826,8 @@ fstat(int fd, struct stat *statbuf)
         scopeLog("fstat", fd, CFG_LOG_DEBUG);
         if (fs) doStatMetric("fstat", fs->path);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
         if (fs) {
-            doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                          "fstat", fs->path);
+            doErrorMetric(FS_ERR_STAT, EVENT_BASED, "fstat", fs->path);
         }
     }
     return rc;
@@ -2838,9 +2846,7 @@ lstat(const char *pathname, struct stat *statbuf)
         scopeLog("lstat", -1, CFG_LOG_DEBUG);
         doStatMetric("lstat", pathname);
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                      "lstat", pathname);
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "lstat", pathname);
     }
     return rc;
 }
@@ -2871,9 +2877,7 @@ syscall(long number, ...)
             doAccept(rc, (struct sockaddr *)fArgs.arg[1],
                      (socklen_t *)fArgs.arg[2], "accept4");
         } else {
-            atomicAdd(&g_ctrs.netConnectErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                          "accept4", "nopath");
+            doErrorMetric(NET_ERR_CONN, EVENT_BASED, "accept4", "nopath");
         }
         return rc;
     }
@@ -2937,10 +2941,8 @@ close(int fd)
     if (rc != -1) {
         doClose(fd, "close");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
         if ((fs = getFSEntry(fd))) {
-            doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                          "close", fs->path);
+            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "close", fs->path);
         }
     }
 
@@ -2961,10 +2963,8 @@ fclose(FILE *stream)
     if (rc != EOF) {
         doClose(fd, "fclose");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
         if ((fs = getFSEntry(fd))) {
-            doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                          "fclose", fs->path);
+            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "fclose", fs->path);
         }
     }
 
@@ -3010,10 +3010,8 @@ close$NOCANCEL(int fd)
     if (rc != -1) {
         doClose(fd, "close$NOCANCEL");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
         if ((fs = getFSEntry(fd))) {
-            doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                          "close$NOCANCEL", fs->path);
+            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "close$NOCANCEL", fs->path);
         }
     }
 
@@ -3033,10 +3031,8 @@ guarded_close_np(int fd, void *guard)
     if (rc != -1) {
         doClose(fd, "guarded_close_np");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
          if ((fs = getFSEntry(fd))) {
-            doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                          "guarded_close_np", fs->path);
+            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "guarded_close_np", fs->path);
         }
     }
 
@@ -3054,10 +3050,8 @@ close_nocancel(int fd)
     if (rc != -1) {
         doClose(fd, "close_nocancel");
     } else {
-        atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
         if ((fs = getFSEntry(fd))) {
-            doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                          "close_nocancel", fs->path);
+            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "close_nocancel", fs->path);
         }
     }
 
@@ -3075,9 +3069,7 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept$NOCANCEL");
     } else {
-        atomicAdd(&g_ctrs.netConnectErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                      "accept$NOCANCEL", "nopath");
+        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "accept$NOCANCEL", "nopath");
     }
 
     return sd;
@@ -3104,9 +3096,7 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
 
         doSend(sockfd, rc);
     } else {
-        atomicAdd(&g_ctrs.netTxRxErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                      "__sendto_nocancel", "nopath");
+        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "__sendto_nocancel", "nopath");
     }
 
     return rc;
@@ -3131,9 +3121,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
         doDNSMetricName(DNS, fullname, time.duration);
         doDNSMetricName(DNS_DURATION, fullname, time.duration);
     } else {
-        atomicAdd(&g_ctrs.netDNSErrors, 1);
-        doErrorMetric(DNS_ERR, g_ctrs.netDNSErrors, EVENT_BASED,
-                      "DNSServiceQueryRecord", fullname);
+        doErrorMetric(NET_ERR_DNS, EVENT_BASED, "DNSServiceQueryRecord", fullname);
         doDNSMetricName(DNS_DURATION, fullname, time.duration);
     }
 
@@ -3156,9 +3144,8 @@ fstatat(int fd, const char *path, struct stat *buf, int flag)
             doStatMetric("fstatat", path);
         }
     } else {
-        atomicAdd(&g_ctrs.fsStatErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsStatErrors, EVENT_BASED,
-                      "fstatat", path);    }
+        doErrorMetric(FS_ERR_STAT, EVENT_BASED, "fstatat", path);
+    }
 
     return rc;
 }
@@ -3181,9 +3168,7 @@ lseek(int fd, off_t offset, int whence)
             doFSMetric(FS_SEEK, fd, EVENT_BASED, "lseek", 0, NULL);
         }
     } else if (fs) {
-        atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-         doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                      "lseek", fs->path);
+         doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "lseek", fs->path);
     }
 
     return rc;
@@ -3206,9 +3191,7 @@ fseeko(FILE *stream, off_t offset, int whence)
             doFSMetric(FS_SEEK, fd, EVENT_BASED, "fseeko", 0, NULL);
         }
     } else if (fs) {
-        atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                      "lseek", fs->path);
+        doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "lseek", fs->path);
     }
 
     return rc;
@@ -3231,9 +3214,7 @@ ftell(FILE *stream)
             doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftell", 0, NULL);
         }
     } else if (fs) {
-        atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                      "ftell", fs->path);
+        doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "ftell", fs->path);
     }
 
     return rc;
@@ -3256,9 +3237,7 @@ ftello(FILE *stream)
             doFSMetric(FS_SEEK, fd, EVENT_BASED, "ftello", 0, NULL);
         }
     } else if (fs) {
-        atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                      "ftello", fs->path);
+        doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "ftello", fs->path);
     }
 
     return rc;
@@ -3278,9 +3257,7 @@ rewind(FILE *stream)
     if (fs) {
         doFSMetric(FS_SEEK, fd, EVENT_BASED, "rewind", 0, NULL);
     } else if (fs) {
-        atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                      "rewind", fs->path);
+        doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "rewind", fs->path);
     }
 
     return;
@@ -3303,9 +3280,8 @@ fsetpos(FILE *stream, const fpos_t *pos)
             doFSMetric(FS_SEEK, fd, EVENT_BASED, "fsetpos", 0, NULL);
         }
     } else if (fs) {
-        atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                      "fsetpos", fs->path);    }
+        doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "fsetpos", fs->path);
+    }
 
     return rc;
 }
@@ -3327,9 +3303,7 @@ fgetpos(FILE *stream,  fpos_t *pos)
             doFSMetric(FS_SEEK, fd, EVENT_BASED, "fgetpos", 0, NULL);
         }
     } else if (fs) {
-        atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-        doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                      "fgetpos", fs->path);
+        doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "fgetpos", fs->path);
     }
 
     return rc;
@@ -3367,13 +3341,9 @@ write(int fd, const void *buf, size_t count)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "write", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "write", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "write", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "write", "nopath");
         }
     }
 
@@ -3412,13 +3382,9 @@ pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
         }
     } else {
          if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "pwrite", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "pwrite", fs->path);
          } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "pwrite", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "pwrite", "nopath");
         }
     }
 
@@ -3457,13 +3423,9 @@ writev(int fd, const struct iovec *iov, int iovcnt)
         }
     } else {
          if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "writev", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "writev", fs->path);
          } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "writev", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "writev", "nopath");
         }
     }
 
@@ -3476,7 +3438,7 @@ fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stre
     WRAP_CHECK(fwrite, -1);
     IOSTREAMPRE(fwrite, size_t);
     rc = g_fn.fwrite(ptr, size, nitems, stream);
-    IOSTREAMPOST(fwrite, rc, 0, &g_ctrs.fsRdWrErrors, (enum event_type_t)EVENT_TX);
+    IOSTREAMPOST(fwrite, rc, 0, (enum event_type_t)EVENT_TX);
 }
 
 EXPORTON int
@@ -3485,7 +3447,7 @@ fputs(const char *s, FILE *stream)
     WRAP_CHECK(fputs, EOF);
     IOSTREAMPRE(fputs, int);
     rc = g_fn.fputs(s, stream);
-    IOSTREAMPOST(fputs, rc, EOF, &g_ctrs.fsRdWrErrors, (enum event_type_t)EVENT_TX);
+    IOSTREAMPOST(fputs, rc, EOF, (enum event_type_t)EVENT_TX);
 }
 
 EXPORTON ssize_t
@@ -3520,13 +3482,9 @@ read(int fd, void *buf, size_t count)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "read", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "read", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "read", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "read", "nopath");
         }
     }
 
@@ -3565,13 +3523,9 @@ readv(int fd, const struct iovec *iov, int iovcnt)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "readv", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "readv", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "readv", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "readv", "nopath");
         }
     }
 
@@ -3610,13 +3564,9 @@ pread(int fd, void *buf, size_t count, off_t offset)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,
-                          "pread", fs->path);
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, "pread", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netTxRxErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                          "pread", "nopath");
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "pread", "nopath");
         }
     }
 
@@ -3629,7 +3579,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     WRAP_CHECK(fread, -1);
     IOSTREAMPRE(fread, size_t);
     rc = g_fn.fread(ptr, size, nmemb, stream);
-    IOSTREAMPOST(fread, rc * size, 0, &g_ctrs.fsRdWrErrors, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(fread, rc * size, 0, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON char *
@@ -3638,7 +3588,7 @@ fgets(char *s, int n, FILE *stream)
     WRAP_CHECK(fgets, NULL);
     IOSTREAMPRE(fgets, char *);
     rc = g_fn.fgets(s, n, stream);
-    IOSTREAMPOST(getline, n, NULL, &g_ctrs.fsRdWrErrors, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(getline, n, NULL, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON ssize_t
@@ -3648,9 +3598,9 @@ getline (char **lineptr, size_t *n, FILE *stream)
     IOSTREAMPRE(getline, ssize_t);
     rc = g_fn.getline(lineptr, n, stream);
     if (n) {
-        IOSTREAMPOST(getline, *n, -1, &g_ctrs.fsRdWrErrors, (enum event_type_t)EVENT_RX);
+        IOSTREAMPOST(getline, *n, -1, (enum event_type_t)EVENT_RX);
     } else {
-        IOSTREAMPOST(getline, 0, -1, &g_ctrs.fsRdWrErrors, (enum event_type_t)EVENT_RX);
+        IOSTREAMPOST(getline, 0, -1, (enum event_type_t)EVENT_RX);
     }
 }
 
@@ -3662,9 +3612,9 @@ getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     g_getdelim = 1;
     rc = g_fn.getdelim(lineptr, n, delimiter, stream);
     if (n) {
-        IOSTREAMPOST(getdelim, *n, -1, &g_ctrs.fsRdWrErrors, (enum event_type_t)EVENT_RX);
+        IOSTREAMPOST(getdelim, *n, -1, (enum event_type_t)EVENT_RX);
     } else {
-        IOSTREAMPOST(getdelim, 0, -1, &g_ctrs.fsRdWrErrors, (enum event_type_t)EVENT_RX);
+        IOSTREAMPOST(getdelim, 0, -1, (enum event_type_t)EVENT_RX);
     }
 }
 
@@ -3680,9 +3630,9 @@ __getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     }
 
     if (n) {
-        IOSTREAMPOST(__getdelim, *n, -1, &g_ctrs.fsRdWrErrors, (enum event_type_t)EVENT_RX);
+        IOSTREAMPOST(__getdelim, *n, -1, (enum event_type_t)EVENT_RX);
     } else {
-        IOSTREAMPOST(__getdelim, 0, -1, &g_ctrs.fsRdWrErrors, (enum event_type_t)EVENT_RX);
+        IOSTREAMPOST(__getdelim, 0, -1, (enum event_type_t)EVENT_RX);
     }
 }
 
@@ -3710,13 +3660,9 @@ fcntl(int fd, int cmd, ...)
             }
         } else {
             if (fs) {
-                atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-                doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                              "fcntl", fs->path);
+                doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "fcntl", fs->path);
             } else if (net) {
-                atomicAdd(&g_ctrs.netConnectErrors, 1);
-                doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                              "fcntl", "nopath");
+                doErrorMetric(NET_ERR_CONN, EVENT_BASED, "fcntl", "nopath");
             }
         }
     }
@@ -3748,13 +3694,9 @@ fcntl64(int fd, int cmd, ...)
             }
         } else {
             if (fs) {
-                atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-                doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                              "fcntl", fs->path);
+                doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "fcntl", fs->path);
             } else if (net) {
-                atomicAdd(&g_ctrs.netConnectErrors, 1);
-                doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                              "fcntl", "nopath");
+                doErrorMetric(NET_ERR_CONN, EVENT_BASED, "fcntl", "nopath");
             }
         }
     }
@@ -3782,13 +3724,9 @@ dup(int fd)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                          "dup", fs->path);
+            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "dup", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netConnectErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                          "dup", "nopath");
+            doErrorMetric(NET_ERR_CONN, EVENT_BASED, "dup", "nopath");
         }
     }
 
@@ -3820,13 +3758,9 @@ dup2(int oldfd, int newfd)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                          "dup2", fs->path);
+            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "dup2", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netConnectErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                          "dup2", "nopath");
+            doErrorMetric(NET_ERR_CONN, EVENT_BASED, "dup2", "nopath");
         }
     }
 
@@ -3858,13 +3792,9 @@ dup3(int oldfd, int newfd, int flags)
         }
     } else {
         if (fs) {
-            atomicAdd(&g_ctrs.fsOpenCloseErrors, 1);
-            doErrorMetric(FS_ERR, g_ctrs.fsOpenCloseErrors, EVENT_BASED,
-                          "dup3", fs->path);
+            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "dup3", fs->path);
         } else if (net) {
-            atomicAdd(&g_ctrs.netConnectErrors, 1);
-            doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                          "dup3", "nopath");
+            doErrorMetric(NET_ERR_CONN, EVENT_BASED, "dup3", "nopath");
         }
     }
 
@@ -3927,9 +3857,7 @@ socket(int socket_family, int socket_type, int protocol)
             doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 1);
         }
     } else {
-        atomicAdd(&g_ctrs.netConnectErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                      "socket", "nopath");
+        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "socket", "nopath");
     }
 
     return sd;
@@ -3946,9 +3874,7 @@ shutdown(int sockfd, int how)
     if (rc != -1) {
         doClose(sockfd, "shutdown");
     } else {
-        atomicAdd(&g_ctrs.netConnectErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                      "shutdown", "nopath");
+        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "shutdown", "nopath");
     }
 
     return rc;
@@ -3974,9 +3900,7 @@ listen(int sockfd, int backlog)
             }
         }
     } else {
-        atomicAdd(&g_ctrs.netConnectErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                      "listen", "nopath");
+        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "listen", "nopath");
     }
 
     return rc;
@@ -3993,9 +3917,7 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept");
     } else {
-        atomicAdd(&g_ctrs.netConnectErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                      "accept", "nopath");
+        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "accept", "nopath");
     }
 
     return sd;
@@ -4012,9 +3934,7 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept4");
     } else {
-        atomicAdd(&g_ctrs.netConnectErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                      "accept4", "nopath");
+        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "accept4", "nopath");
     }
 
     return sd;
@@ -4032,9 +3952,7 @@ bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
         doSetConnection(sockfd, addr, addrlen, LOCAL);
         scopeLog("bind", sockfd, CFG_LOG_DEBUG);
     } else {
-        atomicAdd(&g_ctrs.netConnectErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                      "bind", "nopath");
+        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "bind", "nopath");
     }
 
     return rc;
@@ -4060,9 +3978,7 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
         scopeLog("connect", sockfd, CFG_LOG_DEBUG);
     } else {
-        atomicAdd(&g_ctrs.netConnectErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netConnectErrors, EVENT_BASED,
-                      "connect", "nopath");
+        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "connect", "nopath");
     }
 
     return rc;
@@ -4086,9 +4002,7 @@ send(int sockfd, const void *buf, size_t len, int flags)
 
         doSend(sockfd, rc);
     } else {
-        atomicAdd(&g_ctrs.netTxRxErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                      "send", "nopath");
+        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "send", "nopath");
     }
 
     return rc;
@@ -4115,9 +4029,7 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
 
         doSend(sockfd, rc);
     } else {
-        atomicAdd(&g_ctrs.netTxRxErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                      "sendto", "nopath");
+        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "sendto", "nopath");
     }
 
     return rc;
@@ -4152,9 +4064,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
         
         doSend(sockfd, rc);
     } else {
-        atomicAdd(&g_ctrs.netTxRxErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                      "sendmsg", "nopath");
+        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "sendmsg", "nopath");
     }
 
     return rc;
@@ -4172,9 +4082,7 @@ recv(int sockfd, void *buf, size_t len, int flags)
     if (rc != -1) {
         doRecv(sockfd, rc);
     } else {
-        atomicAdd(&g_ctrs.netTxRxErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                      "recv", "nopath");
+        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "recv", "nopath");
     }
 
     return rc;
@@ -4211,9 +4119,7 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
 
         doNetMetric(NETRX, sockfd, EVENT_BASED, rc);
     } else {
-        atomicAdd(&g_ctrs.netTxRxErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                      "recvfrom", "nopath");
+        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "recvfrom", "nopath");
     }
     return rc;
 }
@@ -4242,9 +4148,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
         
         doRecv(sockfd, rc);
     } else {
-        atomicAdd(&g_ctrs.netTxRxErrors, 1);
-        doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,
-                      "recvmsg", "nopath");
+        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "recvmsg", "nopath");
     }
     
     return rc;
@@ -4266,9 +4170,7 @@ gethostbyname(const char *name)
         doDNSMetricName(DNS, name, time.duration);
         doDNSMetricName(DNS_DURATION, name, time.duration);
     } else {
-        atomicAdd(&g_ctrs.netDNSErrors, 1);
-        doErrorMetric(DNS_ERR, g_ctrs.netDNSErrors, EVENT_BASED,
-                      "gethostbyname", name);
+        doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname", name);
         doDNSMetricName(DNS_DURATION, name, time.duration);
     }
 
@@ -4291,9 +4193,7 @@ gethostbyname2(const char *name, int af)
         doDNSMetricName(DNS, name, time.duration);
         doDNSMetricName(DNS_DURATION, name, time.duration);
     } else {
-        atomicAdd(&g_ctrs.netDNSErrors, 1);
-        doErrorMetric(DNS_ERR, g_ctrs.netDNSErrors, EVENT_BASED,
-                      "gethostbyname2", name);
+        doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname2", name);
         doDNSMetricName(DNS_DURATION, name, time.duration);
     }
 
@@ -4318,9 +4218,7 @@ getaddrinfo(const char *node, const char *service,
         doDNSMetricName(DNS, node, time.duration);
         doDNSMetricName(DNS_DURATION, node, time.duration);
     } else {
-        atomicAdd(&g_ctrs.netDNSErrors, 1);
-        doErrorMetric(DNS_ERR, g_ctrs.netDNSErrors, EVENT_BASED,
-                      "getaddrinfo", node);
+        doErrorMetric(NET_ERR_DNS, EVENT_BASED, "getaddrinfo", node);
         doDNSMetricName(DNS_DURATION, node, time.duration);
     }
 

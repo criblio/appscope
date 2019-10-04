@@ -4,6 +4,7 @@ import sys
 import subprocess
 import time
 import watcher as w
+import datetime
 
 help_text = '''options:
 --help  display help text
@@ -19,8 +20,9 @@ class Runner:
         self.__home = home
         self.__include_tests = include_tests
         self.__exclude_tests = exclude_tests
+        self.__execution_id = "ltp:" + datetime.datetime.now().isoformat()
         # TODO derive from config
-        self.__test_watcher = w.Watcher("/tmp/")
+        self.__test_watcher = w.Watcher("/tmp/", self.__execution_id)
         self.__lib_path = lib_path
 
     def run(self):

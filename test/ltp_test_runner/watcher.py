@@ -17,7 +17,8 @@ class TestResult:
 
 class Watcher:
 
-    def __init__(self, log_path):
+    def __init__(self, log_path, execution_id):
+        self._execution_id = execution_id
         self._log_path = log_path
         self._start_date = None
         self._finish_date = None
@@ -28,10 +29,10 @@ class Watcher:
 
     def start(self):
         self._start_date = datetime.datetime.now()
-        self._print("Started tests execution")
+        self._print("Started tests execution. Execution ID: " + self._execution_id)
 
-        log_file_path = os.path.join(self._log_path, "log_" + self._start_date.isoformat() + ".json")
-        failed_tests_file_path = os.path.join(self._log_path, "log_" + self._start_date.isoformat() + ".json")
+        log_file_path = os.path.join(self._log_path, "log_" + self._execution_id + ".json")
+        failed_tests_file_path = os.path.join(self._log_path, "failed_tests_" + self._execution_id + ".json")
         self._log_file = open(log_file_path, "a")
         self._failed_tests_file = open(failed_tests_file_path, "a")
         self._print("Logs can be found in " + log_file_path)
@@ -103,6 +104,7 @@ class Watcher:
 
     def _to_log_row(self, raw_result, scoped_result, is_valid):
         log_row = {
+            "id": self._execution_id,
             "test": raw_result.name,
             "status": ("fail", "pass")[is_valid],
             "raw": {
@@ -123,6 +125,7 @@ class Watcher:
 
     def _log_summary(self):
         summary_row = json.dumps({
+            "id": self._execution_id,
             "start_date": self._start_date.isoformat(),
             "finish_date": self._finish_date.isoformat(),
             "total_tests": len(self._results),

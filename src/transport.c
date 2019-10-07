@@ -17,14 +17,17 @@
 struct _transport_t
 {
     cfg_transport_t type;
-    ssize_t (*write)(int, const void *, size_t);
     ssize_t (*send)(int, const void *, size_t, int);
     int (*open)(const char *, int, ...);
     int (*dup2)(int, int);
     int (*close)(int);
+    int (*fcntl)(int, int, ...);
+    ssize_t (*write)(int, const void *, size_t);
     int (*socket)(int, int, int);
     int (*connect)(int, const struct sockaddr *, socklen_t);
-    int (*fcntl)(int, int, ...);
+    int (*getaddrinfo)(const char *, const char *,
+                       const struct addrinfo *,
+                       struct addrinfo **);
     union {
         struct {
             int sock;
@@ -55,13 +58,16 @@ newTransport()
     if ((t->write = dlsym(RTLD_NEXT, "write")) == NULL) goto out;
     if ((t->socket = dlsym(RTLD_NEXT, "socket")) == NULL) goto out;
     if ((t->connect = dlsym(RTLD_NEXT, "connect")) == NULL) goto out;
+    if ((t->getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo")) == NULL) goto out;
     return t;
 
   out:
     DBG("send=%p open=%p dup2=%p close=%p "
-        "fcntl=%p write=%p socket=%p connect=%p",
+        "fcntl=%p write=%p socket=%p connect=%p "
+        "getaddrinfo=%p",
         t->send, t->open, t->dup2, t->close,
-        t->fcntl, t->write, t->socket, t->connect);
+        t->fcntl, t->write, t->socket, t->connect,
+        t->getaddrinfo);
     free(t);
     return NULL;
 }
@@ -114,7 +120,7 @@ transportCreateUdp(const char* host, const char* port)
     hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
     hints.ai_socktype = SOCK_DGRAM;  // For udp
     hints.ai_protocol = IPPROTO_UDP; // For udp
-    if (getaddrinfo(host, port, &hints, &addr_list)) goto out;
+    if (t->getaddrinfo(host, port, &hints, &addr_list)) goto out;
 
     // Loop through the addresses until one works
     struct addrinfo* addr;

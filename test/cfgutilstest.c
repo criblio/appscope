@@ -666,6 +666,11 @@ initOutReturnsPtr(void** state)
     cfgDestroy(&cfg);
 }
 
+// Defined in src/cfgutils.c
+// This is not a proper test, it just exists to make valgrind output
+// more readable when analyzing this test, by deallocating the compiled
+// regex in src/cfgutils.c.
+extern void envRegexFree(void** state);
 
 int
 main(int argc, char* argv[])
@@ -691,6 +696,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(initLogReturnsPtr),
         cmocka_unit_test(initOutReturnsPtr),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
+        cmocka_unit_test(envRegexFree),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

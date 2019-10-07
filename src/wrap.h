@@ -73,10 +73,10 @@ typedef unsigned int bool;
  */
 #ifdef __MACOS__
 #ifndef off64_t
-typedef uint64_t off64_t; 
+typedef uint64_t off64_t;
 #endif
-#ifndef fpos64_t 
-typedef uint64_t fpos64_t; 
+#ifndef fpos64_t
+typedef uint64_t fpos64_t;
 #endif
 #ifndef statvfs64
 struct statvfs64 {
@@ -117,14 +117,24 @@ enum metric_t {
     FS_OPEN,
     FS_CLOSE,
     FS_SEEK,
-    FS_STAT,
     TOT_READ,
     TOT_WRITE,
     TOT_RX,
     TOT_TX,
-    NET_ERR,
-    FS_ERR,
-    DNS_ERR
+    TOT_SEEK,
+    TOT_STAT,
+    TOT_OPEN,
+    TOT_CLOSE,
+    TOT_DNS,
+    TOT_PORTS,
+    TOT_TCP_CONN,
+    TOT_ACTIVE_CONN,
+    NET_ERR_CONN,
+    NET_ERR_RX_TX,
+    NET_ERR_DNS,
+    FS_ERR_OPEN_CLOSE,
+    FS_ERR_STAT,
+    FS_ERR_READ_WRITE,
 };
 
 // File types; stream or fd
@@ -142,26 +152,51 @@ enum event_type_t {
 
 typedef struct metric_counters_t {
     int openPorts;
+    int openPortsTot;
     int TCPConnections;
+    int TCPConnectionsTot;
     int activeConnections;
+    int activeConnectionsTot;
     int netrxBytes;
     int nettxBytes;
     int readBytes;
     int writeBytes;
+    int numSeek;
+    int numStat;
+    int numOpen;
+    int numClose;
+    int numDNS;
     int netConnectErrors;
     int netTxRxErrors;
     int netDNSErrors;
     int fsOpenCloseErrors;
-    int fsStatErrors;
     int fsRdWrErrors;
+    int fsStatErrors;
 } metric_counters;
+
+typedef struct {
+    struct {
+        int open_close;
+        int read_write;
+        int stat;
+        int seek;
+        int error;
+    } fs;
+    struct {
+        int open_close;
+        int rx_tx;
+        int dns;
+        int error;
+        int dnserror;
+    } net;
+} summary_t;
 
 typedef struct rtconfig_t {
     int numNinfo;
     int numFSInfo;
     bool tsc_invariant;
     bool tsc_rdtscp;
-    unsigned verbosity;
+    summary_t summarize;
     uint64_t freq;
     const char *cmdpath;
     char hostname[MAX_HOSTNAME];
@@ -189,7 +224,8 @@ typedef struct net_info_t {
     bool dnsSend;
     enum event_type_t action;
     uint64_t startTime;
-    uint64_t duration;
+    int numDuration;
+    uint64_t totalDuration;
     char dnsName[MAX_HOSTNAME];
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;
@@ -207,7 +243,6 @@ typedef struct fs_info_t {
     int numOpen;
     int numClose;
     int numSeek;
-    int numStat;
     int numRead;
     int numWrite;
     int readBytes;
@@ -293,7 +328,7 @@ typedef struct interposed_funcs_t {
     int (*getaddrinfo)(const char *, const char *, const struct addrinfo *,
                        struct addrinfo **);
     // __LINUX__
-    /* 
+    /*
      * We need to make these Linux only, but we're holding off until structiural changes are done.
      */
     int (*open64)(const char *, int, ...);
@@ -359,10 +394,16 @@ typedef struct interposed_funcs_t {
     ssize_t (*__sendto_nocancel)(int, const void *, size_t, int,
                                  const struct sockaddr *, socklen_t);
     uint32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
-                                      uint16_t, uint16_t, void *, void *);    
+                                      uint16_t, uint16_t, void *, void *);
 #endif // __MACOS__
 } interposed_funcs;
-    
+
+static inline bool
+atomicCas64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
+{
+    return __sync_bool_compare_and_swap(ptr, oldval, newval);
+}
+
 static inline void
 atomicAdd(int *ptr, int val) {
     (void)__sync_add_and_fetch(ptr, val);
@@ -512,7 +553,7 @@ extern void *_dl_sym(void *, const char *, void *);
         time.initial = getTime();                    \
     }                                                \
 
-#define IOSTREAMPOST(func, len, type, errcntr, op)  \
+#define IOSTREAMPOST(func, len, type, op)           \
     if (fs) {                                       \
         time.duration = getDuration(time.initial);  \
     }                                               \
@@ -534,11 +575,9 @@ extern void *_dl_sym(void *, const char *, void *);
         }                                           \
     }  else {                                       \
         if (fs) {                                   \
-           atomicAdd(errcntr, 1);                   \
-           doErrorMetric(FS_ERR, *errcntr, EVENT_BASED, #func, fs->path); \
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, #func, fs->path); \
         } else if (net) {                           \
-            atomicAdd(errcntr, 1);                  \
-            doErrorMetric(NET_ERR, *errcntr, EVENT_BASED, #func, "nopath"); \
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, #func, "nopath"); \
         }                                           \
     }                                               \
                                                     \
@@ -579,13 +618,12 @@ return rc;
          * We emit one metric with the input pathname                   \
          */                                                             \
         if (fsrd) {                                                     \
-            atomicAdd(&g_ctrs.fsRdWrErrors, 1);                         \
-            doErrorMetric(FS_ERR, g_ctrs.fsRdWrErrors, EVENT_BASED,     \
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED,     \
                           #func, fsrd->path);                           \
         }                                                               \
                                                                         \
         if (nettx) {                                                    \
-            doErrorMetric(NET_ERR, g_ctrs.netTxRxErrors, EVENT_BASED,   \
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED,   \
                           #func, "nopath");                             \
         }                                                               \
     }                                                                   \

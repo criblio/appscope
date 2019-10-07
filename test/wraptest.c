@@ -82,6 +82,9 @@ testFSDuration(void** state)
     int duration = strtol(log, NULL, 0);
     if ((duration < 1) || (duration > FS_DURATION))
         fail_msg("Duration %d is outside of allowed bounds (1, 100)", duration);
+
+    free(cpath);
+    cfgDestroy(&cfg);
 }
 
 /*
@@ -170,13 +173,16 @@ testConnDuration(void** state)
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
     if ((duration < 1000) || (duration > NET_DURATION))
-        fail_msg("Duration %d is outside of allowed bounds (1000, 1300)", duration);
+        fail_msg("Duration %d is outside of allowed bounds (1000, 2000)", duration);
 
     free(buf);
 
     // Delete these after tests that use the metrics and log files are done
     assert_return_code(unlink(path), errno);
     assert_return_code(unlink(cfgTransportPath(cfg, CFG_LOG)), errno);
+
+    free(cpath);
+    cfgDestroy(&cfg);
 }
 
 static void
@@ -204,7 +210,7 @@ testTSCValue(void** state)
     now = getTime();
     elapsed = getDuration(now);
     if ((elapsed < 20) || (elapsed > 1000))
-        fail_msg("Elapsed %" PRIu64 " is outside of allowed bounds (20, 350)", elapsed);
+        fail_msg("Elapsed %" PRIu64 " is outside of allowed bounds (20, 1000)", elapsed);
 }
 
 /*
@@ -243,6 +249,13 @@ testSyscallDbg(void** state)
 
 */
 
+// Defined in src/cfgutils.c
+// This is not a proper test, it just exists to make valgrind output
+// more readable when analyzing this test, by deallocating the compiled
+// regex in src/cfgutils.c.
+extern void envRegexFree(void** state);
+
+
 int
 main(int argc, char* argv[])
 {
@@ -254,6 +267,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(testTSCRollover),
         cmocka_unit_test(testTSCValue),
         //cmocka_unit_test(testSyscallDbg),
+        cmocka_unit_test(envRegexFree),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

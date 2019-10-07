@@ -9,6 +9,7 @@ import datetime
 help_text = '''options:
 --help  display help text
 --config config file for tests
+--verbose verbose/debug output in console
 '''
 
 

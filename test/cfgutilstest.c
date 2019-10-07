@@ -270,19 +270,19 @@ cfgProcessEnvironmentOutVerbosity(void** state)
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutVerbosity(cfg), 3);
 
-    assert_int_equal(setenv("SCOPE_OUT_VERBOSITY", "12", 1), 0);
+    assert_int_equal(setenv("SCOPE_OUT_VERBOSITY", "9", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutVerbosity(cfg), 12);
+    assert_int_equal(cfgOutVerbosity(cfg), 9);
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv("SCOPE_OUT_VERBOSITY"), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutVerbosity(cfg), 12);
+    assert_int_equal(cfgOutVerbosity(cfg), 9);
 
     // unrecognised value should not affect cfg
     assert_int_equal(setenv("SCOPE_OUT_VERBOSITY", "notEvenANum", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutVerbosity(cfg), 12);
+    assert_int_equal(cfgOutVerbosity(cfg), 9);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);

@@ -41,9 +41,11 @@ class Runner:
         if not os.path.isdir(test_path):
             return
 
+        print(test_path)
         for f in os.listdir(test_path):
             filename = test_path + '/' + f
             if os.path.isfile(filename) and os.access(filename, os.X_OK):
+                print(test_path)
                 self.__execute_test(test_path, f, False)
                 self.__execute_test(test_path, f, True)
 
@@ -96,12 +98,16 @@ def main(args):
         exclude_tests = c["exclude_tests"]
         lib_path = c["lib_path"]
 
-        if not os.path.exists(home):
-            sys.stderr.write("tests home is not valid")
-            return 1
+        if not home.endswith('/'):
+            home += '/'
 
-        if Runner(home, include_tests, exclude_tests, lib_path).run() == 1:
-            test_results = 1
+        if c["enabled"]:
+            if not os.path.exists(home):
+                sys.stderr.write("tests home is not valid")
+                return 1
+
+            if Runner(home, include_tests, exclude_tests, lib_path).run() == 1:
+                test_results = 1
 
     return test_results
 

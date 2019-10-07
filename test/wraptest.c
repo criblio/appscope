@@ -24,7 +24,7 @@ extern int osInitTSC(struct rtconfig_t *);
 // A port that is not likely to be used
 #define PORT1 65430
 #define PORT2 65431
-#define LIKELY_FILE_SIZE 12000
+#define LIKELY_FILE_SIZE 100000
 #define NET_DURATION 2000
 #define FS_DURATION 100
 
@@ -51,7 +51,7 @@ testFSDuration(void** state)
     char* cpath = cfgPath(CFG_FILE_NAME);
     config_t* cfg = cfgRead(cpath);
     const char *path = cfgTransportPath(cfg, CFG_OUT);
-    assert_int_equal(cfgOutVerbosity(cfg), CFG_NET_FS_EVENTS_VERBOSITY);
+    assert_int_equal(cfgOutVerbosity(cfg), CFG_MAX_VERBOSITY);
    
     // Start the duration timer with a read
     fd = open("./scope.sh", O_RDONLY);
@@ -74,7 +74,7 @@ testFSDuration(void** state)
     rc = fclose(fs);
     assert_return_code(rc, errno);
 
-    char *start = strstr(buf, "duration");
+    char *start = strstr(buf, "fs.duration");
     log = strtok_r(start, delim, &last);
     assert_non_null(log);
     log = strtok_r(NULL, delim, &last);
@@ -110,7 +110,7 @@ testConnDuration(void** state)
     char* cpath = cfgPath(CFG_FILE_NAME);
     config_t* cfg = cfgRead(cpath);
     const char *path = cfgTransportPath(cfg, CFG_OUT);
-    assert_int_equal(cfgOutVerbosity(cfg), CFG_NET_FS_EVENTS_VERBOSITY);
+    assert_int_equal(cfgOutVerbosity(cfg), CFG_MAX_VERBOSITY);
 
     saddr.sin_family = AF_INET;
     saddr.sin_port = htons(PORT1);
@@ -166,6 +166,7 @@ testConnDuration(void** state)
     assert_return_code(rc, errno);
 
     char *start = strstr(buf, "conn_duration");
+    assert_non_null(start);
 
     log = strtok_r(start, delim, &last);
     assert_non_null(log);

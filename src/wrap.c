@@ -291,7 +291,12 @@ addSock(int fd, int type)
             doClose(fd, "close: DuplicateSocket");
 
         }
-        
+/*
+ * We need to do this realloc.
+ * However, it needs to be done in such a way as to not
+ * free the previous object that may be in use by a thread.
+ * Possibly not use realloc. Leaving the code in place and this
+ * comment as a reminder.
         if ((fd > g_cfg.numNinfo) && (fd < MAX_FDS))  {
             int increase;
             net_info *temp;
@@ -312,7 +317,7 @@ addSock(int fd, int type)
                 g_netinfo = temp;
             }
         }
-
+*/
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].fd = fd;
         g_netinfo[fd].type = type;
@@ -1102,7 +1107,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         // if called from an event, we update counters
         if ((source == EVENT_BASED) && new_duration) {
-            atomicAdd(&g_netinfo[fd].totalDuration, new_duration);
+            atomicAddLong(&g_netinfo[fd].totalDuration, new_duration);
             atomicAdd(&g_netinfo[fd].numDuration, 1);
         }
 
@@ -1136,7 +1141,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
         }
 
-        atomicSet(&g_netinfo[fd].totalDuration, 0);
+        atomicSetLong(&g_netinfo[fd].totalDuration, 0);
         atomicSet(&g_netinfo[fd].numDuration, 0);
 
         break;
@@ -1880,21 +1885,29 @@ init(void)
 #endif // __STATX__
 #endif // __LINUX__
     
-    if ((g_netinfo = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
+    net_info *netinfoLocal;
+    fs_info *fsinfoLocal;
+    if ((netinfoLocal = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
         scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
     }
 
     g_cfg.pid = getpid();
 
     g_cfg.numNinfo = NET_ENTRIES;
-    if (g_netinfo) memset(g_netinfo, 0, sizeof(struct net_info_t) * NET_ENTRIES);
+    if (netinfoLocal) memset(netinfoLocal, 0, sizeof(struct net_info_t) * NET_ENTRIES);
 
-    if ((g_fsinfo = (fs_info *)malloc(sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
+    // Per a Read Update & Change (RUC) model; now that the object is ready assign the global
+    g_netinfo = netinfoLocal;
+
+    if ((fsinfoLocal = (fs_info *)malloc(sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
         scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
     }
 
     g_cfg.numFSInfo = FS_ENTRIES;
-    if (g_fsinfo) memset(g_fsinfo, 0, sizeof(struct fs_info_t) * FS_ENTRIES);
+    if (fsinfoLocal) memset(fsinfoLocal, 0, sizeof(struct fs_info_t) * FS_ENTRIES);
+
+    // Per RUC...
+    g_fsinfo = fsinfoLocal;
 
     if (gethostname(g_cfg.hostname, sizeof(g_cfg.hostname)) != 0) {
         scopeLog("ERROR: Constructor:gethostname", -1, CFG_LOG_ERROR);
@@ -1964,7 +1977,13 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
             DBG(NULL);
             doClose(fd, func);
         }
-        
+/*
+ * We need to do this realloc.
+ * However, it needs to be done in such a way as to not
+ * free the previous object that may be in use by a thread.
+ * Possibly not use realloc. Leaving the code in place and this
+ * comment as a reminder.
+
         if ((fd > g_cfg.numFSInfo) && (fd < MAX_FDS))  {
             int increase;
             fs_info *temp;
@@ -1985,7 +2004,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
                 g_cfg.numFSInfo = increase;
             }
         }
-
+*/
         memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
         g_fsinfo[fd].fd = fd;
         g_fsinfo[fd].type = type;
@@ -4729,28 +4748,10 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
 
     WRAP_CHECK(recvfrom, -1);
     doThread();
-    scopeLog("recvfrom", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
-        if (getNetEntry(sockfd) == NULL) {
-            // We missed an accept...most likely
-            // Or.. we are a child proc that inherited a socket
-            int type;
-            socklen_t len = sizeof(socklen_t);
-                
-            if (getsockopt(sockfd, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
-                addSock(sockfd, type);
-            } else {
-                // Really can't add the socket at this point
-                scopeLog("ERROR: recvfrom:getsockopt", sockfd, CFG_LOG_ERROR);
-            }
-        }
-
-        if (src_addr && addrlen) {
-            doSetConnection(sockfd, src_addr, *addrlen, REMOTE);
-        }
-
-        doNetMetric(NETRX, sockfd, EVENT_BASED, rc);
+        scopeLog("recvfrom", sockfd, CFG_LOG_TRACE);
+        doRecv(sockfd, rc);
     } else {
         doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "recvfrom", "nopath");
     }

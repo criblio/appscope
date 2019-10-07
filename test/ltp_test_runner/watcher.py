@@ -17,7 +17,8 @@ class TestResult:
 
 class Watcher:
 
-    def __init__(self, log_path, execution_id):
+    def __init__(self, log_path, execution_id, verbose):
+        self._verbose = verbose
         self._execution_id = execution_id
         self._log_path = log_path
         self._start_date = None
@@ -30,6 +31,7 @@ class Watcher:
     def start(self):
         self._start_date = datetime.datetime.now()
         self._print("Started tests execution. Execution ID: " + self._execution_id)
+        if self._verbose: self._print("Verbose output is selected")
 
         log_file_path = os.path.join(self._log_path, "log_" + self._execution_id + ".json")
         failed_tests_file_path = os.path.join(self._log_path, "failed_tests_" + self._execution_id + ".json")
@@ -94,6 +96,7 @@ class Watcher:
         is_valid = self._validate(raw_result, scoped_result)
         self._results[raw_result.name]["failed"] = not is_valid
         log_row = self._to_log_row(raw_result, scoped_result, is_valid)
+        if self._verbose: self._print(log_row)
         self._log_file.write(log_row + "\n")
         if not is_valid:
             self._has_failures = True
@@ -132,4 +135,5 @@ class Watcher:
             "failed_tests": len(filter(lambda v: v["failed"], self._results.values())),
         })
 
+        if self._verbose: self._print(summary_row)
         self._log_file.write(summary_row + "\n")

@@ -13,13 +13,13 @@ help_text = '''options:
 
 
 class Runner:
-    def __init__(self, home, include_tests, exclude_tests, lib_path):
+    def __init__(self, home, include_tests, exclude_tests, lib_path, verbose):
         self.__home = home
         self.__include_tests = include_tests
         self.__exclude_tests = exclude_tests
         self.__execution_id = "ltp:" + datetime.datetime.now().isoformat()
         # TODO derive from config
-        self.__test_watcher = w.Watcher("/tmp/", self.__execution_id)
+        self.__test_watcher = w.Watcher("/tmp/", self.__execution_id, verbose)
         self.__lib_path = lib_path
 
     def run(self):
@@ -71,12 +71,14 @@ class Runner:
 
 def main(args):
     configs = []
-
+    verbose = False
     # parse args
     for i in range(len(args)):
         if args[i] == '--help':
             print(help_text)
 
+        if args[i] == '--verbose':
+            verbose = True
         if args[i] == '--config':
             path = args[i + 1]
             with open(path, "rb") as f:
@@ -100,7 +102,7 @@ def main(args):
             sys.stderr.write("tests home is not valid")
             return 1
 
-        if Runner(home, include_tests, exclude_tests, lib_path).run() == 1:
+        if Runner(home, include_tests, exclude_tests, lib_path, verbose).run() == 1:
             test_results = 1
 
     return test_results

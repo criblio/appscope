@@ -44,12 +44,11 @@ class Runner:
         for f in os.listdir(test_path):
             filename = test_path + '/' + f
             if os.path.isfile(filename) and os.access(filename, os.X_OK):
-                print(test_path)
                 self.__execute_test(test_path, f, False)
                 self.__execute_test(test_path, f, True)
 
     def __execute_test(self, test_path, test, wrapped):
-        print(test_path + test)
+        print("Running {0} test.\t\t Scoped: {1}.\t Path: {2}".format(test, wrapped, test_path))
         start = self.__now_ms()
         env = dict(os.environ)
 

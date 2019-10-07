@@ -113,84 +113,17 @@ setVerbosity(rtconfig* c, unsigned verbosity)
 
     summary_t* summarize = &c->summarize;
 
-    if (verbosity <= 9) {
-        summarize->fs.open_close = 1;
-        summarize->fs.read_write = 1;
-        summarize->fs.seek = 1;
-        summarize->fs.stat = 1;
-        summarize->fs.error = 1;
-        summarize->net.open_close = 1;
-        summarize->net.rx_tx = 1;
-        summarize->net.dns = 1;
-        summarize->net.error = 1;
-        summarize->net.dnserror = 1;
-    } else if (verbosity == 10) {
-        summarize->fs.open_close = 0;
-        summarize->fs.read_write = 0;
-        summarize->fs.seek = 0;
-        summarize->fs.stat = 0;
-        summarize->fs.error = 1;
-        summarize->net.open_close = 1;
-        summarize->net.rx_tx = 1;
-        summarize->net.dns = 1;
-        summarize->net.error = 1;
-        summarize->net.dnserror = 1;
-    } else if (verbosity == 11) {
-        summarize->fs.open_close = 1;
-        summarize->fs.read_write = 1;
-        summarize->fs.seek = 1;
-        summarize->fs.stat = 1;
-        summarize->fs.error = 1;
-        summarize->net.open_close = 0;
-        summarize->net.rx_tx = 0;
-        summarize->net.dns = 0;
-        summarize->net.error = 1;
-        summarize->net.dnserror = 1;
-    } else if (verbosity == 12) {
-        summarize->fs.open_close = 0;
-        summarize->fs.read_write = 0;
-        summarize->fs.seek = 0;
-        summarize->fs.stat = 0;
-        summarize->fs.error = 1;
-        summarize->net.open_close = 0;
-        summarize->net.rx_tx = 0;
-        summarize->net.dns = 0;
-        summarize->net.error = 1;
-        summarize->net.dnserror = 1;
-    } else if (verbosity == 13) {
-        summarize->fs.open_close = 1;
-        summarize->fs.read_write = 1;
-        summarize->fs.seek = 1;
-        summarize->fs.stat = 1;
-        summarize->fs.error = 0;
-        summarize->net.open_close = 1;
-        summarize->net.rx_tx = 1;
-        summarize->net.dns = 1;
-        summarize->net.error = 1;
-        summarize->net.dnserror = 1;
-    } else if (verbosity == 14) {
-        summarize->fs.open_close = 1;
-        summarize->fs.read_write = 1;
-        summarize->fs.seek = 1;
-        summarize->fs.stat = 1;
-        summarize->fs.error = 1;
-        summarize->net.open_close = 1;
-        summarize->net.rx_tx = 1;
-        summarize->net.dns = 1;
-        summarize->net.error = 0;
-        summarize->net.dnserror = 0;
-    } else if (verbosity == 15) {
-        summarize->fs.open_close = 1;
-        summarize->fs.read_write = 1;
-        summarize->fs.seek = 1;
-        summarize->fs.stat = 1;
-        summarize->fs.error = 0;
-        summarize->net.open_close = 1;
-        summarize->net.rx_tx = 1;
-        summarize->net.dns = 1;
-        summarize->net.error = 0;
-        summarize->net.dnserror = 0;
-    }
+    summarize->fs.error =       (verbosity < 5);
+    summarize->fs.open_close =  (verbosity < 6);
+    summarize->fs.stat =        (verbosity < 7);
+    summarize->fs.seek =        (verbosity < 8);
+    summarize->fs.read_write =  (verbosity < 9);
+
+    summarize->net.error =      (verbosity < 5);
+    summarize->net.dnserror =   (verbosity < 5);
+    summarize->net.dns =        (verbosity < 6);
+    summarize->net.open_close = (verbosity < 7);
+    summarize->net.rx_tx =      (verbosity < 9);
 }
 
 

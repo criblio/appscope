@@ -410,6 +410,11 @@ atomicAdd(int *ptr, int val) {
 }
 
 static inline void
+atomicAddLong(uint64_t *ptr, uint64_t val) {
+    (void)__sync_add_and_fetch(ptr, val);
+}
+
+static inline void
 atomicSub(int *ptr, int val)
 {
     if (ptr && (*ptr == 0)) return;
@@ -423,6 +428,12 @@ atomicSub(int *ptr, int val)
  */
 static inline int
 atomicSet(int *ptr, int val)
+{
+    return __sync_lock_test_and_set(ptr, val);
+}
+
+static inline uint64_t
+atomicSetLong(uint64_t *ptr, uint64_t val)
 {
     return __sync_lock_test_and_set(ptr, val);
 }

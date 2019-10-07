@@ -860,69 +860,69 @@ doTotal(enum metric_t type)
     const char* units = "byte";
     switch (type) {
         case TOT_READ:
-            metric = "fs.read.total";
+            metric = "fs.read";
             value = &g_ctrs.readBytes;
             err_str = "ERROR: doTotal:TOT_READ:outSendEvent";
             break;
         case TOT_WRITE:
-            metric = "fs.write.total";
+            metric = "fs.write";
             value = &g_ctrs.writeBytes;
             err_str = "ERROR: doTotal:TOT_WRITE:outSendEvent";
             break;
         case TOT_RX:
-            metric = "net.rx.total";
+            metric = "net.rx";
             value = &g_ctrs.netrxBytes;
             err_str = "ERROR: doTotal:TOT_RX:outSendEvent";
             break;
         case TOT_TX:
-            metric = "net.tx.total";
+            metric = "net.tx";
             value = &g_ctrs.nettxBytes;
             err_str = "ERROR: doTotal:TOT_TX:outSendEvent";
             break;
         case TOT_SEEK:
-            metric = "fs.seek.total";
+            metric = "fs.seek";
             value = &g_ctrs.numSeek;
             err_str = "ERROR: doTotal:TOT_SEEK:outSendEvent";
             units = "operation";
             break;
         case TOT_STAT:
-            metric = "fs.stat.total";
+            metric = "fs.stat";
             value = &g_ctrs.numStat;
             err_str = "ERROR: doTotal:TOT_STAT:outSendEvent";
             units = "operation";
             break;
         case TOT_OPEN:
-            metric = "fs.open.total";
+            metric = "fs.open";
             value = &g_ctrs.numOpen;
             err_str = "ERROR: doTotal:TOT_OPEN:outSendEvent";
             units = "operation";
             break;
         case TOT_CLOSE:
-            metric = "fs.close.total";
+            metric = "fs.close";
             value = &g_ctrs.numClose;
             err_str = "ERROR: doTotal:TOT_CLOSE:outSendEvent";
             units = "operation";
             break;
         case TOT_DNS:
-            metric = "net.dns.total";
+            metric = "net.dns";
             value = &g_ctrs.numDNS;
             err_str = "ERROR: doTotal:TOT_DNS:outSendEvent";
             units = "operation";
             break;
         case TOT_PORTS:
-            metric = "net.port.total";
+            metric = "net.port";
             value = &g_ctrs.openPortsTot;
             err_str = "ERROR: doTotal:TOT_PORTS:outSendEvent";
             units = "instance";
             break;
         case TOT_TCP_CONN:
-            metric = "net.tcp.total";
+            metric = "net.tcp";
             value = &g_ctrs.TCPConnectionsTot;
             err_str = "ERROR: doTotal:TOT_TCP_CONN:outSendEvent";
             units = "session";
             break;
         case TOT_ACTIVE_CONN:
-            metric = "net.conn.total";
+            metric = "net.conn";
             value = &g_ctrs.activeConnectionsTot;
             err_str = "ERROR: doTotal:TOT_ACTIVE_CONN:outSendEvent";
             units = "connection";
@@ -940,6 +940,7 @@ doTotal(enum metric_t type)
             PID_FIELD(g_cfg.pid),
             HOST_FIELD(g_cfg.hostname),
             UNIT_FIELD(units),
+            CLASS_FIELD("summary"),
             FIELDEND
     };
     event_t e = {metric, *value, DELTA, fields};

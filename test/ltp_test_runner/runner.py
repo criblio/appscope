@@ -13,13 +13,12 @@ help_text = '''options:
 
 
 class Runner:
-    def __init__(self, home, include_tests, exclude_tests, lib_path, verbose):
+    def __init__(self, home, include_tests, exclude_tests, lib_path, verbose, log_path):
         self.__home = home
         self.__include_tests = include_tests
         self.__exclude_tests = exclude_tests
         self.__execution_id = "ltp:" + datetime.datetime.now().isoformat()
-        # TODO derive from config
-        self.__test_watcher = w.Watcher("/tmp/", self.__execution_id, verbose)
+        self.__test_watcher = w.Watcher(log_path, self.__execution_id, verbose)
         self.__lib_path = lib_path
 
     def run(self):
@@ -72,6 +71,7 @@ class Runner:
 def main(args):
     configs = []
     verbose = False
+    log_path = None
     # parse args
     for i in range(len(args)):
         if args[i] == '--help':
@@ -83,6 +83,7 @@ def main(args):
             path = args[i + 1]
             with open(path, "rb") as f:
                 config = json.loads(f.read().decode("utf8"))
+                log_path = config.get("log_path", "/tmp/")  # default path is "tmp" dir
                 configs = config["configs"]
 
     if len(configs) == 0:
@@ -102,7 +103,7 @@ def main(args):
             sys.stderr.write("tests home is not valid")
             return 1
 
-        if Runner(home, include_tests, exclude_tests, lib_path, verbose).run() == 1:
+        if Runner(home, include_tests, exclude_tests, lib_path, verbose, log_path).run() == 1:
             test_results = 1
 
     return test_results

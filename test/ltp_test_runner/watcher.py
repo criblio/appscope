@@ -33,6 +33,7 @@ class Watcher:
         self._print("Started tests execution. Execution ID: " + self._execution_id)
         if self._verbose: self._print("Verbose output is selected")
 
+        self.__prepare_log_dir()
         log_file_path = os.path.join(self._log_path, "log_" + self._execution_id + ".json")
         failed_tests_file_path = os.path.join(self._log_path, "failed_tests_" + self._execution_id + ".json")
         self._log_file = open(log_file_path, "a")
@@ -137,3 +138,8 @@ class Watcher:
 
         if self._verbose: self._print(summary_row)
         self._log_file.write(summary_row + "\n")
+
+    def __prepare_log_dir(self):
+        if not os.path.exists(self._log_path):
+            self._print("Log directory {0} not exists. Creating.".format(self._log_path))
+            os.makedirs(self._log_path)

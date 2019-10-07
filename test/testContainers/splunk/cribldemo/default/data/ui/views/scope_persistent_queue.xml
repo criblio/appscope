@@ -1,0 +1,110 @@
+<form>
+  <label>Scope + Persistent Queue</label>
+  <description/>
+  <fieldset submitButton="false">
+    <input type="time" searchWhenChanged="true" token="global_time_tok">
+      <label>Time Range</label>
+      <default>
+        <earliest>-1h</earliest>
+        <latest>now</latest>
+      </default>
+      <change>
+        <eval token="now">now()</eval>
+        <eval token="relative_earliest">relative_time($now$, $earliest$)</eval>
+        <eval token="relative_latest">relative_time($now$, $latest$)</eval>
+        <set token="timeshift_undefined">undefined</set>
+        <eval token="timeshift_earliest_undefined">if(isnum($earliest$), relative_time($earliest$, $timeshift_undefined$), relative_time($relative_earliest$, $timeshift_undefined$))</eval>
+        <eval token="timeshift_latest_undefined">if(isnum($latest$), relative_time($latest$, $timeshift_undefined$), relative_time($relative_latest$, $timeshift_undefined$))</eval>
+      </change>
+    </input>
+    <input type="dropdown">
+      <label>Time Span</label>
+      <choice value="auto">auto</choice>
+      <choice value="5s">5s</choice>
+      <choice value="10s">10s</choice>
+      <choice value="30s">30s</choice>
+      <choice value="1m">1m</choice>
+      <choice value="5m">5m</choice>
+      <choice value="10m">10m</choice>
+      <choice value="30m">30m</choice>
+      <choice value="1h">1h</choice>
+      <default>auto</default>
+      <change>
+        <eval token="timechart_span">if($value$ == "auto", "", "span=".$value$)</eval>
+        <eval token="mstats_span">"span=".$value$</eval>
+      </change>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <chart>
+        <title>net.tx by proc</title>
+        <search>
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="net.tx" AND index="cribl-metrics" AND proc="cribld" $mstats_span$ BY proc
+| timechart avg(_value) $timechart_span$ agg=max limit=5 useother=false BY proc
+| fields - _span</query>
+          <earliest>$global_time_tok.earliest$</earliest>
+          <latest>$global_time_tok.latest$</latest>
+        </search>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.fieldColors">{"9997":"#6a5c9e","9998":"#31a35f","42166":"#1e93c6","42180":"#f2b827","56950":"#d6563c","Avg":"#1e93c6","cribld":"#1e93c6","mongod":"#f2b827","python":"#d6563c","redis-server":"#6a5c9e","splunkd":"#31a35f"}</option>
+        <option name="charting.gridLinesX.showMajorLines">true</option>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.includeZero">true</option>
+        <option name="charting.legend.mode">seriesCompare</option>
+        <option name="charting.fieldDashStyles">{"9997":"solid","9998":"solid","42166":"solid","42180":"solid","56950":"solid","Avg":"solid","cribld":"solid","mongod":"solid","python":"solid","redis-server":"solid","splunkd":"solid"}</option>
+        <option name="displayview">analysis_workspace</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>fs.read by proc</title>
+        <search>
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.read" AND index="cribl-metrics" AND proc="cribld" $mstats_span$ BY proc
+| timechart avg(_value) $timechart_span$ agg=max limit=5 useother=false BY proc
+| fields - _span</query>
+          <earliest>$global_time_tok.earliest$</earliest>
+          <latest>$global_time_tok.latest$</latest>
+        </search>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.fieldColors">{"Avg":"#1e93c6","apt-get":"#1e93c6","cribld":"#f2b827","python":"#d6563c","splunk-optimize":"#6a5c9e","store":"#31a35f"}</option>
+        <option name="charting.gridLinesX.showMajorLines">true</option>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.includeZero">true</option>
+        <option name="charting.legend.mode">seriesCompare</option>
+        <option name="charting.fieldDashStyles">{"Avg":"solid","apt-get":"solid","cribld":"solid","python":"solid","splunk-optimize":"solid","store":"solid"}</option>
+        <option name="displayview">analysis_workspace</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>fs.write by proc</title>
+        <search>
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.write" AND index="cribl-metrics" AND (proc="cribld" OR proc="splunkd") $mstats_span$ BY proc
+| timechart avg(_value) $timechart_span$ agg=max limit=5 useother=false BY proc
+| fields - _span</query>
+          <earliest>$global_time_tok.earliest$</earliest>
+          <latest>$global_time_tok.latest$</latest>
+        </search>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.fieldColors">{"Avg":"#1e93c6","cribld":"#1e93c6","mongod":"#f2b827","splunk-optimize":"#d6563c","splunkd":"#6a5c9e","http":"#31a35f"}</option>
+        <option name="charting.gridLinesX.showMajorLines">true</option>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.includeZero">true</option>
+        <option name="charting.legend.mode">seriesCompare</option>
+        <option name="charting.fieldDashStyles">{"Avg":"solid","cribld":"solid","mongod":"solid","splunk-optimize":"solid","splunkd":"solid","http":"solid"}</option>
+        <option name="displayview">analysis_workspace</option>
+      </chart>
+    </panel>
+  </row>
+</form>

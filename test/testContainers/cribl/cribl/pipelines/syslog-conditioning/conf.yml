@@ -1,0 +1,16 @@
+asyncFuncTimeout: 1000
+output: default
+description: Set default fields
+functions:
+  - id: eval
+    filter: "true"
+    disabled: null
+    conf:
+      add:
+        - name: index
+          value: "index ? index : 'cribl'"
+        - name: source
+          value: "source ? source : appname"
+        - name: sourcetype
+          value: "sourcetype ? sourcetype : 'nagios'"
+      remove: []

@@ -1,0 +1,99 @@
+<form hideFilters="true">
+  <label>Field-Level Hashing</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="field1" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-5m@m</earliest>
+        <latest>@m</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+               <p style="text-align: right">
+        <span style="margin-top:15px; 
+        padding: 6px; 
+        border-radius; 2px;
+        background-color: #1890FF"><a href="" id="masking" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Masking</a></span> 
+        </p>
+      <p>Hashing is often necessary when working with senstive data and uniqueness guarantees are required. For example, if don't want to display certain sensitive fields, such as credit card numbers, API tokens, AWS/GCP/Azure keys, etc., but still want to preserve uniqueness because you care about statistics or associations with other fields then hashing is a perfect solution. <b>cribl provides the ability to hash data on the fly, using a variety of out-of-the-box algorthims; MD5, SHA* </b>. You can clone based on any index-time fields or event patterns.</p>
+      <p>In the example below, we've taken data that contain a credit card number in <code>cardNumber</code> field, <b>MD5</b> hashed it and, just for the fun of it we substring-ed the hash to cardNumber's orginal length. Yes, we fully understand the impact of this - we're just showcasing cribl's capabilities!</p>
+    </html>
+    </panel>
+    <panel>
+      <title>Original vs. Modified</title>
+      <single>
+        <search>
+          <query>(index=cribl sourcetype=business_event) OR (index=cribl-modified sourcetype=business_event redacted::true)
+|  eval len=len(_raw)
+|  stats count(eval(searchmatch("index=cribl"))) as "Events IN" count(eval(searchmatch("index=cribl-modified"))) as "Events Out" sum(eval(if(searchmatch("index=cribl"), round(len/1024, 3), ''))) as "KB IN" sum(eval(if(searchmatch("index=cribl-modified"), round(len/1024, 3), ''))) as "KB OUT"</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="height">130</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0xf1813f","0xf1813f"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Original Data: Non-hashed cardNumber Field</title>
+        <search>
+          <query>index=cribl sourcetype=business_event | head 50 | table userName accountNumber cardNumber | dedup userName | sort userName</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <format type="color" field="SSN">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="color" field="cardNumber">
+          <colorPalette type="list">[#53A051,#006D9C,#F8BE34,#F1813F,#DC4E41]</colorPalette>
+          <scale type="threshold">0,30,70,100</scale>
+        </format>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>Modified Data: Hashed cardNumber Field</title>
+        <search>
+          <query>index=cribl-modified sourcetype=business_event redacted::true | head 50 | table userName accountNumber cardNumber | dedup userName | sort userName</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <format type="color" field="cardNumber">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+</form>

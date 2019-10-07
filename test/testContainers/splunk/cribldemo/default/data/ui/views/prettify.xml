@@ -1,0 +1,93 @@
+<form hideFilters="true">
+  <label>Event Prettification</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="field1" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-5m@m</earliest>
+        <latest>@m</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+      <p style="text-align: right">
+        <span style="margin-top:15px; 
+        padding: 6px; 
+        border-radius; 2px;
+        background-color: #1890FF"><a href="" id="masking" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Prettify</a></span> 
+        </p>
+      <p>
+        The data in this example comes from a middleware doing business event processing from a telco, and it's based on an actual log. It works well for Splunk, with Splunk's auto key/value extraction, but, <b>we'd like this data to be well formatted JSON</b> for sending to external systems. Lots of systems speak JSON natively, so we'd like to take this operational log and turn it into something more easily consumed. 
+      </p>
+      <p>
+        In addition to translating K/V data to JSON, we also take some time to clean up the data. <b>Social Security Number has been dropped, cardNumber has been obfuscated, and we drop a number of unnecessary fields</b> which never seemed to change and just added cruft to the data. As a result, the data is more secure and less voluminous by about 20%.
+      </p>
+    </html>
+    </panel>
+    <panel>
+      <title>Original vs. Modified</title>
+      <single>
+        <search>
+          <query>(index=cribl sourcetype=business_event ) OR (index=cribl-modified source=pretty_autokv sourcetype=business_event)
+|  eval len=len(_raw)
+|  stats count(eval(searchmatch("index=cribl"))) as "Events IN" count(eval(searchmatch("index=cribl-modified"))) as "Events Out" sum(eval(if(searchmatch("index=cribl"), round(len/1024, 3), ''))) as "KB IN" sum(eval(if(searchmatch("index=cribl-modified"), round(len/1024, 3), ''))) as "KB OUT"</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="height">130</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x006d9c","0x006d9c"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Original Key/Value Format</title>
+      <event>
+        <search>
+          <query>index=cribl sourcetype=business_event | head 5</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="list.drilldown">none</option>
+        <option name="raw.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="type">raw</option>
+      </event>
+    </panel>
+    <panel>
+      <title>Prettified JSON</title>
+      <event>
+        <search>
+          <query>index=cribl-modified source=pretty_autokv sourcetype=business_event | head 5</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="list.drilldown">none</option>
+        <option name="raw.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="type">list</option>
+      </event>
+    </panel>
+  </row>
+</form>

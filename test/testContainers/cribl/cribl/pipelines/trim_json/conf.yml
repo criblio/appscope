@@ -1,0 +1,23 @@
+asyncFuncTimeout: 1000
+output: default
+description: Reshape Large JSON events to be more valuable
+functions:
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Remove multiValueHeader and null fields from _raw using Parser
+        Reserialize
+  - id: serde
+    filter: sourcetype=='lambda'
+    disabled: false
+    conf:
+      srcField: _raw
+      dstField: ""
+      mode: reserialize
+      type: json
+      remove:
+        - multiValueHeaders.*
+      fieldFilterExpr: value !== null
+    description: Parse JSON from _raw, drop multiValueHeaders and all null fields and
+      rewrite back to _raw

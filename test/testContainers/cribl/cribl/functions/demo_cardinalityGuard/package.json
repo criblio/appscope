@@ -1,0 +1,16 @@
+{
+  "name": "demo_cardinalityguard",
+  "version": "0.0.1",
+  "description": "Enforce maximum cardinality for a dimension",
+  "main": "index.js",
+  "dependencies": {},
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "mocha": "^6.2.0"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "author": "Clint Sharp",
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,91 @@
+<form hideFilters="true">
+  <label>Suppression</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="field1" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-5m@m</earliest>
+        <latest>@m</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+      <p style="text-align: right">
+        <span style="margin-top:15px; 
+        padding: 6px; 
+        border-radius; 2px;
+        background-color: #1890FF"><a href="" id="suppression" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Suppression</a></span> 
+        </p>
+      <p>Logs come in a variety of forms and shapes. One of our favorites, for it's necessity but also complete oververbosity, is the status log. In this kind of log, some software outputs on an interval the status of a piece of running software. "Still running!" "Still running!". This is useful if you want to go back in time and find the particular time where the state changed, but it's also incredibly verbose and really would be better written to only output when the state changes.</p>
+      <p>This is a great use case for suppression. With suppression, we can configure Cribl to only output N messages every X seconds that have the save signature, defined by a JavaScript expression. In this case, for every host and status, we configure out example log to only output one message every 60 seconds. This enables us to hugely reduce the amount of data being ingested while losing no functionality.</p>
+    </html>
+    </panel>
+    <panel>
+      <title>Original vs. Modified</title>
+      <single>
+        <search>
+          <query>(index=cribl sourcetype=nagios) OR (index=cribl-modified sourcetype=nagios)
+|  eval len=len(_raw)
+|  stats count(eval(searchmatch("index=cribl"))) as "Events IN" count(eval(searchmatch("index=cribl-modified"))) as "Events Out" sum(eval(if(searchmatch("index=cribl"), round(len/1024, 3), ''))) as "KB IN" sum(eval(if(searchmatch("index=cribl-modified"), round(len/1024, 3), ''))) as "KB OUT" | appendcols [search (index=cribl sourcetype=nagios) OR (index=cribl-modified sourcetype=nagios) | eval len=len(_raw) | stats count as "Events" sum(eval(round(len/1024, 3))) as KB by index | autoregress KB | autoregress Events | eval Savings=100*(KB_p1-KB)/(KB_p1) | search Savings=* | fields Savings | rename Savings as "Reduction %"]</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="height">239</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x006d9c","0x006d9c"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Suppressed Events</title>
+        <search>
+          <query>index=cribl-modified sourcetype=nagios | table _raw, suppressCount</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <single>
+        <title>Volume Reduction</title>
+        <search>
+          <query>(index=cribl sourcetype=nagios) OR (index=cribl-modified sourcetype=nagios) | eval len=len(_raw) | stats count as "Events" sum(eval(round(len/1024, 3))) as KB by index | autoregress KB | autoregress Events | eval Savings=100*(KB_p1-KB)/(KB_p1) | search Savings=* | fields Savings</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0.00</option>
+        <option name="rangeColors">["0x53a051","0xf1813f","0xdc4e41","0x3c444d","0x3c444d"]</option>
+        <option name="rangeValues">[100,200,300,400]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="unit">%</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+</form>

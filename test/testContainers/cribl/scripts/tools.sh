@@ -1,0 +1,1 @@
+apt-get update && apt-get install -y net-tools inetutils-ping lsof tcpdump netcat strace dnsutils

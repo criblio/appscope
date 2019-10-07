@@ -1,0 +1,76 @@
+asyncFuncTimeout: 1000
+output: default
+description: Aggregate Metrics from Statsd
+functions:
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Next eval drops out a number of dimensions which are uninteresting and
+        clutter up the UI of Grafana and Splunk.
+  - id: eval
+    filter: sourcetype=='graphite'
+    disabled: null
+    conf:
+      remove:
+        - com.*
+        - io.*
+        - org.*
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: All metrics from statsd and graphite come in with fields _metric,
+        _metric_type and _value. This can be used in aggregations if you want to
+        aggregate values, as seen below. Note Group By also has the fields
+        Splunk expects like index, host, source and sourcetype.
+  - id: aggregation
+    filter: sourcetype=='statsd_ext'
+    disabled: true
+    conf:
+      passthrough: false
+      sufficientStatsOnly: false
+      metricsMode: true
+      timeWindow: 10s
+      aggregations:
+        - count()
+        - sum(_value)
+        - avg(_value)
+        - max(_value)
+        - min(_value)
+        - perc(95, _value)
+        - stdev(_value)
+      groupbys:
+        - _metric
+        - host
+        - cpu
+        - fs
+        - mnt
+        - device
+        - interface
+        - source
+        - sourcetype
+        - index
+      cumulative: false
+      add:
+        - name: index
+          value: "index ? index : 'cribl-metrics'"
+    description: Aggregate Statsd Metrics
+  - id: eval
+    filter: "!index"
+    disabled: null
+    conf:
+      add:
+        - name: index
+          value: "'cribl-metrics'"
+  - id: demo_cardinalityGuard
+    filter: "true"
+    disabled: true
+    conf:
+      ignoreFields:
+        - _*
+      maxValues: 500
+      buckets: 10
+      bucketSeconds: 60
+      redactValue: REDACTED
+    description: Redact any field over 500 Values in 10 minutes

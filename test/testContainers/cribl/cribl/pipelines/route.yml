@@ -1,0 +1,172 @@
+id: default
+groups:
+  kWhP9A:
+    name: Elastic
+    description: Routes destined for ElasticSearch
+    index: 1
+  N8e7LH:
+    name: S3 BigJSON
+    description: S3 Events
+    index: 2
+routes:
+  - id: A1JddJ
+    name: statsd
+    final: true
+    disabled: false
+    pipeline: statsd
+    description: Aggregate Statsd Metrics
+    clones: []
+    filter: sourcetype=='statsd_ext' || sourcetype=='graphite' || sourcetype=='statsd'
+    output: statsd
+  - id: Qo3BYx
+    name: elastic
+    final: true
+    disabled: false
+    pipeline: passthru
+    description: ""
+    clones: []
+    filter: __inputId=='http:elastic:elastic' && sourcetype!='authfailed'
+    output: splunk-beats
+    groupId: kWhP9A
+  - id: semK5P
+    name: Elastic Unmodified BigJSON
+    final: false
+    disabled: false
+    pipeline: passthru
+    description: Unmodified JSON
+    clones:
+      - __index: bigjson
+    filter: index=='cribl' && sourcetype=='lambda'
+    output: elastic
+    groupId: kWhP9A
+  - id: Umz4dS
+    name: Elastic Trimmed BigJSON
+    final: false
+    disabled: false
+    pipeline: trim_json
+    description: Trimmed Elastic Output
+    clones:
+      - __index: bigjson-trimmed
+    filter: index=='cribl' && sourcetype=='lambda'
+    output: elastic
+    groupId: kWhP9A
+  - id: tTglKB
+    name: S3 Unmodified BigJSON
+    final: false
+    disabled: false
+    pipeline: passthru
+    description: Unmodified BigJSON to S3
+    clones:
+      - host: unmodified
+    filter: index=='cribl' && sourcetype=='lambda'
+    output: s3_bigjson
+    groupId: N8e7LH
+  - id: ylRtTp
+    name: S3 Trimmed BigJSON
+    final: false
+    disabled: false
+    pipeline: trim_json
+    description: Trimmed BigJSON to S3
+    clones:
+      - host: trimmed
+    filter: index=='cribl' && sourcetype=='lambda'
+    output: s3_bigjson
+    groupId: N8e7LH
+  - id: be12ct
+    name: KV to JSON
+    final: false
+    disabled: false
+    pipeline: kv2json
+    description: Convert KV Events to JSON
+    clones:
+      - index: cribl-modified
+        source: pretty_autokv
+    filter: index=='cribl' && sourcetype=='business_event'
+    output: kv2json
+  - id: KM9Pf6
+    name: Sensitive Data
+    final: false
+    disabled: false
+    pipeline: masking
+    description: Mask Sensitive Data
+    clones:
+      - index: cribl-modified
+        redacted: "true"
+    filter: index=='cribl' && sourcetype=='business_event'
+    output: default
+  - id: VAGP6z
+    name: Trim BigJSON
+    final: false
+    disabled: false
+    pipeline: trim_json
+    description: Trim Large JSON Events
+    clones:
+      - index: cribl-modified
+    filter: index=='cribl' && sourcetype=='lambda'
+    output: default
+  - id: py0d5r
+    name: Logs to Metrics
+    final: false
+    disabled: false
+    pipeline: logs_to_metrics
+    description: Convert Access Combined Logs to Splunk Metrics
+    clones:
+      - index: cribl-metrics
+    filter: index=='cribl' && sourcetype=='access_combined'
+    output: default
+  - id: 0nJxAA
+    name: Sample and Filter
+    final: false
+    disabled: false
+    pipeline: sample_and_filter
+    description: Clean up voluminous weblog data for our needs
+    clones:
+      - index: cribl-modified
+        source: smart_sample
+      - index: cribl-modified
+        source: filter
+    filter: index=='cribl' && sourcetype=='access_combined'
+    output: default
+  - id: ZLTc0g
+    name: Enrich
+    final: false
+    disabled: false
+    pipeline: enrich
+    description: Use lookups to add context to events
+    clones:
+      - index: cribl-modified
+        source: enrich
+      - index: cribl-modified
+        source: indextimefields
+    filter: index=='cribl' && sourcetype=='access_combined'
+    output: enrich
+  - id: mQEq5u
+    name: JWT Decode
+    final: false
+    disabled: false
+    pipeline: jwt_to_json
+    description: Send auth failures with JWT to decode JWT
+    clones:
+      - index: cribl-modified
+    filter: index=='cribl' && sourcetype=='authfailed'
+    output: default
+  - id: q5s3to
+    name: Suppression
+    final: false
+    disabled: false
+    pipeline: suppress
+    description: Suppress Duplicate Events
+    clones:
+      - index: cribl-modified
+    filter: index=='cribl' && sourcetype=='nagios'
+    output: default
+  - id: OsuFhD
+    name: Main Route
+    final: true
+    disabled: false
+    pipeline: main
+    description: Catchall for routing data through main pipeline
+    clones:
+      - {}
+    filter: "true"
+    output: default

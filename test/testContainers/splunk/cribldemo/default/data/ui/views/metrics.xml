@@ -1,0 +1,140 @@
+<form hideFilters="true">
+  <label>Log to Metrics</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" searchWhenChanged="true" token="global_time_tok">
+      <label>Time Range</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+      <change>
+        <eval token="now">now()</eval>
+        <eval token="relative_earliest">relative_time($now$, $earliest$)</eval>
+        <eval token="relative_latest">relative_time($now$, $latest$)</eval>
+        <set token="timeComp_0">-30m</set>
+        <eval token="earliest_0">if(isnum($earliest$), relative_time($earliest$, $timeComp_0$), relative_time($relative_earliest$, $timeComp_0$))</eval>
+        <eval token="latest_0">if(isnum($latest$), relative_time($latest$, $timeComp_0$), relative_time($relative_latest$, $timeComp_0$))</eval>
+      </change>
+    </input>
+    <input type="dropdown">
+      <label>Time Span</label>
+      <choice value="auto">auto</choice>
+      <choice value="5s">5s</choice>
+      <choice value="10s">10s</choice>
+      <choice value="30s">30s</choice>
+      <choice value="1m">1m</choice>
+      <choice value="5m">5m</choice>
+      <choice value="10m">10m</choice>
+      <choice value="30m">30m</choice>
+      <choice value="1h">1h</choice>
+      <default>auto</default>
+      <change>
+        <eval token="timechart_span">if($value$ == "auto", "", "span=".$value$)</eval>
+        <eval token="mstats_span">"span=".$value$</eval>
+      </change>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+        <p style="text-align: right">
+        <span style="margin-top:15px; 
+        padding: 6px; 
+        border-radius; 2px;
+        background-color: #1890FF"><a href="" id="logs_to_metrics" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Logs To Metrics</a></span> 
+        </p>
+        <p>
+          <b>Cribl allows for taking any incoming log sources and converting them to precise metrics.</b>In this example, we're looking at plain old Apache access logs and converting a few of the fields into metrics. Specifically, we're making these two fields into metric values: <code>timeTaken</code>, <code>bytes</code>, and attaching the following as dimensions: 
+          <code>serverIP</code>, <code>clientIP</code>, <code>httpBasicUser</code>, <code>method</code>, <code>uri</code>, <code>qs</code>, <code>httpVersion</code>, <code>status</code>, <code>referrer</code>, <code>userAgent</code>.</p>
+        <p>
+          <b>Metrics are much more compact than logs and searching and reporting on them is lightning fast.</b>To play around, head on over to the <a href="analysis_workspace">Analysis Workspace</a>. Alternatively, you can try to run a few searches manually. For example: 
+          <ul>
+            <li>
+              <code>| mstats max(_value) prestats=t WHERE metric_name="timetaken.avg" AND "index"="cribl-metrics" span=10s
+| timechart max(_value) as "Max"</code>
+            </li>
+            <li>
+              <code>| mstats p95(_value) prestats=t WHERE metric_name="timetaken.avg" AND "index"="cribl-metrics" span=10s
+| timechart p95(_value) as "p95"</code>
+            </li>
+          </ul>
+        </p>
+    </html>
+    </panel>
+    <panel>
+      <chart>
+        <title>http.bytes Over Time</title>
+        <search>
+          <query>| mstats avg(_value) as "Avg" WHERE metric_name="bytes.avg" AND "index"="cribl-metrics" $mstats_span$
+| append [
+    | mstats avg(_value) as "Avg (-30m)" WHERE metric_name="bytes.avg" AND "index"="cribl-metrics" earliest=$earliest_0$ latest=$latest_0$ $mstats_span$
+    | eval _time = round(relative_time(_time, "+30m"))
+]
+| timechart first("Avg") as "Avg", first("Avg (-30m)") as "Avg (-30m)" $timechart_span$</query>
+          <earliest>$global_time_tok.earliest$</earliest>
+          <latest>$global_time_tok.latest$</latest>
+        </search>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.includeZero">1</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.fieldColors">{"Avg":"#a65c7d","Avg (-30m)":"#C18EA5"}</option>
+        <option name="charting.fieldDashStyles">{"Avg (-30m)":"shortDot"}</option>
+        <option name="charting.gridLinesX.showMajorLines">1</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="displayview">analysis_workspace</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>http.timetaken by Action Over Time</title>
+        <search>
+          <query>| mstats p95(_value) prestats=true WHERE metric_name="timetaken.avg" AND "index"="cribl-metrics" $mstats_span$ BY "action" 
+| timechart p95(_value) as "p95" agg=max limit=5 useother=false $timechart_span$ BY "action"</query>
+          <earliest>$global_time_tok.earliest$</earliest>
+          <latest>$global_time_tok.latest$</latest>
+        </search>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.includeZero">1</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.fieldColors">{"addtocart":"#1e93c6","purchase":"#f2b827","remove":"#d6563c","changequantity":"#6a5c9e","view":"#31a35f"}</option>
+        <option name="charting.gridLinesX.showMajorLines">1</option>
+        <option name="charting.legend.mode">seriesCompare</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="displayview">analysis_workspace</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>http.timetaken by Category Over Time</title>
+        <search>
+          <query>| mstats max(_value) prestats=true WHERE metric_name="timetaken.avg" AND "index"="cribl-metrics" span=10s BY "category_id" 
+| timechart max(_value) as "Max" agg=max limit=5 useother=false span=10s BY "category_id"</query>
+          <earliest>$global_time_tok.earliest$</earliest>
+          <latest>$global_time_tok.latest$</latest>
+        </search>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.includeZero">1</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.fieldColors">{"DISPLAYPROTECT":"#1e93c6","HEADSETS":"#f2b827","BATTERIES":"#d6563c","BLUETOOTH":"#6a5c9e","MEMORYCARDS":"#31a35f"}</option>
+        <option name="charting.gridLinesX.showMajorLines">1</option>
+        <option name="charting.legend.mode">seriesCompare</option>
+        <option name="displayview">analysis_workspace</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+</form>

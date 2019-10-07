@@ -9,17 +9,17 @@ import datetime
 help_text = '''options:
 --help  display help text
 --config config file for tests
+--verbose verbose/debug output in console
 '''
 
 
 class Runner:
-    def __init__(self, home, include_tests, exclude_tests, lib_path):
+    def __init__(self, home, include_tests, exclude_tests, lib_path, verbose, log_path):
         self.__home = home
         self.__include_tests = include_tests
         self.__exclude_tests = exclude_tests
         self.__execution_id = "ltp:" + datetime.datetime.now().isoformat()
-        # TODO derive from config
-        self.__test_watcher = w.Watcher("/tmp/", self.__execution_id)
+        self.__test_watcher = w.Watcher(log_path, self.__execution_id, verbose)
         self.__lib_path = lib_path
 
     def run(self):
@@ -41,7 +41,6 @@ class Runner:
         if not os.path.isdir(test_path):
             return
 
-        print(test_path)
         for f in os.listdir(test_path):
             filename = test_path + '/' + f
             if os.path.isfile(filename) and os.access(filename, os.X_OK):
@@ -50,6 +49,7 @@ class Runner:
                 self.__execute_test(test_path, f, True)
 
     def __execute_test(self, test_path, test, wrapped):
+        print(test_path + test)
         start = self.__now_ms()
         env = dict(os.environ)
 
@@ -73,16 +73,20 @@ class Runner:
 
 def main(args):
     configs = []
-
+    verbose = False
+    log_path = None
     # parse args
     for i in range(len(args)):
         if args[i] == '--help':
             print(help_text)
 
+        if args[i] == '--verbose':
+            verbose = True
         if args[i] == '--config':
             path = args[i + 1]
             with open(path, "rb") as f:
                 config = json.loads(f.read().decode("utf8"))
+                log_path = config.get("log_path", "/tmp/")  # default path is "tmp" dir
                 configs = config["configs"]
 
     if len(configs) == 0:
@@ -106,7 +110,7 @@ def main(args):
                 sys.stderr.write("tests home is not valid")
                 return 1
 
-            if Runner(home, include_tests, exclude_tests, lib_path).run() == 1:
+            if Runner(home, include_tests, exclude_tests, lib_path, verbose, log_path).run() == 1:
                 test_results = 1
 
     return test_results

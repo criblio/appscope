@@ -1,3 +1,5 @@
 coverage/
 # JetBrains specific directory
 .idea
+.DS_Store
+*.pyc

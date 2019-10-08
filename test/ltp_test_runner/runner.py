@@ -45,8 +45,9 @@ class Runner:
         for f in os.listdir(test_path):
             filename = test_path + '/' + f
             if os.path.isfile(filename) and os.access(filename, os.X_OK):
-                self.__execute_test(test_path, f, False)
-                self.__execute_test(test_path, f, True)
+                if f not in self.__exclude_tests:
+                    self.__execute_test(test_path, f, False)
+                    self.__execute_test(test_path, f, True)
 
     def __execute_test(self, test_path, test, wrapped):
         print(tabulate(["Running " + test, "Scoped: " + str(wrapped), "Path: " + test_path], [25,17,0]))

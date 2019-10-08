@@ -99,8 +99,7 @@ enum control_type_t {
 
 enum metric_t {
     OPEN_PORTS,
-    TCP_CONNECTIONS,
-    ACTIVE_CONNECTIONS,
+    NET_CONNECTIONS,
     CONNECTION_DURATION,
     PROC_CPU,
     PROC_MEM,
@@ -128,7 +127,8 @@ enum metric_t {
     TOT_DNS,
     TOT_PORTS,
     TOT_TCP_CONN,
-    TOT_ACTIVE_CONN,
+    TOT_UDP_CONN,
+    TOT_OTHER_CONN,
     NET_ERR_CONN,
     NET_ERR_RX_TX,
     NET_ERR_DNS,
@@ -152,11 +152,9 @@ enum event_type_t {
 
 typedef struct metric_counters_t {
     int openPorts;
-    int openPortsTot;
-    int TCPConnections;
-    int TCPConnectionsTot;
-    int activeConnections;
-    int activeConnectionsTot;
+    int netConnectionsUdp;
+    int netConnectionsTcp;
+    int netConnectionsOther;
     int netrxBytes;
     int nettxBytes;
     int readBytes;
@@ -219,10 +217,7 @@ typedef struct net_info_t {
     int numRX;
     int txBytes;
     int rxBytes;
-    bool listen;
-    bool accept;
     bool dnsSend;
-    enum event_type_t action;
     uint64_t startTime;
     int numDuration;
     uint64_t totalDuration;
@@ -239,7 +234,6 @@ typedef struct {
 typedef struct fs_info_t {
     int fd;
     enum fs_type_t type;
-    enum event_type_t action;
     int numOpen;
     int numClose;
     int numSeek;

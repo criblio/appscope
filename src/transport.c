@@ -22,19 +22,21 @@ struct _transport_t
     int (*dup2)(int, int);
     int (*close)(int);
     int (*fcntl)(int, int, ...);
-    ssize_t (*write)(int, const void *, size_t);
+    size_t (*fwrite)(const void *, size_t, size_t, FILE *);
     int (*socket)(int, int, int);
     int (*connect)(int, const struct sockaddr *, socklen_t);
     int (*getaddrinfo)(const char *, const char *,
                        const struct addrinfo *,
                        struct addrinfo **);
+    int (*fclose)(FILE*);
+    FILE* (*fdopen)(int, const char *);
     union {
         struct {
             int sock;
         } udp;
         struct {
             char* path;
-            int fd;
+            FILE* stream;
         } file;
     };
 };
@@ -55,19 +57,21 @@ newTransport()
     if ((t->dup2 = dlsym(RTLD_NEXT, "dup2")) == NULL) goto out;
     if ((t->close = dlsym(RTLD_NEXT, "close")) == NULL) goto out;
     if ((t->fcntl = dlsym(RTLD_NEXT, "fcntl")) == NULL) goto out;
-    if ((t->write = dlsym(RTLD_NEXT, "write")) == NULL) goto out;
+    if ((t->fwrite = dlsym(RTLD_NEXT, "fwrite")) == NULL) goto out;
     if ((t->socket = dlsym(RTLD_NEXT, "socket")) == NULL) goto out;
     if ((t->connect = dlsym(RTLD_NEXT, "connect")) == NULL) goto out;
     if ((t->getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo")) == NULL) goto out;
+    if ((t->fclose = dlsym(RTLD_NEXT, "fclose")) == NULL) goto out;
+    if ((t->fdopen = dlsym(RTLD_NEXT, "fdopen")) == NULL) goto out;
     return t;
 
   out:
     DBG("send=%p open=%p dup2=%p close=%p "
-        "fcntl=%p write=%p socket=%p connect=%p "
-        "getaddrinfo=%p",
+        "fcntl=%p fwrite=%p socket=%p connect=%p "
+        "getaddrinfo=%p fclose=%p fdopen=%p",
         t->send, t->open, t->dup2, t->close,
-        t->fcntl, t->write, t->socket, t->connect,
-        t->getaddrinfo);
+        t->fcntl, t->fwrite, t->socket, t->connect,
+        t->getaddrinfo, t->fclose, t->fdopen);
     free(t);
     return NULL;
 }
@@ -178,23 +182,43 @@ transportCreateFile(const char* path)
         return t;
     }
 
-    t->file.fd = t->open(t->file.path, O_CREAT|O_RDWR|O_APPEND|O_CLOEXEC, 0666);
-    if (t->file.fd == -1) {
+    int fd;
+    fd = t->open(t->file.path, O_CREAT|O_RDWR|O_APPEND|O_CLOEXEC, 0666);
+    if (fd == -1) {
         DBG("%s", path);
         transportDestroy(&t);
         return t;
     }
 
     // Move this descriptor up out of the way
-    if ((t->file.fd = placeDescriptor(t->file.fd, t)) == -1) {
+    if ((fd = placeDescriptor(fd, t)) == -1) {
         transportDestroy(&t);
         return t;
     }
 
     // Needed because umask affects open permissions
-    if (fchmod(t->file.fd, 0666) == -1) {
-        DBG("%s", path);
+    if (fchmod(fd, 0666) == -1) {
+        DBG("%d %s", fd, path);
     }
+
+    // set close on exec
+    int flags = t->fcntl(fd, F_GETFD, 0);
+    if (t->fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1) {
+        DBG("%d %s", fd, path);
+    }
+
+    FILE* f;
+    if (!(f = t->fdopen(fd, "a"))) {
+        transportDestroy(&t);
+        return t;
+    }
+    t->file.stream = f;
+
+    // Line buffer the output by default
+    if (setvbuf(t->file.stream, NULL, _IOLBF, BUFSIZ)) {
+        DBG(NULL);
+    }
+
     return t;
 }
 
@@ -255,7 +279,7 @@ transportDestroy(transport_t** transport)
             break;
         case CFG_FILE:
             if (t->file.path) free(t->file.path);
-            if (t->file.fd != -1) t->close(t->file.fd);
+            if (t->file.stream) t->fclose(t->file.stream);
             break;
         case CFG_SYSLOG:
             break;
@@ -298,22 +322,16 @@ transportSend(transport_t* t, const char* msg)
             }
             break;
         case CFG_FILE:
-            if (!t->write) {
-                DBG(NULL);
-                break;
-            }
-
-            if (t->file.fd != -1) {
-                int bytes = t->write(t->file.fd, msg, strlen(msg));
-                if ((bytes < 0) && (errno == EBADF)) {
-                    DBG(NULL);
-                    return DEFAULT_BADFD;
-                } else if (bytes < 0) {
-                    DBG("%d %d", t->file.fd, bytes);
-                } else {
-                    if (fsync(t->file.fd) == -1) {
-                        DBG("%d", t->file.fd);
+            if (t->file.stream) {
+                size_t msg_size = strlen(msg);
+                int bytes = t->fwrite(msg, 1, msg_size, t->file.stream);
+                if (bytes != msg_size) {
+                    if (errno == EBADF) {
+                        DBG("%d %d", bytes, msg_size);
+                        return DEFAULT_BADFD;
                     }
+                    DBG("%d %d", bytes, msg_size);
+                    return -1;
                 }
             }
             break;
@@ -321,7 +339,6 @@ transportSend(transport_t* t, const char* msg)
         case CFG_SYSLOG:
         case CFG_SHM:
             return -1;
-            break;
         default:
             DBG("%d", t->type);
             return -1;

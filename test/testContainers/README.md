@@ -5,9 +5,11 @@ These represent containers used to test Cribl Scope.
 Containers:
 cribl
 The log stream product. Metric results are sent to log stream. One or more pipelines in log stream will maniplulate metrics and route them to splunk for evaluation.
+Access log stream at http://localhost:9000/
 
 splunk
 A splunk instance that receives test metric data from log stream. A splunk app is/can be used to evaluate metric and data results fromnm tests.
+Access splunk at http://localhost:8000/
 
 interposed function test
 This is a container used to create tests for interposed functions. It will start with tests from the Linux Test Program, LTP. Results are formatted in json and sent to log stream.

@@ -2,6 +2,7 @@ import json
 import collections
 import datetime
 import os
+from utils import tabulate
 
 
 class TestResult:
@@ -80,17 +81,22 @@ class Watcher:
         def _to_test_result(code):
             return ("fail", "pass")[code == 0]
 
+        cols_width = [20, 15, 15, 20, 20]
         self.__print("Test results:")
         self.__print("")
-        self.__print("Test\t\tRaw result\tWrapped result\tRaw duration\tWrapped duration")
+        self.__print(
+            tabulate(["Test", "Raw result", "Scoped result", "Raw duration (ms)", "Scoped duration (ms)"], cols_width))
         for k, v in self.__results.items():
-            self.__print("{0}\t\t{1}\t\t{2}\t\t{3}\t\t{4}".format(
-                k,
-                _to_test_result(v["raw"].return_code),
-                _to_test_result(v["scoped"].return_code),
-                v["raw"].duration,
-                v["scoped"].duration)
-            )
+            self.__print(tabulate(
+                [
+                    k,
+                    _to_test_result(v["raw"].return_code),
+                    _to_test_result(v["scoped"].return_code),
+                    v["raw"].duration,
+                    v["scoped"].duration
+                ],
+                cols_width
+            ))
 
     def __full_set_completed(self, raw_result, scoped_result):
         is_valid = self.__validate(raw_result, scoped_result)

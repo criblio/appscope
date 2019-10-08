@@ -1,1 +1,3 @@
 coverage/
+# JetBrains specific directory
+.idea

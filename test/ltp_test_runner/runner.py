@@ -5,6 +5,7 @@ import subprocess
 import time
 import watcher as w
 import datetime
+from utils import tabulate
 
 help_text = '''options:
 --help  display help text
@@ -48,7 +49,7 @@ class Runner:
                 self.__execute_test(test_path, f, True)
 
     def __execute_test(self, test_path, test, wrapped):
-        print("Running {0} test.\t\t Scoped: {1}.\t Path: {2}".format(test, wrapped, test_path))
+        print(tabulate(["Running " + test, "Scoped: " + str(wrapped), "Path: " + test_path], [25,17,0]))
         start = self.__now_ms()
         env = dict(os.environ)
 

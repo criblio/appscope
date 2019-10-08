@@ -1,0 +1,101 @@
+<form hideFilters="true">
+  <label>Field-Level Encryption</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="field1" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-5m@m</earliest>
+        <latest>@m</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+               <p style="text-align: right">
+        <span style="margin-top:15px; 
+        padding: 6px; 
+        border-radius; 2px;
+        background-color: #1890FF"><a href="" id="masking" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Masking</a></span> 
+        </p>
+      <p>Obfuscation (see <a href="pii">PII</a>) is a tried and true way of ensuring sensitive information isn't seen by someone downstream. But, what if some people need to see the data and other people do not? cribl provides the ability to encrypt and decrypt data based on role. Cribl allows for multiple levels and clearances, so that you can manage what level of sensitivity exists in your data. Lastly, this data can easily be at a <i>sub-field</i> level, meaning we can encrypt any part of a message including <code>_raw</code> and decrypt that on the fly.</p>
+      <p>In the below example, we've taken a sensitive ID, the ESN, and now we've encrypted it, and on the right hand side we have decrypted it. Feel free to play with this yourself by drilling into the searches, or running these searches:</p>
+      <ul>
+        <li>
+            <code>index="cribl-modified" sourcetype=business_event redacted::true | decrypt</code>
+          </li>
+        <li>
+            <code>index="cribl-modified" sourcetype=business_event redacted::true | stats count by esn | decrypt</code>
+          </li>
+      </ul>
+    </html>
+    </panel>
+    <panel>
+      <title>Original vs. Modified</title>
+      <single>
+        <search>
+          <query>(index=cribl sourcetype=business_event) OR (index=cribl-modified sourcetype=business_event redacted::true)
+|  eval len=len(_raw)
+|  stats count(eval(searchmatch("index=cribl"))) as "Events IN" count(eval(searchmatch("index=cribl-modified"))) as "Events Out" sum(eval(if(searchmatch("index=cribl"), round(len/1024, 3), ''))) as "KB IN" sum(eval(if(searchmatch("index=cribl-modified"), round(len/1024, 3), ''))) as "KB OUT"</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="height">130</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x006d9c","0x006d9c"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Encrypted Data: ESN Field</title>
+        <search>
+          <query>index="cribl-modified" sourcetype=business_event redacted::true | table userName accountNumber esn | dedup userName | sort userName</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <format type="color" field="ESN">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>Decrypted Data: ESN Field</title>
+        <search>
+          <query>index="cribl-modified" sourcetype=business_event redacted::true | table userName accountNumber esn | dedup userName | decrypt | sort userName</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <format type="color" field="ESN">
+          <colorPalette type="list">[#B6C75A]</colorPalette>
+          <scale type="threshold"></scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+</form>

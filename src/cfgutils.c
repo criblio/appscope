@@ -12,6 +12,8 @@
 #include "format.h"
 #include "scopetypes.h"
 
+regex_t* g_regex = NULL;
+
 char* 
 cfgPath(const char* cfgname)
 {
@@ -84,22 +86,30 @@ processCustomTag(config_t* cfg, const char* e, const char* value)
 static regex_t*
 envRegex()
 {
-    static regex_t* regex = NULL;
+    if (g_regex) return g_regex;
 
-    if (regex) return regex;
-
-    if (!(regex = calloc(1, sizeof(regex_t)))) {
+    if (!(g_regex = calloc(1, sizeof(regex_t)))) {
         DBG(NULL);
-        return regex;
+        return g_regex;
     }
 
-    if (regcomp(regex, "\\$[a-zA-Z0-9_]+", REG_EXTENDED)) {
+    if (regcomp(g_regex, "\\$[a-zA-Z0-9_]+", REG_EXTENDED)) {
         // regcomp failed.
         DBG(NULL);
-        free(regex);
-        regex = NULL;
+        free(g_regex);
+        g_regex = NULL;
     }
-    return regex;
+    return g_regex;
+}
+
+// For testing.  Never executed in the real deal.
+// Exists to make valgrind more readable when analyzing tests.
+void
+envRegexFree(void** state)
+{
+    if (!g_regex) return;
+    regfree(g_regex);
+    free(g_regex);
 }
 
 static char*

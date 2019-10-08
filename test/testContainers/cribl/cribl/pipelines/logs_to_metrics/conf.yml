@@ -1,0 +1,91 @@
+asyncFuncTimeout: 1000
+description: Converts Access Combined Logs to Splunk Metrics
+functions:
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: The first Parser parses Apache Common Log Format with our fields,
+        including timetaken (which is non-standard). The second parses K=V pairs
+        from the query string field.
+  - id: serde
+    filter: sourcetype=='access_combined'
+    disabled: false
+    conf:
+      mode: extract
+      type: clf
+      srcField: _raw
+      fields:
+        - clientip
+        - ident
+        - user
+        - timestamp
+        - request
+        - status
+        - bytes
+        - referer
+        - useragent
+        - timetaken
+    description: Parse Access Combined logs
+  - id: serde
+    filter: sourcetype=='access_combined'
+    disabled: false
+    conf:
+      mode: extract
+      type: kvp
+      srcField: request_uri_query
+    description: Parse Query String
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Numerify ensures number fields are represented as numbers.
+  - id: numerify
+    filter: sourcetype=='access_combined'
+    disabled: false
+    conf:
+      ignoreFields: []
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Aggregations does a number of calculations on bytes and timetaken and
+        outputs records every 10 seconds. Note, that in this example URI is very
+        high cardinality, and so Aggregating only results in a eventcount
+        reduction of around 20%. This is important to note when Aggregating, as
+        the cardinality of your group bys and the time window will greatly
+        affect the size of the dataset.
+  - id: aggregation
+    filter: sourcetype=='access_combined'
+    disabled: false
+    conf:
+      passthrough: false
+      sufficientStatsOnly: false
+      metricsMode: true
+      timeWindow: 10s
+      aggregations:
+        - count()
+        - avg(bytes)
+        - min(bytes)
+        - max(bytes)
+        - sum(bytes)
+        - perc(95, bytes)
+        - stdev(bytes)
+        - avg(timetaken)
+        - min(timetaken)
+        - max(timetaken)
+        - sum(timetaken)
+        - perc(95, timetaken)
+        - stdev(timetaken)
+      groupbys:
+        - request_uri_path
+        - status
+        - request_method
+        - index
+        - host
+        - source
+        - sourcetype
+        - action
+        - category_id
+      cumulative: false
+    description: Aggregate Web Access Logs

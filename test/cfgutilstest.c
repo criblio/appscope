@@ -270,19 +270,19 @@ cfgProcessEnvironmentOutVerbosity(void** state)
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutVerbosity(cfg), 3);
 
-    assert_int_equal(setenv("SCOPE_OUT_VERBOSITY", "12", 1), 0);
+    assert_int_equal(setenv("SCOPE_OUT_VERBOSITY", "9", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutVerbosity(cfg), 12);
+    assert_int_equal(cfgOutVerbosity(cfg), 9);
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv("SCOPE_OUT_VERBOSITY"), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutVerbosity(cfg), 12);
+    assert_int_equal(cfgOutVerbosity(cfg), 9);
 
     // unrecognised value should not affect cfg
     assert_int_equal(setenv("SCOPE_OUT_VERBOSITY", "notEvenANum", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutVerbosity(cfg), 12);
+    assert_int_equal(cfgOutVerbosity(cfg), 9);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -666,6 +666,11 @@ initOutReturnsPtr(void** state)
     cfgDestroy(&cfg);
 }
 
+// Defined in src/cfgutils.c
+// This is not a proper test, it just exists to make valgrind output
+// more readable when analyzing this test, by deallocating the compiled
+// regex in src/cfgutils.c.
+extern void envRegexFree(void** state);
 
 int
 main(int argc, char* argv[])
@@ -691,6 +696,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(initLogReturnsPtr),
         cmocka_unit_test(initOutReturnsPtr),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
+        cmocka_unit_test(envRegexFree),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

@@ -1,0 +1,11 @@
+asyncFuncTimeout: 1000
+output: default
+functions:
+  - id: eval
+    filter: "true"
+    disabled: null
+    conf:
+      remove:
+        - index
+        - source
+        - sourcetype

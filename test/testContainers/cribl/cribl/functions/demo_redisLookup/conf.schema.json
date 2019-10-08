@@ -1,0 +1,44 @@
+{
+    "title": "Redis Lookup",
+    "type": "object",
+    "required": ["host", "port", "fromField", "toField"],
+    "properties": {
+        "host": {
+            "title": "Redis Host",
+            "description": "Redis Host to connect to",
+            "type": "string"
+        },
+        "port": {
+            "title": "Redis Port",
+            "description": "Redis Port to connect to",
+            "type": "string",
+            "default": "6379"
+        },
+        "fromField": {
+            "title": "Field to lookup from",
+            "description": "Field in the data to lookup from",
+            "type": "string"
+        },
+        "toField": {
+            "title": "Field to store value in",
+            "description": "Field in the data to store our returned value in",
+            "type": "string"
+        },
+        "db": {
+            "title": "Redis Database",
+            "description": "Redis Database to use",
+            "type": "string"
+        },
+        "password": {
+            "title": "Redis Password",
+            "description": "Redis Password to authenticate with",
+            "type": "string"
+        },
+        "secure": {
+            "title": "Secure",
+            "description": "Use TLS in connection",
+            "type": "boolean",
+            "default": false
+        }
+    }
+}

@@ -1,0 +1,122 @@
+<form hideFilters="true">
+  <label>Index-Time Fields</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="field1" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-5m@m</earliest>
+        <latest>@m</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+        <p style="text-align: right">
+        <span style="margin-top:15px; 
+        padding: 6px; 
+        border-radius; 2px;
+        background-color: #1890FF"><a href="" id="enrich" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Enrich</a></span> 
+        </p>
+        <p>
+          <b>Cribl allows for enriching events with index-time fields.</b> In this example, we're looking at web access logs and adding these index-time fields: <code>geo</code>, <code>dc</code>, and <code>rack</code>. Imagine these could come
+          potentially from some CMDB or external store of configuration information. These are all based off of the first IP address in the web log. Index-time fields are not licensed and if you notice on the panel on the right the events and raw data volumes remain identical.
+        </p>
+        <p>
+          <b>Searching and reporting on index-time fields is lightning fast.</b> To search with index-time fields we need to use <code>field::value</code> syntax. Another benefit of them is that they're available via <code>|tstats</code>, as well. For example: 
+          <ul>
+            <li>
+              <code>index="cribl-modified" source="indextimefields" geo::us-east AND dc::dc-01</code>
+            </li>
+            <li>
+              <code>| tstats count where index="cribl-modified" source="indextimefields" geo=us-east AND dc=dc-01</code>
+            </li>
+          </ul>
+        </p>
+    </html>
+    </panel>
+    <panel>
+      <title>Original vs. Modified</title>
+      <single>
+        <search>
+          <query>(index="cribl" sourcetype="access_combined") OR (index="cribl-modified" source="indextimefields")
+|  eval len=len(_raw)
+|  stats count(eval(searchmatch("index=cribl"))) as "Events IN" count(eval(searchmatch("index=cribl-modified"))) as "Events Out" sum(eval(if(searchmatch("index=cribl"), round(len/1024, 3), ''))) as "KB IN" sum(eval(if(searchmatch("index=cribl-modified"), round(len/1024, 3), ''))) as "KB OUT"</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="height">130</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x006d9c","0x006d9c"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Original Data</title>
+        <search>
+          <query>index="cribl" sourcetype="access_combined"  | head 20 | table geo dc rack _raw</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="wrap">false</option>
+        <format type="color" field="SSN">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>Modified Data - Enriched with index-time fields; geo, dc, rack</title>
+        <search>
+          <query>index="cribl-modified" source="indextimefields" | head 20 | table geo dc rack _raw</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="wrap">false</option>
+        <format type="color" field="SSN">
+          <colorPalette type="list">[#B6C75A]</colorPalette>
+          <scale type="threshold"></scale>
+        </format>
+        <format type="color" field="geo">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="color" field="dc">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="color" field="rack">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+</form>

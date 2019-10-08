@@ -1,0 +1,105 @@
+<form hideFilters="true">
+  <label>Trim</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="field1" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-5m@m</earliest>
+        <latest>@m</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+      <p style="text-align: right">
+        <span style="margin-top:15px; 
+        padding: 6px; 
+        border-radius; 2px;
+        background-color: #1890FF"><a href="" id="trim_json" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Trim JSON</a></span> 
+        </p>
+      <p>One of the most frequent problems we've experienced with modern, structured, logging is over verbosity. From the producer's perspective, it's both easier and better to produce large structured events because they have no idea what may be needed in the future. From the consumer's perspective, this ends up in events which contain duplicative information or information which is simply not needed. Here's an example event taken from a real world log we have from a Lambda function we run along side a trimmed down log. You can see we remove a ton of duplicative information, such as the headers which are actually logged twice, along with field set to null and false because we can easily use something like <code>fillnull</code> to fill in default values. Using this mechanism, we easily trim 50% of data we don't care about.</p>
+    </html>
+    </panel>
+    <panel>
+      <title>Original vs. Modified</title>
+      <single>
+        <search>
+          <query>(index=cribl OR index=cribl-modified) sourcetype=lambda
+|  eval len=len(_raw)
+|  stats count(eval(searchmatch("index=cribl"))) as "Events IN" count(eval(searchmatch("index=cribl-modified"))) as "Events Out" sum(eval(if(searchmatch("index=cribl"), round(len/1024, 3), ''))) as "KB IN" sum(eval(if(searchmatch("index=cribl-modified"), round(len/1024, 3), ''))) as "KB OUT" | appendcols [search (index=cribl sourcetype=lambda) OR (index=cribl-modified sourcetype=lambda) | eval len=len(_raw) | stats count as "Events" sum(eval(round(len/1024, 3))) as KB by index | autoregress KB | autoregress Events | eval Savings=100*(KB_p1-KB)/(KB_p1) | search Savings=* | fields Savings | rename Savings as "Reduction %"]</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="height">239</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x006d9c","0x006d9c"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <event>
+        <search>
+            <query>index=cribl sourcetype=lambda | head 1</query>
+            <earliest>$field1.earliest$</earliest>
+            <latest>$field1.latest$</latest>
+            <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="list.drilldown">none</option>
+        <option name="raw.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </event>
+    </panel>
+    <panel>
+      <event>
+        <search>
+            <query>index=cribl-modified sourcetype=lambda | head 1</query>
+            <earliest>$field1.earliest$</earliest>
+            <latest>$field1.latest$</latest>
+            <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="list.drilldown">none</option>
+        <option name="raw.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </event>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <single>
+        <title>Volume Reduction</title>
+        <search>
+          <query>(index=cribl OR index=cribl-modified) sourcetype=lambda| eval len=len(_raw) | stats count as "Events" sum(eval(round(len/1024, 3))) as KB by index | autoregress KB | autoregress Events | eval Savings=100*(KB_p1-KB)/(KB_p1) | search Savings=* | fields Savings</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0.00</option>
+        <option name="rangeColors">["0x53a051","0xf1813f","0xdc4e41","0x3c444d","0x3c444d"]</option>
+        <option name="rangeValues">[100,200,300,400]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="unit">%</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+</form>

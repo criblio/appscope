@@ -1,0 +1,74 @@
+<dashboard script="cribladdress.js">
+  <label>Start</label>
+  <row>
+    <panel>
+      <html>
+        <!--<h1>Typical Deployment</h1> -->
+        <img src="/static/app/cribl/images/cribl-logo.png"/>
+        <h1>Welcome To Cribl Beta!</h1>
+        <hr/>
+        <div>
+          <a href="https://cribl.io">Cribl</a> helps you process machine data - logs, instrumentation data, application data, metrics, etc. - in real-time and deliver them to your analysis platform of choice. 
+          It helps you enrich your logs with information from other systems, redact sensitive information, encrypt at field level, sample, and filter unneeded junk. 
+        </div>
+        <hr/>
+        <h2><b>Contact us:</b></h2>
+        <ul>
+          <li>Main Site: <a href="https://cribl.io">cribl.io</a></li>
+          <li>Cribl Blog: <a href="https://blog.cribl.io">Cribl Blogs</a></li>
+          <li>Cribl Slack Community: <a href="https://cribl-community.slack.com/">#cribl</a> (<a href="https://cribl.io/community">signup</a>)</li>
+          <li>Cribl Docs: <a href="https://docs.cribl.io">Documentation</a></li>
+          <li>Twitter: <a href="https://twitter.com/cribl_io">@cribl_io</a></li> 
+        </ul>
+      </html>
+    </panel>
+    <panel>
+      <html>
+        <h1>How Does Cribl Work?</h1>
+         <hr/>
+        <p>In a Splunk environment, <a href="https://cribl.io">Cribl</a> is deployed as a Splunk app. Depending on your architecture, 
+        it can reside either on a <b>heavy forwarder (HF)</b> or on an <b>indexer (IDX)</b>. It will receive events from the local Splunk, process it and then send it back to its indexing queue.</p>
+        <h3>Deployment and Configuration </h3>
+        <ul>
+          <li><b>Single Server:</b> Install the app on that instance. </li>
+          <li><b>Distributed Environment:</b> Install the app on a HF.</li>
+        </ul>
+        <p>Configuration is done via <code>_INDEX_AND_FORWARD_ROUTING</code> settings to achieve the necessary data routing. By default all data except internal indexes are routed out to Cribl and back in to Splunk.</p>
+
+  <h1 style="margin-top:25px;">Data Flow Architecture</h1>
+         <hr/>
+         <img src="/static/app/cribl/images/cribl-basic-model.png"/>
+          <ul style="margin-top:10px;">
+          <li><b><a href="https://docs.cribl.io/docs/routes">Routes</a></b>: A route finds the right pipeline to send events to.</li>
+          <li><b><a href="https://docs.cribl.io/docs/pipelines">Pipelines</a></b>: A pipeline is a series of functions executed in order.</li>
+          <li><b><a href="https://docs.cribl.io/docs/functions">Functions</a></b>: A function is code that processes an event.</li>
+        </ul>
+      </html>
+    </panel>
+    <panel>
+      <html>
+        <h1>What's In The Demo?</h1>
+        <hr/>
+        <p>This instance generates sample live data which is passed thru and transformed by <a href="https://cribl.io">Cribl</a> in real-time. There is a number of dashboards for each use-case,
+        including <a href="pii">PII Obfuscation</a>, <a href="smart_sample">Smart Sampling</a>, <a href="indextimefields">Index-time Fields</a> and <a href="lookup">Index-time Lookups</a>.
+        </p>
+        <p>The <a href="overview">Overview</a> page lists all the dashboards and their respective descriptions.</p>
+        <hr/>
+        <p style="text-align: center">
+        <span style="margin-top:15px; 
+        padding: 6px; 
+        border-radius; 2px;
+        background-color: #1890FF"><a href="" id="cribluiaddress" target="_blank" style="color: #fff; text-decoration: none">Go To Cribl Management UI</a></span> 
+        <p style="text-align: center">(same credentials as here)</p>
+        </p>
+        <hr/>
+        <p style="text-align: center">Walkthrough of processing data in real-time with <a href="https://cribl.io">Cribl</a>.</p>
+<div style="position:relative;padding-top:56.25%;">
+  <iframe src="https://player.vimeo.com/video/292388042?portrait=false&amp;byline=false&amp;title=false" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" webkitallowfullscreen="true" mozallowfullscreen="true" allowfullscreen="true"/>
+</div>
+
+
+      </html>
+    </panel>
+  </row>
+</dashboard>

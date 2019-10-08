@@ -1,0 +1,6 @@
+{
+    "ignoreFields": {
+        "ui:field": "Tags",
+        "ui:placeholder": "Enter field names"
+    }
+}

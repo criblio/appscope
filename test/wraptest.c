@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +24,7 @@ extern int osInitTSC(struct rtconfig_t *);
 // A port that is not likely to be used
 #define PORT1 65430
 #define PORT2 65431
-#define LIKELY_FILE_SIZE 12000
+#define LIKELY_FILE_SIZE 100000
 #define NET_DURATION 2000
 #define FS_DURATION 100
 
@@ -50,7 +51,7 @@ testFSDuration(void** state)
     char* cpath = cfgPath(CFG_FILE_NAME);
     config_t* cfg = cfgRead(cpath);
     const char *path = cfgTransportPath(cfg, CFG_OUT);
-    assert_int_equal(cfgOutVerbosity(cfg), CFG_NET_FS_EVENTS_VERBOSITY);
+    assert_int_equal(cfgOutVerbosity(cfg), CFG_MAX_VERBOSITY);
    
     // Start the duration timer with a read
     fd = open("./scope.sh", O_RDONLY);
@@ -73,7 +74,7 @@ testFSDuration(void** state)
     rc = fclose(fs);
     assert_return_code(rc, errno);
 
-    char *start = strstr(buf, "duration");
+    char *start = strstr(buf, "fs.duration");
     log = strtok_r(start, delim, &last);
     assert_non_null(log);
     log = strtok_r(NULL, delim, &last);
@@ -81,6 +82,9 @@ testFSDuration(void** state)
     int duration = strtol(log, NULL, 0);
     if ((duration < 1) || (duration > FS_DURATION))
         fail_msg("Duration %d is outside of allowed bounds (1, 100)", duration);
+
+    free(cpath);
+    cfgDestroy(&cfg);
 }
 
 /*
@@ -106,7 +110,7 @@ testConnDuration(void** state)
     char* cpath = cfgPath(CFG_FILE_NAME);
     config_t* cfg = cfgRead(cpath);
     const char *path = cfgTransportPath(cfg, CFG_OUT);
-    assert_int_equal(cfgOutVerbosity(cfg), CFG_NET_FS_EVENTS_VERBOSITY);
+    assert_int_equal(cfgOutVerbosity(cfg), CFG_MAX_VERBOSITY);
 
     saddr.sin_family = AF_INET;
     saddr.sin_port = htons(PORT1);
@@ -162,6 +166,7 @@ testConnDuration(void** state)
     assert_return_code(rc, errno);
 
     char *start = strstr(buf, "conn_duration");
+    assert_non_null(start);
 
     log = strtok_r(start, delim, &last);
     assert_non_null(log);
@@ -169,13 +174,16 @@ testConnDuration(void** state)
     assert_non_null(log);
     int duration = strtol(log, NULL, 0);
     if ((duration < 1000) || (duration > NET_DURATION))
-        fail_msg("Duration %d is outside of allowed bounds (1000, 1300)", duration);
+        fail_msg("Duration %d is outside of allowed bounds (1000, 2000)", duration);
 
     free(buf);
 
     // Delete these after tests that use the metrics and log files are done
     assert_return_code(unlink(path), errno);
     assert_return_code(unlink(cfgTransportPath(cfg, CFG_LOG)), errno);
+
+    free(cpath);
+    cfgDestroy(&cfg);
 }
 
 static void
@@ -203,7 +211,7 @@ testTSCValue(void** state)
     now = getTime();
     elapsed = getDuration(now);
     if ((elapsed < 20) || (elapsed > 1000))
-        fail_msg("Elapsed %" PRIu64 " is outside of allowed bounds (20, 350)", elapsed);
+        fail_msg("Elapsed %" PRIu64 " is outside of allowed bounds (20, 1000)", elapsed);
 }
 
 /*
@@ -242,6 +250,13 @@ testSyscallDbg(void** state)
 
 */
 
+// Defined in src/cfgutils.c
+// This is not a proper test, it just exists to make valgrind output
+// more readable when analyzing this test, by deallocating the compiled
+// regex in src/cfgutils.c.
+extern void envRegexFree(void** state);
+
+
 int
 main(int argc, char* argv[])
 {
@@ -253,6 +268,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(testTSCRollover),
         cmocka_unit_test(testTSCValue),
         //cmocka_unit_test(testSyscallDbg),
+        cmocka_unit_test(envRegexFree),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

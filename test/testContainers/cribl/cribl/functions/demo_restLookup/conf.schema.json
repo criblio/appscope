@@ -1,0 +1,52 @@
+{
+    "title": "REST Lookup",
+    "type": "object",
+    "required": [
+        "urlExpression",
+        "eventField"
+    ],
+    "properties": {
+        "urlExpression": {
+            "title": "URL Expression",
+            "description": "URL Expression to GET",
+            "type": "string",
+            "jsExpression": true
+        },
+        "eventField": {
+            "title": "Event Field",
+            "description": "Field name to add to event",
+            "type": "string"
+        },
+        "flatten": {
+            "title": "Flatten",
+            "description": "Flatten instead of creating an object",
+            "type": "boolean",
+            "default": false
+        },
+        "headers": {
+            "title": "HTTP Headers",
+            "description": "HTTP Headers to send to lookup",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "title": "HTTP Header",
+                "properties": {
+                    "name": {
+                        "title": "Header Name",
+                        "type": "string"
+                    },
+                    "value": {
+                        "title": "Header Value",
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "retryOnError": {
+            "title": "Retry On Error",
+            "description": "Retry (infinitely) and backpressure until success",
+            "type": "boolean",
+            "default": false
+        }
+    }
+}

@@ -1,0 +1,29 @@
+asyncFuncTimeout: 1000
+output: default
+description: Suppress Duplicate Events
+functions:
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Only emit one message per host and state every 60 seconds
+  - id: regex_extract
+    filter: sourcetype=='nagios'
+    disabled: null
+    conf:
+      regex: /(?<__host>\S+) is (?<__state>\w+)$/
+      source: _raw
+      iterations: 100
+    description: "Extract Nagios "
+  - id: suppress
+    filter: sourcetype=='nagios' && __host && __state
+    disabled: null
+    conf:
+      keyExpr: "`${__host}-${__state}`"
+      allow: 1
+      suppressPeriodSec: 60
+      dropEventsMode: true
+      maxCacheSize: 50000
+      cacheIdleTimeoutPeriods: 2
+      numEventsIdleTimeoutTrigger: 10000
+    description: Suppress duplicate state messages

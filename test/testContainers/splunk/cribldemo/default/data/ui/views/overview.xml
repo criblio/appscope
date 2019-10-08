@@ -1,0 +1,106 @@
+<dashboard>
+  <label>Overview</label>
+  <row>
+    <!--<panel>-->
+    <!--  <html>-->
+        <!--<h1>Typical Deployment</h1> -->
+    <!--    <img src="/static/app/cribl/images/cribl.png"/>-->
+    <!--  </html>-->
+    <!--</panel>-->
+    <panel>
+      <html>
+        <h1><a href="pii">PII Obfuscation</a></h1>
+        <table>
+        <tr>
+          <td><p><img style="opacity: 0.4" height="60" width="60" src="/static/app/cribl/images/pii-96.png"/></p></td>
+          <td><p>Automatically obfuscate sensitive content using common,</p><p> out of the box Personally Identifiable Information categories.</p></td>
+        </tr>
+        </table>
+        <hr/>
+        <h1><a href="hash">Field-Level Hashing</a></h1>
+        <table>
+        <tr>
+          <td><p><img style="opacity: 0.4" height="60" width="60" src="/static/app/cribl/images/hash-96.png"/></p></td>
+          <td><p>Hash parts of, or entire events with any of the available hash functions.</p><p>Overwrite or append hash as necessary.</p></td>
+        </tr>
+        </table>
+        <hr/>
+        <h1><a href="pii">Replace and Mask</a></h1>
+        <table>
+        <tr>
+          <td><p><img style="opacity: 0.4" height="60" width="60" src="/static/app/cribl/images/mask-96.png"/></p></td>
+          <td><p>Find and replace content based on known patterns.</p><p>Manually mask content based that is deemed sensitive.</p></td>
+        </tr>
+        </table>
+        <hr/>
+        <h1><a href="indextimefields">Index-Time Fields</a></h1>
+        <table>
+        <tr>
+          <td><p><img style="opacity: 0.4" height="60" width="60" src="/static/app/cribl/images/index-96.png"/></p></td>
+          <td><p>Extract index-time fields based on event pattern matching.</p><p>Or apply significantly more complex evaluations.</p></td>
+        </tr>
+        </table>
+         <hr/>
+        <h1><a href="clone">Data Cloning</a></h1>
+        <table>
+        <tr>
+          <td><p><img style="opacity: 0.4" height="60" width="60" src="/static/app/cribl/images/clone-96.png"/></p></td>
+          <td><p>Easily clone data based on event pattern matching.</p><p>Or apply more complex evaluations.</p></td>
+        </tr>
+        </table>
+        <hr/>
+      </html>
+    </panel>
+    <panel>
+      <html>
+        <h1><a href="encrypt">Field-Level Encryption</a></h1>
+        <table>
+        <tr>
+          <td><p><img style="opacity: 0.4" height="60" width="60" src="/static/app/cribl/images/encrypt-96.png"/></p></td>
+          <td><p>Encrypt content using any of the out of the box algorithms.</p><p>Role-base decrypt on <b>search or report</b>.</p></td>
+        </tr>
+        </table>
+        <hr/>
+        <h1><a href="filter">Event Filtering</a></h1>
+         <table>
+        <tr>
+          <td><p><img style="opacity: 0.4" height="60" width="60" src="/static/app/cribl/images/filter-96.png"/></p></td>
+          <td><p>Drop parts of, or entire events based on event pattern matching.</p><p>Or bases selection on more complex evaluations.</p></td>
+        </tr>
+        </table>
+        <hr/>
+        <h1><a href="lookup">Index-Time Lookups/Enrichment</a></h1>
+        <table>
+        <tr>
+          <td><p><img style="opacity: 0.4" height="60" width="60" src="/static/app/cribl/images/enrich-96.png"/></p></td>
+          <td><p>Enrich events with static or dynamic lookups.</p><p>E.g., CSV files, embedded key-value store, GeoIP, DNS etc. <b>at index-time</b>.</p></td>
+        </tr>
+        </table>
+        <hr/>
+        <h1><a href="prettify">Reformat and Prettify</a></h1>
+        <table>
+        <tr>
+          <td><p><img style="opacity: 0.4" height="60" width="60" src="/static/app/cribl/images/reformat-96.png"/></p></td>
+          <td><p>Change legacy, unwieldy events into friendlier KV pair or JSON format.</p><p> Add, drop JSON fields.</p></td>
+        </tr>
+        </table>
+        <hr/>
+        <!--<h1>Binary Data (Coming Soon)</h1>-->
+        <!--<table>-->
+        <!--<tr>-->
+        <!--  <td><p><img style="opacity: 0.4" height="60" width="60" src="/static/app/cribl/images/binary-96.png"/></p></td>-->
+        <!--  <td><p>Accept binary inputs (e.g., base64, other encodings) and/or send out to other new or legacy systems.</p></td>-->
+        <!--</tr>-->
+        <!--</table>-->
+        <h1><a href="smart_sample">Smart Sampling</a></h1>
+        <table>
+        <tr>
+          <td><p><img style="opacity: 0.4" height="60" width="60" src="/static/app/cribl/images/binary-96.png"/></p></td>
+          <td><p>Sample noisy, high-volume low-value data smartly.</p><p> Your aggregate analysis remains statistically significant.</p></td>
+        </tr>
+        </table>
+        <hr/>
+      </html>
+    </panel>
+  </row>
+</dashboard>

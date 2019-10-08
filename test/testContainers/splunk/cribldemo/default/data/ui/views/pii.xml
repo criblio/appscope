@@ -1,0 +1,128 @@
+<form hideFilters="true">
+  <label>PII Obfuscation</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="field1" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-5m@m</earliest>
+        <latest>@m</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+        <p style="text-align: right">
+        <span style="margin-top:15px; 
+        padding: 6px; 
+        border-radius; 2px;
+        background-color: #1890FF"><a href="" id="masking" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Masking</a></span> 
+        </p>
+        <p>
+        Cribl can easily help us obfuscate sensitive information in our logs. First, lets look at an example where we have a social security number. Social Security numbers are hard because, intentionally, there is not an easy way to validate whether a given number is a social security number. It's just a string of 9 digits. For that reason, we need to configure cribl to look for something more than just a text string. In this case, we configured Cribl to look for a regex of <code>social=[0-9]{3}-?[0-9]{2}-?[0-9]{4}</code>. This is possible in Splunk today by modifying props and transforms, and is relatively simple and straightforward.
+        </p>
+        <p>Lets look at examples before and after redaction.</p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Original</title>
+        <search>
+          <query>index=cribl sourcetype=business_event "social" | head 5 | rex "(?&lt;social&gt;social=\d+)" | table social</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <format type="color" field="social">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>Modified</title>
+        <search>
+          <query>index=cribl-modified sourcetype=business_event redacted::true "social" | head 5  | rex "(?&lt;social&gt;social=\w+)" | table social</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <format type="color" field="social">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Smart (Programmatic) Redaction</title>
+      <html>
+        <p>
+          Our next example redacts credit card information in log files. In this case, we're using a very simple regex <code>[0-9]{14,16}</code> to look for 14, 15 or 16 digit numbers. We have two numbers in our data which match that profile, <b>orderNumber</b> and <b>cardNumber.</b> If we just use simple redaction like Splunk offers with only regular expressions, we'll end up with data that obfuscates both <b>accidentally</b>. 
+        </p>
+        <p>
+          With Cribl we have a <b>fully programmable enviroment.</b> Credit Cards can be <b>validated</b> through a simple algorithm called "<a href="https://en.wikipedia.org/wiki/Luhn_algorithm">Luhn's algorithm</a>". In this example, we used the same regex but we validate that the number matched matches Luhn's algorithm as well, so we see <b>orderNumber</b> is unobfuscated while <b>cardNumber</b> is obfuscated.
+        </p>
+        <p>
+          This is very important. This allows us to write obfuscation functions which are more generic and apply across a lot of different data sources without having to qualify them with a specific field name or something else very specific the log entry we find them in. <b>With programmatic validation, we are no longer limited to simple regex and its limitations, allowing us to more easily share knowledge about obfuscation and redaction of known PII.</b> We could go so far as to write heuristics which attempt to validate names or physical street addresses to try in advance to obfuscate PII that accidentally leaks into log data.
+        </p>
+        <p>
+          This example does also shows one <b>advantage of programmatic redaction.</b> Unlike redaction by simply X'ing out the data, we are using an <b>md5 hash</b> to unique represent the input value. You can validate by drilling into the dashboard panel below that those credit card numbers are represented multiple times in the source data. Order numbers as input are unique, and you should not see a duplicate order number.
+        </p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Before</title>
+        <search>
+          <query>index=cribl sourcetype=business_event orderNumber cardNumber | head 5 | rex "(?&lt;orderNumber&gt;orderNumber=\d+)" | rex "(?&lt;cardNumber&gt;cardNumber=\d+)" | table orderNumber, cardNumber</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <format type="color" field="orderNumber">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>After</title>
+        <search>
+          <query>index=cribl-modified sourcetype=business_event redacted::true orderNumber cardNumber  | head 5 | rex "(?&lt;orderNumber&gt;orderNumber=\d+)" | rex "(?&lt;cardNumber&gt;cardNumber=\w+)" | table orderNumber, cardNumber</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <format type="color" field="orderNumber">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+</form>

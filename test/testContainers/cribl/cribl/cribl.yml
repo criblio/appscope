@@ -1,0 +1,16 @@
+api:
+  host: 0.0.0.0
+  port: 9000
+  disabled: false
+  ssl:
+    disabled: true
+system:
+  intercom: false
+  upgrade: api
+  restart: api
+  installType: standalone
+workers:
+  count: 3
+  memory: 2048
+distributed:
+  mode: standalone

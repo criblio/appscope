@@ -1,0 +1,27 @@
+asyncFuncTimeout: 1000
+output: default
+description: Convert statsd metrics to logs for Splunk
+functions:
+  - id: clone
+    filter: "true"
+    disabled: false
+    conf:
+      clones:
+        - __cloned: "true"
+    description: Clone matched metrics with new metadata
+  - id: eval
+    filter: __cloned
+    disabled: null
+    conf:
+      add:
+        - name: _raw
+          value: __e.asJSON()
+        - name: index
+          value: "'cribl-modified'"
+        - name: source
+          value: "'scope'"
+        - name: sourcetype
+          value: "'statsd_json'"
+      remove:
+        - __criblMetrics
+    description: Add Splunk Metadata

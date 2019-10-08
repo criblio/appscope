@@ -1,0 +1,35 @@
+<nav search_view="search">
+  <view name="start" default='true' />
+  <view name="overview"/>
+<!--  <view name="route"/> -->
+  
+  <collection label="Context">
+  	<view name="lookup" />
+    <view name="indextimefields" />
+  </collection>
+  
+  <collection label="Safety">
+  	<view name="pii" />
+  	<view name="encrypt" />
+    <view name="hash" />
+  </collection>
+  
+  <collection label="Optimization">
+    <view name="metrics" />
+    <view name="smart_sample" />
+    <view name="suppress" />
+    <view name="trim" />
+    <view name="prettify" />
+    <view name="filter" />
+  </collection>
+  
+  <collection label="Search">
+  	<view name="search" />
+    <view name="troubleshooting" label="Troubleshooting" />
+  </collection>
+  <collection label="AppScope Monitoring">
+   <view name="s_processes" />
+   <!-- <view name="s_network" /> -->
+   <view name="s_file_system" />
+  </collection>
+</nav>

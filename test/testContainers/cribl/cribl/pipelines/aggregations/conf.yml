@@ -1,0 +1,57 @@
+asyncFuncTimeout: 1000
+output: default
+description: Convert Weblogs to Aggregated Metrics
+functions:
+  - id: serde
+    filter: "true"
+    disabled: null
+    conf:
+      mode: extract
+      type: clf
+      srcField: _raw
+      fields:
+        - clientip
+        - ident
+        - user
+        - timestamp
+        - request
+        - status
+        - bytes
+        - referer
+        - useragent
+        - timetaken
+  - id: eval
+    filter: "true"
+    disabled: true
+    conf:
+      add:
+        - name: bytes
+          value: __parsed.bytes
+        - name: timetaken
+          value: __parsed.timetaken
+  - id: aggregation
+    filter: "true"
+    disabled: false
+    conf:
+      passthrough: false
+      sufficientStatsOnly: false
+      metricsMode: true
+      timeWindow: 10s
+      aggregations:
+        - avg(bytes).as('bytes.avg')
+        - perc(95, bytes).as('bytes.p95')
+        - min(bytes).as('bytes.min')
+        - max(bytes).as('bytes.max')
+        - stdev(bytes).as('bytes.stdev')
+        - sum(bytes).as('bytes.sum')
+        - avg(timetaken).as('timetaken.avg')
+        - perc(95, bytes).as('timetaken.p95')
+        - min(timetaken).as('timetaken.min')
+        - max(timetaken).as('timetaken.max')
+        - stdev(timetaken).as('timetaken.stdev')
+        - sum(timetaken).as('timetaken.sum')
+      splitbys:
+        - status
+        - request_uri_path
+      windowTypeSpecific:
+        cumulative: false

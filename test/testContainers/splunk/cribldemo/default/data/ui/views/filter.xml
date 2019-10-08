@@ -1,0 +1,124 @@
+<form hideFilters="true">
+  <label>Event Filtering</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="field1" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-5m@m</earliest>
+        <latest>@m</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+      <p style="text-align: right">
+        <span style="margin-top:15px; 
+        padding: 6px; 
+        border-radius; 2px;
+        background-color: #1890FF"><a href="" id="sample_and_filter" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Sample and Filter</a></span> 
+        </p>
+      <p>As receivers of log data, we often have little control over what the developers of the originating system decided to log. In many instances, we are interested in one particular message or a subset of messages but we are deluged with superflous data. Given the tooling available today, it is possible in Splunk to Null Queue certain messages and not others, but requires digging into props.conf and transforms.conf with some relatively esoteric syntax. Cribl makes it easy to filter and groom your data to just the messages you want to see through a rich interactive experience.</p>
+      <p>In this example, we're using our web access log data source. In this data stream, we have a key value pair called action, and it contains all kinds of user related actions that occur on a fictional web shopping cart. In our case, we aren't interested in all user actions, but only in purchases. We use cribl to filter to only purchase messages, and you can see what a dramatic difference it makes in terms of data volume for this particular source.</p>
+    </html>
+    </panel>
+    <panel>
+      <title>Original vs. Modified</title>
+      <single>
+        <search>
+          <query>(index=cribl sourcetype=access_combined) OR (index=cribl-modified source=filter sourcetype=access_combined)
+|  eval len=len(_raw)
+|  stats count(eval(searchmatch("index=cribl"))) as "Events IN" count(eval(searchmatch("index=cribl-modified"))) as "Events Out" sum(eval(if(searchmatch("index=cribl"), round(len/1024, 3), ''))) as "KB IN" sum(eval(if(searchmatch("index=cribl-modified"), round(len/1024, 3), ''))) as "KB OUT" | appendcols [search (index=cribl sourcetype=access_combined) OR (index=cribl-modified source=filter sourcetype=access_combined) | eval len=len(_raw) | stats count as "Events" sum(eval(round(len/1024, 3))) as KB by index | autoregress KB | autoregress Events | eval Savings=100*(KB_p1-KB)/(KB_p1) | search Savings=* | fields Savings | rename Savings as "Reduction %"]</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="height">239</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x006d9c","0x006d9c"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Original Data vs. Modified Data with Purchases Only   (Note the log scale on the x-axis!)</title>
+        <search>
+          <query>(index=cribl sourcetype=access_combined) OR (index=cribl-modified source=filter sourcetype=access_combined) | rex "\"\S+\s\S+action=(?&lt;action1&gt;\w+)" | eval action1=coalesce(action1, "No Action") | chart count over action1 by index | rename action1 as action</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">count</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">log</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">1</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <single>
+        <title>Volume Reduction</title>
+        <search>
+          <query>(index=cribl sourcetype=access_combined) OR (index=cribl-modified source=filter sourcetype=access_combined) | eval len=len(_raw) | stats count as "Events" sum(eval(round(len/1024, 3))) as KB by index | autoregress KB | autoregress Events | eval Savings=100*(KB_p1-KB)/(KB_p1) | search Savings=* | fields Savings</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0.00</option>
+        <option name="rangeColors">["0x53a051","0xf1813f","0xdc4e41","0x3c444d","0x3c444d"]</option>
+        <option name="rangeValues">[100,200,300,400]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="unit">%</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+</form>

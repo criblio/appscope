@@ -1,0 +1,119 @@
+asyncFuncTimeout: 10000
+functions:
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Extract Weblog Fields using RegEx
+  - id: regex_extract
+    filter: "true"
+    disabled: null
+    conf:
+      regex: /^(?<__clientIP>[\d.]+) (?<__ident>\S+) (?<__httpBasicUser>\S+)
+        (?<__timestamp>\[[^\]]+\]) "(?<method>\w+)
+        (?<uri>[^?]+)\??(?<__queryString>[^ ]+)?
+        HTTP\/(?<__httpVersion>[0-9.]+)" (?<status>\d{3}) (?<bytes>\d+)
+        "(?<__referrer>[^"]+)" "(?<__userAgent>[^"]+)" (?<timeTaken>\d+)$/gm
+      source: _raw
+      iterations: 100
+  - id: serde
+    filter: __queryString
+    disabled: null
+    conf:
+      mode: extract
+      srcField: __queryString
+      type: kvp
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Lookup HTTP Status
+  - id: lookup
+    filter: source=='enrich'
+    disabled: null
+    conf:
+      file: http_status.csv
+      matchMode: exact
+      matchType: first
+      reloadPeriodSec: 60
+      addToEvent: false
+      inFields:
+        - eventField: status
+          lookupField: status
+      outFields:
+        - lookupField: status_description
+          eventField: idx_http_status_description
+        - lookupField: status_type
+          eventField: idx_http_status_type
+    description: Lookup HTTP status description and type
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Add some index time fields
+  - id: eval
+    filter: source=='indextimefields'
+    disabled: null
+    conf:
+      add:
+        - name: geo
+          value: "['us-south', 'us-north', 'us-east',
+            'us-west'][Math.floor(Math.random() * 4)]"
+        - name: dc
+          value: "`dc-0${Math.floor(Math.random() * 8)}`"
+        - name: rack
+          value: "`rack-${Math.floor(Math.random() * 12)}`"
+    description: Add Index Time Fields
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Convert extracted values to numbers
+  - id: numerify
+    filter: "true"
+    disabled: false
+    conf:
+      ignoreFields:
+        - status
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Lookup JSESSIONID against Redis
+  - id: demo_redisLookup
+    filter: "true"
+    disabled: false
+    conf:
+      host: redis
+      port: "6379"
+      fromField: JSESSIONID
+      toField: userName
+      secure: false
+  - id: eval
+    filter: "true"
+    disabled: true
+    conf:
+      add:
+        - name: userName
+          value: "'mwilde'"
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Lookup userName against REST API
+  - id: demo_restLookup
+    filter: "true"
+    disabled: false
+    conf:
+      urlExpression: "`http://apiserver:3000/users/${userName}`"
+      eventField: customer
+      maxConcurrentRequests: 1
+      retryOnError: true
+      flatten: true
+  - id: eval
+    filter: "true"
+    disabled: null
+    conf:
+      remove:
+        - httpBasicUser
+output: default

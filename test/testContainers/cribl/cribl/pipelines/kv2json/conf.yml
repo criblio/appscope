@@ -1,0 +1,26 @@
+asyncFuncTimeout: 1000
+description: Convert k=v events to JSON
+functions:
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Parse K=V in _raw and rewrite as JSON
+  - id: serde
+    filter: sourcetype=='business_event'
+    disabled: null
+    conf:
+      mode: extract
+      type: kvp
+      srcField: _raw
+      dstField: __parsed
+    description: Parse K=V
+  - id: serialize
+    filter: __parsed
+    disabled: null
+    conf:
+      type: json
+      fields:
+        - "*"
+      srcField: __parsed
+      dstField: _raw

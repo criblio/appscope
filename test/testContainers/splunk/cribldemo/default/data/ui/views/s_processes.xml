@@ -1,0 +1,140 @@
+<form theme="dark">
+  <label>Processes</label>
+  <fieldset submitButton="false">
+    <input type="time" token="field1" searchWhenChanged="true">
+      <label>Time Range</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="refresh_token" searchWhenChanged="true">
+      <label>Refresh Interval</label>
+      <choice value="5s">5 Seconds</choice>
+      <choice value="10s">10 Seconds</choice>
+      <choice value="30s">30s</choice>
+      <choice value="1m">1 Minute</choice>
+      <choice value="24h">None</choice>
+      <fieldForLabel>refresh_token</fieldForLabel>
+      <fieldForValue>refresh_token</fieldForValue>
+      <default>10s</default>
+      <initialValue>10s</initialValue>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Process Metrics</title>
+      <html>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>CPU Utilization by Process (usec)</title>
+        <search>
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="proc.cpu" AND `scope_metrics_index` span=10s BY proc
+| timechart avg(_value) span=10s agg=max limit=5 useother=false BY proc
+| fields - _span</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.includeZero">1</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.gridLinesX.showMajorLines">1</option>
+        <option name="charting.legend.mode">seriesCompare</option>
+        <option name="displayview">analysis_workspace</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>CPU Threads by Process</title>
+        <search>
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="proc.thread" AND `scope_metrics_index` span=10s BY proc
+| timechart avg(_value) span=10s agg=max limit=20 useother=false BY proc
+| fields - _span</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.includeZero">1</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.gridLinesX.showMajorLines">1</option>
+        <option name="charting.legend.mode">seriesCompare</option>
+        <option name="displayview">analysis_workspace</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>File Descriptors in Use by Process</title>
+        <search>
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="proc.fd" AND `scope_metrics_index` span=10s BY proc
+| timechart avg(_value) span=5m agg=max limit=5 useother=false BY proc
+| fields - _span</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.includeZero">1</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.gridLinesX.showMajorLines">1</option>
+        <option name="charting.legend.mode">seriesCompare</option>
+        <option name="displayview">analysis_workspace</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Child Processes by Process</title>
+        <search>
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="proc.child" AND `scope_metrics_index` span=10s BY proc
+| timechart avg(_value) span=5m agg=max limit=5 useother=false BY proc
+| fields - _span</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.includeZero">1</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">none</option>>
+        <option name="charting.gridLinesX.showMajorLines">1</option>
+        <option name="charting.legend.mode">seriesCompare</option>
+        <option name="displayview">analysis_workspace</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>RAM Consumption by Process (KB)</title>
+        <search>
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="proc.mem" AND `scope_metrics_index` span=10s BY proc
+| timechart avg(_value) span=10s agg=max limit=5 useother=false BY proc
+| fields - _span</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.includeZero">1</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.gridLinesX.showMajorLines">1</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.mode">seriesCompare</option>
+        <option name="displayview">analysis_workspace</option>
+      </chart>
+    </panel>
+  </row>
+</form>

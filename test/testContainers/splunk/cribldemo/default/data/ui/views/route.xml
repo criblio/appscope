@@ -1,0 +1,27 @@
+<form hideFilters="true" script="shell.js">
+  <label>Routing</label>
+  <row>
+    <panel>
+      <html>
+        <p style="text-align: right">
+        <span style="margin-top:15px; 
+        padding: 6px; 
+        border-radius; 2px;
+        background-color: #1890FF"><a href="" id="route" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Route</a></span> 
+        </p>
+      <p>
+        Splunk's forwarder is the best and most mature log data gathering technology, but until now it's only been able to deliver data to Splunk. For many of our customers and prospects, they've expressed a desire to be able to send some data they're gathering to Splunk and send some of their data to third party systems, like S3, NFS, Hadoop, or other file stores. Cribl makes this possible.
+      </p>
+      <p>
+        In this example, we're simply tee-ing the data to a file using the unix <code>tee</code> command. The file is located in <code>/tmp/events.ndjson</code>. At startup, we've executed <code>tail -f /tmp/events.ndjson</code>. Feel free to <code>^C</code> and take a look at the file yourself with <code>vi</code>, <code>grep</code>, etc. The file is in <a href="http://ndjson.org">newline-delimited json</a> format. Also, try using jq on the data, by executing a command like <code>tail -f /tmp/events.ndjson | jq .</code>. 
+      </p>
+    </html>
+    </panel>
+    <panel>
+      <title>Original vs. Modified</title>
+      <html>
+        <iframe id="shell_iframe" style="height: 80vh; width: 100%;"></iframe>
+      </html>
+    </panel>
+  </row>
+</form>

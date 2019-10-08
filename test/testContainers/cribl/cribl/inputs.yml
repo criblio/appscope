@@ -1,0 +1,84 @@
+inputs:
+  http:
+    type: http
+    disabled: false
+    pipeline: beats-conditioning
+    host: 0.0.0.0
+    port: 10080
+    criblAPI: /cribl
+    splunkHecAPI: ""
+    tls:
+      disabled: true
+    authToken: ""
+  tcpjson:
+    type: tcpjson
+    disabled: false
+    pipeline: tcpjson-conditioning
+    host: 0.0.0.0
+    port: 10001
+    tls:
+      disabled: true
+    ipWhitelistRegex: /.*/
+    authToken: ""
+  syslog:
+    type: syslog
+    disabled: false
+    pipeline: syslog-conditioning
+    host: 0.0.0.0
+    udpPort: 5140
+    tcpPort: 5140
+    maxBufferSize: 1000
+    ipWhitelistRegex: /.*/
+  kafka:
+    type: kafka
+    disabled: false
+    brokers:
+      - kafka:29092
+    topics:
+      - cribl
+    groupId: Cribl
+    fromBeginning: true
+    kafkaSchemaRegistry:
+      disabled: true
+    sasl:
+      disabled: true
+    tls:
+      disabled: true
+  splunk:
+    type: splunk
+    disabled: false
+    host: 0.0.0.0
+    port: 9999
+    tls:
+      disabled: true
+    ipWhitelistRegex: /.*/
+    staleChannelFlushMs: 10000
+  elastic:
+    type: http
+    disabled: false
+    host: 0.0.0.0
+    port: 10200
+    elasticAPI: /
+    criblAPI: /cribl
+    splunkHecAPI: ""
+    tls:
+      disabled: true
+    authToken: ""
+  hec:
+    type: http
+    disabled: false
+    host: 0.0.0.0
+    port: 10088
+    elasticAPI: /elastic
+    criblAPI: /cribl
+    splunkHecAPI: /services/collector
+    tls:
+      disabled: true
+  metrics:
+    type: metrics
+    disabled: false
+    host: 0.0.0.0
+    udpPort: 8125
+    tcpPort: 8125
+    maxBufferSize: 1000
+    ipWhitelistRegex: /.*/

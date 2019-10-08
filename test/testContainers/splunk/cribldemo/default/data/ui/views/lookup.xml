@@ -1,0 +1,164 @@
+<form hideFilters="true">
+  <label>Index-Time Lookups</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="field1" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-5m@m</earliest>
+        <latest>@m</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+         <p style="text-align: right">
+        <span style="margin-top:15px; 
+        padding: 6px; 
+        border-radius; 2px;
+        background-color: #1890FF"><a href="" id="enrich" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Enrich</a></span> 
+        </p>
+        <p>
+          One of the greatest features of Splunk is that it allows us lookup data in other, tabular sources, and enrich our log data. Some great examples include things like getting a location for an IP Address (GeoIP), looking up a user in a directory, or bringing more information about a host from an asset management system. One particular downside of lookups in Splunk, however, is that they can be very slow, especially if you're looking up data in an external system. They are also repeated every time a user runs a search. <b>Lastly, because they are at search time, the data is likely to have changed between when the event was emitted and when the lookup is done.</b>
+        </p>
+        <p>
+          <b>Cribl allows for ingestion time lookups.</b> In this example, we're taking again our web access log and we're looking up all the IP Addresses we're seeing in the web log in DNS to see if they resolve. Only some of them do, and for those that do we add an index time field. Because we don't know how many IP Addresses there are necessarily going to be in the original event, we name the fields according to which match we've seen in the original log, <code>dns</code>, <code>dns2</code>, <code>dns3</code>, etc. Because index time fields are not licensed, you'll notice our events and raw data volumes remain identical.
+        </p>
+      </html>
+    </panel>
+    <panel>
+      <title>Original vs. Modified</title>
+      <single>
+        <search>
+          <query>(index=cribl sourcetype=access_combined) OR (index=cribl-modified sourcetype=access_combined source=enrich)
+|  eval len=len(_raw)
+|  stats count(eval(searchmatch("index=cribl"))) as "Events IN" count(eval(searchmatch("index=cribl-modified"))) as "Events Out" sum(eval(if(searchmatch("index=cribl"), round(len/1024, 3), ''))) as "KB IN" sum(eval(if(searchmatch("index=cribl-modified"), round(len/1024, 3), ''))) as "KB OUT"</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="height">130</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x006d9c","0x006d9c"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <p>
+          Lets look at some events which have been enriched. Note, to search for index time fields, we need to use <code>field::value</code> syntax. In this instance, in the right hand panel, the search uses <code>dns::*</code> to find all records where the second IP address in the event matched in DNS (field <code>dns</code>).
+        </p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Original Events</title>
+        <search>
+          <query>index=cribl sourcetype=access_combined | head 20 | table _time, dns, _raw | eval dns="NONE"</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="drilldown">none</option>
+        <option name="wrap">false</option>
+        <format type="color" field="dns">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>Events enriched with index-time DNS lookups</title>
+        <search>
+          <query>index=cribl-modified sourcetype=access_combined source=enrich dns::* | head 20 | table _time, dns, _raw</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="drilldown">none</option>
+        <option name="wrap">false</option>
+        <format type="color" field="dns">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <p>
+          Now, let's look at some other events which have been enriched with <code>.csv</code> lookups. On the left panel below, we have orignal <code>access_combined</code> events. On the right, we have <code>access_combined</code> data that has been enriched with lookups done on their <code>status</code> field. The following additional index-time fields are added: <code>idx_http_status_description</code> and <code>idx_http_status_type</code>.
+        </p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Original Access Combined Events</title>
+        <search>
+          <query>index=cribl sourcetype=access_combined  | stats count by status</query>
+          <earliest>-5m@m</earliest>
+          <latest>@m</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>Enriched Access Combined Events</title>
+        <search>
+          <query>index=cribl-modified sourcetype=access_combined source="enrich"   | stats count by status idx_http_status_description idx_http_status_type</query>
+          <earliest>-5m@m</earliest>
+          <latest>@m</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <format type="color" field="idx_http_status_description">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="number" field="idx_http_status_description"></format>
+        <format type="color" field="idx_http_status_type">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+</form>

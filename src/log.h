@@ -12,6 +12,7 @@ void                logDestroy(log_t**);
 // Accessors
 int                 logSend(log_t*, const char* msg, cfg_log_level_t level);
 cfg_log_level_t     logLevel(log_t*);
+void                logFlush(log_t*);
 
 // Setters (modifies log_t, but does not persist modifications)
 void                logTransportSet(log_t*, transport_t*);

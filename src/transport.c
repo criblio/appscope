@@ -214,8 +214,8 @@ transportCreateFile(const char* path)
     }
     t->file.stream = f;
 
-    // Line buffer the output by default
-    if (setvbuf(t->file.stream, NULL, _IOLBF, BUFSIZ)) {
+    // Fully buffer the output...
+    if (setvbuf(t->file.stream, NULL, _IOFBF, BUFSIZ)) {
         DBG(NULL);
     }
 
@@ -344,5 +344,29 @@ transportSend(transport_t* t, const char* msg)
             return -1;
     }
      return 0;
+}
+
+int
+transportFlush(transport_t* t)
+{
+    if (!t) return -1;
+
+    switch (t->type) {
+        case CFG_UDP:
+            break;
+        case CFG_FILE:
+            if (fflush(t->file.stream) == EOF) {
+                DBG(NULL);
+            }
+            break;
+        case CFG_UNIX:
+        case CFG_SYSLOG:
+        case CFG_SHM:
+            return -1;
+        default:
+            DBG("%d", t->type);
+            return -1;
+    }
+    return 0;
 }
 

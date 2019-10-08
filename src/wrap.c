@@ -665,7 +665,6 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     {
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
-            g_fsinfo[fd].action |= EVENT_FS;
             atomicAdd(&g_fsinfo[fd].numDuration, 1);
             atomicAdd(&g_fsinfo[fd].totalDuration, size);
         }
@@ -702,7 +701,6 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         // Reset the info if we tried to report
-        //g_fsinfo[fd].action &= ~EVENT_FS;
         atomicSet(&g_fsinfo[fd].numDuration, 0);
         atomicSet(&g_fsinfo[fd].totalDuration, 0);
         break;        
@@ -738,7 +736,6 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
-            g_fsinfo[fd].action |= EVENT_FS;
             atomicAdd(numops, 1);
             atomicAdd(sizebytes, size);
             atomicAdd(global_counter, size); // not by fd
@@ -769,7 +766,6 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         // Reset the info if we tried to report
-        //g_fsinfo[fd].action &= ~EVENT_FS;
         atomicSet(numops, 0);
         atomicSet(sizebytes, 0);
         //atomicSet(global_counter, 0);
@@ -815,7 +811,6 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
-            g_fsinfo[fd].action |= EVENT_FS;
             atomicAdd(numops, 1);
             atomicAdd(global_counter, 1);
         }
@@ -863,6 +858,7 @@ doTotal(enum metric_t type)
     int* value = NULL;
     const char* err_str = "UNKNOWN";
     const char* units = "byte";
+    data_type_t aggregation_type = DELTA;
     switch (type) {
         case TOT_READ:
             metric = "fs.read";
@@ -916,29 +912,39 @@ doTotal(enum metric_t type)
             break;
         case TOT_PORTS:
             metric = "net.port";
-            value = &g_ctrs.openPortsTot;
+            value = &g_ctrs.openPorts;
             err_str = "ERROR: doTotal:TOT_PORTS:outSendEvent";
             units = "instance";
+            aggregation_type = CURRENT;
             break;
         case TOT_TCP_CONN:
             metric = "net.tcp";
-            value = &g_ctrs.TCPConnectionsTot;
+            value = &g_ctrs.netConnectionsTcp;
             err_str = "ERROR: doTotal:TOT_TCP_CONN:outSendEvent";
-            units = "session";
-            break;
-        case TOT_ACTIVE_CONN:
-            metric = "net.conn";
-            value = &g_ctrs.activeConnectionsTot;
-            err_str = "ERROR: doTotal:TOT_ACTIVE_CONN:outSendEvent";
             units = "connection";
+            aggregation_type = CURRENT;
+            break;
+        case TOT_UDP_CONN:
+            metric = "net.udp";
+            value = &g_ctrs.netConnectionsUdp;
+            err_str = "ERROR: doTotal:TOT_UDP_CONN:outSendEvent";
+            units = "connection";
+            aggregation_type = CURRENT;
+            break;
+        case TOT_OTHER_CONN:
+            metric = "net.other";
+            value = &g_ctrs.netConnectionsOther;
+            err_str = "ERROR: doTotal:TOT_OTHER_CONN:outSendEvent";
+            units = "connection";
+            aggregation_type = CURRENT;
             break;
         default:
             DBG(NULL);
             return;
 	}
 
-    // Don't report zeros.
-    if (*value == 0) return;
+    // Don't report zeros (if it's a counter)
+    if ((aggregation_type == DELTA) && (*value == 0)) return;
 
     event_field_t fields[] = {
             PROC_FIELD(g_cfg.procname),
@@ -948,13 +954,13 @@ doTotal(enum metric_t type)
             CLASS_FIELD("summary"),
             FIELDEND
     };
-    event_t e = {metric, *value, DELTA, fields};
+    event_t e = {metric, *value, aggregation_type, fields};
     if (outSendEvent(g_out, &e)) {
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
-    // Reset the info we tried to report
-    atomicSet(value, 0);
+    // Reset the info we tried to report (if it's a counter)
+    if (aggregation_type == DELTA) atomicSet(value, 0);
 }
 
 
@@ -974,39 +980,32 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
     switch (type) {
     case OPEN_PORTS:
-    case TCP_CONNECTIONS:
-    case ACTIVE_CONNECTIONS:
+    case NET_CONNECTIONS:
     {
         const char* metric = "UNKNOWN";
         int* value = NULL;
-        int* total_value = NULL;
-        data_type_t aggregation_type = DELTA;
         const char* units = "UNKNOWN";
         const char* err_str = "UNKNOWN";
         switch (type) {
         case OPEN_PORTS:
             metric = "net.port";
             value = &g_ctrs.openPorts;
-            total_value = &g_ctrs.openPortsTot;
-            aggregation_type = CURRENT;
             units = "instance";
             err_str = "ERROR: doNetMetric:OPEN_PORTS:outSendEvent";
             break;
-        case TCP_CONNECTIONS:
-            metric = "net.tcp";
-            value = &g_ctrs.TCPConnections;
-            total_value = &g_ctrs.TCPConnectionsTot;
-            aggregation_type = CURRENT;
-            units = "session";
-            err_str = "ERROR: doNetMetric:TCP_CONNECTIONS:outSendEvent";
-            break;
-        case ACTIVE_CONNECTIONS:
-            metric = "net.conn";
-            value = &g_ctrs.activeConnections;
-            total_value = &g_ctrs.activeConnectionsTot;
-            aggregation_type = DELTA;
+        case NET_CONNECTIONS:
+            if (g_netinfo[fd].type == SOCK_STREAM) {
+                metric = "net.tcp";
+                value = &g_ctrs.netConnectionsTcp;
+            } else if (g_netinfo[fd].type == SOCK_DGRAM) {
+                metric = "net.udp";
+                value = &g_ctrs.netConnectionsUdp;
+            } else {
+                metric = "net.other";
+                value = &g_ctrs.netConnectionsOther;
+            }
             units = "connection";
-            err_str = "ERROR: doNetMetric:ACTIVE_CONNECTIONS:outSendEvent";
+            err_str = "ERROR: doNetMetric:NET_CONNECTIONS:outSendEvent";
             break;
         default:
             DBG(NULL);
@@ -1016,12 +1015,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
             atomicAdd(value, size);        // size can be negative.
-            atomicAdd(total_value, size);
-            if (((type == OPEN_PORTS) && (g_netinfo[fd].type == SOCK_DGRAM)) || 
-                 (type == TCP_CONNECTIONS)) {
-                g_netinfo[fd].listen = TRUE;
-            }
-            if (type == ACTIVE_CONNECTIONS) g_netinfo[fd].accept = TRUE;
             if (!g_netinfo[fd].startTime)   g_netinfo[fd].startTime = getTime();
         }
 
@@ -1040,13 +1033,13 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             UNIT_FIELD(units),
             FIELDEND
         };
-        event_t e = {metric, *value, aggregation_type, fields};
+        event_t e = {metric, *value, CURRENT, fields};
         if (outSendEvent(g_out, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
 
-        // Reset the (non-gauge) info if we tried to report
-        if (aggregation_type == DELTA) atomicSet(value, 0);
+        // Don't reset the info if we tried to report.  It's a gauge.
+        // atomicSet(value, 0);
 
         break;
     }
@@ -1109,7 +1102,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         char data[16];
 
         if (source == EVENT_BASED) {
-            g_netinfo[fd].action |= EVENT_RX;
             atomicAdd(&g_netinfo[fd].numRX, 1);
             atomicAdd(&g_netinfo[fd].rxBytes, size);
             atomicAdd(&g_ctrs.netrxBytes, size);
@@ -1193,7 +1185,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         // Reset the info if we tried to report
-        //g_netinfo[fd].action &= ~EVENT_RX;
         atomicSet(&g_netinfo[fd].numRX, 0);
         atomicSet(&g_netinfo[fd].rxBytes, 0);
         //atomicSet(&g_ctrs.netrx, 0);
@@ -1208,7 +1199,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         char data[16];
 
         if (source == EVENT_BASED) {
-            g_netinfo[fd].action |= EVENT_TX;
             atomicAdd(&g_netinfo[fd].numTX, 1);
             atomicAdd(&g_netinfo[fd].txBytes, size);
             atomicAdd(&g_ctrs.nettxBytes, size);
@@ -1292,7 +1282,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         // Reset the info if we tried to report
-        //g_netinfo[fd].action &= ~EVENT_TX;
         atomicSet(&g_netinfo[fd].numTX, 0);
         atomicSet(&g_netinfo[fd].txBytes, 0);
         //atomicSet(&g_ctrs.nettx, 0);
@@ -1574,8 +1563,7 @@ doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
     if (getNetEntry(sd) != NULL) {
         if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);
         doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 1);
-        doNetMetric(TCP_CONNECTIONS, sd, EVENT_BASED, 1);
-        doNetMetric(ACTIVE_CONNECTIONS, sd, EVENT_BASED, 1);
+        doNetMetric(NET_CONNECTIONS, sd, EVENT_BASED, 1);
     }
 }
 
@@ -1599,7 +1587,7 @@ reportFD(int fd, enum control_type_t source)
         }
         if (!g_cfg.summarize.net.open_close) {
             doNetMetric(OPEN_PORTS, fd, source, -1);
-            doNetMetric(TCP_CONNECTIONS, fd, source, -1);
+            doNetMetric(NET_CONNECTIONS, fd, source, -1);
             doNetMetric(CONNECTION_DURATION, fd, source, -1);
         }
     }
@@ -1660,7 +1648,8 @@ reportPeriodicStuff(void)
 
     doTotal(TOT_PORTS);
     doTotal(TOT_TCP_CONN);
-    doTotal(TOT_ACTIVE_CONN);
+    doTotal(TOT_UDP_CONN);
+    doTotal(TOT_OTHER_CONN);
 
     // Report errors
     doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
@@ -4501,10 +4490,7 @@ listen(int sockfd, int backlog)
 
         if (net) {
             doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED, 1);
-
-            if (net->type == SOCK_STREAM) {
-                doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED, 1);
-            }
+            doNetMetric(NET_CONNECTIONS, sockfd, EVENT_BASED, 1);
         }
     } else {
         doErrorMetric(NET_ERR_CONN, EVENT_BASED, "listen", "nopath");
@@ -4577,11 +4563,7 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     rc = g_fn.connect(sockfd, addr, addrlen);
     if ((rc != -1) && net) {
         doSetConnection(sockfd, addr, addrlen, REMOTE);
-        doNetMetric(ACTIVE_CONNECTIONS, sockfd, EVENT_BASED, 1);
-
-        if (net->type == SOCK_STREAM) {
-            doNetMetric(TCP_CONNECTIONS, sockfd, EVENT_BASED, 1);
-        }
+        doNetMetric(NET_CONNECTIONS, sockfd, EVENT_BASED, 1);
 
         scopeLog("connect", sockfd, CFG_LOG_DEBUG);
     } else {

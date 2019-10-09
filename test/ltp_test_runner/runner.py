@@ -56,6 +56,7 @@ class Runner:
         env = dict(os.environ)
         stdout = None
         stderr = None
+        return_code = 0
 
         if wrapped:
             env['LD_PRELOAD'] = self.__lib_path
@@ -64,11 +65,13 @@ class Runner:
 
         try:
             stdout, stderr = p.communicate(timeout=self.__process_timeout)
+            return_code = p.returncode
         except subprocess.TimeoutExpired:
             p.kill()
-            sys.stderr.write("\texited by timeout\n")
+            return_code = 124  # timeout return code
+            stderr = "Exit by timeout. Timeout: " + self.__process_timeout
 
-        self.__send_result(w.TestResult(test, wrapped, stdout, stderr, self.__now_ms() - start, p.returncode))
+        self.__send_result(w.TestResult(test, wrapped, stdout, stderr, self.__now_ms() - start, return_code))
 
     def __send_result(self, result):
         if result.return_code == 0:

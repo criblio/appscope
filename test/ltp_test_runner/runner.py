@@ -15,13 +15,14 @@ help_text = '''options:
 
 
 class Runner:
-    def __init__(self, home, include_tests, exclude_tests, lib_path, verbose, log_path):
+    def __init__(self, home, include_tests, exclude_tests, lib_path, verbose, log_path, process_timeout):
         self.__home = home
         self.__include_tests = include_tests
         self.__exclude_tests = exclude_tests
         self.__execution_id = "ltp:" + datetime.datetime.now().isoformat()
         self.__test_watcher = w.Watcher(log_path, self.__execution_id, verbose)
         self.__lib_path = lib_path
+        self.__process_timeout = process_timeout
 
     def run(self):
         self.__test_watcher.start()
@@ -53,12 +54,19 @@ class Runner:
         print(tabulate(["Running " + test, "Scoped: " + str(wrapped), "Path: " + test_path], [25,17,0]))
         start = self.__now_ms()
         env = dict(os.environ)
+        stdout = None
+        stderr = None
 
         if wrapped:
             env['LD_PRELOAD'] = self.__lib_path
 
         p = subprocess.Popen('./' + test, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=test_path, env=env)
-        stdout, stderr = p.communicate()
+
+        try:
+            stdout, stderr = p.communicate(timeout=self.__process_timeout)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            sys.stderr.write("\texited by timeout\n")
 
         self.__send_result(w.TestResult(test, wrapped, stdout, stderr, self.__now_ms() - start, p.returncode))
 
@@ -76,6 +84,7 @@ def main(args):
     configs = []
     verbose = False
     log_path = None
+    process_timeout = 300
     # parse args
     for i in range(len(args)):
         if args[i] == '--help':
@@ -88,6 +97,7 @@ def main(args):
             with open(path, "rb") as f:
                 config = json.loads(f.read().decode("utf8"))
                 log_path = config.get("log_path", "/tmp/")  # default path is "tmp" dir
+                process_timeout = config["process_timeout"]
                 configs = config["configs"]
 
     if len(configs) == 0:
@@ -111,7 +121,7 @@ def main(args):
                 sys.stderr.write("tests home is not valid")
                 return 1
 
-            if Runner(home, include_tests, exclude_tests, lib_path, verbose, log_path).run() == 1:
+            if Runner(home, include_tests, exclude_tests, lib_path, verbose, log_path, process_timeout).run() == 1:
                 test_results = 1
 
     return test_results

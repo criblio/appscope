@@ -19,10 +19,12 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_OUT), "8125");
     assert_null            (cfgTransportPath(config, CFG_OUT));
+    assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_FULLY);
     assert_int_equal       (cfgTransportType(config, CFG_LOG), CFG_FILE);
     assert_null            (cfgTransportHost(config, CFG_LOG));
     assert_null            (cfgTransportPort(config, CFG_LOG));
     assert_string_equal    (cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
+    assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_FULLY);
     assert_null            (cfgCustomTags(config));
     assert_null            (cfgCustomTagValue(config, "tagname"));
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
@@ -192,6 +194,25 @@ cfgTransportPathSetAndGet(void** state)
 }
 
 static void
+cfgTransportBufSetAndGet(void** state)
+{
+    which_transport_t t = *(which_transport_t*)state[0];
+    config_t* config = cfgCreateDefault();
+    cfgTransportBufSet(config, t, CFG_BUFFER_LINE);
+    assert_int_equal(cfgTransportBuf(config, t), CFG_BUFFER_LINE);
+    cfgTransportBufSet(config, t, CFG_BUFFER_FULLY);
+    assert_int_equal(cfgTransportBuf(config, t), CFG_BUFFER_FULLY);
+
+    // Don't crash
+    cfgTransportBufSet(NULL, t, CFG_BUFFER_FULLY);
+    cfgTransportBuf(NULL, t);
+    cfgTransportBufSet(config, t, CFG_BUFFER_LINE+1);
+
+    cfgDestroy(&config);
+}
+
+
+static void
 cfgCustomTagsSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
@@ -270,11 +291,13 @@ cfgReadGoodYaml(void** state)
         "  transport:                        # defines how scope output is sent\n" 
         "    type: file                      # udp, unix, file, syslog\n" 
         "    path: '/var/log/scope.log'\n"
+        "    buffering: line\n"
         "  summaryperiod: 11                 # in seconds\n"
         "  commandpath: /tmp\n"
         "logging:\n"
         "  level: debug                      # debug, info, warning, error, none\n"
         "  transport:\n"
+        "    buffering: full\n"
         "    type: syslog\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
@@ -291,10 +314,12 @@ cfgReadGoodYaml(void** state)
     assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
+    assert_int_equal(cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_LINE);
     assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_SYSLOG);
     assert_null(cfgTransportHost(config, CFG_LOG));
     assert_null(cfgTransportPort(config, CFG_LOG));
     assert_string_equal(cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
+    assert_int_equal(cfgTransportBuf(config, CFG_LOG), CFG_BUFFER_FULLY);
     assert_non_null(cfgCustomTags(config));
     assert_string_equal(cfgCustomTagValue(config, "name1"), "value1");
     assert_string_equal(cfgCustomTagValue(config, "name2"), "value2");
@@ -587,11 +612,13 @@ main(int argc, char* argv[])
         cmocka_unit_test_prestate(cfgTransportHostSetAndGet, out_state),
         cmocka_unit_test_prestate(cfgTransportPortSetAndGet, out_state),
         cmocka_unit_test_prestate(cfgTransportPathSetAndGet, out_state),
+        cmocka_unit_test_prestate(cfgTransportBufSetAndGet,  out_state),
 
         cmocka_unit_test_prestate(cfgTransportTypeSetAndGet, log_state),
         cmocka_unit_test_prestate(cfgTransportHostSetAndGet, log_state),
         cmocka_unit_test_prestate(cfgTransportPortSetAndGet, log_state),
         cmocka_unit_test_prestate(cfgTransportPathSetAndGet, log_state),
+        cmocka_unit_test_prestate(cfgTransportBufSetAndGet,  log_state),
 
         cmocka_unit_test(cfgCustomTagsSetAndGet),
         cmocka_unit_test(cfgLoggingSetAndGet),

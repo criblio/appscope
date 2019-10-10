@@ -166,7 +166,7 @@ out:
 }
 
 transport_t*
-transportCreateFile(const char* path)
+transportCreateFile(const char* path, cfg_buffer_t buf_policy)
 {
     transport_t *t;
 
@@ -214,8 +214,21 @@ transportCreateFile(const char* path)
     }
     t->file.stream = f;
 
-    // Fully buffer the output...
-    if (setvbuf(t->file.stream, NULL, _IOFBF, BUFSIZ)) {
+    // Fully buffer the output unless we're told not to.
+    // I expect line buffering to be useful when we're debugging crashes or
+    // or if many applications are configured to write to the same files.
+    int buf_mode = _IOFBF;
+    switch (buf_policy) {
+        case CFG_BUFFER_FULLY:
+            buf_mode = _IOFBF;
+            break;
+        case CFG_BUFFER_LINE:
+            buf_mode = _IOLBF;
+            break;
+        default:
+            DBG("%d", buf_policy);
+    }
+    if (setvbuf(t->file.stream, NULL, buf_mode, BUFSIZ)) {
         DBG(NULL);
     }
 

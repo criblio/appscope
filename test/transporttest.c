@@ -254,31 +254,26 @@ transportSendForFileWritesToFileAfterFlushWhenFullyBuffered(void** state)
     transport_t* t = transportCreateFile(path, CFG_BUFFER_FULLY);
     assert_non_null(t);
 
-    // open the file with the position at the end
-    FILE* f = fopen(path, "r+");
+
+    long file_pos_before = fileEndPosition(path);
+    const char msg[] = "This is the payload message to transfer.\n";
+    assert_int_equal(transportSend(t, msg), 0);
+    long file_pos_after = fileEndPosition(path);
+
+    // With CFG_BUFFER_FULLY, this output only happens with the flush
+    assert_int_equal(file_pos_before, file_pos_after);
+
+    assert_int_equal(transportFlush(t), 0);
+    file_pos_after = fileEndPosition(path);
+    assert_int_not_equal(file_pos_before, file_pos_after);
+
+    // open the file
+    FILE* f = fopen(path, "r");
     if (!f)
         fail_msg("Couldn't open file %s", path);
-    if (fseek(f, 0, SEEK_END))
-        fail_msg("Couldn't seek to end of file %s", path);
-
-    // Since we're at the end, nothing should be there
     char buf[1024];
     const int maxReadSize = sizeof(buf)-1;
     size_t bytesRead = fread(buf, 1, maxReadSize, f);
-    assert_int_equal(bytesRead, 0);
-    assert_true(feof(f));
-    assert_false(ferror(f));
-    clearerr(f);
-
-    const char msg[] = "This is the payload message to transfer.\n";
-    assert_int_equal(transportSend(t, msg), 0);
-
-    // With CFG_BUFFER_FULLY, our message isn't written until we flush.
-    bytesRead = fread(buf, 1, maxReadSize, f);
-    assert_int_equal(bytesRead, 0);
-
-    transportFlush(t);
-    bytesRead = fread(buf, 1, maxReadSize, f);
     // Provide the null ourselves.  Safe because of maxReadSize
     buf[bytesRead] = '\0';
 

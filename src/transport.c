@@ -183,7 +183,7 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
     }
 
     int fd;
-    fd = t->open(t->file.path, O_CREAT|O_RDWR|O_APPEND|O_CLOEXEC, 0666);
+    fd = t->open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
     if (fd == -1) {
         DBG("%s", path);
         transportDestroy(&t);

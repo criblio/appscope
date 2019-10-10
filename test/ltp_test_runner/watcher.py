@@ -44,7 +44,6 @@ class Watcher:
         self.__test_completed(result)
 
     def test_failed(self, result):
-        self.__has_failures = True
         self.__test_completed(result)
 
     def finish(self):
@@ -109,7 +108,7 @@ class Watcher:
             self.__failed_tests_file.write(log_row + "\n")
 
     def __validate(self, raw_result, scoped_result):
-        return raw_result.return_code == 0 and scoped_result.return_code == 0
+        return raw_result.return_code == scoped_result.return_code
 
     def __to_log_row(self, raw_result, scoped_result, is_valid):
         log_row = {
@@ -135,6 +134,7 @@ class Watcher:
     def __log_summary(self):
         summary_row = json.dumps({
             "id": self.__execution_id,
+            "status": ("fail", "pass")[self.__has_failures],
             "start_date": self.__start_date.isoformat(),
             "finish_date": self.__finish_date.isoformat(),
             "total_tests": len(self.__results),

@@ -128,6 +128,9 @@ enum metric_t {
     TOT_TCP_CONN,
     TOT_UDP_CONN,
     TOT_OTHER_CONN,
+    TOT_FS_DURATION,
+    TOT_NET_DURATION,
+    TOT_DNS_DURATION,
     NET_ERR_CONN,
     NET_ERR_RX_TX,
     NET_ERR_DNS,
@@ -163,6 +166,12 @@ typedef struct metric_counters_t {
     uint64_t numOpen;
     uint64_t numClose;
     uint64_t numDNS;
+    uint64_t fsDurationNum;
+    uint64_t fsDurationTotal;
+    uint64_t connDurationNum;
+    uint64_t connDurationTotal;
+    uint64_t dnsDurationNum;
+    uint64_t dnsDurationTotal;
     uint64_t netConnectErrors;
     uint64_t netTxRxErrors;
     uint64_t netDNSErrors;

@@ -1,11 +1,12 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#include "atomic.h"
 #include "cfg.h"
-#include "scopetypes.h"
 #include "cfgutils.h"
 #include "dbg.h"
 #include "log.h"
 #include "out.h"
+#include "scopetypes.h"
 #include "wrap.h"
 
 interposed_funcs g_fn;
@@ -347,7 +348,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
     case NET_ERR_CONN:
     case NET_ERR_RX_TX:
     {
-        int* value = NULL;
+        uint64_t* value = NULL;
         const char* class = "UNKNOWN";
         switch (type) {
             case NET_ERR_CONN:
@@ -364,7 +365,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
         }
 
         if (source == EVENT_BASED) {
-            atomicAdd(value, 1);
+            atomicAddU64(value, 1);
         }
 
         // Only report if enabled
@@ -390,7 +391,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
             scopeLog("ERROR: doErrorMetric:NET:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
-        atomicSet(value, 0);
+        atomicSwapU64(value, 0);
         break;
     }
 
@@ -401,7 +402,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
     {
 
         const char* metric = NULL;
-        int* value = NULL;
+        uint64_t* value = NULL;
         const char* class = "UNKNOWN";
         int* summarize = NULL;
         event_field_t file_field = FILE_FIELD(name);
@@ -442,7 +443,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
         }
 
         if (source == EVENT_BASED) {
-            atomicAdd(value, 1);
+            atomicAddU64(value, 1);
         }
 
         // Only report if enabled
@@ -469,7 +470,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
             scopeLog("ERROR: doErrorMetric:FS_ERR:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
-        atomicSet(value, 0);
+        atomicSwapU64(value, 0);
         break;
     }
 
@@ -501,7 +502,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
             FIELDEND
         };
 
-        atomicAdd(&g_ctrs.numDNS, 1);
+        atomicAddU64(&g_ctrs.numDNS, 1);
 
         // Only report if enabled
         if (g_cfg.summarize.net.dns) {
@@ -537,7 +538,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
         scopeLog("ERROR: doDNSMetric:metric type", -1, CFG_LOG_ERROR);
     }
 
-    //atomicSet(&g_ctrs.numDNS, 0);
+    //atomicSwapU64(&g_ctrs.numDNS, 0);
 }
 
 static void
@@ -623,7 +624,7 @@ static void
 doStatMetric(const char *op, const char *pathname)
 {
 
-    atomicAdd(&g_ctrs.numStat, 1);
+    atomicAddU64(&g_ctrs.numStat, 1);
 
     event_field_t fields[] = {
             PROC_FIELD(g_cfg.procname),
@@ -646,7 +647,7 @@ doStatMetric(const char *op, const char *pathname)
         scopeLog("doStatMetric", -1, CFG_LOG_ERROR);
     }
 
-    //atomicSet(&g_ctrs.numStat, 0);
+    //atomicSwapU64(&g_ctrs.numStat, 0);
 }
 
 static void
@@ -665,8 +666,8 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     {
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
-            atomicAdd(&g_fsinfo[fd].numDuration, 1);
-            atomicAdd(&g_fsinfo[fd].totalDuration, size);
+            atomicAddU64(&g_fsinfo[fd].numDuration, 1);
+            atomicAddU64(&g_fsinfo[fd].totalDuration, size);
         }
 
         // Only report if enabled
@@ -701,8 +702,8 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         // Reset the info if we tried to report
-        atomicSet(&g_fsinfo[fd].numDuration, 0);
-        atomicSet(&g_fsinfo[fd].totalDuration, 0);
+        atomicSwapU64(&g_fsinfo[fd].numDuration, 0);
+        atomicSwapU64(&g_fsinfo[fd].totalDuration, 0);
         break;        
     }
 
@@ -710,9 +711,9 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     case FS_WRITE:
     {
         const char* metric = "UNKNOWN";
-        int* numops = NULL;
-        int* sizebytes = NULL;
-        int* global_counter = NULL;
+        uint64_t* numops = NULL;
+        uint64_t* sizebytes = NULL;
+        uint64_t* global_counter = NULL;
         const char* err_str = "UNKNOWN";
         switch (type) {
             case FS_READ:
@@ -736,9 +737,9 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
-            atomicAdd(numops, 1);
-            atomicAdd(sizebytes, size);
-            atomicAdd(global_counter, size); // not by fd
+            atomicAddU64(numops, 1);
+            atomicAddU64(sizebytes, size);
+            atomicAddU64(global_counter, size); // not by fd
         }
 
         // Only report if enabled
@@ -766,9 +767,9 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         // Reset the info if we tried to report
-        atomicSet(numops, 0);
-        atomicSet(sizebytes, 0);
-        //atomicSet(global_counter, 0);
+        atomicSwapU64(numops, 0);
+        atomicSwapU64(sizebytes, 0);
+        //atomicSwapU64(global_counter, 0);
 
         break;
     }
@@ -778,8 +779,8 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     case FS_SEEK:
     {
         const char* metric = "UNKNOWN";
-        int* numops = NULL;
-        int* global_counter = NULL;
+        uint64_t* numops = NULL;
+        uint64_t* global_counter = NULL;
         int* summarize = NULL;
         const char* err_str = "UNKNOWN";
         switch (type) {
@@ -811,8 +812,8 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
-            atomicAdd(numops, 1);
-            atomicAdd(global_counter, 1);
+            atomicAddU64(numops, 1);
+            atomicAddU64(global_counter, 1);
         }
 
         // Only report if enabled
@@ -840,7 +841,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         // Reset the info if we tried to report
-        atomicSet(numops, 0);
+        atomicSwapU64(numops, 0);
         break;
     }
     
@@ -855,7 +856,7 @@ static void
 doTotal(enum metric_t type)
 {
     const char* metric = "UNKNOWN";
-    int* value = NULL;
+    uint64_t* value = NULL;
     const char* err_str = "UNKNOWN";
     const char* units = "byte";
     data_type_t aggregation_type = DELTA;
@@ -960,7 +961,7 @@ doTotal(enum metric_t type)
     }
 
     // Reset the info we tried to report (if it's a counter)
-    if (aggregation_type == DELTA) atomicSet(value, 0);
+    if (aggregation_type == DELTA) atomicSwapU64(value, 0);
 }
 
 
@@ -983,7 +984,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     case NET_CONNECTIONS:
     {
         const char* metric = "UNKNOWN";
-        int* value = NULL;
+        uint64_t* value = NULL;
         const char* units = "UNKNOWN";
         const char* err_str = "UNKNOWN";
         switch (type) {
@@ -1014,7 +1015,11 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
-            atomicAdd(value, size);        // size can be negative.
+            if (size < 0) {
+               atomicSubU64(value, labs(size));
+            } else {
+               atomicAddU64(value, size);
+            }
             if (!g_netinfo[fd].startTime)   g_netinfo[fd].startTime = getTime();
         }
 
@@ -1039,7 +1044,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         // Don't reset the info if we tried to report.  It's a gauge.
-        // atomicSet(value, 0);
+        // atomicSwapU64(value, 0);
 
         break;
     }
@@ -1055,8 +1060,8 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         // if called from an event, we update counters
         if ((source == EVENT_BASED) && new_duration) {
-            atomicAddLong(&g_netinfo[fd].totalDuration, new_duration);
-            atomicAdd(&g_netinfo[fd].numDuration, 1);
+            atomicAddU64(&g_netinfo[fd].totalDuration, new_duration);
+            atomicAddU64(&g_netinfo[fd].numDuration, 1);
         }
 
         // Only report if enabled
@@ -1089,8 +1094,8 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
         }
 
-        atomicSetLong(&g_netinfo[fd].totalDuration, 0);
-        atomicSet(&g_netinfo[fd].numDuration, 0);
+        atomicSwapU64(&g_netinfo[fd].totalDuration, 0);
+        atomicSwapU64(&g_netinfo[fd].numDuration, 0);
 
         break;
     }
@@ -1102,9 +1107,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         char data[16];
 
         if (source == EVENT_BASED) {
-            atomicAdd(&g_netinfo[fd].numRX, 1);
-            atomicAdd(&g_netinfo[fd].rxBytes, size);
-            atomicAdd(&g_ctrs.netrxBytes, size);
+            atomicAddU64(&g_netinfo[fd].numRX, 1);
+            atomicAddU64(&g_netinfo[fd].rxBytes, size);
+            atomicAddU64(&g_ctrs.netrxBytes, size);
         }
 
         if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
@@ -1185,9 +1190,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         // Reset the info if we tried to report
-        atomicSet(&g_netinfo[fd].numRX, 0);
-        atomicSet(&g_netinfo[fd].rxBytes, 0);
-        //atomicSet(&g_ctrs.netrx, 0);
+        atomicSwapU64(&g_netinfo[fd].numRX, 0);
+        atomicSwapU64(&g_netinfo[fd].rxBytes, 0);
+        //atomicSwapU64(&g_ctrs.netrx, 0);
 
         break;
     }
@@ -1199,9 +1204,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         char data[16];
 
         if (source == EVENT_BASED) {
-            atomicAdd(&g_netinfo[fd].numTX, 1);
-            atomicAdd(&g_netinfo[fd].txBytes, size);
-            atomicAdd(&g_ctrs.nettxBytes, size);
+            atomicAddU64(&g_netinfo[fd].numTX, 1);
+            atomicAddU64(&g_netinfo[fd].txBytes, size);
+            atomicAddU64(&g_ctrs.nettxBytes, size);
         }
 
         if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
@@ -1282,9 +1287,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         // Reset the info if we tried to report
-        atomicSet(&g_netinfo[fd].numTX, 0);
-        atomicSet(&g_netinfo[fd].txBytes, 0);
-        //atomicSet(&g_ctrs.nettx, 0);
+        atomicSwapU64(&g_netinfo[fd].numTX, 0);
+        atomicSwapU64(&g_netinfo[fd].txBytes, 0);
+        //atomicSwapU64(&g_ctrs.nettx, 0);
 
         break;
     }
@@ -1576,6 +1581,10 @@ doReset()
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
 }
 
+//
+// reportFD is called in two cases:
+//   1) when a socket or file is being closed
+//   2) during periodic reporting
 static void
 reportFD(int fd, enum control_type_t source)
 {
@@ -1615,7 +1624,7 @@ reportPeriodicStuff(void)
     // This is called by periodic(), and due to atexit().
     // If it's actively running for one reason, then skip the second.
     static uint64_t reentrancy_guard = 0ULL;
-    if (!atomicCas64(&reentrancy_guard, 0ULL, 1ULL)) return;
+    if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) return;
 
 
     // We report CPU time for this period.
@@ -1664,7 +1673,7 @@ reportPeriodicStuff(void)
         reportFD(i, PERIODIC);
     }
 
-    if (!atomicCas64(&reentrancy_guard, 1ULL, 0ULL)) {
+    if (!atomicCasU64(&reentrancy_guard, 1ULL, 0ULL)) {
          DBG(NULL);
     }
 }

@@ -1,4 +1,3 @@
-
 #ifndef __WRAP_H__
 #define __WRAP_H__
 
@@ -151,25 +150,25 @@ enum event_type_t {
 };
 
 typedef struct metric_counters_t {
-    int openPorts;
-    int netConnectionsUdp;
-    int netConnectionsTcp;
-    int netConnectionsOther;
-    int netrxBytes;
-    int nettxBytes;
-    int readBytes;
-    int writeBytes;
-    int numSeek;
-    int numStat;
-    int numOpen;
-    int numClose;
-    int numDNS;
-    int netConnectErrors;
-    int netTxRxErrors;
-    int netDNSErrors;
-    int fsOpenCloseErrors;
-    int fsRdWrErrors;
-    int fsStatErrors;
+    uint64_t openPorts;
+    uint64_t netConnectionsUdp;
+    uint64_t netConnectionsTcp;
+    uint64_t netConnectionsOther;
+    uint64_t netrxBytes;
+    uint64_t nettxBytes;
+    uint64_t readBytes;
+    uint64_t writeBytes;
+    uint64_t numSeek;
+    uint64_t numStat;
+    uint64_t numOpen;
+    uint64_t numClose;
+    uint64_t numDNS;
+    uint64_t netConnectErrors;
+    uint64_t netTxRxErrors;
+    uint64_t netDNSErrors;
+    uint64_t fsOpenCloseErrors;
+    uint64_t fsRdWrErrors;
+    uint64_t fsStatErrors;
 } metric_counters;
 
 typedef struct {
@@ -213,13 +212,13 @@ typedef struct net_info_t {
     int fd;
     int type;
     int addrType;
-    int numTX;
-    int numRX;
-    int txBytes;
-    int rxBytes;
+    uint64_t numTX;
+    uint64_t numRX;
+    uint64_t txBytes;
+    uint64_t rxBytes;
     bool dnsSend;
     uint64_t startTime;
-    int numDuration;
+    uint64_t numDuration;
     uint64_t totalDuration;
     char dnsName[MAX_HOSTNAME];
     struct sockaddr_storage localConn;
@@ -234,15 +233,15 @@ typedef struct {
 typedef struct fs_info_t {
     int fd;
     enum fs_type_t type;
-    int numOpen;
-    int numClose;
-    int numSeek;
-    int numRead;
-    int numWrite;
-    int readBytes;
-    int writeBytes;
-    int numDuration;
-    int totalDuration;
+    uint64_t numOpen;
+    uint64_t numClose;
+    uint64_t numSeek;
+    uint64_t numRead;
+    uint64_t numWrite;
+    uint64_t readBytes;
+    uint64_t writeBytes;
+    uint64_t numDuration;
+    uint64_t totalDuration;
     char path[PATH_MAX];
 } fs_info;
 
@@ -391,46 +390,6 @@ typedef struct interposed_funcs_t {
                                       uint16_t, uint16_t, void *, void *);
 #endif // __MACOS__
 } interposed_funcs;
-
-static inline bool
-atomicCas64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
-{
-    return __sync_bool_compare_and_swap(ptr, oldval, newval);
-}
-
-static inline void
-atomicAdd(int *ptr, int val) {
-    (void)__sync_add_and_fetch(ptr, val);
-}
-
-static inline void
-atomicAddLong(uint64_t *ptr, uint64_t val) {
-    (void)__sync_add_and_fetch(ptr, val);
-}
-
-static inline void
-atomicSub(int *ptr, int val)
-{
-    if (ptr && (*ptr == 0)) return;
-	(void)__sync_sub_and_fetch(ptr, val);
-}
-
-/*
- * As described by Intel, this is not a traditional test-and-set operation,
- * but rather an atomic exchange operation.
- * It writes val into *ptr, and returns the previous contents of *ptr.
- */
-static inline int
-atomicSet(int *ptr, int val)
-{
-    return __sync_lock_test_and_set(ptr, val);
-}
-
-static inline uint64_t
-atomicSetLong(uint64_t *ptr, uint64_t val)
-{
-    return __sync_lock_test_and_set(ptr, val);
-}
 
 extern rtconfig g_cfg;
 static inline uint64_t

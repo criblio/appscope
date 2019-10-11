@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "atomic.h"
 #include "dbg.h"
 
 
@@ -218,16 +219,6 @@ dbgAddLineHelper(const char* const key, char* str)
     g_dbg->lines[i] = createLine(key, str);
 }
 
-#ifndef bool
-typedef unsigned int bool;
-#endif
-
-static inline bool
-atomicCas64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
-{
-    return __sync_bool_compare_and_swap(ptr, oldval, newval);
-}
-
 void
 dbgAddLine(const char* key, const char* fmt, ...)
 {
@@ -248,11 +239,11 @@ dbgAddLine(const char* key, const char* fmt, ...)
 
     // One at a time, guys, one at a time.
     static uint64_t spinlock = 0ULL;
-    while (!atomicCas64(&spinlock, 0ULL, 1ULL));
+    while (!atomicCasU64(&spinlock, 0ULL, 1ULL));
 
     dbgAddLineHelper(key, str);
 
     // unleash the hounds!
-    atomicCas64(&spinlock, 1ULL, 0ULL);
+    atomicCasU64(&spinlock, 1ULL, 0ULL);
 
 }

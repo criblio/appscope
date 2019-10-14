@@ -25,6 +25,7 @@ cfg_transport_t     cfgTransportType(config_t*, which_transport_t);
 const char*         cfgTransportHost(config_t*, which_transport_t);
 const char*         cfgTransportPort(config_t*, which_transport_t);
 const char*         cfgTransportPath(config_t*, which_transport_t);
+cfg_buffer_t        cfgTransportBuf(config_t*, which_transport_t);
 custom_tag_t**      cfgCustomTags(config_t*);
 const char*         cfgCustomTagValue(config_t*, const char*);
 cfg_log_level_t     cfgLogLevel(config_t*);
@@ -41,6 +42,7 @@ void                cfgTransportTypeSet(config_t*, which_transport_t, cfg_transp
 void                cfgTransportHostSet(config_t*, which_transport_t, const char*);
 void                cfgTransportPortSet(config_t*, which_transport_t, const char*);
 void                cfgTransportPathSet(config_t*, which_transport_t, const char*);
+void                cfgTransportBufSet(config_t*, which_transport_t, cfg_buffer_t);
 void                cfgCustomTagAdd(config_t*, const char*, const char*);
 void                cfgLogLevelSet(config_t*, cfg_log_level_t);
 

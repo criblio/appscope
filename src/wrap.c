@@ -1782,6 +1782,14 @@ reportPeriodicStuff(void)
     }
 }
 
+static void
+handleExit(void)
+{
+    reportPeriodicStuff();
+    outFlush(g_out);
+    logFlush(g_log);
+}
+
 static void *
 periodic(void *arg)
 {
@@ -1985,7 +1993,7 @@ init(void)
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
     scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
-    if (atexit(reportPeriodicStuff)) {
+    if (atexit(handleExit)) {
         DBG(NULL);
     }
 }

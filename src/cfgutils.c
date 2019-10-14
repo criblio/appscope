@@ -290,7 +290,7 @@ initTransport(config_t* cfg, which_transport_t t)
             transport = transportCreateSyslog();
             break;
         case CFG_FILE:
-            transport = transportCreateFile(cfgTransportPath(cfg, t));
+            transport = transportCreateFile(cfgTransportPath(cfg, t), cfgTransportBuf(cfg,t));
             break;
         case CFG_UNIX:
             transport = transportCreateUnix(cfgTransportPath(cfg, t));

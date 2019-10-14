@@ -53,6 +53,13 @@ outSendEvent(out_t* out, event_t* e)
 }
 
 void
+outFlush(out_t* out)
+{
+    if (!out) return;
+    transportFlush(out->transport);
+}
+
+void
 outTransportSet(out_t* out, transport_t* transport)
 {
     if (!out) return;

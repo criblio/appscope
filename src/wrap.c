@@ -1945,6 +1945,7 @@ init(void)
     g_fn.__fxstatat64 = dlsym(RTLD_NEXT, "__fxstatat64");
     g_fn.gethostbyname_r = dlsym(RTLD_NEXT, "gethostbyname_r");
     g_fn.syscall = dlsym(RTLD_NEXT, "syscall");
+    g_fn.prctl = dlsym(RTLD_NEXT, "prctl");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
@@ -3372,6 +3373,22 @@ fstatat(int fd, const char *path, struct stat *buf, int flag)
     return rc;
 }
 
+EXPORTON int
+prctl(int option, ...)
+{
+    struct FuncArgs fArgs;
+
+    WRAP_CHECK(prctl, -1);
+    doThread();
+    LOAD_FUNC_ARGS_VALIST(fArgs, option);
+
+    if (option == PR_SET_SECCOMP) {
+        return 0;
+    }
+
+    return g_fn.prctl(option, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
+}
+
 /*
  * Note:
  * The syscall function in libc is called from the loader for
@@ -3412,35 +3429,36 @@ syscall(long number, ...)
      * what we are missing. So far, we only see accept4 used.
      */
     case SYS_sendmmsg:
-        DBG("syscall-sendmsg");
+        //DBG("syscall-sendmsg");
         break;
 
     case SYS_recvmmsg:
-        DBG("syscall-recvmsg");
+        //DBG("syscall-recvmsg");
         break;
 
     case SYS_preadv:
-        DBG("syscall-preadv");
+        //DBG("syscall-preadv");
         break;
 
     case SYS_pwritev:
-        DBG("syscall-pwritev");
+        //DBG("syscall-pwritev");
         break;
 
     case SYS_dup3:
-        DBG("syscall-dup3");
+        //DBG("syscall-dup3");
         break;
 #ifdef __STATX__
     case SYS_statx:
-        DBG("syscall-statx");
+        //DBG("syscall-statx");
         break;
 #endif // __STATX__
     default:
         // Supplying args is fine, but is a touch more work.
         // On splunk, in a container on my laptop, I saw this statement being
         // hit every 10-15 microseconds over a 15 minute duration.  Wow.
-        //DBG("syscall-number: %d", number);
-        DBG(NULL);
+        // DBG("syscall-number: %d", number);
+        //DBG(NULL);
+        break;
     }
 
     return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],

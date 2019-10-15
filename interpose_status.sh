@@ -17,7 +17,7 @@ elif [ ! -z "$CRIBL_HOME" ]; then
         LIB_PATH="$CRIBL_HOME/lib/macOS/$LIB_NAME"
     fi
 else
-    LIB_FIND=`find . -type f -name "$LIB_NAME" | head -n1`
+    LIB_FIND=`find . -type f -name "$LIB_NAME" | grep -v dSYM | head -n1`
     if [[ ${LIB_FIND} == *"$LIB_NAME"* ]]; then
         LIB_PATH=${LIB_FIND}
     fi
@@ -54,10 +54,10 @@ fi
 echo "Processing ${CMD}"
 
 
-INTERPOSED_FNS=`nm -D ${LIB_PATH} | grep " T " | cut -c20-100 | grep -vE "(_init)|(_fini)"`
+INTERPOSED_FNS=`nm -a ${LIB_PATH} | grep " T " | cut -c20-100 | grep -vE "(_init)|(_fini)"`
 #echo "${INTERPOSED_FNS}"
 
-nm -D $CMD | grep -E " [WU] " | cut -c20-100 >> ./nm.out
+nm -a $CMD | grep -E " [WU] " | cut -c20-100 >> ./nm.out
 NM_FUNCTIONS_NUM=`cat ./nm.out | wc -l`
 
 SCOPE_NUM=0

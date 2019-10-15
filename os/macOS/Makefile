@@ -8,6 +8,8 @@ TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
 TEST_CFLAGS +=-D__MACOS__
 LD_FLAGS=-Wl, -ldl -lpthread
 INCLUDES=-I./contrib/libyaml/include
+YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
+YAML_SRC=$(wildcard contrib/libyaml/src/*.c)
 YAML_AR=contrib/libyaml/src/.libs/libyaml.a
 TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
@@ -16,9 +18,9 @@ TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
 .PHONY: all clean test
 all: $(YAML_AR) libwrap.so
 
-libwrap.so: src/wrap.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/out.c src/format.c src/dbg.c
+libwrap.so: src/wrap.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/out.c src/format.c src/dbg.c $(YAML_SRC)
 	@echo "Building libwrap.so ..."
-	$(CC) $(CFLAGS) -o ./lib/$(OS)/$@ $(INCLUDES) $^ -e,prog_version $(LD_FLAGS) $(YAML_AR)
+	$(CC) $(CFLAGS) -fvisibility=hidden $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ -e,prog_version $(LD_FLAGS)
 
 clean:
 	rm -f ./lib/$(OS)/libwrap.so

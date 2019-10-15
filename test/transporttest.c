@@ -71,7 +71,7 @@ static void
 transportCreateFileReturnsValidPtrInHappyPath(void** state)
 {
     const char* path = "/tmp/myscope.log";
-    transport_t* t = transportCreateFile(path);
+    transport_t* t = transportCreateFile(path, CFG_BUFFER_LINE);
     assert_non_null(t);
     transportDestroy(&t);
     assert_null(t);
@@ -83,7 +83,7 @@ static void
 transportCreateFileCreatesFileWithRWPermissionsForAll(void** state)
 {
     const char* path = "/tmp/myscope.log";
-    transport_t* t = transportCreateFile(path);
+    transport_t* t = transportCreateFile(path, CFG_BUFFER_LINE);
     assert_non_null(t);
     transportDestroy(&t);
 
@@ -102,12 +102,12 @@ static void
 transportCreateFileReturnsNullForInvalidPath(void** state)
 {
     transport_t* t;
-    t = transportCreateFile(NULL);
+    t = transportCreateFile(NULL, CFG_BUFFER_LINE);
     assert_null(t);
 
     assert_int_equal(dbgCountMatchingLines("src/transport.c"), 0);
 
-    t = transportCreateFile("");
+    t = transportCreateFile("", CFG_BUFFER_LINE);
     assert_null(t);
 
     assert_int_equal(dbgCountMatchingLines("src/transport.c"), 1);
@@ -120,7 +120,7 @@ transportCreateFileCreatesDirectoriesAsNeeded(void** state)
     // This should work in my opinion, but doesn't right now
     skip();
 
-    transport_t* t = transportCreateFile("/var/log/out/directory/path/here.log");
+    transport_t* t = transportCreateFile("/var/log/out/directory/path/here.log", CFG_BUFFER_LINE);
     assert_non_null(t);
 }
 
@@ -181,7 +181,7 @@ static void
 transportSendForNullMessageDoesNothing(void** state)
 {
     const char* path = "/tmp/path";
-    transport_t* t = transportCreateFile(path);
+    transport_t* t = transportCreateFile(path, CFG_BUFFER_LINE);
     assert_non_null(t);
     assert_int_equal(transportSend(t, NULL), -1);
     transportDestroy(&t);
@@ -248,10 +248,53 @@ transportSendForUdpTransmitsMsg(void** state)
 }
 
 static void
-transportSendForFileWritesToFile(void** state)
+transportSendForFileWritesToFileAfterFlushWhenFullyBuffered(void** state)
 {
     const char* path = "/tmp/mypath";
-    transport_t* t = transportCreateFile(path);
+    transport_t* t = transportCreateFile(path, CFG_BUFFER_FULLY);
+    assert_non_null(t);
+
+
+    long file_pos_before = fileEndPosition(path);
+    const char msg[] = "This is the payload message to transfer.\n";
+    assert_int_equal(transportSend(t, msg), 0);
+    long file_pos_after = fileEndPosition(path);
+
+    // With CFG_BUFFER_FULLY, this output only happens with the flush
+    assert_int_equal(file_pos_before, file_pos_after);
+
+    assert_int_equal(transportFlush(t), 0);
+    file_pos_after = fileEndPosition(path);
+    assert_int_not_equal(file_pos_before, file_pos_after);
+
+    // open the file
+    FILE* f = fopen(path, "r");
+    if (!f)
+        fail_msg("Couldn't open file %s", path);
+    char buf[1024];
+    const int maxReadSize = sizeof(buf)-1;
+    size_t bytesRead = fread(buf, 1, maxReadSize, f);
+    // Provide the null ourselves.  Safe because of maxReadSize
+    buf[bytesRead] = '\0';
+
+    assert_int_equal(bytesRead, strlen(msg));
+    assert_true(feof(f));
+    assert_false(ferror(f));
+    assert_string_equal(msg, buf);
+
+    if (fclose(f)) fail_msg("Couldn't close file %s", path);
+
+    transportDestroy(&t);
+
+    if (unlink(path))
+        fail_msg("Couldn't delete test file %s", path);
+}
+
+static void
+transportSendForFileWritesToFileImmediatelyWhenLineBuffered(void** state)
+{
+    const char* path = "/tmp/mypath";
+    transport_t* t = transportCreateFile(path, CFG_BUFFER_LINE);
     assert_non_null(t);
 
     // open the file with the position at the end
@@ -315,7 +358,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportSendForNullMessageDoesNothing),
         cmocka_unit_test(transportSendForUnimplementedTransportTypesIsHarmless),
         cmocka_unit_test(transportSendForUdpTransmitsMsg),
-        cmocka_unit_test(transportSendForFileWritesToFile),
+        cmocka_unit_test(transportSendForFileWritesToFileAfterFlushWhenFullyBuffered),
+        cmocka_unit_test(transportSendForFileWritesToFileImmediatelyWhenLineBuffered),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

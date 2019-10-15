@@ -50,6 +50,13 @@ logLevel(log_t* log)
 }
 
 void
+logFlush(log_t* log)
+{
+    if (!log) return;
+    transportFlush(log->transport);
+}
+
+void
 logTransportSet(log_t* log, transport_t* transport)
 {
     if (!log) return;

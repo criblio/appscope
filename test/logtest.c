@@ -70,7 +70,7 @@ logTranportSetAndLogSend(void** state)
     transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
     transport_t* t3 = transportCreateSyslog();
     transport_t* t4 = transportCreateShm();
-    transport_t* t5 = transportCreateFile(file_path);
+    transport_t* t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
     logTransportSet(log, t1);
     logTransportSet(log, t2);
     logTransportSet(log, t3);
@@ -81,7 +81,13 @@ logTranportSetAndLogSend(void** state)
     // affecting the file at file_path when connected to a file transport.
     long file_pos_before = fileEndPosition(file_path);
     assert_int_equal(logSend(log, "Something to send\n", DEFAULT_LOG_LEVEL), 0);
+
+    // With CFG_BUFFER_FULLY, this output only happens with the flush
     long file_pos_after = fileEndPosition(file_path);
+    assert_int_equal(file_pos_before, file_pos_after);
+
+    logFlush(log);
+    file_pos_after = fileEndPosition(file_path);
     assert_int_not_equal(file_pos_before, file_pos_after);
 
     // Test that transport is cleared by seeing no side effects.
@@ -103,7 +109,7 @@ logSendWithLogLevelFilter(void** state)
     const char* file_path = "/tmp/my.path";
     log_t* log = logCreate();
     assert_non_null(log);
-    transport_t* t = transportCreateFile(file_path);
+    transport_t* t = transportCreateFile(file_path, CFG_BUFFER_LINE);
     logTransportSet(log, t);
 
     // Test logLevel filtering by testing side effects of logSend

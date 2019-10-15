@@ -10,6 +10,7 @@ typedef enum {CFG_LOG_TRACE,
               CFG_LOG_WARN,
               CFG_LOG_ERROR,
               CFG_LOG_NONE} cfg_log_level_t;
+typedef enum {CFG_BUFFER_FULLY, CFG_BUFFER_LINE} cfg_buffer_t;
 
 #define CFG_MAX_VERBOSITY 9
 #define CFG_FILE_NAME "scope.cfg"

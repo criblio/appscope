@@ -3,3 +3,4 @@ coverage/
 .idea
 .DS_Store
 *.pyc
+venv

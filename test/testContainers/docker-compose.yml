@@ -29,3 +29,10 @@ services:
       - "DONT_TIMEOUT=1"
       - "CRIBL_ROUTING_DEMO=1"
     privileged: true
+
+  nginx:
+    build:
+      context: .
+      dockerfile: ./nginx/Dockerfile
+
+    command: -v # verbose output

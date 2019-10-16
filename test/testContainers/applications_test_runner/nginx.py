@@ -14,6 +14,7 @@ class NginxApplicationController:
         self.proc = None
 
     def start(self, scoped=False, scope_config_path=None):
+        logging.info(f"Starting app {self.name} in {'scoped' if scoped else 'unscoped'} mode.")
         cmd = ["nginx", "-g", "daemon off;"]
         env = os.environ.copy()
         if scoped:

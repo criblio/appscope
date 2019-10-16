@@ -13,11 +13,12 @@ class TestWatcher:
         self.__has_failures = False
         self.__error = None
 
-    def test_execution_completed(self, name, duration, scoped, result):
+    def test_execution_completed(self, name, duration, scoped, result, scope_messages):
         result_to_update = (self.__results[name].unscoped_execution_data, self.__results[name].scoped_execution_data)[
             scoped]
         result_to_update.result = result
         result_to_update.duration = duration
+        result_to_update.scope_messages = scope_messages
 
     def test_validated(self, name, passed, error=None):
         if not passed:
@@ -40,7 +41,7 @@ class TestWatcher:
     def finish(self):
         self.finish_date = datetime.now()
 
-    def finishWithError(self, error):
+    def finish_with_error(self, error):
         self.__has_failures = True
         self.__error = error
         self.finish_date = datetime.now()

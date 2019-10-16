@@ -23,10 +23,12 @@ class TestSetResult:
         self.scoped_execution_data = dotdict({
             "result": None,
             "duration": 0,
+            "scope_messages": []
         })
         self.unscoped_execution_data = dotdict({
             "result": None,
             "duration": 0,
+            "scope_messages": []
         })
         self.error = None
 

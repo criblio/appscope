@@ -12,7 +12,7 @@ RUN source scl_source enable rh-python36 && virtualenv /opt/test-runner/
 
 ADD http://cdn.cribl.io/dl/scope/latest/linux/libwrap.so /usr/lib/libwrap.so
 RUN chmod 755 /usr/lib/libwrap.so
-ENV SCOPE_OUT_DEST=file:///tmp/scope_out.log
+ENV SCOPE_OUT_DEST=udp://localhost:8125
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///tmp/scope.log
 ENV SCOPE_OUT_VERBOSITY=4

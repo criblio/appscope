@@ -33,7 +33,7 @@ output:
           #      7  turns off network connect event summarization
           #      8  turns off filesystem seek event summarization
           #      9  turns off filesystem read/write summarization
-          #      9  turns off network  send/receive summarization
+          #      9  turns off network send/receive summarization
     tags:
     #- user: $USER
     #- feeling: elation
@@ -42,11 +42,12 @@ output:
     host: 127.0.0.1
     port: 8125
   summaryperiod : 10                # in seconds
-  commandpath : '/var/tmp'
+  commandpath : '/tmp'
 
 logging:
-  level: info                      # debug, info, warning, error, none
+  level: error                      # debug, info, warning, error, none
   transport:
     type: file
     path: '/tmp/scope.log'
+    buffering: line                 # line, full
 ...

@@ -25,6 +25,6 @@ ENV SPLUNK_BEFORE_START_CMD_2 "cmd /bin/bash /opt/splunk/etc/apps/cribl/bin/inte
 ENV SPLUNK_BEFORE_START_CMD_3 "cmd /bin/bash /opt/splunk/etc/apps/cribl/bin/config.sh"
 ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so
-ADD scope.cfg /etc/scope/scope.cfg
+ADD scope.yml /etc/scope/scope.yml
 RUN cp /var/opt/splunk/etc/splunk-launch.conf.default /var/opt/splunk/etc/splunk-launch.conf && \
     echo -e "\nLD_PRELOAD=/usr/lib/libscope.so\n" >> /var/opt/splunk/etc/splunk-launch.conf

@@ -34,7 +34,7 @@ rtconfig g_cfg = {0};
  * The env var SCOPE_HOME is set in
  * the Makefile or script that runs 
  * this test. It points to a config
- * file in scope/test/conf/scope.cfg.
+ * file in scope/test/conf/scope.yml.
  * Using a config file for test we ensure
  * we have debug logs enabled and that 
  * we know the path to the log file
@@ -48,7 +48,7 @@ testFSDuration(void** state)
     FILE *fs;
     const char delim[] = ":";
     char buf[1024];
-    char* cpath = cfgPath(CFG_FILE_NAME);
+    char* cpath = cfgPath();
     config_t* cfg = cfgRead(cpath);
     const char *path = cfgTransportPath(cfg, CFG_OUT);
     assert_int_equal(cfgOutVerbosity(cfg), CFG_MAX_VERBOSITY);
@@ -91,7 +91,7 @@ testFSDuration(void** state)
  * The env var SCOPE_HOME is set in
  * the Makefile or script that runs 
  * this test. It points to a config
- * file in scope/test/conf/scope.cfg.
+ * file in scope/test/conf/scope.yml.
  * Using a config file for test we ensure
  * we have debug logs enabled and that 
  * we know the path to the log file
@@ -107,7 +107,7 @@ testConnDuration(void** state)
     const char* hostname = "127.0.0.1";
     const char delim[] = ":";
     char *buf;
-    char* cpath = cfgPath(CFG_FILE_NAME);
+    char* cpath = cfgPath();
     config_t* cfg = cfgRead(cpath);
     const char *path = cfgTransportPath(cfg, CFG_OUT);
     assert_int_equal(cfgOutVerbosity(cfg), CFG_MAX_VERBOSITY);

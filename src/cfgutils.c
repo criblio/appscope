@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+#include <dlfcn.h>
 #include <errno.h>
 #include <pwd.h>
 #include <regex.h>
@@ -14,17 +16,17 @@
 
 regex_t* g_regex = NULL;
 
-char* 
-cfgPath(const char* cfgname)
+static char*
+cfgPathSearch(const char* cfgname)
 {
     // in priority order:
-    //   1) $SCOPE_HOME/conf/scope.cfg
-    //   2) $SCOPE_HOME/scope.cfg
-    //   3) /etc/scope/scope.cfg
-    //   4) ~/conf/scope.cfg
-    //   5) ~/scope.cfg
-    //   6) ./conf/scope.cfg
-    //   7) ./scope.cfg
+    //   1) $SCOPE_HOME/conf/scope.yml
+    //   2) $SCOPE_HOME/scope.yml
+    //   3) /etc/scope/scope.yml
+    //   4) ~/conf/scope.yml
+    //   5) ~/scope.yml
+    //   6) ./conf/scope.yml
+    //   7) ./scope.yml
 
     char path[1024]; // Somewhat arbitrary choice for MAX_PATH
 
@@ -64,6 +66,32 @@ cfgPath(const char* cfgname)
     }
 
     return NULL;
+}
+
+char*
+cfgPath(void)
+{
+    const char* envPath = getenv("SCOPE_CONF_PATH");
+
+    // If SCOPE_CONF_PATH is set, and the file can be opened, use it.
+    char* path;
+    if (envPath && (path = strdup(envPath))) {
+
+        // ni for "non-interposed"...  a direct glibc call without scope.
+        FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
+        int (*ni_fclose)(FILE *) = dlsym(RTLD_NEXT, "fclose");
+        FILE* f = NULL;
+        if (ni_fopen && ni_fclose && (f = ni_fopen(path, "rb"))) {
+            ni_fclose(f);
+            return path;
+        }
+
+        // Couldn't open the file
+        free(path);
+    }
+
+    // Otherwise, search for scope.yml
+    return cfgPathSearch(CFG_FILE_NAME);
 }
 
 static void
@@ -204,6 +232,9 @@ startsWith(const char* string, const char* substring)
 //
 // An example of this format: SCOPE_STATSD_MAXLEN=1024
 //
+// For completeness, scope env vars that are not processed here:
+//    SCOPE_CONF_PATH (only used on startup to specify cfg file)
+//    SCOPE_HOME      (only used on startup for searching for cfg file)
 static void
 processEnvStyleInput(config_t* cfg, const char* env_line)
 {

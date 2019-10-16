@@ -1985,7 +1985,7 @@ init(void)
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
 
-    char* path = cfgPath(CFG_FILE_NAME);
+    char* path = cfgPath();
     config_t* cfg = cfgRead(path);
     cfgProcessEnvironment(cfg);
     doConfig(cfg);

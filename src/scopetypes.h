@@ -13,7 +13,7 @@ typedef enum {CFG_LOG_TRACE,
 typedef enum {CFG_BUFFER_FULLY, CFG_BUFFER_LINE} cfg_buffer_t;
 
 #define CFG_MAX_VERBOSITY 9
-#define CFG_FILE_NAME "scope.cfg"
+#define CFG_FILE_NAME "scope.yml"
 
 #define DEFAULT_OUT_FORMAT CFG_EXPANDED_STATSD
 #define DEFAULT_STATSD_MAX_LEN 512

@@ -48,7 +48,7 @@ testFSDuration(void** state)
     FILE *fs;
     const char delim[] = ":";
     char buf[1024];
-    char* cpath = cfgPath(CFG_FILE_NAME);
+    char* cpath = cfgPath();
     config_t* cfg = cfgRead(cpath);
     const char *path = cfgTransportPath(cfg, CFG_OUT);
     assert_int_equal(cfgOutVerbosity(cfg), CFG_MAX_VERBOSITY);
@@ -107,7 +107,7 @@ testConnDuration(void** state)
     const char* hostname = "127.0.0.1";
     const char delim[] = ":";
     char *buf;
-    char* cpath = cfgPath(CFG_FILE_NAME);
+    char* cpath = cfgPath();
     config_t* cfg = cfgRead(cpath);
     const char *path = cfgTransportPath(cfg, CFG_OUT);
     assert_int_equal(cfgOutVerbosity(cfg), CFG_MAX_VERBOSITY);

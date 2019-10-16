@@ -7,7 +7,7 @@
 
 // cfgPath returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
-char* cfgPath(const char* cfgname);
+char* cfgPath(void);
 
 // modify cfg per environment variables
 void cfgProcessEnvironment(config_t* cfg);

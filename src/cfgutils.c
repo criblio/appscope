@@ -14,8 +14,8 @@
 
 regex_t* g_regex = NULL;
 
-char* 
-cfgPath(const char* cfgname)
+static char*
+cfgPathSearch(const char* cfgname)
 {
     // in priority order:
     //   1) $SCOPE_HOME/conf/scope.yml
@@ -64,6 +64,28 @@ cfgPath(const char* cfgname)
     }
 
     return NULL;
+}
+
+char*
+cfgPath(void)
+{
+    const char* envPath = getenv("SCOPE_CONF_PATH");
+
+    // If SCOPE_CONF_PATH is set, and the file can be opened, use it.
+    char* path;
+    if (envPath && (path = strdup(envPath))) {
+        FILE* f = fopen(path, "rb");
+        if (f) {
+            fclose(f);
+            return path;
+        }
+
+        // Couldn't open the file
+        free(path);
+    }
+
+    // Otherwise, search for scope.yml
+    return cfgPathSearch(CFG_FILE_NAME);
 }
 
 static void
@@ -204,6 +226,9 @@ startsWith(const char* string, const char* substring)
 //
 // An example of this format: SCOPE_STATSD_MAXLEN=1024
 //
+// For completeness, scope env vars that are not processed here:
+//    SCOPE_CONF_PATH (only used on startup to specify cfg file)
+//    SCOPE_HOME      (only used on startup for searching for cfg file)
 static void
 processEnvStyleInput(config_t* cfg, const char* env_line)
 {

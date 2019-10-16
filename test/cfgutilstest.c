@@ -21,6 +21,46 @@ openFileAndExecuteCfgProcessCommands(const char* path, config_t* cfg)
     fclose(f);
 }
 
+static void
+cfgPathHonorsEnvVar(void** state)
+{
+    const char* file_path = "/tmp/myfile.yml";
+
+    // grab the current working directory
+    char origdir[MAX_PATH];
+    assert_non_null(getcwd(origdir, sizeof(origdir)));
+    // create newdir, and switch to it
+    char newdir[MAX_PATH];
+    snprintf(newdir, sizeof(newdir), "%s/%s", origdir, "newdir");
+    assert_int_equal(mkdir(newdir, 0777), 0);
+    assert_int_equal(chdir(newdir), 0);
+
+
+    // Verify that if there is no env variable, cfgPath is null
+    assert_null(cfgPath());
+
+    // Verify that if there is an env variable, but no file, cfgPath is null
+    assert_int_equal(setenv("SCOPE_CONF_PATH", file_path, 1), 0);
+    assert_null(cfgPath());
+
+    // Verify that if there is an env variable, and a file, cfgPath is defined
+    int fd = open(file_path, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
+    assert_return_code(fd, errno);
+    char* path = cfgPath();
+    assert_non_null(path);
+    assert_string_equal(path, file_path);
+
+    // cleanup
+    free(path);
+    unlink(file_path);
+    assert_int_equal(unsetenv("SCOPE_CONF_PATH"), 0);
+
+    // change back to origdir
+    assert_int_equal(chdir(origdir), 0);
+    // Delete the directory we created
+    assert_int_equal(rmdir(newdir), 0);
+}
+
 void
 cfgPathHonorsPriorityOrder(void** state)
 {
@@ -55,7 +95,7 @@ cfgPathHonorsPriorityOrder(void** state)
     assert_int_equal(setenv("SCOPE_HOME", scopeHome, 1), 0);
 
     // Create the paths we want to test
-    const char file[] = CFG_FILE_NAME ".test"; // scope.yml.test
+    const char file[] = CFG_FILE_NAME; // scope.yml
     char path[6][MAX_PATH];
     // Lowest priority first
     snprintf(path[0], sizeof(path[0]), "%s/%s", cwd, file);
@@ -81,7 +121,7 @@ cfgPathHonorsPriorityOrder(void** state)
         int fd = creat(path[i], 0777);
         assert_int_not_equal(fd, -1);
         assert_int_equal(close(fd), 0);
-        char* result = cfgPath(file);
+        char* result = cfgPath();
         assert_non_null(result);
 	if (strcmp(result, path[i])) {
             fail_msg("Expected %s but found %s for i=%d", path[i], result, i);
@@ -678,6 +718,7 @@ main(int argc, char* argv[])
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
+        cmocka_unit_test(cfgPathHonorsEnvVar),
         cmocka_unit_test(cfgPathHonorsPriorityOrder),
         cmocka_unit_test(cfgProcessEnvironmentOutFormat),
         cmocka_unit_test(cfgProcessEnvironmentStatsDPrefix),

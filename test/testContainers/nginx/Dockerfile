@@ -22,4 +22,4 @@ RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
 
 COPY ./applications_test_runner/ /opt/test-runner/
 
-ENTRYPOINT ["/opt/test-runner/bin/python", "/opt/test-runner/runner.py"]
+ENTRYPOINT ["/opt/test-runner/bin/python", "/opt/test-runner/app.py"]

@@ -1,7 +1,6 @@
 from typing import Dict
 from common import TestSetResult
 from tabulate import tabulate
-import json
 
 
 def to_status(passed):
@@ -13,8 +12,8 @@ def print_summary(results: Dict[str, TestSetResult]):
         return [
             name,
             to_status(result.passed),
-            to_status(result.unscoped_execution_data.result.passed),
-            to_status(result.scoped_execution_data.result.passed),
+            to_status(result.unscoped_execution_data.result.passed) if result.unscoped_execution_data.result else "-",
+            to_status(result.scoped_execution_data.result.passed) if result.scoped_execution_data.result else "-",
             result.unscoped_execution_data.duration,
             result.scoped_execution_data.duration,
         ]

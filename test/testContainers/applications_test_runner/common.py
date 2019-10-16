@@ -19,14 +19,14 @@ class TestResult:
 class TestSetResult:
 
     def __init__(self):
-        self.passed = True
+        self.passed = False
         self.scoped_execution_data = dotdict({
             "result": None,
-            "duration": -1,
+            "duration": 0,
         })
         self.unscoped_execution_data = dotdict({
             "result": None,
-            "duration": -1,
+            "duration": 0,
         })
         self.error = None
 

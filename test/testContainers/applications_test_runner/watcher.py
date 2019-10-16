@@ -11,6 +11,7 @@ class TestWatcher:
         self.start_date = None
         self.__results = defaultdict(TestSetResult)
         self.__has_failures = False
+        self.__error = None
 
     def test_execution_completed(self, name, duration, scoped, result):
         result_to_update = (self.__results[name].unscoped_execution_data, self.__results[name].scoped_execution_data)[
@@ -37,4 +38,9 @@ class TestWatcher:
         self.start_date = datetime.now()
 
     def finish(self):
+        self.finish_date = datetime.now()
+
+    def finishWithError(self, error):
+        self.__has_failures = True
+        self.__error = error
         self.finish_date = datetime.now()

@@ -1,12 +1,10 @@
 from datetime import datetime
-import sys
+
 import logging
-import nginx
-from watcher import TestWatcher
-from common import TestResult, ValidationException, TestSetResult
+
+from common import TestResult, ValidationException
 from utils import ms
-from reporting import print_summary
-import argparse
+
 
 
 class Runner:
@@ -22,7 +20,6 @@ class Runner:
             return 1
 
         logging.info("Starting unscoped tests.")
-        self.__watcher.start()
         logging.info("Starting app %s in unscoped mode.", self.__app_controller.name)
         self.__app_controller.start(scoped=False)
         self.__execute_tests(False)
@@ -39,13 +36,6 @@ class Runner:
         logging.info("Validating results.")
         self.__validate_results()
 
-        self.__watcher.finish()
-
-        print_summary(self.__watcher.get_all_results())
-
-        return (0, 1)[self.__watcher.has_failures()]
-
-
     def __validate_results(self):
         for test in self.__tests:
             results = self.__watcher.get_test_results(test.name)
@@ -61,7 +51,6 @@ class Runner:
                 self.__watcher.test_validated(test.name, passed=False, error=str(e))
                 continue
 
-
     def __execute_tests(self, scoped):
         for test in self.__tests:
             logging.info("Running test %s", test.name)
@@ -76,27 +65,17 @@ class Runner:
                 logging.warning(f"Test {test.name} failed with exception", exc_info=True)
                 result = TestResult(passed=False, error="Exception: " + str(e))
 
-
             tock = datetime.now()
             diff = tock - tick
             duration = ms(diff.total_seconds())
+
+            if not self.__app_controller.is_running():
+                result = TestResult(passed=False, error="Application is crashed")
+                self.__watcher.test_execution_completed(name=test.name, result=result, scoped=scoped, duration=duration)
+                raise Exception("Application is crashed")
+
             self.__watcher.test_execution_completed(name=test.name, result=result, scoped=scoped, duration=duration)
             logging.info("Finished test %s.", test.name)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
-    args = parser.parse_args()
-    log_level = (logging.INFO, logging.DEBUG)[args.verbose]
-    logging.basicConfig(level=log_level)
 
-    app_controller = nginx.NginxApplicationController()
-    test_watcher = TestWatcher()
-    return_code = Runner(app_controller, nginx.get_tests(), test_watcher).run()
-    logging.shutdown()
-    return return_code
-
-
-if __name__ == '__main__':
-    sys.exit(main())

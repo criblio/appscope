@@ -30,8 +30,8 @@ echo "####################################"
 echo "### running scoped tests ..."
 echo "####################################"
 echo
-LD_PRELOAD=/opt/scope/lib/linux/libwrap.so ./read01
-LD_PRELOAD=/opt/scope/lib/linux/libwrap.so ./read02
-LD_PRELOAD=/opt/scope/lib/linux/libwrap.so ./read03
-LD_PRELOAD=/opt/scope/lib/linux/libwrap.so ./read04
+LD_PRELOAD=/opt/scope/lib/linux/libscope.so ./read01
+LD_PRELOAD=/opt/scope/lib/linux/libscope.so ./read02
+LD_PRELOAD=/opt/scope/lib/linux/libscope.so ./read03
+LD_PRELOAD=/opt/scope/lib/linux/libscope.so ./read04
 

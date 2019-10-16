@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+#include <dlfcn.h>
 #include <errno.h>
 #include <pwd.h>
 #include <regex.h>
@@ -74,9 +76,13 @@ cfgPath(void)
     // If SCOPE_CONF_PATH is set, and the file can be opened, use it.
     char* path;
     if (envPath && (path = strdup(envPath))) {
-        FILE* f = fopen(path, "rb");
-        if (f) {
-            fclose(f);
+
+        // ni for "non-interposed"...  a direct glibc call without scope.
+        FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
+        int (*ni_fclose)(FILE *) = dlsym(RTLD_NEXT, "fclose");
+        FILE* f = NULL;
+        if (ni_fopen && ni_fclose && (f = ni_fopen(path, "rb"))) {
+            ni_fclose(f);
             return path;
         }
 

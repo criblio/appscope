@@ -377,15 +377,16 @@ cfgRead(const char* path)
     int doc_successful = 0;
     yaml_parser_t parser;
     yaml_document_t doc;
-    FILE *(*fnopen)(const char *, const char *);
+    // ni for "not-interposed"... a direct glibc call without scope.
+    FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
+    int (*ni_fclose)(FILE*) = dlsym(RTLD_NEXT, "fclose");
 
-    fnopen = dlsym(RTLD_NEXT, "fopen");
-    if (!fnopen) goto cleanup;
+    if (!ni_fopen || !ni_fclose) goto cleanup;
     
     config = cfgCreateDefault();
     if (!config) goto cleanup;
 
-    f = fnopen(path, "rb");
+    f = ni_fopen(path, "rb");
     if (!f) goto cleanup;
 
     parser_successful = yaml_parser_initialize(&parser);
@@ -402,7 +403,7 @@ cfgRead(const char* path)
 cleanup:    
     if (doc_successful) yaml_document_delete(&doc);
     if (parser_successful) yaml_parser_delete(&parser);
-    if (f) fclose(f);
+    if (f) ni_fclose(f);
     return config;
 }
 #else

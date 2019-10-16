@@ -28,7 +28,7 @@ static void doClose(int, const char *);
 static void doConfig(config_t *);
 
 
-EXPORTON void
+static void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
 {
     if (!g_log || !msg || !g_cfg.procname[0]) return;
@@ -46,7 +46,7 @@ scopeLog(const char* msg, int fd, cfg_log_level_t level)
     }
 }
 
-EXPORTOFF void
+static void
 sendEvent(out_t* out, event_t* e)
 {
     int rc;
@@ -128,7 +128,7 @@ setVerbosity(rtconfig* c, unsigned verbosity)
 }
 
 
-EXPORTOFF void
+static void
 doConfig(config_t *cfg)
 {
     // Save the current objects to get cleaned up on the periodic thread
@@ -148,7 +148,7 @@ doConfig(config_t *cfg)
 }
 
 // Process dynamic config change if they are available
-EXPORTOFF int
+static int
 dynConfig(void)
 {
     FILE *fs;
@@ -174,7 +174,7 @@ dynConfig(void)
 }
 
 // Return the time delta from start to now in nanoseconds
-EXPORTON uint64_t
+static uint64_t
 getDuration(uint64_t start)
 {
     /*
@@ -2080,7 +2080,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
     }
 }
 
-EXPORTON int
+static int
 doDupFile(int newfd, int oldfd, const char *func)
 {
     if ((newfd > g_cfg.numFSInfo) || (oldfd > g_cfg.numFSInfo)) {
@@ -2091,7 +2091,7 @@ doDupFile(int newfd, int oldfd, const char *func)
     return 0;
 }
 
-EXPORTON int
+static int
 doDupSock(int oldfd, int newfd)
 {
     if ((newfd > g_cfg.numFSInfo) || (oldfd > g_cfg.numFSInfo)) {

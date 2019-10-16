@@ -83,15 +83,15 @@ fi
 
 
 # wraptest has special requirements, env wise...
-ENVVARS="SCOPE_HOME=${CWD}/test/ "
-if [ "${OS}" = "linux" ]; then
-    ENVVARS=$ENVVARS"LD_LIBRARY_PATH=lib/${OS}:contrib/cmocka/build/src/ "
-elif [ "${OS}" = "macOS" ]; then
-    ENVVARS=$ENVVARS"DYLD_LIBRARY_PATH=lib/${OS}:contrib/cmocka/build/src/ "
-    ENVVARS=$ENVVARS"DYLD_INSERT_LIBRARIES=${CWD}/lib/${OS}/libwrap.so "
-    ENVVARS=$ENVVARS"DYLD_FORCE_FLAT_NAMESPACE=1 "
-fi
-run_test test/${OS}/wraptest
+#ENVVARS="SCOPE_HOME=${CWD}/test/ "
+#if [ "${OS}" = "linux" ]; then
+#    ENVVARS=$ENVVARS"LD_LIBRARY_PATH=lib/${OS}:contrib/cmocka/build/src/ "
+#elif [ "${OS}" = "macOS" ]; then
+#    ENVVARS=$ENVVARS"DYLD_LIBRARY_PATH=lib/${OS}:contrib/cmocka/build/src/ "
+#    ENVVARS=$ENVVARS"DYLD_INSERT_LIBRARIES=${CWD}/lib/${OS}/libwrap.so "
+#    ENVVARS=$ENVVARS"DYLD_FORCE_FLAT_NAMESPACE=1 "
+#fi
+#run_test test/${OS}/wraptest
 
 
 report_final_coverage

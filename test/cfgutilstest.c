@@ -55,7 +55,7 @@ cfgPathHonorsPriorityOrder(void** state)
     assert_int_equal(setenv("SCOPE_HOME", scopeHome, 1), 0);
 
     // Create the paths we want to test
-    const char file[] = CFG_FILE_NAME ".test"; // scope.cfg.test
+    const char file[] = CFG_FILE_NAME ".test"; // scope.yml.test
     char path[6][MAX_PATH];
     // Lowest priority first
     snprintf(path[0], sizeof(path[0]), "%s/%s", cwd, file);

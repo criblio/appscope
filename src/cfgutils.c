@@ -18,13 +18,13 @@ char*
 cfgPath(const char* cfgname)
 {
     // in priority order:
-    //   1) $SCOPE_HOME/conf/scope.cfg
-    //   2) $SCOPE_HOME/scope.cfg
-    //   3) /etc/scope/scope.cfg
-    //   4) ~/conf/scope.cfg
-    //   5) ~/scope.cfg
-    //   6) ./conf/scope.cfg
-    //   7) ./scope.cfg
+    //   1) $SCOPE_HOME/conf/scope.yml
+    //   2) $SCOPE_HOME/scope.yml
+    //   3) /etc/scope/scope.yml
+    //   4) ~/conf/scope.yml
+    //   5) ~/scope.yml
+    //   6) ./conf/scope.yml
+    //   7) ./scope.yml
 
     char path[1024]; // Somewhat arbitrary choice for MAX_PATH
 

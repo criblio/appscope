@@ -18,9 +18,9 @@ determine_lib_path() {
     PLATFORM=$(determine_platform)
 
     if [ $PLATFORM == "macOS" ]; then
-        echo "$CRIBL_HOME/lib/macOS/libwrap.so"
+        echo "$CRIBL_HOME/lib/macOS/libscope.so"
     elif [ $PLATFORM == "Linux" ]; then
-        echo "$CRIBL_HOME/lib/linux/libwrap.so"
+        echo "$CRIBL_HOME/lib/linux/libscope.so"
     else
         echo "ERROR"
     fi

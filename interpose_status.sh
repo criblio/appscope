@@ -1,6 +1,6 @@
 #!/bin/bash
 
-LIB_NAME=libwrap.so
+LIB_NAME=libscope.so
 
 
 # Setup some things based on platform

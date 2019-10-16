@@ -1,6 +1,6 @@
 /*
  * Testing the operation of Interposing Functions in Dependent Libraries
- * The libwrap library has intgerposed malloc. Call malloc and see that we get the interposed function.
+ * The libscope library has intgerposed malloc. Call malloc and see that we get the interposed function.
  */
 
 #include <stdio.h>

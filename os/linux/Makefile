@@ -20,14 +20,14 @@ TEST_INCLUDES=-I./src -I./contrib/cmocka/include
 TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
 
 .PHONY: all clean test
-all: $(YAML_AR) libwrap.so
+all: $(YAML_AR) libscope.so
 
-libwrap.so: src/wrap.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/out.c src/format.c src/dbg.c $(YAML_SRC)
-	@echo "Building libwrap.so ..."
+libscope.so: src/wrap.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/out.c src/format.c src/dbg.c $(YAML_SRC)
+	@echo "Building libscope.so ..."
 	$(CC) $(CFLAGS) -fvisibility=hidden $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ $(LD_FLAGS)
 
 clean:
-	rm -f ./lib/$(OS)/libwrap.so
+	rm -f ./lib/$(OS)/libscope.so
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))

@@ -1,7 +1,7 @@
-import time
 from ab import run_apache_benchmark
 
-from common import Test, TestResult
+from common import Test
+from validation import validate_all
 
 
 class TestGetUrl(Test):
@@ -11,16 +11,15 @@ class TestGetUrl(Test):
         self.url = url
 
     def run(self):
-        passed = True
 
         benchmark_results = run_apache_benchmark(url=self.url, requests=self.requests)
 
-        self.check(benchmark_results.failed_requests == 0,
-                   f"Failed requests detected {benchmark_results.failed_requests}", benchmark_results)
-        self.check(benchmark_results.write_errors == 0, f"Write errors detected {benchmark_results.write_errors}",
-                   benchmark_results)
+        test_result = validate_all(
+            (benchmark_results.failed_requests == 0, f"Failed requests detected {benchmark_results.failed_requests}"),
+            (benchmark_results.write_errors == 0, f"Write errors detected {benchmark_results.write_errors}")
+        )
 
-        return TestResult(passed=passed, test_data=benchmark_results)
+        return test_result, benchmark_results
 
     @property
     def name(self):

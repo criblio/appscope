@@ -1,41 +1,51 @@
 from abc import ABC, abstractmethod
-
-from utils import dotdict
-
-
-class ValidationException(Exception):
-    def __init__(self, message, data):
-        # Call the base class constructor with the parameters it needs
-        super().__init__(message)
-        self.data = data
+from typing import Any, Tuple, List
 
 
 class TestResult:
-    def __init__(self, passed, test_data=None, error=None):
+    passed: bool
+    error: str
+
+    def __init__(self, passed, error=None):
         self.error = error
-        self.test_data = test_data
         self.passed = passed
+
+class TestExecutionData:
+    result: TestResult
+    duration: int
+    scope_messages: List[str]
+    test_data: Any
+
+    def __init__(self):
+        self.scope_messages = []
+        self.duration = 0
+        self.test_data = None
 
 class TestSetResult:
 
+    error: None
+    unscoped_execution_data: TestExecutionData
+    scoped_execution_data: TestExecutionData
+    passed: bool
+
     def __init__(self):
         self.passed = False
-        self.scoped_execution_data = dotdict({
-            "result": None,
-            "duration": 0,
-            "scope_messages": []
-        })
-        self.unscoped_execution_data = dotdict({
-            "result": None,
-            "duration": 0,
-            "scope_messages": []
-        })
+        self.scoped_execution_data = TestExecutionData()
+        self.unscoped_execution_data = TestExecutionData()
         self.error = None
 
-class Test(ABC):
+class AppController(ABC):
 
     @abstractmethod
-    def run(self):
+    def start(self, scoped):
+        pass
+
+    @abstractmethod
+    def stop(self):
+        pass
+
+    @abstractmethod
+    def is_running(self):
         pass
 
     @property
@@ -43,14 +53,21 @@ class Test(ABC):
     def name(self):
         return None
 
-    @staticmethod
-    def check(condition, message, data=None):
-        if not condition:
-            raise ValidationException(message, data)
 
-    def validate_test_set(self, unscoped_test_data, scoped_test_data):
-        # this method meant to be overriden
+
+class Test(ABC):
+
+    @abstractmethod
+    def run(self) -> Tuple[TestResult, Any]:
         pass
+
+    @property
+    @abstractmethod
+    def name(self):
+        return None
+
+
+
 
 
 

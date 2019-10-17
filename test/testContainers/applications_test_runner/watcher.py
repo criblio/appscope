@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import List, Any
 
-from common import TestSetResult
+from common import TestSetResult, TestResult
 from collections import defaultdict
 
 
@@ -13,12 +14,13 @@ class TestWatcher:
         self.__has_failures = False
         self.__error = None
 
-    def test_execution_completed(self, name, duration, scoped, result, scope_messages):
-        result_to_update = (self.__results[name].unscoped_execution_data, self.__results[name].scoped_execution_data)[
-            scoped]
+    def test_execution_completed(self, name: str, duration: int, scoped: bool, result: TestResult, scope_messages: List[str], test_data: Any):
+        test_results = self.__results[name]
+        result_to_update = test_results.scoped_execution_data if scoped else test_results.unscoped_execution_data
         result_to_update.result = result
         result_to_update.duration = duration
         result_to_update.scope_messages = scope_messages
+        result_to_update.test_data = test_data
 
     def test_validated(self, name, passed, error=None):
         if not passed:

@@ -4312,7 +4312,7 @@ fputwc(wchar_t wc, FILE *stream)
     IOSTREAMPOST(fputwc, 1, WEOF, (enum event_type_t)EVENT_FS);
 }
 
-EXPORTON int
+EXPORTOFF int
 fscanf(FILE *stream, const char *format, ...)
 {
     struct FuncArgs fArgs;

@@ -13,7 +13,7 @@ class TestWatcher:
         self.start_date = None
         self.__results = defaultdict(TestSetResult)
         self.__has_failures = False
-        self.__error = None
+        self.execution_error = None
 
     def test_execution_completed(self, name: str, duration: int, scoped: bool, result: TestResult, scope_messages: List[str], test_data: Any):
         test_results = self.__results[name]
@@ -46,5 +46,5 @@ class TestWatcher:
 
     def finish_with_error(self, error):
         self.__has_failures = True
-        self.__error = error
+        self.execution_error = error
         self.finish_date = datetime.now()

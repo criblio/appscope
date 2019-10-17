@@ -5,11 +5,10 @@ from datetime import datetime
 import nginx
 from runner import Runner
 from watcher import TestWatcher
-from reporting import print_summary
+from reporting import print_summary, store_results_to_file
 import argparse
 from scope import ScopeDataCollector, ScopeUDPDataListener
 from validation import default_test_set_validators
-
 
 
 def main():
@@ -17,14 +16,17 @@ def main():
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
     parser.add_argument("-t", "--target", help="target application to test", choices=["nginx"], required=True)
     parser.add_argument("-id", "--execution_id", help="execution id")
+    parser.add_argument("-l", "--logs_path", help="path to store the execution results and logs", default="/tmp/")
     args = parser.parse_args()
 
     execution_id = args.execution_id or generate_execution_id(args.target)
+    logs_path = args.logs_path
 
     log_level = (logging.INFO, logging.DEBUG)[args.verbose]
     logging.basicConfig(level=log_level)
 
     logging.info("Execution ID: " + execution_id)
+    logging.info("Logs path: " + logs_path)
     test_watcher = TestWatcher(execution_id)
     test_watcher.start()
     scope_data_collector = ScopeDataCollector()
@@ -42,9 +44,11 @@ def main():
             test_watcher.finish_with_error(str(e))
 
     print_summary(test_watcher.get_all_results())
+    store_results_to_file(watcher=test_watcher, path=logs_path)
     logging.shutdown()
 
     return (0, 1)[test_watcher.has_failures()]
+
 
 def generate_execution_id(target):
     return f"{target}:{datetime.now().isoformat()}"

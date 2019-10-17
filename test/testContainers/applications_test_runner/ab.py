@@ -10,8 +10,10 @@ class BenchmarkResults:
         self.write_errors = 0
 
 
-def run_apache_benchmark(url, requests=10, concur=4):
-    command = f"ab -n {requests} -c {concur} {url}"
+def run_apache_benchmark(url, requests=10, concur=4, post_file=None):
+    post_param = f"-p {post_file}" if post_file else ""
+
+    command = f"ab -n {requests} -c {concur} {post_param} {url}"
 
     logging.debug("Running Apache Benchmark. Command " + command)
 

@@ -7,7 +7,7 @@ from typing import Any, List
 from common import AppController, TestResult
 from runner import Runner
 from validation import TestExecutionValidator, validate_all
-from web import TestGetUrl
+from web import TestGetUrl, TestPostToUrl
 
 
 class NginxApplicationController(AppController):
@@ -57,5 +57,6 @@ class NetworkMetricsCollectedValidator(TestExecutionValidator):
 def configure(runner: Runner):
     runner.set_app_controller(NginxApplicationController())
     get_home_page = TestGetUrl(url="http://localhost/", requests=10000)
-    runner.add_test_execution_validators([NetworkMetricsCollectedValidator([get_home_page.name])])
-    runner.add_tests([get_home_page])
+    post_file = TestPostToUrl(url="http://localhost/log/", requests=10000, post_file="./post.json")
+    runner.add_test_execution_validators([NetworkMetricsCollectedValidator([get_home_page.name, post_file.name])])
+    runner.add_tests([get_home_page, post_file])

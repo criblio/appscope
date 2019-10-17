@@ -18,6 +18,9 @@ ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV SCOPE_OUT_VERBOSITY=4
 
+COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
+COPY ./nginx/post.json /opt/test-runner/post.json
+
 COPY ./applications_test_runner/requirements.txt /opt/test-runner/requirements.txt
 RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
 

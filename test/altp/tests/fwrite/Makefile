@@ -1,3 +1,4 @@
-TESTS := fwrite01 fwrite02
+FILES := $(wildcard *.c)
+TESTS := $(basename $(FILES))
 
 include ../../include/mk/make_target.mk

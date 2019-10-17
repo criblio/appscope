@@ -15,19 +15,24 @@ int do_test() {
 
     for(i = 0; i < 100; i++) {
         char file_name[255];    
-        sprintf(file_name, "%s%d", tmp_file_name, i);
-        
-        FILE* pFile = fopen(file_name, "w");
-        
-        if(pFile != NULL) {
-                if(fclose(pFile) == EOF) {
-                    test_result = EXIT_FAILURE;
-                }
-                unlink(file_name);
-        } else {
-            test_result = EXIT_FAILURE;
-            break;
-        }
+	sprintf(file_name, "%s%d", tmp_file_name, i);
+	
+	FILE* pFile = fopen(file_name, "w");
+    
+	if(pFile == NULL) {
+	    test_result = EXIT_FAILURE;
+	    break;
+	}
+    }
+    
+    if(fcloseall() == EOF) {
+        test_result = EXIT_FAILURE;
+    }
+
+    for(i = 0; i < 100; i++) {
+        char file_name[255];    
+	sprintf(file_name, "%s%d", tmp_file_name, i);
+	unlink(file_name);	
     }
     
     REMOVE_TMP_DIR();

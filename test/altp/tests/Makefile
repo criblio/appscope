@@ -1,5 +1,4 @@
-tests := fclose fopen fwrite
-list := $(foreach wrd,$(tests),$(wrd))
+list := $(filter-out Makefile,$(wildcard *))
 
 all:
 	@for dir in $(list); do \

@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <errno.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include "test_utils.h"
@@ -12,10 +12,9 @@ int do_test() {
 
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
-    FILE* pFile = fopen(tmp_file_name, "w");
-
-    if(pFile != NULL) {
-        if(fclose(pFile) == EOF) {
+    int fd = creat64(tmp_file_name, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP );
+    if(fd != EOF ) {
+        if(close(fd) == EOF) {
             test_result = EXIT_FAILURE;
         }
         unlink(tmp_file_name);
@@ -24,6 +23,6 @@ int do_test() {
     }
 
     REMOVE_TMP_DIR();
-
+        
     return test_result;
 }

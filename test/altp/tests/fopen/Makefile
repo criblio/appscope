@@ -1,3 +1,4 @@
-TESTS := fopen01 fopen02
+FILES := $(wildcard *.c)
+TESTS := $(basename $(FILES))
 
 include ../../include/mk/make_target.mk

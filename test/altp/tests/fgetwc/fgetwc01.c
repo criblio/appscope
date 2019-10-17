@@ -2,32 +2,53 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <locale.h>
+#include <wchar.h>
+
 #include "test_utils.h"
 
+#define TEST_CHAR L'А'
+
 int do_test() {
+    setlocale(LC_ALL, "en_US.utf8");
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    
-    char buffer[] = "test";
-    
+    wint_t c = TEST_CHAR;
+
     CREATE_TMP_DIR();
-    
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     FILE* pFile = fopen(tmp_file_name, "w");
     
     if(pFile != NULL) {
-        if(sizeof(buffer) != fwrite(buffer, 1, sizeof(buffer), pFile)) {
+        if(fputwc(c, pFile) == EOF) {
             test_result = EXIT_FAILURE;
         }
         if(fclose(pFile) == EOF) {
             test_result = EXIT_FAILURE;
         }
-        unlink(tmp_file_name);
     } else {
         test_result = EXIT_FAILURE;
     }
 
-    REMOVE_TMP_DIR();    
+    pFile = fopen(tmp_file_name, "r");
     
+    if(pFile != NULL) {
+        c = fgetwc(pFile);
+        if(c == EOF || c != TEST_CHAR) {
+            test_result = EXIT_FAILURE;
+        } 
+        if(fclose(pFile) == EOF) {
+            test_result = EXIT_FAILURE;
+        }
+    } else {
+        test_result = EXIT_FAILURE;
+    }
+    
+    unlink(tmp_file_name);
+    
+    REMOVE_TMP_DIR();
+
     return test_result;
 }

@@ -8,31 +8,29 @@ int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    
     int i = 0;
-    char buffer[] = "test";
     
     CREATE_TMP_DIR();
-    
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
-    FILE* pFile = fopen(tmp_file_name, "w");
-    
-    if(pFile != NULL) {
-        for(i = 0; i < 100; i++) {
-            if(sizeof(buffer) != fwrite(buffer, 1, sizeof(buffer), pFile)) {
+    for(i = 0; i < 100; i++) {
+        char file_name[255];    
+        sprintf(file_name, "%s%d", tmp_file_name, i);
+        
+        FILE* pFile = fopen64(file_name, "w");
+        
+        if(pFile != NULL) {
+            if(fclose(pFile) == EOF) {
                 test_result = EXIT_FAILURE;
-                break;
             }
-        }
-    
-        if(fclose(pFile) == EOF) {
+            unlink(file_name);
+        } else {
             test_result = EXIT_FAILURE;
+            break;
         }
-        unlink(tmp_file_name);
-    } else {
-        test_result = EXIT_FAILURE;
     }
     
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

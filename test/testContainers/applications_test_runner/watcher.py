@@ -7,7 +7,8 @@ from collections import defaultdict
 
 class TestWatcher:
 
-    def __init__(self):
+    def __init__(self, execution_id):
+        self.execution_id = execution_id
         self.finish_date = None
         self.start_date = None
         self.__results = defaultdict(TestSetResult)

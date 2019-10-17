@@ -7,6 +7,7 @@ RUN yum -y install epel-release
 RUN yum -y install nginx httpd-tools
 
 RUN mkdir /opt/test-runner/
+RUN mkdir /opt/test-runner/logs/
 
 RUN source scl_source enable rh-python36 && virtualenv /opt/test-runner/
 

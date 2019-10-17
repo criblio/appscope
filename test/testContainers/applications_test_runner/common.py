@@ -10,6 +10,7 @@ class TestResult:
         self.error = error
         self.passed = passed
 
+
 class TestExecutionData:
     result: TestResult
     duration: int
@@ -21,8 +22,8 @@ class TestExecutionData:
         self.duration = 0
         self.test_data = None
 
-class TestSetResult:
 
+class TestSetResult:
     error: None
     unscoped_execution_data: TestExecutionData
     scoped_execution_data: TestExecutionData
@@ -33,6 +34,7 @@ class TestSetResult:
         self.scoped_execution_data = TestExecutionData()
         self.unscoped_execution_data = TestExecutionData()
         self.error = None
+
 
 class AppController(ABC):
 
@@ -54,7 +56,6 @@ class AppController(ABC):
         return None
 
 
-
 class Test(ABC):
 
     @abstractmethod
@@ -65,11 +66,3 @@ class Test(ABC):
     @abstractmethod
     def name(self):
         return None
-
-
-
-
-
-
-
-

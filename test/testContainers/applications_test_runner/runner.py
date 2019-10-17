@@ -115,7 +115,7 @@ class Runner:
             if len(scope_messages) > 0: logging.debug(f"Last 10 messages:\n {''.join(scope_messages[-9:])}")
             self.__collector.reset()
 
-            if not result:
+            if result.passed:
                 result = self.__validate_test_execution(name=test.name, scoped=scoped, test_data=data,
                                                         scope_messages=scope_messages)
 

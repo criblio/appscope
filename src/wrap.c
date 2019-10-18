@@ -5010,7 +5010,7 @@ static const char scope_help[] =
 "        If the SCOPE_CONF_PATH env variable is defined and points to a\n"
 "        file that can be opened, it will use this as the config file.  If\n"
 "        not, it searches for the config file in this priority order using the\n"
-"        first it finds.  If this fails too, it will look scope.yml in the\n"
+"        first it finds.  If this fails too, it will look for scope.yml in the\n"
 "        same directory as LD_PRELOAD.\n"
 "\n"
 "            $SCOPE_HOME/conf/scope.yml\n"

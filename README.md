@@ -79,10 +79,6 @@ This is the variable that is needed in order for the Scope library to be loaded 
     SCOPE_CMD_DIR
         Specifies a directory to look for dynamic configuration files.
         See Dynamic Configuration below.  Default is /tmp
-    SCOPE_CMD_DBG_PATH
-        Specifies a file path to output internal debugging information.
-        Not a proper env variable - this only works as a command in a
-        dynamic configuration file.  See Dynamic Configuration below.
 
 # Features:
 

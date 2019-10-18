@@ -77,7 +77,7 @@ This is the variable that is needed in order for the Scope library to be loaded 
         Specify a tag to be applied to every metric.
         Environment variable expansion is available e.g. SCOPE_TAG_user=$USER
     SCOPE_CMD_DIR
-        Specifies a directory to look dynamic configuration files.
+        Specifies a directory to look for dynamic configuration files.
         See Dynamic Configuration below.  Default is /tmp
     SCOPE_CMD_DBG_PATH
         Specifies a file path to output internal debugging information.

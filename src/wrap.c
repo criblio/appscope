@@ -4972,7 +4972,7 @@ static const char scope_help[] =
 "        Specify a tag to be applied to every metric.  Environment variable\n"
 "        expansion is available e.g. SCOPE_TAG_user=$USER\n"
 "    SCOPE_CMD_DIR\n"
-"        Specifies a directory to look dynamic configuration files.\n"
+"        Specifies a directory to look for dynamic configuration files.\n"
 "        See Dynamic Configuration below.\n"
 "        Default is /tmp\n"
 "    SCOPE_CMD_DBG_PATH\n"

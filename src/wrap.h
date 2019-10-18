@@ -205,7 +205,7 @@ typedef struct rtconfig_t {
     bool tsc_rdtscp;
     summary_t summarize;
     uint64_t freq;
-    const char *cmdpath;
+    const char *cmddir;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];
     pid_t pid;

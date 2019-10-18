@@ -9,6 +9,9 @@
 // The caller is responsible for deallocating with free().
 char* cfgPath(void);
 
+// reads cfg from yaml file
+config_t* cfgRead(const char* path);
+
 // modify cfg per environment variables
 void cfgProcessEnvironment(config_t* cfg);
 

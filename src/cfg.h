@@ -11,7 +11,6 @@ typedef struct {
 
 // Constructors Destructors
 config_t*           cfgCreateDefault();
-config_t*           cfgRead(const char* path);        // reads config from yaml file
 void                cfgDestroy(config_t**);
 
 // Accessors
@@ -46,16 +45,5 @@ void                cfgTransportBufSet(config_t*, which_transport_t, cfg_buffer_
 void                cfgCustomTagAdd(config_t*, const char*, const char*);
 void                cfgLogLevelSet(config_t*, cfg_log_level_t);
 
-
-// Setters (string-based)
-void                cfgOutFormatSetFromStr(config_t*, const char*);
-void                cfgOutStatsDPrefixSetFromStr(config_t*, const char*);
-void                cfgOutStatsDMaxLenSetFromStr(config_t*, const char*);
-void                cfgOutPeriodSetFromStr(config_t*, const char*);
-void                cfgOutCmdPathSetFromStr(config_t*, const char*);
-void                cfgOutVerbositySetFromStr(config_t*, const char*);
-void                cfgTransportSetFromStr(config_t*, which_transport_t, const char*);
-void                cfgCustomTagAddFromStr(config_t*, const char*, const char*);
-void                cfgLogLevelSetFromStr(config_t*, const char*);
 
 #endif // __CFG_H__

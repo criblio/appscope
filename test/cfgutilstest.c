@@ -275,21 +275,21 @@ cfgProcessEnvironmentCommandPath(void** state)
     assert_string_equal(cfgOutCmdPath(cfg), "/my/favorite/directory");
 
     // should override current cfg
-    assert_int_equal(setenv("SCOPE_CMD_PATH", "/my/other/dir", 1), 0);
+    assert_int_equal(setenv("SCOPE_CMD_DIR", "/my/other/dir", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_string_equal(cfgOutCmdPath(cfg), "/my/other/dir");
 
-    assert_int_equal(setenv("SCOPE_CMD_PATH", "/my/dir", 1), 0);
+    assert_int_equal(setenv("SCOPE_CMD_DIR", "/my/dir", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_string_equal(cfgOutCmdPath(cfg), "/my/dir");
 
     // if env is not defined, cfg should not be affected
-    assert_int_equal(unsetenv("SCOPE_CMD_PATH"), 0);
+    assert_int_equal(unsetenv("SCOPE_CMD_DIR"), 0);
     cfgProcessEnvironment(cfg);
     assert_string_equal(cfgOutCmdPath(cfg), "/my/dir");
 
     // empty string
-    assert_int_equal(setenv("SCOPE_CMD_PATH", "", 1), 0);
+    assert_int_equal(setenv("SCOPE_CMD_DIR", "", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_string_equal(cfgOutCmdPath(cfg), DEFAULT_COMMAND_PATH);
 
@@ -489,7 +489,7 @@ void
 cfgProcessEnvironmentCmdDebugIsIgnored(void** state)
 {
     const char* path = "/tmp/dbgoutfile.txt";
-    assert_int_equal(setenv("SCOPE_CMD_DEBUG", path, 1), 0);
+    assert_int_equal(setenv("SCOPE_CMD_DBG_PATH", path, 1), 0);
 
     long file_pos_before = fileEndPosition(path);
 
@@ -502,7 +502,7 @@ cfgProcessEnvironmentCmdDebugIsIgnored(void** state)
     // since it's not processed, the file position better not have changed.
     assert_int_equal(file_pos_before, file_pos_after);
 
-    unsetenv("SCOPE_CMD_DEBUG");
+    unsetenv("SCOPE_CMD_DBG_PATH");
     if (file_pos_after != -1) unlink(path);
 }
 
@@ -515,7 +515,7 @@ cfgProcessCommandsCmdDebugIsProcessed(void** state)
     long file_pos_before = fileEndPosition(outpath);
 
     config_t* cfg = cfgCreateDefault();
-    writeFile(inpath, "SCOPE_CMD_DEBUG=/tmp/dbgoutfile.txt");
+    writeFile(inpath, "SCOPE_CMD_DBG_PATH=/tmp/dbgoutfile.txt");
     openFileAndExecuteCfgProcessCommands(inpath, cfg);
     cfgDestroy(&cfg);
 
@@ -566,7 +566,7 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_STATSD_PREFIX=prefix\n"
         "SCOPE_STATSD_MAXLEN=1024\n"
         "SCOPE_OUT_SUM_PERIOD=11\n"
-        "SCOPE_CMD_PATH=/the/path/\n"
+        "SCOPE_CMD_DIR=/the/path/\n"
         "SCOPE_OUT_VERBOSITY=1\n"
         "SCOPE_OUT_VERBOSITY:prefix\n"     // ignored (no '=')
         "SCOPE_OUT_VERBOSITY=blah\n"       // processed, but 'blah' isn't int)
@@ -607,7 +607,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
         "SCOPE_STATSD_PREFIX=$VAR1.$MY_ENV_VAR\n"
         "SCOPE_STATSD_MAXLEN=$MAXLEN\n"
         "SCOPE_OUT_SUM_PERIOD=$PERIOD\n"
-        "SCOPE_CMD_PATH=/$MYHOME/scope/\n"
+        "SCOPE_CMD_DIR=/$MYHOME/scope/\n"
         "SCOPE_OUT_VERBOSITY=$VERBOSITY\n"
         "SCOPE_LOG_LEVEL=$LOGLEVEL\n"
         "SCOPE_OUT_DEST=file:///\\$VAR1/$MY_ENV_VAR/\n"

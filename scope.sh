@@ -11,24 +11,24 @@ print_help() {
 }
 
 determine_lib_path() {
-    if [ -z "$CRIBL_HOME" ]; then
-       export CRIBL_HOME=`pwd`
+    if [ -z "$SCOPE_HOME" ]; then
+       export SCOPE_HOME=`pwd`
     fi
 
     PLATFORM=$(determine_platform)
 
     if [ $PLATFORM == "macOS" ]; then
-        echo "$CRIBL_HOME/lib/macOS/libscope.so"
+        echo "$SCOPE_HOME/lib/macOS/libscope.so"
     elif [ $PLATFORM == "Linux" ]; then
-        echo "$CRIBL_HOME/lib/linux/libscope.so"
+        echo "$SCOPE_HOME/lib/linux/libscope.so"
     else
         echo "ERROR"
     fi
 }
 
 run_scoped_cmd() {
-    if [ -z "$CRIBL_HOME" ]; then
-       export CRIBL_HOME=`pwd`
+    if [ -z "$SCOPE_HOME" ]; then
+       export SCOPE_HOME=`pwd`
     fi
 
     PLATFORM=$(determine_platform)

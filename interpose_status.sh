@@ -21,15 +21,15 @@ fi
 # We need to resolve the scope library to see what it interposes.
 # In priority order, use:
 #  1) LD_PRELOAD / DYLD_INSERT_LIBRARIES env variables
-#  2) CRIBL_HOME if defined
+#  2) SCOPE_HOME if defined
 #  3) find from current directory
 if [[ ${LD_PRELOAD} == *"$LIB_NAME"* ]]; then
     LIB_PATH=${LD_PRELOAD}
 elif [[ ${DYLD_INSERT_LIBRARIES} == *"$LIB_NAME"* ]]; then
     LIB_PATH=${DYLD_INSERT_LIBRARIES}
-elif [ ! -z "$CRIBL_HOME" ]; then
-    if [ -f "${CRIBL_HOME}/${REL_PATH}" ]; then
-        LIB_PATH="${CRIBL_HOME}/${REL_PATH}"
+elif [ ! -z "$SCOPE_HOME" ]; then
+    if [ -f "${SCOPE_HOME}/${REL_PATH}" ]; then
+        LIB_PATH="${SCOPE_HOME}/${REL_PATH}"
     fi
 else
     LIB_FIND=`find . -type f -name "$LIB_NAME" | grep -v dSYM | head -n1`
@@ -43,7 +43,7 @@ if [ -z $LIB_PATH ]; then
     echo "Couldn't find $LIB_NAME which is required for $0 to give helpful feedback." >&2
     echo "Please rerun with one of the following changes:" >&2
     echo " o) set ${PRELOAD} env variable with path to $LIB_NAME" >&2
-    echo " o) set CRIBL_HOME env variable to a directory which could resolve ${REL_PATH}" >&2
+    echo " o) set SCOPE_HOME env variable to a directory which could resolve ${REL_PATH}" >&2
     echo " o) run this script from a directory which contains or is a parent of $LIB_NAME" >&2
     exit 1
 fi

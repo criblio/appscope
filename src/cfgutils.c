@@ -253,7 +253,7 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgOutStatsDMaxLenSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_OUT_SUM_PERIOD")) {
         cfgOutPeriodSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_CMD_PATH")) {
+    } else if (startsWith(env_line, "SCOPE_CMD_DIR")) {
         cfgOutCmdPathSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_OUT_VERBOSITY")) {
         cfgOutVerbositySetFromStr(cfg, value);
@@ -265,7 +265,7 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgTransportSetFromStr(cfg, CFG_LOG, value);
     } else if (startsWith(env_line, "SCOPE_TAG_")) {
         processCustomTag(cfg, env_line, value);
-    } else if (startsWith(env_line, "SCOPE_CMD_DEBUG")) {
+    } else if (startsWith(env_line, "SCOPE_CMD_DBG_PATH")) {
         processCmdDebug(value);
     }
 
@@ -288,7 +288,7 @@ cfgProcessEnvironment(config_t* cfg)
 
         // Some things should only be processed as commands, not as
         // environment variables.  Skip them here.
-        if (startsWith(e, "SCOPE_CMD_DEBUG")) continue;
+        if (startsWith(e, "SCOPE_CMD_DBG_PATH")) continue;
 
         // Process everything else.
         processEnvStyleInput(cfg, e);

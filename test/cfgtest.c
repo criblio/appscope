@@ -15,7 +15,7 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgOutStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
     assert_int_equal       (cfgOutVerbosity(config), DEFAULT_OUT_VERBOSITY);
     assert_int_equal       (cfgOutPeriod(config), DEFAULT_SUMMARY_PERIOD);
-    assert_string_equal    (cfgOutCmdPath(config), DEFAULT_COMMAND_PATH);
+    assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
     assert_int_equal       (cfgTransportType(config, CFG_OUT), CFG_UDP);
     assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_OUT), "8125");
@@ -128,13 +128,13 @@ cfgOutPeriodSetAndGet(void** state)
 }
 
 static void
-cfgOutCmdPathSetAndGet(void** state)
+cfgCmdDirSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
-    cfgOutCmdPathSet(config, "/some/path");
-    assert_string_equal(cfgOutCmdPath(config), "/some/path");
-    cfgOutCmdPathSet(config, NULL);
-    assert_string_equal(cfgOutCmdPath(config), DEFAULT_COMMAND_PATH);
+    cfgCmdDirSet(config, "/some/path");
+    assert_string_equal(cfgCmdDir(config), "/some/path");
+    cfgCmdDirSet(config, NULL);
+    assert_string_equal(cfgCmdDir(config), DEFAULT_COMMAND_DIR);
     cfgDestroy(&config);
 }
 
@@ -291,7 +291,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgOutStatsDMaxLenSetAndGet),
         cmocka_unit_test(cfgOutVerbositySetAndGet),
         cmocka_unit_test(cfgOutPeriodSetAndGet),
-        cmocka_unit_test(cfgOutCmdPathSetAndGet),
+        cmocka_unit_test(cfgCmdDirSetAndGet),
 
         cmocka_unit_test_prestate(cfgTransportTypeSetAndGet, out_state),
         cmocka_unit_test_prestate(cfgTransportHostSetAndGet, out_state),

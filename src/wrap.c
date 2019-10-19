@@ -140,7 +140,7 @@ doConfig(config_t *cfg)
         g_thread.startTime = time(NULL) + g_thread.interval;
     }
     setVerbosity(&g_cfg, cfgOutVerbosity(cfg));
-    g_cfg.cmdpath = cfgOutCmdPath(cfg);
+    g_cfg.cmddir = cfgCmdDir(cfg);
 
     log_t* log = initLog(cfg);
     g_out = initOut(cfg);
@@ -154,7 +154,7 @@ dynConfig(void)
     FILE *fs;
     char path[PATH_MAX];
 
-    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmdpath, DYN_CONFIG_PREFIX, g_cfg.pid);
+    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmddir, DYN_CONFIG_PREFIX, g_cfg.pid);
 
     // Is there a command file for this pid
     if (osIsFilePresent(g_cfg.pid, path) == -1) return 0;

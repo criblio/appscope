@@ -18,7 +18,7 @@ cfg_out_format_t    cfgOutFormat(config_t*);
 const char*         cfgOutStatsDPrefix(config_t*);
 unsigned            cfgOutStatsDMaxLen(config_t*);
 unsigned            cfgOutPeriod(config_t*);
-const char*         cfgOutCmdPath(config_t*);
+const char*         cfgCmdDir(config_t*);
 unsigned            cfgOutVerbosity(config_t*);
 cfg_transport_t     cfgTransportType(config_t*, which_transport_t);
 const char*         cfgTransportHost(config_t*, which_transport_t);
@@ -35,7 +35,7 @@ void                cfgOutFormatSet(config_t*, cfg_out_format_t);
 void                cfgOutStatsDPrefixSet(config_t*, const char*);
 void                cfgOutStatsDMaxLenSet(config_t*, unsigned);
 void                cfgOutPeriodSet(config_t*, unsigned);
-void                cfgOutCmdPathSet(config_t*, const char*);
+void                cfgCmdDirSet(config_t*, const char*);
 void                cfgOutVerbositySet(config_t*, unsigned);
 void                cfgTransportTypeSet(config_t*, which_transport_t, cfg_transport_t);
 void                cfgTransportHostSet(config_t*, which_transport_t, const char*);
@@ -44,6 +44,5 @@ void                cfgTransportPathSet(config_t*, which_transport_t, const char
 void                cfgTransportBufSet(config_t*, which_transport_t, cfg_buffer_t);
 void                cfgCustomTagAdd(config_t*, const char*, const char*);
 void                cfgLogLevelSet(config_t*, cfg_log_level_t);
-
 
 #endif // __CFG_H__

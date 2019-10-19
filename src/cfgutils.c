@@ -23,7 +23,7 @@ void cfgOutFormatSetFromStr(config_t*, const char*);
 void cfgOutStatsDPrefixSetFromStr(config_t*, const char*);
 void cfgOutStatsDMaxLenSetFromStr(config_t*, const char*);
 void cfgOutPeriodSetFromStr(config_t*, const char*);
-void cfgOutCmdPathSetFromStr(config_t*, const char*);
+void cfgCmdDirSetFromStr(config_t*, const char*);
 void cfgOutVerbositySetFromStr(config_t*, const char*);
 void cfgTransportSetFromStr(config_t*, which_transport_t, const char*);
 void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
@@ -273,7 +273,7 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
     } else if (startsWith(env_line, "SCOPE_OUT_SUM_PERIOD")) {
         cfgOutPeriodSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_CMD_DIR")) {
-        cfgOutCmdPathSetFromStr(cfg, value);
+        cfgCmdDirSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_OUT_VERBOSITY")) {
         cfgOutVerbositySetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_LOG_LEVEL")) {
@@ -374,10 +374,10 @@ cfgOutPeriodSetFromStr(config_t* cfg, const char* value)
 }
 
 void
-cfgOutCmdPathSetFromStr(config_t* cfg, const char* value)
+cfgCmdDirSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    cfgOutCmdPathSet(cfg, value);
+    cfgCmdDirSet(cfg, value);
 }
 
 void
@@ -688,7 +688,7 @@ static void
 processCommandPath(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
-    cfgOutCmdPathSetFromStr(config, value);
+    cfgCmdDirSetFromStr(config, value);
     if (value) free(value);
 }
 
@@ -701,7 +701,7 @@ processOutput(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_MAPPING_NODE, "format",          processFormat},
         {YAML_MAPPING_NODE, "transport",       processTransport},
         {YAML_SCALAR_NODE,  "summaryperiod",   processSummaryPeriod},
-        {YAML_SCALAR_NODE,  "commandpath",     processCommandPath},
+        {YAML_SCALAR_NODE,  "commanddir",     processCommandPath},
         {YAML_NO_NODE, NULL, NULL}
     };
 

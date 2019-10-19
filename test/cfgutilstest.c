@@ -1064,6 +1064,8 @@ cfgReadEnvSubstitution(void** state)
     unsetenv("PERIOD");
     unsetenv("VERBOSITY");
     unsetenv("LOGLEVEL");
+
+    deleteFile(path);
 }
 
 void

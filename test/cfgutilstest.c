@@ -271,27 +271,27 @@ void
 cfgProcessEnvironmentCommandPath(void** state)
 {
     config_t* cfg = cfgCreateDefault();
-    cfgOutCmdPathSet(cfg, "/my/favorite/directory");
-    assert_string_equal(cfgOutCmdPath(cfg), "/my/favorite/directory");
+    cfgCmdDirSet(cfg, "/my/favorite/directory");
+    assert_string_equal(cfgCmdDir(cfg), "/my/favorite/directory");
 
     // should override current cfg
     assert_int_equal(setenv("SCOPE_CMD_DIR", "/my/other/dir", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgOutCmdPath(cfg), "/my/other/dir");
+    assert_string_equal(cfgCmdDir(cfg), "/my/other/dir");
 
     assert_int_equal(setenv("SCOPE_CMD_DIR", "/my/dir", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgOutCmdPath(cfg), "/my/dir");
+    assert_string_equal(cfgCmdDir(cfg), "/my/dir");
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv("SCOPE_CMD_DIR"), 0);
     cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgOutCmdPath(cfg), "/my/dir");
+    assert_string_equal(cfgCmdDir(cfg), "/my/dir");
 
     // empty string
     assert_int_equal(setenv("SCOPE_CMD_DIR", "", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgOutCmdPath(cfg), DEFAULT_COMMAND_PATH);
+    assert_string_equal(cfgCmdDir(cfg), DEFAULT_COMMAND_DIR);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -582,7 +582,7 @@ cfgProcessCommandsFromFile(void** state)
     assert_string_equal(cfgOutStatsDPrefix(cfg), "prefix.");
     assert_int_equal(cfgOutStatsDMaxLen(cfg), 1024);
     assert_int_equal(cfgOutPeriod(cfg), 11);
-    assert_string_equal(cfgOutCmdPath(cfg), "/the/path/");
+    assert_string_equal(cfgCmdDir(cfg), "/the/path/");
     assert_int_equal(cfgOutVerbosity(cfg), 1);
     assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/tmp/file.tmp");
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/file.tmp2");
@@ -633,7 +633,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_string_equal(cfgOutStatsDPrefix(cfg), "longer.shorter.");
     assert_int_equal(cfgOutStatsDMaxLen(cfg), 1024);
     assert_int_equal(cfgOutPeriod(cfg), 11);
-    assert_string_equal(cfgOutCmdPath(cfg), "/home/mydir/scope/");
+    assert_string_equal(cfgCmdDir(cfg), "/home/mydir/scope/");
     assert_int_equal(cfgOutVerbosity(cfg), 1);
     // test escaped substitution  (a match preceeded by '\')
     assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/$VAR1/shorter/");

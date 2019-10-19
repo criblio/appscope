@@ -254,7 +254,7 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
     } else if (startsWith(env_line, "SCOPE_OUT_SUM_PERIOD")) {
         cfgOutPeriodSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_CMD_DIR")) {
-        cfgOutCmdPathSetFromStr(cfg, value);
+        cfgCmdDirSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_OUT_VERBOSITY")) {
         cfgOutVerbositySetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_LOG_LEVEL")) {

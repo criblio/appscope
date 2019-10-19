@@ -39,4 +39,17 @@ void                 dbgAddLine(const char* key, const char* fmt, ...);
 
 #define DBG(...) dbgAddLine(DBG_FILE_AND_LINE, ## __VA_ARGS__)
 
+//
+//  Dynamic commands allow this information to be output from an actively
+//  running process, with process ID <pid>.  It just runs dbgDumpAll(),
+//  outputting the results to the file specified by SCOPE_CMD_DBG_PATH.
+//  To do this with default configuation settings, run this command and
+//  output should appear in /tmp/mydbg.txt within a SCOPE_OUT_SUM_PERIOD:
+//
+//     echo "SCOPE_CMD_DBG_PATH=/tmp/mydbg.txt" >> /tmp/scope.<pid>
+//
+
+
+
+
 #endif // __DBG_H__

@@ -997,6 +997,76 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
 }
 
 void
+cfgReadEnvSubstitution(void** state)
+{
+
+    // Set env varibles to test indirect substitution
+    assert_int_equal(setenv("VAR1", "longer", 1), 0);
+    assert_int_equal(setenv("MY_ENV_VAR", "shorter", 1), 0);
+    assert_int_equal(setenv("MAXLEN", "1024", 1), 0);
+    assert_int_equal(setenv("DEST", "/tmp/file.tmp2", 1), 0);
+    assert_int_equal(setenv("PERIOD", "11", 1), 0);
+    assert_int_equal(setenv("MYHOME", "home/mydir", 1), 0);
+    assert_int_equal(setenv("VERBOSITY", "1", 1), 0);
+    assert_int_equal(setenv("LOGLEVEL", "trace", 1), 0);
+
+    const char* yamlText =
+        "---\n"
+        "output:\n"
+        "  format:\n"
+        "    type: newlinedelimited\n"
+        "    statsdprefix : $VAR1.$MY_ENV_VAR\n"
+        "    statsdmaxlen : $MAXLEN\n"
+        "    verbosity: $VERBOSITY\n"
+        "    tags:\n"
+        "    - CUSTOM: $PERIOD\n"
+        "    - whyyoumadbro: 'Bill owes me $5.00'\n"
+        "    - undefined: $UNDEFINEDENV\n"
+        "  transport:\n"
+        "    type: file\n"
+        "    path: /\\$VAR1/$MY_ENV_VAR/\n"
+        "    buffering: line\n"
+        "  summaryperiod: $PERIOD\n"
+        "  commandpath: /$MYHOME/scope/\n"
+        "logging:\n"
+        "  level: $LOGLEVEL\n"
+        "  transport:\n"
+        "    buffering: full\n"
+        "    type: file\n"
+        "    path: $DEST\n"
+        "...\n";
+    const char* path = CFG_FILE_NAME;
+    writeFile(path, yamlText);
+    config_t* cfg = cfgRead(path);
+    assert_non_null(cfg);
+
+    // test substitute env values that are longer and shorter than they env name
+    assert_string_equal(cfgOutStatsDPrefix(cfg), "longer.shorter.");
+    assert_int_equal(cfgOutStatsDMaxLen(cfg), 1024);
+    assert_int_equal(cfgOutPeriod(cfg), 11);
+    assert_string_equal(cfgOutCmdPath(cfg), "/home/mydir/scope/");
+    assert_int_equal(cfgOutVerbosity(cfg), 1);
+    // test escaped substitution  (a match preceeded by '\')
+    assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/$VAR1/shorter/");
+    assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/file.tmp2");
+    assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM"), "11");
+    // test lookups that aren't found: $5 and $UNDEFINEDENV
+    assert_string_equal(cfgCustomTagValue(cfg, "whyyoumadbro"), "Bill owes me $5.00");
+    assert_string_equal(cfgCustomTagValue(cfg, "undefined"), "$UNDEFINEDENV");
+    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
+
+    cfgDestroy(&cfg);
+
+    unsetenv("VAR1");
+    unsetenv("MY_ENV_VAR");
+    unsetenv("MAXLEN");
+    unsetenv("DEST");
+    unsetenv("PERIOD");
+    unsetenv("VERBOSITY");
+    unsetenv("LOGLEVEL");
+}
+
+void
 initLogReturnsPtr(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -1082,6 +1152,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgReadBadYamlReturnsDefaults),
         cmocka_unit_test(cfgReadExtraFieldsAreHarmless),
         cmocka_unit_test(cfgReadYamlOrderWithinStructureDoesntMatter),
+        cmocka_unit_test(cfgReadEnvSubstitution),
         cmocka_unit_test(initLogReturnsPtr),
         cmocka_unit_test(initOutReturnsPtr),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),

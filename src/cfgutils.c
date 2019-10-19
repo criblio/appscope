@@ -160,7 +160,7 @@ envRegexFree(void** state)
 }
 
 static char*
-doEnvVariableSubstitution(char* value)
+doEnvVariableSubstitution(const char* value)
 {
     if (!value) return NULL;
 
@@ -174,8 +174,8 @@ doEnvVariableSubstitution(char* value)
         return NULL;
     }
 
-    char* outptr = outval;  // "tail" pointer where text can be appended
-    char* inptr = value;    // "current" pointer as we scan through value
+    char* outptr = outval;       // "tail" pointer where text can be appended
+    char* inptr = (char*) value; // "current" pointer as we scan through value
 
     while (re && !regexec(re, inptr, 1, &match, 0)) {
 
@@ -458,6 +458,14 @@ cfgLogLevelSetFromStr(config_t* cfg, const char* value)
 
 typedef void (*node_fn)(config_t*, yaml_document_t*, yaml_node_t*);
 
+static char*
+stringVal(yaml_node_t* node)
+{
+    if (!node || (node->type != YAML_SCALAR_NODE)) return NULL;
+    const char* nodeStr = (const char*) node->data.scalar.value;
+    return doEnvVariableSubstitution(nodeStr);
+}
+
 typedef struct {
     yaml_node_type_t type;
     char* key;
@@ -489,68 +497,68 @@ processKeyValuePair(parse_table_t* t, yaml_node_pair_t* pair, config_t* config, 
 static void
 processLevel(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (char *)node->data.scalar.value;
+    char* value = stringVal(node);
     cfgLogLevelSetFromStr(config, value);
+    if (value) free(value);
 }
 
 static void
 processTransportType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
+    char* value = stringVal(node);
     which_transport_t c = transport_context;
-    if (!strcmp(v_str, "udp")) {
+    if (!strcmp(value, "udp")) {
         cfgTransportTypeSet(config, c, CFG_UDP);
-    } else if (!strcmp(v_str, "unix")) {
+    } else if (!strcmp(value, "unix")) {
         cfgTransportTypeSet(config, c, CFG_UNIX);
-    } else if (!strcmp(v_str, "file")) {
+    } else if (!strcmp(value, "file")) {
         cfgTransportTypeSet(config, c, CFG_FILE);
-    } else if (!strcmp(v_str, "syslog")) {
+    } else if (!strcmp(value, "syslog")) {
         cfgTransportTypeSet(config, c, CFG_SYSLOG);
-    } else if (!strcmp(v_str, "shm")) {
+    } else if (!strcmp(value, "shm")) {
         cfgTransportTypeSet(config, c, CFG_SHM);
     }
+    if (value) free(value);
 }
 
 static void
 processHost(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
+    char* value = stringVal(node);
     which_transport_t c = transport_context;
-    cfgTransportHostSet(config, c, v_str);
+    cfgTransportHostSet(config, c, value);
+    if (value) free(value);
 }
 
 static void
 processPort(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
+    char* value = stringVal(node);
     which_transport_t c = transport_context;
-    cfgTransportPortSet(config, c, v_str);
+    cfgTransportPortSet(config, c, value);
+    if (value) free(value);
 }
 
 static void
 processPath(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
+    char* value = stringVal(node);
     which_transport_t c = transport_context;
-    cfgTransportPathSet(config, c, v_str);
+    cfgTransportPathSet(config, c, value);
+    if (value) free(value);
 }
 
 static void
 processBuf(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
+    char* value = stringVal(node);
     which_transport_t c = transport_context;
-    if (!strcmp(v_str, "line")) {
+    if (!strcmp(value, "line")) {
         cfgTransportBufSet(config, c, CFG_BUFFER_LINE);
-    } else if (!strcmp(v_str, "full")) {
+    } else if (!strcmp(value, "full")) {
         cfgTransportBufSet(config, c, CFG_BUFFER_FULLY);
     }
+    if (value) free(value);
 }
 
 static void
@@ -605,46 +613,46 @@ processTags(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         yaml_node_pair_t* pair = i->data.mapping.pairs.start;
         yaml_node_t* key = yaml_document_get_node(doc, pair->key);
         yaml_node_t* value = yaml_document_get_node(doc, pair->value);
-        if (key->type != YAML_SCALAR_NODE) return;
-        if (value->type != YAML_SCALAR_NODE) return;
 
-        const char* key_str = (const char*)key->data.scalar.value;
-        const char* value_str = (const char*)value->data.scalar.value;
+        char* key_str = stringVal(key);
+        char* value_str = stringVal(value);
 
         cfgCustomTagAddFromStr(config, key_str, value_str);
+        if (key_str) free(key_str);
+        if (value_str) free(value_str);
     }
 }
 
 static void
 processFormatType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (const char *)node->data.scalar.value;
+    char* value = stringVal(node);
     cfgOutFormatSetFromStr(config, value);
+    if (value) free(value);
 }
 
 static void
 processStatsDPrefix(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (const char *)node->data.scalar.value;
+    char* value = stringVal(node);
     cfgOutStatsDPrefixSetFromStr(config, value);
+    if (value) free(value);
 }
 
 static void
 processStatsDMaxLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (const char *)node->data.scalar.value;
+    char* value = stringVal(node);
     cfgOutStatsDMaxLenSetFromStr(config, value);
+    if (value) free(value);
 }
 
 static void
 processVerbosity(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (const char *)node->data.scalar.value;
+    char* value = stringVal(node);
     cfgOutVerbositySetFromStr(config, value);
+    if (value) free(value);
 }
 
 static void
@@ -671,17 +679,17 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 static void
 processSummaryPeriod(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (const char *)node->data.scalar.value;
+    char* value = stringVal(node);
     cfgOutPeriodSetFromStr(config, value);
+    if (value) free(value);
 }
 
 static void
 processCommandPath(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (const char *)node->data.scalar.value;
+    char* value = stringVal(node);
     cfgOutCmdPathSetFromStr(config, value);
+    if (value) free(value);
 }
 
 static void

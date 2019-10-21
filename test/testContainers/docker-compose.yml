@@ -36,3 +36,9 @@ services:
       dockerfile: ./nginx/Dockerfile
 
     command: -v # verbose output
+
+
+  interposed_func:
+    build:
+      context: .
+      dockerfile: ./interposed_func/Dockerfile

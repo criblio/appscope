@@ -20,9 +20,12 @@ RUN cd /opt/test &&  wget https://github.com/linux-test-project/ltp/archive/mast
 
 RUN cd /opt/test/ltp && make autotools && ./configure && make -j
 
-ADD http://cdn.cribl.io/dl/scope/latest/linux/libwrap.so /usr/lib/libwrap.so
+ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 
-COPY ./ltp_test_runner/ /opt/scope-test/
+COPY ./interposed_func/altp /opt/test/altp
+RUN cd /opt/test/altp && make -j
+
+COPY ./interposed_func_test_runner /opt/scope-test/
 
 ENTRYPOINT ["python", "/opt/scope-test/runner.py"]
 CMD ["--config", "/opt/scope-test/.runner.conf"]

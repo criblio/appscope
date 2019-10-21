@@ -21,7 +21,7 @@ class NginxApplicationController(AppController):
         cmd = ["nginx", "-g", "daemon off;"]
         env = os.environ.copy()
         if scoped:
-            env["LD_PRELOAD"] = "/usr/lib/libwrap.so"
+            env["LD_PRELOAD"] = "/usr/lib/libscope.so"
         logging.debug(f"Command is {cmd}. Environment {env}")
 
         self.proc = subprocess.Popen(cmd, env=env)

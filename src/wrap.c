@@ -1109,7 +1109,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         // if called from an event, we update counters
-        if (source == EVENT_BASED) {
+        if ((source == EVENT_BASED) && size) {
             if (size < 0) {
                atomicSubU64(value, labs(size));
             } else {
@@ -1695,9 +1695,9 @@ reportFD(int fd, enum control_type_t source)
             doNetMetric(NETRX, fd, source, 0);
         }
         if (!g_cfg.summarize.net.open_close) {
-            doNetMetric(OPEN_PORTS, fd, source, -1);
-            doNetMetric(NET_CONNECTIONS, fd, source, -1);
-            doNetMetric(CONNECTION_DURATION, fd, source, -1);
+            doNetMetric(OPEN_PORTS, fd, source, 0);
+            doNetMetric(NET_CONNECTIONS, fd, source, 0);
+            doNetMetric(CONNECTION_DURATION, fd, source, 0);
         }
     }
 
@@ -2005,12 +2005,12 @@ doClose(int fd, const char *func)
     struct net_info_t *ninfo;
     struct fs_info_t *fsinfo;
 
-    // report everything before the info is lost
-    reportFD(fd, EVENT_BASED);
-
     if ((ninfo = getNetEntry(fd)) != NULL) {
 
-        memset(ninfo, 0, sizeof(struct net_info_t));
+        doNetMetric(OPEN_PORTS, fd, EVENT_BASED, -1);
+        doNetMetric(NET_CONNECTIONS, fd, EVENT_BASED, -1);
+        doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED, -1);
+
         if (func) {
             char buf[64];
             snprintf(buf, sizeof(buf), "%s: network", func);
@@ -2020,15 +2020,22 @@ doClose(int fd, const char *func)
 
     // Check both file desriptor tables
     if ((fsinfo = getFSEntry(fd)) != NULL) {
+
+        doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 0, NULL);
+
         if (func) {
             char buf[64];
             snprintf(buf, sizeof(buf), "%s: file", func);
             scopeLog(buf, fd, CFG_LOG_TRACE);
         }
-        
-        doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 0, NULL);
-        memset(fsinfo, 0, sizeof(struct fs_info_t));
     }
+
+    // report everything before the info is lost
+    reportFD(fd, EVENT_BASED);
+
+    if (ninfo) memset(ninfo, 0, sizeof(struct net_info_t));
+    if (fsinfo) memset(fsinfo, 0, sizeof(struct fs_info_t));
+
 }
 
 static void

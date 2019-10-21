@@ -61,7 +61,7 @@ class Runner:
         if wrapped:
             env['LD_PRELOAD'] = self.__lib_path
 
-        p = subprocess.Popen('./' + test, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=test_path, env=env)
+        p = subprocess.Popen('./' + test, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=test_path, env=env, universal_newlines=True)
 
         try:
             stdout, stderr = p.communicate(timeout=self.__process_timeout)

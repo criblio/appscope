@@ -138,7 +138,7 @@ class Watcher:
             "start_date": self.__start_date.isoformat(),
             "finish_date": self.__finish_date.isoformat(),
             "total_tests": len(self.__results),
-            "failed_tests": len(filter(lambda v: v["failed"], self.__results.values())),
+            "failed_tests": len([v for v in self.__results.values() if v["failed"]]),
         })
 
         if self.__verbose: self.__print(summary_row)

@@ -19,13 +19,13 @@ int do_test() {
     
     if(pFile != NULL) {
         if(fputc(c, pFile) == EOF) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         }
         if(fclose(pFile) == EOF) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         }
     } else {
-        test_result = EXIT_FAILURE;
+        TEST_ERROR();
     }
 
     pFile = fopen(tmp_file_name, "r");
@@ -33,13 +33,13 @@ int do_test() {
     if(pFile != NULL) {
         c = fgetc(pFile);
         if(c == EOF || c != TEST_CHAR) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         } 
         if(fclose(pFile) == EOF) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         }
     } else {
-        test_result = EXIT_FAILURE;
+        TEST_ERROR();
     }
     
     unlink(tmp_file_name);

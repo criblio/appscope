@@ -19,13 +19,13 @@ int do_test() {
     
     if(pFile != NULL) {
         if(sizeof(buffer) != fwrite(buffer, 1, sizeof(buffer), pFile)) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         }
         if(fclose(pFile) == EOF) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         }
     } else {
-        test_result = EXIT_FAILURE;
+        TEST_ERROR();
     }
     
     pFile = fopen(tmp_file_name, "r");
@@ -33,18 +33,18 @@ int do_test() {
     if(pFile != NULL) {
         memset(buffer, 0, sizeof(buffer));
         if(sizeof(buffer) != fread(buffer, 1, sizeof(buffer), pFile)) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         } else {
             if(strcmp(buffer, TEST_MSG) != 0) {
-                test_result = EXIT_FAILURE;
+                TEST_ERROR();
             }
         }
 
         if(fclose(pFile) == EOF) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         }
     } else {
-        test_result = EXIT_FAILURE;
+        TEST_ERROR();
     }
 
     unlink(tmp_file_name);

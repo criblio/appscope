@@ -22,17 +22,17 @@ int do_test() {
     if(pFile != NULL) {
         for(i = 0; i < 100; i++) {
             if(fputws(buffer, pFile) == EOF) {
-                test_result = EXIT_FAILURE;
+                TEST_ERROR();
                 break;
             }
         }
     
         if(fclose(pFile) == EOF) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         }
         unlink(tmp_file_name);
     } else {
-        test_result = EXIT_FAILURE;
+        TEST_ERROR();
     }
     
     REMOVE_TMP_DIR();

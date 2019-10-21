@@ -21,16 +21,16 @@ int do_test() {
     if(pFile != NULL) {
         for(i = 0; i < 100; i++) {
             if(fputc(c, pFile) == EOF) {
-                test_result = EXIT_FAILURE;
+                TEST_ERROR();
                 break;
             }
         }
     
         if(fclose(pFile) == EOF) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         }
     } else {
-        test_result = EXIT_FAILURE;
+        TEST_ERROR();
     }
 
     pFile = fopen(tmp_file_name, "r");
@@ -39,16 +39,16 @@ int do_test() {
         for(i = 0; i < 100; i++) {
             c = fgetc(pFile);
             if(c == EOF || c != TEST_CHAR) {
-                test_result = EXIT_FAILURE;
+                TEST_ERROR();
                 break;
             }
         }
     
         if(fclose(pFile) == EOF) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         }
     } else {
-        test_result = EXIT_FAILURE;
+        TEST_ERROR();
     }
 
     unlink(tmp_file_name);

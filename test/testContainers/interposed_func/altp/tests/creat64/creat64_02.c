@@ -20,11 +20,11 @@ int do_test() {
         int fd = creat64(file_name, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP );
         if(fd != EOF ) {
             if(close(fd) == EOF) {
-                test_result = EXIT_FAILURE;
+                TEST_ERROR();
             }
             unlink(file_name);
         } else {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
             break;
         }
     }

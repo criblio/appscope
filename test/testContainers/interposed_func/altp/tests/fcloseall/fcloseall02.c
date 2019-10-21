@@ -20,13 +20,13 @@ int do_test() {
 	FILE* pFile = fopen(file_name, "w");
     
 	if(pFile == NULL) {
-	    test_result = EXIT_FAILURE;
+	    TEST_ERROR();
 	    break;
 	}
     }
     
     if(fcloseall() == EOF) {
-        test_result = EXIT_FAILURE;
+        TEST_ERROR();
     }
 
     for(i = 0; i < 100; i++) {

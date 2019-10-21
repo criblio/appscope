@@ -1,6 +1,9 @@
+#ifndef __PRINT_RESULT_H__
+#define __PRINT_RESULT_H__
+
 #include <stdio.h>
 
-void reset () {
+void reset() {
     printf("\033[0m");
 }
 
@@ -20,3 +23,4 @@ void print_passed() {
     reset();
 }
     
+#endif /* __PRINT_RESULT_H__ */

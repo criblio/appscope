@@ -20,15 +20,15 @@ int do_test() {
     
     if(pFile != NULL) {
         if(fputws(buffer, pFile) == EOF) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         }
 
         if(fclose(pFile) == EOF) {
-            test_result = EXIT_FAILURE;
+            TEST_ERROR();
         }
         unlink(tmp_file_name);
     } else {
-       test_result = EXIT_FAILURE;
+       TEST_ERROR();
     }
     
     REMOVE_TMP_DIR();

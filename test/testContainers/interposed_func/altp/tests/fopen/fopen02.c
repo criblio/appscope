@@ -21,11 +21,11 @@ int do_test() {
         
     	if(pFile != NULL) {
             if(fclose(pFile) == EOF) {
-                test_result = EXIT_FAILURE;
+                TEST_ERROR();
             }
         	unlink(file_name);
     	} else {
-    	    test_result = EXIT_FAILURE;
+    	    TEST_ERROR();
     	    break;
     	}
     }

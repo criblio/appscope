@@ -1,11 +1,12 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#include "atomic.h"
 #include "cfg.h"
-#include "scopetypes.h"
 #include "cfgutils.h"
 #include "dbg.h"
 #include "log.h"
 #include "out.h"
+#include "scopetypes.h"
 #include "wrap.h"
 
 interposed_funcs g_fn;
@@ -87,24 +88,24 @@ dumpAddrs(int sd, enum control_type_t endp)
     }
 }
 
-#define DATA_FIELD(val)         STRFIELD("data",             val,        1)
-#define UNIT_FIELD(val)         STRFIELD("unit",             val,        1)
-#define CLASS_FIELD(val)        STRFIELD("class",            val,        2)
-#define PROTO_FIELD(val)        STRFIELD("proto",            val,        2)
-#define OP_FIELD(val)           STRFIELD("op",               val,        3)
-#define HOST_FIELD(val)         STRFIELD("host",             val,        4)
-#define PROC_FIELD(val)         STRFIELD("proc",             val,        4)
-#define DOMAIN_FIELD(val)       STRFIELD("domain",           val,        5)
-#define FILE_FIELD(val)         STRFIELD("file",             val,        5)
-#define LOCALIP_FIELD(val)      STRFIELD("localip",          val,        6)
-#define REMOTEIP_FIELD(val)     STRFIELD("remoteip",         val,        6)
-#define LOCALP_FIELD(val)       NUMFIELD("localp",           val,        6)
-#define PORT_FIELD(val)         NUMFIELD("port",             val,        6)
-#define REMOTEP_FIELD(val)      NUMFIELD("remotep",          val,        6)
-#define FD_FIELD(val)           NUMFIELD("fd",               val,        7)
-#define PID_FIELD(val)          NUMFIELD("pid",              val,        7)
-#define DURATION_FIELD(val)     NUMFIELD("duration",         val,        8)
-#define NUMOPS_FIELD(val)       NUMFIELD("numops",           val,        8)
+#define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
+#define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)
+#define CLASS_FIELD(val)        STRFIELD("class",          (val),        2)
+#define PROTO_FIELD(val)        STRFIELD("proto",          (val),        2)
+#define OP_FIELD(val)           STRFIELD("op",             (val),        3)
+#define HOST_FIELD(val)         STRFIELD("host",           (val),        4)
+#define PROC_FIELD(val)         STRFIELD("proc",           (val),        4)
+#define DOMAIN_FIELD(val)       STRFIELD("domain",         (val),        5)
+#define FILE_FIELD(val)         STRFIELD("file",           (val),        5)
+#define LOCALIP_FIELD(val)      STRFIELD("localip",        (val),        6)
+#define REMOTEIP_FIELD(val)     STRFIELD("remoteip",       (val),        6)
+#define LOCALP_FIELD(val)       NUMFIELD("localp",         (val),        6)
+#define PORT_FIELD(val)         NUMFIELD("port",           (val),        6)
+#define REMOTEP_FIELD(val)      NUMFIELD("remotep",        (val),        6)
+#define FD_FIELD(val)           NUMFIELD("fd",             (val),        7)
+#define PID_FIELD(val)          NUMFIELD("pid",            (val),        7)
+#define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
+#define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
 
 static void
 setVerbosity(rtconfig* c, unsigned verbosity)
@@ -347,7 +348,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
     case NET_ERR_CONN:
     case NET_ERR_RX_TX:
     {
-        int* value = NULL;
+        uint64_t* value = NULL;
         const char* class = "UNKNOWN";
         switch (type) {
             case NET_ERR_CONN:
@@ -364,7 +365,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
         }
 
         if (source == EVENT_BASED) {
-            atomicAdd(value, 1);
+            atomicAddU64(value, 1);
         }
 
         // Only report if enabled
@@ -390,7 +391,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
             scopeLog("ERROR: doErrorMetric:NET:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
-        atomicSet(value, 0);
+        atomicSwapU64(value, 0);
         break;
     }
 
@@ -401,7 +402,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
     {
 
         const char* metric = NULL;
-        int* value = NULL;
+        uint64_t* value = NULL;
         const char* class = "UNKNOWN";
         int* summarize = NULL;
         event_field_t file_field = FILE_FIELD(name);
@@ -442,7 +443,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
         }
 
         if (source == EVENT_BASED) {
-            atomicAdd(value, 1);
+            atomicAddU64(value, 1);
         }
 
         // Only report if enabled
@@ -469,7 +470,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
             scopeLog("ERROR: doErrorMetric:FS_ERR:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
-        atomicSet(value, 0);
+        atomicSwapU64(value, 0);
         break;
     }
 
@@ -483,53 +484,73 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
 {
     if (!domain) return;
 
-
-    // Both DNS metrics use duration...
-    uint64_t ldur = 0ULL;
-    ldur = duration / 1000000;  // Converts ns to ms
-
     switch (type) {
     case DNS:
     {
-        event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
-            DOMAIN_FIELD(domain),
-            DURATION_FIELD(ldur),
-            UNIT_FIELD("request"),
-            FIELDEND
-        };
-
-        atomicAdd(&g_ctrs.numDNS, 1);
+        atomicAddU64(&g_ctrs.numDNS, 1);
 
         // Only report if enabled
         if (g_cfg.summarize.net.dns) {
             return;
         }
-    
-        event_t e = {"net.dns", 1, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doDNSMetricName:DNS:outSendEvent", -1, CFG_LOG_ERROR);
-        }
-        break;
-    }
 
-    case DNS_DURATION:
-    {
+        // Don't report zeros.
+        if (g_ctrs.numDNS == 0) return;
+
         event_field_t fields[] = {
             PROC_FIELD(g_cfg.procname),
             PID_FIELD(g_cfg.pid),
             HOST_FIELD(g_cfg.hostname),
             DOMAIN_FIELD(domain),
+            DURATION_FIELD(duration / 1000000), // convert ns to ms.
+            UNIT_FIELD("request"),
+            FIELDEND
+        };
+
+        event_t e = {"net.dns", g_ctrs.numDNS, DELTA, fields};
+        if (outSendEvent(g_out, &e)) {
+            scopeLog("ERROR: doDNSMetricName:DNS:outSendEvent", -1, CFG_LOG_ERROR);
+        }
+        atomicSwapU64(&g_ctrs.numDNS, 0);
+        break;
+    }
+
+    case DNS_DURATION:
+    {
+        atomicAddU64(&g_ctrs.dnsDurationNum, 1);
+        atomicAddU64(&g_ctrs.dnsDurationTotal, duration);
+
+        // Only report if enabled
+        if (g_cfg.summarize.net.dns) {
+            return;
+        }
+
+        uint64_t d = 0ULL;
+        int cachedDurationNum = g_ctrs.dnsDurationNum; // avoid div by zero
+        if (cachedDurationNum >= 1) {
+            // factor of 1000000 converts ns to ms.
+            d = g_ctrs.dnsDurationTotal / ( 1000000 * cachedDurationNum);
+        }
+
+        // Don't report zeros.
+        if (d == 0ULL) return;
+
+        event_field_t fields[] = {
+            PROC_FIELD(g_cfg.procname),
+            PID_FIELD(g_cfg.pid),
+            HOST_FIELD(g_cfg.hostname),
+            DOMAIN_FIELD(domain),
+            NUMOPS_FIELD(cachedDurationNum),
             UNIT_FIELD("millisecond"),
             FIELDEND
         };
 
-        event_t e = {"net.dns.duration", ldur, DELTA_MS, fields};
+        event_t e = {"net.dns.duration", d, DELTA_MS, fields};
         if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doDNSMetricName:DNS:outSendEvent", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: doDNSMetricName:DNS_DURATION:outSendEvent", -1, CFG_LOG_ERROR);
         }
+        atomicSwapU64(&g_ctrs.dnsDurationNum, 0);
+        atomicSwapU64(&g_ctrs.dnsDurationTotal, 0);
         break;
     }
 
@@ -537,7 +558,6 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
         scopeLog("ERROR: doDNSMetric:metric type", -1, CFG_LOG_ERROR);
     }
 
-    //atomicSet(&g_ctrs.numDNS, 0);
 }
 
 static void
@@ -623,7 +643,7 @@ static void
 doStatMetric(const char *op, const char *pathname)
 {
 
-    atomicAdd(&g_ctrs.numStat, 1);
+    atomicAddU64(&g_ctrs.numStat, 1);
 
     event_field_t fields[] = {
             PROC_FIELD(g_cfg.procname),
@@ -646,7 +666,7 @@ doStatMetric(const char *op, const char *pathname)
         scopeLog("doStatMetric", -1, CFG_LOG_ERROR);
     }
 
-    //atomicSet(&g_ctrs.numStat, 0);
+    //atomicSwapU64(&g_ctrs.numStat, 0);
 }
 
 static void
@@ -665,8 +685,10 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     {
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
-            atomicAdd(&g_fsinfo[fd].numDuration, 1);
-            atomicAdd(&g_fsinfo[fd].totalDuration, size);
+            atomicAddU64(&g_fsinfo[fd].numDuration, 1);
+            atomicAddU64(&g_fsinfo[fd].totalDuration, size);
+            atomicAddU64(&g_ctrs.fsDurationNum, 1);
+            atomicAddU64(&g_ctrs.fsDurationTotal, size);
         }
 
         // Only report if enabled
@@ -675,10 +697,10 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         uint64_t d = 0ULL;
-        int cachedDuration = g_fsinfo[fd].numDuration; // avoid div by zero
-        if (cachedDuration >= 1) {
+        int cachedDurationNum = g_fsinfo[fd].numDuration; // avoid div by zero
+        if (cachedDurationNum >= 1) {
             // factor of 1000 converts ns to us.
-            d = g_fsinfo[fd].totalDuration / ( 1000 * cachedDuration);
+            d = g_fsinfo[fd].totalDuration / ( 1000 * cachedDurationNum);
         }
 
         // Don't report zeros.
@@ -691,7 +713,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             HOST_FIELD(g_cfg.hostname),
             OP_FIELD(op),
             FILE_FIELD(g_fsinfo[fd].path),
-            NUMOPS_FIELD(g_fsinfo[fd].numDuration),
+            NUMOPS_FIELD(cachedDurationNum),
             UNIT_FIELD("microsecond"),
             FIELDEND
         };
@@ -701,8 +723,10 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         // Reset the info if we tried to report
-        atomicSet(&g_fsinfo[fd].numDuration, 0);
-        atomicSet(&g_fsinfo[fd].totalDuration, 0);
+        atomicSwapU64(&g_fsinfo[fd].numDuration, 0);
+        atomicSwapU64(&g_fsinfo[fd].totalDuration, 0);
+        atomicSwapU64(&g_ctrs.fsDurationNum, 0);
+        atomicSwapU64(&g_ctrs.fsDurationTotal, 0);
         break;        
     }
 
@@ -710,9 +734,9 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     case FS_WRITE:
     {
         const char* metric = "UNKNOWN";
-        int* numops = NULL;
-        int* sizebytes = NULL;
-        int* global_counter = NULL;
+        uint64_t* numops = NULL;
+        uint64_t* sizebytes = NULL;
+        uint64_t* global_counter = NULL;
         const char* err_str = "UNKNOWN";
         switch (type) {
             case FS_READ:
@@ -736,9 +760,9 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
-            atomicAdd(numops, 1);
-            atomicAdd(sizebytes, size);
-            atomicAdd(global_counter, size); // not by fd
+            atomicAddU64(numops, 1);
+            atomicAddU64(sizebytes, size);
+            atomicAddU64(global_counter, size); // not by fd
         }
 
         // Only report if enabled
@@ -766,9 +790,9 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         // Reset the info if we tried to report
-        atomicSet(numops, 0);
-        atomicSet(sizebytes, 0);
-        //atomicSet(global_counter, 0);
+        atomicSwapU64(numops, 0);
+        atomicSwapU64(sizebytes, 0);
+        //atomicSwapU64(global_counter, 0);
 
         break;
     }
@@ -778,8 +802,8 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
     case FS_SEEK:
     {
         const char* metric = "UNKNOWN";
-        int* numops = NULL;
-        int* global_counter = NULL;
+        uint64_t* numops = NULL;
+        uint64_t* global_counter = NULL;
         int* summarize = NULL;
         const char* err_str = "UNKNOWN";
         switch (type) {
@@ -811,8 +835,8 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
-            atomicAdd(numops, 1);
-            atomicAdd(global_counter, 1);
+            atomicAddU64(numops, 1);
+            atomicAddU64(global_counter, 1);
         }
 
         // Only report if enabled
@@ -840,7 +864,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         // Reset the info if we tried to report
-        atomicSet(numops, 0);
+        atomicSwapU64(numops, 0);
         break;
     }
     
@@ -855,7 +879,7 @@ static void
 doTotal(enum metric_t type)
 {
     const char* metric = "UNKNOWN";
-    int* value = NULL;
+    uint64_t* value = NULL;
     const char* err_str = "UNKNOWN";
     const char* units = "byte";
     data_type_t aggregation_type = DELTA;
@@ -943,8 +967,8 @@ doTotal(enum metric_t type)
             return;
 	}
 
-    // Don't report zeros (if it's a counter)
-    if ((aggregation_type == DELTA) && (*value == 0)) return;
+    // Don't report zeros.
+    if (*value == 0) return;
 
     event_field_t fields[] = {
             PROC_FIELD(g_cfg.procname),
@@ -959,8 +983,80 @@ doTotal(enum metric_t type)
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
-    // Reset the info we tried to report (if it's a counter)
-    if (aggregation_type == DELTA) atomicSet(value, 0);
+    // Reset the info we tried to report (if it's not a gauge)
+    if (aggregation_type != CURRENT) atomicSwapU64(value, 0);
+}
+
+
+static void
+doTotalDuration(enum metric_t type)
+{
+    const char* metric = "UNKNOWN";
+    uint64_t* value = NULL;
+    uint64_t* num = NULL;
+    data_type_t aggregation_type = DELTA_MS;
+    const char* units = "UNKNOWN";
+    uint64_t factor = 1ULL;
+    const char* err_str = "UNKNOWN";
+    switch (type) {
+        case TOT_FS_DURATION:
+            metric = "fs.duration";
+            value = &g_ctrs.fsDurationTotal;
+            num = &g_ctrs.fsDurationNum;
+            aggregation_type = HISTOGRAM;
+            units = "microsecond";
+            factor = 1000;
+            err_str = "ERROR: doTotalDuration:TOT_FS_DURATION:outSendEvent";
+            break;
+        case TOT_NET_DURATION:
+            metric = "net.conn_duration";
+            value = &g_ctrs.connDurationTotal;
+            num = &g_ctrs.connDurationNum;
+            aggregation_type = DELTA_MS;
+            units = "millisecond";
+            factor = 1000000;
+            err_str = "ERROR: doTotalDuration:TOT_NET_DURATION:outSendEvent";
+            break;
+        case TOT_DNS_DURATION:
+            metric = "net.dns.duration";
+            value = &g_ctrs.dnsDurationTotal;
+            num = &g_ctrs.dnsDurationNum;
+            aggregation_type = DELTA_MS;
+            units = "millisecond";
+            factor = 1000000;
+            err_str = "ERROR: doTotalDuration:TOT_DNS_DURATION:outSendEvent";
+            break;
+        default:
+            DBG(NULL);
+            return;
+	}
+
+    uint64_t d = 0ULL;
+    int cachedDurationNum = *num; // avoid div by zero
+    if (cachedDurationNum >= 1) {
+        // factor is there to scale from ns to the appropriate units
+        d = *value / ( factor * cachedDurationNum);
+    }
+
+    // Don't report zeros.
+    if (d == 0) return;
+
+    event_field_t fields[] = {
+            PROC_FIELD(g_cfg.procname),
+            PID_FIELD(g_cfg.pid),
+            HOST_FIELD(g_cfg.hostname),
+            UNIT_FIELD(units),
+            CLASS_FIELD("summary"),
+            FIELDEND
+    };
+    event_t e = {metric, d, aggregation_type, fields};
+    if (outSendEvent(g_out, &e)) {
+        scopeLog(err_str, -1, CFG_LOG_ERROR);
+    }
+
+    // Reset the info we tried to report
+    atomicSwapU64(value, 0);
+    atomicSwapU64(num, 0);
 }
 
 
@@ -983,7 +1079,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     case NET_CONNECTIONS:
     {
         const char* metric = "UNKNOWN";
-        int* value = NULL;
+        uint64_t* value = NULL;
         const char* units = "UNKNOWN";
         const char* err_str = "UNKNOWN";
         switch (type) {
@@ -1014,7 +1110,11 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         // if called from an event, we update counters
         if (source == EVENT_BASED) {
-            atomicAdd(value, size);        // size can be negative.
+            if (size < 0) {
+               atomicSubU64(value, labs(size));
+            } else {
+               atomicAddU64(value, size);
+            }
             if (!g_netinfo[fd].startTime)   g_netinfo[fd].startTime = getTime();
         }
 
@@ -1039,7 +1139,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         // Don't reset the info if we tried to report.  It's a gauge.
-        // atomicSet(value, 0);
+        // atomicSwapU64(value, 0);
 
         break;
     }
@@ -1055,8 +1155,10 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         // if called from an event, we update counters
         if ((source == EVENT_BASED) && new_duration) {
-            atomicAddLong(&g_netinfo[fd].totalDuration, new_duration);
-            atomicAdd(&g_netinfo[fd].numDuration, 1);
+            atomicAddU64(&g_netinfo[fd].numDuration, 1);
+            atomicAddU64(&g_netinfo[fd].totalDuration, new_duration);
+            atomicAddU64(&g_ctrs.connDurationNum, 1);
+            atomicAddU64(&g_ctrs.connDurationTotal, new_duration);
         }
 
         // Only report if enabled
@@ -1065,10 +1167,10 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         uint64_t d = 0ULL;
-        int cachedDuration = g_netinfo[fd].numDuration; // avoid div by zero
-        if (cachedDuration >= 1 ) {
+        int cachedDurationNum = g_netinfo[fd].numDuration; // avoid div by zero
+        if (cachedDurationNum >= 1 ) {
             // factor of 1000000 converts ns to ms.
-            d = g_netinfo[fd].totalDuration / ( 1000000 * cachedDuration);
+            d = g_netinfo[fd].totalDuration / ( 1000000 * cachedDurationNum);
         }
 
         // Don't report zeros.
@@ -1081,6 +1183,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             HOST_FIELD(g_cfg.hostname),
             PROTO_FIELD(proto),
             PORT_FIELD(localPort),
+            NUMOPS_FIELD(cachedDurationNum),
             UNIT_FIELD("millisecond"),
             FIELDEND
         };
@@ -1089,8 +1192,10 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
         }
 
-        atomicSetLong(&g_netinfo[fd].totalDuration, 0);
-        atomicSet(&g_netinfo[fd].numDuration, 0);
+        atomicSwapU64(&g_netinfo[fd].numDuration, 0);
+        atomicSwapU64(&g_netinfo[fd].totalDuration, 0);
+        atomicSwapU64(&g_ctrs.connDurationNum, 0);
+        atomicSwapU64(&g_ctrs.connDurationTotal, 0);
 
         break;
     }
@@ -1102,9 +1207,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         char data[16];
 
         if (source == EVENT_BASED) {
-            atomicAdd(&g_netinfo[fd].numRX, 1);
-            atomicAdd(&g_netinfo[fd].rxBytes, size);
-            atomicAdd(&g_ctrs.netrxBytes, size);
+            atomicAddU64(&g_netinfo[fd].numRX, 1);
+            atomicAddU64(&g_netinfo[fd].rxBytes, size);
+            atomicAddU64(&g_ctrs.netrxBytes, size);
         }
 
         if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
@@ -1185,9 +1290,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         // Reset the info if we tried to report
-        atomicSet(&g_netinfo[fd].numRX, 0);
-        atomicSet(&g_netinfo[fd].rxBytes, 0);
-        //atomicSet(&g_ctrs.netrx, 0);
+        atomicSwapU64(&g_netinfo[fd].numRX, 0);
+        atomicSwapU64(&g_netinfo[fd].rxBytes, 0);
+        //atomicSwapU64(&g_ctrs.netrx, 0);
 
         break;
     }
@@ -1199,9 +1304,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         char data[16];
 
         if (source == EVENT_BASED) {
-            atomicAdd(&g_netinfo[fd].numTX, 1);
-            atomicAdd(&g_netinfo[fd].txBytes, size);
-            atomicAdd(&g_ctrs.nettxBytes, size);
+            atomicAddU64(&g_netinfo[fd].numTX, 1);
+            atomicAddU64(&g_netinfo[fd].txBytes, size);
+            atomicAddU64(&g_ctrs.nettxBytes, size);
         }
 
         if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
@@ -1282,9 +1387,9 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         // Reset the info if we tried to report
-        atomicSet(&g_netinfo[fd].numTX, 0);
-        atomicSet(&g_netinfo[fd].txBytes, 0);
-        //atomicSet(&g_ctrs.nettx, 0);
+        atomicSwapU64(&g_netinfo[fd].numTX, 0);
+        atomicSwapU64(&g_netinfo[fd].txBytes, 0);
+        //atomicSwapU64(&g_ctrs.nettx, 0);
 
         break;
     }
@@ -1576,6 +1681,10 @@ doReset()
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
 }
 
+//
+// reportFD is called in two cases:
+//   1) when a socket or file is being closed
+//   2) during periodic reporting
 static void
 reportFD(int fd, enum control_type_t source)
 {
@@ -1615,7 +1724,7 @@ reportPeriodicStuff(void)
     // This is called by periodic(), and due to atexit().
     // If it's actively running for one reason, then skip the second.
     static uint64_t reentrancy_guard = 0ULL;
-    if (!atomicCas64(&reentrancy_guard, 0ULL, 1ULL)) return;
+    if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) return;
 
 
     // We report CPU time for this period.
@@ -1651,6 +1760,10 @@ reportPeriodicStuff(void)
     doTotal(TOT_UDP_CONN);
     doTotal(TOT_OTHER_CONN);
 
+    doTotalDuration(TOT_FS_DURATION);
+    doTotalDuration(TOT_NET_DURATION);
+    doTotalDuration(TOT_DNS_DURATION);
+
     // Report errors
     doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
     doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
@@ -1664,7 +1777,7 @@ reportPeriodicStuff(void)
         reportFD(i, PERIODIC);
     }
 
-    if (!atomicCas64(&reentrancy_guard, 1ULL, 0ULL)) {
+    if (!atomicCasU64(&reentrancy_guard, 1ULL, 0ULL)) {
          DBG(NULL);
     }
 }

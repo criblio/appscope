@@ -1,4 +1,5 @@
-
+#define _GNU_SOURCE
+#include <dlfcn.h>
 #include "yaml_private.h"
 
 /*
@@ -276,8 +277,11 @@ yaml_file_read_handler(void *data, unsigned char *buffer, size_t size,
         size_t *size_read)
 {
     yaml_parser_t *parser = (yaml_parser_t *)data;
+    static size_t (*ni_fread)(void *, size_t, size_t, FILE *);
+    if (!ni_fread) ni_fread = dlsym(RTLD_NEXT, "fread");
+    if (!ni_fread) return 0;
 
-    *size_read = fread(buffer, 1, size, parser->input.file);
+    *size_read = ni_fread(buffer, 1, size, parser->input.file);
     return !ferror(parser->input.file);
 }
 
@@ -446,8 +450,11 @@ static int
 yaml_file_write_handler(void *data, unsigned char *buffer, size_t size)
 {
     yaml_emitter_t *emitter = (yaml_emitter_t *)data;
+    static size_t (*ni_fwrite)(const void *, size_t, size_t, FILE *);
+    if (!ni_fwrite) ni_fwrite = dlsym(RTLD_NEXT, "fwrite");
+    if (!ni_fwrite) return 0;
 
-    return (fwrite(buffer, 1, size, emitter->output.file) == size);
+    return (ni_fwrite(buffer, 1, size, emitter->output.file) == size);
 }
 /*
  * Set a string output.

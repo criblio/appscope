@@ -38,6 +38,9 @@ class TestSetResult:
 
 class AppController(ABC):
 
+    def __init__(self, name):
+        self.__name = name
+
     @abstractmethod
     def start(self, scoped):
         pass
@@ -51,9 +54,8 @@ class AppController(ABC):
         pass
 
     @property
-    @abstractmethod
     def name(self):
-        return None
+        return self.__name
 
 
 class Test(ABC):

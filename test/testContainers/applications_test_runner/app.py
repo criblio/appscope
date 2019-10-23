@@ -1,20 +1,21 @@
+import argparse
 import logging
 import sys
 from datetime import datetime
 
 import nginx
-from runner import Runner
-from watcher import TestWatcher
+import splunk
 from reporting import print_summary, store_results_to_file
-import argparse
+from runner import Runner
 from scope import ScopeDataCollector, ScopeUDPDataListener
 from validation import default_test_set_validators
+from watcher import TestWatcher
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
-    parser.add_argument("-t", "--target", help="target application to test", choices=["nginx"], required=True)
+    parser.add_argument("-t", "--target", help="target application to test", choices=["nginx", "splunk"], required=True)
     parser.add_argument("-id", "--execution_id", help="execution id")
     parser.add_argument("-l", "--logs_path", help="path to store the execution results and logs", default="/tmp/")
     args = parser.parse_args()
@@ -37,6 +38,8 @@ def main():
             runner.add_test_set_validators(default_test_set_validators)
             if args.target == 'nginx':
                 nginx.configure(runner)
+            if args.target == 'splunk':
+                splunk.configure(runner)
             runner.run()
             test_watcher.finish()
         except Exception as e:

@@ -70,7 +70,7 @@ test: $(C_FILES)
 $(YAML_AR):
 	@echo "Building libyaml"
 	cd ./contrib/libyaml && ./bootstrap
-	cd ./contrib/libyaml && ./configure
+	cd ./contrib/libyaml && ./configure LIBS=-ldl
 	cd ./contrib/libyaml && make
 	# don't install on the host.  We only need the static .a file
 

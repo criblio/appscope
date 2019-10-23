@@ -1,12 +1,16 @@
 import logging
 import os
 import subprocess
-import time
 from subprocess import PIPE
 from typing import Tuple, Any
 
+import splunklib.client as client
+from retrying import retry
+from splunklib import results
+
 from common import Test, TestResult, AppController
 from runner import Runner
+from utils import random_string
 from validation import passed
 
 
@@ -52,17 +56,50 @@ class SplunkAppController(AppController):
                 f.write(f"\n{scope_env_var}\n")
 
 
-class SplunkDummyTest(Test):
+class SplunkDirectIndexingTest(Test):
 
     @property
     def name(self):
-        return "dummy test"
+        return "splunk direct indexing"
 
     def run(self) -> Tuple[TestResult, Any]:
-        time.sleep(2)
+        username = "admin"
+        password = "cribldemo"
+        logging.info(f"Connecting to Splunk. User {username}, Password {password}")
+
+        service = client.connect(username=username, password=password)
+
+        index_name = f"test_{random_string(4)}"
+        logging.info(f"Creating test index '{index_name}'")
+        index = service.indexes.create(index_name)
+
+        events_num = 1000000
+        logging.info(f"Sending {events_num} events to Splunk")
+
+        with index.attach() as sock:
+            for i in range(events_num):
+                sock.send(f"This is my test event {i}! \n".encode('utf-8'))
+
+        self.__assert_same_number_of_events(service, events_num, index_name)
+
         return passed(), None
+
+    @retry(stop_max_attempt_number=7, wait_fixed=2000)
+    def __assert_same_number_of_events(self, service, expected_events_num, index_name):
+        search_query = f"search index={index_name} | stats count"
+
+        logging.info(f"Searching splunk for events. Query: {search_query}")
+        search_results = service.jobs.oneshot(search_query)
+
+        # Get the results and display them using the ResultsReader
+        reader = results.ResultsReader(search_results)
+        actual_events_num = reader.next()['count']
+        logging.info(f"Found {actual_events_num} events in index {index_name}")
+
+        assert expected_events_num == int(
+            actual_events_num), f"Expected to see {expected_events_num} in index, but got only {actual_events_num}"
 
 
 def configure(runner: Runner):
     runner.set_app_controller(SplunkAppController())
-    runner.add_tests([SplunkDummyTest()])
+    runner.add_tests([SplunkDirectIndexingTest()])

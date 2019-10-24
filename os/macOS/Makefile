@@ -20,17 +20,8 @@ all: $(YAML_AR) libscope.so
 libscope.so: src/wrap.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/out.c src/format.c src/dbg.c $(YAML_SRC)
 	@echo "Building libscope.so ..."
 	$(CC) $(CFLAGS) -shared -fvisibility=hidden -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ -e,prog_version $(LD_FLAGS)
-	printf "#!/bin/bash\n#\n"                   > ./test/c_file_build.sh
-	printf "# This is created by Makefile, "   >> ./test/c_file_build.sh
-	printf "and used by selfinterposetest.c\n" >> ./test/c_file_build.sh
-	printf "#\n# DO NOT HAND MODIFY\n#\n"      >> ./test/c_file_build.sh
-	printf "$(CC) -c $(CFLAGS) $(INCLUDES) $^" >> ./test/c_file_build.sh
-	printf ' -DSCOPE_VER=\\"""\\"'             >> ./test/c_file_build.sh
-	printf ' -DYAML_VERSION_MAJOR="0"'         >> ./test/c_file_build.sh
-	printf ' -DYAML_VERSION_MINOR="2"'         >> ./test/c_file_build.sh
-	printf ' -DYAML_VERSION_PATCH="2"'         >> ./test/c_file_build.sh
-	printf ' -DYAML_VERSION_STRING=\\"""\\"\n' >> ./test/c_file_build.sh
-	chmod u+x                                     ./test/c_file_build.sh
+	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^ $(LD_FLAGS)
+	mkdir -p ./test/selfinterpose && mv *.o ./test/selfinterpose/
 
 clean:
 	rm -f ./lib/$(OS)/libscope.so

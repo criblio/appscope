@@ -173,16 +173,13 @@ testNoInterposedSymbolIsUsed(void** state)
     fn_list_t* interpose_list = symbolList(f_in, " T ");
     pclose(f_in);
 
-    // Compile the objectfiles without linking them
-    assert_return_code(access("./test/c_file_build.sh", R_OK|X_OK), errno);
-    system("./test/c_file_build.sh");
-
     // Loop through each object file to see if it uses an interposed function
     glob_t glob_obj;
-    glob("*.o", GLOB_ERR | GLOB_NOSORT, NULL, &glob_obj);
+    glob("./test/selfinterpose/*.o", GLOB_ERR | GLOB_NOSORT, NULL, &glob_obj);
+    if (glob_obj.gl_pathc < 17)
+        fail_msg("expected at least 17 files in ./test/selfinterpose/*.o");
     int i;
     for (i=0; i<glob_obj.gl_pathc; i++) {
-        if (strstr(glob_obj.gl_pathv[i], "test.o")) continue;
         checkObjectFile(interpose_list, glob_obj.gl_pathv[i], &s);
     }
     globfree(&glob_obj);

@@ -126,7 +126,7 @@ testEachLineInStreamWorksWithCannedData(void** state)
     const char* path = "/tmp/nmStyleOutput.txt";
 
     const char* sample_nm_output[] = {
-	"                 U __libc_dlsym@@GLIBC_PRIVATE\n"
+        "                 U __libc_dlsym@@GLIBC_PRIVATE\n",
         "                 U time@@GLIBC_2.2.5\n",
         "                 U realpath@@GLIBC_2.3\n",
         "000000000000eed5 T cfgRead\n",

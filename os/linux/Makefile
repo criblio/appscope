@@ -1,9 +1,8 @@
 CWD = $(shell pwd)
 OS=linux
 CC=gcc
-CFLAGS=-fPIC -shared -g -Wall -Wno-nonnull -D__LINUX__
+CFLAGS=-fPIC -g -Wall -Wno-nonnull -D__LINUX__
 SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
-CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
 GCC_STATX_RETURN_CODE := $(shell gcc statx_exists.c 2>/dev/null; echo $$?)
 ifneq ($(GCC_STATX_RETURN_CODE), 0)
 CFLAGS += -DSTRUCT_STATX_MISSING_FROM_SYS_STAT_H
@@ -24,7 +23,9 @@ all: $(YAML_AR) libscope.so
 
 libscope.so: src/wrap.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/out.c src/format.c src/dbg.c $(YAML_SRC)
 	@echo "Building libscope.so ..."
-	$(CC) $(CFLAGS) -fvisibility=hidden $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ $(LD_FLAGS)
+	$(CC) $(CFLAGS) -shared -fvisibility=hidden -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ $(LD_FLAGS)
+	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
+	mkdir -p ./test/selfinterpose && mv *.o ./test/selfinterpose/
 
 clean:
 	rm -f ./lib/$(OS)/libscope.so
@@ -49,6 +50,7 @@ test: $(C_FILES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/formattest formattest.o format.o dbg.o test.o $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dbgtest dbgtest.o dbg.o test.o $(YAML_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/glibcvertest glibcvertest.o $(YAML_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/selfinterposetest selfinterposetest.o $(YAML_AR) $(TEST_LD_FLAGS)
 	# wraptest needs more linker flags
 	#$(CC) -c $(TEST_CFLAGS) test/wraptest.c $(INCLUDES) $(TEST_INCLUDES)
 	#$(CC) $(TEST_CFLAGS) -o test/$(OS)/wraptest wraptest.o dbg.o test.o $(YAML_AR) $(TEST_LD_FLAGS) -Llib/$(OS)/ -lwrap
@@ -59,7 +61,7 @@ test: $(C_FILES)
 $(YAML_AR):
 	@echo "Building libyaml"
 	cd ./contrib/libyaml && ./bootstrap
-	cd ./contrib/libyaml && ./configure
+	cd ./contrib/libyaml && ./configure LIBS=-ldl
 	cd ./contrib/libyaml && make
 	# don't install on the host.  We only need the static .a file
 

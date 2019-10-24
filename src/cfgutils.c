@@ -48,39 +48,42 @@ cfgPathSearch(const char* cfgname)
     //   7) ./scope.yml
 
     char path[1024]; // Somewhat arbitrary choice for MAX_PATH
+    static int (*ni_access)(const char *pathname, int mode);
+    if (!ni_access) ni_access = dlsym(RTLD_NEXT, "access");
+    if (!ni_access) return NULL;
 
     const char* homedir = getenv("HOME");
     const char* scope_home = getenv("SCOPE_HOME");
     if (scope_home &&
        (snprintf(path, sizeof(path), "%s/conf/%s", scope_home, cfgname) > 0) &&
-        !access(path, R_OK)) {
+        !ni_access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if (scope_home &&
        (snprintf(path, sizeof(path), "%s/%s", scope_home, cfgname) > 0) &&
-        !access(path, R_OK)) {
+        !ni_access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if ((snprintf(path, sizeof(path), "/etc/scope/%s", cfgname) > 0 ) &&
-        !access(path, R_OK)) {
+        !ni_access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if (homedir &&
        (snprintf(path, sizeof(path), "%s/conf/%s", homedir, cfgname) > 0) &&
-        !access(path, R_OK)) {
+        !ni_access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if (homedir &&
        (snprintf(path, sizeof(path), "%s/%s", homedir, cfgname) > 0) &&
-        !access(path, R_OK)) {
+        !ni_access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if ((snprintf(path, sizeof(path), "./conf/%s", cfgname) > 0) &&
-        !access(path, R_OK)) {
+        !ni_access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if ((snprintf(path, sizeof(path), "./%s", cfgname) > 0) &&
-        !access(path, R_OK)) {
+        !ni_access(path, R_OK)) {
         return realpath(path, NULL);
     }
 
@@ -235,10 +238,16 @@ processCmdDebug(const char* path)
 {
     if (!path || !path[0]) return;
 
+    static FILE *(*ni_fopen)(const char *, const char *);
+    static int (*ni_fclose)(FILE*);
+    if (!ni_fopen) ni_fopen = dlsym(RTLD_NEXT, "fopen");
+    if (!ni_fclose) ni_fclose = dlsym(RTLD_NEXT, "fclose");
+    if (!ni_fopen || !ni_fclose) return;
+
     FILE* f;
-    if (!(f = fopen(path, "a"))) return;
+    if (!(f = ni_fopen(path, "a"))) return;
     dbgDumpAll(f);
-    fclose(f);
+    ni_fclose(f);
 }
 
 
@@ -318,10 +327,15 @@ void
 cfgProcessCommands(config_t* cfg, FILE* file)
 {
     if (!cfg || !file) return;
+
+    static ssize_t (*ni_getline)(char **, size_t *, FILE *);
+    if (!ni_getline) ni_getline = dlsym(RTLD_NEXT, "getline");
+    if (!ni_getline) return;
+
     char* e = NULL;
     size_t n = 0;
 
-    while (getline(&e, &n, file) != -1) {
+    while (ni_getline(&e, &n, file) != -1) {
         e[strcspn(e, "\r\n")] = '\0'; //overwrite first \r or \n with null
         processEnvStyleInput(cfg, e);
         e[0] = '\0';

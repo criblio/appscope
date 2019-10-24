@@ -23,7 +23,7 @@
  * Put a line break to the output buffer.
  */
 
-inline int
+static inline int
 PUT_BREAK(yaml_emitter_t* emitter) {
     return (FLUSH(emitter)
      && ((emitter->line_break == YAML_CR_BREAK ?

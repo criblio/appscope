@@ -7,6 +7,43 @@
 
 #include "test.h"
 
+//
+// This test was written to ensure that we don't directly use functions we
+// interpose.  I know of a couple of reasons we're wanting to ensure this:
+//   1) We're trying to monitor and describe the application we're in, and
+//      if we report what our library is doing this might confuse anyone
+//      who is trying to use this data to look at application behavior.
+//   2) Some functions we interpose could cause infinite loops or other
+//      similar undesireable behavior.  (To consider the infinte loop,
+//      consider if we were to intercept a send or write that our library
+//      is doing, and this intercept causes the library to do *another*
+//      send or write...)
+//
+// In support of this test, our makefile does a compilation of every .c file
+// that goes into the library and copies the resulting .o files it into the
+// test/selfinterpose directory.  This is currently done by a "make all".
+//
+// To see this yourself, outside of the test, this lists all functions that
+// the linux library publishes for interposition:
+//      nm lib/linux/libscope.so | grep " T "
+//
+// And, similarly this lists all external functions from an example .o file:
+//      nm test/selfinterpose/cfgutils.o | grep " U "
+//
+// This test works by looping through all of the .o files in this directory
+// and comparing the list of interposed functions with the list of external
+// functions.  If any matches are found, they are noted and the test fails.
+//
+// Q: So what should be done if a new failure is found?
+//
+// A: There are a number of examples of how this has been fixed in the past
+//    in this code base.  Search for "dlsym" outside of src/wrap.c to see
+//    them.  Briefly, the current strategy has been to look up a symbol
+//    that does not resolve to our library, and use it directly.  By this
+//    technique we can continue to avoid interposing our own library
+//    functions.
+
+
 typedef struct _fn_list_t fn_list_t;
 struct _fn_list_t
 {

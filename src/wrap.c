@@ -17,9 +17,11 @@ static metric_counters g_ctrs = {0};
 static thread_timing g_thread = {0};
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
+static evt_t* g_evt = NULL;
 static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static out_t *g_prevout = NULL;
+static evt_t *g_prevevt = NULL;
 __thread int g_getdelim = 0;
 
 // Forward declaration
@@ -134,6 +136,7 @@ doConfig(config_t *cfg)
     // Save the current objects to get cleaned up on the periodic thread
     g_prevout = g_out;
     g_prevlog = g_log;
+    g_prevevt = g_evt;
 
     g_thread.interval = cfgOutPeriod(cfg);
     if (!g_thread.startTime) {
@@ -145,6 +148,7 @@ doConfig(config_t *cfg)
     log_t* log = initLog(cfg);
     g_out = initOut(cfg);
     g_log = log; // Set after initOut to avoid infinite loop with socket
+    g_evt = initEvt(cfg);
 }
 
 // Process dynamic config change if they are available
@@ -1788,6 +1792,7 @@ handleExit(void)
     reportPeriodicStuff();
     outFlush(g_out);
     logFlush(g_log);
+    evtFlush(g_evt);
 }
 
 static void *
@@ -1803,6 +1808,7 @@ periodic(void *arg)
         // Clean up previous objects if they exist.
         //if (g_prevout) outDestroy(&g_prevout);
         //if (g_prevlog) logDestroy(&g_prevlog);
+        //if (g_prevevt) evtDestroy(&g_prevevt);
 
         // From the config file
         sleep(g_thread.interval);

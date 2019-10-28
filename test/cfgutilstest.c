@@ -1118,6 +1118,25 @@ initOutReturnsPtr(void** state)
     cfgDestroy(&cfg);
 }
 
+void
+initEvtReturnsPtr(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+
+    cfg_transport_t t;
+    for (t=CFG_UDP; t<=CFG_SHM; t++) {
+        cfgTransportTypeSet(cfg, CFG_EVT, t);
+        if (t==CFG_UNIX || t==CFG_FILE) {
+            cfgTransportPathSet(cfg, CFG_EVT, "/tmp/scope.log");
+        }
+        evt_t* evt = initEvt(cfg);
+        assert_non_null(evt);
+        evtDestroy(&evt);
+    }
+    cfgDestroy(&cfg);
+}
+
 // Defined in src/cfgutils.c
 // This is not a proper test, it just exists to make valgrind output
 // more readable when analyzing this test, by deallocating the compiled
@@ -1157,10 +1176,9 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgReadEnvSubstitution),
         cmocka_unit_test(initLogReturnsPtr),
         cmocka_unit_test(initOutReturnsPtr),
+        cmocka_unit_test(initEvtReturnsPtr),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(envRegexFree),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }
-
-

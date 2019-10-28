@@ -206,6 +206,26 @@ cfgEventSourceSetAndGet(void** state)
     }
 
     cfgDestroy(&config);
+
+    // Test get with NULL config
+    for (i=CFG_SRC_LOGFILE; i<CFG_SRC_MAX; i++) {
+        unsigned expected;
+        switch (i) {
+            case CFG_SRC_LOGFILE:
+                expected = DEFAULT_SRC_LOGFILE;
+                break;
+            case CFG_SRC_CONSOLE:
+                expected = DEFAULT_SRC_CONSOLE;
+                break;
+            case CFG_SRC_SYSLOG:
+                expected = DEFAULT_SRC_SYSLOG;
+                break;
+            case CFG_SRC_METRIC:
+                expected = DEFAULT_SRC_METRIC;
+                break;
+        }
+        assert_int_equal(cfgEventSource(config, i), expected);
+    }
 }
 
 static void

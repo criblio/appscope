@@ -869,3 +869,33 @@ initOut(config_t* cfg)
 
     return out;
 }
+
+evt_t*
+initEvt(config_t* cfg)
+{
+    evt_t* evt = evtCreate();
+    if (!evt) return evt;
+
+    transport_t* t = initTransport(cfg, CFG_EVT);
+    if (!t) {
+        evtDestroy(&evt);
+        return evt;
+    }
+    evtTransportSet(evt, t);
+
+    format_t* f = initFormat(cfg);
+    if (!f) {
+        evtDestroy(&evt);
+        return evt;
+    }
+    evtFormatSet(evt, f);
+
+    evtLogFileFilterSet(evt, cfgEventLogFileFilter(cfg));
+
+    cfg_evt_t src;
+    for (src = CFG_SRC_LOGFILE; src<CFG_SRC_MAX; src++) {
+        evtSourceSet(evt, src, cfgEventSource(cfg, src));
+    }
+
+    return evt;
+}

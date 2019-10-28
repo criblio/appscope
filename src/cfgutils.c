@@ -33,7 +33,7 @@ void cfgLogLevelSetFromStr(config_t*, const char*);
 // which seems fine for now, I guess.
 static which_transport_t transport_context;
 
-regex_t* g_regex = NULL;
+static regex_t* g_regex = NULL;
 
 static char*
 cfgPathSearch(const char* cfgname)

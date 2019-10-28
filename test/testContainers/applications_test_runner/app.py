@@ -18,6 +18,8 @@ def main():
     parser.add_argument("-t", "--target", help="target application to test", choices=["nginx", "splunk"], required=True)
     parser.add_argument("-id", "--execution_id", help="execution id")
     parser.add_argument("-l", "--logs_path", help="path to store the execution results and logs", default="/tmp/")
+    parser.add_argument("-s", "--scope_path", help="path to scope application executable",
+                        default="/usr/lib/libscope.so")
     args = parser.parse_args()
 
     execution_id = args.execution_id or generate_execution_id(args.target)
@@ -37,9 +39,9 @@ def main():
             runner = Runner(test_watcher, scope_data_collector)
             runner.add_test_set_validators(default_test_set_validators)
             if args.target == 'nginx':
-                nginx.configure(runner)
+                nginx.configure(runner, args)
             if args.target == 'splunk':
-                splunk.configure(runner)
+                splunk.configure(runner, args)
             runner.run()
             test_watcher.finish()
         except Exception as e:

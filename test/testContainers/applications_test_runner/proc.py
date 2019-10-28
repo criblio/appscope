@@ -8,8 +8,9 @@ from common import AppController
 
 class SubprocessAppController(AppController):
 
-    def __init__(self, start_command, name, start_wait=5, stop_wait=3):
+    def __init__(self, start_command, name, scope_path, start_wait=5, stop_wait=3):
         super().__init__(name)
+        self.scope_path = scope_path
         self.stop_wait = stop_wait
         self.start_wait = start_wait
         self.start_command = start_command
@@ -19,7 +20,7 @@ class SubprocessAppController(AppController):
         logging.info(f"Starting app {self.name} in {'scoped' if scoped else 'unscoped'} mode.")
         env = os.environ.copy()
         if scoped:
-            env["LD_PRELOAD"] = "/usr/lib/libscope.so"
+            env["LD_PRELOAD"] = self.scope_path
         logging.debug(f"Command is {self.start_command}. Environment {env}")
 
         self.proc = subprocess.Popen(self.start_command, env=env)

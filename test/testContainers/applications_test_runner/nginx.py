@@ -22,8 +22,8 @@ class NetworkMetricsCollectedValidator(TestExecutionValidator):
         )
 
 
-def configure(runner: Runner):
-    runner.set_app_controller(SubprocessAppController(["nginx", "-g", "daemon off;"], "nginx"))
+def configure(runner: Runner, config):
+    runner.set_app_controller(SubprocessAppController(["nginx", "-g", "daemon off;"], "nginx", config.scope_path))
     get_home_page = TestGetUrl(url="http://localhost/", requests=10000)
     post_file = TestPostToUrl(url="http://localhost/log/", requests=10000, post_file="./post.json")
     runner.add_test_execution_validators([NetworkMetricsCollectedValidator([get_home_page.name, post_file.name])])

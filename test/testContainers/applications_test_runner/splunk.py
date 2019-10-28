@@ -16,8 +16,9 @@ from validation import passed
 
 class SplunkAppController(AppController):
 
-    def __init__(self):
+    def __init__(self, scope_path):
         super().__init__("splunk")
+        self.scope_path = scope_path
         self.proc = None
 
     def start(self, scoped):
@@ -38,8 +39,7 @@ class SplunkAppController(AppController):
 
     def __update_launch_conf(self, scoped):
         splunk_home = os.environ["SPLUNK_HOME"]
-        # TODO move path to scope to config
-        scope_env_var = "LD_PRELOAD=/usr/lib/libscope.so"
+        scope_env_var = f"LD_PRELOAD={self.scope_path}"
         path_to_conf = os.path.join(splunk_home, "etc/splunk-launch.conf")
         logging.debug(
             f"Modifying splunk launch conf at {path_to_conf}. {'adding' if scoped else 'removing'} {scope_env_var}")
@@ -77,6 +77,7 @@ class SplunkDirectIndexingTest(Test):
         logging.info(f"Sending {events_num} events to Splunk")
 
         with index.attach() as sock:
+            sock.settimeout(60)
             for i in range(events_num):
                 sock.send(f"This is my test event {i}! \n".encode('utf-8'))
 
@@ -100,6 +101,6 @@ class SplunkDirectIndexingTest(Test):
             actual_events_num), f"Expected to see {expected_events_num} in index, but got only {actual_events_num}"
 
 
-def configure(runner: Runner):
-    runner.set_app_controller(SplunkAppController())
+def configure(runner: Runner, config):
+    runner.set_app_controller(SplunkAppController(config.scope_path))
     runner.add_tests([SplunkDirectIndexingTest()])

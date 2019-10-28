@@ -350,8 +350,8 @@ cfgOutFormatSetFromStr(config_t* cfg, const char* value)
     if (!cfg || !value) return;
     if (!strcmp(value, "expandedstatsd")) {
         cfgOutFormatSet(cfg, CFG_EXPANDED_STATSD);
-    } else if (!strcmp(value, "newlinedelimited")) {
-        cfgOutFormatSet(cfg, CFG_NEWLINE_DELIMITED);
+    } else if (!strcmp(value, "splunkjson")) {
+        cfgOutFormatSet(cfg, CFG_SPLUNK_JSON);
     }
 }
 

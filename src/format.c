@@ -232,7 +232,7 @@ fmtString(format_t* fmt, event_t* e)
     switch (fmt->format) {
         case CFG_EXPANDED_STATSD:
             return fmtStatsDString(fmt, e);
-        case CFG_NEWLINE_DELIMITED:
+        case CFG_SPLUNK_JSON:
             return NULL;
         default:
             DBG("%d %s", fmt->format, e->name);

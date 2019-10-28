@@ -31,7 +31,13 @@ struct _config_t
         char* commanddir;
     } out;
 
-    // CFG_OUT or CFG_LOG
+    struct {
+        cfg_out_format_t format;
+        char* logfilefilter;
+        unsigned src[CFG_SRC_MAX];
+    } evt;
+
+    // CFG_OUT, CFG_EVT, or CFG_LOG
     transport_struct_t transport[CFG_WHICH_MAX]; 
 
     custom_tag_t** tags;
@@ -42,9 +48,14 @@ struct _config_t
 #define DEFAULT_SUMMARY_PERIOD 10
 #define DEFAULT_OUT_TYPE CFG_UDP
 #define DEFAULT_OUT_HOST "127.0.0.1"
-#define DEFAULT_OUT_PORT "8125"
+//#define DEFAULT_OUT_PORT DEFAULT_OUT_PORT (defined in scopetypes.h)
 #define DEFAULT_OUT_PATH NULL
 #define DEFAULT_OUT_BUF CFG_BUFFER_FULLY
+#define DEFAULT_EVT_TYPE CFG_UDP
+#define DEFAULT_EVT_HOST "127.0.0.1"
+//#define DEFAULT_EVT_PORT DEFAULT_EVT_PORT (defined in scopetypes.h)
+#define DEFAULT_EVT_PATH NULL
+#define DEFAULT_EVT_BUF CFG_BUFFER_FULLY
 #define DEFAULT_LOG_TYPE CFG_FILE
 #define DEFAULT_LOG_HOST NULL
 #define DEFAULT_LOG_PORT NULL
@@ -72,11 +83,22 @@ cfgCreateDefault()
     c->out.period = DEFAULT_SUMMARY_PERIOD;
     c->out.verbosity = DEFAULT_OUT_VERBOSITY;
     c->out.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
+    c->evt.format = DEFAULT_EVT_FORMAT;
+    c->evt.logfilefilter = (DEFAULT_LOG_FILE_FILTER) ? strdup(DEFAULT_LOG_FILE_FILTER) : NULL;
+    c->evt.src[CFG_SRC_LOGFILE] = DEFAULT_SRC_LOGFILE;
+    c->evt.src[CFG_SRC_CONSOLE] = DEFAULT_SRC_CONSOLE;;
+    c->evt.src[CFG_SRC_SYSLOG] = DEFAULT_SRC_SYSLOG;
+    c->evt.src[CFG_SRC_METRIC] = DEFAULT_SRC_METRIC;
     c->transport[CFG_OUT].type = DEFAULT_OUT_TYPE;
     c->transport[CFG_OUT].udp.host = (DEFAULT_OUT_HOST) ? strdup(DEFAULT_OUT_HOST) : NULL;
     c->transport[CFG_OUT].udp.port = (DEFAULT_OUT_PORT) ? strdup(DEFAULT_OUT_PORT) : NULL;
     c->transport[CFG_OUT].file.path = (DEFAULT_OUT_PATH) ? strdup(DEFAULT_OUT_PATH) : NULL;
     c->transport[CFG_OUT].file.buf_policy = DEFAULT_OUT_BUF;
+    c->transport[CFG_EVT].type = DEFAULT_EVT_TYPE;
+    c->transport[CFG_EVT].udp.host = (DEFAULT_EVT_HOST) ? strdup(DEFAULT_EVT_HOST) : NULL;
+    c->transport[CFG_EVT].udp.port = (DEFAULT_EVT_PORT) ? strdup(DEFAULT_EVT_PORT) : NULL;
+    c->transport[CFG_EVT].file.path = (DEFAULT_EVT_PATH) ? strdup(DEFAULT_EVT_PATH) : NULL;
+    c->transport[CFG_EVT].file.buf_policy = DEFAULT_EVT_BUF;
     c->transport[CFG_LOG].type = DEFAULT_LOG_TYPE;
     c->transport[CFG_LOG].udp.host = (DEFAULT_LOG_HOST) ? strdup(DEFAULT_LOG_HOST) : NULL;
     c->transport[CFG_LOG].udp.port = (DEFAULT_LOG_PORT) ? strdup(DEFAULT_LOG_PORT) : NULL;
@@ -96,6 +118,7 @@ cfgDestroy(config_t** cfg)
     config_t* c = *cfg;
     if (c->out.statsd.prefix) free(c->out.statsd.prefix);
     if (c->out.commanddir) free(c->out.commanddir);
+    if (c->evt.logfilefilter) free(c->evt.logfilefilter);
     which_transport_t t;
     for (t=CFG_OUT; t<CFG_WHICH_MAX; t++) {
         if (c->transport[t].udp.host) free(c->transport[t].udp.host);
@@ -149,6 +172,41 @@ cfgCmdDir(config_t* cfg)
     return (cfg) ? cfg->out.commanddir : DEFAULT_COMMAND_DIR;
 }
 
+cfg_out_format_t
+cfgEventFormat(config_t* cfg)
+{
+    return (cfg) ? cfg->evt.format : DEFAULT_EVT_FORMAT;
+}
+
+const char*
+cfgEventLogFileFilter(config_t* cfg)
+{
+    return (cfg) ? cfg->evt.logfilefilter : DEFAULT_LOG_FILE_FILTER;
+}
+
+unsigned
+cfgEventSource(config_t* cfg, cfg_evt_t evt)
+{
+    if (cfg && evt < CFG_SRC_MAX) {
+        return cfg->evt.src[evt];
+    }
+
+    switch (evt) {
+        case CFG_SRC_LOGFILE:
+            return DEFAULT_SRC_LOGFILE;
+        case CFG_SRC_CONSOLE:
+            return DEFAULT_SRC_CONSOLE;
+        case CFG_SRC_SYSLOG:
+            return DEFAULT_SRC_SYSLOG;
+        case CFG_SRC_METRIC:
+            return DEFAULT_SRC_METRIC;
+        default:
+            DBG(NULL);
+            return DEFAULT_SRC_LOGFILE;
+    }
+}
+
+
 unsigned
 cfgOutVerbosity(config_t* cfg)
 {
@@ -165,6 +223,8 @@ cfgTransportType(config_t* cfg, which_transport_t t)
     switch (t) {
         case CFG_OUT:
             return DEFAULT_OUT_TYPE;
+        case CFG_EVT:
+            return DEFAULT_EVT_TYPE;
         case CFG_LOG:
             return DEFAULT_LOG_TYPE;
         default:
@@ -183,6 +243,8 @@ cfgTransportHost(config_t* cfg, which_transport_t t)
     switch (t) {
         case CFG_OUT:
             return DEFAULT_OUT_HOST;
+        case CFG_EVT:
+            return DEFAULT_EVT_HOST;
         case CFG_LOG:
             return DEFAULT_LOG_HOST;
         default:
@@ -201,6 +263,8 @@ cfgTransportPort(config_t* cfg, which_transport_t t)
     switch (t) {
         case CFG_OUT:
             return DEFAULT_OUT_PORT;
+        case CFG_EVT:
+            return DEFAULT_EVT_PORT;
         case CFG_LOG:
             return DEFAULT_LOG_PORT;
         default:
@@ -219,6 +283,8 @@ cfgTransportPath(config_t* cfg, which_transport_t t)
     switch (t) {
         case CFG_OUT:
             return DEFAULT_OUT_PATH;
+        case CFG_EVT:
+            return DEFAULT_EVT_PATH;
         case CFG_LOG:
             return DEFAULT_LOG_PATH;
         default:
@@ -237,6 +303,8 @@ cfgTransportBuf(config_t* cfg, which_transport_t t)
     switch (t) {
         case CFG_OUT:
             return DEFAULT_OUT_BUF;
+        case CFG_EVT:
+            return DEFAULT_EVT_BUF;
         case CFG_LOG:
             return DEFAULT_LOG_BUF;
         default:
@@ -340,7 +408,7 @@ cfgCmdDirSet(config_t* cfg, const char* path)
     if (!cfg) return;
     if (cfg->out.commanddir) free(cfg->out.commanddir);
     if (!path || (path[0] == '\0')) {
-        cfg->out.commanddir = strdup(DEFAULT_COMMAND_DIR);
+        cfg->out.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
         return;
     }
 
@@ -353,6 +421,32 @@ cfgOutVerbositySet(config_t* cfg, unsigned val)
     if (!cfg) return;
     if (val > CFG_MAX_VERBOSITY) val = CFG_MAX_VERBOSITY;
     cfg->out.verbosity = val;
+}
+
+void
+cfgEventFormatSet(config_t* cfg, cfg_out_format_t fmt)
+{
+    if (!cfg || fmt >= CFG_FORMAT_MAX) return;
+    cfg->evt.format = fmt;
+}
+
+void
+cfgEventLogFileFilterSet(config_t* cfg,  const char* filter)
+{
+    if (!cfg) return;
+    if (cfg->evt.logfilefilter) free (cfg->evt.logfilefilter);
+    if (!filter || (filter[0] == '\0')) {
+        cfg->evt.logfilefilter = (DEFAULT_LOG_FILE_FILTER) ? strdup(DEFAULT_LOG_FILE_FILTER) : NULL;
+        return;
+    }
+    cfg->evt.logfilefilter = strdup(filter);
+}
+
+void
+cfgEventSourceSet(config_t* cfg, cfg_evt_t evt, unsigned val)
+{
+    if (!cfg || evt >= CFG_SRC_MAX) return;
+    cfg->evt.src[evt] = val;
 }
 
 void

@@ -665,11 +665,22 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgOutVerbosity(config), DEFAULT_OUT_VERBOSITY);
     assert_int_equal       (cfgOutPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
+    assert_int_equal       (cfgEventFormat(config), DEFAULT_EVT_FORMAT);
+    assert_string_equal    (cfgEventLogFileFilter(config), DEFAULT_LOG_FILE_FILTER);
+    assert_int_equal       (cfgEventSource(config, CFG_SRC_LOGFILE), DEFAULT_SRC_LOGFILE);
+    assert_int_equal       (cfgEventSource(config, CFG_SRC_LOGFILE), DEFAULT_SRC_CONSOLE);
+    assert_int_equal       (cfgEventSource(config, CFG_SRC_LOGFILE), DEFAULT_SRC_SYSLOG);
+    assert_int_equal       (cfgEventSource(config, CFG_SRC_LOGFILE), DEFAULT_SRC_METRIC);
     assert_int_equal       (cfgTransportType(config, CFG_OUT), CFG_UDP);
     assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_OUT), "8125");
     assert_null            (cfgTransportPath(config, CFG_OUT));
     assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_FULLY);
+    assert_int_equal       (cfgTransportType(config, CFG_EVT), CFG_UDP);
+    assert_string_equal    (cfgTransportHost(config, CFG_EVT), "127.0.0.1");
+    assert_string_equal    (cfgTransportPort(config, CFG_EVT), DEFAULT_EVT_PORT);
+    assert_null            (cfgTransportPath(config, CFG_EVT));
+    assert_int_equal       (cfgTransportBuf(config, CFG_EVT), CFG_BUFFER_FULLY);
     assert_int_equal       (cfgTransportType(config, CFG_LOG), CFG_FILE);
     assert_null            (cfgTransportHost(config, CFG_LOG));
     assert_null            (cfgTransportPort(config, CFG_LOG));
@@ -689,7 +700,7 @@ cfgReadGoodYaml(void** state)
         "---\n"
         "output:\n"
         "  format:\n"
-        "    type: splunkjson          # expandedstatsd, splunkjson\n"
+        "    type: splunkjson                # expandedstatsd, splunkjson\n"
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
         "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
         "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
@@ -702,6 +713,20 @@ cfgReadGoodYaml(void** state)
         "    buffering: line\n"
         "  summaryperiod: 11                 # in seconds\n"
         "  commanddir: /tmp\n"
+        "event:\n"
+        "  format:\n"
+        "    type : expandedstatsd\n"
+        "  transport:\n"
+        "    type: syslog                    # udp, unix, file, syslog\n"
+        "    host: 127.0.0.2\n"
+        "    port: 9009\n"
+        "    buffering: line\n"
+        "  logfilefilter: .*[.]log$          # extended regex, default '.*log.*'\n"
+        "  activesources:\n"
+        "  - logfile                         # create events from files that match logfilefilter\n"
+        "  - console                         # create events from stdout and stderr\n"
+        "  - syslog                          # create events from syslog and vsyslog\n"
+        "  - highcardmetrics\n"
         "logging:\n"
         "  level: debug                      # debug, info, warning, error, none\n"
         "  transport:\n"
@@ -718,11 +743,22 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgOutVerbosity(config), 3);
     assert_int_equal(cfgOutPeriod(config), 11);
     assert_string_equal(cfgCmdDir(config), "/tmp");
+    assert_int_equal(cfgEventFormat(config), CFG_EXPANDED_STATSD);
+    assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
+    assert_int_equal(cfgEventSource(config, CFG_SRC_LOGFILE), 1);
+    assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 1);
+    assert_int_equal(cfgEventSource(config, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEventSource(config, CFG_SRC_METRIC), 1);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
     assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
     assert_int_equal(cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_LINE);
+    assert_int_equal(cfgTransportType(config, CFG_EVT), CFG_SYSLOG);
+    assert_string_equal(cfgTransportHost(config, CFG_EVT), "127.0.0.2");
+    assert_string_equal(cfgTransportPort(config, CFG_EVT), "9009");
+    assert_null(cfgTransportPath(config, CFG_EVT));
+    assert_int_equal(cfgTransportBuf(config, CFG_EVT), CFG_BUFFER_LINE);
     assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_SYSLOG);
     assert_null(cfgTransportHost(config, CFG_LOG));
     assert_null(cfgTransportPort(config, CFG_LOG));
@@ -851,6 +887,17 @@ cfgReadGoodJson(void** state)
         "    },\n"
         "    'summaryperiod': '13',\n"
         "  },\n"
+        "  'event': {\n"
+        "    'format': {\n"
+        "      'type': 'expandedstatsd'\n"
+        "    },\n"
+        "    'transport': {\n"
+        "      'type': 'file',\n"
+        "      'path': '/var/log/event.log'\n"
+        "    },\n"
+        "    'logfilefilter': '.*[.]log$',\n"
+        "    'activesources' : ['logfile', 'console', 'syslog', 'highcardmetrics'],\n"
+        "  },\n"
         "  'logging': {\n"
         "    'level': 'debug',\n"
         "    'transport': {\n"
@@ -867,10 +914,20 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgOutStatsDMaxLen(config), 42);
     assert_int_equal(cfgOutVerbosity(config), 0);
     assert_int_equal(cfgOutPeriod(config), 13);
+    assert_int_equal(cfgEventFormat(config), CFG_EXPANDED_STATSD);
+    assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
+    assert_int_equal(cfgEventSource(config, CFG_SRC_LOGFILE), 1);
+    assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 1);
+    assert_int_equal(cfgEventSource(config, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEventSource(config, CFG_SRC_METRIC), 1);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
     assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
+    assert_int_equal(cfgTransportType(config, CFG_EVT), CFG_FILE);
+    assert_string_equal(cfgTransportHost(config, CFG_EVT), "127.0.0.1");
+    assert_string_equal(cfgTransportPort(config, CFG_EVT), "9109");
+    assert_string_equal(cfgTransportPath(config, CFG_EVT), "/var/log/event.log");
     assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_SHM);
     assert_null(cfgTransportHost(config, CFG_LOG));
     assert_null(cfgTransportPort(config, CFG_LOG));
@@ -961,6 +1018,19 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
 {
     const char* yamlText =
         "---\n"
+        "event:\n"
+        "  activesources:\n"
+        "  - logfile                         # create events from files that match logfilefilter\n"
+        "  - syslog                          # create events from syslog and vsyslog\n"
+        "  - highcardmetrics\n"
+        "  logfilefilter: .*[.]log$          # extended regex, default '.*log.*'\n"
+        "  transport:\n"
+        "    type: syslog                    # udp, unix, file, syslog\n"
+        "    host: 127.0.0.2\n"
+        "    port: 9009\n"
+        "    buffering: line\n"
+        "  format:\n"
+        "    type : splunkjson\n"
         "logging:\n"
         "  level: info\n"
         "output:\n"
@@ -986,6 +1056,13 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_int_equal(cfgOutStatsDMaxLen(config), 4294967295);
     assert_int_equal(cfgOutVerbosity(config), CFG_MAX_VERBOSITY);
     assert_int_equal(cfgOutPeriod(config), 42);
+    assert_int_equal(cfgEventFormat(config), CFG_SPLUNK_JSON);
+    assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
+    assert_int_equal(cfgEventSource(config, CFG_SRC_LOGFILE), 1);
+    assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 0);
+    assert_int_equal(cfgEventSource(config, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEventSource(config, CFG_SRC_METRIC), 1);
+    assert_int_equal(cfgTransportType(config, CFG_EVT), CFG_SYSLOG);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
     assert_non_null(cfgCustomTags(config));
@@ -1009,6 +1086,9 @@ cfgReadEnvSubstitution(void** state)
     assert_int_equal(setenv("MYHOME", "home/mydir", 1), 0);
     assert_int_equal(setenv("VERBOSITY", "1", 1), 0);
     assert_int_equal(setenv("LOGLEVEL", "trace", 1), 0);
+    assert_int_equal(setenv("FORMAT", "expandedstatsd", 1), 0);
+    assert_int_equal(setenv("FILTER", ".*[.]log$", 1), 0);
+    assert_int_equal(setenv("SOURCE", "syslog", 1), 0);
 
     const char* yamlText =
         "---\n"
@@ -1028,6 +1108,20 @@ cfgReadEnvSubstitution(void** state)
         "    buffering: line\n"
         "  summaryperiod: $PERIOD\n"
         "  commanddir: /$MYHOME/scope/\n"
+        "event:\n"
+        "  format:\n"
+        "    type : $FORMAT\n"
+        "  transport:\n"
+        "    type: syslog                    # udp, unix, file, syslog\n"
+        "    host: 127.0.0.2\n"
+        "    port: 9009\n"
+        "    buffering: line\n"
+        "  logfilefilter: $FILTER            # extended regex, default '.*log.*'\n"
+        "  activesources:\n"
+        "  - logfile                         # create events from files that match logfilefilter\n"
+        "  - console                         # create events from stdout and stderr\n"
+        "  - $SOURCE                         # create events from syslog and vsyslog\n"
+        "  - highcardmetrics\n"
         "logging:\n"
         "  level: $LOGLEVEL\n"
         "  transport:\n"
@@ -1054,6 +1148,10 @@ cfgReadEnvSubstitution(void** state)
     assert_string_equal(cfgCustomTagValue(cfg, "whyyoumadbro"), "Bill owes me $5.00");
     assert_string_equal(cfgCustomTagValue(cfg, "undefined"), "$UNDEFINEDENV");
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
+    // test event fields...
+    assert_int_equal(cfgEventFormat(cfg), CFG_EXPANDED_STATSD);
+    assert_string_equal(cfgEventLogFileFilter(cfg), ".*[.]log$");
+    assert_int_equal(cfgEventSource(cfg, CFG_SRC_SYSLOG), 1);
 
     cfgDestroy(&cfg);
 
@@ -1064,6 +1162,9 @@ cfgReadEnvSubstitution(void** state)
     unsetenv("PERIOD");
     unsetenv("VERBOSITY");
     unsetenv("LOGLEVEL");
+    unsetenv("FORMAT");
+    unsetenv("FILTER");
+    unsetenv("SOURCE");
 
     deleteFile(path);
 }

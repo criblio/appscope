@@ -24,6 +24,8 @@ void cfgOutStatsDPrefixSetFromStr(config_t*, const char*);
 void cfgOutStatsDMaxLenSetFromStr(config_t*, const char*);
 void cfgOutPeriodSetFromStr(config_t*, const char*);
 void cfgCmdDirSetFromStr(config_t*, const char*);
+void cfgEventFormatSetFromStr(config_t*, const char*);
+void cfgEventLogFileFiltersSetFromStr(config_t*, const char*);
 void cfgOutVerbositySetFromStr(config_t*, const char*);
 void cfgTransportSetFromStr(config_t*, which_transport_t, const char*);
 void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
@@ -395,6 +397,24 @@ cfgCmdDirSetFromStr(config_t* cfg, const char* value)
 }
 
 void
+cfgEventFormatSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    if (!strcmp(value, "expandedstatsd")) {
+        cfgEventFormatSet(cfg, CFG_EXPANDED_STATSD);
+    } else if (!strcmp(value, "splunkjson")) {
+        cfgEventFormatSet(cfg, CFG_SPLUNK_JSON);
+    }
+}
+
+void
+cfgEventLogFileFilterSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgEventLogFileFilterSet(cfg, value);
+}
+
+void
 cfgOutVerbositySetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
@@ -641,7 +661,11 @@ static void
 processFormatType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
-    cfgOutFormatSetFromStr(config, value);
+    if (transport_context == CFG_OUT) {
+        cfgOutFormatSetFromStr(config, value);
+    } else if (transport_context == CFG_EVT) {
+        cfgEventFormatSetFromStr(config, value);
+    }
     if (value) free(value);
 }
 
@@ -687,7 +711,6 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     foreach(pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
-
 }
 
 static void
@@ -699,7 +722,7 @@ processSummaryPeriod(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processCommandPath(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processCommandDir(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgCmdDirSetFromStr(config, value);
@@ -715,7 +738,7 @@ processOutput(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_MAPPING_NODE, "format",          processFormat},
         {YAML_MAPPING_NODE, "transport",       processTransport},
         {YAML_SCALAR_NODE,  "summaryperiod",   processSummaryPeriod},
-        {YAML_SCALAR_NODE,  "commanddir",     processCommandPath},
+        {YAML_SCALAR_NODE,  "commanddir",      processCommandDir},
         {YAML_NO_NODE, NULL, NULL}
     };
 
@@ -729,6 +752,84 @@ processOutput(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
+processEvtFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE,  "type",            processFormatType},
+        {YAML_NO_NODE, NULL, NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
+static void
+processLogFileFilter(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char* value = stringVal(node);
+    cfgEventLogFileFilterSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
+processActiveSources(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SEQUENCE_NODE) return;
+
+    // absence of one of these values means to clear it.
+    // clear them all, then set values for whatever we find.
+    cfg_evt_t x;
+    for (x = CFG_SRC_LOGFILE; x<CFG_SRC_MAX; x++) {
+        cfgEventSourceSet(config, x, 0);
+    }
+
+    yaml_node_item_t* item;
+    foreach(item, node->data.sequence.items) {
+        yaml_node_t* i = yaml_document_get_node(doc, *item);
+        if (i->type != YAML_SCALAR_NODE) continue;
+
+        char* value = stringVal(i);
+        if (!strcmp(value, "logfile")) {
+            cfgEventSourceSet(config, CFG_SRC_LOGFILE, 1);
+        } else if (!strcmp(value, "console")) {
+            cfgEventSourceSet(config, CFG_SRC_CONSOLE, 1);
+        } else if (!strcmp(value, "syslog")) {
+            cfgEventSourceSet(config, CFG_SRC_SYSLOG, 1);
+        } else if (!strcmp(value, "highcardmetrics")) {
+            cfgEventSourceSet(config, CFG_SRC_METRIC, 1);
+        }
+        if (value) free(value);
+    }
+}
+
+static void
+processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_table_t t[] = {
+        {YAML_MAPPING_NODE, "format",          processEvtFormat},
+        {YAML_MAPPING_NODE, "transport",       processTransport},
+        {YAML_SCALAR_NODE,  "logfilefilter",   processLogFileFilter},
+        {YAML_SEQUENCE_NODE,"activesources",   processActiveSources},
+        {YAML_NO_NODE, NULL, NULL}
+    };
+
+    // Remember that we're currently processing event
+    transport_context = CFG_EVT;
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
+
+static void
 setConfigFromDoc(config_t* config, yaml_document_t* doc)
 {
     yaml_node_t* node = yaml_document_get_root_node(doc);
@@ -737,6 +838,7 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
     parse_table_t t[] = {
         {YAML_MAPPING_NODE,  "output",             processOutput},
         {YAML_MAPPING_NODE,  "logging",            processLogging},
+        {YAML_MAPPING_NODE,  "event",              processEvent},
         {YAML_NO_NODE, NULL, NULL}
     };
 

@@ -268,7 +268,7 @@ cfgProcessEnvironmentOutPeriod(void** state)
 }
 
 void
-cfgProcessEnvironmentCommandPath(void** state)
+cfgProcessEnvironmentCommandDir(void** state)
 {
     config_t* cfg = cfgCreateDefault();
     cfgCmdDirSet(cfg, "/my/favorite/directory");
@@ -297,6 +297,76 @@ cfgProcessEnvironmentCommandPath(void** state)
     cfgDestroy(&cfg);
     cfgProcessEnvironment(cfg);
 }
+
+void cfgProcessEnvironmentEventLogFileFilter(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    cfgEventLogFileFilterSet(cfg, ".*");
+    assert_string_equal(cfgEventLogFileFilter(cfg), ".*");
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_EVENT_LOG_FILTER", "?*", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgEventLogFileFilter(cfg), "?*");
+
+    assert_int_equal(setenv("SCOPE_EVENT_LOG_FILTER", ".*", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgEventLogFileFilter(cfg), ".*");
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_EVENT_LOG_FILTER"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgEventLogFileFilter(cfg), ".*");
+
+    // empty string
+    assert_int_equal(setenv("SCOPE_EVENT_LOG_FILTER", "", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgEventLogFileFilter(cfg), DEFAULT_LOG_FILE_FILTER);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
+typedef struct
+{
+    const char* env_name;
+    cfg_evt_t   src;
+    unsigned    default_val;
+} source_state_t;
+
+void cfgProcessEnvironmentEventSource(void** state)
+{
+    source_state_t* data = (source_state_t*)state[0];
+
+    config_t* cfg = cfgCreateDefault();
+    cfgEventSourceSet(cfg, data->src, 0);
+    assert_int_equal(cfgEventSource(cfg, data->src), 0);
+
+    // should override current cfg
+    assert_int_equal(setenv(data->env_name, "true", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEventSource(cfg, data->src), 1);
+
+    assert_int_equal(setenv(data->env_name, "false", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEventSource(cfg, data->src), 0);
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv(data->env_name), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEventSource(cfg, data->src), 0);
+
+    // empty string
+    assert_int_equal(setenv(data->env_name, "", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEventSource(cfg, data->src), data->default_val);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
 
 void
 cfgProcessEnvironmentOutVerbosity(void** state)
@@ -360,86 +430,51 @@ cfgProcessEnvironmentLogLevel(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
-cfgProcessEnvironmentOutTransport(void** state)
+typedef struct
 {
+    const char* env_name;
+    which_transport_t transport;
+} dest_state_t;
+
+void
+cfgProcessEnvironmentTransport(void** state)
+{
+    dest_state_t* data = (dest_state_t*)state[0];
+
     config_t* cfg = cfgCreateDefault();
 
     // should override current cfg
-    assert_int_equal(setenv("SCOPE_OUT_DEST", "udp://host:234", 1), 0);
+    assert_int_equal(setenv(data->env_name, "udp://host:234", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, CFG_OUT), CFG_UDP);
-    assert_string_equal(cfgTransportHost(cfg, CFG_OUT), "host");
-    assert_string_equal(cfgTransportPort(cfg, CFG_OUT), "234");
+    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_UDP);
+    assert_string_equal(cfgTransportHost(cfg, data->transport), "host");
+    assert_string_equal(cfgTransportPort(cfg, data->transport), "234");
 
     // test that our code doesn't modify the env variable directly
-    assert_string_equal(getenv("SCOPE_OUT_DEST"), "udp://host:234");
+    assert_string_equal(getenv(data->env_name), "udp://host:234");
 
-    assert_int_equal(setenv("SCOPE_OUT_DEST", "file:///some/path/somewhere", 1), 0);
+    assert_int_equal(setenv(data->env_name, "file:///some/path/somewhere", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, CFG_OUT), CFG_FILE);
-    assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/some/path/somewhere");
+    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_FILE);
+    assert_string_equal(cfgTransportPath(cfg, data->transport), "/some/path/somewhere");
 
     // if env is not defined, cfg should not be affected
-    assert_int_equal(unsetenv("SCOPE_OUT_DEST"), 0);
+    assert_int_equal(unsetenv(data->env_name), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, CFG_OUT), CFG_FILE);
-    assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/some/path/somewhere");
+    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_FILE);
+    assert_string_equal(cfgTransportPath(cfg, data->transport), "/some/path/somewhere");
 
     // unrecognised value should not affect cfg
-    assert_int_equal(setenv("SCOPE_OUT_DEST", "somewhere else", 1), 0);
+    assert_int_equal(setenv(data->env_name, "somewhere else", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, CFG_OUT), CFG_FILE);
-    assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/some/path/somewhere");
+    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_FILE);
+    assert_string_equal(cfgTransportPath(cfg, data->transport), "/some/path/somewhere");
 
     // port is required, if not there cfg should not be modified
-    assert_int_equal(setenv("SCOPE_OUT_DEST", "udp://host", 1), 0);
+    assert_int_equal(setenv(data->env_name, "udp://host", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, CFG_OUT), CFG_FILE);
-    assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/some/path/somewhere");
-
-    // Just don't crash on null cfg
-    cfgDestroy(&cfg);
-    cfgProcessEnvironment(cfg);
-}
-
-void
-cfgProcessEnvironmentLogTransport(void** state)
-{
-    config_t* cfg = cfgCreateDefault();
-
-    // should override current cfg
-    assert_int_equal(setenv("SCOPE_LOG_DEST", "udp://host:234", 1), 0);
-    cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, CFG_LOG), CFG_UDP);
-    assert_string_equal(cfgTransportHost(cfg, CFG_LOG), "host");
-    assert_string_equal(cfgTransportPort(cfg, CFG_LOG), "234");
-
-    // test that our code doesn't modify the env variable directly
-    assert_string_equal(getenv("SCOPE_LOG_DEST"), "udp://host:234");
-
-    assert_int_equal(setenv("SCOPE_LOG_DEST", "file:///some/path/somewhere", 1), 0);
-    cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, CFG_LOG), CFG_FILE);
-    assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/some/path/somewhere");
-
-    // if env is not defined, cfg should not be affected
-    assert_int_equal(unsetenv("SCOPE_LOG_DEST"), 0);
-    cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, CFG_LOG), CFG_FILE);
-    assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/some/path/somewhere");
-
-    // unrecognised value should not affect cfg
-    assert_int_equal(setenv("SCOPE_LOG_DEST", "somewhere else", 1), 0);
-    cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, CFG_LOG), CFG_FILE);
-    assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/some/path/somewhere");
-
-    // port is required, if not there cfg should not be modified
-    assert_int_equal(setenv("SCOPE_LOG_DEST", "udp://host", 1), 0);
-    cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, CFG_LOG), CFG_FILE);
-    assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/some/path/somewhere");
+    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_FILE);
+    assert_string_equal(cfgTransportPath(cfg, data->transport), "/some/path/somewhere");
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -577,7 +612,14 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_OUT_DEST=file:///tmp/file.tmp\n"
         "SCOPE_LOG_DEST=file:///tmp/file.tmp2\n"
         "SCOPE_TAG_CUSTOM1=val1\n"
-        "SCOPE_TAG_CUSTOM2=val2");
+        "SCOPE_TAG_CUSTOM2=val2\n"
+        "SCOPE_EVENT_DEST=udp://host:1234\n"
+        "SCOPE_EVENT_LOGFILE=true\n"
+        "SCOPE_EVENT_CONSOLE=false\n"
+        "SCOPE_EVENT_SYSLOG=true\n"
+        "SCOPE_EVENT_METRICS=false\n"
+        "SCOPE_EVENT_LOG_FILTER=.*\n"
+    );
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_string_equal(cfgOutStatsDPrefix(cfg), "prefix.");
     assert_int_equal(cfgOutStatsDMaxLen(cfg), 1024);
@@ -589,6 +631,14 @@ cfgProcessCommandsFromFile(void** state)
     assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM1"), "val1");
     assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM2"), "val2");
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
+    assert_int_equal(cfgTransportType(cfg, CFG_EVT), CFG_UDP);
+    assert_string_equal(cfgTransportHost(cfg, CFG_EVT), "host");
+    assert_string_equal(cfgTransportPort(cfg, CFG_EVT), "1234");
+    assert_int_equal(cfgEventSource(cfg, CFG_SRC_LOGFILE), 1);
+    assert_int_equal(cfgEventSource(cfg, CFG_SRC_CONSOLE), 0);
+    assert_int_equal(cfgEventSource(cfg, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEventSource(cfg, CFG_SRC_METRIC), 0);
+    assert_string_equal(cfgEventLogFileFilter(cfg), ".*");
 
     deleteFile(path);
     cfgDestroy(&cfg);
@@ -615,6 +665,12 @@ cfgProcessCommandsEnvSubstitution(void** state)
         "SCOPE_TAG_CUSTOM=$PERIOD\n"
         "SCOPE_TAG_whyyoumadbro=Bill owes me $5.00\n"
         "SCOPE_TAG_undefined=$UNDEFINEDENV\n"
+        "SCOPE_EVENT_DEST=udp://ho$st:1234\n"
+        "SCOPE_EVENT_LOGFILE=$TRUTH\n"
+        "SCOPE_EVENT_CONSOLE=false\n"
+        "SCOPE_EVENT_SYSLOG=$TRUTH\n"
+        "SCOPE_EVENT_METRICS=false\n"
+        "SCOPE_EVENT_LOG_FILTER=$FILTER\n"
     );
 
 
@@ -627,6 +683,8 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_int_equal(setenv("MYHOME", "home/mydir", 1), 0);
     assert_int_equal(setenv("VERBOSITY", "1", 1), 0);
     assert_int_equal(setenv("LOGLEVEL", "trace", 1), 0);
+    assert_int_equal(setenv("FILTER", ".*[.]log$", 1), 0);
+    assert_int_equal(setenv("TRUTH", "true", 1), 0);
 
     openFileAndExecuteCfgProcessCommands(path, cfg);
     // test substitute env values that are longer and shorter than they env name
@@ -643,6 +701,13 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_string_equal(cfgCustomTagValue(cfg, "whyyoumadbro"), "Bill owes me $5.00");
     assert_string_equal(cfgCustomTagValue(cfg, "undefined"), "$UNDEFINEDENV");
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
+    // event stuff...
+    assert_string_equal(cfgTransportHost(cfg, CFG_EVT), "ho$st");
+    assert_string_equal(cfgEventLogFileFilter(cfg), ".*[.]log$");
+    assert_int_equal(cfgEventSource(cfg, CFG_SRC_LOGFILE), 1);
+    assert_int_equal(cfgEventSource(cfg, CFG_SRC_CONSOLE), 0);
+    assert_int_equal(cfgEventSource(cfg, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEventSource(cfg, CFG_SRC_METRIC), 0);
 
     deleteFile(path);
     cfgDestroy(&cfg);
@@ -654,6 +719,8 @@ cfgProcessCommandsEnvSubstitution(void** state)
     unsetenv("PERIOD");
     unsetenv("VERBOSITY");
     unsetenv("LOGLEVEL");
+    unsetenv("FILTER");
+    unsetenv("TRUTH");
 }
 
 static void
@@ -1244,10 +1311,20 @@ initEvtReturnsPtr(void** state)
 // regex in src/cfgutils.c.
 extern void envRegexFree(void** state);
 
+
 int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
+
+    source_state_t log = {"SCOPE_EVENT_LOGFILE", CFG_SRC_LOGFILE, DEFAULT_SRC_LOGFILE};
+    source_state_t con = {"SCOPE_EVENT_CONSOLE", CFG_SRC_CONSOLE, DEFAULT_SRC_CONSOLE};
+    source_state_t sys = {"SCOPE_EVENT_SYSLOG" , CFG_SRC_SYSLOG , DEFAULT_SRC_SYSLOG};
+    source_state_t met = {"SCOPE_EVENT_METRICS", CFG_SRC_METRIC , DEFAULT_SRC_METRIC};
+
+    dest_state_t dest_out = {"SCOPE_OUT_DEST", CFG_OUT};
+    dest_state_t dest_evt = {"SCOPE_EVENT_DEST", CFG_EVT};
+    dest_state_t dest_log = {"SCOPE_LOG_DEST", CFG_LOG};
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(cfgPathHonorsEnvVar),
@@ -1256,11 +1333,17 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgProcessEnvironmentStatsDPrefix),
         cmocka_unit_test(cfgProcessEnvironmentStatsDMaxLen),
         cmocka_unit_test(cfgProcessEnvironmentOutPeriod),
-        cmocka_unit_test(cfgProcessEnvironmentCommandPath),
+        cmocka_unit_test(cfgProcessEnvironmentCommandDir),
+        cmocka_unit_test(cfgProcessEnvironmentEventLogFileFilter),
+        cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &log),
+        cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &con),
+        cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &sys),
+        cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &met),
         cmocka_unit_test(cfgProcessEnvironmentOutVerbosity),
         cmocka_unit_test(cfgProcessEnvironmentLogLevel),
-        cmocka_unit_test(cfgProcessEnvironmentOutTransport),
-        cmocka_unit_test(cfgProcessEnvironmentLogTransport),
+        cmocka_unit_test_prestate(cfgProcessEnvironmentTransport, &dest_out),
+        cmocka_unit_test_prestate(cfgProcessEnvironmentTransport, &dest_evt),
+        cmocka_unit_test_prestate(cfgProcessEnvironmentTransport, &dest_log),
         cmocka_unit_test(cfgProcessEnvironmentStatsdTags),
         cmocka_unit_test(cfgProcessEnvironmentCmdDebugIsIgnored),
         cmocka_unit_test(cfgProcessCommandsCmdDebugIsProcessed),

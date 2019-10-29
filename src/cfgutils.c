@@ -25,7 +25,8 @@ void cfgOutStatsDMaxLenSetFromStr(config_t*, const char*);
 void cfgOutPeriodSetFromStr(config_t*, const char*);
 void cfgCmdDirSetFromStr(config_t*, const char*);
 void cfgEventFormatSetFromStr(config_t*, const char*);
-void cfgEventLogFileFiltersSetFromStr(config_t*, const char*);
+void cfgEventLogFileFilterSetFromStr(config_t*, const char*);
+void cfgEventSourceSetFromStr(config_t*, cfg_evt_t, const char*);
 void cfgOutVerbositySetFromStr(config_t*, const char*);
 void cfgTransportSetFromStr(config_t*, which_transport_t, const char*);
 void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
@@ -297,6 +298,18 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         processCustomTag(cfg, env_line, value);
     } else if (startsWith(env_line, "SCOPE_CMD_DBG_PATH")) {
         processCmdDebug(value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_DEST")) {
+        cfgTransportSetFromStr(cfg, CFG_EVT, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE")) {
+        cfgEventSourceSetFromStr(cfg, CFG_SRC_LOGFILE, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE")) {
+        cfgEventSourceSetFromStr(cfg, CFG_SRC_CONSOLE, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG")) {
+        cfgEventSourceSetFromStr(cfg, CFG_SRC_SYSLOG, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_METRICS")) {
+        cfgEventSourceSetFromStr(cfg, CFG_SRC_METRIC, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_LOG_FILTER")) {
+        cfgEventLogFileFilterSetFromStr(cfg, value);
     }
 
     free(value);
@@ -412,6 +425,13 @@ cfgEventLogFileFilterSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     cfgEventLogFileFilterSet(cfg, value);
+}
+
+void
+cfgEventSourceSetFromStr(config_t* cfg, cfg_evt_t x, const char* value)
+{
+    if (!cfg || !value || x >= CFG_SRC_MAX) return;
+    cfgEventSourceSet(cfg, x, !strcmp("true", value));
 }
 
 void

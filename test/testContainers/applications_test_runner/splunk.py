@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import subprocess
@@ -11,7 +12,7 @@ from splunklib import results
 from common import Test, TestResult, AppController
 from runner import Runner
 from utils import random_string, dotdict
-from validation import passed
+from validation import passed, validate_all
 
 config = dotdict({
     "username": "admin",
@@ -82,7 +83,7 @@ class SplunkDirectIndexingTest(Test):
         logging.info(f"Creating test index '{index_name}'")
         index = service.indexes.create(index_name)
 
-        events_num = 1000000
+        events_num = 100000
         logging.info(f"Sending {events_num} events to Splunk")
 
         with index.attach() as sock:
@@ -110,6 +111,43 @@ class SplunkDirectIndexingTest(Test):
             actual_events_num), f"Expected to see {expected_events_num} in index, but got only {actual_events_num}"
 
 
+class SplunkKVStoreTest(Test):
+
+    def run(self) -> Tuple[TestResult, Any]:
+        logging.info(f"Connecting to Splunk. User {config.username}, Password {config.password}")
+
+        service = client.connect(username=config.username, password=config.password)
+        service.namespace['owner'] = 'Nobody'
+
+        collection_name = f"coll_{random_string(4)}"
+        self.__create_collection(collection_name, service)
+
+        collection = service.kvstore[collection_name]
+
+        records_num = 100
+
+        records = [json.dumps({"val": random_string(5)}) for i in range(records_num)]
+        logging.info(f"Inserting {len(records)} records in kvstore")
+        for record in records:
+            collection.data.insert(record)
+
+        found_records = collection.data.query()
+        logging.info(f"Found {len(found_records)} records")
+        return validate_all(
+            (len(found_records) == records_num,
+             f"Expected to have {records_num} records in kvstore, but found {len(found_records)}")
+        ), None
+
+    @retry(stop_max_attempt_number=7, wait_fixed=2000)
+    def __create_collection(self, collection_name, service):
+        collection = service.kvstore.create(collection_name)
+        return collection
+
+    @property
+    def name(self):
+        return "kvstore test"
+
+
 def configure(runner: Runner, config):
     runner.set_app_controller(SplunkAppController(config.scope_path))
-    runner.add_tests([SplunkDirectIndexingTest()])
+    runner.add_tests([SplunkDirectIndexingTest(), SplunkKVStoreTest()])

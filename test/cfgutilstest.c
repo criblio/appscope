@@ -147,27 +147,27 @@ void
 cfgProcessEnvironmentOutFormat(void** state)
 {
     config_t* cfg = cfgCreateDefault();
-    cfgOutFormatSet(cfg, CFG_SPLUNK_JSON);
-    assert_int_equal(cfgOutFormat(cfg), CFG_SPLUNK_JSON);
+    cfgOutFormatSet(cfg, CFG_METRIC_JSON);
+    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
     // should override current cfg
     assert_int_equal(setenv("SCOPE_OUT_FORMAT", "expandedstatsd", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_EXPANDED_STATSD);
 
-    assert_int_equal(setenv("SCOPE_OUT_FORMAT", "splunkjson", 1), 0);
+    assert_int_equal(setenv("SCOPE_OUT_FORMAT", "metricjson", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_SPLUNK_JSON);
+    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv("SCOPE_OUT_FORMAT"), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_SPLUNK_JSON);
+    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
     // unrecognised value should not affect cfg
     assert_int_equal(setenv("SCOPE_OUT_FORMAT", "bson", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_SPLUNK_JSON);
+    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -542,20 +542,20 @@ cfgProcessCommandsFromFile(void** state)
 
 
     // test the basics
-    writeFile(path, "SCOPE_OUT_FORMAT=splunkjson");
+    writeFile(path, "SCOPE_OUT_FORMAT=metricjson");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_SPLUNK_JSON);
+    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
     writeFile(path, "\nSCOPE_OUT_FORMAT=expandedstatsd\r\nblah");
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_EXPANDED_STATSD);
 
-    writeFile(path, "blah\nSCOPE_OUT_FORMAT=splunkjson");
+    writeFile(path, "blah\nSCOPE_OUT_FORMAT=metricjson");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_SPLUNK_JSON);
+    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
     // just demonstrating that the "last one wins"
-    writeFile(path, "SCOPE_OUT_FORMAT=splunkjson\n"
+    writeFile(path, "SCOPE_OUT_FORMAT=metricjson\n"
                     "SCOPE_OUT_FORMAT=expandedstatsd");
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_EXPANDED_STATSD);
@@ -700,7 +700,7 @@ cfgReadGoodYaml(void** state)
         "---\n"
         "output:\n"
         "  format:\n"
-        "    type: splunkjson                # expandedstatsd, splunkjson\n"
+        "    type: metricjson                # expandedstatsd, metricjson\n"
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
         "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
         "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
@@ -737,7 +737,7 @@ cfgReadGoodYaml(void** state)
     writeFile(path, yamlText);
     config_t* config = cfgRead(path);
     assert_non_null(config);
-    assert_int_equal(cfgOutFormat(config), CFG_SPLUNK_JSON);
+    assert_int_equal(cfgOutFormat(config), CFG_METRIC_JSON);
     assert_string_equal(cfgOutStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgOutStatsDMaxLen(config), 1024);
     assert_int_equal(cfgOutVerbosity(config), 3);
@@ -871,7 +871,7 @@ cfgReadGoodJson(void** state)
         "{\n"
         "  'output': {\n"
         "    'format': {\n"
-        "      'type': 'splunkjson',\n"
+        "      'type': 'metricjson',\n"
         "      'statsdprefix': 'cribl.scope',\n"
         "      'statsdmaxlen': '42',\n"
         "      'verbosity': '0',\n"
@@ -909,7 +909,7 @@ cfgReadGoodJson(void** state)
     writeFile(path, jsonText);
     config_t* config = cfgRead(path);
     assert_non_null(config);
-    assert_int_equal(cfgOutFormat(config), CFG_SPLUNK_JSON);
+    assert_int_equal(cfgOutFormat(config), CFG_METRIC_JSON);
     assert_string_equal(cfgOutStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgOutStatsDMaxLen(config), 42);
     assert_int_equal(cfgOutVerbosity(config), 0);
@@ -955,7 +955,7 @@ cfgReadBadYamlReturnsDefaults(void** state)
     const char* yamlText =
         "---\n"
         "output:\n"
-        "  format: splunkjson\n"
+        "  format: metricjson\n"
         "  statsdprefix : 'cribl.scope'\n"
         "  transport:\n"
         "    type: file\n"
@@ -1030,7 +1030,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    port: 9009\n"
         "    buffering: line\n"
         "  format:\n"
-        "    type : splunkjson\n"
+        "    type : metricjson\n"
         "logging:\n"
         "  level: info\n"
         "output:\n"
@@ -1056,7 +1056,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_int_equal(cfgOutStatsDMaxLen(config), 4294967295);
     assert_int_equal(cfgOutVerbosity(config), CFG_MAX_VERBOSITY);
     assert_int_equal(cfgOutPeriod(config), 42);
-    assert_int_equal(cfgEventFormat(config), CFG_SPLUNK_JSON);
+    assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
     assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
     assert_int_equal(cfgEventSource(config, CFG_SRC_LOGFILE), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 0);
@@ -1094,7 +1094,7 @@ cfgReadEnvSubstitution(void** state)
         "---\n"
         "output:\n"
         "  format:\n"
-        "    type: splunkjson\n"
+        "    type: metricjson\n"
         "    statsdprefix : $VAR1.$MY_ENV_VAR\n"
         "    statsdmaxlen : $MAXLEN\n"
         "    verbosity: $VERBOSITY\n"

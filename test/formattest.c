@@ -18,7 +18,7 @@ fmtCreateReturnsValidPtrForGoodFormat(void** state)
     fmtDestroy(&fmt);
     assert_null(fmt);
 
-    fmt = fmtCreate(CFG_SPLUNK_JSON);
+    fmt = fmtCreate(CFG_METRIC_JSON);
     assert_non_null(fmt);
     fmtDestroy(&fmt);
     assert_null(fmt);
@@ -89,7 +89,7 @@ fmtStatsDMaxLenSetAndGet(void** state)
 static void
 fmtOutVerbositySetAndGet(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_SPLUNK_JSON);
+    format_t* fmt = fmtCreate(CFG_METRIC_JSON);
     fmtOutVerbositySet(fmt, 0);
     assert_int_equal(fmtOutVerbosity(fmt), 0);
     fmtOutVerbositySet(fmt, UINT_MAX);
@@ -398,7 +398,7 @@ static void
 fmtStringNewlineDelimitedReturnsNull(void** state)
 {
     // Just because it's not implemented yet...
-    format_t* fmt = fmtCreate(CFG_SPLUNK_JSON);
+    format_t* fmt = fmtCreate(CFG_METRIC_JSON);
     event_t e = {"A", 1, SET, NULL};
     assert_null(fmtString(fmt, &e));
     fmtDestroy(&fmt);

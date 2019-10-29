@@ -78,8 +78,8 @@ static void
 cfgOutFormatSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
-    cfgOutFormatSet(config, CFG_SPLUNK_JSON);
-    assert_int_equal(cfgOutFormat(config), CFG_SPLUNK_JSON);
+    cfgOutFormatSet(config, CFG_METRIC_JSON);
+    assert_int_equal(cfgOutFormat(config), CFG_METRIC_JSON);
     cfgOutFormatSet(config, CFG_EXPANDED_STATSD);
     assert_int_equal(cfgOutFormat(config), CFG_EXPANDED_STATSD);
     cfgDestroy(&config);
@@ -156,8 +156,8 @@ cfgEventFormatSetAndGet(void** state)
     config_t* config = cfgCreateDefault();
     cfgEventFormatSet(config, CFG_EXPANDED_STATSD);
     assert_int_equal(cfgEventFormat(config), CFG_EXPANDED_STATSD);
-    cfgEventFormatSet(config, CFG_SPLUNK_JSON);
-    assert_int_equal(cfgEventFormat(config), CFG_SPLUNK_JSON);
+    cfgEventFormatSet(config, CFG_METRIC_JSON);
+    assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
     cfgDestroy(&config);
 }
 

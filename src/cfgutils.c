@@ -352,8 +352,8 @@ cfgOutFormatSetFromStr(config_t* cfg, const char* value)
     if (!cfg || !value) return;
     if (!strcmp(value, "expandedstatsd")) {
         cfgOutFormatSet(cfg, CFG_EXPANDED_STATSD);
-    } else if (!strcmp(value, "splunkjson")) {
-        cfgOutFormatSet(cfg, CFG_SPLUNK_JSON);
+    } else if (!strcmp(value, "metricjson")) {
+        cfgOutFormatSet(cfg, CFG_METRIC_JSON);
     }
 }
 
@@ -402,8 +402,8 @@ cfgEventFormatSetFromStr(config_t* cfg, const char* value)
     if (!cfg || !value) return;
     if (!strcmp(value, "expandedstatsd")) {
         cfgEventFormatSet(cfg, CFG_EXPANDED_STATSD);
-    } else if (!strcmp(value, "splunkjson")) {
-        cfgEventFormatSet(cfg, CFG_SPLUNK_JSON);
+    } else if (!strcmp(value, "metricjson")) {
+        cfgEventFormatSet(cfg, CFG_METRIC_JSON);
     }
 }
 

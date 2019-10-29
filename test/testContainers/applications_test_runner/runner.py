@@ -1,6 +1,5 @@
-from datetime import datetime
-
 import logging
+from datetime import datetime
 from typing import List
 
 from common import TestResult, AppController, Test
@@ -102,11 +101,11 @@ class Runner:
             diff = tock - tick
             duration = ms(diff.total_seconds())
 
-            if not self.__app_controller.is_running():
-                result = TestResult(passed=False, error="Application is crashed")
-                self.__watcher.test_execution_completed(name=test.name, result=result, scoped=scoped, duration=duration,
-                                                        scope_messages=[], test_data=data)
-                raise Exception("Application is crashed")
+            try:
+                self.__app_controller.assert_running()
+            except Exception as e:
+                logging.error(f"{self.__app_controller.name} app is not running correctly. {str(e)}")
+                result = TestResult(passed=False, error=str(e))
 
             self.__app_controller.stop()
 

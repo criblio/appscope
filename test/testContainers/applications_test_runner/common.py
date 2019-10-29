@@ -50,7 +50,7 @@ class AppController(ABC):
         pass
 
     @abstractmethod
-    def is_running(self):
+    def assert_running(self):
         pass
 
     @property

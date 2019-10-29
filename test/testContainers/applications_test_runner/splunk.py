@@ -10,8 +10,13 @@ from splunklib import results
 
 from common import Test, TestResult, AppController
 from runner import Runner
-from utils import random_string
+from utils import random_string, dotdict
 from validation import passed
+
+config = dotdict({
+    "username": "admin",
+    "password": "cribldemo"
+})
 
 
 class SplunkAppController(AppController):
@@ -32,10 +37,16 @@ class SplunkAppController(AppController):
     def stop(self):
         subprocess.run("/opt/splunk/bin/splunk stop", check=True, shell=True)
 
-    def is_running(self):
+    def assert_running(self):
         completed_proc = subprocess.run("/opt/splunk/bin/splunk status", check=True, shell=True,
                                         universal_newlines=True, stdout=PIPE)
-        return "splunkd is running" in completed_proc.stdout
+        assert "splunkd is running" in completed_proc.stdout, "Splunkd is not running"
+
+        service = client.connect(username=config.username, password=config.password)
+        messages = client._load_atom_entries(service.get("messages"))
+        logging.debug(messages)
+        err_messages = [m['title'] for m in messages if m['content']['severity'] == 'error']
+        assert len(err_messages) == 0, f"Error messages found {err_messages}"
 
     def __update_launch_conf(self, scoped):
         splunk_home = os.environ["SPLUNK_HOME"]
@@ -63,11 +74,9 @@ class SplunkDirectIndexingTest(Test):
         return "splunk direct indexing"
 
     def run(self) -> Tuple[TestResult, Any]:
-        username = "admin"
-        password = "cribldemo"
-        logging.info(f"Connecting to Splunk. User {username}, Password {password}")
+        logging.info(f"Connecting to Splunk. User {config.username}, Password {config.password}")
 
-        service = client.connect(username=username, password=password)
+        service = client.connect(username=config.username, password=config.password)
 
         index_name = f"test_{random_string(4)}"
         logging.info(f"Creating test index '{index_name}'")

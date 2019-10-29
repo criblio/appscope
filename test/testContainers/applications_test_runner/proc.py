@@ -25,18 +25,17 @@ class SubprocessAppController(AppController):
 
         self.proc = subprocess.Popen(self.start_command, env=env)
         time.sleep(self.start_wait)
-        assert self.is_running()
+        self.assert_running()
 
     def stop(self):
         self.proc.terminate()
         self.proc.communicate()
 
         time.sleep(self.stop_wait)
-        assert not self.is_running()
 
-    def is_running(self):
+    def assert_running(self):
         subprocess.run("ps -ef", shell=True)
-        return self.proc.poll() is None
+        assert self.proc.poll() is None, f"{self.name} is crashed"
 
 
 def wait_for_stdout_msg(proc, msg, timeout=60):

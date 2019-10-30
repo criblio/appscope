@@ -230,9 +230,9 @@ fmtString(format_t* fmt, event_t* e)
     if (!fmt) return NULL;
 
     switch (fmt->format) {
-        case CFG_EXPANDED_STATSD:
+        case CFG_METRIC_STATSD:
             return fmtStatsDString(fmt, e);
-        case CFG_NEWLINE_DELIMITED:
+        case CFG_METRIC_JSON:
             return NULL;
         default:
             DBG("%d %s", fmt->format, e->name);

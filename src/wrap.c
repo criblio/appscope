@@ -17,9 +17,11 @@ static metric_counters g_ctrs = {0};
 static thread_timing g_thread = {0};
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
+static evt_t* g_evt = NULL;
 static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static out_t *g_prevout = NULL;
+static evt_t *g_prevevt = NULL;
 __thread int g_getdelim = 0;
 
 // Forward declaration
@@ -134,6 +136,7 @@ doConfig(config_t *cfg)
     // Save the current objects to get cleaned up on the periodic thread
     g_prevout = g_out;
     g_prevlog = g_log;
+    g_prevevt = g_evt;
 
     g_thread.interval = cfgOutPeriod(cfg);
     if (!g_thread.startTime) {
@@ -145,6 +148,7 @@ doConfig(config_t *cfg)
     log_t* log = initLog(cfg);
     g_out = initOut(cfg);
     g_log = log; // Set after initOut to avoid infinite loop with socket
+    g_evt = initEvt(cfg);
 }
 
 // Process dynamic config change if they are available
@@ -1788,6 +1792,7 @@ handleExit(void)
     reportPeriodicStuff();
     outFlush(g_out);
     logFlush(g_log);
+    evtFlush(g_evt);
 }
 
 static void *
@@ -1803,6 +1808,7 @@ periodic(void *arg)
         // Clean up previous objects if they exist.
         //if (g_prevout) outDestroy(&g_prevout);
         //if (g_prevlog) logDestroy(&g_prevlog);
+        //if (g_prevevt) evtDestroy(&g_prevevt);
 
         // From the config file
         sleep(g_thread.interval);
@@ -4966,10 +4972,34 @@ static const char scope_help[] =
 "            file:///tmp/output.log\n"
 "            udp://server:123         (server is servername or address;\n"
 "                                      123 is port number or service name)\n"
+"    SCOPE_OUT_FORMAT\n"
+"        metricstatsd, metricjson\n"
+"        Default is metricstatsd\n"
 "    SCOPE_STATSD_PREFIX\n"
 "        Specify a string to be prepended to every scope metric.\n"
 "    SCOPE_STATSD_MAXLEN\n"
 "        Default is 512\n"
+"    SCOPE_EVENT_DEST\n"
+"        same format as SCOPE_OUT_DEST above.\n"
+"        Default is tcp://localhost:9109\n"
+"    SCOPE_EVENT_FORMAT\n"
+"        eventjsonrawjson, eventjsonrawstatsd\n"
+"        Default is eventjsonrawjson\n"
+"    SCOPE_EVENT_LOGFILE\n"
+"        Create events from logs that match SCOPE_EVENT_LOG_FILTER.\n"
+"        true,false  Default is false.\n"
+"    SCOPE_EVENT_CONSOLE\n"
+"        Create events from stdout, stderr.\n"
+"        true,false  Default is false.\n"
+"    SCOPE_EVENT_SYSLOG\n"
+"        Create events from syslog, vsyslog functions.\n"
+"        true,false  Default is false.\n"
+"    SCOPE_EVENT_METRICS\n"
+"        Create events from metrics.\n"
+"        true,false  Default is false.\n"
+"    SCOPE_EVENT_LOG_FILTER\n"
+"        An extended regular expression that describes log file names.\n"
+"        Only used if SCOPE_EVENT_LOGFILE is true.  Default is .*log.*\n"
 "    SCOPE_LOG_LEVEL\n"
 "        debug, info, warning, error, none.  Default is error.\n"
 "    SCOPE_LOG_DEST\n"

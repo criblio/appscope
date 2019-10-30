@@ -92,6 +92,7 @@ class SplunkDirectIndexingTest(Test):
                 sock.send(f"This is my test event {i}! \n".encode('utf-8'))
 
         self.__assert_same_number_of_events(service, events_num, index_name)
+        self.__assert_transposed_results(service, index_name)
 
         return passed(), None
 
@@ -102,13 +103,19 @@ class SplunkDirectIndexingTest(Test):
         logging.info(f"Searching splunk for events. Query: {search_query}")
         search_results = service.jobs.oneshot(search_query)
 
-        # Get the results and display them using the ResultsReader
         reader = results.ResultsReader(search_results)
         actual_events_num = reader.next()['count']
         logging.info(f"Found {actual_events_num} events in index {index_name}")
 
         assert expected_events_num == int(
             actual_events_num), f"Expected to see {expected_events_num} in index, but got only {actual_events_num}"
+
+    def __assert_transposed_results(self, service, index_name):
+        search_results = service.jobs.oneshot(f"search index={index_name} | head 10 | transpose")
+
+        reader = results.ResultsReader(search_results)
+        for result in reader:
+            assert result.get("column") is not None, f"Attribute 'column' not found in a row {result}"
 
 
 class SplunkKVStoreTest(Test):

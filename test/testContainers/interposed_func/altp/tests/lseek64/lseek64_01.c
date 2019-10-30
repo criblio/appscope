@@ -1,7 +1,3 @@
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -12,8 +8,7 @@
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[255];    
-    struct stat64 fs;
+    char tmp_file_name[255];
     int n = 0;
 
     CREATE_TMP_DIR();

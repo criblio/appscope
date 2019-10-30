@@ -1,9 +1,6 @@
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+
 #include "test_utils.h"
 
 #define TEST_MSG "test"
@@ -52,7 +49,7 @@ int do_test() {
     } else {
         struct sockaddr_in ip_addr;
         struct sockaddr_in client_addr;
-        int addrlen = sizeof(client_addr);
+        unsigned int addrlen = sizeof(client_addr);
         int client_s = 0;
 
         memset(&ip_addr, 0, sizeof(struct sockaddr_in));

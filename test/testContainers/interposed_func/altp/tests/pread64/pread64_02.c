@@ -1,8 +1,5 @@
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include <fcntl.h>
+
 #include "test_utils.h"
 
 #define TEST_MSG "test"

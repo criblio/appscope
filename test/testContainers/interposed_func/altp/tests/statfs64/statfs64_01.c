@@ -1,7 +1,3 @@
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include <fcntl.h>
 #include <sys/statfs.h>
 
@@ -11,7 +7,7 @@
 
 int do_test() {
     int test_result = EXIT_SUCCESS;   
-    struct statfs fs;
+    struct statfs64 fs;
 
     if(statfs64("/", &fs) < 0) {
         TEST_ERROR();

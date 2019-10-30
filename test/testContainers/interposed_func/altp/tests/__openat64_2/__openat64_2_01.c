@@ -1,14 +1,11 @@
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include <fcntl.h>
 #include <sys/types.h>
 
 #include "test_utils.h"
 
-#define __USE_GNU
 #define TEST_MSG "test"
+
+int __openat64_2(int, const char *, int);
 
 int do_test() {
     int test_result = EXIT_SUCCESS;

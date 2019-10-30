@@ -1,10 +1,8 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #include <netdb.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+
 #include "test_utils.h"
 
 int do_test() {

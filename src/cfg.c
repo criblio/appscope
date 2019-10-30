@@ -37,12 +37,15 @@ struct _config_t
         unsigned src[CFG_SRC_MAX];
     } evt;
 
+    struct {
+        cfg_log_level_t level;
+    } log;
+
     // CFG_OUT, CFG_EVT, or CFG_LOG
     transport_struct_t transport[CFG_WHICH_MAX]; 
 
     custom_tag_t** tags;
     unsigned max_tags;
-    cfg_log_level_t level;
 };
 
 #define DEFAULT_SUMMARY_PERIOD 10
@@ -106,7 +109,7 @@ cfgCreateDefault()
     c->transport[CFG_LOG].file.buf_policy = DEFAULT_LOG_BUF;
     c->tags = DEFAULT_TAGS;
     c->max_tags = DEFAULT_NUM_TAGS;
-    c->level = DEFAULT_LOG_LEVEL;
+    c->log.level = DEFAULT_LOG_LEVEL;
 
     return c;
 }
@@ -348,7 +351,7 @@ cfgCustomTagValue(config_t* cfg, const char* tagName)
 cfg_log_level_t
 cfgLogLevel(config_t* cfg)
 {
-    return (cfg) ? cfg->level : DEFAULT_LOG_LEVEL;
+    return (cfg) ? cfg->log.level : DEFAULT_LOG_LEVEL;
 }
 
 ///////////////////////////////////
@@ -554,5 +557,5 @@ void
 cfgLogLevelSet(config_t* cfg, cfg_log_level_t level)
 {
     if (!cfg) return;
-    cfg->level = level;
+    cfg->log.level = level;
 }

@@ -3,8 +3,6 @@
 
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 int do_test() {
     int test_result = EXIT_SUCCESS;   
     struct statvfs64 fs;

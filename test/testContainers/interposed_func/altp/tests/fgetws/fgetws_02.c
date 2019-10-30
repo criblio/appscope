@@ -2,13 +2,11 @@
 
 #include "test_utils.h"
 
-#define TEST_MSG L"test"
-
 int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    
     int i = 0;
-    wchar_t buffer[] = TEST_MSG;
+    wchar_t buffer[] = TEST_MSGW;
 
     CREATE_TMP_DIR();
         
@@ -17,7 +15,7 @@ int do_test() {
     FILE* pFile = fopen(tmp_file_name, "w");
     
     if(pFile != NULL) {
-        for(i = 0; i < 100; i++) {
+        for(i = 0; i < TEST_COUNT; i++) {
             if(fputws(buffer, pFile) == EOF) {
                 TEST_ERROR();
                 break;
@@ -34,14 +32,14 @@ int do_test() {
     pFile = fopen(tmp_file_name, "r");
     
     if(pFile != NULL) {
-	    for(i = 0; i < 100; i++) {
+	    for(i = 0; i < TEST_COUNT; i++) {
 	        memset(buffer, 0, sizeof(buffer));
 	        
 	        if(fgetws(buffer, sizeof(buffer)/sizeof(wchar_t), pFile) == NULL) {
 	            TEST_ERROR();
 	            break;
 	        } else {
-	            if(wcscmp(buffer, TEST_MSG) != 0) {
+	            if(wcscmp(buffer, TEST_MSGW) != 0) {
 	                TEST_ERROR();
                     break;
 	            }

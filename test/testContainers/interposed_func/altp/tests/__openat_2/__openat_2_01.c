@@ -3,8 +3,6 @@
 
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 int __openat_2(int, const char *, int);
 
 int do_test() {

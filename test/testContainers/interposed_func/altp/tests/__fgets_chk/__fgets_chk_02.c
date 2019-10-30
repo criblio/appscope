@@ -1,7 +1,5 @@
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 char * __fgets_chk(char * s, size_t size, int strsize, FILE * stream);
 
 int do_test() {
@@ -17,7 +15,7 @@ int do_test() {
     FILE* pFile = fopen(tmp_file_name, "w");
     
     if(pFile != NULL) {
-        for(i = 0; i < 100; i++) {
+        for(i = 0; i < TEST_COUNT; i++) {
             if(fputs(buffer, pFile) == EOF) {
                 TEST_ERROR();
                 break;
@@ -34,7 +32,7 @@ int do_test() {
     pFile = fopen(tmp_file_name, "r");
     
     if(pFile != NULL) {
-	    for(i = 0; i < 100; i++) {
+	    for(i = 0; i < TEST_COUNT; i++) {
 	        memset(buffer, 0, sizeof(buffer));
 	        
 	        if(__fgets_chk(buffer, sizeof(buffer), sizeof(buffer), pFile) == NULL) {

@@ -1,7 +1,5 @@
 #include "test_utils.h"
 
-#define TEST_CHAR 'A'
-
 int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    

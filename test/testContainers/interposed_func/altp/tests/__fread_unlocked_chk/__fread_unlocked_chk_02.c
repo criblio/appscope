@@ -1,7 +1,5 @@
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 size_t __fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream);
 
 int do_test() {
@@ -17,7 +15,7 @@ int do_test() {
     FILE* pFile = fopen(tmp_file_name, "w");
     
     if(pFile != NULL) {
-        for(i = 0; i < 100; i++) {
+        for(i = 0; i < TEST_COUNT; i++) {
             if(sizeof(buffer) != fwrite(buffer, 1, sizeof(buffer), pFile)) {
                 TEST_ERROR();
                 break;
@@ -34,7 +32,7 @@ int do_test() {
     pFile = fopen(tmp_file_name, "r");
     
     if(pFile != NULL) {
-        for(i = 0; i < 100; i++) {
+        for(i = 0; i < TEST_COUNT; i++) {
             memset(buffer, 0, sizeof(buffer));
             if(__fread_unlocked_chk(buffer, sizeof(buffer), sizeof(buffer), 1, pFile) == 0) {
                 TEST_ERROR();

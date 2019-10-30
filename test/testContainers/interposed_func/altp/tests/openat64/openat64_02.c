@@ -3,8 +3,6 @@
 
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    
@@ -14,7 +12,7 @@ int do_test() {
 
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
-    for(i = 0; i < 100; i++) {
+    for(i = 0; i < TEST_COUNT; i++) {
         int dirfd = open64(tmp_dir_name, O_RDONLY);
 
         int f = openat64(dirfd, "file", O_CREAT | O_WRONLY);

@@ -1,7 +1,5 @@
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 size_t __fread_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream);
 
 int do_test() {

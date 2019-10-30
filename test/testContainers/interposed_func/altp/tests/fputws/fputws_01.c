@@ -2,12 +2,10 @@
 
 #include "test_utils.h"
 
-#define TEST_MSG L"test"
-
 int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    
-    wchar_t buffer[] = TEST_MSG;
+    wchar_t buffer[] = TEST_MSGW;
 
     CREATE_TMP_DIR();
     

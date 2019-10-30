@@ -1,12 +1,10 @@
 #include "test_utils.h"
 
-#define TEST_COUNT 100
-
 int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    
     int i = 0;
-    char buffer[] = "test";
+    char buffer[] = TEST_MSG;
     off_t pos;
 
     CREATE_TMP_DIR();

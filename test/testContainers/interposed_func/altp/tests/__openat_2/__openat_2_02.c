@@ -3,8 +3,6 @@
 
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 int __openat_2(int, const char *, int);
 
 int do_test() {
@@ -16,7 +14,7 @@ int do_test() {
 
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
     
-    for(i = 0; i< 100; i ++) {
+    for(i = 0; i< TEST_COUNT; i ++) {
         int dirfd = open(tmp_dir_name, O_RDONLY);
 
         int f = open(tmp_file_name, O_CREAT | O_WRONLY);

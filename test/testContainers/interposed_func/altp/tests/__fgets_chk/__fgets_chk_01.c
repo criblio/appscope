@@ -1,7 +1,5 @@
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 char * __fgets_chk(char * s, size_t size, int strsize, FILE * stream);
 
 int do_test() {

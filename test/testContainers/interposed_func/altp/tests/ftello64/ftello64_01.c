@@ -3,7 +3,7 @@
 int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    
-    char buffer[] = "test";
+    char buffer[] = TEST_MSG;
     off64_t pos;
 
     CREATE_TMP_DIR();

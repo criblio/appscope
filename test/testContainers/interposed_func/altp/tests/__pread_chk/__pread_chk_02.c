@@ -2,8 +2,6 @@
 
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 ssize_t __pread_chk(int fd, void * buf, size_t nbytes, off_t offset, size_t buflen);
 
 int do_test() {
@@ -30,7 +28,7 @@ int do_test() {
         TEST_ERROR();
     }
 
-    for(i = 0; i < 100; i++) {
+    for(i = 0; i < TEST_COUNT; i++) {
         f = open(tmp_file_name, O_RDONLY);
 
         if (f != EOF) {

@@ -2,8 +2,6 @@
 
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 ssize_t __read_chk(int fd, void * buf, size_t nbytes, size_t buflen);
 
 int do_test() {

@@ -1,7 +1,5 @@
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    
@@ -15,7 +13,7 @@ int do_test() {
     FILE* pFile = fopen(tmp_file_name, "w");
     
     if(pFile != NULL) {
-        for(i = 0; i < 100; i++) {
+        for(i = 0; i < TEST_COUNT; i++) {
             if(fputs(buffer, pFile) == EOF) {
                 TEST_ERROR();
                 break;

@@ -2,14 +2,12 @@
 
 #include "test_utils.h"
 
-#define TEST_MSG L"test"
-
 wchar_t * __fgetws_chk(wchar_t * ws, size_t size, int strsize, FILE * stream);
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    
-    wchar_t buffer[] = TEST_MSG;
+    wchar_t buffer[] = TEST_MSGW;
 
     CREATE_TMP_DIR();
     
@@ -37,7 +35,7 @@ int do_test() {
         if(__fgetws_chk(buffer, sizeof(buffer), sizeof(buffer), pFile) == NULL) {
             TEST_ERROR();
         } else {
-            if(wcscmp(buffer, TEST_MSG) != 0) {
+            if(wcscmp(buffer, TEST_MSGW) != 0) {
                 TEST_ERROR();
             }
         }

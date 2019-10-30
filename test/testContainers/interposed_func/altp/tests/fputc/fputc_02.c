@@ -13,7 +13,7 @@ int do_test() {
     FILE* pFile = fopen(tmp_file_name, "w");
     
     if(pFile != NULL) {
-        for(i = 0; i < 100; i++) {
+        for(i = 0; i < TEST_COUNT; i++) {
             if(fputc(c, pFile) == EOF) {
                 TEST_ERROR();
                 break;

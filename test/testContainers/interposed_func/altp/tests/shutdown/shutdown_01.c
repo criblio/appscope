@@ -3,9 +3,7 @@
 
 #include "test_utils.h"
 
-#define TEST_MSG "test"
 #define TEST_PORT 5555
-#define SEND_MSG_COUNT 100
 
 int create_socket() {
     int yes = 1;

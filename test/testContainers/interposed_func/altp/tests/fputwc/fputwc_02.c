@@ -17,7 +17,7 @@ int do_test() {
     FILE* pFile = fopen(tmp_file_name, "w");
     
     if(pFile != NULL) {
-        for(i = 0; i < 100; i++) {
+        for(i = 0; i < TEST_COUNT; i++) {
             if(fputwc(c, pFile) == WEOF) {
                 TEST_ERROR();
                 break;

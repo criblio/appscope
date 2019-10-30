@@ -1,12 +1,10 @@
 #include "test_utils.h"
 
-#define TEST_MSG "test\n"
-
 int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    
     int i = 0;
-    char buffer[5] = TEST_MSG;
+    char buffer[5] = TEST_MSG_N;
     
     CREATE_TMP_DIR();
     
@@ -15,7 +13,7 @@ int do_test() {
     FILE* pFile = fopen(tmp_file_name, "w");
     
     if(pFile != NULL) {
-        for(i = 0; i < 100; i++) {
+        for(i = 0; i < TEST_COUNT; i++) {
             if(sizeof(buffer) != fwrite(buffer, 1, sizeof(buffer), pFile)) {
                 TEST_ERROR();
                 break;
@@ -34,14 +32,14 @@ int do_test() {
     if(pFile != NULL) {        
         size_t bufsize = 0;
         char *b = NULL;
-        for(i = 0; i < 100; i++) {           
+        for(i = 0; i < TEST_COUNT; i++) {           
             if(getline(&b, &bufsize, pFile) <= 0) {
                 printf("%s", b);
                 TEST_ERROR();
                 break;
             }
 
-            if(strcmp(b, TEST_MSG) != 0) {
+            if(strcmp(b, TEST_MSG_N) != 0) {
                 TEST_ERROR();
                 break;
             }

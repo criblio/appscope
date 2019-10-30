@@ -1,11 +1,9 @@
 #include "test_utils.h"
 
-#define TEST_MSG "test\n"
-
 int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    
-    char buffer[5] = TEST_MSG;
+    char buffer[5] = TEST_MSG_N;
     
     CREATE_TMP_DIR();
     
@@ -35,7 +33,7 @@ int do_test() {
             TEST_ERROR();
         }
 
-        if(strcmp(b, TEST_MSG) != 0) {
+        if(strcmp(b, TEST_MSG_N) != 0) {
             TEST_ERROR();
         }
 

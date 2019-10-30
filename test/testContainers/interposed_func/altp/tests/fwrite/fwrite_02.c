@@ -4,7 +4,7 @@ int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[255];    
     int i = 0;
-    char buffer[] = "test";
+    char buffer[] = TEST_MSG;
     
     CREATE_TMP_DIR();
     
@@ -13,7 +13,7 @@ int do_test() {
     FILE* pFile = fopen(tmp_file_name, "w");
     
     if(pFile != NULL) {
-        for(i = 0; i < 100; i++) {
+        for(i = 0; i < TEST_COUNT; i++) {
             if(sizeof(buffer) != fwrite(buffer, 1, sizeof(buffer), pFile)) {
                 TEST_ERROR();
                 break;

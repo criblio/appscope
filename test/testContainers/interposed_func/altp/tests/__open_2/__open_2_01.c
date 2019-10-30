@@ -5,8 +5,6 @@
 
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 int __open_2(const char *, int);
 
 int do_test() {

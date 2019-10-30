@@ -1,10 +1,4 @@
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include "test_utils.h"
-
-#define TEST_MSG "test"
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
@@ -19,7 +13,7 @@ int do_test() {
     FILE* pFile = freopen64(tmp_file_name, "w", stderr);
     
     if(pFile != NULL) {
-        for(i = 0; i < 100; i++) {
+        for(i = 0; i < TEST_COUNT; i++) {
             fprintf(stderr, TEST_MSG);
         }
     
@@ -33,7 +27,7 @@ int do_test() {
     pFile = fopen(tmp_file_name, "r");
     
     if(pFile != NULL) {
-        for(i = 0; i < 100; i++) {
+        for(i = 0; i < TEST_COUNT; i++) {
             memset(buffer, 0, sizeof(buffer));
             if(fread(buffer, 1, sizeof(buffer) - 1, pFile) == 0) {
                 TEST_ERROR();

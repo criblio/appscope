@@ -1,10 +1,4 @@
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include "test_utils.h"
-
-#define TEST_MSG "test"
 
 int do_test() {
     int test_result = EXIT_SUCCESS;

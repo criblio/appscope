@@ -1,12 +1,7 @@
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include <fcntl.h>
 #include <sys/uio.h>
-#include "test_utils.h"
 
-#define TEST_MSG "test"
+#include "test_utils.h"
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
@@ -37,7 +32,7 @@ int do_test() {
         TEST_ERROR();
     }
 
-    for(i = 0; i < 100; i++) {
+    for(i = 0; i < TEST_COUNT; i++) {
         f = open64(tmp_file_name, O_RDONLY);
 
         if (f != EOF) {

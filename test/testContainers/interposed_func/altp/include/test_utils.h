@@ -1,6 +1,16 @@
 #ifndef __TEST_UTILS_H__
 #define __TEST_UTILS_H__
 
+#define _GNU_SOURCE
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+
+#include "common.h"
+
 #define TEST_ERROR() \
     test_result = EXIT_FAILURE; \
     fprintf(stderr, "[ERROR] Error at line number %d in file %s\n", __LINE__, __FILE__);

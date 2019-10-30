@@ -1,19 +1,12 @@
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
 #include "test_utils.h"
 
-#define TEST_MSG "test"
-
 int do_test() {
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[255];    
-    struct stat64 fs;
+    char tmp_file_name[255];
     int n = 0;
     int i = 0;
 
@@ -24,13 +17,13 @@ int do_test() {
     int f = open64(tmp_file_name, O_CREAT | O_WRONLY);
     
     if(f != EOF) {
-        for(i = 0; i < 100; i++) {
+        for(i = 0; i < TEST_COUNT; i++) {
             if(write(f, TEST_MSG, sizeof(TEST_MSG)) != sizeof(TEST_MSG)) {
                 TEST_ERROR();
                 break;
             }
 
-            if(lseek64(f, n, SEEK_CUR) != (i+1)*sizeof(TEST_MSG)) {
+            if(lseek64(f, n, SEEK_CUR) != (off64_t)((i + 1)*sizeof(TEST_MSG))) {
                 TEST_ERROR();
                 break;
             }

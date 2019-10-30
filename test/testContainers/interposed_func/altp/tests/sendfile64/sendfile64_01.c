@@ -1,11 +1,7 @@
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include <fcntl.h>
-#include "test_utils.h"
+#include <sys/sendfile.h>
 
-#define TEST_MSG "test"
+#include "test_utils.h"
 
 int do_test() {
     int test_result = EXIT_SUCCESS;

@@ -1,7 +1,7 @@
 #ifndef __SCOPETYPES_H__
 #define __SCOPETYPES_H__
 
-typedef enum {CFG_EXPANDED_STATSD, CFG_METRIC_JSON, CFG_FORMAT_MAX} cfg_out_format_t;
+typedef enum {CFG_METRIC_STATSD, CFG_METRIC_JSON, CFG_FORMAT_MAX} cfg_out_format_t;
 typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_SYSLOG, CFG_SHM} cfg_transport_t;
 typedef enum {CFG_OUT, CFG_EVT, CFG_LOG, CFG_WHICH_MAX} which_transport_t;
 typedef enum {CFG_LOG_TRACE,
@@ -21,7 +21,7 @@ typedef enum {CFG_SRC_LOGFILE,
 #define CFG_MAX_VERBOSITY 9
 #define CFG_FILE_NAME "scope.yml"
 
-#define DEFAULT_OUT_FORMAT CFG_EXPANDED_STATSD
+#define DEFAULT_OUT_FORMAT CFG_METRIC_STATSD
 #define DEFAULT_STATSD_MAX_LEN 512
 #define DEFAULT_STATSD_PREFIX ""
 #define DEFAULT_CUSTOM_TAGS NULL

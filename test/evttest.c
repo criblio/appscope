@@ -95,7 +95,7 @@ evtFormatSetAndOutSendEvent(void** state)
     evtTransportSet(evt, t);
 
     event_t e = {"A", 1, DELTA, NULL};
-    format_t* f = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* f = fmtCreate(CFG_METRIC_STATSD);
     evtFormatSet(evt, f);
 
     // Test that format is set by testing side effects of evtSendEvent

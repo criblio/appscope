@@ -151,9 +151,9 @@ cfgProcessEnvironmentOutFormat(void** state)
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
     // should override current cfg
-    assert_int_equal(setenv("SCOPE_OUT_FORMAT", "expandedstatsd", 1), 0);
+    assert_int_equal(setenv("SCOPE_OUT_FORMAT", "metricstatsd", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_EXPANDED_STATSD);
+    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_STATSD);
 
     assert_int_equal(setenv("SCOPE_OUT_FORMAT", "metricjson", 1), 0);
     cfgProcessEnvironment(cfg);
@@ -581,9 +581,9 @@ cfgProcessCommandsFromFile(void** state)
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
-    writeFile(path, "\nSCOPE_OUT_FORMAT=expandedstatsd\r\nblah");
+    writeFile(path, "\nSCOPE_OUT_FORMAT=metricstatsd\r\nblah");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_EXPANDED_STATSD);
+    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_STATSD);
 
     writeFile(path, "blah\nSCOPE_OUT_FORMAT=metricjson");
     openFileAndExecuteCfgProcessCommands(path, cfg);
@@ -591,9 +591,9 @@ cfgProcessCommandsFromFile(void** state)
 
     // just demonstrating that the "last one wins"
     writeFile(path, "SCOPE_OUT_FORMAT=metricjson\n"
-                    "SCOPE_OUT_FORMAT=expandedstatsd");
+                    "SCOPE_OUT_FORMAT=metricstatsd");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_EXPANDED_STATSD);
+    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_STATSD);
 
 
     // test everything else once
@@ -767,7 +767,7 @@ cfgReadGoodYaml(void** state)
         "---\n"
         "output:\n"
         "  format:\n"
-        "    type: metricjson                # expandedstatsd, metricjson\n"
+        "    type: metricjson                # metricstatsd, metricjson\n"
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
         "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
         "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
@@ -782,7 +782,7 @@ cfgReadGoodYaml(void** state)
         "  commanddir: /tmp\n"
         "event:\n"
         "  format:\n"
-        "    type : expandedstatsd\n"
+        "    type : metricstatsd\n"
         "  transport:\n"
         "    type: syslog                    # udp, unix, file, syslog\n"
         "    host: 127.0.0.2\n"
@@ -810,7 +810,7 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgOutVerbosity(config), 3);
     assert_int_equal(cfgOutPeriod(config), 11);
     assert_string_equal(cfgCmdDir(config), "/tmp");
-    assert_int_equal(cfgEventFormat(config), CFG_EXPANDED_STATSD);
+    assert_int_equal(cfgEventFormat(config), CFG_METRIC_STATSD);
     assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
     assert_int_equal(cfgEventSource(config, CFG_SRC_LOGFILE), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 1);
@@ -956,7 +956,7 @@ cfgReadGoodJson(void** state)
         "  },\n"
         "  'event': {\n"
         "    'format': {\n"
-        "      'type': 'expandedstatsd'\n"
+        "      'type': 'metricstatsd'\n"
         "    },\n"
         "    'transport': {\n"
         "      'type': 'file',\n"
@@ -981,7 +981,7 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgOutStatsDMaxLen(config), 42);
     assert_int_equal(cfgOutVerbosity(config), 0);
     assert_int_equal(cfgOutPeriod(config), 13);
-    assert_int_equal(cfgEventFormat(config), CFG_EXPANDED_STATSD);
+    assert_int_equal(cfgEventFormat(config), CFG_METRIC_STATSD);
     assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
     assert_int_equal(cfgEventSource(config, CFG_SRC_LOGFILE), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 1);
@@ -1051,7 +1051,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "  [apples,sugar,flour,dirt]        # dirt mom?  Really?\n"
         "output:\n"
         "  format:\n"
-        "    type: expandedstatsd\n"
+        "    type: metricstatsd\n"
         "    hey: yeahyou\n"
         "    tags:\n"
         "    - brainfarts: 135\n"
@@ -1068,7 +1068,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
 
     config_t* config = cfgRead(path);
     assert_non_null(config);
-    assert_int_equal(cfgOutFormat(config), CFG_EXPANDED_STATSD);
+    assert_int_equal(cfgOutFormat(config), CFG_METRIC_STATSD);
     assert_string_equal(cfgOutStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
@@ -1111,14 +1111,14 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    verbosity: 4294967295\n"
         "    statsdmaxlen: 4294967295\n"
         "    statsdprefix: 'cribl.scope'\n"
-        "    type:  expandedstatsd\n"
+        "    type:  metricstatsd\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     config_t* config = cfgRead(path);
     assert_non_null(config);
-    assert_int_equal(cfgOutFormat(config), CFG_EXPANDED_STATSD);
+    assert_int_equal(cfgOutFormat(config), CFG_METRIC_STATSD);
     assert_string_equal(cfgOutStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgOutStatsDMaxLen(config), 4294967295);
     assert_int_equal(cfgOutVerbosity(config), CFG_MAX_VERBOSITY);
@@ -1153,7 +1153,7 @@ cfgReadEnvSubstitution(void** state)
     assert_int_equal(setenv("MYHOME", "home/mydir", 1), 0);
     assert_int_equal(setenv("VERBOSITY", "1", 1), 0);
     assert_int_equal(setenv("LOGLEVEL", "trace", 1), 0);
-    assert_int_equal(setenv("FORMAT", "expandedstatsd", 1), 0);
+    assert_int_equal(setenv("FORMAT", "metricstatsd", 1), 0);
     assert_int_equal(setenv("FILTER", ".*[.]log$", 1), 0);
     assert_int_equal(setenv("SOURCE", "syslog", 1), 0);
 
@@ -1216,7 +1216,7 @@ cfgReadEnvSubstitution(void** state)
     assert_string_equal(cfgCustomTagValue(cfg, "undefined"), "$UNDEFINEDENV");
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
     // test event fields...
-    assert_int_equal(cfgEventFormat(cfg), CFG_EXPANDED_STATSD);
+    assert_int_equal(cfgEventFormat(cfg), CFG_METRIC_STATSD);
     assert_string_equal(cfgEventLogFileFilter(cfg), ".*[.]log$");
     assert_int_equal(cfgEventSource(cfg, CFG_SRC_SYSLOG), 1);
 

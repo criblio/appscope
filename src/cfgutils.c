@@ -363,8 +363,8 @@ void
 cfgOutFormatSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    if (!strcmp(value, "expandedstatsd")) {
-        cfgOutFormatSet(cfg, CFG_EXPANDED_STATSD);
+    if (!strcmp(value, "metricstatsd")) {
+        cfgOutFormatSet(cfg, CFG_METRIC_STATSD);
     } else if (!strcmp(value, "metricjson")) {
         cfgOutFormatSet(cfg, CFG_METRIC_JSON);
     }
@@ -413,8 +413,8 @@ void
 cfgEventFormatSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    if (!strcmp(value, "expandedstatsd")) {
-        cfgEventFormatSet(cfg, CFG_EXPANDED_STATSD);
+    if (!strcmp(value, "metricstatsd")) {
+        cfgEventFormatSet(cfg, CFG_METRIC_STATSD);
     } else if (!strcmp(value, "metricjson")) {
         cfgEventFormatSet(cfg, CFG_METRIC_JSON);
     }

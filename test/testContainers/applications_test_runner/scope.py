@@ -1,6 +1,15 @@
 import logging
 import socketserver
+import subprocess
 import threading
+
+
+def get_scope_version(scope_path):
+    completed_proc = subprocess.run([scope_path], universal_newlines=True, stdout=subprocess.PIPE)
+    stdout = completed_proc.stdout
+    for line in stdout.splitlines():
+        if "Scope Version: " in line:
+            return line.strip().replace("Scope Version: ", "")
 
 
 class ScopeDataCollector:
@@ -20,7 +29,6 @@ class ScopeDataCollector:
 
 
 class ScopeUDPDataListener:
-
     class __Handler(socketserver.DatagramRequestHandler):
         collector = None
 
@@ -32,7 +40,6 @@ class ScopeUDPDataListener:
         self.host = host
         self.collector = collector
         self.__server = None
-
 
     def start(self):
         self.__Handler.collector = self.collector

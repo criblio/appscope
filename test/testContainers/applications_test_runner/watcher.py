@@ -1,13 +1,13 @@
+from collections import defaultdict
 from datetime import datetime
 from typing import List, Any
 
 from common import TestSetResult, TestResult
-from collections import defaultdict
 
 
 class TestWatcher:
 
-    def __init__(self, execution_id):
+    def __init__(self, execution_id, scope_version):
         self.execution_id = execution_id
         self.finish_date = None
         self.start_date = None

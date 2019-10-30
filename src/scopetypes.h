@@ -1,7 +1,11 @@
 #ifndef __SCOPETYPES_H__
 #define __SCOPETYPES_H__
 
-typedef enum {CFG_METRIC_STATSD, CFG_METRIC_JSON, CFG_FORMAT_MAX} cfg_out_format_t;
+typedef enum {CFG_METRIC_STATSD,
+              CFG_METRIC_JSON,
+              CFG_EVENT_JSON_RAW_JSON,
+              CFG_EVENT_JSON_RAW_STATSD,
+              CFG_FORMAT_MAX} cfg_out_format_t;
 typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_SYSLOG, CFG_SHM} cfg_transport_t;
 typedef enum {CFG_OUT, CFG_EVT, CFG_LOG, CFG_WHICH_MAX} which_transport_t;
 typedef enum {CFG_LOG_TRACE,
@@ -32,7 +36,7 @@ typedef enum {CFG_SRC_LOGFILE,
 #define DEFAULT_FD 999
 #define DEFAULT_MIN_FD 200
 #define DEFAULT_BADFD -2
-#define DEFAULT_EVT_FORMAT CFG_METRIC_JSON
+#define DEFAULT_EVT_FORMAT CFG_EVENT_JSON_RAW_JSON
 #define DEFAULT_SRC_LOGFILE 0
 #define DEFAULT_SRC_CONSOLE 0
 #define DEFAULT_SRC_SYSLOG 0

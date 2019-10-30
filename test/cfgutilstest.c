@@ -155,6 +155,14 @@ cfgProcessEnvironmentOutFormat(void** state)
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_STATSD);
 
+    assert_int_equal(setenv("SCOPE_OUT_FORMAT", "eventjsonrawjson", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgOutFormat(cfg), CFG_EVENT_JSON_RAW_JSON);
+
+    assert_int_equal(setenv("SCOPE_OUT_FORMAT", "eventjsonrawstatsd", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgOutFormat(cfg), CFG_EVENT_JSON_RAW_STATSD);
+
     assert_int_equal(setenv("SCOPE_OUT_FORMAT", "metricjson", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
@@ -298,7 +306,39 @@ cfgProcessEnvironmentCommandDir(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void cfgProcessEnvironmentEventLogFileFilter(void** state)
+void
+cfgProcessEnvironmentEventFormat(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    cfgEventFormatSet(cfg, CFG_METRIC_JSON);
+    assert_int_equal(cfgEventFormat(cfg), CFG_METRIC_JSON);
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_EVENT_FORMAT", "eventjsonrawjson", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEventFormat(cfg), CFG_EVENT_JSON_RAW_JSON);
+
+    assert_int_equal(setenv("SCOPE_EVENT_FORMAT", "eventjsonrawstatsd", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEventFormat(cfg), CFG_EVENT_JSON_RAW_STATSD);
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_EVENT_FORMAT"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEventFormat(cfg), CFG_EVENT_JSON_RAW_STATSD);
+
+    // unrecognised value should not affect cfg
+    assert_int_equal(setenv("SCOPE_EVENT_FORMAT", "bson", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEventFormat(cfg), CFG_EVENT_JSON_RAW_STATSD);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
+void
+cfgProcessEnvironmentEventLogFileFilter(void** state)
 {
     config_t* cfg = cfgCreateDefault();
     cfgEventLogFileFilterSet(cfg, ".*");
@@ -335,7 +375,8 @@ typedef struct
     unsigned    default_val;
 } source_state_t;
 
-void cfgProcessEnvironmentEventSource(void** state)
+void
+cfgProcessEnvironmentEventSource(void** state)
 {
     source_state_t* data = (source_state_t*)state[0];
 
@@ -614,6 +655,7 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_TAG_CUSTOM1=val1\n"
         "SCOPE_TAG_CUSTOM2=val2\n"
         "SCOPE_EVENT_DEST=udp://host:1234\n"
+        "SCOPE_EVENT_FORMAT=eventjsonrawjson\n"
         "SCOPE_EVENT_LOGFILE=true\n"
         "SCOPE_EVENT_CONSOLE=false\n"
         "SCOPE_EVENT_SYSLOG=true\n"
@@ -634,6 +676,7 @@ cfgProcessCommandsFromFile(void** state)
     assert_int_equal(cfgTransportType(cfg, CFG_EVT), CFG_UDP);
     assert_string_equal(cfgTransportHost(cfg, CFG_EVT), "host");
     assert_string_equal(cfgTransportPort(cfg, CFG_EVT), "1234");
+    assert_int_equal(cfgEventFormat(cfg), CFG_EVENT_JSON_RAW_JSON);
     assert_int_equal(cfgEventSource(cfg, CFG_SRC_LOGFILE), 1);
     assert_int_equal(cfgEventSource(cfg, CFG_SRC_CONSOLE), 0);
     assert_int_equal(cfgEventSource(cfg, CFG_SRC_SYSLOG), 1);
@@ -782,7 +825,7 @@ cfgReadGoodYaml(void** state)
         "  commanddir: /tmp\n"
         "event:\n"
         "  format:\n"
-        "    type : metricstatsd\n"
+        "    type : eventjsonrawstatsd       # eventjsonrawjson, eventjsonrawstatsd\n"
         "  transport:\n"
         "    type: syslog                    # udp, unix, file, syslog\n"
         "    host: 127.0.0.2\n"
@@ -810,7 +853,7 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgOutVerbosity(config), 3);
     assert_int_equal(cfgOutPeriod(config), 11);
     assert_string_equal(cfgCmdDir(config), "/tmp");
-    assert_int_equal(cfgEventFormat(config), CFG_METRIC_STATSD);
+    assert_int_equal(cfgEventFormat(config), CFG_EVENT_JSON_RAW_STATSD);
     assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
     assert_int_equal(cfgEventSource(config, CFG_SRC_LOGFILE), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 1);
@@ -956,7 +999,7 @@ cfgReadGoodJson(void** state)
         "  },\n"
         "  'event': {\n"
         "    'format': {\n"
-        "      'type': 'metricstatsd'\n"
+        "      'type': 'eventjsonrawjson'\n"
         "    },\n"
         "    'transport': {\n"
         "      'type': 'file',\n"
@@ -981,7 +1024,7 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgOutStatsDMaxLen(config), 42);
     assert_int_equal(cfgOutVerbosity(config), 0);
     assert_int_equal(cfgOutPeriod(config), 13);
-    assert_int_equal(cfgEventFormat(config), CFG_METRIC_STATSD);
+    assert_int_equal(cfgEventFormat(config), CFG_EVENT_JSON_RAW_JSON);
     assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
     assert_int_equal(cfgEventSource(config, CFG_SRC_LOGFILE), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 1);
@@ -1334,6 +1377,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgProcessEnvironmentStatsDMaxLen),
         cmocka_unit_test(cfgProcessEnvironmentOutPeriod),
         cmocka_unit_test(cfgProcessEnvironmentCommandDir),
+        cmocka_unit_test(cfgProcessEnvironmentEventFormat),
         cmocka_unit_test(cfgProcessEnvironmentEventLogFileFilter),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &log),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &con),

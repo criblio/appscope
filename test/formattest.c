@@ -27,7 +27,7 @@ fmtCreateReturnsValidPtrForGoodFormat(void** state)
 static void
 fmtCreateReturnsNullPtrForBadFormat(void** state)
 {
-    format_t* fmt = fmtCreate(2);
+    format_t* fmt = fmtCreate(CFG_FORMAT_MAX);
     assert_null(fmt);
 }
 

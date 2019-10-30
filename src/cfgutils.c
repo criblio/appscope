@@ -300,6 +300,8 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         processCmdDebug(value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_EVT, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
+        cfgEventFormatSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE")) {
         cfgEventSourceSetFromStr(cfg, CFG_SRC_LOGFILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE")) {
@@ -367,6 +369,10 @@ cfgOutFormatSetFromStr(config_t* cfg, const char* value)
         cfgOutFormatSet(cfg, CFG_METRIC_STATSD);
     } else if (!strcmp(value, "metricjson")) {
         cfgOutFormatSet(cfg, CFG_METRIC_JSON);
+    } else if (!strcmp(value, "eventjsonrawjson")) {
+        cfgOutFormatSet(cfg, CFG_EVENT_JSON_RAW_JSON);
+    } else if (!strcmp(value, "eventjsonrawstatsd")) {
+        cfgOutFormatSet(cfg, CFG_EVENT_JSON_RAW_STATSD);
     }
 }
 
@@ -417,6 +423,10 @@ cfgEventFormatSetFromStr(config_t* cfg, const char* value)
         cfgEventFormatSet(cfg, CFG_METRIC_STATSD);
     } else if (!strcmp(value, "metricjson")) {
         cfgEventFormatSet(cfg, CFG_METRIC_JSON);
+    } else if (!strcmp(value, "eventjsonrawjson")) {
+        cfgEventFormatSet(cfg, CFG_EVENT_JSON_RAW_JSON);
+    } else if (!strcmp(value, "eventjsonrawstatsd")) {
+        cfgEventFormatSet(cfg, CFG_EVENT_JSON_RAW_STATSD);
     }
 }
 

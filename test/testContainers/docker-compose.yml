@@ -19,15 +19,10 @@ services:
       - NET_ADMIN
   splunk:
     build:
-      context: splunk
-    ports:
-      - "8000:8000"
-      - "8088:8088"
-      - "8089:8089"
-      - "9997:9997"
-    environment:
-      - "DONT_TIMEOUT=1"
-      - "CRIBL_ROUTING_DEMO=1"
+      context: .
+      dockerfile: ./splunk/Dockerfile
+
+    command: -v
     privileged: true
 
   nginx:

@@ -6,7 +6,7 @@ typedef enum {CFG_METRIC_STATSD,
               CFG_EVENT_JSON_RAW_JSON,
               CFG_EVENT_JSON_RAW_STATSD,
               CFG_FORMAT_MAX} cfg_out_format_t;
-typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_SYSLOG, CFG_SHM} cfg_transport_t;
+typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_SYSLOG, CFG_SHM, CFG_TCP} cfg_transport_t;
 typedef enum {CFG_OUT, CFG_EVT, CFG_LOG, CFG_WHICH_MAX} which_transport_t;
 typedef enum {CFG_LOG_TRACE,
               CFG_LOG_DEBUG,

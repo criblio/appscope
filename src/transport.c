@@ -35,6 +35,9 @@ struct _transport_t
             int sock;
         } udp;
         struct {
+            int sock;
+        } tcp;
+        struct {
             char* path;
             FILE* stream;
         } file;
@@ -105,6 +108,65 @@ placeDescriptor(int fd, transport_t *t)
     return -1;
 }
 
+transport_t *
+transportCreateTCP(const char *host, const char *port)
+{
+    int flags;
+    transport_t* trans = NULL;
+    struct addrinfo* addr_list = NULL;
+
+    if (!host || !port) goto out;
+
+    trans = newTransport();
+    if (!trans) return NULL;
+
+    trans->type = CFG_TCP;
+    trans->tcp.sock = -1;
+
+    // Get some addresses to try
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
+    hints.ai_socktype = SOCK_STREAM;  // For TCP
+    hints.ai_protocol = IPPROTO_TCP; // For TCP
+    if (trans->getaddrinfo(host, port, &hints, &addr_list)) goto out;
+
+    // Loop through the addresses until one works
+    struct addrinfo* addr;
+    for (addr = addr_list; addr; addr = addr->ai_next) {
+        trans->tcp.sock = trans->socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+        if (trans->tcp.sock == -1) continue;
+
+        if (trans->connect(trans->tcp.sock, addr->ai_addr, addr->ai_addrlen) == -1) {
+            // We could create a sock, but not connect.  Clean up.
+            trans->close(trans->tcp.sock);
+            trans->tcp.sock = -1;
+            continue;
+        }
+
+        break; // Success!
+    }
+
+    // If none worked, get out
+    if (trans->tcp.sock == -1) {
+        DBG("host=%s port=%s", host, port);
+        goto out;
+    }
+
+    // Move this descriptor up out of the way
+    if ((trans->tcp.sock = placeDescriptor(trans->tcp.sock, trans)) == -1) goto out;
+
+    // Set the socket to non blocking, and close on exec
+    flags = trans->fcntl(trans->tcp.sock, F_GETFD, 0);
+    if (trans->fcntl(trans->tcp.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
+        DBG("%d %s %s", trans->tcp.sock, host, port);
+    }
+
+out:
+    if (addr_list) freeaddrinfo(addr_list);
+    if (trans && trans->tcp.sock == -1) transportDestroy(&trans);
+    return trans;
+}
+
 transport_t*
 transportCreateUdp(const char* host, const char* port)
 {
@@ -122,8 +184,8 @@ transportCreateUdp(const char* host, const char* port)
     // Get some addresses to try
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
-    hints.ai_socktype = SOCK_DGRAM;  // For udp
-    hints.ai_protocol = IPPROTO_UDP; // For udp
+    hints.ai_socktype = SOCK_DGRAM;  // For UDP
+    hints.ai_protocol = IPPROTO_UDP; 
     if (t->getaddrinfo(host, port, &hints, &addr_list)) goto out;
 
     // Loop through the addresses until one works
@@ -327,6 +389,30 @@ transportSend(transport_t* t, const char* msg)
                         break;
                     case EWOULDBLOCK:
                         DBG(NULL);
+                        break;
+                    default:
+                        DBG(NULL);
+                    }
+                }
+            }
+            break;
+        case CFG_TCP:
+            if (t->tcp.sock != -1) {
+                if (!t->send) {
+                    DBG(NULL);
+                    break;
+                }
+#ifdef __LINUX__
+                int rc = t->send(t->tcp.sock, msg, strlen(msg), MSG_NOSIGNAL);
+#else
+                int rc = t->send(t->tcp.sock, msg, strlen(msg), 0);
+#endif
+
+                if (rc < 0) {
+                    switch (errno) {
+                    case EBADF:
+                        DBG(NULL);
+                        return DEFAULT_BADFD;
                         break;
                     default:
                         DBG(NULL);

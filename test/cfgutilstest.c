@@ -786,7 +786,7 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgTransportPort(config, CFG_OUT), "8125");
     assert_null            (cfgTransportPath(config, CFG_OUT));
     assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_FULLY);
-    assert_int_equal       (cfgTransportType(config, CFG_EVT), CFG_UDP);
+    assert_int_equal       (cfgTransportType(config, CFG_EVT), CFG_TCP);
     assert_string_equal    (cfgTransportHost(config, CFG_EVT), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_EVT), DEFAULT_EVT_PORT);
     assert_null            (cfgTransportPath(config, CFG_EVT));
@@ -827,7 +827,7 @@ cfgReadGoodYaml(void** state)
         "  format:\n"
         "    type : eventjsonrawstatsd       # eventjsonrawjson, eventjsonrawstatsd\n"
         "  transport:\n"
-        "    type: syslog                    # udp, unix, file, syslog\n"
+        "    type: tcp                    # udp, unix, file, syslog\n"
         "    host: 127.0.0.2\n"
         "    port: 9009\n"
         "    buffering: line\n"
@@ -864,7 +864,7 @@ cfgReadGoodYaml(void** state)
     assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
     assert_int_equal(cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_LINE);
-    assert_int_equal(cfgTransportType(config, CFG_EVT), CFG_SYSLOG);
+    assert_int_equal(cfgTransportType(config, CFG_EVT), CFG_TCP);
     assert_string_equal(cfgTransportHost(config, CFG_EVT), "127.0.0.2");
     assert_string_equal(cfgTransportPort(config, CFG_EVT), "9009");
     assert_null(cfgTransportPath(config, CFG_EVT));
@@ -1289,6 +1289,7 @@ initLogReturnsPtr(void** state)
     for (t=CFG_UDP; t<=CFG_SHM; t++) {
 	    switch (t) {
             case CFG_UDP:
+                cfgTransportTypeSet(cfg, CFG_LOG, t);
                 cfgTransportHostSet(cfg, CFG_LOG, "localhost");
                 cfgTransportPortSet(cfg, CFG_LOG, "4444");
                 break;
@@ -1300,6 +1301,7 @@ initLogReturnsPtr(void** state)
                 break;
             case CFG_SYSLOG:
             case CFG_SHM:
+            case CFG_TCP:
                 break;
 	    }
         cfgTransportTypeSet(cfg, CFG_LOG, t);
@@ -1341,6 +1343,13 @@ initEvtReturnsPtr(void** state)
         if (t==CFG_UNIX || t==CFG_FILE) {
             cfgTransportPathSet(cfg, CFG_EVT, "/tmp/scope.log");
         }
+
+        // Don't do this with TCP. You need a different approach if you want to do that
+        if (t==CFG_UDP) {
+            cfgTransportHostSet(cfg, CFG_EVT, "localhost");
+            cfgTransportPortSet(cfg, CFG_EVT, "4444");
+        }
+
         evt_t* evt = initEvt(cfg);
         assert_non_null(evt);
         evtDestroy(&evt);

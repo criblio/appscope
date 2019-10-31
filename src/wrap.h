@@ -364,9 +364,9 @@ typedef struct interposed_funcs_t {
     ssize_t (*pwritev64v2)(int, const struct iovec *, int, off_t, int);
     size_t (*fwrite_unlocked)(const void *, size_t, size_t, FILE *);
     ssize_t (*sendfile64)(int, int, off64_t *, size_t);
-    off_t (*lseek64)(int, off_t, int);
-    int (*fseeko64)(FILE *, off_t, int);
-    off_t (*ftello64)(FILE *);
+    off64_t (*lseek64)(int, off64_t, int);
+    int (*fseeko64)(FILE *, off64_t, int);
+    off64_t (*ftello64)(FILE *);
     int (*fgetpos64)(FILE *, fpos64_t *);
     int (*fsetpos64)(FILE *stream, const fpos64_t *pos);
     int (*statfs64)(const char *, struct statfs64 *);

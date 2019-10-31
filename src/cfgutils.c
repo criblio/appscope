@@ -1002,25 +1002,26 @@ initOut(config_t* cfg)
     return out;
 }
 
-evt_t*
-initEvt(config_t* cfg)
+evt_t *
+initEvt(config_t *cfg)
 {
-    evt_t* evt = evtCreate();
+    evt_t *evt = evtCreate();
     if (!evt) return evt;
 
-    transport_t* t = initTransport(cfg, CFG_EVT);
-    if (!t) {
+    transport_t *trans = initTransport(cfg, CFG_EVT);
+    if (!trans) {
         evtDestroy(&evt);
         return evt;
     }
-    evtTransportSet(evt, t);
+    evtTransportSet(evt, trans);
 
-    format_t* f = initFormat(cfg);
-    if (!f) {
+    format_t *fmt = fmtCreate(cfgEventFormat(cfg));
+    if (!fmt) {
         evtDestroy(&evt);
         return evt;
     }
-    evtFormatSet(evt, f);
+
+    evtFormatSet(evt, fmt);
 
     evtLogFileFilterSet(evt, cfgEventLogFileFilter(cfg));
 

@@ -34,6 +34,16 @@ typedef struct {
     event_field_t* fields;
 } event_t;
 
+typedef struct event_format {
+    char *timestamp;
+    size_t timesize;
+    const char *src;
+    const char *hostname;
+    char *data;
+    size_t datasize;
+    long unsigned int uid;
+} event_format_t;
+
 typedef struct _format_t format_t;
 
 // Constructors Destructors
@@ -49,6 +59,7 @@ custom_tag_t**      fmtCustomTags(format_t*);
 // fmtString returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
 char*               fmtString(format_t*, event_t*);
+char *              fmtEventMessageString(format_t *, event_format_t *);
 
 // Setters
 void                fmtStatsDPrefixSet(format_t*, const char*);

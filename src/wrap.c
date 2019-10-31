@@ -28,7 +28,7 @@ __thread int g_getdelim = 0;
 static void * periodic(void *);
 static void doClose(int, const char *);
 static void doConfig(config_t *);
-
+static void doOpen(int, const char *, enum fs_type_t, const char *);
 
 static void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
@@ -199,6 +199,15 @@ getDuration(uint64_t start)
     
 }
 
+static int
+doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
+{
+    if (fs->event == TRUE) {
+        return evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid);
+    }
+    return -1;
+}
+
 static bool
 checkNetEntry(int fd)
 {
@@ -236,6 +245,17 @@ getFSEntry(int fd)
         (g_fsinfo[fd].fd == fd)) {
         return &g_fsinfo[fd];
     }
+
+    if (((fd == 1) || (fd == 2)) && g_fsinfo &&
+        (evtSource(g_evt, CFG_SRC_CONSOLE) != DEFAULT_SRC_CONSOLE)) {
+        if (fd == 1) doOpen(fd, "stdout", FD, "console output");
+        if (fd == 2) doOpen(fd, "stderr", FD, "console output");
+        if (g_fsinfo[fd].fd == fd) {
+            g_fsinfo[fd].event = TRUE;
+            return &g_fsinfo[fd];
+        }
+    }
+
     return NULL;    
 }
 
@@ -278,6 +298,7 @@ addSock(int fd, int type)
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].fd = fd;
         g_netinfo[fd].type = type;
+        g_netinfo[fd].uid = getTime();
 #ifdef __LINUX__
         // Clear these bits so comparisons of type will work
         g_netinfo[fd].type &= ~SOCK_CLOEXEC;
@@ -1781,6 +1802,9 @@ reportPeriodicStuff(void)
         reportFD(i, PERIODIC);
     }
 
+    // Process any events that have been posted
+    evtEvents(g_evt);
+
     if (!atomicCasU64(&reentrancy_guard, 1ULL, 0ULL)) {
          DBG(NULL);
     }
@@ -2087,7 +2111,16 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
         memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
         g_fsinfo[fd].fd = fd;
         g_fsinfo[fd].type = type;
+        g_fsinfo[fd].uid = getTime();
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
+
+        if (evtSource(g_evt, CFG_SRC_LOGFILE) != DEFAULT_SRC_LOGFILE) {
+            regmatch_t match = {0};
+            if (regexec(evtLogFileFilter(g_evt), path, 1, &match, 0) == 0) {
+                g_fsinfo[fd].event = TRUE;
+            }
+        }
+
         doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0, NULL);
         scopeLog(func, fd, CFG_LOG_TRACE);
     }
@@ -2617,7 +2650,7 @@ __fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *
     WRAP_CHECK(__fread_unlocked_chk, -1);
     IOSTREAMPRE(__fread_unlocked_chk, size_t);
     rc = g_fn.__fread_unlocked_chk(ptr, ptrlen, size, nmemb, stream);
-    IOSTREAMPOST(__fread_unlocked_chk, rc * size, 0, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(__fread_unlocked_chk, ptr, rc * size, 0, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON ssize_t
@@ -3484,7 +3517,7 @@ fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
     WRAP_CHECK(fwrite_unlocked, -1);
     IOSTREAMPRE(fwrite_unlocked, size_t);
     rc = g_fn.fwrite_unlocked(ptr, size, nitems, stream);
-    IOSTREAMPOST(fwrite_unlocked, rc, 0, (enum event_type_t)EVENT_TX);
+    IOSTREAMPOST(fwrite_unlocked, ptr, rc * size, 0, (enum event_type_t)EVENT_TX);
 }
 
 /*
@@ -3943,6 +3976,7 @@ write(int fd, const void *buf, size_t count)
         } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, "write", time.duration, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, "write", rc, NULL);
+            doEventLog(g_evt, fs, buf, count);
         }
     } else {
         if (fs) {
@@ -4043,7 +4077,7 @@ fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stre
     WRAP_CHECK(fwrite, -1);
     IOSTREAMPRE(fwrite, size_t);
     rc = g_fn.fwrite(ptr, size, nitems, stream);
-    IOSTREAMPOST(fwrite, rc, 0, (enum event_type_t)EVENT_TX);
+    IOSTREAMPOST(fwrite, ptr, rc * size, 0, (enum event_type_t)EVENT_TX);
 }
 
 EXPORTON int
@@ -4052,7 +4086,7 @@ fputs(const char *s, FILE *stream)
     WRAP_CHECK(fputs, EOF);
     IOSTREAMPRE(fputs, int);
     rc = g_fn.fputs(s, stream);
-    IOSTREAMPOST(fputs, rc, EOF, (enum event_type_t)EVENT_TX);
+    IOSTREAMPOST(fputs, s, strlen(s), EOF, (enum event_type_t)EVENT_TX);
 }
 
 EXPORTON int
@@ -4061,7 +4095,7 @@ fputs_unlocked(const char *s, FILE *stream)
     WRAP_CHECK(fputs_unlocked, EOF);
     IOSTREAMPRE(fputs_unlocked, int);
     rc = g_fn.fputs_unlocked(s, stream);
-    IOSTREAMPOST(fputs_unlocked, rc, EOF, (enum event_type_t)EVENT_TX);
+    IOSTREAMPOST(fputs_unlocked, s, strlen(s), EOF, (enum event_type_t)EVENT_TX);
 }
 
 EXPORTON int
@@ -4070,7 +4104,7 @@ fputws(const wchar_t *ws, FILE *stream)
     WRAP_CHECK(fputws, EOF);
     IOSTREAMPRE(fputws, int);
     rc = g_fn.fputws(ws, stream);
-    IOSTREAMPOST(fputws, rc, EOF, (enum event_type_t)EVENT_TX);
+    IOSTREAMPOST(fputws, ws, wcslen(ws), EOF, (enum event_type_t)EVENT_TX);
 }
 
 EXPORTON ssize_t
@@ -4202,7 +4236,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     WRAP_CHECK(fread, -1);
     IOSTREAMPRE(fread, size_t);
     rc = g_fn.fread(ptr, size, nmemb, stream);
-    IOSTREAMPOST(fread, rc * size, 0, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(fread, ptr, rc * size, 0, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON size_t
@@ -4212,7 +4246,7 @@ __fread_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
     WRAP_CHECK(__fread_chk, -1);
     IOSTREAMPRE(__fread_chk, size_t);
     rc = g_fn.__fread_chk(ptr, ptrlen, size, nmemb, stream);
-    IOSTREAMPOST(__fread_chk, rc * size, 0, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(__fread_chk, ptr, rc * size, 0, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON size_t
@@ -4221,7 +4255,7 @@ fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
     WRAP_CHECK(fread_unlocked, 0);
     IOSTREAMPRE(fread_unlocked, size_t);
     rc = g_fn.fread_unlocked(ptr, size, nmemb, stream);
-    IOSTREAMPOST(fread_unlocked, rc, 0, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(fread_unlocked, ptr, rc * size, 0, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON char *
@@ -4230,7 +4264,7 @@ fgets(char *s, int n, FILE *stream)
     WRAP_CHECK(fgets, NULL);
     IOSTREAMPRE(fgets, char *);
     rc = g_fn.fgets(s, n, stream);
-    IOSTREAMPOST(fgets, n, NULL, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(fgets, s, n, NULL, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON char *
@@ -4240,7 +4274,7 @@ __fgets_chk(char *s, size_t size, int strsize, FILE *stream)
     WRAP_CHECK(__fgets_chk, NULL);
     IOSTREAMPRE(__fgets_chk, char *);
     rc = g_fn.__fgets_chk(s, size, strsize, stream);
-    IOSTREAMPOST(__fgets_chk, size, NULL, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(__fgets_chk, s, size, NULL, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON char *
@@ -4249,7 +4283,7 @@ fgets_unlocked(char *s, int n, FILE *stream)
     WRAP_CHECK(fgets_unlocked, NULL);
     IOSTREAMPRE(fgets_unlocked, char *);
     rc = g_fn.fgets_unlocked(s, n, stream);
-    IOSTREAMPOST(fgets_unlocked, n, NULL, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(fgets_unlocked, s, n, NULL, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON wchar_t *
@@ -4259,7 +4293,7 @@ __fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
     WRAP_CHECK(__fgetws_chk, NULL);
     IOSTREAMPRE(__fgetws_chk, wchar_t *);
     rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
-    IOSTREAMPOST(fgetws, size, NULL, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(fgetws, ws, size, NULL, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON wchar_t *
@@ -4268,7 +4302,7 @@ fgetws(wchar_t *ws, int n, FILE *stream)
     WRAP_CHECK(fgetws, NULL);
     IOSTREAMPRE(fgetws, wchar_t *);
     rc = g_fn.fgetws(ws, n, stream);
-    IOSTREAMPOST(fgetws, n, NULL, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(fgetws, ws, n, NULL, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON wint_t
@@ -4277,7 +4311,7 @@ fgetwc(FILE *stream)
     WRAP_CHECK(fgetwc, WEOF);
     IOSTREAMPRE(fgetwc, wint_t);
     rc = g_fn.fgetwc(stream);
-    IOSTREAMPOST(fgetwc, 1, WEOF, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(fgetwc, NULL, 1, WEOF, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON int
@@ -4286,7 +4320,7 @@ fgetc(FILE *stream)
     WRAP_CHECK(fgetc, EOF);
     IOSTREAMPRE(fgetc, int);
     rc = g_fn.fgetc(stream);
-    IOSTREAMPOST(fgetc, 1, EOF, (enum event_type_t)EVENT_FS);
+    IOSTREAMPOST(fgetc, NULL, 1, EOF, (enum event_type_t)EVENT_FS);
 }
 
 EXPORTON int
@@ -4295,7 +4329,7 @@ fputc(int c, FILE *stream)
     WRAP_CHECK(fputc, EOF);
     IOSTREAMPRE(fputc, int);
     rc = g_fn.fputc(c, stream);
-    IOSTREAMPOST(fputc, 1, EOF, (enum event_type_t)EVENT_FS);
+    IOSTREAMPOST(fputc, NULL, 1, EOF, (enum event_type_t)EVENT_FS);
 }
 
 EXPORTON int
@@ -4304,7 +4338,7 @@ fputc_unlocked(int c, FILE *stream)
     WRAP_CHECK(fputc_unlocked, EOF);
     IOSTREAMPRE(fputc_unlocked, int);
     rc = g_fn.fputc_unlocked(c, stream);
-    IOSTREAMPOST(fputc_unlocked, 1, EOF, (enum event_type_t)EVENT_FS);
+    IOSTREAMPOST(fputc_unlocked, NULL, 1, EOF, (enum event_type_t)EVENT_FS);
 }
 
 EXPORTON wint_t
@@ -4313,7 +4347,7 @@ putwc(wchar_t wc, FILE *stream)
     WRAP_CHECK(putwc, WEOF);
     IOSTREAMPRE(putwc, int);
     rc = g_fn.putwc(wc, stream);
-    IOSTREAMPOST(putwc, 1, WEOF, (enum event_type_t)EVENT_FS);
+    IOSTREAMPOST(putwc, NULL, 1, WEOF, (enum event_type_t)EVENT_FS);
 }
 
 EXPORTON wint_t
@@ -4322,7 +4356,7 @@ fputwc(wchar_t wc, FILE *stream)
     WRAP_CHECK(fputwc, WEOF);
     IOSTREAMPRE(fputwc, int);
     rc = g_fn.fputwc(wc, stream);
-    IOSTREAMPOST(fputwc, 1, WEOF, (enum event_type_t)EVENT_FS);
+    IOSTREAMPOST(fputwc, NULL, 1, WEOF, (enum event_type_t)EVENT_FS);
 }
 
 EXPORTOFF int
@@ -4336,7 +4370,7 @@ fscanf(FILE *stream, const char *format, ...)
                      fArgs.arg[0], fArgs.arg[1],
                      fArgs.arg[2], fArgs.arg[3],
                      fArgs.arg[4], fArgs.arg[5]);
-    IOSTREAMPOST(fscanf, rc, EOF, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(fscanf, NULL, rc, EOF, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON ssize_t
@@ -4346,9 +4380,9 @@ getline (char **lineptr, size_t *n, FILE *stream)
     IOSTREAMPRE(getline, ssize_t);
     rc = g_fn.getline(lineptr, n, stream);
     if (n) {
-        IOSTREAMPOST(getline, *n, -1, (enum event_type_t)EVENT_RX);
+        IOSTREAMPOST(getline, NULL, *n, -1, (enum event_type_t)EVENT_RX);
     } else {
-        IOSTREAMPOST(getline, 0, -1, (enum event_type_t)EVENT_RX);
+        IOSTREAMPOST(getline, NULL, 0, -1, (enum event_type_t)EVENT_RX);
     }
 }
 
@@ -4360,9 +4394,9 @@ getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     g_getdelim = 1;
     rc = g_fn.getdelim(lineptr, n, delimiter, stream);
     if (n) {
-        IOSTREAMPOST(getdelim, *n, -1, (enum event_type_t)EVENT_RX);
+        IOSTREAMPOST(getdelim, NULL, *n, -1, (enum event_type_t)EVENT_RX);
     } else {
-        IOSTREAMPOST(getdelim, 0, -1, (enum event_type_t)EVENT_RX);
+        IOSTREAMPOST(getdelim, NULL, 0, -1, (enum event_type_t)EVENT_RX);
     }
 }
 
@@ -4378,9 +4412,9 @@ __getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     }
 
     if (n) {
-        IOSTREAMPOST(__getdelim, *n, -1, (enum event_type_t)EVENT_RX);
+        IOSTREAMPOST(__getdelim, NULL, *n, -1, (enum event_type_t)EVENT_RX);
     } else {
-        IOSTREAMPOST(__getdelim, 0, -1, (enum event_type_t)EVENT_RX);
+        IOSTREAMPOST(__getdelim, NULL, 0, -1, (enum event_type_t)EVENT_RX);
     }
 }
 

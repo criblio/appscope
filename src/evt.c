@@ -1,7 +1,6 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include "dbg.h"
 #include "evt.h"
 
 struct _evt_t
@@ -9,6 +8,7 @@ struct _evt_t
     transport_t* transport;
     format_t* format;
     regex_t* log_file_re;
+    cbuf_handle_t evbuf;
     unsigned src[CFG_SRC_MAX];
 };
 
@@ -34,6 +34,8 @@ evtCreate()
         evtDestroy(&evt);
         return evt;
     }
+
+    evt->evbuf = cbufInit(DEFAULT_CBUF_SIZE);
 
     return evt;
 }
@@ -192,3 +194,85 @@ evtSourceSet(evt_t* evt, cfg_evt_t src, unsigned val)
     evt->src[src] = val;
 }
 
+int
+evtMetric(evt_t* evt, const char *host, uint64_t uid, event_t *metric)
+{
+    char *msg;
+    event_format_t event;
+    struct timeb tb;
+    char ts[128];
+
+    if (!evt || !metric) return -1;
+
+    ftime(&tb);
+    snprintf(ts, sizeof(ts), "%ld.%d", tb.time, tb.millitm);
+    event.timestamp = ts;
+    event.timesize = strlen(ts);
+
+    event.src = "metric";
+    event.hostname = host;
+
+    // Format the metric string using the configured metric format type
+    if ((event.data = fmtString(evt->format, metric)) == NULL) return -1;
+    event.datasize = strlen(event.data);
+
+    event.uid = uid;
+
+    msg = fmtEventMessageString(evt->format, &event);
+
+    if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
+        // Full; drop and ignore
+        free(msg);
+    }
+
+    free(event.data);
+    return 0;
+}
+
+int
+evtLog(evt_t *evt, const char *host, const char *path,
+       const void *buf, size_t count, uint64_t uid)
+{
+    char *msg;
+    event_format_t event;
+    struct timeb tb;
+    char ts[128];
+
+    if (!evt || !buf || !path || !host) return -1;
+
+    ftime(&tb);
+    snprintf(ts, sizeof(ts), "%ld.%d", tb.time, tb.millitm);
+    event.timestamp = ts;
+    event.timesize = strlen(ts);
+    event.src = path;
+    event.hostname = host;
+    event.data = (char *)buf;
+    event.datasize = count;
+    event.uid = uid;
+
+    msg = fmtEventMessageString(evt->format, &event);
+
+    if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
+        // Full; drop and ignore
+        free(msg);
+    }
+
+    return 0;
+}
+
+int
+evtEvents(evt_t *evt)
+{
+    uint64_t data;
+
+    if (!evt) return -1;
+
+    while (cbufGet(evt->evbuf, &data) == 0) {
+        if (data) {
+            char *event = (char *)data;
+            evtSend(evt, event);
+            free(event);
+        }
+    }
+    return 0;
+}

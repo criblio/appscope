@@ -400,7 +400,8 @@ fmtStringNewlineDelimitedReturnsNull(void** state)
     // Just because it's not implemented yet...
     format_t* fmt = fmtCreate(CFG_METRIC_JSON);
     event_t e = {"A", 1, SET, NULL};
-    assert_null(fmtString(fmt, &e));
+    // John; what are ypou trying to test here now that CFG_METRIC_JSON is implemented?
+    //assert_null(fmtString(fmt, &e));
     fmtDestroy(&fmt);
 }
 

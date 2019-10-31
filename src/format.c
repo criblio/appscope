@@ -4,10 +4,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 #include "dbg.h"
 #include "format.h"
 #include "scopetypes.h"
+#include "yaml.h"
 
+// key names for event JSON
+#define HOST "host"
+#define TIME "_time"
+#define DATA "_raw"
+#define SOURCE "source"
+#define CHANNEL "_channel"
 
 struct _format_t
 {
@@ -176,6 +184,269 @@ addCustomFields(format_t* fmt, custom_tag_t** tags, char** end, int* bytes, int*
 }
 
 // Accessors
+static size_t
+eventJsonSize(event_format_t *event)
+{
+    if (!event || !event->src || !event->datasize || !event->timesize) return 0;
+    size_t size = sizeof("{'_time': '', 'host': '', 'source': '', '_raw': '', '_channel': ''}\n");
+
+    // time
+    size += event->timesize;
+    // source
+    size += strlen(event->src);
+    // _raw
+    size += event->datasize;
+    // _channel
+    size += sizeof(uint64_t);
+    // host
+    size += strlen(event->hostname);
+    // fudge factor for things like escaped single quote characters.
+    size += 256;
+    return size;
+}
+
+static char *
+fmtEventJson(format_t *fmt, event_format_t *sev)
+{
+    if (!sev) return NULL;
+
+    yaml_emitter_t emitter;
+    yaml_event_t event;
+    char numbuf[32];
+    int rv;
+
+    int emitter_created = 0;
+    int emitter_opened = 0;
+    int everything_successful = 0;
+
+    size_t bytes_written = 0;
+    char* buf = NULL;
+
+    // Get the size of a complete json string & allocate
+    const size_t bufsize = eventJsonSize(sev);
+    if (!bufsize) goto cleanup;
+    buf = calloc(1, bufsize);
+    if (!buf) goto cleanup;
+
+    // Yaml init stuff
+    emitter_created = yaml_emitter_initialize(&emitter);
+    if (!emitter_created) goto cleanup;
+    yaml_emitter_set_output_string(&emitter, (yaml_char_t*)buf, bufsize,
+                                   &bytes_written);
+    emitter_opened = yaml_emitter_open(&emitter);
+    if (!emitter_opened) goto cleanup;
+
+    rv = yaml_document_start_event_initialize(&event, NULL, NULL, NULL, 1);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    rv = yaml_mapping_start_event_initialize(&event, NULL,
+                                             (yaml_char_t*)YAML_MAP_TAG, 1,
+                                             YAML_FLOW_MAPPING_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    // Start adding key:value entries
+    // "TIME": "epochvalue.ms",
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)TIME, strlen(TIME), 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)sev->timestamp, sev->timesize, 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    // SOURCE: "pathname" || "syslog" || "high cardinality metric" || ...
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)SOURCE, strlen(SOURCE), 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)sev->src, strlen(sev->src), 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    // "data": "app data",
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)DATA, strlen(DATA), 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)sev->data, sev->datasize, 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    // HOST: "hostname"
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)HOST, strlen(HOST), 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)sev->hostname, strlen(sev->hostname), 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    // "channel": "unique value",
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)CHANNEL, strlen(CHANNEL), 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    rv = snprintf(numbuf, sizeof(numbuf), "%lu" PRIu64, sev->uid);
+    if (rv <= 0) goto cleanup;
+
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
+                                      (yaml_char_t*)numbuf, rv, 1, 0, YAML_PLAIN_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    // Done with key:value entries
+    // Tell yaml to wrap it up
+    rv = yaml_mapping_end_event_initialize(&event);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    rv = yaml_document_end_event_initialize(&event, 1);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    everything_successful = 1;
+
+cleanup:
+    if (!everything_successful) {
+        DBG("bufsize=%zu bytes_written=%zu buf=%p emitter_created=%d "
+            "emitter_opened=%d emitter_error=%d emitter_problem=%s",
+            bufsize, bytes_written, buf, emitter_created,
+            emitter_opened, emitter.error, emitter.problem);
+        if (buf) free(buf);
+        buf = NULL;
+    }
+
+    if (emitter_opened) yaml_emitter_close(&emitter);
+    if (emitter_created) yaml_emitter_delete(&emitter);
+
+    return buf;
+}
+
+static size_t
+metricJsonSize(event_t *metric)
+{
+    size_t size = 0;
+    event_field_t *fld;
+
+    if (!metric) return 0;
+
+    for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
+        switch (fld->value_type) {
+        case FMT_NUM:
+            size += sizeof(long long) * 2;
+            break;
+        case FMT_STR:
+            size += strlen(fld->value.str);
+            break;
+        default:
+            break;
+        }
+    }
+
+    // fudge factor for things like escaped single quote characters.
+    size += 256;
+    return size;
+}
+
+static char *
+fmtMetricJson(format_t *fmt, event_t *metric)
+{
+    if (!metric) return NULL;
+
+    yaml_emitter_t emitter;
+    yaml_event_t event;
+    char numbuf[32];
+    int rv;
+
+    int emitter_created = 0;
+    int emitter_opened = 0;
+    int everything_successful = 0;
+
+    size_t bytes_written = 0;
+    char* buf = NULL;
+    event_field_t *fld;
+
+    // Get the size of a complete json string & allocate
+    const size_t bufsize = metricJsonSize(metric);
+    if (!bufsize) goto cleanup;
+    buf = calloc(1, bufsize);
+    if (!buf) goto cleanup;
+
+    // Yaml init stuff
+    emitter_created = yaml_emitter_initialize(&emitter);
+    if (!emitter_created) goto cleanup;
+    yaml_emitter_set_output_string(&emitter, (yaml_char_t*)buf, bufsize,
+                                   &bytes_written);
+    emitter_opened = yaml_emitter_open(&emitter);
+    if (!emitter_opened) goto cleanup;
+
+    rv = yaml_document_start_event_initialize(&event, NULL, NULL, NULL, 1);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    rv = yaml_mapping_start_event_initialize(&event, NULL,
+                                             (yaml_char_t*)YAML_MAP_TAG, 1,
+                                             YAML_FLOW_MAPPING_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    // Start adding key:value entries
+    for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
+        // "Tag"
+        rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                          (yaml_char_t*)fld->name, strlen(fld->name), 0, 1,
+                                          YAML_SINGLE_QUOTED_SCALAR_STYLE);
+        if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+        // "Value"
+        if (fld->value_type == FMT_STR) {
+            rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                              (yaml_char_t*)fld->value.str, strlen(fld->value.str),
+                                              0, 1, YAML_SINGLE_QUOTED_SCALAR_STYLE);
+            if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+        } else if (fld->value_type == FMT_NUM) {
+                rv = snprintf(numbuf, sizeof(numbuf), "%llu" PRIu64, fld->value.num);
+                if (rv <= 0) goto cleanup;
+
+                rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
+                                                  (yaml_char_t*)numbuf, rv, 1, 0,
+                                                  YAML_PLAIN_SCALAR_STYLE);
+                if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+        } else {
+            DBG("bad field type");
+        }
+    }
+
+    // Done with key:value entries
+    // Tell yaml to wrap it up
+    rv = yaml_mapping_end_event_initialize(&event);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    rv = yaml_document_end_event_initialize(&event, 1);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    everything_successful = 1;
+
+cleanup:
+    if (!everything_successful) {
+        DBG("bufsize=%zu bytes_written=%zu buf=%p emitter_created=%d "
+            "emitter_opened=%d emitter_error=%d emitter_problem=%s",
+            bufsize, bytes_written, buf, emitter_created,
+            emitter_opened, emitter.error, emitter.problem);
+        if (buf) free(buf);
+        buf = NULL;
+    }
+
+    if (emitter_opened) yaml_emitter_close(&emitter);
+    if (emitter_created) yaml_emitter_delete(&emitter);
+
+    return buf;
+}
+
 static char*
 fmtStatsDString(format_t* fmt, event_t* e)
 {
@@ -224,6 +495,20 @@ fmtStatsDString(format_t* fmt, event_t* e)
     return end_start;
 }
 
+char *
+fmtEventMessageString(format_t *fmt, event_format_t *evmsg)
+{
+    if (!fmt || !evmsg) return NULL;
+
+    switch (fmt->format) {
+        case CFG_EVENT_JSON_RAW_JSON:
+            return fmtEventJson(fmt, evmsg);
+        default:
+            DBG("%d %s", fmt->format, evmsg->src);
+            return NULL;
+    }
+}
+
 char*
 fmtString(format_t* fmt, event_t* e)
 {
@@ -233,7 +518,7 @@ fmtString(format_t* fmt, event_t* e)
         case CFG_METRIC_STATSD:
             return fmtStatsDString(fmt, e);
         case CFG_METRIC_JSON:
-            return NULL;
+            return fmtMetricJson(fmt, e);
         default:
             DBG("%d %s", fmt->format, e->name);
             return NULL;

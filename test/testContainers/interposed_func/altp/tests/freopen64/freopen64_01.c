@@ -6,12 +6,12 @@ int do_test() {
     char buffer[] = TEST_MSG;
 
     CREATE_TMP_DIR();
-    
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     FILE* pFile = freopen64(tmp_file_name, "w", stderr);
-    
-    if(pFile != NULL) {    
+
+    if(pFile != NULL) {
         fprintf(stderr, TEST_MSG);
 
         if(fclose(pFile) == EOF) {
@@ -22,7 +22,7 @@ int do_test() {
     }
 
     pFile = fopen(tmp_file_name, "r");
-    
+
     if(pFile != NULL) {
         memset(buffer, 0, sizeof(buffer));
         if(fread(buffer, 1, sizeof(buffer), pFile) == 0) {
@@ -41,8 +41,8 @@ int do_test() {
     }
 
     unlink(tmp_file_name);
-    
+
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

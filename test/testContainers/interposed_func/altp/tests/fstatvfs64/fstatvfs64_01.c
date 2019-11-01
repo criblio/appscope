@@ -13,7 +13,7 @@ int do_test() {
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     int f = open64(tmp_file_name, O_CREAT | O_RDONLY);
-    
+
     if(f != EOF) {
         if(fstatvfs64(f, &vfs) < 0) {
             TEST_ERROR();
@@ -36,11 +36,11 @@ int do_test() {
                 TEST_ERROR();
             }
         }
-        
+
         if(close(f) == EOF) {
             TEST_ERROR();
         }
-        
+
     } else {
         TEST_ERROR();
     }

@@ -25,7 +25,7 @@ int do_test() {
             break;
         }
     }
-    
+
     REMOVE_TMP_DIR();
 
     return test_result;

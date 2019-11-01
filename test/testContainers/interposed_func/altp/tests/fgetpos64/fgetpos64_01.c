@@ -6,11 +6,11 @@ int do_test() {
     fpos64_t position;
 
     CREATE_TMP_DIR();
-        
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     FILE* pFile = fopen(tmp_file_name, "w");
-    
+
     if(pFile != NULL) {
         if(!(fgetpos64(pFile, &position) == 0 && position.__pos == 0)) {
             TEST_ERROR();
@@ -28,8 +28,8 @@ int do_test() {
     } else {
        TEST_ERROR();
     }
-    
+
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

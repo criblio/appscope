@@ -13,19 +13,19 @@ int do_test() {
     CREATE_TMP_DIR();
 
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
-    
+
     for(i = 0; i< TEST_COUNT; i ++) {
         int dirfd = open64(tmp_dir_name, O_RDONLY);
 
         int f = open64(tmp_file_name, O_CREAT | O_WRONLY);
-        
+
         if(f != EOF) {
             if(close(f) == EOF) {
                 TEST_ERROR();
             }
 
             f = __openat64_2(dirfd, "file",  O_WRONLY);
-            
+
             if(f != EOF) {
                 if(write(f, TEST_MSG, sizeof(TEST_MSG)) != sizeof(TEST_MSG)) {
                     TEST_ERROR();
@@ -37,7 +37,7 @@ int do_test() {
 
                 if(close(dirfd) == EOF) {
                     TEST_ERROR();
-                }  
+                }
             } else {
                 TEST_ERROR();
             }

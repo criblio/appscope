@@ -9,7 +9,7 @@ int do_test() {
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     FILE* pFile = fopen64(tmp_file_name, "w");
-    
+
     if(pFile != NULL) {
         if(fclose(pFile) == EOF) {
             TEST_ERROR();

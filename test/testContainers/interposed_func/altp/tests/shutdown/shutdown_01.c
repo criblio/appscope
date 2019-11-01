@@ -19,7 +19,7 @@ int create_socket() {
 int do_test() {
     int test_result = EXIT_SUCCESS;
     int pid, i = 0, j = 0;
-    char msg[1024];   
+    char msg[1024];  
 
     pid = fork();
 
@@ -81,6 +81,6 @@ int do_test() {
             TEST_ERROR();
         }
     }
-        
+
     return test_result;
 }

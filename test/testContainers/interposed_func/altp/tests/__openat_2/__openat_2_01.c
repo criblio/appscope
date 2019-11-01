@@ -12,18 +12,18 @@ int do_test() {
     CREATE_TMP_DIR();
 
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
-    
+
     int dirfd = open(tmp_dir_name, O_RDONLY);
 
     int f = open(tmp_file_name, O_CREAT | O_WRONLY);
-    
+
     if(f != EOF) {
         if(close(f) == EOF) {
             TEST_ERROR();
         }
 
         f = __openat_2(dirfd, "file",  O_WRONLY);
-        
+
         if(f != EOF) {
             if(write(f, TEST_MSG, sizeof(TEST_MSG)) != sizeof(TEST_MSG)) {
                 TEST_ERROR();
@@ -35,7 +35,7 @@ int do_test() {
 
             if(close(dirfd) == EOF) {
                 TEST_ERROR();
-            }  
+            }
         } else {
             TEST_ERROR();
         }

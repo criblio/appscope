@@ -30,6 +30,6 @@ int do_test() {
     }
 
     fclose(pFile);
-        
+
     return test_result;
 }

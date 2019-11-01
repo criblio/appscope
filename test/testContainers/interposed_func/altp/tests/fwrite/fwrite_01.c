@@ -4,13 +4,13 @@ int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
     char buffer[] = TEST_MSG;
-    
+
     CREATE_TMP_DIR();
-    
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     FILE* pFile = fopen(tmp_file_name, "w");
-    
+
     if(pFile != NULL) {
         if(sizeof(buffer) != fwrite(buffer, 1, sizeof(buffer), pFile)) {
             TEST_ERROR();
@@ -23,7 +23,7 @@ int do_test() {
         TEST_ERROR();
     }
 
-    REMOVE_TMP_DIR();    
-    
+    REMOVE_TMP_DIR();
+
     return test_result;
 }

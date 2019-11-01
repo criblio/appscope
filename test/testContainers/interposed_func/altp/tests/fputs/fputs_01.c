@@ -6,11 +6,11 @@ int do_test() {
     char buffer[] = TEST_MSG;
 
     CREATE_TMP_DIR();
-    
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     FILE* pFile = fopen(tmp_file_name, "w");
-    
+
     if(pFile != NULL) {
         if(fputs(buffer, pFile) == EOF) {
             TEST_ERROR();
@@ -23,8 +23,8 @@ int do_test() {
     } else {
        TEST_ERROR();
     }
-    
+
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

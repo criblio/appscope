@@ -7,6 +7,8 @@ ssize_t pwritev64v2 (int fd, const struct iovec *vector, int count, off64_t offs
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
+
+#if (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 28)
     char tmp_file_name[NAME_MAX];
     char buffer[] = TEST_MSG;
     struct iovec iov[1];
@@ -55,6 +57,7 @@ int do_test() {
     unlink(tmp_file_name);
 
     REMOVE_TMP_DIR();
+#endif
 
     return test_result;
 }

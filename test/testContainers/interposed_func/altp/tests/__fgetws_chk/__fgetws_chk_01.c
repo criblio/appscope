@@ -10,11 +10,11 @@ int do_test() {
     wchar_t buffer[] = TEST_MSGW;
 
     CREATE_TMP_DIR();
-    
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     FILE* pFile = fopen(tmp_file_name, "w");
-    
+
     if(pFile != NULL) {
         if(fputws(buffer, pFile) == EOF) {
             TEST_ERROR();
@@ -26,12 +26,12 @@ int do_test() {
     } else {
         TEST_ERROR();
     }
-    
+
     pFile = fopen(tmp_file_name, "r");
-    
+
     if(pFile != NULL) {
         memset(buffer, 0, sizeof(buffer));
-        
+
         if(__fgetws_chk(buffer, sizeof(buffer), sizeof(buffer), pFile) == NULL) {
             TEST_ERROR();
         } else {
@@ -39,7 +39,7 @@ int do_test() {
                 TEST_ERROR();
             }
         }
-        
+
         if(fclose(pFile) == EOF) {
             TEST_ERROR();
         }
@@ -48,8 +48,8 @@ int do_test() {
     }
 
     unlink(tmp_file_name);
-    
+
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

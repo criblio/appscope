@@ -16,7 +16,7 @@ int do_test() {
         int dirfd = open64(tmp_dir_name, O_RDONLY);
 
         int f = openat64(dirfd, "file", O_CREAT | O_WRONLY);
-        
+
         if(f != EOF) {
             if(write(f, TEST_MSG, sizeof(TEST_MSG)) != sizeof(TEST_MSG)) {
                 TEST_ERROR();
@@ -30,7 +30,7 @@ int do_test() {
             if(close(dirfd) == EOF) {
                 TEST_ERROR();
             }
-            
+
         } else {
             TEST_ERROR();
         }

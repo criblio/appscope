@@ -8,11 +8,11 @@ int do_test() {
     wchar_t buffer[] = TEST_MSGW;
 
     CREATE_TMP_DIR();
-    
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     FILE* pFile = fopen(tmp_file_name, "w");
-    
+
     if(pFile != NULL) {
         if(fputws(buffer, pFile) == EOF) {
             TEST_ERROR();
@@ -25,8 +25,8 @@ int do_test() {
     } else {
        TEST_ERROR();
     }
-    
+
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

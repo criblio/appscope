@@ -9,11 +9,11 @@ int do_test() {
     char *lineptr = NULL;
 
     CREATE_TMP_DIR();
-    
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     FILE* pFile = fopen(tmp_file_name, "w");
-    
+
     if(pFile != NULL) {
         if(sizeof(buffer) != fwrite(buffer, 1, sizeof(buffer), pFile)) {
             TEST_ERROR();
@@ -24,9 +24,9 @@ int do_test() {
     } else {
         TEST_ERROR();
     }
-    
+
     pFile = fopen(tmp_file_name, "r");
-    
+
     if(pFile != NULL) {
         memset(buffer, 0, sizeof(buffer));
         while((read = __getdelim(&lineptr, &len, 101, pFile))!= -1) {
@@ -46,8 +46,8 @@ int do_test() {
     }
 
     unlink(tmp_file_name);
-    
+
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

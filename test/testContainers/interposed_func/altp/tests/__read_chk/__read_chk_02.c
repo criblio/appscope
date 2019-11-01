@@ -6,16 +6,15 @@ ssize_t __read_chk(int fd, void * buf, size_t nbytes, size_t buflen);
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[NAME_MAX];  
+    char tmp_file_name[NAME_MAX];
     char buffer[] = TEST_MSG;
     int fd;
     int i = 0;
     ssize_t read = 0;
-    
-    CREATE_TMP_DIR();
-    
-    sprintf(tmp_file_name, "%s/file", tmp_dir_name);    
 
+    CREATE_TMP_DIR();
+
+    sprintf(tmp_file_name, "%s/file", tmp_dir_name);
     if ((fd = open(tmp_file_name, O_WRONLY | O_CREAT)) < 0 ) {
         TEST_ERROR();
     } else {
@@ -41,7 +40,7 @@ int do_test() {
             } else {
                 if(strcmp(buffer, TEST_MSG) != 0) {
                     TEST_ERROR();
-                    break; 
+                    break;
                 }
             }
         }
@@ -52,8 +51,8 @@ int do_test() {
     }
 
     unlink(tmp_file_name);
-    
+
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

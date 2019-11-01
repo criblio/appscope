@@ -15,11 +15,11 @@ passed=0
 for t in $TESTS; do
     ./$t
     if [ $? -eq 0 ]; then
-	let passed++
+        let passed++
     else
-	let failed++
+        let failed++
     fi
-    
+
     let counter++
 done
 
@@ -37,11 +37,11 @@ for t in $TESTS; do
     LD_PRELOAD=/opt/scope/lib/linux/libwrap.so ./$t
 
     if [ $? -eq 0 ]; then
-	let passed++
+        let passed++
     else
-	let failed++
+        let failed++
     fi
-    
+
     let counter++
 done
 

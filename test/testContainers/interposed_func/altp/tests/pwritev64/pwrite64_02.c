@@ -15,11 +15,11 @@ int do_test() {
     iov[0].iov_len = strlen(buffer);
 
     CREATE_TMP_DIR();
-    
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     int f = open64(tmp_file_name, O_CREAT | O_WRONLY);
-    
+
     if (f != EOF) {
         if (pwritev64(f, iov, 1, 0) == -1) {
            TEST_ERROR();
@@ -42,7 +42,7 @@ int do_test() {
                 TEST_ERROR();
                 break;
             }
-            
+
             if(strcmp(buffer, TEST_MSG) != 0) {
                 TEST_ERROR();
                 break;
@@ -59,8 +59,8 @@ int do_test() {
     }
 
     unlink(tmp_file_name);
-    
+
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

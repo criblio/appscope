@@ -14,7 +14,7 @@ int do_test() {
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     int f = open64(tmp_file_name, O_CREAT | O_RDONLY);
-    
+
     if(f != EOF) {
         if(__fxstat64(1, f, &fs) < 0) {
             TEST_ERROR();
@@ -27,7 +27,7 @@ int do_test() {
         if(close(f) == EOF) {
             TEST_ERROR();
         }
-        
+
     } else {
         TEST_ERROR();
     }
@@ -35,7 +35,7 @@ int do_test() {
     unlink(tmp_file_name);
 
     f = open64(tmp_file_name, O_CREAT | O_WRONLY);
-    
+
     if(f != EOF) {
         if(write(f, TEST_MSG, sizeof(TEST_MSG)) != sizeof(TEST_MSG)) {
             TEST_ERROR();
@@ -48,11 +48,11 @@ int do_test() {
         if(fs.st_size != sizeof(TEST_MSG)) {
             TEST_ERROR();
         }
-        
+
         if(close(f) == EOF) {
             TEST_ERROR();
         }
-        
+
     } else {
         TEST_ERROR();
     }

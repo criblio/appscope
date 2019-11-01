@@ -21,9 +21,9 @@ int do_test() {
         if(close(f) == EOF) {
             TEST_ERROR();
         }
-        
+
         f = __open_2(tmp_file_name, O_WRONLY);
-        
+
         if(f != EOF) {
             if(write(f, TEST_MSG, sizeof(TEST_MSG)) != sizeof(TEST_MSG)) {
                 TEST_ERROR();
@@ -32,7 +32,7 @@ int do_test() {
             if(close(f) == EOF) {
                 TEST_ERROR();
             }
-            
+
         } else {
             TEST_ERROR();
         }

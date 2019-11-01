@@ -8,13 +8,13 @@ int do_test() {
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
     char buffer[] = TEST_MSG;
-    
+
     CREATE_TMP_DIR();
-    
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     int f = open(tmp_file_name, O_CREAT | O_WRONLY);
-    
+
     if (f != EOF) {
         if (write(f, buffer, sizeof(buffer) - 1) == -1) {
            TEST_ERROR();
@@ -35,7 +35,7 @@ int do_test() {
         if(__pread_chk(f, buffer, sizeof(buffer), 0, sizeof(buffer)) == EOF) {
             TEST_ERROR();
         }
-        
+
         if(strcmp(buffer, TEST_MSG) != 0) {
             TEST_ERROR();
         }
@@ -48,8 +48,8 @@ int do_test() {
     }
 
     unlink(tmp_file_name);
-    
+
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

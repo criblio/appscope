@@ -9,13 +9,13 @@ int do_test() {
     char tmp_file_name[NAME_MAX];
     int i = 0;
     wint_t c = L'А';
-    
+
     CREATE_TMP_DIR();
-    
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     FILE* pFile = fopen(tmp_file_name, "w");
-    
+
     if(pFile != NULL) {
         for(i = 0; i < TEST_COUNT; i++) {
             if(fputwc(c, pFile) == WEOF) {
@@ -23,7 +23,7 @@ int do_test() {
                 break;
             }
         }
-    
+
         if(fclose(pFile) == EOF) {
             TEST_ERROR();
         }
@@ -32,7 +32,7 @@ int do_test() {
        TEST_ERROR();
     }
 
-    REMOVE_TMP_DIR();    
-    
+    REMOVE_TMP_DIR();
+
     return test_result;
 }

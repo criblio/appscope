@@ -8,6 +8,8 @@ int fcntl64 (int fd, int cmd, ...);
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
+
+#if (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 28)
     char tmp_file_name[NAME_MAX];
 
     CREATE_TMP_DIR();
@@ -48,6 +50,7 @@ int do_test() {
     unlink(tmp_file_name);
 
     REMOVE_TMP_DIR();
+#endif
 
     return test_result;
 }

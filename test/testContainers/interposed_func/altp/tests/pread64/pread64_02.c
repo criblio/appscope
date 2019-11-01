@@ -9,11 +9,11 @@ int do_test() {
     int i = 0;
 
     CREATE_TMP_DIR();
-    
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     int f = open64(tmp_file_name, O_CREAT | O_WRONLY);
-    
+
     if (f != EOF) {
         if (write(f, buffer, sizeof(buffer) - 1) == -1) {
            TEST_ERROR();
@@ -36,7 +36,7 @@ int do_test() {
                 TEST_ERROR();
                 break;
             }
-            
+
             if(strcmp(buffer, TEST_MSG) != 0) {
                 TEST_ERROR();
                 break;
@@ -53,8 +53,8 @@ int do_test() {
     }
 
     unlink(tmp_file_name);
-    
+
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

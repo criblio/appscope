@@ -5,11 +5,11 @@ int do_test() {
     char tmp_file_name[NAME_MAX];
 
     CREATE_TMP_DIR();
-        
+
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
     FILE* pFile = fopen(tmp_file_name, "w");
-    
+
     if(pFile != NULL) {
         if(fclose(pFile) == EOF) {
             TEST_ERROR();
@@ -18,8 +18,8 @@ int do_test() {
     } else {
        TEST_ERROR();
     }
-    
+
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

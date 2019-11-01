@@ -21,6 +21,6 @@ int do_test() {
     }
 
     REMOVE_TMP_DIR();
-        
+
     return test_result;
 }

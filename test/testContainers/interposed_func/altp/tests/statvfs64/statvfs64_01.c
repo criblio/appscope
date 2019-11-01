@@ -4,7 +4,7 @@
 #include "test_utils.h"
 
 int do_test() {
-    int test_result = EXIT_SUCCESS;   
+    int test_result = EXIT_SUCCESS;
     struct statvfs64 fs;
 
     if(statvfs64("/", &fs) < 0) {

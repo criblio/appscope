@@ -2,21 +2,11 @@ version: '3.5'
 services:
   cribl:
     build:
-      context: cribl
+      context: .
+      dockerfile: ./cribl/Dockerfile
+    command: -v
     ports:
-      - "10200:10200"
-      - "10088:10088"
-      - "10080:10080"
-      - "10001:10001"
-      - "9999:9999"
       - "9000:9000"
-      - "8125:8125"
-      - "8125:8125/udp"
-      - "5140:5140"
-    volumes:
-      - "./cribl/cribl:/opt/cribl/local/cribl"
-    cap_add:
-      - NET_ADMIN
   splunk:
     build:
       context: .

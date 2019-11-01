@@ -146,13 +146,6 @@ enum fs_type_t {
     STREAM
 };
 
-// Event types; used to indicate activity for periodic thread
-enum event_type_t {
-    EVENT_TX = 1,
-    EVENT_RX = 2,
-    EVENT_FS = 4
-};
-
 typedef struct metric_counters_t {
     uint64_t openPorts;
     uint64_t netConnectionsUdp;
@@ -397,7 +390,7 @@ typedef struct interposed_funcs_t {
     int (*guarded_close_np)(int, void *);
     ssize_t (*__sendto_nocancel)(int, const void *, size_t, int,
                                  const struct sockaddr *, socklen_t);
-    uint32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
+    int32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
                                       uint16_t, uint16_t, void *, void *);
 #endif // __MACOS__
 } interposed_funcs;
@@ -516,46 +509,5 @@ extern void *_dl_sym(void *, const char *, void *);
        }                                                               \
     } 
 #endif // __LINUX__
-
-#define IOSTREAMPRE(func, type)                      \
-    type rc;                                         \
-    int fd = fileno(stream);                         \
-    struct fs_info_t *fs = getFSEntry(fd);           \
-    struct net_info_t *net = getNetEntry(fd);        \
-    elapsed_t time = {0};                            \
-    doThread();                                      \
-    if (fs) {                                        \
-        time.initial = getTime();                    \
-    }                                                \
-
-#define IOSTREAMPOST(func, len, type, op)           \
-    if (fs) {                                       \
-        time.duration = getDuration(time.initial);  \
-    }                                               \
-                                                    \
-    if (rc != type) {                               \
-        scopeLog(#func, fd, CFG_LOG_TRACE);         \
-        if (net) {                                  \
-            doSetAddrs(fd);                         \
-            if (op == (enum event_type_t)EVENT_RX) {\
-               doRecv(fd, len);                     \
-            } else if (op == (enum event_type_t)EVENT_TX) { \
-                doSend(fd, len);                    \
-            } else {                                \
-                DBG(NULL);                          \
-            }                                       \
-        } else if (fs) {                            \
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, #func, time.duration, NULL); \
-            doFSMetric(FS_READ, fd, EVENT_BASED, #func, len, NULL); \
-        }                                           \
-    }  else {                                       \
-        if (fs) {                                   \
-            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, #func, fs->path); \
-        } else if (net) {                           \
-            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, #func, "nopath"); \
-        }                                           \
-    }                                               \
-                                                    \
-return rc;
 
 #endif // __WRAP_H__

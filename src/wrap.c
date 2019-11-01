@@ -2601,14 +2601,19 @@ __read_chk(int fd, void *buf, size_t nbytes, size_t buflen)
     return rc;
 }
 
-EXPORTOFF ssize_t
+EXPORTOFF size_t
 __fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
 {
     // TODO: this function aborts & exits on error, add abort functionality
-    WRAP_CHECK(__fread_unlocked_chk, -1);
-    IOSTREAMPRE(__fread_unlocked_chk, size_t);
-    rc = g_fn.__fread_unlocked_chk(ptr, ptrlen, size, nmemb, stream);
-    IOSTREAMPOST(__fread_unlocked_chk, rc * size, 0, (enum event_type_t)EVENT_RX);
+    WRAP_CHECK(__fread_unlocked_chk, 0);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    size_t rc = g_fn.__fread_unlocked_chk(ptr, ptrlen, size, nmemb, stream);
+
+    doRead(fileno(stream), initialTime, (rc == nmemb), rc*size, "__fread_unlocked_chk");
+
+    return rc;
 }
 
 EXPORTON ssize_t
@@ -3076,7 +3081,7 @@ syscall(long number, ...)
     switch (number) {
     case SYS_accept4:
     {
-        int rc;
+        long rc;
         rc = g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1],
                           fArgs.arg[2], fArgs.arg[3]);
         if (rc != -1) {
@@ -3136,10 +3141,15 @@ syscall(long number, ...)
 EXPORTON size_t
 fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 {
-    WRAP_CHECK(fwrite_unlocked, -1);
-    IOSTREAMPRE(fwrite_unlocked, size_t);
-    rc = g_fn.fwrite_unlocked(ptr, size, nitems, stream);
-    IOSTREAMPOST(fwrite_unlocked, rc, 0, (enum event_type_t)EVENT_TX);
+    WRAP_CHECK(fwrite_unlocked, 0);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    size_t rc = g_fn.fwrite_unlocked(ptr, size, nitems, stream);
+
+    doWrite(fileno(stream), initialTime, (rc == nitems), rc*size, "fwrite_unlocked");
+
+    return rc;
 }
 
 static void
@@ -3390,12 +3400,12 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
     return rc;
 }
 
-EXPORTON uint32_t
+EXPORTON int32_t
 DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
                       const char *fullname, uint16_t rrtype, uint16_t rrclass,
                       void *callback, void *context)
 {
-    uint32_t rc;
+    int32_t rc;
     elapsed_t time = {0};
 
     WRAP_CHECK(DNSServiceQueryRecord, -1);
@@ -3435,7 +3445,7 @@ fseek(FILE *stream, long offset, int whence)
 {
     WRAP_CHECK(fseek, -1);
     doThread();
-    off_t rc = g_fn.fseek(stream, offset, whence);
+    int rc = g_fn.fseek(stream, offset, whence);
 
     doSeek(fileno(stream), (rc != -1), "fseek");
 
@@ -3447,7 +3457,7 @@ fseeko(FILE *stream, off_t offset, int whence)
 {
     WRAP_CHECK(fseeko, -1);
     doThread();
-    off_t rc = g_fn.fseeko(stream, offset, whence);
+    int rc = g_fn.fseeko(stream, offset, whence);
 
     doSeek(fileno(stream), (rc != -1), "fseeko");
 
@@ -3569,39 +3579,59 @@ writev(int fd, const struct iovec *iov, int iovcnt)
 }
 
 EXPORTON size_t
-fwrite(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stream)
+fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 {
-    WRAP_CHECK(fwrite, -1);
-    IOSTREAMPRE(fwrite, size_t);
-    rc = g_fn.fwrite(ptr, size, nitems, stream);
-    IOSTREAMPOST(fwrite, rc, 0, (enum event_type_t)EVENT_TX);
+    WRAP_CHECK(fwrite, 0);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    size_t rc = g_fn.fwrite(ptr, size, nitems, stream);
+
+    doWrite(fileno(stream), initialTime, (rc == nitems), rc*size, "fwrite");
+
+    return rc;
 }
 
 EXPORTON int
 fputs(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs, EOF);
-    IOSTREAMPRE(fputs, int);
-    rc = g_fn.fputs(s, stream);
-    IOSTREAMPOST(fputs, rc, EOF, (enum event_type_t)EVENT_TX);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    int rc = g_fn.fputs(s, stream);
+
+    doWrite(fileno(stream), initialTime, (rc != EOF), rc, "fputs");
+
+    return rc;
 }
 
 EXPORTON int
 fputs_unlocked(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs_unlocked, EOF);
-    IOSTREAMPRE(fputs_unlocked, int);
-    rc = g_fn.fputs_unlocked(s, stream);
-    IOSTREAMPOST(fputs_unlocked, rc, EOF, (enum event_type_t)EVENT_TX);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    int rc = g_fn.fputs_unlocked(s, stream);
+
+    doWrite(fileno(stream), initialTime, (rc != EOF), rc, "fputs_unlocked");
+
+    return rc;
 }
 
 EXPORTON int
 fputws(const wchar_t *ws, FILE *stream)
 {
     WRAP_CHECK(fputws, EOF);
-    IOSTREAMPRE(fputws, int);
-    rc = g_fn.fputws(ws, stream);
-    IOSTREAMPOST(fputws, rc, EOF, (enum event_type_t)EVENT_TX);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    int rc = g_fn.fputws(ws, stream);
+
+    doWrite(fileno(stream), initialTime, (rc != EOF), rc, "fputws");
+
+    return rc;
 }
 
 EXPORTON ssize_t
@@ -3649,38 +3679,58 @@ pread(int fd, void *buf, size_t count, off_t offset)
 EXPORTON size_t
 fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
-    WRAP_CHECK(fread, -1);
-    IOSTREAMPRE(fread, size_t);
-    rc = g_fn.fread(ptr, size, nmemb, stream);
-    IOSTREAMPOST(fread, rc * size, 0, (enum event_type_t)EVENT_RX);
+    WRAP_CHECK(fread, 0);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    size_t rc = g_fn.fread(ptr, size, nmemb, stream);
+
+    doRead(fileno(stream), initialTime, (rc == nmemb), rc*size, "fread");
+
+    return rc;
 }
 
 EXPORTON size_t
 __fread_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
 {
     // TODO: this function aborts & exits on error, add abort functionality
-    WRAP_CHECK(__fread_chk, -1);
-    IOSTREAMPRE(__fread_chk, size_t);
-    rc = g_fn.__fread_chk(ptr, ptrlen, size, nmemb, stream);
-    IOSTREAMPOST(__fread_chk, rc * size, 0, (enum event_type_t)EVENT_RX);
+    WRAP_CHECK(__fread_chk, 0);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    size_t rc = g_fn.__fread_chk(ptr, ptrlen, size, nmemb, stream);
+
+    doRead(fileno(stream), initialTime, (rc == nmemb), rc*size, "__fread_chk");
+
+    return rc;
 }
 
 EXPORTON size_t
 fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     WRAP_CHECK(fread_unlocked, 0);
-    IOSTREAMPRE(fread_unlocked, size_t);
-    rc = g_fn.fread_unlocked(ptr, size, nmemb, stream);
-    IOSTREAMPOST(fread_unlocked, rc, 0, (enum event_type_t)EVENT_RX);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    size_t rc = g_fn.fread_unlocked(ptr, size, nmemb, stream);
+
+    doRead(fileno(stream), initialTime, (rc == nmemb), rc*size, "fread_unlocked");
+
+    return rc;
 }
 
 EXPORTON char *
 fgets(char *s, int n, FILE *stream)
 {
     WRAP_CHECK(fgets, NULL);
-    IOSTREAMPRE(fgets, char *);
-    rc = g_fn.fgets(s, n, stream);
-    IOSTREAMPOST(fgets, n, NULL, (enum event_type_t)EVENT_RX);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    char* rc = g_fn.fgets(s, n, stream);
+
+    doRead(fileno(stream), initialTime, (rc != NULL), n, "fgets");
+
+    return rc;
 }
 
 EXPORTON char *
@@ -3688,18 +3738,28 @@ __fgets_chk(char *s, size_t size, int strsize, FILE *stream)
 {
     // TODO: this function aborts & exits on error, add abort functionality
     WRAP_CHECK(__fgets_chk, NULL);
-    IOSTREAMPRE(__fgets_chk, char *);
-    rc = g_fn.__fgets_chk(s, size, strsize, stream);
-    IOSTREAMPOST(__fgets_chk, size, NULL, (enum event_type_t)EVENT_RX);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    char* rc = g_fn.__fgets_chk(s, size, strsize, stream);
+
+    doRead(fileno(stream), initialTime, (rc != NULL), size, "__fgets_chk");
+
+    return rc;
 }
 
 EXPORTON char *
 fgets_unlocked(char *s, int n, FILE *stream)
 {
     WRAP_CHECK(fgets_unlocked, NULL);
-    IOSTREAMPRE(fgets_unlocked, char *);
-    rc = g_fn.fgets_unlocked(s, n, stream);
-    IOSTREAMPOST(fgets_unlocked, n, NULL, (enum event_type_t)EVENT_RX);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    char* rc = g_fn.fgets_unlocked(s, n, stream);
+
+    doRead(fileno(stream), initialTime, (rc != NULL), n, "fgets_unlocked");
+
+    return rc;
 }
 
 EXPORTON wchar_t *
@@ -3707,72 +3767,112 @@ __fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
 {
     // TODO: this function aborts & exits on error, add abort functionality
     WRAP_CHECK(__fgetws_chk, NULL);
-    IOSTREAMPRE(__fgetws_chk, wchar_t *);
-    rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
-    IOSTREAMPOST(fgetws, size, NULL, (enum event_type_t)EVENT_RX);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    wchar_t* rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
+
+    doRead(fileno(stream), initialTime, (rc != NULL), size, "__fgetws_chk");
+
+    return rc;
 }
 
 EXPORTON wchar_t *
 fgetws(wchar_t *ws, int n, FILE *stream)
 {
     WRAP_CHECK(fgetws, NULL);
-    IOSTREAMPRE(fgetws, wchar_t *);
-    rc = g_fn.fgetws(ws, n, stream);
-    IOSTREAMPOST(fgetws, n, NULL, (enum event_type_t)EVENT_RX);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    wchar_t* rc = g_fn.fgetws(ws, n, stream);
+
+    doRead(fileno(stream), initialTime, (rc != NULL), n, "fgetws");
+
+    return rc;
 }
 
 EXPORTON wint_t
 fgetwc(FILE *stream)
 {
     WRAP_CHECK(fgetwc, WEOF);
-    IOSTREAMPRE(fgetwc, wint_t);
-    rc = g_fn.fgetwc(stream);
-    IOSTREAMPOST(fgetwc, 1, WEOF, (enum event_type_t)EVENT_RX);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    wint_t rc = g_fn.fgetwc(stream);
+
+    doRead(fileno(stream), initialTime, (rc != WEOF), sizeof(wint_t), "fgetwc");
+
+    return rc;
 }
 
 EXPORTON int
 fgetc(FILE *stream)
 {
     WRAP_CHECK(fgetc, EOF);
-    IOSTREAMPRE(fgetc, int);
-    rc = g_fn.fgetc(stream);
-    IOSTREAMPOST(fgetc, 1, EOF, (enum event_type_t)EVENT_FS);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    int rc = g_fn.fgetc(stream);
+
+    doRead(fileno(stream), initialTime, (rc != EOF), 1, "fgetc");
+
+    return rc;
 }
 
 EXPORTON int
 fputc(int c, FILE *stream)
 {
     WRAP_CHECK(fputc, EOF);
-    IOSTREAMPRE(fputc, int);
-    rc = g_fn.fputc(c, stream);
-    IOSTREAMPOST(fputc, 1, EOF, (enum event_type_t)EVENT_FS);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    int rc = g_fn.fputc(c, stream);
+
+    doWrite(fileno(stream), initialTime, (rc != EOF), 1, "fputc");
+
+    return rc;
 }
 
 EXPORTON int
 fputc_unlocked(int c, FILE *stream)
 {
     WRAP_CHECK(fputc_unlocked, EOF);
-    IOSTREAMPRE(fputc_unlocked, int);
-    rc = g_fn.fputc_unlocked(c, stream);
-    IOSTREAMPOST(fputc_unlocked, 1, EOF, (enum event_type_t)EVENT_FS);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    int rc = g_fn.fputc_unlocked(c, stream);
+
+    doWrite(fileno(stream), initialTime, (rc != EOF), 1, "fputc_unlocked");
+
+    return rc;
 }
 
 EXPORTON wint_t
 putwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(putwc, WEOF);
-    IOSTREAMPRE(putwc, int);
-    rc = g_fn.putwc(wc, stream);
-    IOSTREAMPOST(putwc, 1, WEOF, (enum event_type_t)EVENT_FS);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    wint_t rc = g_fn.putwc(wc, stream);
+
+    doWrite(fileno(stream), initialTime, (rc != WEOF), sizeof(wint_t), "putwc");
+
+    return rc;
 }
 
 EXPORTON wint_t
 fputwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(fputwc, WEOF);
-    IOSTREAMPRE(fputwc, int);
-    rc = g_fn.fputwc(wc, stream);
-    IOSTREAMPOST(fputwc, 1, WEOF, (enum event_type_t)EVENT_FS);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    wint_t rc = g_fn.fputwc(wc, stream);
+
+    doWrite(fileno(stream), initialTime, (rc != WEOF), sizeof(wint_t), "fputwc");
+
+    return rc;
 }
 
 EXPORTOFF int
@@ -3781,57 +3881,66 @@ fscanf(FILE *stream, const char *format, ...)
     struct FuncArgs fArgs;
     LOAD_FUNC_ARGS_VALIST(fArgs, format);
     WRAP_CHECK(fscanf, EOF);
-    IOSTREAMPRE(fscanf, int);
-    rc = g_fn.fscanf(stream, format,
+    doThread();
+    uint64_t initialTime = getTime();
+
+    int rc = g_fn.fscanf(stream, format,
                      fArgs.arg[0], fArgs.arg[1],
                      fArgs.arg[2], fArgs.arg[3],
                      fArgs.arg[4], fArgs.arg[5]);
-    IOSTREAMPOST(fscanf, rc, EOF, (enum event_type_t)EVENT_RX);
+
+    doRead(fileno(stream),initialTime, (rc != EOF), rc, "fscanf");
+
+    return rc;
 }
 
 EXPORTON ssize_t
 getline (char **lineptr, size_t *n, FILE *stream)
 {
     WRAP_CHECK(getline, -1);
-    IOSTREAMPRE(getline, ssize_t);
-    rc = g_fn.getline(lineptr, n, stream);
-    if (n) {
-        IOSTREAMPOST(getline, *n, -1, (enum event_type_t)EVENT_RX);
-    } else {
-        IOSTREAMPOST(getline, 0, -1, (enum event_type_t)EVENT_RX);
-    }
+    doThread();
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.getline(lineptr, n, stream);
+
+    size_t bytes = (n) ? *n : 0;
+    doRead(fileno(stream), initialTime, (rc != -1), bytes, "getline");
+
+    return rc;
 }
 
 EXPORTON ssize_t
 getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
 {
     WRAP_CHECK(getdelim, -1);
-    IOSTREAMPRE(getdelim, ssize_t);
+    doThread();
+    uint64_t initialTime = getTime();
+
     g_getdelim = 1;
-    rc = g_fn.getdelim(lineptr, n, delimiter, stream);
-    if (n) {
-        IOSTREAMPOST(getdelim, *n, -1, (enum event_type_t)EVENT_RX);
-    } else {
-        IOSTREAMPOST(getdelim, 0, -1, (enum event_type_t)EVENT_RX);
-    }
+    ssize_t rc = g_fn.getdelim(lineptr, n, delimiter, stream);
+
+    size_t bytes = (n) ? *n : 0;
+    doRead(fileno(stream), initialTime, (rc != -1), bytes, "getdelim");
+
+    return rc;
 }
 
 EXPORTON ssize_t
 __getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
 {
     WRAP_CHECK(__getdelim, -1);
-    IOSTREAMPRE(__getdelim, ssize_t);
-    rc = g_fn.__getdelim(lineptr, n, delimiter, stream);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.__getdelim(lineptr, n, delimiter, stream);
     if (g_getdelim == 1) {
         g_getdelim = 0;
         return rc;
     }
 
-    if (n) {
-        IOSTREAMPOST(__getdelim, *n, -1, (enum event_type_t)EVENT_RX);
-    } else {
-        IOSTREAMPOST(__getdelim, 0, -1, (enum event_type_t)EVENT_RX);
-    }
+    size_t bytes = (n) ? *n : 0;
+    doRead(fileno(stream), initialTime, (rc != -1), bytes, "__getdelim");
+    return rc;
 }
 
 EXPORTON int

@@ -4,7 +4,7 @@ char * __fgets_chk(char * s, size_t size, int strsize, FILE * stream);
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[255];    
+    char tmp_file_name[NAME_MAX];
     int i = 0;
     char buffer[] = TEST_MSG;
     

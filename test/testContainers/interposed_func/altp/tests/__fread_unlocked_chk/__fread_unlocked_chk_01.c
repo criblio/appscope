@@ -4,7 +4,7 @@ size_t __fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb,
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[255];    
+    char tmp_file_name[NAME_MAX];
     char buffer[] = TEST_MSG;
     
     CREATE_TMP_DIR();

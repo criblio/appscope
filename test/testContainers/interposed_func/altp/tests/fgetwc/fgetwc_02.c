@@ -6,7 +6,7 @@
 int do_test() {
     setlocale(LC_ALL, "en_US.utf8");
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[255];    
+    char tmp_file_name[NAME_MAX];
     int i = 0;
     wint_t c = TEST_CHARW;
     

@@ -1,6 +1,20 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+#ifdef __MACOS__                                                                                                                                                                     
+#ifndef off64_t                                                                                                                                                                      
+typedef uint64_t off64_t;                                                                                                                                                            
+#endif                                                                                                                                                                               
+#ifndef fpos64_t                                                                                                                                                                     
+typedef uint64_t fpos64_t;                                                                                                                                                           
+#endif                                                                                                                                                                               
+#ifndef statvfs64                                                                                                                                                                    
+struct statvfs64 {                                                                                                                                                                   
+    uint64_t x;                                                                                                                                                                      
+};                                                                                                                                                                                   
+#endif                                                                                                                                                                               
+#endif // __MACOS__   
+
 #define TEST_MSG "test"
 #define TEST_MSGW L"test"
 #define TEST_MSG_N "test\n"

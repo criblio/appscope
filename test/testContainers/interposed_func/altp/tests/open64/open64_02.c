@@ -6,7 +6,7 @@
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[255];    
+    char tmp_file_name[NAME_MAX];
     int i = 0;
 
     CREATE_TMP_DIR();

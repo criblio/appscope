@@ -6,7 +6,7 @@ ssize_t __read_chk(int fd, void * buf, size_t nbytes, size_t buflen);
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[255];  
+    char tmp_file_name[NAME_MAX];  
     char buffer[] = TEST_MSG;
     int fd;
     int i = 0;

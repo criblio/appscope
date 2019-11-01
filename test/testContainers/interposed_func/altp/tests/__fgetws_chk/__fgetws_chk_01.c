@@ -6,7 +6,7 @@ wchar_t * __fgetws_chk(wchar_t * ws, size_t size, int strsize, FILE * stream);
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[255];    
+    char tmp_file_name[NAME_MAX];
     wchar_t buffer[] = TEST_MSGW;
 
     CREATE_TMP_DIR();

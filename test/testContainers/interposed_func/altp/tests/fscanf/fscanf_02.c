@@ -2,7 +2,7 @@
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[255];    
+    char tmp_file_name[NAME_MAX];
     int i = 0;
     char buffer[] = TEST_MSG;
     
@@ -14,7 +14,7 @@ int do_test() {
     
     if(pFile != NULL) {
         for(i = 0; i < TEST_COUNT; i++) {
-            if(sizeof(buffer) != fwrite(buffer, 1, sizeof(buffer), pFile)) {
+            if(fwrite(buffer, 1, strlen(buffer), pFile) != strlen(buffer)) {
                 TEST_ERROR();
                 break;
             }

@@ -9,7 +9,7 @@ int __open_2(const char *, int);
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[255];    
+    char tmp_file_name[NAME_MAX];
 
     CREATE_TMP_DIR();
 

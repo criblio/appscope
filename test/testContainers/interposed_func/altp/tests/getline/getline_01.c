@@ -2,7 +2,7 @@
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[255];    
+    char tmp_file_name[NAME_MAX];
     char buffer[5] = TEST_MSG_N;
     
     CREATE_TMP_DIR();

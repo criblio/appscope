@@ -6,7 +6,7 @@ ssize_t __pread_chk(int fd, void * buf, size_t nbytes, off_t offset, size_t bufl
 
 int do_test() {
     int test_result = EXIT_SUCCESS;
-    char tmp_file_name[255];    
+    char tmp_file_name[NAME_MAX];
     char buffer[] = TEST_MSG;
     
     CREATE_TMP_DIR();

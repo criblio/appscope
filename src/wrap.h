@@ -482,7 +482,8 @@ extern void *_dl_sym(void *, const char *, void *);
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
             return rc;                                                 \
        }                                                               \
-    } 
+    }                                                                  \
+    doThread();
 
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
@@ -490,7 +491,8 @@ extern void *_dl_sym(void *, const char *, void *);
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
             return;                                                    \
        }                                                               \
-    } 
+    }                                                                  \
+    doThread();
 
 #else
 #define WRAP_CHECK(func, rc)                                           \
@@ -499,7 +501,8 @@ extern void *_dl_sym(void *, const char *, void *);
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
             return rc;                                                 \
        }                                                               \
-    } 
+    }                                                                  \
+    doThread();
 
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
@@ -507,7 +510,8 @@ extern void *_dl_sym(void *, const char *, void *);
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
             return;                                                    \
        }                                                               \
-    } 
+    }                                                                  \
+    doThread();
 #endif // __LINUX__
 
 #endif // __WRAP_H__

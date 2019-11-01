@@ -2284,7 +2284,6 @@ open(const char *pathname, int flags, ...)
     struct FuncArgs fArgs;
 
     WRAP_CHECK(open, -1);
-    doThread(); // Will do nothing if a thread already exists
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.open(pathname, flags, fArgs.arg[0]);
     if (fd != -1) {
@@ -2303,7 +2302,6 @@ openat(int dirfd, const char *pathname, int flags, ...)
     struct FuncArgs fArgs;
 
     WRAP_CHECK(openat, -1);
-    doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.openat(dirfd, pathname, flags, fArgs.arg[0]);
     if (fd != -1) {
@@ -2322,7 +2320,6 @@ creat(const char *pathname, mode_t mode)
     int fd;
 
     WRAP_CHECK(creat, -1);
-    doThread();
     fd = g_fn.creat(pathname, mode);
     if (fd != -1) {
         doOpen(fd, pathname, FD, "creat");
@@ -2339,7 +2336,6 @@ fopen(const char *pathname, const char *mode)
     FILE *stream;
 
     WRAP_CHECK(fopen, NULL);
-    doThread();
     stream = g_fn.fopen(pathname, mode);
     if (stream != NULL) {
         doOpen(fileno(stream), pathname, STREAM, "fopen");
@@ -2356,7 +2352,6 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
     FILE *stream;
 
     WRAP_CHECK(freopen, NULL);
-    doThread();
     stream = g_fn.freopen(pathname, mode, orig_stream);
     // freopen just changes the mode if pathname is null
     if (stream != NULL) {
@@ -2379,7 +2374,6 @@ open64(const char *pathname, int flags, ...)
     struct FuncArgs fArgs;
 
     WRAP_CHECK(open64, -1);
-    doThread(); // Will do nothing if a thread already exists
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.open64(pathname, flags, fArgs.arg[0]);
     if (fd != -1) {
@@ -2398,7 +2392,6 @@ openat64(int dirfd, const char *pathname, int flags, ...)
     struct FuncArgs fArgs;
 
     WRAP_CHECK(openat64, -1);
-    doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.openat64(dirfd, pathname, flags, fArgs.arg[0]);
     if (fd != -1) {
@@ -2416,7 +2409,6 @@ __open_2(const char *file, int oflag)
     int fd;
 
     WRAP_CHECK(__open_2, -1);
-    doThread();
     fd = g_fn.__open_2(file, oflag);
     if (fd != -1) {
         doOpen(fd, file, FD, "__open_2");
@@ -2433,7 +2425,6 @@ __open64_2(const char *file, int oflag)
     int fd;
 
     WRAP_CHECK(__open64_2, -1);
-    doThread();
     fd = g_fn.__open64_2(file, oflag);
     if (fd != -1) {
         doOpen(fd, file, FD, "__open_2");
@@ -2448,7 +2439,6 @@ EXPORTON int
 __openat_2(int fd, const char *file, int oflag)
 {
     WRAP_CHECK(__openat_2, -1);
-    doThread();
     fd = g_fn.__openat_2(fd, file, oflag);
     if (fd != -1) {
         doOpen(fd, file, FD, "__openat_2");
@@ -2466,7 +2456,6 @@ creat64(const char *pathname, mode_t mode)
     int fd;
 
     WRAP_CHECK(creat64, -1);
-    doThread();
     fd = g_fn.creat64(pathname, mode);
     if (fd != -1) {
         doOpen(fd, pathname, FD, "creat64");
@@ -2483,7 +2472,6 @@ fopen64(const char *pathname, const char *mode)
     FILE *stream;
 
     WRAP_CHECK(fopen64, NULL);
-    doThread();
     stream = g_fn.fopen64(pathname, mode);
     if (stream != NULL) {
         doOpen(fileno(stream), pathname, STREAM, "fopen64");
@@ -2500,7 +2488,6 @@ freopen64(const char *pathname, const char *mode, FILE *orig_stream)
     FILE *stream;
 
     WRAP_CHECK(freopen64, NULL);
-    doThread();
     stream = g_fn.freopen64(pathname, mode, orig_stream);
     // freopen just changes the mode if pathname is null
     if (stream != NULL) {
@@ -2519,7 +2506,6 @@ EXPORTON ssize_t
 pread64(int fd, void *buf, size_t count, off_t offset)
 {
     WRAP_CHECK(pread64, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.pread64(fd, buf, count, offset);
@@ -2533,7 +2519,6 @@ EXPORTON ssize_t
 preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
     WRAP_CHECK(preadv, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.preadv(fd, iov, iovcnt, offset);
@@ -2547,7 +2532,6 @@ EXPORTON ssize_t
 preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     WRAP_CHECK(preadv2, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.preadv2(fd, iov, iovcnt, offset, flags);
@@ -2561,7 +2545,6 @@ EXPORTON ssize_t
 preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     WRAP_CHECK(preadv64v2, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.preadv64v2(fd, iov, iovcnt, offset, flags);
@@ -2576,7 +2559,6 @@ __pread_chk(int fd, void * buf, size_t nbytes, off_t offset, size_t buflen)
 {
     // TODO: this function aborts & exits on error, add abort functionality
     WRAP_CHECK(__pread_chk, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.__pread_chk(fd, buf, nbytes, offset, buflen);
@@ -2591,7 +2573,6 @@ __read_chk(int fd, void *buf, size_t nbytes, size_t buflen)
 {
     // TODO: this function aborts & exits on error, add abort functionality
     WRAP_CHECK(__read_chk, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.__read_chk(fd, buf, nbytes, buflen);
@@ -2606,7 +2587,6 @@ __fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *
 {
     // TODO: this function aborts & exits on error, add abort functionality
     WRAP_CHECK(__fread_unlocked_chk, 0);
-    doThread();
     uint64_t initialTime = getTime();
 
     size_t rc = g_fn.__fread_unlocked_chk(ptr, ptrlen, size, nmemb, stream);
@@ -2620,7 +2600,6 @@ EXPORTON ssize_t
 pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
 {
     WRAP_CHECK(pwrite64, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.pwrite64(fd, buf, nbyte, offset);
@@ -2634,7 +2613,6 @@ EXPORTON ssize_t
 pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
     WRAP_CHECK(pwritev, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.pwritev(fd, iov, iovcnt, offset);
@@ -2648,7 +2626,6 @@ EXPORTON ssize_t
 pwritev64(int fd, const struct iovec *iov, int iovcnt, off64_t offset)
 {
     WRAP_CHECK(pwritev64, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.pwritev64(fd, iov, iovcnt, offset);
@@ -2662,7 +2639,6 @@ EXPORTON ssize_t
 pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     WRAP_CHECK(pwritev2, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.pwritev2(fd, iov, iovcnt, offset, flags);
@@ -2676,7 +2652,6 @@ EXPORTON ssize_t
 pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     WRAP_CHECK(pwritev64v2, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.pwritev64v2(fd, iov, iovcnt, offset, flags);
@@ -2690,7 +2665,6 @@ EXPORTON off64_t
 lseek64(int fd, off64_t offset, int whence)
 {
     WRAP_CHECK(lseek64, -1);
-    doThread();
 
     off64_t rc = g_fn.lseek64(fd, offset, whence);
 
@@ -2703,7 +2677,6 @@ EXPORTON int
 fseeko64(FILE *stream, off64_t offset, int whence)
 {
     WRAP_CHECK(fseeko64, -1);
-    doThread();
 
     int rc = g_fn.fseeko64(stream, offset, whence);
 
@@ -2716,7 +2689,6 @@ EXPORTON off64_t
 ftello64(FILE *stream)
 {
     WRAP_CHECK(ftello64, -1);
-    doThread();
 
     off64_t rc = g_fn.ftello64(stream);
 
@@ -2729,7 +2701,6 @@ EXPORTON int
 statfs64(const char *path, struct statfs64 *buf)
 {
     WRAP_CHECK(statfs64, -1);
-    doThread();
     int rc = g_fn.statfs64(path, buf);
 
     doStatPath(path, rc, "statfs64");
@@ -2741,7 +2712,6 @@ EXPORTON int
 fstatfs64(int fd, struct statfs64 *buf)
 {
     WRAP_CHECK(fstatfs64, -1);
-    doThread();
     int rc = g_fn.fstatfs64(fd, buf);
 
     doStatFd(fd, rc, "fstatfs64");
@@ -2753,7 +2723,6 @@ EXPORTON int
 fsetpos64(FILE *stream, const fpos64_t *pos)
 {
     WRAP_CHECK(fsetpos64, -1);
-    doThread();
     int rc = g_fn.fsetpos64(stream, pos);
 
     doSeek(fileno(stream), (rc == 0), "fsetpos64");
@@ -2765,7 +2734,6 @@ EXPORTON int
 __xstat(int ver, const char *path, struct stat *stat_buf)
 {
     WRAP_CHECK(__xstat, -1);
-    doThread();
     int rc = g_fn.__xstat(ver, path, stat_buf);
 
     doStatPath(path, rc, "__xstat");
@@ -2777,7 +2745,6 @@ EXPORTON int
 __xstat64(int ver, const char *path, struct stat64 *stat_buf)
 {
     WRAP_CHECK(__xstat64, -1);
-    doThread();
     int rc = g_fn.__xstat64(ver, path, stat_buf);
 
     doStatPath(path, rc, "__xstat64");
@@ -2789,7 +2756,6 @@ EXPORTON int
 __lxstat(int ver, const char *path, struct stat *stat_buf)
 {
     WRAP_CHECK(__lxstat, -1);
-    doThread();
     int rc = g_fn.__lxstat(ver, path, stat_buf);
 
     doStatPath(path, rc, "__lxstat");
@@ -2801,7 +2767,6 @@ EXPORTON int
 __lxstat64(int ver, const char *path, struct stat64 *stat_buf)
 {
     WRAP_CHECK(__lxstat64, -1);
-    doThread();
     int rc = g_fn.__lxstat64(ver, path, stat_buf);
 
     doStatPath(path, rc, "__lxstat64");
@@ -2813,7 +2778,6 @@ EXPORTON int
 __fxstat(int ver, int fd, struct stat *stat_buf)
 {
     WRAP_CHECK(__fxstat, -1);
-    doThread();
     int rc = g_fn.__fxstat(ver, fd, stat_buf);
 
     doStatFd(fd, rc, "__fxstat");
@@ -2825,7 +2789,6 @@ EXPORTON int
 __fxstat64(int ver, int fd, struct stat64 * stat_buf)
 {
     WRAP_CHECK(__fxstat64, -1);
-    doThread();
     int rc = g_fn.__fxstat64(ver, fd, stat_buf);
 
     doStatFd(fd, rc, "__fxstat64");
@@ -2837,7 +2800,6 @@ EXPORTON int
 __fxstatat(int ver, int dirfd, const char *path, struct stat *stat_buf, int flags)
 {
     WRAP_CHECK(__fxstatat, -1);
-    doThread();
     int rc = g_fn.__fxstatat(ver, dirfd, path, stat_buf, flags);
 
     doStatPath(path, rc, "__fxstatat");
@@ -2849,7 +2811,6 @@ EXPORTON int
 __fxstatat64(int ver, int dirfd, const char * path, struct stat64 * stat_buf, int flags)
 {
     WRAP_CHECK(__fxstatat64, -1);
-    doThread();
     int rc = g_fn.__fxstatat64(ver, dirfd, path, stat_buf, flags);
 
     doStatPath(path, rc, "__fxstatat64");
@@ -2863,7 +2824,6 @@ statx(int dirfd, const char *pathname, int flags,
       unsigned int mask, struct statx *statxbuf)
 {
     WRAP_CHECK(statx, -1);
-    doThread();
     int rc = g_fn.statx(dirfd, pathname, flags, mask, statxbuf);
 
     doStatPath(pathname, rc, "statx");
@@ -2876,7 +2836,6 @@ EXPORTON int
 statfs(const char *path, struct statfs *buf)
 {
     WRAP_CHECK(statfs, -1);
-    doThread();
     int rc = g_fn.statfs(path, buf);
 
     doStatPath(path, rc, "statfs");
@@ -2888,7 +2847,6 @@ EXPORTON int
 fstatfs(int fd, struct statfs *buf)
 {
     WRAP_CHECK(fstatfs, -1);
-    doThread();
     int rc = g_fn.fstatfs(fd, buf);
 
     doStatFd(fd, rc, "fstatfs");
@@ -2900,7 +2858,6 @@ EXPORTON int
 statvfs(const char *path, struct statvfs *buf)
 {
     WRAP_CHECK(statvfs, -1);
-    doThread();
     int rc = g_fn.statvfs(path, buf);
 
     doStatPath(path, rc, "statvfs");
@@ -2912,7 +2869,6 @@ EXPORTON int
 statvfs64(const char *path, struct statvfs64 *buf)
 {
     WRAP_CHECK(statvfs64, -1);
-    doThread();
     int rc = g_fn.statvfs64(path, buf);
 
     doStatPath(path, rc, "statvfs64");
@@ -2924,7 +2880,6 @@ EXPORTON int
 fstatvfs(int fd, struct statvfs *buf)
 {
     WRAP_CHECK(fstatvfs, -1);
-    doThread();
     int rc = g_fn.fstatvfs(fd, buf);
 
     doStatFd(fd, rc, "fstatvfs");
@@ -2936,7 +2891,6 @@ EXPORTON int
 fstatvfs64(int fd, struct statvfs64 *buf)
 {
     WRAP_CHECK(fstatvfs64, -1);
-    doThread();
     int rc = g_fn.fstatvfs64(fd, buf);
 
     doStatFd(fd, rc, "fstatvfs64");
@@ -2948,7 +2902,6 @@ EXPORTON int
 access(const char *pathname, int mode)
 {
     WRAP_CHECK(access, -1);
-    doThread();
     int rc = g_fn.access(pathname, mode);
 
     doStatPath(pathname, rc, "access");
@@ -2960,7 +2913,6 @@ EXPORTON int
 faccessat(int dirfd, const char *pathname, int mode, int flags)
 {
     WRAP_CHECK(faccessat, -1);
-    doThread();
     int rc = g_fn.faccessat(dirfd, pathname, mode, flags);
 
     doStatPath(pathname, rc, "faccessat");
@@ -3002,7 +2954,6 @@ EXPORTOFF int
 stat(const char *pathname, struct stat *statbuf)
 {
     WRAP_CHECK(stat, -1);
-    doThread();
     int rc = g_fn.stat(pathname, statbuf);
 
     doStatPath(pathname, rc, "stat");
@@ -3014,7 +2965,6 @@ EXPORTOFF int
 fstat(int fd, struct stat *statbuf)
 {
     WRAP_CHECK(fstat, -1);
-    doThread();
     int rc = g_fn.fstat(fd, statbuf);
 
     doStatFd(fd, rc, "fstat");
@@ -3026,7 +2976,6 @@ EXPORTOFF int
 lstat(const char *pathname, struct stat *statbuf)
 {
     WRAP_CHECK(lstat, -1);
-    doThread();
     int rc = g_fn.lstat(pathname, statbuf);
 
     doStatPath(pathname, rc, "lstat");
@@ -3038,7 +2987,6 @@ EXPORTON int
 fstatat(int fd, const char *path, struct stat *buf, int flag)
 {
     WRAP_CHECK(fstatat, -1);
-    doThread();
     int rc = g_fn.fstatat(fd, path, buf, flag);
 
     doStatFd(fd, rc, "fstatat");
@@ -3052,7 +3000,6 @@ prctl(int option, ...)
     struct FuncArgs fArgs;
 
     WRAP_CHECK(prctl, -1);
-    doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, option);
 
     if (option == PR_SET_SECCOMP) {
@@ -3075,7 +3022,6 @@ syscall(long number, ...)
     struct FuncArgs fArgs;
 
     WRAP_CHECK(syscall, -1);
-    doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, number);
 
     switch (number) {
@@ -3142,7 +3088,6 @@ EXPORTON size_t
 fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 {
     WRAP_CHECK(fwrite_unlocked, 0);
-    doThread();
     uint64_t initialTime = getTime();
 
     size_t rc = g_fn.fwrite_unlocked(ptr, size, nitems, stream);
@@ -3200,7 +3145,6 @@ EXPORTON ssize_t
 sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
 {
     WRAP_CHECK(sendfile, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.sendfile(out_fd, in_fd, offset, count);
@@ -3214,7 +3158,6 @@ EXPORTON ssize_t
 sendfile64(int out_fd, int in_fd, off64_t *offset, size_t count)
 {
     WRAP_CHECK(sendfile, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.sendfile64(out_fd, in_fd, offset, count);
@@ -3233,7 +3176,6 @@ close(int fd)
     struct fs_info_t *fs;
 
     WRAP_CHECK(close, -1);
-    doThread(); // Will do nothing if a thread already exists
 
     rc = g_fn.close(fd);
     if (rc != -1) {
@@ -3254,7 +3196,6 @@ fclose(FILE *stream)
     struct fs_info_t *fs;
 
     WRAP_CHECK(fclose, EOF);
-    doThread(); // Will do nothing if a thread already exists
     fd = fileno(stream);
 
     rc = g_fn.fclose(stream);
@@ -3275,7 +3216,6 @@ fcloseall(void)
     int rc;
 
     WRAP_CHECK(close, EOF);
-    doThread(); // Will do nothing if a thread already exists
 
     rc = g_fn.fcloseall();
     if (rc != EOF) {
@@ -3303,7 +3243,6 @@ close$NOCANCEL(int fd)
     struct fs_info_t *fs;
 
     WRAP_CHECK(close$NOCANCEL, -1);
-    doThread();
     rc = g_fn.close$NOCANCEL(fd);
     if (rc != -1) {
         doClose(fd, "close$NOCANCEL");
@@ -3324,7 +3263,6 @@ guarded_close_np(int fd, void *guard)
     struct fs_info_t *fs;
 
     WRAP_CHECK(guarded_close_np, -1);
-    doThread();
     rc = g_fn.guarded_close_np(fd, guard);
     if (rc != -1) {
         doClose(fd, "guarded_close_np");
@@ -3362,7 +3300,6 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     int sd;
 
     WRAP_CHECK(accept$NOCANCEL, -1);
-    doThread();
     sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept$NOCANCEL");
@@ -3381,7 +3318,6 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
     struct net_info_t *net = getNetEntry(sockfd);
 
     WRAP_CHECK(__sendto_nocancel, -1);
-    doThread();
     rc = g_fn.__sendto_nocancel(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
         scopeLog("__sendto_nocancel", sockfd, CFG_LOG_TRACE);
@@ -3432,7 +3368,6 @@ EXPORTON off_t
 lseek(int fd, off_t offset, int whence)
 {
     WRAP_CHECK(lseek, -1);
-    doThread();
     off_t rc = g_fn.lseek(fd, offset, whence);
 
     doSeek(fd, (rc != -1), "lseek");
@@ -3444,7 +3379,6 @@ EXPORTON int
 fseek(FILE *stream, long offset, int whence)
 {
     WRAP_CHECK(fseek, -1);
-    doThread();
     int rc = g_fn.fseek(stream, offset, whence);
 
     doSeek(fileno(stream), (rc != -1), "fseek");
@@ -3456,7 +3390,6 @@ EXPORTON int
 fseeko(FILE *stream, off_t offset, int whence)
 {
     WRAP_CHECK(fseeko, -1);
-    doThread();
     int rc = g_fn.fseeko(stream, offset, whence);
 
     doSeek(fileno(stream), (rc != -1), "fseeko");
@@ -3468,7 +3401,6 @@ EXPORTON long
 ftell(FILE *stream)
 {
     WRAP_CHECK(ftell, -1);
-    doThread();
     long rc = g_fn.ftell(stream);
 
     doSeek(fileno(stream), (rc != -1), "ftell");
@@ -3480,7 +3412,6 @@ EXPORTON off_t
 ftello(FILE *stream)
 {
     WRAP_CHECK(ftello, -1);
-    doThread();
     off_t rc = g_fn.ftello(stream);
 
     doSeek(fileno(stream), (rc != -1), "ftello"); 
@@ -3492,7 +3423,6 @@ EXPORTON void
 rewind(FILE *stream)
 {
     WRAP_CHECK_VOID(rewind);
-    doThread();
     g_fn.rewind(stream);
 
     doSeek(fileno(stream), TRUE, "rewind");
@@ -3504,7 +3434,6 @@ EXPORTON int
 fsetpos(FILE *stream, const fpos_t *pos)
 {
     WRAP_CHECK(fsetpos, -1);
-    doThread();
     int rc = g_fn.fsetpos(stream, pos);
 
     doSeek(fileno(stream), (rc == 0), "fsetpos");
@@ -3516,7 +3445,6 @@ EXPORTON int
 fgetpos(FILE *stream,  fpos_t *pos)
 {
     WRAP_CHECK(fgetpos, -1);
-    doThread();
     int rc = g_fn.fgetpos(stream, pos);
 
     doSeek(fileno(stream), (rc == 0), "fgetpos");
@@ -3528,7 +3456,6 @@ EXPORTON int
 fgetpos64(FILE *stream,  fpos64_t *pos)
 {
     WRAP_CHECK(fgetpos64, -1);
-    doThread();
     int rc = g_fn.fgetpos64(stream, pos);
 
     doSeek(fileno(stream), (rc == 0), "fgetpos64");
@@ -3540,7 +3467,6 @@ EXPORTON ssize_t
 write(int fd, const void *buf, size_t count)
 {
     WRAP_CHECK(write, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.write(fd, buf, count);
@@ -3554,7 +3480,6 @@ EXPORTON ssize_t
 pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
 {
     WRAP_CHECK(pwrite, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.pwrite(fd, buf, nbyte, offset);
@@ -3568,7 +3493,6 @@ EXPORTON ssize_t
 writev(int fd, const struct iovec *iov, int iovcnt)
 {
     WRAP_CHECK(writev, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.writev(fd, iov, iovcnt);
@@ -3582,7 +3506,6 @@ EXPORTON size_t
 fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 {
     WRAP_CHECK(fwrite, 0);
-    doThread();
     uint64_t initialTime = getTime();
 
     size_t rc = g_fn.fwrite(ptr, size, nitems, stream);
@@ -3596,7 +3519,6 @@ EXPORTON int
 fputs(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs, EOF);
-    doThread();
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fputs(s, stream);
@@ -3610,7 +3532,6 @@ EXPORTON int
 fputs_unlocked(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs_unlocked, EOF);
-    doThread();
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fputs_unlocked(s, stream);
@@ -3624,7 +3545,6 @@ EXPORTON int
 fputws(const wchar_t *ws, FILE *stream)
 {
     WRAP_CHECK(fputws, EOF);
-    doThread();
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fputws(ws, stream);
@@ -3638,7 +3558,6 @@ EXPORTON ssize_t
 read(int fd, void *buf, size_t count)
 {
     WRAP_CHECK(read, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.read(fd, buf, count);
@@ -3652,7 +3571,6 @@ EXPORTON ssize_t
 readv(int fd, const struct iovec *iov, int iovcnt)
 {
     WRAP_CHECK(readv, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.readv(fd, iov, iovcnt);
@@ -3666,7 +3584,6 @@ EXPORTON ssize_t
 pread(int fd, void *buf, size_t count, off_t offset)
 {
     WRAP_CHECK(pread, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.pread(fd, buf, count, offset);
@@ -3680,7 +3597,6 @@ EXPORTON size_t
 fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     WRAP_CHECK(fread, 0);
-    doThread();
     uint64_t initialTime = getTime();
 
     size_t rc = g_fn.fread(ptr, size, nmemb, stream);
@@ -3695,7 +3611,6 @@ __fread_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
 {
     // TODO: this function aborts & exits on error, add abort functionality
     WRAP_CHECK(__fread_chk, 0);
-    doThread();
     uint64_t initialTime = getTime();
 
     size_t rc = g_fn.__fread_chk(ptr, ptrlen, size, nmemb, stream);
@@ -3709,7 +3624,6 @@ EXPORTON size_t
 fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     WRAP_CHECK(fread_unlocked, 0);
-    doThread();
     uint64_t initialTime = getTime();
 
     size_t rc = g_fn.fread_unlocked(ptr, size, nmemb, stream);
@@ -3723,7 +3637,6 @@ EXPORTON char *
 fgets(char *s, int n, FILE *stream)
 {
     WRAP_CHECK(fgets, NULL);
-    doThread();
     uint64_t initialTime = getTime();
 
     char* rc = g_fn.fgets(s, n, stream);
@@ -3738,7 +3651,6 @@ __fgets_chk(char *s, size_t size, int strsize, FILE *stream)
 {
     // TODO: this function aborts & exits on error, add abort functionality
     WRAP_CHECK(__fgets_chk, NULL);
-    doThread();
     uint64_t initialTime = getTime();
 
     char* rc = g_fn.__fgets_chk(s, size, strsize, stream);
@@ -3752,7 +3664,6 @@ EXPORTON char *
 fgets_unlocked(char *s, int n, FILE *stream)
 {
     WRAP_CHECK(fgets_unlocked, NULL);
-    doThread();
     uint64_t initialTime = getTime();
 
     char* rc = g_fn.fgets_unlocked(s, n, stream);
@@ -3767,7 +3678,6 @@ __fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
 {
     // TODO: this function aborts & exits on error, add abort functionality
     WRAP_CHECK(__fgetws_chk, NULL);
-    doThread();
     uint64_t initialTime = getTime();
 
     wchar_t* rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
@@ -3781,7 +3691,6 @@ EXPORTON wchar_t *
 fgetws(wchar_t *ws, int n, FILE *stream)
 {
     WRAP_CHECK(fgetws, NULL);
-    doThread();
     uint64_t initialTime = getTime();
 
     wchar_t* rc = g_fn.fgetws(ws, n, stream);
@@ -3795,7 +3704,6 @@ EXPORTON wint_t
 fgetwc(FILE *stream)
 {
     WRAP_CHECK(fgetwc, WEOF);
-    doThread();
     uint64_t initialTime = getTime();
 
     wint_t rc = g_fn.fgetwc(stream);
@@ -3809,7 +3717,6 @@ EXPORTON int
 fgetc(FILE *stream)
 {
     WRAP_CHECK(fgetc, EOF);
-    doThread();
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fgetc(stream);
@@ -3823,7 +3730,6 @@ EXPORTON int
 fputc(int c, FILE *stream)
 {
     WRAP_CHECK(fputc, EOF);
-    doThread();
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fputc(c, stream);
@@ -3837,7 +3743,6 @@ EXPORTON int
 fputc_unlocked(int c, FILE *stream)
 {
     WRAP_CHECK(fputc_unlocked, EOF);
-    doThread();
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fputc_unlocked(c, stream);
@@ -3851,7 +3756,6 @@ EXPORTON wint_t
 putwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(putwc, WEOF);
-    doThread();
     uint64_t initialTime = getTime();
 
     wint_t rc = g_fn.putwc(wc, stream);
@@ -3865,7 +3769,6 @@ EXPORTON wint_t
 fputwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(fputwc, WEOF);
-    doThread();
     uint64_t initialTime = getTime();
 
     wint_t rc = g_fn.fputwc(wc, stream);
@@ -3881,7 +3784,6 @@ fscanf(FILE *stream, const char *format, ...)
     struct FuncArgs fArgs;
     LOAD_FUNC_ARGS_VALIST(fArgs, format);
     WRAP_CHECK(fscanf, EOF);
-    doThread();
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fscanf(stream, format,
@@ -3898,7 +3800,6 @@ EXPORTON ssize_t
 getline (char **lineptr, size_t *n, FILE *stream)
 {
     WRAP_CHECK(getline, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.getline(lineptr, n, stream);
@@ -3913,7 +3814,6 @@ EXPORTON ssize_t
 getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
 {
     WRAP_CHECK(getdelim, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     g_getdelim = 1;
@@ -3929,7 +3829,6 @@ EXPORTON ssize_t
 __getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
 {
     WRAP_CHECK(__getdelim, -1);
-    doThread();
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.__getdelim(lineptr, n, delimiter, stream);
@@ -3949,7 +3848,6 @@ fcntl(int fd, int cmd, ...)
     struct FuncArgs fArgs;
 
     WRAP_CHECK(fcntl, -1);
-    doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
     int rc = g_fn.fcntl(fd, cmd, fArgs.arg[0], fArgs.arg[1],
                     fArgs.arg[2], fArgs.arg[3]);
@@ -3966,7 +3864,6 @@ fcntl64(int fd, int cmd, ...)
     struct FuncArgs fArgs;
 
     WRAP_CHECK(fcntl64, -1);
-    doThread();
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
     int rc = g_fn.fcntl64(fd, cmd, fArgs.arg[0], fArgs.arg[1],
                       fArgs.arg[2], fArgs.arg[3]);
@@ -3981,7 +3878,6 @@ EXPORTON int
 dup(int fd)
 {
     WRAP_CHECK(dup, -1);
-    doThread();
     int rc = g_fn.dup(fd);
     doDup(fd, rc, "dup", TRUE);
 
@@ -3992,7 +3888,6 @@ EXPORTON int
 dup2(int oldfd, int newfd)
 {
     WRAP_CHECK(dup2, -1);
-    doThread();
     int rc = g_fn.dup2(oldfd, newfd);
 
     doDup2(oldfd, newfd, rc, "dup2");
@@ -4004,7 +3899,6 @@ EXPORTON int
 dup3(int oldfd, int newfd, int flags)
 {
     WRAP_CHECK(dup3, -1);
-    doThread();
     int rc = g_fn.dup3(oldfd, newfd, flags);
     doDup2(oldfd, newfd, rc, "dup3");
 
@@ -4015,7 +3909,6 @@ EXPORTOFF void
 vsyslog(int priority, const char *format, va_list ap)
 {
     WRAP_CHECK_VOID(vsyslog);
-    doThread();
     scopeLog("vsyslog", -1, CFG_LOG_DEBUG);
     g_fn.vsyslog(priority, format, ap);
     return;
@@ -4027,7 +3920,6 @@ fork()
     pid_t rc;
 
     WRAP_CHECK(fork, -1);
-    doThread();
     scopeLog("fork", -1, CFG_LOG_DEBUG);
     rc = g_fn.fork();
     if (rc == 0) {
@@ -4044,7 +3936,6 @@ socket(int socket_family, int socket_type, int protocol)
     int sd;
 
     WRAP_CHECK(socket, -1);
-    doThread();
     sd = g_fn.socket(socket_family, socket_type, protocol);
     if (sd != -1) {
         struct net_info_t *net;
@@ -4079,7 +3970,6 @@ shutdown(int sockfd, int how)
     int rc;
 
     WRAP_CHECK(shutdown, -1);
-    doThread();
     rc = g_fn.shutdown(sockfd, how);
     if (rc != -1) {
         doClose(sockfd, "shutdown");
@@ -4097,7 +3987,6 @@ listen(int sockfd, int backlog)
     struct net_info_t *net = getNetEntry(sockfd);
 
     WRAP_CHECK(listen, -1);
-    doThread();
     rc = g_fn.listen(sockfd, backlog);
     if (rc != -1) {
         scopeLog("listen", sockfd, CFG_LOG_DEBUG);
@@ -4119,7 +4008,6 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     int sd;
 
     WRAP_CHECK(accept, -1);
-    doThread();
     sd = g_fn.accept(sockfd, addr, addrlen);
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept");
@@ -4136,7 +4024,6 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     int sd;
 
     WRAP_CHECK(accept4, -1);
-    doThread();
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept4");
@@ -4153,7 +4040,6 @@ bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     int rc;
 
     WRAP_CHECK(bind, -1);
-    doThread();
     rc = g_fn.bind(sockfd, addr, addrlen);
     if (rc != -1) { 
         doSetConnection(sockfd, addr, addrlen, LOCAL);
@@ -4173,7 +4059,6 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     struct net_info_t *net = getNetEntry(sockfd);
 
     WRAP_CHECK(connect, -1);
-    doThread();
     rc = g_fn.connect(sockfd, addr, addrlen);
     if ((rc != -1) && net) {
         doSetConnection(sockfd, addr, addrlen, REMOTE);
@@ -4194,7 +4079,6 @@ send(int sockfd, const void *buf, size_t len, int flags)
     struct net_info_t *net = getNetEntry(sockfd);
 
     WRAP_CHECK(send, -1);
-    doThread();
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
         scopeLog("send", sockfd, CFG_LOG_TRACE);
@@ -4219,7 +4103,6 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
     struct net_info_t *net = getNetEntry(sockfd);
     
     WRAP_CHECK(sendto, -1);
-    doThread();
     rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
         scopeLog("sendto", sockfd, CFG_LOG_TRACE);
@@ -4245,7 +4128,6 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
     struct net_info_t *net = getNetEntry(sockfd);
     
     WRAP_CHECK(sendmsg, -1);
-    doThread();
     rc = g_fn.sendmsg(sockfd, msg, flags);
     if (rc != -1) {
         scopeLog("sendmsg", sockfd, CFG_LOG_TRACE);
@@ -4279,7 +4161,6 @@ recv(int sockfd, void *buf, size_t len, int flags)
     ssize_t rc;
 
     WRAP_CHECK(recv, -1);
-    doThread();
     scopeLog("recv", sockfd, CFG_LOG_TRACE);
     rc = g_fn.recv(sockfd, buf, len, flags);
     if (rc != -1) {
@@ -4298,7 +4179,6 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
     ssize_t rc;
 
     WRAP_CHECK(recvfrom, -1);
-    doThread();
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
         scopeLog("recvfrom", sockfd, CFG_LOG_TRACE);
@@ -4315,7 +4195,6 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     ssize_t rc;
     
     WRAP_CHECK(recvmsg, -1);
-    doThread();
     rc = g_fn.recvmsg(sockfd, msg, flags);
     if (rc != -1) {
         scopeLog("recvmsg", sockfd, CFG_LOG_TRACE);

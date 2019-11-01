@@ -1720,22 +1720,22 @@ reportFD(int fd, enum control_type_t source)
 }
 
 static void
-doRead(int fd, uint64_t initialTime, int rc, const char* func)
+doRead(int fd, uint64_t initialTime, int success, ssize_t bytes, const char* func)
 {
     uint64_t duration = getDuration(initialTime);
 
     struct fs_info_t *fs = getFSEntry(fd);
     struct net_info_t *net = getNetEntry(fd);
 
-    if (rc != -1) {
+    if (success) {
         scopeLog(func, fd, CFG_LOG_TRACE);
         if (net) {
             // This is a network descriptor
             doSetAddrs(fd);
-            doRecv(fd, rc);
+            doRecv(fd, bytes);
         } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
-            doFSMetric(FS_READ, fd, EVENT_BASED, func, rc, NULL);
+            doFSMetric(FS_READ, fd, EVENT_BASED, func, bytes, NULL);
         }
     } else {
         if (fs) {
@@ -1747,22 +1747,22 @@ doRead(int fd, uint64_t initialTime, int rc, const char* func)
 }
 
 static void
-doWrite(int fd, uint64_t initialTime, int rc, const char* func)
+doWrite(int fd, uint64_t initialTime, int success, ssize_t bytes, const char* func)
 {
     uint64_t duration = getDuration(initialTime);
 
     struct fs_info_t *fs = getFSEntry(fd);
     struct net_info_t *net = getNetEntry(fd);
 
-    if (rc != -1) {
+    if (success) {
         scopeLog(func, fd, CFG_LOG_TRACE);
         if (net) {
             // This is a network descriptor
             doSetAddrs(fd);
-            doSend(fd, rc);
+            doSend(fd, bytes);
         } else if (fs) {
             doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
-            doFSMetric(FS_WRITE, fd, EVENT_BASED, func, rc, NULL);
+            doFSMetric(FS_WRITE, fd, EVENT_BASED, func, bytes, NULL);
         }
     } else {
         if (fs) {
@@ -2524,7 +2524,7 @@ pread64(int fd, void *buf, size_t count, off_t offset)
 
     ssize_t rc = g_fn.pread64(fd, buf, count, offset);
 
-    doRead(fd, initialTime, rc, "pread64");
+    doRead(fd, initialTime, (rc != -1), rc, "pread64");
 
     return rc;
 }
@@ -2538,7 +2538,7 @@ preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 
     ssize_t rc = g_fn.preadv(fd, iov, iovcnt, offset);
 
-    doRead(fd, initialTime, rc, "preadv");
+    doRead(fd, initialTime, (rc != -1), rc, "preadv");
 
     return rc;
 }
@@ -2552,7 +2552,7 @@ preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 
     ssize_t rc = g_fn.preadv2(fd, iov, iovcnt, offset, flags);
 
-    doRead(fd, initialTime, rc, "preadv2");
+    doRead(fd, initialTime, (rc != -1), rc, "preadv2");
 
     return rc;
 }
@@ -2566,7 +2566,7 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 
     ssize_t rc = g_fn.preadv64v2(fd, iov, iovcnt, offset, flags);
 
-    doRead(fd, initialTime, rc, "preadv64v2");
+    doRead(fd, initialTime, (rc != -1), rc, "preadv64v2");
     
     return rc;
 }
@@ -2581,7 +2581,7 @@ __pread_chk(int fd, void * buf, size_t nbytes, off_t offset, size_t buflen)
 
     ssize_t rc = g_fn.__pread_chk(fd, buf, nbytes, offset, buflen);
 
-    doRead(fd, initialTime, rc, "__pread_chk");
+    doRead(fd, initialTime, (rc != -1), rc, "__pread_chk");
 
     return rc;
 }
@@ -2596,7 +2596,7 @@ __read_chk(int fd, void *buf, size_t nbytes, size_t buflen)
 
     ssize_t rc = g_fn.__read_chk(fd, buf, nbytes, buflen);
 
-    doRead(fd, initialTime, rc, "__read_chk");
+    doRead(fd, initialTime, (rc != -1), rc, "__read_chk");
 
     return rc;
 }
@@ -2620,7 +2620,7 @@ pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
 
     ssize_t rc = g_fn.pwrite64(fd, buf, nbyte, offset);
 
-    doWrite(fd, initialTime, rc, "pwrite64");
+    doWrite(fd, initialTime, (rc != -1), rc, "pwrite64");
 
     return rc;
 }
@@ -2634,7 +2634,7 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 
     ssize_t rc = g_fn.pwritev(fd, iov, iovcnt, offset);
 
-    doWrite(fd, initialTime, rc, "pwritev");
+    doWrite(fd, initialTime, (rc != -1), rc, "pwritev");
 
     return rc;
 }
@@ -2648,7 +2648,7 @@ pwritev64(int fd, const struct iovec *iov, int iovcnt, off64_t offset)
 
     ssize_t rc = g_fn.pwritev64(fd, iov, iovcnt, offset);
 
-    doWrite(fd, initialTime, rc, "pwritev64");
+    doWrite(fd, initialTime, (rc != -1), rc, "pwritev64");
 
     return rc;
 }
@@ -2662,7 +2662,7 @@ pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 
     ssize_t rc = g_fn.pwritev2(fd, iov, iovcnt, offset, flags);
 
-    doWrite(fd, initialTime, rc, "pwritev2");
+    doWrite(fd, initialTime, (rc != -1), rc, "pwritev2");
 
     return rc;
 }
@@ -2676,7 +2676,7 @@ pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
 
     ssize_t rc = g_fn.pwritev64v2(fd, iov, iovcnt, offset, flags);
 
-    doWrite(fd, initialTime, rc, "pwritev64v2");
+    doWrite(fd, initialTime, (rc != -1), rc, "pwritev64v2");
 
     return rc;
 }
@@ -3535,7 +3535,7 @@ write(int fd, const void *buf, size_t count)
 
     ssize_t rc = g_fn.write(fd, buf, count);
 
-    doWrite(fd, initialTime, rc, "write"); 
+    doWrite(fd, initialTime, (rc != -1), rc, "write");
 
     return rc;
 }
@@ -3549,7 +3549,7 @@ pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
 
     ssize_t rc = g_fn.pwrite(fd, buf, nbyte, offset);
 
-    doWrite(fd, initialTime, rc, "pwrite");
+    doWrite(fd, initialTime, (rc != -1), rc, "pwrite");
 
     return rc;
 }
@@ -3563,7 +3563,7 @@ writev(int fd, const struct iovec *iov, int iovcnt)
 
     ssize_t rc = g_fn.writev(fd, iov, iovcnt);
 
-    doWrite(fd, initialTime, rc, "writev");
+    doWrite(fd, initialTime, (rc != -1), rc, "writev");
 
     return rc;
 }
@@ -3613,7 +3613,7 @@ read(int fd, void *buf, size_t count)
 
     ssize_t rc = g_fn.read(fd, buf, count);
 
-    doRead(fd, initialTime, rc, "read");
+    doRead(fd, initialTime, (rc != -1), rc, "read");
 
     return rc;
 }
@@ -3627,7 +3627,7 @@ readv(int fd, const struct iovec *iov, int iovcnt)
 
     ssize_t rc = g_fn.readv(fd, iov, iovcnt);
 
-    doRead(fd, initialTime, rc, "readv");
+    doRead(fd, initialTime, (rc != -1), rc, "readv");
 
     return rc;
 }
@@ -3641,7 +3641,7 @@ pread(int fd, void *buf, size_t count, off_t offset)
 
     ssize_t rc = g_fn.pread(fd, buf, count, offset);
 
-    doRead(fd, initialTime, rc, "pread"); 
+    doRead(fd, initialTime, (rc != -1), rc, "pread");
 
     return rc;
 }

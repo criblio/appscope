@@ -3142,6 +3142,41 @@ fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
     IOSTREAMPOST(fwrite_unlocked, rc, 0, (enum event_type_t)EVENT_TX);
 }
 
+static void
+doSendFile(int out_fd, int in_fd, uint64_t initialTime, int rc, const char* func)
+{
+    uint64_t duration = getDuration(initialTime);
+
+    struct fs_info_t *fsrd = getFSEntry(in_fd);
+    struct net_info_t *nettx = getNetEntry(out_fd);
+
+    if (rc != -1) {
+        scopeLog(func, in_fd, CFG_LOG_TRACE);
+        if (nettx) {
+            doSetAddrs(out_fd);
+            doSend(out_fd, rc);
+        }
+
+        if (fsrd) {
+            doFSMetric(FS_DURATION, in_fd, EVENT_BASED, func, duration, NULL);
+            doFSMetric(FS_WRITE, in_fd, EVENT_BASED, func, rc, NULL);
+        }
+    } else {
+        /*
+         * We don't want to increment an error twice
+         * We don't know which fd the error is associated with
+         * We emit one metric with the input pathname
+         */
+        if (fsrd) {
+            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, func, fsrd->path);
+        }
+
+        if (nettx) {
+            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, func, "nopath");
+        }
+    }
+}
+
 /*
  * Note: in_fd must be a file
  * out_fd can be a file or a socket
@@ -3154,13 +3189,29 @@ fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 EXPORTON ssize_t
 sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
 {
-    doSendfile(sendfile);
+    WRAP_CHECK(sendfile, -1);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.sendfile(out_fd, in_fd, offset, count);
+
+    doSendFile(out_fd, in_fd, initialTime, rc, "sendfile");
+
+    return rc;
 }
 
 EXPORTON ssize_t
 sendfile64(int out_fd, int in_fd, off64_t *offset, size_t count)
 {
-    doSendfile(sendfile64);
+    WRAP_CHECK(sendfile, -1);
+    doThread();
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.sendfile64(out_fd, in_fd, offset, count);
+
+    doSendFile(out_fd, in_fd, initialTime, rc, "sendfile64");
+
+    return rc;
 }
 
 #endif // __LINUX__

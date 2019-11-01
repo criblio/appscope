@@ -33,10 +33,8 @@ struct _transport_t
     union {
         struct {
             int sock;
-        } udp;
-        struct {
-            int sock;
-        } tcp;
+            int connected;
+        } net;
         struct {
             char* path;
             FILE* stream;
@@ -108,6 +106,14 @@ placeDescriptor(int fd, transport_t *t)
     return -1;
 }
 
+int
+transportConnected(transport_t *trans)
+{
+    if (!trans) return 0;
+
+    return trans->net.connected;
+}
+
 transport_t *
 transportCreateTCP(const char *host, const char *port)
 {
@@ -121,7 +127,8 @@ transportCreateTCP(const char *host, const char *port)
     if (!trans) return NULL;
 
     trans->type = CFG_TCP;
-    trans->tcp.sock = -1;
+    trans->net.sock = -1;
+    trans->net.connected = 0;
 
     // Get some addresses to try
     struct addrinfo hints = {0};
@@ -133,13 +140,13 @@ transportCreateTCP(const char *host, const char *port)
     // Loop through the addresses until one works
     struct addrinfo* addr;
     for (addr = addr_list; addr; addr = addr->ai_next) {
-        trans->tcp.sock = trans->socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-        if (trans->tcp.sock == -1) continue;
+        trans->net.sock = trans->socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+        if (trans->net.sock == -1) continue;
 
-        if (trans->connect(trans->tcp.sock, addr->ai_addr, addr->ai_addrlen) == -1) {
+        if (trans->connect(trans->net.sock, addr->ai_addr, addr->ai_addrlen) == -1) {
             // We could create a sock, but not connect.  Clean up.
-            trans->close(trans->tcp.sock);
-            trans->tcp.sock = -1;
+            trans->close(trans->net.sock);
+            trans->net.sock = -1;
             continue;
         }
 
@@ -147,23 +154,26 @@ transportCreateTCP(const char *host, const char *port)
     }
 
     // If none worked, get out
-    if (trans->tcp.sock == -1) {
+    if (trans->net.sock == -1) {
         DBG("host=%s port=%s", host, port);
         goto out;
     }
 
+    // set state for reconnect support
+    trans->net.connected = 1;
+
     // Move this descriptor up out of the way
-    if ((trans->tcp.sock = placeDescriptor(trans->tcp.sock, trans)) == -1) goto out;
+    if ((trans->net.sock = placeDescriptor(trans->net.sock, trans)) == -1) goto out;
 
     // Set the socket to non blocking, and close on exec
-    flags = trans->fcntl(trans->tcp.sock, F_GETFD, 0);
-    if (trans->fcntl(trans->tcp.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
-        DBG("%d %s %s", trans->tcp.sock, host, port);
+    flags = trans->fcntl(trans->net.sock, F_GETFD, 0);
+    if (trans->fcntl(trans->net.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
+        DBG("%d %s %s", trans->net.sock, host, port);
     }
 
 out:
     if (addr_list) freeaddrinfo(addr_list);
-    if (trans && trans->tcp.sock == -1) transportDestroy(&trans);
+    if (trans && trans->net.sock == -1) transportDestroy(&trans);
     return trans;
 }
 
@@ -179,7 +189,7 @@ transportCreateUdp(const char* host, const char* port)
     if (!t) return NULL; 
 
     t->type = CFG_UDP;
-    t->udp.sock = -1;
+    t->net.sock = -1;
 
     // Get some addresses to try
     struct addrinfo hints = {0};
@@ -191,39 +201,39 @@ transportCreateUdp(const char* host, const char* port)
     // Loop through the addresses until one works
     struct addrinfo* addr;
     for (addr = addr_list; addr; addr = addr->ai_next) {
-        t->udp.sock = t->socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-        if (t->udp.sock == -1) continue;
-        if (t->connect(t->udp.sock, addr->ai_addr, addr->ai_addrlen) == -1) {
+        t->net.sock = t->socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+        if (t->net.sock == -1) continue;
+        if (t->connect(t->net.sock, addr->ai_addr, addr->ai_addrlen) == -1) {
             // We could create a sock, but not connect.  Clean up.
-            t->close(t->udp.sock);
-            t->udp.sock = -1;
+            t->close(t->net.sock);
+            t->net.sock = -1;
             continue;
         }
         break; // Success!
     }
 
     // If none worked, get out
-    if (t->udp.sock == -1) {
+    if (t->net.sock == -1) {
         DBG("host=%s port=%s", host, port);
         goto out;
     }
 
     // Move this descriptor up out of the way
-    if ((t->udp.sock = placeDescriptor(t->udp.sock, t)) == -1) goto out;
+    if ((t->net.sock = placeDescriptor(t->net.sock, t)) == -1) goto out;
 
     // Set the socket to non blocking, and close on exec
-    int flags = t->fcntl(t->udp.sock, F_GETFL, 0);
-    if (t->fcntl(t->udp.sock, F_SETFL, flags | O_NONBLOCK) == -1) {
-        DBG("%d %s %s", t->udp.sock, host, port);
+    int flags = t->fcntl(t->net.sock, F_GETFL, 0);
+    if (t->fcntl(t->net.sock, F_SETFL, flags | O_NONBLOCK) == -1) {
+        DBG("%d %s %s", t->net.sock, host, port);
     }
-    flags = t->fcntl(t->udp.sock, F_GETFD, 0);
-    if (t->fcntl(t->udp.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
-        DBG("%d %s %s", t->udp.sock, host, port);
+    flags = t->fcntl(t->net.sock, F_GETFD, 0);
+    if (t->fcntl(t->net.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
+        DBG("%d %s %s", t->net.sock, host, port);
     }
 
 out:
     if (addr_list) freeaddrinfo(addr_list);
-    if (t && t->udp.sock == -1) transportDestroy(&t);
+    if (t && t->net.sock == -1) transportDestroy(&t);
     return t;
 }
 
@@ -348,7 +358,7 @@ transportDestroy(transport_t** transport)
     transport_t* t = *transport;
     switch (t->type) {
         case CFG_UDP:
-            if (t->udp.sock != -1) t->close(t->udp.sock);
+            if (t->net.sock != -1) t->close(t->net.sock);
             break;
         case CFG_UNIX:
             break;
@@ -374,12 +384,12 @@ transportSend(transport_t* t, const char* msg)
 
     switch (t->type) {
         case CFG_UDP:
-            if (t->udp.sock != -1) {
+            if (t->net.sock != -1) {
                 if (!t->send) {
                     DBG(NULL);
                     break;
                 }
-                int rc = t->send(t->udp.sock, msg, strlen(msg), 0);
+                int rc = t->send(t->net.sock, msg, strlen(msg), 0);
 
                 if (rc < 0) {
                     switch (errno) {
@@ -397,15 +407,15 @@ transportSend(transport_t* t, const char* msg)
             }
             break;
         case CFG_TCP:
-            if (t->tcp.sock != -1) {
+            if (t->net.sock != -1) {
                 if (!t->send) {
                     DBG(NULL);
                     break;
                 }
 #ifdef __LINUX__
-                int rc = t->send(t->tcp.sock, msg, strlen(msg), MSG_NOSIGNAL);
+                int rc = t->send(t->net.sock, msg, strlen(msg), MSG_NOSIGNAL);
 #else
-                int rc = t->send(t->tcp.sock, msg, strlen(msg), 0);
+                int rc = t->send(t->net.sock, msg, strlen(msg), 0);
 #endif
 
                 if (rc < 0) {

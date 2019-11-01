@@ -16,5 +16,6 @@ void                transportDestroy(transport_t**);
 // Accessors
 int                 transportSend(transport_t*, const char* msg);
 int                 transportFlush(transport_t*);
+int                 transportConnected(transport_t *);
 
 #endif // __TRANSPORT_H__

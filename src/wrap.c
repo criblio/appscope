@@ -1834,6 +1834,10 @@ periodic(void *arg)
         //if (g_prevlog) logDestroy(&g_prevlog);
         //if (g_prevevt) evtDestroy(&g_prevevt);
 
+        if (evtConnected(g_evt) == FALSE) {
+            evtConnect(g_evt, g_staticfg);
+        }
+
         // From the config file
         sleep(g_thread.interval);
     }

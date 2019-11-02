@@ -3169,22 +3169,40 @@ sendfile64(int out_fd, int in_fd, off64_t *offset, size_t count)
 
 #endif // __LINUX__
 
+static void
+doCloseAndReportFailures(int fd, int success, const char* func)
+{
+    struct fs_info_t *fs;
+    if (success) {
+        doClose(fd, func);
+    } else {
+        if ((fs = getFSEntry(fd))) {
+            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, func, fs->path);
+        }
+    }
+}
+
+static void
+doCloseAllStreams()
+{
+    if (!g_fsinfo) return;
+    int i;
+    for (i = 0; i < g_cfg.numFSInfo; i++) {
+        if ((g_fsinfo[i].fd != 0) &&
+            (g_fsinfo[i].type == STREAM)) {
+            doClose(i, "fcloseall");
+        }
+    }
+}
+
 EXPORTON int
 close(int fd)
 {
-    int rc;
-    struct fs_info_t *fs;
-
     WRAP_CHECK(close, -1);
 
-    rc = g_fn.close(fd);
-    if (rc != -1) {
-        doClose(fd, "close");
-    } else {
-        if ((fs = getFSEntry(fd))) {
-            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "close", fs->path);
-        }
-    }
+    int rc = g_fn.close(fd);
+
+    doCloseAndReportFailures(fd, (rc != -1), "close");
 
     return rc;
 }
@@ -3192,20 +3210,12 @@ close(int fd)
 EXPORTON int
 fclose(FILE *stream)
 {
-    int rc, fd;
-    struct fs_info_t *fs;
-
     WRAP_CHECK(fclose, EOF);
-    fd = fileno(stream);
+    int fd = fileno(stream);
 
-    rc = g_fn.fclose(stream);
-    if (rc != EOF) {
-        doClose(fd, "fclose");
-    } else {
-        if ((fs = getFSEntry(fd))) {
-            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "fclose", fs->path);
-        }
-    }
+    int rc = g_fn.fclose(stream);
+
+    doCloseAndReportFailures(fd, (rc != EOF), "fclose");
 
     return rc;
 }
@@ -3213,21 +3223,11 @@ fclose(FILE *stream)
 EXPORTON int
 fcloseall(void)
 {
-    int rc;
-
     WRAP_CHECK(close, EOF);
 
-    rc = g_fn.fcloseall();
+    int rc = g_fn.fcloseall();
     if (rc != EOF) {
-        if (g_fsinfo) {
-            int i;
-            for (i = 0; i < g_cfg.numFSInfo; i++) {
-                if ((g_fsinfo[i].fd != 0) &&
-                    (g_fsinfo[i].type == STREAM)) {
-                    doClose(i, "fcloseall");
-                }
-            }
-        }
+        doCloseAllStreams();
     } else {
         doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "fcloseall", "nopath");
     }
@@ -3239,18 +3239,11 @@ fcloseall(void)
 EXPORTON int
 close$NOCANCEL(int fd)
 {
-    int rc;
-    struct fs_info_t *fs;
-
     WRAP_CHECK(close$NOCANCEL, -1);
-    rc = g_fn.close$NOCANCEL(fd);
-    if (rc != -1) {
-        doClose(fd, "close$NOCANCEL");
-    } else {
-        if ((fs = getFSEntry(fd))) {
-            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "close$NOCANCEL", fs->path);
-        }
-    }
+
+    int rc = g_fn.close$NOCANCEL(fd);
+
+    doCloseAndReportFailures(fd, (rc != -1), "close$NOCANCEL");
 
     return rc;
 }
@@ -3259,18 +3252,10 @@ close$NOCANCEL(int fd)
 EXPORTON int
 guarded_close_np(int fd, void *guard)
 {
-    int rc;
-    struct fs_info_t *fs;
-
     WRAP_CHECK(guarded_close_np, -1);
-    rc = g_fn.guarded_close_np(fd, guard);
-    if (rc != -1) {
-        doClose(fd, "guarded_close_np");
-    } else {
-         if ((fs = getFSEntry(fd))) {
-            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "guarded_close_np", fs->path);
-        }
-    }
+    int rc = g_fn.guarded_close_np(fd, guard);
+
+    doCloseAndReportFailures(fd, (rc != -1), "guarded_close_np");
 
     return rc;
 }
@@ -3278,18 +3263,10 @@ guarded_close_np(int fd, void *guard)
 EXPORTOFF int
 close_nocancel(int fd)
 {
-    int rc;
-    struct fs_info_t *fs;
-
     WRAP_CHECK(close_nocancel, -1);
-    rc = g_fn.close_nocancel(fd);
-    if (rc != -1) {
-        doClose(fd, "close_nocancel");
-    } else {
-        if ((fs = getFSEntry(fd))) {
-            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "close_nocancel", fs->path);
-        }
-    }
+    int rc = g_fn.close_nocancel(fd);
+
+    doCloseAndReportFailures(fd, (rc != -1), "close_nocancel");
 
     return rc;
 }

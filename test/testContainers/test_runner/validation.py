@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 from typing import Tuple, Any, List
 
-from common import TestResult, TestExecutionData, TestSetResult
+from common import TestResult, TestSetResult
 
 
 class TestExecutionValidator(ABC):

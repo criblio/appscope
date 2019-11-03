@@ -21,9 +21,9 @@ ENV SCOPE_OUT_VERBOSITY=4
 COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./nginx/post.json /opt/test-runner/post.json
 
-COPY ./applications_test_runner/requirements.txt /opt/test-runner/requirements.txt
+COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
 RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
 
-COPY ./applications_test_runner/ /opt/test-runner/
+COPY ./test_runner/ /opt/test-runner/
 
 ENTRYPOINT ["/opt/test-runner/bin/python", "/opt/test-runner/app.py", "--target", "nginx","-l","/opt/test-runner/logs/"]

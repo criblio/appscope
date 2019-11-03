@@ -6,6 +6,7 @@ from datetime import datetime
 import cribl
 import nginx
 import splunk
+import syscalls
 from reporting import print_summary, store_results_to_file
 from runner import Runner
 from scope import ScopeDataCollector, ScopeUDPDataListener, get_scope_version
@@ -16,19 +17,25 @@ from watcher import TestWatcher
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
-    parser.add_argument("-t", "--target", help="target application to test", choices=["nginx", "splunk", "cribl"],
+    parser.add_argument("-t", "--target", help="target application to test",
+                        choices=["nginx", "splunk", "cribl", "syscalls"],
                         required=True)
     parser.add_argument("-id", "--execution_id", help="execution id")
     parser.add_argument("-l", "--logs_path", help="path to store the execution results and logs", default="/tmp/")
     parser.add_argument("-s", "--scope_path", help="path to scope application executable",
                         default="/usr/lib/libscope.so")
+
+    parser.add_argument("--syscalls_tests_config", help="path to syscalls tests config")
+
     args = parser.parse_args()
 
     execution_id = args.execution_id or generate_execution_id(args.target)
     logs_path = args.logs_path
 
     log_level = (logging.INFO, logging.DEBUG)[args.verbose]
-    logging.basicConfig(level=log_level)
+
+    format = "%(asctime)s %(levelname)s %(name)s - %(message)s"
+    logging.basicConfig(level=log_level, format=format)
 
     logging.info("Execution ID: " + execution_id)
     logging.info("Logs path: " + logs_path)
@@ -49,6 +56,8 @@ def main():
                 splunk.configure(runner, args)
             if args.target == 'cribl':
                 cribl.configure(runner, args)
+            if args.target == 'syscalls':
+                syscalls.configure(runner, args)
             runner.run()
             test_watcher.finish()
         except Exception as e:

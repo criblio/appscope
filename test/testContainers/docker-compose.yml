@@ -27,3 +27,5 @@ services:
     build:
       context: .
       dockerfile: ./interposed_func/Dockerfile
+    command: -v
+    privileged: true

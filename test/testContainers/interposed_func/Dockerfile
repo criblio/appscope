@@ -24,13 +24,16 @@ RUN cd /opt/test/ltp && make autotools && ./configure && make -j
 ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so
 ENV SCOPE_LOG_LEVEL=info
-ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
+ENV SCOPE_OUT_DEST=udp://localhost:8125
 ENV SCOPE_OUT_VERBOSITY=4
 
 COPY ./interposed_func/altp /opt/test/altp
 RUN cd /opt/test/altp && make -j
 
-COPY ./interposed_func_test_runner /opt/test-runner/
+COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
+RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
 
-ENTRYPOINT ["/opt/test-runner/bin/python", "/opt/test-runner/runner.py"]
-CMD ["--config", "/opt/test-runner/.runner.conf"]
+COPY ./test_runner /opt/test-runner/
+COPY ./interposed_func/syscall_tests_conf.json /opt/test-runner/syscall_tests_conf.json
+
+ENTRYPOINT ["/opt/test-runner/bin/python", "/opt/test-runner/app.py", "--target", "syscalls","-l","/opt/test-runner/logs/", "--syscalls_tests_config", "/opt/test-runner/syscall_tests_conf.json"]

@@ -24,9 +24,10 @@ ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV SCOPE_OUT_VERBOSITY=4
 
-COPY ./applications_test_runner/requirements.txt /opt/test-runner/requirements.txt
+COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
+RUN pip3 install wheel
 RUN pip3 install -r /opt/test-runner/requirements.txt
 
-COPY ./applications_test_runner/ /opt/test-runner/
+COPY ./test_runner/ /opt/test-runner/
 
 ENTRYPOINT ["python3.6", "/opt/test-runner/app.py", "--target", "cribl","-l","/opt/test-runner/logs/"]

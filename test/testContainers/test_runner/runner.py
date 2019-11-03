@@ -94,6 +94,11 @@ class Runner:
             diff = tock - tick
             duration = ms(diff.total_seconds())
 
+            if not result.passed:
+                logging.error(f"Test {test.name} failed. Error {result.error}")
+                if data:
+                    logging.info(data)
+
             scope_messages = self.__collector.get_all()
             logging.info(f"Received {len(scope_messages)} messages from scope")
             if len(scope_messages) > 0: logging.debug(f"Last 10 messages:\n {''.join(scope_messages[-9:])}")

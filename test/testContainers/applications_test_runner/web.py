@@ -1,17 +1,17 @@
 from ab import run_apache_benchmark
 
-from common import Test
+from common import ApplicationTest, AppController
 from validation import validate_all
 
 
-class TestGetUrl(Test):
+class TestGetUrl(ApplicationTest):
 
-    def __init__(self, url, requests=100):
+    def __init__(self, url, app_controller: AppController, requests=100):
+        super().__init__(app_controller)
         self.requests = requests
         self.url = url
 
-    def run(self):
-
+    def do_run(self, scoped):
         benchmark_results = run_apache_benchmark(url=self.url, requests=self.requests)
 
         test_result = validate_ab(benchmark_results)
@@ -23,18 +23,18 @@ class TestGetUrl(Test):
         return "get " + self.url
 
 
-class TestPostToUrl(Test):
+class TestPostToUrl(ApplicationTest):
     @property
     def name(self):
         return "POST file"
 
-    def __init__(self, url, post_file, requests=100):
+    def __init__(self, url, post_file, app_controller: AppController, requests=100):
+        super().__init__(app_controller)
         self.requests = requests
         self.url = url
         self.post_file = post_file
 
-    def run(self):
-
+    def do_run(self, scoped):
         benchmark_results = run_apache_benchmark(url=self.url, requests=self.requests, post_file=self.post_file)
 
         test_result = validate_ab(benchmark_results)

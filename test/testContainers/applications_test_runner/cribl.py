@@ -8,16 +8,16 @@ from typing import Tuple, Any
 
 from retrying import retry
 
-from common import Test, TestResult
+from common import ApplicationTest, TestResult
 from proc import SubprocessAppController
 from runner import Runner
 from utils import random_string
 from validation import validate_all
 
 
-class CriblTCPToFileTest(Test):
+class CriblTCPToFileTest(ApplicationTest):
 
-    def run(self) -> Tuple[TestResult, Any]:
+    def do_run(self, scoped) -> Tuple[TestResult, Any]:
         # all configured in environment
         # TODO configure in cribl API
         # cribl tcp input localhost:10003
@@ -111,6 +111,6 @@ class CriblTCPToFileTest(Test):
 
 
 def configure(runner: Runner, config):
-    runner.set_app_controller(
-        SubprocessAppController(["/opt/cribl/bin/cribld", "server"], "cribl", config.scope_path, config.logs_path))
-    runner.add_tests([CriblTCPToFileTest()])
+    app_controller = SubprocessAppController(["/opt/cribl/bin/cribld", "server"], "cribl", config.scope_path,
+                                             config.logs_path)
+    runner.add_tests([CriblTCPToFileTest(app_controller)])

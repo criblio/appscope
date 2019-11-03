@@ -9,7 +9,7 @@ import splunklib.client as client
 from retrying import retry
 from splunklib import results
 
-from common import Test, TestResult, AppController
+from common import TestResult, AppController, ApplicationTest
 from runner import Runner
 from utils import random_string, dotdict
 from validation import passed, validate_all
@@ -68,13 +68,13 @@ class SplunkAppController(AppController):
                 f.write(f"\n{scope_env_var}\n")
 
 
-class SplunkDirectIndexingTest(Test):
+class SplunkDirectIndexingTest(ApplicationTest):
 
     @property
     def name(self):
         return "splunk direct indexing"
 
-    def run(self) -> Tuple[TestResult, Any]:
+    def do_run(self, scoped) -> Tuple[TestResult, Any]:
         logging.info(f"Connecting to Splunk. User {config.username}, Password {config.password}")
 
         service = client.connect(username=config.username, password=config.password)
@@ -118,9 +118,9 @@ class SplunkDirectIndexingTest(Test):
             assert result.get("column") is not None, f"Attribute 'column' not found in a row {result}"
 
 
-class SplunkKVStoreTest(Test):
+class SplunkKVStoreTest(ApplicationTest):
 
-    def run(self) -> Tuple[TestResult, Any]:
+    def do_run(self, scoped) -> Tuple[TestResult, Any]:
         logging.info(f"Connecting to Splunk. User {config.username}, Password {config.password}")
 
         service = client.connect(username=config.username, password=config.password)
@@ -156,5 +156,5 @@ class SplunkKVStoreTest(Test):
 
 
 def configure(runner: Runner, config):
-    runner.set_app_controller(SplunkAppController(config.scope_path))
-    runner.add_tests([SplunkDirectIndexingTest(), SplunkKVStoreTest()])
+    app_controller = SplunkAppController(config.scope_path)
+    runner.add_tests([SplunkDirectIndexingTest(app_controller), SplunkKVStoreTest(app_controller)])

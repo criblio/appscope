@@ -61,10 +61,32 @@ class AppController(ABC):
 class Test(ABC):
 
     @abstractmethod
-    def run(self) -> Tuple[TestResult, Any]:
+    def run(self, scoped) -> Tuple[TestResult, Any]:
         pass
 
     @property
     @abstractmethod
     def name(self):
         return None
+
+
+class ApplicationTest(Test, ABC):
+
+    def __init__(self, app_controller: AppController):
+        self.app_controller = app_controller
+
+    def run(self, scoped) -> Tuple[TestResult, Any]:
+
+        self.app_controller.start(scoped)
+
+        try:
+            result, data = self.do_run(scoped)
+            self.app_controller.assert_running()
+        finally:
+            self.app_controller.stop()
+
+        return result, data
+
+    @abstractmethod
+    def do_run(self, scoped) -> Tuple[TestResult, Any]:
+        pass

@@ -1869,7 +1869,7 @@ init(void)
     g_fn.__fgets_chk = dlsym(RTLD_NEXT, "__fgets_chk");
     g_fn.fgets_unlocked = dlsym(RTLD_NEXT, "fgets_unlocked");
     g_fn.fgetws = dlsym(RTLD_NEXT, "fgetws");
-    g_fn.__fgetws_chk = dlsym(RTLD_NEXT, "fgetws");
+    g_fn.__fgetws_chk = dlsym(RTLD_NEXT, "__fgetws_chk");
     g_fn.fgetwc = dlsym(RTLD_NEXT, "fgetwc");
     g_fn.fgetc = dlsym(RTLD_NEXT, "fgetc");
     g_fn.fscanf = dlsym(RTLD_NEXT, "fscanf");

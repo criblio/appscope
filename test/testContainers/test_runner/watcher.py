@@ -25,7 +25,7 @@ class TestWatcher:
 
     def test_validated(self, name, passed, error=None):
         if not passed:
-            self.__has_failures = False
+            self.__has_failures = True
         self.__results[name].passed = passed
         self.__results[name].error = error
 

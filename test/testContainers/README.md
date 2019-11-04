@@ -1,48 +1,55 @@
 # Scope Test Containers
 
-These represent containers used to test Cribl Scope.
+These represent containers used to test Cribl Scope. Each container is self-sufficent and self-executable. 
+General strategy is to run set of tests/challenges against target application or syscall in order to determine that target is working correctly.
+Then to run the same set of tests against the same target, but wrapped in Cribl Scope (scoped) and compare results with raw execution.
+General strategy is to use one container per target. During container build Docker set up the environment, installs target application,
+prepares environment for test-runner, ships runs the test-runner.
 
-Containers:
-cribl
-The log stream product. Metric results are sent to log stream. One or more pipelines in log stream will maniplulate metrics and route them to splunk for evaluation.
-Access log stream at http://localhost:9000/
+##Containers:
+####cribl
+Test the standalone version of Cribl LogStream. 
 
-splunk
-A splunk instance that receives test metric data from log stream. A splunk app is/can be used to evaluate metric and data results fromnm tests.
-Access splunk at http://localhost:8000/
+####splunk
+Tests Splunk Enterprise. Splunk instance has Cribl LogStream as Splunk Application, but LogStream capabilities are not tested or used.
 
-interposed function test
-This is a container used to create tests for interposed functions. It will start with tests from the Linux Test Program, LTP. Results are formatted in json and sent to log stream.
+####interposed_func
+Tests Linux syscalls supported by Scope using executable syscall unit tests. Some unit tests provided by [LTP Project](https://github.com/linux-test-project/ltp) 
+the others are custom C test located in [interposed_func/altp folder](interposed_func/altp)
 
-application containers
-Various containers with application to test. The app is exercised without being scoped and then fully scoped. Results are sent to log stream.
+####nginx
+Tests Nginx web server using Apache Benchmark tool.
 
-exercise containers
-Various containers used to exercise individual applications in containers.
-Example: apache benchmark (ab) used to sent requests to nginx &/or apache.
+##Execution
 
-
+You can run test containers using docker-compose.
 To run:
+```
 % cd scope/test/testContainers
-% docker-compose up -d
+% docker-compose up
+```
 
-To stop:
-% docker-compose down
+To run individual container, for example nginx :
+```
+% docker-compose up nginx
+```
 
-To access a given container:
-% docker-compose exec 'container-name' bash
+You can also build and run containers individually using just Docker. Notice that Dockerfiles desinged to be build and run from `testContainers` folder.
 
-To build the containers:
-% docker-compose build
+####Verbose output
+To see the verbose output in test runner output, run container with `-v` command:
+```commandline
+% docker-compose run nginx -v
+```
 
-Files:
-1) scope/test/testContainers/docker-compose.yml
-defines which containers are included and configures ports, volumes, logs as needed
+####Results output
 
-2) scope/test/testContainers/cribl/Dockerfile
-defines the log stream container
-Option: add additional packages to install when the container starts as needed
+By default test runner will store logs and test results in `/opt/test-runner/logs`. You can mount this folder to your local folder using docker volume feature.
 
-3) scope/test/testContainers/splunk/Dockerfile
-defines the splunk container
-Option: add additional packages to install when the container starts as needed
+####Override default run mode
+By default test runner would output only INFO level messages and won't store any logs in local system. 
+If you need override this, you can use [docker-compose.override.template.yml](docker-compose.override.template.yml) file.
+It will run the test execution in more verbose mode and store logs in `./logs` directory:
+```commandline
+cp docker-compose.override.template.yml docker.compose.override.yml
+```

@@ -6,3 +6,4 @@ coverage/
 venv
 
 test/testContainers/logs
+test/testContainers/docker-compose.override.yml

@@ -1,5 +1,6 @@
-import subprocess
 import logging
+import subprocess
+
 from utils import extract_num
 
 

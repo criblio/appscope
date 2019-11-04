@@ -64,10 +64,10 @@ ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV SCOPE_OUT_VERBOSITY=4
 
 
-COPY ./applications_test_runner/requirements.txt /opt/test-runner/requirements.txt
+COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
 RUN pip3.6 install -r /opt/test-runner/requirements.txt
 
-COPY ./applications_test_runner/ /opt/test-runner/
+COPY ./test_runner/ /opt/test-runner/
 
 COPY splunk/entrypoint.sh /opt/test-runner/entrypoint.sh
 RUN chmod 755 /opt/test-runner/entrypoint.sh

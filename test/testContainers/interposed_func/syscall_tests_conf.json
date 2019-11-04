@@ -92,7 +92,17 @@
         "openat02_child",
         "open12",
         "fork09",
-        "pwritev03_64"
+        "pwritev03_64",
+        "fcntl15",
+        "fcntl14_64",
+        "fcntl15_64",
+        "fcntl36",
+        "fcntl14",
+        "fcntl36_64",
+        "fork14",
+        "sendfile09_64",
+        "sendfile09",
+        "sendmsg02"
       ]
     },
     {

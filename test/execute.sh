@@ -66,11 +66,13 @@ run_test test/${OS}/cfgtest
 run_test test/${OS}/transporttest
 run_test test/${OS}/logtest
 run_test test/${OS}/outtest
+run_test test/${OS}/evttest
 run_test test/${OS}/formattest
 run_test test/${OS}/dbgtest
 if [ "${OS}" = "linux" ]; then
     run_test test/${OS}/glibcvertest
 fi
+run_test test/${OS}/selfinterposetest
 
 
 
@@ -83,15 +85,15 @@ fi
 
 
 # wraptest has special requirements, env wise...
-ENVVARS="SCOPE_HOME=${CWD}/test/ "
-if [ "${OS}" = "linux" ]; then
-    ENVVARS=$ENVVARS"LD_LIBRARY_PATH=lib/${OS}:contrib/cmocka/build/src/ "
-elif [ "${OS}" = "macOS" ]; then
-    ENVVARS=$ENVVARS"DYLD_LIBRARY_PATH=lib/${OS}:contrib/cmocka/build/src/ "
-    ENVVARS=$ENVVARS"DYLD_INSERT_LIBRARIES=${CWD}/lib/${OS}/libwrap.so "
-    ENVVARS=$ENVVARS"DYLD_FORCE_FLAT_NAMESPACE=1 "
-fi
-run_test test/${OS}/wraptest
+#ENVVARS="SCOPE_HOME=${CWD}/test/ "
+#if [ "${OS}" = "linux" ]; then
+#    ENVVARS=$ENVVARS"LD_LIBRARY_PATH=lib/${OS}:contrib/cmocka/build/src/ "
+#elif [ "${OS}" = "macOS" ]; then
+#    ENVVARS=$ENVVARS"DYLD_LIBRARY_PATH=lib/${OS}:contrib/cmocka/build/src/ "
+#    ENVVARS=$ENVVARS"DYLD_INSERT_LIBRARIES=${CWD}/lib/${OS}/libscope.so "
+#    ENVVARS=$ENVVARS"DYLD_FORCE_FLAT_NAMESPACE=1 "
+#fi
+#run_test test/${OS}/wraptest
 
 
 report_final_coverage

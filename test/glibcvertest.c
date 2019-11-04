@@ -16,10 +16,10 @@
 //
 // If you're reading this, please consider whether this new dependency
 // can be avoided rather than just bumping up the LATEST_LIBC_VER_NEEDED
-// It's about the usability of libwrap.so.
+// It's about the usability of libscope.so.
 //
 // Dependencies on GLIBC versions can be observed by:
-//     nm lib/linux/libwrap.so | grep GLIBC_ | fgrep -v "2.2.5"
+//     nm lib/linux/libscope.so | grep GLIBC_ | fgrep -v "2.2.5"
 //
 // Which yields output in this format:
 //     "                 U memmove@@GLIBC_2.2.5\n",
@@ -126,7 +126,7 @@ testEachLineInStreamWorksWithCannedData(void** state)
     const char* path = "/tmp/nmStyleOutput.txt";
 
     const char* sample_nm_output[] = {
-	"                 U __libc_dlsym@@GLIBC_PRIVATE\n"
+        "                 U __libc_dlsym@@GLIBC_PRIVATE\n",
         "                 U time@@GLIBC_2.2.5\n",
         "                 U realpath@@GLIBC_2.3\n",
         "000000000000eed5 T cfgRead\n",
@@ -164,7 +164,7 @@ testEachLineInStreamWorksWithCannedData(void** state)
 static void
 testEachLineInStreamWithActualLibraryData(void** state)
 {
-    FILE* f_in = popen("nm ./lib/linux/libwrap.so", "r");
+    FILE* f_in = popen("nm ./lib/linux/libscope.so", "r");
     results_t result = {0};
     FILE* f_out = fopen("/dev/null", "a");
     testEachLineInStream(f_in, LATEST_LIBC_VER_NEEDED, &result, f_out);

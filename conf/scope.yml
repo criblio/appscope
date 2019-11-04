@@ -1,7 +1,7 @@
 ---
 output:
   format:
-    type : expandedstatsd           # expandedstatsd, newlinedelimited
+    type : metricstatsd             # metricstatsd, metricjson
     #statsdprefix : 'cribl.scope'    # prepends each statsd metric
     statsdmaxlen : 512              # max size of a formatted statsd string
     verbosity : 4                   # 0-9 (0 is least verbose, 9 is most)
@@ -33,7 +33,7 @@ output:
           #      7  turns off network connect event summarization
           #      8  turns off filesystem seek event summarization
           #      9  turns off filesystem read/write summarization
-          #      9  turns off network  send/receive summarization
+          #      9  turns off network send/receive summarization
     tags:
     #- user: $USER
     #- feeling: elation
@@ -42,11 +42,34 @@ output:
     host: 127.0.0.1
     port: 8125
   summaryperiod : 10                # in seconds
-  commandpath : '/var/tmp'
+  commanddir : '/tmp'
+  #  commanddir supports changes to configuration settings of running
+  #  processees.  At every summary period the library looks in commanddir
+  #  to see if a file named scope.<pid> exists.  (where pid is the process ID
+  #  of the process running with scope.)  If it exists, it processes every
+  #  line for environment variable-style commands:
+  #      SCOPE_OUT_VERBOSITY=9
+  #  It changes the configuration to match the new settings, and deletes the
+  #  scope.<pid> file when it's complete.
+
+event:
+  format:
+    type : eventjsonrawjson         # eventjsonrawjson, eventjsonrawstatsd
+  transport:
+    type: tcp                       # udp, unix, file, syslog
+    host: 127.0.0.1
+    port: 9109
+  logfilefilter: .*log.*            # extended regex, default '.*log.*'
+  activesources:
+  - logfile                         # create events from files that match logfilefilter
+  - console                         # create events from stdout and stderr
+  - syslog                          # create events from syslog and vsyslog
+  - highcardmetrics
 
 logging:
-  level: info                      # debug, info, warning, error, none
+  level: error                      # debug, info, warning, error, none
   transport:
     type: file
     path: '/tmp/scope.log'
+    buffering: line                 # line, full
 ...

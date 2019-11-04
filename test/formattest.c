@@ -13,12 +13,12 @@
 static void
 fmtCreateReturnsValidPtrForGoodFormat(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
     fmtDestroy(&fmt);
     assert_null(fmt);
 
-    fmt = fmtCreate(CFG_NEWLINE_DELIMITED);
+    fmt = fmtCreate(CFG_METRIC_JSON);
     assert_non_null(fmt);
     fmtDestroy(&fmt);
     assert_null(fmt);
@@ -27,7 +27,7 @@ fmtCreateReturnsValidPtrForGoodFormat(void** state)
 static void
 fmtCreateReturnsNullPtrForBadFormat(void** state)
 {
-    format_t* fmt = fmtCreate(2);
+    format_t* fmt = fmtCreate(CFG_FORMAT_MAX);
     assert_null(fmt);
 }
 
@@ -43,7 +43,7 @@ verifyDefaults(format_t* fmt)
 static void
 fmtCreateHasExpectedDefaults(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     verifyDefaults(fmt);
     fmtDestroy(&fmt);
 
@@ -63,7 +63,7 @@ fmtDestroyNullDoesntCrash(void** state)
 static void
 fmtStatsDPrefixSetAndGet(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     fmtStatsDPrefixSet(fmt, "cribl.io");
     assert_string_equal(fmtStatsDPrefix(fmt), "cribl.io");
     fmtStatsDPrefixSet(fmt, "");
@@ -78,7 +78,7 @@ fmtStatsDPrefixSetAndGet(void** state)
 static void
 fmtStatsDMaxLenSetAndGet(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     fmtStatsDMaxLenSet(fmt, 0);
     assert_int_equal(fmtStatsDMaxLen(fmt), 0);
     fmtStatsDMaxLenSet(fmt, UINT_MAX);
@@ -89,7 +89,7 @@ fmtStatsDMaxLenSetAndGet(void** state)
 static void
 fmtOutVerbositySetAndGet(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_NEWLINE_DELIMITED);
+    format_t* fmt = fmtCreate(CFG_METRIC_JSON);
     fmtOutVerbositySet(fmt, 0);
     assert_int_equal(fmtOutVerbosity(fmt), 0);
     fmtOutVerbositySet(fmt, UINT_MAX);
@@ -100,7 +100,7 @@ fmtOutVerbositySetAndGet(void** state)
 static void
 fmtCustomTagsSetAndGet(void ** state)
 {
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     {
         custom_tag_t t1 = {"name1", "value1"};
         custom_tag_t t2 = {"name2", "value2"};
@@ -127,7 +127,7 @@ fmtCustomTagsSetAndGet(void ** state)
 static void
 fmtStringStatsDNullEventDoesntCrash(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     assert_null(fmtString(fmt, NULL));
     fmtDestroy(&fmt);
 }
@@ -137,7 +137,7 @@ fmtStringStatsDNullEventFieldsDoesntCrash(void** state)
 {
     event_t e = {"useful.apps", 1, CURRENT, NULL};
 
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     char* msg = fmtString(fmt, &e);
     assert_string_equal(msg, "useful.apps:1|g\n");
     if (msg) free(msg);
@@ -178,7 +178,7 @@ fmtStringStatsDHappyPath(void** state)
     };
     event_t e = {"net.port", g_openPorts, CURRENT, fields};
 
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
     fmtOutVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
@@ -200,7 +200,7 @@ fmtStringStatsDHappyPath(void** state)
 static void
 fmtStatsDWithCustomFields(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
 
     custom_tag_t t1 = {"name1", "value1"};
@@ -221,7 +221,7 @@ fmtStatsDWithCustomFields(void** state)
 static void
 fmtStatsDWithCustomAndStatsdFields(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
 
     custom_tag_t t1 = {"tag", "value"};
@@ -245,7 +245,7 @@ fmtStatsDWithCustomAndStatsdFields(void** state)
 static void
 fmtStringStatsDReturnsNullIfSpaceIsInsufficient(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     fmtStatsDMaxLenSet(fmt, 28);
     fmtStatsDPrefixSet(fmt, "98");
 
@@ -266,7 +266,7 @@ fmtStringStatsDReturnsNullIfSpaceIsInsufficient(void** state)
 static void
 fmtStringStatsDVerifyEachStatsDType(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
 
     data_type_t t;
     for (t=DELTA; t<=SET; t++) {
@@ -321,7 +321,7 @@ fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient(void** state)
         FIELDEND
     };
     event_t e = {"metric", 1, DELTA, fields};
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     fmtOutVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
     // Note that this test documents that we don't prioritize
@@ -364,7 +364,7 @@ fmtStringStatsDHonorsCardinality(void** state)
         FIELDEND
     };
     event_t e = {"metric", 1, DELTA, fields};
-    format_t* fmt = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
 
     fmtOutVerbositySet(fmt, 0);
     char* msg = fmtString(fmt, &e);
@@ -398,7 +398,7 @@ static void
 fmtStringNewlineDelimitedReturnsNull(void** state)
 {
     // Just because it's not implemented yet...
-    format_t* fmt = fmtCreate(CFG_NEWLINE_DELIMITED);
+    format_t* fmt = fmtCreate(CFG_METRIC_JSON);
     event_t e = {"A", 1, SET, NULL};
     assert_null(fmtString(fmt, &e));
     fmtDestroy(&fmt);

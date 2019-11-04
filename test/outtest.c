@@ -42,7 +42,7 @@ outSendForNullMessageDoesntCrash(void** state)
 }
 
 static void
-outTranportSetAndOutSend(void** state)
+outTransportSetAndOutSend(void** state)
 {
     const char* file_path = "/tmp/my.path";
     out_t* out = outCreate();
@@ -51,7 +51,7 @@ outTranportSetAndOutSend(void** state)
     transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
     transport_t* t3 = transportCreateSyslog();
     transport_t* t4 = transportCreateShm();
-    transport_t* t5 = transportCreateFile(file_path);
+    transport_t* t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
     outTransportSet(out, t1);
     outTransportSet(out, t2);
     outTransportSet(out, t3);
@@ -62,7 +62,13 @@ outTranportSetAndOutSend(void** state)
     // affecting the file at file_path when connected to a file transport.
     long file_pos_before = fileEndPosition(file_path);
     assert_int_equal(outSend(out, "Something to send\n"), 0);
+
+    // With CFG_BUFFER_FULLY, this output only happens with the flush
     long file_pos_after = fileEndPosition(file_path);
+    assert_int_equal(file_pos_before, file_pos_after);
+
+    outFlush(out);
+    file_pos_after = fileEndPosition(file_path);
     assert_int_not_equal(file_pos_before, file_pos_after);
 
     // Test that transport is cleared by seeing no side effects.
@@ -84,11 +90,11 @@ outFormatSetAndOutSendEvent(void** state)
     const char* file_path = "/tmp/my.path";
     out_t* out = outCreate();
     assert_non_null(out);
-    transport_t* t = transportCreateFile(file_path);
+    transport_t* t = transportCreateFile(file_path, CFG_BUFFER_LINE);
     outTransportSet(out, t);
 
     event_t e = {"A", 1, DELTA, NULL};
-    format_t* f = fmtCreate(CFG_EXPANDED_STATSD);
+    format_t* f = fmtCreate(CFG_METRIC_STATSD);
     outFormatSet(out, f);
 
     // Test that format is set by testing side effects of outSendEvent
@@ -122,7 +128,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(outDestroyNullOutDoesntCrash),
         cmocka_unit_test(outSendForNullOutDoesntCrash),
         cmocka_unit_test(outSendForNullMessageDoesntCrash),
-        cmocka_unit_test(outTranportSetAndOutSend),
+        cmocka_unit_test(outTransportSetAndOutSend),
         cmocka_unit_test(outFormatSetAndOutSendEvent),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };

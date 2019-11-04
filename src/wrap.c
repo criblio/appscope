@@ -17,9 +17,11 @@ static metric_counters g_ctrs = {0};
 static thread_timing g_thread = {0};
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
+static evt_t* g_evt = NULL;
 static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static out_t *g_prevout = NULL;
+static evt_t *g_prevevt = NULL;
 __thread int g_getdelim = 0;
 
 // Forward declaration
@@ -28,7 +30,7 @@ static void doClose(int, const char *);
 static void doConfig(config_t *);
 
 
-EXPORTON void
+static void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
 {
     if (!g_log || !msg || !g_cfg.procname[0]) return;
@@ -46,7 +48,7 @@ scopeLog(const char* msg, int fd, cfg_log_level_t level)
     }
 }
 
-EXPORTOFF void
+static void
 sendEvent(out_t* out, event_t* e)
 {
     int rc;
@@ -128,33 +130,35 @@ setVerbosity(rtconfig* c, unsigned verbosity)
 }
 
 
-EXPORTOFF void
+static void
 doConfig(config_t *cfg)
 {
     // Save the current objects to get cleaned up on the periodic thread
     g_prevout = g_out;
     g_prevlog = g_log;
+    g_prevevt = g_evt;
 
     g_thread.interval = cfgOutPeriod(cfg);
     if (!g_thread.startTime) {
         g_thread.startTime = time(NULL) + g_thread.interval;
     }
     setVerbosity(&g_cfg, cfgOutVerbosity(cfg));
-    g_cfg.cmdpath = cfgOutCmdPath(cfg);
+    g_cfg.cmddir = cfgCmdDir(cfg);
 
     log_t* log = initLog(cfg);
     g_out = initOut(cfg);
     g_log = log; // Set after initOut to avoid infinite loop with socket
+    g_evt = initEvt(cfg);
 }
 
 // Process dynamic config change if they are available
-EXPORTOFF int
+static int
 dynConfig(void)
 {
     FILE *fs;
     char path[PATH_MAX];
 
-    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmdpath, DYN_CONFIG_PREFIX, g_cfg.pid);
+    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmddir, DYN_CONFIG_PREFIX, g_cfg.pid);
 
     // Is there a command file for this pid
     if (osIsFilePresent(g_cfg.pid, path) == -1) return 0;
@@ -174,7 +178,7 @@ dynConfig(void)
 }
 
 // Return the time delta from start to now in nanoseconds
-EXPORTON uint64_t
+static uint64_t
 getDuration(uint64_t start)
 {
     /*
@@ -1109,7 +1113,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         // if called from an event, we update counters
-        if (source == EVENT_BASED) {
+        if ((source == EVENT_BASED) && size) {
             if (size < 0) {
                atomicSubU64(value, labs(size));
             } else {
@@ -1695,9 +1699,9 @@ reportFD(int fd, enum control_type_t source)
             doNetMetric(NETRX, fd, source, 0);
         }
         if (!g_cfg.summarize.net.open_close) {
-            doNetMetric(OPEN_PORTS, fd, source, -1);
-            doNetMetric(NET_CONNECTIONS, fd, source, -1);
-            doNetMetric(CONNECTION_DURATION, fd, source, -1);
+            doNetMetric(OPEN_PORTS, fd, source, 0);
+            doNetMetric(NET_CONNECTIONS, fd, source, 0);
+            doNetMetric(CONNECTION_DURATION, fd, source, 0);
         }
     }
 
@@ -1782,6 +1786,15 @@ reportPeriodicStuff(void)
     }
 }
 
+static void
+handleExit(void)
+{
+    reportPeriodicStuff();
+    outFlush(g_out);
+    logFlush(g_log);
+    evtFlush(g_evt);
+}
+
 static void *
 periodic(void *arg)
 {
@@ -1795,6 +1808,7 @@ periodic(void *arg)
         // Clean up previous objects if they exist.
         //if (g_prevout) outDestroy(&g_prevout);
         //if (g_prevlog) logDestroy(&g_prevlog);
+        //if (g_prevevt) evtDestroy(&g_prevevt);
 
         // From the config file
         sleep(g_thread.interval);
@@ -1937,6 +1951,7 @@ init(void)
     g_fn.__fxstatat64 = dlsym(RTLD_NEXT, "__fxstatat64");
     g_fn.gethostbyname_r = dlsym(RTLD_NEXT, "gethostbyname_r");
     g_fn.syscall = dlsym(RTLD_NEXT, "syscall");
+    g_fn.prctl = dlsym(RTLD_NEXT, "prctl");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
@@ -1976,7 +1991,7 @@ init(void)
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
 
-    char* path = cfgPath(CFG_FILE_NAME);
+    char* path = cfgPath();
     config_t* cfg = cfgRead(path);
     cfgProcessEnvironment(cfg);
     doConfig(cfg);
@@ -1985,7 +2000,7 @@ init(void)
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
     scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
-    if (atexit(reportPeriodicStuff)) {
+    if (atexit(handleExit)) {
         DBG(NULL);
     }
 }
@@ -1996,12 +2011,12 @@ doClose(int fd, const char *func)
     struct net_info_t *ninfo;
     struct fs_info_t *fsinfo;
 
-    // report everything before the info is lost
-    reportFD(fd, EVENT_BASED);
-
     if ((ninfo = getNetEntry(fd)) != NULL) {
 
-        memset(ninfo, 0, sizeof(struct net_info_t));
+        doNetMetric(OPEN_PORTS, fd, EVENT_BASED, -1);
+        doNetMetric(NET_CONNECTIONS, fd, EVENT_BASED, -1);
+        doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED, -1);
+
         if (func) {
             char buf[64];
             snprintf(buf, sizeof(buf), "%s: network", func);
@@ -2011,15 +2026,22 @@ doClose(int fd, const char *func)
 
     // Check both file desriptor tables
     if ((fsinfo = getFSEntry(fd)) != NULL) {
+
+        doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 0, NULL);
+
         if (func) {
             char buf[64];
             snprintf(buf, sizeof(buf), "%s: file", func);
             scopeLog(buf, fd, CFG_LOG_TRACE);
         }
-        
-        doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 0, NULL);
-        memset(fsinfo, 0, sizeof(struct fs_info_t));
     }
+
+    // report everything before the info is lost
+    reportFD(fd, EVENT_BASED);
+
+    if (ninfo) memset(ninfo, 0, sizeof(struct net_info_t));
+    if (fsinfo) memset(fsinfo, 0, sizeof(struct fs_info_t));
+
 }
 
 static void
@@ -2071,7 +2093,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
     }
 }
 
-EXPORTON int
+static int
 doDupFile(int newfd, int oldfd, const char *func)
 {
     if ((newfd > g_cfg.numFSInfo) || (oldfd > g_cfg.numFSInfo)) {
@@ -2082,7 +2104,7 @@ doDupFile(int newfd, int oldfd, const char *func)
     return 0;
 }
 
-EXPORTON int
+static int
 doDupSock(int oldfd, int newfd)
 {
     if ((newfd > g_cfg.numFSInfo) || (oldfd > g_cfg.numFSInfo)) {
@@ -3364,6 +3386,22 @@ fstatat(int fd, const char *path, struct stat *buf, int flag)
     return rc;
 }
 
+EXPORTON int
+prctl(int option, ...)
+{
+    struct FuncArgs fArgs;
+
+    WRAP_CHECK(prctl, -1);
+    doThread();
+    LOAD_FUNC_ARGS_VALIST(fArgs, option);
+
+    if (option == PR_SET_SECCOMP) {
+        return 0;
+    }
+
+    return g_fn.prctl(option, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
+}
+
 /*
  * Note:
  * The syscall function in libc is called from the loader for
@@ -3404,35 +3442,36 @@ syscall(long number, ...)
      * what we are missing. So far, we only see accept4 used.
      */
     case SYS_sendmmsg:
-        DBG("syscall-sendmsg");
+        //DBG("syscall-sendmsg");
         break;
 
     case SYS_recvmmsg:
-        DBG("syscall-recvmsg");
+        //DBG("syscall-recvmsg");
         break;
 
     case SYS_preadv:
-        DBG("syscall-preadv");
+        //DBG("syscall-preadv");
         break;
 
     case SYS_pwritev:
-        DBG("syscall-pwritev");
+        //DBG("syscall-pwritev");
         break;
 
     case SYS_dup3:
-        DBG("syscall-dup3");
+        //DBG("syscall-dup3");
         break;
 #ifdef __STATX__
     case SYS_statx:
-        DBG("syscall-statx");
+        //DBG("syscall-statx");
         break;
 #endif // __STATX__
     default:
         // Supplying args is fine, but is a touch more work.
         // On splunk, in a container on my laptop, I saw this statement being
         // hit every 10-15 microseconds over a 15 minute duration.  Wow.
-        //DBG("syscall-number: %d", number);
-        DBG(NULL);
+        // DBG("syscall-number: %d", number);
+        //DBG(NULL);
+        break;
     }
 
     return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
@@ -4286,7 +4325,7 @@ fputwc(wchar_t wc, FILE *stream)
     IOSTREAMPOST(fputwc, 1, WEOF, (enum event_type_t)EVENT_FS);
 }
 
-EXPORTON int
+EXPORTOFF int
 fscanf(FILE *stream, const char *format, ...)
 {
     struct FuncArgs fArgs;
@@ -4912,6 +4951,119 @@ getaddrinfo(const char *node, const char *service,
 
 #ifdef __LINUX__
 
+static const char scope_help[] =
+"ENV VARIABLES:\n"
+"\n"
+"    SCOPE_CONF_PATH\n"
+"        Directly specify location and name of config file.\n"
+"        Used only at start-time.\n"
+"    SCOPE_HOME\n"
+"        Specify a directory from which conf/scope.yml or ./scope.yml can\n"
+"        be found.  Used only at start-time only if SCOPE_CONF_PATH does\n"
+"        not exist.  For more info see Config File Resolution below.\n"
+"    SCOPE_OUT_VERBOSITY\n"
+"        0-9 are valid values.  Default is 4.\n"
+"        For more info see Verbosity below.\n"
+"    SCOPE_OUT_SUM_PERIOD\n"
+"        Number of seconds between output summarizations.  Default is 10\n"
+"    SCOPE_OUT_DEST\n"
+"        Default is udp://localhost:8125\n"
+"        Format is one of:\n"
+"            file:///tmp/output.log\n"
+"            udp://server:123         (server is servername or address;\n"
+"                                      123 is port number or service name)\n"
+"    SCOPE_OUT_FORMAT\n"
+"        metricstatsd, metricjson\n"
+"        Default is metricstatsd\n"
+"    SCOPE_STATSD_PREFIX\n"
+"        Specify a string to be prepended to every scope metric.\n"
+"    SCOPE_STATSD_MAXLEN\n"
+"        Default is 512\n"
+"    SCOPE_EVENT_DEST\n"
+"        same format as SCOPE_OUT_DEST above.\n"
+"        Default is tcp://localhost:9109\n"
+"    SCOPE_EVENT_FORMAT\n"
+"        eventjsonrawjson, eventjsonrawstatsd\n"
+"        Default is eventjsonrawjson\n"
+"    SCOPE_EVENT_LOGFILE\n"
+"        Create events from logs that match SCOPE_EVENT_LOG_FILTER.\n"
+"        true,false  Default is false.\n"
+"    SCOPE_EVENT_CONSOLE\n"
+"        Create events from stdout, stderr.\n"
+"        true,false  Default is false.\n"
+"    SCOPE_EVENT_SYSLOG\n"
+"        Create events from syslog, vsyslog functions.\n"
+"        true,false  Default is false.\n"
+"    SCOPE_EVENT_METRICS\n"
+"        Create events from metrics.\n"
+"        true,false  Default is false.\n"
+"    SCOPE_EVENT_LOG_FILTER\n"
+"        An extended regular expression that describes log file names.\n"
+"        Only used if SCOPE_EVENT_LOGFILE is true.  Default is .*log.*\n"
+"    SCOPE_LOG_LEVEL\n"
+"        debug, info, warning, error, none.  Default is error.\n"
+"    SCOPE_LOG_DEST\n"
+"        same format as SCOPE_OUT_DEST above.\n"
+"        Default is file:///tmp/scope.log\n"
+"    SCOPE_TAG_\n"
+"        Specify a tag to be applied to every metric.  Environment variable\n"
+"        expansion is available e.g. SCOPE_TAG_user=$USER\n"
+"    SCOPE_CMD_DIR\n"
+"        Specifies a directory to look for dynamic configuration files.\n"
+"        See Dynamic Configuration below.\n"
+"        Default is /tmp\n"
+"\n"
+"FEATURES:\n"
+"\n"
+"    Verbosity\n"
+"        Controls two different aspects of output - \n"
+"        Tag Cardinality and Summarization.\n"
+"\n"
+"        Tag Cardinality\n"
+"            0   No expanded statsd tags\n"
+"            1   adds 'data', 'unit'\n"
+"            2   adds 'class', 'proto'\n"
+"            3   adds 'op'\n"
+"            4   adds 'host', 'proc'\n"
+"            5   adds 'domain', 'file'\n"
+"            6   adds 'localip', 'remoteip', 'localp', 'port', 'remotep'\n"
+"            7   adds 'fd', 'pid'\n"
+"            8   adds 'duration'\n"
+"            9   adds 'numops'\n"
+"\n"
+"        Summarization\n"
+"            0-4 has full event summarization\n"
+"            5   turns off 'error'\n"
+"            6   turns off 'filesystem open/close' and 'dns'\n"
+"            7   turns off 'filesystem stat' and 'network connect'\n"
+"            8   turns off 'filesystem seek'\n"
+"            9   turns off 'filesystem read/write' and 'network send/receive'\n"
+"\n"
+"    Config File Resolution\n"
+"        If the SCOPE_CONF_PATH env variable is defined and points to a\n"
+"        file that can be opened, it will use this as the config file.  If\n"
+"        not, it searches for the config file in this priority order using the\n"
+"        first it finds.  If this fails too, it will look for scope.yml in the\n"
+"        same directory as LD_PRELOAD.\n"
+"\n"
+"            $SCOPE_HOME/conf/scope.yml\n"
+"            $SCOPE_HOME/scope.yml\n"
+"            /etc/scope/scope.yml\n"
+"            ~/conf/scope.yml\n"
+"            ~/scope.yml\n"
+"            ./conf/scope.yml\n"
+"            ./scope.yml\n"
+"\n"
+"    Dynamic Configuration\n"
+"        Dynamic Configuration allows configuration settings to be\n"
+"        changed on the fly after process start-time.  At every\n"
+"        SCOPE_OUT_SUM_PERIOD the library looks in SCOPE_CMD_DIR to\n"
+"        see if a file scope.<pid> exists.  If it exists, it processes\n"
+"        every line, looking for environment variable-style commands.\n"
+"        (e.g. SCOPE_CMD_DBG_PATH=/tmp/outfile.txt)  It changes the\n"
+"        configuration to match the new settings, and deletes the\n"
+"        scope.<pid> file when it's complete.\n";
+
 // assumes that we're only building for 64 bit...
 char const __invoke_dynamic_linker__[] __attribute__ ((section (".interp"))) = "/lib64/ld-linux-x86-64.so.2";
 
@@ -4928,6 +5080,7 @@ __scope_main(void)
     printf("   Usage: LD_PRELOAD=%s <command name>\n ", path);
     printf("\n");
     printf("\n");
+    printf("%s", scope_help);
     printf("\n");
     exit(0);
 }

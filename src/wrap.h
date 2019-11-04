@@ -35,6 +35,7 @@
 
 #ifdef __LINUX__
 #include <sys/vfs.h>
+#include <sys/prctl.h>
 #endif 
 
 #include "dns.h"
@@ -204,7 +205,7 @@ typedef struct rtconfig_t {
     bool tsc_rdtscp;
     summary_t summarize;
     uint64_t freq;
-    const char *cmdpath;
+    const char *cmddir;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];
     pid_t pid;
@@ -383,6 +384,7 @@ typedef struct interposed_funcs_t {
     int (*__lxstat64)(int, const char *, struct stat64 *);
     int (*fcntl64)(int, int, ...);
     long (*syscall)(long, ...);
+    int (*prctl)(int, unsigned long, unsigned long, unsigned long, unsigned long);
 
 #if defined(__LINUX__) && defined(__STATX__)
     int (*statx)(int, const char *, int, unsigned int, struct statx *);

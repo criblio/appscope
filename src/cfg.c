@@ -6,17 +6,16 @@
 #include "cfg.h"
 #include "dbg.h"
 
-#ifndef NO_YAML
-#include "yaml.h"
-#endif
-
 typedef struct {
     cfg_transport_t type;
-    struct {              // For type = CFG_UDP
+    struct {                             // For type = CFG_UDP
         char* host;
         char* port;
     } udp;
-    char* path;           // For type = CFG_UNIX or CFG_FILE
+    struct {
+        char* path;                      // For type CFG_FILE
+        cfg_buffer_t buf_policy;
+    } file;
 } transport_struct_t;
 
 struct _config_t
@@ -29,30 +28,45 @@ struct _config_t
         } statsd;
         unsigned period;
         unsigned verbosity;
-        char* commandpath;
+        char* commanddir;
     } out;
 
-    // CFG_OUT or CFG_LOG
+    struct {
+        cfg_out_format_t format;
+        char* logfilefilter;
+        unsigned src[CFG_SRC_MAX];
+    } evt;
+
+    struct {
+        cfg_log_level_t level;
+    } log;
+
+    // CFG_OUT, CFG_EVT, or CFG_LOG
     transport_struct_t transport[CFG_WHICH_MAX]; 
-    which_transport_t transport_context; // only used during cfgRead
 
     custom_tag_t** tags;
     unsigned max_tags;
-    cfg_log_level_t level;
 };
 
 #define DEFAULT_SUMMARY_PERIOD 10
 #define DEFAULT_OUT_TYPE CFG_UDP
 #define DEFAULT_OUT_HOST "127.0.0.1"
-#define DEFAULT_OUT_PORT "8125"
+//#define DEFAULT_OUT_PORT DEFAULT_OUT_PORT (defined in scopetypes.h)
 #define DEFAULT_OUT_PATH NULL
+#define DEFAULT_OUT_BUF CFG_BUFFER_FULLY
+#define DEFAULT_EVT_TYPE CFG_UDP
+#define DEFAULT_EVT_HOST "127.0.0.1"
+//#define DEFAULT_EVT_PORT DEFAULT_EVT_PORT (defined in scopetypes.h)
+#define DEFAULT_EVT_PATH NULL
+#define DEFAULT_EVT_BUF CFG_BUFFER_FULLY
 #define DEFAULT_LOG_TYPE CFG_FILE
 #define DEFAULT_LOG_HOST NULL
 #define DEFAULT_LOG_PORT NULL
 #define DEFAULT_LOG_PATH "/tmp/scope.log"
+#define DEFAULT_LOG_BUF CFG_BUFFER_FULLY
 #define DEFAULT_TAGS NULL
 #define DEFAULT_NUM_TAGS 8
-#define DEFAULT_COMMAND_PATH "/tmp"
+#define DEFAULT_COMMAND_DIR "/tmp"
 
     
 ///////////////////////////////////
@@ -71,326 +85,34 @@ cfgCreateDefault()
     c->out.statsd.maxlen = DEFAULT_STATSD_MAX_LEN;
     c->out.period = DEFAULT_SUMMARY_PERIOD;
     c->out.verbosity = DEFAULT_OUT_VERBOSITY;
-    c->out.commandpath = (DEFAULT_COMMAND_PATH) ? strdup(DEFAULT_COMMAND_PATH) : NULL;
+    c->out.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
+    c->evt.format = DEFAULT_EVT_FORMAT;
+    c->evt.logfilefilter = (DEFAULT_LOG_FILE_FILTER) ? strdup(DEFAULT_LOG_FILE_FILTER) : NULL;
+    c->evt.src[CFG_SRC_LOGFILE] = DEFAULT_SRC_LOGFILE;
+    c->evt.src[CFG_SRC_CONSOLE] = DEFAULT_SRC_CONSOLE;;
+    c->evt.src[CFG_SRC_SYSLOG] = DEFAULT_SRC_SYSLOG;
+    c->evt.src[CFG_SRC_METRIC] = DEFAULT_SRC_METRIC;
     c->transport[CFG_OUT].type = DEFAULT_OUT_TYPE;
     c->transport[CFG_OUT].udp.host = (DEFAULT_OUT_HOST) ? strdup(DEFAULT_OUT_HOST) : NULL;
     c->transport[CFG_OUT].udp.port = (DEFAULT_OUT_PORT) ? strdup(DEFAULT_OUT_PORT) : NULL;
-    c->transport[CFG_OUT].path = (DEFAULT_OUT_PATH) ? strdup(DEFAULT_OUT_PATH) : NULL;
+    c->transport[CFG_OUT].file.path = (DEFAULT_OUT_PATH) ? strdup(DEFAULT_OUT_PATH) : NULL;
+    c->transport[CFG_OUT].file.buf_policy = DEFAULT_OUT_BUF;
+    c->transport[CFG_EVT].type = DEFAULT_EVT_TYPE;
+    c->transport[CFG_EVT].udp.host = (DEFAULT_EVT_HOST) ? strdup(DEFAULT_EVT_HOST) : NULL;
+    c->transport[CFG_EVT].udp.port = (DEFAULT_EVT_PORT) ? strdup(DEFAULT_EVT_PORT) : NULL;
+    c->transport[CFG_EVT].file.path = (DEFAULT_EVT_PATH) ? strdup(DEFAULT_EVT_PATH) : NULL;
+    c->transport[CFG_EVT].file.buf_policy = DEFAULT_EVT_BUF;
     c->transport[CFG_LOG].type = DEFAULT_LOG_TYPE;
     c->transport[CFG_LOG].udp.host = (DEFAULT_LOG_HOST) ? strdup(DEFAULT_LOG_HOST) : NULL;
     c->transport[CFG_LOG].udp.port = (DEFAULT_LOG_PORT) ? strdup(DEFAULT_LOG_PORT) : NULL;
-    c->transport[CFG_LOG].path = (DEFAULT_LOG_PATH) ? strdup(DEFAULT_LOG_PATH) : NULL;
+    c->transport[CFG_LOG].file.path = (DEFAULT_LOG_PATH) ? strdup(DEFAULT_LOG_PATH) : NULL;
+    c->transport[CFG_LOG].file.buf_policy = DEFAULT_LOG_BUF;
     c->tags = DEFAULT_TAGS;
     c->max_tags = DEFAULT_NUM_TAGS;
-    c->level = DEFAULT_LOG_LEVEL;
+    c->log.level = DEFAULT_LOG_LEVEL;
 
     return c;
 }
-
-#ifndef NO_YAML
-
-#define foreach(pair, pairs) \
-    for (pair = pairs.start; pair != pairs.top; pair++)
-
-typedef void (*node_fn)(config_t*, yaml_document_t*, yaml_node_t*);
-
-typedef struct {
-    yaml_node_type_t type;
-    char* key;
-    node_fn fn;
-} parse_table_t;
-
-static void
-processKeyValuePair(parse_table_t* t, yaml_node_pair_t* pair, config_t* config, yaml_document_t* doc)
-{
-    yaml_node_t* key = yaml_document_get_node(doc, pair->key);
-    yaml_node_t* value = yaml_document_get_node(doc, pair->value);
-    if (key->type != YAML_SCALAR_NODE) return;
-
-    // printf("key = %s, value = %s\n", key->data.scalar.value,
-    //     (value->type == YAML_SCALAR_NODE) ? value->data.scalar.value : "X");
-
-    // Scan through the parse_table_t for a matching type and key
-    // If found, call the function that handles that.
-    int i;
-    for (i=0; t[i].type != YAML_NO_NODE; i++) {
-        if ((value->type == t[i].type) &&
-            (!strcmp((char*)key->data.scalar.value, t[i].key))) {
-            t[i].fn(config, doc, value);
-            break;
-        }
-    }
-}
-
-static void
-processLevel(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (char *)node->data.scalar.value;
-    cfgLogLevelSetFromStr(config, value);
-}
-
-static void
-processTransportType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
-    which_transport_t c = config->transport_context;
-    if (!strcmp(v_str, "udp")) {
-        cfgTransportTypeSet(config, c, CFG_UDP);
-    } else if (!strcmp(v_str, "unix")) {
-        cfgTransportTypeSet(config, c, CFG_UNIX);
-    } else if (!strcmp(v_str, "file")) {
-        cfgTransportTypeSet(config, c, CFG_FILE);
-    } else if (!strcmp(v_str, "syslog")) {
-        cfgTransportTypeSet(config, c, CFG_SYSLOG);
-    } else if (!strcmp(v_str, "shm")) {
-        cfgTransportTypeSet(config, c, CFG_SHM);
-    }
-}
-
-static void
-processHost(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
-    which_transport_t c = config->transport_context;
-    cfgTransportHostSet(config, c, v_str);
-}
-
-static void
-processPort(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
-    which_transport_t c = config->transport_context;
-    cfgTransportPortSet(config, c, v_str);
-}
-
-static void
-processPath(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-    char* v_str = (char *)node->data.scalar.value;
-    which_transport_t c = config->transport_context;
-    cfgTransportPathSet(config, c, v_str);
-}
-
-static void
-processTransport(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_MAPPING_NODE) return;
-
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "type",       processTransportType},
-        {YAML_SCALAR_NODE,  "host",       processHost},
-        {YAML_SCALAR_NODE,  "port",       processPort},
-        {YAML_SCALAR_NODE,  "path",       processPath},
-        {YAML_NO_NODE, NULL, NULL}
-    };
-
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePair(t, pair, config, doc);
-    }
-}
-
-static void
-processLogging(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_MAPPING_NODE) return;
-
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "level",      processLevel},
-        {YAML_MAPPING_NODE, "transport",  processTransport},
-        {YAML_NO_NODE, NULL, NULL}
-    };
-
-    // Remember that we're currently processing logging
-    config->transport_context = CFG_LOG;
-
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePair(t, pair, config, doc);
-    }
-}
-
-static void
-processTags(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_SEQUENCE_NODE) return;
-
-    yaml_node_item_t* item;
-    foreach(item, node->data.sequence.items) {
-        yaml_node_t* i = yaml_document_get_node(doc, *item);
-        if (i->type != YAML_MAPPING_NODE) continue;
-
-        yaml_node_pair_t* pair = i->data.mapping.pairs.start;
-        yaml_node_t* key = yaml_document_get_node(doc, pair->key);
-        yaml_node_t* value = yaml_document_get_node(doc, pair->value);
-        if (key->type != YAML_SCALAR_NODE) return;
-        if (value->type != YAML_SCALAR_NODE) return;
-
-        const char* key_str = (const char*)key->data.scalar.value;
-        const char* value_str = (const char*)value->data.scalar.value;
-
-        cfgCustomTagAddFromStr(config, key_str, value_str);
-    }
-}
-
-static void
-processFormatType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (const char *)node->data.scalar.value;
-    cfgOutFormatSetFromStr(config, value);
-}
-
-static void
-processStatsDPrefix(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (const char *)node->data.scalar.value;
-    cfgOutStatsDPrefixSetFromStr(config, value);
-}
-
-static void
-processStatsDMaxLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (const char *)node->data.scalar.value;
-    cfgOutStatsDMaxLenSetFromStr(config, value);
-}
-
-static void
-processVerbosity(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (const char *)node->data.scalar.value;
-    cfgOutVerbositySetFromStr(config, value);
-}
-
-static void
-processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_MAPPING_NODE) return;
-
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "type",            processFormatType},
-        {YAML_SCALAR_NODE,  "statsdprefix",    processStatsDPrefix},
-        {YAML_SCALAR_NODE,  "statsdmaxlen",    processStatsDMaxLen},
-        {YAML_SCALAR_NODE,  "verbosity",       processVerbosity},
-        {YAML_SEQUENCE_NODE, "tags",           processTags},
-        {YAML_NO_NODE, NULL, NULL}
-    };
-
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePair(t, pair, config, doc);
-    }
-
-}
-
-static void
-processSummaryPeriod(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (const char *)node->data.scalar.value;
-    cfgOutPeriodSetFromStr(config, value);
-}
-
-static void
-processCommandPath(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-    const char* value = (const char *)node->data.scalar.value;
-    cfgOutCmdPathSetFromStr(config, value);
-}
-
-static void
-processOutput(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    if (node->type != YAML_MAPPING_NODE) return;
-
-    parse_table_t t[] = {
-        {YAML_MAPPING_NODE, "format",          processFormat},
-        {YAML_MAPPING_NODE, "transport",       processTransport},
-        {YAML_SCALAR_NODE,  "summaryperiod",   processSummaryPeriod},
-        {YAML_SCALAR_NODE,  "commandpath",     processCommandPath},
-        {YAML_NO_NODE, NULL, NULL}
-    };
-
-    // Remember that we're currently processing output
-    config->transport_context = CFG_OUT;
-
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePair(t, pair, config, doc);
-    }
-}
-
-static void
-setConfigFromDoc(config_t* config, yaml_document_t* doc)
-{
-    yaml_node_t* node = yaml_document_get_root_node(doc);
-    if (node->type != YAML_MAPPING_NODE) return;
-
-    parse_table_t t[] = {
-        {YAML_MAPPING_NODE,  "output",             processOutput},
-        {YAML_MAPPING_NODE,  "logging",            processLogging},
-        {YAML_NO_NODE, NULL, NULL}
-    };
-
-    yaml_node_pair_t* pair;
-    foreach (pair, node->data.mapping.pairs) {
-        processKeyValuePair(t, pair, config, doc);
-    }
-}
-
-config_t*
-cfgRead(const char* path)
-{
-    FILE* f = NULL;
-    config_t* config = NULL;
-    int parser_successful = 0;
-    int doc_successful = 0;
-    yaml_parser_t parser;
-    yaml_document_t doc;
-    FILE *(*fnopen)(const char *, const char *);
-
-    fnopen = dlsym(RTLD_NEXT, "fopen");
-    if (!fnopen) goto cleanup;
-    
-    config = cfgCreateDefault();
-    if (!config) goto cleanup;
-
-    f = fnopen(path, "rb");
-    if (!f) goto cleanup;
-
-    parser_successful = yaml_parser_initialize(&parser);
-    if (!parser_successful) goto cleanup;
-
-    yaml_parser_set_input_file(&parser, f);
-
-    doc_successful = yaml_parser_load(&parser, &doc);
-    if (!doc_successful) goto cleanup;
-
-    // This is where the magic happens
-    setConfigFromDoc(config, &doc);
-
-cleanup:    
-    if (doc_successful) yaml_document_delete(&doc);
-    if (parser_successful) yaml_parser_delete(&parser);
-    if (f) fclose(f);
-    return config;
-}
-#else
-config_t*
-cfgRead(const char* path)
-{
-    return cfgCreateDefault();
-}
-#endif
 
 void
 cfgDestroy(config_t** cfg)
@@ -398,12 +120,13 @@ cfgDestroy(config_t** cfg)
     if (!cfg || !*cfg) return;
     config_t* c = *cfg;
     if (c->out.statsd.prefix) free(c->out.statsd.prefix);
-    if (c->out.commandpath) free(c->out.commandpath);
+    if (c->out.commanddir) free(c->out.commanddir);
+    if (c->evt.logfilefilter) free(c->evt.logfilefilter);
     which_transport_t t;
     for (t=CFG_OUT; t<CFG_WHICH_MAX; t++) {
         if (c->transport[t].udp.host) free(c->transport[t].udp.host);
         if (c->transport[t].udp.port) free(c->transport[t].udp.port);
-        if (c->transport[t].path) free(c->transport[t].path);
+        if (c->transport[t].file.path) free(c->transport[t].file.path);
     }
     if (c->tags) {
         int i = 0;
@@ -447,10 +170,45 @@ cfgOutPeriod(config_t* cfg)
 }
 
 const char *
-cfgOutCmdPath(config_t* cfg)
+cfgCmdDir(config_t* cfg)
 {
-    return (cfg) ? cfg->out.commandpath : DEFAULT_COMMAND_PATH;
+    return (cfg) ? cfg->out.commanddir : DEFAULT_COMMAND_DIR;
 }
+
+cfg_out_format_t
+cfgEventFormat(config_t* cfg)
+{
+    return (cfg) ? cfg->evt.format : DEFAULT_EVT_FORMAT;
+}
+
+const char*
+cfgEventLogFileFilter(config_t* cfg)
+{
+    return (cfg) ? cfg->evt.logfilefilter : DEFAULT_LOG_FILE_FILTER;
+}
+
+unsigned
+cfgEventSource(config_t* cfg, cfg_evt_t evt)
+{
+    if (cfg && evt < CFG_SRC_MAX) {
+        return cfg->evt.src[evt];
+    }
+
+    switch (evt) {
+        case CFG_SRC_LOGFILE:
+            return DEFAULT_SRC_LOGFILE;
+        case CFG_SRC_CONSOLE:
+            return DEFAULT_SRC_CONSOLE;
+        case CFG_SRC_SYSLOG:
+            return DEFAULT_SRC_SYSLOG;
+        case CFG_SRC_METRIC:
+            return DEFAULT_SRC_METRIC;
+        default:
+            DBG(NULL);
+            return DEFAULT_SRC_LOGFILE;
+    }
+}
+
 
 unsigned
 cfgOutVerbosity(config_t* cfg)
@@ -468,6 +226,8 @@ cfgTransportType(config_t* cfg, which_transport_t t)
     switch (t) {
         case CFG_OUT:
             return DEFAULT_OUT_TYPE;
+        case CFG_EVT:
+            return DEFAULT_EVT_TYPE;
         case CFG_LOG:
             return DEFAULT_LOG_TYPE;
         default:
@@ -486,6 +246,8 @@ cfgTransportHost(config_t* cfg, which_transport_t t)
     switch (t) {
         case CFG_OUT:
             return DEFAULT_OUT_HOST;
+        case CFG_EVT:
+            return DEFAULT_EVT_HOST;
         case CFG_LOG:
             return DEFAULT_LOG_HOST;
         default:
@@ -504,6 +266,8 @@ cfgTransportPort(config_t* cfg, which_transport_t t)
     switch (t) {
         case CFG_OUT:
             return DEFAULT_OUT_PORT;
+        case CFG_EVT:
+            return DEFAULT_EVT_PORT;
         case CFG_LOG:
             return DEFAULT_LOG_PORT;
         default:
@@ -516,17 +280,39 @@ const char*
 cfgTransportPath(config_t* cfg, which_transport_t t)
 {
     if (cfg && t  < CFG_WHICH_MAX) {
-        return cfg->transport[t].path;
+        return cfg->transport[t].file.path;
     }
 
     switch (t) {
         case CFG_OUT:
             return DEFAULT_OUT_PATH;
+        case CFG_EVT:
+            return DEFAULT_EVT_PATH;
         case CFG_LOG:
             return DEFAULT_LOG_PATH;
         default:
             DBG("%d", t);
             return DEFAULT_LOG_PATH;
+    }
+}
+
+cfg_buffer_t
+cfgTransportBuf(config_t* cfg, which_transport_t t)
+{
+    if (cfg && t < CFG_WHICH_MAX) {
+        return cfg->transport[t].file.buf_policy;
+    }
+
+    switch (t) {
+        case CFG_OUT:
+            return DEFAULT_OUT_BUF;
+        case CFG_EVT:
+            return DEFAULT_EVT_BUF;
+        case CFG_LOG:
+            return DEFAULT_LOG_BUF;
+        default:
+            DBG("%d", t);
+            return DEFAULT_LOG_BUF;
     }
 }
 
@@ -565,7 +351,7 @@ cfgCustomTagValue(config_t* cfg, const char* tagName)
 cfg_log_level_t
 cfgLogLevel(config_t* cfg)
 {
-    return (cfg) ? cfg->level : DEFAULT_LOG_LEVEL;
+    return (cfg) ? cfg->log.level : DEFAULT_LOG_LEVEL;
 }
 
 ///////////////////////////////////
@@ -620,16 +406,16 @@ cfgOutPeriodSet(config_t* cfg, unsigned val)
 }
 
 void
-cfgOutCmdPathSet(config_t* cfg, const char* path)
+cfgCmdDirSet(config_t* cfg, const char* path)
 {
     if (!cfg) return;
-    if (cfg->out.commandpath) free(cfg->out.commandpath);
+    if (cfg->out.commanddir) free(cfg->out.commanddir);
     if (!path || (path[0] == '\0')) {
-        cfg->out.commandpath = strdup(DEFAULT_COMMAND_PATH);
+        cfg->out.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
         return;
     }
 
-    cfg->out.commandpath = strdup(path);
+    cfg->out.commanddir = strdup(path);
 }
 
 void
@@ -638,6 +424,32 @@ cfgOutVerbositySet(config_t* cfg, unsigned val)
     if (!cfg) return;
     if (val > CFG_MAX_VERBOSITY) val = CFG_MAX_VERBOSITY;
     cfg->out.verbosity = val;
+}
+
+void
+cfgEventFormatSet(config_t* cfg, cfg_out_format_t fmt)
+{
+    if (!cfg || fmt >= CFG_FORMAT_MAX) return;
+    cfg->evt.format = fmt;
+}
+
+void
+cfgEventLogFileFilterSet(config_t* cfg,  const char* filter)
+{
+    if (!cfg) return;
+    if (cfg->evt.logfilefilter) free (cfg->evt.logfilefilter);
+    if (!filter || (filter[0] == '\0')) {
+        cfg->evt.logfilefilter = (DEFAULT_LOG_FILE_FILTER) ? strdup(DEFAULT_LOG_FILE_FILTER) : NULL;
+        return;
+    }
+    cfg->evt.logfilefilter = strdup(filter);
+}
+
+void
+cfgEventSourceSet(config_t* cfg, cfg_evt_t evt, unsigned val)
+{
+    if (!cfg || evt >= CFG_SRC_MAX) return;
+    cfg->evt.src[evt] = val;
 }
 
 void
@@ -667,8 +479,15 @@ void
 cfgTransportPathSet(config_t* cfg, which_transport_t t, const char* path)
 {
     if (!cfg || t >= CFG_WHICH_MAX) return;
-    if (cfg->transport[t].path) free(cfg->transport[t].path);
-    cfg->transport[t].path = (path) ? strdup(path) : NULL;
+    if (cfg->transport[t].file.path) free(cfg->transport[t].file.path);
+    cfg->transport[t].file.path = (path) ? strdup(path) : NULL;
+}
+
+void
+cfgTransportBufSet(config_t* cfg, which_transport_t t, cfg_buffer_t buf_policy)
+{
+    if (!cfg || t >= CFG_WHICH_MAX) return;
+    cfg->transport[t].file.buf_policy = buf_policy;
 }
 
 void
@@ -738,126 +557,5 @@ void
 cfgLogLevelSet(config_t* cfg, cfg_log_level_t level)
 {
     if (!cfg) return;
-    cfg->level = level;
-}
-
-void
-cfgOutFormatSetFromStr(config_t* cfg, const char* value)
-{
-    if (!cfg || !value) return;
-    if (!strcmp(value, "expandedstatsd")) {
-        cfgOutFormatSet(cfg, CFG_EXPANDED_STATSD);
-    } else if (!strcmp(value, "newlinedelimited")) {
-        cfgOutFormatSet(cfg, CFG_NEWLINE_DELIMITED);
-    }
-}
-
-void
-cfgOutStatsDPrefixSetFromStr(config_t* cfg, const char* value)
-{
-    // A little silly to define passthrough function
-    // but this keeps the interface consistent.
-    cfgOutStatsDPrefixSet(cfg, value);
-}
-
-void
-cfgOutStatsDMaxLenSetFromStr(config_t* cfg, const char* value)
-{
-    if (!cfg || !value) return;
-    errno = 0;
-    char* endptr = NULL;
-    unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
-
-    cfgOutStatsDMaxLenSet(cfg, x);
-}
-
-void
-cfgOutPeriodSetFromStr(config_t* cfg, const char* value)
-{
-    if (!cfg || !value) return;
-    errno = 0;
-    char* endptr = NULL;
-    unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
-
-    cfgOutPeriodSet(cfg, x);
-}
-
-void
-cfgOutCmdPathSetFromStr(config_t* cfg, const char* value)
-{
-    if (!cfg || !value) return;
-    cfgOutCmdPathSet(cfg, value);
-}
-
-void
-cfgOutVerbositySetFromStr(config_t* cfg, const char* value)
-{
-    if (!cfg || !value) return;
-    errno = 0;
-    char* endptr = NULL;
-    unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
-
-    cfgOutVerbositySet(cfg, x);
-}
-
-void
-cfgTransportSetFromStr(config_t* cfg, which_transport_t t, const char* value)
-{
-    if (!cfg || !value) return;
-
-    // see if value starts with udp:// or file://
-    if (value == strstr(value, "udp://")) {
-
-        // copied to avoid directly modifing the process's env variable
-        char value_cpy[1024];
-        strncpy(value_cpy, value, sizeof(value_cpy));
-
-        char* host = value_cpy + strlen("udp://");
-
-        // convert the ':' to a null delimiter for the host
-        // and move port past the null
-        char *port = strrchr(host, ':');
-        if (!port) return;  // port is *required*
-        *port = '\0';
-        port++;
-
-        cfgTransportTypeSet(cfg, t, CFG_UDP);
-        cfgTransportHostSet(cfg, t, host);
-        cfgTransportPortSet(cfg, t, port);
-
-    } else if (value == strstr(value, "file://")) {
-        const char* path = value + strlen("file://");
-        cfgTransportTypeSet(cfg, t, CFG_FILE);
-        cfgTransportPathSet(cfg, t, path);
-    }
-}
-
-void
-cfgCustomTagAddFromStr(config_t* cfg, const char* name, const char* value)
-{
-    // A little silly to define passthrough function
-    // but this keeps the interface consistent.
-    cfgCustomTagAdd(cfg, name, value);
-}
-
-void
-cfgLogLevelSetFromStr(config_t* cfg, const char* value)
-{
-    if (!cfg || !value) return;
-    if (!strcmp(value, "debug")) {
-        cfgLogLevelSet(cfg, CFG_LOG_DEBUG);
-    } else if (!strcmp(value, "info")) {
-        cfgLogLevelSet(cfg, CFG_LOG_INFO);
-    } else if (!strcmp(value, "warning")) {
-        cfgLogLevelSet(cfg, CFG_LOG_WARN);
-    } else if (!strcmp(value, "error")) {
-        cfgLogLevelSet(cfg, CFG_LOG_ERROR);
-    } else if (!strcmp(value, "none")) {
-        cfgLogLevelSet(cfg, CFG_LOG_NONE);
-    } else if (!strcmp(value, "trace")) {
-        cfgLogLevelSet(cfg, CFG_LOG_TRACE);
-    }
+    cfg->log.level = level;
 }

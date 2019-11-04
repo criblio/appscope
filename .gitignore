@@ -4,6 +4,7 @@ coverage/
 .DS_Store
 *.pyc
 venv
+test/selfinterpose/
 
 test/testContainers/logs
 test/testContainers/docker-compose.override.yml

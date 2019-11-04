@@ -14,6 +14,7 @@ void                outDestroy(out_t**);
 // Accessors
 int                 outSend(out_t*, const char* msg);
 int                 outSendEvent(out_t*, event_t*);
+void                outFlush(out_t*);
 
 // Setters (modifies out_t, but does not persist modifications)
 void                outTransportSet(out_t*, transport_t*);

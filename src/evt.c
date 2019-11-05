@@ -149,6 +149,7 @@ evtConnect(evt_t *evt, config_t *cfg)
 {
     if (cfgTransportType(cfg, CFG_EVT) == CFG_TCP) {
         transport_t *trans;
+
         trans = transportCreateTCP(cfgTransportHost(cfg, CFG_EVT),
                                    cfgTransportPort(cfg, CFG_EVT));
         if (trans) {

@@ -165,7 +165,7 @@ transportCreateTCP(const char *host, const char *port)
     // Move this descriptor up out of the way
     if ((trans->net.sock = placeDescriptor(trans->net.sock, trans)) == -1) goto out;
 
-    // Set the socket to non blocking, and close on exec
+    // Set the socket to close on exec
     flags = trans->fcntl(trans->net.sock, F_GETFD, 0);
     if (trans->fcntl(trans->net.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
         DBG("%d %s %s", trans->net.sock, host, port);
@@ -226,6 +226,7 @@ transportCreateUdp(const char* host, const char* port)
     if (t->fcntl(t->net.sock, F_SETFL, flags | O_NONBLOCK) == -1) {
         DBG("%d %s %s", t->net.sock, host, port);
     }
+
     flags = t->fcntl(t->net.sock, F_GETFD, 0);
     if (t->fcntl(t->net.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
         DBG("%d %s %s", t->net.sock, host, port);

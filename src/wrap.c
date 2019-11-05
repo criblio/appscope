@@ -1869,7 +1869,7 @@ init(void)
     g_fn.__fgets_chk = dlsym(RTLD_NEXT, "__fgets_chk");
     g_fn.fgets_unlocked = dlsym(RTLD_NEXT, "fgets_unlocked");
     g_fn.fgetws = dlsym(RTLD_NEXT, "fgetws");
-    g_fn.__fgetws_chk = dlsym(RTLD_NEXT, "fgetws");
+    g_fn.__fgetws_chk = dlsym(RTLD_NEXT, "__fgetws_chk");
     g_fn.fgetwc = dlsym(RTLD_NEXT, "fgetwc");
     g_fn.fgetc = dlsym(RTLD_NEXT, "fgetc");
     g_fn.fscanf = dlsym(RTLD_NEXT, "fscanf");
@@ -4297,7 +4297,7 @@ __fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
     WRAP_CHECK(__fgetws_chk, NULL);
     IOSTREAMPRE(__fgetws_chk, wchar_t *);
     rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
-    IOSTREAMPOST(fgetws, ws, size, NULL, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(__fgetws_chk, ws, size, NULL, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON wchar_t *

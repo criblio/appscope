@@ -1,5 +1,5 @@
 #define _GNU_SOURCE
-#include "wrap.h"
+#include <stdlib.h>
 #include "dbg.h"
 #include "atomic.h"
 #include "circbuf.h"

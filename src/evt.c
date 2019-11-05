@@ -45,6 +45,13 @@ evtDestroy(evt_t** evt)
 {
     if (!evt || !*evt) return;
     evt_t* o = *evt;
+
+    evtEvents(o);       // Try to send events.  We're doing this in an
+                        // attempt to empty the evbuf before the evbuf
+                        // is destroyed.  Any events added after evtEvents
+                        // and before cbufFree wil be leaked.
+    cbufFree(o->evbuf);
+
     transportDestroy(&o->transport);
     if (o->log_file_re) {
         regfree(o->log_file_re);

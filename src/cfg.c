@@ -464,32 +464,17 @@ void
 cfgTransportHostSet(config_t* cfg, which_transport_t t, const char* host)
 {
     if (!cfg || t >= CFG_WHICH_MAX) return;
+    if (cfg->transport[t].net.host) free(cfg->transport[t].net.host);
+    cfg->transport[t].net.host = (host) ? strdup(host) : NULL;
 
-    if (cfgTransportType(cfg, t) == CFG_UDP) {
-        if (cfg->transport[t].net.host) free(cfg->transport[t].net.host);
-        cfg->transport[t].net.host = (host) ? strdup(host) : NULL;
-    }
-
-    if (cfgTransportType(cfg, t) == CFG_TCP) {
-        if (cfg->transport[t].net.host) free(cfg->transport[t].net.host);
-        cfg->transport[t].net.host = (host) ? strdup(host) : NULL;
-    }
 }
 
 void
 cfgTransportPortSet(config_t* cfg, which_transport_t t, const char* port)
 {
     if (!cfg || t >= CFG_WHICH_MAX) return;
-
-    if (cfgTransportType(cfg, t) == CFG_UDP) {
-        if (cfg->transport[t].net.port) free(cfg->transport[t].net.port);
-        cfg->transport[t].net.port = (port) ? strdup(port) : NULL;
-    }
-
-    if (cfgTransportType(cfg, t) == CFG_TCP) {
-        if (cfg->transport[t].net.port) free(cfg->transport[t].net.port);
-        cfg->transport[t].net.port = (port) ? strdup(port) : NULL;
-    }
+    if (cfg->transport[t].net.port) free(cfg->transport[t].net.port);
+    cfg->transport[t].net.port = (port) ? strdup(port) : NULL;
 }
 
 void

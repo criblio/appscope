@@ -256,6 +256,7 @@ evtMetric(evt_t* evt, const char *host, uint64_t uid, event_t *metric)
 
     if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore
+        DBG(NULL);
         free(msg);
     }
 
@@ -288,6 +289,7 @@ evtLog(evt_t *evt, const char *host, const char *path,
 
     if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore
+        DBG(NULL);
         free(msg);
     }
 

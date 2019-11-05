@@ -1037,17 +1037,13 @@ initEvt(config_t *cfg)
      * at this point. If so, it will connect later. As such,
      * it should not be treated as fatal. We'll get a
      * transport when we can connect.
-     *
-     * Otherwise, not TCP, if we can't get a transport, treat
-     * it as fatal.  
      */
     transport_t *trans = initTransport(cfg, CFG_EVT);
-    if (trans) {
-        evtTransportSet(evt, trans);
-    } else if (cfgTransportType(cfg, CFG_EVT) != CFG_TCP) {
+    if (!trans) {
         evtDestroy(&evt);
         return evt;
     }
+    evtTransportSet(evt, trans);
 
     format_t *fmt = fmtCreate(cfgEventFormat(cfg));
     if (!fmt) {

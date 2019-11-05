@@ -3195,6 +3195,23 @@ doCloseAllStreams()
     }
 }
 
+static int
+remotePortIsDNS(int sockfd)
+{
+    struct net_info_t *net = getNetEntry(sockfd);
+    if (!net) return FALSE;
+
+    return (GET_PORT(sockfd, net->remoteConn.ss_family, REMOTE) == DNS_PORT);
+}
+
+static int
+sockIsTCP(int sockfd)
+{
+    struct net_info_t *net = getNetEntry(sockfd);
+    if (!net) return FALSE;
+    return (net->type == SOCK_STREAM);
+}
+
 EXPORTON int
 close(int fd)
 {
@@ -3292,16 +3309,13 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
                   const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
-    struct net_info_t *net = getNetEntry(sockfd);
-
     WRAP_CHECK(__sendto_nocancel, -1);
     rc = g_fn.__sendto_nocancel(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
         scopeLog("__sendto_nocancel", sockfd, CFG_LOG_TRACE);
         doSetAddrs(sockfd);
 
-        if (net &&
-            GET_PORT(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
+        if (remotePortIsDNS(sockfd)) {
             getDNSName(sockfd, (void *)buf, len);
         }
 
@@ -3915,14 +3929,10 @@ socket(int socket_family, int socket_type, int protocol)
     WRAP_CHECK(socket, -1);
     sd = g_fn.socket(socket_family, socket_type, protocol);
     if (sd != -1) {
-        struct net_info_t *net;
-
         scopeLog("socket", sd, CFG_LOG_DEBUG);
         addSock(sd, socket_type);
 
-        if (((net  = getNetEntry(sd)) != NULL) &&
-            ((socket_family == AF_INET) ||
-             (socket_family == AF_INET6))) {
+        if ((socket_family == AF_INET) || (socket_family == AF_INET6)) {
 
             /*
              * State used in close()
@@ -3961,17 +3971,13 @@ EXPORTON int
 listen(int sockfd, int backlog)
 {
     int rc;
-    struct net_info_t *net = getNetEntry(sockfd);
-
     WRAP_CHECK(listen, -1);
     rc = g_fn.listen(sockfd, backlog);
     if (rc != -1) {
         scopeLog("listen", sockfd, CFG_LOG_DEBUG);
 
-        if (net) {
-            doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED, 1);
-            doNetMetric(NET_CONNECTIONS, sockfd, EVENT_BASED, 1);
-        }
+        doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED, 1);
+        doNetMetric(NET_CONNECTIONS, sockfd, EVENT_BASED, 1);
     } else {
         doErrorMetric(NET_ERR_CONN, EVENT_BASED, "listen", "nopath");
     }
@@ -4033,11 +4039,9 @@ EXPORTON int
 connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int rc;
-    struct net_info_t *net = getNetEntry(sockfd);
-
     WRAP_CHECK(connect, -1);
     rc = g_fn.connect(sockfd, addr, addrlen);
-    if ((rc != -1) && net) {
+    if (rc != -1) {
         doSetConnection(sockfd, addr, addrlen, REMOTE);
         doNetMetric(NET_CONNECTIONS, sockfd, EVENT_BASED, 1);
 
@@ -4053,14 +4057,11 @@ EXPORTON ssize_t
 send(int sockfd, const void *buf, size_t len, int flags)
 {
     ssize_t rc;
-    struct net_info_t *net = getNetEntry(sockfd);
-
     WRAP_CHECK(send, -1);
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
         scopeLog("send", sockfd, CFG_LOG_TRACE);
-        if (net &&
-            GET_PORT(sockfd, net->remoteConn.ss_family, REMOTE) == DNS_PORT) {
+        if (remotePortIsDNS(sockfd)) {
             getDNSName(sockfd, (void *)buf, len);
         }
 
@@ -4077,16 +4078,13 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
        const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
-    struct net_info_t *net = getNetEntry(sockfd);
-    
     WRAP_CHECK(sendto, -1);
     rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
     if (rc != -1) {
         scopeLog("sendto", sockfd, CFG_LOG_TRACE);
         doSetConnection(sockfd, dest_addr, addrlen, REMOTE);
 
-        if (net &&
-            GET_PORT(sockfd, net->remoteConn.ss_family, REMOTE) == DNS_PORT) {
+        if (remotePortIsDNS(sockfd)) {
             getDNSName(sockfd, (void *)buf, len);
         }
 
@@ -4102,7 +4100,6 @@ EXPORTON ssize_t
 sendmsg(int sockfd, const struct msghdr *msg, int flags)
 {
     ssize_t rc;
-    struct net_info_t *net = getNetEntry(sockfd);
     
     WRAP_CHECK(sendmsg, -1);
     rc = g_fn.sendmsg(sockfd, msg, flags);
@@ -4110,7 +4107,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
         scopeLog("sendmsg", sockfd, CFG_LOG_TRACE);
 
         // For UDP connections the msg is a remote addr
-        if (net && msg && (net->type != SOCK_STREAM)) {
+        if (msg && !sockIsTCP(sockfd)) {
             if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
                 doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
                                 sizeof(struct sockaddr_in6), REMOTE);
@@ -4120,7 +4117,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
             }
         }
 
-        if (net && GET_PORT(sockfd, net->remoteConn.ss_family, REMOTE) == DNS_PORT) {
+        if (remotePortIsDNS(sockfd)) {
             getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
         }
         
@@ -4177,7 +4174,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
         scopeLog("recvmsg", sockfd, CFG_LOG_TRACE);
 
         // For UDP connections the msg is a remote addr
-        if (msg && getNetEntry(sockfd)) {
+        if (msg) {
             if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
                 doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
                                 sizeof(struct sockaddr_in6), REMOTE);

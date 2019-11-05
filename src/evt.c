@@ -44,21 +44,21 @@ void
 evtDestroy(evt_t** evt)
 {
     if (!evt || !*evt) return;
-    evt_t* o = *evt;
+    evt_t *edestroy  = *evt;
 
-    evtEvents(o);       // Try to send events.  We're doing this in an
-                        // attempt to empty the evbuf before the evbuf
-                        // is destroyed.  Any events added after evtEvents
-                        // and before cbufFree wil be leaked.
-    cbufFree(o->evbuf);
+    evtEvents(edestroy); // Try to send events.  We're doing this in an
+                         // attempt to empty the evbuf before the evbuf
+                         // is destroyed.  Any events added after evtEvents
+                         // and before cbufFree wil be leaked.
+    cbufFree(edestroy->evbuf);
 
-    transportDestroy(&o->transport);
-    if (o->log_file_re) {
-        regfree(o->log_file_re);
-        free(o->log_file_re);
+    transportDestroy(&edestroy->transport);
+    if (edestroy->log_file_re) {
+        regfree(edestroy->log_file_re);
+        free(edestroy->log_file_re);
     }
-    fmtDestroy(&o->format);
-    free(o);
+    fmtDestroy(&edestroy->format);
+    free(edestroy);
     *evt = NULL;
 }
 
@@ -237,7 +237,9 @@ evtMetric(evt_t* evt, const char *host, uint64_t uid, event_t *metric)
     struct timeb tb;
     char ts[128];
 
-    if (!evt || !metric) return -1;
+    if (!evt || !metric ||
+        (evtSource(evt, CFG_SRC_METRIC) == DEFAULT_SRC_METRIC))
+        return -1;
 
     ftime(&tb);
     snprintf(ts, sizeof(ts), "%ld.%d", tb.time, tb.millitm);
@@ -257,6 +259,7 @@ evtMetric(evt_t* evt, const char *host, uint64_t uid, event_t *metric)
 
     if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore
+        DBG(NULL);
         free(msg);
     }
 
@@ -289,6 +292,7 @@ evtLog(evt_t *evt, const char *host, const char *path,
 
     if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore
+        DBG(NULL);
         free(msg);
     }
 

@@ -217,6 +217,11 @@ testNoInterposedSymbolIsUsed(void** state)
         fail_msg("expected at least 17 files in ./test/selfinterpose/*.o");
     int i;
     for (i=0; i<glob_obj.gl_pathc; i++) {
+        if (strstr(glob_obj.gl_pathv[i], "test.o")) {
+            printf("Skipping %s because it looks like a test file.\n",
+                   glob_obj.gl_pathv[i]);
+            continue;
+        }
         checkObjectFile(interpose_list, glob_obj.gl_pathv[i], &s);
     }
     globfree(&glob_obj);

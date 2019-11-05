@@ -4297,7 +4297,7 @@ __fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
     WRAP_CHECK(__fgetws_chk, NULL);
     IOSTREAMPRE(__fgetws_chk, wchar_t *);
     rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
-    IOSTREAMPOST(fgetws, ws, size, NULL, (enum event_type_t)EVENT_RX);
+    IOSTREAMPOST(__fgetws_chk, ws, size, NULL, (enum event_type_t)EVENT_RX);
 }
 
 EXPORTON wchar_t *

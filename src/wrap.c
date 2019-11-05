@@ -25,7 +25,7 @@ static evt_t *g_prevevt = NULL;
 __thread int g_getdelim = 0;
 
 // Forward declaration
-static void * periodic(void *);
+static void *periodic(void *);
 static void doClose(int, const char *);
 static void doConfig(config_t *);
 static void doOpen(int, const char *, enum fs_type_t, const char *);
@@ -393,11 +393,6 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
             atomicAddU64(value, 1);
         }
 
-        // Only report if enabled
-        if ((g_cfg.summarize.net.error) && (source == EVENT_BASED)) {
-            return;
-        }
-
         // Don't report zeros.
         if (*value == 0) return;
 
@@ -411,8 +406,16 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
             FIELDEND
         };
 
-        event_t e = {"net.error", *value, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
+        event_t netErrMetric = {"net.error", *value, DELTA, fields};
+
+        evtMetric(g_evt, g_cfg.hostname, getTime(), &netErrMetric);
+
+        // Only report if enabled
+        if ((g_cfg.summarize.net.error) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        if (outSendEvent(g_out, &netErrMetric)) {
             scopeLog("ERROR: doErrorMetric:NET:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
@@ -471,11 +474,6 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
             atomicAddU64(value, 1);
         }
 
-        // Only report if enabled
-        if (*summarize && (source == EVENT_BASED)) {
-            return;
-        }
-
         // Don't report zeros.
         if (*value == 0) return;
 
@@ -490,8 +488,16 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
             FIELDEND
         };
 
-        event_t e = {metric, *value, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
+        event_t fsErrMetric = {metric, *value, DELTA, fields};
+
+        evtMetric(g_evt, g_cfg.hostname, getTime(), &fsErrMetric);
+
+        // Only report if enabled
+        if (*summarize && (source == EVENT_BASED)) {
+            return;
+        }
+
+        if (outSendEvent(g_out, &fsErrMetric)) {
             scopeLog("ERROR: doErrorMetric:FS_ERR:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
@@ -514,11 +520,6 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
     {
         atomicAddU64(&g_ctrs.numDNS, 1);
 
-        // Only report if enabled
-        if (g_cfg.summarize.net.dns) {
-            return;
-        }
-
         // Don't report zeros.
         if (g_ctrs.numDNS == 0) return;
 
@@ -532,8 +533,16 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
             FIELDEND
         };
 
-        event_t e = {"net.dns", g_ctrs.numDNS, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
+        event_t dnsMetric = {"net.dns", g_ctrs.numDNS, DELTA, fields};
+
+        evtMetric(g_evt, g_cfg.hostname, getTime(), &dnsMetric);
+
+        // Only report if enabled
+        if (g_cfg.summarize.net.dns) {
+            return;
+        }
+
+        if (outSendEvent(g_out, &dnsMetric)) {
             scopeLog("ERROR: doDNSMetricName:DNS:outSendEvent", -1, CFG_LOG_ERROR);
         }
         atomicSwapU64(&g_ctrs.numDNS, 0);
@@ -545,20 +554,15 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
         atomicAddU64(&g_ctrs.dnsDurationNum, 1);
         atomicAddU64(&g_ctrs.dnsDurationTotal, duration);
 
-        // Only report if enabled
-        if (g_cfg.summarize.net.dns) {
-            return;
-        }
-
-        uint64_t d = 0ULL;
+        uint64_t dur = 0ULL;
         int cachedDurationNum = g_ctrs.dnsDurationNum; // avoid div by zero
         if (cachedDurationNum >= 1) {
             // factor of 1000000 converts ns to ms.
-            d = g_ctrs.dnsDurationTotal / ( 1000000 * cachedDurationNum);
+            dur = g_ctrs.dnsDurationTotal / ( 1000000 * cachedDurationNum);
         }
 
         // Don't report zeros.
-        if (d == 0ULL) return;
+        if (dur == 0ULL) return;
 
         event_field_t fields[] = {
             PROC_FIELD(g_cfg.procname),
@@ -570,8 +574,16 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
             FIELDEND
         };
 
-        event_t e = {"net.dns.duration", d, DELTA_MS, fields};
-        if (outSendEvent(g_out, &e)) {
+        event_t dnsDurMetric = {"net.dns.duration", dur, DELTA_MS, fields};
+
+        evtMetric(g_evt, g_cfg.hostname, getTime(), &dnsDurMetric);
+
+        // Only report if enabled
+        if (g_cfg.summarize.net.dns) {
+            return;
+        }
+
+        if (outSendEvent(g_out, &dnsDurMetric)) {
             scopeLog("ERROR: doDNSMetricName:DNS_DURATION:outSendEvent", -1, CFG_LOG_ERROR);
         }
         atomicSwapU64(&g_ctrs.dnsDurationNum, 0);
@@ -790,12 +802,11 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             atomicAddU64(global_counter, size); // not by fd
         }
 
-        // Only report if enabled
-        if ((g_cfg.summarize.fs.read_write) && (source == EVENT_BASED)) {
-            return;
-        }
-
-        // Don't report zeros.
+        /* 
+         * Don't report zeros.
+         * I think doing this here is right, even if we are 
+         * doing events, we don't want to report 0's.
+         */
         if (*sizebytes == 0ULL) return;
 
         event_field_t fields[] = {
@@ -809,8 +820,18 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             UNIT_FIELD("byte"),
             FIELDEND
         };
-        event_t e = {metric, *sizebytes, HISTOGRAM, fields};
-        if (outSendEvent(g_out, &e)) {
+
+        event_t rwMetric = {metric, *sizebytes, HISTOGRAM, fields};
+
+        //evtMetric(g_evt, g_cfg.hostname, g_fsinfo[fd].uid, &rwMetric);
+
+        // Only report if enabled
+        if ((g_cfg.summarize.fs.read_write) && (source == EVENT_BASED)) {
+            return;
+        }
+
+
+        if (outSendEvent(g_out, &rwMetric)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
 
@@ -1237,10 +1258,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             atomicAddU64(&g_ctrs.netrxBytes, size);
         }
 
-        if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
-            return;
-        }
-
         // Don't report zeros.
         if (g_netinfo[fd].rxBytes == 0ULL) return;
 
@@ -1309,8 +1326,16 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             UNIT_FIELD("byte"),
             FIELDEND
         };
-        event_t e = {"net.rx", g_netinfo[fd].rxBytes, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
+
+        event_t rxMetric = {"net.rx", g_netinfo[fd].rxBytes, DELTA, fields};
+
+        evtMetric(g_evt, g_cfg.hostname, g_netinfo[fd].uid, &rxMetric);
+
+        if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        if (outSendEvent(g_out, &rxMetric)) {
             scopeLog("ERROR: doNetMetric:NETRX:outSendEvent", -1, CFG_LOG_ERROR);
         }
 
@@ -1332,10 +1357,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             atomicAddU64(&g_netinfo[fd].numTX, 1);
             atomicAddU64(&g_netinfo[fd].txBytes, size);
             atomicAddU64(&g_ctrs.nettxBytes, size);
-        }
-
-        if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
-            return;
         }
 
         // Don't report zeros.
@@ -1406,8 +1427,16 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             UNIT_FIELD("byte"),
             FIELDEND
         };
-        event_t e = {"net.tx", g_netinfo[fd].txBytes, DELTA, fields};
-        if (outSendEvent(g_out, &e)) {
+
+        event_t txMetric = {"net.tx", g_netinfo[fd].txBytes, DELTA, fields};
+
+        evtMetric(g_evt, g_cfg.hostname, g_netinfo[fd].uid, &txMetric);
+
+        if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        if (outSendEvent(g_out, &txMetric)) {
             scopeLog("ERROR: doNetMetric:NETTX:outSendEvent", -1, CFG_LOG_ERROR);
         }
 

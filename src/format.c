@@ -295,7 +295,7 @@ fmtEventJson(format_t *fmt, event_format_t *sev)
                                       YAML_DOUBLE_QUOTED_SCALAR_STYLE);
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
-    rv = snprintf(numbuf, sizeof(numbuf), "%lu" PRIu64, sev->uid);
+    rv = snprintf(numbuf, sizeof(numbuf), "%lu", sev->uid);
     if (rv <= 0) goto cleanup;
 
     rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
@@ -335,6 +335,9 @@ metricJsonSize(event_t *metric)
     event_field_t *fld;
 
     if (!metric) return 0;
+
+    size += strlen(metric->name);
+    size += sizeof(long long) * 2;
 
     for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
         switch (fld->value_type) {
@@ -394,6 +397,19 @@ fmtMetricJson(format_t *fmt, event_t *metric)
                                              YAML_FLOW_MAPPING_STYLE);
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
+    // add the base metric definition
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)metric->name, strlen(metric->name),
+                                      0, 1, YAML_SINGLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    rv = snprintf(numbuf, sizeof(numbuf), "%llu", metric->value);
+    if (rv <= 0) goto cleanup;
+
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
+                                      (yaml_char_t*)numbuf, rv, 1, 0, YAML_PLAIN_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
     // Start adding key:value entries
     for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
         // "Tag"
@@ -409,7 +425,7 @@ fmtMetricJson(format_t *fmt, event_t *metric)
                                               0, 1, YAML_SINGLE_QUOTED_SCALAR_STYLE);
             if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
         } else if (fld->value_type == FMT_NUM) {
-                rv = snprintf(numbuf, sizeof(numbuf), "%llu" PRIu64, fld->value.num);
+                rv = snprintf(numbuf, sizeof(numbuf), "%lld" , fld->value.num);
                 if (rv <= 0) goto cleanup;
 
                 rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
@@ -518,6 +534,7 @@ fmtString(format_t* fmt, event_t* e)
         case CFG_METRIC_STATSD:
             return fmtStatsDString(fmt, e);
         case CFG_METRIC_JSON:
+        case CFG_EVENT_JSON_RAW_JSON:
             return fmtMetricJson(fmt, e);
         default:
             DBG("%d %s", fmt->format, e->name);

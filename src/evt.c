@@ -237,7 +237,7 @@ evtMetric(evt_t* evt, const char *host, uint64_t uid, event_t *metric)
     struct timeb tb;
     char ts[128];
 
-    if (!evt || !metric ||
+    if (!evt || !metric || !host ||
         (evtSource(evt, CFG_SRC_METRIC) == DEFAULT_SRC_METRIC))
         return -1;
 

@@ -55,7 +55,7 @@ test: $(C_FILES)
 	test/execute.sh
 	# see file:///Users/cribl/scope/coverage/index.html
 
-$(YAML_AR):
+$(YAML_AR): $(YAML_SRC)
 	@echo "Building libyaml"
 	cd ./contrib/libyaml && ./bootstrap
 	cd ./contrib/libyaml && ./configure LIBS=-ldl

@@ -18,6 +18,10 @@ services:
       context: .
       dockerfile: ./nginx/Dockerfile
 
+  kafka:
+    build:
+      context: .
+      dockerfile: ./kafka/Dockerfile
 
   interposed_func:
     build:

@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
-#include "wrap.h"
+#include <stdio.h>
+#include "dbg.h"
 #include "circbuf.h"
 #include "test.h"
 
@@ -51,9 +52,13 @@ circbufPutGetTest(void **state)
     assert_int_equal(cbufPut(ch, data), 0);
     data = 5;
     assert_int_equal(cbufPut(ch, data), 0);
+
     // should not accept a new entry
+    assert_int_equal(dbgCountMatchingLines("src/circbuf.c"), 0);
     data = 6;
     assert_int_equal(cbufPut(ch, data), -1);
+    assert_int_equal(dbgCountMatchingLines("src/circbuf.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
 
     // Did we get the correct data?
     assert_int_equal(cbufGet(ch, &data), 0);
@@ -81,7 +86,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(circbufInitGetsBuf),
         cmocka_unit_test(circbufResetTest),
         cmocka_unit_test(circbufCapacityTest),
-        cmocka_unit_test(circbufPutGetTest)
+        cmocka_unit_test(circbufPutGetTest),
+        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

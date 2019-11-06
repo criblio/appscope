@@ -1,6 +1,7 @@
 #ifndef __CIRCBUF_H__
 #define __CIRCBUF_H__
 #include <stdint.h>
+#include <unistd.h>
 
 /*
  * Note:

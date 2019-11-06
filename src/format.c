@@ -194,7 +194,7 @@ static size_t
 eventJsonSize(event_format_t *event)
 {
     if (!event || !event->src || !event->datasize || !event->timesize) return 0;
-    size_t size = sizeof("{'_time': '', 'host': '', 'source': '', '_raw': '', '_channel': ''}\n");
+    size_t size = sizeof("{'_time':,'source':'','_raw':'','host':'','_channel':''}");
 
     // time
     size += event->timesize;
@@ -202,10 +202,10 @@ eventJsonSize(event_format_t *event)
     size += strlen(event->src);
     // _raw
     size += event->datasize;
-    // _channel
-    size += sizeof(uint64_t);
     // host
     size += strlen(event->hostname);
+    // _channel
+    size += strlen("18446744073709551615");
     // fudge factor for things like escaped single quote characters.
     size += 256;
     return size;
@@ -237,6 +237,9 @@ fmtEventJson(format_t *fmt, event_format_t *sev)
     // Yaml init stuff
     emitter_created = yaml_emitter_initialize(&emitter);
     if (!emitter_created) goto cleanup;
+
+    yaml_emitter_set_unicode(&emitter, 1);
+
     yaml_emitter_set_output_string(&emitter, (yaml_char_t*)buf, bufsize,
                                    &bytes_written);
     emitter_opened = yaml_emitter_open(&emitter);
@@ -257,9 +260,9 @@ fmtEventJson(format_t *fmt, event_format_t *sev)
                                       YAML_DOUBLE_QUOTED_SCALAR_STYLE);
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)sev->timestamp, sev->timesize, 0, 1,
-                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_FLOAT_TAG,
+                                      (yaml_char_t*)sev->timestamp, sev->timesize, 1, 0,
+                                      YAML_PLAIN_SCALAR_STYLE);
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
     // SOURCE: "pathname" || "syslog" || "high cardinality metric" || ...
@@ -301,11 +304,11 @@ fmtEventJson(format_t *fmt, event_format_t *sev)
                                       YAML_DOUBLE_QUOTED_SCALAR_STYLE);
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
-    rv = snprintf(numbuf, sizeof(numbuf), "%lu", sev->uid);
+    rv = snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid);
     if (rv <= 0) goto cleanup;
 
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
-                                      (yaml_char_t*)numbuf, rv, 1, 0, YAML_PLAIN_SCALAR_STYLE);
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)numbuf, rv, 0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
     // Done with key:value entries
@@ -400,7 +403,7 @@ addJsonFields(format_t* fmt, event_field_t* fields, yaml_emitter_t* emitter)
                                               0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
             if (!rv || !yaml_emitter_emit(emitter, &event)) return FALSE;
         } else if (fld->value_type == FMT_NUM) {
-                rv = snprintf(numbuf, sizeof(numbuf), "%lld" , fld->value.num);
+                rv = snprintf(numbuf, sizeof(numbuf), "%lli" , fld->value.num);
                 if (rv <= 0) return FALSE;
 
                 rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
@@ -461,7 +464,7 @@ fmtMetricJson(format_t *fmt, event_t *metric)
                                       0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
-    rv = snprintf(numbuf, sizeof(numbuf), "%llu", metric->value);
+    rv = snprintf(numbuf, sizeof(numbuf), "%lli", metric->value);
     if (rv <= 0) goto cleanup;
 
     rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,

@@ -395,6 +395,42 @@ fmtStringStatsDHonorsCardinality(void** state)
 }
 
 static void
+fmtEventMessageStringValue(void** state)
+{
+    format_t* fmt = fmtCreate(CFG_EVENT_JSON_RAW_JSON);
+    assert_non_null(fmt);
+
+    event_format_t event_format;
+    event_format.timestamp = "1573058085.991";
+    event_format.timesize = strlen(event_format.timestamp);
+    event_format.src = "stdin";
+    event_format.hostname = "earl";
+    event_format.data = "поспехаў";
+    event_format.datasize = strlen(event_format.data);
+    event_format.uid = 0xCAFEBABEDEADBEEF;
+
+    assert_null(fmtEventMessageString(NULL, NULL));
+
+    assert_null(fmtEventMessageString(NULL, &event_format));
+
+    assert_null(fmtEventMessageString(fmt, NULL));
+
+    char* str = fmtEventMessageString(fmt, &event_format);
+    assert_non_null(str);
+
+    assert_string_equal(str, "{\"_time\":1573058085.991,"
+                              "\"source\":\"stdin\","
+                              "\"_raw\":\"поспехаў\","
+                              "\"host\":\"earl\","
+                              "\"_channel\":\"14627333968688430831\"}");
+
+    //printf("%s\n", str);
+    free(str);
+
+    fmtDestroy(&fmt);
+}
+
+static void
 fmtStringMetricJsonNoFields(void** state)
 {
     format_t* fmt = fmtCreate(CFG_METRIC_JSON);
@@ -426,7 +462,7 @@ fmtStringMetricJsonWFields(void** state)
 static void
 fmtStringMetricJsonEscapedValues(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_JSON);
+    format_t* fmt = fmtCreate(CFG_EVENT_JSON_RAW_JSON);
     {
         event_t e = {"Paç \"fat!", 3, SET, NULL};    // embedded double quote
         char* str = fmtString(fmt, &e);
@@ -474,6 +510,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtStringStatsDVerifyEachStatsDType),
         cmocka_unit_test(fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient),
         cmocka_unit_test(fmtStringStatsDHonorsCardinality),
+        cmocka_unit_test(fmtEventMessageStringValue),
         cmocka_unit_test(fmtStringMetricJsonNoFields),
         cmocka_unit_test(fmtStringMetricJsonWFields),
         cmocka_unit_test(fmtStringMetricJsonEscapedValues),

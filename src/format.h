@@ -43,7 +43,7 @@ typedef struct event_format {
     const char *hostname;
     char *data;
     size_t datasize;
-    long unsigned int uid;
+    unsigned long long uid;
 } event_format_t;
 
 typedef struct _format_t format_t;

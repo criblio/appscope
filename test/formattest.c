@@ -395,16 +395,60 @@ fmtStringStatsDHonorsCardinality(void** state)
 }
 
 static void
-fmtStringNewlineDelimitedReturnsNull(void** state)
+fmtStringMetricJsonNoFields(void** state)
 {
-    // Just because it's not implemented yet...
     format_t* fmt = fmtCreate(CFG_METRIC_JSON);
     event_t e = {"A", 1, SET, NULL};
-    // John; what are you trying to test here now that CFG_METRIC_JSON is implemented?
-    //assert_null(fmtString(fmt, &e));
+    char* str = fmtString(fmt, &e);
+    assert_string_equal(str, "{\"A\":1}");
+    if (str) free(str);
     fmtDestroy(&fmt);
 }
 
+static void
+fmtStringMetricJsonWFields(void** state)
+{
+    format_t* fmt = fmtCreate(CFG_METRIC_JSON);
+    event_field_t fields[] = {
+        STRFIELD("A",               "Z",                    0),
+        NUMFIELD("B",               987,                    1),
+        STRFIELD("C",               "Y",                    2),
+        NUMFIELD("D",               654,                    3),
+        FIELDEND
+    };
+    event_t e = {"hey", 2, HISTOGRAM, fields};
+    char* str = fmtString(fmt, &e);
+    assert_string_equal(str, "{\"hey\":2,\"A\":\"Z\",\"B\":987,\"C\":\"Y\",\"D\":654}");
+    if (str) free(str);
+    fmtDestroy(&fmt);
+}
+
+static void
+fmtStringMetricJsonEscapedValues(void** state)
+{
+    format_t* fmt = fmtCreate(CFG_METRIC_JSON);
+    {
+        event_t e = {"Paç \"fat!", 3, SET, NULL};    // embedded double quote
+        char* str = fmtString(fmt, &e);
+        assert_string_equal(str, "{\"Paç \\\"fat!\":3}");
+        free(str);
+    }
+
+    {
+        event_field_t fields[] = {
+            STRFIELD("A",         "행운을	빕니다",    0),   // embedded tab
+            NUMFIELD("Viel\\ Glück",     123,      1),   // embedded backslash
+            FIELDEND
+        };
+        event_t e = {"you", 4, DELTA, fields};
+        char* str = fmtString(fmt, &e);
+        assert_string_equal(str, "{\"you\":4,"
+                                   "\"A\":\"행운을\\t빕니다\","
+                                   "\"Viel\\\\ Glück\":123}");
+        free(str);
+    }
+    fmtDestroy(&fmt);
+}
 
 int
 main(int argc, char* argv[])
@@ -430,7 +474,9 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtStringStatsDVerifyEachStatsDType),
         cmocka_unit_test(fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient),
         cmocka_unit_test(fmtStringStatsDHonorsCardinality),
-        cmocka_unit_test(fmtStringNewlineDelimitedReturnsNull),
+        cmocka_unit_test(fmtStringMetricJsonNoFields),
+        cmocka_unit_test(fmtStringMetricJsonWFields),
+        cmocka_unit_test(fmtStringMetricJsonEscapedValues),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

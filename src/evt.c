@@ -554,6 +554,7 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     event.uid = uid;
 
     msg = fmtEventMessageString(evt->format, &event);
+    if (JSON_DEBUG != 0) strcat(msg, "\n");
 
     if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore

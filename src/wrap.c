@@ -823,7 +823,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         event_t rwMetric = {metric, *sizebytes, HISTOGRAM, fields};
 
-        //evtMetric(g_evt, g_cfg.hostname, g_fsinfo[fd].uid, &rwMetric);
+        evtMetric(g_evt, g_cfg.hostname, g_fsinfo[fd].uid, &rwMetric);
 
         // Only report if enabled
         if ((g_cfg.summarize.fs.read_write) && (source == EVENT_BASED)) {

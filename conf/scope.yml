@@ -61,10 +61,10 @@ event:
     port: 9109
   logfilefilter: .*log.*            # extended regex, default '.*log.*'
   activesources:
-  - logfile                         # create events from files that match logfilefilter
-  - console                         # create events from stdout and stderr
+  #- logfile                         # create events from files that match logfilefilter
+  #- console                         # create events from stdout and stderr
   #- syslog                          # create events from syslog and vsyslog
-  #- highcardmetrics
+  - highcardmetrics
 
 logging:
   level: error                      # debug, info, warning, error, none

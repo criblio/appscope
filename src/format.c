@@ -26,6 +26,7 @@ struct _format_t
     } statsd;
     unsigned verbosity;
     custom_tag_t** tags;
+    regex_t* metric_field_re;
 };
 
 
@@ -45,6 +46,7 @@ fmtCreate(cfg_out_format_t format)
     f->statsd.max_len = DEFAULT_STATSD_MAX_LEN;
     f->verbosity = DEFAULT_OUT_VERBOSITY;
     f->tags = DEFAULT_CUSTOM_TAGS;
+    f->metric_field_re = NULL;
 
     return f;
 }
@@ -366,11 +368,11 @@ fmtMetricJson(format_t *fmt, event_t *metric)
     yaml_event_t event;
     char numbuf[32];
     int rv;
-
     int emitter_created = 0;
     int emitter_opened = 0;
     int everything_successful = 0;
-
+    regex_t *field_filter;
+    regmatch_t match = {0};
     size_t bytes_written = 0;
     char* buf = NULL;
     event_field_t *fld;
@@ -410,9 +412,17 @@ fmtMetricJson(format_t *fmt, event_t *metric)
                                       (yaml_char_t*)numbuf, rv, 1, 0, YAML_PLAIN_SCALAR_STYLE);
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
+    field_filter = fmtMetricFieldFilter(fmt);
+
     // Start adding key:value entries
     for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
-        // "Tag"
+        // if the field filter matches, we exclude that field
+        if (field_filter &&
+            (regexec(field_filter, fld->name, 1, &match, 0) == 0)) {
+            continue;
+        }
+
+        // "Key"
         rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
                                           (yaml_char_t*)fld->name, strlen(fld->name), 0, 1,
                                           YAML_SINGLE_QUOTED_SCALAR_STYLE);
@@ -425,13 +435,13 @@ fmtMetricJson(format_t *fmt, event_t *metric)
                                               0, 1, YAML_SINGLE_QUOTED_SCALAR_STYLE);
             if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
         } else if (fld->value_type == FMT_NUM) {
-                rv = snprintf(numbuf, sizeof(numbuf), "%lld" , fld->value.num);
-                if (rv <= 0) goto cleanup;
+            rv = snprintf(numbuf, sizeof(numbuf), "%lld" , fld->value.num);
+            if (rv <= 0) goto cleanup;
 
-                rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
-                                                  (yaml_char_t*)numbuf, rv, 1, 0,
-                                                  YAML_PLAIN_SCALAR_STYLE);
-                if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+            rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
+                                              (yaml_char_t*)numbuf, rv, 1, 0,
+                                              YAML_PLAIN_SCALAR_STYLE);
+            if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
         } else {
             DBG("bad field type");
         }
@@ -532,6 +542,7 @@ fmtString(format_t* fmt, event_t* e)
 
     switch (fmt->format) {
         case CFG_METRIC_STATSD:
+        case CFG_EVENT_JSON_RAW_STATSD:
             return fmtStatsDString(fmt, e);
         case CFG_METRIC_JSON:
         case CFG_EVENT_JSON_RAW_JSON:
@@ -540,6 +551,13 @@ fmtString(format_t* fmt, event_t* e)
             DBG("%d %s", fmt->format, e->name);
             return NULL;
     }
+}
+
+regex_t *
+fmtMetricFieldFilter(format_t *fmt)
+{
+    if (!fmt) return NULL;
+    return fmt->metric_field_re;
 }
 
 const char*
@@ -567,6 +585,14 @@ fmtCustomTags(format_t* fmt)
 }
 
 // Setters
+void
+fmtMetricFieldFilterSet(format_t *fmt, regex_t *filter)
+{
+    if (!fmt || !filter) return;
+
+    fmt->metric_field_re = filter;
+}
+
 void
 fmtStatsDPrefixSet(format_t* fmt, const char* prefix)
 {

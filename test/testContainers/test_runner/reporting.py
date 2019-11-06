@@ -37,6 +37,7 @@ def store_results_to_file(watcher: TestWatcher, path: str, scope_version: str):
                 "error": result.error
             }
             json.dump(log_row, f, default=lambda o: o.__dict__)
+            f.write("\n")
 
         summary_row = {
             "id": watcher.execution_id,

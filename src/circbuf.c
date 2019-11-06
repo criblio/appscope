@@ -1,4 +1,6 @@
 #define _GNU_SOURCE
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <stdlib.h>
 #include "dbg.h"
 #include "atomic.h"
@@ -56,7 +58,10 @@ cbufPut(cbuf_handle_t cbuf, uint64_t data)
     do {
         head = cbuf->head;
         head_next = (head + 1) % cbuf->maxlen;
-        if (head_next == cbuf->tail) break; // Full
+        if (head_next == cbuf->tail) {
+            DBG("maxlen: %"PRIu64, cbuf->maxlen); // Full
+            break;
+        }
         success = atomicCas32(&cbuf->head, head, head_next);
     } while (!success && (attempts++ < cbuf->maxlen));
 

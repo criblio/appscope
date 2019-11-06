@@ -17,6 +17,10 @@
 #define SOURCE "source"
 #define CHANNEL "_channel"
 
+#define TRUE 1
+#define FALSE 0
+
+
 struct _format_t
 {
     cfg_out_format_t format;
@@ -331,30 +335,72 @@ cleanup:
 static size_t
 metricJsonSize(event_t *metric)
 {
-    size_t size = 0;
-    event_field_t *fld;
-
     if (!metric) return 0;
 
-    size += strlen(metric->name);
-    size += sizeof(long long) * 2;
+    size_t size = 256; // fudge factor for things like escaped quote chars.
 
+    size += strlen(metric->name) + 4;            // include {, "", :
+    size += 21;                                  // -9223372036854775808,
+
+    if (!metric->fields) return size;
+
+    event_field_t *fld;
     for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
+        size += strlen(fld->name) + 3;           // include "", :
+
         switch (fld->value_type) {
         case FMT_NUM:
-            size += sizeof(long long) * 2;
+            size += 21;                          // -9223372036854775808,
             break;
         case FMT_STR:
-            size += strlen(fld->value.str);
+            size += strlen(fld->value.str) + 3;  // include quotes and comma
             break;
         default:
             break;
         }
     }
 
-    // fudge factor for things like escaped single quote characters.
-    size += 256;
     return size;
+}
+
+int
+addJsonFields(format_t* fmt, event_field_t* fields, yaml_emitter_t* emitter)
+{
+    if (!fmt || !fields) return TRUE;
+
+    int rv;
+    yaml_event_t event;
+    char numbuf[32];
+
+    // Start adding key:value entries
+    event_field_t *fld;
+    for (fld = fields; fld->value_type != FMT_END; fld++) {
+        // "Tag"
+        rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                          (yaml_char_t*)fld->name, strlen(fld->name), 0, 1,
+                                          YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+        if (!rv || !yaml_emitter_emit(emitter, &event)) return FALSE;
+
+        // "Value"
+        if (fld->value_type == FMT_STR) {
+            rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                              (yaml_char_t*)fld->value.str, strlen(fld->value.str),
+                                              0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+            if (!rv || !yaml_emitter_emit(emitter, &event)) return FALSE;
+        } else if (fld->value_type == FMT_NUM) {
+                rv = snprintf(numbuf, sizeof(numbuf), "%lld" , fld->value.num);
+                if (rv <= 0) return FALSE;
+
+                rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
+                                                  (yaml_char_t*)numbuf, rv, 1, 0,
+                                                  YAML_PLAIN_SCALAR_STYLE);
+                if (!rv || !yaml_emitter_emit(emitter, &event)) return FALSE;
+        } else {
+            DBG("bad field type");
+        }
+    }
+
+    return TRUE;
 }
 
 static char *
@@ -373,7 +419,6 @@ fmtMetricJson(format_t *fmt, event_t *metric)
 
     size_t bytes_written = 0;
     char* buf = NULL;
-    event_field_t *fld;
 
     // Get the size of a complete json string & allocate
     const size_t bufsize = metricJsonSize(metric);
@@ -384,6 +429,9 @@ fmtMetricJson(format_t *fmt, event_t *metric)
     // Yaml init stuff
     emitter_created = yaml_emitter_initialize(&emitter);
     if (!emitter_created) goto cleanup;
+
+    yaml_emitter_set_unicode(&emitter, 1);
+
     yaml_emitter_set_output_string(&emitter, (yaml_char_t*)buf, bufsize,
                                    &bytes_written);
     emitter_opened = yaml_emitter_open(&emitter);
@@ -400,7 +448,7 @@ fmtMetricJson(format_t *fmt, event_t *metric)
     // add the base metric definition
     rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
                                       (yaml_char_t*)metric->name, strlen(metric->name),
-                                      0, 1, YAML_SINGLE_QUOTED_SCALAR_STYLE);
+                                      0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
     rv = snprintf(numbuf, sizeof(numbuf), "%llu", metric->value);
@@ -410,32 +458,7 @@ fmtMetricJson(format_t *fmt, event_t *metric)
                                       (yaml_char_t*)numbuf, rv, 1, 0, YAML_PLAIN_SCALAR_STYLE);
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
-    // Start adding key:value entries
-    for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
-        // "Tag"
-        rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                          (yaml_char_t*)fld->name, strlen(fld->name), 0, 1,
-                                          YAML_SINGLE_QUOTED_SCALAR_STYLE);
-        if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-        // "Value"
-        if (fld->value_type == FMT_STR) {
-            rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                              (yaml_char_t*)fld->value.str, strlen(fld->value.str),
-                                              0, 1, YAML_SINGLE_QUOTED_SCALAR_STYLE);
-            if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-        } else if (fld->value_type == FMT_NUM) {
-                rv = snprintf(numbuf, sizeof(numbuf), "%lld" , fld->value.num);
-                if (rv <= 0) goto cleanup;
-
-                rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
-                                                  (yaml_char_t*)numbuf, rv, 1, 0,
-                                                  YAML_PLAIN_SCALAR_STYLE);
-                if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-        } else {
-            DBG("bad field type");
-        }
-    }
+    if (!addJsonFields(fmt, metric->fields, &emitter)) goto cleanup;
 
     // Done with key:value entries
     // Tell yaml to wrap it up

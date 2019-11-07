@@ -1863,7 +1863,7 @@ periodic(void *arg)
         //if (g_prevlog) logDestroy(&g_prevlog);
         //if (g_prevevt) evtDestroy(&g_prevevt);
 
-        if (evtConnected(g_evt) == FALSE) {
+        if (evtNeedsConnection(g_evt)) {
             evtConnect(g_evt, g_staticfg);
         }
 

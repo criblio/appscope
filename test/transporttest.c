@@ -12,10 +12,43 @@
 #include "test.h"
 
 static void
+transportCreateTcpReturnsNullPtrForInvalidHost(void** state)
+{
+    transport_t* t = transportCreateTCP(NULL, "54321");
+    assert_null(t);
+}
+
+static void
+transportCreateTcpReturnsNullPtrForInvalidPath(void** state)
+{
+    transport_t* t = transportCreateTCP("127.0.0.1", NULL);
+    assert_null(t);
+}
+
+static void
+transportCreateTcpReturnsValidPtrInHappyPath(void** state)
+{
+    assert_false(transportNeedsConnection(NULL));
+    transport_t* t = transportCreateTCP("127.0.0.1", "54321");
+    assert_non_null(t);
+    assert_true(transportNeedsConnection(t));
+    transportDestroy(&t);
+}
+
+static void
+transportConnectEstablishesConnection(void** state)
+{
+    skip();
+    // We need to verify that tcp connections can be established.
+    // This is reminder to do this.
+}
+
+static void
 transportCreateUdpReturnsValidPtrInHappyPath(void** state)
 {
     transport_t* t = transportCreateUdp("127.0.0.1", "8126");
     assert_non_null(t);
+    assert_false(transportNeedsConnection(t));
     transportDestroy(&t);
 }
 
@@ -73,6 +106,7 @@ transportCreateFileReturnsValidPtrInHappyPath(void** state)
     const char* path = "/tmp/myscope.log";
     transport_t* t = transportCreateFile(path, CFG_BUFFER_LINE);
     assert_non_null(t);
+    assert_false(transportNeedsConnection(t));
     transportDestroy(&t);
     assert_null(t);
     if (unlink(path))
@@ -129,6 +163,7 @@ transportCreateUnixReturnsValidPtrInHappyPath(void** state)
 {
     transport_t* t = transportCreateUnix("/my/favorite/path");
     assert_non_null(t);
+    assert_false(transportNeedsConnection(t));
     transportDestroy(&t);
     assert_null(t);
 
@@ -147,6 +182,7 @@ transportCreateSyslogReturnsValidPtrInHappyPath(void** state)
 {
     transport_t* t = transportCreateSyslog();
     assert_non_null(t);
+    assert_false(transportNeedsConnection(t));
     transportDestroy(&t);
     assert_null(t);
 
@@ -157,6 +193,7 @@ transportCreateShmReturnsValidPtrInHappyPath(void** state)
 {
     transport_t* t = transportCreateShm();
     assert_non_null(t);
+    assert_false(transportNeedsConnection(t));
     transportDestroy(&t);
     assert_null(t);
 }
@@ -341,6 +378,10 @@ main(int argc, char* argv[])
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
+        cmocka_unit_test(transportCreateTcpReturnsNullPtrForInvalidHost),
+        cmocka_unit_test(transportCreateTcpReturnsNullPtrForInvalidPath),
+        cmocka_unit_test(transportCreateTcpReturnsValidPtrInHappyPath),
+        cmocka_unit_test(transportConnectEstablishesConnection),
         cmocka_unit_test(transportCreateUdpReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportCreateUdpReturnsNullPtrForInvalidHost),
         cmocka_unit_test(transportCreateUdpReturnsNullPtrForInvalidPort),

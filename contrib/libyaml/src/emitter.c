@@ -1760,16 +1760,17 @@ yaml_emitter_write_bom(yaml_emitter_t *emitter)
 static int
 yaml_emitter_write_indent(yaml_emitter_t *emitter)
 {
-    int indent = (emitter->indent >= 0) ? emitter->indent : 0;
-
-    if (!emitter->indention || emitter->column > indent
-            || (emitter->column == indent && !emitter->whitespace)) {
-        if (!PUT_BREAK(emitter)) return 0;
-    }
-
-    while (emitter->column < indent) {
-        if (!PUT(emitter, ' ')) return 0;
-    }
+// JRC - remove whitespace
+//    int indent = (emitter->indent >= 0) ? emitter->indent : 0;
+//
+//    if (!emitter->indention || emitter->column > indent
+//            || (emitter->column == indent && !emitter->whitespace)) {
+//        if (!PUT_BREAK(emitter)) return 0;
+//    }
+//
+//    while (emitter->column < indent) {
+//        if (!PUT(emitter, ' ')) return 0;
+//    }
 
     emitter->whitespace = 1;
     emitter->indention = 1;
@@ -1788,9 +1789,10 @@ yaml_emitter_write_indicator(yaml_emitter_t *emitter,
     indicator_length = strlen(indicator);
     STRING_ASSIGN(string, (yaml_char_t *)indicator, indicator_length);
 
-    if (need_whitespace && !emitter->whitespace) {
-        if (!PUT(emitter, ' ')) return 0;
-    }
+//  JRC - remove whitespace
+//    if (need_whitespace && !emitter->whitespace) {
+//        if (!PUT(emitter, ' ')) return 0;
+//    }
 
     while (string.pointer != string.end) {
         if (!WRITE(emitter, string)) return 0;
@@ -1899,9 +1901,10 @@ yaml_emitter_write_plain_scalar(yaml_emitter_t *emitter,
 
     STRING_ASSIGN(string, value, length);
 
-    if (!emitter->whitespace) {
-        if (!PUT(emitter, ' ')) return 0;
-    }
+//  JRC - remove whitespace
+//    if (!emitter->whitespace) {
+//        if (!PUT(emitter, ' ')) return 0;
+//    }
 
     while (string.pointer != string.end)
     {

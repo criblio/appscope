@@ -481,6 +481,25 @@ cfgTransportSetFromStr(config_t* cfg, which_transport_t t, const char* value)
         cfgTransportHostSet(cfg, t, host);
         cfgTransportPortSet(cfg, t, port);
 
+    } else if (value == strstr(value, "tcp://")) {
+
+        // copied to avoid directly modifing the process's env variable
+        char value_cpy[1024];
+        strncpy(value_cpy, value, sizeof(value_cpy));
+
+        char* host = value_cpy + strlen("tcp://");
+
+        // convert the ':' to a null delimiter for the host
+        // and move port past the null
+        char *port = strrchr(host, ':');
+        if (!port) return;  // port is *required*
+        *port = '\0';
+        port++;
+
+        cfgTransportTypeSet(cfg, t, CFG_TCP);
+        cfgTransportHostSet(cfg, t, host);
+        cfgTransportPortSet(cfg, t, port);
+
     } else if (value == strstr(value, "file://")) {
         const char* path = value + strlen("file://");
         cfgTransportTypeSet(cfg, t, CFG_FILE);
@@ -573,6 +592,8 @@ processTransportType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     which_transport_t c = transport_context;
     if (!strcmp(value, "udp")) {
         cfgTransportTypeSet(config, c, CFG_UDP);
+    } else if (!strcmp(value, "tcp")) {
+        cfgTransportTypeSet(config, c, CFG_TCP);
     } else if (!strcmp(value, "unix")) {
         cfgTransportTypeSet(config, c, CFG_UNIX);
     } else if (!strcmp(value, "file")) {
@@ -942,6 +963,9 @@ initTransport(config_t* cfg, which_transport_t t)
         case CFG_UDP:
             transport = transportCreateUdp(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
             break;
+        case CFG_TCP:
+            transport = transportCreateTCP(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
+            break;
         case CFG_SHM:
             transport = transportCreateShm();
             break;
@@ -1002,25 +1026,31 @@ initOut(config_t* cfg)
     return out;
 }
 
-evt_t*
-initEvt(config_t* cfg)
+evt_t *
+initEvt(config_t *cfg)
 {
-    evt_t* evt = evtCreate();
+    evt_t *evt = evtCreate();
     if (!evt) return evt;
 
-    transport_t* t = initTransport(cfg, CFG_EVT);
-    if (!t) {
+    /*
+     * If the transport is TCP, the transport may not connect
+     * at this point. If so, it will connect later. As such,
+     * it should not be treated as fatal.
+     */
+    transport_t *trans = initTransport(cfg, CFG_EVT);
+    if (!trans) {
         evtDestroy(&evt);
         return evt;
     }
-    evtTransportSet(evt, t);
+    evtTransportSet(evt, trans);
 
-    format_t* f = initFormat(cfg);
-    if (!f) {
+    format_t *fmt = fmtCreate(cfgEventFormat(cfg));
+    if (!fmt) {
         evtDestroy(&evt);
         return evt;
     }
-    evtFormatSet(evt, f);
+
+    evtFormatSet(evt, fmt);
 
     evtLogFileFilterSet(evt, cfgEventLogFileFilter(cfg));
 

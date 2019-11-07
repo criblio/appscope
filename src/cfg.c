@@ -11,7 +11,7 @@ typedef struct {
     struct {                             // For type = CFG_UDP
         char* host;
         char* port;
-    } udp;
+    } net;
     struct {
         char* path;                      // For type CFG_FILE
         cfg_buffer_t buf_policy;
@@ -54,7 +54,7 @@ struct _config_t
 //#define DEFAULT_OUT_PORT DEFAULT_OUT_PORT (defined in scopetypes.h)
 #define DEFAULT_OUT_PATH NULL
 #define DEFAULT_OUT_BUF CFG_BUFFER_FULLY
-#define DEFAULT_EVT_TYPE CFG_UDP
+#define DEFAULT_EVT_TYPE CFG_TCP
 #define DEFAULT_EVT_HOST "127.0.0.1"
 //#define DEFAULT_EVT_PORT DEFAULT_EVT_PORT (defined in scopetypes.h)
 #define DEFAULT_EVT_PATH NULL
@@ -93,18 +93,18 @@ cfgCreateDefault()
     c->evt.src[CFG_SRC_SYSLOG] = DEFAULT_SRC_SYSLOG;
     c->evt.src[CFG_SRC_METRIC] = DEFAULT_SRC_METRIC;
     c->transport[CFG_OUT].type = DEFAULT_OUT_TYPE;
-    c->transport[CFG_OUT].udp.host = (DEFAULT_OUT_HOST) ? strdup(DEFAULT_OUT_HOST) : NULL;
-    c->transport[CFG_OUT].udp.port = (DEFAULT_OUT_PORT) ? strdup(DEFAULT_OUT_PORT) : NULL;
+    c->transport[CFG_OUT].net.host = (DEFAULT_OUT_HOST) ? strdup(DEFAULT_OUT_HOST) : NULL;
+    c->transport[CFG_OUT].net.port = (DEFAULT_OUT_PORT) ? strdup(DEFAULT_OUT_PORT) : NULL;
     c->transport[CFG_OUT].file.path = (DEFAULT_OUT_PATH) ? strdup(DEFAULT_OUT_PATH) : NULL;
     c->transport[CFG_OUT].file.buf_policy = DEFAULT_OUT_BUF;
     c->transport[CFG_EVT].type = DEFAULT_EVT_TYPE;
-    c->transport[CFG_EVT].udp.host = (DEFAULT_EVT_HOST) ? strdup(DEFAULT_EVT_HOST) : NULL;
-    c->transport[CFG_EVT].udp.port = (DEFAULT_EVT_PORT) ? strdup(DEFAULT_EVT_PORT) : NULL;
+    c->transport[CFG_EVT].net.host = (DEFAULT_EVT_HOST) ? strdup(DEFAULT_EVT_HOST) : NULL;
+    c->transport[CFG_EVT].net.port = (DEFAULT_EVT_PORT) ? strdup(DEFAULT_EVT_PORT) : NULL;
     c->transport[CFG_EVT].file.path = (DEFAULT_EVT_PATH) ? strdup(DEFAULT_EVT_PATH) : NULL;
     c->transport[CFG_EVT].file.buf_policy = DEFAULT_EVT_BUF;
     c->transport[CFG_LOG].type = DEFAULT_LOG_TYPE;
-    c->transport[CFG_LOG].udp.host = (DEFAULT_LOG_HOST) ? strdup(DEFAULT_LOG_HOST) : NULL;
-    c->transport[CFG_LOG].udp.port = (DEFAULT_LOG_PORT) ? strdup(DEFAULT_LOG_PORT) : NULL;
+    c->transport[CFG_LOG].net.host = (DEFAULT_LOG_HOST) ? strdup(DEFAULT_LOG_HOST) : NULL;
+    c->transport[CFG_LOG].net.port = (DEFAULT_LOG_PORT) ? strdup(DEFAULT_LOG_PORT) : NULL;
     c->transport[CFG_LOG].file.path = (DEFAULT_LOG_PATH) ? strdup(DEFAULT_LOG_PATH) : NULL;
     c->transport[CFG_LOG].file.buf_policy = DEFAULT_LOG_BUF;
     c->tags = DEFAULT_TAGS;
@@ -124,8 +124,8 @@ cfgDestroy(config_t** cfg)
     if (c->evt.logfilefilter) free(c->evt.logfilefilter);
     which_transport_t t;
     for (t=CFG_OUT; t<CFG_WHICH_MAX; t++) {
-        if (c->transport[t].udp.host) free(c->transport[t].udp.host);
-        if (c->transport[t].udp.port) free(c->transport[t].udp.port);
+        if (c->transport[t].net.host) free(c->transport[t].net.host);
+        if (c->transport[t].net.port) free(c->transport[t].net.port);
         if (c->transport[t].file.path) free(c->transport[t].file.path);
     }
     if (c->tags) {
@@ -240,8 +240,9 @@ const char*
 cfgTransportHost(config_t* cfg, which_transport_t t)
 {
     if (cfg && t < CFG_WHICH_MAX) {
-        return cfg->transport[t].udp.host;
+        return cfg->transport[t].net.host;
     } 
+
 
     switch (t) {
         case CFG_OUT:
@@ -260,7 +261,7 @@ const char*
 cfgTransportPort(config_t* cfg, which_transport_t t)
 {
     if (cfg && t < CFG_WHICH_MAX) {
-        return cfg->transport[t].udp.port;
+        return cfg->transport[t].net.port;
     }
 
     switch (t) {
@@ -463,16 +464,17 @@ void
 cfgTransportHostSet(config_t* cfg, which_transport_t t, const char* host)
 {
     if (!cfg || t >= CFG_WHICH_MAX) return;
-    if (cfg->transport[t].udp.host) free(cfg->transport[t].udp.host);
-    cfg->transport[t].udp.host = (host) ? strdup(host) : NULL;
+    if (cfg->transport[t].net.host) free(cfg->transport[t].net.host);
+    cfg->transport[t].net.host = (host) ? strdup(host) : NULL;
+
 }
 
 void
 cfgTransportPortSet(config_t* cfg, which_transport_t t, const char* port)
 {
     if (!cfg || t >= CFG_WHICH_MAX) return;
-    if (cfg->transport[t].udp.port) free(cfg->transport[t].udp.port);
-    cfg->transport[t].udp.port = (port) ? strdup(port) : NULL;
+    if (cfg->transport[t].net.port) free(cfg->transport[t].net.port);
+    cfg->transport[t].net.port = (port) ? strdup(port) : NULL;
 }
 
 void

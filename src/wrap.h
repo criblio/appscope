@@ -223,6 +223,7 @@ typedef struct net_info_t {
     uint64_t startTime;
     uint64_t numDuration;
     uint64_t totalDuration;
+    uint64_t uid;
     char dnsName[MAX_HOSTNAME];
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;
@@ -235,6 +236,7 @@ typedef struct {
 
 typedef struct fs_info_t {
     int fd;
+    bool event;
     enum fs_type_t type;
     uint64_t numOpen;
     uint64_t numClose;
@@ -245,6 +247,7 @@ typedef struct fs_info_t {
     uint64_t writeBytes;
     uint64_t numDuration;
     uint64_t totalDuration;
+    uint64_t uid;
     char path[PATH_MAX];
 } fs_info;
 

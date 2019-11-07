@@ -37,7 +37,7 @@ void                evtMetricNameFilterSet(evt_t *, const char *);
 void                evtMetricValueFilterSet(evt_t *, const char *);
 void                evtMetricFieldFilterSet(evt_t *, const char *);
 void                evtSourceSet(evt_t *, cfg_evt_t, unsigned);
-int                 evtConnect(evt_t *, config_t *);
+int                 evtConnect(evt_t *);
 
 #endif // __EVT_H__
 

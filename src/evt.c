@@ -287,8 +287,9 @@ evtNeedsConnection(evt_t *evt)
 }
 
 int
-evtConnect(evt_t *evt, config_t *cfg)
+evtConnect(evt_t *evt)
 {
+    if (!evt) return 0;
     return transportConnect(evt->transport);
 }
 

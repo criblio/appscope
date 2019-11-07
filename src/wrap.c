@@ -1864,7 +1864,7 @@ periodic(void *arg)
         //if (g_prevevt) evtDestroy(&g_prevevt);
 
         if (evtNeedsConnection(g_evt)) {
-            evtConnect(g_evt, g_staticfg);
+            evtConnect(g_evt);
         }
 
         // From the config file

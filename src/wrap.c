@@ -131,6 +131,43 @@ setVerbosity(rtconfig* c, unsigned verbosity)
 
 
 static void
+remoteConfig()
+{
+    int timeout;
+    struct pollfd fds;
+    int rc;
+    char buf[1024];
+
+    // MS
+    timeout = (g_thread.interval * 60 * 1000);
+    fds.fd = g_cfg.cmdConn;
+
+    rc = poll(&fds, 1, timeout);
+
+    /*
+     * Error from poll;
+     * doing this separtately in order to count errors. Necessary?
+     */
+    if (rc < 0) {
+        DBG(NULL);
+        return;
+    }
+
+    /*
+     * Timeout or no read data?
+     * We can track exceptions where revents != POLLIN. Necessary?
+     */
+    if ((rc == 0) || (fds.revents == 0) || (fds.revents != POLLIN)) return;
+
+    do {
+        rc = recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
+
+    } while ((rc > 0) && (errno != EWOULDBLOCK) && (errno != EAGAIN));
+
+    //FILE *fmemopen(void *buf, size_t size, const char *mode);
+}
+
+static void
 doConfig(config_t *cfg)
 {
     // Save the current objects to get cleaned up on the periodic thread
@@ -1868,7 +1905,8 @@ periodic(void *arg)
         }
 
         // From the config file
-        sleep(g_thread.interval);
+        //sleep(g_thread.interval);
+        remoteConfig();
     }
 
     return NULL;
@@ -2056,6 +2094,9 @@ init(void)
     if (path) free(path);
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
+
+    g_cfg.cmdConn = evtConnection(g_evt);
+
     scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
     if (atexit(handleExit)) {
         DBG(NULL);

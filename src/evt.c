@@ -280,6 +280,13 @@ evtSource(evt_t* evt, cfg_evt_t src)
 }
 
 int
+evtConnection(evt_t *evt)
+{
+    if (!evt) return 0;
+    return transportConnection(evt->transport);
+}
+
+int
 evtConnected(evt_t *evt)
 {
     if (!evt) return 0;

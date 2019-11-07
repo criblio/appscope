@@ -230,6 +230,7 @@ typedef struct net_info_t {
     uint64_t startTime;
     uint64_t numDuration;
     uint64_t totalDuration;
+    uint64_t uid;
     char dnsName[MAX_HOSTNAME];
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;
@@ -242,6 +243,7 @@ typedef struct {
 
 typedef struct fs_info_t {
     int fd;
+    bool event;
     enum fs_type_t type;
     uint64_t numOpen;
     uint64_t numClose;
@@ -252,6 +254,7 @@ typedef struct fs_info_t {
     uint64_t writeBytes;
     uint64_t numDuration;
     uint64_t totalDuration;
+    uint64_t uid;
     char path[PATH_MAX];
 } fs_info;
 
@@ -528,7 +531,7 @@ extern void *_dl_sym(void *, const char *, void *);
         time.initial = getTime();                    \
     }                                                \
 
-#define IOSTREAMPOST(func, len, type, op)           \
+#define IOSTREAMPOST(func, buf, len, type, op)       \
     if (fs) {                                       \
         time.duration = getDuration(time.initial);  \
     }                                               \
@@ -546,7 +549,14 @@ extern void *_dl_sym(void *, const char *, void *);
             }                                       \
         } else if (fs) {                            \
             doFSMetric(FS_DURATION, fd, EVENT_BASED, #func, time.duration, NULL); \
-            doFSMetric(FS_READ, fd, EVENT_BASED, #func, len, NULL); \
+            if (op == (enum event_type_t)EVENT_TX) { \
+                doEventLog(g_evt, fs, buf, len);     \
+                doFSMetric(FS_WRITE, fd, EVENT_BASED, #func, len, NULL); \
+            } else if (op == (enum event_type_t)EVENT_RX) {         \
+                doFSMetric(FS_READ, fd, EVENT_BASED, #func, len, NULL); \
+            } else {                                \
+                DBG(NULL);                          \
+            }                                       \
         }                                           \
     }  else {                                       \
         if (fs) {                                   \

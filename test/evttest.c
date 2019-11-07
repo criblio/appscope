@@ -244,7 +244,7 @@ evtMetricValueFilterSetAndGet(void** state)
 
     evtDestroy(&evt);
 
-    // Get a default filter, even if evt is NULLa
+    // Get a default filter, even if evt is NULL
     default_re = evtMetricValueFilter(evt);
     assert_non_null(default_re);
     assert_int_equal(regexec(default_re, "whatever", 0, NULL, 0), 0);
@@ -276,20 +276,20 @@ evtMetricFieldFilterSetAndGet(void** state)
     evtMetricFieldFilterSet(evt, "");
     new_re = evtMetricFieldFilter(evt);
     assert_non_null(new_re);
-    assert_int_equal(regexec(new_re, "anythingmatches", 0, NULL, 0), 0);
+    assert_int_equal(regexec(new_re, "host.myhost", 0, NULL, 0), 0);
 
     // Make sure default is returned for bad regex
     evtMetricFieldFilterSet(evt, "W![T^F?");
-    new_re = evtMetricValueFilter(evt);
+    new_re = evtMetricFieldFilter(evt);
     assert_non_null(new_re);
-    assert_int_equal(regexec(new_re, "anything", 0, NULL, 0), 0);
+    assert_int_equal(regexec(new_re, "thishost", 0, NULL, 0), 0);
 
     evtDestroy(&evt);
 
-    // Get a default filter, even if evt is NULLa
+    // Get a default filter, even if evt is NULL
     default_re = evtMetricFieldFilter(evt);
     assert_non_null(default_re);
-    assert_int_equal(regexec(default_re, "whatever", 0, NULL, 0), 0);
+    assert_int_equal(regexec(default_re, "dohost", 0, NULL, 0), 0);
 }
 
 static void
@@ -363,6 +363,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(evtSourceSetAndGet),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(evtMetricNameFilterSetAndGet),
+        cmocka_unit_test(evtMetricValueFilterSetAndGet),
+        cmocka_unit_test(evtMetricFieldFilterSetAndGet),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

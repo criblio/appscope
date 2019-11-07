@@ -249,11 +249,8 @@ evtMetricFieldFilter(evt_t *evt)
             DBG(NULL);
             free(default_metric_field_re);
             default_metric_field_re = NULL;
-            fmtMetricFieldFilterSet(evt->format, NULL);
         }
 
-        // format wants this
-        fmtMetricFieldFilterSet(evt->format, default_metric_field_re);
         return default_metric_field_re;
     }
 

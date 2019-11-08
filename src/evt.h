@@ -7,8 +7,6 @@
 #include "dbg.h"
 #include "circbuf.h"
 
-#define JSON_DEBUG 0
-
 typedef struct _evt_t evt_t;
 
 // Constructors Destructors

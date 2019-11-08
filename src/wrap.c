@@ -136,7 +136,9 @@ remoteConfig()
     int timeout;
     struct pollfd fds;
     int rc;
+    FILE *fs;
     char buf[1024];
+    char path[PATH_MAX];
 
     // MS
     timeout = (g_thread.interval * 60 * 1000);
@@ -159,12 +161,33 @@ remoteConfig()
      */
     if ((rc == 0) || (fds.revents == 0) || (fds.revents != POLLIN)) return;
 
-    do {
-        rc = recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
-
-    } while ((rc > 0) && (errno != EWOULDBLOCK) && (errno != EAGAIN));
+    strncpy(path, "/tmp/cfg", sizeof(path));
+    if ((fs = g_fn.fopen(path, "r+")) == NULL) {
+        DBG(NULL);
+        scopeLog("ERROR: remoteConfig:fopen", -1, CFG_LOG_ERROR);
+        return;
+    }
 
     //FILE *fmemopen(void *buf, size_t size, const char *mode);
+    do {
+        rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
+
+        if (g_fn.fwrite(buf, sizeof(buf), (size_t)1, fs) <= 0) {
+            DBG(NULL);
+        }
+    } while ((rc > 0) && (errno != EWOULDBLOCK) && (errno != EAGAIN));
+
+    fflush(fs);
+    rewind(fs);
+
+    // Modify the static config from the command file
+    cfgProcessCommands(g_staticfg, fs);
+
+    // Apply the config
+    doConfig(g_staticfg);
+
+    g_fn.fclose(fs);
+    unlink(path);    
 }
 
 static void

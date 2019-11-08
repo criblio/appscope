@@ -80,7 +80,7 @@ stages:
         pool:
           vmImage: 'ubuntu-16.04'
         steps:
-          - script: docker-compose docker-compose -f docker-compose.yml -f docker-compose.override.azure.yml run cribl
+          - script: docker-compose -f docker-compose.yml -f docker-compose.override.azure.yml run cribl
             workingDirectory: ./test/testContainers/
             failOnStderr: true
           - task: CopyFiles@2

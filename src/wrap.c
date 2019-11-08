@@ -182,6 +182,10 @@ dynConfig(void)
 static uint64_t
 getDuration(uint64_t start)
 {
+    // before the constructor runs, g_cfg.freq is zero.
+    // Avoid div by zero during this time.
+    if (!g_cfg.freq) return 0ULL;
+
     /*
      * The clock frequency is in Mhz.
      * In order to get NS resolution we

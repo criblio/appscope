@@ -65,11 +65,10 @@ stages:
         steps:
           - script: docker-compose -f docker-compose.yml -f docker-compose.override.azure.yml run interposed_func
             workingDirectory: ./test/testContainers/
-            failOnStderr: true
           - task: CopyFiles@2
             condition: always()
             inputs:
-              contents: './test/testContainers/logs/*'
+              contents: test/testContainers/logs/**
               targetFolder: $(Build.ArtifactStagingDirectory)
           - task: PublishBuildArtifacts@1
             inputs:
@@ -83,13 +82,13 @@ stages:
         steps:
           - script: docker-compose -f docker-compose.yml -f docker-compose.override.azure.yml run cribl
             workingDirectory: ./test/testContainers/
-            failOnStderr: true
           - task: CopyFiles@2
             condition: always()
             inputs:
-              contents: './test/testContainers/logs/*'
+              contents: test/testContainers/logs/**
               targetFolder: $(Build.ArtifactStagingDirectory)
           - task: PublishBuildArtifacts@1
+            condition: always()
             inputs:
               pathToPublish: $(Build.ArtifactStagingDirectory)
               artifactName: CriblITOut

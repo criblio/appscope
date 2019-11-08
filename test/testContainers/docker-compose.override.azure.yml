@@ -1,6 +1,7 @@
 version: '3.5'
 services:
   cribl:
+    command: -v
     volumes:
       - ./logs:/opt/test-runner/logs
   splunk:
@@ -13,5 +14,6 @@ services:
       - ./logs:/opt/test-runner/logs
 
   interposed_func:
+    command: -v
     volumes:
       - ./logs:/opt/test-runner/logs

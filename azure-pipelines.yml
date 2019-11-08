@@ -1,5 +1,6 @@
 stages:
   - stage: build
+    displayName: Build Scope application
     jobs:
       - job: BuildInVM
         timeoutInMinutes: 10
@@ -53,10 +54,12 @@ stages:
               ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:
                 targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
               filesAcl: 'public-read'
-  - stage: integration-tests
+  - stage: integration_tests
+    displayName: Run integraion tests
     dependsOn: build
     jobs:
-      - job: syscalls test
+      - job: syscalls_test
+        displayName: Run syscalls tests
         pool:
           vmImage: 'ubuntu-16.04'
         steps:

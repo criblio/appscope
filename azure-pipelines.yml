@@ -67,6 +67,7 @@ stages:
             workingDirectory: ./test/testContainers/
             failOnStderr: true
           - task: CopyFiles@2
+            condition: always()
             inputs:
               contents: './test/testContainers/logs/*'
               targetFolder: $(Build.ArtifactStagingDirectory)
@@ -84,6 +85,7 @@ stages:
             workingDirectory: ./test/testContainers/
             failOnStderr: true
           - task: CopyFiles@2
+            condition: always()
             inputs:
               contents: './test/testContainers/logs/*'
               targetFolder: $(Build.ArtifactStagingDirectory)

@@ -1,0 +1,17 @@
+version: '3.5'
+services:
+  cribl:
+    volumes:
+      - ./logs:/opt/test-runner/logs
+  splunk:
+
+    volumes:
+      - ./logs:/opt/test-runner/logs
+
+  nginx:
+    volumes:
+      - ./logs:/opt/test-runner/logs
+
+  interposed_func:
+    volumes:
+      - ./logs:/opt/test-runner/logs

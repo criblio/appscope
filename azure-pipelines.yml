@@ -63,6 +63,31 @@ stages:
         pool:
           vmImage: 'ubuntu-16.04'
         steps:
-          - script: docker-compose run interposed_func
+          - script: docker-compose -f docker-compose.yml -f docker-compose.override.azure.yml run interposed_func
             workingDirectory: ./test/testContainers/
             failOnStderr: true
+          - task: CopyFiles@2
+            inputs:
+              contents: './test/testContainers/logs/*'
+              targetFolder: $(Build.ArtifactStagingDirectory)
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: $(Build.ArtifactStagingDirectory)
+              artifactName: SyscallsITOut
+
+      - job: cribl_test
+        displayName: Run cribl tests
+        pool:
+          vmImage: 'ubuntu-16.04'
+        steps:
+          - script: docker-compose docker-compose -f docker-compose.yml -f docker-compose.override.azure.yml run cribl
+            workingDirectory: ./test/testContainers/
+            failOnStderr: true
+          - task: CopyFiles@2
+            inputs:
+              contents: './test/testContainers/logs/*'
+              targetFolder: $(Build.ArtifactStagingDirectory)
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: $(Build.ArtifactStagingDirectory)
+              artifactName: CriblITOut

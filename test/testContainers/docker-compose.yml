@@ -18,15 +18,20 @@ services:
       context: .
       dockerfile: ./nginx/Dockerfile
 
-  kafka:
-    build:
-      context: .
-      dockerfile: ./kafka/Dockerfile
+  #  kafka:
+  #    build:
+  #      context: .
+  #      dockerfile: ./kafka/Dockerfile
 
   interposed_func:
     build:
       context: .
       dockerfile: ./interposed_func/Dockerfile
     privileged: true
+
+  elastic:
+    build:
+      context: .
+      dockerfile: ./elastic/Dockerfile
 
 

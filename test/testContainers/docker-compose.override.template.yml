@@ -19,3 +19,9 @@ services:
     command: -v
     volumes:
       - ./logs:/opt/test-runner/logs
+
+  elastic:
+    command: -v
+    volumes:
+      - ./logs:/opt/test-runner/logs
+

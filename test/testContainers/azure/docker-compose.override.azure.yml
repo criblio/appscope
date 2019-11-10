@@ -5,11 +5,12 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
   splunk:
-
+    command: -v
     volumes:
       - ./logs:/opt/test-runner/logs
 
   nginx:
+    command: -v
     volumes:
       - ./logs:/opt/test-runner/logs
 

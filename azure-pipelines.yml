@@ -58,37 +58,22 @@ stages:
     displayName: Run integraion tests
     dependsOn: build
     jobs:
-      - job: syscalls_test
-        displayName: Run syscalls tests
-        pool:
-          vmImage: 'ubuntu-16.04'
-        steps:
-          - script: docker-compose -f docker-compose.yml -f docker-compose.override.azure.yml run interposed_func
-            workingDirectory: ./test/testContainers/
-          - task: CopyFiles@2
-            condition: always()
-            inputs:
-              contents: test/testContainers/logs/**
-              targetFolder: $(Build.ArtifactStagingDirectory)
-          - task: PublishBuildArtifacts@1
-            inputs:
-              pathToPublish: $(Build.ArtifactStagingDirectory)
-              artifactName: SyscallsITOut
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: syscalls
+          containerName: interposed_func
 
-      - job: cribl_test
-        displayName: Run cribl tests
-        pool:
-          vmImage: 'ubuntu-16.04'
-        steps:
-          - script: docker-compose -f docker-compose.yml -f docker-compose.override.azure.yml run cribl
-            workingDirectory: ./test/testContainers/
-          - task: CopyFiles@2
-            condition: always()
-            inputs:
-              contents: test/testContainers/logs/**
-              targetFolder: $(Build.ArtifactStagingDirectory)
-          - task: PublishBuildArtifacts@1
-            condition: always()
-            inputs:
-              pathToPublish: $(Build.ArtifactStagingDirectory)
-              artifactName: CriblITOut
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: cribl
+          containerName: cribl
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: nginx
+          containerName: nginx
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: splunk
+          containerName: splunk

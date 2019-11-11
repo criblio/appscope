@@ -808,7 +808,7 @@ cfgReadGoodYaml(void** state)
     // Test file config (yaml)
     const char* yamlText =
         "---\n"
-        "output:\n"
+        "metric:\n"
         "  format:\n"
         "    type: metricjson                # metricstatsd, metricjson\n"
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
@@ -900,7 +900,7 @@ cfgReadEveryTransportType(void** state)
 {
     const char* yamlText =
         "---\n"
-        "output:\n"
+        "metric:\n"
         "  transport:\n"
         "%s"
         "...\n";
@@ -979,7 +979,7 @@ cfgReadGoodJson(void** state)
     // Test file config (json)
     const char* jsonText =
         "{\n"
-        "  'output': {\n"
+        "  'metric': {\n"
         "    'format': {\n"
         "      'type': 'metricjson',\n"
         "      'statsdprefix': 'cribl.scope',\n"
@@ -1064,7 +1064,7 @@ cfgReadBadYamlReturnsDefaults(void** state)
 {
     const char* yamlText =
         "---\n"
-        "output:\n"
+        "metric:\n"
         "  format: metricjson\n"
         "  statsdprefix : 'cribl.scope'\n"
         "  transport:\n"
@@ -1092,7 +1092,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "---\n"
         "momsApplePieRecipe:                # has possibilities...\n"
         "  [apples,sugar,flour,dirt]        # dirt mom?  Really?\n"
-        "output:\n"
+        "metric:\n"
         "  format:\n"
         "    type: metricstatsd\n"
         "    hey: yeahyou\n"
@@ -1143,7 +1143,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    type : metricjson\n"
         "logging:\n"
         "  level: info\n"
-        "output:\n"
+        "metric:\n"
         "  summaryperiod: 42\n"
         "  transport:\n"
         "    path: '/var/run/scope.sock'\n"
@@ -1202,7 +1202,7 @@ cfgReadEnvSubstitution(void** state)
 
     const char* yamlText =
         "---\n"
-        "output:\n"
+        "metric:\n"
         "  format:\n"
         "    type: metricjson\n"
         "    statsdprefix : $VAR1.$MY_ENV_VAR\n"

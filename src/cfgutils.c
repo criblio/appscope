@@ -781,7 +781,7 @@ processCommandDir(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processOutput(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_MAPPING_NODE) return;
 
@@ -887,7 +887,7 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_MAPPING_NODE,  "output",             processOutput},
+        {YAML_MAPPING_NODE,  "metric",             processMetric},
         {YAML_MAPPING_NODE,  "logging",            processLogging},
         {YAML_MAPPING_NODE,  "event",              processEvent},
         {YAML_NO_NODE, NULL, NULL}

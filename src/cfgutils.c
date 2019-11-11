@@ -879,6 +879,21 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     }
 }
 
+static void
+processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_table_t t[] = {
+        {YAML_MAPPING_NODE, "log",          processLogging},
+        {YAML_NO_NODE, NULL, NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
 
 static void
 setConfigFromDoc(config_t* config, yaml_document_t* doc)
@@ -888,7 +903,7 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
 
     parse_table_t t[] = {
         {YAML_MAPPING_NODE,  "metric",             processMetric},
-        {YAML_MAPPING_NODE,  "logging",            processLogging},
+        {YAML_MAPPING_NODE,  "libscope",           processLibscope},
         {YAML_MAPPING_NODE,  "event",              processEvent},
         {YAML_NO_NODE, NULL, NULL}
     };

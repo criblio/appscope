@@ -837,11 +837,12 @@ cfgReadGoodYaml(void** state)
         "  - console                         # create events from stdout and stderr\n"
         "  - syslog                          # create events from syslog and vsyslog\n"
         "  - highcardmetrics\n"
-        "logging:\n"
-        "  level: debug                      # debug, info, warning, error, none\n"
-        "  transport:\n"
-        "    buffering: full\n"
-        "    type: syslog\n"
+        "libscope:\n"
+        "  log:\n"
+        "    level: debug                      # debug, info, warning, error, none\n"
+        "    transport:\n"
+        "      buffering: full\n"
+        "      type: syslog\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -956,8 +957,9 @@ cfgReadEveryProcessLevel(void** state)
 {
     const char* yamlText =
         "---\n"
-        "logging:\n"
-        "  level: %s\n"
+        "libscope:\n"
+        "  log:\n"
+        "    level: %s\n"
         "...\n";
 
     const char* path = CFG_FILE_NAME;
@@ -1008,10 +1010,12 @@ cfgReadGoodJson(void** state)
         "    'logfilefilter': '.*[.]log$',\n"
         "    'activesources' : ['logfile', 'console', 'syslog', 'highcardmetrics'],\n"
         "  },\n"
-        "  'logging': {\n"
-        "    'level': 'debug',\n"
-        "    'transport': {\n"
-        "      'type': 'shm'\n"
+        "  'libscope': {\n"
+        "    'log': {\n"
+        "      'level': 'debug',\n"
+        "      'transport': {\n"
+        "        'type': 'shm'\n"
+        "      }\n"
         "    }\n"
         "  }\n"
         "}\n";
@@ -1070,10 +1074,11 @@ cfgReadBadYamlReturnsDefaults(void** state)
         "  transport:\n"
         "    type: file\n"
         "    path: '/var/log/scope.log'\n"
-        "logging:\n"
+        "libscope:\n"
+        "  log:\n"
         "      level: debug                  # <--- Extra indention!  bad!\n"
-        "  transport:\n"
-        "    type: syslog\n"
+        "    transport:\n"
+        "      type: syslog\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -1103,8 +1108,9 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "    type: unix\n"
         "    path: '/var/run/scope.sock'\n"
         "    color: 'puce'                  # Extra.\n"
-        "logging:\n"
-        "  level: info\n"
+        "libscope:\n"
+        "  log:\n"
+        "    level: info\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -1141,8 +1147,9 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    buffering: line\n"
         "  format:\n"
         "    type : metricjson\n"
-        "logging:\n"
-        "  level: info\n"
+        "libscope:\n"
+        "  log:\n"
+        "    level: info\n"
         "metric:\n"
         "  summaryperiod: 42\n"
         "  transport:\n"
@@ -1232,12 +1239,13 @@ cfgReadEnvSubstitution(void** state)
         "  - console                         # create events from stdout and stderr\n"
         "  - $SOURCE                         # create events from syslog and vsyslog\n"
         "  - highcardmetrics\n"
-        "logging:\n"
-        "  level: $LOGLEVEL\n"
-        "  transport:\n"
-        "    buffering: full\n"
-        "    type: file\n"
-        "    path: $DEST\n"
+        "libscope:\n"
+        "  log:\n"
+        "    level: $LOGLEVEL\n"
+        "    transport:\n"
+        "      buffering: full\n"
+        "      type: file\n"
+        "      path: $DEST\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);

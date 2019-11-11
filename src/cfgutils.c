@@ -788,8 +788,6 @@ processMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     parse_table_t t[] = {
         {YAML_MAPPING_NODE, "format",          processFormat},
         {YAML_MAPPING_NODE, "transport",       processTransport},
-        {YAML_SCALAR_NODE,  "summaryperiod",   processSummaryPeriod},
-        {YAML_SCALAR_NODE,  "commanddir",      processCommandDir},
         {YAML_NO_NODE, NULL, NULL}
     };
 
@@ -885,7 +883,9 @@ processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_MAPPING_NODE, "log",          processLogging},
+        {YAML_MAPPING_NODE, "log",             processLogging},
+        {YAML_SCALAR_NODE,  "summaryperiod",   processSummaryPeriod},
+        {YAML_SCALAR_NODE,  "commanddir",      processCommandDir},
         {YAML_NO_NODE, NULL, NULL}
     };
 

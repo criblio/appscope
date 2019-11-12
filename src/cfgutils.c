@@ -821,7 +821,56 @@ processLogFileFilter(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processActiveSources(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    char* value = stringVal(node);
+    if (!value) return;  // TBD - Call FromStr func instead
+    if (!strcmp(value, "file")) {
+        cfgEventSourceSet(config, CFG_SRC_FILE, 1);
+    } else if (!strcmp(value, "console")) {
+        cfgEventSourceSet(config, CFG_SRC_CONSOLE, 1);
+    } else if (!strcmp(value, "syslog")) {
+        cfgEventSourceSet(config, CFG_SRC_SYSLOG, 1);
+    } else if (!strcmp(value, "metric")) {
+        cfgEventSourceSet(config, CFG_SRC_METRIC, 1);
+    }
+    if (value) free(value);
+}
+
+static void
+processWatchName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+   // TBD
+}
+
+static void
+processWatchFilter(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+   // TBD
+}
+
+static void
+processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE,  "type",            processWatchType},
+        {YAML_SCALAR_NODE,  "name",            processWatchName},
+        {YAML_SCALAR_NODE,  "filter",          processWatchFilter},
+        {YAML_NO_NODE, NULL, NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
+static void
+processWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SEQUENCE_NODE) return;
 
@@ -835,19 +884,7 @@ processActiveSources(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     yaml_node_item_t* item;
     foreach(item, node->data.sequence.items) {
         yaml_node_t* i = yaml_document_get_node(doc, *item);
-        if (i->type != YAML_SCALAR_NODE) continue;
-
-        char* value = stringVal(i);
-        if (!strcmp(value, "logfile")) {
-            cfgEventSourceSet(config, CFG_SRC_FILE, 1);
-        } else if (!strcmp(value, "console")) {
-            cfgEventSourceSet(config, CFG_SRC_CONSOLE, 1);
-        } else if (!strcmp(value, "syslog")) {
-            cfgEventSourceSet(config, CFG_SRC_SYSLOG, 1);
-        } else if (!strcmp(value, "highcardmetrics")) {
-            cfgEventSourceSet(config, CFG_SRC_METRIC, 1);
-        }
-        if (value) free(value);
+        processSource(config, doc, i);
     }
 }
 
@@ -860,7 +897,7 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_MAPPING_NODE, "format",          processEvtFormat},
         {YAML_MAPPING_NODE, "transport",       processTransport},
         {YAML_SCALAR_NODE,  "logfilefilter",   processLogFileFilter},
-        {YAML_SEQUENCE_NODE,"activesources",   processActiveSources},
+        {YAML_SEQUENCE_NODE,"watch",           processWatch},
         {YAML_NO_NODE, NULL, NULL}
     };
 

@@ -141,9 +141,10 @@ remoteConfig()
     char path[PATH_MAX];
 
     // MS
-    timeout = (g_thread.interval * 60 * 1000);
+    timeout = (g_thread.interval * 1000);
+    bzero(&fds, sizeof(fds));
     fds.fd = g_cfg.cmdConn;
-
+    fds.events = POLLIN;
     rc = poll(&fds, 1, timeout);
 
     /*
@@ -170,9 +171,10 @@ remoteConfig()
 
     //FILE *fmemopen(void *buf, size_t size, const char *mode);
     do {
-        rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
+        rc = g_fn.recv(g_cfg.cmdConn, buf, sizeof(buf), MSG_DONTWAIT);
+        if (rc <= 0) break;
 
-        if (g_fn.fwrite(buf, sizeof(buf), (size_t)1, fs) <= 0) {
+        if (g_fn.fwrite(buf, rc, (size_t)1, fs) <= 0) {
             DBG(NULL);
         }
     } while ((rc > 0) && (errno != EWOULDBLOCK) && (errno != EAGAIN));
@@ -187,7 +189,7 @@ remoteConfig()
     doConfig(g_staticfg);
 
     g_fn.fclose(fs);
-    unlink(path);    
+    unlink(path);
 }
 
 static void
@@ -409,17 +411,18 @@ doThread()
     
     // Create one thread at most
     if (g_thread.once == TRUE) return;
-
+    
     /*
      * g_thread.startTime is the start time, set in the constructor.
      * This is put in place to work around one of the Chrome sandbox limits.
      * Shouldn't hurt anything else.  
      */
     if (time(NULL) >= g_thread.startTime) {
-        g_thread.once = TRUE;
         if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
             scopeLog("ERROR: doThread:pthread_create", -1, CFG_LOG_ERROR);
+            return;
         }
+        g_thread.once = TRUE;
     }
 }
 

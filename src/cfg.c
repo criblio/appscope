@@ -88,7 +88,7 @@ cfgCreateDefault()
     c->out.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
     c->evt.format = DEFAULT_EVT_FORMAT;
     c->evt.logfilefilter = (DEFAULT_LOG_FILE_FILTER) ? strdup(DEFAULT_LOG_FILE_FILTER) : NULL;
-    c->evt.src[CFG_SRC_LOGFILE] = DEFAULT_SRC_LOGFILE;
+    c->evt.src[CFG_SRC_FILE] = DEFAULT_SRC_FILE;
     c->evt.src[CFG_SRC_CONSOLE] = DEFAULT_SRC_CONSOLE;;
     c->evt.src[CFG_SRC_SYSLOG] = DEFAULT_SRC_SYSLOG;
     c->evt.src[CFG_SRC_METRIC] = DEFAULT_SRC_METRIC;
@@ -195,8 +195,8 @@ cfgEventSource(config_t* cfg, cfg_evt_t evt)
     }
 
     switch (evt) {
-        case CFG_SRC_LOGFILE:
-            return DEFAULT_SRC_LOGFILE;
+        case CFG_SRC_FILE:
+            return DEFAULT_SRC_FILE;
         case CFG_SRC_CONSOLE:
             return DEFAULT_SRC_CONSOLE;
         case CFG_SRC_SYSLOG:
@@ -205,7 +205,7 @@ cfgEventSource(config_t* cfg, cfg_evt_t evt)
             return DEFAULT_SRC_METRIC;
         default:
             DBG(NULL);
-            return DEFAULT_SRC_LOGFILE;
+            return DEFAULT_SRC_FILE;
     }
 }
 

@@ -673,7 +673,7 @@ cfgProcessCommandsFromFile(void** state)
     assert_string_equal(cfgTransportHost(cfg, CFG_EVT), "host");
     assert_string_equal(cfgTransportPort(cfg, CFG_EVT), "1234");
     assert_int_equal(cfgEventFormat(cfg), CFG_EVENT_ND_JSON);
-    assert_int_equal(cfgEventSource(cfg, CFG_SRC_LOGFILE), 1);
+    assert_int_equal(cfgEventSource(cfg, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEventSource(cfg, CFG_SRC_CONSOLE), 0);
     assert_int_equal(cfgEventSource(cfg, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEventSource(cfg, CFG_SRC_METRIC), 0);
@@ -743,7 +743,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     // event stuff...
     assert_string_equal(cfgTransportHost(cfg, CFG_EVT), "ho$st");
     assert_string_equal(cfgEventLogFileFilter(cfg), ".*[.]log$");
-    assert_int_equal(cfgEventSource(cfg, CFG_SRC_LOGFILE), 1);
+    assert_int_equal(cfgEventSource(cfg, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEventSource(cfg, CFG_SRC_CONSOLE), 0);
     assert_int_equal(cfgEventSource(cfg, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEventSource(cfg, CFG_SRC_METRIC), 0);
@@ -773,10 +773,10 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
     assert_int_equal       (cfgEventFormat(config), DEFAULT_EVT_FORMAT);
     assert_string_equal    (cfgEventLogFileFilter(config), DEFAULT_LOG_FILE_FILTER);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_LOGFILE), DEFAULT_SRC_LOGFILE);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_LOGFILE), DEFAULT_SRC_CONSOLE);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_LOGFILE), DEFAULT_SRC_SYSLOG);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_LOGFILE), DEFAULT_SRC_METRIC);
+    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
+    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_CONSOLE);
+    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_SYSLOG);
+    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_METRIC);
     assert_int_equal       (cfgTransportType(config, CFG_OUT), CFG_UDP);
     assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_OUT), "8125");
@@ -852,7 +852,7 @@ cfgReadGoodYaml(void** state)
     assert_string_equal(cfgCmdDir(config), "/tmp");
     assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
     assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
-    assert_int_equal(cfgEventSource(config, CFG_SRC_LOGFILE), 1);
+    assert_int_equal(cfgEventSource(config, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_METRIC), 1);
@@ -1026,7 +1026,7 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgOutPeriod(config), 13);
     assert_int_equal(cfgEventFormat(config), CFG_EVENT_ND_JSON);
     assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
-    assert_int_equal(cfgEventSource(config, CFG_SRC_LOGFILE), 1);
+    assert_int_equal(cfgEventSource(config, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_METRIC), 1);
@@ -1171,7 +1171,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_int_equal(cfgOutPeriod(config), 42);
     assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
     assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
-    assert_int_equal(cfgEventSource(config, CFG_SRC_LOGFILE), 1);
+    assert_int_equal(cfgEventSource(config, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 0);
     assert_int_equal(cfgEventSource(config, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEventSource(config, CFG_SRC_METRIC), 1);
@@ -1373,7 +1373,7 @@ main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
 
-    source_state_t log = {"SCOPE_EVENT_LOGFILE", CFG_SRC_LOGFILE, DEFAULT_SRC_LOGFILE};
+    source_state_t log = {"SCOPE_EVENT_LOGFILE", CFG_SRC_FILE, DEFAULT_SRC_FILE};
     source_state_t con = {"SCOPE_EVENT_CONSOLE", CFG_SRC_CONSOLE, DEFAULT_SRC_CONSOLE};
     source_state_t sys = {"SCOPE_EVENT_SYSLOG" , CFG_SRC_SYSLOG , DEFAULT_SRC_SYSLOG};
     source_state_t met = {"SCOPE_EVENT_METRICS", CFG_SRC_METRIC , DEFAULT_SRC_METRIC};

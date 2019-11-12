@@ -19,10 +19,10 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
     assert_int_equal       (cfgEventFormat(config), DEFAULT_EVT_FORMAT);
     assert_string_equal    (cfgEventLogFileFilter(config), DEFAULT_LOG_FILE_FILTER);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_LOGFILE), DEFAULT_SRC_LOGFILE);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_LOGFILE), DEFAULT_SRC_CONSOLE);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_LOGFILE), DEFAULT_SRC_SYSLOG);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_LOGFILE), DEFAULT_SRC_METRIC);
+    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
+    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_CONSOLE);
+    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_SYSLOG);
+    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_METRIC);
     assert_int_equal       (cfgTransportType(config, CFG_OUT), CFG_UDP);
     assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_OUT), DEFAULT_OUT_PORT);
@@ -185,10 +185,10 @@ cfgEventSourceSetAndGet(void** state)
 
     // Set everything to 1
     int i, j;
-    for (i=CFG_SRC_LOGFILE; i<CFG_SRC_MAX+1; i++) {
+    for (i=CFG_SRC_FILE; i<CFG_SRC_MAX+1; i++) {
         cfgEventSourceSet(config, i, 1);
         if (i >= CFG_SRC_MAX) {
-             assert_int_equal(cfgEventSource(config, i), DEFAULT_SRC_LOGFILE);
+             assert_int_equal(cfgEventSource(config, i), DEFAULT_SRC_FILE);
              assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 1);
              dbgInit(); // reset dbg for the rest of the tests
         } else {
@@ -198,9 +198,9 @@ cfgEventSourceSetAndGet(void** state)
     }
 
     // Clear one at a time to see there aren't side effects
-    for (i=CFG_SRC_LOGFILE; i<CFG_SRC_MAX; i++) {
+    for (i=CFG_SRC_FILE; i<CFG_SRC_MAX; i++) {
         cfgEventSourceSet(config, i, 0); // Clear it
-        for (j=CFG_SRC_LOGFILE; j<CFG_SRC_MAX; j++) {
+        for (j=CFG_SRC_FILE; j<CFG_SRC_MAX; j++) {
             if (i==j)
                  assert_int_equal(cfgEventSource(config, j), 0);
             else
@@ -212,11 +212,11 @@ cfgEventSourceSetAndGet(void** state)
     cfgDestroy(&config);
 
     // Test get with NULL config
-    for (i=CFG_SRC_LOGFILE; i<CFG_SRC_MAX; i++) {
+    for (i=CFG_SRC_FILE; i<CFG_SRC_MAX; i++) {
         unsigned expected;
         switch (i) {
-            case CFG_SRC_LOGFILE:
-                expected = DEFAULT_SRC_LOGFILE;
+            case CFG_SRC_FILE:
+                expected = DEFAULT_SRC_FILE;
                 break;
             case CFG_SRC_CONSOLE:
                 expected = DEFAULT_SRC_CONSOLE;

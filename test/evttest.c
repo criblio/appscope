@@ -299,10 +299,10 @@ evtSourceSetAndGet(void** state)
 
     // Set everything to 1
     int i, j;
-    for (i=CFG_SRC_LOGFILE; i<CFG_SRC_MAX+1; i++) {
+    for (i=CFG_SRC_FILE; i<CFG_SRC_MAX+1; i++) {
         evtSourceSet(evt, i, 1);
         if (i >= CFG_SRC_MAX) {
-             assert_int_equal(evtSource(evt, i), DEFAULT_SRC_LOGFILE);
+             assert_int_equal(evtSource(evt, i), DEFAULT_SRC_FILE);
              assert_int_equal(dbgCountMatchingLines("src/evt.c"), 1);
              dbgInit(); // reset dbg for the rest of the tests
         } else {
@@ -312,9 +312,9 @@ evtSourceSetAndGet(void** state)
     }
 
     // Clear one at a time to see there aren't side effects
-    for (i=CFG_SRC_LOGFILE; i<CFG_SRC_MAX; i++) {
+    for (i=CFG_SRC_FILE; i<CFG_SRC_MAX; i++) {
         evtSourceSet(evt, i, 0); // Clear it
-        for (j=CFG_SRC_LOGFILE; j<CFG_SRC_MAX; j++) {
+        for (j=CFG_SRC_FILE; j<CFG_SRC_MAX; j++) {
             if (i==j)
                  assert_int_equal(evtSource(evt, j), 0);
             else
@@ -326,11 +326,11 @@ evtSourceSetAndGet(void** state)
     evtDestroy(&evt);
 
     // Test get with NULL evt
-    for (i=CFG_SRC_LOGFILE; i<CFG_SRC_MAX; i++) {
+    for (i=CFG_SRC_FILE; i<CFG_SRC_MAX; i++) {
         unsigned expected;
         switch (i) {
-            case CFG_SRC_LOGFILE:
-                expected = DEFAULT_SRC_LOGFILE;
+            case CFG_SRC_FILE:
+                expected = DEFAULT_SRC_FILE;
                 break;
             case CFG_SRC_CONSOLE:
                 expected = DEFAULT_SRC_CONSOLE;

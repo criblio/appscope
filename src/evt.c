@@ -265,8 +265,8 @@ evtSource(evt_t* evt, cfg_evt_t src)
     }
 
     switch (src) {
-        case CFG_SRC_LOGFILE:
-            return DEFAULT_SRC_LOGFILE;
+        case CFG_SRC_FILE:
+            return DEFAULT_SRC_FILE;
         case CFG_SRC_CONSOLE:
             return DEFAULT_SRC_CONSOLE;
         case CFG_SRC_SYSLOG:
@@ -275,7 +275,7 @@ evtSource(evt_t* evt, cfg_evt_t src)
             return DEFAULT_SRC_METRIC;
         default:
             DBG(NULL);
-            return DEFAULT_SRC_LOGFILE;
+            return DEFAULT_SRC_FILE;
     }
 }
 

@@ -303,7 +303,7 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
     } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
         cfgEventFormatSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE")) {
-        cfgEventSourceSetFromStr(cfg, CFG_SRC_LOGFILE, value);
+        cfgEventSourceSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE")) {
         cfgEventSourceSetFromStr(cfg, CFG_SRC_CONSOLE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG")) {
@@ -828,7 +828,7 @@ processActiveSources(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     // absence of one of these values means to clear it.
     // clear them all, then set values for whatever we find.
     cfg_evt_t x;
-    for (x = CFG_SRC_LOGFILE; x<CFG_SRC_MAX; x++) {
+    for (x = CFG_SRC_FILE; x<CFG_SRC_MAX; x++) {
         cfgEventSourceSet(config, x, 0);
     }
 
@@ -839,7 +839,7 @@ processActiveSources(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
         char* value = stringVal(i);
         if (!strcmp(value, "logfile")) {
-            cfgEventSourceSet(config, CFG_SRC_LOGFILE, 1);
+            cfgEventSourceSet(config, CFG_SRC_FILE, 1);
         } else if (!strcmp(value, "console")) {
             cfgEventSourceSet(config, CFG_SRC_CONSOLE, 1);
         } else if (!strcmp(value, "syslog")) {
@@ -1066,7 +1066,7 @@ initEvt(config_t *cfg)
     evtLogFileFilterSet(evt, cfgEventLogFileFilter(cfg));
 
     cfg_evt_t src;
-    for (src = CFG_SRC_LOGFILE; src<CFG_SRC_MAX; src++) {
+    for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
         evtSourceSet(evt, src, cfgEventSource(cfg, src));
     }
 

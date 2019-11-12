@@ -14,7 +14,7 @@ typedef enum {CFG_LOG_TRACE,
               CFG_LOG_ERROR,
               CFG_LOG_NONE} cfg_log_level_t;
 typedef enum {CFG_BUFFER_FULLY, CFG_BUFFER_LINE} cfg_buffer_t;
-typedef enum {CFG_SRC_LOGFILE,
+typedef enum {CFG_SRC_FILE,
               CFG_SRC_CONSOLE,
               CFG_SRC_SYSLOG,
               CFG_SRC_METRIC,
@@ -36,7 +36,7 @@ typedef enum {CFG_SRC_LOGFILE,
 #define DEFAULT_MIN_FD 200
 #define DEFAULT_BADFD -2
 #define DEFAULT_EVT_FORMAT CFG_EVENT_ND_JSON
-#define DEFAULT_SRC_LOGFILE 0
+#define DEFAULT_SRC_FILE 0
 #define DEFAULT_SRC_CONSOLE 0
 #define DEFAULT_SRC_SYSLOG 0
 #define DEFAULT_SRC_METRIC 0

@@ -554,7 +554,7 @@ fmtEventMessageString(format_t *fmt, event_format_t *evmsg)
     if (!fmt || !evmsg) return NULL;
 
     switch (fmt->format) {
-        case CFG_EVENT_JSON_RAW_JSON:
+        case CFG_EVENT_ND_JSON:
             return fmtEventJson(fmt, evmsg);
         default:
             DBG("%d %s", fmt->format, evmsg->src);
@@ -569,10 +569,9 @@ fmtString(format_t* fmt, event_t* e)
 
     switch (fmt->format) {
         case CFG_METRIC_STATSD:
-        case CFG_EVENT_JSON_RAW_STATSD:
             return fmtStatsDString(fmt, e);
         case CFG_METRIC_JSON:
-        case CFG_EVENT_JSON_RAW_JSON:
+        case CFG_EVENT_ND_JSON:
             return fmtMetricJson(fmt, e);
         default:
             DBG("%d %s", fmt->format, e->name);

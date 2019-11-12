@@ -369,10 +369,8 @@ cfgOutFormatSetFromStr(config_t* cfg, const char* value)
         cfgOutFormatSet(cfg, CFG_METRIC_STATSD);
     } else if (!strcmp(value, "metricjson")) {
         cfgOutFormatSet(cfg, CFG_METRIC_JSON);
-    } else if (!strcmp(value, "eventjsonrawjson")) {
-        cfgOutFormatSet(cfg, CFG_EVENT_JSON_RAW_JSON);
-    } else if (!strcmp(value, "eventjsonrawstatsd")) {
-        cfgOutFormatSet(cfg, CFG_EVENT_JSON_RAW_STATSD);
+    } else if (!strcmp(value, "ndjson")) {
+        cfgOutFormatSet(cfg, CFG_EVENT_ND_JSON);
     }
 }
 
@@ -423,10 +421,8 @@ cfgEventFormatSetFromStr(config_t* cfg, const char* value)
         cfgEventFormatSet(cfg, CFG_METRIC_STATSD);
     } else if (!strcmp(value, "metricjson")) {
         cfgEventFormatSet(cfg, CFG_METRIC_JSON);
-    } else if (!strcmp(value, "eventjsonrawjson")) {
-        cfgEventFormatSet(cfg, CFG_EVENT_JSON_RAW_JSON);
-    } else if (!strcmp(value, "eventjsonrawstatsd")) {
-        cfgEventFormatSet(cfg, CFG_EVENT_JSON_RAW_STATSD);
+    } else if (!strcmp(value, "ndjson")) {
+        cfgEventFormatSet(cfg, CFG_EVENT_ND_JSON);
     }
 }
 

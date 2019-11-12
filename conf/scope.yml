@@ -54,7 +54,7 @@ output:
 
 event:
   format:
-    type : eventjsonrawjson         # eventjsonrawjson, eventjsonrawstatsd
+    type : ndjson                   # ndjson
   transport:
     type: tcp                       # udp, unix, file, syslog
     host: 127.0.0.1

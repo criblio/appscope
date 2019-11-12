@@ -397,7 +397,7 @@ fmtStringStatsDHonorsCardinality(void** state)
 static void
 fmtEventMessageStringValue(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EVENT_JSON_RAW_JSON);
+    format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
     assert_non_null(fmt);
 
     event_format_t event_format;
@@ -462,7 +462,7 @@ fmtStringMetricJsonWFields(void** state)
 static void
 fmtStringMetricJsonEscapedValues(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EVENT_JSON_RAW_JSON);
+    format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
     {
         event_t e = {"Paç \"fat!", 3, SET, NULL};    // embedded double quote
         char* str = fmtString(fmt, &e);

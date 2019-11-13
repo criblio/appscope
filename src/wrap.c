@@ -247,7 +247,7 @@ getFSEntry(int fd)
     }
 
     if (((fd == 1) || (fd == 2)) && g_fsinfo &&
-        (evtSource(g_evt, CFG_SRC_CONSOLE) != DEFAULT_SRC_CONSOLE)) {
+        (evtSourceEnabled(g_evt, CFG_SRC_CONSOLE))) {
         if (fd == 1) doOpen(fd, "stdout", FD, "console output");
         if (fd == 2) doOpen(fd, "stderr", FD, "console output");
         if (g_fsinfo[fd].fd == fd) {
@@ -2147,9 +2147,9 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
         g_fsinfo[fd].uid = getTime();
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
 
-        if (evtSource(g_evt, CFG_SRC_FILE) != DEFAULT_SRC_FILE) {
+        if (evtSourceEnabled(g_evt, CFG_SRC_FILE)) {
             regmatch_t match = {0};
-            if (regexec(evtLogFileFilter(g_evt), path, 1, &match, 0) == 0) {
+            if (regexec(evtNameFilter(g_evt, CFG_SRC_FILE), path, 1, &match, 0) == 0) {
                 g_fsinfo[fd].event = TRUE;
             }
         }

@@ -33,7 +33,9 @@ struct _config_t
 
     struct {
         cfg_out_format_t format;
-        char* logfilefilter;
+        char* valuefilter[CFG_SRC_MAX];
+        char* fieldfilter[CFG_SRC_MAX];
+        char* namefilter[CFG_SRC_MAX];
         unsigned src[CFG_SRC_MAX];
     } evt;
 
@@ -68,6 +70,65 @@ struct _config_t
 #define DEFAULT_NUM_TAGS 8
 #define DEFAULT_COMMAND_DIR "/tmp"
 
+
+static const char* valueFilterDefault[] = {
+    DEFAULT_SRC_FILE_VALUE,
+    DEFAULT_SRC_CONSOLE_VALUE,
+    DEFAULT_SRC_SYSLOG_VALUE,
+    DEFAULT_SRC_METRIC_VALUE,
+};
+
+static const char* fieldFilterDefault[] = {
+    DEFAULT_SRC_FILE_FIELD,
+    DEFAULT_SRC_CONSOLE_FIELD,
+    DEFAULT_SRC_SYSLOG_FIELD,
+    DEFAULT_SRC_METRIC_FIELD,
+};
+
+static const char* nameFilterDefault[] = {
+    DEFAULT_SRC_FILE_NAME,
+    DEFAULT_SRC_CONSOLE_NAME,
+    DEFAULT_SRC_SYSLOG_NAME,
+    DEFAULT_SRC_METRIC_NAME,
+};
+
+static unsigned srcEnabledDefault[] = {
+    DEFAULT_SRC_FILE,
+    DEFAULT_SRC_CONSOLE,
+    DEFAULT_SRC_SYSLOG,
+    DEFAULT_SRC_METRIC,
+};
+
+static cfg_out_format_t typeDefault[] = {
+    DEFAULT_OUT_TYPE,
+    DEFAULT_EVT_TYPE,
+    DEFAULT_LOG_TYPE,
+};
+
+static const char* hostDefault[] = {
+    DEFAULT_OUT_HOST,
+    DEFAULT_EVT_HOST,
+    DEFAULT_LOG_HOST,
+};
+
+static const char* portDefault[] = {
+    DEFAULT_OUT_PORT,
+    DEFAULT_EVT_PORT,
+    DEFAULT_LOG_PORT,
+};
+
+static const char* pathDefault[] = {
+    DEFAULT_OUT_PATH,
+    DEFAULT_EVT_PATH,
+    DEFAULT_LOG_PATH,
+};
+
+static cfg_buffer_t bufDefault[] = {
+    DEFAULT_OUT_BUF,
+    DEFAULT_EVT_BUF,
+    DEFAULT_LOG_BUF,
+};
+
     
 ///////////////////////////////////
 // Constructors Destructors
@@ -87,26 +148,30 @@ cfgCreateDefault()
     c->out.verbosity = DEFAULT_OUT_VERBOSITY;
     c->out.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
     c->evt.format = DEFAULT_EVT_FORMAT;
-    c->evt.logfilefilter = (DEFAULT_LOG_FILE_FILTER) ? strdup(DEFAULT_LOG_FILE_FILTER) : NULL;
-    c->evt.src[CFG_SRC_FILE] = DEFAULT_SRC_FILE;
-    c->evt.src[CFG_SRC_CONSOLE] = DEFAULT_SRC_CONSOLE;;
-    c->evt.src[CFG_SRC_SYSLOG] = DEFAULT_SRC_SYSLOG;
-    c->evt.src[CFG_SRC_METRIC] = DEFAULT_SRC_METRIC;
-    c->transport[CFG_OUT].type = DEFAULT_OUT_TYPE;
-    c->transport[CFG_OUT].net.host = (DEFAULT_OUT_HOST) ? strdup(DEFAULT_OUT_HOST) : NULL;
-    c->transport[CFG_OUT].net.port = (DEFAULT_OUT_PORT) ? strdup(DEFAULT_OUT_PORT) : NULL;
-    c->transport[CFG_OUT].file.path = (DEFAULT_OUT_PATH) ? strdup(DEFAULT_OUT_PATH) : NULL;
-    c->transport[CFG_OUT].file.buf_policy = DEFAULT_OUT_BUF;
-    c->transport[CFG_EVT].type = DEFAULT_EVT_TYPE;
-    c->transport[CFG_EVT].net.host = (DEFAULT_EVT_HOST) ? strdup(DEFAULT_EVT_HOST) : NULL;
-    c->transport[CFG_EVT].net.port = (DEFAULT_EVT_PORT) ? strdup(DEFAULT_EVT_PORT) : NULL;
-    c->transport[CFG_EVT].file.path = (DEFAULT_EVT_PATH) ? strdup(DEFAULT_EVT_PATH) : NULL;
-    c->transport[CFG_EVT].file.buf_policy = DEFAULT_EVT_BUF;
-    c->transport[CFG_LOG].type = DEFAULT_LOG_TYPE;
-    c->transport[CFG_LOG].net.host = (DEFAULT_LOG_HOST) ? strdup(DEFAULT_LOG_HOST) : NULL;
-    c->transport[CFG_LOG].net.port = (DEFAULT_LOG_PORT) ? strdup(DEFAULT_LOG_PORT) : NULL;
-    c->transport[CFG_LOG].file.path = (DEFAULT_LOG_PATH) ? strdup(DEFAULT_LOG_PATH) : NULL;
-    c->transport[CFG_LOG].file.buf_policy = DEFAULT_LOG_BUF;
+
+    cfg_evt_t src;
+    for (src=CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
+        const char* val_def = valueFilterDefault[src];
+        c->evt.valuefilter[src] = (val_def) ? strdup(val_def) : NULL;
+        const char* field_def = fieldFilterDefault[src];
+        c->evt.fieldfilter[src] = (field_def) ? strdup(field_def) : NULL;
+        const char* name_def = nameFilterDefault[src];
+        c->evt.namefilter[src] = (name_def) ? strdup(name_def) : NULL;
+        c->evt.src[src] = srcEnabledDefault[src];
+    }
+
+    which_transport_t tp;
+    for (tp=CFG_OUT; tp<CFG_WHICH_MAX; tp++) {
+        c->transport[tp].type = typeDefault[tp];
+        const char* host_def = hostDefault[tp];
+        c->transport[tp].net.host = (host_def) ? strdup(host_def) : NULL;
+        const char* port_def = portDefault[tp];
+        c->transport[tp].net.port = (port_def) ? strdup(port_def) : NULL;
+        const char* path_def = pathDefault[tp];
+        c->transport[tp].file.path = (path_def) ? strdup(path_def) : NULL;
+        c->transport[tp].file.buf_policy = bufDefault[tp];
+    }
+
     c->tags = DEFAULT_TAGS;
     c->max_tags = DEFAULT_NUM_TAGS;
     c->log.level = DEFAULT_LOG_LEVEL;
@@ -121,13 +186,21 @@ cfgDestroy(config_t** cfg)
     config_t* c = *cfg;
     if (c->out.statsd.prefix) free(c->out.statsd.prefix);
     if (c->out.commanddir) free(c->out.commanddir);
-    if (c->evt.logfilefilter) free(c->evt.logfilefilter);
+
+    cfg_evt_t src;
+    for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
+        if (c->evt.valuefilter[src]) free (c->evt.valuefilter[src]);
+        if (c->evt.fieldfilter[src]) free (c->evt.fieldfilter[src]);
+        if (c->evt.namefilter[src]) free (c->evt.namefilter[src]);
+    }
+
     which_transport_t t;
     for (t=CFG_OUT; t<CFG_WHICH_MAX; t++) {
         if (c->transport[t].net.host) free(c->transport[t].net.host);
         if (c->transport[t].net.port) free(c->transport[t].net.port);
         if (c->transport[t].file.path) free(c->transport[t].file.path);
     }
+
     if (c->tags) {
         int i = 0;
         while (c->tags[i]) {
@@ -182,31 +255,51 @@ cfgEventFormat(config_t* cfg)
 }
 
 const char*
-cfgEventLogFileFilter(config_t* cfg)
+cfgEventValueFilter(config_t* cfg, cfg_evt_t evt)
 {
-    return (cfg) ? cfg->evt.logfilefilter : DEFAULT_LOG_FILE_FILTER;
+    if (evt < CFG_SRC_MAX) {
+        if (cfg) return cfg->evt.valuefilter[evt];
+        return valueFilterDefault[evt];
+    }
+
+    DBG("%d", evt);
+    return valueFilterDefault[CFG_SRC_FILE];
+}
+
+const char*
+cfgEventFieldFilter(config_t* cfg, cfg_evt_t evt)
+{
+    if (evt < CFG_SRC_MAX) {
+        if (cfg) return cfg->evt.fieldfilter[evt];
+        return fieldFilterDefault[evt];
+    }
+
+    DBG("%d", evt);
+    return fieldFilterDefault[CFG_SRC_FILE];
+}
+
+const char*
+cfgEventNameFilter(config_t* cfg, cfg_evt_t evt)
+{
+    if (evt < CFG_SRC_MAX) {
+        if (cfg) return cfg->evt.namefilter[evt];
+        return nameFilterDefault[evt];
+    }
+
+    DBG("%d", evt);
+    return nameFilterDefault[CFG_SRC_FILE];
 }
 
 unsigned
-cfgEventSource(config_t* cfg, cfg_evt_t evt)
+cfgEventSourceEnabled(config_t* cfg, cfg_evt_t evt)
 {
-    if (cfg && evt < CFG_SRC_MAX) {
-        return cfg->evt.src[evt];
+    if (evt < CFG_SRC_MAX) {
+        if (cfg) return cfg->evt.src[evt];
+        return srcEnabledDefault[evt];
     }
 
-    switch (evt) {
-        case CFG_SRC_FILE:
-            return DEFAULT_SRC_FILE;
-        case CFG_SRC_CONSOLE:
-            return DEFAULT_SRC_CONSOLE;
-        case CFG_SRC_SYSLOG:
-            return DEFAULT_SRC_SYSLOG;
-        case CFG_SRC_METRIC:
-            return DEFAULT_SRC_METRIC;
-        default:
-            DBG(NULL);
-            return DEFAULT_SRC_FILE;
-    }
+    DBG("%d", evt);
+    return srcEnabledDefault[CFG_SRC_FILE];
 }
 
 
@@ -219,102 +312,61 @@ cfgOutVerbosity(config_t* cfg)
 cfg_transport_t
 cfgTransportType(config_t* cfg, which_transport_t t)
 {
-    if (cfg && t < CFG_WHICH_MAX) {
-        return cfg->transport[t].type;
+    if (t < CFG_WHICH_MAX) {
+        if (cfg) return cfg->transport[t].type;
+        return typeDefault[t];
     }
- 
-    switch (t) {
-        case CFG_OUT:
-            return DEFAULT_OUT_TYPE;
-        case CFG_EVT:
-            return DEFAULT_EVT_TYPE;
-        case CFG_LOG:
-            return DEFAULT_LOG_TYPE;
-        default:
-            DBG("%d", t);
-            return DEFAULT_LOG_TYPE;
-    }
+
+    DBG("%d", t);
+    return typeDefault[CFG_LOG];
 }
 
 const char*
 cfgTransportHost(config_t* cfg, which_transport_t t)
 {
-    if (cfg && t < CFG_WHICH_MAX) {
-        return cfg->transport[t].net.host;
+    if (t < CFG_WHICH_MAX) {
+        if (cfg) return cfg->transport[t].net.host;
+        return hostDefault[t];
     } 
 
-
-    switch (t) {
-        case CFG_OUT:
-            return DEFAULT_OUT_HOST;
-        case CFG_EVT:
-            return DEFAULT_EVT_HOST;
-        case CFG_LOG:
-            return DEFAULT_LOG_HOST;
-        default:
-            DBG("%d", t);
-            return DEFAULT_LOG_HOST;
-    }
+    DBG("%d", t);
+    return hostDefault[CFG_LOG];
 }
 
 const char*
 cfgTransportPort(config_t* cfg, which_transport_t t)
 {
-    if (cfg && t < CFG_WHICH_MAX) {
-        return cfg->transport[t].net.port;
+    if (t < CFG_WHICH_MAX) {
+        if (cfg) return cfg->transport[t].net.port;
+        return portDefault[t];
     }
 
-    switch (t) {
-        case CFG_OUT:
-            return DEFAULT_OUT_PORT;
-        case CFG_EVT:
-            return DEFAULT_EVT_PORT;
-        case CFG_LOG:
-            return DEFAULT_LOG_PORT;
-        default:
-            DBG("%d", t);
-            return DEFAULT_LOG_PORT;
-    }
+    DBG("%d", t);
+    return portDefault[CFG_LOG];
 }
 
 const char*
 cfgTransportPath(config_t* cfg, which_transport_t t)
 {
-    if (cfg && t  < CFG_WHICH_MAX) {
-        return cfg->transport[t].file.path;
+    if (t < CFG_WHICH_MAX) {
+        if (cfg) return cfg->transport[t].file.path;
+        return pathDefault[t];
     }
 
-    switch (t) {
-        case CFG_OUT:
-            return DEFAULT_OUT_PATH;
-        case CFG_EVT:
-            return DEFAULT_EVT_PATH;
-        case CFG_LOG:
-            return DEFAULT_LOG_PATH;
-        default:
-            DBG("%d", t);
-            return DEFAULT_LOG_PATH;
-    }
+    DBG("%d", t);
+    return pathDefault[CFG_LOG];
 }
 
 cfg_buffer_t
 cfgTransportBuf(config_t* cfg, which_transport_t t)
 {
-    if (cfg && t < CFG_WHICH_MAX) {
-        return cfg->transport[t].file.buf_policy;
+    if (t < CFG_WHICH_MAX) {
+        if (cfg) return cfg->transport[t].file.buf_policy;
+        return bufDefault[t];
     }
 
-    switch (t) {
-        case CFG_OUT:
-            return DEFAULT_OUT_BUF;
-        case CFG_EVT:
-            return DEFAULT_EVT_BUF;
-        case CFG_LOG:
-            return DEFAULT_LOG_BUF;
-        default:
-            DBG("%d", t);
-            return DEFAULT_LOG_BUF;
-    }
+    DBG("%d", t);
+    return bufDefault[CFG_LOG];
 }
 
 custom_tag_t**
@@ -435,19 +487,46 @@ cfgEventFormatSet(config_t* cfg, cfg_out_format_t fmt)
 }
 
 void
-cfgEventLogFileFilterSet(config_t* cfg,  const char* filter)
+cfgEventValueFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
 {
-    if (!cfg) return;
-    if (cfg->evt.logfilefilter) free (cfg->evt.logfilefilter);
+    if (!cfg || evt >= CFG_SRC_MAX) return;
+    if (cfg->evt.valuefilter[evt]) free (cfg->evt.valuefilter[evt]);
     if (!filter || (filter[0] == '\0')) {
-        cfg->evt.logfilefilter = (DEFAULT_LOG_FILE_FILTER) ? strdup(DEFAULT_LOG_FILE_FILTER) : NULL;
+        const char* vdefault = valueFilterDefault[evt];
+        cfg->evt.valuefilter[evt] = (vdefault) ? strdup(vdefault) : NULL;
         return;
     }
-    cfg->evt.logfilefilter = strdup(filter);
+    cfg->evt.valuefilter[evt] = strdup(filter);
 }
 
 void
-cfgEventSourceSet(config_t* cfg, cfg_evt_t evt, unsigned val)
+cfgEventFieldFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
+{
+    if (!cfg || evt >= CFG_SRC_MAX) return;
+    if (cfg->evt.fieldfilter[evt]) free (cfg->evt.fieldfilter[evt]);
+    if (!filter || (filter[0] == '\0')) {
+        const char* fdefault = fieldFilterDefault[evt];
+        cfg->evt.fieldfilter[evt] = (fdefault) ? strdup(fdefault) : NULL;
+        return;
+    }
+    cfg->evt.fieldfilter[evt] = strdup(filter);
+}
+
+void
+cfgEventNameFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
+{
+    if (!cfg || evt >= CFG_SRC_MAX) return;
+    if (cfg->evt.namefilter[evt]) free (cfg->evt.namefilter[evt]);
+    if (!filter || (filter[0] == '\0')) {
+        const char* ndefault = nameFilterDefault[evt];
+        cfg->evt.namefilter[evt] = (ndefault) ? strdup(ndefault) : NULL;
+        return;
+    }
+    cfg->evt.namefilter[evt] = strdup(filter);
+}
+
+void
+cfgEventSourceEnabledSet(config_t* cfg, cfg_evt_t evt, unsigned val)
 {
     if (!cfg || evt >= CFG_SRC_MAX) return;
     cfg->evt.src[evt] = val;

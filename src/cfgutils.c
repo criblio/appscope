@@ -25,16 +25,19 @@ void cfgOutStatsDMaxLenSetFromStr(config_t*, const char*);
 void cfgOutPeriodSetFromStr(config_t*, const char*);
 void cfgCmdDirSetFromStr(config_t*, const char*);
 void cfgEventFormatSetFromStr(config_t*, const char*);
-void cfgEventLogFileFilterSetFromStr(config_t*, const char*);
-void cfgEventSourceSetFromStr(config_t*, cfg_evt_t, const char*);
+void cfgEventValueFilterSetFromStr(config_t*, cfg_evt_t, const char*);
+void cfgEventFieldFilterSetFromStr(config_t*, cfg_evt_t, const char*);
+void cfgEventNameFilterSetFromStr(config_t*, cfg_evt_t, const char*);
+void cfgEventSourceEnabledSetFromStr(config_t*, cfg_evt_t, const char*);
 void cfgOutVerbositySetFromStr(config_t*, const char*);
 void cfgTransportSetFromStr(config_t*, which_transport_t, const char*);
 void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
 
-// This global variable limits us to only reading one config file at a time...
+// These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
 static which_transport_t transport_context;
+static cfg_evt_t watch_context;
 
 static regex_t* g_regex = NULL;
 
@@ -303,15 +306,15 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
     } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
         cfgEventFormatSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE")) {
-        cfgEventSourceSetFromStr(cfg, CFG_SRC_FILE, value);
+        cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE")) {
-        cfgEventSourceSetFromStr(cfg, CFG_SRC_CONSOLE, value);
+        cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_CONSOLE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG")) {
-        cfgEventSourceSetFromStr(cfg, CFG_SRC_SYSLOG, value);
+        cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_SYSLOG, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_METRICS")) {
-        cfgEventSourceSetFromStr(cfg, CFG_SRC_METRIC, value);
+        cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOG_FILTER")) {
-        cfgEventLogFileFilterSetFromStr(cfg, value);
+        cfgEventNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     }
 
     free(value);
@@ -427,17 +430,31 @@ cfgEventFormatSetFromStr(config_t* cfg, const char* value)
 }
 
 void
-cfgEventLogFileFilterSetFromStr(config_t* cfg, const char* value)
+cfgEventValueFilterSetFromStr(config_t* cfg, cfg_evt_t src, const char* value)
 {
     if (!cfg || !value) return;
-    cfgEventLogFileFilterSet(cfg, value);
+    cfgEventValueFilterSet(cfg, src, value);
 }
 
 void
-cfgEventSourceSetFromStr(config_t* cfg, cfg_evt_t x, const char* value)
+cfgEventFieldFilterSetFromStr(config_t* cfg, cfg_evt_t src, const char* value)
 {
-    if (!cfg || !value || x >= CFG_SRC_MAX) return;
-    cfgEventSourceSet(cfg, x, !strcmp("true", value));
+    if (!cfg || !value) return;
+    cfgEventFieldFilterSet(cfg, src, value);
+}
+
+void
+cfgEventNameFilterSetFromStr(config_t* cfg, cfg_evt_t src, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgEventNameFilterSet(cfg, src, value);
+}
+
+void
+cfgEventSourceEnabledSetFromStr(config_t* cfg, cfg_evt_t src, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgEventSourceEnabledSet(cfg, src, !strcmp("true", value));
 }
 
 void
@@ -813,42 +830,61 @@ processEvtFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processLogFileFilter(config_t* config, yaml_document_t* doc, yaml_node_t* node)
-{
-    char* value = stringVal(node);
-    cfgEventLogFileFilterSetFromStr(config, value);
-    if (value) free(value);
-}
-
-static void
 processWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
 
     char* value = stringVal(node);
-    if (!value) return;  // TBD - Call FromStr func instead
+    watch_context = CFG_SRC_MAX;            // Deliberately invalid
     if (!strcmp(value, "file")) {
-        cfgEventSourceSet(config, CFG_SRC_FILE, 1);
+        watch_context = CFG_SRC_FILE;
     } else if (!strcmp(value, "console")) {
-        cfgEventSourceSet(config, CFG_SRC_CONSOLE, 1);
+        watch_context = CFG_SRC_CONSOLE;
     } else if (!strcmp(value, "syslog")) {
-        cfgEventSourceSet(config, CFG_SRC_SYSLOG, 1);
+        watch_context = CFG_SRC_SYSLOG;
     } else if (!strcmp(value, "metric")) {
-        cfgEventSourceSet(config, CFG_SRC_METRIC, 1);
+        watch_context = CFG_SRC_METRIC;
     }
+    cfgEventSourceEnabledSet(config, watch_context, 1);
     if (value) free(value);
 }
 
 static void
 processWatchName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-   // TBD
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    char* value = stringVal(node);
+    cfgEventNameFilterSetFromStr(config, watch_context, value);
+    if (value) free(value);
 }
 
 static void
-processWatchFilter(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processWatchField(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-   // TBD
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    char* value = stringVal(node);
+    cfgEventFieldFilterSetFromStr(config, watch_context, value);
+    if (value) free(value);
+}
+
+static void
+processWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    char* value = stringVal(node);
+    cfgEventValueFilterSetFromStr(config, watch_context, value);
+    if (value) free(value);
+}
+
+static int
+isWatchType(yaml_document_t* doc, yaml_node_pair_t* pair)
+{
+    yaml_node_t* key = yaml_document_get_node(doc, pair->key);
+    if (!key || (key->type != YAML_SCALAR_NODE)) return 0;
+    return !strcmp((char*)key->data.scalar.value, "type");
 }
 
 static void
@@ -859,14 +895,26 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,  "type",            processWatchType},
         {YAML_SCALAR_NODE,  "name",            processWatchName},
-        {YAML_SCALAR_NODE,  "filter",          processWatchFilter},
+        {YAML_SCALAR_NODE,  "field",           processWatchField},
+        {YAML_SCALAR_NODE,  "value",           processWatchValue},
         {YAML_NO_NODE, NULL, NULL}
     };
 
+    watch_context = CFG_SRC_MAX;
+
     yaml_node_pair_t* pair;
+    // process type first
     foreach(pair, node->data.mapping.pairs) {
+        if (!isWatchType(doc, pair)) continue;
+        processKeyValuePair(t, pair, config, doc);
+        break;
+    }
+    // Then process everything else
+    foreach(pair, node->data.mapping.pairs) {
+        if (isWatchType(doc, pair)) continue;
         processKeyValuePair(t, pair, config, doc);
     }
+
 }
 
 static void
@@ -878,7 +926,7 @@ processWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     // clear them all, then set values for whatever we find.
     cfg_evt_t x;
     for (x = CFG_SRC_FILE; x<CFG_SRC_MAX; x++) {
-        cfgEventSourceSet(config, x, 0);
+        cfgEventSourceEnabledSet(config, x, 0);
     }
 
     yaml_node_item_t* item;
@@ -896,7 +944,6 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     parse_table_t t[] = {
         {YAML_MAPPING_NODE, "format",          processEvtFormat},
         {YAML_MAPPING_NODE, "transport",       processTransport},
-        {YAML_SCALAR_NODE,  "logfilefilter",   processLogFileFilter},
         {YAML_SEQUENCE_NODE,"watch",           processWatch},
         {YAML_NO_NODE, NULL, NULL}
     };
@@ -1100,11 +1147,12 @@ initEvt(config_t *cfg)
 
     evtFormatSet(evt, fmt);
 
-    evtLogFileFilterSet(evt, cfgEventLogFileFilter(cfg));
-
     cfg_evt_t src;
     for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
-        evtSourceSet(evt, src, cfgEventSource(cfg, src));
+        evtSourceEnabledSet(evt, src, cfgEventSourceEnabled(cfg, src));
+        evtNameFilterSet(evt, src, cfgEventNameFilter(cfg, src));
+        evtFieldFilterSet(evt, src, cfgEventFieldFilter(cfg, src));
+        evtValueFilterSet(evt, src, cfgEventValueFilter(cfg, src));
     }
 
     return evt;

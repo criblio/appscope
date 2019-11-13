@@ -18,11 +18,22 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgOutPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
     assert_int_equal       (cfgEventFormat(config), DEFAULT_EVT_FORMAT);
-    assert_string_equal    (cfgEventLogFileFilter(config), DEFAULT_LOG_FILE_FILTER);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_CONSOLE);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_SYSLOG);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_METRIC);
+    assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
+    assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
+    assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
+    assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_VALUE);
+    assert_string_equal    (cfgEventFieldFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_FIELD);
+    assert_string_equal    (cfgEventFieldFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_FIELD);
+    assert_string_equal    (cfgEventFieldFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_FIELD);
+    assert_string_equal    (cfgEventFieldFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_FIELD);
+    assert_string_equal    (cfgEventNameFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_NAME);
+    assert_string_equal    (cfgEventNameFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_NAME);
+    assert_string_equal    (cfgEventNameFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_NAME);
+    assert_string_equal    (cfgEventNameFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_NAME);
+    assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
+    assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
+    assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
+    assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
     assert_int_equal       (cfgTransportType(config, CFG_OUT), CFG_UDP);
     assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_OUT), DEFAULT_OUT_PORT);
@@ -165,48 +176,88 @@ cfgEventFormatSetAndGet(void** state)
     cfgDestroy(&config);
 }
 
-static void
-cfgEventLogFileFilterSetAndGet(void** state)
+typedef struct
 {
+    cfg_evt_t   src;
+    const char* default_value;
+    const char* default_field;
+    const char* default_name;
+} source_state_t;
+
+static void
+cfgEventValueFilterSetAndGet(void** state)
+{
+    source_state_t* data = (source_state_t*)state[0];
+
     config_t* config = cfgCreateDefault();
-    cfgEventLogFileFilterSet(config, ".*\\.log$");
-    assert_string_equal(cfgEventLogFileFilter(config), ".*\\.log$");
-    cfgEventLogFileFilterSet(config, "^/var/log/.*");
-    assert_string_equal(cfgEventLogFileFilter(config), "^/var/log/.*");
-    cfgEventLogFileFilterSet(config, NULL);
-    assert_string_equal(cfgEventLogFileFilter(config), DEFAULT_LOG_FILE_FILTER);
+    cfgEventValueFilterSet(config, data->src, ".*\\.log$");
+    assert_string_equal(cfgEventValueFilter(config, data->src), ".*\\.log$");
+    cfgEventValueFilterSet(config, data->src, "^/var/log/.*");
+    assert_string_equal(cfgEventValueFilter(config, data->src), "^/var/log/.*");
+    cfgEventValueFilterSet(config, data->src, NULL);
+    assert_string_equal(cfgEventValueFilter(config, data->src), data->default_value);
     cfgDestroy(&config);
 }
 
 static void
-cfgEventSourceSetAndGet(void** state)
+cfgEventFieldFilterSetAndGet(void** state)
+{
+    source_state_t* data = (source_state_t*)state[0];
+
+    config_t* config = cfgCreateDefault();
+    cfgEventFieldFilterSet(config, data->src, ".*\\.log$");
+    assert_string_equal(cfgEventFieldFilter(config, data->src), ".*\\.log$");
+    cfgEventFieldFilterSet(config, data->src, "^/var/log/.*");
+    assert_string_equal(cfgEventFieldFilter(config, data->src), "^/var/log/.*");
+    cfgEventFieldFilterSet(config, data->src, NULL);
+    assert_string_equal(cfgEventFieldFilter(config, data->src), data->default_field);
+    cfgDestroy(&config);
+}
+
+static void
+cfgEventNameFilterSetAndGet(void** state)
+{
+    source_state_t* data = (source_state_t*)state[0];
+
+    config_t* config = cfgCreateDefault();
+    cfgEventNameFilterSet(config, data->src, ".*\\.log$");
+    assert_string_equal(cfgEventNameFilter(config, data->src), ".*\\.log$");
+    cfgEventNameFilterSet(config, data->src, "^/var/log/.*");
+    assert_string_equal(cfgEventNameFilter(config, data->src), "^/var/log/.*");
+    cfgEventNameFilterSet(config, data->src, NULL);
+    assert_string_equal(cfgEventNameFilter(config, data->src), data->default_name);
+    cfgDestroy(&config);
+}
+
+static void
+cfgEventSourceEnabledSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
 
     // Set everything to 1
     int i, j;
     for (i=CFG_SRC_FILE; i<CFG_SRC_MAX+1; i++) {
-        cfgEventSourceSet(config, i, 1);
+        cfgEventSourceEnabledSet(config, i, 1);
         if (i >= CFG_SRC_MAX) {
-             assert_int_equal(cfgEventSource(config, i), DEFAULT_SRC_FILE);
+             assert_int_equal(cfgEventSourceEnabled(config, i), DEFAULT_SRC_FILE);
              assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 1);
              dbgInit(); // reset dbg for the rest of the tests
         } else {
              assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 0);
-             assert_int_equal(cfgEventSource(config, i), 1);
+             assert_int_equal(cfgEventSourceEnabled(config, i), 1);
         }
     }
 
     // Clear one at a time to see there aren't side effects
     for (i=CFG_SRC_FILE; i<CFG_SRC_MAX; i++) {
-        cfgEventSourceSet(config, i, 0); // Clear it
+        cfgEventSourceEnabledSet(config, i, 0); // Clear it
         for (j=CFG_SRC_FILE; j<CFG_SRC_MAX; j++) {
             if (i==j)
-                 assert_int_equal(cfgEventSource(config, j), 0);
+                 assert_int_equal(cfgEventSourceEnabled(config, j), 0);
             else
-                 assert_int_equal(cfgEventSource(config, j), 1);
+                 assert_int_equal(cfgEventSourceEnabled(config, j), 1);
         }
-        cfgEventSourceSet(config, i, 1); // Set it back
+        cfgEventSourceEnabledSet(config, i, 1); // Set it back
     }
 
     cfgDestroy(&config);
@@ -228,7 +279,7 @@ cfgEventSourceSetAndGet(void** state)
                 expected = DEFAULT_SRC_METRIC;
                 break;
         }
-        assert_int_equal(cfgEventSource(config, i), expected);
+        assert_int_equal(cfgEventSourceEnabled(config, i), expected);
     }
 }
 
@@ -385,6 +436,11 @@ main(int argc, char* argv[])
     void* evt_state[] = {(void*)CFG_EVT, NULL};
     void* log_state[] = {(void*)CFG_LOG, NULL};
 
+    source_state_t log = {CFG_SRC_FILE, DEFAULT_SRC_FILE_VALUE, DEFAULT_SRC_FILE_FIELD, DEFAULT_SRC_FILE_NAME};
+    source_state_t con = {CFG_SRC_CONSOLE, DEFAULT_SRC_CONSOLE_VALUE, DEFAULT_SRC_CONSOLE_FIELD, DEFAULT_SRC_CONSOLE_NAME};
+    source_state_t sys = {CFG_SRC_SYSLOG, DEFAULT_SRC_SYSLOG_VALUE, DEFAULT_SRC_SYSLOG_FIELD, DEFAULT_SRC_SYSLOG_NAME};
+    source_state_t met = {CFG_SRC_METRIC, DEFAULT_SRC_METRIC_VALUE, DEFAULT_SRC_METRIC_FIELD, DEFAULT_SRC_METRIC_NAME};
+
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(cfgCreateDefaultReturnsValidPtr),
         cmocka_unit_test(accessorValuesForDefaultConfigAreAsExpected),
@@ -396,8 +452,23 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgOutPeriodSetAndGet),
         cmocka_unit_test(cfgCmdDirSetAndGet),
         cmocka_unit_test(cfgEventFormatSetAndGet),
-        cmocka_unit_test(cfgEventLogFileFilterSetAndGet),
-        cmocka_unit_test(cfgEventSourceSetAndGet),
+
+        cmocka_unit_test_prestate(cfgEventValueFilterSetAndGet, &log),
+        cmocka_unit_test_prestate(cfgEventValueFilterSetAndGet, &con),
+        cmocka_unit_test_prestate(cfgEventValueFilterSetAndGet, &sys),
+        cmocka_unit_test_prestate(cfgEventValueFilterSetAndGet, &met),
+
+        cmocka_unit_test_prestate(cfgEventFieldFilterSetAndGet, &log),
+        cmocka_unit_test_prestate(cfgEventFieldFilterSetAndGet, &con),
+        cmocka_unit_test_prestate(cfgEventFieldFilterSetAndGet, &sys),
+        cmocka_unit_test_prestate(cfgEventFieldFilterSetAndGet, &met),
+
+        cmocka_unit_test_prestate(cfgEventNameFilterSetAndGet, &log),
+        cmocka_unit_test_prestate(cfgEventNameFilterSetAndGet, &con),
+        cmocka_unit_test_prestate(cfgEventNameFilterSetAndGet, &sys),
+        cmocka_unit_test_prestate(cfgEventNameFilterSetAndGet, &met),
+
+        cmocka_unit_test(cfgEventSourceEnabledSetAndGet),
 
         cmocka_unit_test_prestate(cfgTransportTypeSetAndGet, out_state),
         cmocka_unit_test_prestate(cfgTransportHostSetAndGet, out_state),

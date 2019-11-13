@@ -333,36 +333,6 @@ cfgProcessEnvironmentEventFormat(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
-cfgProcessEnvironmentEventLogFileFilter(void** state)
-{
-    config_t* cfg = cfgCreateDefault();
-    cfgEventLogFileFilterSet(cfg, ".*");
-    assert_string_equal(cfgEventLogFileFilter(cfg), ".*");
-
-    // should override current cfg
-    assert_int_equal(setenv("SCOPE_EVENT_LOG_FILTER", "?*", 1), 0);
-    cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgEventLogFileFilter(cfg), "?*");
-
-    assert_int_equal(setenv("SCOPE_EVENT_LOG_FILTER", ".*", 1), 0);
-    cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgEventLogFileFilter(cfg), ".*");
-
-    // if env is not defined, cfg should not be affected
-    assert_int_equal(unsetenv("SCOPE_EVENT_LOG_FILTER"), 0);
-    cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgEventLogFileFilter(cfg), ".*");
-
-    // empty string
-    assert_int_equal(setenv("SCOPE_EVENT_LOG_FILTER", "", 1), 0);
-    cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgEventLogFileFilter(cfg), DEFAULT_LOG_FILE_FILTER);
-
-    // Just don't crash on null cfg
-    cfgDestroy(&cfg);
-    cfgProcessEnvironment(cfg);
-}
 
 typedef struct
 {
@@ -377,27 +347,27 @@ cfgProcessEnvironmentEventSource(void** state)
     source_state_t* data = (source_state_t*)state[0];
 
     config_t* cfg = cfgCreateDefault();
-    cfgEventSourceSet(cfg, data->src, 0);
-    assert_int_equal(cfgEventSource(cfg, data->src), 0);
+    cfgEventSourceEnabledSet(cfg, data->src, 0);
+    assert_int_equal(cfgEventSourceEnabled(cfg, data->src), 0);
 
     // should override current cfg
     assert_int_equal(setenv(data->env_name, "true", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventSource(cfg, data->src), 1);
+    assert_int_equal(cfgEventSourceEnabled(cfg, data->src), 1);
 
     assert_int_equal(setenv(data->env_name, "false", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventSource(cfg, data->src), 0);
+    assert_int_equal(cfgEventSourceEnabled(cfg, data->src), 0);
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv(data->env_name), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventSource(cfg, data->src), 0);
+    assert_int_equal(cfgEventSourceEnabled(cfg, data->src), 0);
 
     // empty string
     assert_int_equal(setenv(data->env_name, "", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventSource(cfg, data->src), data->default_val);
+    assert_int_equal(cfgEventSourceEnabled(cfg, data->src), data->default_val);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -673,11 +643,11 @@ cfgProcessCommandsFromFile(void** state)
     assert_string_equal(cfgTransportHost(cfg, CFG_EVT), "host");
     assert_string_equal(cfgTransportPort(cfg, CFG_EVT), "1234");
     assert_int_equal(cfgEventFormat(cfg), CFG_EVENT_ND_JSON);
-    assert_int_equal(cfgEventSource(cfg, CFG_SRC_FILE), 1);
-    assert_int_equal(cfgEventSource(cfg, CFG_SRC_CONSOLE), 0);
-    assert_int_equal(cfgEventSource(cfg, CFG_SRC_SYSLOG), 1);
-    assert_int_equal(cfgEventSource(cfg, CFG_SRC_METRIC), 0);
-    assert_string_equal(cfgEventLogFileFilter(cfg), ".*");
+    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_FILE), 1);
+    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
+    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_METRIC), 0);
+    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_FILE), ".*");
 
     deleteFile(path);
     cfgDestroy(&cfg);
@@ -742,11 +712,11 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
     // event stuff...
     assert_string_equal(cfgTransportHost(cfg, CFG_EVT), "ho$st");
-    assert_string_equal(cfgEventLogFileFilter(cfg), ".*[.]log$");
-    assert_int_equal(cfgEventSource(cfg, CFG_SRC_FILE), 1);
-    assert_int_equal(cfgEventSource(cfg, CFG_SRC_CONSOLE), 0);
-    assert_int_equal(cfgEventSource(cfg, CFG_SRC_SYSLOG), 1);
-    assert_int_equal(cfgEventSource(cfg, CFG_SRC_METRIC), 0);
+    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_FILE), ".*[.]log$");
+    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_FILE), 1);
+    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
+    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_METRIC), 0);
 
     deleteFile(path);
     cfgDestroy(&cfg);
@@ -772,11 +742,22 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgOutPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
     assert_int_equal       (cfgEventFormat(config), DEFAULT_EVT_FORMAT);
-    assert_string_equal    (cfgEventLogFileFilter(config), DEFAULT_LOG_FILE_FILTER);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_CONSOLE);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_SYSLOG);
-    assert_int_equal       (cfgEventSource(config, CFG_SRC_FILE), DEFAULT_SRC_METRIC);
+    assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
+    assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
+    assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
+    assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_VALUE);
+    assert_string_equal    (cfgEventFieldFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_FIELD);
+    assert_string_equal    (cfgEventFieldFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_FIELD);
+    assert_string_equal    (cfgEventFieldFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_FIELD);
+    assert_string_equal    (cfgEventFieldFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_FIELD);
+    assert_string_equal    (cfgEventNameFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_NAME);
+    assert_string_equal    (cfgEventNameFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_NAME);
+    assert_string_equal    (cfgEventNameFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_NAME);
+    assert_string_equal    (cfgEventNameFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_NAME);
+    assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
+    assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
+    assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
+    assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
     assert_int_equal       (cfgTransportType(config, CFG_OUT), CFG_UDP);
     assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_OUT), "8125");
@@ -825,9 +806,9 @@ cfgReadGoodYaml(void** state)
         "    host: 127.0.0.2\n"
         "    port: 9009\n"
         "    buffering: line\n"
-        "  logfilefilter: .*[.]log$          # extended regex, default '.*log.*'\n"
         "  watch:\n"
         "    - type: file                    # create events from file\n"
+        "      name: .*[.]log$\n"
         "    - type: console                 # create events from stdout and stderr\n"
         "    - type: syslog                  # create events from syslog and vsyslog\n"
         "    - type: metric\n"
@@ -851,11 +832,11 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgOutPeriod(config), 11);
     assert_string_equal(cfgCmdDir(config), "/tmp");
     assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
-    assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
-    assert_int_equal(cfgEventSource(config, CFG_SRC_FILE), 1);
-    assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 1);
-    assert_int_equal(cfgEventSource(config, CFG_SRC_SYSLOG), 1);
-    assert_int_equal(cfgEventSource(config, CFG_SRC_METRIC), 1);
+    assert_string_equal(cfgEventNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
+    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_FILE), 1);
+    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), 1);
+    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_METRIC), 1);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
     assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");
@@ -1002,9 +983,8 @@ cfgReadGoodJson(void** state)
         "      'type': 'file',\n"
         "      'path': '/var/log/event.log'\n"
         "    },\n"
-        "    'logfilefilter': '.*[.]log$',\n"
         "    'watch' : [\n"
-        "      {'type':'file'},\n"
+        "      {'type':'file', 'name':'.*[.]log$'},\n"
         "      {'type':'console'},\n"
         "      {'type':'syslog'},\n"
         "      {'type':'metric'}\n"
@@ -1030,11 +1010,11 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgOutVerbosity(config), 0);
     assert_int_equal(cfgOutPeriod(config), 13);
     assert_int_equal(cfgEventFormat(config), CFG_EVENT_ND_JSON);
-    assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
-    assert_int_equal(cfgEventSource(config, CFG_SRC_FILE), 1);
-    assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 1);
-    assert_int_equal(cfgEventSource(config, CFG_SRC_SYSLOG), 1);
-    assert_int_equal(cfgEventSource(config, CFG_SRC_METRIC), 1);
+    assert_string_equal(cfgEventNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
+    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_FILE), 1);
+    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), 1);
+    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_METRIC), 1);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
     assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");
@@ -1138,9 +1118,9 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "event:\n"
         "  watch:\n"
         "    - type: file                    # create events from files\n"
+        "      name: .*[.]log$\n"
         "    - type: syslog                  # create events from syslog and vsyslog\n"
         "    - type: metric\n"
-        "  logfilefilter: .*[.]log$          # extended regex, default '.*log.*'\n"
         "  transport:\n"
         "    type: syslog                    # udp, unix, file, syslog\n"
         "    host: 127.0.0.2\n"
@@ -1175,11 +1155,11 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_int_equal(cfgOutVerbosity(config), CFG_MAX_VERBOSITY);
     assert_int_equal(cfgOutPeriod(config), 42);
     assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
-    assert_string_equal(cfgEventLogFileFilter(config), ".*[.]log$");
-    assert_int_equal(cfgEventSource(config, CFG_SRC_FILE), 1);
-    assert_int_equal(cfgEventSource(config, CFG_SRC_CONSOLE), 0);
-    assert_int_equal(cfgEventSource(config, CFG_SRC_SYSLOG), 1);
-    assert_int_equal(cfgEventSource(config, CFG_SRC_METRIC), 1);
+    assert_string_equal(cfgEventNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
+    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_FILE), 1);
+    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), 0);
+    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_METRIC), 1);
     assert_int_equal(cfgTransportType(config, CFG_EVT), CFG_SYSLOG);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
@@ -1232,9 +1212,9 @@ cfgReadEnvSubstitution(void** state)
         "    host: 127.0.0.2\n"
         "    port: 9009\n"
         "    buffering: line\n"
-        "  logfilefilter: $FILTER            # extended regex, default '.*log.*'\n"
         "  watch:\n"
         "    - type: file                    # create events from files\n"
+        "      name: $FILTER\n"
         "    - type: console                 # create events from stdout and stderr\n"
         "    - type: $SOURCE                 # create events from syslog and vsyslog\n"
         "    - type: metric\n"
@@ -1269,8 +1249,8 @@ cfgReadEnvSubstitution(void** state)
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
     // test event fields...
     assert_int_equal(cfgEventFormat(cfg), CFG_METRIC_STATSD);
-    assert_string_equal(cfgEventLogFileFilter(cfg), ".*[.]log$");
-    assert_int_equal(cfgEventSource(cfg, CFG_SRC_SYSLOG), 1);
+    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_FILE), ".*[.]log$");
+    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
 
     cfgDestroy(&cfg);
 
@@ -1396,7 +1376,6 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgProcessEnvironmentOutPeriod),
         cmocka_unit_test(cfgProcessEnvironmentCommandDir),
         cmocka_unit_test(cfgProcessEnvironmentEventFormat),
-        cmocka_unit_test(cfgProcessEnvironmentEventLogFileFilter),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &log),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &con),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &sys),

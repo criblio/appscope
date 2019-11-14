@@ -151,25 +151,25 @@ cfgProcessEnvironmentOutFormat(void** state)
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
     // should override current cfg
-    assert_int_equal(setenv("SCOPE_OUT_FORMAT", "metricstatsd", 1), 0);
+    assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "metricstatsd", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_STATSD);
 
-    assert_int_equal(setenv("SCOPE_OUT_FORMAT", "ndjson", 1), 0);
+    assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "ndjson", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_EVENT_ND_JSON);
 
-    assert_int_equal(setenv("SCOPE_OUT_FORMAT", "metricjson", 1), 0);
+    assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "metricjson", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
     // if env is not defined, cfg should not be affected
-    assert_int_equal(unsetenv("SCOPE_OUT_FORMAT"), 0);
+    assert_int_equal(unsetenv("SCOPE_METRIC_FORMAT"), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
     // unrecognised value should not affect cfg
-    assert_int_equal(setenv("SCOPE_OUT_FORMAT", "bson", 1), 0);
+    assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "bson", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
@@ -248,21 +248,21 @@ cfgProcessEnvironmentOutPeriod(void** state)
     assert_int_equal(cfgOutPeriod(cfg), 0);
 
     // should override current cfg
-    assert_int_equal(setenv("SCOPE_OUT_SUM_PERIOD", "3", 1), 0);
+    assert_int_equal(setenv("SCOPE_SUMMARY_PERIOD", "3", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutPeriod(cfg), 3);
 
-    assert_int_equal(setenv("SCOPE_OUT_SUM_PERIOD", "12", 1), 0);
+    assert_int_equal(setenv("SCOPE_SUMMARY_PERIOD", "12", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutPeriod(cfg), 12);
 
     // if env is not defined, cfg should not be affected
-    assert_int_equal(unsetenv("SCOPE_OUT_SUM_PERIOD"), 0);
+    assert_int_equal(unsetenv("SCOPE_SUMMARY_PERIOD"), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutPeriod(cfg), 12);
 
     // unrecognised value should not affect cfg
-    assert_int_equal(setenv("SCOPE_OUT_SUM_PERIOD", "notEvenANum", 1), 0);
+    assert_int_equal(setenv("SCOPE_SUMMARY_PERIOD", "notEvenANum", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutPeriod(cfg), 12);
 
@@ -383,21 +383,21 @@ cfgProcessEnvironmentOutVerbosity(void** state)
     assert_int_equal(cfgOutVerbosity(cfg), 0);
 
     // should override current cfg
-    assert_int_equal(setenv("SCOPE_OUT_VERBOSITY", "3", 1), 0);
+    assert_int_equal(setenv("SCOPE_METRIC_VERBOSITY", "3", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutVerbosity(cfg), 3);
 
-    assert_int_equal(setenv("SCOPE_OUT_VERBOSITY", "9", 1), 0);
+    assert_int_equal(setenv("SCOPE_METRIC_VERBOSITY", "9", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutVerbosity(cfg), 9);
 
     // if env is not defined, cfg should not be affected
-    assert_int_equal(unsetenv("SCOPE_OUT_VERBOSITY"), 0);
+    assert_int_equal(unsetenv("SCOPE_METRIC_VERBOSITY"), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutVerbosity(cfg), 9);
 
     // unrecognised value should not affect cfg
-    assert_int_equal(setenv("SCOPE_OUT_VERBOSITY", "notEvenANum", 1), 0);
+    assert_int_equal(setenv("SCOPE_METRIC_VERBOSITY", "notEvenANum", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgOutVerbosity(cfg), 9);
 
@@ -584,21 +584,21 @@ cfgProcessCommandsFromFile(void** state)
 
 
     // test the basics
-    writeFile(path, "SCOPE_OUT_FORMAT=metricjson");
+    writeFile(path, "SCOPE_METRIC_FORMAT=metricjson");
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
-    writeFile(path, "\nSCOPE_OUT_FORMAT=metricstatsd\r\nblah");
+    writeFile(path, "\nSCOPE_METRIC_FORMAT=metricstatsd\r\nblah");
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_STATSD);
 
-    writeFile(path, "blah\nSCOPE_OUT_FORMAT=metricjson");
+    writeFile(path, "blah\nSCOPE_METRIC_FORMAT=metricjson");
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
 
     // just demonstrating that the "last one wins"
-    writeFile(path, "SCOPE_OUT_FORMAT=metricjson\n"
-                    "SCOPE_OUT_FORMAT=metricstatsd");
+    writeFile(path, "SCOPE_METRIC_FORMAT=metricjson\n"
+                    "SCOPE_METRIC_FORMAT=metricstatsd");
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_STATSD);
 
@@ -607,16 +607,16 @@ cfgProcessCommandsFromFile(void** state)
     writeFile(path,
         "SCOPE_STATSD_PREFIX=prefix\n"
         "SCOPE_STATSD_MAXLEN=1024\n"
-        "SCOPE_OUT_SUM_PERIOD=11\n"
+        "SCOPE_SUMMARY_PERIOD=11\n"
         "SCOPE_CMD_DIR=/the/path/\n"
-        "SCOPE_OUT_VERBOSITY=1\n"
-        "SCOPE_OUT_VERBOSITY:prefix\n"     // ignored (no '=')
-        "SCOPE_OUT_VERBOSITY=blah\n"       // processed, but 'blah' isn't int)
+        "SCOPE_METRIC_VERBOSITY=1\n"
+        "SCOPE_METRIC_VERBOSITY:prefix\n"     // ignored (no '=')
+        "SCOPE_METRIC_VERBOSITY=blah\n"       // processed, but 'blah' isn't int)
         "\n"                               // ignored (no '=')
         "ignored =  too.\n"                // ignored (not one of our env vars)
         "SEE_THAT_THIS_IS_HARMLESS=True\n" // ignored (not one of our env vars)
         "SCOPE_LOG_LEVEL=trace\n"
-        "SCOPE_OUT_DEST=file:///tmp/file.tmp\n"
+        "SCOPE_METRIC_DEST=file:///tmp/file.tmp\n"
         "SCOPE_LOG_DEST=file:///tmp/file.tmp2\n"
         "SCOPE_TAG_CUSTOM1=val1\n"
         "SCOPE_TAG_CUSTOM2=val2\n"
@@ -625,7 +625,7 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_EVENT_LOGFILE=true\n"
         "SCOPE_EVENT_CONSOLE=false\n"
         "SCOPE_EVENT_SYSLOG=true\n"
-        "SCOPE_EVENT_METRICS=false\n"
+        "SCOPE_EVENT_METRIC=false\n"
         "SCOPE_EVENT_LOG_FILTER=.*\n"
     );
     openFileAndExecuteCfgProcessCommands(path, cfg);
@@ -665,11 +665,11 @@ cfgProcessCommandsEnvSubstitution(void** state)
     writeFile(path,
         "SCOPE_STATSD_PREFIX=$VAR1.$MY_ENV_VAR\n"
         "SCOPE_STATSD_MAXLEN=$MAXLEN\n"
-        "SCOPE_OUT_SUM_PERIOD=$PERIOD\n"
+        "SCOPE_SUMMARY_PERIOD=$PERIOD\n"
         "SCOPE_CMD_DIR=/$MYHOME/scope/\n"
-        "SCOPE_OUT_VERBOSITY=$VERBOSITY\n"
+        "SCOPE_METRIC_VERBOSITY=$VERBOSITY\n"
         "SCOPE_LOG_LEVEL=$LOGLEVEL\n"
-        "SCOPE_OUT_DEST=file:///\\$VAR1/$MY_ENV_VAR/\n"
+        "SCOPE_METRIC_DEST=file:///\\$VAR1/$MY_ENV_VAR/\n"
         "SCOPE_LOG_DEST=$DEST\n"
         "SCOPE_TAG_CUSTOM=$PERIOD\n"
         "SCOPE_TAG_whyyoumadbro=Bill owes me $5.00\n"
@@ -678,7 +678,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
         "SCOPE_EVENT_LOGFILE=$TRUTH\n"
         "SCOPE_EVENT_CONSOLE=false\n"
         "SCOPE_EVENT_SYSLOG=$TRUTH\n"
-        "SCOPE_EVENT_METRICS=false\n"
+        "SCOPE_EVENT_METRIC=false\n"
         "SCOPE_EVENT_LOG_FILTER=$FILTER\n"
     );
 
@@ -1369,9 +1369,9 @@ main(int argc, char* argv[])
     source_state_t log = {"SCOPE_EVENT_LOGFILE", CFG_SRC_FILE, DEFAULT_SRC_FILE};
     source_state_t con = {"SCOPE_EVENT_CONSOLE", CFG_SRC_CONSOLE, DEFAULT_SRC_CONSOLE};
     source_state_t sys = {"SCOPE_EVENT_SYSLOG" , CFG_SRC_SYSLOG , DEFAULT_SRC_SYSLOG};
-    source_state_t met = {"SCOPE_EVENT_METRICS", CFG_SRC_METRIC , DEFAULT_SRC_METRIC};
+    source_state_t met = {"SCOPE_EVENT_METRIC", CFG_SRC_METRIC , DEFAULT_SRC_METRIC};
 
-    dest_state_t dest_out = {"SCOPE_OUT_DEST", CFG_OUT};
+    dest_state_t dest_out = {"SCOPE_METRIC_DEST", CFG_OUT};
     dest_state_t dest_evt = {"SCOPE_EVENT_DEST", CFG_EVT};
     dest_state_t dest_log = {"SCOPE_LOG_DEST", CFG_LOG};
 

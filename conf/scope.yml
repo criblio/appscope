@@ -75,7 +75,7 @@ libscope:
   #  to see if a file named scope.<pid> exists.  (where pid is the process ID
   #  of the process running with scope.)  If it exists, it processes every
   #  line for environment variable-style commands:
-  #      SCOPE_OUT_VERBOSITY=9
+  #      SCOPE_METRIC_VERBOSITY=9
   #  It changes the configuration to match the new settings, and deletes the
   #  scope.<pid> file when it's complete.
 

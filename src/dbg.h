@@ -44,7 +44,7 @@ void                 dbgAddLine(const char* key, const char* fmt, ...);
 //  running process, with process ID <pid>.  It just runs dbgDumpAll(),
 //  outputting the results to the file specified by SCOPE_CMD_DBG_PATH.
 //  To do this with default configuation settings, run this command and
-//  output should appear in /tmp/mydbg.txt within a SCOPE_OUT_SUM_PERIOD:
+//  output should appear in /tmp/mydbg.txt within a SCOPE_SUMMARY_PERIOD:
 //
 //     echo "SCOPE_CMD_DBG_PATH=/tmp/mydbg.txt" >> /tmp/scope.<pid>
 //

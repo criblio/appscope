@@ -279,21 +279,21 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
     if (!(env_ptr = strchr(env_line, '='))) return;
     if (!(value = doEnvVariableSubstitution(&env_ptr[1]))) return;
 
-    if (startsWith(env_line, "SCOPE_OUT_FORMAT")) {
+    if (startsWith(env_line, "SCOPE_METRIC_FORMAT")) {
         cfgOutFormatSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_STATSD_PREFIX")) {
         cfgOutStatsDPrefixSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_STATSD_MAXLEN")) {
         cfgOutStatsDMaxLenSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_OUT_SUM_PERIOD")) {
+    } else if (startsWith(env_line, "SCOPE_SUMMARY_PERIOD")) {
         cfgOutPeriodSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_CMD_DIR")) {
         cfgCmdDirSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_OUT_VERBOSITY")) {
+    } else if (startsWith(env_line, "SCOPE_METRIC_VERBOSITY")) {
         cfgOutVerbositySetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_LOG_LEVEL")) {
         cfgLogLevelSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_OUT_DEST")) {
+    } else if (startsWith(env_line, "SCOPE_METRIC_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_OUT, value);
     } else if (startsWith(env_line, "SCOPE_LOG_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_LOG, value);
@@ -311,7 +311,7 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_CONSOLE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG")) {
         cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_SYSLOG, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_METRICS")) {
+    } else if (startsWith(env_line, "SCOPE_EVENT_METRIC")) {
         cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOG_FILTER")) {
         cfgEventNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);

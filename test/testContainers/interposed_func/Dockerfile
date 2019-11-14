@@ -24,8 +24,8 @@ RUN cd /opt/test/ltp && make autotools && ./configure && make -j
 ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so
 ENV SCOPE_LOG_LEVEL=info
-ENV SCOPE_OUT_DEST=udp://localhost:8125
-ENV SCOPE_OUT_VERBOSITY=4
+ENV SCOPE_METRIC_DEST=udp://localhost:8125
+ENV SCOPE_METRIC_VERBOSITY=4
 
 COPY ./interposed_func/altp /opt/test/altp
 RUN cd /opt/test/altp && make -j

@@ -1776,8 +1776,6 @@ reportFD(int fd, enum control_type_t source)
 static void
 doRead(int fd, uint64_t initialTime, int success, ssize_t bytes, const char* func)
 {
-    uint64_t duration = getDuration(initialTime);
-
     struct fs_info_t *fs = getFSEntry(fd);
     struct net_info_t *net = getNetEntry(fd);
 
@@ -1788,6 +1786,7 @@ doRead(int fd, uint64_t initialTime, int success, ssize_t bytes, const char* fun
             doSetAddrs(fd);
             doRecv(fd, bytes);
         } else if (fs) {
+            uint64_t duration = getDuration(initialTime);
             doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
             doFSMetric(FS_READ, fd, EVENT_BASED, func, bytes, NULL);
         }
@@ -1803,8 +1802,6 @@ doRead(int fd, uint64_t initialTime, int success, ssize_t bytes, const char* fun
 static void
 doWrite(int fd, uint64_t initialTime, int success, const void* buf, ssize_t bytes, const char* func)
 {
-    uint64_t duration = getDuration(initialTime);
-
     struct fs_info_t *fs = getFSEntry(fd);
     struct net_info_t *net = getNetEntry(fd);
 
@@ -1815,6 +1812,7 @@ doWrite(int fd, uint64_t initialTime, int success, const void* buf, ssize_t byte
             doSetAddrs(fd);
             doSend(fd, bytes);
         } else if (fs) {
+            uint64_t duration = getDuration(initialTime);
             doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
             doFSMetric(FS_WRITE, fd, EVENT_BASED, func, bytes, NULL);
             doEventLog(g_evt, fs, buf, bytes);
@@ -3171,8 +3169,6 @@ fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 static void
 doSendFile(int out_fd, int in_fd, uint64_t initialTime, int rc, const char* func)
 {
-    uint64_t duration = getDuration(initialTime);
-
     struct fs_info_t *fsrd = getFSEntry(in_fd);
     struct net_info_t *nettx = getNetEntry(out_fd);
 
@@ -3184,6 +3180,7 @@ doSendFile(int out_fd, int in_fd, uint64_t initialTime, int rc, const char* func
         }
 
         if (fsrd) {
+            uint64_t duration = getDuration(initialTime);
             doFSMetric(FS_DURATION, in_fd, EVENT_BASED, func, duration, NULL);
             doFSMetric(FS_WRITE, in_fd, EVENT_BASED, func, rc, NULL);
         }

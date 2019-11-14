@@ -809,6 +809,8 @@ cfgReadGoodYaml(void** state)
         "  watch:\n"
         "    - type: file                    # create events from file\n"
         "      name: .*[.]log$\n"
+        "      field: .*host.*\n"
+        "      value: '[0-9]+'\n"
         "    - type: console                 # create events from stdout and stderr\n"
         "    - type: syslog                  # create events from syslog and vsyslog\n"
         "    - type: metric\n"
@@ -833,6 +835,8 @@ cfgReadGoodYaml(void** state)
     assert_string_equal(cfgCmdDir(config), "/tmp");
     assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
     assert_string_equal(cfgEventNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
+    assert_string_equal(cfgEventFieldFilter(config, CFG_SRC_FILE), ".*host.*");
+    assert_string_equal(cfgEventValueFilter(config, CFG_SRC_FILE), "[0-9]+");
     assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), 1);
     assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), 1);
@@ -1117,9 +1121,11 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "---\n"
         "event:\n"
         "  watch:\n"
-        "    - type: file                    # create events from files\n"
-        "      name: .*[.]log$\n"
-        "    - type: syslog                  # create events from syslog and vsyslog\n"
+        "    - name: .*[.]log$\n"
+        "      type: syslog\n"
+        "      field: .*host.*\n"
+        "      value: '[0-9]+'\n"
+        "    - type: file\n"
         "    - type: metric\n"
         "  transport:\n"
         "    type: syslog                    # udp, unix, file, syslog\n"
@@ -1155,7 +1161,9 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_int_equal(cfgOutVerbosity(config), CFG_MAX_VERBOSITY);
     assert_int_equal(cfgOutPeriod(config), 42);
     assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
-    assert_string_equal(cfgEventNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
+    assert_string_equal(cfgEventNameFilter(config, CFG_SRC_SYSLOG), ".*[.]log$");
+    assert_string_equal(cfgEventFieldFilter(config, CFG_SRC_SYSLOG), ".*host.*");
+    assert_string_equal(cfgEventValueFilter(config, CFG_SRC_SYSLOG), "[0-9]+");
     assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), 0);
     assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), 1);

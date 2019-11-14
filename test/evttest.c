@@ -136,7 +136,6 @@ evtValueFilterSetAndGet(void** state)
     evtValueFilterSet(evt, CFG_SRC_FILE, "myvalue.*");
     regex_t* new_re = evtValueFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
-    assert_ptr_not_equal(default_re, new_re);
     assert_int_equal(regexec(new_re, "whatever", 0, NULL, 0), REG_NOMATCH);
     assert_int_equal(regexec(new_re, "myvalue.value", 0, NULL, 0), 0);
 
@@ -178,7 +177,6 @@ evtFieldFilterSetAndGet(void** state)
     evtFieldFilterSet(evt, CFG_SRC_FILE, "myfield.*");
     regex_t* new_re = evtFieldFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
-    assert_ptr_not_equal(default_re, new_re);
     assert_int_equal(regexec(new_re, "whatever", 0, NULL, 0), REG_NOMATCH);
     assert_int_equal(regexec(new_re, "myfield.value", 0, NULL, 0), 0);
 
@@ -209,18 +207,17 @@ evtNameFilterSetAndGet(void** state)
 
     /*
      * WARNING: This is hardcoded!! 
-     * The default is ".*"
+     * The default is ".*log.*"
      * When the default changes this needs to change
     */
     regex_t* default_re = evtNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(default_re);
-    assert_int_equal(regexec(default_re, "anythingmatches", 0, NULL, 0), 0);
+    assert_int_equal(regexec(default_re, "anythingwithlogmatches", 0, NULL, 0), 0);
 
     // Make sure it can be changed
     evtNameFilterSet(evt, CFG_SRC_FILE, "net.*");
     regex_t* new_re = evtNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
-    assert_ptr_not_equal(default_re, new_re);
     assert_int_equal(regexec(new_re, "whatever", 0, NULL, 0), REG_NOMATCH);
     assert_int_equal(regexec(new_re, "net.tx", 0, NULL, 0), 0);
 
@@ -228,20 +225,20 @@ evtNameFilterSetAndGet(void** state)
     evtNameFilterSet(evt, CFG_SRC_FILE, "");
     new_re = evtNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
-    assert_int_equal(regexec(new_re, "anythingmatches", 0, NULL, 0), 0);
+    assert_int_equal(regexec(new_re, "anythingwithlogmatches", 0, NULL, 0), 0);
 
     // Make sure default is returned for bad regex
     evtNameFilterSet(evt, CFG_SRC_FILE, "W![T^F?");
     new_re = evtNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
-    assert_int_equal(regexec(new_re, "anything", 0, NULL, 0), 0);
+    assert_int_equal(regexec(new_re, "anythingwithlog", 0, NULL, 0), 0);
 
     evtDestroy(&evt);
 
     // Get a default filter, even if evt is NULL
     default_re = evtNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(default_re);
-    assert_int_equal(regexec(default_re, "whatever", 0, NULL, 0), 0);
+    assert_int_equal(regexec(default_re, "logthingsmatch", 0, NULL, 0), 0);
 }
 
 static void
@@ -313,9 +310,9 @@ main(int argc, char* argv[])
         cmocka_unit_test(evtFormatSetAndOutSendEvent),
         cmocka_unit_test(evtSourceEnabledSetAndGet),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
-        cmocka_unit_test(evtNameFilterSetAndGet),
         cmocka_unit_test(evtValueFilterSetAndGet),
         cmocka_unit_test(evtFieldFilterSetAndGet),
+        cmocka_unit_test(evtNameFilterSetAndGet),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

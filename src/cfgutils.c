@@ -305,6 +305,30 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgTransportSetFromStr(cfg, CFG_EVT, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
         cfgEventFormatSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_NAME")) {
+        cfgEventNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_NAME")) {
+        cfgEventNameFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG_NAME")) {
+        cfgEventNameFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_METRIC_NAME")) {
+        cfgEventNameFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_FIELD")) {
+        cfgEventFieldFilterSetFromStr(cfg, CFG_SRC_FILE, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_FIELD")) {
+        cfgEventFieldFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG_FIELD")) {
+        cfgEventFieldFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_METRIC_FIELD")) {
+        cfgEventFieldFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_VALUE")) {
+        cfgEventValueFilterSetFromStr(cfg, CFG_SRC_FILE, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_VALUE")) {
+        cfgEventValueFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG_VALUE")) {
+        cfgEventValueFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_METRIC_VALUE")) {
+        cfgEventValueFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE")) {
         cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE")) {
@@ -313,8 +337,6 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_SYSLOG, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_METRIC")) {
         cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_METRIC, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_LOG_FILTER")) {
-        cfgEventNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     }
 
     free(value);

@@ -626,8 +626,20 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_EVENT_CONSOLE=false\n"
         "SCOPE_EVENT_SYSLOG=true\n"
         "SCOPE_EVENT_METRIC=false\n"
-        "SCOPE_EVENT_LOG_FILTER=.*\n"
+        "SCOPE_EVENT_LOGFILE_NAME=a\n"
+        "SCOPE_EVENT_CONSOLE_NAME=b\n"
+        "SCOPE_EVENT_SYSLOG_NAME=c\n"
+        "SCOPE_EVENT_METRIC_NAME=d\n"
+        "SCOPE_EVENT_LOGFILE_FIELD=e\n"
+        "SCOPE_EVENT_CONSOLE_FIELD=f\n"
+        "SCOPE_EVENT_SYSLOG_FIELD=g\n"
+        "SCOPE_EVENT_METRIC_FIELD=h\n"
+        "SCOPE_EVENT_LOGFILE_VALUE=i\n"
+        "SCOPE_EVENT_CONSOLE_VALUE=j\n"
+        "SCOPE_EVENT_SYSLOG_VALUE=k\n"
+        "SCOPE_EVENT_METRIC_VALUE=l\n"
     );
+
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_string_equal(cfgOutStatsDPrefix(cfg), "prefix.");
     assert_int_equal(cfgOutStatsDMaxLen(cfg), 1024);
@@ -647,7 +659,18 @@ cfgProcessCommandsFromFile(void** state)
     assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
     assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_METRIC), 0);
-    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_FILE), ".*");
+    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_FILE), "a");
+    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_CONSOLE), "b");
+    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_SYSLOG), "c");
+    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_METRIC), "d");
+    assert_string_equal(cfgEventFieldFilter(cfg, CFG_SRC_FILE), "e");
+    assert_string_equal(cfgEventFieldFilter(cfg, CFG_SRC_CONSOLE), "f");
+    assert_string_equal(cfgEventFieldFilter(cfg, CFG_SRC_SYSLOG), "g");
+    assert_string_equal(cfgEventFieldFilter(cfg, CFG_SRC_METRIC), "h");
+    assert_string_equal(cfgEventValueFilter(cfg, CFG_SRC_FILE), "i");
+    assert_string_equal(cfgEventValueFilter(cfg, CFG_SRC_CONSOLE), "j");
+    assert_string_equal(cfgEventValueFilter(cfg, CFG_SRC_SYSLOG), "k");
+    assert_string_equal(cfgEventValueFilter(cfg, CFG_SRC_METRIC), "l");
 
     deleteFile(path);
     cfgDestroy(&cfg);
@@ -679,7 +702,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
         "SCOPE_EVENT_CONSOLE=false\n"
         "SCOPE_EVENT_SYSLOG=$TRUTH\n"
         "SCOPE_EVENT_METRIC=false\n"
-        "SCOPE_EVENT_LOG_FILTER=$FILTER\n"
+        "SCOPE_EVENT_LOGFILE_NAME=$FILTER\n"
     );
 
 

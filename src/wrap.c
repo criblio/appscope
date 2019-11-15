@@ -6,6 +6,7 @@
 #include "dbg.h"
 #include "log.h"
 #include "out.h"
+#include "evt.h"
 #include "scopetypes.h"
 #include "wrap.h"
 
@@ -135,7 +136,7 @@ remoteConfig()
 {
     int timeout;
     struct pollfd fds;
-    int rc;
+    int rc, success;
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
@@ -163,22 +164,35 @@ remoteConfig()
     if ((rc == 0) || (fds.revents == 0) || (fds.revents != POLLIN)) return;
 
     strncpy(path, "/tmp/cfg", sizeof(path));
-    if ((fs = g_fn.fopen(path, "r+")) == NULL) {
+    if ((fs = g_fn.fopen(path, "a+")) == NULL) {
         DBG(NULL);
         scopeLog("ERROR: remoteConfig:fopen", -1, CFG_LOG_ERROR);
         return;
     }
 
     //FILE *fmemopen(void *buf, size_t size, const char *mode);
+    success = rc = errno = 0;
     do {
-        rc = g_fn.recv(g_cfg.cmdConn, buf, sizeof(buf), MSG_DONTWAIT);
-        if (rc <= 0) break;
+        rc = g_fn.recv(g_cfg.cmdConn, buf, sizeof(buf), MSG_DONTWAIT); //MSG_DONTWAIT
+        //if (errno == EAGAIN) {
+        //    continue;
+        //}
+        if (rc <= 0) {
+            char err[16];
+            snprintf(err, sizeof(err), "errno: %d\n", errno);
+            perror("recv");
+            write(1, err, strlen(err));
+            break;
+        }
 
         if (g_fn.fwrite(buf, rc, (size_t)1, fs) <= 0) {
             DBG(NULL);
+        } else {
+            success = 1;
         }
-    } while ((rc > 0) && (errno != EWOULDBLOCK) && (errno != EAGAIN));
+    } while (1); //((rc > 0) && (errno != EWOULDBLOCK) && (errno != EAGAIN));
 
+    if (success == 0) goto out;
     fflush(fs);
     rewind(fs);
 
@@ -187,7 +201,7 @@ remoteConfig()
 
     // Apply the config
     doConfig(g_staticfg);
-
+  out:
     g_fn.fclose(fs);
     unlink(path);
 }
@@ -210,7 +224,8 @@ doConfig(config_t *cfg)
     log_t* log = initLog(cfg);
     g_out = initOut(cfg);
     g_log = log; // Set after initOut to avoid infinite loop with socket
-    g_evt = initEvt(cfg);
+    //g_evt = initEvt(cfg);
+    updateEvt(cfg, g_evt);
 }
 
 // Process dynamic config change if they are available
@@ -1794,8 +1809,10 @@ doReset()
 {
     g_cfg.pid = getpid();
     g_thread.once = 0;
-    g_thread.startTime = time(NULL) + g_thread.interval;
+    g_thread.startTime = time(NULL); // + g_thread.interval;
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
+    evtDestroy(&g_evt);
+    g_evt = initEvt(g_staticfg);
 }
 
 //
@@ -2115,6 +2132,7 @@ init(void)
     char* path = cfgPath();
     config_t* cfg = cfgRead(path);
     cfgProcessEnvironment(cfg);
+    g_evt = initEvt(cfg);
     doConfig(cfg);
     g_staticfg = cfg;
     if (path) free(path);

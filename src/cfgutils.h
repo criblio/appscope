@@ -22,6 +22,6 @@ void cfgProcessCommands(config_t* cfg, FILE* file);
 log_t* initLog(config_t* cfg);
 out_t* initOut(config_t* cfg);
 evt_t* initEvt(config_t* cfg);
-
+int     updateEvt(config_t *, evt_t *);
 
 #endif // __CFGUTILS_H__

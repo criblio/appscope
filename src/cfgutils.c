@@ -1062,3 +1062,16 @@ initEvt(config_t *cfg)
 
     return evt;
 }
+
+int
+updateEvt(config_t *cfg, evt_t *evt)
+{
+    evtLogFileFilterSet(evt, cfgEventLogFileFilter(cfg));
+
+    cfg_evt_t src;
+    for (src = CFG_SRC_LOGFILE; src<CFG_SRC_MAX; src++) {
+        evtSourceSet(evt, src, cfgEventSource(cfg, src));
+    }
+
+    return 0;
+}

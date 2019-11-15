@@ -593,6 +593,8 @@ evtLog(evt_t *evt, const char *host, const char *path,
     event.uid = uid;
 
     msg = fmtEventMessageString(evt->format, &event);
+    // Until we know how to do this with the json lib; new line delimited
+    strcat(msg, "\n");
 
     if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore

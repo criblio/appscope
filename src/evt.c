@@ -235,7 +235,6 @@ evtFormatSet(evt_t* evt, format_t* format)
     // Don't leak if evtFormatSet is called repeatedly
     fmtDestroy(&evt->format);
     evt->format = format;
-    fmtMetricFieldFilterSet(evt->format, evtFieldFilter(evt, CFG_SRC_METRIC));
 }
 
 void
@@ -266,53 +265,90 @@ evtSourceEnabledSet(evt_t* evt, cfg_evt_t src, unsigned val)
     evt->enabled[src] = val;
 }
 
-int
-evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
+#define MATCH_FOUND 1
+#define NO_MATCH_FOUND 0
+
+static int
+anyValueFieldMatches(regex_t* filter, event_t* metric)
 {
-    int go = 0;
-    char *msg;
-    event_format_t event;
-    struct timeb tb;
-    char ts[128];
-    regmatch_t match = {0};
+    if (!filter || !metric) return MATCH_FOUND;
+
+    // Test the value of metric
+    char valbuf[64];
+    if (snprintf(valbuf, sizeof(valbuf), "%lld", metric->value) > 0) {
+        if (!regexec(filter, valbuf, 0, NULL, 0)) return MATCH_FOUND;
+    }
+
+    // Test every field value until a match is found
     event_field_t *fld;
-    regex_t *value_filter;
-
-    if (!evt || !metric || !host ||
-        (evtSourceEnabled(evt, CFG_SRC_METRIC)) ||
-        (regexec(evtNameFilter(evt, CFG_SRC_METRIC), metric->name, 1, &match, 0) != 0))
-        return -1;
-
-    /*
-     * Loop through all metrics to test a value filter
-     * At least one match must occur in order to emit this metric
-     */
-    value_filter = evtValueFilter(evt, CFG_SRC_METRIC);
-    if (value_filter != NULL) {
-        for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
-            if ((fld->value_type == FMT_STR) &&
-                (regexec(value_filter, fld->value.str, 1, &match, 0) == 0)) {
-                go = 1;
-                break;
+    for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
+        const char *str = NULL;
+        if (fld->value_type == FMT_STR) {
+            str = fld->value.str;
+        } else if (fld->value_type == FMT_NUM) {
+            if (snprintf(valbuf, sizeof(valbuf), "%lld", fld->value.num) > 0) {
+                str = valbuf;
             }
+        }
 
-            if (fld->value_type == FMT_NUM) {
-                if (snprintf(ts, sizeof(ts), "%lld" , fld->value.num) < 0) {
-                    continue;
-                }
+        if (str && !regexec(filter, str, 0, NULL, 0)) return MATCH_FOUND;
+    }
 
-                if (regexec(value_filter, ts, 1, &match, 0) == 0) {
-                    go = 1;
-                    break;
-                }
+    return NO_MATCH_FOUND;
+}
+
+static void
+filterFields(event_t* metric, regex_t* filter)
+{
+    if (!metric || !metric->fields || !filter) return;
+
+    event_field_t *in_fld;
+    event_field_t *out_fld = metric->fields;
+    for (in_fld = metric->fields; in_fld->value_type != FMT_END; in_fld++) {
+
+        if (!regexec(filter, in_fld->name, 0, NULL, 0)) {
+            if (in_fld != out_fld) {
+                memmove(out_fld++, in_fld, sizeof(*in_fld));
             }
         }
     }
 
-    // At least one value filter needs to match
-    if (go == 0) {
+    // preserve the FIELDEND
+    if (in_fld != out_fld) {
+        memmove(out_fld++, in_fld, sizeof(*in_fld));
+    }
+}
+
+int
+evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
+{
+    char *msg;
+    event_format_t event;
+    struct timeb tb;
+    char ts[128];
+    regex_t *filter;
+
+    if (!evt || !metric || !host || !metric) return -1;
+
+    // Test for a name field match.  No match, no metric output
+    if (!evtSourceEnabled(evt, CFG_SRC_METRIC) ||
+        !(filter = evtNameFilter(evt, CFG_SRC_METRIC)) ||
+        (regexec(filter, metric->name, 0, NULL, 0))) {
         return -1;
     }
+
+    /*
+     * Loop through all metric fields for at least one matching field value
+     * No match, no metric output
+     */
+    if (!anyValueFieldMatches(evtValueFilter(evt, CFG_SRC_METRIC), metric)) {
+        return -1;
+    }
+
+    /*
+     * Loop through all metric fields, only keeping matching field names
+     */
+    filterFields(metric, evtFieldFilter(evt, CFG_SRC_METRIC));
 
     ftime(&tb);
     snprintf(ts, sizeof(ts), "%ld.%d", tb.time, tb.millitm);
@@ -343,7 +379,7 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
 
 int
 evtLog(evt_t *evt, const char *host, const char *path,
-       const void *buf, size_t count, uint64_t uid)
+       const void *buf, size_t count, uint64_t uid, cfg_evt_t logType)
 {
     char *msg;
     event_format_t event;
@@ -363,6 +399,13 @@ evtLog(evt_t *evt, const char *host, const char *path,
     event.uid = uid;
 
     msg = fmtEventMessageString(evt->format, &event);
+
+    regex_t* filter = evtValueFilter(evt, logType);
+    if (msg && filter && regexec(filter, msg, 0, NULL, 0)) {
+        // This event doesn't match.  Drop it on the floor.
+        free(msg);
+        return 0;
+    }
 
     if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore

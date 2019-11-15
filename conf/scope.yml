@@ -52,19 +52,13 @@ event:
   watch:
     - type: file
       name: .*[.]log$               # whitelist ex regex describing log file names
-      field: .*host.*               # whitelist ex regex describing field names
       value: .*                     # whitelist ex regex describing field values
     - type: console
       name: .*                      # (stdout)|(stderr)
-      field: .*
-      value: .*
-    - type: syslog
-      name: .*                      # facility or severity
-      field: .*
       value: .*
     - type: metric
       name: .*                      # (net.*)|(.*err.*)
-      field: .*
+      field: .*                     # whitelist ex regex describing field names
       value: .*
 
 libscope:

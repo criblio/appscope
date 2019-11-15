@@ -202,8 +202,11 @@ getDuration(uint64_t start)
 static int
 doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
 {
-    if (fs->event == TRUE) {
-        return evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid);
+    if (fs->event & (1>>CFG_SRC_CONSOLE)) {
+        return evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid, CFG_SRC_CONSOLE);
+    }
+    if (fs->event & (1>>CFG_SRC_FILE)) {
+        return evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid, CFG_SRC_FILE);
     }
     return -1;
 }
@@ -211,7 +214,7 @@ doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
 static bool
 checkNetEntry(int fd)
 {
-    if (g_netinfo && (fd > 0) && (fd <= g_cfg.numNinfo)) {
+    if (g_netinfo && (fd >= 0) && (fd < g_cfg.numNinfo)) {
         return TRUE;
     }
 
@@ -221,7 +224,7 @@ checkNetEntry(int fd)
 static bool
 checkFSEntry(int fd)
 {
-    if (g_fsinfo && (fd > 0) && (fd <= g_cfg.numFSInfo)) {
+    if (g_fsinfo && (fd >= 0) && (fd < g_cfg.numFSInfo)) {
         return TRUE;
     }
 
@@ -231,8 +234,8 @@ checkFSEntry(int fd)
 static net_info *
 getNetEntry(int fd)
 {
-    if (g_netinfo && (fd > 0) && (fd <= g_cfg.numNinfo) &&
-        (g_netinfo[fd].fd == fd)) {
+    if (g_netinfo && (fd >= 0) && (fd < g_cfg.numNinfo) &&
+        g_netinfo[fd].active) {
         return &g_netinfo[fd];
     }
     return NULL;    
@@ -241,19 +244,35 @@ getNetEntry(int fd)
 static fs_info *
 getFSEntry(int fd)
 {
-    if (g_fsinfo && (fd > 0) && (fd <= g_cfg.numFSInfo) &&
-        (g_fsinfo[fd].fd == fd)) {
+    if (g_fsinfo && (fd >= 0) && (fd < g_cfg.numFSInfo) &&
+        g_fsinfo[fd].active) {
         return &g_fsinfo[fd];
     }
 
-    if (((fd == 1) || (fd == 2)) && g_fsinfo &&
-        (evtSourceEnabled(g_evt, CFG_SRC_CONSOLE))) {
-        if (fd == 1) doOpen(fd, "stdout", FD, "console output");
-        if (fd == 2) doOpen(fd, "stderr", FD, "console output");
-        if (g_fsinfo[fd].fd == fd) {
-            g_fsinfo[fd].event = TRUE;
-            return &g_fsinfo[fd];
+    const char* name;
+    const char* description;
+    if (g_fsinfo && ((fd >= 0 ) && (fd <= 2))) {
+        switch(fd) {
+            case 0:
+                name = "stdin";
+                description = "console input";
+                break;
+            case 1:
+                name = "stdout";
+                description = "console output";
+                break;
+            case 2:
+                name = "stderr";
+                description = "console output";
+                break;
+            default:
+                DBG(NULL);
+                return NULL;
         }
+
+        doOpen(fd, name, FD, description);
+
+        return &g_fsinfo[fd];
     }
 
     return NULL;    
@@ -263,7 +282,7 @@ static void
 addSock(int fd, int type)
 {
     if (checkNetEntry(fd) == TRUE) {
-        if (g_netinfo[fd].fd == fd) {
+        if (g_netinfo[fd].active) {
 
             doClose(fd, "close: DuplicateSocket");
 
@@ -296,7 +315,7 @@ addSock(int fd, int type)
         }
 */
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
-        g_netinfo[fd].fd = fd;
+        g_netinfo[fd].active = TRUE;
         g_netinfo[fd].type = type;
         g_netinfo[fd].uid = getTime();
 #ifdef __LINUX__
@@ -1683,7 +1702,7 @@ static int
 doRecv(int sockfd, ssize_t rc)
 {
     if (checkNetEntry(sockfd) == TRUE) {
-        if (g_netinfo[sockfd].fd != sockfd) {
+        if (!g_netinfo[sockfd].active) {
             doAddNewSock(sockfd);
         }
 
@@ -1697,7 +1716,7 @@ static int
 doSend(int sockfd, ssize_t rc)
 {
     if (checkNetEntry(sockfd) == TRUE) {
-        if (g_netinfo[sockfd].fd != sockfd) {
+        if (!g_netinfo[sockfd].active) {
             doAddNewSock(sockfd);
         }
 
@@ -2105,7 +2124,7 @@ static void
 doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
 {
     if (checkFSEntry(fd) == TRUE) {
-        if (g_fsinfo[fd].fd == fd) {
+        if (g_fsinfo[fd].active) {
             char buf[128];
 
             snprintf(buf, sizeof(buf), "%s:doOpen: duplicate(%d)", func, fd);
@@ -2142,16 +2161,24 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
         }
 */
         memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
-        g_fsinfo[fd].fd = fd;
+        g_fsinfo[fd].active = TRUE;
         g_fsinfo[fd].type = type;
         g_fsinfo[fd].uid = getTime();
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
 
-        if (evtSourceEnabled(g_evt, CFG_SRC_FILE)) {
-            regmatch_t match = {0};
-            if (regexec(evtNameFilter(g_evt, CFG_SRC_FILE), path, 1, &match, 0) == 0) {
-                g_fsinfo[fd].event = TRUE;
-            }
+        regex_t* filter;
+        if (evtSourceEnabled(g_evt, CFG_SRC_CONSOLE) &&
+           (filter = evtNameFilter(g_evt, CFG_SRC_CONSOLE)) &&
+           (!regexec(filter, path, 0, NULL, 0))) {
+
+            g_fsinfo[fd].event |= (1>>CFG_SRC_CONSOLE);
+        }
+
+        if (evtSourceEnabled(g_evt, CFG_SRC_FILE) &&
+           (filter = evtNameFilter(g_evt, CFG_SRC_FILE)) &&
+           (!regexec(filter, path, 0, NULL, 0))) {
+
+           g_fsinfo[fd].event |= (1>>CFG_SRC_FILE);
         }
 
         doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0, NULL);
@@ -2162,7 +2189,7 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
 static int
 doDupFile(int newfd, int oldfd, const char *func)
 {
-    if ((newfd > g_cfg.numFSInfo) || (oldfd > g_cfg.numFSInfo)) {
+    if ((newfd >= g_cfg.numFSInfo) || (oldfd >= g_cfg.numFSInfo)) {
         return -1;
     }
 
@@ -2173,12 +2200,12 @@ doDupFile(int newfd, int oldfd, const char *func)
 static int
 doDupSock(int oldfd, int newfd)
 {
-    if ((newfd > g_cfg.numFSInfo) || (oldfd > g_cfg.numFSInfo)) {
+    if ((newfd >= g_cfg.numFSInfo) || (oldfd >= g_cfg.numFSInfo)) {
         return -1;
     }
 
     bcopy(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct fs_info_t));
-    g_netinfo[newfd].fd = newfd;
+    g_netinfo[newfd].active = TRUE;
     g_netinfo[newfd].numTX = 0;
     g_netinfo[newfd].numRX = 0;
     g_netinfo[newfd].txBytes = 0;
@@ -3632,7 +3659,7 @@ fcloseall(void)
         if (g_fsinfo) {
             int i;
             for (i = 0; i < g_cfg.numFSInfo; i++) {
-                if ((g_fsinfo[i].fd != 0) &&
+                if ((g_fsinfo[i].active) &&
                     (g_fsinfo[i].type == STREAM)) {
                     doClose(i, "fcloseall");
                 }

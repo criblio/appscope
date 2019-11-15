@@ -30,7 +30,6 @@ struct _format_t
     } statsd;
     unsigned verbosity;
     custom_tag_t** tags;
-    regex_t* metric_field_re;
 };
 
 
@@ -50,7 +49,6 @@ fmtCreate(cfg_out_format_t format)
     f->statsd.max_len = DEFAULT_STATSD_MAX_LEN;
     f->verbosity = DEFAULT_OUT_VERBOSITY;
     f->tags = DEFAULT_CUSTOM_TAGS;
-    f->metric_field_re = NULL;
 
     return f;
 }
@@ -377,19 +375,9 @@ addJsonFields(format_t* fmt, event_field_t* fields, yaml_emitter_t* emitter)
     yaml_event_t event;
     char numbuf[32];
     event_field_t *fld;
-    regex_t *field_filter;
-    regmatch_t match = {0};
 
-    field_filter = fmtMetricFieldFilter(fmt);
-    
     // Start adding key:value entries
     for (fld = fields; fld->value_type != FMT_END; fld++) {
-        // if the field filter matches, we exclude that field
-        if (field_filter &&
-            (regexec(field_filter, fld->name, 1, &match, 0) == 0)) {
-            continue;
-        }
-
         // "Key"
         rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
                                           (yaml_char_t*)fld->name, strlen(fld->name), 0, 1,
@@ -579,13 +567,6 @@ fmtString(format_t* fmt, event_t* e)
     }
 }
 
-regex_t *
-fmtMetricFieldFilter(format_t *fmt)
-{
-    if (!fmt) return NULL;
-    return fmt->metric_field_re;
-}
-
 const char*
 fmtStatsDPrefix(format_t* fmt)
 {
@@ -611,13 +592,6 @@ fmtCustomTags(format_t* fmt)
 }
 
 // Setters
-void
-fmtMetricFieldFilterSet(format_t *fmt, regex_t *filter)
-{
-    if (!fmt || !filter) return;
-
-    fmt->metric_field_re = filter;
-}
 
 void
 fmtStatsDPrefixSet(format_t* fmt, const char* prefix)

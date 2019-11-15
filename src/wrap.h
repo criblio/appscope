@@ -219,7 +219,7 @@ typedef struct thread_timing_t {
 } thread_timing;
 
 typedef struct net_info_t {
-    int fd;
+    int active;
     int type;
     int addrType;
     uint64_t numTX;
@@ -242,7 +242,7 @@ typedef struct {
 } elapsed_t;
 
 typedef struct fs_info_t {
-    int fd;
+    int active;
     bool event;
     enum fs_type_t type;
     uint64_t numOpen;

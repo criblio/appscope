@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
   char *hostaddrp; /* dotted decimal host addr string */
   int optval; /* flag value for setsockopt */
   int rc, i, j, fd;
-  int numfds, lerr;
+  int numfds;
 #if 0
   fd_set workfds, masterfds, exceptfds;
   struct timeval tv;
@@ -227,19 +227,30 @@ int main(int argc, char **argv) {
       if (rc <= 0) continue;
   
       for (i = 0; i < numfds; ++i) {
-          printf("%s:%d fds[%d].fd = %d\n", __FUNCTION__, __LINE__, i, fds[i].fd);
-          if (fds[i].revents == 0) continue;
-          if ((fds[i].revents & POLLIN) != POLLIN) {
-              printf("%s:%d fd %d\n", __FUNCTION__, __LINE__, fd);
+          //printf("%s:%d fds[%d].fd = %d\n", __FUNCTION__, __LINE__, i, fds[i].fd);
+          if (fds[i].revents == 0) {
+              //printf("%s:%d No event\n", __FUNCTION__, __LINE__);
               continue;
           }
-          if (((fds[i].revents & POLLHUP) == POLLHUP) ||
-              ((fds[i].revents & POLLERR) == POLLERR) ||
-              ((fds[i].revents & POLLNVAL) == POLLNVAL)) {
-              printf("%s:%d fd %d\n", __FUNCTION__, __LINE__, fd);
+
+          if (fds[i].revents & POLLHUP) {
+              printf("%s:%d Disconnect on fd %d\n", __FUNCTION__, __LINE__, fd);
+              close(fds[1].fd);
+              fds[i].fd = -1;
+              fds[i].events = 0;
               continue;
           }
           
+          if (fds[i].revents & POLLERR) {
+              printf("%s:%d Error on fd %d\n", __FUNCTION__, __LINE__, fd);
+              continue;
+          }
+
+          if (fds[i].revents & POLLNVAL) {
+              printf("%s:%d Invalid on fd %d\n", __FUNCTION__, __LINE__, fd);
+              continue;
+          }
+
           if (fds[i].fd == parentfd) {
               childfd = accept(parentfd, (struct sockaddr *) &clientaddr, &clientlen);
               if (childfd < 0) {
@@ -294,7 +305,6 @@ int main(int argc, char **argv) {
                       continue;
                   }
                   
-                  //printf("%s:%d numfds %d\n%s\n", __FUNCTION__, __LINE__, numfds, cmd);
                   for (j = 2; j < numfds; j++) {
                       printf("%s:%d fds[%d].fd=%d rc %d\n%s\n", __FUNCTION__, __LINE__,
                              j, fds[j].fd, rc, cmd);
@@ -307,17 +317,20 @@ int main(int argc, char **argv) {
                   free(cmd);
               }
           } else {
-              //printf("%s:%d fd %d\n", __FUNCTION__, __LINE__, fds[i].fd);
               do {
                   bzero(buf, BUFSIZE);
                   rc = recv(fds[i].fd, buf, (size_t)BUFSIZE, MSG_DONTWAIT);
-                  if (rc <= 0) break;
-                  lerr = errno;
-
+                  if (rc < 0) {
+                      break;
+                  } else if (rc == 0) {
+                      // EOF
+                      close(fds[i].fd);
+                      fds[i].fd = -1;
+                      fds[i].events = 0;
+                  }
                   // echo input to stdout
                   write(1, buf, rc);
-              } while ((lerr != EAGAIN) && (lerr != EWOULDBLOCK));
-              //continue;
+              } while (1);
           }
       }
   }

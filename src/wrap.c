@@ -140,7 +140,8 @@ remoteConfig()
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
-
+    //char dbg[128];
+    
     // MS
     timeout = (g_thread.interval * 1000);
     bzero(&fds, sizeof(fds));
@@ -161,7 +162,11 @@ remoteConfig()
      * Timeout or no read data?
      * We can track exceptions where revents != POLLIN. Necessary?
      */
-    if ((rc == 0) || (fds.revents == 0) || (fds.revents != POLLIN)) return;
+    if ((rc == 0) || (fds.revents == 0) || ((fds.revents & POLLIN) == 0) ||
+        ((fds.revents & POLLHUP) != 0) || ((fds.revents & POLLNVAL) != 0)) return;
+
+    //snprintf(dbg, sizeof(dbg), "\npid %d POLLIN\n", getpid());
+    //g_fn.write(1, dbg, strlen(dbg));
 
     strncpy(path, "/tmp/cfg", sizeof(path));
     if ((fs = g_fn.fopen(path, "a+")) == NULL) {
@@ -174,14 +179,16 @@ remoteConfig()
     success = rc = errno = 0;
     do {
         rc = g_fn.recv(g_cfg.cmdConn, buf, sizeof(buf), MSG_DONTWAIT); //MSG_DONTWAIT
-        //if (errno == EAGAIN) {
+        //if ((rc < 0) && (errno == EAGAIN)) {
         //    continue;
         //}
+
         if (rc <= 0) {
-            char err[16];
-            snprintf(err, sizeof(err), "errno: %d\n", errno);
-            perror("recv");
-            write(1, err, strlen(err));
+            //snprintf(dbg, sizeof(dbg), "pid %d errno: %d\n", getpid(), errno);
+            //perror("recv");
+            //g_fn.write(1, dbg, strlen(dbg));
+            //snprintf(dbg, sizeof(dbg), "\npid %d Recv Done\n", getpid());
+            //g_fn.write(1, dbg, strlen(dbg));
             break;
         }
 
@@ -189,19 +196,22 @@ remoteConfig()
             DBG(NULL);
         } else {
             success = 1;
+            //snprintf(dbg, sizeof(dbg), "\npid %d WRITE\n", getpid());
+            //g_fn.write(1, dbg, strlen(dbg));
         }
     } while (1); //((rc > 0) && (errno != EWOULDBLOCK) && (errno != EAGAIN));
 
-    if (success == 0) goto out;
-    fflush(fs);
-    rewind(fs);
+    if (success == 1) {
+        fflush(fs);
+        rewind(fs);
 
-    // Modify the static config from the command file
-    cfgProcessCommands(g_staticfg, fs);
+        // Modify the static config from the command file
+        cfgProcessCommands(g_staticfg, fs);
+        
+        // Apply the config
+        doConfig(g_staticfg);
+    }
 
-    // Apply the config
-    doConfig(g_staticfg);
-  out:
     g_fn.fclose(fs);
     unlink(path);
 }
@@ -1813,6 +1823,7 @@ doReset()
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
     evtDestroy(&g_evt);
     g_evt = initEvt(g_staticfg);
+    g_cfg.cmdConn = evtConnection(g_evt);
 }
 
 //

@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
   char buf[BUFSIZE]; /* message buffer */
   char *hostaddrp; /* dotted decimal host addr string */
   int optval; /* flag value for setsockopt */
-  int rc, i, fd;
+  int rc, i, j, fd;
   int numfds, lerr;
 #if 0
   fd_set workfds, masterfds, exceptfds;
@@ -227,6 +227,7 @@ int main(int argc, char **argv) {
       if (rc <= 0) continue;
   
       for (i = 0; i < numfds; ++i) {
+          printf("%s:%d fds[%d].fd = %d\n", __FUNCTION__, __LINE__, i, fds[i].fd);
           if (fds[i].revents == 0) continue;
           if ((fds[i].revents & POLLIN) != POLLIN) {
               printf("%s:%d fd %d\n", __FUNCTION__, __LINE__, fd);
@@ -293,12 +294,11 @@ int main(int argc, char **argv) {
                       continue;
                   }
                   
-                  printf("%s:%d numfds %d\n%s\n", __FUNCTION__, __LINE__, numfds, cmd);
-                  for (i = 2; i < numfds; i++) {
-                      char buf[BUFSIZE];
-                      memmove(buf, cmd, rc);
-                      printf("%s:%d fd %d\n", __FUNCTION__, __LINE__, fds[i].fd); //fdseen[i]
-                      if (send(fds[i].fd, cmd, rc, 0) < 0) { // MSG_DONTWAIT
+                  //printf("%s:%d numfds %d\n%s\n", __FUNCTION__, __LINE__, numfds, cmd);
+                  for (j = 2; j < numfds; j++) {
+                      printf("%s:%d fds[%d].fd=%d rc %d\n%s\n", __FUNCTION__, __LINE__,
+                             j, fds[j].fd, rc, cmd);
+                      if (send(fds[j].fd, cmd, rc, 0) < 0) { // MSG_DONTWAIT
                           perror("send");
                       }
                   }
@@ -317,7 +317,7 @@ int main(int argc, char **argv) {
                   // echo input to stdout
                   write(1, buf, rc);
               } while ((lerr != EAGAIN) && (lerr != EWOULDBLOCK));
-              continue;
+              //continue;
           }
       }
   }

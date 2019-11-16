@@ -11,7 +11,7 @@ jobs:
       - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml pull ${{ parameters.containerName }}
         continueOnError: true
         workingDirectory: ./test/testContainers/
-      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml up ${{ parameters.containerName }}
+      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml  up --build  ${{ parameters.containerName }}
         workingDirectory: ./test/testContainers/
       - task: CopyFiles@2
         condition: always()

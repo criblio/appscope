@@ -1,5 +1,5 @@
 stages:
-#  - stage: build
+  #  - stage: build
   #    displayName: Build Scope application
   #    jobs:
   #      - job: BuildInVM
@@ -56,24 +56,24 @@ stages:
   #              filesAcl: 'public-read'
   - stage: integration_tests
     displayName: Run integraion tests
-#    dependsOn: build
+    #    dependsOn: build
     jobs:
-      #      - template: test/testContainers/azure/it-test-job-template.yml
-      #        parameters:
-      #          name: syscalls
-      #          containerName: interposed_func
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: syscalls
+          containerName: interposed_func
 
       - template: test/testContainers/azure/it-test-job-template.yml
         parameters:
           name: cribl
           containerName: cribl
 
-#      - template: test/testContainers/azure/it-test-job-template.yml
-#        parameters:
-#          name: nginx
-#          containerName: nginx
-#
-#      - template: test/testContainers/azure/it-test-job-template.yml
-#        parameters:
-#          name: splunk
-#          containerName: splunk
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: nginx
+          containerName: nginx
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: splunk
+          containerName: splunk

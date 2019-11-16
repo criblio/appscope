@@ -56,7 +56,7 @@ stages:
   #              filesAcl: 'public-read'
   - stage: integration_tests
     displayName: Run integraion tests
-    dependsOn: build
+#    dependsOn: build
     jobs:
       #      - template: test/testContainers/azure/it-test-job-template.yml
       #        parameters:

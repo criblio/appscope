@@ -1,20 +1,36 @@
 version: '3.5'
 services:
   cribl:
+    build:
+      cache_from:
+        - criblci/scope-logstream-it:latest
+    image: criblci/scope-logstream-it
     command: -v
     volumes:
       - ./logs:/opt/test-runner/logs
   splunk:
+    build:
+      cache_from:
+        - criblci/scope-splunk-it:latest
+    image: criblci/scope-splunk-it
     command: -v
     volumes:
       - ./logs:/opt/test-runner/logs
 
   nginx:
+    build:
+      cache_from:
+        - criblci/scope-nginx-it:latest
+    image: criblci/scope-nginx-it
     command: -v
     volumes:
       - ./logs:/opt/test-runner/logs
 
   interposed_func:
+    build:
+      cache_from:
+        - criblci/scope-syscalls-it:latest
+    image: criblci/scope-syscalls-it
     command: -v
     volumes:
       - ./logs:/opt/test-runner/logs

@@ -4,7 +4,13 @@ jobs:
     pool:
       vmImage: 'ubuntu-16.04'
     steps:
-      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml run ${{ parameters.containerName }}
+      - script: docker login -u $HUB_USERNAME  --password-stdin <<< $HUB_PASSWORD
+        env:
+          HUB_USERNAME: $(dockerhub.username)
+          HUB_PASSWORD: $(dockerhub.password)
+      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml pull ${{ parameters.containerName }}
+        continueOnError: true
+      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml up ${{ parameters.containerName }}
         workingDirectory: ./test/testContainers/
       - task: CopyFiles@2
         condition: always()
@@ -15,3 +21,6 @@ jobs:
         inputs:
           pathToPublish: $(Build.ArtifactStagingDirectory)
           artifactName: ${{ parameters.name }}ITOut
+      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml push ${{ parameters.containerName }}
+        continueOnError: true
+      - script: docker logout

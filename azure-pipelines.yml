@@ -58,22 +58,22 @@ stages:
     displayName: Run integraion tests
     dependsOn: build
     jobs:
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: syscalls
-          containerName: interposed_func
+#      - template: test/testContainers/azure/it-test-job-template.yml
+      #        parameters:
+      #          name: syscalls
+      #          containerName: interposed_func
 
       - template: test/testContainers/azure/it-test-job-template.yml
         parameters:
           name: cribl
           containerName: cribl
 
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: nginx
-          containerName: nginx
-
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: splunk
-          containerName: splunk
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: nginx
+#          containerName: nginx
+#
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: splunk
+#          containerName: splunk

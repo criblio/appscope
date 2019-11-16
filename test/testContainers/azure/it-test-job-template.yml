@@ -13,8 +13,11 @@ jobs:
         displayName: Pull previous image
         continueOnError: true
         workingDirectory: ./test/testContainers/
-      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml  up --build  ${{ parameters.containerName }}
-        displayName: Build image and run tests
+      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml build ${{ parameters.containerName }}
+        displayName: Build image
+        workingDirectory: ./test/testContainers/
+      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml run  ${{ parameters.containerName }}
+        displayName: Run tests
         workingDirectory: ./test/testContainers/
       - task: CopyFiles@2
         condition: always()

@@ -1,7 +1,11 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
 #include "evt.h"
+
+#define MAXEVENTS 10 * 1024
 
 struct _evt_t
 {
@@ -609,15 +613,29 @@ int
 evtEvents(evt_t *evt)
 {
     uint64_t data;
+    int maxevent = 0;
+    int truncated = 0;
 
     if (!evt) return -1;
 
     while (cbufGet(evt->evbuf, &data) == 0) {
         if (data) {
             char *event = (char *)data;
-            evtSend(evt, event);
+            if ((maxevent += strlen(event)) < MAXEVENTS) {
+                evtSend(evt, event);
+            } else {
+                truncated = 1;
+            }
             free(event);
         }
+    }
+
+    if (truncated) {
+        char notice[512];
+        snprintf(notice, sizeof(notice),
+                 "\"_time\":%ld,\"source\":\"notice\",\"_raw\":\"Truncated events. Your events exceeded %d bytes per second\",\"host\":\"notice\",\"_channel\":\"notice\"\n",
+                 time(NULL), MAXEVENTS/10);
+        evtSend(evt, notice);
     }
     return 0;
 }

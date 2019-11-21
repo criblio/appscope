@@ -7,6 +7,7 @@ import cribl
 import elastic
 import nginx
 import splunk
+import kafka
 import syscalls
 from reporting import print_summary, store_results_to_file
 from runner import Runner
@@ -19,7 +20,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
     parser.add_argument("-t", "--target", help="target application to test",
-                        choices=["nginx", "splunk", "cribl", "syscalls", "elastic"],
+                        choices=["nginx", "splunk", "cribl", "syscalls", "elastic", "kafka"],
                         required=True)
     parser.add_argument("-id", "--execution_id", help="execution id")
     parser.add_argument("-l", "--logs_path", help="path to store the execution results and logs", default="/tmp/")
@@ -61,6 +62,8 @@ def main():
                 syscalls.configure(runner, args)
             if args.target == 'elastic':
                 elastic.configure(runner, args)
+            if args.target == 'kafka':
+                kafka.configure(runner, args)
             runner.run()
             test_watcher.finish()
         except Exception as e:

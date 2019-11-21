@@ -4,6 +4,7 @@ RUN yum -y update
 RUN yum -y install centos-release-scl
 RUN yum -y install rh-python36
 RUN yum -y install epel-release
+RUN yum -y install java-1.8.0-openjdk
 RUN yum -y install mc
 
 RUN mkdir /opt/test-runner/
@@ -20,16 +21,19 @@ ENV SCOPE_OUT_VERBOSITY=4
 
 COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
 RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
+RUN /opt/test-runner/bin/pip install kafka-python
 
 COPY ./test_runner/ /opt/test-runner/
 
 # The Scala 2.11 build is currently recommended by the project.
-ENV KAFKA_VERSION=2.1.1 KAFKA_SCALA_VERSION=2.11 JMX_PORT=7203
+ENV KAFKA_VERSION=2.1.1 KAFKA_SCALA_VERSION=2.11
 ENV KAFKA_RELEASE_ARCHIVE kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz
 
 RUN mkdir /kafka /data /logs
 
 # Download Kafka binary distribution
+#COPY ./kafka/kafka_2.11-2.1.1.tgz /tmp/kafka_2.11-2.1.1.tgz
+
 ADD http://www.us.apache.org/dist/kafka/${KAFKA_VERSION}/${KAFKA_RELEASE_ARCHIVE} /tmp/
 ADD https://dist.apache.org/repos/dist/release/kafka/${KAFKA_VERSION}/${KAFKA_RELEASE_ARCHIVE}.md5 /tmp/
 
@@ -45,19 +49,16 @@ RUN tar -zx -C /kafka --strip-components=1 -f ${KAFKA_RELEASE_ARCHIVE} && \
   rm -rf kafka_*
 
 ADD ./kafka/config /kafka/config
-#ADD start.sh /start.sh
 
 # Set up a user to run Kafka
 RUN groupadd kafka && \
   useradd -d /kafka -g kafka -s /bin/false kafka && \
   chown -R kafka:kafka /kafka /data /logs
-USER kafka
+
 ENV PATH /kafka/bin:$PATH
 WORKDIR /kafka
 
 # broker, jmx
-EXPOSE 9092 ${JMX_PORT}
 VOLUME [ "/data", "/logs" ]
-
 
 ENTRYPOINT ["/opt/test-runner/bin/python", "/opt/test-runner/app.py", "--target", "kafka","-l","/opt/test-runner/logs/"]

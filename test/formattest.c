@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <limits.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -395,15 +396,121 @@ fmtStringStatsDHonorsCardinality(void** state)
 }
 
 static void
-fmtStringNewlineDelimitedReturnsNull(void** state)
+fmtEventMessageStringValue(void** state)
 {
-    // Just because it's not implemented yet...
-    format_t* fmt = fmtCreate(CFG_METRIC_JSON);
-    event_t e = {"A", 1, SET, NULL};
-    assert_null(fmtString(fmt, &e));
+    format_t* fmt = fmtCreate(CFG_EVENT_JSON_RAW_JSON);
+    assert_non_null(fmt);
+
+    event_format_t event_format;
+    event_format.timestamp = "1573058085.991";
+    event_format.timesize = strlen(event_format.timestamp);
+    event_format.src = "stdin";
+    event_format.hostname = "earl";
+    event_format.data = "поспехаў";
+    event_format.datasize = strlen(event_format.data);
+    event_format.uid = 0xCAFEBABEDEADBEEF;
+
+    assert_null(fmtEventMessageString(NULL, NULL));
+
+    assert_null(fmtEventMessageString(NULL, &event_format));
+
+    assert_null(fmtEventMessageString(fmt, NULL));
+
+    char* str = fmtEventMessageString(fmt, &event_format);
+    assert_non_null(str);
+
+    assert_string_equal(str, "{\"_time\":1573058085.991,"
+                              "\"source\":\"stdin\","
+                              "\"_raw\":\"поспехаў\","
+                              "\"host\":\"earl\","
+                              "\"_channel\":\"14627333968688430831\"}");
+
+    //printf("%s\n", str);
+    free(str);
+
     fmtDestroy(&fmt);
 }
 
+static void
+fmtStringMetricJsonNoFields(void** state)
+{
+    format_t* fmt = fmtCreate(CFG_METRIC_JSON);
+
+    const char* map[] =
+        //DELTA     CURRENT  DELTA_MS  HISTOGRAM    SET
+        {"counter", "gauge", "timer", "histogram", "set", "unknown"};
+
+    // test each value of _metric_type
+    data_type_t type;
+    for (type=DELTA; type<=SET+1; type++) {
+        char expected[256];
+        assert_return_code(snprintf(expected, sizeof(expected),
+                 "{\"_metric\":\"A\","
+                 "\"_metric_type\":\"%s\","
+                 "\"_value\":1}", map[type]), errno);
+
+        event_t e = {"A", 1, type, NULL};
+        char* actual = fmtString(fmt, &e);
+        assert_string_equal(actual, expected);
+        if (actual) free(actual);
+    }
+    fmtDestroy(&fmt);
+}
+
+static void
+fmtStringMetricJsonWFields(void** state)
+{
+    format_t* fmt = fmtCreate(CFG_METRIC_JSON);
+    event_field_t fields[] = {
+        STRFIELD("A",               "Z",                    0),
+        NUMFIELD("B",               987,                    1),
+        STRFIELD("C",               "Y",                    2),
+        NUMFIELD("D",               654,                    3),
+        FIELDEND
+    };
+    event_t e = {"hey", 2, HISTOGRAM, fields};
+    char* str = fmtString(fmt, &e);
+    assert_string_equal(str,
+                 "{\"_metric\":\"hey\","
+                 "\"_metric_type\":\"histogram\","
+                 "\"_value\":2,"
+                 "\"A\":\"Z\",\"B\":987,\"C\":\"Y\",\"D\":654}");
+    if (str) free(str);
+    fmtDestroy(&fmt);
+}
+
+static void
+fmtStringMetricJsonEscapedValues(void** state)
+{
+    format_t* fmt = fmtCreate(CFG_EVENT_JSON_RAW_JSON);
+    {
+        event_t e = {"Paç \"fat!", 3, SET, NULL};    // embedded double quote
+        char* str = fmtString(fmt, &e);
+        assert_string_equal(str,
+                 "{\"_metric\":\"Paç \\\"fat!\","
+                 "\"_metric_type\":\"set\","
+                 "\"_value\":3}");
+        free(str);
+    }
+
+    {
+        event_field_t fields[] = {
+            STRFIELD("A",         "행운을	빕니다",    0),   // embedded tab
+            NUMFIELD("Viel\\ Glück",     123,      1),   // embedded backslash
+            FIELDEND
+        };
+        event_t e = {"you", 4, DELTA, fields};
+        char* str = fmtString(fmt, &e);
+        assert_string_equal(str,
+                 "{\"_metric\":\"you\","
+                 "\"_metric_type\":\"counter\","
+                 "\"_value\":4,"
+                 "\"A\":\"행운을\\t빕니다\","
+                 "\"Viel\\\\ Glück\":123}");
+        free(str);
+    }
+    fmtDestroy(&fmt);
+}
 
 int
 main(int argc, char* argv[])
@@ -429,7 +536,10 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtStringStatsDVerifyEachStatsDType),
         cmocka_unit_test(fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient),
         cmocka_unit_test(fmtStringStatsDHonorsCardinality),
-        cmocka_unit_test(fmtStringNewlineDelimitedReturnsNull),
+        cmocka_unit_test(fmtEventMessageStringValue),
+        cmocka_unit_test(fmtStringMetricJsonNoFields),
+        cmocka_unit_test(fmtStringMetricJsonWFields),
+        cmocka_unit_test(fmtStringMetricJsonEscapedValues),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

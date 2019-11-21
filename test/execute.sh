@@ -68,6 +68,7 @@ run_test test/${OS}/logtest
 run_test test/${OS}/outtest
 run_test test/${OS}/evttest
 run_test test/${OS}/formattest
+run_test test/${OS}/circbuftest
 run_test test/${OS}/dbgtest
 if [ "${OS}" = "linux" ]; then
     run_test test/${OS}/glibcvertest

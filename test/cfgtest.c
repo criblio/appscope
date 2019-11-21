@@ -28,7 +28,7 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgTransportPort(config, CFG_OUT), DEFAULT_OUT_PORT);
     assert_null            (cfgTransportPath(config, CFG_OUT));
     assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_FULLY);
-    assert_int_equal       (cfgTransportType(config, CFG_EVT), CFG_UDP);
+    assert_int_equal       (cfgTransportType(config, CFG_EVT), CFG_TCP);
     assert_string_equal    (cfgTransportHost(config, CFG_EVT), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_EVT), DEFAULT_EVT_PORT);
     assert_null            (cfgTransportPath(config, CFG_EVT));
@@ -257,26 +257,34 @@ cfgTransportTypeSetAndGet(void** state)
 static void
 cfgTransportHostSetAndGet(void** state)
 {
-    which_transport_t t = *(which_transport_t*)state[0];
+    which_transport_t typeOutEvtLog = *(which_transport_t*)state[0];
     config_t* config = cfgCreateDefault();
-    cfgTransportHostSet(config, t, "larrysComputer");
-    assert_string_equal(cfgTransportHost(config, t), "larrysComputer");
-    cfgTransportHostSet(config, t, "bobsComputer");
-    assert_string_equal(cfgTransportHost(config, t), "bobsComputer");
-    cfgTransportHostSet(config, t, NULL);
-    assert_null(cfgTransportHost(config, t));
+
+    // You can no longer hardcode host/port
+    cfgTransportTypeSet(config, typeOutEvtLog, CFG_UDP);
+
+    cfgTransportHostSet(config, typeOutEvtLog, "larrysComputer");
+    assert_string_equal(cfgTransportHost(config, typeOutEvtLog), "larrysComputer");
+    cfgTransportHostSet(config, typeOutEvtLog, "bobsComputer");
+    assert_string_equal(cfgTransportHost(config, typeOutEvtLog), "bobsComputer");
+    cfgTransportHostSet(config, typeOutEvtLog, NULL);
+    assert_null(cfgTransportHost(config, typeOutEvtLog));
     cfgDestroy(&config);
 }
 
 static void
 cfgTransportPortSetAndGet(void** state)
 {
-    which_transport_t t = *(which_transport_t*)state[0];
+    which_transport_t typeOutEvtLog = *(which_transport_t*)state[0];
     config_t* config = cfgCreateDefault();
-    cfgTransportPortSet(config, t, "54321");
-    assert_string_equal(cfgTransportPort(config, t), "54321");
-    cfgTransportPortSet(config, t, "12345");
-    assert_string_equal(cfgTransportPort(config, t), "12345");
+
+    // You can no longer hardcode host/port
+    cfgTransportTypeSet(config, typeOutEvtLog, CFG_UDP);
+
+    cfgTransportPortSet(config, typeOutEvtLog, "54321");
+    assert_string_equal(cfgTransportPort(config, typeOutEvtLog), "54321");
+    cfgTransportPortSet(config, typeOutEvtLog, "12345");
+    assert_string_equal(cfgTransportPort(config, typeOutEvtLog), "12345");
     cfgDestroy(&config);
 }
 

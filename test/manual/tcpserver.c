@@ -195,10 +195,12 @@ int main(int argc, char **argv) {
                   }
                   
                   for (j = 2; j < numfds; j++) {
-                      printf("%s:%d fds[%d].fd=%d rc %d\n%s\n", __FUNCTION__, __LINE__,
-                             j, fds[j].fd, rc, cmd);
-                      if (send(fds[j].fd, cmd, rc, 0) < 0) { // MSG_DONTWAIT
-                          perror("send");
+                      if ((fds[j].fd != -1) && (fds[j].fd > 2)) {
+                          printf("%s:%d fds[%d].fd=%d rc %d\n%s\n", __FUNCTION__, __LINE__,
+                                 j, fds[j].fd, rc, cmd);
+                          if (send(fds[j].fd, cmd, rc, 0) < 0) { // MSG_DONTWAIT
+                              perror("send");
+                          }
                       }
                   }
                   
@@ -216,7 +218,6 @@ int main(int argc, char **argv) {
                       close(fds[i].fd);
                       fds[i].fd = -1;
                       fds[i].events = 0;
-                      numfds--;
                   }
                   // echo input to stdout
                   write(1, buf, rc);

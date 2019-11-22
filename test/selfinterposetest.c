@@ -218,11 +218,10 @@ testNoInterposedSymbolIsUsed(void** state)
     int i;
     for (i=0; i<glob_obj.gl_pathc; i++) {
         if (strstr(glob_obj.gl_pathv[i], "test.o")) {
-            printf ("Skipping %s because it looks like a test file.\n", 
-                    glob_obj.gl_pathv[i]);
+            printf("Skipping %s because it looks like a test file.\n",
+                   glob_obj.gl_pathv[i]);
             continue;
         }
-
         checkObjectFile(interpose_list, glob_obj.gl_pathv[i], &s);
     }
     globfree(&glob_obj);

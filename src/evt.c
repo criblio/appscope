@@ -291,6 +291,13 @@ evtNeedsConnection(evt_t *evt)
 }
 
 int
+evtConnection(evt_t *evt)
+{
+    if (!evt) return 0;
+    return transportConnection(evt->transport);
+}
+
+int
 evtConnect(evt_t *evt)
 {
     if (!evt) return 0;

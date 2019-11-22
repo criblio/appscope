@@ -284,38 +284,18 @@ evtSource(evt_t* evt, cfg_evt_t src)
 }
 
 int
-evtConnection(evt_t *evt)
+evtNeedsConnection(evt_t *evt)
 {
     if (!evt) return 0;
-    return transportConnection(evt->transport);
+    return transportNeedsConnection(evt->transport);
 }
 
 int
-evtConnected(evt_t *evt)
+evtConnect(evt_t *evt)
 {
     if (!evt) return 0;
-    return transportConnected(evt->transport);
+    return transportConnect(evt->transport);
 }
-
-int
-evtConnect(evt_t *evt, config_t *cfg)
-{
-    if (cfgTransportType(cfg, CFG_EVT) == CFG_TCP) {
-        transport_t *trans;
-
-        trans = transportCreateTCP(cfgTransportHost(cfg, CFG_EVT),
-                                   cfgTransportPort(cfg, CFG_EVT));
-        if (trans) {
-            evtTransportSet(evt, trans);
-            return 1;
-        } else {
-            return 0;
-        }
-    }
-
-    return 0;
-}
-
 
 void
 evtTransportSet(evt_t* evt, transport_t* transport)

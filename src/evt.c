@@ -5,7 +5,7 @@
 
 #include "evt.h"
 
-#define MAXEVENTS 10 * 1024
+#define MAXEVENTS 100
 
 struct _evt_t
 {
@@ -497,11 +497,41 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     regmatch_t match = {0};
     event_field_t *fld;
     regex_t *value_filter;
-
+    time_t now;
+    static time_t rateTime = 0;
+    static int rate = 0;
+    static int notified = 0;
+    
     if (!evt || !metric || !host ||
         (evtSource(evt, CFG_SRC_METRIC) == DEFAULT_SRC_METRIC) ||
         (regexec(evtMetricNameFilter(evt), metric->name, 1, &match, 0) != 0))
         return -1;
+
+    // rate limited to MAXEVENTS per second
+    if (time(&now) > rateTime) {
+        rateTime = now;
+        rate = notified = 0;
+    } else if (++rate > MAXEVENTS) {
+        // one notice per truncate
+        if (notified == 0) {
+            char *notice;
+            if ((notice = calloc(1, 512)) == NULL) {
+                DBG(NULL);
+                return -1;
+            }
+
+            notified = 1;
+            snprintf(notice, 512,
+                     "\"_time\":%ld,\"source\":\"notice\",\"_raw\":\"Truncated metrics. Your rate exceeded %d metrics per second\",\"host\":\"notice\",\"_channel\":\"notice\"\n",
+                     now, MAXEVENTS);
+            if (cbufPut(evt->evbuf, (uint64_t)notice) == -1) {
+                // Full; drop and ignore
+                DBG(NULL);
+                free(notice);
+            }
+        }
+        return 0;
+    }
 
     /*
      * Loop through all metrics to test a value filter
@@ -531,6 +561,7 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
 
     // At least one value filter needs to match
     if (go == 0) {
+        rate--;
         return -1;
     }
 
@@ -600,29 +631,16 @@ int
 evtEvents(evt_t *evt)
 {
     uint64_t data;
-    int maxevent = 0;
-    int truncated = 0;
 
     if (!evt) return -1;
 
     while (cbufGet(evt->evbuf, &data) == 0) {
         if (data) {
             char *event = (char *)data;
-            if ((maxevent += strlen(event)) < MAXEVENTS) {
-                evtSend(evt, event);
-            } else {
-                truncated = 1;
-            }
+            evtSend(evt, event);
             free(event);
         }
     }
 
-    if (truncated) {
-        char notice[512];
-        snprintf(notice, sizeof(notice),
-                 "\"_time\":%ld,\"source\":\"notice\",\"_raw\":\"Truncated events. Your events exceeded %d bytes per second\",\"host\":\"notice\",\"_channel\":\"notice\"\n",
-                 time(NULL), MAXEVENTS/10);
-        evtSend(evt, notice);
-    }
     return 0;
 }

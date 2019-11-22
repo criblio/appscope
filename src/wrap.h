@@ -146,13 +146,6 @@ enum fs_type_t {
     STREAM
 };
 
-// Event types; used to indicate activity for periodic thread
-enum event_type_t {
-    EVENT_TX = 1,
-    EVENT_RX = 2,
-    EVENT_FS = 4
-};
-
 typedef struct metric_counters_t {
     uint64_t openPorts;
     uint64_t netConnectionsUdp;
@@ -367,9 +360,9 @@ typedef struct interposed_funcs_t {
     ssize_t (*pwritev64v2)(int, const struct iovec *, int, off_t, int);
     size_t (*fwrite_unlocked)(const void *, size_t, size_t, FILE *);
     ssize_t (*sendfile64)(int, int, off64_t *, size_t);
-    off_t (*lseek64)(int, off_t, int);
-    int (*fseeko64)(FILE *, off_t, int);
-    off_t (*ftello64)(FILE *);
+    off64_t (*lseek64)(int, off64_t, int);
+    int (*fseeko64)(FILE *, off64_t, int);
+    off64_t (*ftello64)(FILE *);
     int (*fgetpos64)(FILE *, fpos64_t *);
     int (*fsetpos64)(FILE *stream, const fpos64_t *pos);
     int (*statfs64)(const char *, struct statfs64 *);
@@ -400,7 +393,7 @@ typedef struct interposed_funcs_t {
     int (*guarded_close_np)(int, void *);
     ssize_t (*__sendto_nocancel)(int, const void *, size_t, int,
                                  const struct sockaddr *, socklen_t);
-    uint32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
+    int32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
                                       uint16_t, uint16_t, void *, void *);
 #endif // __MACOS__
 } interposed_funcs;
@@ -492,7 +485,8 @@ extern void *_dl_sym(void *, const char *, void *);
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
             return rc;                                                 \
        }                                                               \
-    } 
+    }                                                                  \
+    doThread();
 
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
@@ -500,7 +494,8 @@ extern void *_dl_sym(void *, const char *, void *);
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
             return;                                                    \
        }                                                               \
-    } 
+    }                                                                  \
+    doThread();
 
 #else
 #define WRAP_CHECK(func, rc)                                           \
@@ -509,7 +504,8 @@ extern void *_dl_sym(void *, const char *, void *);
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
             return rc;                                                 \
        }                                                               \
-    } 
+    }                                                                  \
+    doThread();
 
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
@@ -517,101 +513,8 @@ extern void *_dl_sym(void *, const char *, void *);
             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
             return;                                                    \
        }                                                               \
-    } 
+    }                                                                  \
+    doThread();
 #endif // __LINUX__
-
-#define IOSTREAMPRE(func, type)                      \
-    type rc;                                         \
-    int fd = fileno(stream);                         \
-    struct fs_info_t *fs = getFSEntry(fd);           \
-    struct net_info_t *net = getNetEntry(fd);        \
-    elapsed_t time = {0};                            \
-    doThread();                                      \
-    if (fs) {                                        \
-        time.initial = getTime();                    \
-    }                                                \
-
-#define IOSTREAMPOST(func, buf, len, type, op)       \
-    if (fs) {                                       \
-        time.duration = getDuration(time.initial);  \
-    }                                               \
-                                                    \
-    if (rc != type) {                               \
-        scopeLog(#func, fd, CFG_LOG_TRACE);         \
-        if (net) {                                  \
-            doSetAddrs(fd);                         \
-            if (op == (enum event_type_t)EVENT_RX) {\
-               doRecv(fd, len);                     \
-            } else if (op == (enum event_type_t)EVENT_TX) { \
-                doSend(fd, len);                    \
-            } else {                                \
-                DBG(NULL);                          \
-            }                                       \
-        } else if (fs) {                            \
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, #func, time.duration, NULL); \
-            if (op == (enum event_type_t)EVENT_TX) { \
-                doEventLog(g_evt, fs, buf, len);     \
-                doFSMetric(FS_WRITE, fd, EVENT_BASED, #func, len, NULL); \
-            } else if (op == (enum event_type_t)EVENT_RX) {         \
-                doFSMetric(FS_READ, fd, EVENT_BASED, #func, len, NULL); \
-            } else {                                \
-                DBG(NULL);                          \
-            }                                       \
-        }                                           \
-    }  else {                                       \
-        if (fs) {                                   \
-            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, #func, fs->path); \
-        } else if (net) {                           \
-            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, #func, "nopath"); \
-        }                                           \
-    }                                               \
-                                                    \
-return rc;
-
-#define doSendfile(func)                                \
-    ssize_t rc;                                         \
-    struct fs_info_t *fsrd = getFSEntry(in_fd);         \
-    struct net_info_t *nettx = getNetEntry(out_fd);     \
-    elapsed_t time = {0};                               \
-    WRAP_CHECK(func, -1);                                   \
-    doThread();                                         \
-    if (fsrd) {                                         \
-        time.initial = getTime();                       \
-    }                                                   \
-                                                        \
-    rc = g_fn.func(out_fd, in_fd, offset, count); \
-                                                        \
-    if (fsrd) {                                         \
-        time.duration = getDuration(time.initial);      \
-    }                                                   \
-                                                        \
-    if (rc != -1) {                                     \
-        scopeLog(#func, in_fd, CFG_LOG_TRACE);     \
-        if (nettx) {                                    \
-            doSetAddrs(out_fd);                         \
-            doSend(out_fd, rc);                         \
-        }                                               \
-                                                        \
-        if (fsrd) {                                                     \
-            doFSMetric(FS_DURATION, in_fd, EVENT_BASED, #func, time.duration, NULL); \
-            doFSMetric(FS_WRITE, in_fd, EVENT_BASED, #func, rc, NULL);  \
-        }                                                               \
-    } else {                                                            \
-        /*                                                              \
-         * We don't want to increment an error twice                    \
-         * We don't know which fd the error is associated with          \
-         * We emit one metric with the input pathname                   \
-         */                                                             \
-        if (fsrd) {                                                     \
-            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED,     \
-                          #func, fsrd->path);                           \
-        }                                                               \
-                                                                        \
-        if (nettx) {                                                    \
-            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED,   \
-                          #func, "nopath");                             \
-        }                                                               \
-    }                                                                   \
-    return rc;
 
 #endif // __WRAP_H__

@@ -406,6 +406,25 @@ addJsonFields(format_t* fmt, event_field_t* fields, yaml_emitter_t* emitter)
     return TRUE;
 }
 
+static const char*
+metricTypeStr(data_type_t type)
+{
+    switch (type) {
+        case DELTA:
+            return "counter";
+        case CURRENT:
+            return "gauge";
+        case DELTA_MS:
+            return "timer";
+        case HISTOGRAM:
+            return "histogram";
+        case SET:
+            return "set";
+        default:
+            return "unknown";
+    }
+}
+
 static char *
 fmtMetricJson(format_t *fmt, event_t *metric)
 {
@@ -448,13 +467,32 @@ fmtMetricJson(format_t *fmt, event_t *metric)
 
     // add the base metric definition
     rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)"_metric", strlen("_metric"),
+                                      0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
                                       (yaml_char_t*)metric->name, strlen(metric->name),
                                       0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
+    // add the metric type
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)"_metric_type", strlen("_metric_type"),
+                                      0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+    const char* metric_type = metricTypeStr(metric->type);
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)metric_type, strlen(metric_type),
+                                      0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    // add the value
     rv = snprintf(numbuf, sizeof(numbuf), "%lli", metric->value);
     if (rv <= 0) goto cleanup;
-
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)"_value", strlen("_value"),
+                                      0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
     rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
                                       (yaml_char_t*)numbuf, rv, 1, 0, YAML_PLAIN_SCALAR_STYLE);
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;

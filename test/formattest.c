@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <limits.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -434,10 +435,25 @@ static void
 fmtStringMetricJsonNoFields(void** state)
 {
     format_t* fmt = fmtCreate(CFG_METRIC_JSON);
-    event_t e = {"A", 1, SET, NULL};
-    char* str = fmtString(fmt, &e);
-    assert_string_equal(str, "{\"A\":1}");
-    if (str) free(str);
+
+    const char* map[] =
+        //DELTA     CURRENT  DELTA_MS  HISTOGRAM    SET
+        {"counter", "gauge", "timer", "histogram", "set", "unknown"};
+
+    // test each value of _metric_type
+    data_type_t type;
+    for (type=DELTA; type<=SET+1; type++) {
+        char expected[256];
+        assert_return_code(snprintf(expected, sizeof(expected),
+                 "{\"_metric\":\"A\","
+                 "\"_metric_type\":\"%s\","
+                 "\"_value\":1}", map[type]), errno);
+
+        event_t e = {"A", 1, type, NULL};
+        char* actual = fmtString(fmt, &e);
+        assert_string_equal(actual, expected);
+        if (actual) free(actual);
+    }
     fmtDestroy(&fmt);
 }
 
@@ -454,7 +470,11 @@ fmtStringMetricJsonWFields(void** state)
     };
     event_t e = {"hey", 2, HISTOGRAM, fields};
     char* str = fmtString(fmt, &e);
-    assert_string_equal(str, "{\"hey\":2,\"A\":\"Z\",\"B\":987,\"C\":\"Y\",\"D\":654}");
+    assert_string_equal(str,
+                 "{\"_metric\":\"hey\","
+                 "\"_metric_type\":\"histogram\","
+                 "\"_value\":2,"
+                 "\"A\":\"Z\",\"B\":987,\"C\":\"Y\",\"D\":654}");
     if (str) free(str);
     fmtDestroy(&fmt);
 }
@@ -466,7 +486,10 @@ fmtStringMetricJsonEscapedValues(void** state)
     {
         event_t e = {"Paç \"fat!", 3, SET, NULL};    // embedded double quote
         char* str = fmtString(fmt, &e);
-        assert_string_equal(str, "{\"Paç \\\"fat!\":3}");
+        assert_string_equal(str,
+                 "{\"_metric\":\"Paç \\\"fat!\","
+                 "\"_metric_type\":\"set\","
+                 "\"_value\":3}");
         free(str);
     }
 
@@ -478,9 +501,12 @@ fmtStringMetricJsonEscapedValues(void** state)
         };
         event_t e = {"you", 4, DELTA, fields};
         char* str = fmtString(fmt, &e);
-        assert_string_equal(str, "{\"you\":4,"
-                                   "\"A\":\"행운을\\t빕니다\","
-                                   "\"Viel\\\\ Glück\":123}");
+        assert_string_equal(str,
+                 "{\"_metric\":\"you\","
+                 "\"_metric_type\":\"counter\","
+                 "\"_value\":4,"
+                 "\"A\":\"행운을\\t빕니다\","
+                 "\"Viel\\\\ Glück\":123}");
         free(str);
     }
     fmtDestroy(&fmt);

@@ -72,7 +72,7 @@ def main():
 
 
 def generate_execution_id(target):
-    return f"{target}:{datetime.now().isoformat()}"
+    return f"{target}_{datetime.now().isoformat()}".replace(":", "_")
 
 
 if __name__ == '__main__':

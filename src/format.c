@@ -144,7 +144,7 @@ appendStatsdFieldString(format_t* fmt, char* tag, int sz, char** end, int* bytes
 
 
 static void
-addStatsdFields(format_t* fmt, event_field_t* fields, char** end, int* bytes, int* firstTagAdded)
+addStatsdFields(format_t* fmt, event_field_t* fields, char** end, int* bytes, int* firstTagAdded, regex_t* fieldFilter)
 {
     if (!fmt || !fields || ! end || !*end || !bytes) return;
 
@@ -154,6 +154,8 @@ addStatsdFields(format_t* fmt, event_field_t* fields, char** end, int* bytes, in
 
     event_field_t* f;
     for (f = fields; f->value_type != FMT_END; f++) {
+
+        if (fieldFilter && regexec(fieldFilter, f->name, 0, NULL, 0)) continue;
 
         // Honor Verbosity
         if (f->cardinality > fmt->verbosity) continue;
@@ -367,7 +369,7 @@ metricJsonSize(event_t *metric)
 }
 
 static int
-addJsonFields(format_t* fmt, event_field_t* fields, yaml_emitter_t* emitter)
+addJsonFields(format_t* fmt, event_field_t* fields, regex_t* fieldFilter, yaml_emitter_t* emitter)
 {
     if (!fmt || !fields) return TRUE;
 
@@ -378,6 +380,10 @@ addJsonFields(format_t* fmt, event_field_t* fields, yaml_emitter_t* emitter)
 
     // Start adding key:value entries
     for (fld = fields; fld->value_type != FMT_END; fld++) {
+
+        // skip outputting anything that doesn't match fieldFilter
+        if (fieldFilter && regexec(fieldFilter, fld->name, 0, NULL, 0)) continue;
+
         // "Key"
         rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
                                           (yaml_char_t*)fld->name, strlen(fld->name), 0, 1,
@@ -426,7 +432,7 @@ metricTypeStr(data_type_t type)
 }
 
 static char *
-fmtMetricJson(format_t *fmt, event_t *metric)
+fmtMetricJson(format_t *fmt, event_t *metric, regex_t* fieldFilter)
 {
     if (!metric) return NULL;
 
@@ -498,7 +504,7 @@ fmtMetricJson(format_t *fmt, event_t *metric)
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
     // Add key:value fields
-    if (!addJsonFields(fmt, metric->fields, &emitter)) goto cleanup;
+    if (!addJsonFields(fmt, metric->fields, fieldFilter, &emitter)) goto cleanup;
 
     // Done with key:value entries
     // Tell yaml to wrap it up
@@ -527,7 +533,7 @@ cleanup:
 }
 
 static char*
-fmtStatsDString(format_t* fmt, event_t* e)
+fmtStatsDString(format_t* fmt, event_t* e, regex_t* fieldFilter)
 {
     if (!fmt || !e) return NULL;
 
@@ -566,7 +572,7 @@ fmtStatsDString(format_t* fmt, event_t* e)
 
     int firstTagAdded = 0;
     addCustomFields(fmt, fmt->tags, &end, &bytes, &firstTagAdded);
-    addStatsdFields(fmt, e->fields, &end, &bytes, &firstTagAdded);
+    addStatsdFields(fmt, e->fields, &end, &bytes, &firstTagAdded, fieldFilter);
 
     // Now that we're done, we can count the trailing newline
     bytes += 1;
@@ -589,18 +595,18 @@ fmtEventMessageString(format_t *fmt, event_format_t *evmsg)
 }
 
 char*
-fmtString(format_t* fmt, event_t* e)
+fmtString(format_t* fmt, event_t* e, regex_t* fieldFilter)
 {
     if (!fmt) return NULL;
 
     switch (fmt->format) {
         case CFG_METRIC_STATSD:
-            return fmtStatsDString(fmt, e);
+            return fmtStatsDString(fmt, e, fieldFilter);
         case CFG_METRIC_JSON:
         case CFG_EVENT_ND_JSON:
-            return fmtMetricJson(fmt, e);
+            return fmtMetricJson(fmt, e, fieldFilter);
         default:
-            DBG("%d %s", fmt->format, e->name);
+            DBG("%d %s %p", fmt->format, e->name, fieldFilter);
             return NULL;
     }
 }

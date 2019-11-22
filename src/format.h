@@ -1,6 +1,7 @@
 #ifndef __FORMAT_H__
 #define __FORMAT_H__
 
+#include <regex.h>
 #include "scopetypes.h"
 #include "cfg.h"
 
@@ -59,7 +60,7 @@ custom_tag_t**      fmtCustomTags(format_t*);
 
 // fmtString returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
-char*               fmtString(format_t*, event_t*);
+char*               fmtString(format_t*, event_t*, regex_t*);
 char *              fmtEventMessageString(format_t *, event_format_t *);
 
 // Setters

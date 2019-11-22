@@ -133,7 +133,7 @@ evtSendEvent(evt_t* evt, event_t* e)
 {
     if (!evt || !e) return -1;
 
-    char* msg = fmtString(evt->format, e);
+    char* msg = fmtString(evt->format, e, NULL);
     int rv = evtSend(evt, msg);
     if (msg) free(msg);
     return rv;
@@ -297,37 +297,6 @@ anyValueFieldMatches(regex_t* filter, event_t* metric)
     return NO_MATCH_FOUND;
 }
 
-static int
-fieldCount(event_t* metric)
-{
-    int i = 0;
-    if (!metric || !metric->fields) return i;
-    for (i=0; metric->fields[i].value_type != FMT_END; i++);
-    return i+1; // Include the FMT_END field
-}
-
-static void
-filterFields(event_t* metric, regex_t* filter)
-{
-    if (!metric || !metric->fields || !filter) return;
-
-    event_field_t *in_fld;
-    event_field_t *out_fld = metric->fields;
-    for (in_fld = metric->fields; in_fld->value_type != FMT_END; in_fld++) {
-
-        if (!regexec(filter, in_fld->name, 0, NULL, 0)) {
-            if (in_fld != out_fld) {
-                memmove(out_fld++, in_fld, sizeof(*in_fld));
-            }
-        }
-    }
-
-    // preserve the FIELDEND
-    if (in_fld != out_fld) {
-        memmove(out_fld++, in_fld, sizeof(*in_fld));
-    }
-}
-
 int
 evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
 {
@@ -354,34 +323,19 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
         return -1;
     }
 
-    {
-        // Create a copy of the metric
-        event_t metric_copy = *metric;
-        metric_copy.fields = NULL;
-        // Create a copy of the fields
-        int numFields = fieldCount(metric);
-        event_field_t fields_copy[numFields];
-        if (numFields) {
-            metric_copy.fields = &fields_copy[0];
-            memmove(&fields_copy, metric->fields, sizeof(fields_copy));
-        }
-
-        // Modify the copy per the field filter
-        filterFields(&metric_copy, evtFieldFilter(evt, CFG_SRC_METRIC));
-
-        // Format the metric string using the configured metric format type
-        event.data = fmtString(evt->format, &metric_copy);
-        if (!event.data) return -1;
-        event.datasize = strlen(event.data);
-    }
-
     ftime(&tb);
-    snprintf(ts, sizeof(ts), "%ld.%d", tb.time, tb.millitm);
+    if (snprintf(ts, sizeof(ts), "%ld.%d", tb.time, tb.millitm) < 0) return -1;
     event.timestamp = ts;
     event.timesize = strlen(ts);
 
     event.src = "metric";
     event.hostname = host;
+
+    // Format the metric string using the configured metric format type
+    event.data = fmtString(evt->format, metric, evtFieldFilter(evt, CFG_SRC_METRIC));
+    if (!event.data) return -1;
+    event.datasize = strlen(event.data);
+
     event.uid = uid;
 
     msg = fmtEventMessageString(evt->format, &event);

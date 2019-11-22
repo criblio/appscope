@@ -202,10 +202,10 @@ getDuration(uint64_t start)
 static int
 doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
 {
-    if (fs->event & (1>>CFG_SRC_CONSOLE)) {
+    if (fs->event & (1<<CFG_SRC_CONSOLE)) {
         return evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid, CFG_SRC_CONSOLE);
     }
-    if (fs->event & (1>>CFG_SRC_FILE)) {
+    if (fs->event & (1<<CFG_SRC_FILE)) {
         return evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid, CFG_SRC_FILE);
     }
     return -1;
@@ -2171,14 +2171,14 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
            (filter = evtNameFilter(g_evt, CFG_SRC_CONSOLE)) &&
            (!regexec(filter, path, 0, NULL, 0))) {
 
-            g_fsinfo[fd].event |= (1>>CFG_SRC_CONSOLE);
+            g_fsinfo[fd].event |= (1<<CFG_SRC_CONSOLE);
         }
 
         if (evtSourceEnabled(g_evt, CFG_SRC_FILE) &&
            (filter = evtNameFilter(g_evt, CFG_SRC_FILE)) &&
            (!regexec(filter, path, 0, NULL, 0))) {
 
-           g_fsinfo[fd].event |= (1>>CFG_SRC_FILE);
+           g_fsinfo[fd].event |= (1<<CFG_SRC_FILE);
         }
 
         doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0, NULL);

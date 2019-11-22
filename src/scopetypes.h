@@ -40,12 +40,12 @@ typedef enum {CFG_SRC_FILE,
 #define DEFAULT_SRC_CONSOLE_VALUE ".*"
 #define DEFAULT_SRC_SYSLOG_VALUE ".*"
 #define DEFAULT_SRC_METRIC_VALUE ".*"
-#define DEFAULT_SRC_FILE_FIELD ".*host.*"
+#define DEFAULT_SRC_FILE_FIELD ".*"
 #define DEFAULT_SRC_CONSOLE_FIELD ".*"
 #define DEFAULT_SRC_SYSLOG_FIELD ".*"
-#define DEFAULT_SRC_METRIC_FIELD ".*"
+#define DEFAULT_SRC_METRIC_FIELD "^[^h]+"
 #define DEFAULT_SRC_FILE_NAME ".*log.*"
-#define DEFAULT_SRC_CONSOLE_NAME ".*" // (stdout)|(stderr)
+#define DEFAULT_SRC_CONSOLE_NAME "(stdout)|(stderr)"
 #define DEFAULT_SRC_SYSLOG_NAME ".*"
 #define DEFAULT_SRC_METRIC_NAME ".*"
 #define DEFAULT_SRC_FILE 0

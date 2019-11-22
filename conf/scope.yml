@@ -50,16 +50,16 @@ event:
     host: 127.0.0.1
     port: 9109
   watch:
-    - type: file
-      name: .*[.]log$               # whitelist ex regex describing log file names
-      value: .*                     # whitelist ex regex describing field values
-    - type: console
-      name: .*                      # (stdout)|(stderr)
-      value: .*
-    - type: metric
-      name: .*                      # (net.*)|(.*err.*)
-      field: .*                     # whitelist ex regex describing field names
-      value: .*
+#    - type: file
+#      name: .*log.*                 # whitelist ex regex describing log file names
+#      value: .*                     # whitelist ex regex describing field values
+#    - type: console
+#      name: (stdout)|(stderr)
+#      value: .*
+#    - type: metric
+#      name: .*                      # (net.*)|(.*err.*)
+#      field: ^[^h]+                 # whitelist ex regex describing field names
+#      value: .*
 
 libscope:
   summaryperiod : 10                # in seconds
@@ -74,9 +74,9 @@ libscope:
   #  scope.<pid> file when it's complete.
 
   log:
-    level: error                      # debug, info, warning, error, none
+    level: error                    # debug, info, warning, error, none
     transport:
       type: file
       path: '/tmp/scope.log'
-      buffering: line                 # line, full
+      buffering: line               # line, full
 ...

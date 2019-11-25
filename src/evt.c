@@ -522,7 +522,7 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
 
             notified = 1;
             snprintf(notice, 512,
-                     "\"_time\":%ld,\"source\":\"notice\",\"_raw\":\"Truncated metrics. Your rate exceeded %d metrics per second\",\"host\":\"notice\",\"_channel\":\"notice\"\n",
+                     "{\"_time\":%ld,\"source\":\"notice\",\"_raw\":\"Truncated metrics. Your rate exceeded %d metrics per second\",\"host\":\"notice\",\"_channel\":\"notice\"}\n",
                      now, MAXEVENTS);
             if (cbufPut(evt->evbuf, (uint64_t)notice) == -1) {
                 // Full; drop and ignore

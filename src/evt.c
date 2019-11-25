@@ -5,7 +5,7 @@
 
 #include "evt.h"
 
-#define MAXEVENTS 100
+#define MAXEVENTS 10
 
 struct _evt_t
 {
@@ -511,7 +511,7 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     if (time(&now) > rateTime) {
         rateTime = now;
         rate = notified = 0;
-    } else if (++rate > MAXEVENTS) {
+    } else if (++rate >= MAXEVENTS) {
         // one notice per truncate
         if (notified == 0) {
             char *notice;

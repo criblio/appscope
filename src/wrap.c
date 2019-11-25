@@ -1805,9 +1805,12 @@ doRead(int fd, uint64_t initialTime, int success, ssize_t bytes, const char* fun
             doSetAddrs(fd);
             doRecv(fd, bytes);
         } else if (fs) {
-            uint64_t duration = getDuration(initialTime);
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
-            doFSMetric(FS_READ, fd, EVENT_BASED, func, bytes, NULL);
+            // Don't count data from stdin
+            if ((fd > 2) || strncmp(fs->path, "std", 3)) {
+                uint64_t duration = getDuration(initialTime);
+                doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
+                doFSMetric(FS_READ, fd, EVENT_BASED, func, bytes, NULL);
+            }
         }
     } else {
         if (fs) {
@@ -1831,9 +1834,12 @@ doWrite(int fd, uint64_t initialTime, int success, const void* buf, ssize_t byte
             doSetAddrs(fd);
             doSend(fd, bytes);
         } else if (fs) {
-            uint64_t duration = getDuration(initialTime);
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
-            doFSMetric(FS_WRITE, fd, EVENT_BASED, func, bytes, NULL);
+            // Don't count data from stdout, stderr
+            if ((fd > 2) || strncmp(fs->path, "std", 3)) {
+                uint64_t duration = getDuration(initialTime);
+                doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
+                doFSMetric(FS_WRITE, fd, EVENT_BASED, func, bytes, NULL);
+            }
             doEventLog(g_evt, fs, buf, bytes);
         }
     } else {

@@ -57,11 +57,11 @@ This is the variable that is needed in order for the Scope library to be loaded 
         Specify a directory from which conf/scope.yml or ./scope.yml can be found.
         Used only at start-time only if SCOPE_CONF_PATH does not exist.
         For more info see Config File Resolution below.
-    SCOPE_OUT_VERBOSITY
+    SCOPE_METRIC_VERBOSITY
         0-9 are valid values.  Default is 4.  For more info see Verbosity below.
-    SCOPE_OUT_SUM_PERIOD
+    SCOPE_SUMMARY_PERIOD
         Number of seconds between output summarizations.  Default is 10
-    SCOPE_OUT_DEST
+    SCOPE_METRIC_DEST
         Default is udp://localhost:8125.   Format is one of: file:///tmp/output.log or
         udp://Server:123
         Server is servername or address.  123 is a port number or service name
@@ -72,7 +72,7 @@ This is the variable that is needed in order for the Scope library to be loaded 
     SCOPE_LOG_LEVEL
         debug, info, warning, error, none.  Default is error.
     SCOPE_LOG_DEST
-        same format as SCOPE_OUT_DEST above.  Default is file:///tmp/scope.log
+        same format as SCOPE_METRIC_DEST above.  Default is file:///tmp/scope.log
     SCOPE_TAG_
         Specify a tag to be applied to every metric.
         Environment variable expansion is available e.g. SCOPE_TAG_user=$USER
@@ -117,5 +117,5 @@ If the SCOPE_CONF_PATH env variable is defined and the points to a file that can
     ./scope.yml
 
 ## Dynamic Configuration
-Dynamic Configuration allows configuration settings to be changed on the fly after process start-time.  At every SCOPE_OUT_SUM_PERIOD the library looks in SCOPE_CMD_DIR to see if a file scope.<pid> exists.  If it exists, it processes every line, looking for environment variable-style commands.  (e.g. SCOPE_CMD_DBG_PATH=/tmp/outfile.txt)  It changes the configuration to match the new settings, and deletes the scope.<pid> file when it's complete.
+Dynamic Configuration allows configuration settings to be changed on the fly after process start-time.  At every SCOPE_SUMMARY_PERIOD the library looks in SCOPE_CMD_DIR to see if a file scope.<pid> exists.  If it exists, it processes every line, looking for environment variable-style commands.  (e.g. SCOPE_CMD_DBG_PATH=/tmp/outfile.txt)  It changes the configuration to match the new settings, and deletes the scope.<pid> file when it's complete.
 

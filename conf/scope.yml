@@ -1,5 +1,5 @@
 ---
-output:
+metric:
   format:
     type : metricstatsd             # metricstatsd, metricjson
     #statsdprefix : 'cribl.scope'    # prepends each statsd metric
@@ -38,9 +38,42 @@ output:
     #- user: $USER
     #- feeling: elation
   transport:                        # defines how scope output is sent
-    type: udp                       # udp, unix, file, syslog
+    type: udp                       # udp, tcp, unix, file, syslog
     host: 127.0.0.1
     port: 8125
+
+event:
+  format:
+    type : ndjson                   # ndjson
+  transport:
+    type: tcp                       # udp, tcp, unix, file, syslog
+    host: 127.0.0.1
+    port: 9109
+  watch:
+    # Creates events from data written to files.
+    # Designed for monitoring log files, but capable of capturing
+    # any file writes.
+#    - type: file
+#      name: .*log.*                 # whitelist ex regex describing log file names
+#      value: .*                     # whitelist ex regex describing field values
+
+    # Creates events from data written to stdout, stderr, or both.
+    # May be most useful for capturing debug output from processes
+    # running in containerized environments.
+#    - type: console
+#      name: (stdout)|(stderr)
+#      value: .*
+
+    # Creates events from libscope's metric (statsd) data.  May be
+    # most useful for data which could overwhelm metric aggregation
+    # servers, either due to data volumes or dimensions (tags) with
+    # high cardinality.
+#    - type: metric
+#      name: .*                      # (net.*)|(.*err.*)
+#      field: ^[^h]+                 # whitelist ex regex describing field names
+#      value: .*
+
+libscope:
   summaryperiod : 10                # in seconds
   commanddir : '/tmp'
   #  commanddir supports changes to configuration settings of running
@@ -48,28 +81,14 @@ output:
   #  to see if a file named scope.<pid> exists.  (where pid is the process ID
   #  of the process running with scope.)  If it exists, it processes every
   #  line for environment variable-style commands:
-  #      SCOPE_OUT_VERBOSITY=9
+  #      SCOPE_METRIC_VERBOSITY=9
   #  It changes the configuration to match the new settings, and deletes the
   #  scope.<pid> file when it's complete.
 
-event:
-  format:
-    type : eventjsonrawjson         # eventjsonrawjson, eventjsonrawstatsd
-  transport:
-    type: tcp                       # udp, unix, file, syslog
-    host: 127.0.0.1
-    port: 9109
-  logfilefilter: .*log.*            # extended regex, default '.*log.*'
-  activesources:
-  #- logfile                         # create events from files that match logfilefilter
-  #- console                         # create events from stdout and stderr
-  #- syslog                          # create events from syslog and vsyslog
-  #- highcardmetrics
-
-logging:
-  level: error                      # debug, info, warning, error, none
-  transport:
-    type: file
-    path: '/tmp/scope.log'
-    buffering: line                 # line, full
+  log:
+    level: error                    # debug, info, warning, error, none
+    transport:
+      type: file
+      path: '/tmp/scope.log'
+      buffering: line               # line, full
 ...

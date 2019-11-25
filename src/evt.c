@@ -3,18 +3,72 @@
 #include <string.h>
 #include "evt.h"
 
+typedef struct {
+    int valid;
+    regex_t re;
+} local_re_t;
+
 struct _evt_t
 {
     transport_t* transport;
     format_t* format;
-    regex_t* log_file_re;
-    regex_t* metric_name_re;
-    regex_t* metric_value_re;
-    regex_t* metric_field_re;
+    local_re_t value_re[CFG_SRC_MAX];
+    local_re_t field_re[CFG_SRC_MAX];
+    local_re_t name_re[CFG_SRC_MAX];
+    unsigned enabled[CFG_SRC_MAX];
     cbuf_handle_t evbuf;
-    unsigned src[CFG_SRC_MAX];
 };
 
+static const char* valueFilterDefault[] = {
+    DEFAULT_SRC_FILE_VALUE,
+    DEFAULT_SRC_CONSOLE_VALUE,
+    DEFAULT_SRC_SYSLOG_VALUE,
+    DEFAULT_SRC_METRIC_VALUE,
+};
+
+static const char* fieldFilterDefault[] = {
+    DEFAULT_SRC_FILE_FIELD,
+    DEFAULT_SRC_CONSOLE_FIELD,
+    DEFAULT_SRC_SYSLOG_FIELD,
+    DEFAULT_SRC_METRIC_FIELD,
+};
+
+static const char* nameFilterDefault[] = {
+    DEFAULT_SRC_FILE_NAME,
+    DEFAULT_SRC_CONSOLE_NAME,
+    DEFAULT_SRC_SYSLOG_NAME,
+    DEFAULT_SRC_METRIC_NAME,
+};
+
+static unsigned srcEnabledDefault[] = {
+    DEFAULT_SRC_FILE,
+    DEFAULT_SRC_CONSOLE,
+    DEFAULT_SRC_SYSLOG,
+    DEFAULT_SRC_METRIC,
+};
+
+
+static void
+filterSet(local_re_t* re, const char *str, const char* default_val)
+{
+    if (!re || !default_val) return;
+
+    local_re_t temp;
+    temp.valid = str && !regcomp(&temp.re, str, REG_EXTENDED | REG_NOSUB);
+    if (!temp.valid) {
+        // regcomp failed on str.  Try the default.
+        temp.valid = !regcomp(&temp.re, default_val, REG_EXTENDED | REG_NOSUB);
+    }
+
+    if (temp.valid) {
+        // Out with the old
+        if (re->valid) regfree(&re->re);
+        // In with the new
+        *re = temp;
+    } else {
+        DBG("%s", str);
+    }
+}
 
 evt_t*
 evtCreate()
@@ -25,60 +79,13 @@ evtCreate()
         return NULL;
     }
 
-    if (!(evt->log_file_re = calloc(1, sizeof(regex_t)))) {
-        DBG(NULL);
-        evtDestroy(&evt);
-        return evt;
+    cfg_evt_t src;
+    for (src=CFG_SRC_FILE;  src<CFG_SRC_MAX; src++) {
+        filterSet(&evt->value_re[src], NULL, valueFilterDefault[src]);
+        filterSet(&evt->field_re[src], NULL, fieldFilterDefault[src]);
+        filterSet(&evt->name_re[src], NULL, nameFilterDefault[src]);
+        evt->enabled[src] = srcEnabledDefault[src];
     }
-
-    if (regcomp(evt->log_file_re, DEFAULT_LOG_FILE_FILTER, REG_EXTENDED)) {
-        // regcomp failed.
-        DBG(NULL);
-        evtDestroy(&evt);
-        return evt;
-    }
-
-    if (!(evt->metric_name_re = calloc(1, sizeof(regex_t)))) {
-        DBG(NULL);
-        evtDestroy(&evt);
-        return evt;
-    }
-
-    if (regcomp(evt->metric_name_re, DEFAULT_METRIC_NAME_FILTER, REG_EXTENDED)) {
-        // regcomp failed.
-        DBG(NULL);
-        evtDestroy(&evt);
-        return evt;
-    }
-
-    if (!(evt->metric_value_re = calloc(1, sizeof(regex_t)))) {
-        DBG(NULL);
-        evtDestroy(&evt);
-        return evt;
-    }
-
-    if (regcomp(evt->metric_value_re, DEFAULT_METRIC_VALUE_FILTER, REG_EXTENDED)) {
-        // regcomp failed.
-        DBG(NULL);
-        evtDestroy(&evt);
-        return evt;
-    }
-
-    if (!(evt->metric_field_re = calloc(1, sizeof(regex_t)))) {
-        DBG(NULL);
-        evtDestroy(&evt);
-        return evt;
-    }
-
-    if (regcomp(evt->metric_field_re, DEFAULT_METRIC_FIELD_FILTER, REG_EXTENDED)) {
-        // regcomp failed.
-        DBG(NULL);
-        evtDestroy(&evt);
-        return evt;
-    }
-
-    // format wants this
-    fmtMetricFieldFilterSet(evt->format, evt->metric_field_re);
 
     evt->evbuf = cbufInit(DEFAULT_CBUF_SIZE);
 
@@ -97,29 +104,17 @@ evtDestroy(evt_t** evt)
                          // and before cbufFree wil be leaked.
     cbufFree(edestroy->evbuf);
 
-    transportDestroy(&edestroy->transport);
-
-    if (edestroy->log_file_re) {
-        regfree(edestroy->log_file_re);
-        free(edestroy->log_file_re);
-    }
-
-    if (edestroy->metric_name_re) {
-        regfree(edestroy->metric_name_re);
-        free(edestroy->metric_name_re);
-    }
-
-    if (edestroy->metric_value_re) {
-        regfree(edestroy->metric_value_re);
-        free(edestroy->metric_value_re);
-    }
-
-    if (edestroy->metric_field_re) {
-        regfree(edestroy->metric_field_re);
-        free(edestroy->metric_field_re);
+    cfg_evt_t src;
+    for (src=CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
+        if (edestroy->value_re[src].valid) regfree(&edestroy->value_re[src].re);
+        if (edestroy->field_re[src].valid) regfree(&edestroy->field_re[src].re);
+        if (edestroy->name_re[src].valid) regfree(&edestroy->name_re[src].re);
     }
 
     fmtDestroy(&edestroy->format);
+
+    transportDestroy(&edestroy->transport);
+
     free(edestroy);
     *evt = NULL;
 }
@@ -138,7 +133,7 @@ evtSendEvent(evt_t* evt, event_t* e)
 {
     if (!evt || !e) return -1;
 
-    char* msg = fmtString(evt->format, e);
+    char* msg = fmtString(evt->format, e, NULL);
     int rv = evtSend(evt, msg);
     if (msg) free(msg);
     return rv;
@@ -151,132 +146,61 @@ evtFlush(evt_t* evt)
     transportFlush(evt->transport);
 }
 
-regex_t*
-evtLogFileFilter(evt_t* evt)
+regex_t *
+evtValueFilter(evt_t *evt, cfg_evt_t src)
 {
-
-    if (!evt) {
-        static regex_t* default_log_file_re = NULL;
-
-        if (default_log_file_re) return default_log_file_re;
-
-        if (!(default_log_file_re = calloc(1, sizeof(regex_t)))) {
-            DBG(NULL);
-            return NULL;
+    if (src < CFG_SRC_MAX) {
+        if (evt && evt->value_re[src].valid) return &evt->value_re[src].re;
+        static local_re_t default_re[CFG_SRC_MAX];
+        if (!default_re[src].valid) {
+            filterSet(&default_re[src], NULL, valueFilterDefault[src]);
         }
-
-        if (regcomp(default_log_file_re, DEFAULT_LOG_FILE_FILTER, REG_EXTENDED)) {
-            // regcomp failed.
-            DBG(NULL);
-            free(default_log_file_re);
-            default_log_file_re = NULL;
-        }
-        return default_log_file_re;
+        if (default_re[src].valid) return &default_re[src].re;
     }
-
-    return evt->log_file_re;
+    DBG("%d", src);
+    return NULL;
 }
 
 regex_t *
-evtMetricNameFilter(evt_t *evt)
+evtFieldFilter(evt_t *evt, cfg_evt_t src)
 {
-
-    if (!evt) {
-        static regex_t *default_metric_name_re = NULL;
-
-        if (default_metric_name_re) return default_metric_name_re;
-
-        if (!(default_metric_name_re = calloc(1, sizeof(regex_t)))) {
-            DBG(NULL);
-            return NULL;
+    if (src < CFG_SRC_MAX) {
+        if (evt && evt->field_re[src].valid) return &evt->field_re[src].re;
+        static local_re_t default_re[CFG_SRC_MAX];
+        if (!default_re[src].valid) {
+            filterSet(&default_re[src], NULL, fieldFilterDefault[src]);
         }
-
-        if (regcomp(default_metric_name_re, DEFAULT_METRIC_NAME_FILTER, REG_EXTENDED)) {
-            // regcomp failed.
-            DBG(NULL);
-            free(default_metric_name_re);
-            default_metric_name_re = NULL;
-        }
-        return default_metric_name_re;
+        if (default_re[src].valid) return &default_re[src].re;
     }
-
-    return evt->metric_name_re;
+    DBG("%d", src);
+    return NULL;
 }
 
 regex_t *
-evtMetricValueFilter(evt_t *evt)
+evtNameFilter(evt_t *evt, cfg_evt_t src)
 {
-
-    if (!evt) {
-        static regex_t *default_metric_value_re = NULL;
-
-        if (default_metric_value_re) return default_metric_value_re;
-
-        if (!(default_metric_value_re = calloc(1, sizeof(regex_t)))) {
-            DBG(NULL);
-            return NULL;
+    if (src < CFG_SRC_MAX) {
+        if (evt && evt->name_re[src].valid) return &evt->name_re[src].re;
+        static local_re_t default_re[CFG_SRC_MAX];
+        if (!default_re[src].valid) {
+            filterSet(&default_re[src], NULL, nameFilterDefault[src]);
         }
-
-        if (regcomp(default_metric_value_re, DEFAULT_METRIC_VALUE_FILTER, REG_EXTENDED)) {
-            // regcomp failed.
-            DBG(NULL);
-            free(default_metric_value_re);
-            default_metric_value_re = NULL;
-        }
-
-        return default_metric_value_re;
+        if (default_re[src].valid) return &default_re[src].re;
     }
-
-    return evt->metric_value_re;
-}
-
-regex_t *
-evtMetricFieldFilter(evt_t *evt)
-{
-
-    if (!evt) {
-        static regex_t *default_metric_field_re = NULL;
-
-        if (default_metric_field_re) return default_metric_field_re;
-
-        if (!(default_metric_field_re = calloc(1, sizeof(regex_t)))) {
-            DBG(NULL);
-            return NULL;
-        }
-
-        if (regcomp(default_metric_field_re, DEFAULT_METRIC_FIELD_FILTER, REG_EXTENDED)) {
-            // regcomp failed.
-            DBG(NULL);
-            free(default_metric_field_re);
-            default_metric_field_re = NULL;
-        }
-
-        return default_metric_field_re;
-    }
-
-    return evt->metric_field_re;
+    DBG("%d", src);
+    return NULL;
 }
 
 unsigned
-evtSource(evt_t* evt, cfg_evt_t src)
+evtSourceEnabled(evt_t* evt, cfg_evt_t src)
 {
-    if (evt && src < CFG_SRC_MAX) {
-        return evt->src[src];
+    if (src < CFG_SRC_MAX) {
+        if (evt) return evt->enabled[src];
+        return srcEnabledDefault[src];
     }
 
-    switch (src) {
-        case CFG_SRC_LOGFILE:
-            return DEFAULT_SRC_LOGFILE;
-        case CFG_SRC_CONSOLE:
-            return DEFAULT_SRC_CONSOLE;
-        case CFG_SRC_SYSLOG:
-            return DEFAULT_SRC_SYSLOG;
-        case CFG_SRC_METRIC:
-            return DEFAULT_SRC_METRIC;
-        default:
-            DBG(NULL);
-            return DEFAULT_SRC_LOGFILE;
-    }
+    DBG("%d", src);
+    return srcEnabledDefault[CFG_SRC_FILE];
 }
 
 int
@@ -311,220 +235,96 @@ evtFormatSet(evt_t* evt, format_t* format)
     // Don't leak if evtFormatSet is called repeatedly
     fmtDestroy(&evt->format);
     evt->format = format;
-    fmtMetricFieldFilterSet(evt->format, evt->metric_field_re);
 }
 
 void
-evtLogFileFilterSet(evt_t* evt, const char* str)
-{
-    if (!evt) return;
-
-    regex_t* temp_re = calloc(1, sizeof(regex_t));
-    if (!temp_re) {
-        DBG(NULL);
-        return;
-    }
-
-    const char* filter_string;
-    if (!str || str[0]=='\0') {
-        // no str.  Revert to default filter
-        filter_string = DEFAULT_LOG_FILE_FILTER;
-    } else {
-        filter_string = str;
-    }
-
-    int temp_re_valid = !regcomp(temp_re, filter_string, REG_EXTENDED);
-    if (!temp_re_valid) {
-        // regcomp failed on filter_string.  Try the default
-        filter_string = DEFAULT_LOG_FILE_FILTER;
-        temp_re_valid = !regcomp(temp_re, filter_string, REG_EXTENDED);
-    }
-
-    if (temp_re_valid) {
-        // Out with the old
-        regfree(evt->log_file_re);
-        free(evt->log_file_re);
-        // In with the new
-        evt->log_file_re = temp_re;
-    } else {
-        DBG("%s", str);
-        free(temp_re);
-    }
-}
-
-void
-evtMetricNameFilterSet(evt_t *evt, const char *str)
-{
-    if (!evt) return;
-
-    regex_t *temp_re = calloc(1, sizeof(regex_t));
-    if (!temp_re) {
-        DBG(NULL);
-        return;
-    }
-
-    const char *filter_string;
-    if (!str || str[0]=='\0') {
-        // no str.  Revert to default filter
-        filter_string = DEFAULT_METRIC_NAME_FILTER;
-    } else {
-        filter_string = str;
-    }
-
-    int temp_re_valid = !regcomp(temp_re, filter_string, REG_EXTENDED);
-    if (!temp_re_valid) {
-        // regcomp failed on filter_string.  Try the default
-        filter_string = DEFAULT_METRIC_NAME_FILTER;
-        temp_re_valid = !regcomp(temp_re, filter_string, REG_EXTENDED);
-    }
-
-    if (temp_re_valid) {
-        // Out with the old
-        regfree(evt->metric_name_re);
-        free(evt->metric_name_re);
-        // In with the new
-        evt->metric_name_re = temp_re;
-    } else {
-        DBG("%s", str);
-        free(temp_re);
-    }
-}
-
-void
-evtMetricValueFilterSet(evt_t *evt, const char *str)
-{
-    if (!evt) return;
-
-    regex_t *temp_re = calloc(1, sizeof(regex_t));
-    if (!temp_re) {
-        DBG(NULL);
-        return;
-    }
-
-    const char *filter_string;
-    if (!str || str[0]=='\0') {
-        // no str.  Revert to default filter
-        filter_string = DEFAULT_METRIC_VALUE_FILTER;
-    } else {
-        filter_string = str;
-    }
-
-    int temp_re_valid = !regcomp(temp_re, filter_string, REG_EXTENDED);
-    if (!temp_re_valid) {
-        // regcomp failed on filter_string.  Try the default
-        filter_string = DEFAULT_METRIC_VALUE_FILTER;
-        temp_re_valid = !regcomp(temp_re, filter_string, REG_EXTENDED);
-    }
-
-    if (temp_re_valid) {
-        // Out with the old
-        regfree(evt->metric_value_re);
-        free(evt->metric_value_re);
-        // In with the new
-        evt->metric_value_re = temp_re;
-    } else {
-        DBG("%s", str);
-        free(temp_re);
-    }
-}
-
-void
-evtMetricFieldFilterSet(evt_t *evt, const char *str)
-{
-    if (!evt) return;
-
-    regex_t *temp_re = calloc(1, sizeof(regex_t));
-    if (!temp_re) {
-        DBG(NULL);
-        return;
-    }
-
-    const char *filter_string;
-    if (!str || str[0]=='\0') {
-        // no str.  Revert to default filter
-        filter_string = DEFAULT_METRIC_FIELD_FILTER;
-    } else {
-        filter_string = str;
-    }
-
-    int temp_re_valid = !regcomp(temp_re, filter_string, REG_EXTENDED);
-    if (!temp_re_valid) {
-        // regcomp failed on filter_string.  Try the default
-        filter_string = DEFAULT_METRIC_FIELD_FILTER;
-        temp_re_valid = !regcomp(temp_re, filter_string, REG_EXTENDED);
-    }
-
-    if (temp_re_valid) {
-        // Out with the old
-        regfree(evt->metric_field_re);
-        free(evt->metric_field_re);
-        // In with the new
-        evt->metric_field_re = temp_re;
-        // format wants this
-        fmtMetricFieldFilterSet(evt->format, evt->metric_field_re);
-    } else {
-        DBG("%s", str);
-        free(temp_re);
-    }
-}
-
-void
-evtSourceSet(evt_t* evt, cfg_evt_t src, unsigned val)
+evtValueFilterSet(evt_t *evt, cfg_evt_t src, const char *str)
 {
     if (!evt || src >= CFG_SRC_MAX) return;
-    evt->src[src] = val;
+    filterSet(&evt->value_re[src], str, valueFilterDefault[src]);
+}
+
+void
+evtFieldFilterSet(evt_t *evt, cfg_evt_t src, const char *str)
+{
+    if (!evt || src >= CFG_SRC_MAX) return;
+    filterSet(&evt->field_re[src], str, fieldFilterDefault[src]);
+}
+
+void
+evtNameFilterSet(evt_t *evt, cfg_evt_t src, const char *str)
+{
+    if (!evt || src >= CFG_SRC_MAX) return;
+    filterSet(&evt->name_re[src], str, nameFilterDefault[src]);
+}
+
+void
+evtSourceEnabledSet(evt_t* evt, cfg_evt_t src, unsigned val)
+{
+    if (!evt || src >= CFG_SRC_MAX) return;
+    evt->enabled[src] = val;
+}
+
+#define MATCH_FOUND 1
+#define NO_MATCH_FOUND 0
+
+static int
+anyValueFieldMatches(regex_t* filter, event_t* metric)
+{
+    if (!filter || !metric) return MATCH_FOUND;
+
+    // Test the value of metric
+    char valbuf[64];
+    if (snprintf(valbuf, sizeof(valbuf), "%lld", metric->value) > 0) {
+        if (!regexec(filter, valbuf, 0, NULL, 0)) return MATCH_FOUND;
+    }
+
+    // Test every field value until a match is found
+    event_field_t *fld;
+    for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
+        const char *str = NULL;
+        if (fld->value_type == FMT_STR) {
+            str = fld->value.str;
+        } else if (fld->value_type == FMT_NUM) {
+            if (snprintf(valbuf, sizeof(valbuf), "%lld", fld->value.num) > 0) {
+                str = valbuf;
+            }
+        }
+
+        if (str && !regexec(filter, str, 0, NULL, 0)) return MATCH_FOUND;
+    }
+
+    return NO_MATCH_FOUND;
 }
 
 int
 evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
 {
-    int go = 0;
     char *msg;
     event_format_t event;
     struct timeb tb;
     char ts[128];
-    regmatch_t match = {0};
-    event_field_t *fld;
-    regex_t *value_filter;
+    regex_t *filter;
 
-    if (!evt || !metric || !host ||
-        (evtSource(evt, CFG_SRC_METRIC) == DEFAULT_SRC_METRIC) ||
-        (regexec(evtMetricNameFilter(evt), metric->name, 1, &match, 0) != 0))
+    if (!evt || !metric || !host || !metric) return -1;
+
+    // Test for a name field match.  No match, no metric output
+    if (!evtSourceEnabled(evt, CFG_SRC_METRIC) ||
+        !(filter = evtNameFilter(evt, CFG_SRC_METRIC)) ||
+        (regexec(filter, metric->name, 0, NULL, 0))) {
         return -1;
-
-    /*
-     * Loop through all metrics to test a value filter
-     * At least one match must occur in order to emit this metric
-     */
-    value_filter = evtMetricValueFilter(evt);
-    if (value_filter != NULL) {
-        for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
-            if ((fld->value_type == FMT_STR) &&
-                (regexec(value_filter, fld->value.str, 1, &match, 0) == 0)) {
-                go = 1;
-                break;
-            }
-
-            if (fld->value_type == FMT_NUM) {
-                if (snprintf(ts, sizeof(ts), "%lld" , fld->value.num) < 0) {
-                    continue;
-                }
-
-                if (regexec(value_filter, ts, 1, &match, 0) == 0) {
-                    go = 1;
-                    break;
-                }
-            }
-        }
     }
 
-    // At least one value filter needs to match
-    if (go == 0) {
+    /*
+     * Loop through all metric fields for at least one matching field value
+     * No match, no metric output
+     */
+    if (!anyValueFieldMatches(evtValueFilter(evt, CFG_SRC_METRIC), metric)) {
         return -1;
     }
 
     ftime(&tb);
-    snprintf(ts, sizeof(ts), "%ld.%d", tb.time, tb.millitm);
+    if (snprintf(ts, sizeof(ts), "%ld.%d", tb.time, tb.millitm) < 0) return -1;
     event.timestamp = ts;
     event.timesize = strlen(ts);
 
@@ -532,7 +332,8 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     event.hostname = host;
 
     // Format the metric string using the configured metric format type
-    if ((event.data = fmtString(evt->format, metric)) == NULL) return -1;
+    event.data = fmtString(evt->format, metric, evtFieldFilter(evt, CFG_SRC_METRIC));
+    if (!event.data) return -1;
     event.datasize = strlen(event.data);
 
     event.uid = uid;
@@ -552,7 +353,7 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
 
 int
 evtLog(evt_t *evt, const char *host, const char *path,
-       const void *buf, size_t count, uint64_t uid)
+       const void *buf, size_t count, uint64_t uid, cfg_evt_t logType)
 {
     char *msg;
     event_format_t event;
@@ -572,6 +373,13 @@ evtLog(evt_t *evt, const char *host, const char *path,
     event.uid = uid;
 
     msg = fmtEventMessageString(evt->format, &event);
+
+    regex_t* filter = evtValueFilter(evt, logType);
+    if (msg && filter && regexec(filter, msg, 0, NULL, 0)) {
+        // This event doesn't match.  Drop it on the floor.
+        free(msg);
+        return 0;
+    }
 
     if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore

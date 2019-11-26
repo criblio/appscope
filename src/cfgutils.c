@@ -1183,11 +1183,14 @@ initEvt(config_t *cfg)
 int
 updateEvt(config_t *cfg, evt_t *evt)
 {
-    evtLogFileFilterSet(evt, cfgEventLogFileFilter(cfg));
+    if (!cfg || !evt) return -1;
 
     cfg_evt_t src;
-    for (src = CFG_SRC_LOGFILE; src<CFG_SRC_MAX; src++) {
-        evtSourceSet(evt, src, cfgEventSource(cfg, src));
+    for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
+        evtSourceEnabledSet(evt, src, cfgEventSourceEnabled(cfg, src));
+        evtNameFilterSet(evt, src, cfgEventNameFilter(cfg, src));
+        evtFieldFilterSet(evt, src, cfgEventFieldFilter(cfg, src));
+        evtValueFilterSet(evt, src, cfgEventValueFilter(cfg, src));
     }
 
     return 0;

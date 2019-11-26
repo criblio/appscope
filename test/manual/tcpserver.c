@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
   char buf[BUFSIZE]; /* message buffer */
   char *hostaddrp; /* dotted decimal host addr string */
   int optval; /* flag value for setsockopt */
-  int rc, i, j, fd;
+  int rc, i, j, fd, arr;
   int numfds;
   int timeout;
   struct pollfd fds[MAXFDS];
@@ -152,9 +152,23 @@ int main(int argc, char **argv) {
                   continue;
               }
 
-              fds[numfds].fd = childfd;
-              fds[numfds].events = POLLIN;
-              numfds++;
+              // try to re-use an entry
+              for (j=0; j < numfds; j++) {
+                  if (fds[j].fd == -1) {
+                      fds[j].fd = childfd;
+                      fds[j].events = POLLIN;
+                      arr = j;
+                      break;
+                  }
+              }
+
+              // if not, use a new entry
+              if (j >= numfds) {
+                  fds[numfds].fd = childfd;
+                  fds[numfds].events = POLLIN;
+                  arr = numfds;
+                  numfds++;
+              }
                             
               // who sent the message 
               hostp = gethostbyaddr((const char *)&clientaddr.sin_addr.s_addr, 
@@ -166,8 +180,8 @@ int main(int argc, char **argv) {
               if (hostaddrp == NULL)
                   perror("ERROR on inet_ntoa\n");
 
-              printf("server established connection on %d with %s (%s:%d)\n", 
-                     childfd, hostp->h_name, hostaddrp, htons(clientaddr.sin_port));
+              printf("server established connection on [%d].%d with %s (%s:%d)\n", 
+                     arr, childfd, hostp->h_name, hostaddrp, htons(clientaddr.sin_port));
               break;
           } else if (fds[i].fd == 0) {
               // command input from stdin

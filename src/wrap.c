@@ -141,7 +141,6 @@ remoteConfig()
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
-    //char dbg[128];
     
     // MS
     timeout = (g_thread.interval * 1000);
@@ -166,9 +165,6 @@ remoteConfig()
     if ((rc == 0) || (fds.revents == 0) || ((fds.revents & POLLIN) == 0) ||
         ((fds.revents & POLLHUP) != 0) || ((fds.revents & POLLNVAL) != 0)) return;
 
-    //snprintf(dbg, sizeof(dbg), "\npid %d POLLIN\n", getpid());
-    //g_fn.write(1, dbg, strlen(dbg));
-
     strncpy(path, "/tmp/cfg", sizeof(path));
     if ((fs = g_fn.fopen(path, "a+")) == NULL) {
         DBG(NULL);
@@ -176,20 +172,14 @@ remoteConfig()
         return;
     }
 
-    //FILE *fmemopen(void *buf, size_t size, const char *mode);
     success = rc = errno = 0;
     do {
-        rc = g_fn.recv(g_cfg.cmdConn, buf, sizeof(buf), MSG_DONTWAIT); //MSG_DONTWAIT
-        //if ((rc < 0) && (errno == EAGAIN)) {
-        //    continue;
-        //}
-
+        rc = g_fn.recv(g_cfg.cmdConn, buf, sizeof(buf), MSG_DONTWAIT);
+        /*
+         * TODO: if we get an error, we don't get the whoile file
+         * When we support ndjson look for new line as EOF
+         */
         if (rc <= 0) {
-            //snprintf(dbg, sizeof(dbg), "pid %d errno: %d\n", getpid(), errno);
-            //perror("recv");
-            //g_fn.write(1, dbg, strlen(dbg));
-            //snprintf(dbg, sizeof(dbg), "\npid %d Recv Done\n", getpid());
-            //g_fn.write(1, dbg, strlen(dbg));
             break;
         }
 
@@ -197,10 +187,8 @@ remoteConfig()
             DBG(NULL);
         } else {
             success = 1;
-            //snprintf(dbg, sizeof(dbg), "\npid %d WRITE\n", getpid());
-            //g_fn.write(1, dbg, strlen(dbg));
         }
-    } while (1); //((rc > 0) && (errno != EWOULDBLOCK) && (errno != EAGAIN));
+    } while (1);
 
     if (success == 1) {
         fflush(fs);

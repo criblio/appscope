@@ -294,8 +294,11 @@ getDuration(uint64_t start)
 static int
 doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
 {
-    if (fs->event == TRUE) {
-        return evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid);
+    if (fs->event & (1<<CFG_SRC_CONSOLE)) {
+        return evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid, CFG_SRC_CONSOLE);
+    }
+    if (fs->event & (1<<CFG_SRC_FILE)) {
+        return evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid, CFG_SRC_FILE);
     }
     return -1;
 }
@@ -303,7 +306,7 @@ doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
 static bool
 checkNetEntry(int fd)
 {
-    if (g_netinfo && (fd > 0) && (fd <= g_cfg.numNinfo)) {
+    if (g_netinfo && (fd >= 0) && (fd < g_cfg.numNinfo)) {
         return TRUE;
     }
 
@@ -313,7 +316,7 @@ checkNetEntry(int fd)
 static bool
 checkFSEntry(int fd)
 {
-    if (g_fsinfo && (fd > 0) && (fd <= g_cfg.numFSInfo)) {
+    if (g_fsinfo && (fd >= 0) && (fd < g_cfg.numFSInfo)) {
         return TRUE;
     }
 
@@ -323,8 +326,8 @@ checkFSEntry(int fd)
 static net_info *
 getNetEntry(int fd)
 {
-    if (g_netinfo && (fd > 0) && (fd <= g_cfg.numNinfo) &&
-        (g_netinfo[fd].fd == fd)) {
+    if (g_netinfo && (fd >= 0) && (fd < g_cfg.numNinfo) &&
+        g_netinfo[fd].active) {
         return &g_netinfo[fd];
     }
     return NULL;    
@@ -333,19 +336,35 @@ getNetEntry(int fd)
 static fs_info *
 getFSEntry(int fd)
 {
-    if (g_fsinfo && (fd > 0) && (fd <= g_cfg.numFSInfo) &&
-        (g_fsinfo[fd].fd == fd)) {
+    if (g_fsinfo && (fd >= 0) && (fd < g_cfg.numFSInfo) &&
+        g_fsinfo[fd].active) {
         return &g_fsinfo[fd];
     }
 
-    if (((fd == 1) || (fd == 2)) && g_fsinfo &&
-        (evtSource(g_evt, CFG_SRC_CONSOLE) != DEFAULT_SRC_CONSOLE)) {
-        if (fd == 1) doOpen(fd, "stdout", FD, "console output");
-        if (fd == 2) doOpen(fd, "stderr", FD, "console output");
-        if (g_fsinfo[fd].fd == fd) {
-            g_fsinfo[fd].event = TRUE;
-            return &g_fsinfo[fd];
+    const char* name;
+    const char* description;
+    if (g_fsinfo && ((fd >= 0 ) && (fd <= 2))) {
+        switch(fd) {
+            case 0:
+                name = "stdin";
+                description = "console input";
+                break;
+            case 1:
+                name = "stdout";
+                description = "console output";
+                break;
+            case 2:
+                name = "stderr";
+                description = "console output";
+                break;
+            default:
+                DBG(NULL);
+                return NULL;
         }
+
+        doOpen(fd, name, FD, description);
+
+        return &g_fsinfo[fd];
     }
 
     return NULL;    
@@ -355,7 +374,7 @@ static void
 addSock(int fd, int type)
 {
     if (checkNetEntry(fd) == TRUE) {
-        if (g_netinfo[fd].fd == fd) {
+        if (g_netinfo[fd].active) {
 
             doClose(fd, "close: DuplicateSocket");
 
@@ -388,7 +407,7 @@ addSock(int fd, int type)
         }
 */
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
-        g_netinfo[fd].fd = fd;
+        g_netinfo[fd].active = TRUE;
         g_netinfo[fd].type = type;
         g_netinfo[fd].uid = getTime();
 #ifdef __LINUX__
@@ -1776,7 +1795,7 @@ static int
 doRecv(int sockfd, ssize_t rc)
 {
     if (checkNetEntry(sockfd) == TRUE) {
-        if (g_netinfo[sockfd].fd != sockfd) {
+        if (!g_netinfo[sockfd].active) {
             doAddNewSock(sockfd);
         }
 
@@ -1790,7 +1809,7 @@ static int
 doSend(int sockfd, ssize_t rc)
 {
     if (checkNetEntry(sockfd) == TRUE) {
-        if (g_netinfo[sockfd].fd != sockfd) {
+        if (!g_netinfo[sockfd].active) {
             doAddNewSock(sockfd);
         }
 
@@ -1877,9 +1896,12 @@ doRead(int fd, uint64_t initialTime, int success, ssize_t bytes, const char* fun
             doSetAddrs(fd);
             doRecv(fd, bytes);
         } else if (fs) {
-            uint64_t duration = getDuration(initialTime);
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
-            doFSMetric(FS_READ, fd, EVENT_BASED, func, bytes, NULL);
+            // Don't count data from stdin
+            if ((fd > 2) || strncmp(fs->path, "std", 3)) {
+                uint64_t duration = getDuration(initialTime);
+                doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
+                doFSMetric(FS_READ, fd, EVENT_BASED, func, bytes, NULL);
+            }
         }
     } else {
         if (fs) {
@@ -1903,9 +1925,12 @@ doWrite(int fd, uint64_t initialTime, int success, const void* buf, ssize_t byte
             doSetAddrs(fd);
             doSend(fd, bytes);
         } else if (fs) {
-            uint64_t duration = getDuration(initialTime);
-            doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
-            doFSMetric(FS_WRITE, fd, EVENT_BASED, func, bytes, NULL);
+            // Don't count data from stdout, stderr
+            if ((fd > 2) || strncmp(fs->path, "std", 3)) {
+                uint64_t duration = getDuration(initialTime);
+                doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
+                doFSMetric(FS_WRITE, fd, EVENT_BASED, func, bytes, NULL);
+            }
             doEventLog(g_evt, fs, buf, bytes);
         }
     } else {
@@ -1964,7 +1989,7 @@ doStatFd(int fd, int rc, const char* func)
 static int
 doDupFile(int newfd, int oldfd, const char *func)
 {
-    if ((newfd > g_cfg.numFSInfo) || (oldfd > g_cfg.numFSInfo)) {
+    if ((newfd >= g_cfg.numFSInfo) || (oldfd >= g_cfg.numFSInfo)) {
         return -1;
     }
 
@@ -1975,12 +2000,12 @@ doDupFile(int newfd, int oldfd, const char *func)
 static int
 doDupSock(int oldfd, int newfd)
 {
-    if ((newfd > g_cfg.numFSInfo) || (oldfd > g_cfg.numFSInfo)) {
+    if ((newfd >= g_cfg.numFSInfo) || (oldfd >= g_cfg.numFSInfo)) {
         return -1;
     }
 
     bcopy(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct fs_info_t));
-    g_netinfo[newfd].fd = newfd;
+    g_netinfo[newfd].active = TRUE;
     g_netinfo[newfd].numTX = 0;
     g_netinfo[newfd].numRX = 0;
     g_netinfo[newfd].txBytes = 0;
@@ -2388,7 +2413,7 @@ static void
 doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
 {
     if (checkFSEntry(fd) == TRUE) {
-        if (g_fsinfo[fd].fd == fd) {
+        if (g_fsinfo[fd].active) {
             char buf[128];
 
             snprintf(buf, sizeof(buf), "%s:doOpen: duplicate(%d)", func, fd);
@@ -2425,16 +2450,24 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
         }
 */
         memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
-        g_fsinfo[fd].fd = fd;
+        g_fsinfo[fd].active = TRUE;
         g_fsinfo[fd].type = type;
         g_fsinfo[fd].uid = getTime();
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
 
-        if (evtSource(g_evt, CFG_SRC_LOGFILE) != DEFAULT_SRC_LOGFILE) {
-            regmatch_t match = {0};
-            if (regexec(evtLogFileFilter(g_evt), path, 1, &match, 0) == 0) {
-                g_fsinfo[fd].event = TRUE;
-            }
+        regex_t* filter;
+        if (evtSourceEnabled(g_evt, CFG_SRC_CONSOLE) &&
+           (filter = evtNameFilter(g_evt, CFG_SRC_CONSOLE)) &&
+           (!regexec(filter, path, 0, NULL, 0))) {
+
+            g_fsinfo[fd].event |= (1<<CFG_SRC_CONSOLE);
+        }
+
+        if (evtSourceEnabled(g_evt, CFG_SRC_FILE) &&
+           (filter = evtNameFilter(g_evt, CFG_SRC_FILE)) &&
+           (!regexec(filter, path, 0, NULL, 0))) {
+
+           g_fsinfo[fd].event |= (1<<CFG_SRC_FILE);
         }
 
         doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0, NULL);
@@ -3352,7 +3385,7 @@ doCloseAllStreams()
     if (!g_fsinfo) return;
     int i;
     for (i = 0; i < g_cfg.numFSInfo; i++) {
-        if ((g_fsinfo[i].fd != 0) &&
+        if ((g_fsinfo[i].active) &&
             (g_fsinfo[i].type == STREAM)) {
             doClose(i, "fcloseall");
         }
@@ -4440,49 +4473,64 @@ static const char scope_help[] =
 "        Specify a directory from which conf/scope.yml or ./scope.yml can\n"
 "        be found.  Used only at start-time only if SCOPE_CONF_PATH does\n"
 "        not exist.  For more info see Config File Resolution below.\n"
-"    SCOPE_OUT_VERBOSITY\n"
+"    SCOPE_METRIC_VERBOSITY\n"
 "        0-9 are valid values.  Default is 4.\n"
 "        For more info see Verbosity below.\n"
-"    SCOPE_OUT_SUM_PERIOD\n"
-"        Number of seconds between output summarizations.  Default is 10\n"
-"    SCOPE_OUT_DEST\n"
+"    SCOPE_METRIC_DEST\n"
 "        Default is udp://localhost:8125\n"
 "        Format is one of:\n"
 "            file:///tmp/output.log\n"
 "            udp://server:123         (server is servername or address;\n"
 "                                      123 is port number or service name)\n"
-"    SCOPE_OUT_FORMAT\n"
+"    SCOPE_METRIC_FORMAT\n"
 "        metricstatsd, metricjson\n"
 "        Default is metricstatsd\n"
 "    SCOPE_STATSD_PREFIX\n"
 "        Specify a string to be prepended to every scope metric.\n"
 "    SCOPE_STATSD_MAXLEN\n"
 "        Default is 512\n"
+"    SCOPE_SUMMARY_PERIOD\n"
+"        Number of seconds between output summarizations.  Default is 10\n"
 "    SCOPE_EVENT_DEST\n"
-"        same format as SCOPE_OUT_DEST above.\n"
+"        same format as SCOPE_METRIC_DEST above.\n"
 "        Default is tcp://localhost:9109\n"
 "    SCOPE_EVENT_FORMAT\n"
-"        eventjsonrawjson, eventjsonrawstatsd\n"
-"        Default is eventjsonrawjson\n"
+"        ndjson\n"
+"        Default is ndjson\n"
 "    SCOPE_EVENT_LOGFILE\n"
-"        Create events from logs that match SCOPE_EVENT_LOG_FILTER.\n"
+"        Create events from logs that match SCOPE_EVENT_LOGFILE_NAME.\n"
 "        true,false  Default is false.\n"
+"    SCOPE_EVENT_LOGFILE_NAME\n"
+"        An extended regular expression that describes log file names.\n"
+"        Only used if SCOPE_EVENT_LOGFILE is true.  Default is .*log.*\n"
+"    SCOPE_EVENT_LOGFILE_VALUE\n"
+"        An extended regular expression that describes field values.\n"
+"        Only used if SCOPE_EVENT_LOGFILE is true.  Default is .*\n"
 "    SCOPE_EVENT_CONSOLE\n"
 "        Create events from stdout, stderr.\n"
 "        true,false  Default is false.\n"
-"    SCOPE_EVENT_SYSLOG\n"
-"        Create events from syslog, vsyslog functions.\n"
-"        true,false  Default is false.\n"
-"    SCOPE_EVENT_METRICS\n"
+"    SCOPE_EVENT_CONSOLE_NAME\n"
+"        An extended regular expression that includes stdout, stderr.\n"
+"        Only used if SCOPE_EVENT_CONSOLE is true.  Default is .*\n"
+"    SCOPE_EVENT_CONSOLE_VALUE\n"
+"        An extended regular expression that describes field values.\n"
+"        Only used if SCOPE_EVENT_CONSOLE is true.  Default is .*\n"
+"    SCOPE_EVENT_METRIC\n"
 "        Create events from metrics.\n"
 "        true,false  Default is false.\n"
-"    SCOPE_EVENT_LOG_FILTER\n"
-"        An extended regular expression that describes log file names.\n"
-"        Only used if SCOPE_EVENT_LOGFILE is true.  Default is .*log.*\n"
+"    SCOPE_EVENT_METRIC_NAME\n"
+"        An extended regular expression that describes metric names.\n"
+"        Only used if SCOPE_EVENT_METRIC is true.  Default is .*\n"
+"    SCOPE_EVENT_METRIC_FIELD\n"
+"        An extended regular expression that describes field names.\n"
+"        Only used if SCOPE_EVENT_METRIC is true.  Default is .*\n"
+"    SCOPE_EVENT_METRIC_VALUE\n"
+"        An extended regular expression that describes field values.\n"
+"        Only used if SCOPE_EVENT_METRIC is true.  Default is .*\n"
 "    SCOPE_LOG_LEVEL\n"
 "        debug, info, warning, error, none.  Default is error.\n"
 "    SCOPE_LOG_DEST\n"
-"        same format as SCOPE_OUT_DEST above.\n"
+"        same format as SCOPE_METRIC_DEST above.\n"
 "        Default is file:///tmp/scope.log\n"
 "    SCOPE_TAG_\n"
 "        Specify a tag to be applied to every metric.  Environment variable\n"
@@ -4536,7 +4584,7 @@ static const char scope_help[] =
 "    Dynamic Configuration\n"
 "        Dynamic Configuration allows configuration settings to be\n"
 "        changed on the fly after process start-time.  At every\n"
-"        SCOPE_OUT_SUM_PERIOD the library looks in SCOPE_CMD_DIR to\n"
+"        SCOPE_SUMMARY_PERIOD the library looks in SCOPE_CMD_DIR to\n"
 "        see if a file scope.<pid> exists.  If it exists, it processes\n"
 "        every line, looking for environment variable-style commands.\n"
 "        (e.g. SCOPE_CMD_DBG_PATH=/tmp/outfile.txt)  It changes the\n"

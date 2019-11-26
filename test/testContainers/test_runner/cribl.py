@@ -55,16 +55,17 @@ class CriblTCPToFileTest(ApplicationTest):
         out_file_pattern = "/tmp/CriblOut-*.json"
         logging.info(f"Waiting for cribl to output to file {out_file_pattern}")
 
-        result_file_path = self.__wait_for_file(out_file_pattern)
+        result_file_paths = self.__wait_for_files(out_file_pattern)
 
         try:
-            res = self.__validate_results(result_file_path, sent_messages)
+            res = self.__validate_results(result_file_paths, sent_messages)
         finally:
-            os.remove(result_file_path)
+            for path in result_file_paths:
+                os.remove(path)
 
         return res, None
 
-    def __validate_results(self, result_file_path, sent_messages):
+    def __validate_results(self, result_file_paths, sent_messages):
         def read_msg_from_json(msg):
             obj = json.loads(msg)
 
@@ -74,13 +75,14 @@ class CriblTCPToFileTest(ApplicationTest):
                 "count": obj["count"],
             }
 
-        logging.info(f"Reading file {result_file_path}")
         received_messages = []
-        with open(result_file_path, "r") as f:
-            lines = f.readlines()
-            logging.debug("First lines from file:")
-            logging.debug("".join(lines[:5]))
-            received_messages = [read_msg_from_json(l) for l in lines]
+        for path in result_file_paths:
+            logging.info(f"Reading file {path}")
+            with open(path, "r") as f:
+                lines = f.readlines()
+                logging.debug("First lines from file:")
+                logging.debug("".join(lines[:5]))
+                received_messages.extend([read_msg_from_json(l) for l in lines])
 
         logging.info("Validating results")
         return validate_all(
@@ -95,15 +97,12 @@ class CriblTCPToFileTest(ApplicationTest):
         )
 
     @retry(stop_max_attempt_number=7, wait_fixed=20000)
-    def __wait_for_file(self, path):
+    def __wait_for_files(self, path):
         matched_files = glob.glob(path)
         if len(matched_files) == 0:
             raise FileNotFoundError(path)
 
-        if len(matched_files) > 1:
-            raise Exception(f"Expected to find 1 file, but found more {matched_files}")
-
-        return matched_files[0]
+        return matched_files
 
     @property
     def name(self):
@@ -111,6 +110,6 @@ class CriblTCPToFileTest(ApplicationTest):
 
 
 def configure(runner: Runner, config):
-    app_controller = SubprocessAppController(["/opt/cribl/bin/cribld", "server"], "cribl", config.scope_path,
+    app_controller = SubprocessAppController(["/opt/cribl/bin/cribl", "server"], "cribl", config.scope_path,
                                              config.logs_path)
     runner.add_tests([CriblTCPToFileTest(app_controller)])

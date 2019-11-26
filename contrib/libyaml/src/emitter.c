@@ -2060,13 +2060,13 @@ yaml_emitter_write_double_quoted_scalar(yaml_emitter_t *emitter,
 
             switch (value)
             {
-                case 0x00:
-                    if (!PUT(emitter, '0')) return 0;
-                    break;
+                //case 0x00:  JRC - removing illegal json escape characters
+                    //if (!PUT(emitter, '0')) return 0;
+                    //break;
 
-                case 0x07:
-                    if (!PUT(emitter, 'a')) return 0;
-                    break;
+                //case 0x07:  JRC - removing illegal json escape characters
+                    //if (!PUT(emitter, 'a')) return 0;
+                    //break;
 
                 case 0x08:
                     if (!PUT(emitter, 'b')) return 0;
@@ -2080,9 +2080,9 @@ yaml_emitter_write_double_quoted_scalar(yaml_emitter_t *emitter,
                     if (!PUT(emitter, 'n')) return 0;
                     break;
 
-                case 0x0B:
-                    if (!PUT(emitter, 'v')) return 0;
-                    break;
+                //case 0x0B:  JRC - removing illegal json escape characters
+                    //if (!PUT(emitter, 'v')) return 0;
+                    //break;
 
                 case 0x0C:
                     if (!PUT(emitter, 'f')) return 0;
@@ -2092,9 +2092,9 @@ yaml_emitter_write_double_quoted_scalar(yaml_emitter_t *emitter,
                     if (!PUT(emitter, 'r')) return 0;
                     break;
 
-                case 0x1B:
-                    if (!PUT(emitter, 'e')) return 0;
-                    break;
+                //case 0x1B:  JRC - removing illegal json escape characters
+                    //if (!PUT(emitter, 'e')) return 0;
+                    //break;
 
                 case 0x22:
                     if (!PUT(emitter, '\"')) return 0;
@@ -2104,35 +2104,36 @@ yaml_emitter_write_double_quoted_scalar(yaml_emitter_t *emitter,
                     if (!PUT(emitter, '\\')) return 0;
                     break;
 
-                case 0x85:
-                    if (!PUT(emitter, 'N')) return 0;
-                    break;
+                //case 0x85:  JRC - removing illegal json escape characters
+                    //if (!PUT(emitter, 'N')) return 0;
+                    //break;
 
-                case 0xA0:
-                    if (!PUT(emitter, '_')) return 0;
-                    break;
+                //case 0xA0:  JRC - removing illegal json escape characters
+                    //if (!PUT(emitter, '_')) return 0;
+                    //break;
 
-                case 0x2028:
-                    if (!PUT(emitter, 'L')) return 0;
-                    break;
+                //case 0x2028:  JRC - removing illegal json escape characters
+                    //if (!PUT(emitter, 'L')) return 0;
+                    //break;
 
-                case 0x2029:
-                    if (!PUT(emitter, 'P')) return 0;
-                    break;
+                //case 0x2029:  JRC - removing illegal json escape characters
+                    //if (!PUT(emitter, 'P')) return 0;
+                    //break;
 
                 default:
-                    if (value <= 0xFF) {
-                        if (!PUT(emitter, 'x')) return 0;
-                        width = 2;
-                    }
-                    else if (value <= 0xFFFF) {
+                    //if (value <= 0xFF) {  JRC - removing illegal json escape characters
+                        //if (!PUT(emitter, 'x')) return 0;
+                        //width = 2;
+                    //}
+                    //else
+                    if (value <= 0xFFFF) {
                         if (!PUT(emitter, 'u')) return 0;
                         width = 4;
                     }
-                    else {
-                        if (!PUT(emitter, 'U')) return 0;
-                        width = 8;
-                    }
+                    //else {  JRC - removing illegal json escape characters
+                        //if (!PUT(emitter, 'U')) return 0;
+                        //width = 8;
+                    //}
                     for (k = (width-1)*4; k >= 0; k -= 4) {
                         int digit = (value >> k) & 0x0F;
                         if (!PUT(emitter, digit + (digit < 10 ? '0' : 'A'-10)))

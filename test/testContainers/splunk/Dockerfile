@@ -58,10 +58,10 @@ RUN mkdir /opt/test-runner/logs/
 
 ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so
-ENV SCOPE_OUT_DEST=udp://localhost:8125
+ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
-ENV SCOPE_OUT_VERBOSITY=4
+ENV SCOPE_METRIC_VERBOSITY=4
 
 
 COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt

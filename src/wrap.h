@@ -238,7 +238,6 @@ typedef struct {
 
 typedef struct fs_info_t {
     int active;
-    bool event;
     enum fs_type_t type;
     uint64_t numOpen;
     uint64_t numClose;

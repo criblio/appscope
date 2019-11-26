@@ -416,15 +416,17 @@ evtLog(evt_t *evt, const char *host, const char *path,
     event.uid = uid;
 
     msg = fmtEventMessageString(evt->format, &event);
-    // Until we know how to do this with the json lib; new line delimited
-    strcat(msg, "\n");
+    if (!msg) return -1;
 
     regex_t* filter = evtValueFilter(evt, logType);
-    if (msg && filter && regexec(filter, msg, 0, NULL, 0)) {
+    if (filter && regexec(filter, msg, 0, NULL, 0)) {
         // This event doesn't match.  Drop it on the floor.
         free(msg);
         return 0;
     }
+
+    // Until we know how to do this with the json lib; new line delimited
+    strcat(msg, "\n");
 
     if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore

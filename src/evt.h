@@ -7,8 +7,6 @@
 #include "dbg.h"
 #include "circbuf.h"
 
-#define JSON_DEBUG 0
-
 typedef struct _evt_t evt_t;
 
 // Constructors Destructors
@@ -27,6 +25,7 @@ int                 evtMetric(evt_t *, const char *, uint64_t, event_t *);
 int                 evtLog(evt_t *, const char *, const char *, const void *, size_t, uint64_t, cfg_evt_t);
 int                 evtEvents(evt_t *);
 int                 evtNeedsConnection(evt_t *);
+int                 evtConnection(evt_t *);
 
 // Setters (modifies evt_t, but does not persist modifications)
 void                evtTransportSet(evt_t *, transport_t *);

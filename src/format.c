@@ -212,7 +212,7 @@ eventJsonSize(event_format_t *event)
 }
 
 static char *
-fmtEventJson(format_t *fmt, event_format_t *sev)
+fmtEventNdJson(format_t *fmt, event_format_t *sev)
 {
     if (!sev) return NULL;
 
@@ -240,7 +240,8 @@ fmtEventJson(format_t *fmt, event_format_t *sev)
 
     yaml_emitter_set_unicode(&emitter, 1);
 
-    yaml_emitter_set_output_string(&emitter, (yaml_char_t*)buf, bufsize,
+    // subtract 1 from bufsize so we have room to append a newline below.
+    yaml_emitter_set_output_string(&emitter, (yaml_char_t*)buf, bufsize - 1,
                                    &bytes_written);
     emitter_opened = yaml_emitter_open(&emitter);
     if (!emitter_opened) goto cleanup;
@@ -320,6 +321,9 @@ fmtEventJson(format_t *fmt, event_format_t *sev)
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
     everything_successful = 1;
+
+    // Always newline delimited.
+    strcat(buf, "\n");
 
 cleanup:
     if (!everything_successful) {
@@ -587,7 +591,7 @@ fmtEventMessageString(format_t *fmt, event_format_t *evmsg)
 
     switch (fmt->format) {
         case CFG_EVENT_ND_JSON:
-            return fmtEventJson(fmt, evmsg);
+            return fmtEventNdJson(fmt, evmsg);
         default:
             DBG("%d %s", fmt->format, evmsg->src);
             return NULL;

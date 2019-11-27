@@ -1,7 +1,11 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
 #include "evt.h"
+
+#define MAXEVENTS 10
 
 typedef struct {
     int valid;
@@ -211,6 +215,13 @@ evtNeedsConnection(evt_t *evt)
 }
 
 int
+evtConnection(evt_t *evt)
+{
+    if (!evt) return 0;
+    return transportConnection(evt->transport);
+}
+
+int
 evtConnect(evt_t *evt)
 {
     if (!evt) return 0;
@@ -304,6 +315,11 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     event_format_t event;
     struct timeb tb;
     char ts[128];
+    time_t now;
+    static time_t rateTime = 0;
+    static int rate = 0;
+    static int notified = 0;
+    
     regex_t *filter;
 
     if (!evt || !metric || !host || !metric) return -1;
@@ -315,6 +331,33 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
         return -1;
     }
 
+    // rate limited to MAXEVENTS per second
+    if (time(&now) > rateTime) {
+        rateTime = now;
+        rate = notified = 0;
+    } else if (++rate >= MAXEVENTS) {
+        // one notice per truncate
+        if (notified == 0) {
+            char *notice;
+            if ((notice = calloc(1, 512)) == NULL) {
+                DBG(NULL);
+                return -1;
+            }
+
+            notified = 1;
+            ftime(&tb);
+            snprintf(notice, 512,
+                     "{\"_time\":%ld.%03d,\"source\":\"notice\",\"_raw\":\"Truncated metrics. Your rate exceeded %d metrics per second\",\"host\":\"notice\",\"_channel\":\"notice\"}\n",
+                     tb.time, tb.millitm, MAXEVENTS);
+            if (cbufPut(evt->evbuf, (uint64_t)notice) == -1) {
+                // Full; drop and ignore
+                DBG(NULL);
+                free(notice);
+            }
+        }
+        return 0;
+    }
+
     /*
      * Loop through all metric fields for at least one matching field value
      * No match, no metric output
@@ -324,7 +367,7 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     }
 
     ftime(&tb);
-    if (snprintf(ts, sizeof(ts), "%ld.%d", tb.time, tb.millitm) < 0) return -1;
+    if (snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm) < 0) return -1;
     event.timestamp = ts;
     event.timesize = strlen(ts);
 
@@ -339,7 +382,7 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     event.uid = uid;
 
     msg = fmtEventMessageString(evt->format, &event);
-    if (JSON_DEBUG != 0) strcat(msg, "\n");
+    if (!msg) return -1;
 
     if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore
@@ -363,7 +406,7 @@ evtLog(evt_t *evt, const char *host, const char *path,
     if (!evt || !buf || !path || !host) return -1;
 
     ftime(&tb);
-    snprintf(ts, sizeof(ts), "%ld.%d", tb.time, tb.millitm);
+    snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm);
     event.timestamp = ts;
     event.timesize = strlen(ts);
     event.src = path;
@@ -373,9 +416,10 @@ evtLog(evt_t *evt, const char *host, const char *path,
     event.uid = uid;
 
     msg = fmtEventMessageString(evt->format, &event);
+    if (!msg) return -1;
 
     regex_t* filter = evtValueFilter(evt, logType);
-    if (msg && filter && regexec(filter, msg, 0, NULL, 0)) {
+    if (filter && regexec(filter, msg, 0, NULL, 0)) {
         // This event doesn't match.  Drop it on the floor.
         free(msg);
         return 0;
@@ -404,5 +448,6 @@ evtEvents(evt_t *evt)
             free(event);
         }
     }
+
     return 0;
 }

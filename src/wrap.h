@@ -21,6 +21,7 @@
 #include <limits.h>
 #include <sys/syscall.h>
 #include <wchar.h>
+#include <sys/poll.h>
 
 #include <sys/stat.h>
 #if defined(__LINUX__) && defined(__STATX__) && defined(STRUCT_STATX_MISSING_FROM_SYS_STAT_H)
@@ -194,6 +195,7 @@ typedef struct {
 typedef struct rtconfig_t {
     int numNinfo;
     int numFSInfo;
+    int cmdConn;
     bool tsc_invariant;
     bool tsc_rdtscp;
     summary_t summarize;

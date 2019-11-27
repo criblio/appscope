@@ -6,6 +6,7 @@
 #include "dbg.h"
 #include "log.h"
 #include "out.h"
+#include "evt.h"
 #include "scopetypes.h"
 #include "wrap.h"
 
@@ -132,6 +133,79 @@ setVerbosity(rtconfig* c, unsigned verbosity)
 
 
 static void
+remoteConfig()
+{
+    int timeout;
+    struct pollfd fds;
+    int rc, success;
+    FILE *fs;
+    char buf[1024];
+    char path[PATH_MAX];
+    
+    // MS
+    timeout = (g_thread.interval * 1000);
+    bzero(&fds, sizeof(fds));
+    fds.fd = g_cfg.cmdConn;
+    fds.events = POLLIN;
+    rc = poll(&fds, 1, timeout);
+
+    /*
+     * Error from poll;
+     * doing this separtately in order to count errors. Necessary?
+     */
+    if (rc < 0) {
+        DBG(NULL);
+        return;
+    }
+
+    /*
+     * Timeout or no read data?
+     * We can track exceptions where revents != POLLIN. Necessary?
+     */
+    if ((rc == 0) || (fds.revents == 0) || ((fds.revents & POLLIN) == 0) ||
+        ((fds.revents & POLLHUP) != 0) || ((fds.revents & POLLNVAL) != 0)) return;
+
+    snprintf(path, sizeof(path), "/tmp/cfg.%d", g_cfg.pid);
+    if ((fs = g_fn.fopen(path, "a+")) == NULL) {
+        DBG(NULL);
+        scopeLog("ERROR: remoteConfig:fopen", -1, CFG_LOG_ERROR);
+        return;
+    }
+
+    success = rc = errno = 0;
+    do {
+        rc = g_fn.recv(g_cfg.cmdConn, buf, sizeof(buf), MSG_DONTWAIT);
+        /*
+         * TODO: if we get an error, we don't get the whoile file
+         * When we support ndjson look for new line as EOF
+         */
+        if (rc <= 0) {
+            break;
+        }
+
+        if (g_fn.fwrite(buf, rc, (size_t)1, fs) <= 0) {
+            DBG(NULL);
+        } else {
+            success = 1;
+        }
+    } while (1);
+
+    if (success == 1) {
+        if (fflush(fs) != 0) DBG(NULL);
+        rewind(fs);
+
+        // Modify the static config from the command file
+        cfgProcessCommands(g_staticfg, fs);
+        
+        // Apply the config
+        doConfig(g_staticfg);
+    }
+
+    g_fn.fclose(fs);
+    unlink(path);
+}
+
+static void
 doConfig(config_t *cfg)
 {
     // Save the current objects to get cleaned up on the periodic thread
@@ -149,7 +223,8 @@ doConfig(config_t *cfg)
     log_t* log = initLog(cfg);
     g_out = initOut(cfg);
     g_log = log; // Set after initOut to avoid infinite loop with socket
-    g_evt = initEvt(cfg);
+    //g_evt = initEvt(cfg);
+    updateEvt(cfg, g_evt);
 }
 
 // Process dynamic config change if they are available
@@ -382,17 +457,18 @@ doThread()
     
     // Create one thread at most
     if (g_thread.once == TRUE) return;
-
+    
     /*
      * g_thread.startTime is the start time, set in the constructor.
      * This is put in place to work around one of the Chrome sandbox limits.
      * Shouldn't hurt anything else.  
      */
     if (time(NULL) >= g_thread.startTime) {
-        g_thread.once = TRUE;
         if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
             scopeLog("ERROR: doThread:pthread_create", -1, CFG_LOG_ERROR);
+            return;
         }
+        g_thread.once = TRUE;
     }
 }
 
@@ -1764,8 +1840,11 @@ doReset()
 {
     g_cfg.pid = getpid();
     g_thread.once = 0;
-    g_thread.startTime = time(NULL) + g_thread.interval;
+    g_thread.startTime = time(NULL); // + g_thread.interval;
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
+    evtDestroy(&g_evt);
+    g_evt = initEvt(g_staticfg);
+    g_cfg.cmdConn = evtConnection(g_evt);
 }
 
 //
@@ -2089,7 +2168,8 @@ periodic(void *arg)
         }
 
         // From the config file
-        sleep(g_thread.interval);
+        //sleep(g_thread.interval);
+        remoteConfig();
     }
 
     return NULL;
@@ -2272,11 +2352,15 @@ init(void)
     char* path = cfgPath();
     config_t* cfg = cfgRead(path);
     cfgProcessEnvironment(cfg);
+    g_evt = initEvt(cfg);
     doConfig(cfg);
     g_staticfg = cfg;
     if (path) free(path);
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
+
+    g_cfg.cmdConn = evtConnection(g_evt);
+
     scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
     if (atexit(handleExit)) {
         DBG(NULL);

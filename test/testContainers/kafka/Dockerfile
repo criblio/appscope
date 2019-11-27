@@ -12,19 +12,6 @@ RUN mkdir /opt/test-runner/logs/
 
 RUN source scl_source enable rh-python36 && virtualenv /opt/test-runner/
 
-ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
-RUN chmod 755 /usr/lib/libscope.so
-ENV SCOPE_OUT_DEST=udp://localhost:8125
-ENV SCOPE_LOG_LEVEL=info
-ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
-ENV SCOPE_OUT_VERBOSITY=4
-
-COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
-RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
-RUN /opt/test-runner/bin/pip install kafka-python
-
-COPY ./test_runner/ /opt/test-runner/
-
 # The Scala 2.11 build is currently recommended by the project.
 ENV KAFKA_VERSION=2.1.1 KAFKA_SCALA_VERSION=2.11
 ENV KAFKA_RELEASE_ARCHIVE kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz
@@ -54,6 +41,19 @@ ADD ./kafka/config /kafka/config
 RUN groupadd kafka && \
   useradd -d /kafka -g kafka -s /bin/false kafka && \
   chown -R kafka:kafka /kafka /data /logs
+
+ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
+RUN chmod 755 /usr/lib/libscope.so
+ENV SCOPE_OUT_DEST=udp://localhost:8125
+ENV SCOPE_LOG_LEVEL=info
+ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
+ENV SCOPE_OUT_VERBOSITY=4
+
+COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
+RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
+RUN /opt/test-runner/bin/pip install kafka-python
+
+COPY ./test_runner/ /opt/test-runner/
 
 ENV PATH /kafka/bin:$PATH
 WORKDIR /kafka

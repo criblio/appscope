@@ -469,7 +469,7 @@ fmtEventMessageStringValue(void** state)
                               "\"source\":\"stdin\","
                               "\"_raw\":\"поспехаў\","
                               "\"host\":\"earl\","
-                              "\"_channel\":\"14627333968688430831\"}");
+                              "\"_channel\":\"14627333968688430831\"}\n");
 
     //printf("%s\n", str);
     free(str);

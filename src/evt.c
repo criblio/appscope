@@ -347,7 +347,7 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
             notified = 1;
             ftime(&tb);
             snprintf(notice, 512,
-                     "{\"_time\":%ld.%d,\"source\":\"notice\",\"_raw\":\"Truncated metrics. Your rate exceeded %d metrics per second\",\"host\":\"notice\",\"_channel\":\"notice\"}\n",
+                     "{\"_time\":%ld.%03d,\"source\":\"notice\",\"_raw\":\"Truncated metrics. Your rate exceeded %d metrics per second\",\"host\":\"notice\",\"_channel\":\"notice\"}\n",
                      tb.time, tb.millitm, MAXEVENTS);
             if (cbufPut(evt->evbuf, (uint64_t)notice) == -1) {
                 // Full; drop and ignore
@@ -367,7 +367,7 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     }
 
     ftime(&tb);
-    if (snprintf(ts, sizeof(ts), "%ld.%d", tb.time, tb.millitm) < 0) return -1;
+    if (snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm) < 0) return -1;
     event.timestamp = ts;
     event.timesize = strlen(ts);
 
@@ -383,8 +383,6 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
 
     msg = fmtEventMessageString(evt->format, &event);
     if (!msg) return -1;
-    // Until we know how to do this with the json lib; new line delimited
-    strcat(msg, "\n");
 
     if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore
@@ -408,7 +406,7 @@ evtLog(evt_t *evt, const char *host, const char *path,
     if (!evt || !buf || !path || !host) return -1;
 
     ftime(&tb);
-    snprintf(ts, sizeof(ts), "%ld.%d", tb.time, tb.millitm);
+    snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm);
     event.timestamp = ts;
     event.timesize = strlen(ts);
     event.src = path;
@@ -426,9 +424,6 @@ evtLog(evt_t *evt, const char *host, const char *path,
         free(msg);
         return 0;
     }
-
-    // Until we know how to do this with the json lib; new line delimited
-    strcat(msg, "\n");
 
     if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore

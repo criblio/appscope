@@ -108,6 +108,14 @@ placeDescriptor(int fd, transport_t *t)
 }
 
 int
+transportConnection(transport_t *trans)
+{
+    if (!trans) return 0;
+
+    return trans->net.sock;
+}
+
+int
 transportNeedsConnection(transport_t *trans)
 {
     if (!trans) return 0;

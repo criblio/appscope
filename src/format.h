@@ -1,7 +1,7 @@
 #ifndef __FORMAT_H__
 #define __FORMAT_H__
-#include <regex.h>
 
+#include <regex.h>
 #include "scopetypes.h"
 #include "cfg.h"
 
@@ -57,11 +57,10 @@ const char*         fmtStatsDPrefix(format_t*);
 unsigned            fmtStatsDMaxLen(format_t*);
 unsigned            fmtOutVerbosity(format_t*);
 custom_tag_t**      fmtCustomTags(format_t*);
-regex_t *           fmtMetricFieldFilter(format_t *);
 
 // fmtString returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
-char*               fmtString(format_t*, event_t*);
+char*               fmtString(format_t*, event_t*, regex_t*);
 char *              fmtEventMessageString(format_t *, event_format_t *);
 
 // Setters
@@ -69,5 +68,4 @@ void                fmtStatsDPrefixSet(format_t*, const char*);
 void                fmtStatsDMaxLenSet(format_t*, unsigned);
 void                fmtOutVerbositySet(format_t*, unsigned);
 void                fmtCustomTagsSet(format_t*, custom_tag_t**);
-void                fmtMetricFieldFilterSet(format_t *, regex_t *);
 #endif // __FORMAT_H__

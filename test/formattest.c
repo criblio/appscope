@@ -129,7 +129,7 @@ static void
 fmtStringStatsDNullEventDoesntCrash(void** state)
 {
     format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
-    assert_null(fmtString(fmt, NULL));
+    assert_null(fmtString(fmt, NULL, NULL));
     fmtDestroy(&fmt);
 }
 
@@ -139,7 +139,7 @@ fmtStringStatsDNullEventFieldsDoesntCrash(void** state)
     event_t e = {"useful.apps", 1, CURRENT, NULL};
 
     format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
-    char* msg = fmtString(fmt, &e);
+    char* msg = fmtString(fmt, &e, NULL);
     assert_string_equal(msg, "useful.apps:1|g\n");
     if (msg) free(msg);
     fmtDestroy(&fmt);
@@ -154,7 +154,7 @@ fmtStringNullFmtDoesntCrash(void** state)
     };
     event_t e = {"useful.apps", 1, CURRENT, fields};
 
-    assert_null(fmtString(NULL, &e));
+    assert_null(fmtString(NULL, &e, NULL));
 }
 
 static void
@@ -183,7 +183,7 @@ fmtStringStatsDHappyPath(void** state)
     assert_non_null(fmt);
     fmtOutVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
-    char* msg = fmtString(fmt, &e);
+    char* msg = fmtString(fmt, &e, NULL);
     assert_non_null(msg);
 
     char expected[1024];
@@ -194,6 +194,52 @@ fmtStringStatsDHappyPath(void** state)
     assert_string_equal(expected, msg);
     free(msg);
 
+    fmtDestroy(&fmt);
+    assert_null(fmt);
+}
+
+static void
+fmtStringStatsDHappyPathFilteredFields(void** state)
+{
+    char* g_hostname = "myhost";
+    char* g_procname = "testapp";
+    int g_openPorts = 2;
+    pid_t pid = 666;
+    int fd = 3;
+    char* proto = "TCP";
+    in_port_t localPort = 8125;
+
+    event_field_t fields[] = {
+        STRFIELD("proc",             g_procname,            2),
+        NUMFIELD("pid",              pid,                   7),
+        NUMFIELD("fd",               fd,                    7),
+        STRFIELD("host",             g_hostname,            2),
+        STRFIELD("proto",            proto,                 1),
+        NUMFIELD("port",             localPort,             4),
+        FIELDEND
+    };
+    event_t e = {"net.port", g_openPorts, CURRENT, fields};
+
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
+    assert_non_null(fmt);
+    fmtOutVerbositySet(fmt, CFG_MAX_VERBOSITY);
+
+    regex_t re;
+    assert_int_equal(regcomp(&re, "^[p]", REG_EXTENDED), 0);
+
+    char* msg = fmtString(fmt, &e, &re);
+    assert_non_null(msg);
+
+
+    char expected[1024];
+    int rv = snprintf(expected, sizeof(expected),
+        "net.port:%d|g|#proc:%s,pid:%d,proto:%s,port:%d\n",
+         g_openPorts, g_procname, pid, proto, localPort);
+    assert_true(rv > 0 && rv < 1024);
+    assert_string_equal(expected, msg);
+    free(msg);
+
+    regfree(&re);
     fmtDestroy(&fmt);
     assert_null(fmt);
 }
@@ -211,7 +257,7 @@ fmtStatsDWithCustomFields(void** state)
 
     event_t e = {"statsd.metric", 3, CURRENT, NULL};
 
-    char* msg = fmtString(fmt, &e);
+    char* msg = fmtString(fmt, &e, NULL);
     assert_non_null(msg);
 
     assert_string_equal("statsd.metric:3|g|#name1:value1,name2:value2\n", msg);
@@ -235,7 +281,7 @@ fmtStatsDWithCustomAndStatsdFields(void** state)
     };
     event_t e = {"fs.read", 3, CURRENT, fields};
 
-    char* msg = fmtString(fmt, &e);
+    char* msg = fmtString(fmt, &e, NULL);
     assert_non_null(msg);
 
     assert_string_equal("fs.read:3|g|#tag:value,proc:test\n", msg);
@@ -252,14 +298,14 @@ fmtStringStatsDReturnsNullIfSpaceIsInsufficient(void** state)
 
     // Test one that just fits
     event_t e1 = {"A", -1234567890123456789, DELTA_MS, NULL};
-    char* msg = fmtString(fmt, &e1);
+    char* msg = fmtString(fmt, &e1, NULL);
     assert_string_equal(msg, "98A:-1234567890123456789|ms\n");
     assert_true(strlen(msg) == 28);
     free(msg);
 
     // One character too much (longer name)
     event_t e2 = {"AB", e1.value, e1.type, e1.fields};
-    msg = fmtString(fmt, &e2);
+    msg = fmtString(fmt, &e2, NULL);
     assert_null(msg);
     fmtDestroy(&fmt);
 }
@@ -272,7 +318,7 @@ fmtStringStatsDVerifyEachStatsDType(void** state)
     data_type_t t;
     for (t=DELTA; t<=SET; t++) {
         event_t e = {"A", 1, t, NULL};
-        char* msg = fmtString(fmt, &e);
+        char* msg = fmtString(fmt, &e, NULL);
         switch (t) {
             case DELTA:
                 assert_string_equal(msg, "A:1|c\n");
@@ -297,7 +343,7 @@ fmtStringStatsDVerifyEachStatsDType(void** state)
 
     // In undefined case, just don't crash...
     event_t e = {"A", 1, SET+1, NULL};
-    char* msg = fmtString(fmt, &e);
+    char* msg = fmtString(fmt, &e, NULL);
     if (msg) free(msg);
 
     assert_int_equal(dbgCountMatchingLines("src/format.c"), 1);
@@ -331,7 +377,7 @@ fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient(void** state)
     // fmtStatsDMaxLen.
 
     fmtStatsDMaxLenSet(fmt, 31);
-    char* msg = fmtString(fmt, &e);
+    char* msg = fmtString(fmt, &e, NULL);
     assert_non_null(msg);
     //                                 1111111111222222222233
     //                        1234567890123456789012345678901
@@ -340,7 +386,7 @@ fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient(void** state)
     free(msg);
 
     fmtStatsDMaxLenSet(fmt, 32);
-    msg = fmtString(fmt, &e);
+    msg = fmtString(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#J:222,I:V,H:111,G:W\n");
     free(msg);
@@ -368,19 +414,19 @@ fmtStringStatsDHonorsCardinality(void** state)
     format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
 
     fmtOutVerbositySet(fmt, 0);
-    char* msg = fmtString(fmt, &e);
+    char* msg = fmtString(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#A:Z\n");
     free(msg);
 
     fmtOutVerbositySet(fmt, 5);
-    msg = fmtString(fmt, &e);
+    msg = fmtString(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#A:Z,B:987,C:Y,D:654,E:X,F:321\n");
     free(msg);
 
     fmtOutVerbositySet(fmt, 9);
-    msg = fmtString(fmt, &e);
+    msg = fmtString(fmt, &e, NULL);
     assert_non_null(msg);
     // Verify every name is there, 10 in total
     int count =0;
@@ -398,7 +444,7 @@ fmtStringStatsDHonorsCardinality(void** state)
 static void
 fmtEventMessageStringValue(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EVENT_JSON_RAW_JSON);
+    format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
     assert_non_null(fmt);
 
     event_format_t event_format;
@@ -423,7 +469,7 @@ fmtEventMessageStringValue(void** state)
                               "\"source\":\"stdin\","
                               "\"_raw\":\"поспехаў\","
                               "\"host\":\"earl\","
-                              "\"_channel\":\"14627333968688430831\"}");
+                              "\"_channel\":\"14627333968688430831\"}\n");
 
     //printf("%s\n", str);
     free(str);
@@ -450,7 +496,7 @@ fmtStringMetricJsonNoFields(void** state)
                  "\"_value\":1}", map[type]), errno);
 
         event_t e = {"A", 1, type, NULL};
-        char* actual = fmtString(fmt, &e);
+        char* actual = fmtString(fmt, &e, NULL);
         assert_string_equal(actual, expected);
         if (actual) free(actual);
     }
@@ -469,7 +515,7 @@ fmtStringMetricJsonWFields(void** state)
         FIELDEND
     };
     event_t e = {"hey", 2, HISTOGRAM, fields};
-    char* str = fmtString(fmt, &e);
+    char* str = fmtString(fmt, &e, NULL);
     assert_string_equal(str,
                  "{\"_metric\":\"hey\","
                  "\"_metric_type\":\"histogram\","
@@ -480,12 +526,37 @@ fmtStringMetricJsonWFields(void** state)
 }
 
 static void
+fmtStringMetricJsonWFilteredFields(void** state)
+{
+    format_t* fmt = fmtCreate(CFG_METRIC_JSON);
+    event_field_t fields[] = {
+        STRFIELD("A",               "Z",                    0),
+        NUMFIELD("B",               987,                    1),
+        STRFIELD("C",               "Y",                    2),
+        NUMFIELD("D",               654,                    3),
+        FIELDEND
+    };
+    event_t e = {"hey", 2, HISTOGRAM, fields};
+    regex_t re;
+    assert_int_equal(regcomp(&re, "[AD]", REG_EXTENDED), 0);
+    char* str = fmtString(fmt, &e, &re);
+    assert_string_equal(str,
+                 "{\"_metric\":\"hey\","
+                 "\"_metric_type\":\"histogram\","
+                 "\"_value\":2,"
+                 "\"A\":\"Z\",\"D\":654}");
+    if (str) free(str);
+    regfree(&re);
+    fmtDestroy(&fmt);
+}
+
+static void
 fmtStringMetricJsonEscapedValues(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_EVENT_JSON_RAW_JSON);
+    format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
     {
         event_t e = {"Paç \"fat!", 3, SET, NULL};    // embedded double quote
-        char* str = fmtString(fmt, &e);
+        char* str = fmtString(fmt, &e, NULL);
         assert_string_equal(str,
                  "{\"_metric\":\"Paç \\\"fat!\","
                  "\"_metric_type\":\"set\","
@@ -500,7 +571,7 @@ fmtStringMetricJsonEscapedValues(void** state)
             FIELDEND
         };
         event_t e = {"you", 4, DELTA, fields};
-        char* str = fmtString(fmt, &e);
+        char* str = fmtString(fmt, &e, NULL);
         assert_string_equal(str,
                  "{\"_metric\":\"you\","
                  "\"_metric_type\":\"counter\","
@@ -530,6 +601,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtStringStatsDNullEventFieldsDoesntCrash),
         cmocka_unit_test(fmtStringNullFmtDoesntCrash),
         cmocka_unit_test(fmtStringStatsDHappyPath),
+        cmocka_unit_test(fmtStringStatsDHappyPathFilteredFields),
         cmocka_unit_test(fmtStatsDWithCustomFields),
         cmocka_unit_test(fmtStatsDWithCustomAndStatsdFields),
         cmocka_unit_test(fmtStringStatsDReturnsNullIfSpaceIsInsufficient),
@@ -539,6 +611,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtEventMessageStringValue),
         cmocka_unit_test(fmtStringMetricJsonNoFields),
         cmocka_unit_test(fmtStringMetricJsonWFields),
+        cmocka_unit_test(fmtStringMetricJsonWFilteredFields),
         cmocka_unit_test(fmtStringMetricJsonEscapedValues),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };

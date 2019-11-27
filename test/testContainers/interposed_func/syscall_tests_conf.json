@@ -102,6 +102,7 @@
         "fork14",
         "sendfile09_64",
         "sendfile09",
+        "creat07",
         "sendmsg02"
       ]
     },

@@ -1,0 +1,36 @@
+jobs:
+  - job: ${{ parameters.name }}_test
+    displayName: Run ${{ parameters.name }} tests
+    pool:
+      vmImage: 'ubuntu-16.04'
+    steps:
+      - script: docker login -u $HUB_USERNAME  --password-stdin <<< $HUB_PASSWORD
+        displayName: Login to Docker
+        env:
+          HUB_USERNAME: $(dockerhub.username)
+          HUB_PASSWORD: $(dockerhub.password)
+      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml pull ${{ parameters.containerName }}
+        displayName: Pull previous image
+        continueOnError: true
+        workingDirectory: ./test/testContainers/
+      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml build ${{ parameters.containerName }}
+        displayName: Build image
+        workingDirectory: ./test/testContainers/
+      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml run  ${{ parameters.containerName }}
+        displayName: Run tests
+        workingDirectory: ./test/testContainers/
+      - task: CopyFiles@2
+        condition: always()
+        inputs:
+          contents: test/testContainers/logs/**
+          targetFolder: $(Build.ArtifactStagingDirectory)
+      - task: PublishBuildArtifacts@1
+        inputs:
+          pathToPublish: $(Build.ArtifactStagingDirectory)
+          artifactName: ${{ parameters.name }}ITOut
+      - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml push ${{ parameters.containerName }}
+        displayName: Push image to Docker
+        continueOnError: true
+        workingDirectory: ./test/testContainers/
+      - script: docker logout
+        displayName: Logout from Docker

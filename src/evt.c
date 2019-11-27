@@ -345,9 +345,10 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
             }
 
             notified = 1;
+            ftime(&tb);
             snprintf(notice, 512,
-                     "{\"_time\":%ld,\"source\":\"notice\",\"_raw\":\"Truncated metrics. Your rate exceeded %d metrics per second\",\"host\":\"notice\",\"_channel\":\"notice\"}\n",
-                     now, MAXEVENTS);
+                     "{\"_time\":%ld.%d,\"source\":\"notice\",\"_raw\":\"Truncated metrics. Your rate exceeded %d metrics per second\",\"host\":\"notice\",\"_channel\":\"notice\"}\n",
+                     tb.time, tb.millitm, MAXEVENTS);
             if (cbufPut(evt->evbuf, (uint64_t)notice) == -1) {
                 // Full; drop and ignore
                 DBG(NULL);
@@ -381,6 +382,7 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     event.uid = uid;
 
     msg = fmtEventMessageString(evt->format, &event);
+    if (!msg) return -1;
     // Until we know how to do this with the json lib; new line delimited
     strcat(msg, "\n");
 

@@ -165,7 +165,7 @@ remoteConfig()
     if ((rc == 0) || (fds.revents == 0) || ((fds.revents & POLLIN) == 0) ||
         ((fds.revents & POLLHUP) != 0) || ((fds.revents & POLLNVAL) != 0)) return;
 
-    strncpy(path, "/tmp/cfg", sizeof(path));
+    snprintf(path, sizeof(path), "/tmp/cfg.%d", g_cfg.pid);
     if ((fs = g_fn.fopen(path, "a+")) == NULL) {
         DBG(NULL);
         scopeLog("ERROR: remoteConfig:fopen", -1, CFG_LOG_ERROR);
@@ -191,7 +191,7 @@ remoteConfig()
     } while (1);
 
     if (success == 1) {
-        fflush(fs);
+        if (fflush(fs) != 0) DBG(NULL);
         rewind(fs);
 
         // Modify the static config from the command file

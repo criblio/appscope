@@ -5,9 +5,9 @@ from datetime import datetime
 
 import cribl
 import elastic
+import kafka_test
 import nginx
 import splunk
-import kafka
 import syscalls
 from reporting import print_summary, store_results_to_file
 from runner import Runner
@@ -63,7 +63,7 @@ def main():
             if args.target == 'elastic':
                 elastic.configure(runner, args)
             if args.target == 'kafka':
-                kafka.configure(runner, args)
+                kafka_test.configure(runner, args)
             runner.run()
             test_watcher.finish()
         except Exception as e:

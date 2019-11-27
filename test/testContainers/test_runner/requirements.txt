@@ -2,3 +2,4 @@ tabulate
 splunk-sdk
 retrying
 elasticsearch
+kafka

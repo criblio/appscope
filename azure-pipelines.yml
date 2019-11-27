@@ -1,63 +1,63 @@
 stages:
-  - stage: build
-    displayName: Build Scope application
-    jobs:
-      - job: BuildInVM
-        timeoutInMinutes: 10
-        strategy:
-          matrix:
-            ubuntu16_04:
-              imageName: 'ubuntu-16.04'
-            mac10_14:
-              imageName: 'macos-10.14'
-        #      windows_2017:
-        #        imageName: 'vs2017-win2016'
-        #      windows_2015:
-        #        imageName: 'vs2017-win2016'
-        #      alpine:
-        #        imageName: 'ubuntu-16.04'
-        pool:
-          vmImage: $(imageName)
-        steps:
-          - task: ShellScript@2
-            displayName: Install dependencies
-            inputs:
-              scriptPath: ./install_build_tools.sh
-          - script: make all
-            displayName: Build all
-          - script: make test
-            displayName: Run tests
-          #- job: BuildInContainer
-          #  timeoutInMinutes: 10
-          #  pool:
-          #    vmImage: 'ubuntu-16.04'
-          #  strategy:
-          #    matrix:
-          #      centos7_6:
-          #        containerImage: centos:centos7.6.1810 #https://hub.docker.com/_/centos/
-          #      ubuntu18_04:
-          #        containerImage: ubuntu:bionic-20190612 #https://hub.docker.com/_/ubuntu/
-          #  container: $[ variables['containerImage'] ]
-          #  steps:
-          #  - script: ./scope.sh build
-          #    displayName: scope.sh build
-          - task: S3Upload@1
-            condition: succeeded()
-            inputs:
-              awsCredentials: 'azure-pipeline-aws'
-              regionName: 'us-west-2'
-              bucketName: 'cdn.cribl.io'
-              sourceFolder: 'lib/'
-              globExpressions: '**/*.so'
-              ${{ if eq(variables['Build.SourceBranchName'], 'master') }}:
-                targetFolder: 'dl/scope/latest/'
-              ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:
-                targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
-              filesAcl: 'public-read'
+#  - stage: build
+  #    displayName: Build Scope application
+  #    jobs:
+  #      - job: BuildInVM
+  #        timeoutInMinutes: 10
+  #        strategy:
+  #          matrix:
+  #            ubuntu16_04:
+  #              imageName: 'ubuntu-16.04'
+  #            mac10_14:
+  #              imageName: 'macos-10.14'
+  #        #      windows_2017:
+  #        #        imageName: 'vs2017-win2016'
+  #        #      windows_2015:
+  #        #        imageName: 'vs2017-win2016'
+  #        #      alpine:
+  #        #        imageName: 'ubuntu-16.04'
+  #        pool:
+  #          vmImage: $(imageName)
+  #        steps:
+  #          - task: ShellScript@2
+  #            displayName: Install dependencies
+  #            inputs:
+  #              scriptPath: ./install_build_tools.sh
+  #          - script: make all
+  #            displayName: Build all
+  #          - script: make test
+  #            displayName: Run tests
+  #          #- job: BuildInContainer
+  #          #  timeoutInMinutes: 10
+  #          #  pool:
+  #          #    vmImage: 'ubuntu-16.04'
+  #          #  strategy:
+  #          #    matrix:
+  #          #      centos7_6:
+  #          #        containerImage: centos:centos7.6.1810 #https://hub.docker.com/_/centos/
+  #          #      ubuntu18_04:
+  #          #        containerImage: ubuntu:bionic-20190612 #https://hub.docker.com/_/ubuntu/
+  #          #  container: $[ variables['containerImage'] ]
+  #          #  steps:
+  #          #  - script: ./scope.sh build
+  #          #    displayName: scope.sh build
+  #          - task: S3Upload@1
+  #            condition: succeeded()
+  #            inputs:
+  #              awsCredentials: 'azure-pipeline-aws'
+  #              regionName: 'us-west-2'
+  #              bucketName: 'cdn.cribl.io'
+  #              sourceFolder: 'lib/'
+  #              globExpressions: '**/*.so'
+  #              ${{ if eq(variables['Build.SourceBranchName'], 'master') }}:
+  #                targetFolder: 'dl/scope/latest/'
+  #              ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:
+  #                targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
+  #              filesAcl: 'public-read'
   - stage: integration_tests
     displayName: Run integraion tests
-    dependsOn: build
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+    #    dependsOn: build
+    #    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
     jobs:
       - template: test/testContainers/azure/it-test-job-template.yml
         parameters:
@@ -78,3 +78,13 @@ stages:
         parameters:
           name: splunk
           containerName: splunk
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: elastic
+          containerName: elastic
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: kafka
+          containerName: kafka

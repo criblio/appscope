@@ -26,6 +26,24 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
 
+  elastic:
+    build:
+      cache_from:
+        - criblci/scope-elastic-it:latest
+    image: criblci/scope-elastic-it
+    command: -v
+    volumes:
+      - ./logs:/opt/test-runner/logs
+
+  kafka:
+    build:
+      cache_from:
+        - criblci/scope-kafka-it:latest
+    image: criblci/scope-kafka-it
+    command: -v
+    volumes:
+      - ./logs:/opt/test-runner/logs
+
   interposed_func:
     build:
       cache_from:

@@ -25,3 +25,8 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
 
+  kafka:
+    command: -v
+    volumes:
+      - ./logs:/opt/test-runner/logs
+

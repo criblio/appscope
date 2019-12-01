@@ -700,6 +700,28 @@ processTransport(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         processKeyValuePair(t, pair, config, doc);
     }
 }
+
+static void
+processTransportMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    transport_context = CFG_OUT;
+    processTransport(config, doc, node);
+}
+
+static void
+processTransportLog(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    transport_context = CFG_LOG;
+    processTransport(config, doc, node);
+}
+
+static void
+processTransportCtl(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    transport_context = CFG_CTL;
+    processTransport(config, doc, node);
+}
+
 static void
 processLogging(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
@@ -707,12 +729,9 @@ processLogging(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,  "level",      processLevel},
-        {YAML_MAPPING_NODE, "transport",  processTransport},
+        {YAML_MAPPING_NODE, "transport",  processTransportLog},
         {YAML_NO_NODE, NULL, NULL}
     };
-
-    // Remember that we're currently processing logging
-    transport_context = CFG_LOG;
 
     yaml_node_pair_t* pair;
     foreach(pair, node->data.mapping.pairs) {
@@ -744,14 +763,18 @@ processTags(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processFormatType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processFormatTypeMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
-    if (transport_context == CFG_OUT) {
-        cfgOutFormatSetFromStr(config, value);
-    } else if (transport_context == CFG_CTL) {
-        cfgEventFormatSetFromStr(config, value);
-    }
+    cfgOutFormatSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
+processFormatTypeEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char* value = stringVal(node);
+    cfgEventFormatSetFromStr(config, value);
     if (value) free(value);
 }
 
@@ -785,7 +808,7 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "type",            processFormatType},
+        {YAML_SCALAR_NODE,  "type",            processFormatTypeMetric},
         {YAML_SCALAR_NODE,  "statsdprefix",    processStatsDPrefix},
         {YAML_SCALAR_NODE,  "statsdmaxlen",    processStatsDMaxLen},
         {YAML_SCALAR_NODE,  "verbosity",       processVerbosity},
@@ -822,12 +845,9 @@ processMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     parse_table_t t[] = {
         {YAML_MAPPING_NODE, "format",          processFormat},
-        {YAML_MAPPING_NODE, "transport",       processTransport},
+        {YAML_MAPPING_NODE, "transport",       processTransportMetric},
         {YAML_NO_NODE, NULL, NULL}
     };
-
-    // Remember that we're currently processing output
-    transport_context = CFG_OUT;
 
     yaml_node_pair_t* pair;
     foreach(pair, node->data.mapping.pairs) {
@@ -841,7 +861,7 @@ processEvtFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "type",            processFormatType},
+        {YAML_SCALAR_NODE,  "type",            processFormatTypeEvent},
         {YAML_NO_NODE, NULL, NULL}
     };
 
@@ -965,13 +985,9 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     parse_table_t t[] = {
         {YAML_MAPPING_NODE, "format",          processEvtFormat},
-        {YAML_MAPPING_NODE, "transport",       processTransport},
         {YAML_SEQUENCE_NODE,"watch",           processWatch},
         {YAML_NO_NODE, NULL, NULL}
     };
-
-    // Remember that we're currently processing event
-    transport_context = CFG_CTL;
 
     yaml_node_pair_t* pair;
     foreach(pair, node->data.mapping.pairs) {
@@ -985,6 +1001,7 @@ processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
+        {YAML_MAPPING_NODE, "transport",       processTransportCtl},
         {YAML_MAPPING_NODE, "log",             processLogging},
         {YAML_SCALAR_NODE,  "summaryperiod",   processSummaryPeriod},
         {YAML_SCALAR_NODE,  "commanddir",      processCommandDir},

@@ -302,7 +302,7 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
     } else if (startsWith(env_line, "SCOPE_CMD_DBG_PATH")) {
         processCmdDebug(value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DEST")) {
-        cfgTransportSetFromStr(cfg, CFG_EVT, value);
+        cfgTransportSetFromStr(cfg, CFG_CTL, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
         cfgEventFormatSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_NAME")) {
@@ -749,7 +749,7 @@ processFormatType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char* value = stringVal(node);
     if (transport_context == CFG_OUT) {
         cfgOutFormatSetFromStr(config, value);
-    } else if (transport_context == CFG_EVT) {
+    } else if (transport_context == CFG_CTL) {
         cfgEventFormatSetFromStr(config, value);
     }
     if (value) free(value);
@@ -971,7 +971,7 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     };
 
     // Remember that we're currently processing event
-    transport_context = CFG_EVT;
+    transport_context = CFG_CTL;
 
     yaml_node_pair_t* pair;
     foreach(pair, node->data.mapping.pairs) {
@@ -1178,7 +1178,7 @@ initCtl(config_t *cfg)
      * at this point. If so, it will connect later. As such,
      * it should not be treated as fatal.
      */
-    transport_t *trans = initTransport(cfg, CFG_EVT);
+    transport_t *trans = initTransport(cfg, CFG_CTL);
     if (!trans) {
         ctlDestroy(&ctl);
         return ctl;

@@ -195,7 +195,6 @@ typedef struct {
 typedef struct rtconfig_t {
     int numNinfo;
     int numFSInfo;
-    int cmdConn;
     bool tsc_invariant;
     bool tsc_rdtscp;
     summary_t summarize;

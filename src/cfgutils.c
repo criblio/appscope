@@ -1149,24 +1149,11 @@ initEvt(config_t *cfg)
     evt_t *evt = evtCreate();
     if (!evt) return evt;
 
-    /*
-     * If the transport is TCP, the transport may not connect
-     * at this point. If so, it will connect later. As such,
-     * it should not be treated as fatal.
-     */
-    transport_t *trans = initTransport(cfg, CFG_EVT);
-    if (!trans) {
-        evtDestroy(&evt);
-        return evt;
-    }
-    evtTransportSet(evt, trans);
-
     format_t *fmt = fmtCreate(cfgEventFormat(cfg));
     if (!fmt) {
         evtDestroy(&evt);
         return evt;
     }
-
     evtFormatSet(evt, fmt);
 
     cfg_evt_t src;
@@ -1180,18 +1167,23 @@ initEvt(config_t *cfg)
     return evt;
 }
 
-int
-updateEvt(config_t *cfg, evt_t *evt)
+ctl_t*
+initCtl(config_t *cfg)
 {
-    if (!cfg || !evt) return -1;
+    ctl_t *ctl = ctlCreate();
+    if (!ctl) return ctl;
 
-    cfg_evt_t src;
-    for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
-        evtSourceEnabledSet(evt, src, cfgEventSourceEnabled(cfg, src));
-        evtNameFilterSet(evt, src, cfgEventNameFilter(cfg, src));
-        evtFieldFilterSet(evt, src, cfgEventFieldFilter(cfg, src));
-        evtValueFilterSet(evt, src, cfgEventValueFilter(cfg, src));
+    /*
+     * If the transport is TCP, the transport may not connect
+     * at this point. If so, it will connect later. As such,
+     * it should not be treated as fatal.
+     */
+    transport_t *trans = initTransport(cfg, CFG_EVT);
+    if (!trans) {
+        ctlDestroy(&ctl);
+        return ctl;
     }
+    ctlTransportSet(ctl, trans);
 
-    return 0;
+    return ctl;
 }

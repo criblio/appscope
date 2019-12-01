@@ -24,97 +24,37 @@ evtDestroyNullOutDoesntCrash(void** state)
 }
 
 static void
-evtSendForNullOutDoesntCrash(void** state)
-{
-    const char* msg = "Hey, this is cool!\n";
-    assert_int_equal(evtSend(NULL, msg), -1);
-}
-
-static void
-evtSendForNullMessageDoesntCrash(void** state)
-{
-    evt_t* evt = evtCreate();
-    assert_non_null(evt);
-    transport_t* t = transportCreateSyslog();
-    assert_non_null(t);
-    evtTransportSet(evt, t);
-    assert_int_equal(evtSend(evt, NULL), -1);
-    evtDestroy(&evt);
-}
-
-static void
-evtTransportSetAndOutSend(void** state)
-{
-    const char* file_path = "/tmp/my.path";
-    evt_t* evt = evtCreate();
-    assert_non_null(evt);
-    transport_t* t1 = transportCreateUdp("127.0.0.1", "12345");
-    transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
-    transport_t* t3 = transportCreateSyslog();
-    transport_t* t4 = transportCreateShm();
-    transport_t* t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
-    evtTransportSet(evt, t1);
-    evtTransportSet(evt, t2);
-    evtTransportSet(evt, t3);
-    evtTransportSet(evt, t4);
-    evtTransportSet(evt, t5);
-
-    // Test that transport is set by testing side effects of evtSend
-    // affecting the file at file_path when connected to a file transport.
-    long file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(evtSend(evt, "Something to send\n"), 0);
-
-    // With CFG_BUFFER_FULLY, this output only happens with the flush
-    long file_pos_after = fileEndPosition(file_path);
-    assert_int_equal(file_pos_before, file_pos_after);
-
-    evtFlush(evt);
-    file_pos_after = fileEndPosition(file_path);
-    assert_int_not_equal(file_pos_before, file_pos_after);
-
-    // Test that transport is cleared by seeing no side effects.
-    evtTransportSet(evt, NULL);
-    file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(evtSend(evt, "Something to send\n"), -1);
-    file_pos_after = fileEndPosition(file_path);
-    assert_int_equal(file_pos_before, file_pos_after);
-
-    if (unlink(file_path))
-        fail_msg("Couldn't delete file %s", file_path);
-
-    evtDestroy(&evt);
-}
-
-static void
 evtFormatSetAndOutSendEvent(void** state)
 {
-    const char* file_path = "/tmp/my.path";
     evt_t* evt = evtCreate();
     assert_non_null(evt);
-    transport_t* t = transportCreateFile(file_path, CFG_BUFFER_LINE);
-    evtTransportSet(evt, t);
 
-    event_t e = {"A", 1, DELTA, NULL};
     format_t* f = fmtCreate(CFG_METRIC_STATSD);
     evtFormatSet(evt, f);
 
-    // Test that format is set by testing side effects of evtSendEvent
+/*  TBD
+
+    const char* file_path = "/tmp/my.path";
+    event_t e = {"A", 1, DELTA, NULL};
+
+    // Test that format is set by testing side effects of ctlSendEvent
     // affecting the file at file_path when connected to format.
     long file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(evtSendEvent(evt, &e), 0);
+    assert_int_equal(ctlSendEvent(evt, &e), 0);
     long file_pos_after = fileEndPosition(file_path);
     assert_int_not_equal(file_pos_before, file_pos_after);
 
     // Test that format is cleared by seeing no side effects.
     evtFormatSet(evt, NULL);
     file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(evtSendEvent(evt, &e), -1);
+    assert_int_equal(ctlSendEvent(evt, &e), -1);
     file_pos_after = fileEndPosition(file_path);
     assert_int_equal(file_pos_before, file_pos_after);
 
     if (unlink(file_path))
         fail_msg("Couldn't delete file %s", file_path);
 
+*/
     evtDestroy(&evt);
 }
 
@@ -304,15 +244,12 @@ main(int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(evtCreateReturnsValidPtr),
         cmocka_unit_test(evtDestroyNullOutDoesntCrash),
-        cmocka_unit_test(evtSendForNullOutDoesntCrash),
-        cmocka_unit_test(evtSendForNullMessageDoesntCrash),
-        cmocka_unit_test(evtTransportSetAndOutSend),
         cmocka_unit_test(evtFormatSetAndOutSendEvent),
         cmocka_unit_test(evtSourceEnabledSetAndGet),
-        cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(evtValueFilterSetAndGet),
         cmocka_unit_test(evtFieldFilterSetAndGet),
         cmocka_unit_test(evtNameFilterSetAndGet),
+        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

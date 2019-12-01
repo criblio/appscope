@@ -1,11 +1,8 @@
 #ifndef __EVT_H__
 #define __EVT_H__
 #include <regex.h>
-#include <sys/timeb.h>
+#include <stdint.h>
 #include "format.h"
-#include "transport.h"
-#include "dbg.h"
-#include "circbuf.h"
 
 typedef struct _evt_t evt_t;
 
@@ -14,27 +11,20 @@ evt_t *             evtCreate();
 void                evtDestroy(evt_t **);
 
 // Accessors
-int                 evtSend(evt_t *, const char *);
-int                 evtSendEvent(evt_t *, event_t *);
-void                evtFlush(evt_t *);
 regex_t *           evtValueFilter(evt_t *, cfg_evt_t);
 regex_t *           evtFieldFilter(evt_t *, cfg_evt_t);
 regex_t *           evtNameFilter(evt_t *, cfg_evt_t);
 unsigned            evtSourceEnabled(evt_t *, cfg_evt_t);
-int                 evtMetric(evt_t *, const char *, uint64_t, event_t *);
-int                 evtLog(evt_t *, const char *, const char *, const void *, size_t, uint64_t, cfg_evt_t);
-int                 evtEvents(evt_t *);
-int                 evtNeedsConnection(evt_t *);
-int                 evtConnection(evt_t *);
+
+char *              evtMetric(evt_t *, const char *, uint64_t, event_t *);
+char *              evtLog(evt_t *, const char *, const char *, const void *, size_t, uint64_t, cfg_evt_t);
 
 // Setters (modifies evt_t, but does not persist modifications)
-void                evtTransportSet(evt_t *, transport_t *);
 void                evtFormatSet(evt_t *, format_t *);
 void                evtValueFilterSet(evt_t *, cfg_evt_t, const char *);
 void                evtFieldFilterSet(evt_t *, cfg_evt_t, const char *);
 void                evtNameFilterSet(evt_t *, cfg_evt_t, const char *);
 void                evtSourceEnabledSet(evt_t *, cfg_evt_t, unsigned);
-int                 evtConnect(evt_t *);
 
 #endif // __EVT_H__
 

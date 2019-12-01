@@ -1,8 +1,11 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/timeb.h>
 #include <time.h>
 
+#include "circbuf.h"
+#include "dbg.h"
 #include "evt.h"
 
 #define MAXEVENTS 10
@@ -14,13 +17,11 @@ typedef struct {
 
 struct _evt_t
 {
-    transport_t* transport;
     format_t* format;
     local_re_t value_re[CFG_SRC_MAX];
     local_re_t field_re[CFG_SRC_MAX];
     local_re_t name_re[CFG_SRC_MAX];
     unsigned enabled[CFG_SRC_MAX];
-    cbuf_handle_t evbuf;
 };
 
 static const char* valueFilterDefault[] = {
@@ -91,8 +92,6 @@ evtCreate()
         evt->enabled[src] = srcEnabledDefault[src];
     }
 
-    evt->evbuf = cbufInit(DEFAULT_CBUF_SIZE);
-
     return evt;
 }
 
@@ -101,12 +100,6 @@ evtDestroy(evt_t** evt)
 {
     if (!evt || !*evt) return;
     evt_t *edestroy  = *evt;
-
-    evtEvents(edestroy); // Try to send events.  We're doing this in an
-                         // attempt to empty the evbuf before the evbuf
-                         // is destroyed.  Any events added after evtEvents
-                         // and before cbufFree wil be leaked.
-    cbufFree(edestroy->evbuf);
 
     cfg_evt_t src;
     for (src=CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
@@ -117,37 +110,8 @@ evtDestroy(evt_t** evt)
 
     fmtDestroy(&edestroy->format);
 
-    transportDestroy(&edestroy->transport);
-
     free(edestroy);
     *evt = NULL;
-}
-
-int
-evtSend(evt_t* evt, const char* msg)
-{
-    if (!evt || !msg) return -1;
-
-    return transportSend(evt->transport, msg);
-    return 0;
-}
-
-int
-evtSendEvent(evt_t* evt, event_t* e)
-{
-    if (!evt || !e) return -1;
-
-    char* msg = fmtString(evt->format, e, NULL);
-    int rv = evtSend(evt, msg);
-    if (msg) free(msg);
-    return rv;
-}
-
-void
-evtFlush(evt_t* evt)
-{
-    if (!evt) return;
-    transportFlush(evt->transport);
 }
 
 regex_t *
@@ -205,37 +169,6 @@ evtSourceEnabled(evt_t* evt, cfg_evt_t src)
 
     DBG("%d", src);
     return srcEnabledDefault[CFG_SRC_FILE];
-}
-
-int
-evtNeedsConnection(evt_t *evt)
-{
-    if (!evt) return 0;
-    return transportNeedsConnection(evt->transport);
-}
-
-int
-evtConnection(evt_t *evt)
-{
-    if (!evt) return 0;
-    return transportConnection(evt->transport);
-}
-
-int
-evtConnect(evt_t *evt)
-{
-    if (!evt) return 0;
-    return transportConnect(evt->transport);
-}
-
-void
-evtTransportSet(evt_t* evt, transport_t* transport)
-{
-    if (!evt) return;
-
-    // Don't leak if evtTransportSet is called repeatedly
-    transportDestroy(&evt->transport);
-    evt->transport = transport;
 }
 
 void
@@ -308,10 +241,9 @@ anyValueFieldMatches(regex_t* filter, event_t* metric)
     return NO_MATCH_FOUND;
 }
 
-int
+char *
 evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
 {
-    char *msg;
     event_format_t event;
     struct timeb tb;
     char ts[128];
@@ -322,13 +254,13 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     
     regex_t *filter;
 
-    if (!evt || !metric || !host || !metric) return -1;
+    if (!evt || !metric || !host || !metric) return NULL;
 
     // Test for a name field match.  No match, no metric output
     if (!evtSourceEnabled(evt, CFG_SRC_METRIC) ||
         !(filter = evtNameFilter(evt, CFG_SRC_METRIC)) ||
         (regexec(filter, metric->name, 0, NULL, 0))) {
-        return -1;
+        return NULL;
     }
 
     // rate limited to MAXEVENTS per second
@@ -336,12 +268,13 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
         rateTime = now;
         rate = notified = 0;
     } else if (++rate >= MAXEVENTS) {
+        char *notice = NULL;
+
         // one notice per truncate
         if (notified == 0) {
-            char *notice;
             if ((notice = calloc(1, 512)) == NULL) {
                 DBG(NULL);
-                return -1;
+                return NULL;
             }
 
             notified = 1;
@@ -349,13 +282,8 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
             snprintf(notice, 512,
                      "{\"_time\":%ld.%03d,\"source\":\"notice\",\"_raw\":\"Truncated metrics. Your rate exceeded %d metrics per second\",\"host\":\"notice\",\"_channel\":\"notice\"}\n",
                      tb.time, tb.millitm, MAXEVENTS);
-            if (cbufPut(evt->evbuf, (uint64_t)notice) == -1) {
-                // Full; drop and ignore
-                DBG(NULL);
-                free(notice);
-            }
         }
-        return 0;
+        return notice;
     }
 
     /*
@@ -363,11 +291,11 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
      * No match, no metric output
      */
     if (!anyValueFieldMatches(evtValueFilter(evt, CFG_SRC_METRIC), metric)) {
-        return -1;
+        return NULL;
     }
 
     ftime(&tb);
-    if (snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm) < 0) return -1;
+    if (snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm) < 0) return NULL;
     event.timestamp = ts;
     event.timesize = strlen(ts);
 
@@ -376,25 +304,18 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
 
     // Format the metric string using the configured metric format type
     event.data = fmtString(evt->format, metric, evtFieldFilter(evt, CFG_SRC_METRIC));
-    if (!event.data) return -1;
+    if (!event.data) return NULL;
     event.datasize = strlen(event.data);
 
     event.uid = uid;
 
-    msg = fmtEventMessageString(evt->format, &event);
-    if (!msg) return -1;
-
-    if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
-        // Full; drop and ignore
-        DBG(NULL);
-        free(msg);
-    }
+    char * msg = fmtEventMessageString(evt->format, &event);
 
     free(event.data);
-    return 0;
+    return msg;
 }
 
-int
+char *
 evtLog(evt_t *evt, const char *host, const char *path,
        const void *buf, size_t count, uint64_t uid, cfg_evt_t logType)
 {
@@ -403,7 +324,7 @@ evtLog(evt_t *evt, const char *host, const char *path,
     struct timeb tb;
     char ts[128];
 
-    if (!evt || !buf || !path || !host) return -1;
+    if (!evt || !buf || !path || !host) return NULL;
 
     ftime(&tb);
     snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm);
@@ -416,38 +337,14 @@ evtLog(evt_t *evt, const char *host, const char *path,
     event.uid = uid;
 
     msg = fmtEventMessageString(evt->format, &event);
-    if (!msg) return -1;
+    if (!msg) return NULL;
 
     regex_t* filter = evtValueFilter(evt, logType);
     if (filter && regexec(filter, msg, 0, NULL, 0)) {
         // This event doesn't match.  Drop it on the floor.
         free(msg);
-        return 0;
+        return NULL;
     }
 
-    if (cbufPut(evt->evbuf, (uint64_t)msg) == -1) {
-        // Full; drop and ignore
-        DBG(NULL);
-        free(msg);
-    }
-
-    return 0;
-}
-
-int
-evtEvents(evt_t *evt)
-{
-    uint64_t data;
-
-    if (!evt) return -1;
-
-    while (cbufGet(evt->evbuf, &data) == 0) {
-        if (data) {
-            char *event = (char *)data;
-            evtSend(evt, event);
-            free(event);
-        }
-    }
-
-    return 0;
+    return msg;
 }

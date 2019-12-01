@@ -67,6 +67,7 @@ run_test test/${OS}/transporttest
 run_test test/${OS}/logtest
 run_test test/${OS}/outtest
 run_test test/${OS}/evttest
+run_test test/${OS}/ctltest
 run_test test/${OS}/formattest
 run_test test/${OS}/circbuftest
 run_test test/${OS}/dbgtest

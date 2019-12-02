@@ -4,7 +4,6 @@
 #include <sys/timeb.h>
 #include <time.h>
 
-#include "circbuf.h"
 #include "dbg.h"
 #include "evt.h"
 

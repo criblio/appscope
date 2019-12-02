@@ -2168,7 +2168,7 @@ periodic(void *arg)
         }
 
         // From the config file
-        //sleep(g_thread.interval);
+        sleep(g_thread.interval);
         remoteConfig();
     }
 

@@ -78,3 +78,13 @@ stages:
         parameters:
           name: splunk
           containerName: splunk
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: elastic
+          containerName: elastic
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: kafka
+          containerName: kafka

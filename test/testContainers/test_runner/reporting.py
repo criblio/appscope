@@ -76,4 +76,4 @@ def print_summary(results: Dict[str, TestSetResult]):
     table = [to_table_row(k, v) for k, v in results.items()]
 
     print(tabulate(table, headers=["Test", "Result", "Result unscoped/scoped", "Duration unscoped/scoped",
-                                   "Messages uscoped/scoped", "Error"]))
+                                   "Messages unscoped/scoped", "Error"]))

@@ -22,6 +22,12 @@ struct _evt_t
     local_re_t field_re[CFG_SRC_MAX];
     local_re_t name_re[CFG_SRC_MAX];
     unsigned enabled[CFG_SRC_MAX];
+
+    struct {
+        time_t time;
+        unsigned long evtCount;
+        int notified;
+    } ratelimit;
 };
 
 static const char* valueFilterDefault[] = {
@@ -91,6 +97,9 @@ evtCreate()
         filterSet(&evt->name_re[src], NULL, nameFilterDefault[src]);
         evt->enabled[src] = srcEnabledDefault[src];
     }
+
+    // default format for events, which can be overriden
+    evt->format = fmtCreate(CFG_EVENT_ND_JSON);
 
     return evt;
 }
@@ -223,6 +232,9 @@ anyValueFieldMatches(regex_t* filter, event_t* metric)
         if (!regexec(filter, valbuf, 0, NULL, 0)) return MATCH_FOUND;
     }
 
+    // Handle the case where there are no fields...
+    if (!metric->fields) return NO_MATCH_FOUND;
+
     // Test every field value until a match is found
     event_field_t *fld;
     for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
@@ -248,9 +260,6 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     struct timeb tb;
     char ts[128];
     time_t now;
-    static time_t rateTime = 0;
-    static int rate = 0;
-    static int notified = 0;
     
     regex_t *filter;
 
@@ -264,20 +273,20 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     }
 
     // rate limited to MAXEVENTS per second
-    if (time(&now) > rateTime) {
-        rateTime = now;
-        rate = notified = 0;
-    } else if (++rate >= MAXEVENTS) {
+    if (time(&now) != evt->ratelimit.time) {
+        evt->ratelimit.time = now;
+        evt->ratelimit.evtCount = evt->ratelimit.notified = 0;
+    } else if (++evt->ratelimit.evtCount >= MAXEVENTS) {
         char *notice = NULL;
 
         // one notice per truncate
-        if (notified == 0) {
+        if (evt->ratelimit.notified == 0) {
             if ((notice = calloc(1, 512)) == NULL) {
                 DBG(NULL);
                 return NULL;
             }
 
-            notified = 1;
+            evt->ratelimit.notified = 1;
             ftime(&tb);
             snprintf(notice, 512,
                      "{\"_time\":%ld.%03d,\"source\":\"notice\",\"_raw\":\"Truncated metrics. Your rate exceeded %d metrics per second\",\"host\":\"notice\",\"_channel\":\"notice\"}\n",
@@ -317,14 +326,28 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
 
 char *
 evtLog(evt_t *evt, const char *host, const char *path,
-       const void *buf, size_t count, uint64_t uid, cfg_evt_t logType)
+       const void *buf, size_t count, uint64_t uid)
 {
     char *msg;
     event_format_t event;
     struct timeb tb;
     char ts[128];
+    cfg_evt_t logType;
 
     if (!evt || !buf || !path || !host) return NULL;
+
+    regex_t* filter;
+    if (evtSourceEnabled(evt, CFG_SRC_CONSOLE) &&
+       (filter = evtNameFilter(evt, CFG_SRC_CONSOLE)) &&
+       (!regexec(filter, path, 0, NULL, 0))) {
+        logType = CFG_SRC_CONSOLE;
+    } else if (evtSourceEnabled(evt, CFG_SRC_FILE) &&
+       (filter = evtNameFilter(evt, CFG_SRC_FILE)) &&
+       (!regexec(filter, path, 0, NULL, 0))) {
+        logType = CFG_SRC_FILE;
+    } else {
+        return NULL;
+    }
 
     ftime(&tb);
     snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm);
@@ -339,7 +362,7 @@ evtLog(evt_t *evt, const char *host, const char *path,
     msg = fmtEventMessageString(evt->format, &event);
     if (!msg) return NULL;
 
-    regex_t* filter = evtValueFilter(evt, logType);
+    filter = evtValueFilter(evt, logType);
     if (filter && regexec(filter, msg, 0, NULL, 0)) {
         // This event doesn't match.  Drop it on the floor.
         free(msg);

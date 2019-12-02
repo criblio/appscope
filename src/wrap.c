@@ -290,24 +290,8 @@ doMetric(evt_t* gev, const char *host, uint64_t uid, event_t *metric)
 static void
 doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
 {
-    regex_t* filter;
-    if (evtSourceEnabled(g_evt, CFG_SRC_CONSOLE) &&
-       (filter = evtNameFilter(g_evt, CFG_SRC_CONSOLE)) &&
-       (!regexec(filter, fs->path, 0, NULL, 0))) {
-
-        char* msg = evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid, CFG_SRC_CONSOLE);
-        ctlSendMsg(g_ctl, msg);
-        return;
-    }
-
-    if (evtSourceEnabled(g_evt, CFG_SRC_FILE) &&
-       (filter = evtNameFilter(g_evt, CFG_SRC_FILE)) &&
-       (!regexec(filter, fs->path, 0, NULL, 0))) {
-
-        char* msg = evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid, CFG_SRC_FILE);
-        ctlSendMsg(g_ctl, msg);
-        return;
-    }
+    char* msg = evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid);
+    ctlSendMsg(g_ctl, msg);
 }
 
 static bool

@@ -17,7 +17,7 @@ regex_t *           evtNameFilter(evt_t *, cfg_evt_t);
 unsigned            evtSourceEnabled(evt_t *, cfg_evt_t);
 
 char *              evtMetric(evt_t *, const char *, uint64_t, event_t *);
-char *              evtLog(evt_t *, const char *, const char *, const void *, size_t, uint64_t, cfg_evt_t);
+char *              evtLog(evt_t *, const char *, const char *, const void *, size_t, uint64_t);
 
 // Setters (modifies evt_t, but does not persist modifications)
 void                evtFormatSet(evt_t *, format_t *);

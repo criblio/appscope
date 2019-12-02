@@ -61,7 +61,7 @@ cfgPathHonorsEnvVar(void** state)
     assert_int_equal(rmdir(newdir), 0);
 }
 
-void
+static void
 cfgPathHonorsPriorityOrder(void** state)
 {
     // Get HOME env variable
@@ -143,7 +143,7 @@ cfgPathHonorsPriorityOrder(void** state)
     }
 }
 
-void
+static void
 cfgProcessEnvironmentOutFormat(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -178,7 +178,7 @@ cfgProcessEnvironmentOutFormat(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentStatsDPrefix(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -209,7 +209,7 @@ cfgProcessEnvironmentStatsDPrefix(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentStatsDMaxLen(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -240,7 +240,7 @@ cfgProcessEnvironmentStatsDMaxLen(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentOutPeriod(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -271,7 +271,7 @@ cfgProcessEnvironmentOutPeriod(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentCommandDir(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -302,7 +302,7 @@ cfgProcessEnvironmentCommandDir(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentEventFormat(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -341,7 +341,7 @@ typedef struct
     unsigned    default_val;
 } source_state_t;
 
-void
+static void
 cfgProcessEnvironmentEventSource(void** state)
 {
     source_state_t* data = (source_state_t*)state[0];
@@ -375,7 +375,7 @@ cfgProcessEnvironmentEventSource(void** state)
 }
 
 
-void
+static void
 cfgProcessEnvironmentOutVerbosity(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -406,7 +406,7 @@ cfgProcessEnvironmentOutVerbosity(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentLogLevel(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -443,7 +443,7 @@ typedef struct
     which_transport_t transport;
 } dest_state_t;
 
-void
+static void
 cfgProcessEnvironmentTransport(void** state)
 {
     dest_state_t* data = (dest_state_t*)state[0];
@@ -488,7 +488,7 @@ cfgProcessEnvironmentTransport(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentStatsdTags(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -527,7 +527,7 @@ cfgProcessEnvironmentStatsdTags(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentCmdDebugIsIgnored(void** state)
 {
     const char* path = "/tmp/dbgoutfile.txt";
@@ -548,7 +548,7 @@ cfgProcessEnvironmentCmdDebugIsIgnored(void** state)
     if (file_pos_after != -1) unlink(path);
 }
 
-void
+static void
 cfgProcessCommandsCmdDebugIsProcessed(void** state)
 {
     const char* outpath = "/tmp/dbgoutfile.txt";
@@ -570,7 +570,7 @@ cfgProcessCommandsCmdDebugIsProcessed(void** state)
     if (file_pos_after != -1) unlink(outpath);
 }
 
-void
+static void
 cfgProcessCommandsFromFile(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -676,7 +676,7 @@ cfgProcessCommandsFromFile(void** state)
     cfgDestroy(&cfg);
 }
 
-void
+static void
 cfgProcessCommandsEnvSubstitution(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -1202,7 +1202,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     deleteFile(path);
 }
 
-void
+static void
 cfgReadEnvSubstitution(void** state)
 {
 
@@ -1299,7 +1299,7 @@ cfgReadEnvSubstitution(void** state)
     deleteFile(path);
 }
 
-void
+static void
 initLogReturnsPtr(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -1332,7 +1332,7 @@ initLogReturnsPtr(void** state)
     cfgDestroy(&cfg);
 }
 
-void
+static void
 initOutReturnsPtr(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -1351,29 +1351,29 @@ initOutReturnsPtr(void** state)
     cfgDestroy(&cfg);
 }
 
-void
+static void
 initEvtReturnsPtr(void** state)
 {
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    cfg_transport_t t;
-    for (t=CFG_UDP; t<=CFG_SHM; t++) {
-        cfgTransportTypeSet(cfg, CFG_CTL, t);
-        if (t==CFG_UNIX || t==CFG_FILE) {
-            cfgTransportPathSet(cfg, CFG_CTL, "/tmp/scope.log");
-        }
+    evt_t* evt = initEvt(cfg);
+    assert_non_null(evt);
+    evtDestroy(&evt);
 
-        // Don't do this with TCP. You need a different approach if you want to do that
-        if (t==CFG_UDP) {
-            cfgTransportHostSet(cfg, CFG_CTL, "localhost");
-            cfgTransportPortSet(cfg, CFG_CTL, "4444");
-        }
+    cfgDestroy(&cfg);
+}
 
-        evt_t* evt = initEvt(cfg);
-        assert_non_null(evt);
-        evtDestroy(&evt);
-    }
+static void
+initCtlReturnsPtr(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+
+    ctl_t* ctl = initCtl(cfg);
+    assert_non_null(ctl);
+    ctlDestroy(&ctl);
+
     cfgDestroy(&cfg);
 }
 
@@ -1433,6 +1433,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(initLogReturnsPtr),
         cmocka_unit_test(initOutReturnsPtr),
         cmocka_unit_test(initEvtReturnsPtr),
+        cmocka_unit_test(initCtlReturnsPtr),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(envRegexFree),
     };

@@ -19,6 +19,10 @@ ctlCreate()
     }
 
     ctl->evbuf = cbufInit(DEFAULT_CBUF_SIZE);
+    if (!ctl->evbuf) {
+        DBG(NULL);
+        return NULL;
+    }
 
     return ctl;
 }

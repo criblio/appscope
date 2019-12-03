@@ -15,6 +15,7 @@ void                ctlFlush(ctl_t *);
 int                 ctlNeedsConnection(ctl_t *);
 int                 ctlConnection(ctl_t *);
 int                 ctlConnect(ctl_t *);
+int                 ctlClose(ctl_t *);
 void                ctlTransportSet(ctl_t *, transport_t *);
 
 #endif // _CTL_H__

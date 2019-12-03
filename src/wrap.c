@@ -182,8 +182,8 @@ remoteConfig()
          * When we support ndjson look for new line as EOF
          */
         if (rc <= 0) {
-            close(g_cfg.cmdConn);
-            g_cfg.cmdConn = -1;
+            close(fds.fd);
+            ctlClose(g_ctl);
             break;
         }
 

@@ -178,10 +178,12 @@ remoteConfig()
     do {
         rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
         /*
-         * TODO: if we get an error, we don't get the whoile file
+         * TODO: if we get an error, we don't get the whole file
          * When we support ndjson look for new line as EOF
          */
         if (rc <= 0) {
+            close(fds.fd);
+            ctlClose(g_ctl);
             break;
         }
 
@@ -2160,8 +2162,6 @@ periodic(void *arg)
             ctlConnect(g_ctl);
         }
 
-        // From the config file
-        sleep(g_thread.interval);
         remoteConfig();
     }
 

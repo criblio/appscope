@@ -123,6 +123,14 @@ transportNeedsConnection(transport_t *trans)
 }
 
 int
+transportDisconnect(transport_t *trans)
+{
+    if (!trans) return 0;
+    if (trans->type == CFG_TCP) trans->net.sock = -1;
+    return 0;
+}
+
+int
 transportConnect(transport_t *trans)
 {
     // We're already connected.  Do nothing.

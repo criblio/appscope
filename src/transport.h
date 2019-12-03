@@ -19,4 +19,5 @@ int                 transportFlush(transport_t*);
 int                 transportNeedsConnection(transport_t *);
 int                 transportConnect(transport_t*);
 int                 transportConnection(transport_t *);
+int                 transportDisconnect(transport_t *);
 #endif // __TRANSPORT_H__

@@ -1,4 +1,7 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include "dbg.h"
 #include "evt.h"
@@ -24,96 +27,289 @@ evtDestroyNullOutDoesntCrash(void** state)
 }
 
 static void
-evtSendForNullOutDoesntCrash(void** state)
-{
-    const char* msg = "Hey, this is cool!\n";
-    assert_int_equal(evtSend(NULL, msg), -1);
-}
-
-static void
-evtSendForNullMessageDoesntCrash(void** state)
+evtFormatSetAffectsOutput(void** state)
 {
     evt_t* evt = evtCreate();
     assert_non_null(evt);
-    transport_t* t = transportCreateSyslog();
-    assert_non_null(t);
-    evtTransportSet(evt, t);
-    assert_int_equal(evtSend(evt, NULL), -1);
-    evtDestroy(&evt);
-}
-
-static void
-evtTransportSetAndOutSend(void** state)
-{
-    const char* file_path = "/tmp/my.path";
-    evt_t* evt = evtCreate();
-    assert_non_null(evt);
-    transport_t* t1 = transportCreateUdp("127.0.0.1", "12345");
-    transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
-    transport_t* t3 = transportCreateSyslog();
-    transport_t* t4 = transportCreateShm();
-    transport_t* t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
-    evtTransportSet(evt, t1);
-    evtTransportSet(evt, t2);
-    evtTransportSet(evt, t3);
-    evtTransportSet(evt, t4);
-    evtTransportSet(evt, t5);
-
-    // Test that transport is set by testing side effects of evtSend
-    // affecting the file at file_path when connected to a file transport.
-    long file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(evtSend(evt, "Something to send\n"), 0);
-
-    // With CFG_BUFFER_FULLY, this output only happens with the flush
-    long file_pos_after = fileEndPosition(file_path);
-    assert_int_equal(file_pos_before, file_pos_after);
-
-    evtFlush(evt);
-    file_pos_after = fileEndPosition(file_path);
-    assert_int_not_equal(file_pos_before, file_pos_after);
-
-    // Test that transport is cleared by seeing no side effects.
-    evtTransportSet(evt, NULL);
-    file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(evtSend(evt, "Something to send\n"), -1);
-    file_pos_after = fileEndPosition(file_path);
-    assert_int_equal(file_pos_before, file_pos_after);
-
-    if (unlink(file_path))
-        fail_msg("Couldn't delete file %s", file_path);
-
-    evtDestroy(&evt);
-}
-
-static void
-evtFormatSetAndOutSendEvent(void** state)
-{
-    const char* file_path = "/tmp/my.path";
-    evt_t* evt = evtCreate();
-    assert_non_null(evt);
-    transport_t* t = transportCreateFile(file_path, CFG_BUFFER_LINE);
-    evtTransportSet(evt, t);
+    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
     event_t e = {"A", 1, DELTA, NULL};
+
+    // default format is CFG_EVENT_ND_JSON
+    char* msg1 = evtMetric(evt, "host", 12345, &e);
+    assert_non_null(msg1);
+
+    // Change to another format
     format_t* f = fmtCreate(CFG_METRIC_STATSD);
     evtFormatSet(evt, f);
 
-    // Test that format is set by testing side effects of evtSendEvent
-    // affecting the file at file_path when connected to format.
-    long file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(evtSendEvent(evt, &e), 0);
-    long file_pos_after = fileEndPosition(file_path);
-    assert_int_not_equal(file_pos_before, file_pos_after);
+    // fmtEventMessageString will only return non-null for CFG_EVENT_ND_JSON
+    // Since msg1 and msg2 are different, it shows that the evtFormatSet worked.
+    char* msg2 = evtMetric(evt, "host", 12345, &e);
+    assert_null(msg2);
 
-    // Test that format is cleared by seeing no side effects.
-    evtFormatSet(evt, NULL);
-    file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(evtSendEvent(evt, &e), -1);
-    file_pos_after = fileEndPosition(file_path);
-    assert_int_equal(file_pos_before, file_pos_after);
+    free(msg1);
 
-    if (unlink(file_path))
-        fail_msg("Couldn't delete file %s", file_path);
+    evtDestroy(&evt);
+}
+
+static void
+evtMetricWithSourceDisabledReturnsNull(void** state)
+{
+    evt_t* evt = evtCreate();
+    assert_non_null(evt);
+
+    event_t e = {"A", 1, DELTA, NULL};
+
+    // default is disabled
+    char* msg = evtMetric(evt, "host", 12345, &e);
+    assert_null(msg);
+
+    // when enabled, we should get a non-null msg
+    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_non_null(msg);
+    free(msg);
+
+    // Set it back to disabled, just to be sure.
+    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 0);
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_null(msg);
+
+    evtDestroy(&evt);
+}
+
+static void
+evtMetricWithAndWithoutMatchingNameFilter(void** state)
+{
+    evt_t* evt = evtCreate();
+    assert_non_null(evt);
+    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+
+    event_t e = {"A", 1, DELTA, NULL};
+    char* msg;
+
+    // Default name filter allows everything
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_non_null(msg);
+    free(msg);
+
+    // Changing the name filter to "^B" shouldn't match.
+    evtNameFilterSet(evt, CFG_SRC_METRIC, "^B");
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_null(msg);
+
+    // Changing the name filter to "^A" should match.
+    evtNameFilterSet(evt, CFG_SRC_METRIC, "^A");
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_non_null(msg);
+    free(msg);
+
+    evtDestroy(&evt);
+}
+
+static void
+evtMetricWithAndWithoutMatchingFieldFilter(void** state)
+{
+    evt_t* evt = evtCreate();
+    assert_non_null(evt);
+    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+
+    event_field_t fields[] = {
+        STRFIELD("proc",             "ps",                  3),
+        NUMFIELD("pid",              2,                     3),
+        FIELDEND
+    };
+    event_t e = {"A", 1, DELTA, fields};
+    char* msg;
+
+    // Default field filter allows both fields
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_non_null(msg);
+    assert_non_null(strstr(msg, "proc"));
+    assert_non_null(strstr(msg, "pid"));
+    free(msg);
+
+    // Changing the field filter to ".*oc" should match proc but not pid
+    evtFieldFilterSet(evt, CFG_SRC_METRIC, ".*oc");
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_non_null(msg);
+    assert_non_null(strstr(msg, "proc"));
+    assert_null(strstr(msg, "pid"));
+    free(msg);
+
+    evtDestroy(&evt);
+}
+
+static void
+evtMetricWithAndWithoutMatchingValueFilter(void** state)
+{
+    evt_t* evt = evtCreate();
+    assert_non_null(evt);
+    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+
+    event_t e = {"A", 1, DELTA, NULL};
+    char* msg;
+
+    // Default value filter allows everything
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_non_null(msg);
+    free(msg);
+
+    // Changing the value filter to "^2" shouldn't match.
+    evtValueFilterSet(evt, CFG_SRC_METRIC, "^2");
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_null(msg);
+
+    // Adding a field with value 2 should match.
+    event_field_t fields[] = {
+        STRFIELD("proc",             "ps",                  3),
+        NUMFIELD("pid",              2,                     3),
+        FIELDEND
+    };
+    e.fields = fields;
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_non_null(msg);
+    free(msg);
+
+    // Changing the value filter to "^1" should match.
+    evtValueFilterSet(evt, CFG_SRC_METRIC, "^1");
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_non_null(msg);
+    free(msg);
+
+    // Changing the value filter to "ps" should match too.
+    evtValueFilterSet(evt, CFG_SRC_METRIC, "ps");
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_non_null(msg);
+    free(msg);
+
+    // Changing the value filter to "blah" should not match.
+    evtValueFilterSet(evt, CFG_SRC_METRIC, "blah");
+    msg = evtMetric(evt, "host", 12345, &e);
+    assert_null(msg);
+
+    evtDestroy(&evt);
+}
+
+#define MAXEVENTS 10
+
+static void
+evtMetricRateLimitReturnsNotice(void** state)
+{
+    evt_t* evt = evtCreate();
+    assert_non_null(evt);
+    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+
+    event_t e = {"Hey", 1, DELTA, NULL};
+    char* msg;
+
+    time_t initial, current;
+    time(&initial);
+
+    int i;
+    for (i=0; i<=MAXEVENTS; i++) {
+        msg = evtMetric(evt, "host", 12345, &e);
+        assert_non_null(msg);
+
+        time(&current);
+        if (initial != current) {
+            // This test depends on running all iterations in the same second.
+            // If we find this isn't true, start the loop over.
+            initial = current;
+            i=0;
+            free(msg);
+            continue;
+        }
+
+        //printf("i=%d %s\n", i, msg);
+        if (i<MAXEVENTS) {
+            // Verify that msg contains "Hey", and not "Truncated"
+            assert_non_null(strstr(msg, "Hey"));
+            assert_null(strstr(msg, "Truncated"));
+        } else {
+            // Verify that msg contains "Truncated", and not "Hey"
+            assert_null(strstr(msg, "Hey"));
+            assert_non_null(strstr(msg, "Truncated"));
+        }
+        free(msg);
+    }
+
+    evtDestroy(&evt);
+}
+
+static void
+evtLogWithSourceDisabledReturnsNull(void** state)
+{
+    evt_t* evt = evtCreate();
+    assert_non_null(evt);
+
+    // default is disabled
+    char* msg = evtLog(evt, "host", "stdout", "hey", 4, 12345);
+    assert_null(msg);
+
+    // when enabled, we should get a non-null msg
+    evtSourceEnabledSet(evt, CFG_SRC_CONSOLE, 1);
+    msg = evtLog(evt, "host", "stdout", "hey", 4, 12345);
+    assert_non_null(msg);
+    free(msg);
+
+    // Set it back to disabled, just to be sure.
+    evtSourceEnabledSet(evt, CFG_SRC_CONSOLE, 0);
+    msg = evtLog(evt, "host", "stdout", "hey", 4, 12345);
+    assert_null(msg);
+
+    evtDestroy(&evt);
+}
+
+static void
+evtLogWithAndWithoutMatchingNameFilter(void** state)
+{
+    evt_t* evt = evtCreate();
+    assert_non_null(evt);
+    evtSourceEnabledSet(evt, CFG_SRC_FILE, 1);
+
+    // default name filter matches anything with log in the path
+    char* msg = evtLog(evt, "host", "/var/log/something.log", "hey", 4, 12345);
+    assert_non_null(msg);
+    free(msg);
+
+    // Changing the name filter to ".*my[.]log" shouldn't match.
+    evtNameFilterSet(evt, CFG_SRC_FILE, ".*my[.]log");
+    msg = evtLog(evt, "host", "/var/log/something.log", "hey", 4, 12345);
+    assert_null(msg);
+
+    // Changing the name filter to "^/var/log/.*[.]log$" should match.
+    evtNameFilterSet(evt, CFG_SRC_FILE, "^/var/log/.*[.]log$");
+    msg = evtLog(evt, "host", "/var/log/something.log", "hey", 4, 12345);
+    assert_non_null(msg);
+    free(msg);
+
+    evtDestroy(&evt);
+}
+
+static void
+evtLogWithAndWithoutMatchingValueFilter(void** state)
+{
+    evt_t* evt = evtCreate();
+    assert_non_null(evt);
+    evtSourceEnabledSet(evt, CFG_SRC_FILE, 1);
+
+    // default value filter matches anything
+    char* msg = evtLog(evt, "host", "/var/log/something.log", "hey", 4, 12345);
+    assert_non_null(msg);
+    free(msg);
+
+    // Changing the value filter to "blah" shouldn't match.
+    evtValueFilterSet(evt, CFG_SRC_FILE, "blah");
+    msg = evtLog(evt, "host", "/var/log/something.log", "hey", 4, 12345);
+    assert_null(msg);
+
+    // Changing the value filter to "hey" should match.
+    evtValueFilterSet(evt, CFG_SRC_FILE, "hey");
+    msg = evtLog(evt, "host", "/var/log/something.log", "hey", 4, 12345);
+    assert_non_null(msg);
+    free(msg);
 
     evtDestroy(&evt);
 }
@@ -304,15 +500,20 @@ main(int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(evtCreateReturnsValidPtr),
         cmocka_unit_test(evtDestroyNullOutDoesntCrash),
-        cmocka_unit_test(evtSendForNullOutDoesntCrash),
-        cmocka_unit_test(evtSendForNullMessageDoesntCrash),
-        cmocka_unit_test(evtTransportSetAndOutSend),
-        cmocka_unit_test(evtFormatSetAndOutSendEvent),
+        cmocka_unit_test(evtFormatSetAffectsOutput),
+        cmocka_unit_test(evtMetricWithSourceDisabledReturnsNull),
+        cmocka_unit_test(evtMetricWithAndWithoutMatchingNameFilter),
+        cmocka_unit_test(evtMetricWithAndWithoutMatchingFieldFilter),
+        cmocka_unit_test(evtMetricWithAndWithoutMatchingValueFilter),
+        cmocka_unit_test(evtMetricRateLimitReturnsNotice),
+        cmocka_unit_test(evtLogWithSourceDisabledReturnsNull),
+        cmocka_unit_test(evtLogWithAndWithoutMatchingNameFilter),
+        cmocka_unit_test(evtLogWithAndWithoutMatchingValueFilter),
         cmocka_unit_test(evtSourceEnabledSetAndGet),
-        cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(evtValueFilterSetAndGet),
         cmocka_unit_test(evtFieldFilterSetAndGet),
         cmocka_unit_test(evtNameFilterSetAndGet),
+        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

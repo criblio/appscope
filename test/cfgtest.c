@@ -17,7 +17,7 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgOutVerbosity(config), DEFAULT_OUT_VERBOSITY);
     assert_int_equal       (cfgOutPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
-    assert_int_equal       (cfgEventFormat(config), DEFAULT_EVT_FORMAT);
+    assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
     assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
     assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
     assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
@@ -39,11 +39,11 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgTransportPort(config, CFG_OUT), DEFAULT_OUT_PORT);
     assert_null            (cfgTransportPath(config, CFG_OUT));
     assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_FULLY);
-    assert_int_equal       (cfgTransportType(config, CFG_EVT), CFG_TCP);
-    assert_string_equal    (cfgTransportHost(config, CFG_EVT), "127.0.0.1");
-    assert_string_equal    (cfgTransportPort(config, CFG_EVT), DEFAULT_EVT_PORT);
-    assert_null            (cfgTransportPath(config, CFG_EVT));
-    assert_int_equal       (cfgTransportBuf(config, CFG_EVT), CFG_BUFFER_FULLY);
+    assert_int_equal       (cfgTransportType(config, CFG_CTL), CFG_TCP);
+    assert_string_equal    (cfgTransportHost(config, CFG_CTL), "127.0.0.1");
+    assert_string_equal    (cfgTransportPort(config, CFG_CTL), DEFAULT_CTL_PORT);
+    assert_null            (cfgTransportPath(config, CFG_CTL));
+    assert_int_equal       (cfgTransportBuf(config, CFG_CTL), CFG_BUFFER_FULLY);
     assert_int_equal       (cfgTransportType(config, CFG_LOG), CFG_FILE);
     assert_null            (cfgTransportHost(config, CFG_LOG));
     assert_null            (cfgTransportPort(config, CFG_LOG));
@@ -433,7 +433,7 @@ main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
     void* out_state[] = {(void*)CFG_OUT, NULL};
-    void* evt_state[] = {(void*)CFG_EVT, NULL};
+    void* evt_state[] = {(void*)CFG_CTL, NULL};
     void* log_state[] = {(void*)CFG_LOG, NULL};
 
     source_state_t log = {CFG_SRC_FILE, DEFAULT_SRC_FILE_VALUE, DEFAULT_SRC_FILE_FIELD, DEFAULT_SRC_FILE_NAME};

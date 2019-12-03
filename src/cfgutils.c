@@ -302,7 +302,7 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
     } else if (startsWith(env_line, "SCOPE_CMD_DBG_PATH")) {
         processCmdDebug(value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DEST")) {
-        cfgTransportSetFromStr(cfg, CFG_EVT, value);
+        cfgTransportSetFromStr(cfg, CFG_CTL, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
         cfgEventFormatSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_NAME")) {
@@ -700,6 +700,28 @@ processTransport(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         processKeyValuePair(t, pair, config, doc);
     }
 }
+
+static void
+processTransportMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    transport_context = CFG_OUT;
+    processTransport(config, doc, node);
+}
+
+static void
+processTransportLog(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    transport_context = CFG_LOG;
+    processTransport(config, doc, node);
+}
+
+static void
+processTransportCtl(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    transport_context = CFG_CTL;
+    processTransport(config, doc, node);
+}
+
 static void
 processLogging(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
@@ -707,12 +729,9 @@ processLogging(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,  "level",      processLevel},
-        {YAML_MAPPING_NODE, "transport",  processTransport},
+        {YAML_MAPPING_NODE, "transport",  processTransportLog},
         {YAML_NO_NODE, NULL, NULL}
     };
-
-    // Remember that we're currently processing logging
-    transport_context = CFG_LOG;
 
     yaml_node_pair_t* pair;
     foreach(pair, node->data.mapping.pairs) {
@@ -744,14 +763,18 @@ processTags(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processFormatType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processFormatTypeMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
-    if (transport_context == CFG_OUT) {
-        cfgOutFormatSetFromStr(config, value);
-    } else if (transport_context == CFG_EVT) {
-        cfgEventFormatSetFromStr(config, value);
-    }
+    cfgOutFormatSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
+processFormatTypeEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char* value = stringVal(node);
+    cfgEventFormatSetFromStr(config, value);
     if (value) free(value);
 }
 
@@ -785,7 +808,7 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "type",            processFormatType},
+        {YAML_SCALAR_NODE,  "type",            processFormatTypeMetric},
         {YAML_SCALAR_NODE,  "statsdprefix",    processStatsDPrefix},
         {YAML_SCALAR_NODE,  "statsdmaxlen",    processStatsDMaxLen},
         {YAML_SCALAR_NODE,  "verbosity",       processVerbosity},
@@ -822,12 +845,9 @@ processMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     parse_table_t t[] = {
         {YAML_MAPPING_NODE, "format",          processFormat},
-        {YAML_MAPPING_NODE, "transport",       processTransport},
+        {YAML_MAPPING_NODE, "transport",       processTransportMetric},
         {YAML_NO_NODE, NULL, NULL}
     };
-
-    // Remember that we're currently processing output
-    transport_context = CFG_OUT;
 
     yaml_node_pair_t* pair;
     foreach(pair, node->data.mapping.pairs) {
@@ -841,7 +861,7 @@ processEvtFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "type",            processFormatType},
+        {YAML_SCALAR_NODE,  "type",            processFormatTypeEvent},
         {YAML_NO_NODE, NULL, NULL}
     };
 
@@ -965,13 +985,9 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     parse_table_t t[] = {
         {YAML_MAPPING_NODE, "format",          processEvtFormat},
-        {YAML_MAPPING_NODE, "transport",       processTransport},
         {YAML_SEQUENCE_NODE,"watch",           processWatch},
         {YAML_NO_NODE, NULL, NULL}
     };
-
-    // Remember that we're currently processing event
-    transport_context = CFG_EVT;
 
     yaml_node_pair_t* pair;
     foreach(pair, node->data.mapping.pairs) {
@@ -985,6 +1001,7 @@ processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
+        {YAML_MAPPING_NODE, "transport",       processTransportCtl},
         {YAML_MAPPING_NODE, "log",             processLogging},
         {YAML_SCALAR_NODE,  "summaryperiod",   processSummaryPeriod},
         {YAML_SCALAR_NODE,  "commanddir",      processCommandDir},
@@ -1149,24 +1166,11 @@ initEvt(config_t *cfg)
     evt_t *evt = evtCreate();
     if (!evt) return evt;
 
-    /*
-     * If the transport is TCP, the transport may not connect
-     * at this point. If so, it will connect later. As such,
-     * it should not be treated as fatal.
-     */
-    transport_t *trans = initTransport(cfg, CFG_EVT);
-    if (!trans) {
-        evtDestroy(&evt);
-        return evt;
-    }
-    evtTransportSet(evt, trans);
-
     format_t *fmt = fmtCreate(cfgEventFormat(cfg));
     if (!fmt) {
         evtDestroy(&evt);
         return evt;
     }
-
     evtFormatSet(evt, fmt);
 
     cfg_evt_t src;
@@ -1180,18 +1184,23 @@ initEvt(config_t *cfg)
     return evt;
 }
 
-int
-updateEvt(config_t *cfg, evt_t *evt)
+ctl_t*
+initCtl(config_t *cfg)
 {
-    if (!cfg || !evt) return -1;
+    ctl_t *ctl = ctlCreate();
+    if (!ctl) return ctl;
 
-    cfg_evt_t src;
-    for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
-        evtSourceEnabledSet(evt, src, cfgEventSourceEnabled(cfg, src));
-        evtNameFilterSet(evt, src, cfgEventNameFilter(cfg, src));
-        evtFieldFilterSet(evt, src, cfgEventFieldFilter(cfg, src));
-        evtValueFilterSet(evt, src, cfgEventValueFilter(cfg, src));
+    /*
+     * If the transport is TCP, the transport may not connect
+     * at this point. If so, it will connect later. As such,
+     * it should not be treated as fatal.
+     */
+    transport_t *trans = initTransport(cfg, CFG_CTL);
+    if (!trans) {
+        ctlDestroy(&ctl);
+        return ctl;
     }
+    ctlTransportSet(ctl, trans);
 
-    return 0;
+    return ctl;
 }

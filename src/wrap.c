@@ -3,6 +3,7 @@
 #include "atomic.h"
 #include "cfg.h"
 #include "cfgutils.h"
+#include "ctl.h"
 #include "dbg.h"
 #include "log.h"
 #include "out.h"
@@ -19,6 +20,7 @@ static thread_timing g_thread = {0};
 static log_t* g_log = NULL;
 static out_t* g_out = NULL;
 static evt_t* g_evt = NULL;
+static ctl_t* g_ctl = NULL;
 static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static out_t *g_prevout = NULL;
@@ -145,7 +147,7 @@ remoteConfig()
     // MS
     timeout = (g_thread.interval * 1000);
     bzero(&fds, sizeof(fds));
-    fds.fd = g_cfg.cmdConn;
+    fds.fd = ctlConnection(g_ctl);
     fds.events = POLLIN;
     rc = poll(&fds, 1, timeout);
 
@@ -174,7 +176,7 @@ remoteConfig()
 
     success = rc = errno = 0;
     do {
-        rc = g_fn.recv(g_cfg.cmdConn, buf, sizeof(buf), MSG_DONTWAIT);
+        rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
         /*
          * TODO: if we get an error, we don't get the whoile file
          * When we support ndjson look for new line as EOF
@@ -223,8 +225,7 @@ doConfig(config_t *cfg)
     log_t* log = initLog(cfg);
     g_out = initOut(cfg);
     g_log = log; // Set after initOut to avoid infinite loop with socket
-    //g_evt = initEvt(cfg);
-    updateEvt(cfg, g_evt);
+    g_evt = initEvt(cfg);
 }
 
 // Process dynamic config change if they are available
@@ -279,25 +280,18 @@ getDuration(uint64_t start)
     
 }
 
-static int
+static void
+doMetric(evt_t* gev, const char *host, uint64_t uid, event_t *metric)
+{
+    char* msg = evtMetric(gev, host, uid, metric);
+    ctlSendMsg(g_ctl, msg);
+}
+
+static void
 doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
 {
-    regex_t* filter;
-    if (evtSourceEnabled(g_evt, CFG_SRC_CONSOLE) &&
-       (filter = evtNameFilter(g_evt, CFG_SRC_CONSOLE)) &&
-       (!regexec(filter, fs->path, 0, NULL, 0))) {
-
-        return evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid, CFG_SRC_CONSOLE);
-    }
-
-    if (evtSourceEnabled(g_evt, CFG_SRC_FILE) &&
-       (filter = evtNameFilter(g_evt, CFG_SRC_FILE)) &&
-       (!regexec(filter, fs->path, 0, NULL, 0))) {
-
-        return evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid, CFG_SRC_FILE);
-    }
-
-    return -1;
+    char* msg = evtLog(gev, g_cfg.hostname, fs->path, buf, len, fs->uid);
+    ctlSendMsg(g_ctl, msg);
 }
 
 static bool
@@ -517,7 +511,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
 
         event_t netErrMetric = {"net.error", *value, DELTA, fields};
 
-        evtMetric(g_evt, g_cfg.hostname, getTime(), &netErrMetric);
+        doMetric(g_evt, g_cfg.hostname, getTime(), &netErrMetric);
 
         // Only report if enabled
         if ((g_cfg.summarize.net.error) && (source == EVENT_BASED)) {
@@ -599,7 +593,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
 
         event_t fsErrMetric = {metric, *value, DELTA, fields};
 
-        evtMetric(g_evt, g_cfg.hostname, getTime(), &fsErrMetric);
+        doMetric(g_evt, g_cfg.hostname, getTime(), &fsErrMetric);
 
         // Only report if enabled
         if (*summarize && (source == EVENT_BASED)) {
@@ -644,7 +638,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
 
         event_t dnsMetric = {"net.dns", g_ctrs.numDNS, DELTA, fields};
 
-        evtMetric(g_evt, g_cfg.hostname, getTime(), &dnsMetric);
+        doMetric(g_evt, g_cfg.hostname, getTime(), &dnsMetric);
 
         // Only report if enabled
         if (g_cfg.summarize.net.dns) {
@@ -685,7 +679,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
 
         event_t dnsDurMetric = {"net.dns.duration", dur, DELTA_MS, fields};
 
-        evtMetric(g_evt, g_cfg.hostname, getTime(), &dnsDurMetric);
+        doMetric(g_evt, g_cfg.hostname, getTime(), &dnsDurMetric);
 
         // Only report if enabled
         if (g_cfg.summarize.net.dns) {
@@ -932,7 +926,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         event_t rwMetric = {metric, *sizebytes, HISTOGRAM, fields};
 
-        evtMetric(g_evt, g_cfg.hostname, g_fsinfo[fd].uid, &rwMetric);
+        doMetric(g_evt, g_cfg.hostname, g_fsinfo[fd].uid, &rwMetric);
 
         // Only report if enabled
         if ((g_cfg.summarize.fs.read_write) && (source == EVENT_BASED)) {
@@ -1438,7 +1432,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         event_t rxMetric = {"net.rx", g_netinfo[fd].rxBytes, DELTA, fields};
 
-        evtMetric(g_evt, g_cfg.hostname, g_netinfo[fd].uid, &rxMetric);
+        doMetric(g_evt, g_cfg.hostname, g_netinfo[fd].uid, &rxMetric);
 
         if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
             return;
@@ -1539,7 +1533,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         event_t txMetric = {"net.tx", g_netinfo[fd].txBytes, DELTA, fields};
 
-        evtMetric(g_evt, g_cfg.hostname, g_netinfo[fd].uid, &txMetric);
+        doMetric(g_evt, g_cfg.hostname, g_netinfo[fd].uid, &txMetric);
 
         if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
             return;
@@ -1842,9 +1836,8 @@ doReset()
     g_thread.once = 0;
     g_thread.startTime = time(NULL); // + g_thread.interval;
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
-    evtDestroy(&g_evt);
-    g_evt = initEvt(g_staticfg);
-    g_cfg.cmdConn = evtConnection(g_evt);
+    ctlDestroy(&g_ctl);
+    g_ctl = initCtl(g_staticfg);
 }
 
 //
@@ -2132,7 +2125,7 @@ reportPeriodicStuff(void)
     }
 
     // Process any events that have been posted
-    evtEvents(g_evt);
+    ctlFlush(g_ctl);
 
     if (!atomicCasU64(&reentrancy_guard, 1ULL, 0ULL)) {
          DBG(NULL);
@@ -2145,7 +2138,7 @@ handleExit(void)
     reportPeriodicStuff();
     outFlush(g_out);
     logFlush(g_log);
-    evtFlush(g_evt);
+    ctlFlush(g_ctl);
 }
 
 static void *
@@ -2163,8 +2156,8 @@ periodic(void *arg)
         //if (g_prevlog) logDestroy(&g_prevlog);
         //if (g_prevevt) evtDestroy(&g_prevevt);
 
-        if (evtNeedsConnection(g_evt)) {
-            evtConnect(g_evt);
+        if (ctlNeedsConnection(g_ctl)) {
+            ctlConnect(g_ctl);
         }
 
         // From the config file
@@ -2173,6 +2166,28 @@ periodic(void *arg)
     }
 
     return NULL;
+}
+
+static void
+reportProcessStart(void)
+{
+    // Log it at startup, provided the loglevel is set to allow it
+    scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
+
+    // Send a metric
+    event_field_t fields[] = {
+        PROC_FIELD(g_cfg.procname),
+        PID_FIELD(g_cfg.pid),
+        HOST_FIELD(g_cfg.hostname),
+        UNIT_FIELD("process"),
+        FIELDEND
+    };
+    event_t e = {"proc.start", 1, DELTA, fields};
+    sendEvent(g_out, &e);
+
+    // Send an event at startup, provided metric events are enabled
+    ctlSendMsg(g_ctl, evtMetric(g_evt, g_cfg.hostname, getTime(), &e));
+    ctlFlush(g_ctl);
 }
 
 __attribute__((constructor)) void
@@ -2352,16 +2367,15 @@ init(void)
     char* path = cfgPath();
     config_t* cfg = cfgRead(path);
     cfgProcessEnvironment(cfg);
-    g_evt = initEvt(cfg);
     doConfig(cfg);
+    g_ctl = initCtl(cfg);
     g_staticfg = cfg;
     if (path) free(path);
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
-    g_cfg.cmdConn = evtConnection(g_evt);
+    reportProcessStart();
 
-    scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
     if (atexit(handleExit)) {
         DBG(NULL);
     }

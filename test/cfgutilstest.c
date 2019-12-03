@@ -61,7 +61,7 @@ cfgPathHonorsEnvVar(void** state)
     assert_int_equal(rmdir(newdir), 0);
 }
 
-void
+static void
 cfgPathHonorsPriorityOrder(void** state)
 {
     // Get HOME env variable
@@ -143,7 +143,7 @@ cfgPathHonorsPriorityOrder(void** state)
     }
 }
 
-void
+static void
 cfgProcessEnvironmentOutFormat(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -178,7 +178,7 @@ cfgProcessEnvironmentOutFormat(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentStatsDPrefix(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -209,7 +209,7 @@ cfgProcessEnvironmentStatsDPrefix(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentStatsDMaxLen(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -240,7 +240,7 @@ cfgProcessEnvironmentStatsDMaxLen(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentOutPeriod(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -271,7 +271,7 @@ cfgProcessEnvironmentOutPeriod(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentCommandDir(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -302,7 +302,7 @@ cfgProcessEnvironmentCommandDir(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentEventFormat(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -341,7 +341,7 @@ typedef struct
     unsigned    default_val;
 } source_state_t;
 
-void
+static void
 cfgProcessEnvironmentEventSource(void** state)
 {
     source_state_t* data = (source_state_t*)state[0];
@@ -375,7 +375,7 @@ cfgProcessEnvironmentEventSource(void** state)
 }
 
 
-void
+static void
 cfgProcessEnvironmentOutVerbosity(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -406,7 +406,7 @@ cfgProcessEnvironmentOutVerbosity(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentLogLevel(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -443,7 +443,7 @@ typedef struct
     which_transport_t transport;
 } dest_state_t;
 
-void
+static void
 cfgProcessEnvironmentTransport(void** state)
 {
     dest_state_t* data = (dest_state_t*)state[0];
@@ -488,7 +488,7 @@ cfgProcessEnvironmentTransport(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentStatsdTags(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -527,7 +527,7 @@ cfgProcessEnvironmentStatsdTags(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-void
+static void
 cfgProcessEnvironmentCmdDebugIsIgnored(void** state)
 {
     const char* path = "/tmp/dbgoutfile.txt";
@@ -548,7 +548,7 @@ cfgProcessEnvironmentCmdDebugIsIgnored(void** state)
     if (file_pos_after != -1) unlink(path);
 }
 
-void
+static void
 cfgProcessCommandsCmdDebugIsProcessed(void** state)
 {
     const char* outpath = "/tmp/dbgoutfile.txt";
@@ -570,7 +570,7 @@ cfgProcessCommandsCmdDebugIsProcessed(void** state)
     if (file_pos_after != -1) unlink(outpath);
 }
 
-void
+static void
 cfgProcessCommandsFromFile(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -651,9 +651,9 @@ cfgProcessCommandsFromFile(void** state)
     assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM1"), "val1");
     assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM2"), "val2");
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
-    assert_int_equal(cfgTransportType(cfg, CFG_EVT), CFG_UDP);
-    assert_string_equal(cfgTransportHost(cfg, CFG_EVT), "host");
-    assert_string_equal(cfgTransportPort(cfg, CFG_EVT), "1234");
+    assert_int_equal(cfgTransportType(cfg, CFG_CTL), CFG_UDP);
+    assert_string_equal(cfgTransportHost(cfg, CFG_CTL), "host");
+    assert_string_equal(cfgTransportPort(cfg, CFG_CTL), "1234");
     assert_int_equal(cfgEventFormat(cfg), CFG_EVENT_ND_JSON);
     assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
@@ -676,7 +676,7 @@ cfgProcessCommandsFromFile(void** state)
     cfgDestroy(&cfg);
 }
 
-void
+static void
 cfgProcessCommandsEnvSubstitution(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -734,7 +734,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_string_equal(cfgCustomTagValue(cfg, "undefined"), "$UNDEFINEDENV");
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
     // event stuff...
-    assert_string_equal(cfgTransportHost(cfg, CFG_EVT), "ho$st");
+    assert_string_equal(cfgTransportHost(cfg, CFG_CTL), "ho$st");
     assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_FILE), ".*[.]log$");
     assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
@@ -764,7 +764,7 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgOutVerbosity(config), DEFAULT_OUT_VERBOSITY);
     assert_int_equal       (cfgOutPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
-    assert_int_equal       (cfgEventFormat(config), DEFAULT_EVT_FORMAT);
+    assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
     assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
     assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
     assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
@@ -786,11 +786,11 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgTransportPort(config, CFG_OUT), "8125");
     assert_null            (cfgTransportPath(config, CFG_OUT));
     assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_FULLY);
-    assert_int_equal       (cfgTransportType(config, CFG_EVT), CFG_TCP);
-    assert_string_equal    (cfgTransportHost(config, CFG_EVT), "127.0.0.1");
-    assert_string_equal    (cfgTransportPort(config, CFG_EVT), DEFAULT_EVT_PORT);
-    assert_null            (cfgTransportPath(config, CFG_EVT));
-    assert_int_equal       (cfgTransportBuf(config, CFG_EVT), CFG_BUFFER_FULLY);
+    assert_int_equal       (cfgTransportType(config, CFG_CTL), CFG_TCP);
+    assert_string_equal    (cfgTransportHost(config, CFG_CTL), "127.0.0.1");
+    assert_string_equal    (cfgTransportPort(config, CFG_CTL), DEFAULT_CTL_PORT);
+    assert_null            (cfgTransportPath(config, CFG_CTL));
+    assert_int_equal       (cfgTransportBuf(config, CFG_CTL), CFG_BUFFER_FULLY);
     assert_int_equal       (cfgTransportType(config, CFG_LOG), CFG_FILE);
     assert_null            (cfgTransportHost(config, CFG_LOG));
     assert_null            (cfgTransportPort(config, CFG_LOG));
@@ -824,11 +824,6 @@ cfgReadGoodYaml(void** state)
         "event:\n"
         "  format:\n"
         "    type : metricjson               # ndjson\n"
-        "  transport:\n"
-        "    type: tcp                       # udp, unix, file, syslog\n"
-        "    host: 127.0.0.2\n"
-        "    port: 9009\n"
-        "    buffering: line\n"
         "  watch:\n"
         "    - type: file                    # create events from file\n"
         "      name: .*[.]log$\n"
@@ -838,6 +833,11 @@ cfgReadGoodYaml(void** state)
         "    - type: syslog                  # create events from syslog and vsyslog\n"
         "    - type: metric\n"
         "libscope:\n"
+        "  transport:\n"
+        "    type: tcp                       # udp, unix, file, syslog\n"
+        "    host: 127.0.0.2\n"
+        "    port: 9009\n"
+        "    buffering: line\n"
         "  summaryperiod: 11                 # in seconds\n"
         "  commanddir: /tmp\n"
         "  log:\n"
@@ -869,11 +869,11 @@ cfgReadGoodYaml(void** state)
     assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
     assert_int_equal(cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_LINE);
-    assert_int_equal(cfgTransportType(config, CFG_EVT), CFG_TCP);
-    assert_string_equal(cfgTransportHost(config, CFG_EVT), "127.0.0.2");
-    assert_string_equal(cfgTransportPort(config, CFG_EVT), "9009");
-    assert_null(cfgTransportPath(config, CFG_EVT));
-    assert_int_equal(cfgTransportBuf(config, CFG_EVT), CFG_BUFFER_LINE);
+    assert_int_equal(cfgTransportType(config, CFG_CTL), CFG_TCP);
+    assert_string_equal(cfgTransportHost(config, CFG_CTL), "127.0.0.2");
+    assert_string_equal(cfgTransportPort(config, CFG_CTL), "9009");
+    assert_null(cfgTransportPath(config, CFG_CTL));
+    assert_int_equal(cfgTransportBuf(config, CFG_CTL), CFG_BUFFER_LINE);
     assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_SYSLOG);
     assert_null(cfgTransportHost(config, CFG_LOG));
     assert_null(cfgTransportPort(config, CFG_LOG));
@@ -1006,10 +1006,6 @@ cfgReadGoodJson(void** state)
         "    'format': {\n"
         "      'type': 'ndjson'\n"
         "    },\n"
-        "    'transport': {\n"
-        "      'type': 'file',\n"
-        "      'path': '/var/log/event.log'\n"
-        "    },\n"
         "    'watch' : [\n"
         "      {'type':'file', 'name':'.*[.]log$'},\n"
         "      {'type':'console'},\n"
@@ -1018,6 +1014,10 @@ cfgReadGoodJson(void** state)
         "    ],\n"
         "  },\n"
         "  'libscope': {\n"
+        "    'transport': {\n"
+        "      'type': 'file',\n"
+        "      'path': '/var/log/event.log'\n"
+        "    },\n"
         "    'summaryperiod': '13',\n"
         "    'log': {\n"
         "      'level': 'debug',\n"
@@ -1046,10 +1046,10 @@ cfgReadGoodJson(void** state)
     assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
-    assert_int_equal(cfgTransportType(config, CFG_EVT), CFG_FILE);
-    assert_string_equal(cfgTransportHost(config, CFG_EVT), "127.0.0.1");
-    assert_string_equal(cfgTransportPort(config, CFG_EVT), "9109");
-    assert_string_equal(cfgTransportPath(config, CFG_EVT), "/var/log/event.log");
+    assert_int_equal(cfgTransportType(config, CFG_CTL), CFG_FILE);
+    assert_string_equal(cfgTransportHost(config, CFG_CTL), "127.0.0.1");
+    assert_string_equal(cfgTransportPort(config, CFG_CTL), "9109");
+    assert_string_equal(cfgTransportPath(config, CFG_CTL), "/var/log/event.log");
     assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_SHM);
     assert_null(cfgTransportHost(config, CFG_LOG));
     assert_null(cfgTransportPort(config, CFG_LOG));
@@ -1150,17 +1150,17 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "      value: '[0-9]+'\n"
         "    - type: file\n"
         "    - type: metric\n"
-        "  transport:\n"
-        "    type: syslog                    # udp, unix, file, syslog\n"
-        "    host: 127.0.0.2\n"
-        "    port: 9009\n"
-        "    buffering: line\n"
         "  format:\n"
         "    type : metricjson\n"
         "libscope:\n"
         "  log:\n"
         "    level: info\n"
         "  summaryperiod: 42\n"
+        "  transport:\n"
+        "    type: syslog                    # udp, unix, file, syslog\n"
+        "    host: 127.0.0.2\n"
+        "    port: 9009\n"
+        "    buffering: line\n"
         "metric:\n"
         "  transport:\n"
         "    path: '/var/run/scope.sock'\n"
@@ -1191,7 +1191,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), 0);
     assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_METRIC), 1);
-    assert_int_equal(cfgTransportType(config, CFG_EVT), CFG_SYSLOG);
+    assert_int_equal(cfgTransportType(config, CFG_CTL), CFG_SYSLOG);
     assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
     assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
     assert_non_null(cfgCustomTags(config));
@@ -1202,7 +1202,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     deleteFile(path);
 }
 
-void
+static void
 cfgReadEnvSubstitution(void** state)
 {
 
@@ -1238,11 +1238,6 @@ cfgReadEnvSubstitution(void** state)
         "event:\n"
         "  format:\n"
         "    type : $FORMAT\n"
-        "  transport:\n"
-        "    type: syslog                    # udp, unix, file, syslog\n"
-        "    host: 127.0.0.2\n"
-        "    port: 9009\n"
-        "    buffering: line\n"
         "  watch:\n"
         "    - type: file                    # create events from files\n"
         "      name: $FILTER\n"
@@ -1250,6 +1245,11 @@ cfgReadEnvSubstitution(void** state)
         "    - type: $SOURCE                 # create events from syslog and vsyslog\n"
         "    - type: metric\n"
         "libscope:\n"
+        "  transport:\n"
+        "    type: syslog                    # udp, unix, file, syslog\n"
+        "    host: 127.0.0.2\n"
+        "    port: 9009\n"
+        "    buffering: line\n"
         "  summaryperiod: $PERIOD\n"
         "  commanddir: /$MYHOME/scope/\n"
         "  log:\n"
@@ -1299,7 +1299,7 @@ cfgReadEnvSubstitution(void** state)
     deleteFile(path);
 }
 
-void
+static void
 initLogReturnsPtr(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -1332,7 +1332,7 @@ initLogReturnsPtr(void** state)
     cfgDestroy(&cfg);
 }
 
-void
+static void
 initOutReturnsPtr(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -1351,29 +1351,29 @@ initOutReturnsPtr(void** state)
     cfgDestroy(&cfg);
 }
 
-void
+static void
 initEvtReturnsPtr(void** state)
 {
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    cfg_transport_t t;
-    for (t=CFG_UDP; t<=CFG_SHM; t++) {
-        cfgTransportTypeSet(cfg, CFG_EVT, t);
-        if (t==CFG_UNIX || t==CFG_FILE) {
-            cfgTransportPathSet(cfg, CFG_EVT, "/tmp/scope.log");
-        }
+    evt_t* evt = initEvt(cfg);
+    assert_non_null(evt);
+    evtDestroy(&evt);
 
-        // Don't do this with TCP. You need a different approach if you want to do that
-        if (t==CFG_UDP) {
-            cfgTransportHostSet(cfg, CFG_EVT, "localhost");
-            cfgTransportPortSet(cfg, CFG_EVT, "4444");
-        }
+    cfgDestroy(&cfg);
+}
 
-        evt_t* evt = initEvt(cfg);
-        assert_non_null(evt);
-        evtDestroy(&evt);
-    }
+static void
+initCtlReturnsPtr(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+
+    ctl_t* ctl = initCtl(cfg);
+    assert_non_null(ctl);
+    ctlDestroy(&ctl);
+
     cfgDestroy(&cfg);
 }
 
@@ -1395,7 +1395,7 @@ main(int argc, char* argv[])
     source_state_t met = {"SCOPE_EVENT_METRIC", CFG_SRC_METRIC , DEFAULT_SRC_METRIC};
 
     dest_state_t dest_out = {"SCOPE_METRIC_DEST", CFG_OUT};
-    dest_state_t dest_evt = {"SCOPE_EVENT_DEST", CFG_EVT};
+    dest_state_t dest_evt = {"SCOPE_EVENT_DEST", CFG_CTL};
     dest_state_t dest_log = {"SCOPE_LOG_DEST", CFG_LOG};
 
     const struct CMUnitTest tests[] = {
@@ -1433,6 +1433,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(initLogReturnsPtr),
         cmocka_unit_test(initOutReturnsPtr),
         cmocka_unit_test(initEvtReturnsPtr),
+        cmocka_unit_test(initCtlReturnsPtr),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(envRegexFree),
     };

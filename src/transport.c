@@ -490,6 +490,7 @@ transportFlush(transport_t* t)
 
     switch (t->type) {
         case CFG_UDP:
+        case CFG_TCP:
             break;
         case CFG_FILE:
             if (fflush(t->file.stream) == EOF) {

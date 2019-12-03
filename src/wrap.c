@@ -2168,6 +2168,28 @@ periodic(void *arg)
     return NULL;
 }
 
+static void
+reportProcessStart(void)
+{
+    // Log it at startup, provided the loglevel is set to allow it
+    scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
+
+    // Send a metric
+    event_field_t fields[] = {
+        PROC_FIELD(g_cfg.procname),
+        PID_FIELD(g_cfg.pid),
+        HOST_FIELD(g_cfg.hostname),
+        UNIT_FIELD("process"),
+        FIELDEND
+    };
+    event_t e = {"proc.start", 1, DELTA, fields};
+    sendEvent(g_out, &e);
+
+    // Send an event at startup, provided metric events are enabled
+    ctlSendMsg(g_ctl, evtMetric(g_evt, g_cfg.hostname, getTime(), &e));
+    ctlFlush(g_ctl);
+}
+
 __attribute__((constructor)) void
 init(void)
 {
@@ -2352,7 +2374,8 @@ init(void)
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
-    scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
+    reportProcessStart();
+
     if (atexit(handleExit)) {
         DBG(NULL);
     }

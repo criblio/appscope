@@ -43,7 +43,7 @@ struct _config_t
         cfg_log_level_t level;
     } log;
 
-    // CFG_OUT, CFG_EVT, or CFG_LOG
+    // CFG_OUT, CFG_CTL, or CFG_LOG
     transport_struct_t transport[CFG_WHICH_MAX]; 
 
     custom_tag_t** tags;
@@ -56,11 +56,11 @@ struct _config_t
 //#define DEFAULT_OUT_PORT DEFAULT_OUT_PORT (defined in scopetypes.h)
 #define DEFAULT_OUT_PATH NULL
 #define DEFAULT_OUT_BUF CFG_BUFFER_FULLY
-#define DEFAULT_EVT_TYPE CFG_TCP
-#define DEFAULT_EVT_HOST "127.0.0.1"
-//#define DEFAULT_EVT_PORT DEFAULT_EVT_PORT (defined in scopetypes.h)
-#define DEFAULT_EVT_PATH NULL
-#define DEFAULT_EVT_BUF CFG_BUFFER_FULLY
+#define DEFAULT_CTL_TYPE CFG_TCP
+#define DEFAULT_CTL_HOST "127.0.0.1"
+//#define DEFAULT_CTL_PORT DEFAULT_CTL_PORT (defined in scopetypes.h)
+#define DEFAULT_CTL_PATH NULL
+#define DEFAULT_CTL_BUF CFG_BUFFER_FULLY
 #define DEFAULT_LOG_TYPE CFG_FILE
 #define DEFAULT_LOG_HOST NULL
 #define DEFAULT_LOG_PORT NULL
@@ -101,31 +101,31 @@ static unsigned srcEnabledDefault[] = {
 
 static cfg_out_format_t typeDefault[] = {
     DEFAULT_OUT_TYPE,
-    DEFAULT_EVT_TYPE,
+    DEFAULT_CTL_TYPE,
     DEFAULT_LOG_TYPE,
 };
 
 static const char* hostDefault[] = {
     DEFAULT_OUT_HOST,
-    DEFAULT_EVT_HOST,
+    DEFAULT_CTL_HOST,
     DEFAULT_LOG_HOST,
 };
 
 static const char* portDefault[] = {
     DEFAULT_OUT_PORT,
-    DEFAULT_EVT_PORT,
+    DEFAULT_CTL_PORT,
     DEFAULT_LOG_PORT,
 };
 
 static const char* pathDefault[] = {
     DEFAULT_OUT_PATH,
-    DEFAULT_EVT_PATH,
+    DEFAULT_CTL_PATH,
     DEFAULT_LOG_PATH,
 };
 
 static cfg_buffer_t bufDefault[] = {
     DEFAULT_OUT_BUF,
-    DEFAULT_EVT_BUF,
+    DEFAULT_CTL_BUF,
     DEFAULT_LOG_BUF,
 };
 
@@ -147,7 +147,7 @@ cfgCreateDefault()
     c->out.period = DEFAULT_SUMMARY_PERIOD;
     c->out.verbosity = DEFAULT_OUT_VERBOSITY;
     c->out.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
-    c->evt.format = DEFAULT_EVT_FORMAT;
+    c->evt.format = DEFAULT_CTL_FORMAT;
 
     cfg_evt_t src;
     for (src=CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
@@ -251,7 +251,7 @@ cfgCmdDir(config_t* cfg)
 cfg_out_format_t
 cfgEventFormat(config_t* cfg)
 {
-    return (cfg) ? cfg->evt.format : DEFAULT_EVT_FORMAT;
+    return (cfg) ? cfg->evt.format : DEFAULT_CTL_FORMAT;
 }
 
 const char*

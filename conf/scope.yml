@@ -45,10 +45,6 @@ metric:
 event:
   format:
     type : ndjson                   # ndjson
-  transport:
-    type: tcp                       # udp, tcp, unix, file, syslog
-    host: 127.0.0.1
-    port: 9109
   watch:
     # Creates events from data written to files.
     # Designed for monitoring log files, but capable of capturing
@@ -74,6 +70,10 @@ event:
 #      value: .*
 
 libscope:
+  transport:
+    type: tcp                       # udp, tcp, unix, file, syslog
+    host: 127.0.0.1
+    port: 9109
   summaryperiod : 10                # in seconds
   commanddir : '/tmp'
   #  commanddir supports changes to configuration settings of running

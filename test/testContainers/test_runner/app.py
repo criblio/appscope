@@ -4,6 +4,8 @@ import sys
 from datetime import datetime
 
 import cribl
+import elastic
+import kafka_test
 import nginx
 import splunk
 import syscalls
@@ -18,7 +20,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
     parser.add_argument("-t", "--target", help="target application to test",
-                        choices=["nginx", "splunk", "cribl", "syscalls"],
+                        choices=["nginx", "splunk", "cribl", "syscalls", "elastic", "kafka"],
                         required=True)
     parser.add_argument("-id", "--execution_id", help="execution id")
     parser.add_argument("-l", "--logs_path", help="path to store the execution results and logs", default="/tmp/")
@@ -58,6 +60,10 @@ def main():
                 cribl.configure(runner, args)
             if args.target == 'syscalls':
                 syscalls.configure(runner, args)
+            if args.target == 'elastic':
+                elastic.configure(runner, args)
+            if args.target == 'kafka':
+                kafka_test.configure(runner, args)
             runner.run()
             test_watcher.finish()
         except Exception as e:

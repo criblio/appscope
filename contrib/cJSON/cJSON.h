@@ -268,6 +268,24 @@ CJSON_PUBLIC(cJSON*) cJSON_AddRawToObject(cJSON * const object, const char * con
 CJSON_PUBLIC(cJSON*) cJSON_AddObjectToObject(cJSON * const object, const char * const name);
 CJSON_PUBLIC(cJSON*) cJSON_AddArrayToObject(cJSON * const object, const char * const name);
 
+/* Helper functions for creating and adding items to an object at the same time.
+ * They return the added item or NULL on failure.
+ *
+ * Unlike the *Object helper functions immediately above, these *ObjLN functions
+ * can only be used when name is a string literal.  LN: "Literal Name".
+ * See the comment re: the cJSON_AddItemToObjectCS string parameter above.
+ * If you have any doubt, use the *Object functions instead of these.
+ */
+CJSON_PUBLIC(cJSON*) cJSON_AddNullToObjLN(cJSON * const object, const char * const name);
+CJSON_PUBLIC(cJSON*) cJSON_AddTrueToObjLN(cJSON * const object, const char * const name);
+CJSON_PUBLIC(cJSON*) cJSON_AddFalseToObjLN(cJSON * const object, const char * const name);
+CJSON_PUBLIC(cJSON*) cJSON_AddBoolToObjLN(cJSON * const object, const char * const name, const cJSON_bool boolean);
+CJSON_PUBLIC(cJSON*) cJSON_AddNumberToObjLN(cJSON * const object, const char * const name, const double number);
+CJSON_PUBLIC(cJSON*) cJSON_AddStringToObjLN(cJSON * const object, const char * const name, const char * const string);
+CJSON_PUBLIC(cJSON*) cJSON_AddRawToObjLN(cJSON * const object, const char * const name, const char * const raw);
+CJSON_PUBLIC(cJSON*) cJSON_AddObjectToObjLN(cJSON * const object, const char * const name);
+CJSON_PUBLIC(cJSON*) cJSON_AddArrayToObjLN(cJSON * const object, const char * const name);
+
 /* When assigning an integer value, it needs to be propagated to valuedouble too. */
 #define cJSON_SetIntValue(object, number) ((object) ? (object)->valueint = (object)->valuedouble = (number) : (number))
 /* helper for the cJSON_SetNumberValue macro */

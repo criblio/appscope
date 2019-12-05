@@ -448,8 +448,7 @@ fmtEventMessageStringValue(void** state)
     assert_non_null(fmt);
 
     event_format_t event_format;
-    event_format.timestamp = "1573058085.991";
-    event_format.timesize = strlen(event_format.timestamp);
+    event_format.timestamp = 1573058085.991;
     event_format.src = "stdin";
     event_format.hostname = "earl";
     event_format.data = "поспехаў";

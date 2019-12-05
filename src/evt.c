@@ -257,7 +257,6 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
 {
     event_format_t event;
     struct timeb tb;
-    char ts[128];
     time_t now;
     
     regex_t *filter;
@@ -303,9 +302,7 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     }
 
     ftime(&tb);
-    if (snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm) < 0) return NULL;
-    event.timestamp = ts;
-    event.timesize = strlen(ts);
+    event.timestamp = tb.time + tb.millitm/1000;
 
     event.src = "metric";
     event.hostname = host;
@@ -330,7 +327,6 @@ evtLog(evt_t *evt, const char *host, const char *path,
     char *msg;
     event_format_t event;
     struct timeb tb;
-    char ts[128];
     cfg_evt_t logType;
 
     if (!evt || !buf || !path || !host) return NULL;
@@ -349,9 +345,7 @@ evtLog(evt_t *evt, const char *host, const char *path,
     }
 
     ftime(&tb);
-    snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm);
-    event.timestamp = ts;
-    event.timesize = strlen(ts);
+    event.timestamp = tb.time + tb.millitm/1000;
     event.src = path;
     event.hostname = host;
     event.data = (char *)buf;

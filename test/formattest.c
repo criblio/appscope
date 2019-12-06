@@ -477,6 +477,59 @@ fmtEventMessageStringValue(void** state)
 }
 
 static void
+fmtEventMessageStringWithEmbeddedNulls(void** state)
+{
+    format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
+    assert_non_null(fmt);
+
+    event_format_t event_format;
+    event_format.timestamp = 1573058085.001;
+    event_format.src = "stdout";
+    event_format.hostname = "earl";
+    char buf[] = "Unë mund të ha qelq dhe nuk më gjen gjë";
+    event_format.data = buf;
+    event_format.datasize = strlen(event_format.data);
+    event_format.data[9] = '\0';                  //  <-- Null in middle of buf
+    event_format.data[29] = '\0';                 //  <-- Null in middle of buf
+    event_format.uid = 0xCAFEBABEDEADBEEF;
+
+    // test that _raw has the nulls properly escaped
+    char* str = fmtEventMessageString(fmt, &event_format);
+    assert_non_null(str);
+    assert_string_equal(str, "{\"_time\":1573058085.001,"
+                              "\"source\":\"stdout\","
+                              "\"_raw\":\"Unë mund\\u0000të ha qelq dhe nuk\\u0000më gjen gjë\","
+                              "\"host\":\"earl\","
+                              "\"_channel\":\"14627333968688430831\"}\n");
+    free(str);
+
+    // test that datasize of zero acts like null delimited input.
+    event_format.datasize=0;
+    str = fmtEventMessageString(fmt, &event_format);
+    assert_non_null(str);
+    assert_string_equal(str, "{\"_time\":1573058085.001,"
+                              "\"source\":\"stdout\","
+                              "\"_raw\":\"Unë mund\","
+                              "\"host\":\"earl\","
+                              "\"_channel\":\"14627333968688430831\"}\n");
+    free(str);
+
+    // test that null data returns empty string for _raw.
+    event_format.datasize=29;
+    event_format.data=NULL;
+    str = fmtEventMessageString(fmt, &event_format);
+    assert_non_null(str);
+    assert_string_equal(str, "{\"_time\":1573058085.001,"
+                              "\"source\":\"stdout\","
+                              "\"_raw\":\"\","
+                              "\"host\":\"earl\","
+                              "\"_channel\":\"14627333968688430831\"}\n");
+    free(str);
+
+    fmtDestroy(&fmt);
+}
+
+static void
 fmtStringMetricJsonNoFields(void** state)
 {
     format_t* fmt = fmtCreate(CFG_METRIC_JSON);
@@ -608,6 +661,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient),
         cmocka_unit_test(fmtStringStatsDHonorsCardinality),
         cmocka_unit_test(fmtEventMessageStringValue),
+        cmocka_unit_test(fmtEventMessageStringWithEmbeddedNulls),
         cmocka_unit_test(fmtStringMetricJsonNoFields),
         cmocka_unit_test(fmtStringMetricJsonWFields),
         cmocka_unit_test(fmtStringMetricJsonWFilteredFields),

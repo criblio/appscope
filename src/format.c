@@ -203,7 +203,9 @@ fmtEventNdJson(format_t *fmt, event_format_t *sev)
 
     if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto cleanup;
     if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto cleanup;
-    if (!cJSON_AddStringToObjLN(json, DATA, sev->data)) goto cleanup; // TBD: Needs sev->datasize param too...
+    cJSON* data = cJSON_CreateStringFromBuffer(sev->data, sev->datasize);
+    if (!data) goto cleanup;
+    cJSON_AddItemToObjectCS(json, DATA, data);
     if (!cJSON_AddStringToObjLN(json, HOST, sev->hostname)) goto cleanup;
     if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto cleanup;
     if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto cleanup;

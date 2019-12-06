@@ -195,6 +195,7 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateFalse(void);
 CJSON_PUBLIC(cJSON *) cJSON_CreateBool(cJSON_bool boolean);
 CJSON_PUBLIC(cJSON *) cJSON_CreateNumber(double num);
 CJSON_PUBLIC(cJSON *) cJSON_CreateString(const char *string);
+CJSON_PUBLIC(cJSON *) cJSON_CreateStringFromBuffer(const char *buffer, int length);
 /* raw json */
 CJSON_PUBLIC(cJSON *) cJSON_CreateRaw(const char *raw);
 CJSON_PUBLIC(cJSON *) cJSON_CreateArray(void);

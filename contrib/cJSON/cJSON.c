@@ -836,9 +836,10 @@ fail:
 }
 
 /* Render the cstring provided to an escaped version that can be printed. */
-static cJSON_bool print_string_ptr(const unsigned char * const input, printbuffer * const output_buffer)
+static cJSON_bool print_string_ptr(const unsigned char * const input, int str_len, printbuffer * const output_buffer)
 {
     const unsigned char *input_pointer = NULL;
+    const unsigned char* input_end = NULL;
     unsigned char *output = NULL;
     unsigned char *output_pointer = NULL;
     size_t output_length = 0;
@@ -864,7 +865,8 @@ static cJSON_bool print_string_ptr(const unsigned char * const input, printbuffe
     }
 
     /* set "flag" to 1 if something needs to be escaped */
-    for (input_pointer = input; *input_pointer; input_pointer++)
+    input_end = (str_len) ? &input[str_len] : &input[strlen((const char*)input)];
+    for (input_pointer = input; input_pointer!=input_end; input_pointer++)
     {
         switch (*input_pointer)
         {
@@ -909,7 +911,7 @@ static cJSON_bool print_string_ptr(const unsigned char * const input, printbuffe
     output[0] = '\"';
     output_pointer = output + 1;
     /* copy the string */
-    for (input_pointer = input; *input_pointer != '\0'; (void)input_pointer++, output_pointer++)
+    for (input_pointer = input; input_pointer!=input_end; (void)input_pointer++, output_pointer++)
     {
         if ((*input_pointer > 31) && (*input_pointer != '\"') && (*input_pointer != '\\'))
         {
@@ -960,7 +962,7 @@ static cJSON_bool print_string_ptr(const unsigned char * const input, printbuffe
 /* Invoke print_string_ptr (which is useful) on an item. */
 static cJSON_bool print_string(const cJSON * const item, printbuffer * const p)
 {
-    return print_string_ptr((unsigned char*)item->valuestring, p);
+    return print_string_ptr((unsigned char*)item->valuestring, 0, p);
 }
 
 /* Predeclare these prototypes. */
@@ -1660,7 +1662,7 @@ static cJSON_bool print_object(const cJSON * const item, printbuffer * const out
         }
 
         /* print key */
-        if (!print_string_ptr((unsigned char*)current_item->string, output_buffer))
+        if (!print_string_ptr((unsigned char*)current_item->string, 0, output_buffer))
         {
             return false;
         }
@@ -2452,6 +2454,33 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateString(const char *string)
     }
 
     return item;
+}
+
+CJSON_PUBLIC(cJSON *) cJSON_CreateStringFromBuffer(const char * buffer, int length)
+{
+    static const size_t default_buffer_size = 256;
+    cJSON *item = NULL;
+    printbuffer pb = {0};
+
+    /* initialize printbuffer */
+    pb.buffer = (unsigned char*) global_hooks.allocate(default_buffer_size);
+    if (pb.buffer == NULL) goto fail;
+    pb.length = default_buffer_size;
+    pb.hooks = global_hooks;
+
+    /* do whatever escaping is needed *now*. */
+    if (!print_string_ptr((const unsigned char*)buffer, length, &pb)) goto fail;
+
+    /* like cJSON_CreateRaw((const char *)pb.buffer), but avoids a strdup */
+    if (!(item = cJSON_New_Item(&global_hooks))) goto fail;
+    item->type = cJSON_Raw;
+    item->valuestring = (char*)pb.buffer;
+    return item;
+
+fail:
+    if (pb.buffer) free(pb.buffer);
+    if (item) cJSON_Delete(item);
+    return NULL;
 }
 
 CJSON_PUBLIC(cJSON *) cJSON_CreateStringReference(const char *string)

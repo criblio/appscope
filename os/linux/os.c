@@ -1,4 +1,5 @@
 #include "os.h"
+#include <linux/binfmts.h>
 
 int
 osGetProcname(char *pname, int len)
@@ -212,4 +213,57 @@ osIsFilePresent(pid_t pid, const char *path)
     } else {
         return sb.st_size;
     }
+}
+
+int
+osGetCmdline(pid_t pid, char *cmd, size_t cmdlen)
+{
+    int fd, rc;
+    char *buf;
+    char path[64];
+
+    //DEBUG
+    //strncpy(cmd, "none", cmdlen);
+    //return -1;
+
+    if (!cmd || !cmdlen) return -1;
+
+    if (!g_fn.open || !g_fn.read || !g_fn.close) {
+        strncpy(cmd, "none", cmdlen);
+        return -1;
+    }
+
+    if ((buf = calloc(1, NCARGS)) == NULL) {
+        strncpy(cmd, "none", cmdlen);
+        return -1;
+    }
+
+    snprintf(path, sizeof(path), "/proc/%d/cmdline", pid);
+
+    if ((fd = g_fn.open(path, O_RDONLY)) == -1) {
+        DBG(NULL);
+        free(buf);
+        strncpy(cmd, "none", cmdlen);
+        return -1;
+    }
+
+    if ((rc = g_fn.read(fd, buf, NCARGS)) <= 0) {
+        DBG(NULL);
+        g_fn.close(fd);
+        free(buf);
+        strncpy(cmd, "none", cmdlen);
+        return -1;
+    }
+
+    if (rc > cmdlen) {
+        memmove(cmd, &buf[rc - cmdlen], cmdlen - 1);
+        strcat(cmd, "\0");
+    } else {
+        memmove(cmd, buf, rc);
+    }
+
+    //strncpy(cmd, "none", cmdlen);
+    g_fn.close(fd);
+    free(buf);
+    return 0;
 }

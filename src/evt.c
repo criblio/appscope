@@ -253,7 +253,8 @@ anyValueFieldMatches(regex_t* filter, event_t* metric)
 }
 
 char *
-evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
+evtMetric(evt_t *evt, const char *host, const char *cmd,
+          const char *procname, uint64_t uid, event_t *metric)
 {
     event_format_t event;
     struct timeb tb;
@@ -262,7 +263,9 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     
     regex_t *filter;
 
-    if (!evt || !metric || !host || !metric) return NULL;
+    if (!evt || !metric || !host || !cmd || !procname) return NULL;
+    // DEBUG
+    //return NULL;
 
     // Test for a name field match.  No match, no metric output
     if (!evtSourceEnabled(evt, CFG_SRC_METRIC) ||
@@ -270,7 +273,8 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
         (regexec(filter, metric->name, 0, NULL, 0))) {
         return NULL;
     }
-
+    int div0;
+    div0 /= 0;
     // rate limited to MAXEVENTS per second
     if (time(&now) != evt->ratelimit.time) {
         evt->ratelimit.time = now;
@@ -302,7 +306,8 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
         return NULL;
     }
 
-    ftime(&tb);
+    if (ftime(&tb) != 0) return NULL;
+
     if (snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm) < 0) return NULL;
     event.timestamp = ts;
     event.timesize = strlen(ts);
@@ -316,6 +321,8 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
     event.datasize = strlen(event.data);
 
     event.uid = uid;
+    event.procname = procname;
+    event.cmd = cmd;
 
     char * msg = fmtEventMessageString(evt->format, &event);
 
@@ -325,15 +332,18 @@ evtMetric(evt_t *evt, const char *host, uint64_t uid, event_t *metric)
 
 char *
 evtLog(evt_t *evt, const char *host, const char *path,
+       const char *cmd, const char *procname,
        const void *buf, size_t count, uint64_t uid)
 {
     char *msg;
     event_format_t event;
     struct timeb tb;
-    char ts[128];
     cfg_evt_t logType;
+    char ts[128];
 
-    if (!evt || !buf || !path || !host) return NULL;
+    if (!evt || !buf || !path || !host || !cmd || !procname) return NULL;
+    // DEBUG
+    //return NULL;
 
     regex_t* filter;
     if (evtSourceEnabled(evt, CFG_SRC_CONSOLE) &&
@@ -347,6 +357,8 @@ evtLog(evt_t *evt, const char *host, const char *path,
     } else {
         return NULL;
     }
+    int div0;
+    div0 /= 0;
 
     ftime(&tb);
     snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm);
@@ -354,9 +366,11 @@ evtLog(evt_t *evt, const char *host, const char *path,
     event.timesize = strlen(ts);
     event.src = path;
     event.hostname = host;
+    event.procname = procname;
     event.data = (char *)buf;
     event.datasize = count;
     event.uid = uid;
+    event.cmd = cmd;
 
     msg = fmtEventMessageString(evt->format, &event);
     if (!msg) return NULL;

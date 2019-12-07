@@ -16,6 +16,9 @@
 #define DATA "_raw"
 #define SOURCE "source"
 #define CHANNEL "_channel"
+#define TYPE "ty"
+#define EVENT "ev"
+#define ID "id"
 
 #define TRUE 1
 #define FALSE 0
@@ -193,9 +196,17 @@ addCustomFields(format_t* fmt, custom_tag_t** tags, char** end, int* bytes, int*
 static size_t
 eventJsonSize(event_format_t *event)
 {
-    if (!event || !event->src || !event->datasize || !event->timesize) return 0;
-    size_t size = sizeof("{'_time':,'source':'','_raw':'','host':'','_channel':''}");
+    if (!event || !event->src || !event->datasize || !event->timesize ||
+        !event->hostname || !event->procname || !event->cmd) return 0;
+    size_t size = sizeof("{'ty':,'id':,'_time':,'source':'','_raw':'','host':'','_channel':''}");
 
+    // type
+    size += 5; //'ev'
+    // id:hostname-procname-cmd
+    size += strlen(event->hostname);
+    size += strlen(event->procname);
+    size += strlen(event->cmd);
+    size += 5;
     // time
     size += event->timesize;
     // source
@@ -215,7 +226,8 @@ static char *
 fmtEventNdJson(format_t *fmt, event_format_t *sev)
 {
     if (!sev) return NULL;
-
+    // DEBUG
+    return NULL;
     yaml_emitter_t emitter;
     yaml_event_t event;
     char numbuf[32];
@@ -227,6 +239,9 @@ fmtEventNdJson(format_t *fmt, event_format_t *sev)
 
     size_t bytes_written = 0;
     char* buf = NULL;
+    char idbuf[strlen(sev->hostname) +
+               strlen(sev->procname) +
+               strlen(sev->cmd) + 5];
 
     // Get the size of a complete json string & allocate
     const size_t bufsize = eventJsonSize(sev);
@@ -255,6 +270,37 @@ fmtEventNdJson(format_t *fmt, event_format_t *sev)
     if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
 
     // Start adding key:value entries
+    // TYPE:EVENT
+    /*
+     * Note: assumption here is that this func is always used to
+     * create an event. If that changes we will want to pass the
+     * value of TYPE as part of event_format_t; event or response.
+     */
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)TYPE, strlen(TYPE), 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)EVENT, strlen(EVENT), 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    // ID:hostname_procname_pid_cmd
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)ID, strlen(ID), 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
+    rv = snprintf(idbuf, sizeof(idbuf), "%s-%s-%s",
+                  sev->hostname, sev->procname, sev->cmd);
+    if (rv <= 0) goto cleanup;
+
+    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
+                                      (yaml_char_t*)idbuf, strlen(idbuf), 0, 1,
+                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
+    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
+
     // "TIME": "epochvalue.ms",
     rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
                                       (yaml_char_t*)TIME, strlen(TIME), 0, 1,
@@ -375,7 +421,7 @@ metricJsonSize(event_t *metric)
 static int
 addJsonFields(format_t* fmt, event_field_t* fields, regex_t* fieldFilter, yaml_emitter_t* emitter)
 {
-    if (!fmt || !fields) return TRUE;
+    if (!fmt || !fields || !fieldFilter || !emitter) return FALSE;
 
     int rv;
     yaml_event_t event;
@@ -401,13 +447,13 @@ addJsonFields(format_t* fmt, event_field_t* fields, regex_t* fieldFilter, yaml_e
                                               0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
             if (!rv || !yaml_emitter_emit(emitter, &event)) return FALSE;
         } else if (fld->value_type == FMT_NUM) {
-                rv = snprintf(numbuf, sizeof(numbuf), "%lli" , fld->value.num);
-                if (rv <= 0) return FALSE;
+            rv = snprintf(numbuf, sizeof(numbuf), "%lli" , fld->value.num);
+            if (rv <= 0) return FALSE;
 
-                rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
-                                                  (yaml_char_t*)numbuf, rv, 1, 0,
-                                                  YAML_PLAIN_SCALAR_STYLE);
-                if (!rv || !yaml_emitter_emit(emitter, &event)) return FALSE;
+            rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
+                                              (yaml_char_t*)numbuf, rv, 1, 0,
+                                              YAML_PLAIN_SCALAR_STYLE);
+            if (!rv || !yaml_emitter_emit(emitter, &event)) return FALSE;
         } else {
             DBG("bad field type");
         }
@@ -438,7 +484,7 @@ metricTypeStr(data_type_t type)
 static char *
 fmtMetricJson(format_t *fmt, event_t *metric, regex_t* fieldFilter)
 {
-    if (!metric) return NULL;
+    if (!metric || !fmt || !fieldFilter) return NULL;
 
     yaml_emitter_t emitter;
     yaml_event_t event;
@@ -454,6 +500,7 @@ fmtMetricJson(format_t *fmt, event_t *metric, regex_t* fieldFilter)
     const size_t bufsize = metricJsonSize(metric);
     if (!bufsize) goto cleanup;
     buf = calloc(1, bufsize);
+
     if (!buf) goto cleanup;
 
     // Yaml init stuff
@@ -525,7 +572,7 @@ cleanup:
         DBG("bufsize=%zu bytes_written=%zu buf=%p emitter_created=%d "
             "emitter_opened=%d emitter_error=%d emitter_problem=%s",
             bufsize, bytes_written, buf, emitter_created,
-            emitter_opened, emitter.error, emitter.problem);
+           emitter_opened, emitter.error, emitter.problem);
         if (buf) free(buf);
         buf = NULL;
     }

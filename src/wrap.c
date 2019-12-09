@@ -1836,7 +1836,7 @@ doReset()
 {
     g_cfg.pid = getpid();
     g_thread.once = 0;
-    g_thread.startTime = time(NULL); // + g_thread.interval;
+    g_thread.startTime = time(NULL) + g_thread.interval;
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
     ctlDestroy(&g_ctl);
     g_ctl = initCtl(g_staticfg);

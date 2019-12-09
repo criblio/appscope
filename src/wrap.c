@@ -2073,7 +2073,8 @@ reportPeriodicStuff(void)
 {
     long mem;
     int i, nthread, nfds, children;
-    long long cpu, cpuState = 0;
+    long long cpu = 0;
+    static long long cpuState = 0;
 
     // This is called by periodic(), and due to atexit().
     // If it's actively running for one reason, then skip the second.

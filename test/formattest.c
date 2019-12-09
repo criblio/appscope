@@ -455,6 +455,8 @@ fmtEventMessageStringValue(void** state)
     event_format.data = "поспехаў";
     event_format.datasize = strlen(event_format.data);
     event_format.uid = 0xCAFEBABEDEADBEEF;
+    event_format.cmd = "cmd";
+    event_format.procname = "formattest";
 
     assert_null(fmtEventMessageString(NULL, NULL));
 
@@ -465,7 +467,9 @@ fmtEventMessageStringValue(void** state)
     char* str = fmtEventMessageString(fmt, &event_format);
     assert_non_null(str);
 
-    assert_string_equal(str, "{\"_time\":1573058085.991,"
+    assert_string_equal(str, "{\"ty\":\"ev\","
+                              "\"id\":\"earl-formattest-cmd\","
+                              "\"_time\":1573058085.991,"
                               "\"source\":\"stdin\","
                               "\"_raw\":\"поспехаў\","
                               "\"host\":\"earl\","

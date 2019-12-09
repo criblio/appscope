@@ -29,7 +29,7 @@ run_test() {
     echo "$ENVVARS$1"
 
     # run the test
-    (export $ENVVARS; valgrind $1)
+    (export $ENVVARS; $1)
 
     # accumulate errors reported by the return value of the test
     ERR+=$?

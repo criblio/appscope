@@ -264,8 +264,6 @@ evtMetric(evt_t *evt, const char *host, const char *cmd,
     regex_t *filter;
 
     if (!evt || !metric || !host || !cmd || !procname) return NULL;
-    // DEBUG
-    //return NULL;
 
     // Test for a name field match.  No match, no metric output
     if (!evtSourceEnabled(evt, CFG_SRC_METRIC) ||
@@ -273,8 +271,7 @@ evtMetric(evt_t *evt, const char *host, const char *cmd,
         (regexec(filter, metric->name, 0, NULL, 0))) {
         return NULL;
     }
-    int div0;
-    div0 /= 0;
+
     // rate limited to MAXEVENTS per second
     if (time(&now) != evt->ratelimit.time) {
         evt->ratelimit.time = now;
@@ -342,8 +339,6 @@ evtLog(evt_t *evt, const char *host, const char *path,
     char ts[128];
 
     if (!evt || !buf || !path || !host || !cmd || !procname) return NULL;
-    // DEBUG
-    //return NULL;
 
     regex_t* filter;
     if (evtSourceEnabled(evt, CFG_SRC_CONSOLE) &&
@@ -357,8 +352,6 @@ evtLog(evt_t *evt, const char *host, const char *path,
     } else {
         return NULL;
     }
-    int div0;
-    div0 /= 0;
 
     ftime(&tb);
     snprintf(ts, sizeof(ts), "%ld.%03d", tb.time, tb.millitm);

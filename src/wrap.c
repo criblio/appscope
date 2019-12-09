@@ -285,10 +285,8 @@ getDuration(uint64_t start)
 static void
 doMetric(evt_t* gev, const char *host, uint64_t uid, event_t *metric)
 {
-    return;
-    //char cmd[DEFAULT_CMD_SIZE];
-    //osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
-    char cmd[] = "none";
+    char cmd[DEFAULT_CMD_SIZE];
+    osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
     char *msg = evtMetric(gev, host, cmd, g_cfg.procname, uid, metric);
     ctlSendMsg(g_ctl, msg);
 }
@@ -296,11 +294,9 @@ doMetric(evt_t* gev, const char *host, uint64_t uid, event_t *metric)
 static void
 doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
 {
-    return;
-    //char cmd[DEFAULT_CMD_SIZE];
+    char cmd[DEFAULT_CMD_SIZE];
 
-    //osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
-    char cmd[] = "none";
+    osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
     char* msg = evtLog(gev, g_cfg.hostname, fs->path, cmd,
                        g_cfg.procname, buf, len, fs->uid);
     ctlSendMsg(g_ctl, msg);
@@ -2202,10 +2198,9 @@ reportProcessStart(void)
     sendEvent(g_out, &e);
 
     // Send an event at startup, provided metric events are enabled
-    //char cmd[DEFAULT_CMD_SIZE];
+    char cmd[DEFAULT_CMD_SIZE];
 
-    //osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
-    char cmd[] = "none";
+    osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
     ctlSendMsg(g_ctl, evtMetric(g_evt, g_cfg.hostname, cmd,
                                 g_cfg.procname, getTime(), &e));
     ctlFlush(g_ctl);

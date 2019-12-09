@@ -226,8 +226,7 @@ static char *
 fmtEventNdJson(format_t *fmt, event_format_t *sev)
 {
     if (!sev) return NULL;
-    // DEBUG
-    return NULL;
+
     yaml_emitter_t emitter;
     yaml_event_t event;
     char numbuf[32];
@@ -421,7 +420,7 @@ metricJsonSize(event_t *metric)
 static int
 addJsonFields(format_t* fmt, event_field_t* fields, regex_t* fieldFilter, yaml_emitter_t* emitter)
 {
-    if (!fmt || !fields || !fieldFilter || !emitter) return FALSE;
+    if (!fmt || !fields || !emitter) return TRUE;
 
     int rv;
     yaml_event_t event;
@@ -484,7 +483,7 @@ metricTypeStr(data_type_t type)
 static char *
 fmtMetricJson(format_t *fmt, event_t *metric, regex_t* fieldFilter)
 {
-    if (!metric || !fmt || !fieldFilter) return NULL;
+    if (!metric || !fmt) return NULL;
 
     yaml_emitter_t emitter;
     yaml_event_t event;

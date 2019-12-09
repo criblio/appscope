@@ -226,8 +226,19 @@ anyValueFieldMatches(regex_t* filter, event_t* metric)
     if (!filter || !metric) return MATCH_FOUND;
 
     // Test the value of metric
-    char valbuf[64];
-    if (snprintf(valbuf, sizeof(valbuf), "%lld", metric->value) > 0) {
+    char valbuf[320]; // Seems crazy but -MAX_DBL.00 is 313 chars!
+    valbuf[0]='\0';
+    switch ( metric->value.type ) {
+        case FMT_INT:
+            snprintf(valbuf, sizeof(valbuf), "%lld", metric->value.integer);
+            break;
+        case FMT_FLT:
+            snprintf(valbuf, sizeof(valbuf), "%.2f", metric->value.floating);
+            break;
+        default:
+            DBG(NULL);
+    }
+    if (valbuf[0]) {
         if (!regexec(filter, valbuf, 0, NULL, 0)) return MATCH_FOUND;
     }
 

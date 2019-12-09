@@ -474,6 +474,11 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
 {
     if (!func || !name) return;
 
+    const char err_name[] = "EFAULT";
+    if (errno == EFAULT) {
+        name = err_name;
+    }
+
     switch (type) {
     case NET_ERR_CONN:
     case NET_ERR_RX_TX:

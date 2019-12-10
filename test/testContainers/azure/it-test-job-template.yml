@@ -9,6 +9,7 @@ jobs:
           source: current
           artifact: linux_build
           path: ./test/testContainers/
+      - script: chmod +x ./test/testContainers/libscope.so
       - script: docker login -u $HUB_USERNAME  --password-stdin <<< $HUB_PASSWORD
         displayName: Login to Docker
         env:

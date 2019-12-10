@@ -474,6 +474,11 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
 {
     if (!func || !name) return;
 
+    const char err_name[] = "EFAULT";
+    if (errno == EFAULT) {
+        name = err_name;
+    }
+
     switch (type) {
     case NET_ERR_CONN:
     case NET_ERR_RX_TX:
@@ -1836,7 +1841,7 @@ doReset()
 {
     g_cfg.pid = getpid();
     g_thread.once = 0;
-    g_thread.startTime = time(NULL); // + g_thread.interval;
+    g_thread.startTime = time(NULL) + g_thread.interval;
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
     ctlDestroy(&g_ctl);
     g_ctl = initCtl(g_staticfg);

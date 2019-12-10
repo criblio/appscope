@@ -18,11 +18,16 @@ RUN mkdir /opt/test-runner/logs/
 
 
 ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
+#COPY ./libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV SCOPE_METRIC_VERBOSITY=4
+ENV SCOPE_EVENT_LOGFILE=true
+ENV SCOPE_EVENT_CONSOLE=true
+ENV SCOPE_EVENT_METRICS=true
+#ENV SCOPE_EVENT_DEST=tcp://172.16.198.132:9109
 
 COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
 RUN pip3 install wheel

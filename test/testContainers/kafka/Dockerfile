@@ -42,8 +42,8 @@ RUN groupadd kafka && \
   useradd -d /kafka -g kafka -s /bin/false kafka && \
   chown -R kafka:kafka /kafka /data /logs
 
-ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
-#COPY ./libscope.so /usr/lib/libscope.so
+#ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
+COPY ./libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so
 ENV SCOPE_OUT_DEST=udp://localhost:8125
 ENV SCOPE_LOG_LEVEL=info

@@ -17,8 +17,8 @@ RUN mkdir /opt/test-runner/
 RUN mkdir /opt/test-runner/logs/
 
 
-ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
-#COPY ./libscope.so /usr/lib/libscope.so
+#ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
+COPY ./libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_LEVEL=info

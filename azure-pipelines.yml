@@ -42,13 +42,13 @@ stages:
           #  - script: ./scope.sh build
           #    displayName: scope.sh build
           - task: PublishPipelineArtifact@1
-              inputs:
-                ${{ if eq(variables['Agent.OS'], 'Linux') }}:
-                  targetPath: ./lib/linux/libscope.so
-                  artifactName: linux_build
-                ${{ if eq(variables['Agent.OS'], 'Darwin') }}:
-                  targetPath: ./lib/macOS/libscope.so
-                  artifactName: macOS_build
+            inputs:
+              ${{ if eq(variables['Agent.OS'], 'Linux') }}:
+                targetPath: ./lib/linux/libscope.so
+                artifactName: linux_build
+              ${{ if eq(variables['Agent.OS'], 'Darwin') }}:
+                targetPath: ./lib/macOS/libscope.so
+                artifactName: macOS_build
           - task: S3Upload@1
             condition: succeeded()
             inputs:

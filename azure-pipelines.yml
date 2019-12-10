@@ -55,9 +55,9 @@ stages:
                 targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
               filesAcl: 'public-read'
   - stage: integration_tests
-    displayName: Run integraion tests
+    displayName: Run integration tests
     dependsOn: build
-    #condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
     jobs:
       - template: test/testContainers/azure/it-test-job-template.yml
         parameters:

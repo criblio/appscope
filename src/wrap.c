@@ -713,15 +713,38 @@ doProcMetric(enum metric_t type, long long measurement)
     switch (type) {
     case PROC_CPU:
     {
-        event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
-            UNIT_FIELD("microsecond"),
-            FIELDEND
-        };
-        event_t e = INT_EVENT("proc.cpu", measurement, DELTA, fields);
-        sendEvent(g_out, &e);
+        {
+            event_field_t fields[] = {
+                PROC_FIELD(g_cfg.procname),
+                PID_FIELD(g_cfg.pid),
+                HOST_FIELD(g_cfg.hostname),
+                UNIT_FIELD("microsecond"),
+                FIELDEND
+            };
+            event_t e = INT_EVENT("proc.cpu", measurement, DELTA, fields);
+            sendEvent(g_out, &e);
+        }
+
+        // Avoid div by zero
+        unsigned interval = g_thread.interval;
+        if (!interval) break;
+
+        {
+            event_field_t fields[] = {
+                PROC_FIELD(g_cfg.procname),
+                PID_FIELD(g_cfg.pid),
+                HOST_FIELD(g_cfg.hostname),
+                UNIT_FIELD("percent"),
+                FIELDEND
+            };
+            // convert measurement to double and scale to percent
+            // convert interval from seconds to microseconds
+            //
+            // TBD: switch from using the configured to a measured interval
+            double val = measurement * 100.0 / (interval*1000000.0);
+            event_t e = FLT_EVENT("proc.cpu_perc", val, CURRENT, fields);
+            sendEvent(g_out, &e);
+        }
         break;
     }
 

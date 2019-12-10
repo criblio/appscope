@@ -37,8 +37,7 @@ typedef struct {
 } event_t;
 
 typedef struct event_format {
-    char *timestamp;
-    size_t timesize;
+    double timestamp;
     const char *src;
     const char *hostname;
     char *data;

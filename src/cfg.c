@@ -99,7 +99,7 @@ static unsigned srcEnabledDefault[] = {
     DEFAULT_SRC_METRIC,
 };
 
-static cfg_out_format_t typeDefault[] = {
+static cfg_transport_t typeDefault[] = {
     DEFAULT_OUT_TYPE,
     DEFAULT_CTL_TYPE,
     DEFAULT_LOG_TYPE,

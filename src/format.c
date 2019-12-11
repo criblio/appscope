@@ -126,20 +126,20 @@ static void
 appendStatsdFieldString(format_t* fmt, char* tag, int sz, char** end, int* bytes, int* firstTagAdded)
 {
     if (!*firstTagAdded) {
-        sz += 3; // add space for the |#, and trailing newline
-        if ((*bytes + sz) > fmt->statsd.max_len) return;
+        sz += 2; // add space for the |#
+        if ((*bytes + sz) >= fmt->statsd.max_len) return;
         *end = stpcpy(*end, "|#");
         *end = stpcpy(*end, tag);
         strcpy(*end, "\n"); // add newline, but don't advance end
         *firstTagAdded = 1;
     } else {
-        sz += 2; // add space for the comma, and trailing newline
-        if ((*bytes + sz) > fmt->statsd.max_len) return;
+        sz += 1; // add space for the comma
+        if ((*bytes + sz) >= fmt->statsd.max_len) return;
         *end = stpcpy(*end, ",");
         *end = stpcpy(*end, tag);
         strcpy(*end, "\n"); // add newline, but don't advance end
     }
-    *bytes += (sz - 1); // Don't count the newline, it's ok to overwrite
+    *bytes += sz;
 }
 
 
@@ -294,7 +294,16 @@ fmtMetricJson(format_t *fmt, event_t *metric, regex_t* fieldFilter)
     if (!cJSON_AddStringToObjLN(json, "_metric", metric->name)) goto cleanup;
     metric_type = metricTypeStr(metric->type);
     if (!cJSON_AddStringToObjLN(json, "_metric_type", metric_type)) goto cleanup;
-    if (!cJSON_AddNumberToObjLN(json, "_value", metric->value)) goto cleanup;
+    switch ( metric->value.type ) {
+        case FMT_INT:
+            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.integer)) goto cleanup;
+            break;
+        case FMT_FLT:
+            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.floating)) goto cleanup;
+            break;
+        default:
+            DBG(NULL);
+    }
 
     // Add fields
     if (!addJsonFields(fmt, metric->fields, fieldFilter, json)) goto cleanup;
@@ -324,29 +333,44 @@ fmtStatsDString(format_t* fmt, event_t* e, regex_t* fieldFilter)
 
     char* end_start = end;
 
-    // First, just estimate size, w/worst case
+    // First, calculate size
     int bytes = 0;
     bytes += strlen(fmt->statsd.prefix);
     bytes += strlen(e->name);
-    bytes += 22; // :-9223372036854775808|
-    bytes += 3;  // ms, newline
-    if (bytes > fmt->statsd.max_len) {
+    char valuebuf[320]; // :-MAX_DBL.00| => max of 315 chars for float
+    int n = -1;
+    switch ( e->value.type ) {
+        case FMT_INT:
+            n = sprintf(valuebuf, ":%lli|", e->value.integer);
+            break;
+        case FMT_FLT:
+            n = sprintf(valuebuf, ":%.2f|", e->value.floating);
+            break;
+        default:
+            DBG(NULL);
+    }
+    if (n < 0) {
+        free(end_start);
+        return NULL;
+    }
+    bytes += n; // size of value in valuebuf
+    char* type = statsdType(e->type);
+    bytes += strlen(type);
+
+    // Test the calloc'd size is adequate
+    if (bytes >= fmt->statsd.max_len) {
         free(end_start);
         return NULL;
     }
 
-    // Construct it
+    // Then construct it
     end = stpcpy(end, fmt->statsd.prefix);
     end = stpcpy(end, e->name);
-    int n = sprintf(end, ":%lli|", e->value);
-    if (n>0) end += n;
-    end = stpcpy(end, statsdType(e->type));
+    end = stpcpy(end, valuebuf);
+    end = stpcpy(end, type);
 
-    // Update bytes to reflect actual (not worst case, probabaly)
-    bytes = end - end_start;
-
-    // Add a newline that will get overwritten if there are fields
-    // strcpy doesn't advance end
+    // Add a newline that will get overwritten if there are fields.
+    // (strcpy doesn't advance end)
     strcpy(end, "\n");
 
     int firstTagAdded = 0;

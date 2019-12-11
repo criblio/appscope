@@ -516,7 +516,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
             FIELDEND
         };
 
-        event_t netErrMetric = {"net.error", *value, DELTA, fields};
+        event_t netErrMetric = INT_EVENT("net.error", *value, DELTA, fields);
 
         doMetric(g_evt, g_cfg.hostname, getTime(), &netErrMetric);
 
@@ -598,7 +598,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
             FIELDEND
         };
 
-        event_t fsErrMetric = {metric, *value, DELTA, fields};
+        event_t fsErrMetric = INT_EVENT(metric, *value, DELTA, fields);
 
         doMetric(g_evt, g_cfg.hostname, getTime(), &fsErrMetric);
 
@@ -643,7 +643,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
             FIELDEND
         };
 
-        event_t dnsMetric = {"net.dns", g_ctrs.numDNS, DELTA, fields};
+        event_t dnsMetric = INT_EVENT("net.dns", g_ctrs.numDNS, DELTA, fields);
 
         doMetric(g_evt, g_cfg.hostname, getTime(), &dnsMetric);
 
@@ -684,7 +684,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
             FIELDEND
         };
 
-        event_t dnsDurMetric = {"net.dns.duration", dur, DELTA_MS, fields};
+        event_t dnsDurMetric = INT_EVENT("net.dns.duration", dur, DELTA_MS, fields);
 
         doMetric(g_evt, g_cfg.hostname, getTime(), &dnsDurMetric);
 
@@ -713,15 +713,38 @@ doProcMetric(enum metric_t type, long long measurement)
     switch (type) {
     case PROC_CPU:
     {
-        event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
-            UNIT_FIELD("microsecond"),
-            FIELDEND
-        };
-        event_t e = {"proc.cpu", measurement, DELTA, fields};
-        sendEvent(g_out, &e);
+        {
+            event_field_t fields[] = {
+                PROC_FIELD(g_cfg.procname),
+                PID_FIELD(g_cfg.pid),
+                HOST_FIELD(g_cfg.hostname),
+                UNIT_FIELD("microsecond"),
+                FIELDEND
+            };
+            event_t e = INT_EVENT("proc.cpu", measurement, DELTA, fields);
+            sendEvent(g_out, &e);
+        }
+
+        // Avoid div by zero
+        unsigned interval = g_thread.interval;
+        if (!interval) break;
+
+        {
+            event_field_t fields[] = {
+                PROC_FIELD(g_cfg.procname),
+                PID_FIELD(g_cfg.pid),
+                HOST_FIELD(g_cfg.hostname),
+                UNIT_FIELD("percent"),
+                FIELDEND
+            };
+            // convert measurement to double and scale to percent
+            // convert interval from seconds to microseconds
+            //
+            // TBD: switch from using the configured to a measured interval
+            double val = measurement * 100.0 / (interval*1000000.0);
+            event_t e = FLT_EVENT("proc.cpu_perc", val, CURRENT, fields);
+            sendEvent(g_out, &e);
+        }
         break;
     }
 
@@ -734,7 +757,7 @@ doProcMetric(enum metric_t type, long long measurement)
             UNIT_FIELD("kibibyte"),
             FIELDEND
         };
-        event_t e = {"proc.mem", measurement, DELTA, fields};
+        event_t e = INT_EVENT("proc.mem", measurement, DELTA, fields);
         sendEvent(g_out, &e);
         break;
     }
@@ -748,7 +771,7 @@ doProcMetric(enum metric_t type, long long measurement)
             UNIT_FIELD("thread"),
             FIELDEND
         };
-        event_t e = {"proc.thread", measurement, CURRENT, fields};
+        event_t e = INT_EVENT("proc.thread", measurement, CURRENT, fields);
         sendEvent(g_out, &e);
         break;
     }
@@ -762,7 +785,7 @@ doProcMetric(enum metric_t type, long long measurement)
             UNIT_FIELD("file"),
             FIELDEND
         };
-        event_t e = {"proc.fd", measurement, CURRENT, fields};
+        event_t e = INT_EVENT("proc.fd", measurement, CURRENT, fields);
         sendEvent(g_out, &e);
         break;
     }
@@ -776,7 +799,7 @@ doProcMetric(enum metric_t type, long long measurement)
             UNIT_FIELD("process"),
             FIELDEND
         };
-        event_t e = {"proc.child", measurement, CURRENT, fields};
+        event_t e = INT_EVENT("proc.child", measurement, CURRENT, fields);
         sendEvent(g_out, &e);
         break;
     }
@@ -808,7 +831,7 @@ doStatMetric(const char *op, const char *pathname)
         return;
     }
 
-    event_t e = {"fs.op.stat", 1, DELTA, fields};
+    event_t e = INT_EVENT("fs.op.stat", 1, DELTA, fields);
     if (outSendEvent(g_out, &e)) {
         scopeLog("doStatMetric", -1, CFG_LOG_ERROR);
     }
@@ -864,7 +887,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             UNIT_FIELD("microsecond"),
             FIELDEND
         };
-        event_t e = {"fs.duration", d, HISTOGRAM, fields};
+        event_t e = INT_EVENT("fs.duration", d, HISTOGRAM, fields);
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doFSMetric:FS_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
         }
@@ -931,7 +954,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             FIELDEND
         };
 
-        event_t rwMetric = {metric, *sizebytes, HISTOGRAM, fields};
+        event_t rwMetric = INT_EVENT(metric, *sizebytes, HISTOGRAM, fields);
 
         doMetric(g_evt, g_cfg.hostname, g_fsinfo[fd].uid, &rwMetric);
 
@@ -1014,7 +1037,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             FIELDEND
         };
 
-        event_t e = {metric, *numops, DELTA, fields};
+        event_t e = INT_EVENT(metric, *numops, DELTA, fields);
         if (outSendEvent(g_out, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
@@ -1134,7 +1157,7 @@ doTotal(enum metric_t type)
             CLASS_FIELD("summary"),
             FIELDEND
     };
-    event_t e = {metric, *value, aggregation_type, fields};
+    event_t e = INT_EVENT(metric, *value, aggregation_type, fields);
     if (outSendEvent(g_out, &e)) {
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
@@ -1205,7 +1228,7 @@ doTotalDuration(enum metric_t type)
             CLASS_FIELD("summary"),
             FIELDEND
     };
-    event_t e = {metric, d, aggregation_type, fields};
+    event_t e = INT_EVENT(metric, d, aggregation_type, fields);
     if (outSendEvent(g_out, &e)) {
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
@@ -1289,7 +1312,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             UNIT_FIELD(units),
             FIELDEND
         };
-        event_t e = {metric, *value, CURRENT, fields};
+        event_t e = INT_EVENT(metric, *value, CURRENT, fields);
         if (outSendEvent(g_out, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
@@ -1343,7 +1366,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             UNIT_FIELD("millisecond"),
             FIELDEND
         };
-        event_t e = {"net.conn_duration", d, DELTA_MS, fields};
+        event_t e = INT_EVENT("net.conn_duration", d, DELTA_MS, fields);
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
         }
@@ -1437,7 +1460,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             FIELDEND
         };
 
-        event_t rxMetric = {"net.rx", g_netinfo[fd].rxBytes, DELTA, fields};
+        event_t rxMetric = INT_EVENT("net.rx", g_netinfo[fd].rxBytes, DELTA, fields);
 
         doMetric(g_evt, g_cfg.hostname, g_netinfo[fd].uid, &rxMetric);
 
@@ -1538,7 +1561,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             FIELDEND
         };
 
-        event_t txMetric = {"net.tx", g_netinfo[fd].txBytes, DELTA, fields};
+        event_t txMetric = INT_EVENT("net.tx", g_netinfo[fd].txBytes, DELTA, fields);
 
         doMetric(g_evt, g_cfg.hostname, g_netinfo[fd].uid, &txMetric);
 
@@ -2073,7 +2096,8 @@ reportPeriodicStuff(void)
 {
     long mem;
     int i, nthread, nfds, children;
-    long long cpu, cpuState = 0;
+    long long cpu = 0;
+    static long long cpuState = 0;
 
     // This is called by periodic(), and due to atexit().
     // If it's actively running for one reason, then skip the second.
@@ -2187,7 +2211,7 @@ reportProcessStart(void)
         UNIT_FIELD("process"),
         FIELDEND
     };
-    event_t e = {"proc.start", 1, DELTA, fields};
+    event_t e = INT_EVENT("proc.start", 1, DELTA, fields);
     sendEvent(g_out, &e);
 
     // Send an event at startup, provided metric events are enabled

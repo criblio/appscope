@@ -93,7 +93,7 @@ outFormatSetAndOutSendEvent(void** state)
     transport_t* t = transportCreateFile(file_path, CFG_BUFFER_LINE);
     outTransportSet(out, t);
 
-    event_t e = {"A", 1, DELTA, NULL};
+    event_t e = INT_EVENT("A", 1, DELTA, NULL);
     format_t* f = fmtCreate(CFG_METRIC_STATSD);
     outFormatSet(out, f);
 

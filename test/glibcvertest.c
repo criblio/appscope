@@ -167,6 +167,7 @@ testEachLineInStreamWithActualLibraryData(void** state)
     FILE* f_in = popen("nm ./lib/linux/libscope.so", "r");
     results_t result = {0};
     FILE* f_out = fopen("/dev/null", "a");
+    //                              replace f_out with stdout for debugging...
     testEachLineInStream(f_in, LATEST_LIBC_VER_NEEDED, &result, f_out);
     assert_true(result.lines_tested > 350);            // 383 when written
     assert_true(result.lines_glibc > 40);              // 54 when written

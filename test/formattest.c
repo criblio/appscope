@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <float.h>
 #include <limits.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -136,7 +137,7 @@ fmtStringStatsDNullEventDoesntCrash(void** state)
 static void
 fmtStringStatsDNullEventFieldsDoesntCrash(void** state)
 {
-    event_t e = {"useful.apps", 1, CURRENT, NULL};
+    event_t e = INT_EVENT("useful.apps", 1, CURRENT, NULL);
 
     format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     char* msg = fmtString(fmt, &e, NULL);
@@ -152,7 +153,7 @@ fmtStringNullFmtDoesntCrash(void** state)
         STRFIELD("proc",             "redis",            2),
         FIELDEND
     };
-    event_t e = {"useful.apps", 1, CURRENT, fields};
+    event_t e = INT_EVENT("useful.apps", 1, CURRENT, fields);
 
     assert_null(fmtString(NULL, &e, NULL));
 }
@@ -177,7 +178,7 @@ fmtStringStatsDHappyPath(void** state)
         NUMFIELD("port",             localPort,             4),
         FIELDEND
     };
-    event_t e = {"net.port", g_openPorts, CURRENT, fields};
+    event_t e = INT_EVENT("net.port", g_openPorts, CURRENT, fields);
 
     format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
@@ -218,7 +219,7 @@ fmtStringStatsDHappyPathFilteredFields(void** state)
         NUMFIELD("port",             localPort,             4),
         FIELDEND
     };
-    event_t e = {"net.port", g_openPorts, CURRENT, fields};
+    event_t e = INT_EVENT("net.port", g_openPorts, CURRENT, fields);
 
     format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
@@ -255,7 +256,7 @@ fmtStatsDWithCustomFields(void** state)
     custom_tag_t* tags[] = { &t1, &t2, NULL };
     fmtCustomTagsSet(fmt, tags);
 
-    event_t e = {"statsd.metric", 3, CURRENT, NULL};
+    event_t e = INT_EVENT("statsd.metric", 3, CURRENT, NULL);
 
     char* msg = fmtString(fmt, &e, NULL);
     assert_non_null(msg);
@@ -279,7 +280,7 @@ fmtStatsDWithCustomAndStatsdFields(void** state)
         STRFIELD("proc",             "test",                2),
         FIELDEND
     };
-    event_t e = {"fs.read", 3, CURRENT, fields};
+    event_t e = INT_EVENT("fs.read", 3, CURRENT, fields);
 
     char* msg = fmtString(fmt, &e, NULL);
     assert_non_null(msg);
@@ -297,14 +298,37 @@ fmtStringStatsDReturnsNullIfSpaceIsInsufficient(void** state)
     fmtStatsDPrefixSet(fmt, "98");
 
     // Test one that just fits
-    event_t e1 = {"A", -1234567890123456789, DELTA_MS, NULL};
+    event_t e1 = INT_EVENT("A", -1234567890123456789, DELTA_MS, NULL);
     char* msg = fmtString(fmt, &e1, NULL);
+    assert_non_null(msg);
     assert_string_equal(msg, "98A:-1234567890123456789|ms\n");
     assert_true(strlen(msg) == 28);
     free(msg);
 
     // One character too much (longer name)
-    event_t e2 = {"AB", e1.value, e1.type, e1.fields};
+    event_t e2 = INT_EVENT("AB", e1.value.integer, e1.type, e1.fields);
+    msg = fmtString(fmt, &e2, NULL);
+    assert_null(msg);
+    fmtDestroy(&fmt);
+}
+
+static void
+fmtStringStatsDReturnsNullIfSpaceIsInsufficientMax(void** state)
+{
+    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
+    fmtStatsDMaxLenSet(fmt, 2+1+315+3);
+    fmtStatsDPrefixSet(fmt, "98");
+
+    // Test one that just fits
+    event_t e1 = FLT_EVENT("A", -DBL_MAX, DELTA_MS, NULL);
+    char* msg = fmtString(fmt, &e1, NULL);
+    assert_non_null(msg);
+    assert_string_equal(msg, "98A:-179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.00|ms\n");
+    assert_true(strlen(msg) == 2+1+315+3);
+    free(msg);
+
+    // One character too much (longer name)
+    event_t e2 = FLT_EVENT("AB", e1.value.floating, e1.type, e1.fields);
     msg = fmtString(fmt, &e2, NULL);
     assert_null(msg);
     fmtDestroy(&fmt);
@@ -317,7 +341,7 @@ fmtStringStatsDVerifyEachStatsDType(void** state)
 
     data_type_t t;
     for (t=DELTA; t<=SET; t++) {
-        event_t e = {"A", 1, t, NULL};
+        event_t e = INT_EVENT("A", 1, t, NULL);
         char* msg = fmtString(fmt, &e, NULL);
         switch (t) {
             case DELTA:
@@ -342,7 +366,7 @@ fmtStringStatsDVerifyEachStatsDType(void** state)
     assert_int_equal(dbgCountMatchingLines("src/format.c"), 0);
 
     // In undefined case, just don't crash...
-    event_t e = {"A", 1, SET+1, NULL};
+    event_t e = INT_EVENT("A", 1, SET+1, NULL);
     char* msg = fmtString(fmt, &e, NULL);
     if (msg) free(msg);
 
@@ -367,7 +391,7 @@ fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient(void** state)
         STRFIELD("A",               "Z",                    0),
         FIELDEND
     };
-    event_t e = {"metric", 1, DELTA, fields};
+    event_t e = INT_EVENT("metric", 1, DELTA, fields);
     format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     fmtOutVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
@@ -410,7 +434,7 @@ fmtStringStatsDHonorsCardinality(void** state)
         NUMFIELD("J",               222,                    9),
         FIELDEND
     };
-    event_t e = {"metric", 1, DELTA, fields};
+    event_t e = INT_EVENT("metric", 1, DELTA, fields);
     format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
 
     fmtOutVerbositySet(fmt, 0);
@@ -448,8 +472,7 @@ fmtEventMessageStringValue(void** state)
     assert_non_null(fmt);
 
     event_format_t event_format;
-    event_format.timestamp = "1573058085.991";
-    event_format.timesize = strlen(event_format.timestamp);
+    event_format.timestamp = 1573058085.991;
     event_format.src = "stdin";
     event_format.hostname = "earl";
     event_format.data = "поспехаў";
@@ -482,6 +505,59 @@ fmtEventMessageStringValue(void** state)
 }
 
 static void
+fmtEventMessageStringWithEmbeddedNulls(void** state)
+{
+    format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
+    assert_non_null(fmt);
+
+    event_format_t event_format;
+    event_format.timestamp = 1573058085.001;
+    event_format.src = "stdout";
+    event_format.hostname = "earl";
+    char buf[] = "Unë mund të ha qelq dhe nuk më gjen gjë";
+    event_format.data = buf;
+    event_format.datasize = strlen(event_format.data);
+    event_format.data[9] = '\0';                  //  <-- Null in middle of buf
+    event_format.data[29] = '\0';                 //  <-- Null in middle of buf
+    event_format.uid = 0xCAFEBABEDEADBEEF;
+
+    // test that _raw has the nulls properly escaped
+    char* str = fmtEventMessageString(fmt, &event_format);
+    assert_non_null(str);
+    assert_string_equal(str, "{\"_time\":1573058085.001,"
+                              "\"source\":\"stdout\","
+                              "\"_raw\":\"Unë mund\\u0000të ha qelq dhe nuk\\u0000më gjen gjë\","
+                              "\"host\":\"earl\","
+                              "\"_channel\":\"14627333968688430831\"}\n");
+    free(str);
+
+    // test that datasize of zero acts like null delimited input.
+    event_format.datasize=0;
+    str = fmtEventMessageString(fmt, &event_format);
+    assert_non_null(str);
+    assert_string_equal(str, "{\"_time\":1573058085.001,"
+                              "\"source\":\"stdout\","
+                              "\"_raw\":\"Unë mund\","
+                              "\"host\":\"earl\","
+                              "\"_channel\":\"14627333968688430831\"}\n");
+    free(str);
+
+    // test that null data returns empty string for _raw.
+    event_format.datasize=29;
+    event_format.data=NULL;
+    str = fmtEventMessageString(fmt, &event_format);
+    assert_non_null(str);
+    assert_string_equal(str, "{\"_time\":1573058085.001,"
+                              "\"source\":\"stdout\","
+                              "\"_raw\":\"\","
+                              "\"host\":\"earl\","
+                              "\"_channel\":\"14627333968688430831\"}\n");
+    free(str);
+
+    fmtDestroy(&fmt);
+}
+
+static void
 fmtStringMetricJsonNoFields(void** state)
 {
     format_t* fmt = fmtCreate(CFG_METRIC_JSON);
@@ -499,7 +575,7 @@ fmtStringMetricJsonNoFields(void** state)
                  "\"_metric_type\":\"%s\","
                  "\"_value\":1}", map[type]), errno);
 
-        event_t e = {"A", 1, type, NULL};
+        event_t e = INT_EVENT("A", 1, type, NULL);
         char* actual = fmtString(fmt, &e, NULL);
         assert_string_equal(actual, expected);
         if (actual) free(actual);
@@ -518,7 +594,7 @@ fmtStringMetricJsonWFields(void** state)
         NUMFIELD("D",               654,                    3),
         FIELDEND
     };
-    event_t e = {"hey", 2, HISTOGRAM, fields};
+    event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
     char* str = fmtString(fmt, &e, NULL);
     assert_string_equal(str,
                  "{\"_metric\":\"hey\","
@@ -540,7 +616,7 @@ fmtStringMetricJsonWFilteredFields(void** state)
         NUMFIELD("D",               654,                    3),
         FIELDEND
     };
-    event_t e = {"hey", 2, HISTOGRAM, fields};
+    event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
     regex_t re;
     assert_int_equal(regcomp(&re, "[AD]", REG_EXTENDED), 0);
     char* str = fmtString(fmt, &e, &re);
@@ -559,7 +635,7 @@ fmtStringMetricJsonEscapedValues(void** state)
 {
     format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
     {
-        event_t e = {"Paç \"fat!", 3, SET, NULL};    // embedded double quote
+        event_t e = INT_EVENT("Paç \"fat!", 3, SET, NULL);    // embedded double quote
         char* str = fmtString(fmt, &e, NULL);
         assert_string_equal(str,
                  "{\"_metric\":\"Paç \\\"fat!\","
@@ -574,7 +650,7 @@ fmtStringMetricJsonEscapedValues(void** state)
             NUMFIELD("Viel\\ Glück",     123,      1),   // embedded backslash
             FIELDEND
         };
-        event_t e = {"you", 4, DELTA, fields};
+        event_t e = INT_EVENT("you", 4, DELTA, fields);
         char* str = fmtString(fmt, &e, NULL);
         assert_string_equal(str,
                  "{\"_metric\":\"you\","
@@ -609,10 +685,12 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtStatsDWithCustomFields),
         cmocka_unit_test(fmtStatsDWithCustomAndStatsdFields),
         cmocka_unit_test(fmtStringStatsDReturnsNullIfSpaceIsInsufficient),
+        cmocka_unit_test(fmtStringStatsDReturnsNullIfSpaceIsInsufficientMax),
         cmocka_unit_test(fmtStringStatsDVerifyEachStatsDType),
         cmocka_unit_test(fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient),
         cmocka_unit_test(fmtStringStatsDHonorsCardinality),
         cmocka_unit_test(fmtEventMessageStringValue),
+        cmocka_unit_test(fmtEventMessageStringWithEmbeddedNulls),
         cmocka_unit_test(fmtStringMetricJsonNoFields),
         cmocka_unit_test(fmtStringMetricJsonWFields),
         cmocka_unit_test(fmtStringMetricJsonWFilteredFields),

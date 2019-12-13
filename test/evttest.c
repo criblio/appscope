@@ -33,7 +33,7 @@ evtFormatSetAffectsOutput(void** state)
     assert_non_null(evt);
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
-    event_t e = {"A", 1, DELTA, NULL};
+    event_t e = INT_EVENT("A", 1, DELTA, NULL);
 
     // default format is CFG_EVENT_ND_JSON
     char* msg1 = evtMetric(evt, "host", "cmd-1", "evttest", 12345, &e);
@@ -59,7 +59,7 @@ evtMetricWithSourceDisabledReturnsNull(void** state)
     evt_t* evt = evtCreate();
     assert_non_null(evt);
 
-    event_t e = {"A", 1, DELTA, NULL};
+    event_t e = INT_EVENT("A", 1, DELTA, NULL);
 
     // default is disabled
     char* msg = evtMetric(evt, "host", "cmd-3", "evttest", 12345, &e);
@@ -86,7 +86,7 @@ evtMetricWithAndWithoutMatchingNameFilter(void** state)
     assert_non_null(evt);
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
-    event_t e = {"A", 1, DELTA, NULL};
+    event_t e = INT_EVENT("A", 1, DELTA, NULL);
     char* msg;
 
     // Default name filter allows everything
@@ -120,7 +120,7 @@ evtMetricWithAndWithoutMatchingFieldFilter(void** state)
         NUMFIELD("pid",              2,                     3),
         FIELDEND
     };
-    event_t e = {"A", 1, DELTA, fields};
+    event_t e = INT_EVENT("A", 1, DELTA, fields);
     char* msg;
 
     // Default field filter allows both fields
@@ -148,7 +148,7 @@ evtMetricWithAndWithoutMatchingValueFilter(void** state)
     assert_non_null(evt);
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
-    event_t e = {"A", 1, DELTA, NULL};
+    event_t e = INT_EVENT("A", 1, DELTA, NULL);
     char* msg;
 
     // Default value filter allows everything
@@ -201,7 +201,7 @@ evtMetricRateLimitReturnsNotice(void** state)
     assert_non_null(evt);
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
-    event_t e = {"Hey", 1, DELTA, NULL};
+    event_t e = INT_EVENT("Hey", 1, DELTA, NULL);
     char* msg;
 
     time_t initial, current;

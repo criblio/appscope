@@ -30,6 +30,7 @@ run_test() {
 
     # run the test
     (export $ENVVARS; $1)
+    #(export $ENVVARS; valgrind $1)
 
     # accumulate errors reported by the return value of the test
     ERR+=$?

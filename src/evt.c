@@ -343,7 +343,6 @@ evtLog(evt_t *evt, const char *host, const char *path,
     event_format_t event;
     struct timeb tb;
     cfg_evt_t logType;
-    char ts[128];
 
     if (!evt || !buf || !path || !host || !cmd || !procname) return NULL;
 

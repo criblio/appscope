@@ -222,10 +222,6 @@ osGetCmdline(pid_t pid, char *cmd, size_t cmdlen)
     char *buf;
     char path[64];
 
-    //DEBUG
-    //strncpy(cmd, "none", cmdlen);
-    //return -1;
-
     if (!cmd || !cmdlen) return -1;
 
     if (!g_fn.open || !g_fn.read || !g_fn.close) {
@@ -262,7 +258,6 @@ osGetCmdline(pid_t pid, char *cmd, size_t cmdlen)
         memmove(cmd, buf, rc);
     }
 
-    //strncpy(cmd, "none", cmdlen);
     g_fn.close(fd);
     free(buf);
     return 0;

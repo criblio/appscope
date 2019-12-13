@@ -520,11 +520,15 @@ fmtEventMessageStringWithEmbeddedNulls(void** state)
     event_format.data[9] = '\0';                  //  <-- Null in middle of buf
     event_format.data[29] = '\0';                 //  <-- Null in middle of buf
     event_format.uid = 0xCAFEBABEDEADBEEF;
-
+    event_format.procname = "";
+    event_format.cmd = "";
+    
     // test that _raw has the nulls properly escaped
     char* str = fmtEventMessageString(fmt, &event_format);
     assert_non_null(str);
-    assert_string_equal(str, "{\"_time\":1573058085.001,"
+    assert_string_equal(str, "{\"ty\":\"ev\","
+                              "\"id\":\"earl--\","
+                              "\"_time\":1573058085.001,"
                               "\"source\":\"stdout\","
                               "\"_raw\":\"Unë mund\\u0000të ha qelq dhe nuk\\u0000më gjen gjë\","
                               "\"host\":\"earl\","
@@ -535,7 +539,9 @@ fmtEventMessageStringWithEmbeddedNulls(void** state)
     event_format.datasize=0;
     str = fmtEventMessageString(fmt, &event_format);
     assert_non_null(str);
-    assert_string_equal(str, "{\"_time\":1573058085.001,"
+    assert_string_equal(str, "{\"ty\":\"ev\","
+                              "\"id\":\"earl--\","
+                              "\"_time\":1573058085.001,"
                               "\"source\":\"stdout\","
                               "\"_raw\":\"Unë mund\","
                               "\"host\":\"earl\","
@@ -547,7 +553,9 @@ fmtEventMessageStringWithEmbeddedNulls(void** state)
     event_format.data=NULL;
     str = fmtEventMessageString(fmt, &event_format);
     assert_non_null(str);
-    assert_string_equal(str, "{\"_time\":1573058085.001,"
+    assert_string_equal(str, "{\"ty\":\"ev\","
+                              "\"id\":\"earl--\","
+                              "\"_time\":1573058085.001,"
                               "\"source\":\"stdout\","
                               "\"_raw\":\"\","
                               "\"host\":\"earl\","

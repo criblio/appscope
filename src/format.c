@@ -204,6 +204,19 @@ fmtEventNdJson(format_t *fmt, event_format_t *sev)
     cJSON* json = cJSON_CreateObject();
     if (!json) goto cleanup;
 
+    if (!cJSON_AddStringToObjLN(json, TYPE, EVENT)) goto cleanup;
+
+    if (sev->hostname && sev->procname && sev->cmd) {
+        char id[strlen(sev->hostname) + strlen(sev->procname) + strlen(sev->cmd) + 4];
+
+        snprintf(id, sizeof(id), "%s-%s-%s", sev->hostname, sev->procname, sev->cmd);
+        if (!cJSON_AddStringToObjLN(json, ID, id)) goto cleanup;
+    } else {
+        char id[8];
+        snprintf(id, sizeof(id), "badid");
+        if (!cJSON_AddStringToObjLN(json, ID, id)) goto cleanup;
+    }
+
     if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto cleanup;
     if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto cleanup;
     cJSON* data = cJSON_CreateStringFromBuffer(sev->data, sev->datasize);
@@ -242,7 +255,7 @@ cleanup:
 static int
 addJsonFields(format_t* fmt, event_field_t* fields, regex_t* fieldFilter, cJSON* json)
 {
-    if (!fmt || !fields || !emitter) return TRUE;
+    if (!fmt || !fields) return TRUE;
 
     event_field_t *fld;
 

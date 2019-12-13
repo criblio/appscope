@@ -1051,6 +1051,7 @@ cfgRead(const char* path)
     config = cfgCreateDefault();
     if (!config) goto cleanup;
 
+    if (!path) goto cleanup;
     f = ni_fopen(path, "rb");
     if (!f) goto cleanup;
 
@@ -1071,9 +1072,46 @@ cleanup:
     if (f) ni_fclose(f);
     return config;
 }
+
+config_t*
+cfgFromString(const char* string)
+{
+    config_t* config = NULL;
+    int parser_successful = 0;
+    int doc_successful = 0;
+    yaml_parser_t parser;
+    yaml_document_t doc;
+
+    if (!string) goto cleanup;
+
+    config = cfgCreateDefault();
+    if (!config) goto cleanup;
+
+    parser_successful = yaml_parser_initialize(&parser);
+    if (!parser_successful) goto cleanup;
+
+    yaml_parser_set_input_string(&parser, (unsigned char*)string, strlen(string));
+
+    doc_successful = yaml_parser_load(&parser, &doc);
+    if (!doc_successful) goto cleanup;
+
+    // This is where the magic happens
+    setConfigFromDoc(config, &doc);
+
+cleanup:
+    if (doc_successful) yaml_document_delete(&doc);
+    if (parser_successful) yaml_parser_delete(&parser);
+    return config;
+}
+
 #else
 config_t*
 cfgRead(const char* path)
+{
+    return cfgCreateDefault();
+}
+config_t*
+cfgFromString(const char* string)
 {
     return cfgCreateDefault();
 }

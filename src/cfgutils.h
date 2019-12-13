@@ -14,6 +14,9 @@ char* cfgPath(void);
 // reads cfg from yaml file
 config_t* cfgRead(const char* path);
 
+// reads cfg from a string (containing json or yaml)
+config_t* cfgFromString(const char* string);
+
 // modify cfg per environment variables
 void cfgProcessEnvironment(config_t* cfg);
 

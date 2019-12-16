@@ -49,14 +49,14 @@ event:
     # Creates events from data written to files.
     # Designed for monitoring log files, but capable of capturing
     # any file writes.
-    - type: file
-      name: .*log.*                 # whitelist ex regex describing log file names
-      value: .*                     # whitelist ex regex describing field values
+#    - type: file
+#      name: .*log.*                 # whitelist ex regex describing log file names
+#      value: .*                     # whitelist ex regex describing field values
 
     # Creates events from data written to stdout, stderr, or both.
     # May be most useful for capturing debug output from processes
     # running in containerized environments.
-    - type: console
+#    - type: console
 #      name: stdout
 #      value: .*
 
@@ -64,10 +64,10 @@ event:
     # most useful for data which could overwhelm metric aggregation
     # servers, either due to data volumes or dimensions (tags) with
     # high cardinality.
-    - type: metric
-      name: .*                      # (net.*)|(.*err.*)
-      field: ^[^h]+                 # whitelist ex regex describing field names
-      value: .*
+#    - type: metric
+#      name: .*                      # (net.*)|(.*err.*)
+#      field: ^[^h]+                 # whitelist ex regex describing field names
+#      value: .*
 
 libscope:
   transport:

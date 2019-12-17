@@ -251,7 +251,7 @@ osGetCmdline(pid_t pid, char *cmd, size_t cmdlen)
     }
 
     if (rc > cmdlen) {
-        memmove(cmd, &buf[rc - cmdlen], cmdlen - 1);
+        memmove(cmd, &buf[rc - cmdlen], cmdlen);
     } else {
         memmove(cmd, buf, rc);
     }

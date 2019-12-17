@@ -56,8 +56,8 @@ event:
     # Creates events from data written to stdout, stderr, or both.
     # May be most useful for capturing debug output from processes
     # running in containerized environments.
-#    - type: console
-#      name: (stdout)|(stderr)
+#    - type: (stdout|stderr)
+#      name: stdout
 #      value: .*
 
     # Creates events from libscope's metric (statsd) data.  May be

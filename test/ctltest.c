@@ -130,28 +130,28 @@ ctlParseRxMsgSetCfgWithoutDataObjectReturnsParamErr(void** state)
          "    %s"
          "}";
 
-    const char* data[] = {
-    //  o) data field absent
+    const char* body[] = {
+    //  o) body field absent
         "",
-    //  o) data is not object
-        ",\"data\": \"hey\"",
-        ",\"data\": 1",
-        ",\"data\": [ \"Clint\", \"Ledion\", \"Dritan\" ]",
-        ",\"data\": true",
-        ",\"data\": false",
-        ",\"data\": null",
+    //  o) body is not object
+        ",\"body\": \"hey\"",
+        ",\"body\": 1",
+        ",\"body\": [ \"Clint\", \"Ledion\", \"Dritan\" ]",
+        ",\"body\": true",
+        ",\"body\": false",
+        ",\"body\": null",
         NULL
     };
 
     const char** test;
-    for (test=data; *test; test++) {
+    for (test=body; *test; test++) {
         assert_return_code(asprintf(&msg, base, *test), errno);
         //printf("%s\n", msg);
         request_t* req = ctlParseRxMsg(msg);
         free(msg);
         assert_non_null(req);
 
-        // data is missing, so expect REQ_PARAM_ERR
+        // body is missing, so expect REQ_PARAM_ERR
         assert_int_equal(req->cmd, REQ_PARAM_ERR);
         assert_string_equal(req->cmd_str, "SetCfg");
         assert_int_equal(req->id, 987413948756391);
@@ -170,10 +170,10 @@ ctlParseRxMsgSetCfg(void** state)
          "    \"type\": \"req\","
          "    \"req\": \"SetCfg\","
          "    \"reqId\": 3,"
-         "    \"data\": %s"
+         "    \"body\": %s"
          "}";
 
-    const char* data[] = {
+    const char* body[] = {
     //  o) Any object will be accepted, this will return *all* defaults
         "{}",
     //  o) This should create a cfg object that is different than default
@@ -226,21 +226,21 @@ ctlParseRxMsgSetCfg(void** state)
 
     const char** test;
     int run=1;
-    for (test=data; *test; test++) {
+    for (test=body; *test; test++) {
         assert_return_code(asprintf(&msg, base, *test), errno);
         //printf("%s\n", msg);
         request_t* req = ctlParseRxMsg(msg);
         free(msg);
         assert_non_null(req);
 
-        // data exists! expect REQ_SET_CFG, and non-null req->cfg
+        // body exists! expect REQ_SET_CFG, and non-null req->cfg
         assert_int_equal(req->cmd, REQ_SET_CFG);
         assert_string_equal(req->cmd_str, "SetCfg");
         assert_int_equal(req->id, 3);
         assert_non_null(req->cfg);
 
         // Verify StatsDMaxLen just to do some crude verification that
-        // the data made it into the req->cfg object...
+        // the body made it into the req->cfg object...
         // Run 1: verify that StatsDMaxLen is default
         // Run 2: verify that StatsDMaxLen is 42
         int expected_statsd_val;
@@ -252,7 +252,7 @@ ctlParseRxMsgSetCfg(void** state)
                 expected_statsd_val = 42;
                 break;
             default:
-                fail(); // must have added a test to data[] above.
+                fail(); // must have added a test to body[] above.
         }
         assert_int_equal(cfgOutStatsDMaxLen(req->cfg), expected_statsd_val);
         destroyReq(&req);
@@ -368,12 +368,12 @@ ctlCreateTxMsgResp(void** state)
         { .in = "{ \"type\": \"req\", \"req\": \"huh?\",\"reqId\": 2}",
           .out = {.req="huh?",    .reqId=2, .status=400,
                   .message="Req field was not expected value"}},
-        // REQ_PARAM_ERR (data field is required for SetCfg)
+        // REQ_PARAM_ERR (body field is required for SetCfg)
         { .in = "{ \"type\": \"req\", \"req\": \"SetCfg\",\"reqId\": 3}",
           .out = {.req="SetCfg",  .reqId=3, .status=400,
                   .message="Based on the req field, expected fields were missing"}},
         // REQ_SET_CFG
-        { .in = "{ \"type\": \"req\", \"req\": \"SetCfg\",\"reqId\": 4, \"data\": {}}",
+        { .in = "{ \"type\": \"req\", \"req\": \"SetCfg\",\"reqId\": 4, \"body\": {}}",
           .out = {.req="SetCfg",  .reqId=4, .status=200, .message=NULL}},
         // REQ_GET_CFG
         { .in = "{ \"type\": \"req\", \"req\": \"GetCfg\",\"reqId\": 5}",

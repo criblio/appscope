@@ -30,11 +30,11 @@ grab_supplemental_for_set_cfg(cJSON* json_root, request_t* req)
     // This expects a json version of our scope.yml file
     // See cfgReadGoodJson() in test/cfgutilstest.c or
     // ctlParseRxMsgSetCfg() in test/ctltest.c for an example
-    // of what we expect to find in the "data" json node.
-    json = cJSON_GetObjectItem(json_root, "data");
+    // of what we expect to find in the "body" json node.
+    json = cJSON_GetObjectItem(json_root, "body");
     if (!json || !cJSON_IsObject(json)) goto error;
 
-    // Create a string from the "data" json object
+    // Create a string from the "body" json object
     string = cJSON_PrintUnformatted(json);
     if (!string) goto error;
 
@@ -48,7 +48,7 @@ grab_supplemental_for_set_cfg(cJSON* json_root, request_t* req)
     return;
 
 error:
-    // data is required for REQ_SET_CFG
+    // body is required for REQ_SET_CFG
     req->cmd=REQ_PARAM_ERR;
 }
 
@@ -118,23 +118,23 @@ ctlParseRxMsg(const char* msg)
     if (req->cmd == REQ_UNKNOWN) goto out;
 
     //
-    // phase 4, grab supplemental info as required
+    // phase 4, grab supplemental info from body field as required
     //
     switch (req->cmd) {
         case REQ_PARSE_ERR:
         case REQ_MALFORMED:
         case REQ_UNKNOWN:
         case REQ_PARAM_ERR:
-            // Shouldn't be checking these for supplemental data.
+            // Shouldn't be checking these for body field
             DBG("Unexpected Cmd: %d", req->cmd);
             break;
         case REQ_SET_CFG:
-            // Right now, only REQ_SET_CFG has supplemental info
+            // Right now, only REQ_SET_CFG has required body field
             grab_supplemental_for_set_cfg(json_root, req);
             break;
         case REQ_GET_CFG:
         case REQ_GET_DIAG:
-            // No supplemental data
+            // body field not used
             break;
         default:
             DBG("Unknown Cmd: %d", req->cmd);

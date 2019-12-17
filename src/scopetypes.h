@@ -55,7 +55,7 @@ typedef enum {CFG_SRC_FILE,
 #define DEFAULT_OUT_PORT "8125"
 #define DEFAULT_CTL_PORT "9109"
 #define DEFAULT_CBUF_SIZE 5000
-
+#define DEFAULT_CMD_SIZE 32
 
 #endif // __SCOPETYPES_H__
 

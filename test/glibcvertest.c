@@ -28,7 +28,7 @@
 //     "                 U __stack_chk_fail@@GLIBC_2.4\n",
 //
 
-#define LATEST_LIBC_VER_NEEDED "2.4"
+#define LATEST_LIBC_VER_NEEDED "2.12"
 #define LIBC "GLIBC_"
 
 #define PRIVATE "PRIVATE"
@@ -166,14 +166,15 @@ testEachLineInStreamWithActualLibraryData(void** state)
 {
     FILE* f_in = popen("nm ./lib/linux/libscope.so", "r");
     results_t result = {0};
-    FILE* f_out = fopen("/dev/null", "a");
-    testEachLineInStream(f_in, LATEST_LIBC_VER_NEEDED, &result, f_out);
+    //FILE* f_out = fopen("/dev/null", "a");
+    //                              replace f_out with stdout for debugging...
+    testEachLineInStream(f_in, LATEST_LIBC_VER_NEEDED, &result, stdout);
     assert_true(result.lines_tested > 350);            // 383 when written
     assert_true(result.lines_glibc > 40);              // 54 when written
     assert_int_equal(result.lines_glibc_private,  1);  // _dl_sym
     assert_int_equal(result.lines_failed, 0);
     pclose(f_in);
-    fclose(f_out);
+    //fclose(f_out);
 }
 
 

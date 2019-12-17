@@ -33,10 +33,10 @@ evtFormatSetAffectsOutput(void** state)
     assert_non_null(evt);
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
-    event_t e = {"A", 1, DELTA, NULL};
+    event_t e = INT_EVENT("A", 1, DELTA, NULL);
 
     // default format is CFG_EVENT_ND_JSON
-    char* msg1 = evtMetric(evt, "host", 12345, &e);
+    char* msg1 = evtMetric(evt, "host", "cmd-1", "evttest", 12345, &e);
     assert_non_null(msg1);
 
     // Change to another format
@@ -45,7 +45,7 @@ evtFormatSetAffectsOutput(void** state)
 
     // fmtEventMessageString will only return non-null for CFG_EVENT_ND_JSON
     // Since msg1 and msg2 are different, it shows that the evtFormatSet worked.
-    char* msg2 = evtMetric(evt, "host", 12345, &e);
+    char* msg2 = evtMetric(evt, "host", "cmd-2", "evttest", 12345, &e);
     assert_null(msg2);
 
     free(msg1);
@@ -59,21 +59,21 @@ evtMetricWithSourceDisabledReturnsNull(void** state)
     evt_t* evt = evtCreate();
     assert_non_null(evt);
 
-    event_t e = {"A", 1, DELTA, NULL};
+    event_t e = INT_EVENT("A", 1, DELTA, NULL);
 
     // default is disabled
-    char* msg = evtMetric(evt, "host", 12345, &e);
+    char* msg = evtMetric(evt, "host", "cmd-3", "evttest", 12345, &e);
     assert_null(msg);
 
     // when enabled, we should get a non-null msg
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-4", "evttest", 12345, &e);
     assert_non_null(msg);
     free(msg);
 
     // Set it back to disabled, just to be sure.
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 0);
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-5", "evttest", 12345, &e);
     assert_null(msg);
 
     evtDestroy(&evt);
@@ -86,22 +86,22 @@ evtMetricWithAndWithoutMatchingNameFilter(void** state)
     assert_non_null(evt);
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
-    event_t e = {"A", 1, DELTA, NULL};
+    event_t e = INT_EVENT("A", 1, DELTA, NULL);
     char* msg;
 
     // Default name filter allows everything
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-6", "evttest", 12345, &e);
     assert_non_null(msg);
     free(msg);
 
     // Changing the name filter to "^B" shouldn't match.
     evtNameFilterSet(evt, CFG_SRC_METRIC, "^B");
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-7", "evttest", 12345, &e);
     assert_null(msg);
 
     // Changing the name filter to "^A" should match.
     evtNameFilterSet(evt, CFG_SRC_METRIC, "^A");
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-8", "evttest", 12345, &e);
     assert_non_null(msg);
     free(msg);
 
@@ -120,11 +120,11 @@ evtMetricWithAndWithoutMatchingFieldFilter(void** state)
         NUMFIELD("pid",              2,                     3),
         FIELDEND
     };
-    event_t e = {"A", 1, DELTA, fields};
+    event_t e = INT_EVENT("A", 1, DELTA, fields);
     char* msg;
 
     // Default field filter allows both fields
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-9", "evttest", 12345, &e);
     assert_non_null(msg);
     assert_non_null(strstr(msg, "proc"));
     assert_non_null(strstr(msg, "pid"));
@@ -132,7 +132,7 @@ evtMetricWithAndWithoutMatchingFieldFilter(void** state)
 
     // Changing the field filter to ".*oc" should match proc but not pid
     evtFieldFilterSet(evt, CFG_SRC_METRIC, ".*oc");
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-10", "evttest", 12345, &e);
     assert_non_null(msg);
     assert_non_null(strstr(msg, "proc"));
     assert_null(strstr(msg, "pid"));
@@ -148,17 +148,17 @@ evtMetricWithAndWithoutMatchingValueFilter(void** state)
     assert_non_null(evt);
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
-    event_t e = {"A", 1, DELTA, NULL};
+    event_t e = INT_EVENT("A", 1, DELTA, NULL);
     char* msg;
 
     // Default value filter allows everything
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-11", "evttest", 12345, &e);
     assert_non_null(msg);
     free(msg);
 
     // Changing the value filter to "^2" shouldn't match.
     evtValueFilterSet(evt, CFG_SRC_METRIC, "^2");
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-12", "evttest", 12345, &e);
     assert_null(msg);
 
     // Adding a field with value 2 should match.
@@ -168,25 +168,25 @@ evtMetricWithAndWithoutMatchingValueFilter(void** state)
         FIELDEND
     };
     e.fields = fields;
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-13", "evttest", 12345, &e);
     assert_non_null(msg);
     free(msg);
 
     // Changing the value filter to "^1" should match.
     evtValueFilterSet(evt, CFG_SRC_METRIC, "^1");
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-14", "evttest", 12345, &e);
     assert_non_null(msg);
     free(msg);
 
     // Changing the value filter to "ps" should match too.
     evtValueFilterSet(evt, CFG_SRC_METRIC, "ps");
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-15", "evttest", 12345, &e);
     assert_non_null(msg);
     free(msg);
 
     // Changing the value filter to "blah" should not match.
     evtValueFilterSet(evt, CFG_SRC_METRIC, "blah");
-    msg = evtMetric(evt, "host", 12345, &e);
+    msg = evtMetric(evt, "host",  "cmd-16", "evttest", 12345, &e);
     assert_null(msg);
 
     evtDestroy(&evt);
@@ -201,7 +201,7 @@ evtMetricRateLimitReturnsNotice(void** state)
     assert_non_null(evt);
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
-    event_t e = {"Hey", 1, DELTA, NULL};
+    event_t e = INT_EVENT("Hey", 1, DELTA, NULL);
     char* msg;
 
     time_t initial, current;
@@ -209,7 +209,7 @@ evtMetricRateLimitReturnsNotice(void** state)
 
     int i;
     for (i=0; i<=MAXEVENTS; i++) {
-        msg = evtMetric(evt, "host", 12345, &e);
+        msg = evtMetric(evt, "host",  "cmd-17", "evttest", 12345, &e);
         assert_non_null(msg);
 
         time(&current);
@@ -245,18 +245,18 @@ evtLogWithSourceDisabledReturnsNull(void** state)
     assert_non_null(evt);
 
     // default is disabled
-    char* msg = evtLog(evt, "host", "stdout", "hey", 4, 12345);
+    char* msg = evtLog(evt, "host", "stdout",  "cmd-log", "evttest", "hey", 4, 12345);
     assert_null(msg);
 
     // when enabled, we should get a non-null msg
     evtSourceEnabledSet(evt, CFG_SRC_CONSOLE, 1);
-    msg = evtLog(evt, "host", "stdout", "hey", 4, 12345);
+    msg = evtLog(evt, "host", "stdout",   "cmd-log", "evttest", "hey", 4, 12345);
     assert_non_null(msg);
     free(msg);
 
     // Set it back to disabled, just to be sure.
     evtSourceEnabledSet(evt, CFG_SRC_CONSOLE, 0);
-    msg = evtLog(evt, "host", "stdout", "hey", 4, 12345);
+    msg = evtLog(evt, "host", "stdout",   "cmd-log", "evttest", "hey", 4, 12345);
     assert_null(msg);
 
     evtDestroy(&evt);
@@ -270,18 +270,19 @@ evtLogWithAndWithoutMatchingNameFilter(void** state)
     evtSourceEnabledSet(evt, CFG_SRC_FILE, 1);
 
     // default name filter matches anything with log in the path
-    char* msg = evtLog(evt, "host", "/var/log/something.log", "hey", 4, 12345);
+    char* msg = evtLog(evt, "host", "/var/log/something.log", "cmd-log", "evttest",
+                       "hey", 4, 12345);
     assert_non_null(msg);
     free(msg);
 
     // Changing the name filter to ".*my[.]log" shouldn't match.
     evtNameFilterSet(evt, CFG_SRC_FILE, ".*my[.]log");
-    msg = evtLog(evt, "host", "/var/log/something.log", "hey", 4, 12345);
+    msg = evtLog(evt, "host", "/var/log/something.log", "cmd-log", "evttest", "hey", 4, 12345);
     assert_null(msg);
 
     // Changing the name filter to "^/var/log/.*[.]log$" should match.
     evtNameFilterSet(evt, CFG_SRC_FILE, "^/var/log/.*[.]log$");
-    msg = evtLog(evt, "host", "/var/log/something.log", "hey", 4, 12345);
+    msg = evtLog(evt, "host", "/var/log/something.log", "cmd-log", "evttest", "hey", 4, 12345);
     assert_non_null(msg);
     free(msg);
 
@@ -296,18 +297,19 @@ evtLogWithAndWithoutMatchingValueFilter(void** state)
     evtSourceEnabledSet(evt, CFG_SRC_FILE, 1);
 
     // default value filter matches anything
-    char* msg = evtLog(evt, "host", "/var/log/something.log", "hey", 4, 12345);
+    char* msg = evtLog(evt, "host", "/var/log/something.log", "cmd-log", "evttest",
+                       "hey", 4, 12345);
     assert_non_null(msg);
     free(msg);
 
     // Changing the value filter to "blah" shouldn't match.
     evtValueFilterSet(evt, CFG_SRC_FILE, "blah");
-    msg = evtLog(evt, "host", "/var/log/something.log", "hey", 4, 12345);
+    msg = evtLog(evt, "host", "/var/log/something.log", "cmd-log", "evttest", "hey", 4, 12345);
     assert_null(msg);
 
     // Changing the value filter to "hey" should match.
     evtValueFilterSet(evt, CFG_SRC_FILE, "hey");
-    msg = evtLog(evt, "host", "/var/log/something.log", "hey", 4, 12345);
+    msg = evtLog(evt, "host", "/var/log/something.log", "cmd-log", "evttest", "hey", 4, 12345);
     assert_non_null(msg);
     free(msg);
 

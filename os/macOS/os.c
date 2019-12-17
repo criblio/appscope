@@ -76,3 +76,10 @@ osIsFilePresent(pid_t pid, const char *path)
         return sb.st_size;
     }
 }
+
+int
+osGetCmdline(pid_t pid, char *cmd, size_t cmdlen)
+{
+    strncpy(cmd, "MACPATH", cmdlen);
+    return 0;
+}

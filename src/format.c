@@ -5,10 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include "cJSON.h"
 #include "dbg.h"
 #include "format.h"
 #include "scopetypes.h"
-#include "yaml.h"
 
 // key names for event JSON
 #define HOST "host"
@@ -16,6 +16,9 @@
 #define DATA "_raw"
 #define SOURCE "source"
 #define CHANNEL "_channel"
+#define TYPE "ty"
+#define EVENT "ev"
+#define ID "id"
 
 #define TRUE 1
 #define FALSE 0
@@ -126,20 +129,20 @@ static void
 appendStatsdFieldString(format_t* fmt, char* tag, int sz, char** end, int* bytes, int* firstTagAdded)
 {
     if (!*firstTagAdded) {
-        sz += 3; // add space for the |#, and trailing newline
-        if ((*bytes + sz) > fmt->statsd.max_len) return;
+        sz += 2; // add space for the |#
+        if ((*bytes + sz) >= fmt->statsd.max_len) return;
         *end = stpcpy(*end, "|#");
         *end = stpcpy(*end, tag);
         strcpy(*end, "\n"); // add newline, but don't advance end
         *firstTagAdded = 1;
     } else {
-        sz += 2; // add space for the comma, and trailing newline
-        if ((*bytes + sz) > fmt->statsd.max_len) return;
+        sz += 1; // add space for the comma
+        if ((*bytes + sz) >= fmt->statsd.max_len) return;
         *end = stpcpy(*end, ",");
         *end = stpcpy(*end, tag);
         strcpy(*end, "\n"); // add newline, but don't advance end
     }
-    *bytes += (sz - 1); // Don't count the newline, it's ok to overwrite
+    *bytes += sz;
 }
 
 
@@ -190,196 +193,70 @@ addCustomFields(format_t* fmt, custom_tag_t** tags, char** end, int* bytes, int*
 }
 
 // Accessors
-static size_t
-eventJsonSize(event_format_t *event)
-{
-    if (!event || !event->src || !event->datasize || !event->timesize) return 0;
-    size_t size = sizeof("{'_time':,'source':'','_raw':'','host':'','_channel':''}");
-
-    // time
-    size += event->timesize;
-    // source
-    size += strlen(event->src);
-    // _raw
-    size += event->datasize;
-    // host
-    size += strlen(event->hostname);
-    // _channel
-    size += strlen("18446744073709551615");
-    // fudge factor for things like escaped single quote characters.
-    size += 256;
-    return size;
-}
-
 static char *
 fmtEventNdJson(format_t *fmt, event_format_t *sev)
 {
-    if (!sev) return NULL;
-
-    yaml_emitter_t emitter;
-    yaml_event_t event;
-    char numbuf[32];
-    int rv;
-
-    int emitter_created = 0;
-    int emitter_opened = 0;
-    int everything_successful = 0;
-
-    size_t bytes_written = 0;
     char* buf = NULL;
+    char numbuf[32];
 
-    // Get the size of a complete json string & allocate
-    const size_t bufsize = eventJsonSize(sev);
-    if (!bufsize) goto cleanup;
-    buf = calloc(1, bufsize);
-    if (!buf) goto cleanup;
+    if (!fmt || !sev) return NULL;
 
-    // Yaml init stuff
-    emitter_created = yaml_emitter_initialize(&emitter);
-    if (!emitter_created) goto cleanup;
+    cJSON* json = cJSON_CreateObject();
+    if (!json) goto cleanup;
 
-    yaml_emitter_set_unicode(&emitter, 1);
+    if (!cJSON_AddStringToObjLN(json, TYPE, EVENT)) goto cleanup;
 
-    // subtract 1 from bufsize so we have room to append a newline below.
-    yaml_emitter_set_output_string(&emitter, (yaml_char_t*)buf, bufsize - 1,
-                                   &bytes_written);
-    emitter_opened = yaml_emitter_open(&emitter);
-    if (!emitter_opened) goto cleanup;
+    if (sev->hostname && sev->procname && sev->cmd) {
+        char id[strlen(sev->hostname) + strlen(sev->procname) + strlen(sev->cmd) + 4];
 
-    rv = yaml_document_start_event_initialize(&event, NULL, NULL, NULL, 1);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    rv = yaml_mapping_start_event_initialize(&event, NULL,
-                                             (yaml_char_t*)YAML_MAP_TAG, 1,
-                                             YAML_FLOW_MAPPING_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    // Start adding key:value entries
-    // "TIME": "epochvalue.ms",
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)TIME, strlen(TIME), 0, 1,
-                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_FLOAT_TAG,
-                                      (yaml_char_t*)sev->timestamp, sev->timesize, 1, 0,
-                                      YAML_PLAIN_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    // SOURCE: "pathname" || "syslog" || "high cardinality metric" || ...
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)SOURCE, strlen(SOURCE), 0, 1,
-                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)sev->src, strlen(sev->src), 0, 1,
-                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    // "data": "app data",
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)DATA, strlen(DATA), 0, 1,
-                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)sev->data, sev->datasize, 0, 1,
-                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    // HOST: "hostname"
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)HOST, strlen(HOST), 0, 1,
-                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)sev->hostname, strlen(sev->hostname), 0, 1,
-                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    // "channel": "unique value",
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)CHANNEL, strlen(CHANNEL), 0, 1,
-                                      YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    rv = snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid);
-    if (rv <= 0) goto cleanup;
-
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)numbuf, rv, 0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    // Done with key:value entries
-    // Tell yaml to wrap it up
-    rv = yaml_mapping_end_event_initialize(&event);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    rv = yaml_document_end_event_initialize(&event, 1);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    everything_successful = 1;
-
-    // Always newline delimited.
-    strcat(buf, "\n");
-
-cleanup:
-    if (!everything_successful) {
-        DBG("bufsize=%zu bytes_written=%zu buf=%p emitter_created=%d "
-            "emitter_opened=%d emitter_error=%d emitter_problem=%s",
-            bufsize, bytes_written, buf, emitter_created,
-            emitter_opened, emitter.error, emitter.problem);
-        if (buf) free(buf);
-        buf = NULL;
+        snprintf(id, sizeof(id), "%s-%s-%s", sev->hostname, sev->procname, sev->cmd);
+        if (!cJSON_AddStringToObjLN(json, ID, id)) goto cleanup;
+    } else {
+        char id[8];
+        snprintf(id, sizeof(id), "badid");
+        if (!cJSON_AddStringToObjLN(json, ID, id)) goto cleanup;
     }
 
-    if (emitter_opened) yaml_emitter_close(&emitter);
-    if (emitter_created) yaml_emitter_delete(&emitter);
+    if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto cleanup;
+    if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto cleanup;
+    cJSON* data = cJSON_CreateStringFromBuffer(sev->data, sev->datasize);
+    if (!data) goto cleanup;
+    cJSON_AddItemToObjectCS(json, DATA, data);
+    if (!cJSON_AddStringToObjLN(json, HOST, sev->hostname)) goto cleanup;
+    if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto cleanup;
+    if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto cleanup;
+
+    if (!(buf = cJSON_PrintUnformatted(json))) goto cleanup;
+
+    // Add the newline delimiter.
+    {
+        int strsize = strlen(buf);
+        char* temp = realloc(buf, strsize+2); // room for "\n\0"
+        if (!temp) {
+            DBG(NULL);
+            free(buf);
+            buf = NULL;
+            goto cleanup;
+        }
+        buf = temp;
+        strcat(&buf[strsize], "\n");
+    }
+
+cleanup:
+    if (!buf) {
+        DBG("time=%s src=%s data=%p host=%s channel=%s json=%p",
+            sev->timestamp, sev->src, sev->data, sev->hostname, numbuf, json);
+    }
+    if (json) cJSON_Delete(json);
 
     return buf;
 }
 
-static size_t
-metricJsonSize(event_t *metric)
-{
-    if (!metric) return 0;
-
-    size_t size = 256; // fudge factor for things like escaped quote chars.
-
-    size += strlen(metric->name) + 4;            // include {, "", :
-    size += 21;                                  // -9223372036854775808,
-
-    if (!metric->fields) return size;
-
-    event_field_t *fld;
-    for (fld = metric->fields; fld->value_type != FMT_END; fld++) {
-        size += strlen(fld->name) + 3;           // include "", :
-
-        switch (fld->value_type) {
-        case FMT_NUM:
-            size += 21;                          // -9223372036854775808,
-            break;
-        case FMT_STR:
-            size += strlen(fld->value.str) + 3;  // include quotes and comma
-            break;
-        default:
-            break;
-        }
-    }
-
-    return size;
-}
-
 static int
-addJsonFields(format_t* fmt, event_field_t* fields, regex_t* fieldFilter, yaml_emitter_t* emitter)
+addJsonFields(format_t* fmt, event_field_t* fields, regex_t* fieldFilter, cJSON* json)
 {
     if (!fmt || !fields) return TRUE;
 
-    int rv;
-    yaml_event_t event;
-    char numbuf[32];
     event_field_t *fld;
 
     // Start adding key:value entries
@@ -388,26 +265,10 @@ addJsonFields(format_t* fmt, event_field_t* fields, regex_t* fieldFilter, yaml_e
         // skip outputting anything that doesn't match fieldFilter
         if (fieldFilter && regexec(fieldFilter, fld->name, 0, NULL, 0)) continue;
 
-        // "Key"
-        rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                          (yaml_char_t*)fld->name, strlen(fld->name), 0, 1,
-                                          YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-        if (!rv || !yaml_emitter_emit(emitter, &event)) return FALSE;
-
-        // "Value"
         if (fld->value_type == FMT_STR) {
-            rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                              (yaml_char_t*)fld->value.str, strlen(fld->value.str),
-                                              0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-            if (!rv || !yaml_emitter_emit(emitter, &event)) return FALSE;
+            if (!cJSON_AddStringToObjLN(json, fld->name, fld->value.str)) return FALSE;
         } else if (fld->value_type == FMT_NUM) {
-                rv = snprintf(numbuf, sizeof(numbuf), "%lli" , fld->value.num);
-                if (rv <= 0) return FALSE;
-
-                rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
-                                                  (yaml_char_t*)numbuf, rv, 1, 0,
-                                                  YAML_PLAIN_SCALAR_STYLE);
-                if (!rv || !yaml_emitter_emit(emitter, &event)) return FALSE;
+            if (!cJSON_AddNumberToObjLN(json, fld->name, fld->value.num)) return FALSE;
         } else {
             DBG("bad field type");
         }
@@ -438,100 +299,39 @@ metricTypeStr(data_type_t type)
 static char *
 fmtMetricJson(format_t *fmt, event_t *metric, regex_t* fieldFilter)
 {
-    if (!metric) return NULL;
-
-    yaml_emitter_t emitter;
-    yaml_event_t event;
-    char numbuf[32];
-    int rv;
-    int emitter_created = 0;
-    int emitter_opened = 0;
-    int everything_successful = 0;
-    size_t bytes_written = 0;
     char* buf = NULL;
+    const char* metric_type = NULL;
 
-    // Get the size of a complete json string & allocate
-    const size_t bufsize = metricJsonSize(metric);
-    if (!bufsize) goto cleanup;
-    buf = calloc(1, bufsize);
-    if (!buf) goto cleanup;
+    if (!fmt || !metric) return NULL;
 
-    // Yaml init stuff
-    emitter_created = yaml_emitter_initialize(&emitter);
-    if (!emitter_created) goto cleanup;
+    cJSON *json = cJSON_CreateObject();
+    if (!json) goto cleanup;
 
-    yaml_emitter_set_unicode(&emitter, 1);
-
-    yaml_emitter_set_output_string(&emitter, (yaml_char_t*)buf, bufsize,
-                                   &bytes_written);
-    emitter_opened = yaml_emitter_open(&emitter);
-    if (!emitter_opened) goto cleanup;
-
-    rv = yaml_document_start_event_initialize(&event, NULL, NULL, NULL, 1);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    rv = yaml_mapping_start_event_initialize(&event, NULL,
-                                             (yaml_char_t*)YAML_MAP_TAG, 1,
-                                             YAML_FLOW_MAPPING_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    // add the base metric definition
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)"_metric", strlen("_metric"),
-                                      0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)metric->name, strlen(metric->name),
-                                      0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    // add the metric type
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)"_metric_type", strlen("_metric_type"),
-                                      0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-    const char* metric_type = metricTypeStr(metric->type);
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)metric_type, strlen(metric_type),
-                                      0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    // add the value
-    rv = snprintf(numbuf, sizeof(numbuf), "%lli", metric->value);
-    if (rv <= 0) goto cleanup;
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_STR_TAG,
-                                      (yaml_char_t*)"_value", strlen("_value"),
-                                      0, 1, YAML_DOUBLE_QUOTED_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-    rv = yaml_scalar_event_initialize(&event, NULL, (yaml_char_t*)YAML_INT_TAG,
-                                      (yaml_char_t*)numbuf, rv, 1, 0, YAML_PLAIN_SCALAR_STYLE);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    // Add key:value fields
-    if (!addJsonFields(fmt, metric->fields, fieldFilter, &emitter)) goto cleanup;
-
-    // Done with key:value entries
-    // Tell yaml to wrap it up
-    rv = yaml_mapping_end_event_initialize(&event);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    rv = yaml_document_end_event_initialize(&event, 1);
-    if (!rv || !yaml_emitter_emit(&emitter, &event)) goto cleanup;
-
-    everything_successful = 1;
-
-cleanup:
-    if (!everything_successful) {
-        DBG("bufsize=%zu bytes_written=%zu buf=%p emitter_created=%d "
-            "emitter_opened=%d emitter_error=%d emitter_problem=%s",
-            bufsize, bytes_written, buf, emitter_created,
-            emitter_opened, emitter.error, emitter.problem);
-        if (buf) free(buf);
-        buf = NULL;
+    if (!cJSON_AddStringToObjLN(json, "_metric", metric->name)) goto cleanup;
+    metric_type = metricTypeStr(metric->type);
+    if (!cJSON_AddStringToObjLN(json, "_metric_type", metric_type)) goto cleanup;
+    switch ( metric->value.type ) {
+        case FMT_INT:
+            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.integer)) goto cleanup;
+            break;
+        case FMT_FLT:
+            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.floating)) goto cleanup;
+            break;
+        default:
+            DBG(NULL);
     }
 
-    if (emitter_opened) yaml_emitter_close(&emitter);
-    if (emitter_created) yaml_emitter_delete(&emitter);
+    // Add fields
+    if (!addJsonFields(fmt, metric->fields, fieldFilter, json)) goto cleanup;
+
+    buf = cJSON_PrintUnformatted(json);
+
+cleanup:
+    if (!buf) {
+        DBG("_metric=%s _metric_type=%s _value=%lld, fields=%p, json=%p",
+            metric->name, metric_type, metric->value, metric->fields, json);
+    }
+    if (json) cJSON_Delete(json);
 
     return buf;
 }
@@ -549,29 +349,44 @@ fmtStatsDString(format_t* fmt, event_t* e, regex_t* fieldFilter)
 
     char* end_start = end;
 
-    // First, just estimate size, w/worst case
+    // First, calculate size
     int bytes = 0;
     bytes += strlen(fmt->statsd.prefix);
     bytes += strlen(e->name);
-    bytes += 22; // :-9223372036854775808|
-    bytes += 3;  // ms, newline
-    if (bytes > fmt->statsd.max_len) {
+    char valuebuf[320]; // :-MAX_DBL.00| => max of 315 chars for float
+    int n = -1;
+    switch ( e->value.type ) {
+        case FMT_INT:
+            n = sprintf(valuebuf, ":%lli|", e->value.integer);
+            break;
+        case FMT_FLT:
+            n = sprintf(valuebuf, ":%.2f|", e->value.floating);
+            break;
+        default:
+            DBG(NULL);
+    }
+    if (n < 0) {
+        free(end_start);
+        return NULL;
+    }
+    bytes += n; // size of value in valuebuf
+    char* type = statsdType(e->type);
+    bytes += strlen(type);
+
+    // Test the calloc'd size is adequate
+    if (bytes >= fmt->statsd.max_len) {
         free(end_start);
         return NULL;
     }
 
-    // Construct it
+    // Then construct it
     end = stpcpy(end, fmt->statsd.prefix);
     end = stpcpy(end, e->name);
-    int n = sprintf(end, ":%lli|", e->value);
-    if (n>0) end += n;
-    end = stpcpy(end, statsdType(e->type));
+    end = stpcpy(end, valuebuf);
+    end = stpcpy(end, type);
 
-    // Update bytes to reflect actual (not worst case, probabaly)
-    bytes = end - end_start;
-
-    // Add a newline that will get overwritten if there are fields
-    // strcpy doesn't advance end
+    // Add a newline that will get overwritten if there are fields.
+    // (strcpy doesn't advance end)
     strcpy(end, "\n");
 
     int firstTagAdded = 0;

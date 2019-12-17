@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
               childfd = accept(parentfd, (struct sockaddr *) &clientaddr, &clientlen);
               if (childfd < 0) {
                   perror("ERROR on accept");
-                  break;
+                  continue;
               }
 
               if (numfds > MAXFDS) {
@@ -173,12 +173,19 @@ int main(int argc, char **argv) {
               // who sent the message 
               hostp = gethostbyaddr((const char *)&clientaddr.sin_addr.s_addr, 
                                     sizeof(clientaddr.sin_addr.s_addr), AF_INET);
-              if (hostp == NULL)
-                  perror("ERROR on gethostbyaddr");
+              if (hostp == NULL) {
+                  //perror("ERROR on gethostbyaddr");
+                  printf("server established connection on [%d].%d\n", arr, childfd);
+                  continue;
+              }
 
               hostaddrp = inet_ntoa(clientaddr.sin_addr);
-              if (hostaddrp == NULL)
-                  perror("ERROR on inet_ntoa\n");
+              if (hostaddrp == NULL) {
+                  //perror("ERROR on inet_ntoa\n");
+                  printf("server established connection on [%d].%d with %s\n", 
+                         arr, childfd, hostp->h_name);
+                  continue;
+              }
 
               printf("server established connection on [%d].%d with %s (%s:%d)\n", 
                      arr, childfd, hostp->h_name, hostaddrp, htons(clientaddr.sin_port));

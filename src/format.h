@@ -10,11 +10,11 @@
 // but abstracting it a bit.  In this terminology, a statsd metric
 // with (dogstatsd) tags is an event with event fields.
 
-typedef enum {FMT_END, FMT_STR, FMT_NUM} value_t;
+typedef enum {FMT_END, FMT_STR, FMT_NUM} field_value_t;
 
 typedef struct {
     const char* const name;
-    const value_t value_type;
+    const field_value_t value_type;
     union {
         const char* str;
         long long num;
@@ -29,18 +29,29 @@ typedef struct {
 // statsd:  COUNTER,   GAUGE,    TIMER, HISTOGRAM, SET
 typedef enum {DELTA, CURRENT, DELTA_MS, HISTOGRAM, SET} data_type_t;
 
+typedef enum {FMT_INT, FMT_FLT} value_t;
 typedef struct {
     const char* const name;
-    const long long value;
+    struct {
+        const value_t type;
+        union {
+            const long long integer;
+            double floating;
+        };
+    } value;
     const data_type_t type;
     event_field_t* fields;
 } event_t;
 
+#define INT_EVENT(n, v, t, f) {n, { FMT_INT, .integer=v}, t, f}
+#define FLT_EVENT(n, v, t, f) {n, { FMT_FLT, .floating=v}, t, f}
+
 typedef struct event_format {
-    char *timestamp;
-    size_t timesize;
+    double timestamp;
     const char *src;
     const char *hostname;
+    const char *procname;
+    const char *cmd;
     char *data;
     size_t datasize;
     unsigned long long uid;

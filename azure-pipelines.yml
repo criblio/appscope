@@ -89,26 +89,28 @@ stages:
   - stage: publish
     displayName: Publish artifacts to S3
     condition: succeeded()
-    steps:
-      - task: DownloadPipelineArtifact@2
-        inputs:
-          artifact: 'linux_build'
-          path: $(Build.BinariesDirectory)/lib/linux/
-      - task: DownloadPipelineArtifact@2
-        inputs:
-          artifact: 'macOS_build'
-          path: $(Build.BinariesDirectory)/lib/macOS/
-      - task: S3Upload@1
-        condition: succeeded()
-        inputs:
-          awsCredentials: 'azure-pipeline-aws'
-          regionName: 'us-west-2'
-          bucketName: 'cdn.cribl.io'
-          sourceFolder: '$(Build.BinariesDirectory)/lib/'
-          globExpressions: '**/*.so'
-          ${{ if eq(variables['Build.SourceBranchName'], 'master') }}:
-            targetFolder: 'dl/scope/latest/'
-          ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:
-            targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
-          filesAcl: 'public-read'
+    jobs:
+      - job: publish
+        steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifact: 'linux_build'
+              path: $(Build.BinariesDirectory)/lib/linux/
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifact: 'macOS_build'
+              path: $(Build.BinariesDirectory)/lib/macOS/
+          - task: S3Upload@1
+            condition: succeeded()
+            inputs:
+              awsCredentials: 'azure-pipeline-aws'
+              regionName: 'us-west-2'
+              bucketName: 'cdn.cribl.io'
+              sourceFolder: '$(Build.BinariesDirectory)/lib/'
+              globExpressions: '**/*.so'
+              ${{ if eq(variables['Build.SourceBranchName'], 'master') }}:
+                targetFolder: 'dl/scope/latest/'
+              ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:
+                targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
+              filesAcl: 'public-read'
 

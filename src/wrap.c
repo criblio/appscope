@@ -178,10 +178,6 @@ remoteConfig()
     do {
         numtries++;
         rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
-        /*
-         * TODO: if we get an error, we don't get the whole file
-         * When we support ndjson look for new line as EOF
-         */
         if (rc <= 0) {
             if (errno == 0) {
                 // This is the case where we lost connection
@@ -207,7 +203,7 @@ remoteConfig()
              * and we receive a viable EOM.
              */
             // EOM
-            if (strstr((const char *)buf, "\n") != NULL) {
+            if (strchr((const char *)buf, '\n') != NULL) {
                 char dbg[4096];
                 success = 1;
                 //debug

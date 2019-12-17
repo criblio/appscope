@@ -64,6 +64,7 @@
 #define MAX_PROCNAME 128
 #define SCOPE_UNIX 99
 #define DYN_CONFIG_PREFIX "scope"
+#define MAXTRIES 10
 #ifndef bool
 typedef unsigned int bool;
 #endif

@@ -139,7 +139,7 @@ remoteConfig()
 {
     int timeout;
     struct pollfd fds;
-    int rc, success;
+    int rc, success, numtries;
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
@@ -174,23 +174,54 @@ remoteConfig()
         return;
     }
 
-    success = rc = errno = 0;
+    success = rc = errno = numtries = 0;
     do {
+        numtries++;
         rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
         /*
          * TODO: if we get an error, we don't get the whole file
          * When we support ndjson look for new line as EOF
          */
         if (rc <= 0) {
-            close(fds.fd);
-            ctlClose(g_ctl);
-            break;
+            if (errno == 0) {
+                // This is the case where we lost connection
+                close(fds.fd);
+                ctlClose(g_ctl);
+                //debug
+                scopeLog("Disconnect command channel", -1, CFG_LOG_DEBUG);
+                break;
+            } else {
+                // we've had an error: abandon the data
+                break;
+            }
         }
 
         if (g_fn.fwrite(buf, rc, (size_t)1, fs) <= 0) {
             DBG(NULL);
+            break;
         } else {
-            success = 1;
+            /*
+             * We are done if we get end of msg (EOM) or if we've read more 
+             * than expected and never saw an EOM.
+             * We are only successful if we've had no errors or disconnects
+             * and we receive a viable EOM.
+             */
+            // EOM
+            if (strstr((const char *)buf, "\n") != NULL) {
+                char dbg[4096];
+                success = 1;
+                //debug
+                snprintf(dbg, sizeof(dbg), "Command Success: tries %d", numtries);
+                scopeLog(dbg, -1, CFG_LOG_DEBUG);
+                break;
+            } else {
+                // No EOM after more than enough tries, bail out
+                if (numtries > MAXTRIES) {
+                    //debug
+                    scopeLog("Command Failed: no EOM", -1, CFG_LOG_DEBUG);
+                    break;
+                }
+            }
         }
     } while (1);
 
@@ -203,6 +234,15 @@ remoteConfig()
         
         // Apply the config
         doConfig(g_staticfg);
+    } else {
+        /*
+         * need to send an error response json message when that's ready:
+         * { .type=UPLD_INFO, .body=NULL, .req=NULL, status=500, message=“Error in
+         * receive from stream.  Please resend pending requests.” }
+         * Then use ctlCreateTxMsg() to create a string from it.
+         */
+        //debug
+        scopeLog("Command Failed!", -1, CFG_LOG_DEBUG);
     }
 
     g_fn.fclose(fs);
@@ -2105,7 +2145,7 @@ reportPeriodicStuff(void)
     long long cpu = 0;
     static long long cpuState = 0;
 
-    // This is called by periodic(), and due to atexit().
+    // This is called by periodic, and due to atexit().
     // If it's actively running for one reason, then skip the second.
     static uint64_t reentrancy_guard = 0ULL;
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) return;

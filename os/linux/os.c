@@ -1,5 +1,4 @@
 #include "os.h"
-#include <linux/binfmts.h>
 
 int
 osGetProcname(char *pname, int len)
@@ -253,7 +252,6 @@ osGetCmdline(pid_t pid, char *cmd, size_t cmdlen)
 
     if (rc > cmdlen) {
         memmove(cmd, &buf[rc - cmdlen], cmdlen - 1);
-        strcat(cmd, "\0");
     } else {
         memmove(cmd, buf, rc);
     }

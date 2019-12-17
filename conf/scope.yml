@@ -56,7 +56,7 @@ event:
     # Creates events from data written to stdout, stderr, or both.
     # May be most useful for capturing debug output from processes
     # running in containerized environments.
-#    - type: console
+#    - type: (stdout|stderr)
 #      name: stdout
 #      value: .*
 

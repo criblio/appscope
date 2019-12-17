@@ -88,7 +88,15 @@ stages:
           containerName: kafka
   - stage: publish
     displayName: Publish artifacts to S3
-    condition: succeeded()
+    dependsOn:
+      - build
+      - integration_tests
+    condition: |
+      and
+      (
+        in(dependencies.integration_tests.result, 'Succeeded', 'Skipped'),
+        in(dependencies.build.result, 'Succeeded')
+      )
     jobs:
       - job: publish
         steps:

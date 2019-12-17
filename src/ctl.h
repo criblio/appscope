@@ -48,9 +48,7 @@ typedef enum {
 typedef struct {
     upload_type_t type;
     cJSON* body;
-    request_t* req;           // NULL unless this is UPLD_RESP
-    long long status;         // HTTP-like status
-    const char* message;      // optional error message
+    request_t* req;            // NULL unless this is UPLD_RESP
 } upload_t;
 
 // Functions to help with send/receive messaging

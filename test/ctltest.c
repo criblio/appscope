@@ -130,28 +130,28 @@ ctlParseRxMsgSetCfgWithoutDataObjectReturnsParamErr(void** state)
          "    %s"
          "}";
 
-    const char* data[] = {
-    //  o) data field absent
+    const char* body[] = {
+    //  o) body field absent
         "",
-    //  o) data is not object
-        ",\"data\": \"hey\"",
-        ",\"data\": 1",
-        ",\"data\": [ \"Clint\", \"Ledion\", \"Dritan\" ]",
-        ",\"data\": true",
-        ",\"data\": false",
-        ",\"data\": null",
+    //  o) body is not object
+        ",\"body\": \"hey\"",
+        ",\"body\": 1",
+        ",\"body\": [ \"Clint\", \"Ledion\", \"Dritan\" ]",
+        ",\"body\": true",
+        ",\"body\": false",
+        ",\"body\": null",
         NULL
     };
 
     const char** test;
-    for (test=data; *test; test++) {
+    for (test=body; *test; test++) {
         assert_return_code(asprintf(&msg, base, *test), errno);
         //printf("%s\n", msg);
         request_t* req = ctlParseRxMsg(msg);
         free(msg);
         assert_non_null(req);
 
-        // data is missing, so expect REQ_PARAM_ERR
+        // body is missing, so expect REQ_PARAM_ERR
         assert_int_equal(req->cmd, REQ_PARAM_ERR);
         assert_string_equal(req->cmd_str, "SetCfg");
         assert_int_equal(req->id, 987413948756391);
@@ -170,10 +170,10 @@ ctlParseRxMsgSetCfg(void** state)
          "    \"type\": \"req\","
          "    \"req\": \"SetCfg\","
          "    \"reqId\": 3,"
-         "    \"data\": %s"
+         "    \"body\": %s"
          "}";
 
-    const char* data[] = {
+    const char* body[] = {
     //  o) Any object will be accepted, this will return *all* defaults
         "{}",
     //  o) This should create a cfg object that is different than default
@@ -226,21 +226,21 @@ ctlParseRxMsgSetCfg(void** state)
 
     const char** test;
     int run=1;
-    for (test=data; *test; test++) {
+    for (test=body; *test; test++) {
         assert_return_code(asprintf(&msg, base, *test), errno);
         //printf("%s\n", msg);
         request_t* req = ctlParseRxMsg(msg);
         free(msg);
         assert_non_null(req);
 
-        // data exists! expect REQ_SET_CFG, and non-null req->cfg
+        // body exists! expect REQ_SET_CFG, and non-null req->cfg
         assert_int_equal(req->cmd, REQ_SET_CFG);
         assert_string_equal(req->cmd_str, "SetCfg");
         assert_int_equal(req->id, 3);
         assert_non_null(req->cfg);
 
         // Verify StatsDMaxLen just to do some crude verification that
-        // the data made it into the req->cfg object...
+        // the body made it into the req->cfg object...
         // Run 1: verify that StatsDMaxLen is default
         // Run 2: verify that StatsDMaxLen is 42
         int expected_statsd_val;
@@ -252,7 +252,7 @@ ctlParseRxMsgSetCfg(void** state)
                 expected_statsd_val = 42;
                 break;
             default:
-                fail(); // must have added a test to data[] above.
+                fail(); // must have added a test to body[] above.
         }
         assert_int_equal(cfgOutStatsDMaxLen(req->cfg), expected_statsd_val);
         destroyReq(&req);
@@ -299,6 +299,173 @@ ctlParseRxMsgGetDiags(void** state)
     assert_null(req->cfg);
 
     destroyReq(&req);
+}
+
+static void
+ctlCreateTxMsgReturnsNullForNullUpload(void** state)
+{
+    assert_null(ctlCreateTxMsg(NULL));
+}
+
+static void
+ctlCreateTxMsgInfo(void** state)
+{
+    upload_t upload = {0};
+    upload.type = UPLD_INFO;
+
+    // If body is null, msg should be null
+    assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 0);
+    char* msg = ctlCreateTxMsg(&upload);
+    assert_null(msg);
+    assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
+
+    // If body is non-null, msg should exist
+    upload.body = cJSON_Parse("\"yeah, dude\"");
+    msg = ctlCreateTxMsg(&upload);
+    assert_non_null(msg);
+
+    char expected_msg[] =
+        "{\"type\":\"info\",\"body\":\"yeah, dude\"}";
+    assert_string_equal(msg, expected_msg);
+
+    free(msg);
+}
+
+typedef struct {
+    char*      in;
+    struct {
+        char* req;
+        int reqId;
+        int status;
+        char* message;
+    } out;
+} test_t;
+
+static void
+ctlCreateTxMsgResp(void** state)
+{
+    upload_t upload = {0};
+    upload.type = UPLD_RESP;
+
+    // If req is null, tx_msg should be null
+    assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 0);
+    char* tx_msg = ctlCreateTxMsg(&upload);
+    assert_null(tx_msg);
+    assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
+
+    test_t test[] = {
+        // REQ_PARSE_ERR
+        { .in = "{ \"type\": \"req\", \"re",
+          .out = {.req=NULL,      .reqId=0, .status=400,
+                  .message="Request could not be parsed as a json object"}},
+        // REQ_MALFORMED
+        { .in = "{ \"type\": \"info\", \"req\": \"GetCfg\", \"reqId\": 1 }",
+          .out = {.req="GetCfg",  .reqId=1, .status=400,
+                  .message="Type was not request, required fields were missing or of wrong type"}},
+        // REQ_UNKNOWN
+        { .in = "{ \"type\": \"req\", \"req\": \"huh?\",\"reqId\": 2}",
+          .out = {.req="huh?",    .reqId=2, .status=400,
+                  .message="Req field was not expected value"}},
+        // REQ_PARAM_ERR (body field is required for SetCfg)
+        { .in = "{ \"type\": \"req\", \"req\": \"SetCfg\",\"reqId\": 3}",
+          .out = {.req="SetCfg",  .reqId=3, .status=400,
+                  .message="Based on the req field, expected fields were missing"}},
+        // REQ_SET_CFG
+        { .in = "{ \"type\": \"req\", \"req\": \"SetCfg\",\"reqId\": 4, \"body\": {}}",
+          .out = {.req="SetCfg",  .reqId=4, .status=200, .message=NULL}},
+        // REQ_GET_CFG
+        { .in = "{ \"type\": \"req\", \"req\": \"GetCfg\",\"reqId\": 5}",
+          .out = {.req="GetCfg",  .reqId=5, .status=200, .message=NULL}},
+        // REQ_GET_DIAG
+        { .in = "{ \"type\": \"req\", \"req\": \"GetDiag\",\"reqId\": 6}",
+          .out = {.req="GetDiag", .reqId=6, .status=200, .message=NULL}},
+    };
+
+    int i;
+    for (i=0; i<sizeof(test)/sizeof(test[0]); i++) {
+        test_t* test_case = &test[i];
+        char expected[512];
+
+        // ctlParseRxMsg is not under test here, but is used to create upload.req
+        //printf("%s\n", test_case->in);
+        upload.req = ctlParseRxMsg(test_case->in);
+        assert_non_null(upload.req);
+
+        // If req is non-null, tx_msg should exist
+        tx_msg = ctlCreateTxMsg(&upload);
+        assert_non_null(tx_msg);
+        //printf("%s\n", tx_msg);
+
+        // verify type field (constant value of resp)
+        assert_non_null(strstr(tx_msg, "\"type\":\"resp\""));
+
+        // verify body field (does not exist in these test cases)
+        assert_null(strstr(tx_msg, "\"body\":"));
+
+        // verify req field
+        if (test_case->out.req) {
+            snprintf(expected, sizeof(expected), "\"req\":\"%s\"", test_case->out.req);
+            assert_non_null(strstr(tx_msg, expected));
+        } else {
+            assert_null(strstr(tx_msg, "\"req\":"));
+        }
+
+        // verify reqId field
+        snprintf(expected, sizeof(expected), "\"reqId\":%d", test_case->out.reqId);
+        assert_non_null(strstr(tx_msg, expected));
+
+        // verify status field
+        snprintf(expected, sizeof(expected), "\"status\":%d", test_case->out.status);
+        assert_non_null(strstr(tx_msg, expected));
+
+        // verify message field
+        if (test_case->out.message) {
+            snprintf(expected, sizeof(expected), "\"message\":\"%s\"", test_case->out.message);
+            assert_non_null(strstr(tx_msg, expected));
+        } else {
+            assert_null(strstr(tx_msg, "\"message\":"));
+        }
+
+        free(tx_msg);
+        destroyReq(&upload.req);
+    }
+
+    // Verify body is sent if it exists in the upload
+    upload.req = ctlParseRxMsg("{ \"type\": \"req\", \"req\": \"GetCfg\",\"reqId\": 7}");
+    upload.body = cJSON_Parse("\"Gnarly\"");
+    tx_msg = ctlCreateTxMsg(&upload);
+    //printf("%s\n", tx_msg);
+    assert_non_null(tx_msg);
+    assert_non_null(strstr(tx_msg, "\"body\":\"Gnarly\""));
+    free(tx_msg);
+    destroyReq(&upload.req);
+}
+
+static void
+ctlCreateTxMsgEvt(void** state)
+{
+    upload_t upload = {0};
+    upload.type = UPLD_EVT;
+
+    // If body is null, msg should be null
+    assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 0);
+    char* msg = ctlCreateTxMsg(&upload);
+    assert_null(msg);
+    assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
+
+    // If body is non-null, msg should exist
+    upload.body = cJSON_Parse("\"yeah, dude\"");
+    msg = ctlCreateTxMsg(&upload);
+    assert_non_null(msg);
+
+    char expected_msg[] =
+        "{\"type\":\"evt\",\"body\":\"yeah, dude\"}";
+    assert_string_equal(msg, expected_msg);
+
+    free(msg);
 }
 
 
@@ -381,6 +548,10 @@ main(int argc, char* argv[])
         cmocka_unit_test(ctlParseRxMsgSetCfg),
         cmocka_unit_test(ctlParseRxMsgGetCfg),
         cmocka_unit_test(ctlParseRxMsgGetDiags),
+        cmocka_unit_test(ctlCreateTxMsgReturnsNullForNullUpload),
+        cmocka_unit_test(ctlCreateTxMsgInfo),
+        cmocka_unit_test(ctlCreateTxMsgResp),
+        cmocka_unit_test(ctlCreateTxMsgEvt),
         cmocka_unit_test(ctlSendMsgForNullOutDoesntCrash),
         cmocka_unit_test(ctlSendMsgForNullMessageDoesntCrash),
         cmocka_unit_test(ctlTransportSetAndOutSend),

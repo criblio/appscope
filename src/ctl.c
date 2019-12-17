@@ -30,11 +30,11 @@ grab_supplemental_for_set_cfg(cJSON* json_root, request_t* req)
     // This expects a json version of our scope.yml file
     // See cfgReadGoodJson() in test/cfgutilstest.c or
     // ctlParseRxMsgSetCfg() in test/ctltest.c for an example
-    // of what we expect to find in the "data" json node.
-    json = cJSON_GetObjectItem(json_root, "data");
+    // of what we expect to find in the "body" json node.
+    json = cJSON_GetObjectItem(json_root, "body");
     if (!json || !cJSON_IsObject(json)) goto error;
 
-    // Create a string from the "data" json object
+    // Create a string from the "body" json object
     string = cJSON_PrintUnformatted(json);
     if (!string) goto error;
 
@@ -48,7 +48,7 @@ grab_supplemental_for_set_cfg(cJSON* json_root, request_t* req)
     return;
 
 error:
-    // data is required for REQ_SET_CFG
+    // body is required for REQ_SET_CFG
     req->cmd=REQ_PARAM_ERR;
 }
 
@@ -118,23 +118,23 @@ ctlParseRxMsg(const char* msg)
     if (req->cmd == REQ_UNKNOWN) goto out;
 
     //
-    // phase 4, grab supplemental info as required
+    // phase 4, grab supplemental info from body field as required
     //
     switch (req->cmd) {
         case REQ_PARSE_ERR:
         case REQ_MALFORMED:
         case REQ_UNKNOWN:
         case REQ_PARAM_ERR:
-            // Shouldn't be checking these for supplemental data.
+            // Shouldn't be checking these for body field
             DBG("Unexpected Cmd: %d", req->cmd);
             break;
         case REQ_SET_CFG:
-            // Right now, only REQ_SET_CFG has supplemental info
+            // Right now, only REQ_SET_CFG has required body field
             grab_supplemental_for_set_cfg(json_root, req);
             break;
         case REQ_GET_CFG:
         case REQ_GET_DIAG:
-            // No supplemental data
+            // body field not used
             break;
         default:
             DBG("Unknown Cmd: %d", req->cmd);
@@ -160,11 +160,131 @@ destroyReq(request_t** request)
     *request=NULL;
 }
 
+static cJSON*
+create_info_json(upload_t* upld)
+{
+    cJSON* json_root = NULL;
+    if (!upld || !upld->body) goto err;
+
+    if (!(json_root = cJSON_CreateObject())) goto err;
+    if (!cJSON_AddStringToObjLN(json_root, "type", "info")) goto err;
+    cJSON_AddItemToObjectCS(json_root, "body", upld->body);
+
+    return json_root;
+err:
+    DBG("upld:%p upld->body:%p json_root:%p",
+        upld, (upld)?upld->body:NULL, json_root);
+    if (json_root) cJSON_Delete(json_root);
+    return NULL;
+}
+
+static cJSON*
+create_resp_json(upload_t* upld)
+{
+    cJSON* json_root = NULL;
+    if (!upld || !upld->req) goto err;
+
+    if (!(json_root = cJSON_CreateObject())) goto err;
+    if (!cJSON_AddStringToObjLN(json_root, "type", "resp")) goto err;
+
+    // upld->body is optional
+    if (upld->body) {
+        // Move the upld->body from the upld to json_root
+        cJSON_AddItemToObjectCS(json_root, "body", upld->body);
+        upld->body = NULL;
+    }
+
+    // If we had trouble parsing, we might not have cmd_str
+    if (upld->req->cmd_str) {
+        if (!cJSON_AddStringToObjLN(json_root, "req", upld->req->cmd_str)) goto err;
+    }
+    if (!cJSON_AddNumberToObjLN(json_root, "reqId", upld->req->id)) goto err;
+
+    int status = 200;
+    char* message = NULL;
+     switch (upld->req->cmd) {
+        case REQ_PARSE_ERR:
+            status = 400;
+            message = "Request could not be parsed as a json object";
+            break;
+        case REQ_MALFORMED:
+            status = 400;
+            message = "Type was not request, required fields were missing or of wrong type";
+            break;
+        case REQ_UNKNOWN:
+            status = 400;
+            message = "Req field was not expected value";
+            break;
+        case REQ_PARAM_ERR:
+            status = 400;
+            message = "Based on the req field, expected fields were missing";
+            break;
+        case REQ_SET_CFG:
+        case REQ_GET_CFG:
+        case REQ_GET_DIAG:
+            break;
+        default:
+            DBG(NULL);
+    }
+    if (!cJSON_AddNumberToObjLN(json_root, "status", status)) goto err;
+    if (message) {
+        if (!cJSON_AddStringToObjLN(json_root, "message", message)) goto err;
+    }
+
+    return json_root;
+err:
+    DBG("upld:%p upld->body:%p upld->req:%p json_root:%p",
+        upld, (upld)?upld->body:NULL, (upld)?upld->req:NULL, json_root);
+    if (json_root) cJSON_Delete(json_root);
+    return NULL;
+}
+
+static cJSON*
+create_evt_json(upload_t* upld)
+{
+    cJSON* json_root = NULL;
+    if (!upld || !upld->body) goto err;
+
+    if (!(json_root = cJSON_CreateObject())) goto err;
+    if (!cJSON_AddStringToObjLN(json_root, "type", "evt")) goto err;
+    cJSON_AddItemToObjectCS(json_root, "body", upld->body);
+    return json_root;
+err:
+    DBG("upld:%p upld->body:%p json_root:%p",
+        upld, (upld)?upld->body:NULL, json_root);
+    if (json_root) cJSON_Delete(json_root);
+    return NULL;
+}
+
 char*
 ctlCreateTxMsg(upload_t* upld)
 {
-    // TBD
-    return NULL;
+    cJSON* json = NULL;
+    char* msg = NULL;
+
+    if (!upld) goto out;
+
+    switch (upld->type) {
+        case UPLD_INFO:
+            json = create_info_json(upld);
+            break;
+        case UPLD_RESP:
+            json = create_resp_json(upld);
+            break;
+        case UPLD_EVT:
+            json = create_evt_json(upld);
+            break;
+        default:
+            DBG(NULL);
+            goto out;
+    }
+    if (!json) goto out;
+
+    msg = cJSON_PrintUnformatted(json);
+
+out:
+    if (json) cJSON_Delete(json);
+    return msg;
 }
 
 

@@ -257,7 +257,7 @@ cfgEventFormat(config_t* cfg)
 const char*
 cfgEventValueFilter(config_t* cfg, cfg_evt_t evt)
 {
-    if (evt < CFG_SRC_MAX) {
+    if (evt >= 0 && evt < CFG_SRC_MAX) {
         if (cfg) return cfg->evt.valuefilter[evt];
         return valueFilterDefault[evt];
     }
@@ -269,7 +269,7 @@ cfgEventValueFilter(config_t* cfg, cfg_evt_t evt)
 const char*
 cfgEventFieldFilter(config_t* cfg, cfg_evt_t evt)
 {
-    if (evt < CFG_SRC_MAX) {
+    if (evt >= 0 && evt < CFG_SRC_MAX) {
         if (cfg) return cfg->evt.fieldfilter[evt];
         return fieldFilterDefault[evt];
     }
@@ -281,7 +281,7 @@ cfgEventFieldFilter(config_t* cfg, cfg_evt_t evt)
 const char*
 cfgEventNameFilter(config_t* cfg, cfg_evt_t evt)
 {
-    if (evt < CFG_SRC_MAX) {
+    if (evt >= 0 && evt < CFG_SRC_MAX) {
         if (cfg) return cfg->evt.namefilter[evt];
         return nameFilterDefault[evt];
     }
@@ -293,7 +293,7 @@ cfgEventNameFilter(config_t* cfg, cfg_evt_t evt)
 unsigned
 cfgEventSourceEnabled(config_t* cfg, cfg_evt_t evt)
 {
-    if (evt < CFG_SRC_MAX) {
+    if (evt >= 0 && evt < CFG_SRC_MAX) {
         if (cfg) return cfg->evt.src[evt];
         return srcEnabledDefault[evt];
     }
@@ -312,7 +312,7 @@ cfgOutVerbosity(config_t* cfg)
 cfg_transport_t
 cfgTransportType(config_t* cfg, which_transport_t t)
 {
-    if (t < CFG_WHICH_MAX) {
+    if (t >= 0 && t < CFG_WHICH_MAX) {
         if (cfg) return cfg->transport[t].type;
         return typeDefault[t];
     }
@@ -324,7 +324,7 @@ cfgTransportType(config_t* cfg, which_transport_t t)
 const char*
 cfgTransportHost(config_t* cfg, which_transport_t t)
 {
-    if (t < CFG_WHICH_MAX) {
+    if (t >= 0 && t < CFG_WHICH_MAX) {
         if (cfg) return cfg->transport[t].net.host;
         return hostDefault[t];
     } 
@@ -336,7 +336,7 @@ cfgTransportHost(config_t* cfg, which_transport_t t)
 const char*
 cfgTransportPort(config_t* cfg, which_transport_t t)
 {
-    if (t < CFG_WHICH_MAX) {
+    if (t >= 0 && t < CFG_WHICH_MAX) {
         if (cfg) return cfg->transport[t].net.port;
         return portDefault[t];
     }
@@ -348,7 +348,7 @@ cfgTransportPort(config_t* cfg, which_transport_t t)
 const char*
 cfgTransportPath(config_t* cfg, which_transport_t t)
 {
-    if (t < CFG_WHICH_MAX) {
+    if (t >= 0 && t < CFG_WHICH_MAX) {
         if (cfg) return cfg->transport[t].file.path;
         return pathDefault[t];
     }
@@ -360,7 +360,7 @@ cfgTransportPath(config_t* cfg, which_transport_t t)
 cfg_buffer_t
 cfgTransportBuf(config_t* cfg, which_transport_t t)
 {
-    if (t < CFG_WHICH_MAX) {
+    if (t >= 0 && t < CFG_WHICH_MAX) {
         if (cfg) return cfg->transport[t].file.buf_policy;
         return bufDefault[t];
     }
@@ -413,7 +413,7 @@ cfgLogLevel(config_t* cfg)
 void
 cfgOutFormatSet(config_t* cfg, cfg_out_format_t fmt)
 {
-    if (!cfg) return;
+    if (!cfg || fmt < 0 || fmt >= CFG_FORMAT_MAX) return;
     cfg->out.format = fmt;
 }
 
@@ -482,14 +482,14 @@ cfgOutVerbositySet(config_t* cfg, unsigned val)
 void
 cfgEventFormatSet(config_t* cfg, cfg_out_format_t fmt)
 {
-    if (!cfg || fmt >= CFG_FORMAT_MAX) return;
+    if (!cfg || fmt < 0 || fmt >= CFG_FORMAT_MAX) return;
     cfg->evt.format = fmt;
 }
 
 void
 cfgEventValueFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
 {
-    if (!cfg || evt >= CFG_SRC_MAX) return;
+    if (!cfg || evt < 0 || evt >= CFG_SRC_MAX) return;
     if (cfg->evt.valuefilter[evt]) free (cfg->evt.valuefilter[evt]);
     if (!filter || (filter[0] == '\0')) {
         const char* vdefault = valueFilterDefault[evt];
@@ -502,7 +502,7 @@ cfgEventValueFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
 void
 cfgEventFieldFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
 {
-    if (!cfg || evt >= CFG_SRC_MAX) return;
+    if (!cfg || evt < 0 || evt >= CFG_SRC_MAX) return;
     if (cfg->evt.fieldfilter[evt]) free (cfg->evt.fieldfilter[evt]);
     if (!filter || (filter[0] == '\0')) {
         const char* fdefault = fieldFilterDefault[evt];
@@ -515,7 +515,7 @@ cfgEventFieldFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
 void
 cfgEventNameFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
 {
-    if (!cfg || evt >= CFG_SRC_MAX) return;
+    if (!cfg || evt < 0 || evt >= CFG_SRC_MAX) return;
     if (cfg->evt.namefilter[evt]) free (cfg->evt.namefilter[evt]);
     if (!filter || (filter[0] == '\0')) {
         const char* ndefault = nameFilterDefault[evt];
@@ -528,21 +528,22 @@ cfgEventNameFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
 void
 cfgEventSourceEnabledSet(config_t* cfg, cfg_evt_t evt, unsigned val)
 {
-    if (!cfg || evt >= CFG_SRC_MAX) return;
+    if (!cfg || evt < 0 || evt >= CFG_SRC_MAX) return;
     cfg->evt.src[evt] = val;
 }
 
 void
 cfgTransportTypeSet(config_t* cfg, which_transport_t t, cfg_transport_t type)
 {
-    if (!cfg || t >= CFG_WHICH_MAX) return;
+    if (!cfg || t < 0 || t >= CFG_WHICH_MAX) return;
+    if (type < 0 || type > CFG_TCP) return;
     cfg->transport[t].type = type;
 }
 
 void
 cfgTransportHostSet(config_t* cfg, which_transport_t t, const char* host)
 {
-    if (!cfg || t >= CFG_WHICH_MAX) return;
+    if (!cfg || t < 0 || t >= CFG_WHICH_MAX) return;
     if (cfg->transport[t].net.host) free(cfg->transport[t].net.host);
     cfg->transport[t].net.host = (host) ? strdup(host) : NULL;
 
@@ -551,7 +552,7 @@ cfgTransportHostSet(config_t* cfg, which_transport_t t, const char* host)
 void
 cfgTransportPortSet(config_t* cfg, which_transport_t t, const char* port)
 {
-    if (!cfg || t >= CFG_WHICH_MAX) return;
+    if (!cfg || t < 0 || t >= CFG_WHICH_MAX) return;
     if (cfg->transport[t].net.port) free(cfg->transport[t].net.port);
     cfg->transport[t].net.port = (port) ? strdup(port) : NULL;
 }
@@ -559,16 +560,17 @@ cfgTransportPortSet(config_t* cfg, which_transport_t t, const char* port)
 void
 cfgTransportPathSet(config_t* cfg, which_transport_t t, const char* path)
 {
-    if (!cfg || t >= CFG_WHICH_MAX) return;
+    if (!cfg || t < 0 || t >= CFG_WHICH_MAX) return;
     if (cfg->transport[t].file.path) free(cfg->transport[t].file.path);
     cfg->transport[t].file.path = (path) ? strdup(path) : NULL;
 }
 
 void
-cfgTransportBufSet(config_t* cfg, which_transport_t t, cfg_buffer_t buf_policy)
+cfgTransportBufSet(config_t* cfg, which_transport_t t, cfg_buffer_t buf)
 {
-    if (!cfg || t >= CFG_WHICH_MAX) return;
-    cfg->transport[t].file.buf_policy = buf_policy;
+    if (!cfg || t < 0 || t >= CFG_WHICH_MAX) return;
+    if (buf < CFG_BUFFER_FULLY || buf > CFG_BUFFER_LINE) return;
+    cfg->transport[t].file.buf_policy = buf;
 }
 
 void
@@ -637,6 +639,6 @@ cfgCustomTagAdd(config_t* c, const char* name, const char* value)
 void
 cfgLogLevelSet(config_t* cfg, cfg_log_level_t level)
 {
-    if (!cfg) return;
+    if (!cfg || level < 0 || level > CFG_LOG_NONE) return;
     cfg->log.level = level;
 }

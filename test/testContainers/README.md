@@ -53,3 +53,23 @@ It will run the test execution in more verbose mode and store logs in `./logs` d
 ```commandline
 cp docker-compose.override.template.yml docker.compose.override.yml
 ```
+
+####Using different scope library file
+By default tests will download and use a library executable from the http://cdn.cribl.io/dl/scope/latest/linux/libscope.so. 
+If you want to use a different file, you can use a `-s` flag in a test runner and provide a custom path to scope executable.
+```commandline
+docker-compose run nginx -s /opt/custom_libscope.so
+```
+By combining docker volumes and `-s` flag, you can run integration tests against locally built scope executable. 
+In your `docker.compose.override.yml`:
+```yaml
+  nginx:
+    command: -v -s /opt/test-runner/bin/libscope.so
+    volumes:
+      # taking file from default build path lib/linux/libscope.so
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+``` 
+Note, that the scope executable should have a linux "executable" permission:
+```commandline
+chmod +x lib/linux/libscope.so
+```

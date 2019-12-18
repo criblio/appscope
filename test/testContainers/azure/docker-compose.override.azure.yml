@@ -5,50 +5,56 @@ services:
       cache_from:
         - criblci/scope-logstream-it:latest
     image: criblci/scope-logstream-it
-    command: -v
+    command: -v -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
   splunk:
     build:
       cache_from:
         - criblci/scope-splunk-it:latest
     image: criblci/scope-splunk-it
-    command: -v
+    command: -v -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
 
   nginx:
     build:
       cache_from:
         - criblci/scope-nginx-it:latest
     image: criblci/scope-nginx-it
-    command: -v
+    command: -v -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
 
   elastic:
     build:
       cache_from:
         - criblci/scope-elastic-it:latest
     image: criblci/scope-elastic-it
-    command: -v
+    command: -v -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
 
   kafka:
     build:
       cache_from:
         - criblci/scope-kafka-it:latest
     image: criblci/scope-kafka-it
-    command: -v
+    command: -v -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
 
   interposed_func:
     build:
       cache_from:
         - criblci/scope-syscalls-it:latest
     image: criblci/scope-syscalls-it
-    command: -v
+    command: -v -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so

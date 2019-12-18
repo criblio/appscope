@@ -17,6 +17,10 @@ config_t* cfgRead(const char* path);
 // reads cfg from a string (containing json or yaml)
 config_t* cfgFromString(const char* string);
 
+// constructs a cJSON object heirarchy or json string
+cJSON* jsonObjectFromCfg(config_t* cfg);
+char* jsonStringFromCfg(config_t* cfg);
+
 // modify cfg per environment variables
 void cfgProcessEnvironment(config_t* cfg);
 

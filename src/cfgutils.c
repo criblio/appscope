@@ -18,6 +18,101 @@
 #include "yaml.h"
 #endif
 
+#define METRIC_NODE          "metric"
+#define FORMAT_NODE              "format"
+#define TYPE_NODE                    "type"
+#define STATSDPREFIX_NODE            "statsdprefix"
+#define STATSDMAXLEN_NODE            "statsdmaxlen"
+#define VERBOSITY_NODE               "verbosity"
+#define TAGS_NODE                    "tags"
+#define TRANSPORT_NODE           "transport"
+#define TYPE_NODE                    "type"
+#define HOST_NODE                    "host"
+#define PORT_NODE                    "port"
+#define PATH_NODE                    "path"
+#define BUFFERING_NODE               "buffering"
+
+#define LIBSCOPE_NODE        "libscope"
+#define TRANSPORT_NODE           "transport"
+#define LOG_NODE                 "log"
+#define LEVEL_NODE                   "level"
+#define TRANSPORT_NODE               "transport"
+#define SUMMARYPERIOD_NODE       "summaryperiod"
+#define COMMANDDIR_NODE          "commanddir"
+
+#define EVENT_NODE           "event"
+#define FORMAT_NODE              "format"
+#define TYPE_NODE                    "type"
+#define WATCH_NODE               "watch"
+#define TYPE_NODE                    "type"
+#define NAME_NODE                    "name"
+#define FIELD_NODE                   "field"
+#define VALUE_NODE                   "value"
+
+typedef struct {
+    const char* str;
+    unsigned val;
+} enum_map_t;
+
+unsigned strToVal(enum_map_t map[], const char* str)
+{
+    enum_map_t* m;
+    for (m=map; m->str; m++) {
+        if (!strcmp(str, m->str)) return m->val;
+    }
+    return -1;
+}
+
+const char* valToStr(enum_map_t map[], unsigned val)
+{
+    enum_map_t* m;
+    for (m=map; m->str; m++) {
+        if (val == m->val) return m->str;
+    }
+    return NULL;
+}
+
+enum_map_t formatMap[] = {
+    {"metricstatsd",          CFG_METRIC_STATSD},
+    {"metricjson",            CFG_METRIC_JSON},
+    {"ndjson",                CFG_EVENT_ND_JSON},
+    {NULL,                    -1}
+};
+
+enum_map_t transportTypeMap[] = {
+    {"udp",                   CFG_UDP},
+    {"tcp",                   CFG_TCP},
+    {"unix",                  CFG_UNIX},
+    {"file",                  CFG_FILE},
+    {"syslog",                CFG_SYSLOG},
+    {"shm",                   CFG_SHM},
+    {NULL,                   -1}
+};
+
+enum_map_t logLevelMap[] = {
+    {"debug",                 CFG_LOG_DEBUG},
+    {"info",                  CFG_LOG_INFO},
+    {"warning",               CFG_LOG_WARN},
+    {"error",                 CFG_LOG_ERROR},
+    {"none",                  CFG_LOG_NONE},
+    {"trace",                 CFG_LOG_TRACE},
+    {NULL,                    -1}
+};
+
+enum_map_t bufferMap[] = {
+    {"line",                  CFG_BUFFER_LINE},
+    {"full",                  CFG_BUFFER_FULLY},
+    {NULL,                    -1}
+};
+
+enum_map_t watchTypeMap[] = {
+    {"file",                  CFG_SRC_FILE},
+    {"console",               CFG_SRC_CONSOLE},
+    {"syslog",                CFG_SRC_SYSLOG},
+    {"metric",                CFG_SRC_METRIC},
+    {NULL,                    -1}
+};
+
 // forward declarations
 void cfgOutFormatSetFromStr(config_t*, const char*);
 void cfgOutStatsDPrefixSetFromStr(config_t*, const char*);
@@ -390,13 +485,7 @@ void
 cfgOutFormatSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    if (!strcmp(value, "metricstatsd")) {
-        cfgOutFormatSet(cfg, CFG_METRIC_STATSD);
-    } else if (!strcmp(value, "metricjson")) {
-        cfgOutFormatSet(cfg, CFG_METRIC_JSON);
-    } else if (!strcmp(value, "ndjson")) {
-        cfgOutFormatSet(cfg, CFG_EVENT_ND_JSON);
-    }
+    cfgOutFormatSet(cfg, strToVal(formatMap, value));
 }
 
 void
@@ -442,13 +531,7 @@ void
 cfgEventFormatSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    if (!strcmp(value, "metricstatsd")) {
-        cfgEventFormatSet(cfg, CFG_METRIC_STATSD);
-    } else if (!strcmp(value, "metricjson")) {
-        cfgEventFormatSet(cfg, CFG_METRIC_JSON);
-    } else if (!strcmp(value, "ndjson")) {
-        cfgEventFormatSet(cfg, CFG_EVENT_ND_JSON);
-    }
+    cfgEventFormatSet(cfg, strToVal(formatMap, value));
 }
 
 void
@@ -554,19 +637,7 @@ void
 cfgLogLevelSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    if (!strcmp(value, "debug")) {
-        cfgLogLevelSet(cfg, CFG_LOG_DEBUG);
-    } else if (!strcmp(value, "info")) {
-        cfgLogLevelSet(cfg, CFG_LOG_INFO);
-    } else if (!strcmp(value, "warning")) {
-        cfgLogLevelSet(cfg, CFG_LOG_WARN);
-    } else if (!strcmp(value, "error")) {
-        cfgLogLevelSet(cfg, CFG_LOG_ERROR);
-    } else if (!strcmp(value, "none")) {
-        cfgLogLevelSet(cfg, CFG_LOG_NONE);
-    } else if (!strcmp(value, "trace")) {
-        cfgLogLevelSet(cfg, CFG_LOG_TRACE);
-    }
+    cfgLogLevelSet(cfg, strToVal(logLevelMap, value));
 }
 
 #ifndef NO_YAML
@@ -625,19 +696,7 @@ processTransportType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     which_transport_t c = transport_context;
-    if (!strcmp(value, "udp")) {
-        cfgTransportTypeSet(config, c, CFG_UDP);
-    } else if (!strcmp(value, "tcp")) {
-        cfgTransportTypeSet(config, c, CFG_TCP);
-    } else if (!strcmp(value, "unix")) {
-        cfgTransportTypeSet(config, c, CFG_UNIX);
-    } else if (!strcmp(value, "file")) {
-        cfgTransportTypeSet(config, c, CFG_FILE);
-    } else if (!strcmp(value, "syslog")) {
-        cfgTransportTypeSet(config, c, CFG_SYSLOG);
-    } else if (!strcmp(value, "shm")) {
-        cfgTransportTypeSet(config, c, CFG_SHM);
-    }
+    cfgTransportTypeSet(config, c, strToVal(transportTypeMap, value));
     if (value) free(value);
 }
 
@@ -673,11 +732,7 @@ processBuf(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     which_transport_t c = transport_context;
-    if (!strcmp(value, "line")) {
-        cfgTransportBufSet(config, c, CFG_BUFFER_LINE);
-    } else if (!strcmp(value, "full")) {
-        cfgTransportBufSet(config, c, CFG_BUFFER_FULLY);
-    }
+    cfgTransportBufSet(config, c, strToVal(bufferMap, value));
     if (value) free(value);
 }
 
@@ -687,12 +742,12 @@ processTransport(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "type",       processTransportType},
-        {YAML_SCALAR_NODE,  "host",       processHost},
-        {YAML_SCALAR_NODE,  "port",       processPort},
-        {YAML_SCALAR_NODE,  "path",       processPath},
-        {YAML_SCALAR_NODE,  "buffering",  processBuf},
-        {YAML_NO_NODE, NULL, NULL}
+        {YAML_SCALAR_NODE,    TYPE_NODE,            processTransportType},
+        {YAML_SCALAR_NODE,    HOST_NODE,            processHost},
+        {YAML_SCALAR_NODE,    PORT_NODE,            processPort},
+        {YAML_SCALAR_NODE,    PATH_NODE,            processPath},
+        {YAML_SCALAR_NODE,    BUFFERING_NODE,       processBuf},
+        {YAML_NO_NODE,        NULL,                 NULL}
     };
 
     yaml_node_pair_t* pair;
@@ -728,9 +783,9 @@ processLogging(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "level",      processLevel},
-        {YAML_MAPPING_NODE, "transport",  processTransportLog},
-        {YAML_NO_NODE, NULL, NULL}
+        {YAML_SCALAR_NODE,    LEVEL_NODE,           processLevel},
+        {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportLog},
+        {YAML_NO_NODE,        NULL,                 NULL}
     };
 
     yaml_node_pair_t* pair;
@@ -808,12 +863,12 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "type",            processFormatTypeMetric},
-        {YAML_SCALAR_NODE,  "statsdprefix",    processStatsDPrefix},
-        {YAML_SCALAR_NODE,  "statsdmaxlen",    processStatsDMaxLen},
-        {YAML_SCALAR_NODE,  "verbosity",       processVerbosity},
-        {YAML_SEQUENCE_NODE, "tags",           processTags},
-        {YAML_NO_NODE, NULL, NULL}
+        {YAML_SCALAR_NODE,    TYPE_NODE,            processFormatTypeMetric},
+        {YAML_SCALAR_NODE,    STATSDPREFIX_NODE,    processStatsDPrefix},
+        {YAML_SCALAR_NODE,    STATSDMAXLEN_NODE,    processStatsDMaxLen},
+        {YAML_SCALAR_NODE,    VERBOSITY_NODE,       processVerbosity},
+        {YAML_SEQUENCE_NODE,  TAGS_NODE,            processTags},
+        {YAML_NO_NODE,        NULL,                 NULL}
     };
 
     yaml_node_pair_t* pair;
@@ -844,9 +899,9 @@ processMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_MAPPING_NODE, "format",          processFormat},
-        {YAML_MAPPING_NODE, "transport",       processTransportMetric},
-        {YAML_NO_NODE, NULL, NULL}
+        {YAML_MAPPING_NODE,   FORMAT_NODE,          processFormat},
+        {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportMetric},
+        {YAML_NO_NODE,        NULL,                 NULL}
     };
 
     yaml_node_pair_t* pair;
@@ -861,8 +916,8 @@ processEvtFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "type",            processFormatTypeEvent},
-        {YAML_NO_NODE, NULL, NULL}
+        {YAML_SCALAR_NODE,    TYPE_NODE,            processFormatTypeEvent},
+        {YAML_NO_NODE,        NULL,                 NULL}
     };
 
     yaml_node_pair_t* pair;
@@ -877,16 +932,7 @@ processWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_SCALAR_NODE) return;
 
     char* value = stringVal(node);
-    watch_context = CFG_SRC_MAX;            // Deliberately invalid
-    if (!strcmp(value, "file")) {
-        watch_context = CFG_SRC_FILE;
-    } else if (!strcmp(value, "console")) {
-        watch_context = CFG_SRC_CONSOLE;
-    } else if (!strcmp(value, "syslog")) {
-        watch_context = CFG_SRC_SYSLOG;
-    } else if (!strcmp(value, "metric")) {
-        watch_context = CFG_SRC_METRIC;
-    }
+    watch_context = strToVal(watchTypeMap, value);
     cfgEventSourceEnabledSet(config, watch_context, 1);
     if (value) free(value);
 }
@@ -926,7 +972,7 @@ isWatchType(yaml_document_t* doc, yaml_node_pair_t* pair)
 {
     yaml_node_t* key = yaml_document_get_node(doc, pair->key);
     if (!key || (key->type != YAML_SCALAR_NODE)) return 0;
-    return !strcmp((char*)key->data.scalar.value, "type");
+    return !strcmp((char*)key->data.scalar.value, TYPE_NODE);
 }
 
 static void
@@ -935,11 +981,11 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,  "type",            processWatchType},
-        {YAML_SCALAR_NODE,  "name",            processWatchName},
-        {YAML_SCALAR_NODE,  "field",           processWatchField},
-        {YAML_SCALAR_NODE,  "value",           processWatchValue},
-        {YAML_NO_NODE, NULL, NULL}
+        {YAML_SCALAR_NODE,    TYPE_NODE,            processWatchType},
+        {YAML_SCALAR_NODE,    NAME_NODE,            processWatchName},
+        {YAML_SCALAR_NODE,    FIELD_NODE,           processWatchField},
+        {YAML_SCALAR_NODE,    VALUE_NODE,           processWatchValue},
+        {YAML_NO_NODE,        NULL,                 NULL}
     };
 
     watch_context = CFG_SRC_MAX;
@@ -984,9 +1030,9 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_MAPPING_NODE, "format",          processEvtFormat},
-        {YAML_SEQUENCE_NODE,"watch",           processWatch},
-        {YAML_NO_NODE, NULL, NULL}
+        {YAML_MAPPING_NODE,   FORMAT_NODE,          processEvtFormat},
+        {YAML_SEQUENCE_NODE,  WATCH_NODE,           processWatch},
+        {YAML_NO_NODE,        NULL,                 NULL}
     };
 
     yaml_node_pair_t* pair;
@@ -1001,11 +1047,11 @@ processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_MAPPING_NODE, "transport",       processTransportCtl},
-        {YAML_MAPPING_NODE, "log",             processLogging},
-        {YAML_SCALAR_NODE,  "summaryperiod",   processSummaryPeriod},
-        {YAML_SCALAR_NODE,  "commanddir",      processCommandDir},
-        {YAML_NO_NODE, NULL, NULL}
+        {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportCtl},
+        {YAML_MAPPING_NODE,   LOG_NODE,             processLogging},
+        {YAML_SCALAR_NODE,    SUMMARYPERIOD_NODE,   processSummaryPeriod},
+        {YAML_SCALAR_NODE,    COMMANDDIR_NODE,      processCommandDir},
+        {YAML_NO_NODE,        NULL,                 NULL}
     };
 
     yaml_node_pair_t* pair;
@@ -1021,10 +1067,10 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_MAPPING_NODE,  "metric",             processMetric},
-        {YAML_MAPPING_NODE,  "libscope",           processLibscope},
-        {YAML_MAPPING_NODE,  "event",              processEvent},
-        {YAML_NO_NODE, NULL, NULL}
+        {YAML_MAPPING_NODE,   METRIC_NODE,          processMetric},
+        {YAML_MAPPING_NODE,   LIBSCOPE_NODE,        processLibscope},
+        {YAML_MAPPING_NODE,   EVENT_NODE,           processEvent},
+        {YAML_NO_NODE,        NULL,                 NULL}
     };
 
     yaml_node_pair_t* pair;
@@ -1116,6 +1162,277 @@ cfgFromString(const char* string)
     return cfgCreateDefault();
 }
 #endif
+
+static cJSON*
+createTransportJson(config_t* cfg, which_transport_t trans)
+{
+    cJSON* root = NULL;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
+         valToStr(transportTypeMap, cfgTransportType(cfg, trans)))) goto err;
+
+    switch (cfgTransportType(cfg, trans)) {
+        case CFG_TCP:
+        case CFG_UDP:
+            if (!cJSON_AddStringToObjLN(root, HOST_NODE,
+                                     cfgTransportHost(cfg, trans))) goto err;
+            if (!cJSON_AddStringToObjLN(root, PORT_NODE,
+                                     cfgTransportPort(cfg, trans))) goto err;
+            break;
+        case CFG_UNIX:
+            if (!cJSON_AddStringToObjLN(root, PATH_NODE,
+                                     cfgTransportPath(cfg, trans))) goto err;
+            break;
+        case CFG_FILE:
+            if (!cJSON_AddStringToObjLN(root, PATH_NODE,
+                                     cfgTransportPath(cfg, trans))) goto err;
+            if (!cJSON_AddStringToObjLN(root, BUFFERING_NODE,
+                 valToStr(bufferMap, cfgTransportBuf(cfg, trans)))) goto err;
+            break;
+        case CFG_SYSLOG:
+        case CFG_SHM:
+            break;
+        default:
+            DBG(NULL);
+    }
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+
+static cJSON*
+createLogJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+    cJSON* transport;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+    if (!cJSON_AddStringToObjLN(root, LEVEL_NODE,
+                     valToStr(logLevelMap, cfgLogLevel(cfg)))) goto err;
+
+    if (!(transport = createTransportJson(cfg, CFG_LOG))) goto err;
+    cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createTagsJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+    if (!(root = cJSON_CreateArray())) goto err;
+
+    custom_tag_t **tags = cfgCustomTags(cfg);
+    int i;
+    if (tags) {
+        for (i=0; tags[i]; i++) {
+            cJSON* item;
+            if (!(item = cJSON_CreateObject())) continue;
+            if (!(cJSON_AddStringToObject(item, tags[i]->name, tags[i]->value))) {
+                DBG(NULL);
+                cJSON_Delete(item);
+            } else {
+                cJSON_AddItemToArray(root, item);
+            }
+        }
+    }
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createMetricFormatJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+    cJSON* tags;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
+                     valToStr(formatMap, cfgOutFormat(cfg)))) goto err;
+    if (!cJSON_AddStringToObjLN(root, STATSDPREFIX_NODE,
+                                    cfgOutStatsDPrefix(cfg))) goto err;
+    if (!cJSON_AddNumberToObjLN(root, STATSDMAXLEN_NODE,
+                                    cfgOutStatsDMaxLen(cfg))) goto err;
+    if (!cJSON_AddNumberToObjLN(root, VERBOSITY_NODE,
+                                       cfgOutVerbosity(cfg))) goto err;
+
+    if (!(tags = createTagsJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(root, TAGS_NODE, tags);
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createMetricJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+    cJSON* transport, *format;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!(transport = createTransportJson(cfg, CFG_OUT))) goto err;
+    cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
+
+    if (!(format = createMetricFormatJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(root, FORMAT_NODE, format);
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createWatchObjectJson(config_t* cfg, cfg_evt_t evt)
+{
+    cJSON* root = NULL;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
+                                    valToStr(watchTypeMap, evt))) goto err;
+    if (!cJSON_AddStringToObjLN(root, NAME_NODE,
+                                   cfgEventNameFilter(cfg, evt))) goto err;
+    if (!cJSON_AddStringToObjLN(root, FIELD_NODE,
+                                  cfgEventFieldFilter(cfg, evt))) goto err;
+    if (!cJSON_AddStringToObjLN(root, VALUE_NODE,
+                                  cfgEventValueFilter(cfg, evt))) goto err;
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createWatchArrayJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+
+    if (!(root = cJSON_CreateArray())) goto err;
+
+    cfg_evt_t evt;
+    for (evt = CFG_SRC_FILE; evt<CFG_SRC_MAX; evt++) {
+        cJSON* item;
+        if (!cfgEventSourceEnabled(cfg, evt)) continue;
+        if (!(item = createWatchObjectJson(cfg, evt))) continue;
+        cJSON_AddItemToArray(root, item);
+    }
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createEventFormatJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+    if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
+                      valToStr(formatMap, cfgEventFormat(cfg)))) goto err;
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createEventJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+    cJSON* format, *watch;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!(format = createEventFormatJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(root, FORMAT_NODE, format);
+
+    if (!(watch = createWatchArrayJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(root, WATCH_NODE, watch);
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createLibscopeJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+    cJSON* transport, *log;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!(transport = createTransportJson(cfg, CFG_CTL))) goto err;
+    cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
+
+    if (!(log = createLogJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(root, LOG_NODE, log);
+
+    if (!cJSON_AddNumberToObjLN(root, SUMMARYPERIOD_NODE,
+                                      cfgOutPeriod(cfg))) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, COMMANDDIR_NODE,
+                                         cfgCmdDir(cfg))) goto err;
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+cJSON*
+jsonObjectFromCfg(config_t* cfg)
+{
+    cJSON* json_root = NULL;
+    cJSON* metric, *libscope, *event;
+
+    if (!(json_root = cJSON_CreateObject())) goto err;
+
+    if (!(metric = createMetricJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, METRIC_NODE, metric);
+
+    if (!(libscope = createLibscopeJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, LIBSCOPE_NODE, libscope);
+
+     if (!(event = createEventJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, EVENT_NODE, event);
+
+    return json_root;
+err:
+    if (json_root) cJSON_Delete(json_root);
+    return NULL;
+}
+
+char*
+jsonStringFromCfg(config_t* cfg)
+{
+    cJSON* json = jsonObjectFromCfg(cfg);
+    if (!json) return NULL;
+
+    char* string = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+    return string;
+}
 
 static transport_t*
 initTransport(config_t* cfg, which_transport_t t)

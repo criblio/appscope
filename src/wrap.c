@@ -67,6 +67,27 @@ sendEvent(out_t* out, event_t* e)
     }
 }
 
+static void
+sendCmd(char *msg, upload_type_t type, request_t *req, bool now)
+{
+    char *streamMsg;
+    upload_t upld;
+
+    upld.type = type;
+    upld.msg = msg;
+    upld.body = NULL;
+    upld.req = req;
+    streamMsg = ctlCreateTxMsg(&upld);
+
+    if (streamMsg) {
+        // on the ring buffer
+        ctlSendMsg(g_ctl, streamMsg);
+
+        // send it now or periodic
+        if (now) ctlFlush(g_ctl);
+    }
+}
+
 // DEBUG
 EXPORTOFF void
 dumpAddrs(int sd, enum control_type_t endp)
@@ -222,21 +243,52 @@ remoteConfig()
     } while (1);
 
     if (success == 1) {
+        char *cmd;
+        struct stat sb;
+        request_t *req;
+
         if (fflush(fs) != 0) DBG(NULL);
         rewind(fs);
+        if (lstat(path, &sb) == -1) {
+            sb.st_size = DEFAULT_CONFIG_SIZE;
+        }
 
-        // Modify the static config from the command file
-        cfgProcessCommands(g_staticfg, fs);
+        cmd = calloc(1, sb.st_size);
+        if (!cmd) {
+            g_fn.fclose(fs);
+            unlink(path);
+            sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
+            return;
+        }
         
-        // Apply the config
-        doConfig(g_staticfg);
+        if (g_fn.fread(cmd, sb.st_size, 1, fs) == 0) {
+            g_fn.fclose(fs);
+            unlink(path);
+            free(cmd);
+            sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
+            return;
+        }
+
+        req = ctlParseRxMsg((const char *)cmd);
+        if (req) {
+            if ((req->cmd == REQ_SET_CFG) && (req->cfg)) {
+                // Apply the config
+                doConfig(req->cfg);
+                g_staticfg = req->cfg;
+            } else {
+                // error or cmd not yet implemented; error msg applied by ctl
+                // place holder
+            }
+
+            sendCmd(NULL, UPLD_RESP, req, TRUE);
+            destroyReq(&req);
+        } else {
+            sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
+        }
+
+        free(cmd);
     } else {
-        /*
-         * need to send an error response json message when that's ready:
-         * { .type=UPLD_INFO, .body=NULL, .req=NULL, status=500, message=“Error in
-         * receive from stream.  Please resend pending requests.” }
-         * Then use ctlCreateTxMsg() to create a string from it.
-         */
+        sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
         //debug
         scopeLog("Command Failed!", -1, CFG_LOG_DEBUG);
     }
@@ -322,9 +374,12 @@ static void
 doMetric(evt_t* gev, const char *host, uint64_t uid, event_t *metric)
 {
     char cmd[DEFAULT_CMD_SIZE];
+
     osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
     char *msg = evtMetric(gev, host, cmd, g_cfg.procname, uid, metric);
-    ctlSendMsg(g_ctl, msg);
+
+    // create cmd json and then output
+    sendCmd(msg, UPLD_EVT, NULL, FALSE);
 }
 
 static void
@@ -335,7 +390,9 @@ doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
     osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
     char* msg = evtLog(gev, g_cfg.hostname, fs->path, cmd,
                        g_cfg.procname, buf, len, fs->uid);
-    ctlSendMsg(g_ctl, msg);
+
+    // create cmd json and then output
+    sendCmd(msg, UPLD_EVT, NULL, FALSE);
 }
 
 static bool
@@ -2242,7 +2299,6 @@ periodic(void *arg)
 static void
 reportProcessStart(void)
 {
-    return;
     // Log it at startup, provided the loglevel is set to allow it
     scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
 
@@ -2254,16 +2310,20 @@ reportProcessStart(void)
         UNIT_FIELD("process"),
         FIELDEND
     };
-    event_t e = INT_EVENT("proc.start", 1, DELTA, fields);
-    sendEvent(g_out, &e);
+    event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
+    sendEvent(g_out, &evt);
 
     // Send an event at startup, provided metric events are enabled
     char cmd[DEFAULT_CMD_SIZE];
+    char *metric;
 
     osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
-    ctlSendMsg(g_ctl, evtMetric(g_evt, g_cfg.hostname, cmd,
-                                g_cfg.procname, getTime(), &e));
-    ctlFlush(g_ctl);
+
+    // get json from the data set
+    metric = evtMetric(g_evt, g_cfg.hostname, cmd, g_cfg.procname,
+                       getTime(), &evt);
+    // create cmd json and then output
+    sendCmd(metric, UPLD_EVT, NULL, FALSE);
 }
 
 __attribute__((constructor)) void
@@ -3220,6 +3280,7 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
  * have them turned off for now.
  * stat, fstat, lstat.
  */
+/*
 EXPORTOFF int
 stat(const char *pathname, struct stat *statbuf)
 {
@@ -3252,7 +3313,7 @@ lstat(const char *pathname, struct stat *statbuf)
 
     return rc;
 }
-
+*/
 EXPORTON int
 fstatat(int fd, const char *path, struct stat *buf, int flag)
 {

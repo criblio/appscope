@@ -228,20 +228,6 @@ fmtEventNdJson(format_t *fmt, event_format_t *sev)
 
     if (!(buf = cJSON_PrintUnformatted(json))) goto cleanup;
 
-    // Add the newline delimiter.
-    {
-        int strsize = strlen(buf);
-        char* temp = realloc(buf, strsize+2); // room for "\n\0"
-        if (!temp) {
-            DBG(NULL);
-            free(buf);
-            buf = NULL;
-            goto cleanup;
-        }
-        buf = temp;
-        strcat(&buf[strsize], "\n");
-    }
-
 cleanup:
     if (!buf) {
         DBG("time=%s src=%s data=%p host=%s channel=%s json=%p",

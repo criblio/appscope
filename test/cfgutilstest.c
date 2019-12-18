@@ -979,54 +979,55 @@ cfgReadEveryProcessLevel(void** state)
     }
 }
 
+// Test file config (json)
+const char* jsonText =
+    "{\n"
+    "  'metric': {\n"
+    "    'format': {\n"
+    "      'type': 'metricjson',\n"
+    "      'statsdprefix': 'cribl.scope',\n"
+    "      'statsdmaxlen': '42',\n"
+    "      'verbosity': '0',\n"
+    "      'tags': [\n"
+    "        {'tagA': 'val1'},\n"
+    "        {'tagB': 'val2'},\n"
+    "        {'tagC': 'val3'}\n"
+    "      ]\n"
+    "    },\n"
+    "    'transport': {\n"
+    "      'type': 'file',\n"
+    "      'path': '/var/log/scope.log'\n"
+    "    }\n"
+    "  },\n"
+    "  'event': {\n"
+    "    'format': {\n"
+    "      'type': 'ndjson'\n"
+    "    },\n"
+    "    'watch' : [\n"
+    "      {'type':'file', 'name':'.*[.]log$'},\n"
+    "      {'type':'console'},\n"
+    "      {'type':'syslog'},\n"
+    "      {'type':'metric'}\n"
+    "    ]\n"
+    "  },\n"
+    "  'libscope': {\n"
+    "    'transport': {\n"
+    "      'type': 'file',\n"
+    "      'path': '/var/log/event.log'\n"
+    "    },\n"
+    "    'summaryperiod': '13',\n"
+    "    'log': {\n"
+    "      'level': 'debug',\n"
+    "      'transport': {\n"
+    "        'type': 'shm'\n"
+    "      }\n"
+    "    }\n"
+    "  }\n"
+    "}\n";
+
 static void
 cfgReadGoodJson(void** state)
 {
-    // Test file config (json)
-    const char* jsonText =
-        "{\n"
-        "  'metric': {\n"
-        "    'format': {\n"
-        "      'type': 'metricjson',\n"
-        "      'statsdprefix': 'cribl.scope',\n"
-        "      'statsdmaxlen': '42',\n"
-        "      'verbosity': '0',\n"
-        "      'tags': [\n"
-        "        {'tagA': 'val1'},\n"
-        "        {'tagB': 'val2'},\n"
-        "        {'tagC': 'val3'}\n"
-        "      ]\n"
-        "    },\n"
-        "    'transport': {\n"
-        "      'type': 'file',\n"
-        "      'path': '/var/log/scope.log'\n"
-        "    }\n"
-        "  },\n"
-        "  'event': {\n"
-        "    'format': {\n"
-        "      'type': 'ndjson'\n"
-        "    },\n"
-        "    'watch' : [\n"
-        "      {'type':'file', 'name':'.*[.]log$'},\n"
-        "      {'type':'console'},\n"
-        "      {'type':'syslog'},\n"
-        "      {'type':'metric'}\n"
-        "    ]\n"
-        "  },\n"
-        "  'libscope': {\n"
-        "    'transport': {\n"
-        "      'type': 'file',\n"
-        "      'path': '/var/log/event.log'\n"
-        "    },\n"
-        "    'summaryperiod': '13',\n"
-        "    'log': {\n"
-        "      'level': 'debug',\n"
-        "      'transport': {\n"
-        "        'type': 'shm'\n"
-        "      }\n"
-        "    }\n"
-        "  }\n"
-        "}\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, jsonText);
     config_t* config = cfgRead(path);
@@ -1300,6 +1301,44 @@ cfgReadEnvSubstitution(void** state)
 }
 
 static void
+jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void** state)
+{
+    // Start with a string, just since it's already defined for another test
+    config_t* cfg = cfgFromString(jsonText);
+    assert_non_null(cfg);
+
+    // Now from the cfg object above, we should be able to create a
+    // new string and json object with the same content
+    char* stringified_json1 = jsonStringFromCfg(cfg);
+    assert_non_null(stringified_json1);
+    cJSON* json1 = jsonObjectFromCfg(cfg);
+    assert_non_null(json1);
+
+    // Do this again with the new string we output this time
+    cfgDestroy(&cfg);
+    cfg = cfgFromString(stringified_json1);
+    assert_non_null(cfg);
+
+    char* stringified_json2 = jsonStringFromCfg(cfg);
+    assert_non_null(stringified_json2);
+    cJSON* json2 = jsonObjectFromCfg(cfg);
+    assert_non_null(json2);
+
+    // now the diff to make sure the strings and json object trees are identical
+    assert_string_equal(stringified_json1, stringified_json2);
+    assert_true(cJSON_Compare(json1, json2, 1)); // case-sensitive comparison
+
+    //printf("%s\n", stringified_json1);
+
+    cfgDestroy(&cfg);
+    cJSON_Delete(json1);
+    cJSON_Delete(json2);
+    free(stringified_json1);
+    free(stringified_json2);
+}
+
+
+static void
 initLogReturnsPtr(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -1430,6 +1469,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgReadExtraFieldsAreHarmless),
         cmocka_unit_test(cfgReadYamlOrderWithinStructureDoesntMatter),
         cmocka_unit_test(cfgReadEnvSubstitution),
+        cmocka_unit_test(jsonObjectFromCfgAndjsonStringFromCfgRoundTrip),
         cmocka_unit_test(initLogReturnsPtr),
         cmocka_unit_test(initOutReturnsPtr),
         cmocka_unit_test(initEvtReturnsPtr),

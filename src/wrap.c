@@ -204,8 +204,6 @@ remoteConfig()
                 // This is the case where we lost connection
                 close(fds.fd);
                 ctlClose(g_ctl);
-                //debug
-                scopeLog("Disconnect command channel", -1, CFG_LOG_DEBUG);
                 break;
             } else {
                 // we've had an error: abandon the data
@@ -225,17 +223,11 @@ remoteConfig()
              */
             // EOM
             if (strchr((const char *)buf, '\n') != NULL) {
-                char dbg[4096];
                 success = 1;
-                //debug
-                snprintf(dbg, sizeof(dbg), "Command Success: tries %d", numtries);
-                scopeLog(dbg, -1, CFG_LOG_DEBUG);
                 break;
             } else {
                 // No EOM after more than enough tries, bail out
                 if (numtries > MAXTRIES) {
-                    //debug
-                    scopeLog("Command Failed: no EOM", -1, CFG_LOG_DEBUG);
                     break;
                 }
             }
@@ -289,8 +281,6 @@ remoteConfig()
         free(cmd);
     } else {
         sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
-        //debug
-        scopeLog("Command Failed!", -1, CFG_LOG_DEBUG);
     }
 
     g_fn.fclose(fs);
@@ -2299,10 +2289,10 @@ periodic(void *arg)
 static void
 reportProcessStart(void)
 {
-    // Log it at startup, provided the loglevel is set to allow it
+    // 1) Log it at startup, provided the loglevel is set to allow it
     scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
 
-    // Send a metric
+    // 2) Send a metric
     event_field_t fields[] = {
         PROC_FIELD(g_cfg.procname),
         PID_FIELD(g_cfg.pid),
@@ -2313,17 +2303,17 @@ reportProcessStart(void)
     event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
     sendEvent(g_out, &evt);
 
-    // Send an event at startup, provided metric events are enabled
+    // 3) Send an event at startup, provided metric events are enabled
     char cmd[DEFAULT_CMD_SIZE];
-    char *metric;
+    char *msg;
 
     osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
 
-    // get json from the data set
-    metric = evtMetric(g_evt, g_cfg.hostname, cmd, g_cfg.procname,
-                       getTime(), &evt);
+    // get current config in json format
+    msg = jsonStringFromCfg(g_staticfg);
+
     // create cmd json and then output
-    sendCmd(metric, UPLD_EVT, NULL, FALSE);
+    sendCmd(msg, UPLD_INFO, NULL, FALSE);
 }
 
 __attribute__((constructor)) void

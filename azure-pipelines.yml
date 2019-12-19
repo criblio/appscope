@@ -41,19 +41,17 @@ stages:
           #  steps:
           #  - script: ./scope.sh build
           #    displayName: scope.sh build
-          - task: S3Upload@1
-            condition: succeeded()
-            inputs:
-              awsCredentials: 'azure-pipeline-aws'
-              regionName: 'us-west-2'
-              bucketName: 'cdn.cribl.io'
-              sourceFolder: 'lib/'
-              globExpressions: '**/*.so'
-              ${{ if eq(variables['Build.SourceBranchName'], 'master') }}:
-                targetFolder: 'dl/scope/latest/'
-              ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:
-                targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
-              filesAcl: 'public-read'
+          - publish: ./lib/linux/libscope.so
+            displayName: publish linux build
+            condition: and(succeeded(), eq(variables['Agent.OS'], 'Linux'))
+            artifact: linux_build
+
+          - publish: ./lib/macOS/libscope.so
+            displayName: publish macos build
+            condition: and(succeeded(), eq(variables['Agent.OS'], 'Darwin'))
+            artifact: macOS_build
+
+
   - stage: integration_tests
     displayName: Run integration tests
     dependsOn: build
@@ -88,3 +86,39 @@ stages:
         parameters:
           name: kafka
           containerName: kafka
+  - stage: publish
+    displayName: Publish artifacts to S3
+    dependsOn:
+      - build
+      - integration_tests
+    condition: |
+      and
+      (
+        in(dependencies.integration_tests.result, 'Succeeded', 'Skipped'),
+        in(dependencies.build.result, 'Succeeded')
+      )
+    jobs:
+      - job: publish
+        steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifact: 'linux_build'
+              path: $(Build.BinariesDirectory)/lib/linux/
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifact: 'macOS_build'
+              path: $(Build.BinariesDirectory)/lib/macOS/
+          - task: S3Upload@1
+            condition: succeeded()
+            inputs:
+              awsCredentials: 'azure-pipeline-aws'
+              regionName: 'us-west-2'
+              bucketName: 'cdn.cribl.io'
+              sourceFolder: '$(Build.BinariesDirectory)/lib/'
+              globExpressions: '**/*.so'
+              ${{ if eq(variables['Build.SourceBranchName'], 'master') }}:
+                targetFolder: 'dl/scope/latest/'
+              ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:
+                targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
+              filesAcl: 'public-read'
+

@@ -1,32 +1,49 @@
 version: '3.5'
 services:
   cribl:
-    command: -v
+    command: -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
-  splunk:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
 
-    command: -v
+  splunk:
+    command: -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
 
   nginx:
-    command: -v # verbose output
+    command: -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
 
   interposed_func:
-    command: -v
+    command: -s /opt/test-runner/bin/libscope.so
     volumes:
-      - ./logs:/opt/test-runner/logs
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
 
   elastic:
-    command: -v
+    command: -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
 
   kafka:
-    command: -v
+    command: -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
 

@@ -51,7 +51,7 @@ By default test runner would output only INFO level messages and won't store any
 If you need override this, you can use [docker-compose.override.template.yml](docker-compose.override.template.yml) file.
 It will run the test execution in more verbose mode and store logs in `./logs` directory:
 ```commandline
-cp docker-compose.override.template.yml docker.compose.override.yml
+cp docker-compose.override.template.yml docker-compose.override.yml
 ```
 
 ####Using different scope library file

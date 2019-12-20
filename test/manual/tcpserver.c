@@ -132,11 +132,17 @@ int main(int argc, char **argv) {
           
           if (fds[i].revents & POLLERR) {
               printf("%s:%d Error on fd %d\n", __FUNCTION__, __LINE__, fd);
+              close(fds[i].fd);
+              fds[i].fd = -1;
+              fds[i].events = 0;
               continue;
           }
 
           if (fds[i].revents & POLLNVAL) {
               printf("%s:%d Invalid on fd %d\n", __FUNCTION__, __LINE__, fd);
+              close(fds[i].fd);
+              fds[i].fd = -1;
+              fds[i].events = 0;
               continue;
           }
 

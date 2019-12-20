@@ -2,15 +2,14 @@
 
 
 static int
-postMsg(ctl_t *ctl, char *msg, upload_type_t type, request_t *req, bool now)
+postMsg(ctl_t *ctl, cJSON *body, upload_type_t type, request_t *req, bool now)
 {
     int rc = -1;
     char *streamMsg;
     upload_t upld;
 
     upld.type = type;
-    upld.msg = msg;
-    upld.body = NULL;
+    upld.body = body;
     upld.req = req;
     streamMsg = ctlCreateTxMsg(&upld);
 
@@ -27,27 +26,33 @@ postMsg(ctl_t *ctl, char *msg, upload_type_t type, request_t *req, bool now)
 }
 
 int
-cmdPostEvtMsg(ctl_t *ctl, char *msg)
+cmdPostEvtMsg(ctl_t *ctl, cJSON *json)
 {
-    return postMsg(ctl, msg, UPLD_EVT, NULL, FALSE);
+    return postMsg(ctl, json, UPLD_EVT, NULL, FALSE);
 }
 
 int
-cmdPostInfoMsg(ctl_t *ctl, char *msg)
+cmdPostInfoStr(ctl_t *ctl, const char *str)
 {
-    return postMsg(ctl, msg, UPLD_INFO, NULL, FALSE);
+    return postMsg(ctl, cJSON_CreateString(str), UPLD_INFO, NULL, FALSE);
 }
 
 int
-cmdSendEvtMsg(ctl_t *ctl, char *msg)
+cmdPostInfoMsg(ctl_t *ctl, cJSON *json)
 {
-    return postMsg(ctl, msg, UPLD_EVT, NULL, TRUE);
+    return postMsg(ctl, json, UPLD_INFO, NULL, FALSE);
 }
 
 int
-cmdSendInfoMsg(ctl_t *ctl, char *msg)
+cmdSendEvtMsg(ctl_t *ctl, cJSON *json)
 {
-    return postMsg(ctl, msg, UPLD_INFO, NULL, TRUE);
+    return postMsg(ctl, json, UPLD_EVT, NULL, TRUE);
+}
+
+int
+cmdSendInfoMsg(ctl_t *ctl, cJSON *json)
+{
+    return postMsg(ctl, json, UPLD_INFO, NULL, TRUE);
 }
 
 int
@@ -62,19 +67,19 @@ cmdParse(ctl_t *ctl, char *cmd)
     return ctlParseRxMsg((const char *)cmd);
 }
 
-char *
+cJSON *
 msgStart(rtconfig *rcfg, config_t *scfg)
 {
-    return jsonStringFromCfg(scfg);
+    return jsonObjectFromCfg(scfg);
 }
 
-char *
+cJSON *
 msgEvtMetric(evt_t *evt, event_t *metric, uint64_t uid, rtconfig *rcfg)
 {
     return evtMetric(evt, rcfg->hostname, rcfg->cmd, rcfg->procname, uid, metric);
 }
 
-char *
+cJSON *
 msgEvtLog(evt_t *evt, const char *path, const void *buf, size_t len,
           uint64_t uid, rtconfig *rcfg)
 {

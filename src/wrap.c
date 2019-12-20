@@ -229,7 +229,7 @@ remoteConfig()
         if (!cmd) {
             g_fn.fclose(fs);
             unlink(path);
-            cmdSendInfoMsg(g_ctl, "Error in receive from stream. Resend pending request.");
+            cmdSendInfoStr(g_ctl, "Error in receive from stream. Resend pending request.");
             return;
         }
         
@@ -237,7 +237,7 @@ remoteConfig()
             g_fn.fclose(fs);
             unlink(path);
             free(cmd);
-            cmdSendInfoMsg(g_ctl, "Error in receive from stream. Resend pending request.");
+            cmdSendInfoStr(g_ctl, "Error in receive from stream. Resend pending request.");
             return;
         }
         
@@ -255,12 +255,12 @@ remoteConfig()
             cmdSendResponse(g_ctl, req);
             destroyReq(&req);
         } else {
-            cmdSendInfoMsg(g_ctl, "Error in receive from stream. Resend pending request.");
+            cmdSendInfoStr(g_ctl, "Error in receive from stream. Resend pending request.");
         }
 
         free(cmd);
     } else {
-        cmdSendInfoMsg(g_ctl, "Error in receive from stream. Resend pending request.");
+        cmdSendInfoStr(g_ctl, "Error in receive from stream. Resend pending request.");
     }
 
     g_fn.fclose(fs);
@@ -343,21 +343,21 @@ getDuration(uint64_t start)
 static void
 doMetric(evt_t* gev, const char *host, uint64_t uid, event_t *metric)
 {
-    // get a formatted string for the given metric
-    char *msg = msgEvtMetric(gev, metric, uid, &g_cfg);
+    // get a cJSON object for the given metric
+    cJSON *json = msgEvtMetric(gev, metric, uid, &g_cfg);
 
     // create cmd json and then output
-    cmdPostEvtMsg(g_ctl, msg);
+    cmdPostEvtMsg(g_ctl, json);
 }
 
 static void
 doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
 {
-    // get a formatted string for the given log msg
-    char *msg = msgEvtLog(gev, fs->path, buf, len, fs->uid, &g_cfg);
+    // get a cJSON object for the given log msg
+    cJSON *json = msgEvtLog(gev, fs->path, buf, len, fs->uid, &g_cfg);
     
     // create cmd json and then output
-    cmdPostEvtMsg(g_ctl, msg);
+    cmdPostEvtMsg(g_ctl, json);
 }
 
 static bool
@@ -2280,13 +2280,12 @@ reportProcessStart(void)
 
     // 3) Send an event at startup, provided metric events are enabled
     //char cmd[DEFAULT_CMD_SIZE];
-    char *msg;
 
-    // get a formatted string for our current config
-    msg = msgStart(&g_cfg, g_staticfg);
+    // get a cJSON object for our current config
+    cJSON *json = msgStart(&g_cfg, g_staticfg);
 
     // create cmd json and then output
-    cmdSendInfoMsg(g_ctl, msg);
+    cmdSendInfoMsg(g_ctl, json);
 }
 
 __attribute__((constructor)) void

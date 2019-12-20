@@ -77,7 +77,9 @@ cfgPathHonorsPriorityOrder(void** state)
                       homeConfDir};
     int i;
     for (i=0; i<sizeof(newdir)/sizeof(newdir[0]); i++) {
-        assert_int_equal(mkdir(newdir[i], 0777), 0);
+        if (access(newdir[i], F_OK) == -1) {
+            assert_int_equal(mkdir(newdir[i], 0777), 0);
+        }
     }
 
     // get the basedir, set cwd and scopeHome from it

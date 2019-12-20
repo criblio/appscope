@@ -490,15 +490,14 @@ fmtEventMessageStringValue(void** state)
     char* str = fmtEventMessageString(fmt, &event_format);
     assert_non_null(str);
 
+    //printf("%s:%d %s\n", __FUNCTION__, __LINE__, str);
     assert_string_equal(str, "{\"ty\":\"ev\","
                               "\"id\":\"earl-formattest-cmd\","
                               "\"_time\":1573058085.991,"
                               "\"source\":\"stdin\","
                               "\"_raw\":\"поспехаў\","
                               "\"host\":\"earl\","
-                              "\"_channel\":\"14627333968688430831\"}\n");
-
-    //printf("%s\n", str);
+                              "\"_channel\":\"14627333968688430831\"}");
     free(str);
 
     fmtDestroy(&fmt);
@@ -532,7 +531,7 @@ fmtEventMessageStringWithEmbeddedNulls(void** state)
                               "\"source\":\"stdout\","
                               "\"_raw\":\"Unë mund\\u0000të ha qelq dhe nuk\\u0000më gjen gjë\","
                               "\"host\":\"earl\","
-                              "\"_channel\":\"14627333968688430831\"}\n");
+                              "\"_channel\":\"14627333968688430831\"}");
     free(str);
 
     // test that datasize of zero acts like null delimited input.
@@ -545,7 +544,7 @@ fmtEventMessageStringWithEmbeddedNulls(void** state)
                               "\"source\":\"stdout\","
                               "\"_raw\":\"Unë mund\","
                               "\"host\":\"earl\","
-                              "\"_channel\":\"14627333968688430831\"}\n");
+                              "\"_channel\":\"14627333968688430831\"}");
     free(str);
 
     // test that null data returns empty string for _raw.
@@ -559,7 +558,7 @@ fmtEventMessageStringWithEmbeddedNulls(void** state)
                               "\"source\":\"stdout\","
                               "\"_raw\":\"\","
                               "\"host\":\"earl\","
-                              "\"_channel\":\"14627333968688430831\"}\n");
+                              "\"_channel\":\"14627333968688430831\"}");
     free(str);
 
     fmtDestroy(&fmt);

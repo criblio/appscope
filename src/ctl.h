@@ -48,6 +48,7 @@ typedef enum {
 typedef struct {
     upload_type_t type;
     cJSON* body;
+    char *msg;
     request_t* req;            // NULL unless this is UPLD_RESP
 } upload_t;
 

@@ -67,6 +67,27 @@ sendEvent(out_t* out, event_t* e)
     }
 }
 
+static void
+sendCmd(char *msg, upload_type_t type, request_t *req, bool now)
+{
+    char *streamMsg;
+    upload_t upld;
+
+    upld.type = type;
+    upld.msg = msg;
+    upld.body = NULL;
+    upld.req = req;
+    streamMsg = ctlCreateTxMsg(&upld);
+
+    if (streamMsg) {
+        // on the ring buffer
+        ctlSendMsg(g_ctl, streamMsg);
+
+        // send it now or periodic
+        if (now) ctlFlush(g_ctl);
+    }
+}
+
 // DEBUG
 EXPORTOFF void
 dumpAddrs(int sd, enum control_type_t endp)
@@ -139,7 +160,7 @@ remoteConfig()
 {
     int timeout;
     struct pollfd fds;
-    int rc, success;
+    int rc, success, numtries;
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
@@ -174,35 +195,92 @@ remoteConfig()
         return;
     }
 
-    success = rc = errno = 0;
+    success = rc = errno = numtries = 0;
     do {
+        numtries++;
         rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
-        /*
-         * TODO: if we get an error, we don't get the whole file
-         * When we support ndjson look for new line as EOF
-         */
         if (rc <= 0) {
-            close(fds.fd);
-            ctlClose(g_ctl);
-            break;
+            if (errno == 0) {
+                // This is the case where we lost connection
+                close(fds.fd);
+                ctlClose(g_ctl);
+                break;
+            } else {
+                // we've had an error: abandon the data
+                break;
+            }
         }
 
         if (g_fn.fwrite(buf, rc, (size_t)1, fs) <= 0) {
             DBG(NULL);
+            break;
         } else {
-            success = 1;
+            /*
+             * We are done if we get end of msg (EOM) or if we've read more 
+             * than expected and never saw an EOM.
+             * We are only successful if we've had no errors or disconnects
+             * and we receive a viable EOM.
+             */
+            // EOM
+            if (strchr((const char *)buf, '\n') != NULL) {
+                success = 1;
+                break;
+            } else {
+                // No EOM after more than enough tries, bail out
+                if (numtries > MAXTRIES) {
+                    break;
+                }
+            }
         }
     } while (1);
 
     if (success == 1) {
+        char *cmd;
+        struct stat sb;
+        request_t *req;
+
         if (fflush(fs) != 0) DBG(NULL);
         rewind(fs);
+        if (lstat(path, &sb) == -1) {
+            sb.st_size = DEFAULT_CONFIG_SIZE;
+        }
 
-        // Modify the static config from the command file
-        cfgProcessCommands(g_staticfg, fs);
+        cmd = calloc(1, sb.st_size);
+        if (!cmd) {
+            g_fn.fclose(fs);
+            unlink(path);
+            sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
+            return;
+        }
         
-        // Apply the config
-        doConfig(g_staticfg);
+        if (g_fn.fread(cmd, sb.st_size, 1, fs) == 0) {
+            g_fn.fclose(fs);
+            unlink(path);
+            free(cmd);
+            sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
+            return;
+        }
+
+        req = ctlParseRxMsg((const char *)cmd);
+        if (req) {
+            if ((req->cmd == REQ_SET_CFG) && (req->cfg)) {
+                // Apply the config
+                doConfig(req->cfg);
+                g_staticfg = req->cfg;
+            } else {
+                // error or cmd not yet implemented; error msg applied by ctl
+                // place holder
+            }
+
+            sendCmd(NULL, UPLD_RESP, req, TRUE);
+            destroyReq(&req);
+        } else {
+            sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
+        }
+
+        free(cmd);
+    } else {
+        sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
     }
 
     g_fn.fclose(fs);
@@ -286,9 +364,12 @@ static void
 doMetric(evt_t* gev, const char *host, uint64_t uid, event_t *metric)
 {
     char cmd[DEFAULT_CMD_SIZE];
+
     osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
     char *msg = evtMetric(gev, host, cmd, g_cfg.procname, uid, metric);
-    ctlSendMsg(g_ctl, msg);
+
+    // create cmd json and then output
+    sendCmd(msg, UPLD_EVT, NULL, FALSE);
 }
 
 static void
@@ -299,7 +380,9 @@ doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
     osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
     char* msg = evtLog(gev, g_cfg.hostname, fs->path, cmd,
                        g_cfg.procname, buf, len, fs->uid);
-    ctlSendMsg(g_ctl, msg);
+
+    // create cmd json and then output
+    sendCmd(msg, UPLD_EVT, NULL, FALSE);
 }
 
 static bool
@@ -2105,7 +2188,7 @@ reportPeriodicStuff(void)
     long long cpu = 0;
     static long long cpuState = 0;
 
-    // This is called by periodic(), and due to atexit().
+    // This is called by periodic, and due to atexit().
     // If it's actively running for one reason, then skip the second.
     static uint64_t reentrancy_guard = 0ULL;
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) return;
@@ -2206,11 +2289,10 @@ periodic(void *arg)
 static void
 reportProcessStart(void)
 {
-    return;
-    // Log it at startup, provided the loglevel is set to allow it
+    // 1) Log it at startup, provided the loglevel is set to allow it
     scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
 
-    // Send a metric
+    // 2) Send a metric
     event_field_t fields[] = {
         PROC_FIELD(g_cfg.procname),
         PID_FIELD(g_cfg.pid),
@@ -2218,16 +2300,20 @@ reportProcessStart(void)
         UNIT_FIELD("process"),
         FIELDEND
     };
-    event_t e = INT_EVENT("proc.start", 1, DELTA, fields);
-    sendEvent(g_out, &e);
+    event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
+    sendEvent(g_out, &evt);
 
-    // Send an event at startup, provided metric events are enabled
+    // 3) Send an event at startup, provided metric events are enabled
     char cmd[DEFAULT_CMD_SIZE];
+    char *msg;
 
     osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
-    ctlSendMsg(g_ctl, evtMetric(g_evt, g_cfg.hostname, cmd,
-                                g_cfg.procname, getTime(), &e));
-    ctlFlush(g_ctl);
+
+    // get current config in json format
+    msg = jsonStringFromCfg(g_staticfg);
+
+    // create cmd json and then output
+    sendCmd(msg, UPLD_INFO, NULL, FALSE);
 }
 
 __attribute__((constructor)) void
@@ -3184,6 +3270,7 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
  * have them turned off for now.
  * stat, fstat, lstat.
  */
+/*
 EXPORTOFF int
 stat(const char *pathname, struct stat *statbuf)
 {
@@ -3216,7 +3303,7 @@ lstat(const char *pathname, struct stat *statbuf)
 
     return rc;
 }
-
+*/
 EXPORTON int
 fstatat(int fd, const char *path, struct stat *buf, int flag)
 {

@@ -13,6 +13,7 @@
 
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
+static summary g_summary = {0};
 static net_info *g_netinfo;
 static fs_info *g_fsinfo;
 static metric_counters g_ctrs = {0};
@@ -67,27 +68,6 @@ sendEvent(out_t* out, event_t* e)
     }
 }
 
-static void
-sendCmd(char *msg, upload_type_t type, request_t *req, bool now)
-{
-    char *streamMsg;
-    upload_t upld;
-
-    upld.type = type;
-    upld.msg = msg;
-    upld.body = NULL;
-    upld.req = req;
-    streamMsg = ctlCreateTxMsg(&upld);
-
-    if (streamMsg) {
-        // on the ring buffer
-        ctlSendMsg(g_ctl, streamMsg);
-
-        // send it now or periodic
-        if (now) ctlFlush(g_ctl);
-    }
-}
-
 // DEBUG
 EXPORTOFF void
 dumpAddrs(int sd, enum control_type_t endp)
@@ -139,7 +119,7 @@ setVerbosity(rtconfig* c, unsigned verbosity)
 {
     if (!c) return;
 
-    summary_t* summarize = &c->summarize;
+    summary *summarize = &g_summary;
 
     summarize->fs.error =       (verbosity < 5);
     summarize->fs.open_close =  (verbosity < 6);
@@ -249,7 +229,7 @@ remoteConfig()
         if (!cmd) {
             g_fn.fclose(fs);
             unlink(path);
-            sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
+            cmdSendInfoMsg(g_ctl, "Error in receive from stream. Resend pending request.");
             return;
         }
         
@@ -257,11 +237,11 @@ remoteConfig()
             g_fn.fclose(fs);
             unlink(path);
             free(cmd);
-            sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
+            cmdSendInfoMsg(g_ctl, "Error in receive from stream. Resend pending request.");
             return;
         }
-
-        req = ctlParseRxMsg((const char *)cmd);
+        
+        req = cmdParse(g_ctl, cmd);
         if (req) {
             if ((req->cmd == REQ_SET_CFG) && (req->cfg)) {
                 // Apply the config
@@ -271,16 +251,16 @@ remoteConfig()
                 // error or cmd not yet implemented; error msg applied by ctl
                 // place holder
             }
-
-            sendCmd(NULL, UPLD_RESP, req, TRUE);
+            
+            cmdSendResponse(g_ctl, req);
             destroyReq(&req);
         } else {
-            sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
+            cmdSendInfoMsg(g_ctl, "Error in receive from stream. Resend pending request.");
         }
 
         free(cmd);
     } else {
-        sendCmd("Error in receive from stream. Resend pending request.", UPLD_INFO, NULL, TRUE);
+        cmdSendInfoMsg(g_ctl, "Error in receive from stream. Resend pending request.");
     }
 
     g_fn.fclose(fs);
@@ -363,26 +343,21 @@ getDuration(uint64_t start)
 static void
 doMetric(evt_t* gev, const char *host, uint64_t uid, event_t *metric)
 {
-    char cmd[DEFAULT_CMD_SIZE];
-
-    osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
-    char *msg = evtMetric(gev, host, cmd, g_cfg.procname, uid, metric);
+    // get a formatted string for the given metric
+    char *msg = msgEvtMetric(gev, metric, uid, &g_cfg);
 
     // create cmd json and then output
-    sendCmd(msg, UPLD_EVT, NULL, FALSE);
+    cmdPostEvtMsg(g_ctl, msg);
 }
 
 static void
 doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
 {
-    char cmd[DEFAULT_CMD_SIZE];
-
-    osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
-    char* msg = evtLog(gev, g_cfg.hostname, fs->path, cmd,
-                       g_cfg.procname, buf, len, fs->uid);
-
+    // get a formatted string for the given log msg
+    char *msg = msgEvtLog(gev, fs->path, buf, len, fs->uid, &g_cfg);
+    
     // create cmd json and then output
-    sendCmd(msg, UPLD_EVT, NULL, FALSE);
+    cmdPostEvtMsg(g_ctl, msg);
 }
 
 static bool
@@ -610,7 +585,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
         doMetric(g_evt, g_cfg.hostname, getTime(), &netErrMetric);
 
         // Only report if enabled
-        if ((g_cfg.summarize.net.error) && (source == EVENT_BASED)) {
+        if ((g_summary.net.error) && (source == EVENT_BASED)) {
             return;
         }
 
@@ -640,28 +615,28 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
                 metric = "fs.error";
                 value = &g_ctrs.fsOpenCloseErrors;
                 class = "open/close";
-                summarize = &g_cfg.summarize.fs.error;
+                summarize = &g_summary.fs.error;
                 name_field = &file_field;
                 break;
             case FS_ERR_READ_WRITE:
                 metric = "fs.error";
                 value = &g_ctrs.fsRdWrErrors;
                 class = "read/write";
-                summarize = &g_cfg.summarize.fs.error;
+                summarize = &g_summary.fs.error;
                 name_field = &file_field;
                 break;
             case FS_ERR_STAT:
                 metric = "fs.error";
                 value = &g_ctrs.fsStatErrors;
                 class = "stat";
-                summarize = &g_cfg.summarize.fs.error;
+                summarize = &g_summary.fs.error;
                 name_field = &file_field;
                 break;
             case NET_ERR_DNS:
                 metric = "net.error";
                 value = &g_ctrs.netDNSErrors;
                 class = "dns";
-                summarize = &g_cfg.summarize.net.dnserror;
+                summarize = &g_summary.net.dnserror;
                 name_field = &domain_field;
                 break;
             default:
@@ -737,7 +712,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
         doMetric(g_evt, g_cfg.hostname, getTime(), &dnsMetric);
 
         // Only report if enabled
-        if (g_cfg.summarize.net.dns) {
+        if (g_summary.net.dns) {
             return;
         }
 
@@ -778,7 +753,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
         doMetric(g_evt, g_cfg.hostname, getTime(), &dnsDurMetric);
 
         // Only report if enabled
-        if (g_cfg.summarize.net.dns) {
+        if (g_summary.net.dns) {
             return;
         }
 
@@ -916,7 +891,7 @@ doStatMetric(const char *op, const char *pathname)
 
 
     // Only report if enabled
-    if (g_cfg.summarize.fs.stat) {
+    if (g_summary.fs.stat) {
         return;
     }
 
@@ -951,7 +926,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         }
 
         // Only report if enabled
-        if ((g_cfg.summarize.fs.read_write) && (source == EVENT_BASED)) {
+        if ((g_summary.fs.read_write) && (source == EVENT_BASED)) {
             return;
         }
 
@@ -1048,7 +1023,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         doMetric(g_evt, g_cfg.hostname, g_fsinfo[fd].uid, &rwMetric);
 
         // Only report if enabled
-        if ((g_cfg.summarize.fs.read_write) && (source == EVENT_BASED)) {
+        if ((g_summary.fs.read_write) && (source == EVENT_BASED)) {
             return;
         }
 
@@ -1079,21 +1054,21 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
                 metric = "fs.op.open";
                 numops = &g_fsinfo[fd].numOpen;
                 global_counter = &g_ctrs.numOpen;
-                summarize = &g_cfg.summarize.fs.open_close;
+                summarize = &g_summary.fs.open_close;
                 err_str = "ERROR: doFSMetric:FS_OPEN:outSendEvent";
                 break;
             case FS_CLOSE:
                 metric = "fs.op.close";
                 numops = &g_fsinfo[fd].numClose;
                 global_counter = &g_ctrs.numClose;
-                summarize = &g_cfg.summarize.fs.open_close;
+                summarize = &g_summary.fs.open_close;
                 err_str = "ERROR: doFSMetric:FS_CLOSE:outSendEvent";
                 break;
             case FS_SEEK:
                 metric = "fs.op.seek";
                 numops = &g_fsinfo[fd].numSeek;
                 global_counter = &g_ctrs.numSeek;
-                summarize = &g_cfg.summarize.fs.seek;
+                summarize = &g_summary.fs.seek;
                 err_str = "ERROR: doFSMetric:FS_SEEK:outSendEvent";
                 break;
             default:
@@ -1387,7 +1362,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         // Only report if enabled
-        if ((g_cfg.summarize.net.open_close) && (source == EVENT_BASED)) {
+        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
             return;
         }
 
@@ -1430,7 +1405,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         // Only report if enabled
-        if ((g_cfg.summarize.net.open_close) && (source == EVENT_BASED)) {
+        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
             return;
         }
 
@@ -1553,7 +1528,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         doMetric(g_evt, g_cfg.hostname, g_netinfo[fd].uid, &rxMetric);
 
-        if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
+        if ((g_summary.net.rx_tx) && (source == EVENT_BASED)) {
             return;
         }
 
@@ -1654,7 +1629,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         doMetric(g_evt, g_cfg.hostname, g_netinfo[fd].uid, &txMetric);
 
-        if ((g_cfg.summarize.net.rx_tx) && (source == EVENT_BASED)) {
+        if ((g_summary.net.rx_tx) && (source == EVENT_BASED)) {
             return;
         }
 
@@ -1968,11 +1943,11 @@ reportFD(int fd, enum control_type_t source)
 {
     struct net_info_t *ninfo = getNetEntry(fd);
     if (ninfo) {
-        if (!g_cfg.summarize.net.rx_tx) {
+        if (!g_summary.net.rx_tx) {
             doNetMetric(NETTX, fd, source, 0);
             doNetMetric(NETRX, fd, source, 0);
         }
-        if (!g_cfg.summarize.net.open_close) {
+        if (!g_summary.net.open_close) {
             doNetMetric(OPEN_PORTS, fd, source, 0);
             doNetMetric(NET_CONNECTIONS, fd, source, 0);
             doNetMetric(CONNECTION_DURATION, fd, source, 0);
@@ -1981,12 +1956,12 @@ reportFD(int fd, enum control_type_t source)
 
     struct fs_info_t *finfo = getFSEntry(fd);
     if (finfo) {
-        if (!g_cfg.summarize.fs.read_write) {
+        if (!g_summary.fs.read_write) {
             doFSMetric(FS_DURATION, fd, source, "read/write", 0, NULL);
             doFSMetric(FS_READ, fd, source, "read", 0, NULL);
             doFSMetric(FS_WRITE, fd, source, "write", 0, NULL);
         }
-        if (!g_cfg.summarize.fs.seek) {
+        if (!g_summary.fs.seek) {
             doFSMetric(FS_SEEK, fd, source, "seek", 0, NULL);
         }
     }
@@ -2304,16 +2279,14 @@ reportProcessStart(void)
     sendEvent(g_out, &evt);
 
     // 3) Send an event at startup, provided metric events are enabled
-    char cmd[DEFAULT_CMD_SIZE];
+    //char cmd[DEFAULT_CMD_SIZE];
     char *msg;
 
-    osGetCmdline(g_cfg.pid, cmd, sizeof(cmd));
-
-    // get current config in json format
-    msg = jsonStringFromCfg(g_staticfg);
+    // get a formatted string for our current config
+    msg = msgStart(&g_cfg, g_staticfg);
 
     // create cmd json and then output
-    sendCmd(msg, UPLD_INFO, NULL, FALSE);
+    cmdSendInfoMsg(g_ctl, msg);
 }
 
 __attribute__((constructor)) void
@@ -2485,6 +2458,7 @@ init(void)
     }
 
     osGetProcname(g_cfg.procname, sizeof(g_cfg.procname));
+    osGetCmdline(g_cfg.pid, g_cfg.cmd, sizeof(g_cfg.cmd));
     osInitTSC(&g_cfg);
     if (g_cfg.tsc_invariant == FALSE) {
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);

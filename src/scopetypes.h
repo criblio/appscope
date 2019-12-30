@@ -1,6 +1,8 @@
 #ifndef __SCOPETYPES_H__
 #define __SCOPETYPES_H__
 
+#include <unistd.h>
+
 typedef enum {CFG_METRIC_STATSD,
               CFG_METRIC_JSON,
               CFG_EVENT_ND_JSON,
@@ -20,6 +22,29 @@ typedef enum {CFG_SRC_FILE,
               CFG_SRC_METRIC,
               CFG_SRC_MAX} cfg_evt_t;
 
+
+#define MAX_HOSTNAME 255
+#define MAX_PROCNAME 128
+#define DEFAULT_CMD_SIZE 32
+#define MAX_ID 512
+
+typedef struct
+{
+    pid_t pid;
+    pid_t ppid;
+    char hostname[MAX_HOSTNAME];
+    char procname[MAX_PROCNAME];
+    char cmd[DEFAULT_CMD_SIZE];
+    char id[MAX_ID];
+} proc_id_t;
+
+
+#define TRUE 1
+#define FALSE 0
+
+#ifndef bool
+typedef unsigned int bool;
+#endif
 
 #define CFG_MAX_VERBOSITY 9
 #define CFG_FILE_NAME "scope.yml"
@@ -55,7 +80,6 @@ typedef enum {CFG_SRC_FILE,
 #define DEFAULT_OUT_PORT "8125"
 #define DEFAULT_CTL_PORT "9109"
 #define DEFAULT_CBUF_SIZE 5000
-#define DEFAULT_CMD_SIZE 32
 #define DEFAULT_CONFIG_SIZE 30 * 1024
 
 #endif // __SCOPETYPES_H__

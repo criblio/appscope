@@ -198,37 +198,28 @@ fmtEventJson(format_t *fmt, event_format_t *sev)
 {
     char numbuf[32];
 
-    if (!fmt || !sev) return NULL;
+    if (!fmt || !sev || !sev->proc) return NULL;
 
     cJSON* json = cJSON_CreateObject();
     if (!json) goto err;
 
     if (!cJSON_AddStringToObjLN(json, TYPE, EVENT)) goto err;
 
-    if (sev->hostname && sev->procname && sev->cmd) {
-        char id[strlen(sev->hostname) + strlen(sev->procname) + strlen(sev->cmd) + 4];
-
-        snprintf(id, sizeof(id), "%s-%s-%s", sev->hostname, sev->procname, sev->cmd);
-        if (!cJSON_AddStringToObjLN(json, ID, id)) goto err;
-    } else {
-        char id[8];
-        snprintf(id, sizeof(id), "badid");
-        if (!cJSON_AddStringToObjLN(json, ID, id)) goto err;
-    }
+    if (!cJSON_AddStringToObjLN(json, ID, sev->proc->id)) goto err;
 
     if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto err;
     if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto err;
     cJSON* data = cJSON_CreateStringFromBuffer(sev->data, sev->datasize);
     if (!data) goto err;
     cJSON_AddItemToObjectCS(json, DATA, data);
-    if (!cJSON_AddStringToObjLN(json, HOST, sev->hostname)) goto err;
+    if (!cJSON_AddStringToObjLN(json, HOST, sev->proc->hostname)) goto err;
     if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto err;
     if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto err;
 
     return json;
 err:
     DBG("time=%s src=%s data=%p host=%s channel=%s json=%p",
-            sev->timestamp, sev->src, sev->data, sev->hostname, numbuf, json);
+            sev->timestamp, sev->src, sev->data, sev->proc->hostname, numbuf, json);
     if (json) cJSON_Delete(json);
 
     return NULL;

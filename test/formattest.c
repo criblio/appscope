@@ -471,15 +471,18 @@ fmtEventJsonValue(void** state)
     format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
     assert_non_null(fmt);
 
+    proc_id_t proc;
+    strcpy(proc.hostname, "earl");
+    strcpy(proc.procname, "formattest");
+    strcpy(proc.cmd, "cmd");
+    strcpy(proc.id, "earl-formattest-cmd");
     event_format_t event_format;
     event_format.timestamp = 1573058085.991;
     event_format.src = "stdin";
-    event_format.hostname = "earl";
+    event_format.proc = &proc;
+    event_format.uid = 0xCAFEBABEDEADBEEF;
     event_format.data = "поспехаў";
     event_format.datasize = strlen(event_format.data);
-    event_format.uid = 0xCAFEBABEDEADBEEF;
-    event_format.cmd = "cmd";
-    event_format.procname = "formattest";
 
     assert_null(fmtEventJson(NULL, NULL));
 
@@ -512,18 +515,21 @@ fmtEventJsonWithEmbeddedNulls(void** state)
     format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
     assert_non_null(fmt);
 
+    proc_id_t proc;
+    strcpy (proc.hostname, "earl");
+    strcpy (proc.procname, "");
+    strcpy (proc.cmd, "");
+    strcpy (proc.id, "earl--");
     event_format_t event_format;
     event_format.timestamp = 1573058085.001;
     event_format.src = "stdout";
-    event_format.hostname = "earl";
+    event_format.proc = &proc;
+    event_format.uid = 0xCAFEBABEDEADBEEF;
     char buf[] = "Unë mund të ha qelq dhe nuk më gjen gjë";
     event_format.data = buf;
     event_format.datasize = strlen(event_format.data);
     event_format.data[9] = '\0';                  //  <-- Null in middle of buf
     event_format.data[29] = '\0';                 //  <-- Null in middle of buf
-    event_format.uid = 0xCAFEBABEDEADBEEF;
-    event_format.procname = "";
-    event_format.cmd = "";
     
     // test that _raw has the nulls properly escaped
     cJSON* json = fmtEventJson(fmt, &event_format);

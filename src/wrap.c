@@ -13,7 +13,7 @@
 
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
-static summary g_summary = {0};
+static summary_t g_summary = {0};
 static net_info *g_netinfo;
 static fs_info *g_fsinfo;
 static metric_counters g_ctrs = {0};
@@ -38,13 +38,13 @@ static void doOpen(int, const char *, enum fs_type_t, const char *);
 static void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
 {
-    if (!g_log || !msg || !g_cfg.procname[0]) return;
+    if (!g_log || !msg || !g_cfg.proc.procname[0]) return;
 
     char buf[strlen(msg) + 128];
     if (fd != -1) {
-        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): fd:%d %s\n", g_cfg.procname, g_cfg.pid, fd, msg);
+        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): fd:%d %s\n", g_cfg.proc.procname, g_cfg.proc.pid, fd, msg);
     } else {
-        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): %s\n", g_cfg.procname, g_cfg.pid, msg);
+        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): %s\n", g_cfg.proc.procname, g_cfg.proc.pid, msg);
     }
     if (logSend(g_log, buf, level) == DEFAULT_BADFD) {
         // We lost our fd, re-open
@@ -119,7 +119,7 @@ setVerbosity(rtconfig* c, unsigned verbosity)
 {
     if (!c) return;
 
-    summary *summarize = &g_summary;
+    summary_t *summarize = &g_summary;
 
     summarize->fs.error =       (verbosity < 5);
     summarize->fs.open_close =  (verbosity < 6);
@@ -168,7 +168,7 @@ remoteConfig()
     if ((rc == 0) || (fds.revents == 0) || ((fds.revents & POLLIN) == 0) ||
         ((fds.revents & POLLHUP) != 0) || ((fds.revents & POLLNVAL) != 0)) return;
 
-    snprintf(path, sizeof(path), "/tmp/cfg.%d", g_cfg.pid);
+    snprintf(path, sizeof(path), "/tmp/cfg.%d", g_cfg.proc.pid);
     if ((fs = g_fn.fopen(path, "a+")) == NULL) {
         DBG(NULL);
         scopeLog("ERROR: remoteConfig:fopen", -1, CFG_LOG_ERROR);
@@ -241,7 +241,7 @@ remoteConfig()
             return;
         }
         
-        req = cmdParse(g_ctl, cmd);
+        req = cmdParse((const char*)cmd);
         if (req) {
             if ((req->cmd == REQ_SET_CFG) && (req->cfg)) {
                 // Apply the config
@@ -295,10 +295,10 @@ dynConfig(void)
     FILE *fs;
     char path[PATH_MAX];
 
-    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmddir, DYN_CONFIG_PREFIX, g_cfg.pid);
+    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmddir, DYN_CONFIG_PREFIX, g_cfg.proc.pid);
 
     // Is there a command file for this pid
-    if (osIsFilePresent(g_cfg.pid, path) == -1) return 0;
+    if (osIsFilePresent(g_cfg.proc.pid, path) == -1) return 0;
 
     // Open the command file
     if ((fs = g_fn.fopen(path, "r")) == NULL) return -1;
@@ -344,7 +344,7 @@ static void
 doMetric(evt_t* gev, const char *host, uint64_t uid, event_t *metric)
 {
     // get a cJSON object for the given metric
-    cJSON *json = msgEvtMetric(gev, metric, uid, &g_cfg);
+    cJSON *json = msgEvtMetric(gev, metric, uid, &g_cfg.proc);
 
     // create cmd json and then output
     cmdPostEvtMsg(g_ctl, json);
@@ -354,7 +354,7 @@ static void
 doEventLog(evt_t *gev, fs_info *fs, const void *buf, size_t len)
 {
     // get a cJSON object for the given log msg
-    cJSON *json = msgEvtLog(gev, fs->path, buf, len, fs->uid, &g_cfg);
+    cJSON *json = msgEvtLog(gev, fs->path, buf, len, fs->uid, &g_cfg.proc);
     
     // create cmd json and then output
     cmdPostEvtMsg(g_ctl, json);
@@ -571,9 +571,9 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
         if (*value == 0) return;
 
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
+            HOST_FIELD(g_cfg.proc.hostname),
             OP_FIELD(func),
             CLASS_FIELD(class),
             UNIT_FIELD("operation"),
@@ -582,7 +582,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
 
         event_t netErrMetric = INT_EVENT("net.error", *value, DELTA, fields);
 
-        doMetric(g_evt, g_cfg.hostname, getTime(), &netErrMetric);
+        doMetric(g_evt, g_cfg.proc.hostname, getTime(), &netErrMetric);
 
         // Only report if enabled
         if ((g_summary.net.error) && (source == EVENT_BASED)) {
@@ -652,9 +652,9 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
         if (*value == 0) return;
 
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
+            HOST_FIELD(g_cfg.proc.hostname),
             OP_FIELD(func),
             *name_field,
             CLASS_FIELD(class),
@@ -664,7 +664,7 @@ doErrorMetric(enum metric_t type, enum control_type_t source,
 
         event_t fsErrMetric = INT_EVENT(metric, *value, DELTA, fields);
 
-        doMetric(g_evt, g_cfg.hostname, getTime(), &fsErrMetric);
+        doMetric(g_evt, g_cfg.proc.hostname, getTime(), &fsErrMetric);
 
         // Only report if enabled
         if (*summarize && (source == EVENT_BASED)) {
@@ -698,9 +698,9 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
         if (g_ctrs.numDNS == 0) return;
 
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
+            HOST_FIELD(g_cfg.proc.hostname),
             DOMAIN_FIELD(domain),
             DURATION_FIELD(duration / 1000000), // convert ns to ms.
             UNIT_FIELD("request"),
@@ -709,7 +709,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
 
         event_t dnsMetric = INT_EVENT("net.dns", g_ctrs.numDNS, DELTA, fields);
 
-        doMetric(g_evt, g_cfg.hostname, getTime(), &dnsMetric);
+        doMetric(g_evt, g_cfg.proc.hostname, getTime(), &dnsMetric);
 
         // Only report if enabled
         if (g_summary.net.dns) {
@@ -739,9 +739,9 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
         if (dur == 0ULL) return;
 
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
+            HOST_FIELD(g_cfg.proc.hostname),
             DOMAIN_FIELD(domain),
             NUMOPS_FIELD(cachedDurationNum),
             UNIT_FIELD("millisecond"),
@@ -750,7 +750,7 @@ doDNSMetricName(enum metric_t type, const char *domain, uint64_t duration)
 
         event_t dnsDurMetric = INT_EVENT("net.dns.duration", dur, DELTA_MS, fields);
 
-        doMetric(g_evt, g_cfg.hostname, getTime(), &dnsDurMetric);
+        doMetric(g_evt, g_cfg.proc.hostname, getTime(), &dnsDurMetric);
 
         // Only report if enabled
         if (g_summary.net.dns) {
@@ -779,9 +779,9 @@ doProcMetric(enum metric_t type, long long measurement)
     {
         {
             event_field_t fields[] = {
-                PROC_FIELD(g_cfg.procname),
-                PID_FIELD(g_cfg.pid),
-                HOST_FIELD(g_cfg.hostname),
+                PROC_FIELD(g_cfg.proc.procname),
+                PID_FIELD(g_cfg.proc.pid),
+                HOST_FIELD(g_cfg.proc.hostname),
                 UNIT_FIELD("microsecond"),
                 FIELDEND
             };
@@ -795,9 +795,9 @@ doProcMetric(enum metric_t type, long long measurement)
 
         {
             event_field_t fields[] = {
-                PROC_FIELD(g_cfg.procname),
-                PID_FIELD(g_cfg.pid),
-                HOST_FIELD(g_cfg.hostname),
+                PROC_FIELD(g_cfg.proc.procname),
+                PID_FIELD(g_cfg.proc.pid),
+                HOST_FIELD(g_cfg.proc.hostname),
                 UNIT_FIELD("percent"),
                 FIELDEND
             };
@@ -815,9 +815,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_MEM:
     {
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
+            HOST_FIELD(g_cfg.proc.hostname),
             UNIT_FIELD("kibibyte"),
             FIELDEND
         };
@@ -829,9 +829,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_THREAD:
     {
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
+            HOST_FIELD(g_cfg.proc.hostname),
             UNIT_FIELD("thread"),
             FIELDEND
         };
@@ -843,9 +843,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_FD:
     {
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
+            HOST_FIELD(g_cfg.proc.hostname),
             UNIT_FIELD("file"),
             FIELDEND
         };
@@ -857,9 +857,9 @@ doProcMetric(enum metric_t type, long long measurement)
     case PROC_CHILD:
     {
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
+            HOST_FIELD(g_cfg.proc.hostname),
             UNIT_FIELD("process"),
             FIELDEND
         };
@@ -880,9 +880,9 @@ doStatMetric(const char *op, const char *pathname)
     atomicAddU64(&g_ctrs.numStat, 1);
 
     event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
+            HOST_FIELD(g_cfg.proc.hostname),
             OP_FIELD(op),
             FILE_FIELD(pathname),
             UNIT_FIELD("operation"),
@@ -941,10 +941,10 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         if (d == 0ULL) return;
 
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
             FD_FIELD(fd),
-            HOST_FIELD(g_cfg.hostname),
+            HOST_FIELD(g_cfg.proc.hostname),
             OP_FIELD(op),
             FILE_FIELD(g_fsinfo[fd].path),
             NUMOPS_FIELD(cachedDurationNum),
@@ -1007,10 +1007,10 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         if (*sizebytes == 0ULL) return;
 
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
             FD_FIELD(fd),
-            HOST_FIELD(g_cfg.hostname),
+            HOST_FIELD(g_cfg.proc.hostname),
             OP_FIELD(op),
             FILE_FIELD(g_fsinfo[fd].path),
             NUMOPS_FIELD(*numops),
@@ -1020,7 +1020,7 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
 
         event_t rwMetric = INT_EVENT(metric, *sizebytes, HISTOGRAM, fields);
 
-        doMetric(g_evt, g_cfg.hostname, g_fsinfo[fd].uid, &rwMetric);
+        doMetric(g_evt, g_cfg.proc.hostname, g_fsinfo[fd].uid, &rwMetric);
 
         // Only report if enabled
         if ((g_summary.fs.read_write) && (source == EVENT_BASED)) {
@@ -1091,10 +1091,10 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         if (*numops == 0ULL) return;
 
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
             FD_FIELD(fd),
-            HOST_FIELD(g_cfg.hostname),
+            HOST_FIELD(g_cfg.proc.hostname),
             OP_FIELD(op),
             FILE_FIELD(g_fsinfo[fd].path),
             UNIT_FIELD("operation"),
@@ -1214,9 +1214,9 @@ doTotal(enum metric_t type)
     if (*value == 0) return;
 
     event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
+            HOST_FIELD(g_cfg.proc.hostname),
             UNIT_FIELD(units),
             CLASS_FIELD("summary"),
             FIELDEND
@@ -1285,9 +1285,9 @@ doTotalDuration(enum metric_t type)
     if (d == 0) return;
 
     event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
-            HOST_FIELD(g_cfg.hostname),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
+            HOST_FIELD(g_cfg.proc.hostname),
             UNIT_FIELD(units),
             CLASS_FIELD("summary"),
             FIELDEND
@@ -1367,10 +1367,10 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
             FD_FIELD(fd),
-            HOST_FIELD(g_cfg.hostname),
+            HOST_FIELD(g_cfg.proc.hostname),
             PROTO_FIELD(proto),
             PORT_FIELD(localPort),
             UNIT_FIELD(units),
@@ -1420,10 +1420,10 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         if (d == 0ULL) return;
 
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
             FD_FIELD(fd),
-            HOST_FIELD(g_cfg.hostname),
+            HOST_FIELD(g_cfg.proc.hostname),
             PROTO_FIELD(proto),
             PORT_FIELD(localPort),
             NUMOPS_FIELD(cachedDurationNum),
@@ -1509,10 +1509,10 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
         
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
             FD_FIELD(fd),
-            HOST_FIELD(g_cfg.hostname),
+            HOST_FIELD(g_cfg.proc.hostname),
             PROTO_FIELD(proto),
             LOCALIP_FIELD(lip),
             LOCALP_FIELD(localPort),
@@ -1526,7 +1526,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         event_t rxMetric = INT_EVENT("net.rx", g_netinfo[fd].rxBytes, DELTA, fields);
 
-        doMetric(g_evt, g_cfg.hostname, g_netinfo[fd].uid, &rxMetric);
+        doMetric(g_evt, g_cfg.proc.hostname, g_netinfo[fd].uid, &rxMetric);
 
         if ((g_summary.net.rx_tx) && (source == EVENT_BASED)) {
             return;
@@ -1610,10 +1610,10 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         }
 
         event_field_t fields[] = {
-            PROC_FIELD(g_cfg.procname),
-            PID_FIELD(g_cfg.pid),
+            PROC_FIELD(g_cfg.proc.procname),
+            PID_FIELD(g_cfg.proc.pid),
             FD_FIELD(fd),
-            HOST_FIELD(g_cfg.hostname),
+            HOST_FIELD(g_cfg.proc.hostname),
             PROTO_FIELD(proto),
             LOCALIP_FIELD(lip),
             LOCALP_FIELD(localPort),
@@ -1627,7 +1627,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
         event_t txMetric = INT_EVENT("net.tx", g_netinfo[fd].txBytes, DELTA, fields);
 
-        doMetric(g_evt, g_cfg.hostname, g_netinfo[fd].uid, &txMetric);
+        doMetric(g_evt, g_cfg.proc.hostname, g_netinfo[fd].uid, &txMetric);
 
         if ((g_summary.net.rx_tx) && (source == EVENT_BASED)) {
             return;
@@ -1924,9 +1924,30 @@ doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 }
 
 static void
+setProcId(proc_id_t* proc)
+{
+    if (!proc) return;
+
+    proc->pid = getpid();
+    proc->ppid = getppid();
+    if (gethostname(proc->hostname, sizeof(proc->hostname)) != 0) {
+        scopeLog("ERROR: gethostname", -1, CFG_LOG_ERROR);
+    }
+    osGetProcname(proc->procname, sizeof(proc->procname));
+    osGetCmdline(proc->pid, proc->cmd, sizeof(proc->cmd));
+
+    if (proc->hostname && proc->procname && proc->cmd) {
+        snprintf(proc->id, sizeof(proc->id), "%s-%s-%s", proc->hostname, proc->procname, proc->cmd);
+    } else {
+        snprintf(proc->id, sizeof(proc->id), "badid");
+    }
+}
+
+static void
 doReset()
 {
-    g_cfg.pid = getpid();
+    setProcId(&g_cfg.proc);
+
     g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
@@ -2174,16 +2195,16 @@ reportPeriodicStuff(void)
     doProcMetric(PROC_CPU, cpu - cpuState);
     cpuState = cpu;
 
-    mem = osGetProcMemory(g_cfg.pid);
+    mem = osGetProcMemory(g_cfg.proc.pid);
     doProcMetric(PROC_MEM, mem);
 
-    nthread = osGetNumThreads(g_cfg.pid);
+    nthread = osGetNumThreads(g_cfg.proc.pid);
     doProcMetric(PROC_THREAD, nthread);
 
-    nfds = osGetNumFds(g_cfg.pid);
+    nfds = osGetNumFds(g_cfg.proc.pid);
     doProcMetric(PROC_FD, nfds);
 
-    children = osGetNumChildProcs(g_cfg.pid);
+    children = osGetNumChildProcs(g_cfg.proc.pid);
     doProcMetric(PROC_CHILD, children);
 
     // report totals (not by file descriptor/socket descriptor)
@@ -2269,9 +2290,9 @@ reportProcessStart(void)
 
     // 2) Send a metric
     event_field_t fields[] = {
-        PROC_FIELD(g_cfg.procname),
-        PID_FIELD(g_cfg.pid),
-        HOST_FIELD(g_cfg.hostname),
+        PROC_FIELD(g_cfg.proc.procname),
+        PID_FIELD(g_cfg.proc.pid),
+        HOST_FIELD(g_cfg.proc.hostname),
         UNIT_FIELD("process"),
         FIELDEND
     };
@@ -2282,7 +2303,7 @@ reportProcessStart(void)
     //char cmd[DEFAULT_CMD_SIZE];
 
     // get a cJSON object for our current config
-    cJSON *json = msgStart(&g_cfg, g_staticfg);
+    cJSON *json = msgStart(&g_cfg.proc, g_staticfg);
 
     // create cmd json and then output
     cmdSendInfoMsg(g_ctl, json);
@@ -2427,14 +2448,14 @@ init(void)
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
 #endif // __LINUX__
+
+    setProcId(&g_cfg.proc);
     
     net_info *netinfoLocal;
     fs_info *fsinfoLocal;
     if ((netinfoLocal = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
         scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
     }
-
-    g_cfg.pid = getpid();
 
     g_cfg.numNinfo = NET_ENTRIES;
     if (netinfoLocal) memset(netinfoLocal, 0, sizeof(struct net_info_t) * NET_ENTRIES);
@@ -2452,12 +2473,6 @@ init(void)
     // Per RUC...
     g_fsinfo = fsinfoLocal;
 
-    if (gethostname(g_cfg.hostname, sizeof(g_cfg.hostname)) != 0) {
-        scopeLog("ERROR: Constructor:gethostname", -1, CFG_LOG_ERROR);
-    }
-
-    osGetProcname(g_cfg.procname, sizeof(g_cfg.procname));
-    osGetCmdline(g_cfg.pid, g_cfg.cmd, sizeof(g_cfg.cmd));
     osInitTSC(&g_cfg);
     if (g_cfg.tsc_invariant == FALSE) {
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);

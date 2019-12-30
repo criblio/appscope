@@ -264,23 +264,21 @@ anyValueFieldMatches(regex_t* filter, event_t* metric)
 }
 
 cJSON *
-rateLimitMessage()
+rateLimitMessage(proc_id_t *proc)
 {
     event_format_t event;
+
     struct timeb tb;
     ftime(&tb);
-
-    char string[128];
-    event.datasize = snprintf(string, sizeof(string), "Truncated metrics. Your rate exceeded %d metrics per second", MAXEVENTS);
-    event.data = string;
-    if (event.datasize == -1) return NULL;
-
     event.timestamp = tb.time + tb.millitm/1000;
     event.src = "notice";
-    event.hostname = "notice";
-    event.uid = 0;
-    event.procname = "notice";
-    event.cmd = "notice";
+    event.proc = proc;
+    event.uid = 0ULL;
+
+    char string[128];
+    event.data = string;
+    event.datasize = snprintf(string, sizeof(string), "Truncated metrics. Your rate exceeded %d metrics per second", MAXEVENTS);
+    if (event.datasize == -1) return NULL;
 
     // TBD - format is required as an argument, but isn't even used.  this is stupid.
     format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
@@ -290,8 +288,7 @@ rateLimitMessage()
 }
 
 cJSON *
-evtMetric(evt_t *evt, const char *host, const char *cmd,
-          const char *procname, uint64_t uid, event_t *metric)
+evtMetric(evt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
 {
     event_format_t event;
     struct timeb tb;
@@ -299,7 +296,7 @@ evtMetric(evt_t *evt, const char *host, const char *cmd,
     
     regex_t *filter;
 
-    if (!evt || !metric || !host || !cmd || !procname) return NULL;
+    if (!evt || !metric || !proc) return NULL;
 
     // Test for a name field match.  No match, no metric output
     if (!evtSourceEnabled(evt, CFG_SRC_METRIC) ||
@@ -315,7 +312,7 @@ evtMetric(evt_t *evt, const char *host, const char *cmd,
     } else if (++evt->ratelimit.evtCount >= MAXEVENTS) {
         // one notice per truncate
         if (evt->ratelimit.notified == 0) {
-            cJSON* notice = rateLimitMessage();
+            cJSON* notice = rateLimitMessage(proc);
             evt->ratelimit.notified = (notice)?1:0;
             return notice;
         }
@@ -331,18 +328,14 @@ evtMetric(evt_t *evt, const char *host, const char *cmd,
 
     ftime(&tb);
     event.timestamp = tb.time + tb.millitm/1000;
-
     event.src = "metric";
-    event.hostname = host;
+    event.proc = proc;
+    event.uid = uid;
 
     // Format the metric string using the configured metric format type
     event.data = fmtString(evt->format, metric, evtFieldFilter(evt, CFG_SRC_METRIC));
     if (!event.data) return NULL;
     event.datasize = strlen(event.data);
-
-    event.uid = uid;
-    event.procname = procname;
-    event.cmd = cmd;
 
     cJSON * json = fmtEventJson(evt->format, &event);
 
@@ -351,15 +344,14 @@ evtMetric(evt_t *evt, const char *host, const char *cmd,
 }
 
 cJSON *
-evtLog(evt_t *evt, const char *host, const char *path,
-       const char *cmd, const char *procname,
-       const void *buf, size_t count, uint64_t uid)
+evtLog(evt_t *evt, const char *path, const void *buf, size_t count,
+       uint64_t uid, proc_id_t* proc)
 {
     event_format_t event;
     struct timeb tb;
     cfg_evt_t logType;
 
-    if (!evt || !buf || !path || !host || !cmd || !procname) return NULL;
+    if (!evt || !path || !buf || !proc) return NULL;
 
     regex_t* filter;
     if (evtSourceEnabled(evt, CFG_SRC_CONSOLE) &&
@@ -377,12 +369,10 @@ evtLog(evt_t *evt, const char *host, const char *path,
     ftime(&tb);
     event.timestamp = tb.time + tb.millitm/1000;
     event.src = path;
-    event.hostname = host;
-    event.procname = procname;
+    event.proc = proc;
+    event.uid = uid;
     event.data = (char *)buf;
     event.datasize = count;
-    event.uid = uid;
-    event.cmd = cmd;
 
     cJSON * json = fmtEventJson(evt->format, &event);
     if (!json) return NULL;

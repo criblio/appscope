@@ -50,9 +50,7 @@ typedef struct {
 typedef struct event_format {
     double timestamp;
     const char *src;
-    const char *hostname;
-    const char *procname;
-    const char *cmd;
+    proc_id_t* proc;
     char *data;
     size_t datasize;
     unsigned long long uid;

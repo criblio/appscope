@@ -17,10 +17,9 @@ regex_t *           evtFieldFilter(evt_t *, cfg_evt_t);
 regex_t *           evtNameFilter(evt_t *, cfg_evt_t);
 unsigned            evtSourceEnabled(evt_t *, cfg_evt_t);
 
-cJSON *             evtMetric(evt_t *, const char *, const char *,
-                              const char *, uint64_t, event_t *);
-cJSON *             evtLog(evt_t *, const char *, const char *, const char *,
-                           const char *, const void *, size_t, uint64_t);
+cJSON *             evtMetric(evt_t *, event_t *, uint64_t, proc_id_t *);
+cJSON *             evtLog(evt_t *, const char *, const void *, size_t,
+                           uint64_t, proc_id_t *);
 
 // Setters (modifies evt_t, but does not persist modifications)
 void                evtFormatSet(evt_t *, format_t *);

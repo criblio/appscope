@@ -119,14 +119,17 @@ int
 transportNeedsConnection(transport_t *trans)
 {
     if (!trans) return 0;
-    return (trans->type == CFG_TCP) && (trans->net.sock == -1);
+    return (trans->type == CFG_TCP || trans->type == CFG_UDP) && (trans->net.sock == -1);
 }
 
 int
 transportDisconnect(transport_t *trans)
 {
     if (!trans) return 0;
-    if (trans->type == CFG_TCP) trans->net.sock = -1;
+    if (trans->type == CFG_TCP || trans->type == CFG_UDP) {
+        if (trans->net.sock != -1) trans->close(trans->net.sock);
+        trans->net.sock = -1;
+    }
     return 0;
 }
 
@@ -139,8 +142,20 @@ transportConnect(transport_t *trans)
     struct addrinfo* addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
-    hints.ai_socktype = SOCK_STREAM; // For TCP
-    hints.ai_protocol = IPPROTO_TCP; // For TCP
+    switch (trans->type) {
+        case CFG_TCP:
+            hints.ai_socktype = SOCK_STREAM; // For TCP
+            hints.ai_protocol = IPPROTO_TCP; // For TCP
+            break;
+        case CFG_UDP:
+            hints.ai_socktype = SOCK_DGRAM;  // For UDP
+            hints.ai_protocol = IPPROTO_UDP; // For UDP
+            break;
+        default:
+            DBG(NULL);
+            return !transportNeedsConnection(trans);
+    }
+
     if (trans->getaddrinfo(trans->net.host,
                            trans->net.port,
                            &hints, &addr_list)) return 0;
@@ -159,8 +174,7 @@ transportConnect(transport_t *trans)
                            addr->ai_addrlen) == -1) {
 
             // We could create a sock, but not connect.  Clean up.
-            trans->close(trans->net.sock);
-            trans->net.sock = -1;
+            transportDisconnect(trans);
             continue;
         }
 
@@ -175,7 +189,6 @@ transportConnect(transport_t *trans)
 transport_t *
 transportCreateTCP(const char *host, const char *port)
 {
-    int flags;
     transport_t* trans = NULL;
 
     if (!host || !port) return trans;
@@ -189,6 +202,7 @@ transportCreateTCP(const char *host, const char *port)
     trans->net.port = strdup(port);
 
     if (!trans->net.host || !trans->net.port) {
+        DBG(NULL);
         transportDestroy(&trans);
         return trans;
     }
@@ -200,7 +214,7 @@ transportCreateTCP(const char *host, const char *port)
     if (transportNeedsConnection(trans)) return trans;
 
     // Set the socket to close on exec
-    flags = trans->fcntl(trans->net.sock, F_GETFD, 0);
+    int flags = trans->fcntl(trans->net.sock, F_GETFD, 0);
     if (trans->fcntl(trans->net.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
         DBG("%d %s %s", trans->net.sock, host, port);
     }
@@ -212,45 +226,28 @@ transport_t*
 transportCreateUdp(const char* host, const char* port)
 {
     transport_t* t = NULL;
-    struct addrinfo* addr_list = NULL;
 
-    if (!host || !port) goto out;
+    if (!host || !port) return t;
 
     t = newTransport();
-    if (!t) return NULL; 
+    if (!t) return t;
 
     t->type = CFG_UDP;
     t->net.sock = -1;
+    t->net.host = strdup(host);
+    t->net.port = strdup(port);
 
-    // Get some addresses to try
-    struct addrinfo hints = {0};
-    hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
-    hints.ai_socktype = SOCK_DGRAM;  // For UDP
-    hints.ai_protocol = IPPROTO_UDP; 
-    if (t->getaddrinfo(host, port, &hints, &addr_list)) goto out;
-
-    // Loop through the addresses until one works
-    struct addrinfo* addr;
-    for (addr = addr_list; addr; addr = addr->ai_next) {
-        t->net.sock = t->socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-        if (t->net.sock == -1) continue;
-        if (t->connect(t->net.sock, addr->ai_addr, addr->ai_addrlen) == -1) {
-            // We could create a sock, but not connect.  Clean up.
-            t->close(t->net.sock);
-            t->net.sock = -1;
-            continue;
-        }
-        break; // Success!
+    if (!t->net.host || !t->net.port) {
+        DBG(NULL);
+        transportDestroy(&t);
+        return t;
     }
 
-    // If none worked, get out
-    if (t->net.sock == -1) {
-        DBG("host=%s port=%s", host, port);
-        goto out;
-    }
+    if (!transportConnect(t))  return t;
 
     // Move this descriptor up out of the way
-    if ((t->net.sock = placeDescriptor(t->net.sock, t)) == -1) goto out;
+    t->net.sock = placeDescriptor(t->net.sock, t);
+    if (transportNeedsConnection(t)) return t;
 
     // Set the socket to non blocking, and close on exec
     int flags = t->fcntl(t->net.sock, F_GETFL, 0);
@@ -263,9 +260,6 @@ transportCreateUdp(const char* host, const char* port)
         DBG("%d %s %s", t->net.sock, host, port);
     }
 
-out:
-    if (addr_list) freeaddrinfo(addr_list);
-    if (t && t->net.sock == -1) transportDestroy(&t);
     return t;
 }
 
@@ -390,12 +384,11 @@ transportDestroy(transport_t** transport)
     transport_t* t = *transport;
     switch (t->type) {
         case CFG_UDP:
-            if (t->net.sock != -1) t->close(t->net.sock);
-            break;
         case CFG_TCP:
-            if (t->net.sock != -1) t->close(t->net.sock);
+            transportDisconnect(t);
             if (t->net.host) free (t->net.host);
             if (t->net.port) free (t->net.port);
+            break;
         case CFG_UNIX:
             break;
         case CFG_FILE:

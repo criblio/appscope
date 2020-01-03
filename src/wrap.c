@@ -202,7 +202,6 @@ remoteConfig()
         if (rc <= 0) {
             if (errno == 0) {
                 // This is the case where we lost connection
-                close(fds.fd);
                 ctlClose(g_ctl);
                 break;
             } else {

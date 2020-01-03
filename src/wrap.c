@@ -538,7 +538,7 @@ doThread()
      * initialized. This check is intended to ensure that we don't 
      * start the thread until after we have our config. 
      */
-    if (!g_out) return;
+    if (!g_ctl) return;
     
     // Create one thread at most
     if (g_thread.once == TRUE) return;

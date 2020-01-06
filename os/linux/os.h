@@ -19,6 +19,8 @@
 // Anecdotal evidence that a proc entry should be max 4096 bytes
 #define MAX_PROC 4096
 
+#define STATMODTIME(sb) sb.st_mtime
+
 extern char *program_invocation_short_name;
 extern struct interposed_funcs_t g_fn;
 extern struct rtconfig_t g_cfg;

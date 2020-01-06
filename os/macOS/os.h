@@ -12,6 +12,8 @@
 
 #include "../../src/wrap.h"
 
+#define STATMODTIME(sb) sb.st_mtimespec.tv_sec
+
 extern struct rtconfig_t g_cfg;
 
 extern int osGetProcname(char *, size_t);
@@ -21,4 +23,4 @@ extern int osGetNumChildProcs(pid_t);
 extern int osInitTSC(struct rtconfig_t *);
 extern int osGetProcMemory(pid_t);
 extern int osIsFilePresent(pid_t, const char *);
-extern intosGetCmdline(pid_t, char *, size_t);
+extern int osGetCmdline(pid_t, char *, size_t);

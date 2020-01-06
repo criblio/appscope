@@ -16,6 +16,10 @@ osGetProcMemory(pid_t pid)
     const char delim[] = ":";
     char buf[2048];
 
+    if (!g_fn.open || !g_fn.read || !g_fn.close) {
+        return -1;
+    }
+
     snprintf(buf, sizeof(buf), "/proc/%d/status", pid);
     if ((fd = g_fn.open(buf, O_RDONLY)) == -1) {
         DBG(NULL);
@@ -60,6 +64,10 @@ osGetNumThreads(pid_t pid)
     char *entry, *last;
     const char delim[] = " ";
     char buf[1024];
+
+    if (!g_fn.open || !g_fn.read || !g_fn.close) {
+        return -1;
+    }
 
     // Get the size of the file with stat, malloc buf then free
     snprintf(buf, sizeof(buf), "/proc/%d/stat", pid);
@@ -143,6 +151,10 @@ osInitTSC(struct rtconfig_t *cfg)
     const char freqStr[] = "cpu MHz";
     char *buf;
 
+    if (!g_fn.open || !g_fn.read || !g_fn.close) {
+        return -1;
+    }
+
     if ((fd = g_fn.open(path, O_RDONLY)) == -1) {
         DBG(NULL);
         return -1;
@@ -207,6 +219,10 @@ int
 osIsFilePresent(pid_t pid, const char *path)
 {
     struct stat sb = {};
+    if (!g_fn.__xstat) {
+        return -1;
+    }
+
     if (g_fn.__xstat(_STAT_VER, path, &sb) != 0) {
         return -1;
     } else {

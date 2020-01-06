@@ -12,16 +12,13 @@
 #include "test.h"
 
 static void
-transportCreateTcpReturnsNullPtrForInvalidHost(void** state)
+transportCreateTcpReturnsNullPtrForNullHostOrPath(void** state)
 {
-    transport_t* t = transportCreateTCP(NULL, "54321");
+    transport_t* t;
+    t = transportCreateTCP(NULL, "54321");
     assert_null(t);
-}
 
-static void
-transportCreateTcpReturnsNullPtrForInvalidPath(void** state)
-{
-    transport_t* t = transportCreateTCP("127.0.0.1", NULL);
+    t = transportCreateTCP("127.0.0.1", NULL);
     assert_null(t);
 }
 
@@ -36,11 +33,40 @@ transportCreateTcpReturnsValidPtrInHappyPath(void** state)
 }
 
 static void
+transportCreateTcpReturnsValidPtrForUnresolvedHostPort(void** state)
+{
+    transport_t* t;
+    // This is a valid test, but it hangs for as long as 30s.
+    // (It depends on dns more than a unit test should.)
+/*
+    t = transportCreateTCP("-tota11y bogus hostname", "666");
+    assert_non_null(t);
+    assert_true(transportNeedsConnection(t));
+    transportDestroy(&t);
+*/
+    t = transportCreateTCP("127.0.0.1", "mom's apple pie recipe");
+    assert_non_null(t);
+    assert_true(transportNeedsConnection(t));
+    transportDestroy(&t);
+}
+
+static void
 transportConnectEstablishesConnection(void** state)
 {
     skip();
     // We need to verify that tcp connections can be established.
     // This is reminder to do this.
+}
+
+static void
+transportCreateUdpReturnsNullPtrForNullHostOrPath(void** state)
+{
+    transport_t* t;
+    t = transportCreateUdp(NULL, "8128");
+    assert_null(t);
+
+    t = transportCreateUdp("127.0.0.1", NULL);
+    assert_null(t);
 }
 
 static void
@@ -53,30 +79,20 @@ transportCreateUdpReturnsValidPtrInHappyPath(void** state)
 }
 
 static void
-transportCreateUdpReturnsNullPtrForInvalidHost(void** state)
+transportCreateUdpReturnsValidPtrForUnresolvedHostPort(void** state)
 {
+    transport_t* t;
     // This is a valid test, but it hangs for as long as 30s.
     // (It depends on dns more than a unit test should.)
 /*
     t = transportCreateUdp("-tota11y bogus hostname", "666");
-    assert_null(t);
-*/
-
-    transport_t* t;
-    t = transportCreateUdp(NULL, "8128");
-    assert_null(t);
-}
-
-static void
-transportCreateUdpReturnsNullPtrForInvalidPort(void** state)
-{
-    transport_t* t;
-    t = transportCreateUdp("127.0.0.1", "mom's apple pie recipe");
-    assert_null(t);
+    assert_non_null(t);
+    assert_true(transportNeedsConnection(t));
     transportDestroy(&t);
-
-    t = transportCreateUdp("127.0.0.1", NULL);
-    assert_null(t);
+*/
+    t = transportCreateUdp("127.0.0.1", "mom's apple pie recipe");
+    assert_non_null(t);
+    assert_true(transportNeedsConnection(t));
     transportDestroy(&t);
 }
 
@@ -378,13 +394,13 @@ main(int argc, char* argv[])
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(transportCreateTcpReturnsNullPtrForInvalidHost),
-        cmocka_unit_test(transportCreateTcpReturnsNullPtrForInvalidPath),
+        cmocka_unit_test(transportCreateTcpReturnsNullPtrForNullHostOrPath),
         cmocka_unit_test(transportCreateTcpReturnsValidPtrInHappyPath),
+        cmocka_unit_test(transportCreateTcpReturnsValidPtrForUnresolvedHostPort),
         cmocka_unit_test(transportConnectEstablishesConnection),
+        cmocka_unit_test(transportCreateUdpReturnsNullPtrForNullHostOrPath),
         cmocka_unit_test(transportCreateUdpReturnsValidPtrInHappyPath),
-        cmocka_unit_test(transportCreateUdpReturnsNullPtrForInvalidHost),
-        cmocka_unit_test(transportCreateUdpReturnsNullPtrForInvalidPort),
+        cmocka_unit_test(transportCreateUdpReturnsValidPtrForUnresolvedHostPort),
         cmocka_unit_test(transportCreateUdpHandlesGoodHostArguments),
         cmocka_unit_test(transportCreateFileReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportCreateFileCreatesFileWithRWPermissionsForAll),

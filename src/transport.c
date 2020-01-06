@@ -155,7 +155,7 @@ transportConnect(transport_t *trans)
             break;
         default:
             DBG(NULL);
-            return !transportNeedsConnection(trans);
+            return 1;
     }
 
     if (trans->getaddrinfo(trans->net.host,
@@ -185,7 +185,7 @@ transportConnect(transport_t *trans)
 
     if (addr_list) freeaddrinfo(addr_list);
 
-    return !transportNeedsConnection(trans);
+    return (trans->net.sock != -1);
 }
 
 transport_t *
@@ -213,7 +213,7 @@ transportCreateTCP(const char *host, const char *port)
 
     // Move this descriptor up out of the way
     trans->net.sock = placeDescriptor(trans->net.sock, trans);
-    if (transportNeedsConnection(trans)) return trans;
+    if (trans->net.sock == -1) return trans;
 
     // Set the socket to close on exec
     int flags = trans->fcntl(trans->net.sock, F_GETFD, 0);
@@ -249,7 +249,7 @@ transportCreateUdp(const char* host, const char* port)
 
     // Move this descriptor up out of the way
     t->net.sock = placeDescriptor(t->net.sock, t);
-    if (transportNeedsConnection(t)) return t;
+    if (t->net.sock == -1) return t;
 
     // Set the socket to non blocking, and close on exec
     int flags = t->fcntl(t->net.sock, F_GETFL, 0);

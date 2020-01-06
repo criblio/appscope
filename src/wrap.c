@@ -206,7 +206,6 @@ remoteConfig()
         if (rc <= 0) {
             if (errno == 0) {
                 // This is the case where we lost connection
-                close(fds.fd);
                 ctlClose(g_ctl);
                 break;
             } else {
@@ -549,7 +548,7 @@ doThread()
      * initialized. This check is intended to ensure that we don't 
      * start the thread until after we have our config. 
      */
-    if (!g_out) return;
+    if (!g_ctl) return;
     
     // Create one thread at most
     if (g_thread.once == TRUE) return;
@@ -4626,7 +4625,8 @@ static const char scope_help[] =
 "    SCOPE_METRIC_DEST\n"
 "        Default is udp://localhost:8125\n"
 "        Format is one of:\n"
-"            file:///tmp/output.log\n"
+"            file:///tmp/output.log   (file://stdout, file://stderr are\n"
+"                                      special allowed values)\n"
 "            udp://server:123         (server is servername or address;\n"
 "                                      123 is port number or service name)\n"
 "    SCOPE_METRIC_FORMAT\n"
@@ -4744,9 +4744,9 @@ char const __invoke_dynamic_linker__[] __attribute__ ((section (".interp"))) = "
 void
 __scope_main(void)
 {
-    char path[1024] = {0};
     printf("Scope Version: " SCOPE_VER "\n");
 
+    char path[1024] = {0};
     if (readlink("/proc/self/exe", path, sizeof(path)) == -1) exit(0);
     printf("\n");
     printf("   Usage: LD_PRELOAD=%s <command name>\n ", path);

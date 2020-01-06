@@ -4722,10 +4722,8 @@ __scope_main(void)
 {
     printf("Scope Version: " SCOPE_VER "\n");
 
-    char buf[64];
-    if (snprintf(buf, sizeof(buf), "/proc/%d/exe", getpid()) == -1) exit(0);
     char path[1024] = {0};
-    if (readlink(buf, path, sizeof(path)) == -1) exit(0);
+    if (readlink("/proc/self/exe", path, sizeof(path)) == -1) exit(0);
     printf("\n");
     printf("   Usage: LD_PRELOAD=%s <command name>\n ", path);
     printf("\n");

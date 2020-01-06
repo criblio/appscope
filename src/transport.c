@@ -39,6 +39,8 @@ struct _transport_t
         struct {
             char* path;
             FILE* stream;
+            int stdout;  // Flag to indicate that stream is stdout
+            int stderr;  // Flag to indicate that stream is stderr
         } file;
     };
 };
@@ -280,6 +282,19 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
         return t;
     }
 
+    // See if path is "stdout" or "stderr"
+    t->file.stdout = !strcmp(path, "stdout");
+    t->file.stderr = !strcmp(path, "stderr");
+
+    // if stdout/stderr, set stream and skip everything else in the function.
+    if (t->file.stdout) {
+        t->file.stream = stdout;
+        return t;
+    } else if (t->file.stderr) {
+        t->file.stream = stderr;
+        return t;
+    }
+
     int fd;
     fd = t->open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
     if (fd == -1) {
@@ -393,7 +408,10 @@ transportDestroy(transport_t** transport)
             break;
         case CFG_FILE:
             if (t->file.path) free(t->file.path);
-            if (t->file.stream) t->fclose(t->file.stream);
+            if (!t->file.stdout && !t->file.stderr) {
+                // if stdout/stderr, we didn't open stream, so don't close it
+                if (t->file.stream) t->fclose(t->file.stream);
+            }
             break;
         case CFG_SYSLOG:
             break;

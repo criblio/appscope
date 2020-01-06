@@ -263,9 +263,32 @@ anyValueFieldMatches(regex_t* filter, event_t* metric)
     return NO_MATCH_FOUND;
 }
 
-char *
-evtMetric(evt_t *evt, const char *host, const char *cmd,
-          const char *procname, uint64_t uid, event_t *metric)
+cJSON *
+rateLimitMessage(proc_id_t *proc)
+{
+    event_format_t event;
+
+    struct timeb tb;
+    ftime(&tb);
+    event.timestamp = tb.time + tb.millitm/1000;
+    event.src = "notice";
+    event.proc = proc;
+    event.uid = 0ULL;
+
+    char string[128];
+    event.data = string;
+    event.datasize = snprintf(string, sizeof(string), "Truncated metrics. Your rate exceeded %d metrics per second", MAXEVENTS);
+    if (event.datasize == -1) return NULL;
+
+    // TBD - format is required as an argument, but isn't even used.  this is stupid.
+    format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
+    cJSON* json = fmtEventJson(fmt, &event);
+    fmtDestroy(&fmt);
+    return json;
+}
+
+cJSON *
+evtMetric(evt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
 {
     event_format_t event;
     struct timeb tb;
@@ -273,7 +296,7 @@ evtMetric(evt_t *evt, const char *host, const char *cmd,
     
     regex_t *filter;
 
-    if (!evt || !metric || !host || !cmd || !procname) return NULL;
+    if (!evt || !metric || !proc) return NULL;
 
     // Test for a name field match.  No match, no metric output
     if (!evtSourceEnabled(evt, CFG_SRC_METRIC) ||
@@ -287,22 +310,12 @@ evtMetric(evt_t *evt, const char *host, const char *cmd,
         evt->ratelimit.time = now;
         evt->ratelimit.evtCount = evt->ratelimit.notified = 0;
     } else if (++evt->ratelimit.evtCount >= MAXEVENTS) {
-        char *notice = NULL;
-
         // one notice per truncate
         if (evt->ratelimit.notified == 0) {
-            if ((notice = calloc(1, 512)) == NULL) {
-                DBG(NULL);
-                return NULL;
-            }
-
-            evt->ratelimit.notified = 1;
-            ftime(&tb);
-            snprintf(notice, 512,
-                     "{\"_time\":%ld.%03d,\"source\":\"notice\",\"_raw\":\"Truncated metrics. Your rate exceeded %d metrics per second\",\"host\":\"notice\",\"_channel\":\"notice\"}\n",
-                     tb.time, tb.millitm, MAXEVENTS);
+            cJSON* notice = rateLimitMessage(proc);
+            evt->ratelimit.notified = (notice)?1:0;
+            return notice;
         }
-        return notice;
     }
 
     /*
@@ -315,36 +328,30 @@ evtMetric(evt_t *evt, const char *host, const char *cmd,
 
     ftime(&tb);
     event.timestamp = tb.time + tb.millitm/1000;
-
     event.src = "metric";
-    event.hostname = host;
+    event.proc = proc;
+    event.uid = uid;
 
     // Format the metric string using the configured metric format type
     event.data = fmtString(evt->format, metric, evtFieldFilter(evt, CFG_SRC_METRIC));
     if (!event.data) return NULL;
     event.datasize = strlen(event.data);
 
-    event.uid = uid;
-    event.procname = procname;
-    event.cmd = cmd;
-
-    char * msg = fmtEventMessageString(evt->format, &event);
+    cJSON * json = fmtEventJson(evt->format, &event);
 
     free(event.data);
-    return msg;
+    return json;
 }
 
-char *
-evtLog(evt_t *evt, const char *host, const char *path,
-       const char *cmd, const char *procname,
-       const void *buf, size_t count, uint64_t uid)
+cJSON *
+evtLog(evt_t *evt, const char *path, const void *buf, size_t count,
+       uint64_t uid, proc_id_t* proc)
 {
-    char *msg;
     event_format_t event;
     struct timeb tb;
     cfg_evt_t logType;
 
-    if (!evt || !buf || !path || !host || !cmd || !procname) return NULL;
+    if (!evt || !path || !buf || !proc) return NULL;
 
     regex_t* filter;
     if (evtSourceEnabled(evt, CFG_SRC_CONSOLE) &&
@@ -362,22 +369,24 @@ evtLog(evt_t *evt, const char *host, const char *path,
     ftime(&tb);
     event.timestamp = tb.time + tb.millitm/1000;
     event.src = path;
-    event.hostname = host;
-    event.procname = procname;
+    event.proc = proc;
+    event.uid = uid;
     event.data = (char *)buf;
     event.datasize = count;
-    event.uid = uid;
-    event.cmd = cmd;
 
-    msg = fmtEventMessageString(evt->format, &event);
-    if (!msg) return NULL;
+    cJSON * json = fmtEventJson(evt->format, &event);
+    if (!json) return NULL;
 
-    filter = evtValueFilter(evt, logType);
-    if (filter && regexec(filter, msg, 0, NULL, 0)) {
-        // This event doesn't match.  Drop it on the floor.
-        free(msg);
-        return NULL;
+
+    cJSON* rawField = cJSON_GetObjectItem(json, "_raw");
+    if (rawField && rawField->valuestring) {
+        filter = evtValueFilter(evt, logType);
+        if (filter && regexec(filter, rawField->valuestring, 0, NULL, 0)) {
+            // This event doesn't match.  Drop it on the floor.
+            cJSON_Delete(json);
+            return NULL;
+        }
     }
 
-    return msg;
+    return json;
 }

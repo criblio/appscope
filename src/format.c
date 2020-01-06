@@ -193,49 +193,36 @@ addCustomFields(format_t* fmt, custom_tag_t** tags, char** end, int* bytes, int*
 }
 
 // Accessors
-static char *
-fmtEventNdJson(format_t *fmt, event_format_t *sev)
+cJSON *
+fmtEventJson(format_t *fmt, event_format_t *sev)
 {
-    char* buf = NULL;
     char numbuf[32];
 
-    if (!fmt || !sev) return NULL;
+    if (!fmt || !sev || !sev->proc) return NULL;
 
     cJSON* json = cJSON_CreateObject();
-    if (!json) goto cleanup;
+    if (!json) goto err;
 
-    if (!cJSON_AddStringToObjLN(json, TYPE, EVENT)) goto cleanup;
+    if (!cJSON_AddStringToObjLN(json, TYPE, EVENT)) goto err;
 
-    if (sev->hostname && sev->procname && sev->cmd) {
-        char id[strlen(sev->hostname) + strlen(sev->procname) + strlen(sev->cmd) + 4];
+    if (!cJSON_AddStringToObjLN(json, ID, sev->proc->id)) goto err;
 
-        snprintf(id, sizeof(id), "%s-%s-%s", sev->hostname, sev->procname, sev->cmd);
-        if (!cJSON_AddStringToObjLN(json, ID, id)) goto cleanup;
-    } else {
-        char id[8];
-        snprintf(id, sizeof(id), "badid");
-        if (!cJSON_AddStringToObjLN(json, ID, id)) goto cleanup;
-    }
-
-    if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto cleanup;
-    if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto cleanup;
+    if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto err;
+    if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto err;
     cJSON* data = cJSON_CreateStringFromBuffer(sev->data, sev->datasize);
-    if (!data) goto cleanup;
+    if (!data) goto err;
     cJSON_AddItemToObjectCS(json, DATA, data);
-    if (!cJSON_AddStringToObjLN(json, HOST, sev->hostname)) goto cleanup;
-    if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto cleanup;
-    if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto cleanup;
+    if (!cJSON_AddStringToObjLN(json, HOST, sev->proc->hostname)) goto err;
+    if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto err;
+    if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto err;
 
-    if (!(buf = cJSON_PrintUnformatted(json))) goto cleanup;
-
-cleanup:
-    if (!buf) {
-        DBG("time=%s src=%s data=%p host=%s channel=%s json=%p",
-            sev->timestamp, sev->src, sev->data, sev->hostname, numbuf, json);
-    }
+    return json;
+err:
+    DBG("time=%s src=%s data=%p host=%s channel=%s json=%p",
+            sev->timestamp, sev->src, sev->data, sev->proc->hostname, numbuf, json);
     if (json) cJSON_Delete(json);
 
-    return buf;
+    return NULL;
 }
 
 static int
@@ -383,20 +370,6 @@ fmtStatsDString(format_t* fmt, event_t* e, regex_t* fieldFilter)
     bytes += 1;
 
     return end_start;
-}
-
-char *
-fmtEventMessageString(format_t *fmt, event_format_t *evmsg)
-{
-    if (!fmt || !evmsg) return NULL;
-
-    switch (fmt->format) {
-        case CFG_EVENT_ND_JSON:
-            return fmtEventNdJson(fmt, evmsg);
-        default:
-            DBG("%d %s", fmt->format, evmsg->src);
-            return NULL;
-    }
 }
 
 char*

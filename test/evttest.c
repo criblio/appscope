@@ -27,54 +27,34 @@ evtDestroyNullOutDoesntCrash(void** state)
 }
 
 static void
-evtFormatSetAffectsOutput(void** state)
-{
-    evt_t* evt = evtCreate();
-    assert_non_null(evt);
-    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
-
-    event_t e = INT_EVENT("A", 1, DELTA, NULL);
-
-    // default format is CFG_EVENT_ND_JSON
-    char* msg1 = evtMetric(evt, "host", "cmd-1", "evttest", 12345, &e);
-    assert_non_null(msg1);
-
-    // Change to another format
-    format_t* f = fmtCreate(CFG_METRIC_STATSD);
-    evtFormatSet(evt, f);
-
-    // fmtEventMessageString will only return non-null for CFG_EVENT_ND_JSON
-    // Since msg1 and msg2 are different, it shows that the evtFormatSet worked.
-    char* msg2 = evtMetric(evt, "host", "cmd-2", "evttest", 12345, &e);
-    assert_null(msg2);
-
-    free(msg1);
-
-    evtDestroy(&evt);
-}
-
-static void
 evtMetricWithSourceDisabledReturnsNull(void** state)
 {
     evt_t* evt = evtCreate();
     assert_non_null(evt);
 
     event_t e = INT_EVENT("A", 1, DELTA, NULL);
+    proc_id_t proc = {.pid = 4848,
+                      .ppid = 4847,
+                      .hostname = "host",
+                      .procname = "evttest",
+                      .cmd = "cmd-4",
+                      .id = "host-evttest-cmd-4"};
 
     // default is disabled
-    char* msg = evtMetric(evt, "host", "cmd-3", "evttest", 12345, &e);
-    assert_null(msg);
+    cJSON* json = evtMetric(evt, &e, 12345, &proc);
+    assert_null(json);
 
-    // when enabled, we should get a non-null msg
+    // when enabled, we should get a non-null json
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
-    msg = evtMetric(evt, "host",  "cmd-4", "evttest", 12345, &e);
-    assert_non_null(msg);
-    free(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_non_null(json);
+    cJSON_Delete(json);
 
     // Set it back to disabled, just to be sure.
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 0);
-    msg = evtMetric(evt, "host",  "cmd-5", "evttest", 12345, &e);
-    assert_null(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_null(json);
+    cJSON_Delete(json);
 
     evtDestroy(&evt);
 }
@@ -87,23 +67,29 @@ evtMetricWithAndWithoutMatchingNameFilter(void** state)
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
     event_t e = INT_EVENT("A", 1, DELTA, NULL);
-    char* msg;
+    proc_id_t proc = {.pid = 4848,
+                      .ppid = 4847,
+                      .hostname = "host",
+                      .procname = "evttest",
+                      .cmd = "cmd-4",
+                      .id = "host-evttest-cmd-4"};
+    cJSON* json;
 
     // Default name filter allows everything
-    msg = evtMetric(evt, "host",  "cmd-6", "evttest", 12345, &e);
-    assert_non_null(msg);
-    free(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_non_null(json);
+    cJSON_Delete(json);
 
     // Changing the name filter to "^B" shouldn't match.
     evtNameFilterSet(evt, CFG_SRC_METRIC, "^B");
-    msg = evtMetric(evt, "host",  "cmd-7", "evttest", 12345, &e);
-    assert_null(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_null(json);
 
     // Changing the name filter to "^A" should match.
     evtNameFilterSet(evt, CFG_SRC_METRIC, "^A");
-    msg = evtMetric(evt, "host",  "cmd-8", "evttest", 12345, &e);
-    assert_non_null(msg);
-    free(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_non_null(json);
+    cJSON_Delete(json);
 
     evtDestroy(&evt);
 }
@@ -121,22 +107,31 @@ evtMetricWithAndWithoutMatchingFieldFilter(void** state)
         FIELDEND
     };
     event_t e = INT_EVENT("A", 1, DELTA, fields);
-    char* msg;
+    proc_id_t proc = {.pid = 4848,
+                      .ppid = 4847,
+                      .hostname = "host",
+                      .procname = "evttest",
+                      .cmd = "cmd-4",
+                      .id = "host-evttest-cmd-4"};
+    cJSON* json, *raw;
 
     // Default field filter allows both fields
-    msg = evtMetric(evt, "host",  "cmd-9", "evttest", 12345, &e);
-    assert_non_null(msg);
-    assert_non_null(strstr(msg, "proc"));
-    assert_non_null(strstr(msg, "pid"));
-    free(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_non_null(json);
+    raw = cJSON_GetObjectItem(json, "_raw");
+    assert_non_null(raw);
+    assert_non_null(strstr(raw->valuestring, "proc"));
+    assert_non_null(strstr(raw->valuestring, "pid"));
+    cJSON_Delete(json);
 
     // Changing the field filter to ".*oc" should match proc but not pid
     evtFieldFilterSet(evt, CFG_SRC_METRIC, ".*oc");
-    msg = evtMetric(evt, "host",  "cmd-10", "evttest", 12345, &e);
-    assert_non_null(msg);
-    assert_non_null(strstr(msg, "proc"));
-    assert_null(strstr(msg, "pid"));
-    free(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_non_null(json);
+    raw = cJSON_GetObjectItem(json, "_raw");
+    assert_non_null(strstr(raw->valuestring, "proc"));
+    assert_null(strstr(raw->valuestring, "pid"));
+    cJSON_Delete(json);
 
     evtDestroy(&evt);
 }
@@ -149,17 +144,23 @@ evtMetricWithAndWithoutMatchingValueFilter(void** state)
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
     event_t e = INT_EVENT("A", 1, DELTA, NULL);
-    char* msg;
+    proc_id_t proc = {.pid = 4848,
+                      .ppid = 4847,
+                      .hostname = "host",
+                      .procname = "evttest",
+                      .cmd = "cmd-4",
+                      .id = "host-evttest-cmd-4"};
+    cJSON* json;
 
     // Default value filter allows everything
-    msg = evtMetric(evt, "host",  "cmd-11", "evttest", 12345, &e);
-    assert_non_null(msg);
-    free(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_non_null(json);
+    cJSON_Delete(json);
 
     // Changing the value filter to "^2" shouldn't match.
     evtValueFilterSet(evt, CFG_SRC_METRIC, "^2");
-    msg = evtMetric(evt, "host",  "cmd-12", "evttest", 12345, &e);
-    assert_null(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_null(json);
 
     // Adding a field with value 2 should match.
     event_field_t fields[] = {
@@ -168,26 +169,26 @@ evtMetricWithAndWithoutMatchingValueFilter(void** state)
         FIELDEND
     };
     e.fields = fields;
-    msg = evtMetric(evt, "host",  "cmd-13", "evttest", 12345, &e);
-    assert_non_null(msg);
-    free(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_non_null(json);
+    cJSON_Delete(json);
 
     // Changing the value filter to "^1" should match.
     evtValueFilterSet(evt, CFG_SRC_METRIC, "^1");
-    msg = evtMetric(evt, "host",  "cmd-14", "evttest", 12345, &e);
-    assert_non_null(msg);
-    free(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_non_null(json);
+    cJSON_Delete(json);
 
     // Changing the value filter to "ps" should match too.
     evtValueFilterSet(evt, CFG_SRC_METRIC, "ps");
-    msg = evtMetric(evt, "host",  "cmd-15", "evttest", 12345, &e);
-    assert_non_null(msg);
-    free(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_non_null(json);
+    cJSON_Delete(json);
 
     // Changing the value filter to "blah" should not match.
     evtValueFilterSet(evt, CFG_SRC_METRIC, "blah");
-    msg = evtMetric(evt, "host",  "cmd-16", "evttest", 12345, &e);
-    assert_null(msg);
+    json = evtMetric(evt, &e, 12345, &proc);
+    assert_null(json);
 
     evtDestroy(&evt);
 }
@@ -202,15 +203,21 @@ evtMetricRateLimitReturnsNotice(void** state)
     evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
     event_t e = INT_EVENT("Hey", 1, DELTA, NULL);
-    char* msg;
+    proc_id_t proc = {.pid = 4848,
+                      .ppid = 4847,
+                      .hostname = "host",
+                      .procname = "evttest",
+                      .cmd = "cmd-4",
+                      .id = "host-evttest-cmd-4"};
+    cJSON* json, *raw;
 
     time_t initial, current;
     time(&initial);
 
     int i;
     for (i=0; i<=MAXEVENTS; i++) {
-        msg = evtMetric(evt, "host",  "cmd-17", "evttest", 12345, &e);
-        assert_non_null(msg);
+        json = evtMetric(evt, &e, 12345, &proc);
+        assert_non_null(json);
 
         time(&current);
         if (initial != current) {
@@ -218,21 +225,23 @@ evtMetricRateLimitReturnsNotice(void** state)
             // If we find this isn't true, start the loop over.
             initial = current;
             i=0;
-            free(msg);
+            cJSON_Delete(json);
             continue;
         }
 
         //printf("i=%d %s\n", i, msg);
+        raw = cJSON_GetObjectItem(json, "_raw");
+
         if (i<MAXEVENTS) {
-            // Verify that msg contains "Hey", and not "Truncated"
-            assert_non_null(strstr(msg, "Hey"));
-            assert_null(strstr(msg, "Truncated"));
+            // Verify that raw contains "Hey", and not "Truncated"
+            assert_non_null(strstr(raw->valuestring, "Hey"));
+            assert_null(strstr(raw->valuestring, "Truncated"));
         } else {
-            // Verify that msg contains "Truncated", and not "Hey"
-            assert_null(strstr(msg, "Hey"));
-            assert_non_null(strstr(msg, "Truncated"));
+            // Verify that raw contains "Truncated", and not "Hey"
+            assert_null(strstr(raw->valuestring, "Hey"));
+            assert_non_null(strstr(raw->valuestring, "Truncated"));
         }
-        free(msg);
+        cJSON_Delete(json);
     }
 
     evtDestroy(&evt);
@@ -244,20 +253,27 @@ evtLogWithSourceDisabledReturnsNull(void** state)
     evt_t* evt = evtCreate();
     assert_non_null(evt);
 
+    proc_id_t proc = {.pid = 4848,
+                      .ppid = 4847,
+                      .hostname = "host",
+                      .procname = "evttest",
+                      .cmd = "cmd-log",
+                      .id = "host-evttest-cmd-4"};
+
     // default is disabled
-    char* msg = evtLog(evt, "host", "stdout",  "cmd-log", "evttest", "hey", 4, 12345);
-    assert_null(msg);
+    cJSON* json = evtLog(evt, "stdout", "hey", 4, 12345, &proc);
+    assert_null(json);
 
     // when enabled, we should get a non-null msg
     evtSourceEnabledSet(evt, CFG_SRC_CONSOLE, 1);
-    msg = evtLog(evt, "host", "stdout",   "cmd-log", "evttest", "hey", 4, 12345);
-    assert_non_null(msg);
-    free(msg);
+    json = evtLog(evt, "stdout", "hey", 4, 12345, &proc);
+    assert_non_null(json);
+    cJSON_Delete(json);
 
     // Set it back to disabled, just to be sure.
     evtSourceEnabledSet(evt, CFG_SRC_CONSOLE, 0);
-    msg = evtLog(evt, "host", "stdout",   "cmd-log", "evttest", "hey", 4, 12345);
-    assert_null(msg);
+    json = evtLog(evt, "stdout", "hey", 4, 12345, &proc);
+    assert_null(json);
 
     evtDestroy(&evt);
 }
@@ -269,22 +285,28 @@ evtLogWithAndWithoutMatchingNameFilter(void** state)
     assert_non_null(evt);
     evtSourceEnabledSet(evt, CFG_SRC_FILE, 1);
 
+    proc_id_t proc = {.pid = 4848,
+                      .ppid = 4847,
+                      .hostname = "host",
+                      .procname = "evttest",
+                      .cmd = "cmd-log",
+                      .id = "host-evttest-cmd-4"};
+
     // default name filter matches anything with log in the path
-    char* msg = evtLog(evt, "host", "/var/log/something.log", "cmd-log", "evttest",
-                       "hey", 4, 12345);
-    assert_non_null(msg);
-    free(msg);
+    cJSON* json = evtLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
+    assert_non_null(json);
+    cJSON_Delete(json);
 
     // Changing the name filter to ".*my[.]log" shouldn't match.
     evtNameFilterSet(evt, CFG_SRC_FILE, ".*my[.]log");
-    msg = evtLog(evt, "host", "/var/log/something.log", "cmd-log", "evttest", "hey", 4, 12345);
-    assert_null(msg);
+    json = evtLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
+    assert_null(json);
 
     // Changing the name filter to "^/var/log/.*[.]log$" should match.
     evtNameFilterSet(evt, CFG_SRC_FILE, "^/var/log/.*[.]log$");
-    msg = evtLog(evt, "host", "/var/log/something.log", "cmd-log", "evttest", "hey", 4, 12345);
-    assert_non_null(msg);
-    free(msg);
+    json = evtLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
+    assert_non_null(json);
+    cJSON_Delete(json);
 
     evtDestroy(&evt);
 }
@@ -296,22 +318,28 @@ evtLogWithAndWithoutMatchingValueFilter(void** state)
     assert_non_null(evt);
     evtSourceEnabledSet(evt, CFG_SRC_FILE, 1);
 
+    proc_id_t proc = {.pid = 4848,
+                      .ppid = 4847,
+                      .hostname = "host",
+                      .procname = "evttest",
+                      .cmd = "cmd-log",
+                      .id = "host-evttest-cmd-4"};
+
     // default value filter matches anything
-    char* msg = evtLog(evt, "host", "/var/log/something.log", "cmd-log", "evttest",
-                       "hey", 4, 12345);
-    assert_non_null(msg);
-    free(msg);
+    cJSON* json = evtLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
+    assert_non_null(json);
+    cJSON_Delete(json);
 
     // Changing the value filter to "blah" shouldn't match.
     evtValueFilterSet(evt, CFG_SRC_FILE, "blah");
-    msg = evtLog(evt, "host", "/var/log/something.log", "cmd-log", "evttest", "hey", 4, 12345);
-    assert_null(msg);
+    json = evtLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
+    assert_null(json);
 
     // Changing the value filter to "hey" should match.
     evtValueFilterSet(evt, CFG_SRC_FILE, "hey");
-    msg = evtLog(evt, "host", "/var/log/something.log", "cmd-log", "evttest", "hey", 4, 12345);
-    assert_non_null(msg);
-    free(msg);
+    json = evtLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
+    assert_non_null(json);
+    cJSON_Delete(json);
 
     evtDestroy(&evt);
 }
@@ -502,7 +530,6 @@ main(int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(evtCreateReturnsValidPtr),
         cmocka_unit_test(evtDestroyNullOutDoesntCrash),
-        cmocka_unit_test(evtFormatSetAffectsOutput),
         cmocka_unit_test(evtMetricWithSourceDisabledReturnsNull),
         cmocka_unit_test(evtMetricWithAndWithoutMatchingNameFilter),
         cmocka_unit_test(evtMetricWithAndWithoutMatchingFieldFilter),

@@ -40,6 +40,7 @@
 #endif 
 
 #include "dns.h"
+#include "com.h"
 
 #ifdef __MACOS__
 #include "../os/macOS/os.h"
@@ -48,8 +49,6 @@
 #endif
 
 #define DEBUG 0
-#define TRUE 1
-#define FALSE 0
 #define EXPORT __attribute__((visibility("default")))
 #define EXPORTOFF  __attribute__((visibility("hidden")))
 #define EXPORTON __attribute__((visibility("default")))
@@ -60,14 +59,9 @@
 #define FS_ENTRIES 1024
 #define MAX_FDS 4096
 #define PROTOCOL_STR 16
-#define MAX_HOSTNAME 255
-#define MAX_PROCNAME 128
 #define SCOPE_UNIX 99
 #define DYN_CONFIG_PREFIX "scope"
 #define MAXTRIES 10
-#ifndef bool
-typedef unsigned int bool;
-#endif
 
 /*
  * OK; this is not cool. But, we are holding off making structural changes right now 
@@ -198,12 +192,9 @@ typedef struct rtconfig_t {
     int numFSInfo;
     bool tsc_invariant;
     bool tsc_rdtscp;
-    summary_t summarize;
     uint64_t freq;
     const char *cmddir;
-    char hostname[MAX_HOSTNAME];
-    char procname[MAX_PROCNAME];
-    pid_t pid;
+    proc_id_t proc;
 } rtconfig;
 
 typedef struct thread_timing_t {

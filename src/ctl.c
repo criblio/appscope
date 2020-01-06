@@ -264,14 +264,6 @@ ctlCreateTxMsg(upload_t* upld)
 
     if (!upld) goto out;
 
-    /*
-     * If we're given a json object, use it directly
-     * else if we are given a string, encode it first
-     */
-    if (!upld->body && upld->msg) {
-        upld->body = cJSON_CreateString(upld->msg);
-    }
-
     switch (upld->type) {
         case UPLD_INFO:
             json = create_info_json(upld);

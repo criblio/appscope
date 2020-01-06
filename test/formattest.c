@@ -466,28 +466,33 @@ fmtStringStatsDHonorsCardinality(void** state)
 }
 
 static void
-fmtEventMessageStringValue(void** state)
+fmtEventJsonValue(void** state)
 {
     format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
     assert_non_null(fmt);
 
+    proc_id_t proc;
+    strcpy(proc.hostname, "earl");
+    strcpy(proc.procname, "formattest");
+    strcpy(proc.cmd, "cmd");
+    strcpy(proc.id, "earl-formattest-cmd");
     event_format_t event_format;
     event_format.timestamp = 1573058085.991;
     event_format.src = "stdin";
-    event_format.hostname = "earl";
+    event_format.proc = &proc;
+    event_format.uid = 0xCAFEBABEDEADBEEF;
     event_format.data = "поспехаў";
     event_format.datasize = strlen(event_format.data);
-    event_format.uid = 0xCAFEBABEDEADBEEF;
-    event_format.cmd = "cmd";
-    event_format.procname = "formattest";
 
-    assert_null(fmtEventMessageString(NULL, NULL));
+    assert_null(fmtEventJson(NULL, NULL));
 
-    assert_null(fmtEventMessageString(NULL, &event_format));
+    assert_null(fmtEventJson(NULL, &event_format));
 
-    assert_null(fmtEventMessageString(fmt, NULL));
+    assert_null(fmtEventJson(fmt, NULL));
 
-    char* str = fmtEventMessageString(fmt, &event_format);
+    cJSON* json = fmtEventJson(fmt, &event_format);
+    assert_non_null(json);
+    char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
 
     //printf("%s:%d %s\n", __FUNCTION__, __LINE__, str);
@@ -499,31 +504,37 @@ fmtEventMessageStringValue(void** state)
                               "\"host\":\"earl\","
                               "\"_channel\":\"14627333968688430831\"}");
     free(str);
+    cJSON_Delete(json);
 
     fmtDestroy(&fmt);
 }
 
 static void
-fmtEventMessageStringWithEmbeddedNulls(void** state)
+fmtEventJsonWithEmbeddedNulls(void** state)
 {
     format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
     assert_non_null(fmt);
 
+    proc_id_t proc;
+    strcpy (proc.hostname, "earl");
+    strcpy (proc.procname, "");
+    strcpy (proc.cmd, "");
+    strcpy (proc.id, "earl--");
     event_format_t event_format;
     event_format.timestamp = 1573058085.001;
     event_format.src = "stdout";
-    event_format.hostname = "earl";
+    event_format.proc = &proc;
+    event_format.uid = 0xCAFEBABEDEADBEEF;
     char buf[] = "Unë mund të ha qelq dhe nuk më gjen gjë";
     event_format.data = buf;
     event_format.datasize = strlen(event_format.data);
     event_format.data[9] = '\0';                  //  <-- Null in middle of buf
     event_format.data[29] = '\0';                 //  <-- Null in middle of buf
-    event_format.uid = 0xCAFEBABEDEADBEEF;
-    event_format.procname = "";
-    event_format.cmd = "";
     
     // test that _raw has the nulls properly escaped
-    char* str = fmtEventMessageString(fmt, &event_format);
+    cJSON* json = fmtEventJson(fmt, &event_format);
+    assert_non_null(json);
+    char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
     assert_string_equal(str, "{\"ty\":\"ev\","
                               "\"id\":\"earl--\","
@@ -533,10 +544,13 @@ fmtEventMessageStringWithEmbeddedNulls(void** state)
                               "\"host\":\"earl\","
                               "\"_channel\":\"14627333968688430831\"}");
     free(str);
+    cJSON_Delete(json);
 
     // test that datasize of zero acts like null delimited input.
     event_format.datasize=0;
-    str = fmtEventMessageString(fmt, &event_format);
+    json = fmtEventJson(fmt, &event_format);
+    assert_non_null(json);
+    str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
     assert_string_equal(str, "{\"ty\":\"ev\","
                               "\"id\":\"earl--\","
@@ -546,11 +560,14 @@ fmtEventMessageStringWithEmbeddedNulls(void** state)
                               "\"host\":\"earl\","
                               "\"_channel\":\"14627333968688430831\"}");
     free(str);
+    cJSON_Delete(json);
 
     // test that null data returns empty string for _raw.
     event_format.datasize=29;
     event_format.data=NULL;
-    str = fmtEventMessageString(fmt, &event_format);
+    json = fmtEventJson(fmt, &event_format);
+    assert_non_null(json);
+    str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
     assert_string_equal(str, "{\"ty\":\"ev\","
                               "\"id\":\"earl--\","
@@ -560,6 +577,7 @@ fmtEventMessageStringWithEmbeddedNulls(void** state)
                               "\"host\":\"earl\","
                               "\"_channel\":\"14627333968688430831\"}");
     free(str);
+    cJSON_Delete(json);
 
     fmtDestroy(&fmt);
 }
@@ -696,8 +714,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtStringStatsDVerifyEachStatsDType),
         cmocka_unit_test(fmtStringStatsDOmitsFieldsIfSpaceIsInsufficient),
         cmocka_unit_test(fmtStringStatsDHonorsCardinality),
-        cmocka_unit_test(fmtEventMessageStringValue),
-        cmocka_unit_test(fmtEventMessageStringWithEmbeddedNulls),
+        cmocka_unit_test(fmtEventJsonValue),
+        cmocka_unit_test(fmtEventJsonWithEmbeddedNulls),
         cmocka_unit_test(fmtStringMetricJsonNoFields),
         cmocka_unit_test(fmtStringMetricJsonWFields),
         cmocka_unit_test(fmtStringMetricJsonWFilteredFields),

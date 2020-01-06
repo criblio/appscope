@@ -4,6 +4,7 @@
 #include <regex.h>
 #include "scopetypes.h"
 #include "cfg.h"
+#include "cJSON.h"
 
 
 // This event structure is meant to meet our needs w.r.t. statsd,
@@ -49,9 +50,7 @@ typedef struct {
 typedef struct event_format {
     double timestamp;
     const char *src;
-    const char *hostname;
-    const char *procname;
-    const char *cmd;
+    proc_id_t* proc;
     char *data;
     size_t datasize;
     unsigned long long uid;
@@ -72,7 +71,7 @@ custom_tag_t**      fmtCustomTags(format_t*);
 // fmtString returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
 char*               fmtString(format_t*, event_t*, regex_t*);
-char *              fmtEventMessageString(format_t *, event_format_t *);
+cJSON *             fmtEventJson(format_t *, event_format_t *);
 
 // Setters
 void                fmtStatsDPrefixSet(format_t*, const char*);

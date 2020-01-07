@@ -95,6 +95,30 @@ dumpAddrs(int sd, enum control_type_t endp)
     }
 }
 
+static time_t
+fileModTime(const char *path)
+{
+    int fd;
+    struct stat statbuf;
+
+    if (!path) return 0;
+
+    if (!g_fn.open || !g_fn.close) {
+        return 0;
+    }
+
+    if ((fd = g_fn.open(path, O_RDONLY)) == -1) return 0;
+    
+    if (fstat(fd, &statbuf) < 0) {
+        g_fn.close(fd);
+        return 0;
+    }
+
+    g_fn.close(fd);
+    // STATMODTIME from os.h as timespec names are different between OSs
+    return STATMODTIME(statbuf);
+}
+
 #define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
 #define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)
 #define CLASS_FIELD(val)        STRFIELD("class",          (val),        2)
@@ -292,12 +316,24 @@ static int
 dynConfig(void)
 {
     FILE *fs;
+    time_t now;
     char path[PATH_MAX];
+    static time_t modtime = 0;
 
     snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmddir, DYN_CONFIG_PREFIX, g_cfg.proc.pid);
 
     // Is there a command file for this pid
     if (osIsFilePresent(g_cfg.proc.pid, path) == -1) return 0;
+
+    // Have we already processed this file?
+    now = fileModTime(path);
+    if (now == modtime) {
+        // Been there, try to remove the file and we're done
+        unlink(path);
+        return 0;
+    }
+
+    modtime = now;
 
     // Open the command file
     if ((fs = g_fn.fopen(path, "r")) == NULL) return -1;

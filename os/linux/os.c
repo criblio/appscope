@@ -166,6 +166,7 @@ osInitTSC(struct rtconfig_t *cfg)
      */    
     if ((buf = malloc(MAX_PROC)) == NULL) {
         DBG(NULL);
+        g_fn.close(fd);
         return -1;
     }
     

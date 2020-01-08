@@ -471,11 +471,12 @@ fmtEventJsonValue(void** state)
     format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
     assert_non_null(fmt);
 
-    proc_id_t proc;
-    strcpy(proc.hostname, "earl");
-    strcpy(proc.procname, "formattest");
-    strcpy(proc.cmd, "cmd");
-    strcpy(proc.id, "earl-formattest-cmd");
+    proc_id_t proc = {.pid = 1234,
+                      .ppid = 1233,
+                      .hostname = "earl",
+                      .procname = "formattest",
+                      .cmd = "cmd",
+                      .id = "earl-formattest-cmd"};
     event_format_t event_format;
     event_format.timestamp = 1573058085.991;
     event_format.src = "stdin";
@@ -515,11 +516,12 @@ fmtEventJsonWithEmbeddedNulls(void** state)
     format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
     assert_non_null(fmt);
 
-    proc_id_t proc;
-    strcpy (proc.hostname, "earl");
-    strcpy (proc.procname, "");
-    strcpy (proc.cmd, "");
-    strcpy (proc.id, "earl--");
+    proc_id_t proc = {.pid = 1234,
+                      .ppid = 1233,
+                      .hostname = "earl",
+                      .procname = "",
+                      .cmd = "",
+                      .id = "earl--"};
     event_format_t event_format;
     event_format.timestamp = 1573058085.001;
     event_format.src = "stdout";

@@ -34,7 +34,7 @@ typedef struct
     pid_t ppid;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];
-    char cmd[DEFAULT_CMD_SIZE];
+    char *cmd;
     char id[MAX_ID];
 } proc_id_t;
 

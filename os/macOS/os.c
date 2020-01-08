@@ -78,8 +78,18 @@ osIsFilePresent(pid_t pid, const char *path)
 }
 
 int
-osGetCmdline(pid_t pid, char *cmd, size_t cmdlen)
+osGetCmdline(pid_t pid, char **cmd)
 {
-    strncpy(cmd, "MACPATH", cmdlen);
-    return 0;
+    if (!cmd) return 0;
+    char* buf = *cmd;
+
+    // Free old value, if one exists
+    if (buf) free(buf);
+    buf = NULL;
+
+    // TBD: placeholder for mac development
+    buf = strdup("MACPATH");
+    *cmd = buf;
+
+    return (*cmd != NULL);
 }

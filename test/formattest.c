@@ -690,6 +690,95 @@ fmtStringMetricJsonEscapedValues(void** state)
     fmtDestroy(&fmt);
 }
 
+typedef struct {
+    char* decoded;
+    char* encoded;
+} test_case_t;
+
+static void
+fmtUrlEncodeDecodeRoundTrip(void** state)
+{
+    // Verify that NULL in returns NULL
+    assert_null(fmtUrlEncode(NULL));
+    assert_null(fmtUrlDecode(NULL));
+
+    // Test things that should round trip without issues
+    test_case_t round_trip_tests[] = {
+        // Contains all the characters we wish to avoid in statsd
+        {.decoded="bar|pound#colon:ampersand@comma,end",
+         .encoded="bar%7Cpound%23colon%3Aampersand%40comma%2Cend"},
+        // Other misc tests
+        {.decoded="",
+         .encoded=""},
+        {.decoded="a b",
+         .encoded="a%20b"},
+        {.decoded="행운을",
+         .encoded="%ED%96%89%EC%9A%B4%EC%9D%84"},
+    };
+
+    int i;
+    for (i=0; i<sizeof(round_trip_tests)/sizeof(round_trip_tests[0]); i++) {
+        test_case_t* test = &round_trip_tests[i];
+
+        char* encoded = fmtUrlEncode(test->decoded);
+        assert_non_null(encoded);
+        assert_string_equal(encoded, test->encoded);
+
+        char* decoded = fmtUrlDecode(encoded);
+        assert_non_null(decoded);
+        assert_string_equal(decoded, test->decoded);
+
+        free(encoded);
+        free(decoded);
+    }
+
+    // Verify lower case hex nibbles are tolerated
+    char* decoded = fmtUrlDecode("bar%7cpound%23colon%3aampersand%40comma%2cend");
+    assert_non_null(decoded);
+    assert_string_equal(decoded, "bar|pound#colon:ampersand@comma,end");
+    free(decoded);
+}
+
+static void
+fmtUrlDecodeToleratesBadData(void** state)
+{
+    // Verify that malformed input is tolerated on decode
+    test_case_t bad_input_tests[] ={
+        {.decoded="",
+         .encoded="%"},
+        {.decoded="",
+         .encoded="%0"},
+        {.decoded="",
+         .encoded="%G0"},
+        {.decoded="",
+         .encoded="%0g"},
+        {.decoded="hey",
+         .encoded="hey%0gyou"},
+        {.decoded="hey",
+         .encoded="hey%%0you"},
+        {.decoded="hey",
+         .encoded="hey%1gyou"},
+        {.decoded="hey",
+         .encoded="hey%%1you"},
+    };
+
+    int i;
+    for (i=0; i<sizeof(bad_input_tests)/sizeof(bad_input_tests[0]); i++) {
+        test_case_t* test = &bad_input_tests[i];
+
+        assert_int_equal(dbgCountMatchingLines("src/format.c"), 0);
+
+        char* decoded = fmtUrlDecode(test->encoded);
+        assert_non_null(decoded);
+        assert_string_equal(decoded, test->decoded);
+
+        assert_int_equal(dbgCountMatchingLines("src/format.c"), 1);
+        dbgInit(); // reset dbg for the rest of the tests
+
+        free(decoded);
+    }
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -722,6 +811,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtStringMetricJsonWFields),
         cmocka_unit_test(fmtStringMetricJsonWFilteredFields),
         cmocka_unit_test(fmtStringMetricJsonEscapedValues),
+        cmocka_unit_test(fmtUrlEncodeDecodeRoundTrip),
+        cmocka_unit_test(fmtUrlDecodeToleratesBadData),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

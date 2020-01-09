@@ -135,6 +135,7 @@ fileModTime(const char *path)
 #define REMOTEP_FIELD(val)      NUMFIELD("remotep",        (val),        6)
 #define FD_FIELD(val)           NUMFIELD("fd",             (val),        7)
 #define PID_FIELD(val)          NUMFIELD("pid",            (val),        7)
+#define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
 
@@ -2332,15 +2333,18 @@ reportProcessStart(void)
     }
 
     // 2) Send a metric
+    char* urlEncodedCmd = fmtUrlEncode(g_cfg.proc.cmd);
     event_field_t fields[] = {
         PROC_FIELD(g_cfg.proc.procname),
         PID_FIELD(g_cfg.proc.pid),
         HOST_FIELD(g_cfg.proc.hostname),
+        ARGS_FIELD(urlEncodedCmd),
         UNIT_FIELD("process"),
         FIELDEND
     };
     event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
     sendEvent(g_out, &evt);
+    if (urlEncodedCmd) free(urlEncodedCmd);
 
     // 3) Send an event at startup, provided metric events are enabled
     cJSON *json = msgStart(&g_cfg.proc, g_staticfg);

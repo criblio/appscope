@@ -4708,7 +4708,7 @@ static const char scope_help[] =
 "            4   adds 'host', 'proc'\n"
 "            5   adds 'domain', 'file'\n"
 "            6   adds 'localip', 'remoteip', 'localp', 'port', 'remotep'\n"
-"            7   adds 'fd', 'pid'\n"
+"            7   adds 'fd', 'pid', 'args'\n"
 "            8   adds 'duration'\n"
 "            9   adds 'numops'\n"
 "\n"

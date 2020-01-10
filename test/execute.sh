@@ -78,6 +78,13 @@ if [ "${OS}" = "linux" ]; then
 fi
 run_test test/${OS}/selfinterposetest
 
+if [ "${OS}" = "linux" ]; then
+    SAVEVARS=$ENVARS
+    ENVVARS=$ENVVARS"LD_PRELOAD=./lib/linux/libscope.so ""SCOPE_METRIC_DEST=file:///tmp/dnstest.log ""SCOPE_METRIC_VERBOSITY=9 "
+    run_test test/${OS}/dnstest
+    ENVARS=$SAVEVARS
+rm "/tmp/dnstest.log"
+fi
 
 
 

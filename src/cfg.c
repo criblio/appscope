@@ -55,7 +55,8 @@ struct _config_t
 #define DEFAULT_OUT_HOST "127.0.0.1"
 //#define DEFAULT_OUT_PORT DEFAULT_OUT_PORT (defined in scopetypes.h)
 #define DEFAULT_OUT_PATH NULL
-#define DEFAULT_OUT_BUF CFG_BUFFER_FULLY
+//#define DEFAULT_OUT_BUF CFG_BUFFER_FULLY
+#define DEFAULT_OUT_BUF CFG_BUFFER_LINE
 #define DEFAULT_CTL_TYPE CFG_TCP
 #define DEFAULT_CTL_HOST "127.0.0.1"
 //#define DEFAULT_CTL_PORT DEFAULT_CTL_PORT (defined in scopetypes.h)

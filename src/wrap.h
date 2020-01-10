@@ -52,7 +52,6 @@
 #define EXPORT __attribute__((visibility("default")))
 #define EXPORTOFF  __attribute__((visibility("hidden")))
 #define EXPORTON __attribute__((visibility("default")))
-#define DNS_PORT 53
 
 // Initial size of net array for state
 #define NET_ENTRIES 1024

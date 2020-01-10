@@ -38,7 +38,7 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_OUT), DEFAULT_OUT_PORT);
     assert_null            (cfgTransportPath(config, CFG_OUT));
-    assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_FULLY);
+    assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_LINE);
     assert_int_equal       (cfgTransportType(config, CFG_CTL), CFG_TCP);
     assert_string_equal    (cfgTransportHost(config, CFG_CTL), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_CTL), DEFAULT_CTL_PORT);
@@ -48,7 +48,7 @@ verifyDefaults(config_t* config)
     assert_null            (cfgTransportHost(config, CFG_LOG));
     assert_null            (cfgTransportPort(config, CFG_LOG));
     assert_string_equal    (cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
-    assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_FULLY);
+    assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_LINE);
     assert_null            (cfgCustomTags(config));
     assert_null            (cfgCustomTagValue(config, "tagname"));
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);

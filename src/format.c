@@ -477,3 +477,93 @@ fmtCustomTagsSet(format_t* fmt, custom_tag_t** tags)
         fmt->tags[j++]=t;
     }
 }
+
+static int
+isHex(const char x)
+{
+    // I'm not using isxdigit because I don't want locale to affect it.
+    if (x >= '0' && x <= '9') return 1;
+    if (x >= 'A' && x <= 'F') return 1;
+    if (x >= 'a' && x <= 'f') return 1;
+    return 0;
+}
+static char
+fromHex(const char x) {
+    if (x >= '0' && x <= '9') return (x - '0');
+    if (x >= 'A' && x <= 'F') return (x - 'A' + 10);
+    if (x >= 'a' && x <= 'f') return (x - 'a' + 10);
+
+    DBG(NULL);
+    return 0;
+}
+
+static char
+toHex(const char code) {
+    static char hex[] = "0123456789ABCDEF";
+    return hex[code & 15];
+}
+
+static int
+isUnreserved(const char x)
+{
+    // I'm not using isalnum because I don't want locale to affect it.
+    if (x >= 'a' && x <= 'z') return 1;
+    if (x >= 'A' && x <= 'Z') return 1;
+    if (x >= '0' && x <= '9') return 1;
+    if (x == '-' || x == '.' || x == '_' || x == '~') return 1;
+    return 0;
+}
+
+char*
+fmtUrlEncode(const char* in_str)
+{
+    // rfc3986 Percent-Encoding
+    if (!in_str) return NULL;
+    char *out = malloc(strlen(in_str) * 3 + 1);
+    if (!out) return NULL;
+
+    char *inptr = (char*) in_str;
+    char *outptr = out;
+
+    while (*inptr) {
+        if (isUnreserved(*inptr)) {
+            *outptr++ = *inptr;
+        } else {
+            *outptr++ = '%';
+            *outptr++ = toHex(*inptr >> 4);
+            *outptr++ = toHex(*inptr);
+        }
+        inptr++;
+    }
+    *outptr = '\0';
+    return out;
+}
+
+char*
+fmtUrlDecode(const char* in_str)
+{
+    // rfc3986 Percent-Encoding
+    if (!in_str) return NULL;
+    char *out = malloc(strlen(in_str) + 1);
+    if (!out) return NULL;
+
+    char *inptr = (char*) in_str;
+    char *outptr = out;
+
+    while (*inptr) {
+        if (*inptr == '%') {
+            if (isHex(inptr[1]) && isHex(inptr[2])) {
+                *outptr++ = fromHex(inptr[1]) << 4 | fromHex(inptr[2]);
+                inptr += 2;
+            } else {
+                DBG(NULL);
+                break;
+            }
+        } else {
+            *outptr++ = *inptr;
+        }
+        inptr++;
+    }
+    *outptr = '\0';
+    return out;
+}

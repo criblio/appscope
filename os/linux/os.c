@@ -232,48 +232,57 @@ osIsFilePresent(pid_t pid, const char *path)
 }
 
 int
-osGetCmdline(pid_t pid, char *cmd, size_t cmdlen)
+osGetCmdline(pid_t pid, char **cmd)
 {
-    int fd, rc;
-    char *buf;
+    int fd = -1;
+    int bytesRead = 0;
     char path[64];
 
-    if (!cmd || !cmdlen) return -1;
+    if (!cmd) return 0;
+    char* buf = *cmd;
+    buf = NULL;
 
     if (!g_fn.open || !g_fn.read || !g_fn.close) {
-        strncpy(cmd, "none", cmdlen);
-        return -1;
+        goto out;
     }
 
     if ((buf = calloc(1, NCARGS)) == NULL) {
-        strncpy(cmd, "none", cmdlen);
-        return -1;
+        goto out;
     }
 
-    snprintf(path, sizeof(path), "/proc/%d/cmdline", pid);
+    if (snprintf(path, sizeof(path), "/proc/%d/cmdline", pid) < 0) {
+        goto out;
+    }
 
     if ((fd = g_fn.open(path, O_RDONLY)) == -1) {
         DBG(NULL);
-        free(buf);
-        strncpy(cmd, "none", cmdlen);
-        return -1;
+        goto out;
     }
 
-    if ((rc = g_fn.read(fd, buf, NCARGS)) <= 0) {
+    if ((bytesRead = g_fn.read(fd, buf, NCARGS)) <= 0) {
         DBG(NULL);
-        g_fn.close(fd);
-        free(buf);
-        strncpy(cmd, "none", cmdlen);
-        return -1;
+        goto out;
     }
 
-    if (rc > cmdlen) {
-        memmove(cmd, &buf[rc - cmdlen], cmdlen);
+    // Replace all but the last null with spaces
+    int i;
+    for (i=0; i < (bytesRead - 1); i++) {
+        if (buf[i] == '\0') buf[i] = ' ';
+    }
+
+out:
+    if (!buf || !buf[0]) {
+        if (buf) free(buf);
+        buf = strdup("none");
     } else {
-        memmove(cmd, buf, rc);
+        // buf is big; try to strdup what we've used and free the rest
+        char* tmp = strdup(buf);
+        if (tmp) {
+            free(buf);
+            buf = tmp;
+        }
     }
-
-    g_fn.close(fd);
-    free(buf);
-    return 0;
+    if (fd != -1) g_fn.close(fd);
+    *cmd = buf;
+    return (*cmd != NULL);
 }

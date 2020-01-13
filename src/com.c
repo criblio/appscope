@@ -97,7 +97,9 @@ jsonProcessObject(proc_id_t* proc)
     if (!(cJSON_AddNumberToObjLN(root, "ppid", proc->ppid))) goto err;
     if (!(cJSON_AddStringToObjLN(root, "hostname", proc->hostname))) goto err;
     if (!(cJSON_AddStringToObjLN(root, "procname", proc->procname))) goto err;
-    if (!(cJSON_AddStringToObjLN(root, "cmd", proc->cmd))) goto err;
+    if (proc->cmd) {
+        if (!(cJSON_AddStringToObjLN(root, "cmd", proc->cmd))) goto err;
+    }
     if (!(cJSON_AddStringToObjLN(root, "id", proc->id))) goto err;
     // starttime
 

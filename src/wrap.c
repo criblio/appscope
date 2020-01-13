@@ -135,6 +135,7 @@ fileModTime(const char *path)
 #define REMOTEP_FIELD(val)      NUMFIELD("remotep",        (val),        6)
 #define FD_FIELD(val)           NUMFIELD("fd",             (val),        7)
 #define PID_FIELD(val)          NUMFIELD("pid",            (val),        7)
+#define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
 
@@ -1969,10 +1970,17 @@ setProcId(proc_id_t* proc)
         scopeLog("ERROR: gethostname", -1, CFG_LOG_ERROR);
     }
     osGetProcname(proc->procname, sizeof(proc->procname));
-    osGetCmdline(proc->pid, proc->cmd, sizeof(proc->cmd));
+
+    // free old value of cmd, if an old value exists
+    if (proc->cmd) free(proc->cmd);
+    proc->cmd = NULL;
+    osGetCmdline(proc->pid, &proc->cmd);
 
     if (proc->hostname && proc->procname && proc->cmd) {
-        snprintf(proc->id, sizeof(proc->id), "%s-%s-%s", proc->hostname, proc->procname, proc->cmd);
+        // limit amount of cmd used in id
+        int cmdlen = strlen(proc->cmd);
+        char *ptr = (cmdlen < DEFAULT_CMD_SIZE) ? proc->cmd : &proc->cmd[cmdlen-DEFAULT_CMD_SIZE];
+        snprintf(proc->id, sizeof(proc->id), "%s-%s-%s", proc->hostname, proc->procname, ptr);
     } else {
         snprintf(proc->id, sizeof(proc->id), "badid");
     }
@@ -2322,25 +2330,28 @@ reportProcessStart(void)
 {
     // 1) Log it at startup, provided the loglevel is set to allow it
     scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
+    char* cmd_w_args=NULL;
+    if (asprintf(&cmd_w_args, "command w/args: %s", g_cfg.proc.cmd) != -1) {
+        scopeLog(cmd_w_args, -1, CFG_LOG_INFO);
+        if (cmd_w_args) free(cmd_w_args);
+    }
 
     // 2) Send a metric
+    char* urlEncodedCmd = fmtUrlEncode(g_cfg.proc.cmd);
     event_field_t fields[] = {
         PROC_FIELD(g_cfg.proc.procname),
         PID_FIELD(g_cfg.proc.pid),
         HOST_FIELD(g_cfg.proc.hostname),
+        ARGS_FIELD(urlEncodedCmd),
         UNIT_FIELD("process"),
         FIELDEND
     };
     event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
     sendEvent(g_out, &evt);
+    if (urlEncodedCmd) free(urlEncodedCmd);
 
     // 3) Send an event at startup, provided metric events are enabled
-    //char cmd[DEFAULT_CMD_SIZE];
-
-    // get a cJSON object for our current config
     cJSON *json = msgStart(&g_cfg.proc, g_staticfg);
-
-    // create cmd json and then output
     cmdSendInfoMsg(g_ctl, json);
 }
 
@@ -4701,7 +4712,7 @@ static const char scope_help[] =
 "            4   adds 'host', 'proc'\n"
 "            5   adds 'domain', 'file'\n"
 "            6   adds 'localip', 'remoteip', 'localp', 'port', 'remotep'\n"
-"            7   adds 'fd', 'pid'\n"
+"            7   adds 'fd', 'pid', 'args'\n"
 "            8   adds 'duration'\n"
 "            9   adds 'numops'\n"
 "\n"

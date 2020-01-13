@@ -78,4 +78,10 @@ void                fmtStatsDPrefixSet(format_t*, const char*);
 void                fmtStatsDMaxLenSet(format_t*, unsigned);
 void                fmtOutVerbositySet(format_t*, unsigned);
 void                fmtCustomTagsSet(format_t*, custom_tag_t**);
+
+// Helper functions - returns a pointer to a malloc'd buffer.
+// The caller is reponsible for deallocating with free().
+char* fmtUrlEncode(const char*);
+char* fmtUrlDecode(const char*);
+
 #endif // __FORMAT_H__

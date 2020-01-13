@@ -32,4 +32,4 @@ extern int osGetNumChildProcs(pid_t);
 extern int osInitTSC(struct rtconfig_t *);
 extern int osGetProcMemory(pid_t);
 extern int osIsFilePresent(pid_t, const char *);
-extern int osGetCmdline(pid_t, char *, size_t);
+extern int osGetCmdline(pid_t, char **);

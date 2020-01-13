@@ -1970,6 +1970,10 @@ setProcId(proc_id_t* proc)
         scopeLog("ERROR: gethostname", -1, CFG_LOG_ERROR);
     }
     osGetProcname(proc->procname, sizeof(proc->procname));
+
+    // free old value of cmd, if an old value exists
+    if (proc->cmd) free(proc->cmd);
+    proc->cmd = NULL;
     osGetCmdline(proc->pid, &proc->cmd);
 
     if (proc->hostname && proc->procname && proc->cmd) {

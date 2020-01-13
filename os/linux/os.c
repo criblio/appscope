@@ -240,9 +240,6 @@ osGetCmdline(pid_t pid, char **cmd)
 
     if (!cmd) return 0;
     char* buf = *cmd;
-
-    // Free old value, if one exists
-    if (buf) free(buf);
     buf = NULL;
 
     if (!g_fn.open || !g_fn.read || !g_fn.close) {

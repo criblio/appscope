@@ -192,7 +192,7 @@ dnsReply(void** state)
     assert_int_not_equal(-1, fd);
     assert_int_equal(0, CreateQuery(&pkt));
     assert_int_not_equal(-1, sendToNS(fd, (char *)&pkt,
-                                      sizeof(pkt) + sizeof(question), &sa, 1));
+                                      sizeof(pkt) + sizeof(question), &sa, 0));
     truncFile();
     close(fd);
 }

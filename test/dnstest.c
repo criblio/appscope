@@ -191,8 +191,7 @@ dnsReply(void** state)
     int fd = createSocket(&sa);
     assert_int_not_equal(-1, fd);
     assert_int_equal(0, CreateQuery(&pkt));
-    assert_int_not_equal(-1, sendToNS(fd, (char *)&pkt,
-                                      sizeof(pkt) + sizeof(question), &sa, 0));
+    assert_int_not_equal(-1, sendToNS(fd, (char *)&pkt, sizeof(pkt), &sa, 0));
     truncFile();
     close(fd);
 }
@@ -209,8 +208,7 @@ dnsName(void** state)
     assert_int_not_equal(-1, fd);
     // Do an A query
     assert_int_equal(0, CreateQuery(&pkt));
-    assert_int_not_equal(-1, sendToNS(fd, (char *)&pkt,
-                                      sizeof(pkt) + sizeof(question), &sa, 0));
+    assert_int_not_equal(-1, sendToNS(fd, (char *)&pkt, sizeof(pkt), &sa, 0));
     assert_int_equal(0, checkMetric(DOMAIN));
     truncFile();
     close(fd);
@@ -220,8 +218,7 @@ dnsName(void** state)
     assert_int_not_equal(-1, fd);
     question = (struct question_t *)(pkt.name + strlen((char *)pkt.name) + 1);
     question->qtype = htons(QTYPE_AAAA);
-    assert_int_not_equal(-1, sendToNS(fd, (char *)&pkt,
-                                      sizeof(pkt) + sizeof(question), &sa, 0));
+    assert_int_not_equal(-1, sendToNS(fd, (char *)&pkt, sizeof(pkt), &sa, 0));
     assert_int_equal(0, checkMetric(DOMAIN));
     truncFile();
     close(fd);
@@ -233,7 +230,6 @@ dnsNoName(void** state)
 {
     struct sockaddr_in sa;
     query pkt;
-    question *question;
 
     int fd = createSocket(&sa);
     assert_int_not_equal(-1, fd);
@@ -242,8 +238,7 @@ dnsNoName(void** state)
     // modify the packet such that it's not a query
     // Define an inverse query
     pkt.qhead.hb3 = OPCODE_INVERSE_QUERY;
-    assert_int_not_equal(-1, sendToNS(fd, (char *)&pkt,
-                                      sizeof(pkt) + sizeof(question), &sa, 0));
+    assert_int_not_equal(-1, sendToNS(fd, (char *)&pkt, sizeof(pkt), &sa, 0));
     assert_int_equal(-1, checkMetric(DOMAIN));
     truncFile();
     close(fd);
@@ -279,6 +274,7 @@ dnsGetaddrinfo(void** state)
     
     assert_int_equal(0, getaddrinfo(DOMAIN, "8080", &hints, &addrs));
     assert_int_equal(0, checkMetric(DOMAIN));
+    freeaddrinfo(addrs);
     truncFile();
 }
 

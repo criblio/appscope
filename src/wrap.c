@@ -1815,7 +1815,7 @@ getDNSName(int sd, void *pkt, int pktlen)
 {
     int llen;
     dns_query *query;
-    struct question *q;
+    struct dns_header *header;
     char *aname, *dname;
     char dnsName[MAX_HOSTNAME];
 
@@ -1824,13 +1824,14 @@ getDNSName(int sd, void *pkt, int pktlen)
     }
     
     query = (struct dns_query_t *)pkt;
+    header = &query->qhead;
     if ((dname = (char *)&query->name) == NULL) {
         return -1;
     }
 
-/*    
-      An opcode appears to be represented in a query packet 
-      in what we define as a queston type; q->qtype. 
+    /*
+      An opcode is represented in a DNS header and is defined foe every query packet
+      We look for the opcode in the header to be a query.
       Based on the table below we want to only handle a type of 0.
       OpCode 	Name 	Reference 
       0	Query	[RFC1035]
@@ -1880,9 +1881,9 @@ getDNSName(int sd, void *pkt, int pktlen)
       local name server. We interpose the function DNSServiceQueryRecord
       in order to dig out the domain name. The DNS metric is created
       directly from that function interposition. 
-*/
-    q = (struct question *)(pkt + sizeof(struct dns_header) + strlen(dname));
-    if ((q->qtype != 0) || ((q->qclass < 1) || (q->qclass > 16))) {
+    */
+
+    if ((header->opcode != OPCODE_QUERY) && (header->qr != 1)) {
         return 0;
     }
 
@@ -1901,11 +1902,11 @@ getDNSName(int sd, void *pkt, int pktlen)
     aname--;
     *aname = '\0';
 
-    if (strncmp(aname, g_netinfo[sd].dnsName, strlen(aname)) == 0) {
+    if (strncmp(dnsName, g_netinfo[sd].dnsName, strlen(dnsName)) == 0) {
         // Already sent this from an interposed function
         g_netinfo[sd].dnsSend = FALSE;
     } else {
-        strncpy(g_netinfo[sd].dnsName, aname, strlen(aname));
+        strncpy(g_netinfo[sd].dnsName, dnsName, strlen(dnsName));
         g_netinfo[sd].dnsSend = TRUE;
     }
     

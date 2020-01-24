@@ -34,6 +34,7 @@ static void doClose(int, const char *);
 static void doOpen(int, const char *, enum fs_type_t, const char *);
 static void doConfig(config_t *);
 static void doOpen(int, const char *, enum fs_type_t, const char *);
+static void doMetric(evt_t*, const char *, uint64_t, event_t *);
 
 static void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
@@ -57,6 +58,8 @@ static void
 sendEvent(out_t* out, event_t* e)
 {
     int rc;
+
+    doMetric(g_evt, g_cfg.proc.hostname, getTime(), e);
 
     rc = outSendEvent(out, e);
     if (rc == DEFAULT_BADFD) {
@@ -925,13 +928,14 @@ doStatMetric(const char *op, const char *pathname)
             FIELDEND
     };
 
+    event_t e = INT_EVENT("fs.op.stat", 1, DELTA, fields);
+    doMetric(g_evt, g_cfg.proc.hostname, getTime(), &e);
 
     // Only report if enabled
     if (g_summary.fs.stat) {
         return;
     }
 
-    event_t e = INT_EVENT("fs.op.stat", 1, DELTA, fields);
     if (outSendEvent(g_out, &e)) {
         scopeLog("doStatMetric", -1, CFG_LOG_ERROR);
     }
@@ -961,11 +965,6 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             atomicAddU64(&g_ctrs.fsDurationTotal, size);
         }
 
-        // Only report if enabled
-        if ((g_summary.fs.read_write) && (source == EVENT_BASED)) {
-            return;
-        }
-
         uint64_t d = 0ULL;
         int cachedDurationNum = g_fsinfo[fd].numDuration; // avoid div by zero
         if (cachedDurationNum >= 1) {
@@ -988,6 +987,13 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             FIELDEND
         };
         event_t e = INT_EVENT("fs.duration", d, HISTOGRAM, fields);
+        doMetric(g_evt, g_cfg.proc.hostname, g_fsinfo[fd].uid, &e);
+
+        // Only report if enabled
+        if ((g_summary.fs.read_write) && (source == EVENT_BASED)) {
+            return;
+        }
+
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doFSMetric:FS_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
         }
@@ -1118,11 +1124,6 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
             atomicAddU64(global_counter, 1);
         }
 
-        // Only report if enabled
-        if ((source == EVENT_BASED) && *summarize) {
-            return;
-        }
-
         // Don't report zeros.
         if (*numops == 0ULL) return;
 
@@ -1138,6 +1139,13 @@ doFSMetric(enum metric_t type, int fd, enum control_type_t source,
         };
 
         event_t e = INT_EVENT(metric, *numops, DELTA, fields);
+        doMetric(g_evt, g_cfg.proc.hostname, g_fsinfo[fd].uid, &e);
+
+        // Only report if enabled
+        if ((source == EVENT_BASED) && *summarize) {
+            return;
+        }
+
         if (outSendEvent(g_out, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
@@ -1397,11 +1405,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             if (!g_netinfo[fd].startTime)   g_netinfo[fd].startTime = getTime();
         }
 
-        // Only report if enabled
-        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
-            return;
-        }
-
         event_field_t fields[] = {
             PROC_FIELD(g_cfg.proc.procname),
             PID_FIELD(g_cfg.proc.pid),
@@ -1413,6 +1416,13 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             FIELDEND
         };
         event_t e = INT_EVENT(metric, *value, CURRENT, fields);
+        doMetric(g_evt, g_cfg.proc.hostname, g_netinfo[fd].uid, &e);
+
+        // Only report if enabled
+        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
+            return;
+        }
+
         if (outSendEvent(g_out, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
@@ -1440,11 +1450,6 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             atomicAddU64(&g_ctrs.connDurationTotal, new_duration);
         }
 
-        // Only report if enabled
-        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
-            return;
-        }
-
         uint64_t d = 0ULL;
         int cachedDurationNum = g_netinfo[fd].numDuration; // avoid div by zero
         if (cachedDurationNum >= 1 ) {
@@ -1467,6 +1472,13 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             FIELDEND
         };
         event_t e = INT_EVENT("net.conn_duration", d, DELTA_MS, fields);
+        doMetric(g_evt, g_cfg.proc.hostname, g_netinfo[fd].uid, &e);
+
+        // Only report if enabled
+        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
+            return;
+        }
+
         if (outSendEvent(g_out, &e)) {
             scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
         }
@@ -2348,7 +2360,7 @@ reportProcessStart(void)
         FIELDEND
     };
     event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
-    sendEvent(g_out, &evt);
+    outSendEvent(g_out, &evt);
     if (urlEncodedCmd) free(urlEncodedCmd);
 
     // 3) Send an event at startup, provided metric events are enabled

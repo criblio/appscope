@@ -7,8 +7,6 @@
 #include "dbg.h"
 #include "evt.h"
 
-#define MAXEVENTS 10
-
 typedef struct {
     int valid;
     regex_t re;
@@ -277,7 +275,7 @@ rateLimitMessage(proc_id_t *proc)
 
     char string[128];
     event.data = string;
-    event.datasize = snprintf(string, sizeof(string), "Truncated metrics. Your rate exceeded %d metrics per second", MAXEVENTS);
+    event.datasize = snprintf(string, sizeof(string), "Truncated metrics. Your rate exceeded %d metrics per second", MAXEVENTSPERSEC);
     if (event.datasize == -1) return NULL;
 
     // TBD - format is required as an argument, but isn't even used.  this is stupid.
@@ -305,11 +303,11 @@ evtMetric(evt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
         return NULL;
     }
 
-    // rate limited to MAXEVENTS per second
+    // rate limited to MAXEVENTSPERSEC
     if (time(&now) != evt->ratelimit.time) {
         evt->ratelimit.time = now;
         evt->ratelimit.evtCount = evt->ratelimit.notified = 0;
-    } else if (++evt->ratelimit.evtCount >= MAXEVENTS) {
+    } else if (++evt->ratelimit.evtCount >= MAXEVENTSPERSEC) {
         // one notice per truncate
         if (evt->ratelimit.notified == 0) {
             cJSON* notice = rateLimitMessage(proc);

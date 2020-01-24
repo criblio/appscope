@@ -193,8 +193,6 @@ evtMetricWithAndWithoutMatchingValueFilter(void** state)
     evtDestroy(&evt);
 }
 
-#define MAXEVENTS 10
-
 static void
 evtMetricRateLimitReturnsNotice(void** state)
 {
@@ -215,7 +213,7 @@ evtMetricRateLimitReturnsNotice(void** state)
     time(&initial);
 
     int i;
-    for (i=0; i<=MAXEVENTS; i++) {
+    for (i=0; i<=MAXEVENTSPERSEC; i++) {
         json = evtMetric(evt, &e, 12345, &proc);
         assert_non_null(json);
 
@@ -232,7 +230,7 @@ evtMetricRateLimitReturnsNotice(void** state)
         //printf("i=%d %s\n", i, msg);
         raw = cJSON_GetObjectItem(json, "_raw");
 
-        if (i<MAXEVENTS) {
+        if (i<MAXEVENTSPERSEC) {
             // Verify that raw contains "Hey", and not "Truncated"
             assert_non_null(strstr(raw->valuestring, "Hey"));
             assert_null(strstr(raw->valuestring, "Truncated"));

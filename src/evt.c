@@ -7,8 +7,6 @@
 #include "dbg.h"
 #include "evt.h"
 
-#define MAXEVENTS 10
-
 typedef struct {
     int valid;
     regex_t re;
@@ -276,14 +274,13 @@ rateLimitMessage(proc_id_t *proc)
     event.uid = 0ULL;
 
     char string[128];
-    event.data = string;
-    event.datasize = snprintf(string, sizeof(string), "Truncated metrics. Your rate exceeded %d metrics per second", MAXEVENTS);
-    if (event.datasize == -1) return NULL;
+    if (snprintf(string, sizeof(string), "Truncated metrics. Your rate exceeded %d metrics per second", MAXEVENTSPERSEC) == -1) {
+        return NULL;
+    }
+    event.data = cJSON_CreateString(string);
+    event.sourcetype = CFG_SRC_METRIC;
 
-    // TBD - format is required as an argument, but isn't even used.  this is stupid.
-    format_t* fmt = fmtCreate(CFG_EVENT_ND_JSON);
-    cJSON* json = fmtEventJson(fmt, &event);
-    fmtDestroy(&fmt);
+    cJSON* json = fmtEventJson(&event);
     return json;
 }
 
@@ -305,11 +302,11 @@ evtMetric(evt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
         return NULL;
     }
 
-    // rate limited to MAXEVENTS per second
+    // rate limited to MAXEVENTSPERSEC
     if (time(&now) != evt->ratelimit.time) {
         evt->ratelimit.time = now;
         evt->ratelimit.evtCount = evt->ratelimit.notified = 0;
-    } else if (++evt->ratelimit.evtCount >= MAXEVENTS) {
+    } else if (++evt->ratelimit.evtCount >= MAXEVENTSPERSEC) {
         // one notice per truncate
         if (evt->ratelimit.notified == 0) {
             cJSON* notice = rateLimitMessage(proc);
@@ -328,19 +325,16 @@ evtMetric(evt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
 
     ftime(&tb);
     event.timestamp = tb.time + tb.millitm/1000;
-    event.src = "metric";
+    event.src = metric->name;
     event.proc = proc;
     event.uid = uid;
 
     // Format the metric string using the configured metric format type
-    event.data = fmtString(evt->format, metric, evtFieldFilter(evt, CFG_SRC_METRIC));
+    event.data = fmtMetricJson(metric, evtFieldFilter(evt, CFG_SRC_METRIC));
     if (!event.data) return NULL;
-    event.datasize = strlen(event.data);
+    event.sourcetype = CFG_SRC_METRIC;
 
-    cJSON * json = fmtEventJson(evt->format, &event);
-
-    free(event.data);
-    return json;
+    return fmtEventJson(&event);
 }
 
 cJSON *
@@ -371,17 +365,18 @@ evtLog(evt_t *evt, const char *path, const void *buf, size_t count,
     event.src = path;
     event.proc = proc;
     event.uid = uid;
-    event.data = (char *)buf;
-    event.datasize = count;
+    event.data = cJSON_CreateStringFromBuffer(buf, count);
+    if (!event.data) return NULL;
+    event.sourcetype = logType;
 
-    cJSON * json = fmtEventJson(evt->format, &event);
+    cJSON * json = fmtEventJson(&event);
     if (!json) return NULL;
 
 
-    cJSON* rawField = cJSON_GetObjectItem(json, "_raw");
-    if (rawField && rawField->valuestring) {
+    cJSON* dataField = cJSON_GetObjectItem(json, "data");
+    if (dataField && dataField->valuestring) {
         filter = evtValueFilter(evt, logType);
-        if (filter && regexec(filter, rawField->valuestring, 0, NULL, 0)) {
+        if (filter && regexec(filter, dataField->valuestring, 0, NULL, 0)) {
             // This event doesn't match.  Drop it on the floor.
             cJSON_Delete(json);
             return NULL;

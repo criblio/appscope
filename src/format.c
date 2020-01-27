@@ -13,10 +13,10 @@
 // key names for event JSON
 #define HOST "host"
 #define TIME "_time"
-#define DATA "_raw"
+#define DATA "data"
 #define SOURCE "source"
 #define CHANNEL "_channel"
-#define TYPE "ty"
+#define SOURCETYPE "sourcetype"
 #define EVENT "ev"
 #define ID "id"
 
@@ -192,26 +192,48 @@ addCustomFields(format_t* fmt, custom_tag_t** tags, char** end, int* bytes, int*
     }
 }
 
+
+typedef struct {
+    const char* str;
+    unsigned val;
+} enum_map_t;
+
+static enum_map_t watchTypeMap[] = {
+    {"file",                  CFG_SRC_FILE},
+    {"console",               CFG_SRC_CONSOLE},
+    {"syslog",                CFG_SRC_SYSLOG},
+    {"metric",                CFG_SRC_METRIC},
+    {NULL,                    -1}
+};
+
+static const char*
+valToStr(enum_map_t map[], unsigned val)
+{
+    enum_map_t* m;
+    for (m=map; m->str; m++) {
+        if (val == m->val) return m->str;
+    }
+    return NULL;
+}
+
 // Accessors
 cJSON *
-fmtEventJson(format_t *fmt, event_format_t *sev)
+fmtEventJson(event_format_t *sev)
 {
     char numbuf[32];
 
-    if (!fmt || !sev || !sev->proc) return NULL;
+    if (!sev || !sev->proc) return NULL;
 
     cJSON* json = cJSON_CreateObject();
     if (!json) goto err;
 
-    if (!cJSON_AddStringToObjLN(json, TYPE, EVENT)) goto err;
+    if (!cJSON_AddStringToObjLN(json, SOURCETYPE, valToStr(watchTypeMap, sev->sourcetype))) goto err;
 
     if (!cJSON_AddStringToObjLN(json, ID, sev->proc->id)) goto err;
 
     if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto err;
     if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto err;
-    cJSON* data = cJSON_CreateStringFromBuffer(sev->data, sev->datasize);
-    if (!data) goto err;
-    cJSON_AddItemToObjectCS(json, DATA, data);
+    cJSON_AddItemToObjectCS(json, DATA, sev->data);
     if (!cJSON_AddStringToObjLN(json, HOST, sev->proc->hostname)) goto err;
     if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto err;
     if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto err;
@@ -226,9 +248,9 @@ err:
 }
 
 static int
-addJsonFields(format_t* fmt, event_field_t* fields, regex_t* fieldFilter, cJSON* json)
+addJsonFields(event_field_t* fields, regex_t* fieldFilter, cJSON* json)
 {
-    if (!fmt || !fields) return TRUE;
+    if (!fields) return TRUE;
 
     event_field_t *fld;
 
@@ -269,47 +291,43 @@ metricTypeStr(data_type_t type)
     }
 }
 
-static char *
-fmtMetricJson(format_t *fmt, event_t *metric, regex_t* fieldFilter)
+cJSON *
+fmtMetricJson(event_t *metric, regex_t* fieldFilter)
 {
-    char* buf = NULL;
     const char* metric_type = NULL;
 
-    if (!fmt || !metric) return NULL;
+    if (!metric) return NULL;
 
     cJSON *json = cJSON_CreateObject();
-    if (!json) goto cleanup;
+    if (!json) goto err;
 
-    if (!cJSON_AddStringToObjLN(json, "_metric", metric->name)) goto cleanup;
+    if (!cJSON_AddStringToObjLN(json, "_metric", metric->name)) goto err;
     metric_type = metricTypeStr(metric->type);
-    if (!cJSON_AddStringToObjLN(json, "_metric_type", metric_type)) goto cleanup;
+    if (!cJSON_AddStringToObjLN(json, "_metric_type", metric_type)) goto err;
     switch ( metric->value.type ) {
         case FMT_INT:
-            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.integer)) goto cleanup;
+            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.integer)) goto err;
             break;
         case FMT_FLT:
-            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.floating)) goto cleanup;
+            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.floating)) goto err;
             break;
         default:
             DBG(NULL);
     }
 
     // Add fields
-    if (!addJsonFields(fmt, metric->fields, fieldFilter, json)) goto cleanup;
+    if (!addJsonFields(metric->fields, fieldFilter, json)) goto err;
+    return json;
 
-    buf = cJSON_PrintUnformatted(json);
-
-cleanup:
-    if (!buf) {
-        DBG("_metric=%s _metric_type=%s _value=%lld, fields=%p, json=%p",
-            metric->name, metric_type, metric->value, metric->fields, json);
-    }
+err:
+    DBG("_metric=%s _metric_type=%s _value=%lld, fields=%p, json=%p",
+        metric->name, metric_type, metric->value, metric->fields, json);
     if (json) cJSON_Delete(json);
 
-    return buf;
+    return NULL;
 }
 
-static char*
+char*
 fmtStatsDString(format_t* fmt, event_t* e, regex_t* fieldFilter)
 {
     if (!fmt || !e) return NULL;
@@ -370,23 +388,6 @@ fmtStatsDString(format_t* fmt, event_t* e, regex_t* fieldFilter)
     bytes += 1;
 
     return end_start;
-}
-
-char*
-fmtString(format_t* fmt, event_t* e, regex_t* fieldFilter)
-{
-    if (!fmt) return NULL;
-
-    switch (fmt->format) {
-        case CFG_METRIC_STATSD:
-            return fmtStatsDString(fmt, e, fieldFilter);
-        case CFG_METRIC_JSON:
-        case CFG_EVENT_ND_JSON:
-            return fmtMetricJson(fmt, e, fieldFilter);
-        default:
-            DBG("%d %s %p", fmt->format, e->name, fieldFilter);
-            return NULL;
-    }
 }
 
 const char*

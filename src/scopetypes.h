@@ -79,7 +79,15 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_METRIC 0
 #define DEFAULT_OUT_PORT "8125"
 #define DEFAULT_CTL_PORT "9109"
-#define DEFAULT_CBUF_SIZE 5000
+#define MAXEVENTSPERSEC 10000
+/*
+ * This calculation is not what we need in the long run.
+ * Not all events are rate limited; only metric events at this point.
+ * The correct size is empirical at the moment. This calculation
+ * results in a value large enough to support what we are aware
+ * of as requirements. SO, we'll extend this over time.
+ */
+#define DEFAULT_CBUF_SIZE (MAXEVENTSPERSEC * DEFAULT_SUMMARY_PERIOD)
 #define DEFAULT_CONFIG_SIZE 30 * 1024
 
 #endif // __SCOPETYPES_H__

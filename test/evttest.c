@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +25,50 @@ evtDestroyNullOutDoesntCrash(void** state)
     evt_t* evt = NULL;
     evtDestroy(&evt);
     // Implicitly shows that calling evtDestroy with NULL is harmless
+}
+
+static void
+evtMetricHappyPath(void** state)
+{
+    evt_t* evt = evtCreate();
+    assert_non_null(evt);
+
+    event_t e = INT_EVENT("A", 1, DELTA, NULL);
+    proc_id_t proc = {.pid = 4848,
+                      .ppid = 4847,
+                      .hostname = "host",
+                      .procname = "evttest",
+                      .cmd = "cmd-4",
+                      .id = "host-evttest-cmd-4"};
+
+    // when enabled, we should get a non-null json
+    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+    cJSON* json = evtMetric(evt, &e, 12345, &proc);
+    assert_non_null(json);
+
+    // grab the time value from json to use in our expected output.
+    // the specific value isn't of interest.
+    cJSON* time = cJSON_GetObjectItem(json, "_time");
+
+    char* expected = NULL;
+    asprintf(&expected, "{\"sourcetype\":\"metric\","
+                           "\"id\":\"host-evttest-cmd-4\","
+                           "\"_time\":%ld,"
+                           "\"source\":\"A\",\"data\":"
+                           "{\"_metric\":\"A\","
+                              "\"_metric_type\":\"counter\","
+                              "\"_value\":1"
+                           "},\"host\":\"host\","
+                           "\"_channel\":\"12345\"}", (long)time->valuedouble);
+    assert_non_null(expected);
+    char* actual = cJSON_PrintUnformatted(json);
+    assert_non_null(actual);
+    assert_string_equal(expected, actual);
+    cJSON_Delete(json);
+    free(actual);
+    free(expected);
+
+    evtDestroy(&evt);
 }
 
 static void
@@ -113,24 +158,25 @@ evtMetricWithAndWithoutMatchingFieldFilter(void** state)
                       .procname = "evttest",
                       .cmd = "cmd-4",
                       .id = "host-evttest-cmd-4"};
-    cJSON* json, *raw;
+    cJSON* json, *data;
 
     // Default field filter allows both fields
     json = evtMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
-    raw = cJSON_GetObjectItem(json, "_raw");
-    assert_non_null(raw);
-    assert_non_null(strstr(raw->valuestring, "proc"));
-    assert_non_null(strstr(raw->valuestring, "pid"));
+    data = cJSON_GetObjectItem(json, "data");
+    assert_non_null(data);
+    assert_non_null(cJSON_GetObjectItem(data, "proc"));
+    assert_non_null(cJSON_GetObjectItem(data, "pid"));
     cJSON_Delete(json);
 
     // Changing the field filter to ".*oc" should match proc but not pid
     evtFieldFilterSet(evt, CFG_SRC_METRIC, ".*oc");
     json = evtMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
-    raw = cJSON_GetObjectItem(json, "_raw");
-    assert_non_null(strstr(raw->valuestring, "proc"));
-    assert_null(strstr(raw->valuestring, "pid"));
+    data = cJSON_GetObjectItem(json, "data");
+    assert_non_null(data);
+    assert_non_null(cJSON_GetObjectItem(data, "proc"));
+    assert_null(cJSON_GetObjectItem(data, "pid"));
     cJSON_Delete(json);
 
     evtDestroy(&evt);
@@ -193,8 +239,6 @@ evtMetricWithAndWithoutMatchingValueFilter(void** state)
     evtDestroy(&evt);
 }
 
-#define MAXEVENTS 10
-
 static void
 evtMetricRateLimitReturnsNotice(void** state)
 {
@@ -209,13 +253,13 @@ evtMetricRateLimitReturnsNotice(void** state)
                       .procname = "evttest",
                       .cmd = "cmd-4",
                       .id = "host-evttest-cmd-4"};
-    cJSON* json, *raw;
+    cJSON* json, *data;
 
     time_t initial, current;
     time(&initial);
 
     int i;
-    for (i=0; i<=MAXEVENTS; i++) {
+    for (i=0; i<=MAXEVENTSPERSEC; i++) {
         json = evtMetric(evt, &e, 12345, &proc);
         assert_non_null(json);
 
@@ -230,16 +274,18 @@ evtMetricRateLimitReturnsNotice(void** state)
         }
 
         //printf("i=%d %s\n", i, msg);
-        raw = cJSON_GetObjectItem(json, "_raw");
+        data = cJSON_GetObjectItem(json, "data");
+        assert_non_null(data);
 
-        if (i<MAXEVENTS) {
-            // Verify that raw contains "Hey", and not "Truncated"
-            assert_non_null(strstr(raw->valuestring, "Hey"));
-            assert_null(strstr(raw->valuestring, "Truncated"));
+        if (i<MAXEVENTSPERSEC) {
+            // Verify that data contains _metric, and not "Truncated"
+            assert_true(cJSON_HasObjectItem(data, "_metric"));
+            assert_false(cJSON_IsString(data));
         } else {
-            // Verify that raw contains "Truncated", and not "Hey"
-            assert_null(strstr(raw->valuestring, "Hey"));
-            assert_non_null(strstr(raw->valuestring, "Truncated"));
+            // Verify that data contains "Truncated", and not _metric
+            assert_true(cJSON_IsString(data));
+            assert_non_null(strstr(data->valuestring, "Truncated"));
+            assert_false(cJSON_HasObjectItem(data, "_metric"));
         }
         cJSON_Delete(json);
     }
@@ -530,6 +576,7 @@ main(int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(evtCreateReturnsValidPtr),
         cmocka_unit_test(evtDestroyNullOutDoesntCrash),
+        cmocka_unit_test(evtMetricHappyPath),
         cmocka_unit_test(evtMetricWithSourceDisabledReturnsNull),
         cmocka_unit_test(evtMetricWithAndWithoutMatchingNameFilter),
         cmocka_unit_test(evtMetricWithAndWithoutMatchingFieldFilter),

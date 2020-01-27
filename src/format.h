@@ -51,8 +51,7 @@ typedef struct event_format {
     double timestamp;
     const char *src;
     proc_id_t* proc;
-    char *data;
-    size_t datasize;
+    cJSON *data;
     unsigned long long uid;
 } event_format_t;
 
@@ -68,10 +67,14 @@ unsigned            fmtStatsDMaxLen(format_t*);
 unsigned            fmtOutVerbosity(format_t*);
 custom_tag_t**      fmtCustomTags(format_t*);
 
-// fmtString returns a pointer to a malloc()'d buffer.
+// This function returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
-char*               fmtString(format_t*, event_t*, regex_t*);
-cJSON *             fmtEventJson(format_t *, event_format_t *);
+char*               fmtStatsDString(format_t*, event_t*, regex_t*);
+
+// These functions return a pointer to malloc()'d buffers.
+// The caller is reposibile for deallocating with cJSON_Delete().
+cJSON *             fmtMetricJson(event_t*, regex_t*);
+cJSON *             fmtEventJson(event_format_t *);
 
 // Setters
 void                fmtStatsDPrefixSet(format_t*, const char*);

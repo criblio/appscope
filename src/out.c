@@ -46,7 +46,7 @@ outSendEvent(out_t* out, event_t* e)
 {
     if (!out || !e) return -1;
 
-    char* msg = fmtString(out->format, e, NULL);
+    char* msg = fmtStatsDString(out->format, e, NULL);
     int rv = outSend(out, msg);
     if (msg) free(msg);
     return rv;

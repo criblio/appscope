@@ -113,24 +113,25 @@ evtMetricWithAndWithoutMatchingFieldFilter(void** state)
                       .procname = "evttest",
                       .cmd = "cmd-4",
                       .id = "host-evttest-cmd-4"};
-    cJSON* json, *raw;
+    cJSON* json, *data;
 
     // Default field filter allows both fields
     json = evtMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
-    raw = cJSON_GetObjectItem(json, "_raw");
-    assert_non_null(raw);
-    assert_non_null(strstr(raw->valuestring, "proc"));
-    assert_non_null(strstr(raw->valuestring, "pid"));
+    data = cJSON_GetObjectItem(json, "data");
+    assert_non_null(data);
+    assert_non_null(cJSON_GetObjectItem(data, "proc"));
+    assert_non_null(cJSON_GetObjectItem(data, "pid"));
     cJSON_Delete(json);
 
     // Changing the field filter to ".*oc" should match proc but not pid
     evtFieldFilterSet(evt, CFG_SRC_METRIC, ".*oc");
     json = evtMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
-    raw = cJSON_GetObjectItem(json, "_raw");
-    assert_non_null(strstr(raw->valuestring, "proc"));
-    assert_null(strstr(raw->valuestring, "pid"));
+    data = cJSON_GetObjectItem(json, "data");
+    assert_non_null(data);
+    assert_non_null(cJSON_GetObjectItem(data, "proc"));
+    assert_null(cJSON_GetObjectItem(data, "pid"));
     cJSON_Delete(json);
 
     evtDestroy(&evt);
@@ -207,7 +208,7 @@ evtMetricRateLimitReturnsNotice(void** state)
                       .procname = "evttest",
                       .cmd = "cmd-4",
                       .id = "host-evttest-cmd-4"};
-    cJSON* json, *raw;
+    cJSON* json, *data;
 
     time_t initial, current;
     time(&initial);
@@ -228,16 +229,18 @@ evtMetricRateLimitReturnsNotice(void** state)
         }
 
         //printf("i=%d %s\n", i, msg);
-        raw = cJSON_GetObjectItem(json, "_raw");
+        data = cJSON_GetObjectItem(json, "data");
+        assert_non_null(data);
 
         if (i<MAXEVENTSPERSEC) {
-            // Verify that raw contains "Hey", and not "Truncated"
-            assert_non_null(strstr(raw->valuestring, "Hey"));
-            assert_null(strstr(raw->valuestring, "Truncated"));
+            // Verify that data contains _metric, and not "Truncated"
+            assert_true(cJSON_HasObjectItem(data, "_metric"));
+            assert_false(cJSON_IsString(data));
         } else {
-            // Verify that raw contains "Truncated", and not "Hey"
-            assert_null(strstr(raw->valuestring, "Hey"));
-            assert_non_null(strstr(raw->valuestring, "Truncated"));
+            // Verify that data contains "Truncated", and not _metric
+            assert_true(cJSON_IsString(data));
+            assert_non_null(strstr(data->valuestring, "Truncated"));
+            assert_false(cJSON_HasObjectItem(data, "_metric"));
         }
         cJSON_Delete(json);
     }

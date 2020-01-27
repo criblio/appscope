@@ -16,7 +16,7 @@
 #define DATA "data"
 #define SOURCE "source"
 #define CHANNEL "_channel"
-#define TYPE "ty"
+#define SOURCETYPE "sourcetype"
 #define EVENT "ev"
 #define ID "id"
 
@@ -192,6 +192,30 @@ addCustomFields(format_t* fmt, custom_tag_t** tags, char** end, int* bytes, int*
     }
 }
 
+
+typedef struct {
+    const char* str;
+    unsigned val;
+} enum_map_t;
+
+static enum_map_t watchTypeMap[] = {
+    {"file",                  CFG_SRC_FILE},
+    {"console",               CFG_SRC_CONSOLE},
+    {"syslog",                CFG_SRC_SYSLOG},
+    {"metric",                CFG_SRC_METRIC},
+    {NULL,                    -1}
+};
+
+static const char*
+valToStr(enum_map_t map[], unsigned val)
+{
+    enum_map_t* m;
+    for (m=map; m->str; m++) {
+        if (val == m->val) return m->str;
+    }
+    return NULL;
+}
+
 // Accessors
 cJSON *
 fmtEventJson(event_format_t *sev)
@@ -203,7 +227,7 @@ fmtEventJson(event_format_t *sev)
     cJSON* json = cJSON_CreateObject();
     if (!json) goto err;
 
-    if (!cJSON_AddStringToObjLN(json, TYPE, EVENT)) goto err;
+    if (!cJSON_AddStringToObjLN(json, SOURCETYPE, valToStr(watchTypeMap, sev->sourcetype))) goto err;
 
     if (!cJSON_AddStringToObjLN(json, ID, sev->proc->id)) goto err;
 

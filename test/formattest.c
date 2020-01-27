@@ -480,6 +480,7 @@ fmtEventJsonValue(void** state)
     event_format.proc = &proc;
     event_format.uid = 0xCAFEBABEDEADBEEF;
     event_format.data = cJSON_CreateString("поспехаў");
+    event_format.sourcetype = CFG_SRC_SYSLOG;
 
     assert_null(fmtEventJson(NULL));
 
@@ -489,7 +490,7 @@ fmtEventJsonValue(void** state)
     assert_non_null(str);
 
     //printf("%s:%d %s\n", __FUNCTION__, __LINE__, str);
-    assert_string_equal(str, "{\"ty\":\"ev\","
+    assert_string_equal(str, "{\"sourcetype\":\"syslog\","
                               "\"id\":\"earl-formattest-cmd\","
                               "\"_time\":1573058085.991,"
                               "\"source\":\"stdin\","
@@ -519,13 +520,14 @@ fmtEventJsonWithEmbeddedNulls(void** state)
     buf[9] = '\0';                  //  <-- Null in middle of buf
     buf[29] = '\0';                 //  <-- Null in middle of buf
     event_format.data = cJSON_CreateStringFromBuffer(buf, datasize);
+    event_format.sourcetype = CFG_SRC_CONSOLE;
     
     // test that data has the nulls properly escaped
     cJSON* json = fmtEventJson(&event_format);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
-    assert_string_equal(str, "{\"ty\":\"ev\","
+    assert_string_equal(str, "{\"sourcetype\":\"console\","
                               "\"id\":\"earl--\","
                               "\"_time\":1573058085.001,"
                               "\"source\":\"stdout\","
@@ -541,7 +543,7 @@ fmtEventJsonWithEmbeddedNulls(void** state)
     assert_non_null(json);
     str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
-    assert_string_equal(str, "{\"ty\":\"ev\","
+    assert_string_equal(str, "{\"sourcetype\":\"console\","
                               "\"id\":\"earl--\","
                               "\"_time\":1573058085.001,"
                               "\"source\":\"stdout\","

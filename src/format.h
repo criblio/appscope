@@ -51,8 +51,9 @@ typedef struct event_format {
     double timestamp;
     const char *src;
     proc_id_t* proc;
-    cJSON *data;
     unsigned long long uid;
+    cJSON *data;
+    cfg_evt_t sourcetype;
 } event_format_t;
 
 typedef struct _format_t format_t;

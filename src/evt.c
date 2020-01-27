@@ -278,6 +278,7 @@ rateLimitMessage(proc_id_t *proc)
         return NULL;
     }
     event.data = cJSON_CreateString(string);
+    event.sourcetype = CFG_SRC_METRIC;
 
     cJSON* json = fmtEventJson(&event);
     return json;
@@ -324,17 +325,16 @@ evtMetric(evt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
 
     ftime(&tb);
     event.timestamp = tb.time + tb.millitm/1000;
-    event.src = "metric";
+    event.src = metric->name;
     event.proc = proc;
     event.uid = uid;
 
     // Format the metric string using the configured metric format type
     event.data = fmtMetricJson(metric, evtFieldFilter(evt, CFG_SRC_METRIC));
     if (!event.data) return NULL;
+    event.sourcetype = CFG_SRC_METRIC;
 
-    cJSON * json = fmtEventJson(&event);
-
-    return json;
+    return fmtEventJson(&event);
 }
 
 cJSON *
@@ -367,6 +367,7 @@ evtLog(evt_t *evt, const char *path, const void *buf, size_t count,
     event.uid = uid;
     event.data = cJSON_CreateStringFromBuffer(buf, count);
     if (!event.data) return NULL;
+    event.sourcetype = logType;
 
     cJSON * json = fmtEventJson(&event);
     if (!json) return NULL;

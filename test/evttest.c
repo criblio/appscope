@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +25,50 @@ evtDestroyNullOutDoesntCrash(void** state)
     evt_t* evt = NULL;
     evtDestroy(&evt);
     // Implicitly shows that calling evtDestroy with NULL is harmless
+}
+
+static void
+evtMetricHappyPath(void** state)
+{
+    evt_t* evt = evtCreate();
+    assert_non_null(evt);
+
+    event_t e = INT_EVENT("A", 1, DELTA, NULL);
+    proc_id_t proc = {.pid = 4848,
+                      .ppid = 4847,
+                      .hostname = "host",
+                      .procname = "evttest",
+                      .cmd = "cmd-4",
+                      .id = "host-evttest-cmd-4"};
+
+    // when enabled, we should get a non-null json
+    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+    cJSON* json = evtMetric(evt, &e, 12345, &proc);
+    assert_non_null(json);
+
+    // grab the time value from json to use in our expected output.
+    // the specific value isn't of interest.
+    cJSON* time = cJSON_GetObjectItem(json, "_time");
+
+    char* expected = NULL;
+    asprintf(&expected, "{\"sourcetype\":\"metric\","
+                           "\"id\":\"host-evttest-cmd-4\","
+                           "\"_time\":%ld,"
+                           "\"source\":\"A\",\"data\":"
+                           "{\"_metric\":\"A\","
+                              "\"_metric_type\":\"counter\","
+                              "\"_value\":1"
+                           "},\"host\":\"host\","
+                           "\"_channel\":\"12345\"}", (long)time->valuedouble);
+    assert_non_null(expected);
+    char* actual = cJSON_PrintUnformatted(json);
+    assert_non_null(actual);
+    assert_string_equal(expected, actual);
+    cJSON_Delete(json);
+    free(actual);
+    free(expected);
+
+    evtDestroy(&evt);
 }
 
 static void
@@ -531,6 +576,7 @@ main(int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(evtCreateReturnsValidPtr),
         cmocka_unit_test(evtDestroyNullOutDoesntCrash),
+        cmocka_unit_test(evtMetricHappyPath),
         cmocka_unit_test(evtMetricWithSourceDisabledReturnsNull),
         cmocka_unit_test(evtMetricWithAndWithoutMatchingNameFilter),
         cmocka_unit_test(evtMetricWithAndWithoutMatchingFieldFilter),

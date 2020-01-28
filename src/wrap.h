@@ -194,6 +194,7 @@ typedef struct rtconfig_t {
     uint64_t freq;
     const char *cmddir;
     proc_id_t proc;
+    unsigned short blockconn;
 } rtconfig;
 
 typedef struct thread_timing_t {

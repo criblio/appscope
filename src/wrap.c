@@ -4501,6 +4501,12 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
 
     WRAP_CHECK(accept4, -1);
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
+    if ((sd != -1) && (doBlockConnection(sockfd, addr) == 1)) {
+        if (g_fn.close) g_fn.close(sd); 
+        errno = ECONNABORTED;
+        return -1;
+    }
+
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept4");
     } else {

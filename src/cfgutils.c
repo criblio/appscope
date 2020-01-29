@@ -797,16 +797,14 @@ processLogging(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 static void
 processTags(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SEQUENCE_NODE) return;
+    if (node->type != YAML_MAPPING_NODE) return;
 
-    yaml_node_item_t* item;
-    foreach(item, node->data.sequence.items) {
-        yaml_node_t* i = yaml_document_get_node(doc, *item);
-        if (i->type != YAML_MAPPING_NODE) continue;
-
-        yaml_node_pair_t* pair = i->data.mapping.pairs.start;
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
         yaml_node_t* key = yaml_document_get_node(doc, pair->key);
         yaml_node_t* value = yaml_document_get_node(doc, pair->value);
+        if (key->type != YAML_SCALAR_NODE) continue;
+        if (value->type != YAML_SCALAR_NODE) continue;
 
         char* key_str = stringVal(key);
         char* value_str = stringVal(value);
@@ -867,7 +865,7 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    STATSDPREFIX_NODE,    processStatsDPrefix},
         {YAML_SCALAR_NODE,    STATSDMAXLEN_NODE,    processStatsDMaxLen},
         {YAML_SCALAR_NODE,    VERBOSITY_NODE,       processVerbosity},
-        {YAML_SEQUENCE_NODE,  TAGS_NODE,            processTags},
+        {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1227,19 +1225,14 @@ static cJSON*
 createTagsJson(config_t* cfg)
 {
     cJSON* root = NULL;
-    if (!(root = cJSON_CreateArray())) goto err;
+    if (!(root = cJSON_CreateObject())) goto err;
 
     custom_tag_t **tags = cfgCustomTags(cfg);
     int i;
     if (tags) {
         for (i=0; tags[i]; i++) {
-            cJSON* item;
-            if (!(item = cJSON_CreateObject())) continue;
-            if (!(cJSON_AddStringToObject(item, tags[i]->name, tags[i]->value))) {
-                DBG(NULL);
-                cJSON_Delete(item);
-            } else {
-                cJSON_AddItemToArray(root, item);
+            if (!(cJSON_AddStringToObject(root, tags[i]->name, tags[i]->value))) {
+                DBG("name:%s value:%s", tags[i]->name, tags[i]->value);
             }
         }
     }

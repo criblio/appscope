@@ -35,8 +35,8 @@ metric:
           #      9  turns off filesystem read/write summarization
           #      9  turns off network send/receive summarization
     tags:
-    #- user: $USER
-    #- feeling: elation
+      #user: $USER
+      #feeling: elation
   transport:                        # defines how scope output is sent
     type: udp                       # udp, tcp, unix, file, syslog
     host: 127.0.0.1

@@ -71,9 +71,9 @@ cmdSendInfoMsg(ctl_t *ctl, cJSON *json)
 }
 
 int
-cmdSendResponse(ctl_t *ctl, request_t *req)
+cmdSendResponse(ctl_t *ctl, request_t *req, cJSON *body)
 {
-    return postMsg(ctl, NULL, UPLD_RESP, req, TRUE);
+    return postMsg(ctl, body, UPLD_RESP, req, TRUE);
 }
 
 request_t *
@@ -109,7 +109,7 @@ err:
     return NULL;
 }
 
-static cJSON*
+cJSON*
 jsonConfigurationObject(config_t* cfg)
 {
     cJSON* root = NULL;

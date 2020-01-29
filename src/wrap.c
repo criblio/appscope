@@ -260,7 +260,7 @@ remoteConfig()
         if (!cmd) {
             g_fn.fclose(fs);
             unlink(path);
-            cmdSendInfoStr(g_ctl, "Error in receive from stream. Resend pending request.");
+            cmdSendInfoStr(g_ctl, "Error in receive from stream.  Memory error in scope receive.");
             return;
         }
         
@@ -268,30 +268,53 @@ remoteConfig()
             g_fn.fclose(fs);
             unlink(path);
             free(cmd);
-            cmdSendInfoStr(g_ctl, "Error in receive from stream. Resend pending request.");
+            cmdSendInfoStr(g_ctl, "Error in receive from stream.  Read error in scope.");
             return;
         }
         
         req = cmdParse((const char*)cmd);
         if (req) {
-            if ((req->cmd == REQ_SET_CFG) && (req->cfg)) {
-                // Apply the config
-                doConfig(req->cfg);
-                g_staticfg = req->cfg;
-            } else {
-                // error or cmd not yet implemented; error msg applied by ctl
-                // place holder
+            cJSON* body = NULL;
+            switch (req->cmd) {
+                case REQ_PARSE_ERR:
+                case REQ_MALFORMED:
+                case REQ_UNKNOWN:
+                case REQ_PARAM_ERR:
+                    // Nothing to do here.  Req is not well-formed.
+                    break;
+                case REQ_SET_CFG:
+                    if (req->cfg) {
+                        // Apply the config
+                        doConfig(req->cfg);
+                        g_staticfg = req->cfg;
+                    } else {
+                        DBG(NULL);
+                    }
+                    break;
+                case REQ_GET_CFG:
+                    // construct a response representing our current config
+                    body = jsonConfigurationObject(g_staticfg);
+                    break;
+                case REQ_GET_DIAG:
+                    // Not implemented yet.
+                    break;
+                case REQ_BLOCK_PORT:
+                    // Assign new value for port blocking
+                    g_cfg.blockconn = req->port;
+                    break;
+                default:
+                    DBG(NULL);
             }
             
-            cmdSendResponse(g_ctl, req);
+            cmdSendResponse(g_ctl, req, body);
             destroyReq(&req);
         } else {
-            cmdSendInfoStr(g_ctl, "Error in receive from stream. Resend pending request.");
+            cmdSendInfoStr(g_ctl, "Error in receive from stream.  Memory error in scope parsing.");
         }
 
         free(cmd);
     } else {
-        cmdSendInfoStr(g_ctl, "Error in receive from stream. Resend pending request.");
+        cmdSendInfoStr(g_ctl, "Error in receive from stream.  Scope receive retries exhausted.");
     }
 
     g_fn.fclose(fs);
@@ -546,7 +569,7 @@ getProtocol(int type, char *proto, size_t len)
 }
 
 static int
-doBlockConnection(int fd, const struct sockaddr *addr, socklen_t addrlen)
+doBlockConnection(int fd, const struct sockaddr *addr)
 {
     in_port_t port;
 
@@ -2418,8 +2441,11 @@ periodic(void *arg)
         //if (g_prevlog) logDestroy(&g_prevlog);
         //if (g_prevevt) evtDestroy(&g_prevevt);
 
-        if (ctlNeedsConnection(g_ctl)) {
-            ctlConnect(g_ctl);
+        if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl)) {
+            // Hey we have a new connection!  Identify ourselves
+            // like reportProcessStart, but only on the event interface...
+            cJSON *json = msgStart(&g_cfg.proc, g_staticfg);
+            cmdSendInfoMsg(g_ctl, json);
         }
 
         remoteConfig();
@@ -4452,6 +4478,13 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
     WRAP_CHECK(accept, -1);
     sd = g_fn.accept(sockfd, addr, addrlen);
+
+    if ((sd != -1) && (doBlockConnection(sockfd, addr) == 1)) {
+        if (g_fn.close) g_fn.close(sd); 
+        errno = ECONNABORTED;
+        return -1;
+    }
+
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept");
     } else {
@@ -4468,6 +4501,12 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
 
     WRAP_CHECK(accept4, -1);
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
+    if ((sd != -1) && (doBlockConnection(sockfd, addr) == 1)) {
+        if (g_fn.close) g_fn.close(sd); 
+        errno = ECONNABORTED;
+        return -1;
+    }
+
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept4");
     } else {
@@ -4483,11 +4522,6 @@ bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     int rc;
 
     WRAP_CHECK(bind, -1);
-    if (doBlockConnection(sockfd, addr, addrlen) == 1) {
-        errno = EBADF;
-        return -1;
-    }
-
     rc = g_fn.bind(sockfd, addr, addrlen);
     if (rc != -1) { 
         doSetConnection(sockfd, addr, addrlen, LOCAL);
@@ -4505,7 +4539,7 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int rc;
     WRAP_CHECK(connect, -1);
-    if (doBlockConnection(sockfd, addr, addrlen) == 1) {
+    if (doBlockConnection(sockfd, addr) == 1) {
         errno = ECONNREFUSED;
         return -1;
     }

@@ -569,7 +569,7 @@ getProtocol(int type, char *proto, size_t len)
 }
 
 static int
-doBlockConnection(int fd, const struct sockaddr *addr, socklen_t addrlen)
+doBlockConnection(int fd, const struct sockaddr *addr)
 {
     in_port_t port;
 
@@ -4478,6 +4478,13 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
     WRAP_CHECK(accept, -1);
     sd = g_fn.accept(sockfd, addr, addrlen);
+
+    if ((sd != -1) && (doBlockConnection(sockfd, addr) == 1)) {
+        if (g_fn.close) g_fn.close(sd); 
+        errno = ECONNABORTED;
+        return -1;
+    }
+
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept");
     } else {
@@ -4509,11 +4516,6 @@ bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     int rc;
 
     WRAP_CHECK(bind, -1);
-    if (doBlockConnection(sockfd, addr, addrlen) == 1) {
-        errno = EBADF;
-        return -1;
-    }
-
     rc = g_fn.bind(sockfd, addr, addrlen);
     if (rc != -1) { 
         doSetConnection(sockfd, addr, addrlen, LOCAL);
@@ -4531,7 +4533,7 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int rc;
     WRAP_CHECK(connect, -1);
-    if (doBlockConnection(sockfd, addr, addrlen) == 1) {
+    if (doBlockConnection(sockfd, addr) == 1) {
         errno = ECONNREFUSED;
         return -1;
     }

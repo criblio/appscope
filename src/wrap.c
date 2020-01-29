@@ -30,6 +30,7 @@ __thread int g_getdelim = 0;
 
 //temporary
 int g_urls = 0;
+#define OVERURL "GET / HTTP/1.1\r\nHost: localhost\r\nUser-Agent: curl/7.64.0\r\nAccept: */*\r\n\r\n"
 
 // Forward declaration
 static void *periodic(void *);
@@ -549,6 +550,7 @@ doBlockConnection(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
     in_port_t port;
 
+    if (g_cfg.blockconn == DEFAULT_PORTBLOCK) return 0;
     if (!addr) return 0;
 
     if (addr->sa_family == AF_INET) {
@@ -1953,11 +1955,17 @@ getDNSName(int sd, void *pkt, int pktlen)
 
 /*
   {"type":"evt","body":{"ty":"ev","id":"ubuntu-curl-/usr/bin/curl wttr.in/Des Moines","_time":1580231505,"source":"http-req","_raw":"GET /Des Moines HTTP/1.1\r\nHost: wttr.in\r\nUser-Agent: curl/7.64.0\r\nAccept: *//*\r\n\r\n","host":"ubuntu","_channel":"27832173930478"}}
+
+HEAD / HTTP/1.1\r\nHost: cribl.io\r\nUser-Agent: curl/7.64.0\r\nAccept: \*\\*\r\n\r\n
+
+GET /Des Moines HTTP/1.1\r\nHost: wttr.in\r\nUser-Agent: curl/7.64.0\r\nAccept: 
+
+https://www.fluentd.org/
  */
 static int
 doURL(int sockfd, const void *buf, size_t len)
 {
-    char *headend, *header, *modheader, *modend;
+    char *headend, *header; //, *modheader, *modend;
 
     if (g_urls == 0) return 0;
 
@@ -1973,8 +1981,20 @@ doURL(int sockfd, const void *buf, size_t len)
     if (port == 80) {
         if ((headend = strstr(buf, "\r\n\r\n")) != NULL) {
             size_t headsize = (headend - (char *)buf) + 4;
-            if ((header = calloc(1, headsize + 1)) != NULL) {
+            //if ((header = calloc(1, headsize + 1)) != NULL) {
+            if ((header = calloc(1, len)) != NULL) {
                 strncpy(header, buf, headsize);
+                //if (strstr(header, "fluentd") != NULL) {
+                if (1) {
+                    scopeLog(header, sockfd, CFG_LOG_DEBUG);
+                    g_fn.write(2, header, strlen(header));
+                    //strncpy(header, OVERURL,  headsize);
+                    //strncpy(header, OVERURL,  strlen(OVERURL));
+                    scopeLog(header, sockfd, CFG_LOG_DEBUG);
+                    g_fn.write(2, header, strlen(header));
+                    bcopy(header, (char *)buf, strlen(header));
+                }
+#if 0                
                 if ((modend = strstr(header, "Host:")) != NULL) {
                     if ((modheader = calloc(1, headsize + 1)) != NULL) {
                         size_t modsize = (modend - header) + strlen("Host:");
@@ -1986,8 +2006,9 @@ doURL(int sockfd, const void *buf, size_t len)
                     }
                 }
                 scopeLog(modheader, sockfd, CFG_LOG_DEBUG);
-                free(header);
                 free(modheader);
+#endif
+                free(header);
             }
         }
     }
@@ -2623,7 +2644,7 @@ init(void)
     }
 
     //temporary
-    g_cfg.blockconn = 8000;
+    g_cfg.blockconn = DEFAULT_PORTBLOCK;
 }
 
 static void

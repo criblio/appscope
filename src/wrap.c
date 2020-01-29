@@ -292,11 +292,15 @@ remoteConfig()
                     }
                     break;
                 case REQ_GET_CFG:
-                    // construct a response representing our current operational config
+                    // construct a response representing our current config
                     body = jsonConfigurationObject(g_staticfg);
                     break;
                 case REQ_GET_DIAG:
                     // Not implemented yet.
+                    break;
+                case REQ_BLOCK_PORT:
+                    // Assign new value for port blocking
+                    g_cfg.blockconn = req->port;
                     break;
                 default:
                     DBG(NULL);

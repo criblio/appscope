@@ -18,6 +18,7 @@ typedef enum {
     REQ_SET_CFG,
     REQ_GET_CFG,
     REQ_GET_DIAG,
+    REQ_BLOCK_PORT,
 } cmd_t;
 
 typedef struct {
@@ -26,6 +27,7 @@ typedef struct {
     long long id;              // unique request id
 
     config_t* cfg;             // only used for REQ_SET_CFG
+    unsigned short port;       // only used for REQ_BLOCK_PORT
 
     // other params/structure as we define it,
     // presumably these will be received in body field

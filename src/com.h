@@ -24,13 +24,16 @@ int cmdPostInfoMsg(ctl_t *, cJSON *);
 int cmdSendEvtMsg(ctl_t *, cJSON *);
 int cmdSendInfoStr(ctl_t *, const char *);
 int cmdSendInfoMsg(ctl_t *, cJSON *);
-int cmdSendResponse(ctl_t *, request_t *);
+int cmdSendResponse(ctl_t *, request_t *, cJSON *);
 
 // Process a command received from stream over the command channel
 request_t *cmdParse(const char *);
 
 // Create a json object for process start
 cJSON *msgStart(proc_id_t *, config_t *);
+
+// Create a json object describing the current configuration
+cJSON *jsonConfigurationObject(config_t *);
 
 // Create a json object for an event metric
 cJSON *msgEvtMetric(evt_t *, event_t *, uint64_t, proc_id_t *);

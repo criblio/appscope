@@ -301,6 +301,68 @@ ctlParseRxMsgGetDiags(void** state)
     destroyReq(&req);
 }
 
+
+typedef struct {
+    const char*    req;
+    unsigned short port;
+} test_port_t;
+
+static void
+ctlParseRxMsgBlockPort(void** state)
+{
+    test_port_t test[] = {
+        // if body isn't present, clear the port
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 0}",
+          .port = 0},
+        // body with one json number in range should set the port
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 1,\"body\":0}",
+          .port = 0},
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 2,\"body\":54321}",
+          .port = 54321},
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 3,\"body\":65535}",
+          .port = 65535},
+        // body of other json types should clear the port
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 4,\"body\":{\"huh\":\"what\"}}",
+          .port = 0},
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 5,\"body\":[ 1, 2, 3 ]}",
+          .port = 0},
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 6,\"body\":\"hey\"}",
+          .port = 0},
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 7,\"body\":true}",
+          .port = 0},
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 8,\"body\":false}",
+          .port = 0},
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 9,\"body\":null}",
+          .port = 0},
+        // body with out of range json numbers should clear the port
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\":10,\"body\":65536}",
+          .port = 0},
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\":11,\"body\":-1}",
+          .port = 0},
+        // fractional numbers are weird, but will work... (set the port)
+        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\":12,\"body\":1.667}",
+          .port = 1},
+    };
+
+    int i;
+    for (i=0; i<sizeof(test)/sizeof(test[0]); i++) {
+        test_port_t* test_case = &test[i];
+
+        request_t* req = ctlParseRxMsg(test_case->req);
+        assert_non_null(req);
+
+        //printf("%s\n", test_case->req);
+
+        assert_int_equal(req->cmd, REQ_BLOCK_PORT);
+        assert_string_equal(req->cmd_str, "BlockPort");
+        assert_int_equal(req->id, i);
+        assert_null(req->cfg);
+        assert_int_equal(req->port, test_case->port);
+
+        destroyReq(&req);
+    }
+}
+
 static void
 ctlCreateTxMsgReturnsNullForNullUpload(void** state)
 {
@@ -548,6 +610,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(ctlParseRxMsgSetCfg),
         cmocka_unit_test(ctlParseRxMsgGetCfg),
         cmocka_unit_test(ctlParseRxMsgGetDiags),
+        cmocka_unit_test(ctlParseRxMsgBlockPort),
         cmocka_unit_test(ctlCreateTxMsgReturnsNullForNullUpload),
         cmocka_unit_test(ctlCreateTxMsgInfo),
         cmocka_unit_test(ctlCreateTxMsgResp),

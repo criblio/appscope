@@ -2418,8 +2418,11 @@ periodic(void *arg)
         //if (g_prevlog) logDestroy(&g_prevlog);
         //if (g_prevevt) evtDestroy(&g_prevevt);
 
-        if (ctlNeedsConnection(g_ctl)) {
-            ctlConnect(g_ctl);
+        if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl)) {
+            // Hey we have a new connection!  Identify ourselves
+            // like reportProcessStart, but only on the event interface...
+            cJSON *json = msgStart(&g_cfg.proc, g_staticfg);
+            cmdSendInfoMsg(g_ctl, json);
         }
 
         remoteConfig();

@@ -260,7 +260,7 @@ remoteConfig()
         if (!cmd) {
             g_fn.fclose(fs);
             unlink(path);
-            cmdSendInfoStr(g_ctl, "Error in receive from stream. Resend pending request.");
+            cmdSendInfoStr(g_ctl, "Error in receive from stream.  Memory error in scope receive.");
             return;
         }
         
@@ -268,7 +268,7 @@ remoteConfig()
             g_fn.fclose(fs);
             unlink(path);
             free(cmd);
-            cmdSendInfoStr(g_ctl, "Error in receive from stream. Resend pending request.");
+            cmdSendInfoStr(g_ctl, "Error in receive from stream.  Read error in scope.");
             return;
         }
         
@@ -286,12 +286,12 @@ remoteConfig()
             cmdSendResponse(g_ctl, req);
             destroyReq(&req);
         } else {
-            cmdSendInfoStr(g_ctl, "Error in receive from stream. Resend pending request.");
+            cmdSendInfoStr(g_ctl, "Error in receive from stream.  Memory error in scope parsing.");
         }
 
         free(cmd);
     } else {
-        cmdSendInfoStr(g_ctl, "Error in receive from stream. Resend pending request.");
+        cmdSendInfoStr(g_ctl, "Error in receive from stream.  Scope receive retries exhausted.");
     }
 
     g_fn.fclose(fs);

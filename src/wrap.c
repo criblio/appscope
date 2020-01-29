@@ -274,16 +274,35 @@ remoteConfig()
         
         req = cmdParse((const char*)cmd);
         if (req) {
-            if ((req->cmd == REQ_SET_CFG) && (req->cfg)) {
-                // Apply the config
-                doConfig(req->cfg);
-                g_staticfg = req->cfg;
-            } else {
-                // error or cmd not yet implemented; error msg applied by ctl
-                // place holder
+            cJSON* body = NULL;
+            switch (req->cmd) {
+                case REQ_PARSE_ERR:
+                case REQ_MALFORMED:
+                case REQ_UNKNOWN:
+                case REQ_PARAM_ERR:
+                    // Nothing to do here.  Req is not well-formed.
+                    break;
+                case REQ_SET_CFG:
+                    if (req->cfg) {
+                        // Apply the config
+                        doConfig(req->cfg);
+                        g_staticfg = req->cfg;
+                    } else {
+                        DBG(NULL);
+                    }
+                    break;
+                case REQ_GET_CFG:
+                    // construct a response representing our current operational config
+                    body = jsonConfigurationObject(g_staticfg);
+                    break;
+                case REQ_GET_DIAG:
+                    // Not implemented yet.
+                    break;
+                default:
+                    DBG(NULL);
             }
             
-            cmdSendResponse(g_ctl, req);
+            cmdSendResponse(g_ctl, req, body);
             destroyReq(&req);
         } else {
             cmdSendInfoStr(g_ctl, "Error in receive from stream.  Memory error in scope parsing.");

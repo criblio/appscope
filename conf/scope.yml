@@ -74,6 +74,8 @@ libscope:
     type: tcp                       # udp, tcp, unix, file, syslog
     host: 127.0.0.1
     port: 9109
+  summaryperiod : 10                # in seconds
+  commanddir : '/tmp'
   #  commanddir supports changes to configuration settings of running
   #  processees.  At every summary period the library looks in commanddir
   #  to see if a file named scope.<pid> exists.  (where pid is the process ID

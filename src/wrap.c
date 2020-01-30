@@ -1992,13 +1992,13 @@ doURL(int sockfd, const void *buf, size_t len, enum metric_t src)
     }
 
     if ((src == NETTX) && (strstr(buf, REDIRECTURL) != NULL)) {
-        g_netinfo[sockfd].addrType = -2;
+        g_netinfo[sockfd].urlRedirect = TRUE;
         return 0;
     }
 
-    if ((src == NETRX) && (g_netinfo[sockfd].addrType == -2) &&
+    if ((src == NETRX) && (g_netinfo[sockfd].urlRedirect == TRUE) &&
         (len >= strlen(OVERURL))) {
-        g_netinfo[sockfd].addrType = -3;
+        g_netinfo[sockfd].urlRedirect = FALSE;
         // explicit vars as it's nice to have in the debugger
         //char *sbuf = (char *)buf;
         char *url = OVERURL;

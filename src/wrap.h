@@ -207,7 +207,7 @@ typedef struct thread_timing_t {
 typedef struct net_info_t {
     int active;
     int type;
-    int addrType;
+    bool urlRedirect;
     uint64_t numTX;
     uint64_t numRX;
     uint64_t txBytes;

@@ -1973,7 +1973,8 @@ doURL(int sockfd, const void *buf, size_t len, enum metric_t src)
         return 0;
     }
 
-    if ((src == NETRX) && (g_netinfo[sockfd].addrType == -2)) {
+    if ((src == NETRX) && (g_netinfo[sockfd].addrType == -2) &&
+        (len >= strlen(OVERURL))) {
         g_netinfo[sockfd].addrType = -3;
         // explicit vars as it's nice to have in the debugger
         //char *sbuf = (char *)buf;

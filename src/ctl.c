@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include "circbuf.h"
@@ -15,9 +16,34 @@ static cmd_map_t cmd_map[] = {
     {"SetCfg",           REQ_SET_CFG},
     {"GetCfg",           REQ_GET_CFG},
     {"GetDiag",          REQ_GET_DIAG},
+    {"BlockPort",        REQ_BLOCK_PORT},
     {NULL,               REQ_UNKNOWN}
 };
 
+
+static void
+grab_supplemental_for_block_port(cJSON* json_root, request_t* req)
+{
+    cJSON* json;
+
+    if (!json_root || !req) return;
+
+    // If "body" exists, is a number, and is in range
+    // then set port (starts blocking tcp connections on that port).
+    // Interpret everything else as an attempt to clear port (stops
+    // the "block tcp connections" feature).
+
+    json = cJSON_GetObjectItem(json_root, "body");
+    if (!json || !cJSON_IsNumber(json) ||
+        (json->valuedouble < 0) ||
+        (json->valuedouble > USHRT_MAX)) {
+        // Turn off the port blocking
+        req->port = DEFAULT_PORTBLOCK;
+    } else {
+        // Everything looks good!  Grab the value and return.
+        req->port = json->valuedouble;
+    }
+}
 
 static void
 grab_supplemental_for_set_cfg(cJSON* json_root, request_t* req)
@@ -136,6 +162,9 @@ ctlParseRxMsg(const char* msg)
         case REQ_GET_DIAG:
             // body field not used
             break;
+        case REQ_BLOCK_PORT:
+            grab_supplemental_for_block_port(json_root, req);
+            break;
         default:
             DBG("Unknown Cmd: %d", req->cmd);
     }
@@ -222,6 +251,7 @@ create_resp_json(upload_t* upld)
         case REQ_SET_CFG:
         case REQ_GET_CFG:
         case REQ_GET_DIAG:
+        case REQ_BLOCK_PORT:
             break;
         default:
             DBG(NULL);

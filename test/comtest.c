@@ -86,10 +86,11 @@ cmdSendResponseDoesNotCrash(void** state)
     request_t* req = cmdParse(buf);
     assert_non_null(req);
 
-    assert_int_equal(-1, cmdSendResponse(NULL, NULL));
-    assert_int_equal(-1, cmdSendResponse(NULL, req));
-    assert_int_equal(-1, cmdSendResponse(ctl, NULL));
-    assert_int_equal(0, cmdSendResponse(ctl, req));
+    // First two arguments must be non-null.  The last arg can be null.
+    assert_int_equal(-1, cmdSendResponse(NULL, NULL, NULL));
+    assert_int_equal(-1, cmdSendResponse(NULL, req, NULL));
+    assert_int_equal(-1, cmdSendResponse(ctl, NULL, NULL));
+    assert_int_equal(0, cmdSendResponse(ctl, req, NULL));
 
     ctlDestroy(&ctl);
     destroyReq(&req);

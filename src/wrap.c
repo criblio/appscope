@@ -41,6 +41,7 @@ static void doOpen(int, const char *, enum fs_type_t, const char *);
 static void doConfig(config_t *);
 static void doOpen(int, const char *, enum fs_type_t, const char *);
 static void doMetric(evt_t*, const char *, uint64_t, event_t *);
+static void reportProcessStart(void);
 
 static void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
@@ -2105,6 +2106,8 @@ doReset()
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
     ctlDestroy(&g_ctl);
     g_ctl = initCtl(g_staticfg);
+
+    reportProcessStart();
 }
 
 //

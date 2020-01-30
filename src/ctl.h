@@ -19,7 +19,14 @@ typedef enum {
     REQ_GET_CFG,
     REQ_GET_DIAG,
     REQ_BLOCK_PORT,
+    REQ_SWITCH,
 } cmd_t;
+
+typedef enum {
+    NO_ACTION,
+    URL_REDIRECT_ON,
+    URL_REDIRECT_OFF
+} switch_action_t;
 
 typedef struct {
     cmd_t cmd;                 // our interpretation of what we received
@@ -28,6 +35,7 @@ typedef struct {
 
     config_t* cfg;             // only used for REQ_SET_CFG
     unsigned short port;       // only used for REQ_BLOCK_PORT
+    switch_action_t action;    // only used for REQ_SWITCH
 
     // other params/structure as we define it,
     // presumably these will be received in body field

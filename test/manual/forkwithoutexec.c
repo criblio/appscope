@@ -5,7 +5,7 @@
 #include <unistd.h>
 
 // nc -klu4w 0 localhost 8125
-// gcc -g forkwithoutexec.c -o forkwithoutexec && ./forkwithoutexec
+// gcc -g test/manual/forkwithoutexec.c -o forkwithoutexec && ./forkwithoutexec
 
 int
 do_child()

@@ -17,9 +17,20 @@ static cmd_map_t cmd_map[] = {
     {"GetCfg",           REQ_GET_CFG},
     {"GetDiag",          REQ_GET_DIAG},
     {"BlockPort",        REQ_BLOCK_PORT},
+    {"Switch",           REQ_SWITCH},
     {NULL,               REQ_UNKNOWN}
 };
 
+typedef struct {
+    const char* str;
+    switch_action_t action;
+} switch_map_t;
+
+static switch_map_t switch_map[] = {
+    {"redirect-on",      URL_REDIRECT_ON},
+    {"redirect-off",     URL_REDIRECT_OFF},
+    {NULL,               NO_ACTION}
+};
 
 static void
 grab_supplemental_for_block_port(cJSON* json_root, request_t* req)
@@ -69,6 +80,40 @@ grab_supplemental_for_set_cfg(cJSON* json_root, request_t* req)
     free(string);
 
     if (!req->cfg) goto error;
+
+    // Everything worked!
+    return;
+
+error:
+    // body is required for REQ_SET_CFG
+    req->cmd=REQ_PARAM_ERR;
+}
+
+static void
+grab_supplemental_for_switch(cJSON* json_root, request_t* req)
+{
+    cJSON* json;
+    char* string = NULL;
+    switch_map_t* map;
+
+    if (!json_root || !req) goto error;
+
+    // This expects a single string in the "body" field
+    json = cJSON_GetObjectItem(json_root, "body");
+    if (!json || !(string = cJSON_GetStringValue(json))) goto error;
+
+    req->action = NO_ACTION;
+
+    // search switch_map for commands we handle
+    for (map=switch_map; map->str; map++) {
+        if (!strcmp(string, map->str)) {
+            req->action = map->action;
+            break;
+        }
+    }
+
+    // If we didn't find anything we handle, consider it an error
+    if (req->action == NO_ACTION) goto error;
 
     // Everything worked!
     return;
@@ -165,6 +210,9 @@ ctlParseRxMsg(const char* msg)
         case REQ_BLOCK_PORT:
             grab_supplemental_for_block_port(json_root, req);
             break;
+        case REQ_SWITCH:
+            grab_supplemental_for_switch(json_root, req);
+            break;
         default:
             DBG("Unknown Cmd: %d", req->cmd);
     }
@@ -252,6 +300,7 @@ create_resp_json(upload_t* upld)
         case REQ_GET_CFG:
         case REQ_GET_DIAG:
         case REQ_BLOCK_PORT:
+        case REQ_SWITCH:
             break;
         default:
             DBG(NULL);

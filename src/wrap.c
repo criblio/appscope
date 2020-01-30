@@ -29,7 +29,7 @@ static evt_t *g_prevevt = NULL;
 __thread int g_getdelim = 0;
 
 //temporary
-int g_urls = 1;
+int g_urls = 0;
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
 
@@ -303,6 +303,18 @@ remoteConfig()
                 case REQ_BLOCK_PORT:
                     // Assign new value for port blocking
                     g_cfg.blockconn = req->port;
+                    break;
+                case REQ_SWITCH:
+                    switch (req->action) {
+                        case URL_REDIRECT_ON:
+                            g_urls = 1;
+                            break;
+                        case URL_REDIRECT_OFF:
+                            g_urls = 0;
+                            break;
+                        default:
+                            DBG("%d", req->action);
+                    }
                     break;
                 default:
                     DBG(NULL);

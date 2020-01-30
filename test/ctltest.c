@@ -363,6 +363,63 @@ ctlParseRxMsgBlockPort(void** state)
     }
 }
 
+typedef struct {
+    const char*    req;
+    cmd_t cmd;
+    switch_action_t action;
+} test_switch_t;
+
+static void
+ctlParseRxMsgSwitch(void** state)
+{
+    test_switch_t test[] = {
+        // if body isn't present, there's nothing to do
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 0}",
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        // body with these specific strings should work
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 1,\"body\":\"redirect-on\"}",
+          .cmd = REQ_SWITCH, .action = URL_REDIRECT_ON},
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 2,\"body\":\"redirect-off\"}",
+          .cmd = REQ_SWITCH, .action = URL_REDIRECT_OFF},
+        // body of other json types should do nothing
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 3,\"body\":0}",
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 4,\"body\":{\"huh\":\"what\"}}",
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 5,\"body\":[ 1, 2, 3 ]}",
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 6,\"body\":true}",
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 7,\"body\":false}",
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 8,\"body\":null}",
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        // body with strings of the wrong case should do nothing
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 9,\"body\":\"Redirect-On\"}",
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\":10,\"body\":\"REDIRECT-ON\"}",
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+    };
+
+    int i;
+    for (i=0; i<sizeof(test)/sizeof(test[0]); i++) {
+        test_switch_t* test_case = &test[i];
+
+        request_t* req = ctlParseRxMsg(test_case->req);
+        assert_non_null(req);
+
+        printf("%s\n", test_case->req);
+
+        assert_int_equal(req->cmd, test_case->cmd);
+        assert_string_equal(req->cmd_str, "Switch");
+        assert_int_equal(req->id, i);
+        assert_null(req->cfg);
+        assert_int_equal(req->port, 0);
+        assert_int_equal(req->action, test_case->action);
+
+        destroyReq(&req);
+    }
+}
 static void
 ctlCreateTxMsgReturnsNullForNullUpload(void** state)
 {
@@ -611,6 +668,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(ctlParseRxMsgGetCfg),
         cmocka_unit_test(ctlParseRxMsgGetDiags),
         cmocka_unit_test(ctlParseRxMsgBlockPort),
+        cmocka_unit_test(ctlParseRxMsgSwitch),
         cmocka_unit_test(ctlCreateTxMsgReturnsNullForNullUpload),
         cmocka_unit_test(ctlCreateTxMsgInfo),
         cmocka_unit_test(ctlCreateTxMsgResp),

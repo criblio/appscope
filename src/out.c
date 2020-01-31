@@ -8,6 +8,7 @@ struct _out_t
 {
     transport_t* transport;
     format_t* format;
+    int metric_disabled;
 };
 
 out_t*
@@ -18,6 +19,10 @@ outCreate()
         DBG(NULL);
         return NULL;
     }
+
+    // TBD.  This is a quick and dirty way to disable metric output.
+    // Added 31-Jan-2020 for a demo.
+    out->metric_disabled = (getenv("SCOPE_METRIC_DISABLE") != NULL);
 
     return out;
 }
@@ -45,6 +50,8 @@ int
 outSendEvent(out_t* out, event_t* e)
 {
     if (!out || !e) return -1;
+
+    if (out->metric_disabled) return -1;
 
     char* msg = fmtStatsDString(out->format, e, NULL);
     int rv = outSend(out, msg);

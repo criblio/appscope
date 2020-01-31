@@ -432,8 +432,22 @@ sendBufferedMessages(ctl_t* ctl)
     while (cbufGet(ctl->evbuf, &data) == 0) {
         if (data) {
             char *msg = (char*) data;
+
+            // Add the newline delimiter to the msg.
+            {
+                int strsize = strlen(msg);
+                char* temp = realloc(msg, strsize+2); // room for "\n\0"
+                if (!temp) {
+                    DBG(NULL);
+                    free(msg);
+                    msg = NULL;
+                    continue;
+                }
+                msg = temp;
+                msg[strsize] = '\n';
+                msg[strsize+1] = '\0';
+            }
             transportSend(ctl->transport, msg);
-            transportSend(ctl->transport, "\n");
             free(msg);
         }
     }

@@ -42,6 +42,7 @@ static void doConfig(config_t *);
 static void doOpen(int, const char *, enum fs_type_t, const char *);
 static void doMetric(evt_t*, const char *, uint64_t, event_t *);
 static void reportProcessStart(void);
+static void threadNow(void);
 
 static void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
@@ -608,6 +609,16 @@ doBlockConnection(int fd, const struct sockaddr *addr)
 }
 
 static void
+threadNow()
+{
+    if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
+        scopeLog("ERROR: doThread:pthread_create", -1, CFG_LOG_ERROR);
+        return;
+    }
+    g_thread.once = TRUE;
+}
+
+static void
 doThread()
 {
     /*
@@ -622,18 +633,14 @@ doThread()
     
     // Create one thread at most
     if (g_thread.once == TRUE) return;
-    
+
     /*
      * g_thread.startTime is the start time, set in the constructor.
      * This is put in place to work around one of the Chrome sandbox limits.
      * Shouldn't hurt anything else.  
      */
     if (time(NULL) >= g_thread.startTime) {
-        if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
-            scopeLog("ERROR: doThread:pthread_create", -1, CFG_LOG_ERROR);
-            return;
-        }
-        g_thread.once = TRUE;
+        threadNow();
     }
 }
 
@@ -2657,6 +2664,48 @@ init(void)
 
     //temporary
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
+
+   /*
+    * This is not self evident.
+    * There are some apps that check to see if only one thread exists when
+    * they start and then exit if that is the case. The first place we see
+    * this is with Chromium. Several apps use Chromium, including
+    * Chrome, Slack and more.
+    *
+    * The resolution is to delay the start of the thread until
+    * an app that checks has completed its configuration.
+    *
+    * Simple enough. Normally, we'd just start a timer and
+    * create the thread when the timer expires. However, it
+    * turns out that a timer either creates a thread to
+    * handle the expiry or delivers a signal. The use
+    * of a thread causes the same problem we're trying
+    * to avoid. The use of a signal is problematic
+    * because a number of apps install their own handlers.
+    * When we install a handler in the library constructor
+    * it is replaced when the app starts.
+    *
+    * If we need to delay the start of a thread we check
+    * on every interposed function to see if the thread has
+    * started. If the time has expired and the constructor
+    * has run then we start the thread.
+    *
+    * The act of starting the thread from an interposed
+    * function works, but it results in the need for the
+    * app to call a function that has been interposed.
+    * Many server apps don't call a function that has been
+    * interposed until data is received. This means that we
+    * need to kick the server app before the thread starts.
+    * Therefore, we can't connect to the app until it receives
+    * some data to kick things off.
+    *
+    * The approach used here is not what we want. However, until
+    * we can find a viable solution we attempt to check for the
+    * presence of Chromium and delay the start of the thread.
+    */
+    if (osThreadNow() == TRUE) {
+        threadNow();
+    }
 }
 
 static void

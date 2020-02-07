@@ -286,3 +286,49 @@ out:
     *cmd = buf;
     return (*cmd != NULL);
 }
+
+/*
+ * Looking for the presence of a Chromium enabled app.
+ * It's not as simple as checking the process name.
+ *
+ * First, Chrome itself changes the name of some of
+ * it's processes. Despite what is shown with a 'ps'
+ * command the process name we get back from inside
+ * the process is not always 'chrome'.
+ *
+ * Second, several applications use Chromium.
+ * So, the process name is unrelated.
+ *
+ * Therfore, we look for a number of indicators
+ * in the maps file to see what libs, config
+ * files and data files are being used. This
+ * is the result of simple experimentation
+ * with a couple of Chromium enable apps.
+ * There is likely to be lots of holes.
+ */
+bool
+osThreadNow()
+{
+    int fd = -1, rc = TRUE;
+    char *maps = NULL;
+
+    if (((maps = calloc(1, MAX_MAPS)) != NULL) &&
+        (g_fn.open) && ((fd = g_fn.open("/proc/self/maps", O_RDONLY)) != -1) &&
+        (g_fn.read) && (g_fn.read(fd, maps, MAX_MAPS) != -1)) {
+        if ((strstr(maps, "chrome") != NULL) ||
+            (strstr(maps, "Chrome") != NULL) ||
+            (strstr(maps, "chromium") != NULL) ||
+            (strstr(maps, "Chromium") != NULL) ||
+            (strstr(maps, "croco") != NULL)) {
+            rc = FALSE;
+        }
+    }
+
+    if ((fd != -1) && (g_fn.close)) {
+            g_fn.close(fd);
+    }
+
+    if (maps) free (maps);
+
+    return rc;
+}

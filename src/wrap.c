@@ -2444,6 +2444,9 @@ handleExit(void)
 static void *
 periodic(void *arg)
 {
+    // Primarily for short lived procs, we don't want or need the thread
+    if (g_cfg.threadnow == TRUE) sleep(g_thread.interval);
+
     while (1) {
         reportPeriodicStuff();
 
@@ -2726,7 +2729,10 @@ init(void)
     * presence of Chromium and delay the start of the thread.
     */
     if (osThreadNow() == TRUE) {
+        g_cfg.threadnow = TRUE;
         threadNow();
+    } else {
+        g_cfg.threadnow = FALSE;
     }
 }
 

@@ -408,7 +408,7 @@ ctlParseRxMsgSwitch(void** state)
         request_t* req = ctlParseRxMsg(test_case->req);
         assert_non_null(req);
 
-        printf("%s\n", test_case->req);
+        //printf("%s\n", test_case->req);
 
         assert_int_equal(req->cmd, test_case->cmd);
         assert_string_equal(req->cmd_str, "Switch");

@@ -1882,6 +1882,21 @@ doAddNewSock(int sockfd)
     return 0;
 }
 
+static int
+isLegalLabelChar(char x)
+{
+    // Technically, RFC 1035 has more constraints than this... positionally.
+    // Must start with a letter, end with a letter or digit, and can contain
+    // a hyphen.  This is the check we can make if we don't care about position.
+
+    // I'm not using isalnum because I don't want locale to affect it.
+    if (x >= 'a' && x <= 'z') return 1;
+    if (x >= 'A' && x <= 'Z') return 1;
+    if (x >= '0' && x <= '9') return 1;
+    if (x == '-') return 1;
+    return 0;
+}
+
 /*
  * Dereference a DNS packet and
  * extract the domain name.
@@ -1893,16 +1908,17 @@ doAddNewSock(int sockfd)
  * name format:
  * octet of len followed by a label of len octets
  * len is <=63 and total len octets + labels <= 255
+ * See RFC 1035 for details.
  */
 
 static int
 getDNSName(int sd, void *pkt, int pktlen)
 {
-    int llen;
     dns_query *query;
     struct dns_header *header;
-    char *aname, *dname;
-    char dnsName[MAX_HOSTNAME];
+    char *dname;
+    char dnsName[MAX_HOSTNAME+1];
+    int dnsNameBytesUsed = 0;
 
     if (getNetEntry(sd) == NULL) {
         return -1;
@@ -1973,25 +1989,31 @@ getDNSName(int sd, void *pkt, int pktlen)
     }
 
     // We think we have a direct DNS request
-    aname = dnsName;
+    char* pkt_end = (char*)pkt + pktlen;
 
-    while (*dname != '\0') {
+    while ((*dname != '\0') && (dname < pkt_end)) {
         // handle one label
-        for (llen = (int)*dname++; llen > 0; llen--) {
-            *aname++ = *dname++;
+
+        int label_len = (int)*dname++;
+        if (label_len > 63) return -1; // labels must be 63 chars or less
+        if (&dname[label_len] >= pkt_end) return -1; // honor packet end
+        // Ensure we don't overrun the size of dnsName
+        if ((dnsNameBytesUsed + label_len) >= sizeof(dnsName)) return -1;
+
+        for ( ; (label_len > 0); label_len--) {
+            if (!isLegalLabelChar(*dname)) return -1;
+            dnsName[dnsNameBytesUsed++] = *dname++;
         }
-        
-        *aname++ = '.';
+        dnsName[dnsNameBytesUsed++] = '.';
     }
 
-    aname--;
-    *aname = '\0';
+    dnsName[dnsNameBytesUsed-1] = '\0'; // overwrite the last period
 
-    if (strncmp(dnsName, g_netinfo[sd].dnsName, strlen(dnsName)) == 0) {
+    if (strncmp(dnsName, g_netinfo[sd].dnsName, dnsNameBytesUsed) == 0) {
         // Already sent this from an interposed function
         g_netinfo[sd].dnsSend = FALSE;
     } else {
-        strncpy(g_netinfo[sd].dnsName, dnsName, strlen(dnsName));
+        strncpy(g_netinfo[sd].dnsName, dnsName, dnsNameBytesUsed);
         g_netinfo[sd].dnsSend = TRUE;
     }
     

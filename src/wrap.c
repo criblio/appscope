@@ -1909,8 +1909,9 @@ getDNSName(int sd, void *pkt, int pktlen)
 {
     dns_query *query;
     struct dns_header *header;
-    char *aname, *dname;
+    char *dname;
     char dnsName[MAX_HOSTNAME+1];
+    int dnsNameBytesUsed = 0;
 
     if (getNetEntry(sd) == NULL) {
         return -1;
@@ -1981,32 +1982,31 @@ getDNSName(int sd, void *pkt, int pktlen)
     }
 
     // We think we have a direct DNS request
-    aname = dnsName;
     char* pkt_end = (char*)pkt + pktlen;
 
-    while (*dname != '\0') {
+    while ((*dname != '\0') && (dname < pkt_end)) {
         // handle one label
 
         int label_len = (int)*dname++;
         if (label_len > 63) return -1; // labels must be 63 chars or less
         if (&dname[label_len] >= pkt_end) return -1; // honor packet end
+        // Ensure we don't overrun the size of dnsName
+        if ((dnsNameBytesUsed + label_len) >= sizeof(dnsName)) return -1;
 
         for ( ; (label_len > 0); label_len--) {
             if (!isLegalLabelChar(*dname)) return -1;
-            *aname++ = *dname++;
+            dnsName[dnsNameBytesUsed++] = *dname++;
         }
-        
-        *aname++ = '.';
+        dnsName[dnsNameBytesUsed++] = '.';
     }
 
-    aname--;
-    *aname = '\0';
+    dnsName[dnsNameBytesUsed-1] = '\0'; // overwrite the last period
 
-    if (strncmp(dnsName, g_netinfo[sd].dnsName, strlen(dnsName)) == 0) {
+    if (strncmp(dnsName, g_netinfo[sd].dnsName, dnsNameBytesUsed) == 0) {
         // Already sent this from an interposed function
         g_netinfo[sd].dnsSend = FALSE;
     } else {
-        strncpy(g_netinfo[sd].dnsName, dnsName, strlen(dnsName));
+        strncpy(g_netinfo[sd].dnsName, dnsName, dnsNameBytesUsed);
         g_netinfo[sd].dnsSend = TRUE;
     }
     

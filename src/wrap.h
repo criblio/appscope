@@ -194,6 +194,7 @@ typedef struct rtconfig_t {
     uint64_t freq;
     const char *cmddir;
     proc_id_t proc;
+    bool threadnow;
     unsigned short blockconn;
 } rtconfig;
 

@@ -1,6 +1,7 @@
 #include "os.h"
 
-int osGetProcname(char *pname, size_t len)
+int
+osGetProcname(char *pname, size_t len)
 {
     proc_name(getpid(), pname, len);
     return 0;
@@ -19,7 +20,8 @@ osGetProcMemory(pid_t pid)
     return ruse.ru_maxrss / 1024;
 }
 
-int osGetNumThreads(pid_t pid)
+int
+osGetNumThreads(pid_t pid)
 {
     struct proc_taskinfo task;
     
@@ -31,13 +33,15 @@ int osGetNumThreads(pid_t pid)
     return task.pti_threadnum;
 }
 
-int osGetNumFds(pid_t pid)
+int
+osGetNumFds(pid_t pid)
 {
     int bufferSize = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, 0, 0);
     return bufferSize / PROC_PIDLISTFD_SIZE;
 }
 
-int osGetNumChildProcs(pid_t pid)
+int
+osGetNumChildProcs(pid_t pid)
 {
     int bufferSize = proc_listchildpids(pid, (void *)NULL, 0);
     return bufferSize / PROC_PIDTASKINFO_SIZE;
@@ -77,6 +81,11 @@ osIsFilePresent(pid_t pid, const char *path)
     }
 }
 
+/*
+ * TBD:
+ * This is not functional.
+ * Just a place holder.
+ */
 int
 osGetCmdline(pid_t pid, char **cmd)
 {
@@ -92,4 +101,29 @@ osGetCmdline(pid_t pid, char **cmd)
     *cmd = buf;
 
     return (*cmd != NULL);
+}
+
+/*
+ * TBD:
+ * Note that this is incomplete.
+ * It should work for chrome. It may not work
+ * even for chrome if proc names are altered
+ * by chrome. It will not work for other
+ * apps that use Chromium. Refer to the
+ * comment in os/linux/os.c for the
+ * same function.
+ */
+bool
+osThreadNow()
+{
+    char pname[MAX_PROCNAME];
+
+    proc_name(getpid(), pname, sizeof(pname));
+    if (pname[0] != '0') {
+        if ((strstr(pname, "Chrome") != NULL) ||
+            (strstr(pname, "chrome") != NULL)) {
+            return FALSE;
+        }
+    }
+    return TRUE;
 }

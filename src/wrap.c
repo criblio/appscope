@@ -26,6 +26,7 @@ static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static out_t *g_prevout = NULL;
 static evt_t *g_prevevt = NULL;
+static bool g_replacehandler = FALSE;
 __thread int g_getdelim = 0;
 
 //temporary
@@ -42,7 +43,7 @@ static void doConfig(config_t *);
 static void doOpen(int, const char *, enum fs_type_t, const char *);
 static void doMetric(evt_t*, const char *, uint64_t, event_t *);
 static void reportProcessStart(void);
-static void threadNow(void);
+static void threadNow(int);
 
 static void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
@@ -349,6 +350,7 @@ doConfig(config_t *cfg)
     if (!g_thread.startTime) {
         g_thread.startTime = time(NULL) + g_thread.interval;
     }
+
     setVerbosity(&g_cfg, cfgOutVerbosity(cfg));
     g_cfg.cmddir = cfgCmdDir(cfg);
 
@@ -609,13 +611,87 @@ doBlockConnection(int fd, const struct sockaddr *addr)
 }
 
 static void
-threadNow()
+threadNow(int sig)
 {
-    if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
-        scopeLog("ERROR: doThread:pthread_create", -1, CFG_LOG_ERROR);
+    static uint64_t serialize;
+
+    if (!atomicCasU64(&serialize, 0ULL, 1ULL)) return;
+
+    // Create one thread at most
+    if (g_thread.once == TRUE) {
+        if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
         return;
     }
+
+    if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
+        scopeLog("ERROR: doThread:pthread_create", -1, CFG_LOG_ERROR);
+        if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
+        return;
+    }
+
     g_thread.once = TRUE;
+
+    // Restore a handler if one exists
+    if ((g_replacehandler == TRUE) && (g_thread.act != NULL)) {
+        struct sigaction oldact;
+        if (g_fn.sigaction) {
+            g_fn.sigaction(SIGUSR2, g_thread.act, &oldact);
+            g_thread.act = NULL;
+        }
+    }
+
+    if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
+}
+
+/*
+ * This is not self evident.
+ * There are some apps that check to see if only one thread exists when
+ * they start and then exit if that is the case. The first place we see
+ * this is with Chromium. Several apps use Chromium, including
+ * Chrome, Slack and more.
+ *
+ * There are other processes that don't work if a thread
+ * has been created before the application starts. We've
+ * seen this in some bash scripts.
+ *
+ * The resolution is to delay the start of the thread until
+ * an app has completed its configuration. In the case of
+ * short lived procs, the thread never starts and is
+ * not needed.
+ *
+ * Simple enough. Normally, we'd just start a timer and
+ * create the thread when the timer expires. However, it
+ * turns out that a timer either creates a thread to
+ * handle the expiry or delivers a signal. The use
+ * of a thread causes the same problem we're trying
+ * to avoid. The use of a signal is problematic
+ * because a number of apps install their own handlers.
+ * When we install a handler in the library constructor
+ * it is replaced when the app starts.
+ *
+ * This seems to work:
+ * If we start a timer to deliver a signal on expiry
+ * and also interpose sigaction we can make this work.
+ * We use sigaction to install our handler. Then, we
+ * interpose sigaction, look for our signal and
+ * ensure that our handler will run in the presence
+ * of an application installed handler.
+ *
+ * This creates the situation where the thread is
+ * not started until after the app starts and is
+ * past it's own init. We no longer need to rely
+ * on the thread being created when an interposed
+ * function is called. For nopw, we are leaving
+ * the check for the thread in each interposed
+ * function as a back up in case the timer has
+ * an issue of some sort.
+ */
+static void
+threadInit()
+{
+    if (osThreadInit(threadNow, g_thread.interval) == FALSE) {
+        scopeLog("ERROR: threadInit:osThreadInit", -1, CFG_LOG_ERROR);
+    }
 }
 
 static void
@@ -640,7 +716,7 @@ doThread()
      * Shouldn't hurt anything else.  
      */
     if (time(NULL) >= g_thread.startTime) {
-        threadNow();
+        threadNow(0);
     }
 }
 
@@ -2444,9 +2520,6 @@ handleExit(void)
 static void *
 periodic(void *arg)
 {
-    // Primarily for short lived procs, we don't want or need the thread
-    if (g_cfg.threadnow == TRUE) sleep(g_thread.interval);
-
     while (1) {
         reportPeriodicStuff();
 
@@ -2585,6 +2658,11 @@ init(void)
     g_fn.gethostbyname = dlsym(RTLD_NEXT, "gethostbyname");
     g_fn.gethostbyname2 = dlsym(RTLD_NEXT, "gethostbyname2");
     g_fn.getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo");
+    g_fn.nanosleep = dlsym(RTLD_NEXT, "nanosleep");
+    g_fn.epoll_wait = dlsym(RTLD_NEXT, "epoll_wait");
+    g_fn.select = dlsym(RTLD_NEXT, "select");
+    g_fn.sigsuspend = dlsym(RTLD_NEXT, "sigsuspend");
+    g_fn.sigaction = dlsym(RTLD_NEXT, "sigaction");
 
 #ifdef __MACOS__
     g_fn.close$NOCANCEL = dlsym(RTLD_NEXT, "close$NOCANCEL");
@@ -2687,53 +2765,10 @@ init(void)
         DBG(NULL);
     }
 
+    threadInit();
+
     //temporary
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
-
-   /*
-    * This is not self evident.
-    * There are some apps that check to see if only one thread exists when
-    * they start and then exit if that is the case. The first place we see
-    * this is with Chromium. Several apps use Chromium, including
-    * Chrome, Slack and more.
-    *
-    * The resolution is to delay the start of the thread until
-    * an app that checks has completed its configuration.
-    *
-    * Simple enough. Normally, we'd just start a timer and
-    * create the thread when the timer expires. However, it
-    * turns out that a timer either creates a thread to
-    * handle the expiry or delivers a signal. The use
-    * of a thread causes the same problem we're trying
-    * to avoid. The use of a signal is problematic
-    * because a number of apps install their own handlers.
-    * When we install a handler in the library constructor
-    * it is replaced when the app starts.
-    *
-    * If we need to delay the start of a thread we check
-    * on every interposed function to see if the thread has
-    * started. If the time has expired and the constructor
-    * has run then we start the thread.
-    *
-    * The act of starting the thread from an interposed
-    * function works, but it results in the need for the
-    * app to call a function that has been interposed.
-    * Many server apps don't call a function that has been
-    * interposed until data is received. This means that we
-    * need to kick the server app before the thread starts.
-    * Therefore, we can't connect to the app until it receives
-    * some data to kick things off.
-    *
-    * The approach used here is not what we want. However, until
-    * we can find a viable solution we attempt to check for the
-    * presence of Chromium and delay the start of the thread.
-    */
-    if (osThreadNow() == TRUE) {
-        g_cfg.threadnow = TRUE;
-        threadNow();
-    } else {
-        g_cfg.threadnow = FALSE;
-    }
 }
 
 static void
@@ -2824,6 +2859,50 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
         doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0, NULL);
         scopeLog(func, fd, CFG_LOG_TRACE);
     }
+}
+
+EXPORTOFF int
+nanosleep(const struct timespec *req, struct timespec *rem)
+{
+    WRAP_CHECK(nanosleep, -1);
+    return g_fn.nanosleep(req, rem);
+}
+
+EXPORTOFF int
+epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
+{
+    WRAP_CHECK(epoll_wait, -1);
+    return g_fn.epoll_wait(epfd, events, maxevents, timeout);
+}
+
+EXPORTOFF int
+select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
+{
+    WRAP_CHECK(select, -1);
+    return g_fn.select(nfds, readfds, writefds, exceptfds, timeout);
+}
+
+EXPORTOFF int
+sigsuspend(const sigset_t *mask)
+{
+    WRAP_CHECK(sigsuspend, -1);
+    return g_fn.sigsuspend(mask);
+}
+
+EXPORTON int
+sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
+{
+    WRAP_CHECK(sigaction, -1);
+    /*
+     * If there is a handler being installed, just save it.
+     * If no handler, they may just be checking for the current handler.
+     */
+    if ((signum == SIGUSR2) && (act != NULL)) {
+        g_thread.act = act; 
+        return 0;
+    }
+
+    return g_fn.sigaction(signum, act, oldact);
 }
 
 EXPORTON int

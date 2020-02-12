@@ -127,3 +127,17 @@ osThreadNow()
     }
     return TRUE;
 }
+
+/*
+ * TBD:
+ * Note that this is incomplete.
+ * In Linux we create a timer that delivers a
+ * signal on expiry. The signal handler starts
+ * the periodic thread. Need the equivalent
+ * for OSX.
+ */
+bool
+osThreadInit(void(*handler)(int), unsigned interval)
+{
+    return TRUE;
+}

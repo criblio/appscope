@@ -624,7 +624,7 @@ threadNow(int sig)
     }
 
     if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
-        scopeLog("ERROR: doThread:pthread_create", -1, CFG_LOG_ERROR);
+        scopeLog("ERROR: threadNow:pthread_create", -1, CFG_LOG_ERROR);
         if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
         return;
     }

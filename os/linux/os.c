@@ -286,3 +286,38 @@ out:
     *cmd = buf;
     return (*cmd != NULL);
 }
+
+bool
+osThreadInit(void(*handler)(int), unsigned interval)
+{
+    struct sigaction sact;
+    struct sigevent sevent;
+    timer_t timerid;
+    struct itimerspec tspec;
+
+    sigemptyset(&sact.sa_mask);
+    sact.sa_handler = handler;
+    sact.sa_flags = 0;
+
+    if (!g_fn.sigaction || g_fn.sigaction(SIGUSR2, &sact, NULL) == -1) {
+        DBG("errno %d", errno);
+        return FALSE;
+    }
+
+    sevent.sigev_notify = SIGEV_SIGNAL;
+    sevent.sigev_signo = SIGUSR2;
+    if (timer_create(CLOCK_MONOTONIC, &sevent, &timerid) == -1) {
+        DBG("errno %d", errno);
+        return FALSE;
+    }
+
+    tspec.it_interval.tv_sec = 0;
+    tspec.it_interval.tv_nsec = 0;
+    tspec.it_value.tv_sec = interval;
+    tspec.it_value.tv_nsec = 0;
+    if (timer_settime(timerid, 0, &tspec, NULL) == -1) {
+        DBG("errno %d", errno);
+        return FALSE;
+    }
+    return TRUE;
+}

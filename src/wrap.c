@@ -26,6 +26,7 @@ static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static out_t *g_prevout = NULL;
 static evt_t *g_prevevt = NULL;
+static bool g_replacehandler = FALSE;
 __thread int g_getdelim = 0;
 
 //temporary
@@ -42,6 +43,7 @@ static void doConfig(config_t *);
 static void doOpen(int, const char *, enum fs_type_t, const char *);
 static void doMetric(evt_t*, const char *, uint64_t, event_t *);
 static void reportProcessStart(void);
+static void threadNow(int);
 
 static void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
@@ -348,6 +350,7 @@ doConfig(config_t *cfg)
     if (!g_thread.startTime) {
         g_thread.startTime = time(NULL) + g_thread.interval;
     }
+
     setVerbosity(&g_cfg, cfgOutVerbosity(cfg));
     g_cfg.cmddir = cfgCmdDir(cfg);
 
@@ -608,6 +611,90 @@ doBlockConnection(int fd, const struct sockaddr *addr)
 }
 
 static void
+threadNow(int sig)
+{
+    static uint64_t serialize;
+
+    if (!atomicCasU64(&serialize, 0ULL, 1ULL)) return;
+
+    // Create one thread at most
+    if (g_thread.once == TRUE) {
+        if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
+        return;
+    }
+
+    if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
+        scopeLog("ERROR: threadNow:pthread_create", -1, CFG_LOG_ERROR);
+        if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
+        return;
+    }
+
+    g_thread.once = TRUE;
+
+    // Restore a handler if one exists
+    if ((g_replacehandler == TRUE) && (g_thread.act != NULL)) {
+        struct sigaction oldact;
+        if (g_fn.sigaction) {
+            g_fn.sigaction(SIGUSR2, g_thread.act, &oldact);
+            g_thread.act = NULL;
+        }
+    }
+
+    if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
+}
+
+/*
+ * This is not self evident.
+ * There are some apps that check to see if only one thread exists when
+ * they start and then exit if that is the case. The first place we see
+ * this is with Chromium. Several apps use Chromium, including
+ * Chrome, Slack and more.
+ *
+ * There are other processes that don't work if a thread
+ * has been created before the application starts. We've
+ * seen this in some bash scripts.
+ *
+ * The resolution is to delay the start of the thread until
+ * an app has completed its configuration. In the case of
+ * short lived procs, the thread never starts and is
+ * not needed.
+ *
+ * Simple enough. Normally, we'd just start a timer and
+ * create the thread when the timer expires. However, it
+ * turns out that a timer either creates a thread to
+ * handle the expiry or delivers a signal. The use
+ * of a thread causes the same problem we're trying
+ * to avoid. The use of a signal is problematic
+ * because a number of apps install their own handlers.
+ * When we install a handler in the library constructor
+ * it is replaced when the app starts.
+ *
+ * This seems to work:
+ * If we start a timer to deliver a signal on expiry
+ * and also interpose sigaction we can make this work.
+ * We use sigaction to install our handler. Then, we
+ * interpose sigaction, look for our signal and
+ * ensure that our handler will run in the presence
+ * of an application installed handler.
+ *
+ * This creates the situation where the thread is
+ * not started until after the app starts and is
+ * past it's own init. We no longer need to rely
+ * on the thread being created when an interposed
+ * function is called. For nopw, we are leaving
+ * the check for the thread in each interposed
+ * function as a back up in case the timer has
+ * an issue of some sort.
+ */
+static void
+threadInit()
+{
+    if (osThreadInit(threadNow, g_thread.interval) == FALSE) {
+        scopeLog("ERROR: threadInit:osThreadInit", -1, CFG_LOG_ERROR);
+    }
+}
+
+static void
 doThread()
 {
     /*
@@ -622,18 +709,14 @@ doThread()
     
     // Create one thread at most
     if (g_thread.once == TRUE) return;
-    
+
     /*
      * g_thread.startTime is the start time, set in the constructor.
      * This is put in place to work around one of the Chrome sandbox limits.
      * Shouldn't hurt anything else.  
      */
     if (time(NULL) >= g_thread.startTime) {
-        if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
-            scopeLog("ERROR: doThread:pthread_create", -1, CFG_LOG_ERROR);
-            return;
-        }
-        g_thread.once = TRUE;
+        threadNow(0);
     }
 }
 
@@ -1875,6 +1958,21 @@ doAddNewSock(int sockfd)
     return 0;
 }
 
+static int
+isLegalLabelChar(char x)
+{
+    // Technically, RFC 1035 has more constraints than this... positionally.
+    // Must start with a letter, end with a letter or digit, and can contain
+    // a hyphen.  This is the check we can make if we don't care about position.
+
+    // I'm not using isalnum because I don't want locale to affect it.
+    if (x >= 'a' && x <= 'z') return 1;
+    if (x >= 'A' && x <= 'Z') return 1;
+    if (x >= '0' && x <= '9') return 1;
+    if (x == '-') return 1;
+    return 0;
+}
+
 /*
  * Dereference a DNS packet and
  * extract the domain name.
@@ -1886,16 +1984,17 @@ doAddNewSock(int sockfd)
  * name format:
  * octet of len followed by a label of len octets
  * len is <=63 and total len octets + labels <= 255
+ * See RFC 1035 for details.
  */
 
 static int
 getDNSName(int sd, void *pkt, int pktlen)
 {
-    int llen;
     dns_query *query;
     struct dns_header *header;
-    char *aname, *dname;
-    char dnsName[MAX_HOSTNAME];
+    char *dname;
+    char dnsName[MAX_HOSTNAME+1];
+    int dnsNameBytesUsed = 0;
 
     if (getNetEntry(sd) == NULL) {
         return -1;
@@ -1966,25 +2065,31 @@ getDNSName(int sd, void *pkt, int pktlen)
     }
 
     // We think we have a direct DNS request
-    aname = dnsName;
+    char* pkt_end = (char*)pkt + pktlen;
 
-    while (*dname != '\0') {
+    while ((*dname != '\0') && (dname < pkt_end)) {
         // handle one label
-        for (llen = (int)*dname++; llen > 0; llen--) {
-            *aname++ = *dname++;
+
+        int label_len = (int)*dname++;
+        if (label_len > 63) return -1; // labels must be 63 chars or less
+        if (&dname[label_len] >= pkt_end) return -1; // honor packet end
+        // Ensure we don't overrun the size of dnsName
+        if ((dnsNameBytesUsed + label_len) >= sizeof(dnsName)) return -1;
+
+        for ( ; (label_len > 0); label_len--) {
+            if (!isLegalLabelChar(*dname)) return -1;
+            dnsName[dnsNameBytesUsed++] = *dname++;
         }
-        
-        *aname++ = '.';
+        dnsName[dnsNameBytesUsed++] = '.';
     }
 
-    aname--;
-    *aname = '\0';
+    dnsName[dnsNameBytesUsed-1] = '\0'; // overwrite the last period
 
-    if (strncmp(dnsName, g_netinfo[sd].dnsName, strlen(dnsName)) == 0) {
+    if (strncmp(dnsName, g_netinfo[sd].dnsName, dnsNameBytesUsed) == 0) {
         // Already sent this from an interposed function
         g_netinfo[sd].dnsSend = FALSE;
     } else {
-        strncpy(g_netinfo[sd].dnsName, dnsName, strlen(dnsName));
+        strncpy(g_netinfo[sd].dnsName, dnsName, dnsNameBytesUsed);
         g_netinfo[sd].dnsSend = TRUE;
     }
     
@@ -2103,6 +2208,8 @@ doReset()
 
     g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
+    threadInit();
+
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
     ctlDestroy(&g_ctl);
     g_ctl = initCtl(g_staticfg);
@@ -2553,6 +2660,11 @@ init(void)
     g_fn.gethostbyname = dlsym(RTLD_NEXT, "gethostbyname");
     g_fn.gethostbyname2 = dlsym(RTLD_NEXT, "gethostbyname2");
     g_fn.getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo");
+    g_fn.nanosleep = dlsym(RTLD_NEXT, "nanosleep");
+    g_fn.epoll_wait = dlsym(RTLD_NEXT, "epoll_wait");
+    g_fn.select = dlsym(RTLD_NEXT, "select");
+    g_fn.sigsuspend = dlsym(RTLD_NEXT, "sigsuspend");
+    g_fn.sigaction = dlsym(RTLD_NEXT, "sigaction");
 
 #ifdef __MACOS__
     g_fn.close$NOCANCEL = dlsym(RTLD_NEXT, "close$NOCANCEL");
@@ -2655,6 +2767,8 @@ init(void)
         DBG(NULL);
     }
 
+    threadInit();
+
     //temporary
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 }
@@ -2747,6 +2861,50 @@ doOpen(int fd, const char *path, enum fs_type_t type, const char *func)
         doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0, NULL);
         scopeLog(func, fd, CFG_LOG_TRACE);
     }
+}
+
+EXPORTOFF int
+nanosleep(const struct timespec *req, struct timespec *rem)
+{
+    WRAP_CHECK(nanosleep, -1);
+    return g_fn.nanosleep(req, rem);
+}
+
+EXPORTOFF int
+epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
+{
+    WRAP_CHECK(epoll_wait, -1);
+    return g_fn.epoll_wait(epfd, events, maxevents, timeout);
+}
+
+EXPORTOFF int
+select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
+{
+    WRAP_CHECK(select, -1);
+    return g_fn.select(nfds, readfds, writefds, exceptfds, timeout);
+}
+
+EXPORTOFF int
+sigsuspend(const sigset_t *mask)
+{
+    WRAP_CHECK(sigsuspend, -1);
+    return g_fn.sigsuspend(mask);
+}
+
+EXPORTON int
+sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
+{
+    WRAP_CHECK(sigaction, -1);
+    /*
+     * If there is a handler being installed, just save it.
+     * If no handler, they may just be checking for the current handler.
+     */
+    if ((signum == SIGUSR2) && (act != NULL)) {
+        g_thread.act = act; 
+        return 0;
+    }
+
+    return g_fn.sigaction(signum, act, oldact);
 }
 
 EXPORTON int

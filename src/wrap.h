@@ -22,8 +22,8 @@
 #include <sys/syscall.h>
 #include <wchar.h>
 #include <sys/poll.h>
-
 #include <sys/stat.h>
+
 #if defined(__LINUX__) && defined(__STATX__) && defined(STRUCT_STATX_MISSING_FROM_SYS_STAT_H)
 #include <linux/stat.h>
 #endif // __LINUX__ && __STATX__ && STRUCT_STATX_MISSING_FROM_SYS_STAT_H
@@ -37,6 +37,7 @@
 #ifdef __LINUX__
 #include <sys/vfs.h>
 #include <sys/prctl.h>
+#include <sys/epoll.h>
 #endif 
 
 #include "dns.h"
@@ -202,6 +203,7 @@ typedef struct thread_timing_t {
     time_t startTime; 
     bool once;
     pthread_t periodicTID;
+    const struct sigaction *act;
 } thread_timing;
 
 typedef struct net_info_t {
@@ -373,6 +375,11 @@ typedef struct interposed_funcs_t {
     int (*fcntl64)(int, int, ...);
     long (*syscall)(long, ...);
     int (*prctl)(int, unsigned long, unsigned long, unsigned long, unsigned long);
+    int (*nanosleep)(const struct timespec *, struct timespec *);
+    int (*epoll_wait)(int, struct epoll_event *, int, int);
+    int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
+    int (*sigsuspend)(const sigset_t *);
+    int (*sigaction)(int, const struct sigaction *, struct sigaction *);
 
 #if defined(__LINUX__) && defined(__STATX__)
     int (*statx)(int, const char *, int, unsigned int, struct statx *);

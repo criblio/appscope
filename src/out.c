@@ -51,7 +51,7 @@ outSendEvent(out_t* out, event_t* e)
 {
     if (!out || !e) return -1;
 
-    if (out->metric_disabled) return -1;
+    if (out->metric_disabled) return 0;
 
     char* msg = fmtStatsDString(out->format, e, NULL);
     int rv = outSend(out, msg);

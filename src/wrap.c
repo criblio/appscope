@@ -2208,6 +2208,8 @@ doReset()
 
     g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
+    threadInit();
+
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
     ctlDestroy(&g_ctl);
     g_ctl = initCtl(g_staticfg);

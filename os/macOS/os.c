@@ -106,31 +106,6 @@ osGetCmdline(pid_t pid, char **cmd)
 /*
  * TBD:
  * Note that this is incomplete.
- * It should work for chrome. It may not work
- * even for chrome if proc names are altered
- * by chrome. It will not work for other
- * apps that use Chromium. Refer to the
- * comment in os/linux/os.c for the
- * same function.
- */
-bool
-osThreadNow()
-{
-    char pname[MAX_PROCNAME];
-
-    proc_name(getpid(), pname, sizeof(pname));
-    if (pname[0] != '0') {
-        if ((strstr(pname, "Chrome") != NULL) ||
-            (strstr(pname, "chrome") != NULL)) {
-            return FALSE;
-        }
-    }
-    return TRUE;
-}
-
-/*
- * TBD:
- * Note that this is incomplete.
  * In Linux we create a timer that delivers a
  * signal on expiry. The signal handler starts
  * the periodic thread. Need the equivalent

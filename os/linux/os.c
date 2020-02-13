@@ -287,52 +287,6 @@ out:
     return (*cmd != NULL);
 }
 
-/*
- * Looking for the presence of a Chromium enabled app.
- * It's not as simple as checking the process name.
- *
- * First, Chrome itself changes the name of some of
- * it's processes. Despite what is shown with a 'ps'
- * command the process name we get back from inside
- * the process is not always 'chrome'.
- *
- * Second, several applications use Chromium.
- * So, the process name is unrelated.
- *
- * Therfore, we look for a number of indicators
- * in the maps file to see what libs, config
- * files and data files are being used. This
- * is the result of simple experimentation
- * with a couple of Chromium enable apps.
- * There is likely to be lots of holes.
- */
-bool
-osThreadNow()
-{
-    int fd = -1, rc = TRUE;
-    char *maps = NULL;
-
-    if (((maps = calloc(1, MAX_MAPS)) != NULL) &&
-        (g_fn.open) && ((fd = g_fn.open("/proc/self/maps", O_RDONLY)) != -1) &&
-        (g_fn.read) && (g_fn.read(fd, maps, MAX_MAPS) != -1)) {
-        if ((strstr(maps, "chrome") != NULL) ||
-            (strstr(maps, "Chrome") != NULL) ||
-            (strstr(maps, "chromium") != NULL) ||
-            (strstr(maps, "Chromium") != NULL) ||
-            (strstr(maps, "croco") != NULL)) {
-            rc = FALSE;
-        }
-    }
-
-    if ((fd != -1) && (g_fn.close)) {
-            g_fn.close(fd);
-    }
-
-    if (maps) free (maps);
-
-    return rc;
-}
-
 bool
 osThreadInit(void(*handler)(int), unsigned interval)
 {
@@ -346,12 +300,14 @@ osThreadInit(void(*handler)(int), unsigned interval)
     sact.sa_flags = 0;
 
     if (!g_fn.sigaction || g_fn.sigaction(SIGUSR2, &sact, NULL) == -1) {
+        DBG("errno %d", errno);
         return FALSE;
     }
 
     sevent.sigev_notify = SIGEV_SIGNAL;
     sevent.sigev_signo = SIGUSR2;
     if (timer_create(CLOCK_MONOTONIC, &sevent, &timerid) == -1) {
+        DBG("errno %d", errno);
         return FALSE;
     }
 
@@ -360,6 +316,7 @@ osThreadInit(void(*handler)(int), unsigned interval)
     tspec.it_value.tv_sec = interval;
     tspec.it_value.tv_nsec = 0;
     if (timer_settime(timerid, 0, &tspec, NULL) == -1) {
+        DBG("errno %d", errno);
         return FALSE;
     }
     return TRUE;

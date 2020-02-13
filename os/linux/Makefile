@@ -9,7 +9,7 @@ CFLAGS += -DSTRUCT_STATX_MISSING_FROM_SYS_STAT_H
 endif
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
-LD_FLAGS=-ldl -lpthread -e __scope_main
+LD_FLAGS=-ldl -lpthread -lrt -e __scope_main
 INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 YAML_SRC=$(wildcard contrib/libyaml/src/*.c)

@@ -318,6 +318,8 @@ typedef struct interposed_funcs_t {
     int (*gethostbyname_r)(const char *, struct hostent *, char *, size_t,
                           struct hostent **, int *);
     struct hostent *(*gethostbyname2)(const char *, int);
+    int (*gethostbyname2_r)(const char *, int, struct hostent *, char *, size_t,
+                            struct hostent **, int *);
     int (*getaddrinfo)(const char *, const char *, const struct addrinfo *,
                        struct addrinfo **);
     // __LINUX__

@@ -2151,7 +2151,7 @@ doAccessRights(struct msghdr *msg)
                 if ((sbuf.st_mode & S_IFMT) == S_IFSOCK) {
                     doAddNewSock(recvfd[i]);
                 } else {
-                    doOpen(recvfd[i], "Received_Access_Rights", FD, "recvmsg");
+                    doOpen(recvfd[i], "Received_File_Descriptor", FD, "recvmsg");
                 }
             } else {
                 DBG("errno: %d", errno);

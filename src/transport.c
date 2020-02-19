@@ -459,11 +459,26 @@ transportSend(transport_t* t, const char* msg)
                     DBG(NULL);
                     break;
                 }
+                int flags = 0;
 #ifdef __LINUX__
-                int rc = t->send(t->net.sock, msg, strlen(msg), MSG_NOSIGNAL);
-#else
-                int rc = t->send(t->net.sock, msg, strlen(msg), 0);
+                flags |= MSG_NOSIGNAL;
 #endif
+
+                size_t bytes_to_send = strlen(msg);
+                size_t bytes_sent = 0;
+                int rc;
+
+                while (bytes_to_send > 0) {
+                    rc = t->send(t->net.sock, &msg[bytes_sent], bytes_to_send, flags);
+                    if (rc <= 0) break;
+
+                    if (rc != bytes_to_send) {
+                        DBG("rc = %d, bytes_to_send = %zu", rc, bytes_to_send);
+                    }
+
+                    bytes_sent += rc;
+                    bytes_to_send -= rc;
+                }
 
                 if (rc < 0) {
                     switch (errno) {

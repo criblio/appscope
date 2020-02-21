@@ -23,6 +23,7 @@
 #include <wchar.h>
 #include <sys/poll.h>
 #include <sys/stat.h>
+#include <sys/un.h>
 
 #if defined(__LINUX__) && defined(__STATX__) && defined(STRUCT_STATX_MISSING_FROM_SYS_STAT_H)
 #include <linux/stat.h>
@@ -38,6 +39,10 @@
 #include <sys/vfs.h>
 #include <sys/prctl.h>
 #include <sys/epoll.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#include <linux/sock_diag.h>
+#include <linux/unix_diag.h>
 #endif 
 
 #include "dns.h"
@@ -219,6 +224,8 @@ typedef struct net_info_t {
     uint64_t numDuration;
     uint64_t totalDuration;
     uint64_t uid;
+    uint64_t lnode;
+    uint64_t rnode;
     char dnsName[MAX_HOSTNAME];
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;

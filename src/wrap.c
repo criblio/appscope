@@ -44,6 +44,7 @@ static void doOpen(int, const char *, enum fs_type_t, const char *);
 static void doMetric(evt_t*, const char *, uint64_t, event_t *);
 static void reportProcessStart(void);
 static void threadNow(int);
+static void doUnixEndpoint(int, net_info *);
 
 static void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
@@ -1666,7 +1667,10 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             (g_netinfo[fd].localConn.ss_family == AF_NETLINK)) {
             strncpy(lip, "UNIX", sizeof(lip));
             strncpy(rip, "UNIX", sizeof(rip));
-            localPort = remotePort = 0;
+            doUnixEndpoint(fd, &g_netinfo[fd]);
+            localPort = g_netinfo[fd].lnode;
+            remotePort = g_netinfo[fd].rnode;
+
             if (g_netinfo[fd].localConn.ss_family == AF_NETLINK) {
                 strncpy(proto, "NETLINK", sizeof(proto));
             }
@@ -1767,7 +1771,10 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             (g_netinfo[fd].localConn.ss_family == AF_NETLINK)) {
             strncpy(lip, "UNIX", sizeof(lip));
             strncpy(rip, "UNIX", sizeof(rip));
-            localPort = remotePort = 0;
+            doUnixEndpoint(fd, &g_netinfo[fd]);
+            localPort = g_netinfo[fd].lnode;
+            remotePort = g_netinfo[fd].rnode;
+
             if (g_netinfo[fd].localConn.ss_family == AF_NETLINK) {
                 strncpy(proto, "NETLINK", sizeof(proto));
             }
@@ -1867,7 +1874,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 static long long
 doGetProcCPU() {
     struct rusage ruse;
-    
+
     if (getrusage(RUSAGE_SELF, &ruse) != 0) {
         return (long long)-1;
     }
@@ -1877,13 +1884,190 @@ doGetProcCPU() {
         ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
 }
 
+#ifdef __LINUX__
+static int
+sendNL(int sd, ino_t node)
+{
+    if (g_fn.sendmsg == NULL) return -1;
+
+    struct sockaddr_nl nladdr = {
+        .nl_family = AF_NETLINK
+    };
+
+    struct {
+        struct nlmsghdr nlh;
+        struct unix_diag_req udr;
+    } req = {
+        .nlh = {
+            .nlmsg_len = sizeof(req),
+            .nlmsg_type = SOCK_DIAG_BY_FAMILY,
+            .nlmsg_flags = NLM_F_REQUEST
+        },
+        .udr = {
+            .sdiag_family = AF_UNIX,
+            .sdiag_protocol = 0,
+            .pad = 0,
+            .udiag_states = -1,
+            .udiag_ino = node,
+            .udiag_cookie[0] = -1,
+            .udiag_cookie[1] = -1,
+            .udiag_show = UDIAG_SHOW_PEER
+        }
+    }; // reminder cookies must -1 in order for single request to work
+
+    struct iovec iov = {
+        .iov_base = &req,
+        .iov_len = sizeof(req)
+    };
+
+    struct msghdr msg = {
+        .msg_name = (void *) &nladdr,
+        .msg_namelen = sizeof(nladdr),
+        .msg_iov = &iov,
+        .msg_iovlen = 1
+    };
+
+    // should we check for a partial send?
+    if (g_fn.sendmsg(sd, &msg, 0) < 0) {
+        scopeLog("ERROR:sendNL:sendmsg", sd, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    return 0;
+}
+
+static ino_t
+getNL(int sd)
+{
+    if (g_fn.recvmsg == NULL) return -1;
+
+    int rc;
+    long buf[sizeof(struct nlmsghdr) + sizeof(long)];
+    struct unix_diag_msg *diag;
+    struct rtattr *attr;
+    struct sockaddr_nl nladdr = {
+        .nl_family = AF_NETLINK
+    };
+
+    struct iovec iov = {
+        .iov_base = buf,
+        .iov_len = sizeof(buf)
+    };
+
+    struct msghdr msg = {
+        .msg_name = (void *) &nladdr,
+        .msg_namelen = sizeof(nladdr),
+        .msg_iov = &iov,
+        .msg_iovlen = 1
+    };
+
+    if ((rc = g_fn.recvmsg(sd, &msg, 0)) <= 0) {
+        scopeLog("ERROR:getNL:recvmsg", sd, CFG_LOG_ERROR);
+        return (ino_t)-1;
+    }
+
+    const struct nlmsghdr *nlhdr = (struct nlmsghdr *)buf;
+
+    if (!NLMSG_OK(nlhdr, rc)) {
+        scopeLog("ERROR:getNL:!NLMSG_OK", sd, CFG_LOG_ERROR);
+        return (ino_t)-1;
+    }
+
+    for (; NLMSG_OK(nlhdr, rc); nlhdr = NLMSG_NEXT(nlhdr, rc)) {
+        if (nlhdr->nlmsg_type == NLMSG_DONE) {
+            scopeLog("ERROR:getNL:no message", sd, CFG_LOG_ERROR);
+            return (ino_t)-1;
+        }
+
+        if (nlhdr->nlmsg_type == NLMSG_ERROR) {
+            const struct nlmsgerr *err = NLMSG_DATA(nlhdr);
+
+            if (nlhdr->nlmsg_len < NLMSG_LENGTH(sizeof(*err))) {
+                scopeLog("ERROR:getNL:message error", sd, CFG_LOG_ERROR);
+            } else {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "ERROR:getNL:message errno %d", -err->error);
+                scopeLog(buf, sd, CFG_LOG_DEBUG);
+            }
+
+            return (ino_t)-1;
+        }
+
+        if (nlhdr->nlmsg_type != SOCK_DIAG_BY_FAMILY) {
+            scopeLog("ERROR:getNL:unexpected nlmsg_type", sd, CFG_LOG_ERROR);
+            return (ino_t)-1;
+        }
+
+        if ((diag = NLMSG_DATA(nlhdr)) != NULL) {
+            if (nlhdr->nlmsg_len < NLMSG_LENGTH(sizeof(*diag))) {
+                scopeLog("ERROR:getNL:short response", sd, CFG_LOG_ERROR);
+                return (ino_t)-1;
+            }
+
+            if (diag->udiag_family != AF_UNIX) {
+                scopeLog("ERROR:getNL:unexpected family", sd, CFG_LOG_ERROR);
+                return (ino_t)-1;
+            }
+
+            attr = (struct rtattr *) (diag + 1);
+            if (attr->rta_type == UNIX_DIAG_PEER) {
+                if (RTA_PAYLOAD(attr) >= sizeof(unsigned int)) {
+                    return (ino_t)*(unsigned int *) RTA_DATA(attr);
+                }
+            }
+        }
+    }
+    return (ino_t)-1;
+}
+
+static void
+doUnixEndpoint(int sd, net_info *net)
+{
+    int nsd;
+    ino_t rnode;
+    struct stat sbuf;
+
+    if (!net || !g_fn.socket || !g_fn.close) return;
+
+    if (fstat(sd, &sbuf) == -1 ) return;
+    if ((sbuf.st_mode & S_IFMT) != S_IFSOCK) return;
+
+    if ((nsd = g_fn.socket(AF_NETLINK, SOCK_RAW, NETLINK_SOCK_DIAG)) == 1) return;
+
+    if (sendNL(nsd, sbuf.st_ino) == -1) {
+        g_fn.close(nsd);
+        return;
+    }
+
+    if ((rnode = getNL(nsd)) == -1) {
+        g_fn.close(nsd);
+        return;
+    }
+
+    net->lnode = sbuf.st_ino;
+    net->rnode = rnode;
+    g_fn.close(nsd);
+    return;
+}
+#else
+
+static void
+doUnixEndpoint(int sd, net_info *net)
+{
+    net->lnode = 0;
+    net->rnode = 0;
+    return;
+}
+
+#endif
+
 static void
 doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control_type_t endp)
 {
     if (!addr || (len <= 0)) {
         return;
     }
-    
+
     // Should we check for at least the size of sockaddr_in?
     if ((getNetEntry(sd) != NULL) && addr && (len > 0)) {
         if (endp == LOCAL) {

@@ -2134,14 +2134,16 @@ doAccessRights(struct msghdr *msg)
     struct cmsghdr *cmptr;
     struct stat sbuf;
 
+    if (!msg) return -1;
+
     if (((cmptr = CMSG_FIRSTHDR(msg)) != NULL) &&
-        (cmptr->cmsg_len > 0) &&
+        (cmptr->cmsg_len >= CMSG_LEN(sizeof(int))) &&
         (cmptr->cmsg_level == SOL_SOCKET) &&
         (cmptr->cmsg_type == SCM_RIGHTS)) {
         // voila; we have a new fd
         int i, numfds;
 
-        numfds = (cmptr->cmsg_len - sizeof(struct cmsghdr)) / sizeof(int);
+        numfds = (cmptr->cmsg_len - CMSG_ALIGN(sizeof(struct cmsghdr))) / sizeof(int);
         if (numfds <= 0) return -1;
         recvfd = ((int *) CMSG_DATA(cmptr));
 
@@ -2159,6 +2161,7 @@ doAccessRights(struct msghdr *msg)
             }
         }
     }
+
     return 0;
 }
 

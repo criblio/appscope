@@ -1,8 +1,20 @@
 /* 
- * passfd.c - Test to see that Scope is handling the passing of fd access rights between proceses correctly
+ * passfd.c - Test to see that Scope is handling the passing of fd access
+ * rights between proceses correctly
  *
  * gcc -g test/manual/passfd.c -lpthread -o test/linux/passfd
+ *
+ * 1) passfd is a parent that sends access rights to a child process over a UNIX socket.
+ *
+ * 2) In order to send a file or socket descriptor, the parent opens
+ *    a file and creates a TCP socket. In order to get a TCP socket descriptor,
+ *    the parent creates a thread which implements the server-side (accept) socket.
+ *
+ * 3) The parent sends the access rights of the file &/or socket descriptor
+ *    to the child over the UNIX socket.
  */
+
+#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <unistd.h>
@@ -26,6 +38,11 @@
 #define TESTPORT "9009"
 #define TESTPORTNO 9009
 #define HOST "localhost"
+
+#define CMSG_OK(mhdr, cmsg) ((cmsg)->cmsg_len >= sizeof(struct cmsghdr) && \
+                             (cmsg)->cmsg_len <= (unsigned long)        \
+                             ((mhdr)->msg_controllen -                  \
+                              ((char *)(cmsg) - (char *)(mhdr)->msg_control)))
 
 char *pfile;
 
@@ -95,8 +112,8 @@ int
 send_array_rights(int sd, int *sendfds, int numfds)
 {
     int clen;
-    struct msghdr	msg;
-    struct iovec	iov[1];
+    struct msghdr msg;
+    struct iovec iov[1];
     struct cmsghdr *cmptr;
     char control[CMSG_SPACE(sizeof(int) * numfds)];
     char tdata[] = "test";
@@ -120,9 +137,9 @@ send_array_rights(int sd, int *sendfds, int numfds)
     msg.msg_iov = iov;
     msg.msg_iovlen = 1;
 
-    fprintf(stderr, "Parent:sending\n");
+    fprintf(stderr, "Parent:send_array_rights\n");
     if ((clen = sendmsg(sd, &msg, 0)) == -1) {
-        perror("sendmsg:send_access_rights");
+        perror("sendmsg:send_array_rights");
         return -1;
     }
     
@@ -130,13 +147,100 @@ send_array_rights(int sd, int *sendfds, int numfds)
     return 0;
 }
 
+/*
+ * This is not used. Left it here in case
+ * we find that this changes or other UNIX
+ * releases do support this.
+ *
+ * The Linux kernel does not allow multiple
+ * cmsg headers sent in a single message.
+ * Ref Linux source:
+ * net/unix/af_unix.c:unix_stream_sendmsg()
+ *
+ */
+int
+send_multiple_rights(int sd, int *sendfds, int numfds)
+{
+    int i, clen;
+    size_t csize;
+    struct msghdr msg;
+    struct iovec iov;
+    struct cmsghdr *cmptr;
+    struct ucred *credp;
+    //char control[CMSG_SPACE(sizeof(int) * numfds)];
+    char *control;
+    char tdata[] = "test";
+
+    csize = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(int));
+    if ((control = malloc(CMSG_LEN(csize))) == NULL) return -1;
+    memset(control, 0, CMSG_LEN(csize));
+    memset(&iov, 0, sizeof(iov));
+
+    msg.msg_control = control;
+    msg.msg_controllen = csize;
+
+    cmptr = CMSG_FIRSTHDR(&msg);
+    if (!cmptr) {
+        fprintf(stderr, "Can't get a first header\n");
+        free(control);
+        return -1;
+    }
+    cmptr->cmsg_len = CMSG_LEN(sizeof(int));
+    cmptr->cmsg_level = SOL_SOCKET;
+    cmptr->cmsg_type = SCM_RIGHTS;
+    *(int *) CMSG_DATA(cmptr) = sendfds[0];
+    if (!CMSG_OK(&msg, cmptr)) {
+        fprintf(stderr, "ERROR: self test1: invalid argument\n");
+        free(control);
+        return -1;
+    }
+
+    CMSG_NXTHDR(&msg, cmptr);
+    if (!cmptr) {
+        fprintf(stderr, "Can't get a second header\n");
+        free(control);
+        return -1;
+    }
+    cmptr->cmsg_len = CMSG_LEN(sizeof(int));
+    cmptr->cmsg_level = SOL_SOCKET;
+    cmptr->cmsg_type = SCM_RIGHTS;
+    *(int *) CMSG_DATA(cmptr) = sendfds[1];
+    if (!CMSG_OK(&msg, cmptr)) {
+        fprintf(stderr, "ERROR: self test2: invalid argument\n");
+        free(control);
+        return -1;
+    }
+
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+
+    iov.iov_base = tdata;
+    iov.iov_len = strlen(tdata);
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+
+    fprintf(stderr, "cmsghdr %ld control 0x%p ctl len %ld msg1 0x%p msg2 0x%p\n",
+            sizeof(struct cmsghdr), msg.msg_control, msg.msg_controllen,
+            CMSG_FIRSTHDR(&msg), CMSG_NXTHDR(&msg, cmptr));
+
+    fprintf(stderr, "Parent:send_multiple_rights\n");
+    if ((clen = sendmsg(sd, &msg, 0)) == -1) {
+        perror("sendmsg:send_multiple_rights");
+        free(control);
+        return -1;
+    }
+
+    fprintf(stderr, "Parent:sent %d bytes\n", clen);
+    free(control);
+    return 0;
+}
+
 int
 send_access_rights(int sd, int sendfd)
 {
-
     int clen;
-    struct msghdr	msg;
-    struct iovec	iov[1];
+    struct msghdr msg;
+    struct iovec iov[1];
     struct cmsghdr *cmptr;
     char control[CMSG_SPACE(sizeof(int))];
     char tdata[] = "test";
@@ -161,7 +265,7 @@ send_access_rights(int sd, int sendfd)
     msg.msg_iovlen = 1;
 
 
-    fprintf(stderr, "Parent:sending\n");
+    fprintf(stderr, "Parent:send_access_rights\n");
     if ((clen = sendmsg(sd, &msg, 0)) == -1) {
         perror("sendmsg:send_access_rights");
         return -1;
@@ -246,7 +350,8 @@ get_send_sock(void)
 
 	if (res == NULL) {
         fprintf(stderr, "Connect error: get_send_sock\n");
-        sd = -1;
+        freeaddrinfo(ressave);
+        return -1;
     }
 
 	freeaddrinfo(ressave);
@@ -281,11 +386,11 @@ void *
 recv_thread(void *param)
 {
     int sd, rsd, optval;
-    socklen_t clientlen;
     unsigned short port = TESTPORTNO;
     struct sockaddr_in serveraddr;
     struct sockaddr_in clientaddr;
-    
+    socklen_t clientlen = sizeof(clientaddr);
+
     sd = socket(AF_INET, SOCK_STREAM, 0);
     if (sd < 0) {
         perror("ERROR:recv_thread:opening socket");
@@ -388,47 +493,48 @@ unruly_kid()
       exit(-1);
   }
 
-  if (((cmptr = CMSG_FIRSTHDR(&msg)) != NULL) &&
-      (cmptr->cmsg_len > 0)) {
+  for (cmptr = CMSG_FIRSTHDR(&msg); cmptr != NULL; cmptr = CMSG_NXTHDR(&msg, cmptr)) {
+      if  (cmptr->cmsg_len >= CMSG_LEN(sizeof(int))) {
 
-      if (cmptr->cmsg_level != SOL_SOCKET) {
-          fprintf(stderr, "Child:control level != SOL_SOCKET\n");
-          exit(-1);
-      }
-      
-      if (cmptr->cmsg_type != SCM_RIGHTS) {
-          fprintf(stderr, "Child:control type != SCM_RIGHTS\n");
-          exit(-1);
-      }
-      
-      recvfd = ((int *) CMSG_DATA(cmptr));
-      fprintf(stdout, "Child:Received len %ld\n", cmptr->cmsg_len);
-      numfds = (cmptr->cmsg_len - sizeof(struct cmsghdr)) / sizeof(int);
-      fprintf(stdout, "Child:Received %d fds %ld\n", numfds, sizeof(int));
-      
-      for (i = 0; i < numfds; i++) {
-          // on the new fd
-          if (fstat(recvfd[i], &sbuf) != -1) {
-              if ((sbuf.st_mode & S_IFMT) == S_IFSOCK) {
-                  if (send(recvfd[i], test_data, strlen(test_data), 0) == -1) {
-                      perror("send child");
-                      continue;
-                  }
-              } else {
-                  if (write(recvfd[i], test_data, strlen(test_data)) == -1) {
-                      perror("write child");
-                      continue;
-                  }
-              }
-          } else {
-              perror("fstat child");
+          if (cmptr->cmsg_level != SOL_SOCKET) {
+              fprintf(stderr, "Child:control level != SOL_SOCKET\n");
               exit(-1);
           }
+      
+          if (cmptr->cmsg_type != SCM_RIGHTS) {
+              fprintf(stderr, "Child:control type != SCM_RIGHTS\n");
+              exit(-1);
+          }
+      
+          recvfd = ((int *) CMSG_DATA(cmptr));
+          fprintf(stdout, "Child:Received len %ld\n", cmptr->cmsg_len);
+          numfds = (cmptr->cmsg_len - CMSG_ALIGN(sizeof(struct cmsghdr))) / sizeof(int);
+          fprintf(stdout, "Child:Received %d fds %ld\n", numfds, sizeof(int));
+      
+          for (i = 0; i < numfds; i++) {
+              // on the new fd
+              if (fstat(recvfd[i], &sbuf) != -1) {
+                  if ((sbuf.st_mode & S_IFMT) == S_IFSOCK) {
+                      if (send(recvfd[i], test_data, strlen(test_data), 0) == -1) {
+                          perror("send child");
+                          continue;
+                      }
+                  } else {
+                      if (write(recvfd[i], test_data, strlen(test_data)) == -1) {
+                          perror("write child");
+                          continue;
+                      }
+                  }
+              } else {
+                  perror("fstat child");
+                  exit(-1);
+              }
           
-          close(recvfd[i]);
+              close(recvfd[i]);
+          }
+      } else {
+          fprintf(stderr, "Child:Did not receive access rights\n");
       }
-  } else {
-      fprintf(stderr, "Child:Did not receive access rights\n");
   }
   exit(0);
 }
@@ -508,6 +614,9 @@ main(int argc, char **argv) {
       exit(-1);
   }
 
+  struct timespec ts = {.tv_sec=0, .tv_nsec=010000000}; // 10 ms
+   nanosleep(&ts, NULL);
+
   // start the child that receives the access rights
   if ((child = fork()) == 0) {
       //We are the child proc
@@ -518,8 +627,8 @@ main(int argc, char **argv) {
   // do we want or need to loop?
   while(1) {
       int sd, sendfd, sendsock;
-      socklen_t clen;
       struct sockaddr caddr;
+      socklen_t clen = sizeof(struct sockaddr);
       int sendfds[2];
       
       // wait for the child to tell us it's ready

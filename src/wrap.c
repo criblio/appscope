@@ -2753,6 +2753,7 @@ init(void)
     g_fn.__fxstatat = dlsym(RTLD_NEXT, "__fxstatat");
     g_fn.__fxstatat64 = dlsym(RTLD_NEXT, "__fxstatat64");
     g_fn.gethostbyname_r = dlsym(RTLD_NEXT, "gethostbyname_r");
+    g_fn.gethostbyname2_r = dlsym(RTLD_NEXT, "gethostbyname2_r");
     g_fn.syscall = dlsym(RTLD_NEXT, "syscall");
     g_fn.prctl = dlsym(RTLD_NEXT, "prctl");
 #ifdef __STATX__
@@ -3606,6 +3607,30 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
         doDNSMetricName(DNS_DURATION, name, time.duration);
     }  else {
         doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname_r", name);
+        doDNSMetricName(DNS_DURATION, name, time.duration);
+    }
+
+    return rc;
+}
+
+EXPORTON int
+gethostbyname2_r(const char *name, int af, struct hostent *ret, char *buf,
+                 size_t buflen, struct hostent **result, int *h_errnop)
+{
+    int rc;
+    elapsed_t time = {0};
+    
+    WRAP_CHECK(gethostbyname2_r, -1);
+    time.initial = getTime();
+    rc = g_fn.gethostbyname2_r(name, af, ret, buf, buflen, result, h_errnop);
+    time.duration = getDuration(time.initial);
+
+    if ((rc == 0) && (result != NULL)) {
+        scopeLog("gethostbyname2_r", -1, CFG_LOG_DEBUG);
+        doDNSMetricName(DNS, name, time.duration);
+        doDNSMetricName(DNS_DURATION, name, time.duration);
+    }  else {
+        doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname2_r", name);
         doDNSMetricName(DNS_DURATION, name, time.duration);
     }
 

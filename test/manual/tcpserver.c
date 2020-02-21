@@ -116,14 +116,14 @@ int main(int argc, char **argv) {
       if (rc <= 0) continue;
   
       for (i = 0; i < numfds; ++i) {
-          //printf("%s:%d fds[%d].fd = %d\n", __FUNCTION__, __LINE__, i, fds[i].fd);
+          //fprintf(stderr, "%s:%d fds[%d].fd = %d\n", __FUNCTION__, __LINE__, i, fds[i].fd);
           if (fds[i].revents == 0) {
-              //printf("%s:%d No event\n", __FUNCTION__, __LINE__);
+              //fprintf(stderr, "%s:%d No event\n", __FUNCTION__, __LINE__);
               continue;
           }
 
           if (fds[i].revents & POLLHUP) {
-              printf("%s:%d Disconnect on fd %d\n", __FUNCTION__, __LINE__, fd);
+              fprintf(stderr, "%s:%d Disconnect on fd %d\n", __FUNCTION__, __LINE__, fd);
               close(fds[1].fd);
               fds[i].fd = -1;
               fds[i].events = 0;
@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
           }
           
           if (fds[i].revents & POLLERR) {
-              printf("%s:%d Error on fd %d\n", __FUNCTION__, __LINE__, fd);
+              fprintf(stderr, "%s:%d Error on fd %d\n", __FUNCTION__, __LINE__, fd);
               close(fds[i].fd);
               fds[i].fd = -1;
               fds[i].events = 0;
@@ -139,7 +139,7 @@ int main(int argc, char **argv) {
           }
 
           if (fds[i].revents & POLLNVAL) {
-              printf("%s:%d Invalid on fd %d\n", __FUNCTION__, __LINE__, fd);
+              fprintf(stderr, "%s:%d Invalid on fd %d\n", __FUNCTION__, __LINE__, fd);
               close(fds[i].fd);
               fds[i].fd = -1;
               fds[i].events = 0;
@@ -154,7 +154,7 @@ int main(int argc, char **argv) {
               }
 
               if (numfds > MAXFDS) {
-                  printf("%s:%d exceeded max FDs supported\n", __FUNCTION__, __LINE__);
+                  fprintf(stderr, "%s:%d exceeded max FDs supported\n", __FUNCTION__, __LINE__);
                   continue;
               }
 
@@ -181,19 +181,19 @@ int main(int argc, char **argv) {
                                     sizeof(clientaddr.sin_addr.s_addr), AF_INET);
               if (hostp == NULL) {
                   //perror("ERROR on gethostbyaddr");
-                  printf("server established connection on [%d].%d\n", arr, childfd);
+                  fprintf(stderr, "server established connection on [%d].%d\n", arr, childfd);
                   continue;
               }
 
               hostaddrp = inet_ntoa(clientaddr.sin_addr);
               if (hostaddrp == NULL) {
                   //perror("ERROR on inet_ntoa\n");
-                  printf("server established connection on [%d].%d with %s\n", 
+                  fprintf(stderr, "server established connection on [%d].%d with %s\n",
                          arr, childfd, hostp->h_name);
                   continue;
               }
 
-              printf("server established connection on [%d].%d with %s (%s:%d)\n", 
+              fprintf(stderr, "server established connection on [%d].%d with %s (%s:%d)\n",
                      arr, childfd, hostp->h_name, hostaddrp, htons(clientaddr.sin_port));
               break;
           } else if (fds[i].fd == 0) {
@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
               char *cmd;
                   
               if (fgetc(stdin) == 'U') {
-                  printf("%s:%d\n", __FUNCTION__, __LINE__);
+                  fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
                   if ((fd = open(CMDFILE, O_RDONLY)) < 0) {
                       perror("open");
                       continue;
@@ -223,7 +223,7 @@ int main(int argc, char **argv) {
                   
                   for (j = 2; j < numfds; j++) {
                       if ((fds[j].fd != -1) && (fds[j].fd > 2)) {
-                          printf("%s:%d fds[%d].fd=%d rc %d\n%s\n", __FUNCTION__, __LINE__,
+                          fprintf(stderr, "%s:%d fds[%d].fd=%d rc %d\n%s\n", __FUNCTION__, __LINE__,
                                  j, fds[j].fd, rc, cmd);
                           if (send(fds[j].fd, cmd, rc, 0) < 0) { // MSG_DONTWAIT
                               perror("send");
@@ -248,6 +248,11 @@ int main(int argc, char **argv) {
                   }
                   // echo input to stdout
                   write(1, buf, rc);
+
+                  // Artifical delay...
+                  //struct timespec ts = {.tv_sec=0, .tv_nsec=001000000}; // 1 ms
+                  //nanosleep(&ts, NULL);
+
               } while (1);
           }
       }

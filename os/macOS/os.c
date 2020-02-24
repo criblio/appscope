@@ -116,3 +116,16 @@ osThreadInit(void(*handler)(int), unsigned interval)
 {
     return TRUE;
 }
+
+/*
+ * In Linux we use Netlink socket capabilities
+ * in order to extract the peer inode for
+ * a given socket inode. There is no 
+ * Netlink in macOS. We will need to find
+ * a way to do something similar.
+ */
+int
+osUnixSockPeer(ino_t lnode)
+{
+    return -1;
+}

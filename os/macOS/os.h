@@ -10,6 +10,10 @@
 #include <libproc.h>
 #include <sys/resource.h>
 
+#ifndef CMSG_ALIGN
+#define CMSG_ALIGN(n) __DARWIN_ALIGN32(n)
+#endif
+
 #include "../../src/wrap.h"
 
 #define STATMODTIME(sb) sb.st_mtimespec.tv_sec

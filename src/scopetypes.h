@@ -59,7 +59,6 @@ typedef unsigned int bool;
 #define DEFAULT_SUMMARY_PERIOD 10
 #define DEFAULT_FD 999
 #define DEFAULT_MIN_FD 200
-#define DEFAULT_BADFD -2
 #define DEFAULT_CTL_FORMAT CFG_EVENT_ND_JSON
 #define DEFAULT_SRC_FILE_VALUE ".*"
 #define DEFAULT_SRC_CONSOLE_VALUE ".*"

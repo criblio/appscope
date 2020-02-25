@@ -1,4 +1,10 @@
 #include "os.h"
+#include "../../src/dbg.h"
+#include "../../src/scopetypes.h"
+#include "../../src/wrap.h"
+
+extern struct interposed_funcs_t g_fn;
+
 
 int
 osGetProcname(char *pname, int len)
@@ -142,7 +148,7 @@ osGetNumChildProcs(pid_t pid)
 }
 
 int
-osInitTSC(struct rtconfig_t *cfg)
+osInitTSC(platform_time_t *cfg)
 {
     int fd;
     char *entry, *last;

@@ -17,6 +17,9 @@ int                 outSendEvent(out_t*, event_t*);
 void                outFlush(out_t*);
 
 // Setters (modifies out_t, but does not persist modifications)
+int                 outNeedsConnection(out_t *);
+int                 outConnect(out_t *);
+int                 outDisonnect(out_t *);
 void                outTransportSet(out_t*, transport_t*);
 void                outFormatSet(out_t*, format_t*);
 

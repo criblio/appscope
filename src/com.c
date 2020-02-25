@@ -119,7 +119,7 @@ jsonConfigurationObject(config_t* cfg)
 
     if (!(root = cJSON_CreateObject())) goto err;
 
-    if (!(current = jsonObjectFromCfg(cfg)));
+    if (!(current = jsonObjectFromCfg(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, "current", current);
 
     return root;

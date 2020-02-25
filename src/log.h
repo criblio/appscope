@@ -15,6 +15,9 @@ cfg_log_level_t     logLevel(log_t*);
 void                logFlush(log_t*);
 
 // Setters (modifies log_t, but does not persist modifications)
+int                 logNeedsConnection(log_t*);
+int                 logConnect(log_t*);
+int                 logDisconnect(log_t*);
 void                logTransportSet(log_t*, transport_t*);
 void                logLevelSet(log_t*, cfg_log_level_t);
 

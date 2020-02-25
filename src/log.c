@@ -56,6 +56,27 @@ logFlush(log_t* log)
     transportFlush(log->transport);
 }
 
+int
+logNeedsConnection(log_t* log)
+{
+    if (!log) return 0;
+    return transportNeedsConnection(log->transport);
+}
+
+int
+logConnect(log_t* log)
+{
+    if (!log) return 0;
+    return transportConnect(log->transport);
+}
+
+int
+logDisconnect(log_t* log)
+{
+    if (!log) return 0;
+    return transportDisconnect(log->transport);
+}
+
 void
 logTransportSet(log_t* log, transport_t* transport)
 {

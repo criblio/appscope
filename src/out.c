@@ -66,6 +66,27 @@ outFlush(out_t* out)
     transportFlush(out->transport);
 }
 
+int
+outNeedsConnection(out_t* out)
+{
+    if (!out) return 0;
+    return transportNeedsConnection(out->transport);
+}
+
+int
+outConnect(out_t* out)
+{
+    if (!out) return 0;
+    return transportConnect(out->transport);
+}
+
+int
+outDisconnect(out_t* out)
+{
+    if (!out) return 0;
+    return transportDisconnect(out->transport);
+}
+
 void
 outTransportSet(out_t* out, transport_t* transport)
 {

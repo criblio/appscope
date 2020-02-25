@@ -1,4 +1,6 @@
 #include "os.h"
+#include "../../src/wrap.h"
+#include "../../src/scopetypes.h"
 
 int
 osGetProcname(char *pname, size_t len)
@@ -49,7 +51,7 @@ osGetNumChildProcs(pid_t pid)
 
 // For consistency, return the TSC freq in Mhz
 int
-osInitTSC(struct rtconfig_t *cfg)
+osInitTSC(platform_time_t *cfg)
 {
     uint64_t freq;
     size_t size = sizeof(uint64_t);

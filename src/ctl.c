@@ -476,17 +476,17 @@ ctlConnection(ctl_t *ctl)
 }
 
 int
-ctlClose(ctl_t *ctl)
-{
-    if (!ctl) return 0;
-    return transportDisconnect(ctl->transport);
-}
-
-int
 ctlConnect(ctl_t *ctl)
 {
     if (!ctl) return 0;
     return transportConnect(ctl->transport);
+}
+
+int
+ctlClose(ctl_t *ctl)
+{
+    if (!ctl) return 0;
+    return transportDisconnect(ctl->transport);
 }
 
 void

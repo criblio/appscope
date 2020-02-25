@@ -149,7 +149,7 @@ transportCreateFileCreatesFileWithRWPermissionsForAll(void** state)
 }
 
 static void
-transportCreateFileReturnsNullForInvalidPath(void** state)
+transportCreateFileReturnsUnconnectedForInvalidPath(void** state)
 {
     transport_t* t;
     t = transportCreateFile(NULL, CFG_BUFFER_LINE);
@@ -158,7 +158,10 @@ transportCreateFileReturnsNullForInvalidPath(void** state)
     assert_int_equal(dbgCountMatchingLines("src/transport.c"), 0);
 
     t = transportCreateFile("", CFG_BUFFER_LINE);
-    assert_null(t);
+    assert_non_null(t);
+
+    assert_true(transportNeedsConnection(t));
+    transportDestroy(&t);
 
     assert_int_equal(dbgCountMatchingLines("src/transport.c"), 1);
     dbgInit(); // reset dbg for the rest of the tests
@@ -404,7 +407,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportCreateUdpHandlesGoodHostArguments),
         cmocka_unit_test(transportCreateFileReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportCreateFileCreatesFileWithRWPermissionsForAll),
-        cmocka_unit_test(transportCreateFileReturnsNullForInvalidPath),
+        cmocka_unit_test(transportCreateFileReturnsUnconnectedForInvalidPath),
         cmocka_unit_test(transportCreateFileCreatesDirectoriesAsNeeded),
         cmocka_unit_test(transportCreateUnixReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportCreateUnixReturnsNullForInvalidPath),

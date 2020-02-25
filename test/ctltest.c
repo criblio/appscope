@@ -243,7 +243,7 @@ ctlParseRxMsgSetCfg(void** state)
         // the body made it into the req->cfg object...
         // Run 1: verify that StatsDMaxLen is default
         // Run 2: verify that StatsDMaxLen is 42
-        int expected_statsd_val;
+        int expected_statsd_val = -1;
         switch (run++) {
             case 1:
                 expected_statsd_val = DEFAULT_STATSD_MAX_LEN;

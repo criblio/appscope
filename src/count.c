@@ -12,6 +12,7 @@
 #include "dbg.h"
 #include "dns.h"
 #include "format.h"
+#include "os.h"
 #include "plattime.h"
 
 #define PROTOCOL_STR 16

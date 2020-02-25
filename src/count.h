@@ -107,6 +107,7 @@ int doSetAddrs(int sockfd);
 int doAddNewSock(int sockfd);
 int getDNSName(int sd, void *pkt, int pktlen);
 int doURL(int sockfd, const void *buf, size_t len, metric_t src);
+int doAccessRights(struct msghdr *msg);
 int doRecv(int sockfd, ssize_t rc);
 int doSend(int sockfd, ssize_t rc);
 void doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func);

@@ -2701,6 +2701,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
         }
         
         doRecv(sockfd, rc);
+        doAccessRights(msg);
     } else {
         doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "recvmsg", "nopath");
     }

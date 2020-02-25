@@ -59,19 +59,17 @@ test: $(C_FILES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/glibcvertest glibcvertest.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/selfinterposetest selfinterposetest.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dnstest dnstest.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	# wraptest needs more linker flags
-	#$(CC) -c $(TEST_CFLAGS) test/wraptest.c $(INCLUDES) $(TEST_INCLUDES)
-	#$(CC) $(TEST_CFLAGS) -o test/$(OS)/wraptest wraptest.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -Llib/$(OS)/ -lwrap
+	$(CC) $(TEST_CFLAGS) test/manual/passfd.c -lpthread -o test/$(OS)/passfd
 	@echo "Running Tests and Generating Test Coverage"
 	test/execute.sh
-	# see file:///Users/cribl/scope/coverage/index.html
+# see file:///Users/cribl/scope/coverage/index.html
 
 $(YAML_AR): $(YAML_SRC)
 	@echo "Building libyaml"
 	cd ./contrib/libyaml && ./bootstrap
 	cd ./contrib/libyaml && ./configure LIBS=-ldl
 	cd ./contrib/libyaml && make
-	# don't install on the host.  We only need the static .a file
+# don't install on the host.  We only need the static .a file
 
 $(JSON_AR): contrib/cJSON/cJSON.c
 	@echo "Building cJSON"
@@ -83,5 +81,5 @@ $(TEST_LIB):
 	cd contrib/cmocka && test -d ./build || mkdir ./build
 	cd contrib/cmocka/build && cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Debug ..
 	cd contrib/cmocka/build && make
-	# don't install on the host.
-	# We can tell the linker where to find the .dylib file
+# don't install on the host.
+# We can tell the linker where to find the .dylib file

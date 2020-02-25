@@ -11,6 +11,10 @@
 #include <sys/resource.h>
 #include "../../src/plattime.h"
 
+#ifndef CMSG_ALIGN
+#define CMSG_ALIGN(n) __DARWIN_ALIGN32(n)
+#endif
+
 #define STATMODTIME(sb) sb.st_mtimespec.tv_sec
 
 extern int osGetProcname(char *, size_t);

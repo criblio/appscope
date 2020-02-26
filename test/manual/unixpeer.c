@@ -1,7 +1,7 @@
 /* 
  * unixpeer.c 
  *
- * gcc -g test/manual/unixpeer.c -o test/linux/unixpeer
+ * gcc -g -Wall test/manual/unixpeer.c -o test/linux/unixpeer
  *
  * Create a UNIX socket between 2 procs; client & server
  * Send data over the socket
@@ -27,7 +27,7 @@
 #include <netdb.h>
 #include <sys/wait.h>
 
-#define EVENTFILE "/tmp/scope_events.log"
+#define EVENTFILE "/tmp/scope_peer.log"
 
 char *pfile;
 int verbose = 0;
@@ -60,7 +60,7 @@ get_node(char *events, char *start, char *tag)
 char *
 get_events()
 {
-    int fd, rc, i;
+    int fd, rc;
     char *buf;
     struct stat sbuf;
     
@@ -98,7 +98,7 @@ server_child()
 {
     int parentfd;
     int childfd;
-    int clientlen;
+    unsigned int clientlen;
     int optval;
     int rc;
     struct sockaddr_un serveraddr;
@@ -213,7 +213,6 @@ client_child() {
 }
 
 int main(int argc, char **argv) {
-    int optval;
     int rc, opt, client_stat, server_stat;
     pid_t client, server;
     ino_t tx_lnode, tx_rnode, rx_lnode, rx_rnode;
@@ -238,6 +237,9 @@ int main(int argc, char **argv) {
         server_child();
     }
 
+    struct timespec ts = {.tv_sec=0, .tv_nsec=100000000}; // 100 ms
+    nanosleep(&ts, NULL);
+
     // start the client child
     if ((client = fork()) == 0) {
         //We are the child proc
@@ -250,10 +252,10 @@ int main(int argc, char **argv) {
     rc = 0;
     if ((events = get_events()) == NULL) exit(-1);
 
-    if ((tx_lnode = get_node(events, "\"net.tx\"", "\"localp\"")) == -1) rc = -1;
-    if ((tx_rnode = get_node(events, "\"net.tx\"", "\"remotep\"")) == -1) rc = -1;
-    if ((rx_lnode = get_node(events, "\"net.rx\"", "\"localp\"")) == -1) rc = -1;
-    if ((rx_rnode = get_node(events, "\"net.rx\"", "\"remotep\"")) == -1) rc = -1;
+    if ((tx_lnode = get_node(events, "\"net.tx\"", "\"localn\"")) == -1) rc = -1;
+    if ((tx_rnode = get_node(events, "\"net.tx\"", "\"remoten\"")) == -1) rc = -1;
+    if ((rx_lnode = get_node(events, "\"net.rx\"", "\"localn\"")) == -1) rc = -1;
+    if ((rx_rnode = get_node(events, "\"net.rx\"", "\"remoten\"")) == -1) rc = -1;
     
     if ((rc == 0) && (tx_lnode == rx_rnode) && (tx_rnode == rx_lnode)) {
         fprintf(stdout, "Nodes match tx_%ld:%ld rx_%ld:%ld\n",

@@ -1,7 +1,7 @@
 #! /bin/bash
 
 export SCOPE_EVENT_METRIC=true
-export SCOPE_EVENT_DEST=file:///tmp/scope_events.log
+export SCOPE_EVENT_DEST=file:///tmp/scope_peer.log
 export LD_PRELOAD=./lib/linux/libscope.so
 
 declare -i ERR=0

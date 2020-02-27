@@ -44,8 +44,9 @@ static void doOpen(int, const char *, enum fs_type_t, const char *);
 static void doMetric(evt_t*, const char *, uint64_t, event_t *);
 static void reportProcessStart(void);
 static void threadNow(int);
+static void doUnixEndpoint(int, net_info *);
 
-static void
+void
 scopeLog(const char* msg, int fd, cfg_log_level_t level)
 {
     if (!g_log || !msg || !g_cfg.proc.procname[0]) return;
@@ -143,8 +144,10 @@ fileModTime(const char *path)
 #define LOCALIP_FIELD(val)      STRFIELD("localip",        (val),        6)
 #define REMOTEIP_FIELD(val)     STRFIELD("remoteip",       (val),        6)
 #define LOCALP_FIELD(val)       NUMFIELD("localp",         (val),        6)
+#define LOCALN_FIELD(val)       NUMFIELD("localn",         (val),        6)
 #define PORT_FIELD(val)         NUMFIELD("port",           (val),        6)
 #define REMOTEP_FIELD(val)      NUMFIELD("remotep",        (val),        6)
+#define REMOTEN_FIELD(val)      NUMFIELD("remoten",        (val),        6)
 #define FD_FIELD(val)           NUMFIELD("fd",             (val),        7)
 #define PID_FIELD(val)          NUMFIELD("pid",            (val),        7)
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
@@ -1642,6 +1645,8 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
     case NETRX:
     {
+        event_t rxMetric;
+        event_field_t rxFields[20];
         char lip[INET6_ADDRSTRLEN];
         char rip[INET6_ADDRSTRLEN];
         char data[16];
@@ -1661,15 +1666,35 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             strncpy(data, "clear", sizeof(data));
         }
 
+        // Do we need to define domain=LOCAL or NETLINK?
         if ((g_netinfo[fd].type == SCOPE_UNIX) ||
             (g_netinfo[fd].localConn.ss_family == AF_LOCAL) ||
             (g_netinfo[fd].localConn.ss_family == AF_NETLINK)) {
-            strncpy(lip, "UNIX", sizeof(lip));
-            strncpy(rip, "UNIX", sizeof(rip));
-            localPort = remotePort = 0;
+            doUnixEndpoint(fd, &g_netinfo[fd]);
+            localPort = g_netinfo[fd].lnode;
+            remotePort = g_netinfo[fd].rnode;
+
             if (g_netinfo[fd].localConn.ss_family == AF_NETLINK) {
                 strncpy(proto, "NETLINK", sizeof(proto));
             }
+
+            event_field_t fields[] = {
+                PROC_FIELD(g_cfg.proc.procname),
+                PID_FIELD(g_cfg.proc.pid),
+                FD_FIELD(fd),
+                HOST_FIELD(g_cfg.proc.hostname),
+                DOMAIN_FIELD("UNIX"),
+                PROTO_FIELD(proto),
+                LOCALN_FIELD(localPort),
+                REMOTEN_FIELD(remotePort),
+                DATA_FIELD(data),
+                NUMOPS_FIELD(g_netinfo[fd].numRX),
+                UNIT_FIELD("byte"),
+                FIELDEND
+            };
+            memmove(&rxFields, &fields, sizeof(fields));
+            event_t rxUnixMetric = INT_EVENT("net.rx", g_netinfo[fd].rxBytes, DELTA, rxFields);
+            memmove(&rxMetric, &rxUnixMetric, sizeof(event_t));
         } else {
             if (g_netinfo[fd].localConn.ss_family == AF_INET) {
                 if (inet_ntop(AF_INET,
@@ -1703,25 +1728,27 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             } else {
                 strncpy(rip, " ", sizeof(rip));
             }
-        }
-        
-        event_field_t fields[] = {
-            PROC_FIELD(g_cfg.proc.procname),
-            PID_FIELD(g_cfg.proc.pid),
-            FD_FIELD(fd),
-            HOST_FIELD(g_cfg.proc.hostname),
-            PROTO_FIELD(proto),
-            LOCALIP_FIELD(lip),
-            LOCALP_FIELD(localPort),
-            REMOTEIP_FIELD(rip),
-            REMOTEP_FIELD(remotePort),
-            DATA_FIELD(data),
-            NUMOPS_FIELD(g_netinfo[fd].numRX),
-            UNIT_FIELD("byte"),
-            FIELDEND
-        };
 
-        event_t rxMetric = INT_EVENT("net.rx", g_netinfo[fd].rxBytes, DELTA, fields);
+            event_field_t fields[] = {
+                PROC_FIELD(g_cfg.proc.procname),
+                PID_FIELD(g_cfg.proc.pid),
+                FD_FIELD(fd),
+                HOST_FIELD(g_cfg.proc.hostname),
+                DOMAIN_FIELD("AF_INET"),
+                PROTO_FIELD(proto),
+                LOCALIP_FIELD(lip),
+                LOCALP_FIELD(localPort),
+                REMOTEIP_FIELD(rip),
+                REMOTEP_FIELD(remotePort),
+                DATA_FIELD(data),
+                NUMOPS_FIELD(g_netinfo[fd].numRX),
+                UNIT_FIELD("byte"),
+                FIELDEND
+            };
+            memmove(&rxFields, &fields, sizeof(fields));
+            event_t rxNetMetric = INT_EVENT("net.rx", g_netinfo[fd].rxBytes, DELTA, rxFields);
+            memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
+        }
 
         doMetric(g_evt, g_cfg.proc.hostname, g_netinfo[fd].uid, &rxMetric);
 
@@ -1743,6 +1770,8 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 
     case NETTX:
     {
+        event_t txMetric;
+        event_field_t txFields[20];
         char lip[INET6_ADDRSTRLEN];
         char rip[INET6_ADDRSTRLEN];
         char data[16];
@@ -1765,12 +1794,31 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
         if ((g_netinfo[fd].type == SCOPE_UNIX) ||
             (g_netinfo[fd].localConn.ss_family == AF_LOCAL) ||
             (g_netinfo[fd].localConn.ss_family == AF_NETLINK)) {
-            strncpy(lip, "UNIX", sizeof(lip));
-            strncpy(rip, "UNIX", sizeof(rip));
-            localPort = remotePort = 0;
+            doUnixEndpoint(fd, &g_netinfo[fd]);
+            localPort = g_netinfo[fd].lnode;
+            remotePort = g_netinfo[fd].rnode;
+
             if (g_netinfo[fd].localConn.ss_family == AF_NETLINK) {
                 strncpy(proto, "NETLINK", sizeof(proto));
             }
+
+            event_field_t fields[] = {
+                PROC_FIELD(g_cfg.proc.procname),
+                PID_FIELD(g_cfg.proc.pid),
+                FD_FIELD(fd),
+                HOST_FIELD(g_cfg.proc.hostname),
+                DOMAIN_FIELD("UNIX"),
+                PROTO_FIELD(proto),
+                LOCALN_FIELD(localPort),
+                REMOTEN_FIELD(remotePort),
+                DATA_FIELD(data),
+                NUMOPS_FIELD(g_netinfo[fd].numRX),
+                UNIT_FIELD("byte"),
+                FIELDEND
+            };
+            memmove(&txFields, &fields, sizeof(fields));
+            event_t txUnixMetric = INT_EVENT("net.tx", g_netinfo[fd].txBytes, DELTA, txFields);
+            memmove(&txMetric, &txUnixMetric, sizeof(event_t));
         } else {
             if (g_netinfo[fd].localConn.ss_family == AF_INET) {
                 if (inet_ntop(AF_INET,
@@ -1804,25 +1852,27 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
             } else {
                 strncpy(rip, " ", sizeof(rip));
             }
+
+            event_field_t fields[] = {
+                PROC_FIELD(g_cfg.proc.procname),
+                PID_FIELD(g_cfg.proc.pid),
+                FD_FIELD(fd),
+                HOST_FIELD(g_cfg.proc.hostname),
+                DOMAIN_FIELD("AF_INET"),
+                PROTO_FIELD(proto),
+                LOCALIP_FIELD(lip),
+                LOCALP_FIELD(localPort),
+                REMOTEIP_FIELD(rip),
+                REMOTEP_FIELD(remotePort),
+                DATA_FIELD(data),
+                NUMOPS_FIELD(g_netinfo[fd].numRX),
+                UNIT_FIELD("byte"),
+                FIELDEND
+            };
+            memmove(&txFields, &fields, sizeof(fields));
+            event_t txNetMetric = INT_EVENT("net.tx", g_netinfo[fd].txBytes, DELTA, txFields);
+            memmove(&txMetric, &txNetMetric, sizeof(event_t));
         }
-
-        event_field_t fields[] = {
-            PROC_FIELD(g_cfg.proc.procname),
-            PID_FIELD(g_cfg.proc.pid),
-            FD_FIELD(fd),
-            HOST_FIELD(g_cfg.proc.hostname),
-            PROTO_FIELD(proto),
-            LOCALIP_FIELD(lip),
-            LOCALP_FIELD(localPort),
-            REMOTEIP_FIELD(rip),
-            REMOTEP_FIELD(remotePort),
-            DATA_FIELD(data),
-            NUMOPS_FIELD(g_netinfo[fd].numTX),
-            UNIT_FIELD("byte"),
-            FIELDEND
-        };
-
-        event_t txMetric = INT_EVENT("net.tx", g_netinfo[fd].txBytes, DELTA, fields);
 
         doMetric(g_evt, g_cfg.proc.hostname, g_netinfo[fd].uid, &txMetric);
 
@@ -1867,7 +1917,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
 static long long
 doGetProcCPU() {
     struct rusage ruse;
-    
+
     if (getrusage(RUSAGE_SELF, &ruse) != 0) {
         return (long long)-1;
     }
@@ -1878,12 +1928,37 @@ doGetProcCPU() {
 }
 
 static void
+doUnixEndpoint(int sd, net_info *net)
+{
+    ino_t rnode;
+    struct stat sbuf;
+
+    if (!net || !g_fn.socket || !g_fn.close) return;
+
+    if ((fstat(sd, &sbuf) == -1) ||
+        ((sbuf.st_mode & S_IFMT) != S_IFSOCK)) {
+        net->lnode = 0;
+        net->rnode = 0;
+        return;
+    }
+
+    if ((rnode = osUnixSockPeer(sbuf.st_ino)) != -1) {
+        net->lnode = sbuf.st_ino;
+        net->rnode = rnode;
+    } else {
+        net->lnode = 0;
+        net->rnode = 0;
+    }
+    return;
+}
+
+static void
 doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, enum control_type_t endp)
 {
     if (!addr || (len <= 0)) {
         return;
     }
-    
+
     // Should we check for at least the size of sockaddr_in?
     if ((getNetEntry(sd) != NULL) && addr && (len > 0)) {
         if (endp == LOCAL) {

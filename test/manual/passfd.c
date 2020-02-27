@@ -2,7 +2,7 @@
  * passfd.c - Test to see that Scope is handling the passing of fd access
  * rights between proceses correctly
  *
- * gcc -g test/manual/passfd.c -lpthread -o test/linux/passfd
+ * gcc -g -Wall test/manual/passfd.c -lpthread -o test/linux/passfd
  *
  * 1) passfd is a parent that sends access rights to a child process over a UNIX socket.
  *
@@ -166,7 +166,6 @@ send_multiple_rights(int sd, int *sendfds, int numfds)
     struct msghdr msg;
     struct iovec iov;
     struct cmsghdr *cmptr;
-    //struct ucred *credp;
     //char control[CMSG_SPACE(sizeof(int) * numfds)];
     char *control;
     char tdata[] = "test";

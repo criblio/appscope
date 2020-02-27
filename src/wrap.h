@@ -6,21 +6,11 @@
 #include <pthread.h>
 #include <wchar.h>
 
-#if defined(__LINUX__) && defined(__STATX__) && defined(STRUCT_STATX_MISSING_FROM_SYS_STAT_H)
-#include <linux/stat.h>
-#endif // __LINUX__ && __STATX__ && STRUCT_STATX_MISSING_FROM_SYS_STAT_H
-
 #include <sys/statvfs.h>
 #include <sys/param.h>
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#ifdef __LINUX__
-#include <sys/vfs.h>
-#include <sys/epoll.h>
-#endif 
-
-#include "os.h"
 
 #define DEBUG 0
 #define EXPORT __attribute__((visibility("default")))
@@ -29,24 +19,6 @@
 
 #define DYN_CONFIG_PREFIX "scope"
 #define MAXTRIES 10
-
-/*
- * OK; this is not cool. But, we are holding off making structural changes right now 
- * We'll move things into a Linux only build. Until then we need these for the macOS build
- */
-#ifdef __MACOS__
-#ifndef off64_t
-typedef uint64_t off64_t;
-#endif
-#ifndef fpos64_t
-typedef uint64_t fpos64_t;
-#endif
-#ifndef statvfs64
-struct statvfs64 {
-    uint64_t x;
-};
-#endif
-#endif // __MACOS__
 
 typedef struct rtconfig_t {
     const char *cmddir;

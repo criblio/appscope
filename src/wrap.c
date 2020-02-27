@@ -8,6 +8,7 @@
 #include <sys/prctl.h>
 #endif
 #include <sys/syscall.h>
+#include <sys/stat.h>
 #include "atomic.h"
 #include "cfg.h"
 #include "cfgutils.h"
@@ -15,6 +16,7 @@
 #include "count.h"
 #include "dbg.h"
 #include "dns.h"
+#include "os.h"
 #include "scopetypes.h"
 #include "plattime.h"
 #include "wrap.h"
@@ -35,7 +37,6 @@ static void *periodic(void *);
 static void doConfig(config_t *);
 static void reportProcessStart(void);
 static void threadNow(int);
-
 
 static time_t
 fileModTime(const char *path)
@@ -60,7 +61,6 @@ fileModTime(const char *path)
     // STATMODTIME from os.h as timespec names are different between OSs
     return STATMODTIME(statbuf);
 }
-
 
 static void
 remoteConfig()

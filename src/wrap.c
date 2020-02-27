@@ -1646,6 +1646,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     case NETRX:
     {
         event_t rxMetric;
+        event_field_t rxFields[20];
         char lip[INET6_ADDRSTRLEN];
         char rip[INET6_ADDRSTRLEN];
         char data[16];
@@ -1691,8 +1692,8 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
                 UNIT_FIELD("byte"),
                 FIELDEND
             };
-
-            event_t rxUnixMetric = INT_EVENT("net.rx", g_netinfo[fd].rxBytes, DELTA, fields);
+            memmove(&rxFields, &fields, sizeof(fields));
+            event_t rxUnixMetric = INT_EVENT("net.rx", g_netinfo[fd].rxBytes, DELTA, rxFields);
             memmove(&rxMetric, &rxUnixMetric, sizeof(event_t));
         } else {
             if (g_netinfo[fd].localConn.ss_family == AF_INET) {
@@ -1744,8 +1745,8 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
                 UNIT_FIELD("byte"),
                 FIELDEND
             };
-
-            event_t rxNetMetric = INT_EVENT("net.rx", g_netinfo[fd].rxBytes, DELTA, fields);
+            memmove(&rxFields, &fields, sizeof(fields));
+            event_t rxNetMetric = INT_EVENT("net.rx", g_netinfo[fd].rxBytes, DELTA, rxFields);
             memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
         }
 
@@ -1770,6 +1771,7 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
     case NETTX:
     {
         event_t txMetric;
+        event_field_t txFields[20];
         char lip[INET6_ADDRSTRLEN];
         char rip[INET6_ADDRSTRLEN];
         char data[16];
@@ -1814,8 +1816,8 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
                 UNIT_FIELD("byte"),
                 FIELDEND
             };
-
-            event_t txUnixMetric = INT_EVENT("net.tx", g_netinfo[fd].txBytes, DELTA, fields);
+            memmove(&txFields, &fields, sizeof(fields));
+            event_t txUnixMetric = INT_EVENT("net.tx", g_netinfo[fd].txBytes, DELTA, txFields);
             memmove(&txMetric, &txUnixMetric, sizeof(event_t));
         } else {
             if (g_netinfo[fd].localConn.ss_family == AF_INET) {
@@ -1867,8 +1869,8 @@ doNetMetric(enum metric_t type, int fd, enum control_type_t source, ssize_t size
                 UNIT_FIELD("byte"),
                 FIELDEND
             };
-
-            event_t txNetMetric = INT_EVENT("net.tx", g_netinfo[fd].txBytes, DELTA, fields);
+            memmove(&txFields, &fields, sizeof(fields));
+            event_t txNetMetric = INT_EVENT("net.tx", g_netinfo[fd].txBytes, DELTA, txFields);
             memmove(&txMetric, &txNetMetric, sizeof(event_t));
         }
 

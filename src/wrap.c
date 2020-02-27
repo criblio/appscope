@@ -106,15 +106,15 @@ remoteConfig()
     do {
         numtries++;
         rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
-        if (rc <= 0) {
-            if (errno == 0) {
-                // This is the case where we lost connection
-                ctlClose(g_ctl);
-                break;
-            } else {
-                // we've had an error: abandon the data
-                break;
-            }
+        if (rc == 0) {
+            // The remote side has closed the connection
+            ctlClose(g_ctl);
+            break;
+        } else if (rc < 0) {
+            // Our own application has closed fds.fd
+            if (errno == EBADF) ctlClose(g_ctl);
+            // We've had an error; abandon the data
+            break;
         }
 
         if (g_fn.fwrite(buf, rc, (size_t)1, fs) <= 0) {

@@ -96,13 +96,20 @@ placeDescriptor(int fd, transport_t *t)
 {
     if (!t) return -1;
 
+    // next_fd_to_try avoids reusing file descriptors.
+    // Without this, we've had problems where the buffered stream for
+    // g_log has it's fd closed and reopened by another transport which
+    // causes the mis-routing of data.
+    static int next_fd_to_try = DEFAULT_FD;
+
     int i, dupfd;
 
-    for (i = DEFAULT_FD; i >= DEFAULT_MIN_FD; i--) {
+    for (i = next_fd_to_try; i >= DEFAULT_MIN_FD; i--) {
         if ((t->fcntl(i, F_GETFD) == -1) && (errno == EBADF)) {
             // This fd is available
             if ((dupfd = t->dup2(fd, i)) == -1) continue;
             t->close(fd);
+            next_fd_to_try = dupfd - 1;
             return dupfd;
         }
     }
@@ -144,6 +151,14 @@ transportNeedsConnection(transport_t *trans)
         case CFG_TCP:
             return (trans->net.sock == -1);
         case CFG_FILE:
+            // This checks to see if our file descriptor has been
+            // closed by our process.  (errno == EBADF) Stream buffering
+            // makes it harder to know when this has happened.
+            if ((trans->file.stream) &&
+                   (trans->fcntl(fileno(trans->file.stream), F_GETFD) == -1)) {
+                DBG(NULL);
+                transportDisconnect(trans);
+            }
             return (trans->file.stream == NULL);
         case CFG_UNIX:
         case CFG_SYSLOG:

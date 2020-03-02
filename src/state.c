@@ -31,10 +31,8 @@ metric_counters g_ctrs = {0};
 
 
 // interfaces
-log_t* g_log = NULL;
 out_t* g_out = NULL;
 ctl_t* g_ctl = NULL;
-proc_id_t g_proc = {0};
 
 // operational params (not config-based)
 int g_urls = 0;
@@ -117,20 +115,6 @@ void
 resetState()
 {
     memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
-}
-
-void
-scopeLog(const char* msg, int fd, cfg_log_level_t level)
-{
-    if (!g_log || !msg || !g_proc.procname[0]) return;
-
-    char buf[strlen(msg) + 128];
-    if (fd != -1) {
-        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): fd:%d %s\n", g_proc.procname, g_proc.pid, fd, msg);
-    } else {
-        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): %s\n", g_proc.procname, g_proc.pid, msg);
-    }
-    logSend(g_log, buf, level);
 }
 
 // DEBUG

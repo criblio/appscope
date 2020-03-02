@@ -12,7 +12,6 @@ extern int g_blockconn;
 void initState();
 void resetState();
 
-void scopeLog(const char* msg, int fd, cfg_log_level_t level);
 void setVerbosity(unsigned verbosity);
 void addSock(int fd, int type);
 int doBlockConnection(int fd, const struct sockaddr *addr_arg);

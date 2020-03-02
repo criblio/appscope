@@ -7,7 +7,6 @@
 
 #include "ctl.h"
 #include "evt.h"
-#include "log.h"
 #include "out.h"
 
 typedef enum {
@@ -68,11 +67,8 @@ typedef enum {
 
 
 // Interfaces
-extern log_t* g_log;
 extern out_t* g_out;
 extern ctl_t* g_ctl;
-
-extern proc_id_t g_proc;
 
 
 void setReportingInterval(int);

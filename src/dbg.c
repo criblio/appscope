@@ -30,6 +30,8 @@ struct _dbg_t {
 };
 
 dbg_t* g_dbg = NULL;
+log_t* g_log = NULL;
+proc_id_t g_proc = {0};
 
 
 void
@@ -247,3 +249,18 @@ dbgAddLine(const char* key, const char* fmt, ...)
     atomicCasU64(&spinlock, 1ULL, 0ULL);
 
 }
+
+void
+scopeLog(const char* msg, int fd, cfg_log_level_t level)
+{
+    if (!g_log || !msg || !g_proc.procname[0]) return;
+
+    char buf[strlen(msg) + 128];
+    if (fd != -1) {
+        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): fd:%d %s\n", g_proc.procname, g_proc.pid, fd, msg);
+    } else {
+        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): %s\n", g_proc.procname, g_proc.pid, msg);
+    }
+    logSend(g_log, buf, level);
+}
+

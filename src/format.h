@@ -72,11 +72,6 @@ custom_tag_t**      fmtCustomTags(format_t*);
 // The caller is responsible for deallocating with free().
 char*               fmtStatsDString(format_t*, event_t*, regex_t*);
 
-// These functions return a pointer to malloc()'d buffers.
-// The caller is reposibile for deallocating with cJSON_Delete().
-cJSON *             fmtMetricJson(event_t*, regex_t*);
-cJSON *             fmtEventJson(event_format_t *);
-
 // Setters
 void                fmtStatsDPrefixSet(format_t*, const char*);
 void                fmtStatsDMaxLenSet(format_t*, unsigned);

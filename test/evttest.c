@@ -391,6 +391,202 @@ evtLogWithAndWithoutMatchingValueFilter(void** state)
 }
 
 static void
+fmtEventJsonValue(void** state)
+{
+    proc_id_t proc = {.pid = 1234,
+                      .ppid = 1233,
+                      .hostname = "earl",
+                      .procname = "formattest",
+                      .cmd = "cmd",
+                      .id = "earl-formattest-cmd"};
+    event_format_t event_format;
+    event_format.timestamp = 1573058085.991;
+    event_format.src = "stdin";
+    event_format.proc = &proc;
+    event_format.uid = 0xCAFEBABEDEADBEEF;
+    event_format.data = cJSON_CreateString("поспехаў");
+    event_format.sourcetype = CFG_SRC_SYSLOG;
+
+    assert_null(fmtEventJson(NULL));
+
+    cJSON* json = fmtEventJson(&event_format);
+    assert_non_null(json);
+    char* str = cJSON_PrintUnformatted(json);
+    assert_non_null(str);
+
+    //printf("%s:%d %s\n", __FUNCTION__, __LINE__, str);
+    assert_string_equal(str, "{\"sourcetype\":\"syslog\","
+                              "\"id\":\"earl-formattest-cmd\","
+                              "\"_time\":1573058085.991,"
+                              "\"source\":\"stdin\","
+                              "\"data\":\"поспехаў\","
+                              "\"host\":\"earl\","
+                              "\"_channel\":\"14627333968688430831\"}");
+    free(str);
+    cJSON_Delete(json);
+}
+
+static void
+fmtEventJsonWithEmbeddedNulls(void** state)
+{
+    proc_id_t proc = {.pid = 1234,
+                      .ppid = 1233,
+                      .hostname = "earl",
+                      .procname = "",
+                      .cmd = "",
+                      .id = "earl--"};
+    event_format_t event_format;
+    event_format.timestamp = 1573058085.001;
+    event_format.src = "stdout";
+    event_format.proc = &proc;
+    event_format.uid = 0xCAFEBABEDEADBEEF;
+    char buf[] = "Unë mund të ha qelq dhe nuk më gjen gjë";
+    int datasize = strlen(buf);
+    buf[9] = '\0';                  //  <-- Null in middle of buf
+    buf[29] = '\0';                 //  <-- Null in middle of buf
+    event_format.data = cJSON_CreateStringFromBuffer(buf, datasize);
+    event_format.sourcetype = CFG_SRC_CONSOLE;
+
+    // test that data has the nulls properly escaped
+    cJSON* json = fmtEventJson(&event_format);
+    assert_non_null(json);
+    char* str = cJSON_PrintUnformatted(json);
+    assert_non_null(str);
+    assert_string_equal(str, "{\"sourcetype\":\"console\","
+                              "\"id\":\"earl--\","
+                              "\"_time\":1573058085.001,"
+                              "\"source\":\"stdout\","
+                              "\"data\":\"Unë mund\\u0000të ha qelq dhe nuk\\u0000më gjen gjë\","
+                              "\"host\":\"earl\","
+                              "\"_channel\":\"14627333968688430831\"}");
+    free(str);
+    cJSON_Delete(json);
+
+    // test that null data omits a data field.
+    event_format.data=NULL;
+    json = fmtEventJson(&event_format);
+    assert_non_null(json);
+    str = cJSON_PrintUnformatted(json);
+    assert_non_null(str);
+    assert_string_equal(str, "{\"sourcetype\":\"console\","
+                              "\"id\":\"earl--\","
+                              "\"_time\":1573058085.001,"
+                              "\"source\":\"stdout\","
+                              "\"host\":\"earl\","
+                              "\"_channel\":\"14627333968688430831\"}");
+    free(str);
+    cJSON_Delete(json);
+}
+
+static void
+fmtMetricJsonNoFields(void** state)
+{
+    const char* map[] =
+        //DELTA     CURRENT  DELTA_MS  HISTOGRAM    SET
+        {"counter", "gauge", "timer", "histogram", "set", "unknown"};
+
+    // test each value of _metric_type
+    data_type_t type;
+    for (type=DELTA; type<=SET+1; type++) {
+        event_t e = INT_EVENT("A", 1, type, NULL);
+        cJSON* json = fmtMetricJson(&e, NULL);
+        cJSON* json_type = cJSON_GetObjectItem(json, "_metric_type");
+        assert_string_equal(map[type], cJSON_GetStringValue(json_type));
+        if (json) cJSON_Delete(json);
+    }
+}
+
+static void
+fmtMetricJsonWFields(void** state)
+{
+    event_field_t fields[] = {
+        STRFIELD("A",               "Z",                    0),
+        NUMFIELD("B",               987,                    1),
+        STRFIELD("C",               "Y",                    2),
+        NUMFIELD("D",               654,                    3),
+        FIELDEND
+    };
+    event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
+    cJSON* json = fmtMetricJson(&e, NULL);
+    assert_non_null(json);
+    char* str = cJSON_PrintUnformatted(json);
+    assert_non_null(str);
+    assert_string_equal(str,
+                 "{\"_metric\":\"hey\","
+                 "\"_metric_type\":\"histogram\","
+                 "\"_value\":2,"
+                 "\"A\":\"Z\",\"B\":987,\"C\":\"Y\",\"D\":654}");
+    if (str) free(str);
+    cJSON_Delete(json);
+}
+
+static void
+fmtMetricJsonWFilteredFields(void** state)
+{
+    event_field_t fields[] = {
+        STRFIELD("A",               "Z",                    0),
+        NUMFIELD("B",               987,                    1),
+        STRFIELD("C",               "Y",                    2),
+        NUMFIELD("D",               654,                    3),
+        FIELDEND
+    };
+    event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
+    regex_t re;
+    assert_int_equal(regcomp(&re, "[AD]", REG_EXTENDED), 0);
+    cJSON* json = fmtMetricJson(&e, &re);
+    assert_non_null(json);
+    char* str = cJSON_PrintUnformatted(json);
+    assert_non_null(str);
+    assert_string_equal(str,
+                 "{\"_metric\":\"hey\","
+                 "\"_metric_type\":\"histogram\","
+                 "\"_value\":2,"
+                 "\"A\":\"Z\",\"D\":654}");
+    if (str) free(str);
+    regfree(&re);
+    cJSON_Delete(json);
+}
+
+static void
+fmtMetricJsonEscapedValues(void** state)
+{
+    {
+        event_t e = INT_EVENT("Paç \"fat!", 3, SET, NULL);    // embedded double quote
+        cJSON* json = fmtMetricJson(&e, NULL);
+        assert_non_null(json);
+        char* str = cJSON_PrintUnformatted(json);
+        assert_non_null(str);
+        assert_string_equal(str,
+                 "{\"_metric\":\"Paç \\\"fat!\","
+                 "\"_metric_type\":\"set\","
+                 "\"_value\":3}");
+        free(str);
+        cJSON_Delete(json);
+    }
+
+    {
+        event_field_t fields[] = {
+            STRFIELD("A",         "행운을	빕니다",    0),   // embedded tab
+            NUMFIELD("Viel\\ Glück",     123,      1),   // embedded backslash
+            FIELDEND
+        };
+        event_t e = INT_EVENT("you", 4, DELTA, fields);
+        cJSON* json = fmtMetricJson(&e, NULL);
+        assert_non_null(json);
+        char* str = cJSON_PrintUnformatted(json);
+        assert_non_null(str);
+        assert_string_equal(str,
+                 "{\"_metric\":\"you\","
+                 "\"_metric_type\":\"counter\","
+                 "\"_value\":4,"
+                 "\"A\":\"행운을\\t빕니다\","
+                 "\"Viel\\\\ Glück\":123}");
+        free(str);
+        cJSON_Delete(json);
+    }
+}
+
+static void
 evtValueFilterSetAndGet(void** state)
 {
     evt_t* evt = evtCreate();
@@ -585,6 +781,12 @@ main(int argc, char* argv[])
         cmocka_unit_test(evtLogWithSourceDisabledReturnsNull),
         cmocka_unit_test(evtLogWithAndWithoutMatchingNameFilter),
         cmocka_unit_test(evtLogWithAndWithoutMatchingValueFilter),
+        cmocka_unit_test(fmtEventJsonValue),
+        cmocka_unit_test(fmtEventJsonWithEmbeddedNulls),
+        cmocka_unit_test(fmtMetricJsonNoFields),
+        cmocka_unit_test(fmtMetricJsonWFields),
+        cmocka_unit_test(fmtMetricJsonWFilteredFields),
+        cmocka_unit_test(fmtMetricJsonEscapedValues),
         cmocka_unit_test(evtSourceEnabledSetAndGet),
         cmocka_unit_test(evtValueFilterSetAndGet),
         cmocka_unit_test(evtFieldFilterSetAndGet),

@@ -21,6 +21,9 @@ cJSON *             evtMetric(evt_t *, event_t *, uint64_t, proc_id_t *);
 cJSON *             evtLog(evt_t *, const char *, const void *, size_t,
                            uint64_t, proc_id_t *);
 
+cJSON *             fmtMetricJson(event_t*, regex_t*);
+cJSON *             fmtEventJson(event_format_t *);
+
 // Setters (modifies evt_t, but does not persist modifications)
 void                evtValueFilterSet(evt_t *, cfg_evt_t, const char *);
 void                evtFieldFilterSet(evt_t *, cfg_evt_t, const char *);

@@ -7,6 +7,39 @@
 #include "dbg.h"
 #include "evt.h"
 
+// key names for event JSON
+#define HOST "host"
+#define TIME "_time"
+#define DATA "data"
+#define SOURCE "source"
+#define CHANNEL "_channel"
+#define SOURCETYPE "sourcetype"
+#define EVENT "ev"
+#define ID "id"
+
+typedef struct {
+    const char* str;
+    unsigned val;
+} enum_map_t;
+
+static enum_map_t watchTypeMap[] = {
+    {"file",                  CFG_SRC_FILE},
+    {"console",               CFG_SRC_CONSOLE},
+    {"syslog",                CFG_SRC_SYSLOG},
+    {"metric",                CFG_SRC_METRIC},
+    {NULL,                    -1}
+};
+
+static const char*
+valToStr(enum_map_t map[], unsigned val)
+{
+    enum_map_t* m;
+    for (m=map; m->str; m++) {
+        if (val == m->val) return m->str;
+    }
+    return NULL;
+}
+
 typedef struct {
     int valid;
     regex_t re;
@@ -246,6 +279,36 @@ anyValueFieldMatches(regex_t* filter, event_t* metric)
 }
 
 cJSON *
+fmtEventJson(event_format_t *sev)
+{
+    char numbuf[32];
+
+    if (!sev || !sev->proc) return NULL;
+
+    cJSON* json = cJSON_CreateObject();
+    if (!json) goto err;
+
+    if (!cJSON_AddStringToObjLN(json, SOURCETYPE, valToStr(watchTypeMap, sev->sourcetype))) goto err;
+
+    if (!cJSON_AddStringToObjLN(json, ID, sev->proc->id)) goto err;
+
+    if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto err;
+    if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto err;
+    cJSON_AddItemToObjectCS(json, DATA, sev->data);
+    if (!cJSON_AddStringToObjLN(json, HOST, sev->proc->hostname)) goto err;
+    if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto err;
+    if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto err;
+
+    return json;
+err:
+    DBG("time=%s src=%s data=%p host=%s channel=%s json=%p",
+            sev->timestamp, sev->src, sev->data, sev->proc->hostname, numbuf, json);
+    if (json) cJSON_Delete(json);
+
+    return NULL;
+}
+
+cJSON *
 rateLimitMessage(proc_id_t *proc)
 {
     event_format_t event;
@@ -266,6 +329,86 @@ rateLimitMessage(proc_id_t *proc)
 
     cJSON* json = fmtEventJson(&event);
     return json;
+}
+
+static const char*
+metricTypeStr(data_type_t type)
+{
+    switch (type) {
+        case DELTA:
+            return "counter";
+        case CURRENT:
+            return "gauge";
+        case DELTA_MS:
+            return "timer";
+        case HISTOGRAM:
+            return "histogram";
+        case SET:
+            return "set";
+        default:
+            return "unknown";
+    }
+}
+
+static int
+addJsonFields(event_field_t* fields, regex_t* fieldFilter, cJSON* json)
+{
+    if (!fields) return TRUE;
+
+    event_field_t *fld;
+
+    // Start adding key:value entries
+    for (fld = fields; fld->value_type != FMT_END; fld++) {
+
+        // skip outputting anything that doesn't match fieldFilter
+        if (fieldFilter && regexec(fieldFilter, fld->name, 0, NULL, 0)) continue;
+
+        if (fld->value_type == FMT_STR) {
+            if (!cJSON_AddStringToObjLN(json, fld->name, fld->value.str)) return FALSE;
+        } else if (fld->value_type == FMT_NUM) {
+            if (!cJSON_AddNumberToObjLN(json, fld->name, fld->value.num)) return FALSE;
+        } else {
+            DBG("bad field type");
+        }
+    }
+
+    return TRUE;
+}
+
+cJSON *
+fmtMetricJson(event_t *metric, regex_t* fieldFilter)
+{
+    const char* metric_type = NULL;
+
+    if (!metric) return NULL;
+
+    cJSON *json = cJSON_CreateObject();
+    if (!json) goto err;
+
+    if (!cJSON_AddStringToObjLN(json, "_metric", metric->name)) goto err;
+    metric_type = metricTypeStr(metric->type);
+    if (!cJSON_AddStringToObjLN(json, "_metric_type", metric_type)) goto err;
+    switch ( metric->value.type ) {
+        case FMT_INT:
+            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.integer)) goto err;
+            break;
+        case FMT_FLT:
+            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.floating)) goto err;
+            break;
+        default:
+            DBG(NULL);
+    }
+
+    // Add fields
+    if (!addJsonFields(metric->fields, fieldFilter, json)) goto err;
+    return json;
+
+err:
+    DBG("_metric=%s _metric_type=%s _value=%lld, fields=%p, json=%p",
+        metric->name, metric_type, metric->value, metric->fields, json);
+    if (json) cJSON_Delete(json);
+
+    return NULL;
 }
 
 cJSON *

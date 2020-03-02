@@ -14,7 +14,6 @@ typedef struct {
 
 struct _evt_t
 {
-    format_t* format;
     local_re_t value_re[CFG_SRC_MAX];
     local_re_t field_re[CFG_SRC_MAX];
     local_re_t name_re[CFG_SRC_MAX];
@@ -95,9 +94,6 @@ evtCreate()
         evt->enabled[src] = srcEnabledDefault[src];
     }
 
-    // default format for events, which can be overriden
-    evt->format = fmtCreate(CFG_EVENT_ND_JSON);
-
     return evt;
 }
 
@@ -113,8 +109,6 @@ evtDestroy(evt_t** evt)
         if (edestroy->field_re[src].valid) regfree(&edestroy->field_re[src].re);
         if (edestroy->name_re[src].valid) regfree(&edestroy->name_re[src].re);
     }
-
-    fmtDestroy(&edestroy->format);
 
     free(edestroy);
     *evt = NULL;
@@ -175,16 +169,6 @@ evtSourceEnabled(evt_t* evt, cfg_evt_t src)
 
     DBG("%d", src);
     return srcEnabledDefault[CFG_SRC_FILE];
-}
-
-void
-evtFormatSet(evt_t* evt, format_t* format)
-{
-    if (!evt) return;
-
-    // Don't leak if evtFormatSet is called repeatedly
-    fmtDestroy(&evt->format);
-    evt->format = format;
 }
 
 void

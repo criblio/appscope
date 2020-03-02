@@ -13,12 +13,13 @@
 #include "cfg.h"
 #include "cfgutils.h"
 #include "com.h"
-#include "count.h"
 #include "dbg.h"
 #include "dns.h"
 #include "os.h"
 #include "scopetypes.h"
 #include "plattime.h"
+#include "report.h"
+#include "state.h"
 #include "wrap.h"
 
 interposed_funcs g_fn;
@@ -27,7 +28,6 @@ static thread_timing g_thread = {0};
 static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static out_t *g_prevout = NULL;
-static evt_t *g_prevevt = NULL;
 static bool g_replacehandler = FALSE;
 __thread int g_getdelim = 0;
 
@@ -234,10 +234,9 @@ doConfig(config_t *cfg)
     // Save the current objects to get cleaned up on the periodic thread
     g_prevout = g_out;
     g_prevlog = g_log;
-    g_prevevt = g_evt;
 
     g_thread.interval = cfgOutPeriod(cfg);
-    setCountInterval(cfgOutPeriod(cfg));
+    setReportingInterval(cfgOutPeriod(cfg));
     if (!g_thread.startTime) {
         g_thread.startTime = time(NULL) + g_thread.interval;
     }
@@ -248,7 +247,7 @@ doConfig(config_t *cfg)
     log_t* log = initLog(cfg);
     g_out = initOut(cfg);
     g_log = log; // Set after initOut to avoid infinite loop with socket
-    g_evt = initEvt(cfg);
+    ctlEvtSet(g_ctl, initEvt(cfg));
 }
 
 // Process dynamic config change if they are available
@@ -450,7 +449,7 @@ doReset()
     g_thread.startTime = time(NULL) + g_thread.interval;
     threadInit();
 
-    resetCount();
+    resetState();
     ctlDestroy(&g_ctl);
     g_ctl = initCtl(g_staticfg);
 
@@ -549,7 +548,6 @@ periodic(void *arg)
         // Clean up previous objects if they exist.
         //if (g_prevout) outDestroy(&g_prevout);
         //if (g_prevlog) logDestroy(&g_prevlog);
-        //if (g_prevevt) evtDestroy(&g_prevevt);
 
         // Q: What does it mean to connect transports we expect to be
         // "connectionless"?  A: We've observed some processes close all
@@ -738,7 +736,7 @@ init(void)
 
     setProcId(&g_proc);
 
-    initCount();
+    initState();
 
     platform_time_t* time_struct = initTime();
     if (time_struct->tsc_invariant == FALSE) {

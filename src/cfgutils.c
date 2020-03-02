@@ -1514,13 +1514,6 @@ initEvt(config_t *cfg)
     evt_t *evt = evtCreate();
     if (!evt) return evt;
 
-    format_t *fmt = fmtCreate(cfgEventFormat(cfg));
-    if (!fmt) {
-        evtDestroy(&evt);
-        return evt;
-    }
-    evtFormatSet(evt, fmt);
-
     cfg_evt_t src;
     for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
         evtSourceEnabledSet(evt, src, cfgEventSourceEnabled(cfg, src));
@@ -1549,6 +1542,13 @@ initCtl(config_t *cfg)
         return ctl;
     }
     ctlTransportSet(ctl, trans);
+
+    evt_t* evt = initEvt(cfg);
+    if (!evt) {
+        ctlDestroy(&ctl);
+        return ctl;
+    }
+    ctlEvtSet(ctl, evt);
 
     return ctl;
 }

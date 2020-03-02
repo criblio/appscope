@@ -19,7 +19,7 @@ TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
 .PHONY: all clean test
 all: libscope.so
 
-libscope.so: src/wrap.c src/count.c src/plattime.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/out.c src/circbuf.c src/evt.c src/ctl.c src/format.c src/com.c src/dbg.c $(YAML_SRC) contrib/cJSON/cJSON.c
+libscope.so: src/wrap.c src/state.c src/report.c src/plattime.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/out.c src/circbuf.c src/evt.c src/ctl.c src/format.c src/com.c src/dbg.c $(YAML_SRC) contrib/cJSON/cJSON.c
 	@echo "Building libscope.so ..."
 	$(CC) $(CFLAGS) -shared -fvisibility=hidden -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ -e,prog_version $(LD_FLAGS)
 	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
@@ -54,19 +54,16 @@ test: $(C_FILES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dbgtest dbgtest.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/selfinterposetest selfinterposetest.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dnstest dnstest.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	# wraptest needs more linker flags
-	#$(CC) -c $(TEST_CFLAGS) test/wraptest.c $(INCLUDES) $(TEST_INCLUDES)
-	#$(CC) $(TEST_CFLAGS) -o test/$(OS)/wraptest wraptest.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -Llib/$(OS)/ -lwrap
 	@echo "Running Tests and Generating Test Coverage"
 	test/execute.sh
-	# see file:///Users/cribl/scope/coverage/index.html
+# see file:///Users/cribl/scope/coverage/index.html
 
 $(YAML_AR): $(YAML_SRC)
 	@echo "Building libyaml"
 	cd ./contrib/libyaml && ./bootstrap
 	cd ./contrib/libyaml && ./configure LIBS=-ldl
 	cd ./contrib/libyaml && make
-	# don't install on the host.  We only need the static .a file
+# don't install on the host.  We only need the static .a file
 
 $(JSON_AR): contrib/cJSON/cJSON.c
 	@echo "Building cJSON"
@@ -78,5 +75,5 @@ $(TEST_LIB):
 	cd contrib/cmocka && test -d ./build || mkdir ./build
 	cd contrib/cmocka/build && cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Debug ..
 	cd contrib/cmocka/build && make
-	# don't install on the host.
-	# We can tell the linker where to find the .dylib file
+# don't install on the host.
+# We can tell the linker where to find the .dylib file

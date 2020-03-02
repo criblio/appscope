@@ -22,7 +22,6 @@ cJSON *             evtLog(evt_t *, const char *, const void *, size_t,
                            uint64_t, proc_id_t *);
 
 // Setters (modifies evt_t, but does not persist modifications)
-void                evtFormatSet(evt_t *, format_t *);
 void                evtValueFilterSet(evt_t *, cfg_evt_t, const char *);
 void                evtFieldFilterSet(evt_t *, cfg_evt_t, const char *);
 void                evtNameFilterSet(evt_t *, cfg_evt_t, const char *);

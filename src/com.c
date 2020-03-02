@@ -1,46 +1,10 @@
 #include "com.h"
 
 
-static int
-postMsg(ctl_t *ctl, cJSON *body, upload_type_t type, request_t *req, bool now)
-{
-    int rc = -1;
-    char *streamMsg;
-    upload_t upld;
-
-    if (type == UPLD_RESP) {
-        // req is required for UPLD_RESP type
-        if (!req || !ctl) return rc;
-    } else {
-        // body is required for all other types
-        if (!body) return rc;
-        if (!ctl) {
-            cJSON_Delete(body);
-            return rc;
-        }
-    }
-
-    upld.type = type;
-    upld.body = body;
-    upld.req = req;
-    streamMsg = ctlCreateTxMsg(&upld);
-
-    if (streamMsg) {
-        // on the ring buffer
-        ctlSendMsg(ctl, streamMsg);
-
-        // send it now or periodic
-        if (now) ctlFlush(ctl);
-        rc = 0;
-    }
-
-    return rc;
-}
-
 int
 cmdPostEvtMsg(ctl_t *ctl, cJSON *json)
 {
-    return postMsg(ctl, json, UPLD_EVT, NULL, FALSE);
+    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
 }
 
 int
@@ -49,31 +13,31 @@ cmdSendInfoStr(ctl_t *ctl, const char *str)
     cJSON* json;
     if (!str || !(json = cJSON_CreateString(str))) return -1;
 
-    return postMsg(ctl, json, UPLD_INFO, NULL, TRUE);
+    return ctlPostMsg(ctl, json, UPLD_INFO, NULL, TRUE);
 }
 
 int
 cmdPostInfoMsg(ctl_t *ctl, cJSON *json)
 {
-    return postMsg(ctl, json, UPLD_INFO, NULL, FALSE);
+    return ctlPostMsg(ctl, json, UPLD_INFO, NULL, FALSE);
 }
 
 int
 cmdSendEvtMsg(ctl_t *ctl, cJSON *json)
 {
-    return postMsg(ctl, json, UPLD_EVT, NULL, TRUE);
+    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, TRUE);
 }
 
 int
 cmdSendInfoMsg(ctl_t *ctl, cJSON *json)
 {
-    return postMsg(ctl, json, UPLD_INFO, NULL, TRUE);
+    return ctlPostMsg(ctl, json, UPLD_INFO, NULL, TRUE);
 }
 
 int
 cmdSendResponse(ctl_t *ctl, request_t *req, cJSON *body)
 {
-    return postMsg(ctl, body, UPLD_RESP, req, TRUE);
+    return ctlPostMsg(ctl, body, UPLD_RESP, req, TRUE);
 }
 
 request_t *

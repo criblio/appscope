@@ -4,6 +4,7 @@
 #include "cfg.h"
 #include "cJSON.h"
 #include "transport.h"
+#include "evt.h"
 
 //////////////////
 // This structure is intended to capture received request data from an
@@ -76,8 +77,15 @@ typedef struct _ctl_t ctl_t;
 ctl_t *             ctlCreate();
 void                ctlDestroy(ctl_t **);
 
-// Raw Send
+// Raw Send (without messaging protocol)
 void                ctlSendMsg(ctl_t *, char *);
+
+// Messaging protocol send
+int                 ctlPostMsg(ctl_t *ctl, cJSON *body, upload_type_t type,
+                        request_t *req, bool now);
+void                ctlSendMetric(ctl_t *, event_t *, uint64_t, proc_id_t*);
+void                ctlSendLog(ctl_t *, const char* path, const void* buf,
+                        size_t size, uint64_t uid, proc_id_t* proc);
 void                ctlFlush(ctl_t *);
 
 // Connection oriented stuff
@@ -86,5 +94,6 @@ int                 ctlConnection(ctl_t *);
 int                 ctlConnect(ctl_t *);
 int                 ctlClose(ctl_t *);
 void                ctlTransportSet(ctl_t *, transport_t *);
+void                ctlEvtSet(ctl_t *, evt_t *);
 
 #endif // _CTL_H__

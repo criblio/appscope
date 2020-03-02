@@ -191,8 +191,6 @@ typedef struct interposed_funcs_t {
 #endif // __MACOS__
 } interposed_funcs;
 
-extern rtconfig g_cfg;
-
 extern int close$NOCANCEL(int);
 extern int guarded_close_np(int, void *);
 

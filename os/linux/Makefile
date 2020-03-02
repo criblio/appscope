@@ -3,10 +3,6 @@ OS=linux
 CC=gcc
 CFLAGS=-fPIC -g -Wall -Wno-nonnull -D__LINUX__
 SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
-GCC_STATX_RETURN_CODE := $(shell gcc statx_exists.c 2>/dev/null; echo $$?)
-ifneq ($(GCC_STATX_RETURN_CODE), 0)
-CFLAGS += -DSTRUCT_STATX_MISSING_FROM_SYS_STAT_H
-endif
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
 LD_FLAGS=-ldl -lpthread -lrt -e __scope_main

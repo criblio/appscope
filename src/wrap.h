@@ -2,14 +2,15 @@
 #define __WRAP_H__
 
 #define _GNU_SOURCE
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <netdb.h>
 #include <pthread.h>
 #include <wchar.h>
 
-#include <sys/statvfs.h>
 #include <sys/param.h>
-#define __STDC_FORMAT_MACROS
-#include <inttypes.h>
+#include <sys/stat.h>
+#include <sys/statvfs.h>
 
 
 #define DEBUG 0

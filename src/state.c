@@ -566,44 +566,6 @@ doURL(int sockfd, const void *buf, size_t len, metric_t src)
 }
 
 int
-doAccessRights(struct msghdr *msg)
-{
-    int *recvfd;
-    struct cmsghdr *cmptr;
-    struct stat sbuf;
-
-    if (!msg) return -1;
-
-    if (((cmptr = CMSG_FIRSTHDR(msg)) != NULL) &&
-        (cmptr->cmsg_len >= CMSG_LEN(sizeof(int))) &&
-        (cmptr->cmsg_level == SOL_SOCKET) &&
-        (cmptr->cmsg_type == SCM_RIGHTS)) {
-        // voila; we have a new fd
-        int i, numfds;
-
-        numfds = (cmptr->cmsg_len - CMSG_ALIGN(sizeof(struct cmsghdr))) / sizeof(int);
-        if (numfds <= 0) return -1;
-        recvfd = ((int *) CMSG_DATA(cmptr));
-
-        for (i = 0; i < numfds; i++) {
-            // file or socket?
-            if (fstat(recvfd[i], &sbuf) != -1) {
-                if ((sbuf.st_mode & S_IFMT) == S_IFSOCK) {
-                    doAddNewSock(recvfd[i]);
-                } else {
-                    doOpen(recvfd[i], "Received_File_Descriptor", FD, "recvmsg");
-                }
-            } else {
-                DBG("errno: %d", errno);
-                return -1;
-            }
-        }
-    }
-
-    return 0;
-}
-
-int
 doRecv(int sockfd, ssize_t rc)
 {
     if (checkNetEntry(sockfd) == TRUE) {

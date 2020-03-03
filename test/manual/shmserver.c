@@ -1,4 +1,4 @@
-/* 
+/*
  * shmserver.c - A simple /dev/shm reader
  *
  * gcc -g test/manual/shmserver.c -lpthread -o shmserver
@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h> 
+#include <sys/types.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -39,7 +39,7 @@ main(int argc, char **argv) {
     if (argc < 2) {
         usage(argv[0]);
     }
-  
+
     while ((opt = getopt(argc, argv, "vhf:")) > 0) {
         switch (opt) {
         case 'v': verbose++; break;
@@ -76,12 +76,12 @@ main(int argc, char **argv) {
         }
 
         free(buf);
-        
+
         if ((dirp = opendir(path)) == NULL) {
             perror("opendir");
             exit(-1);
         }
-        
+
         while  ((dent = readdir(dirp)) != NULL) {
             char fpath[NAME_MAX];
 
@@ -114,7 +114,7 @@ main(int argc, char **argv) {
                 perror("calloc");
                 exit(-1);
             }
-            
+
             if ((rc = read(fd, buf, stat.st_size)) <= 0) {
                 perror("read");
                 exit(-1);
@@ -132,7 +132,7 @@ main(int argc, char **argv) {
                 perror("unlink");
                 fprintf(stderr, "file: %s\n", fpath);
             }
-        
+
             if (flock(fd, LOCK_UN) == -1) {
                 perror("flock UN");
                 exit(-1);

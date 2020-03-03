@@ -9,12 +9,11 @@
 #include <sys/sysctl.h>
 #include <libproc.h>
 #include <sys/resource.h>
+#include "../../src/plattime.h"
 
 #ifndef CMSG_ALIGN
 #define CMSG_ALIGN(n) __DARWIN_ALIGN32(n)
 #endif
-
-#include "../../src/wrap.h"
 
 #define STATMODTIME(sb) sb.st_mtimespec.tv_sec
 
@@ -29,13 +28,11 @@ typedef uint64_t fpos64_t;
 #define AF_NETLINK 16
 #endif
 
-extern struct rtconfig_t g_cfg;
-
 extern int osGetProcname(char *, size_t);
 extern int osGetNumThreads(pid_t);
 extern int osGetNumFds(pid_t);
 extern int osGetNumChildProcs(pid_t);
-extern int osInitTSC(struct rtconfig_t *);
+extern int osInitTSC(platform_time_t *);
 extern int osGetProcMemory(pid_t);
 extern int osIsFilePresent(pid_t, const char *);
 extern int osGetCmdline(pid_t, char **);

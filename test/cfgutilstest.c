@@ -146,34 +146,34 @@ cfgPathHonorsPriorityOrder(void** state)
 }
 
 static void
-cfgProcessEnvironmentOutFormat(void** state)
+cfgProcessEnvironmentMtcFormat(void** state)
 {
     config_t* cfg = cfgCreateDefault();
-    cfgOutFormatSet(cfg, CFG_METRIC_JSON);
-    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
+    cfgMtcFormatSet(cfg, CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_JSON);
 
     // should override current cfg
     assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "metricstatsd", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_STATSD);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_STATSD);
 
     assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "ndjson", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_EVENT_ND_JSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_EVENT_ND_JSON);
 
     assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "metricjson", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_JSON);
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv("SCOPE_METRIC_FORMAT"), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_JSON);
 
     // unrecognised value should not affect cfg
     assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "bson", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_JSON);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -184,27 +184,27 @@ static void
 cfgProcessEnvironmentStatsDPrefix(void** state)
 {
     config_t* cfg = cfgCreateDefault();
-    cfgOutStatsDPrefixSet(cfg, "something");
-    assert_string_equal(cfgOutStatsDPrefix(cfg), "something.");
+    cfgMtcStatsDPrefixSet(cfg, "something");
+    assert_string_equal(cfgMtcStatsDPrefix(cfg), "something.");
 
     // should override current cfg
     assert_int_equal(setenv("SCOPE_STATSD_PREFIX", "blah", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgOutStatsDPrefix(cfg), "blah.");
+    assert_string_equal(cfgMtcStatsDPrefix(cfg), "blah.");
 
     assert_int_equal(setenv("SCOPE_STATSD_PREFIX", "hey", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgOutStatsDPrefix(cfg), "hey.");
+    assert_string_equal(cfgMtcStatsDPrefix(cfg), "hey.");
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv("SCOPE_STATSD_PREFIX"), 0);
     cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgOutStatsDPrefix(cfg), "hey.");
+    assert_string_equal(cfgMtcStatsDPrefix(cfg), "hey.");
 
     // empty string
     assert_int_equal(setenv("SCOPE_STATSD_PREFIX", "", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_string_equal(cfgOutStatsDPrefix(cfg), "");
+    assert_string_equal(cfgMtcStatsDPrefix(cfg), "");
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -215,27 +215,27 @@ static void
 cfgProcessEnvironmentStatsDMaxLen(void** state)
 {
     config_t* cfg = cfgCreateDefault();
-    cfgOutStatsDMaxLenSet(cfg, 0);
-    assert_int_equal(cfgOutStatsDMaxLen(cfg), 0);
+    cfgMtcStatsDMaxLenSet(cfg, 0);
+    assert_int_equal(cfgMtcStatsDMaxLen(cfg), 0);
 
     // should override current cfg
     assert_int_equal(setenv("SCOPE_STATSD_MAXLEN", "3", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutStatsDMaxLen(cfg), 3);
+    assert_int_equal(cfgMtcStatsDMaxLen(cfg), 3);
 
     assert_int_equal(setenv("SCOPE_STATSD_MAXLEN", "12", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutStatsDMaxLen(cfg), 12);
+    assert_int_equal(cfgMtcStatsDMaxLen(cfg), 12);
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv("SCOPE_STATSD_MAXLEN"), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutStatsDMaxLen(cfg), 12);
+    assert_int_equal(cfgMtcStatsDMaxLen(cfg), 12);
 
     // unrecognised value should not affect cfg
     assert_int_equal(setenv("SCOPE_STATSD_MAXLEN", "notEvenANum", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutStatsDMaxLen(cfg), 12);
+    assert_int_equal(cfgMtcStatsDMaxLen(cfg), 12);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -243,30 +243,30 @@ cfgProcessEnvironmentStatsDMaxLen(void** state)
 }
 
 static void
-cfgProcessEnvironmentOutPeriod(void** state)
+cfgProcessEnvironmentMtcPeriod(void** state)
 {
     config_t* cfg = cfgCreateDefault();
-    cfgOutPeriodSet(cfg, 0);
-    assert_int_equal(cfgOutPeriod(cfg), 0);
+    cfgMtcPeriodSet(cfg, 0);
+    assert_int_equal(cfgMtcPeriod(cfg), 0);
 
     // should override current cfg
     assert_int_equal(setenv("SCOPE_SUMMARY_PERIOD", "3", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutPeriod(cfg), 3);
+    assert_int_equal(cfgMtcPeriod(cfg), 3);
 
     assert_int_equal(setenv("SCOPE_SUMMARY_PERIOD", "12", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutPeriod(cfg), 12);
+    assert_int_equal(cfgMtcPeriod(cfg), 12);
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv("SCOPE_SUMMARY_PERIOD"), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutPeriod(cfg), 12);
+    assert_int_equal(cfgMtcPeriod(cfg), 12);
 
     // unrecognised value should not affect cfg
     assert_int_equal(setenv("SCOPE_SUMMARY_PERIOD", "notEvenANum", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutPeriod(cfg), 12);
+    assert_int_equal(cfgMtcPeriod(cfg), 12);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -339,7 +339,7 @@ cfgProcessEnvironmentEventFormat(void** state)
 typedef struct
 {
     const char* env_name;
-    cfg_evt_t   src;
+    watch_t   src;
     unsigned    default_val;
 } source_state_t;
 
@@ -349,27 +349,27 @@ cfgProcessEnvironmentEventSource(void** state)
     source_state_t* data = (source_state_t*)state[0];
 
     config_t* cfg = cfgCreateDefault();
-    cfgEventSourceEnabledSet(cfg, data->src, 0);
-    assert_int_equal(cfgEventSourceEnabled(cfg, data->src), 0);
+    cfgEvtFormatSourceEnabledSet(cfg, data->src, 0);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, data->src), 0);
 
     // should override current cfg
     assert_int_equal(setenv(data->env_name, "true", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventSourceEnabled(cfg, data->src), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, data->src), 1);
 
     assert_int_equal(setenv(data->env_name, "false", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventSourceEnabled(cfg, data->src), 0);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, data->src), 0);
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv(data->env_name), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventSourceEnabled(cfg, data->src), 0);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, data->src), 0);
 
     // empty string
     assert_int_equal(setenv(data->env_name, "", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventSourceEnabled(cfg, data->src), data->default_val);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, data->src), data->default_val);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -378,30 +378,30 @@ cfgProcessEnvironmentEventSource(void** state)
 
 
 static void
-cfgProcessEnvironmentOutVerbosity(void** state)
+cfgProcessEnvironmentMtcVerbosity(void** state)
 {
     config_t* cfg = cfgCreateDefault();
-    cfgOutVerbositySet(cfg, 0);
-    assert_int_equal(cfgOutVerbosity(cfg), 0);
+    cfgMtcVerbositySet(cfg, 0);
+    assert_int_equal(cfgMtcVerbosity(cfg), 0);
 
     // should override current cfg
     assert_int_equal(setenv("SCOPE_METRIC_VERBOSITY", "3", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutVerbosity(cfg), 3);
+    assert_int_equal(cfgMtcVerbosity(cfg), 3);
 
     assert_int_equal(setenv("SCOPE_METRIC_VERBOSITY", "9", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutVerbosity(cfg), 9);
+    assert_int_equal(cfgMtcVerbosity(cfg), 9);
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv("SCOPE_METRIC_VERBOSITY"), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutVerbosity(cfg), 9);
+    assert_int_equal(cfgMtcVerbosity(cfg), 9);
 
     // unrecognised value should not affect cfg
     assert_int_equal(setenv("SCOPE_METRIC_VERBOSITY", "notEvenANum", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgOutVerbosity(cfg), 9);
+    assert_int_equal(cfgMtcVerbosity(cfg), 9);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -588,21 +588,21 @@ cfgProcessCommandsFromFile(void** state)
     // test the basics
     writeFile(path, "SCOPE_METRIC_FORMAT=metricjson");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_JSON);
 
     writeFile(path, "\nSCOPE_METRIC_FORMAT=metricstatsd\r\nblah");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_STATSD);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_STATSD);
 
     writeFile(path, "blah\nSCOPE_METRIC_FORMAT=metricjson");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_JSON);
 
     // just demonstrating that the "last one wins"
     writeFile(path, "SCOPE_METRIC_FORMAT=metricjson\n"
                     "SCOPE_METRIC_FORMAT=metricstatsd");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgOutFormat(cfg), CFG_METRIC_STATSD);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_STATSD);
 
 
     // test everything else once
@@ -643,12 +643,12 @@ cfgProcessCommandsFromFile(void** state)
     );
 
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_string_equal(cfgOutStatsDPrefix(cfg), "prefix.");
-    assert_int_equal(cfgOutStatsDMaxLen(cfg), 1024);
-    assert_int_equal(cfgOutPeriod(cfg), 11);
+    assert_string_equal(cfgMtcStatsDPrefix(cfg), "prefix.");
+    assert_int_equal(cfgMtcStatsDMaxLen(cfg), 1024);
+    assert_int_equal(cfgMtcPeriod(cfg), 11);
     assert_string_equal(cfgCmdDir(cfg), "/the/path/");
-    assert_int_equal(cfgOutVerbosity(cfg), 1);
-    assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/tmp/file.tmp");
+    assert_int_equal(cfgMtcVerbosity(cfg), 1);
+    assert_string_equal(cfgTransportPath(cfg, CFG_MTC), "/tmp/file.tmp");
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/file.tmp2");
     assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM1"), "val1");
     assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM2"), "val2");
@@ -657,22 +657,22 @@ cfgProcessCommandsFromFile(void** state)
     assert_string_equal(cfgTransportHost(cfg, CFG_CTL), "host");
     assert_string_equal(cfgTransportPort(cfg, CFG_CTL), "1234");
     assert_int_equal(cfgEventFormat(cfg), CFG_EVENT_ND_JSON);
-    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_FILE), 1);
-    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
-    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
-    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_METRIC), 0);
-    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_FILE), "a");
-    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_CONSOLE), "b");
-    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_SYSLOG), "c");
-    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_METRIC), "d");
-    assert_string_equal(cfgEventFieldFilter(cfg, CFG_SRC_FILE), "e");
-    assert_string_equal(cfgEventFieldFilter(cfg, CFG_SRC_CONSOLE), "f");
-    assert_string_equal(cfgEventFieldFilter(cfg, CFG_SRC_SYSLOG), "g");
-    assert_string_equal(cfgEventFieldFilter(cfg, CFG_SRC_METRIC), "h");
-    assert_string_equal(cfgEventValueFilter(cfg, CFG_SRC_FILE), "i");
-    assert_string_equal(cfgEventValueFilter(cfg, CFG_SRC_CONSOLE), "j");
-    assert_string_equal(cfgEventValueFilter(cfg, CFG_SRC_SYSLOG), "k");
-    assert_string_equal(cfgEventValueFilter(cfg, CFG_SRC_METRIC), "l");
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_FILE), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_METRIC), 0);
+    assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_FILE), "a");
+    assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_CONSOLE), "b");
+    assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_SYSLOG), "c");
+    assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_METRIC), "d");
+    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_FILE), "e");
+    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_CONSOLE), "f");
+    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_SYSLOG), "g");
+    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_METRIC), "h");
+    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_FILE), "i");
+    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_CONSOLE), "j");
+    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_SYSLOG), "k");
+    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_METRIC), "l");
 
     deleteFile(path);
     cfgDestroy(&cfg);
@@ -722,13 +722,13 @@ cfgProcessCommandsEnvSubstitution(void** state)
 
     openFileAndExecuteCfgProcessCommands(path, cfg);
     // test substitute env values that are longer and shorter than they env name
-    assert_string_equal(cfgOutStatsDPrefix(cfg), "longer.shorter.");
-    assert_int_equal(cfgOutStatsDMaxLen(cfg), 1024);
-    assert_int_equal(cfgOutPeriod(cfg), 11);
+    assert_string_equal(cfgMtcStatsDPrefix(cfg), "longer.shorter.");
+    assert_int_equal(cfgMtcStatsDMaxLen(cfg), 1024);
+    assert_int_equal(cfgMtcPeriod(cfg), 11);
     assert_string_equal(cfgCmdDir(cfg), "/home/mydir/scope/");
-    assert_int_equal(cfgOutVerbosity(cfg), 1);
+    assert_int_equal(cfgMtcVerbosity(cfg), 1);
     // test escaped substitution  (a match preceeded by '\')
-    assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/$VAR1/shorter/");
+    assert_string_equal(cfgTransportPath(cfg, CFG_MTC), "/$VAR1/shorter/");
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/file.tmp2");
     assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM"), "11");
     // test lookups that aren't found: $5 and $UNDEFINEDENV
@@ -737,11 +737,11 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
     // event stuff...
     assert_string_equal(cfgTransportHost(cfg, CFG_CTL), "ho$st");
-    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_FILE), ".*[.]log$");
-    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_FILE), 1);
-    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
-    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
-    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_METRIC), 0);
+    assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_FILE), ".*[.]log$");
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_FILE), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_METRIC), 0);
 
     deleteFile(path);
     cfgDestroy(&cfg);
@@ -760,34 +760,34 @@ cfgProcessCommandsEnvSubstitution(void** state)
 static void
 verifyDefaults(config_t* config)
 {
-    assert_int_equal       (cfgOutFormat(config), DEFAULT_OUT_FORMAT);
-    assert_string_equal    (cfgOutStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
-    assert_int_equal       (cfgOutStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
-    assert_int_equal       (cfgOutVerbosity(config), DEFAULT_OUT_VERBOSITY);
-    assert_int_equal       (cfgOutPeriod(config), DEFAULT_SUMMARY_PERIOD);
+    assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
+    assert_string_equal    (cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
+    assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
+    assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
+    assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
     assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
-    assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
-    assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
-    assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
-    assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_VALUE);
-    assert_string_equal    (cfgEventFieldFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_FIELD);
-    assert_string_equal    (cfgEventFieldFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_FIELD);
-    assert_string_equal    (cfgEventFieldFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_FIELD);
-    assert_string_equal    (cfgEventFieldFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_FIELD);
-    assert_string_equal    (cfgEventNameFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_NAME);
-    assert_string_equal    (cfgEventNameFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_NAME);
-    assert_string_equal    (cfgEventNameFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_NAME);
-    assert_string_equal    (cfgEventNameFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_NAME);
-    assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
-    assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
-    assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
-    assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
-    assert_int_equal       (cfgTransportType(config, CFG_OUT), CFG_UDP);
-    assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
-    assert_string_equal    (cfgTransportPort(config, CFG_OUT), "8125");
-    assert_null            (cfgTransportPath(config, CFG_OUT));
-    assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_LINE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_VALUE);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_FIELD);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_NAME);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
+    assert_int_equal       (cfgTransportType(config, CFG_MTC), CFG_UDP);
+    assert_string_equal    (cfgTransportHost(config, CFG_MTC), "127.0.0.1");
+    assert_string_equal    (cfgTransportPort(config, CFG_MTC), "8125");
+    assert_null            (cfgTransportPath(config, CFG_MTC));
+    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), CFG_BUFFER_LINE);
     assert_int_equal       (cfgTransportType(config, CFG_CTL), CFG_TCP);
     assert_string_equal    (cfgTransportHost(config, CFG_CTL), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_CTL), DEFAULT_CTL_PORT);
@@ -797,7 +797,7 @@ verifyDefaults(config_t* config)
     assert_null            (cfgTransportHost(config, CFG_LOG));
     assert_null            (cfgTransportPort(config, CFG_LOG));
     assert_string_equal    (cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
-    assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_LINE);
+    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), CFG_BUFFER_LINE);
     assert_null            (cfgCustomTags(config));
     assert_null            (cfgCustomTagValue(config, "tagname"));
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
@@ -852,25 +852,25 @@ cfgReadGoodYaml(void** state)
     writeFile(path, yamlText);
     config_t* config = cfgRead(path);
     assert_non_null(config);
-    assert_int_equal(cfgOutFormat(config), CFG_METRIC_JSON);
-    assert_string_equal(cfgOutStatsDPrefix(config), "cribl.scope.");
-    assert_int_equal(cfgOutStatsDMaxLen(config), 1024);
-    assert_int_equal(cfgOutVerbosity(config), 3);
-    assert_int_equal(cfgOutPeriod(config), 11);
+    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_JSON);
+    assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
+    assert_int_equal(cfgMtcStatsDMaxLen(config), 1024);
+    assert_int_equal(cfgMtcVerbosity(config), 3);
+    assert_int_equal(cfgMtcPeriod(config), 11);
     assert_string_equal(cfgCmdDir(config), "/tmp");
     assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
-    assert_string_equal(cfgEventNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
-    assert_string_equal(cfgEventFieldFilter(config, CFG_SRC_FILE), ".*host.*");
-    assert_string_equal(cfgEventValueFilter(config, CFG_SRC_FILE), "[0-9]+");
-    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_FILE), 1);
-    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), 1);
-    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), 1);
-    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_METRIC), 1);
-    assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
-    assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
-    assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");
-    assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
-    assert_int_equal(cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_LINE);
+    assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
+    assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_FILE), ".*host.*");
+    assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_FILE), "[0-9]+");
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), 1);
+    assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_FILE);
+    assert_string_equal(cfgTransportHost(config, CFG_MTC), "127.0.0.1");
+    assert_string_equal(cfgTransportPort(config, CFG_MTC), "8125");
+    assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/log/scope.log");
+    assert_int_equal(cfgTransportBuf(config, CFG_MTC), CFG_BUFFER_LINE);
     assert_int_equal(cfgTransportType(config, CFG_CTL), CFG_TCP);
     assert_string_equal(cfgTransportHost(config, CFG_CTL), "127.0.0.2");
     assert_string_equal(cfgTransportPort(config, CFG_CTL), "9009");
@@ -937,19 +937,19 @@ cfgReadEveryTransportType(void** state)
         config_t* config = cfgRead(path);
 
         if (transport_lines[i] == udp_str) {
-                assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UDP);
-                assert_string_equal(cfgTransportHost(config, CFG_OUT), "labmachine8235");
-                assert_string_equal(cfgTransportPort(config, CFG_OUT), "ntp");
+                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UDP);
+                assert_string_equal(cfgTransportHost(config, CFG_MTC), "labmachine8235");
+                assert_string_equal(cfgTransportPort(config, CFG_MTC), "ntp");
         } else if (transport_lines[i] == unix_str) {
-                assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
-                assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
+                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UNIX);
+                assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/run/scope.sock");
         } else if (transport_lines[i] == file_str) {
-                assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
-                assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
+                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_FILE);
+                assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/log/scope.log");
         } else if (transport_lines[i] == syslog_str) {
-                assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_SYSLOG);
+                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_SYSLOG);
         } else if (transport_lines[i] == shm_str) {
-                assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_SHM);
+                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_SHM);
          }
 
         deleteFile(path);
@@ -1034,21 +1034,21 @@ cfgReadGoodJson(void** state)
     writeFile(path, jsonText);
     config_t* config = cfgRead(path);
     assert_non_null(config);
-    assert_int_equal(cfgOutFormat(config), CFG_METRIC_JSON);
-    assert_string_equal(cfgOutStatsDPrefix(config), "cribl.scope.");
-    assert_int_equal(cfgOutStatsDMaxLen(config), 42);
-    assert_int_equal(cfgOutVerbosity(config), 0);
-    assert_int_equal(cfgOutPeriod(config), 13);
+    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_JSON);
+    assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
+    assert_int_equal(cfgMtcStatsDMaxLen(config), 42);
+    assert_int_equal(cfgMtcVerbosity(config), 0);
+    assert_int_equal(cfgMtcPeriod(config), 13);
     assert_int_equal(cfgEventFormat(config), CFG_EVENT_ND_JSON);
-    assert_string_equal(cfgEventNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
-    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_FILE), 1);
-    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), 1);
-    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), 1);
-    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_METRIC), 1);
-    assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_FILE);
-    assert_string_equal(cfgTransportHost(config, CFG_OUT), "127.0.0.1");
-    assert_string_equal(cfgTransportPort(config, CFG_OUT), "8125");
-    assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/log/scope.log");
+    assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), 1);
+    assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_FILE);
+    assert_string_equal(cfgTransportHost(config, CFG_MTC), "127.0.0.1");
+    assert_string_equal(cfgTransportPort(config, CFG_MTC), "8125");
+    assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/log/scope.log");
     assert_int_equal(cfgTransportType(config, CFG_CTL), CFG_FILE);
     assert_string_equal(cfgTransportHost(config, CFG_CTL), "127.0.0.1");
     assert_string_equal(cfgTransportPort(config, CFG_CTL), "9109");
@@ -1128,10 +1128,10 @@ cfgReadExtraFieldsAreHarmless(void** state)
 
     config_t* config = cfgRead(path);
     assert_non_null(config);
-    assert_int_equal(cfgOutFormat(config), CFG_METRIC_STATSD);
-    assert_string_equal(cfgOutStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
-    assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
-    assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
+    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_STATSD);
+    assert_string_equal(cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
+    assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UNIX);
+    assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/run/scope.sock");
     assert_non_null(cfgCustomTags(config));
     assert_string_equal(cfgCustomTagValue(config, "brainfarts"), "135");
     assert_int_equal(cfgLogLevel(config), CFG_LOG_INFO);
@@ -1181,22 +1181,22 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
 
     config_t* config = cfgRead(path);
     assert_non_null(config);
-    assert_int_equal(cfgOutFormat(config), CFG_METRIC_STATSD);
-    assert_string_equal(cfgOutStatsDPrefix(config), "cribl.scope.");
-    assert_int_equal(cfgOutStatsDMaxLen(config), 4294967295);
-    assert_int_equal(cfgOutVerbosity(config), CFG_MAX_VERBOSITY);
-    assert_int_equal(cfgOutPeriod(config), 42);
+    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_STATSD);
+    assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
+    assert_int_equal(cfgMtcStatsDMaxLen(config), 4294967295);
+    assert_int_equal(cfgMtcVerbosity(config), CFG_MAX_VERBOSITY);
+    assert_int_equal(cfgMtcPeriod(config), 42);
     assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
-    assert_string_equal(cfgEventNameFilter(config, CFG_SRC_SYSLOG), ".*[.]log$");
-    assert_string_equal(cfgEventFieldFilter(config, CFG_SRC_SYSLOG), ".*host.*");
-    assert_string_equal(cfgEventValueFilter(config, CFG_SRC_SYSLOG), "[0-9]+");
-    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_FILE), 1);
-    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), 0);
-    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), 1);
-    assert_int_equal(cfgEventSourceEnabled(config, CFG_SRC_METRIC), 1);
+    assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_SYSLOG), ".*[.]log$");
+    assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_SYSLOG), ".*host.*");
+    assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), "[0-9]+");
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), 0);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), 1);
     assert_int_equal(cfgTransportType(config, CFG_CTL), CFG_SYSLOG);
-    assert_int_equal(cfgTransportType(config, CFG_OUT), CFG_UNIX);
-    assert_string_equal(cfgTransportPath(config, CFG_OUT), "/var/run/scope.sock");
+    assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UNIX);
+    assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/run/scope.sock");
     assert_non_null(cfgCustomTags(config));
     assert_string_equal(cfgCustomTagValue(config, "135"), "kittens");
     assert_int_equal(cfgLogLevel(config), CFG_LOG_INFO);
@@ -1268,13 +1268,13 @@ cfgReadEnvSubstitution(void** state)
     assert_non_null(cfg);
 
     // test substitute env values that are longer and shorter than they env name
-    assert_string_equal(cfgOutStatsDPrefix(cfg), "longer.shorter.");
-    assert_int_equal(cfgOutStatsDMaxLen(cfg), 1024);
-    assert_int_equal(cfgOutPeriod(cfg), 11);
+    assert_string_equal(cfgMtcStatsDPrefix(cfg), "longer.shorter.");
+    assert_int_equal(cfgMtcStatsDMaxLen(cfg), 1024);
+    assert_int_equal(cfgMtcPeriod(cfg), 11);
     assert_string_equal(cfgCmdDir(cfg), "/home/mydir/scope/");
-    assert_int_equal(cfgOutVerbosity(cfg), 1);
+    assert_int_equal(cfgMtcVerbosity(cfg), 1);
     // test escaped substitution  (a match preceeded by '\')
-    assert_string_equal(cfgTransportPath(cfg, CFG_OUT), "/$VAR1/shorter/");
+    assert_string_equal(cfgTransportPath(cfg, CFG_MTC), "/$VAR1/shorter/");
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/file.tmp2");
     assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM"), "11");
     // test lookups that aren't found: $5 and $UNDEFINEDENV
@@ -1283,8 +1283,8 @@ cfgReadEnvSubstitution(void** state)
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
     // test event fields...
     assert_int_equal(cfgEventFormat(cfg), CFG_METRIC_STATSD);
-    assert_string_equal(cfgEventNameFilter(cfg, CFG_SRC_FILE), ".*[.]log$");
-    assert_int_equal(cfgEventSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
+    assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_FILE), ".*[.]log$");
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
 
     cfgDestroy(&cfg);
 
@@ -1374,33 +1374,33 @@ initLogReturnsPtr(void** state)
 }
 
 static void
-initOutReturnsPtr(void** state)
+initMtcReturnsPtr(void** state)
 {
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
     cfg_transport_t t;
     for (t=CFG_UDP; t<=CFG_SHM; t++) {
-        cfgTransportTypeSet(cfg, CFG_OUT, t);
+        cfgTransportTypeSet(cfg, CFG_MTC, t);
         if (t==CFG_UNIX || t==CFG_FILE) {
-            cfgTransportPathSet(cfg, CFG_OUT, "/tmp/scope.log");
+            cfgTransportPathSet(cfg, CFG_MTC, "/tmp/scope.log");
         }
-        out_t* out = initOut(cfg);
-        assert_non_null(out);
-        outDestroy(&out);
+        mtc_t* mtc = initMtc(cfg);
+        assert_non_null(mtc);
+        mtcDestroy(&mtc);
     }
     cfgDestroy(&cfg);
 }
 
 static void
-initEvtReturnsPtr(void** state)
+initEvtFormatReturnsPtr(void** state)
 {
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    evt_t* evt = initEvt(cfg);
+    evt_fmt_t* evt = initEvtFormat(cfg);
     assert_non_null(evt);
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 
     cfgDestroy(&cfg);
 }
@@ -1435,26 +1435,26 @@ main(int argc, char* argv[])
     source_state_t sys = {"SCOPE_EVENT_SYSLOG" , CFG_SRC_SYSLOG , DEFAULT_SRC_SYSLOG};
     source_state_t met = {"SCOPE_EVENT_METRIC", CFG_SRC_METRIC , DEFAULT_SRC_METRIC};
 
-    dest_state_t dest_out = {"SCOPE_METRIC_DEST", CFG_OUT};
+    dest_state_t dest_mtc = {"SCOPE_METRIC_DEST", CFG_MTC};
     dest_state_t dest_evt = {"SCOPE_EVENT_DEST", CFG_CTL};
     dest_state_t dest_log = {"SCOPE_LOG_DEST", CFG_LOG};
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(cfgPathHonorsEnvVar),
         cmocka_unit_test(cfgPathHonorsPriorityOrder),
-        cmocka_unit_test(cfgProcessEnvironmentOutFormat),
+        cmocka_unit_test(cfgProcessEnvironmentMtcFormat),
         cmocka_unit_test(cfgProcessEnvironmentStatsDPrefix),
         cmocka_unit_test(cfgProcessEnvironmentStatsDMaxLen),
-        cmocka_unit_test(cfgProcessEnvironmentOutPeriod),
+        cmocka_unit_test(cfgProcessEnvironmentMtcPeriod),
         cmocka_unit_test(cfgProcessEnvironmentCommandDir),
         cmocka_unit_test(cfgProcessEnvironmentEventFormat),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &log),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &con),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &sys),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &met),
-        cmocka_unit_test(cfgProcessEnvironmentOutVerbosity),
+        cmocka_unit_test(cfgProcessEnvironmentMtcVerbosity),
         cmocka_unit_test(cfgProcessEnvironmentLogLevel),
-        cmocka_unit_test_prestate(cfgProcessEnvironmentTransport, &dest_out),
+        cmocka_unit_test_prestate(cfgProcessEnvironmentTransport, &dest_mtc),
         cmocka_unit_test_prestate(cfgProcessEnvironmentTransport, &dest_evt),
         cmocka_unit_test_prestate(cfgProcessEnvironmentTransport, &dest_log),
         cmocka_unit_test(cfgProcessEnvironmentStatsdTags),
@@ -1473,8 +1473,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgReadEnvSubstitution),
         cmocka_unit_test(jsonObjectFromCfgAndjsonStringFromCfgRoundTrip),
         cmocka_unit_test(initLogReturnsPtr),
-        cmocka_unit_test(initOutReturnsPtr),
-        cmocka_unit_test(initEvtReturnsPtr),
+        cmocka_unit_test(initMtcReturnsPtr),
+        cmocka_unit_test(initEvtFormatReturnsPtr),
         cmocka_unit_test(initCtlReturnsPtr),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(envRegexFree),

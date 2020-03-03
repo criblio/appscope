@@ -7,26 +7,16 @@
 #include <inttypes.h>
 #include "cJSON.h"
 #include "dbg.h"
-#include "format.h"
+#include "mtcformat.h"
 #include "scopetypes.h"
-
-// key names for event JSON
-#define HOST "host"
-#define TIME "_time"
-#define DATA "data"
-#define SOURCE "source"
-#define CHANNEL "_channel"
-#define SOURCETYPE "sourcetype"
-#define EVENT "ev"
-#define ID "id"
 
 #define TRUE 1
 #define FALSE 0
 
 
-struct _format_t
+struct _mtc_fmt_t
 {
-    cfg_out_format_t format;
+    cfg_mtc_format_t format;
     struct {
         char* prefix;
         unsigned max_len;       // Max length in bytes of a statsd string
@@ -37,12 +27,12 @@ struct _format_t
 
 
 // Constructors Destructors
-format_t*
-fmtCreate(cfg_out_format_t format)
+mtc_fmt_t*
+mtcFormatCreate(cfg_mtc_format_t format)
 {
     if (format >= CFG_FORMAT_MAX) return NULL;
 
-    format_t* f = calloc(1, sizeof(format_t));
+    mtc_fmt_t* f = calloc(1, sizeof(mtc_fmt_t));
     if (!f) {
         DBG(NULL);
         return NULL;
@@ -50,7 +40,7 @@ fmtCreate(cfg_out_format_t format)
     f->format = format;
     f->statsd.prefix = (DEFAULT_STATSD_PREFIX) ? strdup(DEFAULT_STATSD_PREFIX) : NULL;
     f->statsd.max_len = DEFAULT_STATSD_MAX_LEN;
-    f->verbosity = DEFAULT_OUT_VERBOSITY;
+    f->verbosity = DEFAULT_MTC_VERBOSITY;
     f->tags = DEFAULT_CUSTOM_TAGS;
 
     return f;
@@ -58,7 +48,7 @@ fmtCreate(cfg_out_format_t format)
 
 static
 void
-fmtDestroyTags(custom_tag_t*** tags)
+mtcFormatDestroyTags(custom_tag_t*** tags)
 {
     if (!tags || !*tags) return;
     custom_tag_t** t = *tags;
@@ -74,12 +64,12 @@ fmtDestroyTags(custom_tag_t*** tags)
 }
 
 void
-fmtDestroy(format_t** fmt)
+mtcFormatDestroy(mtc_fmt_t** fmt)
 {
     if (!fmt || !*fmt) return;
-    format_t* f = *fmt;
+    mtc_fmt_t* f = *fmt;
     if (f->statsd.prefix) free(f->statsd.prefix);
-    fmtDestroyTags(&f->tags);
+    mtcFormatDestroyTags(&f->tags);
     free(f);
     *fmt = NULL;
 }
@@ -105,7 +95,7 @@ statsdType(data_type_t x)
 }
 
 static int
-createStatsFieldString(format_t* fmt, event_field_t* f, char* tag, int sizeoftag)
+createStatsFieldString(mtc_fmt_t* fmt, event_field_t* f, char* tag, int sizeoftag)
 {
     if (!fmt || !f || !tag || sizeoftag <= 0) return -1;
 
@@ -126,7 +116,7 @@ createStatsFieldString(format_t* fmt, event_field_t* f, char* tag, int sizeoftag
 }
 
 static void
-appendStatsdFieldString(format_t* fmt, char* tag, int sz, char** end, int* bytes, int* firstTagAdded)
+appendStatsdFieldString(mtc_fmt_t* fmt, char* tag, int sz, char** end, int* bytes, int* firstTagAdded)
 {
     if (!*firstTagAdded) {
         sz += 2; // add space for the |#
@@ -147,7 +137,7 @@ appendStatsdFieldString(format_t* fmt, char* tag, int sz, char** end, int* bytes
 
 
 static void
-addStatsdFields(format_t* fmt, event_field_t* fields, char** end, int* bytes, int* firstTagAdded, regex_t* fieldFilter)
+addStatsdFields(mtc_fmt_t* fmt, event_field_t* fields, char** end, int* bytes, int* firstTagAdded, regex_t* fieldFilter)
 {
     if (!fmt || !fields || ! end || !*end || !bytes) return;
 
@@ -171,7 +161,7 @@ addStatsdFields(format_t* fmt, event_field_t* fields, char** end, int* bytes, in
 }
 
 static void
-addCustomFields(format_t* fmt, custom_tag_t** tags, char** end, int* bytes, int* firstTagAdded)
+addCustomFields(mtc_fmt_t* fmt, custom_tag_t** tags, char** end, int* bytes, int* firstTagAdded)
 {
     if (!fmt || !tags || !*tags || !end || !*end || !bytes) return;
 
@@ -192,143 +182,8 @@ addCustomFields(format_t* fmt, custom_tag_t** tags, char** end, int* bytes, int*
     }
 }
 
-
-typedef struct {
-    const char* str;
-    unsigned val;
-} enum_map_t;
-
-static enum_map_t watchTypeMap[] = {
-    {"file",                  CFG_SRC_FILE},
-    {"console",               CFG_SRC_CONSOLE},
-    {"syslog",                CFG_SRC_SYSLOG},
-    {"metric",                CFG_SRC_METRIC},
-    {NULL,                    -1}
-};
-
-static const char*
-valToStr(enum_map_t map[], unsigned val)
-{
-    enum_map_t* m;
-    for (m=map; m->str; m++) {
-        if (val == m->val) return m->str;
-    }
-    return NULL;
-}
-
-// Accessors
-cJSON *
-fmtEventJson(event_format_t *sev)
-{
-    char numbuf[32];
-
-    if (!sev || !sev->proc) return NULL;
-
-    cJSON* json = cJSON_CreateObject();
-    if (!json) goto err;
-
-    if (!cJSON_AddStringToObjLN(json, SOURCETYPE, valToStr(watchTypeMap, sev->sourcetype))) goto err;
-
-    if (!cJSON_AddStringToObjLN(json, ID, sev->proc->id)) goto err;
-
-    if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto err;
-    if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto err;
-    cJSON_AddItemToObjectCS(json, DATA, sev->data);
-    if (!cJSON_AddStringToObjLN(json, HOST, sev->proc->hostname)) goto err;
-    if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto err;
-    if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto err;
-
-    return json;
-err:
-    DBG("time=%s src=%s data=%p host=%s channel=%s json=%p",
-            sev->timestamp, sev->src, sev->data, sev->proc->hostname, numbuf, json);
-    if (json) cJSON_Delete(json);
-
-    return NULL;
-}
-
-static int
-addJsonFields(event_field_t* fields, regex_t* fieldFilter, cJSON* json)
-{
-    if (!fields) return TRUE;
-
-    event_field_t *fld;
-
-    // Start adding key:value entries
-    for (fld = fields; fld->value_type != FMT_END; fld++) {
-
-        // skip outputting anything that doesn't match fieldFilter
-        if (fieldFilter && regexec(fieldFilter, fld->name, 0, NULL, 0)) continue;
-
-        if (fld->value_type == FMT_STR) {
-            if (!cJSON_AddStringToObjLN(json, fld->name, fld->value.str)) return FALSE;
-        } else if (fld->value_type == FMT_NUM) {
-            if (!cJSON_AddNumberToObjLN(json, fld->name, fld->value.num)) return FALSE;
-        } else {
-            DBG("bad field type");
-        }
-    }
-
-    return TRUE;
-}
-
-static const char*
-metricTypeStr(data_type_t type)
-{
-    switch (type) {
-        case DELTA:
-            return "counter";
-        case CURRENT:
-            return "gauge";
-        case DELTA_MS:
-            return "timer";
-        case HISTOGRAM:
-            return "histogram";
-        case SET:
-            return "set";
-        default:
-            return "unknown";
-    }
-}
-
-cJSON *
-fmtMetricJson(event_t *metric, regex_t* fieldFilter)
-{
-    const char* metric_type = NULL;
-
-    if (!metric) return NULL;
-
-    cJSON *json = cJSON_CreateObject();
-    if (!json) goto err;
-
-    if (!cJSON_AddStringToObjLN(json, "_metric", metric->name)) goto err;
-    metric_type = metricTypeStr(metric->type);
-    if (!cJSON_AddStringToObjLN(json, "_metric_type", metric_type)) goto err;
-    switch ( metric->value.type ) {
-        case FMT_INT:
-            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.integer)) goto err;
-            break;
-        case FMT_FLT:
-            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.floating)) goto err;
-            break;
-        default:
-            DBG(NULL);
-    }
-
-    // Add fields
-    if (!addJsonFields(metric->fields, fieldFilter, json)) goto err;
-    return json;
-
-err:
-    DBG("_metric=%s _metric_type=%s _value=%lld, fields=%p, json=%p",
-        metric->name, metric_type, metric->value, metric->fields, json);
-    if (json) cJSON_Delete(json);
-
-    return NULL;
-}
-
 char*
-fmtStatsDString(format_t* fmt, event_t* e, regex_t* fieldFilter)
+mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
 {
     if (!fmt || !e) return NULL;
 
@@ -391,25 +246,25 @@ fmtStatsDString(format_t* fmt, event_t* e, regex_t* fieldFilter)
 }
 
 const char*
-fmtStatsDPrefix(format_t* fmt)
+mtcFormatStatsDPrefix(mtc_fmt_t* fmt)
 {
     return (fmt && fmt->statsd.prefix) ? fmt->statsd.prefix : DEFAULT_STATSD_PREFIX;
 }
 
 unsigned
-fmtStatsDMaxLen(format_t* fmt)
+mtcFormatStatsDMaxLen(mtc_fmt_t* fmt)
 {
     return (fmt) ? fmt->statsd.max_len : DEFAULT_STATSD_MAX_LEN;
 }
 
 unsigned
-fmtOutVerbosity(format_t* fmt)
+mtcFormatVerbosity(mtc_fmt_t* fmt)
 {
-    return (fmt) ? fmt->verbosity : DEFAULT_OUT_VERBOSITY;
+    return (fmt) ? fmt->verbosity : DEFAULT_MTC_VERBOSITY;
 }
 
 custom_tag_t**
-fmtCustomTags(format_t* fmt)
+mtcFormatCustomTags(mtc_fmt_t* fmt)
 {
     return (fmt) ? fmt->tags : DEFAULT_CUSTOM_TAGS;
 }
@@ -417,7 +272,7 @@ fmtCustomTags(format_t* fmt)
 // Setters
 
 void
-fmtStatsDPrefixSet(format_t* fmt, const char* prefix)
+mtcFormatStatsDPrefixSet(mtc_fmt_t* fmt, const char* prefix)
 {
     if (!fmt) return;
 
@@ -427,14 +282,14 @@ fmtStatsDPrefixSet(format_t* fmt, const char* prefix)
 }
 
 void
-fmtStatsDMaxLenSet(format_t* fmt, unsigned v)
+mtcFormatStatsDMaxLenSet(mtc_fmt_t* fmt, unsigned v)
 {
     if (!fmt) return;
     fmt->statsd.max_len = v;
 }
 
 void
-fmtOutVerbositySet(format_t* fmt, unsigned v)
+mtcFormatVerbositySet(mtc_fmt_t* fmt, unsigned v)
 {
     if (!fmt) return;
     if (v > CFG_MAX_VERBOSITY) v = CFG_MAX_VERBOSITY;
@@ -442,12 +297,12 @@ fmtOutVerbositySet(format_t* fmt, unsigned v)
 }
 
 void
-fmtCustomTagsSet(format_t* fmt, custom_tag_t** tags)
+mtcFormatCustomTagsSet(mtc_fmt_t* fmt, custom_tag_t** tags)
 {
     if (!fmt) return;
 
     // Don't leak with multiple set operations
-    fmtDestroyTags(&fmt->tags);
+    mtcFormatDestroyTags(&fmt->tags);
 
     if (!tags || !*tags) return;
 

@@ -1,120 +1,120 @@
 #include <stdio.h>
 #include <unistd.h>
-#include "out.h"
+#include "mtc.h"
 
 #include "test.h"
 
 static void
-outCreateReturnsValidPtr(void** state)
+mtcCreateReturnsValidPtr(void** state)
 {
-    out_t* out = outCreate();
-    assert_non_null(out);
-    outDestroy(&out);
-    assert_null(out);
+    mtc_t* mtc = mtcCreate();
+    assert_non_null(mtc);
+    mtcDestroy(&mtc);
+    assert_null(mtc);
 }
 
 static void
-outDestroyNullOutDoesntCrash(void** state)
+mtcDestroyNullMtcDoesntCrash(void** state)
 {
-    outDestroy(NULL);
-    out_t* out = NULL;
-    outDestroy(&out);
-    // Implicitly shows that calling outDestroy with NULL is harmless
+    mtcDestroy(NULL);
+    mtc_t* mtc = NULL;
+    mtcDestroy(&mtc);
+    // Implicitly shows that calling mtcDestroy with NULL is harmless
 }
 
 static void
-outSendForNullOutDoesntCrash(void** state)
+mtcSendForNullMtcDoesntCrash(void** state)
 {
     const char* msg = "Hey, this is cool!\n";
-    assert_int_equal(outSend(NULL, msg), -1);
+    assert_int_equal(mtcSend(NULL, msg), -1);
 }
 
 static void
-outSendForNullMessageDoesntCrash(void** state)
+mtcSendForNullMessageDoesntCrash(void** state)
 {
-    out_t* out = outCreate();
-    assert_non_null(out);
+    mtc_t* mtc = mtcCreate();
+    assert_non_null(mtc);
     transport_t* t = transportCreateSyslog();
     assert_non_null(t);
-    outTransportSet(out, t);
-    assert_int_equal(outSend(out, NULL), -1);
-    outDestroy(&out);
+    mtcTransportSet(mtc, t);
+    assert_int_equal(mtcSend(mtc, NULL), -1);
+    mtcDestroy(&mtc);
 }
 
 static void
-outTransportSetAndOutSend(void** state)
+mtcTransportSetAndMtcSend(void** state)
 {
     const char* file_path = "/tmp/my.path";
-    out_t* out = outCreate();
-    assert_non_null(out);
+    mtc_t* mtc = mtcCreate();
+    assert_non_null(mtc);
     transport_t* t1 = transportCreateUdp("127.0.0.1", "12345");
     transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
     transport_t* t3 = transportCreateSyslog();
     transport_t* t4 = transportCreateShm();
     transport_t* t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
-    outTransportSet(out, t1);
-    outTransportSet(out, t2);
-    outTransportSet(out, t3);
-    outTransportSet(out, t4);
-    outTransportSet(out, t5);
+    mtcTransportSet(mtc, t1);
+    mtcTransportSet(mtc, t2);
+    mtcTransportSet(mtc, t3);
+    mtcTransportSet(mtc, t4);
+    mtcTransportSet(mtc, t5);
 
-    // Test that transport is set by testing side effects of outSend
+    // Test that transport is set by testing side effects of mtcSend
     // affecting the file at file_path when connected to a file transport.
     long file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(outSend(out, "Something to send\n"), 0);
+    assert_int_equal(mtcSend(mtc, "Something to send\n"), 0);
 
     // With CFG_BUFFER_FULLY, this output only happens with the flush
     long file_pos_after = fileEndPosition(file_path);
     assert_int_equal(file_pos_before, file_pos_after);
 
-    outFlush(out);
+    mtcFlush(mtc);
     file_pos_after = fileEndPosition(file_path);
     assert_int_not_equal(file_pos_before, file_pos_after);
 
     // Test that transport is cleared by seeing no side effects.
-    outTransportSet(out, NULL);
+    mtcTransportSet(mtc, NULL);
     file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(outSend(out, "Something to send\n"), -1);
+    assert_int_equal(mtcSend(mtc, "Something to send\n"), -1);
     file_pos_after = fileEndPosition(file_path);
     assert_int_equal(file_pos_before, file_pos_after);
 
     if (unlink(file_path))
         fail_msg("Couldn't delete file %s", file_path);
 
-    outDestroy(&out);
+    mtcDestroy(&mtc);
 }
 
 static void
-outFormatSetAndOutSendEvent(void** state)
+mtcFormatSetAndMtcSendEvent(void** state)
 {
     const char* file_path = "/tmp/my.path";
-    out_t* out = outCreate();
-    assert_non_null(out);
+    mtc_t* mtc = mtcCreate();
+    assert_non_null(mtc);
     transport_t* t = transportCreateFile(file_path, CFG_BUFFER_LINE);
-    outTransportSet(out, t);
+    mtcTransportSet(mtc, t);
 
     event_t e = INT_EVENT("A", 1, DELTA, NULL);
-    format_t* f = fmtCreate(CFG_METRIC_STATSD);
-    outFormatSet(out, f);
+    mtc_fmt_t* f = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtcFormatSet(mtc, f);
 
-    // Test that format is set by testing side effects of outSendEvent
+    // Test that format is set by testing side effects of mtcSendMetric
     // affecting the file at file_path when connected to format.
     long file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(outSendEvent(out, &e), 0);
+    assert_int_equal(mtcSendMetric(mtc, &e), 0);
     long file_pos_after = fileEndPosition(file_path);
     assert_int_not_equal(file_pos_before, file_pos_after);
 
     // Test that format is cleared by seeing no side effects.
-    outFormatSet(out, NULL);
+    mtcFormatSet(mtc, NULL);
     file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(outSendEvent(out, &e), -1);
+    assert_int_equal(mtcSendMetric(mtc, &e), -1);
     file_pos_after = fileEndPosition(file_path);
     assert_int_equal(file_pos_before, file_pos_after);
 
     if (unlink(file_path))
         fail_msg("Couldn't delete file %s", file_path);
 
-    outDestroy(&out);
+    mtcDestroy(&mtc);
 }
 
 
@@ -124,12 +124,12 @@ main(int argc, char* argv[])
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(outCreateReturnsValidPtr),
-        cmocka_unit_test(outDestroyNullOutDoesntCrash),
-        cmocka_unit_test(outSendForNullOutDoesntCrash),
-        cmocka_unit_test(outSendForNullMessageDoesntCrash),
-        cmocka_unit_test(outTransportSetAndOutSend),
-        cmocka_unit_test(outFormatSetAndOutSendEvent),
+        cmocka_unit_test(mtcCreateReturnsValidPtr),
+        cmocka_unit_test(mtcDestroyNullMtcDoesntCrash),
+        cmocka_unit_test(mtcSendForNullMtcDoesntCrash),
+        cmocka_unit_test(mtcSendForNullMessageDoesntCrash),
+        cmocka_unit_test(mtcTransportSetAndMtcSend),
+        cmocka_unit_test(mtcFormatSetAndMtcSendEvent),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

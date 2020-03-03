@@ -1,5 +1,5 @@
-#ifndef __FORMAT_H__
-#define __FORMAT_H__
+#ifndef __MTC_FORMAT_H__
+#define __MTC_FORMAT_H__
 
 #include <regex.h>
 #include "scopetypes.h"
@@ -53,39 +53,34 @@ typedef struct event_format {
     proc_id_t* proc;
     unsigned long long uid;
     cJSON *data;
-    cfg_evt_t sourcetype;
+    watch_t sourcetype;
 } event_format_t;
 
-typedef struct _format_t format_t;
+typedef struct _mtc_fmt_t mtc_fmt_t;
 
 // Constructors Destructors
-format_t*           fmtCreate(cfg_out_format_t);
-void                fmtDestroy(format_t**);
+mtc_fmt_t*          mtcFormatCreate(cfg_mtc_format_t);
+void                mtcFormatDestroy(mtc_fmt_t**);
 
 // Accessors
-const char*         fmtStatsDPrefix(format_t*);
-unsigned            fmtStatsDMaxLen(format_t*);
-unsigned            fmtOutVerbosity(format_t*);
-custom_tag_t**      fmtCustomTags(format_t*);
+const char*         mtcFormatStatsDPrefix(mtc_fmt_t*);
+unsigned            mtcFormatStatsDMaxLen(mtc_fmt_t*);
+unsigned            mtcFormatVerbosity(mtc_fmt_t*);
+custom_tag_t**      mtcFormatCustomTags(mtc_fmt_t*);
 
 // This function returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
-char*               fmtStatsDString(format_t*, event_t*, regex_t*);
-
-// These functions return a pointer to malloc()'d buffers.
-// The caller is reposibile for deallocating with cJSON_Delete().
-cJSON *             fmtMetricJson(event_t*, regex_t*);
-cJSON *             fmtEventJson(event_format_t *);
+char*               mtcFormatStatsDString(mtc_fmt_t*, event_t*, regex_t*);
 
 // Setters
-void                fmtStatsDPrefixSet(format_t*, const char*);
-void                fmtStatsDMaxLenSet(format_t*, unsigned);
-void                fmtOutVerbositySet(format_t*, unsigned);
-void                fmtCustomTagsSet(format_t*, custom_tag_t**);
+void                mtcFormatStatsDPrefixSet(mtc_fmt_t*, const char*);
+void                mtcFormatStatsDMaxLenSet(mtc_fmt_t*, unsigned);
+void                mtcFormatVerbositySet(mtc_fmt_t*, unsigned);
+void                mtcFormatCustomTagsSet(mtc_fmt_t*, custom_tag_t**);
 
 // Helper functions - returns a pointer to a malloc'd buffer.
 // The caller is reponsible for deallocating with free().
 char* fmtUrlEncode(const char*);
 char* fmtUrlDecode(const char*);
 
-#endif // __FORMAT_H__
+#endif // __MTC_FORMAT_H__

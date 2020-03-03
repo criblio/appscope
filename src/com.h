@@ -16,6 +16,11 @@
 #include "scopetypes.h"
 
 
+// Post a message from report to the command buffer
+int cmdSendEvent(ctl_t *, event_t*, uint64_t, proc_id_t*);
+int cmdSendMetric(mtc_t *, event_t*);
+
+
 // Post a message to the command buffer
 int cmdPostEvtMsg(ctl_t *, cJSON *);
 int cmdPostInfoMsg(ctl_t *, cJSON *);
@@ -34,11 +39,5 @@ cJSON *msgStart(proc_id_t *, config_t *);
 
 // Create a json object describing the current configuration
 cJSON *jsonConfigurationObject(config_t *);
-
-// Create a json object for an event metric
-cJSON *msgEvtMetric(evt_t *, event_t *, uint64_t, proc_id_t *);
-
-// Create a json object for a log event
-cJSON *msgEvtLog(evt_t *, const char *path, const void *, size_t, uint64_t, proc_id_t *);
 
 #endif // __COM_H__

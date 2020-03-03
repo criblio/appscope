@@ -1,46 +1,22 @@
 #include "com.h"
 
-
-static int
-postMsg(ctl_t *ctl, cJSON *body, upload_type_t type, request_t *req, bool now)
+int
+cmdSendEvent(ctl_t *ctl, event_t* e, uint64_t time, proc_id_t* proc)
 {
-    int rc = -1;
-    char *streamMsg;
-    upload_t upld;
-
-    if (type == UPLD_RESP) {
-        // req is required for UPLD_RESP type
-        if (!req || !ctl) return rc;
-    } else {
-        // body is required for all other types
-        if (!body) return rc;
-        if (!ctl) {
-            cJSON_Delete(body);
-            return rc;
-        }
-    }
-
-    upld.type = type;
-    upld.body = body;
-    upld.req = req;
-    streamMsg = ctlCreateTxMsg(&upld);
-
-    if (streamMsg) {
-        // on the ring buffer
-        ctlSendMsg(ctl, streamMsg);
-
-        // send it now or periodic
-        if (now) ctlFlush(ctl);
-        rc = 0;
-    }
-
-    return rc;
+    return ctlSendEvent(ctl, e, time, proc);
 }
+
+int
+cmdSendMetric(mtc_t *mtc, event_t* e)
+{
+    return mtcSendMetric(mtc, e);
+}
+
 
 int
 cmdPostEvtMsg(ctl_t *ctl, cJSON *json)
 {
-    return postMsg(ctl, json, UPLD_EVT, NULL, FALSE);
+    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
 }
 
 int
@@ -49,31 +25,31 @@ cmdSendInfoStr(ctl_t *ctl, const char *str)
     cJSON* json;
     if (!str || !(json = cJSON_CreateString(str))) return -1;
 
-    return postMsg(ctl, json, UPLD_INFO, NULL, TRUE);
+    return ctlPostMsg(ctl, json, UPLD_INFO, NULL, TRUE);
 }
 
 int
 cmdPostInfoMsg(ctl_t *ctl, cJSON *json)
 {
-    return postMsg(ctl, json, UPLD_INFO, NULL, FALSE);
+    return ctlPostMsg(ctl, json, UPLD_INFO, NULL, FALSE);
 }
 
 int
 cmdSendEvtMsg(ctl_t *ctl, cJSON *json)
 {
-    return postMsg(ctl, json, UPLD_EVT, NULL, TRUE);
+    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, TRUE);
 }
 
 int
 cmdSendInfoMsg(ctl_t *ctl, cJSON *json)
 {
-    return postMsg(ctl, json, UPLD_INFO, NULL, TRUE);
+    return ctlPostMsg(ctl, json, UPLD_INFO, NULL, TRUE);
 }
 
 int
 cmdSendResponse(ctl_t *ctl, request_t *req, cJSON *body)
 {
-    return postMsg(ctl, body, UPLD_RESP, req, TRUE);
+    return ctlPostMsg(ctl, body, UPLD_RESP, req, TRUE);
 }
 
 request_t *
@@ -119,7 +95,7 @@ jsonConfigurationObject(config_t* cfg)
 
     if (!(root = cJSON_CreateObject())) goto err;
 
-    if (!(current = jsonObjectFromCfg(cfg)));
+    if (!(current = jsonObjectFromCfg(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, "current", current);
 
     return root;
@@ -158,18 +134,3 @@ err:
     if (json_root) cJSON_Delete(json_root);
     return NULL;
 }
-
-cJSON *
-msgEvtMetric(evt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc)
-{
-    return evtMetric(evt, metric, uid, proc);
-}
-
-cJSON *
-msgEvtLog(evt_t *evt, const char *path, const void *buf, size_t len,
-          uint64_t uid, proc_id_t *proc)
-{
-    return evtLog(evt, path, buf, len, uid, proc);
-
-}
-

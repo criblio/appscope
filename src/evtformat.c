@@ -5,16 +5,48 @@
 #include <time.h>
 
 #include "dbg.h"
-#include "evt.h"
+#include "evtformat.h"
+
+// key names for event JSON
+#define HOST "host"
+#define TIME "_time"
+#define DATA "data"
+#define SOURCE "source"
+#define CHANNEL "_channel"
+#define SOURCETYPE "sourcetype"
+#define EVENT "ev"
+#define ID "id"
+
+typedef struct {
+    const char* str;
+    unsigned val;
+} enum_map_t;
+
+static enum_map_t watchTypeMap[] = {
+    {"file",                  CFG_SRC_FILE},
+    {"console",               CFG_SRC_CONSOLE},
+    {"syslog",                CFG_SRC_SYSLOG},
+    {"metric",                CFG_SRC_METRIC},
+    {NULL,                    -1}
+};
+
+static const char*
+valToStr(enum_map_t map[], unsigned val)
+{
+    enum_map_t* m;
+    for (m=map; m->str; m++) {
+        if (val == m->val) return m->str;
+    }
+    return NULL;
+}
 
 typedef struct {
     int valid;
     regex_t re;
 } local_re_t;
 
-struct _evt_t
+struct _evt_fmt_t
 {
-    format_t* format;
     local_re_t value_re[CFG_SRC_MAX];
     local_re_t field_re[CFG_SRC_MAX];
     local_re_t name_re[CFG_SRC_MAX];
@@ -78,16 +110,16 @@ filterSet(local_re_t* re, const char *str, const char* default_val)
     }
 }
 
-evt_t*
-evtCreate()
+evt_fmt_t*
+evtFormatCreate()
 {
-    evt_t* evt = calloc(1, sizeof(evt_t));
+    evt_fmt_t* evt = calloc(1, sizeof(evt_fmt_t));
     if (!evt) {
         DBG(NULL);
         return NULL;
     }
 
-    cfg_evt_t src;
+    watch_t src;
     for (src=CFG_SRC_FILE;  src<CFG_SRC_MAX; src++) {
         filterSet(&evt->value_re[src], NULL, valueFilterDefault[src]);
         filterSet(&evt->field_re[src], NULL, fieldFilterDefault[src]);
@@ -95,33 +127,28 @@ evtCreate()
         evt->enabled[src] = srcEnabledDefault[src];
     }
 
-    // default format for events, which can be overriden
-    evt->format = fmtCreate(CFG_EVENT_ND_JSON);
-
     return evt;
 }
 
 void
-evtDestroy(evt_t** evt)
+evtFormatDestroy(evt_fmt_t** evt)
 {
     if (!evt || !*evt) return;
-    evt_t *edestroy  = *evt;
+    evt_fmt_t *edestroy  = *evt;
 
-    cfg_evt_t src;
+    watch_t src;
     for (src=CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
         if (edestroy->value_re[src].valid) regfree(&edestroy->value_re[src].re);
         if (edestroy->field_re[src].valid) regfree(&edestroy->field_re[src].re);
         if (edestroy->name_re[src].valid) regfree(&edestroy->name_re[src].re);
     }
 
-    fmtDestroy(&edestroy->format);
-
     free(edestroy);
     *evt = NULL;
 }
 
 regex_t *
-evtValueFilter(evt_t *evt, cfg_evt_t src)
+evtFormatValueFilter(evt_fmt_t *evt, watch_t src)
 {
     if (src < CFG_SRC_MAX) {
         if (evt && evt->value_re[src].valid) return &evt->value_re[src].re;
@@ -136,7 +163,7 @@ evtValueFilter(evt_t *evt, cfg_evt_t src)
 }
 
 regex_t *
-evtFieldFilter(evt_t *evt, cfg_evt_t src)
+evtFormatFieldFilter(evt_fmt_t *evt, watch_t src)
 {
     if (src < CFG_SRC_MAX) {
         if (evt && evt->field_re[src].valid) return &evt->field_re[src].re;
@@ -151,7 +178,7 @@ evtFieldFilter(evt_t *evt, cfg_evt_t src)
 }
 
 regex_t *
-evtNameFilter(evt_t *evt, cfg_evt_t src)
+evtFormatNameFilter(evt_fmt_t *evt, watch_t src)
 {
     if (src < CFG_SRC_MAX) {
         if (evt && evt->name_re[src].valid) return &evt->name_re[src].re;
@@ -166,7 +193,7 @@ evtNameFilter(evt_t *evt, cfg_evt_t src)
 }
 
 unsigned
-evtSourceEnabled(evt_t* evt, cfg_evt_t src)
+evtFormatSourceEnabled(evt_fmt_t* evt, watch_t src)
 {
     if (src < CFG_SRC_MAX) {
         if (evt) return evt->enabled[src];
@@ -178,38 +205,28 @@ evtSourceEnabled(evt_t* evt, cfg_evt_t src)
 }
 
 void
-evtFormatSet(evt_t* evt, format_t* format)
-{
-    if (!evt) return;
-
-    // Don't leak if evtFormatSet is called repeatedly
-    fmtDestroy(&evt->format);
-    evt->format = format;
-}
-
-void
-evtValueFilterSet(evt_t *evt, cfg_evt_t src, const char *str)
+evtFormatValueFilterSet(evt_fmt_t *evt, watch_t src, const char *str)
 {
     if (!evt || src >= CFG_SRC_MAX) return;
     filterSet(&evt->value_re[src], str, valueFilterDefault[src]);
 }
 
 void
-evtFieldFilterSet(evt_t *evt, cfg_evt_t src, const char *str)
+evtFormatFieldFilterSet(evt_fmt_t *evt, watch_t src, const char *str)
 {
     if (!evt || src >= CFG_SRC_MAX) return;
     filterSet(&evt->field_re[src], str, fieldFilterDefault[src]);
 }
 
 void
-evtNameFilterSet(evt_t *evt, cfg_evt_t src, const char *str)
+evtFormatNameFilterSet(evt_fmt_t *evt, watch_t src, const char *str)
 {
     if (!evt || src >= CFG_SRC_MAX) return;
     filterSet(&evt->name_re[src], str, nameFilterDefault[src]);
 }
 
 void
-evtSourceEnabledSet(evt_t* evt, cfg_evt_t src, unsigned val)
+evtFormatSourceEnabledSet(evt_fmt_t* evt, watch_t src, unsigned val)
 {
     if (!evt || src >= CFG_SRC_MAX) return;
     evt->enabled[src] = val;
@@ -262,6 +279,36 @@ anyValueFieldMatches(regex_t* filter, event_t* metric)
 }
 
 cJSON *
+fmtEventJson(event_format_t *sev)
+{
+    char numbuf[32];
+
+    if (!sev || !sev->proc) return NULL;
+
+    cJSON* json = cJSON_CreateObject();
+    if (!json) goto err;
+
+    if (!cJSON_AddStringToObjLN(json, SOURCETYPE, valToStr(watchTypeMap, sev->sourcetype))) goto err;
+
+    if (!cJSON_AddStringToObjLN(json, ID, sev->proc->id)) goto err;
+
+    if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto err;
+    if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto err;
+    cJSON_AddItemToObjectCS(json, DATA, sev->data);
+    if (!cJSON_AddStringToObjLN(json, HOST, sev->proc->hostname)) goto err;
+    if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto err;
+    if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto err;
+
+    return json;
+err:
+    DBG("time=%s src=%s data=%p host=%s channel=%s json=%p",
+            sev->timestamp, sev->src, sev->data, sev->proc->hostname, numbuf, json);
+    if (json) cJSON_Delete(json);
+
+    return NULL;
+}
+
+cJSON *
 rateLimitMessage(proc_id_t *proc)
 {
     event_format_t event;
@@ -284,8 +331,88 @@ rateLimitMessage(proc_id_t *proc)
     return json;
 }
 
+static const char*
+metricTypeStr(data_type_t type)
+{
+    switch (type) {
+        case DELTA:
+            return "counter";
+        case CURRENT:
+            return "gauge";
+        case DELTA_MS:
+            return "timer";
+        case HISTOGRAM:
+            return "histogram";
+        case SET:
+            return "set";
+        default:
+            return "unknown";
+    }
+}
+
+static int
+addJsonFields(event_field_t* fields, regex_t* fieldFilter, cJSON* json)
+{
+    if (!fields) return TRUE;
+
+    event_field_t *fld;
+
+    // Start adding key:value entries
+    for (fld = fields; fld->value_type != FMT_END; fld++) {
+
+        // skip outputting anything that doesn't match fieldFilter
+        if (fieldFilter && regexec(fieldFilter, fld->name, 0, NULL, 0)) continue;
+
+        if (fld->value_type == FMT_STR) {
+            if (!cJSON_AddStringToObjLN(json, fld->name, fld->value.str)) return FALSE;
+        } else if (fld->value_type == FMT_NUM) {
+            if (!cJSON_AddNumberToObjLN(json, fld->name, fld->value.num)) return FALSE;
+        } else {
+            DBG("bad field type");
+        }
+    }
+
+    return TRUE;
+}
+
 cJSON *
-evtMetric(evt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
+fmtMetricJson(event_t *metric, regex_t* fieldFilter)
+{
+    const char* metric_type = NULL;
+
+    if (!metric) return NULL;
+
+    cJSON *json = cJSON_CreateObject();
+    if (!json) goto err;
+
+    if (!cJSON_AddStringToObjLN(json, "_metric", metric->name)) goto err;
+    metric_type = metricTypeStr(metric->type);
+    if (!cJSON_AddStringToObjLN(json, "_metric_type", metric_type)) goto err;
+    switch ( metric->value.type ) {
+        case FMT_INT:
+            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.integer)) goto err;
+            break;
+        case FMT_FLT:
+            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.floating)) goto err;
+            break;
+        default:
+            DBG(NULL);
+    }
+
+    // Add fields
+    if (!addJsonFields(metric->fields, fieldFilter, json)) goto err;
+    return json;
+
+err:
+    DBG("_metric=%s _metric_type=%s _value=%lld, fields=%p, json=%p",
+        metric->name, metric_type, metric->value, metric->fields, json);
+    if (json) cJSON_Delete(json);
+
+    return NULL;
+}
+
+cJSON *
+evtFormatMetric(evt_fmt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
 {
     event_format_t event;
     struct timeb tb;
@@ -296,8 +423,8 @@ evtMetric(evt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
     if (!evt || !metric || !proc) return NULL;
 
     // Test for a name field match.  No match, no metric output
-    if (!evtSourceEnabled(evt, CFG_SRC_METRIC) ||
-        !(filter = evtNameFilter(evt, CFG_SRC_METRIC)) ||
+    if (!evtFormatSourceEnabled(evt, CFG_SRC_METRIC) ||
+        !(filter = evtFormatNameFilter(evt, CFG_SRC_METRIC)) ||
         (regexec(filter, metric->name, 0, NULL, 0))) {
         return NULL;
     }
@@ -319,7 +446,7 @@ evtMetric(evt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
      * Loop through all metric fields for at least one matching field value
      * No match, no metric output
      */
-    if (!anyValueFieldMatches(evtValueFilter(evt, CFG_SRC_METRIC), metric)) {
+    if (!anyValueFieldMatches(evtFormatValueFilter(evt, CFG_SRC_METRIC), metric)) {
         return NULL;
     }
 
@@ -330,7 +457,7 @@ evtMetric(evt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
     event.uid = uid;
 
     // Format the metric string using the configured metric format type
-    event.data = fmtMetricJson(metric, evtFieldFilter(evt, CFG_SRC_METRIC));
+    event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, CFG_SRC_METRIC));
     if (!event.data) return NULL;
     event.sourcetype = CFG_SRC_METRIC;
 
@@ -338,22 +465,22 @@ evtMetric(evt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
 }
 
 cJSON *
-evtLog(evt_t *evt, const char *path, const void *buf, size_t count,
+evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
        uint64_t uid, proc_id_t* proc)
 {
     event_format_t event;
     struct timeb tb;
-    cfg_evt_t logType;
+    watch_t logType;
 
     if (!evt || !path || !buf || !proc) return NULL;
 
     regex_t* filter;
-    if (evtSourceEnabled(evt, CFG_SRC_CONSOLE) &&
-       (filter = evtNameFilter(evt, CFG_SRC_CONSOLE)) &&
+    if (evtFormatSourceEnabled(evt, CFG_SRC_CONSOLE) &&
+       (filter = evtFormatNameFilter(evt, CFG_SRC_CONSOLE)) &&
        (!regexec(filter, path, 0, NULL, 0))) {
         logType = CFG_SRC_CONSOLE;
-    } else if (evtSourceEnabled(evt, CFG_SRC_FILE) &&
-       (filter = evtNameFilter(evt, CFG_SRC_FILE)) &&
+    } else if (evtFormatSourceEnabled(evt, CFG_SRC_FILE) &&
+       (filter = evtFormatNameFilter(evt, CFG_SRC_FILE)) &&
        (!regexec(filter, path, 0, NULL, 0))) {
         logType = CFG_SRC_FILE;
     } else {
@@ -375,7 +502,7 @@ evtLog(evt_t *evt, const char *path, const void *buf, size_t count,
 
     cJSON* dataField = cJSON_GetObjectItem(json, "data");
     if (dataField && dataField->valuestring) {
-        filter = evtValueFilter(evt, logType);
+        filter = evtFormatValueFilter(evt, logType);
         if (filter && regexec(filter, dataField->valuestring, 0, NULL, 0)) {
             // This event doesn't match.  Drop it on the floor.
             cJSON_Delete(json);

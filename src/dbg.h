@@ -2,6 +2,8 @@
 #define __DBG_H__
 
 #include <stdio.h>
+#include "log.h"
+#include "scopetypes.h"
 
 typedef struct _dbg_t dbg_t;
 
@@ -50,6 +52,17 @@ void                 dbgAddLine(const char* key, const char* fmt, ...);
 //
 
 
+
+
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// logging utilities
+//
+
+extern log_t* g_log;
+extern proc_id_t g_proc;
+
+void scopeLog(const char* msg, int fd, cfg_log_level_t level);
 
 
 #endif // __DBG_H__

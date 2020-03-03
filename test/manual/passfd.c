@@ -1,4 +1,4 @@
-/* 
+/*
  * passfd.c - Test to see that Scope is handling the passing of fd access
  * rights between proceses correctly
  *
@@ -20,7 +20,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h> 
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <pthread.h>
@@ -58,7 +58,7 @@ check_event(char **validation, int numval)
     int fd, rc, i;
     char *buf;
     struct stat sbuf;
-    
+
     if ((fd = open(EVENTFILE, O_RDONLY)) == -1) {
         perror("open:check_event");
         return -1;
@@ -66,17 +66,17 @@ check_event(char **validation, int numval)
 
     if (fstat(fd, &sbuf) == -1) {
         perror("fstat:check_event");
-        return -1;        
+        return -1;
     }
 
     if ((buf = calloc(1, sbuf.st_size)) == NULL) {
         perror("calloc:check_event");
-        return -1;        
+        return -1;
     }
 
     if ((read(fd, buf, sbuf.st_size)) <= 0) {
         perror("read:check_event");
-        return -1;        
+        return -1;
     }
 
     // look for validation strings within the same event line
@@ -96,7 +96,7 @@ check_event(char **validation, int numval)
 
     if (close(fd) == -1) {
         perror("close:check_event");
-        return -1;        
+        return -1;
     }
 
     if (unlink(EVENTFILE) == -1) {
@@ -117,7 +117,7 @@ send_array_rights(int sd, int *sendfds, int numfds)
     struct cmsghdr *cmptr;
     char control[CMSG_SPACE(sizeof(int) * numfds)];
     char tdata[] = "test";
-  
+
     msg.msg_control = control;
     msg.msg_controllen = sizeof(control);
 
@@ -131,7 +131,7 @@ send_array_rights(int sd, int *sendfds, int numfds)
 
     msg.msg_name = NULL;
     msg.msg_namelen = 0;
-      
+
     iov[0].iov_base = tdata;
     iov[0].iov_len = strlen(tdata);
     msg.msg_iov = iov;
@@ -142,7 +142,7 @@ send_array_rights(int sd, int *sendfds, int numfds)
         perror("sendmsg:send_array_rights");
         return -1;
     }
-    
+
     fprintf(stderr, "Parent:sent %d bytes\n", clen);
     return 0;
 }
@@ -254,10 +254,10 @@ send_access_rights(int sd, int sendfd)
     cmptr->cmsg_type = SCM_RIGHTS;
     *((int *) CMSG_DATA(cmptr)) = sendfd;
 
-      
+
     msg.msg_name = NULL;
     msg.msg_namelen = 0;
-      
+
     iov[0].iov_base = tdata;
     iov[0].iov_len = strlen(tdata);
     msg.msg_iov = iov;
@@ -295,10 +295,10 @@ send_ttl_rights(int sd, int sendfd)
     cmptr->cmsg_type = IP_TTL;
     *((int *) CMSG_DATA(cmptr)) = sendfd;
 
-      
+
     msg.msg_name = NULL;
     msg.msg_namelen = 0;
-      
+
     iov[0].iov_base = tdata;
     iov[0].iov_len = strlen(tdata);
     msg.msg_iov = iov;
@@ -318,8 +318,8 @@ send_ttl_rights(int sd, int sendfd)
 int
 get_send_sock(void)
 {
- 	int sd;
-	struct addrinfo	hints, *res, *ressave;
+    int sd;
+    struct addrinfo	hints, *res, *ressave;
     char port[] = TESTPORT;
     char host[] = HOST;
     char test_data[] = "Start from the server, the source\n";
@@ -368,7 +368,7 @@ get_send_fd()
 {
     int fd;
     char test_data[] = "Start from the server, the source\n";
-  
+
     if ((fd = open(TESTFILE, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666)) == -1) {
         perror("open:get_send_fd");
         return -1;
@@ -397,7 +397,7 @@ recv_thread(void *param)
     }
 
     optval = 1;
-    setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, 
+    setsockopt(sd, SOL_SOCKET, SO_REUSEADDR,
                (const void *)&optval , sizeof(int));
 
     bzero((char *)&serveraddr, sizeof(serveraddr));
@@ -408,13 +408,13 @@ recv_thread(void *param)
 
     serveraddr.sin_port = htons(port);
 
-    if (bind(sd, (struct sockaddr *)&serveraddr, 
+    if (bind(sd, (struct sockaddr *)&serveraddr,
              sizeof(serveraddr)) < 0) {
         perror("ERROR:recv_thread:bind");
         exit(-1);
     }
-  
-    if (listen(sd, 5) < 0) { /* allow 5 requests to queue up */ 
+
+    if (listen(sd, 5) < 0) { /* allow 5 requests to queue up */
         perror("ERROR:recv_thread:listen");
         exit(-1);
     }
@@ -422,7 +422,7 @@ recv_thread(void *param)
     while (1) {
         int rc;
         char buf[64];
-        
+
         rsd = accept(sd, (struct sockaddr *)&clientaddr, &clientlen);
         if (rsd < 0) {
             perror("ERROR:recv_thread:accept");
@@ -456,8 +456,8 @@ unruly_kid()
   struct stat sbuf;
   char control[CMSG_SPACE(sizeof(int))];
   char test_data[] = "Passing the buck\n";
-  
-  // socket: create the parent socket 
+
+  // socket: create the parent socket
   clientsock = socket(AF_UNIX, SOCK_STREAM, 0);
   if (clientsock < 0) {
       perror("ERROR opening child socket");
@@ -499,17 +499,17 @@ unruly_kid()
               fprintf(stderr, "Child:control level != SOL_SOCKET\n");
               exit(-1);
           }
-      
+
           if (cmptr->cmsg_type != SCM_RIGHTS) {
               fprintf(stderr, "Child:control type != SCM_RIGHTS\n");
               exit(-1);
           }
-      
+
           recvfd = ((int *) CMSG_DATA(cmptr));
           fprintf(stdout, "Child:Received len %ld\n", cmptr->cmsg_len);
           numfds = (cmptr->cmsg_len - CMSG_ALIGN(sizeof(struct cmsghdr))) / sizeof(int);
           fprintf(stdout, "Child:Received %d fds %ld\n", numfds, sizeof(int));
-      
+
           for (i = 0; i < numfds; i++) {
               // on the new fd
               if (fstat(recvfd[i], &sbuf) != -1) {
@@ -528,7 +528,7 @@ unruly_kid()
                   perror("fstat child");
                   exit(-1);
               }
-          
+
               close(recvfd[i]);
           }
       } else {
@@ -551,7 +551,7 @@ main(int argc, char **argv) {
   if (argc < 2) {
       usage(argv[0]);
   }
-  
+
   while ((opt = getopt(argc, argv, "vhf:1234")) > 0) {
     switch (opt) {
       case 'v': verbose++; break;
@@ -564,20 +564,20 @@ main(int argc, char **argv) {
     }
   }
 
-  // socket: create the parent socket 
+  // socket: create the parent socket
   servsock = socket(AF_UNIX, SOCK_STREAM, 0);
   if (servsock < 0) {
       perror("ERROR opening socket");
       exit(1);
   }
 
-  /* setsockopt: Handy debugging trick that lets 
-   * us rerun the server immediately after we kill it; 
-   * otherwise we have to wait about 20 secs. 
-   * Eliminates "ERROR on binding: Address already in use" error. 
+  /* setsockopt: Handy debugging trick that lets
+   * us rerun the server immediately after we kill it;
+   * otherwise we have to wait about 20 secs.
+   * Eliminates "ERROR on binding: Address already in use" error.
    */
   optval = 1;
-  setsockopt(servsock, SOL_SOCKET, SO_REUSEADDR, 
+  setsockopt(servsock, SOL_SOCKET, SO_REUSEADDR,
              (const void *)&optval , sizeof(int));
 
   bzero((char *)&serveraddr, sizeof(serveraddr));
@@ -591,13 +591,13 @@ main(int argc, char **argv) {
       perror("unlink");
   }
 
-  if (bind(servsock, (struct sockaddr *) &serveraddr, 
+  if (bind(servsock, (struct sockaddr *) &serveraddr,
            sizeof(serveraddr)) < 0) {
       perror("ERROR on binding");
       exit(1);
   }
-  
-  if (listen(servsock, 15) < 0) { /* allow 15 requests to queue up */ 
+
+  if (listen(servsock, 15) < 0) { /* allow 15 requests to queue up */
       perror("ERROR on listen");
       exit(1);
   }
@@ -629,7 +629,7 @@ main(int argc, char **argv) {
       struct sockaddr caddr;
       socklen_t clen = sizeof(struct sockaddr);
       int sendfds[2];
-      
+
       // wait for the child to tell us it's ready
       fprintf(stderr, "Parent:accepting\n");
       sd = accept(servsock, (struct sockaddr *)&caddr, &clen);
@@ -643,7 +643,7 @@ main(int argc, char **argv) {
 
       // get a socket to send
       if ((sendsock = get_send_sock()) == -1) exit(-1);
-      
+
       // send fd access rights
       switch (ttype) {
       case 1:
@@ -665,12 +665,12 @@ main(int argc, char **argv) {
           exit(-1);
       }
 
-      close(sd);      
+      close(sd);
       close(sendfd);
       close(sendsock);
       break;
   }
-  
+
   waitpid(child, &child_stat, 0);
 
   switch (ttype) {

@@ -372,6 +372,7 @@ out:
 struct _ctl_t
 {
     transport_t* transport;
+    evt_fmt_t* evt;
     cbuf_handle_t evbuf;
 };
 
@@ -402,6 +403,7 @@ ctlDestroy(ctl_t** ctl)
     cbufFree((*ctl)->evbuf);
 
     transportDestroy(&(*ctl)->transport);
+    evtFormatDestroy(&(*ctl)->evt);
 
     free(*ctl);
     *ctl = NULL;
@@ -421,6 +423,66 @@ ctlSendMsg(ctl_t* ctl, char * msg)
         DBG(NULL);
         free(msg);
     }
+}
+
+int
+ctlPostMsg(ctl_t *ctl, cJSON *body, upload_type_t type, request_t *req, bool now)
+{
+    int rc = -1;
+    char *streamMsg;
+    upload_t upld;
+
+    if (type == UPLD_RESP) {
+        // req is required for UPLD_RESP type
+        if (!req || !ctl) return rc;
+    } else {
+        // body is required for all other types
+        if (!body) return rc;
+        if (!ctl) {
+            cJSON_Delete(body);
+            return rc;
+        }
+    }
+
+    upld.type = type;
+    upld.body = body;
+    upld.req = req;
+    streamMsg = ctlCreateTxMsg(&upld);
+
+    if (streamMsg) {
+        // on the ring buffer
+        ctlSendMsg(ctl, streamMsg);
+
+        // send it now or periodic
+        if (now) ctlFlush(ctl);
+        rc = 0;
+    }
+
+    return rc;
+}
+
+int
+ctlSendEvent(ctl_t* ctl, event_t* e, uint64_t uid, proc_id_t* proc)
+{
+    if (!ctl || !e || !proc) return -1;
+
+    // get a cJSON object for the given event
+    cJSON *json = evtFormatMetric(ctl->evt, e, uid, proc);
+
+    // send it
+    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
+}
+
+int
+ctlSendLog(ctl_t* ctl, const char* path, const void* buf, size_t count, uint64_t uid, proc_id_t* proc)
+{
+    if (!ctl || !path || !buf || !proc) return -1;
+
+    // get a cJSON object for the given log msg
+    cJSON *json = evtFormatLog(ctl->evt, path, buf, count, uid, proc);
+
+    // send it
+    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
 }
 
 static void
@@ -476,17 +538,17 @@ ctlConnection(ctl_t *ctl)
 }
 
 int
-ctlClose(ctl_t *ctl)
-{
-    if (!ctl) return 0;
-    return transportDisconnect(ctl->transport);
-}
-
-int
 ctlConnect(ctl_t *ctl)
 {
     if (!ctl) return 0;
     return transportConnect(ctl->transport);
+}
+
+int
+ctlClose(ctl_t *ctl)
+{
+    if (!ctl) return 0;
+    return transportDisconnect(ctl->transport);
 }
 
 void
@@ -499,4 +561,13 @@ ctlTransportSet(ctl_t* ctl, transport_t* transport)
     ctl->transport = transport;
 }
 
+void
+ctlEvtSet(ctl_t* ctl, evt_fmt_t* evt)
+{
+    if (!ctl) return;
 
+    // Don't leak if ctlEvtSet is called repeatedly
+    // TODO: need to ensure that previous object is no longer in use
+    // evtFormatDestroy(&ctl->evt);
+    ctl->evt = evt;
+}

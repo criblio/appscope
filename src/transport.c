@@ -41,6 +41,7 @@ struct _transport_t
             FILE* stream;
             int stdout;  // Flag to indicate that stream is stdout
             int stderr;  // Flag to indicate that stream is stderr
+            cfg_buffer_t buf_policy;
         } file;
     };
 };
@@ -95,13 +96,20 @@ placeDescriptor(int fd, transport_t *t)
 {
     if (!t) return -1;
 
+    // next_fd_to_try avoids reusing file descriptors.
+    // Without this, we've had problems where the buffered stream for
+    // g_log has it's fd closed and reopened by another transport which
+    // causes the mis-routing of data.
+    static int next_fd_to_try = DEFAULT_FD;
+
     int i, dupfd;
 
-    for (i = DEFAULT_FD; i >= DEFAULT_MIN_FD; i--) {
+    for (i = next_fd_to_try; i >= DEFAULT_MIN_FD; i--) {
         if ((t->fcntl(i, F_GETFD) == -1) && (errno == EBADF)) {
             // This fd is available
             if ((dupfd = t->dup2(fd, i)) == -1) continue;
             t->close(fd);
+            next_fd_to_try = dupfd - 1;
             return dupfd;
         }
     }
@@ -112,46 +120,96 @@ placeDescriptor(int fd, transport_t *t)
 int
 transportConnection(transport_t *trans)
 {
-    if (!trans) return 0;
+    if (!trans) return -1;
+    switch(trans->type) {
+        case CFG_UDP:
+        case CFG_TCP:
+            return trans->net.sock;
+        case CFG_FILE:
+            if (trans->file.stream) {
+                return fileno(trans->file.stream);
+            } else {
+                return -1;
+            }
+        case CFG_UNIX:
+        case CFG_SYSLOG:
+        case CFG_SHM:
+            break;
+        default:
+            DBG(NULL);
+    }
 
-    return trans->net.sock;
+    return -1;
 }
 
 int
 transportNeedsConnection(transport_t *trans)
 {
     if (!trans) return 0;
-    return (trans->type == CFG_TCP || trans->type == CFG_UDP) && (trans->net.sock == -1);
+    switch (trans->type) {
+        case CFG_UDP:
+        case CFG_TCP:
+            return (trans->net.sock == -1);
+        case CFG_FILE:
+            // This checks to see if our file descriptor has been
+            // closed by our process.  (errno == EBADF) Stream buffering
+            // makes it harder to know when this has happened.
+            if ((trans->file.stream) &&
+                   (trans->fcntl(fileno(trans->file.stream), F_GETFD) == -1)) {
+                DBG(NULL);
+                transportDisconnect(trans);
+            }
+            return (trans->file.stream == NULL);
+        case CFG_UNIX:
+        case CFG_SYSLOG:
+        case CFG_SHM:
+            break;
+        default:
+            DBG(NULL);
+    }
+    return 0;
 }
 
 int
 transportDisconnect(transport_t *trans)
 {
     if (!trans) return 0;
-    if (trans->type == CFG_TCP || trans->type == CFG_UDP) {
-        if (trans->net.sock != -1) trans->close(trans->net.sock);
-        trans->net.sock = -1;
+    switch (trans->type) {
+        case CFG_UDP:
+        case CFG_TCP:
+            if (trans->net.sock != -1) trans->close(trans->net.sock);
+            trans->net.sock = -1;
+            break;
+        case CFG_FILE:
+            if (!trans->file.stdout && !trans->file.stderr) {
+                if (trans->file.stream) trans->fclose(trans->file.stream);
+            }
+            trans->file.stream = NULL;
+            break;
+        case CFG_UNIX:
+        case CFG_SYSLOG:
+        case CFG_SHM:
+            break;
+        default:
+            DBG(NULL);
     }
     return 0;
 }
 
-int
-transportConnect(transport_t *trans)
+static int
+transportConnectSocket(transport_t *trans)
 {
-    // We're already connected.  Do nothing.
-    if (!transportNeedsConnection(trans)) return 1;
-
     struct addrinfo* addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
     switch (trans->type) {
-        case CFG_TCP:
-            hints.ai_socktype = SOCK_STREAM; // For TCP
-            hints.ai_protocol = IPPROTO_TCP; // For TCP
-            break;
         case CFG_UDP:
             hints.ai_socktype = SOCK_DGRAM;  // For UDP
             hints.ai_protocol = IPPROTO_UDP; // For UDP
+            break;
+        case CFG_TCP:
+            hints.ai_socktype = SOCK_STREAM; // For TCP
+            hints.ai_protocol = IPPROTO_TCP; // For TCP
             break;
         default:
             DBG(NULL);
@@ -185,7 +243,112 @@ transportConnect(transport_t *trans)
 
     if (addr_list) freeaddrinfo(addr_list);
 
+    // If no connection was made above, then there's nothing more to do
+    if (trans->net.sock == -1) return 0;
+
+    // Move this descriptor up out of the way
+    trans->net.sock = placeDescriptor(trans->net.sock, trans);
+    if (trans->net.sock == -1) return 0;
+
+    // Set the socket to close on exec
+    int flags = trans->fcntl(trans->net.sock, F_GETFD, 0);
+    if (trans->fcntl(trans->net.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
+        DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
+    }
+
+    if (trans->type == CFG_UDP) {
+        // Set the socket to non blocking
+        int flags = trans->fcntl(trans->net.sock, F_GETFL, 0);
+        if (trans->fcntl(trans->net.sock, F_SETFL, flags | O_NONBLOCK) == -1) {
+            DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
+        }
+    }
+
     return (trans->net.sock != -1);
+}
+
+static int
+transportConnectFile(transport_t *t)
+{
+    // if stdout/stderr, set stream and skip everything else in the function.
+    if (t->file.stdout) {
+        t->file.stream = stdout;
+        return 1;
+    } else if (t->file.stderr) {
+        t->file.stream = stderr;
+        return 1;
+    }
+
+    int fd;
+    fd = t->open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
+    if (fd == -1) {
+        DBG("%s", t->file.path);
+        transportDisconnect(t);
+        return 0;
+    }
+
+    // Move this descriptor up out of the way
+    if ((fd = placeDescriptor(fd, t)) == -1) {
+        transportDisconnect(t);
+        return 0;
+    }
+
+    // Needed because umask affects open permissions
+    if (fchmod(fd, 0666) == -1) {
+        DBG("%d %s", fd, t->file.path);
+    }
+
+    // set close on exec
+    int flags = t->fcntl(fd, F_GETFD, 0);
+    if (t->fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1) {
+        DBG("%d %s", fd, t->file.path);
+    }
+
+    FILE* f;
+    if (!(f = t->fdopen(fd, "a"))) {
+        transportDisconnect(t);
+        return 0;
+    }
+    t->file.stream = f;
+
+    // Fully buffer the output unless we're told not to.
+    // I expect line buffering to be useful when we're debugging crashes or
+    // or if many applications are configured to write to the same files.
+    int buf_mode = _IOFBF;
+    switch (t->file.buf_policy) {
+        case CFG_BUFFER_FULLY:
+            buf_mode = _IOFBF;
+            break;
+        case CFG_BUFFER_LINE:
+            buf_mode = _IOLBF;
+            break;
+        default:
+            DBG("%d", t->file.buf_policy);
+    }
+    if (setvbuf(t->file.stream, NULL, buf_mode, BUFSIZ)) {
+        DBG(NULL);
+    }
+
+    return (t->file.stream != NULL);
+}
+
+int
+transportConnect(transport_t *trans)
+{
+    // We're already connected.  Do nothing.
+    if (!transportNeedsConnection(trans)) return 1;
+
+    switch (trans->type) {
+        case CFG_UDP:
+        case CFG_TCP:
+            return transportConnectSocket(trans);
+        case CFG_FILE:
+            return transportConnectFile(trans);
+        default:
+            DBG(NULL);
+    }
+
+    return 1;
 }
 
 transport_t *
@@ -210,16 +373,6 @@ transportCreateTCP(const char *host, const char *port)
     }
 
     if (!transportConnect(trans)) return trans;
-
-    // Move this descriptor up out of the way
-    trans->net.sock = placeDescriptor(trans->net.sock, trans);
-    if (trans->net.sock == -1) return trans;
-
-    // Set the socket to close on exec
-    int flags = trans->fcntl(trans->net.sock, F_GETFD, 0);
-    if (trans->fcntl(trans->net.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
-        DBG("%d %s %s", trans->net.sock, host, port);
-    }
 
     return trans;
 }
@@ -247,21 +400,6 @@ transportCreateUdp(const char* host, const char* port)
 
     if (!transportConnect(t))  return t;
 
-    // Move this descriptor up out of the way
-    t->net.sock = placeDescriptor(t->net.sock, t);
-    if (t->net.sock == -1) return t;
-
-    // Set the socket to non blocking, and close on exec
-    int flags = t->fcntl(t->net.sock, F_GETFL, 0);
-    if (t->fcntl(t->net.sock, F_SETFL, flags | O_NONBLOCK) == -1) {
-        DBG("%d %s %s", t->net.sock, host, port);
-    }
-
-    flags = t->fcntl(t->net.sock, F_GETFD, 0);
-    if (t->fcntl(t->net.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
-        DBG("%d %s %s", t->net.sock, host, port);
-    }
-
     return t;
 }
 
@@ -281,69 +419,13 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
         transportDestroy(&t);
         return t;
     }
+    t->file.buf_policy = buf_policy;
 
     // See if path is "stdout" or "stderr"
     t->file.stdout = !strcmp(path, "stdout");
     t->file.stderr = !strcmp(path, "stderr");
 
-    // if stdout/stderr, set stream and skip everything else in the function.
-    if (t->file.stdout) {
-        t->file.stream = stdout;
-        return t;
-    } else if (t->file.stderr) {
-        t->file.stream = stderr;
-        return t;
-    }
-
-    int fd;
-    fd = t->open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
-    if (fd == -1) {
-        DBG("%s", path);
-        transportDestroy(&t);
-        return t;
-    }
-
-    // Move this descriptor up out of the way
-    if ((fd = placeDescriptor(fd, t)) == -1) {
-        transportDestroy(&t);
-        return t;
-    }
-
-    // Needed because umask affects open permissions
-    if (fchmod(fd, 0666) == -1) {
-        DBG("%d %s", fd, path);
-    }
-
-    // set close on exec
-    int flags = t->fcntl(fd, F_GETFD, 0);
-    if (t->fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1) {
-        DBG("%d %s", fd, path);
-    }
-
-    FILE* f;
-    if (!(f = t->fdopen(fd, "a"))) {
-        transportDestroy(&t);
-        return t;
-    }
-    t->file.stream = f;
-
-    // Fully buffer the output unless we're told not to.
-    // I expect line buffering to be useful when we're debugging crashes or
-    // or if many applications are configured to write to the same files.
-    int buf_mode = _IOFBF;
-    switch (buf_policy) {
-        case CFG_BUFFER_FULLY:
-            buf_mode = _IOFBF;
-            break;
-        case CFG_BUFFER_LINE:
-            buf_mode = _IOLBF;
-            break;
-        default:
-            DBG("%d", buf_policy);
-    }
-    if (setvbuf(t->file.stream, NULL, buf_mode, BUFSIZ)) {
-        DBG(NULL);
-    }
+    if (!transportConnect(t)) return t;
 
     return t;
 }
@@ -442,8 +524,9 @@ transportSend(transport_t* t, const char* msg)
                     switch (errno) {
                     case EBADF:
                         DBG(NULL);
-                        return DEFAULT_BADFD;
-                        break;
+                        transportDisconnect(t);
+                        transportConnect(t);
+                        return -1;
                     case EWOULDBLOCK:
                         DBG(NULL);
                         break;
@@ -484,8 +567,9 @@ transportSend(transport_t* t, const char* msg)
                     switch (errno) {
                     case EBADF:
                         DBG(NULL);
-                        return DEFAULT_BADFD;
-                        break;
+                        transportDisconnect(t);
+                        transportConnect(t);
+                        return -1;
                     default:
                         DBG(NULL);
                     }
@@ -499,7 +583,9 @@ transportSend(transport_t* t, const char* msg)
                 if (bytes != msg_size) {
                     if (errno == EBADF) {
                         DBG("%d %d", bytes, msg_size);
-                        return DEFAULT_BADFD;
+                        transportDisconnect(t);
+                        transportConnect(t);
+                        return -1;
                     }
                     DBG("%d %d", bytes, msg_size);
                     return -1;

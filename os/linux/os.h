@@ -23,12 +23,7 @@
 #include <linux/sock_diag.h>
 #include <linux/unix_diag.h>
 
-#if defined(__STATX__) && defined(STRUCT_STATX_MISSING_FROM_SYS_STAT_H)
-#include <linux/stat.h>
-#endif // __LINUX__ && __STATX__ && STRUCT_STATX_MISSING_FROM_SYS_STAT_H
-
-#include "../../src/wrap.h"
-#include "../../src/dbg.h"
+#include "../../src/plattime.h"
 
 // Anecdotal evidence that a proc entry should be max 4096 bytes
 #define MAX_PROC 4096
@@ -45,20 +40,17 @@
 #endif
 
 extern char *program_invocation_short_name;
-extern struct interposed_funcs_t g_fn;
-extern struct rtconfig_t g_cfg;
 
 extern int osGetProcname(char *, int);
 extern int osGetNumThreads(pid_t);
 extern int osGetNumFds(pid_t);
 extern int osGetNumChildProcs(pid_t);
-extern int osInitTSC(struct rtconfig_t *);
+extern int osInitTSC(platform_time_t *);
 extern int osGetProcMemory(pid_t);
 extern int osIsFilePresent(pid_t, const char *);
 extern int osGetCmdline(pid_t, char **);
 extern bool osThreadInit(void(*handler)(int), unsigned);
 extern int osUnixSockPeer(ino_t);
-extern void scopeLog(const char *, int, cfg_log_level_t);
 
 
 #endif  //__OS_H__

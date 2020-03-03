@@ -2,168 +2,27 @@
 #define __WRAP_H__
 
 #define _GNU_SOURCE
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <dlfcn.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <pthread.h>
-#include <ctype.h>
-#include <limits.h>
-#include <sys/syscall.h>
-#include <wchar.h>
-#include <sys/poll.h>
-#include <sys/stat.h>
-#include <sys/un.h>
-#include <sys/statvfs.h>
-#include <sys/param.h>
-#include <sys/mount.h>
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
+#include <netdb.h>
+#include <pthread.h>
+#include <wchar.h>
 
-#ifdef __MACOS__
-#include "../os/macOS/os.h"
-#elif defined (__LINUX__)
-#include "../os/linux/os.h"
-#endif
+#include <sys/param.h>
+#include <sys/stat.h>
+#include <sys/statvfs.h>
 
-#include "dns.h"
-#include "com.h"
 
 #define DEBUG 0
 #define EXPORT __attribute__((visibility("default")))
 #define EXPORTOFF  __attribute__((visibility("hidden")))
 #define EXPORTON __attribute__((visibility("default")))
 
-// Initial size of net array for state
-#define NET_ENTRIES 1024
-#define FS_ENTRIES 1024
-#define MAX_FDS 4096
-#define PROTOCOL_STR 16
-#define SCOPE_UNIX 99
 #define DYN_CONFIG_PREFIX "scope"
 #define MAXTRIES 10
 
-// Several control types, used in several areas
-enum control_type_t {
-    LOCAL,
-    REMOTE,
-    PERIODIC,
-    EVENT_BASED
-};
-
-enum metric_t {
-    OPEN_PORTS,
-    NET_CONNECTIONS,
-    CONNECTION_DURATION,
-    PROC_CPU,
-    PROC_MEM,
-    PROC_THREAD,
-    PROC_FD,
-    PROC_CHILD,
-    NETRX,
-    NETTX,
-    DNS,
-    DNS_DURATION,
-    FS_DURATION,
-    FS_READ,
-    FS_WRITE,
-    FS_OPEN,
-    FS_CLOSE,
-    FS_SEEK,
-    TOT_READ,
-    TOT_WRITE,
-    TOT_RX,
-    TOT_TX,
-    TOT_SEEK,
-    TOT_STAT,
-    TOT_OPEN,
-    TOT_CLOSE,
-    TOT_DNS,
-    TOT_PORTS,
-    TOT_TCP_CONN,
-    TOT_UDP_CONN,
-    TOT_OTHER_CONN,
-    TOT_FS_DURATION,
-    TOT_NET_DURATION,
-    TOT_DNS_DURATION,
-    NET_ERR_CONN,
-    NET_ERR_RX_TX,
-    NET_ERR_DNS,
-    FS_ERR_OPEN_CLOSE,
-    FS_ERR_STAT,
-    FS_ERR_READ_WRITE,
-};
-
-// File types; stream or fd
-enum fs_type_t {
-    FD,
-    STREAM
-};
-
-typedef struct metric_counters_t {
-    uint64_t openPorts;
-    uint64_t netConnectionsUdp;
-    uint64_t netConnectionsTcp;
-    uint64_t netConnectionsOther;
-    uint64_t netrxBytes;
-    uint64_t nettxBytes;
-    uint64_t readBytes;
-    uint64_t writeBytes;
-    uint64_t numSeek;
-    uint64_t numStat;
-    uint64_t numOpen;
-    uint64_t numClose;
-    uint64_t numDNS;
-    uint64_t fsDurationNum;
-    uint64_t fsDurationTotal;
-    uint64_t connDurationNum;
-    uint64_t connDurationTotal;
-    uint64_t dnsDurationNum;
-    uint64_t dnsDurationTotal;
-    uint64_t netConnectErrors;
-    uint64_t netTxRxErrors;
-    uint64_t netDNSErrors;
-    uint64_t fsOpenCloseErrors;
-    uint64_t fsRdWrErrors;
-    uint64_t fsStatErrors;
-} metric_counters;
-
-typedef struct {
-    struct {
-        int open_close;
-        int read_write;
-        int stat;
-        int seek;
-        int error;
-    } fs;
-    struct {
-        int open_close;
-        int rx_tx;
-        int dns;
-        int error;
-        int dnserror;
-    } net;
-} summary_t;
-
 typedef struct rtconfig_t {
-    int numNinfo;
-    int numFSInfo;
-    bool tsc_invariant;
-    bool tsc_rdtscp;
-    uint64_t freq;
     const char *cmddir;
-    proc_id_t proc;
-    unsigned short blockconn;
 } rtconfig;
 
 typedef struct thread_timing_t {
@@ -174,46 +33,10 @@ typedef struct thread_timing_t {
     const struct sigaction *act;
 } thread_timing;
 
-typedef struct net_info_t {
-    int active;
-    int type;
-    bool urlRedirect;
-    uint64_t numTX;
-    uint64_t numRX;
-    uint64_t txBytes;
-    uint64_t rxBytes;
-    bool dnsSend;
-    uint64_t startTime;
-    uint64_t numDuration;
-    uint64_t totalDuration;
-    uint64_t uid;
-    uint64_t lnode;
-    uint64_t rnode;
-    char dnsName[MAX_HOSTNAME];
-    struct sockaddr_storage localConn;
-    struct sockaddr_storage remoteConn;
-} net_info;
-
 typedef struct {
     uint64_t initial;
     uint64_t duration;
 } elapsed_t;
-
-typedef struct fs_info_t {
-    int active;
-    enum fs_type_t type;
-    uint64_t numOpen;
-    uint64_t numClose;
-    uint64_t numSeek;
-    uint64_t numRead;
-    uint64_t numWrite;
-    uint64_t readBytes;
-    uint64_t writeBytes;
-    uint64_t numDuration;
-    uint64_t totalDuration;
-    uint64_t uid;
-    char path[PATH_MAX];
-} fs_info;
 
 typedef struct interposed_funcs_t {
     void (*vsyslog)(int, const char *, va_list);
@@ -369,65 +192,8 @@ typedef struct interposed_funcs_t {
 #endif // __MACOS__
 } interposed_funcs;
 
-extern rtconfig g_cfg;
-static inline uint64_t
-getTime() {
-    unsigned low, high;
-
-    /*
-     * Newer CPUs support a second TSC read instruction.
-     * The new instruction, rdtscp, performes a serialization
-     * instruction before calling RDTSC. Specifically, rdtscp
-     * performs a cpuid instruction then an rdtsc. This is 
-     * intended to flush the instruction pipeline befiore
-     * calling rdtsc.
-     *
-     * A serializing instruction is used as the order of 
-     * execution is not guaranteed. It's described as 
-     * "Out ofOrder Execution". In some cases the read 
-     * of the TSC can come before the instruction being 
-     * measured. That scenario is not very likely for us
-     * as we tend to measure functions as opposed to 
-     * statements.
-     *
-     * If the rdtscp instruction is available, we use it.
-     * It takes a bit longer to execute due to the extra
-     * serialization instruction (cpuid). However, it's
-     * supposed to be more accurate.
-     */
-    if (g_cfg.tsc_rdtscp == TRUE) {
-        asm volatile("rdtscp" : "=a" (low), "=d" (high));
-    } else {
-        asm volatile("rdtsc" : "=a" (low), "=d" (high));
-    }
-    return ((uint64_t)low) | (((uint64_t)high) << 32);
-}
-
 extern int close$NOCANCEL(int);
 extern int guarded_close_np(int, void *);
-
-#define GET_PORT(fd, type, which) ({            \
-     in_port_t port;                     \
-     switch (type) {                     \
-     case AF_INET:                                                      \
-        if (which == LOCAL) {                                           \
-            port = ((struct sockaddr_in *)&g_netinfo[fd].localConn)->sin_port; \
-        } else {                                                        \
-            port = ((struct sockaddr_in *)&g_netinfo[fd].remoteConn)->sin_port; \
-        }                                                               \
-        break;                                                          \
-     case AF_INET6:                                                     \
-        if (which == LOCAL) {                                           \
-            port = ((struct sockaddr_in6 *)&g_netinfo[fd].localConn)->sin6_port; \
-        } else {                                                        \
-            port = ((struct sockaddr_in6 *)&g_netinfo[fd].remoteConn)->sin6_port; \
-        }                                                               \
-        break;                                                          \
-     default:                                                           \
-         port = (in_port_t)0;                                           \
-         break;                                                         \
-     }                                                                  \
-        htons(port);})
 
 // struct to hold the next 6 numeric (int/ptr etc) variadic arguments
 // use LOAD_FUNC_ARGS_VALIST to populate this structure

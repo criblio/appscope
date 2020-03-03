@@ -1,5 +1,5 @@
-/* 
- * unixserver.c - A simple UNIX Domain echo server 
+/*
+ * unixserver.c - A simple UNIX Domain echo server
  *
  * gcc -g test/manual/unixserver.c -lpthread -o unixserver
  */
@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h> 
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <pthread.h>
@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
   if (argc < 2) {
       usage(argv[0]);
   }
-  
+
   while ((opt = getopt(argc, argv, "vhf:")) > 0) {
     switch (opt) {
       case 'v': verbose++; break;
@@ -58,21 +58,21 @@ int main(int argc, char **argv) {
       perror("calloc");
       exit(-1);
   }
-  
-  // socket: create the parent socket 
+
+  // socket: create the parent socket
   parentfd = socket(AF_UNIX, SOCK_STREAM, 0);
   if (parentfd < 0) {
       perror("ERROR opening socket");
       exit(1);
   }
 
-  /* setsockopt: Handy debugging trick that lets 
-   * us rerun the server immediately after we kill it; 
-   * otherwise we have to wait about 20 secs. 
-   * Eliminates "ERROR on binding: Address already in use" error. 
+  /* setsockopt: Handy debugging trick that lets
+   * us rerun the server immediately after we kill it;
+   * otherwise we have to wait about 20 secs.
+   * Eliminates "ERROR on binding: Address already in use" error.
    */
   optval = 1;
-  setsockopt(parentfd, SOL_SOCKET, SO_REUSEADDR, 
+  setsockopt(parentfd, SOL_SOCKET, SO_REUSEADDR,
              (const void *)&optval , sizeof(int));
 
   bzero((char *)&serveraddr, sizeof(serveraddr));
@@ -85,14 +85,14 @@ int main(int argc, char **argv) {
       perror("unlink");
   }
 
-  if (bind(parentfd, (struct sockaddr *) &serveraddr, 
+  if (bind(parentfd, (struct sockaddr *) &serveraddr,
            sizeof(serveraddr)) < 0) {
       perror("ERROR on binding");
       exit(1);
   }
-  
-  // listen: make this socket ready to accept connection requests 
-  if (listen(parentfd, 15) < 0) { /* allow 15 requests to queue up */ 
+
+  // listen: make this socket ready to accept connection requests
+  if (listen(parentfd, 15) < 0) { /* allow 15 requests to queue up */
       perror("ERROR on listen");
       exit(1);
   }
@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
       perror("chmod");
       exit(-1);
   }
-      
+
   // wait for a connection request then echo
   clientlen = sizeof(clientaddr);
 
@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
 
       // Error or timeout from poll;
       if (rc <= 0) continue;
-  
+
       for (i = 0; i < numfds; ++i) {
           //printf("%s:%d fds[%d].fd = %d\n", __FUNCTION__, __LINE__, i, fds[i].fd);
           if (fds[i].revents == 0) {
@@ -133,7 +133,7 @@ int main(int argc, char **argv) {
               fds[i].events = 0;
               continue;
           }
-          
+
           if (fds[i].revents & POLLERR) {
               printf("%s:%d Error on fd %d\n", __FUNCTION__, __LINE__, fd);
               close(fds[i].fd);
@@ -179,13 +179,13 @@ int main(int argc, char **argv) {
                   arr = numfds;
                   numfds++;
               }
-                            
+
               printf("server established connection on [%d].%d\n", arr, childfd);
               break;
           } else if (fds[i].fd == 0) {
               // command input from stdin
               char *cmd;
-                  
+
               if (fgetc(stdin) == 'U') {
                   printf("%s:%d\n", __FUNCTION__, __LINE__);
                   if ((fd = open(CMDFILE, O_RDONLY)) < 0) {
@@ -206,7 +206,7 @@ int main(int argc, char **argv) {
                       close(fd);
                       continue;
                   }
-                  
+
                   for (j = 2; j < numfds; j++) {
                       if ((fds[j].fd != -1) && (fds[j].fd > 2)) {
                           printf("%s:%d fds[%d].fd=%d rc %d\n%s\n", __FUNCTION__, __LINE__,
@@ -216,7 +216,7 @@ int main(int argc, char **argv) {
                           }
                       }
                   }
-                  
+
                   close(fd);
                   free(cmd);
               }
@@ -224,7 +224,7 @@ int main(int argc, char **argv) {
               u_int64_t total = 0;
               int pfd;
               printf("%s:%d\n", __FUNCTION__, __LINE__);
-              
+
               if ((verbose > 2) &&
                   (((pfd = open("/tmp/protstats.log", O_APPEND | O_RDWR | O_CREAT))) < 0)) {
                   perror("open");
@@ -238,10 +238,10 @@ int main(int argc, char **argv) {
                       if (verbose > 0) printf("%d\n", rc);
                       total += rc;
                   }
-                  
+
                   if (rc == 0) {
                       char msg[64];
-                      
+
                       close(fds[i].fd);
                       snprintf(msg, sizeof(msg), "Closed: total %ld\n", total);
                       puts(msg);

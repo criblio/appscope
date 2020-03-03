@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include "cfgutils.h"
 #include "dbg.h"
-#include "format.h"
+#include "mtcformat.h"
 #include "scopetypes.h"
 
 #ifndef NO_YAML
@@ -114,17 +114,17 @@ enum_map_t watchTypeMap[] = {
 };
 
 // forward declarations
-void cfgOutFormatSetFromStr(config_t*, const char*);
-void cfgOutStatsDPrefixSetFromStr(config_t*, const char*);
-void cfgOutStatsDMaxLenSetFromStr(config_t*, const char*);
-void cfgOutPeriodSetFromStr(config_t*, const char*);
+void cfgMtcFormatSetFromStr(config_t*, const char*);
+void cfgMtcStatsDPrefixSetFromStr(config_t*, const char*);
+void cfgMtcStatsDMaxLenSetFromStr(config_t*, const char*);
+void cfgMtcPeriodSetFromStr(config_t*, const char*);
 void cfgCmdDirSetFromStr(config_t*, const char*);
 void cfgEventFormatSetFromStr(config_t*, const char*);
-void cfgEventValueFilterSetFromStr(config_t*, cfg_evt_t, const char*);
-void cfgEventFieldFilterSetFromStr(config_t*, cfg_evt_t, const char*);
-void cfgEventNameFilterSetFromStr(config_t*, cfg_evt_t, const char*);
-void cfgEventSourceEnabledSetFromStr(config_t*, cfg_evt_t, const char*);
-void cfgOutVerbositySetFromStr(config_t*, const char*);
+void cfgEvtFormatValueFilterSetFromStr(config_t*, watch_t, const char*);
+void cfgEvtFormatFieldFilterSetFromStr(config_t*, watch_t, const char*);
+void cfgEvtFormatNameFilterSetFromStr(config_t*, watch_t, const char*);
+void cfgEvtFormatSourceEnabledSetFromStr(config_t*, watch_t, const char*);
+void cfgMtcVerbositySetFromStr(config_t*, const char*);
 void cfgTransportSetFromStr(config_t*, which_transport_t, const char*);
 void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
@@ -132,7 +132,7 @@ void cfgLogLevelSetFromStr(config_t*, const char*);
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
 static which_transport_t transport_context;
-static cfg_evt_t watch_context;
+static watch_t watch_context;
 
 static regex_t* g_regex = NULL;
 
@@ -375,21 +375,21 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
     if (!(value = doEnvVariableSubstitution(&env_ptr[1]))) return;
 
     if (startsWith(env_line, "SCOPE_METRIC_FORMAT")) {
-        cfgOutFormatSetFromStr(cfg, value);
+        cfgMtcFormatSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_STATSD_PREFIX")) {
-        cfgOutStatsDPrefixSetFromStr(cfg, value);
+        cfgMtcStatsDPrefixSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_STATSD_MAXLEN")) {
-        cfgOutStatsDMaxLenSetFromStr(cfg, value);
+        cfgMtcStatsDMaxLenSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_SUMMARY_PERIOD")) {
-        cfgOutPeriodSetFromStr(cfg, value);
+        cfgMtcPeriodSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_CMD_DIR")) {
         cfgCmdDirSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_METRIC_VERBOSITY")) {
-        cfgOutVerbositySetFromStr(cfg, value);
+        cfgMtcVerbositySetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_LOG_LEVEL")) {
         cfgLogLevelSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_METRIC_DEST")) {
-        cfgTransportSetFromStr(cfg, CFG_OUT, value);
+        cfgTransportSetFromStr(cfg, CFG_MTC, value);
     } else if (startsWith(env_line, "SCOPE_LOG_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_LOG, value);
     } else if (startsWith(env_line, "SCOPE_TAG_")) {
@@ -401,37 +401,37 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
     } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
         cfgEventFormatSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_NAME")) {
-        cfgEventNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
+        cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_NAME")) {
-        cfgEventNameFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
+        cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG_NAME")) {
-        cfgEventNameFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
+        cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_METRIC_NAME")) {
-        cfgEventNameFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
+        cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_FIELD")) {
-        cfgEventFieldFilterSetFromStr(cfg, CFG_SRC_FILE, value);
+        cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_FIELD")) {
-        cfgEventFieldFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
+        cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG_FIELD")) {
-        cfgEventFieldFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
+        cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_METRIC_FIELD")) {
-        cfgEventFieldFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
+        cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_VALUE")) {
-        cfgEventValueFilterSetFromStr(cfg, CFG_SRC_FILE, value);
+        cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_VALUE")) {
-        cfgEventValueFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
+        cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG_VALUE")) {
-        cfgEventValueFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
+        cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_METRIC_VALUE")) {
-        cfgEventValueFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
+        cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE")) {
-        cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_FILE, value);
+        cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE")) {
-        cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_CONSOLE, value);
+        cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_CONSOLE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG")) {
-        cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_SYSLOG, value);
+        cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_SYSLOG, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_METRIC")) {
-        cfgEventSourceEnabledSetFromStr(cfg, CFG_SRC_METRIC, value);
+        cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_METRIC, value);
     }
 
     free(value);
@@ -482,22 +482,22 @@ cfgProcessCommands(config_t* cfg, FILE* file)
 }
 
 void
-cfgOutFormatSetFromStr(config_t* cfg, const char* value)
+cfgMtcFormatSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    cfgOutFormatSet(cfg, strToVal(formatMap, value));
+    cfgMtcFormatSet(cfg, strToVal(formatMap, value));
 }
 
 void
-cfgOutStatsDPrefixSetFromStr(config_t* cfg, const char* value)
+cfgMtcStatsDPrefixSetFromStr(config_t* cfg, const char* value)
 {
     // A little silly to define passthrough function
     // but this keeps the interface consistent.
-    cfgOutStatsDPrefixSet(cfg, value);
+    cfgMtcStatsDPrefixSet(cfg, value);
 }
 
 void
-cfgOutStatsDMaxLenSetFromStr(config_t* cfg, const char* value)
+cfgMtcStatsDMaxLenSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     errno = 0;
@@ -505,11 +505,11 @@ cfgOutStatsDMaxLenSetFromStr(config_t* cfg, const char* value)
     unsigned long x = strtoul(value, &endptr, 10);
     if (errno || *endptr) return;
 
-    cfgOutStatsDMaxLenSet(cfg, x);
+    cfgMtcStatsDMaxLenSet(cfg, x);
 }
 
 void
-cfgOutPeriodSetFromStr(config_t* cfg, const char* value)
+cfgMtcPeriodSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     errno = 0;
@@ -517,7 +517,7 @@ cfgOutPeriodSetFromStr(config_t* cfg, const char* value)
     unsigned long x = strtoul(value, &endptr, 10);
     if (errno || *endptr) return;
 
-    cfgOutPeriodSet(cfg, x);
+    cfgMtcPeriodSet(cfg, x);
 }
 
 void
@@ -535,35 +535,35 @@ cfgEventFormatSetFromStr(config_t* cfg, const char* value)
 }
 
 void
-cfgEventValueFilterSetFromStr(config_t* cfg, cfg_evt_t src, const char* value)
+cfgEvtFormatValueFilterSetFromStr(config_t* cfg, watch_t src, const char* value)
 {
     if (!cfg || !value) return;
-    cfgEventValueFilterSet(cfg, src, value);
+    cfgEvtFormatValueFilterSet(cfg, src, value);
 }
 
 void
-cfgEventFieldFilterSetFromStr(config_t* cfg, cfg_evt_t src, const char* value)
+cfgEvtFormatFieldFilterSetFromStr(config_t* cfg, watch_t src, const char* value)
 {
     if (!cfg || !value) return;
-    cfgEventFieldFilterSet(cfg, src, value);
+    cfgEvtFormatFieldFilterSet(cfg, src, value);
 }
 
 void
-cfgEventNameFilterSetFromStr(config_t* cfg, cfg_evt_t src, const char* value)
+cfgEvtFormatNameFilterSetFromStr(config_t* cfg, watch_t src, const char* value)
 {
     if (!cfg || !value) return;
-    cfgEventNameFilterSet(cfg, src, value);
+    cfgEvtFormatNameFilterSet(cfg, src, value);
 }
 
 void
-cfgEventSourceEnabledSetFromStr(config_t* cfg, cfg_evt_t src, const char* value)
+cfgEvtFormatSourceEnabledSetFromStr(config_t* cfg, watch_t src, const char* value)
 {
     if (!cfg || !value) return;
-    cfgEventSourceEnabledSet(cfg, src, !strcmp("true", value));
+    cfgEvtFormatSourceEnabledSet(cfg, src, !strcmp("true", value));
 }
 
 void
-cfgOutVerbositySetFromStr(config_t* cfg, const char* value)
+cfgMtcVerbositySetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     errno = 0;
@@ -571,7 +571,7 @@ cfgOutVerbositySetFromStr(config_t* cfg, const char* value)
     unsigned long x = strtoul(value, &endptr, 10);
     if (errno || *endptr) return;
 
-    cfgOutVerbositySet(cfg, x);
+    cfgMtcVerbositySet(cfg, x);
 }
 
 void
@@ -759,7 +759,7 @@ processTransport(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 static void
 processTransportMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    transport_context = CFG_OUT;
+    transport_context = CFG_MTC;
     processTransport(config, doc, node);
 }
 
@@ -819,7 +819,7 @@ static void
 processFormatTypeMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
-    cfgOutFormatSetFromStr(config, value);
+    cfgMtcFormatSetFromStr(config, value);
     if (value) free(value);
 }
 
@@ -835,7 +835,7 @@ static void
 processStatsDPrefix(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
-    cfgOutStatsDPrefixSetFromStr(config, value);
+    cfgMtcStatsDPrefixSetFromStr(config, value);
     if (value) free(value);
 }
 
@@ -843,7 +843,7 @@ static void
 processStatsDMaxLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
-    cfgOutStatsDMaxLenSetFromStr(config, value);
+    cfgMtcStatsDMaxLenSetFromStr(config, value);
     if (value) free(value);
 }
 
@@ -851,7 +851,7 @@ static void
 processVerbosity(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
-    cfgOutVerbositySetFromStr(config, value);
+    cfgMtcVerbositySetFromStr(config, value);
     if (value) free(value);
 }
 
@@ -879,7 +879,7 @@ static void
 processSummaryPeriod(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
-    cfgOutPeriodSetFromStr(config, value);
+    cfgMtcPeriodSetFromStr(config, value);
     if (value) free(value);
 }
 
@@ -931,7 +931,7 @@ processWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     char* value = stringVal(node);
     watch_context = strToVal(watchTypeMap, value);
-    cfgEventSourceEnabledSet(config, watch_context, 1);
+    cfgEvtFormatSourceEnabledSet(config, watch_context, 1);
     if (value) free(value);
 }
 
@@ -941,7 +941,7 @@ processWatchName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_SCALAR_NODE) return;
 
     char* value = stringVal(node);
-    cfgEventNameFilterSetFromStr(config, watch_context, value);
+    cfgEvtFormatNameFilterSetFromStr(config, watch_context, value);
     if (value) free(value);
 }
 
@@ -951,7 +951,7 @@ processWatchField(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_SCALAR_NODE) return;
 
     char* value = stringVal(node);
-    cfgEventFieldFilterSetFromStr(config, watch_context, value);
+    cfgEvtFormatFieldFilterSetFromStr(config, watch_context, value);
     if (value) free(value);
 }
 
@@ -961,7 +961,7 @@ processWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_SCALAR_NODE) return;
 
     char* value = stringVal(node);
-    cfgEventValueFilterSetFromStr(config, watch_context, value);
+    cfgEvtFormatValueFilterSetFromStr(config, watch_context, value);
     if (value) free(value);
 }
 
@@ -1010,9 +1010,9 @@ processWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     // absence of one of these values means to clear it.
     // clear them all, then set values for whatever we find.
-    cfg_evt_t x;
+    watch_t x;
     for (x = CFG_SRC_FILE; x<CFG_SRC_MAX; x++) {
-        cfgEventSourceEnabledSet(config, x, 0);
+        cfgEvtFormatSourceEnabledSet(config, x, 0);
     }
 
     yaml_node_item_t* item;
@@ -1252,13 +1252,13 @@ createMetricFormatJson(config_t* cfg)
     if (!(root = cJSON_CreateObject())) goto err;
 
     if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
-                     valToStr(formatMap, cfgOutFormat(cfg)))) goto err;
+                     valToStr(formatMap, cfgMtcFormat(cfg)))) goto err;
     if (!cJSON_AddStringToObjLN(root, STATSDPREFIX_NODE,
-                                    cfgOutStatsDPrefix(cfg))) goto err;
+                                    cfgMtcStatsDPrefix(cfg))) goto err;
     if (!cJSON_AddNumberToObjLN(root, STATSDMAXLEN_NODE,
-                                    cfgOutStatsDMaxLen(cfg))) goto err;
+                                    cfgMtcStatsDMaxLen(cfg))) goto err;
     if (!cJSON_AddNumberToObjLN(root, VERBOSITY_NODE,
-                                       cfgOutVerbosity(cfg))) goto err;
+                                       cfgMtcVerbosity(cfg))) goto err;
 
     if (!(tags = createTagsJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, TAGS_NODE, tags);
@@ -1277,7 +1277,7 @@ createMetricJson(config_t* cfg)
 
     if (!(root = cJSON_CreateObject())) goto err;
 
-    if (!(transport = createTransportJson(cfg, CFG_OUT))) goto err;
+    if (!(transport = createTransportJson(cfg, CFG_MTC))) goto err;
     cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
 
     if (!(format = createMetricFormatJson(cfg))) goto err;
@@ -1290,20 +1290,20 @@ err:
 }
 
 static cJSON*
-createWatchObjectJson(config_t* cfg, cfg_evt_t evt)
+createWatchObjectJson(config_t* cfg, watch_t src)
 {
     cJSON* root = NULL;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
     if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
-                                    valToStr(watchTypeMap, evt))) goto err;
+                                    valToStr(watchTypeMap, src))) goto err;
     if (!cJSON_AddStringToObjLN(root, NAME_NODE,
-                                   cfgEventNameFilter(cfg, evt))) goto err;
+                                   cfgEvtFormatNameFilter(cfg, src))) goto err;
     if (!cJSON_AddStringToObjLN(root, FIELD_NODE,
-                                  cfgEventFieldFilter(cfg, evt))) goto err;
+                                  cfgEvtFormatFieldFilter(cfg, src))) goto err;
     if (!cJSON_AddStringToObjLN(root, VALUE_NODE,
-                                  cfgEventValueFilter(cfg, evt))) goto err;
+                                  cfgEvtFormatValueFilter(cfg, src))) goto err;
 
     return root;
 err:
@@ -1318,11 +1318,11 @@ createWatchArrayJson(config_t* cfg)
 
     if (!(root = cJSON_CreateArray())) goto err;
 
-    cfg_evt_t evt;
-    for (evt = CFG_SRC_FILE; evt<CFG_SRC_MAX; evt++) {
+    watch_t src;
+    for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
         cJSON* item;
-        if (!cfgEventSourceEnabled(cfg, evt)) continue;
-        if (!(item = createWatchObjectJson(cfg, evt))) continue;
+        if (!cfgEvtFormatSourceEnabled(cfg, src)) continue;
+        if (!(item = createWatchObjectJson(cfg, src))) continue;
         cJSON_AddItemToArray(root, item);
     }
 
@@ -1382,7 +1382,7 @@ createLibscopeJson(config_t* cfg)
     cJSON_AddItemToObjectCS(root, LOG_NODE, log);
 
     if (!cJSON_AddNumberToObjLN(root, SUMMARYPERIOD_NODE,
-                                      cfgOutPeriod(cfg))) goto err;
+                                      cfgMtcPeriod(cfg))) goto err;
 
     if (!cJSON_AddStringToObjLN(root, COMMANDDIR_NODE,
                                          cfgCmdDir(cfg))) goto err;
@@ -1457,16 +1457,16 @@ initTransport(config_t* cfg, which_transport_t t)
     return transport;
 }
 
-static format_t*
-initFormat(config_t* cfg)
+static mtc_fmt_t*
+initMtcFormat(config_t* cfg)
 {
-    format_t* fmt = fmtCreate(cfgOutFormat(cfg));
+    mtc_fmt_t* fmt = mtcFormatCreate(cfgMtcFormat(cfg));
     if (!fmt) return NULL;
 
-    fmtStatsDPrefixSet(fmt, cfgOutStatsDPrefix(cfg));
-    fmtStatsDMaxLenSet(fmt, cfgOutStatsDMaxLen(cfg));
-    fmtOutVerbositySet(fmt, cfgOutVerbosity(cfg));
-    fmtCustomTagsSet(fmt, cfgCustomTags(cfg));
+    mtcFormatStatsDPrefixSet(fmt, cfgMtcStatsDPrefix(cfg));
+    mtcFormatStatsDMaxLenSet(fmt, cfgMtcStatsDMaxLen(cfg));
+    mtcFormatVerbositySet(fmt, cfgMtcVerbosity(cfg));
+    mtcFormatCustomTagsSet(fmt, cfgCustomTags(cfg));
     return fmt;
 }
 
@@ -1485,48 +1485,41 @@ initLog(config_t* cfg)
     return log;
 }
 
-out_t*
-initOut(config_t* cfg)
+mtc_t*
+initMtc(config_t* cfg)
 {
-    out_t* out = outCreate();
-    if (!out) return out;
+    mtc_t* mtc = mtcCreate();
+    if (!mtc) return mtc;
 
-    transport_t* t = initTransport(cfg, CFG_OUT);
+    transport_t* t = initTransport(cfg, CFG_MTC);
     if (!t) {
-        outDestroy(&out);
-        return out;
+        mtcDestroy(&mtc);
+        return mtc;
     }
-    outTransportSet(out, t);
+    mtcTransportSet(mtc, t);
 
-    format_t* f = initFormat(cfg);
+    mtc_fmt_t* f = initMtcFormat(cfg);
     if (!f) {
-        outDestroy(&out);
-        return out;
+        mtcDestroy(&mtc);
+        return mtc;
     }
-    outFormatSet(out, f);
+    mtcFormatSet(mtc, f);
 
-    return out;
+    return mtc;
 }
 
-evt_t *
-initEvt(config_t *cfg)
+evt_fmt_t *
+initEvtFormat(config_t *cfg)
 {
-    evt_t *evt = evtCreate();
+    evt_fmt_t *evt = evtFormatCreate();
     if (!evt) return evt;
 
-    format_t *fmt = fmtCreate(cfgEventFormat(cfg));
-    if (!fmt) {
-        evtDestroy(&evt);
-        return evt;
-    }
-    evtFormatSet(evt, fmt);
-
-    cfg_evt_t src;
+    watch_t src;
     for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
-        evtSourceEnabledSet(evt, src, cfgEventSourceEnabled(cfg, src));
-        evtNameFilterSet(evt, src, cfgEventNameFilter(cfg, src));
-        evtFieldFilterSet(evt, src, cfgEventFieldFilter(cfg, src));
-        evtValueFilterSet(evt, src, cfgEventValueFilter(cfg, src));
+        evtFormatSourceEnabledSet(evt, src, cfgEvtFormatSourceEnabled(cfg, src));
+        evtFormatNameFilterSet(evt, src, cfgEvtFormatNameFilter(cfg, src));
+        evtFormatFieldFilterSet(evt, src, cfgEvtFormatFieldFilter(cfg, src));
+        evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
     }
 
     return evt;
@@ -1549,6 +1542,13 @@ initCtl(config_t *cfg)
         return ctl;
     }
     ctlTransportSet(ctl, trans);
+
+    evt_fmt_t* evt = initEvtFormat(cfg);
+    if (!evt) {
+        ctlDestroy(&ctl);
+        return ctl;
+    }
+    ctlEvtSet(ctl, evt);
 
     return ctl;
 }

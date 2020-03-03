@@ -147,51 +147,6 @@ msgStartHasExpectedSubNodes(void** state)
     cfgDestroy(&cfg);
 }
 
-static void
-msgEvtMetricDoesNotCrash(void** state)
-{
-    evt_t* evt = evtCreate();
-    assert_non_null(evt);
-
-    event_t e = INT_EVENT("A", 1, DELTA, NULL);
-    proc_id_t proc = {.pid = 4848,
-                      .ppid = 4847,
-                      .hostname = "host",
-                      .procname = "comtest",
-                      .cmd = "cmd",
-                      .id = "host-comtest-cmd"};
-
-    // when enabled, we should get a non-null json
-    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
-    cJSON* json = msgEvtMetric(evt, &e, 12345, &proc);
-    assert_non_null(json);
-    cJSON_Delete(json);
-
-    evtDestroy(&evt);
-}
-
-static void
-msgEvtLogDoesNotCrash(void** state)
-{
-    evt_t* evt = evtCreate();
-    assert_non_null(evt);
-
-    proc_id_t proc = {.pid = 4848,
-                      .ppid = 4847,
-                      .hostname = "host",
-                      .procname = "comtest",
-                      .cmd = "cmd",
-                      .id = "host-comtest-cmd"};
-
-    // when enabled, we should get a non-null json
-    evtSourceEnabledSet(evt, CFG_SRC_CONSOLE, 1);
-    cJSON* json = msgEvtLog(evt, "stdout", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-    cJSON_Delete(json);
-
-    evtDestroy(&evt);
-}
-
 int
 main(int argc, char* argv[])
 {
@@ -206,8 +161,6 @@ main(int argc, char* argv[])
         cmocka_unit_test(cmdSendResponseDoesNotCrash),
         cmocka_unit_test(cmdParseDoesNotCrash),
         cmocka_unit_test(msgStartHasExpectedSubNodes),
-        cmocka_unit_test(msgEvtMetricDoesNotCrash),
-        cmocka_unit_test(msgEvtLogDoesNotCrash),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

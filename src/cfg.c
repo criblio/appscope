@@ -21,7 +21,7 @@ typedef struct {
 struct _config_t
 {
     struct {
-        cfg_out_format_t format;
+        cfg_mtc_format_t format;
         struct {
             char* prefix;
             unsigned maxlen;
@@ -29,10 +29,10 @@ struct _config_t
         unsigned period;
         unsigned verbosity;
         char* commanddir;
-    } out;
+    } mtc;
 
     struct {
-        cfg_out_format_t format;
+        cfg_mtc_format_t format;
         char* valuefilter[CFG_SRC_MAX];
         char* fieldfilter[CFG_SRC_MAX];
         char* namefilter[CFG_SRC_MAX];
@@ -43,7 +43,7 @@ struct _config_t
         cfg_log_level_t level;
     } log;
 
-    // CFG_OUT, CFG_CTL, or CFG_LOG
+    // CFG_MTC, CFG_CTL, or CFG_LOG
     transport_struct_t transport[CFG_WHICH_MAX]; 
 
     custom_tag_t** tags;
@@ -51,12 +51,12 @@ struct _config_t
 };
 
 #define DEFAULT_SUMMARY_PERIOD 10
-#define DEFAULT_OUT_TYPE CFG_UDP
-#define DEFAULT_OUT_HOST "127.0.0.1"
-//#define DEFAULT_OUT_PORT DEFAULT_OUT_PORT (defined in scopetypes.h)
-#define DEFAULT_OUT_PATH NULL
-//#define DEFAULT_OUT_BUF CFG_BUFFER_FULLY
-#define DEFAULT_OUT_BUF CFG_BUFFER_LINE
+#define DEFAULT_MTC_TYPE CFG_UDP
+#define DEFAULT_MTC_HOST "127.0.0.1"
+//#define DEFAULT_MTC_PORT DEFAULT_MTC_PORT (defined in scopetypes.h)
+#define DEFAULT_MTC_PATH NULL
+//#define DEFAULT_MTC_BUF CFG_BUFFER_FULLY
+#define DEFAULT_MTC_BUF CFG_BUFFER_LINE
 #define DEFAULT_CTL_TYPE CFG_TCP
 #define DEFAULT_CTL_HOST "127.0.0.1"
 //#define DEFAULT_CTL_PORT DEFAULT_CTL_PORT (defined in scopetypes.h)
@@ -101,31 +101,31 @@ static unsigned srcEnabledDefault[] = {
 };
 
 static cfg_transport_t typeDefault[] = {
-    DEFAULT_OUT_TYPE,
+    DEFAULT_MTC_TYPE,
     DEFAULT_CTL_TYPE,
     DEFAULT_LOG_TYPE,
 };
 
 static const char* hostDefault[] = {
-    DEFAULT_OUT_HOST,
+    DEFAULT_MTC_HOST,
     DEFAULT_CTL_HOST,
     DEFAULT_LOG_HOST,
 };
 
 static const char* portDefault[] = {
-    DEFAULT_OUT_PORT,
+    DEFAULT_MTC_PORT,
     DEFAULT_CTL_PORT,
     DEFAULT_LOG_PORT,
 };
 
 static const char* pathDefault[] = {
-    DEFAULT_OUT_PATH,
+    DEFAULT_MTC_PATH,
     DEFAULT_CTL_PATH,
     DEFAULT_LOG_PATH,
 };
 
 static cfg_buffer_t bufDefault[] = {
-    DEFAULT_OUT_BUF,
+    DEFAULT_MTC_BUF,
     DEFAULT_CTL_BUF,
     DEFAULT_LOG_BUF,
 };
@@ -142,15 +142,15 @@ cfgCreateDefault()
         DBG(NULL);
         return NULL;
     }
-    c->out.format = DEFAULT_OUT_FORMAT;
-    c->out.statsd.prefix = (DEFAULT_STATSD_PREFIX) ? strdup(DEFAULT_STATSD_PREFIX) : NULL;
-    c->out.statsd.maxlen = DEFAULT_STATSD_MAX_LEN;
-    c->out.period = DEFAULT_SUMMARY_PERIOD;
-    c->out.verbosity = DEFAULT_OUT_VERBOSITY;
-    c->out.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
+    c->mtc.format = DEFAULT_MTC_FORMAT;
+    c->mtc.statsd.prefix = (DEFAULT_STATSD_PREFIX) ? strdup(DEFAULT_STATSD_PREFIX) : NULL;
+    c->mtc.statsd.maxlen = DEFAULT_STATSD_MAX_LEN;
+    c->mtc.period = DEFAULT_SUMMARY_PERIOD;
+    c->mtc.verbosity = DEFAULT_MTC_VERBOSITY;
+    c->mtc.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
     c->evt.format = DEFAULT_CTL_FORMAT;
 
-    cfg_evt_t src;
+    watch_t src;
     for (src=CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
         const char* val_def = valueFilterDefault[src];
         c->evt.valuefilter[src] = (val_def) ? strdup(val_def) : NULL;
@@ -162,7 +162,7 @@ cfgCreateDefault()
     }
 
     which_transport_t tp;
-    for (tp=CFG_OUT; tp<CFG_WHICH_MAX; tp++) {
+    for (tp=CFG_MTC; tp<CFG_WHICH_MAX; tp++) {
         c->transport[tp].type = typeDefault[tp];
         const char* host_def = hostDefault[tp];
         c->transport[tp].net.host = (host_def) ? strdup(host_def) : NULL;
@@ -185,10 +185,10 @@ cfgDestroy(config_t** cfg)
 {
     if (!cfg || !*cfg) return;
     config_t* c = *cfg;
-    if (c->out.statsd.prefix) free(c->out.statsd.prefix);
-    if (c->out.commanddir) free(c->out.commanddir);
+    if (c->mtc.statsd.prefix) free(c->mtc.statsd.prefix);
+    if (c->mtc.commanddir) free(c->mtc.commanddir);
 
-    cfg_evt_t src;
+    watch_t src;
     for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
         if (c->evt.valuefilter[src]) free (c->evt.valuefilter[src]);
         if (c->evt.fieldfilter[src]) free (c->evt.fieldfilter[src]);
@@ -196,7 +196,7 @@ cfgDestroy(config_t** cfg)
     }
 
     which_transport_t t;
-    for (t=CFG_OUT; t<CFG_WHICH_MAX; t++) {
+    for (t=CFG_MTC; t<CFG_WHICH_MAX; t++) {
         if (c->transport[t].net.host) free(c->transport[t].net.host);
         if (c->transport[t].net.port) free(c->transport[t].net.port);
         if (c->transport[t].file.path) free(c->transport[t].file.path);
@@ -219,95 +219,95 @@ cfgDestroy(config_t** cfg)
 ///////////////////////////////////
 // Accessors
 ///////////////////////////////////
-cfg_out_format_t
-cfgOutFormat(config_t* cfg)
+cfg_mtc_format_t
+cfgMtcFormat(config_t* cfg)
 {
-    return (cfg) ? cfg->out.format : DEFAULT_OUT_FORMAT;
+    return (cfg) ? cfg->mtc.format : DEFAULT_MTC_FORMAT;
 }
 
 const char*
-cfgOutStatsDPrefix(config_t* cfg)
+cfgMtcStatsDPrefix(config_t* cfg)
 {
-    return (cfg && cfg->out.statsd.prefix) ? cfg->out.statsd.prefix : DEFAULT_STATSD_PREFIX;
+    return (cfg && cfg->mtc.statsd.prefix) ? cfg->mtc.statsd.prefix : DEFAULT_STATSD_PREFIX;
 }
 
 unsigned
-cfgOutStatsDMaxLen(config_t* cfg)
+cfgMtcStatsDMaxLen(config_t* cfg)
 {
-    return (cfg) ? cfg->out.statsd.maxlen : DEFAULT_STATSD_MAX_LEN;
+    return (cfg) ? cfg->mtc.statsd.maxlen : DEFAULT_STATSD_MAX_LEN;
 }
 
 unsigned
-cfgOutPeriod(config_t* cfg)
+cfgMtcPeriod(config_t* cfg)
 {
-    return (cfg) ? cfg->out.period : DEFAULT_SUMMARY_PERIOD;
+    return (cfg) ? cfg->mtc.period : DEFAULT_SUMMARY_PERIOD;
 }
 
 const char *
 cfgCmdDir(config_t* cfg)
 {
-    return (cfg) ? cfg->out.commanddir : DEFAULT_COMMAND_DIR;
+    return (cfg) ? cfg->mtc.commanddir : DEFAULT_COMMAND_DIR;
 }
 
-cfg_out_format_t
+cfg_mtc_format_t
 cfgEventFormat(config_t* cfg)
 {
     return (cfg) ? cfg->evt.format : DEFAULT_CTL_FORMAT;
 }
 
 const char*
-cfgEventValueFilter(config_t* cfg, cfg_evt_t evt)
+cfgEvtFormatValueFilter(config_t* cfg, watch_t src)
 {
-    if (evt >= 0 && evt < CFG_SRC_MAX) {
-        if (cfg) return cfg->evt.valuefilter[evt];
-        return valueFilterDefault[evt];
+    if (src >= 0 && src < CFG_SRC_MAX) {
+        if (cfg) return cfg->evt.valuefilter[src];
+        return valueFilterDefault[src];
     }
 
-    DBG("%d", evt);
+    DBG("%d", src);
     return valueFilterDefault[CFG_SRC_FILE];
 }
 
 const char*
-cfgEventFieldFilter(config_t* cfg, cfg_evt_t evt)
+cfgEvtFormatFieldFilter(config_t* cfg, watch_t src)
 {
-    if (evt >= 0 && evt < CFG_SRC_MAX) {
-        if (cfg) return cfg->evt.fieldfilter[evt];
-        return fieldFilterDefault[evt];
+    if (src >= 0 && src < CFG_SRC_MAX) {
+        if (cfg) return cfg->evt.fieldfilter[src];
+        return fieldFilterDefault[src];
     }
 
-    DBG("%d", evt);
+    DBG("%d", src);
     return fieldFilterDefault[CFG_SRC_FILE];
 }
 
 const char*
-cfgEventNameFilter(config_t* cfg, cfg_evt_t evt)
+cfgEvtFormatNameFilter(config_t* cfg, watch_t src)
 {
-    if (evt >= 0 && evt < CFG_SRC_MAX) {
-        if (cfg) return cfg->evt.namefilter[evt];
-        return nameFilterDefault[evt];
+    if (src >= 0 && src < CFG_SRC_MAX) {
+        if (cfg) return cfg->evt.namefilter[src];
+        return nameFilterDefault[src];
     }
 
-    DBG("%d", evt);
+    DBG("%d", src);
     return nameFilterDefault[CFG_SRC_FILE];
 }
 
 unsigned
-cfgEventSourceEnabled(config_t* cfg, cfg_evt_t evt)
+cfgEvtFormatSourceEnabled(config_t* cfg, watch_t src)
 {
-    if (evt >= 0 && evt < CFG_SRC_MAX) {
-        if (cfg) return cfg->evt.src[evt];
-        return srcEnabledDefault[evt];
+    if (src >= 0 && src < CFG_SRC_MAX) {
+        if (cfg) return cfg->evt.src[src];
+        return srcEnabledDefault[src];
     }
 
-    DBG("%d", evt);
+    DBG("%d", src);
     return srcEnabledDefault[CFG_SRC_FILE];
 }
 
 
 unsigned
-cfgOutVerbosity(config_t* cfg)
+cfgMtcVerbosity(config_t* cfg)
 {
-    return (cfg) ? cfg->out.verbosity : DEFAULT_OUT_VERBOSITY;
+    return (cfg) ? cfg->mtc.verbosity : DEFAULT_MTC_VERBOSITY;
 }
 
 cfg_transport_t
@@ -412,19 +412,19 @@ cfgLogLevel(config_t* cfg)
 // Setters 
 ///////////////////////////////////
 void
-cfgOutFormatSet(config_t* cfg, cfg_out_format_t fmt)
+cfgMtcFormatSet(config_t* cfg, cfg_mtc_format_t fmt)
 {
     if (!cfg || fmt < 0 || fmt >= CFG_FORMAT_MAX) return;
-    cfg->out.format = fmt;
+    cfg->mtc.format = fmt;
 }
 
 void
-cfgOutStatsDPrefixSet(config_t* cfg, const char* prefix)
+cfgMtcStatsDPrefixSet(config_t* cfg, const char* prefix)
 {
     if (!cfg) return;
-    if (cfg->out.statsd.prefix) free(cfg->out.statsd.prefix);
+    if (cfg->mtc.statsd.prefix) free(cfg->mtc.statsd.prefix);
     if (!prefix || prefix[0] == '\0') {
-        cfg->out.statsd.prefix = strdup(DEFAULT_STATSD_PREFIX);
+        cfg->mtc.statsd.prefix = strdup(DEFAULT_STATSD_PREFIX);
         return;
     }
 
@@ -439,98 +439,98 @@ cfgOutStatsDPrefixSet(config_t* cfg, const char* prefix)
         } else {
             DBG("%s", prefix);
         }
-        cfg->out.statsd.prefix = temp;
+        cfg->mtc.statsd.prefix = temp;
     } else {
-        cfg->out.statsd.prefix = strdup(prefix);
+        cfg->mtc.statsd.prefix = strdup(prefix);
     }
 }
 
 void
-cfgOutStatsDMaxLenSet(config_t* cfg, unsigned len)
+cfgMtcStatsDMaxLenSet(config_t* cfg, unsigned len)
 {
     if (!cfg) return;
-    cfg->out.statsd.maxlen = len;
+    cfg->mtc.statsd.maxlen = len;
 }
 
 void
-cfgOutPeriodSet(config_t* cfg, unsigned val)
+cfgMtcPeriodSet(config_t* cfg, unsigned val)
 {
     if (!cfg) return;
-    cfg->out.period = val;
+    cfg->mtc.period = val;
 }
 
 void
 cfgCmdDirSet(config_t* cfg, const char* path)
 {
     if (!cfg) return;
-    if (cfg->out.commanddir) free(cfg->out.commanddir);
+    if (cfg->mtc.commanddir) free(cfg->mtc.commanddir);
     if (!path || (path[0] == '\0')) {
-        cfg->out.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
+        cfg->mtc.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
         return;
     }
 
-    cfg->out.commanddir = strdup(path);
+    cfg->mtc.commanddir = strdup(path);
 }
 
 void
-cfgOutVerbositySet(config_t* cfg, unsigned val)
+cfgMtcVerbositySet(config_t* cfg, unsigned val)
 {
     if (!cfg) return;
     if (val > CFG_MAX_VERBOSITY) val = CFG_MAX_VERBOSITY;
-    cfg->out.verbosity = val;
+    cfg->mtc.verbosity = val;
 }
 
 void
-cfgEventFormatSet(config_t* cfg, cfg_out_format_t fmt)
+cfgEventFormatSet(config_t* cfg, cfg_mtc_format_t fmt)
 {
     if (!cfg || fmt < 0 || fmt >= CFG_FORMAT_MAX) return;
     cfg->evt.format = fmt;
 }
 
 void
-cfgEventValueFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
+cfgEvtFormatValueFilterSet(config_t* cfg, watch_t src, const char* filter)
 {
-    if (!cfg || evt < 0 || evt >= CFG_SRC_MAX) return;
-    if (cfg->evt.valuefilter[evt]) free (cfg->evt.valuefilter[evt]);
+    if (!cfg || src < 0 || src >= CFG_SRC_MAX) return;
+    if (cfg->evt.valuefilter[src]) free (cfg->evt.valuefilter[src]);
     if (!filter || (filter[0] == '\0')) {
-        const char* vdefault = valueFilterDefault[evt];
-        cfg->evt.valuefilter[evt] = (vdefault) ? strdup(vdefault) : NULL;
+        const char* vdefault = valueFilterDefault[src];
+        cfg->evt.valuefilter[src] = (vdefault) ? strdup(vdefault) : NULL;
         return;
     }
-    cfg->evt.valuefilter[evt] = strdup(filter);
+    cfg->evt.valuefilter[src] = strdup(filter);
 }
 
 void
-cfgEventFieldFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
+cfgEvtFormatFieldFilterSet(config_t* cfg, watch_t src, const char* filter)
 {
-    if (!cfg || evt < 0 || evt >= CFG_SRC_MAX) return;
-    if (cfg->evt.fieldfilter[evt]) free (cfg->evt.fieldfilter[evt]);
+    if (!cfg || src < 0 || src >= CFG_SRC_MAX) return;
+    if (cfg->evt.fieldfilter[src]) free (cfg->evt.fieldfilter[src]);
     if (!filter || (filter[0] == '\0')) {
-        const char* fdefault = fieldFilterDefault[evt];
-        cfg->evt.fieldfilter[evt] = (fdefault) ? strdup(fdefault) : NULL;
+        const char* fdefault = fieldFilterDefault[src];
+        cfg->evt.fieldfilter[src] = (fdefault) ? strdup(fdefault) : NULL;
         return;
     }
-    cfg->evt.fieldfilter[evt] = strdup(filter);
+    cfg->evt.fieldfilter[src] = strdup(filter);
 }
 
 void
-cfgEventNameFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
+cfgEvtFormatNameFilterSet(config_t* cfg, watch_t src, const char* filter)
 {
-    if (!cfg || evt < 0 || evt >= CFG_SRC_MAX) return;
-    if (cfg->evt.namefilter[evt]) free (cfg->evt.namefilter[evt]);
+    if (!cfg || src < 0 || src >= CFG_SRC_MAX) return;
+    if (cfg->evt.namefilter[src]) free (cfg->evt.namefilter[src]);
     if (!filter || (filter[0] == '\0')) {
-        const char* ndefault = nameFilterDefault[evt];
-        cfg->evt.namefilter[evt] = (ndefault) ? strdup(ndefault) : NULL;
+        const char* ndefault = nameFilterDefault[src];
+        cfg->evt.namefilter[src] = (ndefault) ? strdup(ndefault) : NULL;
         return;
     }
-    cfg->evt.namefilter[evt] = strdup(filter);
+    cfg->evt.namefilter[src] = strdup(filter);
 }
 
 void
-cfgEventSourceEnabledSet(config_t* cfg, cfg_evt_t evt, unsigned val)
+cfgEvtFormatSourceEnabledSet(config_t* cfg, watch_t src, unsigned val)
 {
-    if (!cfg || evt < 0 || evt >= CFG_SRC_MAX) return;
-    cfg->evt.src[evt] = val;
+    if (!cfg || src < 0 || src >= CFG_SRC_MAX) return;
+    cfg->evt.src[src] = val;
 }
 
 void

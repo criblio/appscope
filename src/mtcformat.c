@@ -7,14 +7,14 @@
 #include <inttypes.h>
 #include "cJSON.h"
 #include "dbg.h"
-#include "format.h"
+#include "mtcformat.h"
 #include "scopetypes.h"
 
 #define TRUE 1
 #define FALSE 0
 
 
-struct _format_t
+struct _mtc_fmt_t
 {
     cfg_mtc_format_t format;
     struct {
@@ -27,12 +27,12 @@ struct _format_t
 
 
 // Constructors Destructors
-format_t*
-fmtCreate(cfg_mtc_format_t format)
+mtc_fmt_t*
+mtcFormatCreate(cfg_mtc_format_t format)
 {
     if (format >= CFG_FORMAT_MAX) return NULL;
 
-    format_t* f = calloc(1, sizeof(format_t));
+    mtc_fmt_t* f = calloc(1, sizeof(mtc_fmt_t));
     if (!f) {
         DBG(NULL);
         return NULL;
@@ -48,7 +48,7 @@ fmtCreate(cfg_mtc_format_t format)
 
 static
 void
-fmtDestroyTags(custom_tag_t*** tags)
+mtcFormatDestroyTags(custom_tag_t*** tags)
 {
     if (!tags || !*tags) return;
     custom_tag_t** t = *tags;
@@ -64,12 +64,12 @@ fmtDestroyTags(custom_tag_t*** tags)
 }
 
 void
-fmtDestroy(format_t** fmt)
+mtcFormatDestroy(mtc_fmt_t** fmt)
 {
     if (!fmt || !*fmt) return;
-    format_t* f = *fmt;
+    mtc_fmt_t* f = *fmt;
     if (f->statsd.prefix) free(f->statsd.prefix);
-    fmtDestroyTags(&f->tags);
+    mtcFormatDestroyTags(&f->tags);
     free(f);
     *fmt = NULL;
 }
@@ -95,7 +95,7 @@ statsdType(data_type_t x)
 }
 
 static int
-createStatsFieldString(format_t* fmt, event_field_t* f, char* tag, int sizeoftag)
+createStatsFieldString(mtc_fmt_t* fmt, event_field_t* f, char* tag, int sizeoftag)
 {
     if (!fmt || !f || !tag || sizeoftag <= 0) return -1;
 
@@ -116,7 +116,7 @@ createStatsFieldString(format_t* fmt, event_field_t* f, char* tag, int sizeoftag
 }
 
 static void
-appendStatsdFieldString(format_t* fmt, char* tag, int sz, char** end, int* bytes, int* firstTagAdded)
+appendStatsdFieldString(mtc_fmt_t* fmt, char* tag, int sz, char** end, int* bytes, int* firstTagAdded)
 {
     if (!*firstTagAdded) {
         sz += 2; // add space for the |#
@@ -137,7 +137,7 @@ appendStatsdFieldString(format_t* fmt, char* tag, int sz, char** end, int* bytes
 
 
 static void
-addStatsdFields(format_t* fmt, event_field_t* fields, char** end, int* bytes, int* firstTagAdded, regex_t* fieldFilter)
+addStatsdFields(mtc_fmt_t* fmt, event_field_t* fields, char** end, int* bytes, int* firstTagAdded, regex_t* fieldFilter)
 {
     if (!fmt || !fields || ! end || !*end || !bytes) return;
 
@@ -161,7 +161,7 @@ addStatsdFields(format_t* fmt, event_field_t* fields, char** end, int* bytes, in
 }
 
 static void
-addCustomFields(format_t* fmt, custom_tag_t** tags, char** end, int* bytes, int* firstTagAdded)
+addCustomFields(mtc_fmt_t* fmt, custom_tag_t** tags, char** end, int* bytes, int* firstTagAdded)
 {
     if (!fmt || !tags || !*tags || !end || !*end || !bytes) return;
 
@@ -183,7 +183,7 @@ addCustomFields(format_t* fmt, custom_tag_t** tags, char** end, int* bytes, int*
 }
 
 char*
-fmtStatsDString(format_t* fmt, event_t* e, regex_t* fieldFilter)
+mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
 {
     if (!fmt || !e) return NULL;
 
@@ -246,25 +246,25 @@ fmtStatsDString(format_t* fmt, event_t* e, regex_t* fieldFilter)
 }
 
 const char*
-fmtStatsDPrefix(format_t* fmt)
+mtcFormatStatsDPrefix(mtc_fmt_t* fmt)
 {
     return (fmt && fmt->statsd.prefix) ? fmt->statsd.prefix : DEFAULT_STATSD_PREFIX;
 }
 
 unsigned
-fmtStatsDMaxLen(format_t* fmt)
+mtcFormatStatsDMaxLen(mtc_fmt_t* fmt)
 {
     return (fmt) ? fmt->statsd.max_len : DEFAULT_STATSD_MAX_LEN;
 }
 
 unsigned
-fmtMtcVerbosity(format_t* fmt)
+mtcFormatVerbosity(mtc_fmt_t* fmt)
 {
     return (fmt) ? fmt->verbosity : DEFAULT_MTC_VERBOSITY;
 }
 
 custom_tag_t**
-fmtCustomTags(format_t* fmt)
+mtcFormatCustomTags(mtc_fmt_t* fmt)
 {
     return (fmt) ? fmt->tags : DEFAULT_CUSTOM_TAGS;
 }
@@ -272,7 +272,7 @@ fmtCustomTags(format_t* fmt)
 // Setters
 
 void
-fmtStatsDPrefixSet(format_t* fmt, const char* prefix)
+mtcFormatStatsDPrefixSet(mtc_fmt_t* fmt, const char* prefix)
 {
     if (!fmt) return;
 
@@ -282,14 +282,14 @@ fmtStatsDPrefixSet(format_t* fmt, const char* prefix)
 }
 
 void
-fmtStatsDMaxLenSet(format_t* fmt, unsigned v)
+mtcFormatStatsDMaxLenSet(mtc_fmt_t* fmt, unsigned v)
 {
     if (!fmt) return;
     fmt->statsd.max_len = v;
 }
 
 void
-fmtMtcVerbositySet(format_t* fmt, unsigned v)
+mtcFormatVerbositySet(mtc_fmt_t* fmt, unsigned v)
 {
     if (!fmt) return;
     if (v > CFG_MAX_VERBOSITY) v = CFG_MAX_VERBOSITY;
@@ -297,12 +297,12 @@ fmtMtcVerbositySet(format_t* fmt, unsigned v)
 }
 
 void
-fmtCustomTagsSet(format_t* fmt, custom_tag_t** tags)
+mtcFormatCustomTagsSet(mtc_fmt_t* fmt, custom_tag_t** tags)
 {
     if (!fmt) return;
 
     // Don't leak with multiple set operations
-    fmtDestroyTags(&fmt->tags);
+    mtcFormatDestroyTags(&fmt->tags);
 
     if (!tags || !*tags) return;
 

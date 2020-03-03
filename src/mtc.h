@@ -1,6 +1,6 @@
 #ifndef __MTC_H__
 #define __MTC_H__
-#include "format.h"
+#include "mtcformat.h"
 #include "log.h"
 #include "transport.h"
 
@@ -20,7 +20,7 @@ int                 mtcNeedsConnection(mtc_t *);
 int                 mtcConnect(mtc_t *);
 int                 mtcDisconnect(mtc_t *);
 void                mtcTransportSet(mtc_t*, transport_t*);
-void                mtcFormatSet(mtc_t*, format_t*);
+void                mtcFormatSet(mtc_t*, mtc_fmt_t*);
 
 
 #endif // __MTC_H__

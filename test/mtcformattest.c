@@ -7,147 +7,147 @@
 #include <string.h>
 #include <unistd.h>
 #include "dbg.h"
-#include "format.h"
+#include "mtcformat.h"
 
 #include "test.h"
 
 
 static void
-fmtCreateReturnsValidPtrForGoodFormat(void** state)
+mtcFormatCreateReturnsValidPtrForGoodFormat(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
     assert_null(fmt);
 
-    fmt = fmtCreate(CFG_METRIC_JSON);
+    fmt = mtcFormatCreate(CFG_METRIC_JSON);
     assert_non_null(fmt);
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
     assert_null(fmt);
 }
 
 static void
-fmtCreateReturnsNullPtrForBadFormat(void** state)
+mtcFormatCreateReturnsNullPtrForBadFormat(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_FORMAT_MAX);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FORMAT_MAX);
     assert_null(fmt);
 }
 
 void
-verifyDefaults(format_t* fmt)
+verifyDefaults(mtc_fmt_t* fmt)
 {
-    assert_string_equal(fmtStatsDPrefix(fmt), DEFAULT_STATSD_PREFIX);
-    assert_int_equal(fmtStatsDMaxLen(fmt), DEFAULT_STATSD_MAX_LEN);
-    assert_int_equal(fmtMtcVerbosity(fmt), DEFAULT_MTC_VERBOSITY);
-    assert_int_equal(fmtCustomTags(fmt), DEFAULT_CUSTOM_TAGS);
+    assert_string_equal(mtcFormatStatsDPrefix(fmt), DEFAULT_STATSD_PREFIX);
+    assert_int_equal(mtcFormatStatsDMaxLen(fmt), DEFAULT_STATSD_MAX_LEN);
+    assert_int_equal(mtcFormatVerbosity(fmt), DEFAULT_MTC_VERBOSITY);
+    assert_int_equal(mtcFormatCustomTags(fmt), DEFAULT_CUSTOM_TAGS);
 }
 
 static void
-fmtCreateHasExpectedDefaults(void** state)
+mtcFormatCreateHasExpectedDefaults(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
     verifyDefaults(fmt);
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
 
     // Test that accessors work with null fmt too
     verifyDefaults(NULL);
 }
 
 static void
-fmtDestroyNullDoesntCrash(void** state)
+mtcFormatDestroyNullDoesntCrash(void** state)
 {
-    fmtDestroy(NULL);
-    format_t* fmt = NULL;
-    fmtDestroy(&fmt);
-    // Implicitly shows that calling fmtDestroy with NULL is harmless
+    mtcFormatDestroy(NULL);
+    mtc_fmt_t* fmt = NULL;
+    mtcFormatDestroy(&fmt);
+    // Implicitly shows that calling mtcFormatDestroy with NULL is harmless
 }
 
 static void
-fmtStatsDPrefixSetAndGet(void** state)
+mtcFormatStatsDPrefixSetAndGet(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
-    fmtStatsDPrefixSet(fmt, "cribl.io");
-    assert_string_equal(fmtStatsDPrefix(fmt), "cribl.io");
-    fmtStatsDPrefixSet(fmt, "");
-    assert_string_equal(fmtStatsDPrefix(fmt), "");
-    fmtStatsDPrefixSet(fmt, "huh");
-    assert_string_equal(fmtStatsDPrefix(fmt), "huh");
-    fmtStatsDPrefixSet(fmt, NULL);
-    assert_string_equal(fmtStatsDPrefix(fmt), DEFAULT_STATSD_PREFIX);
-    fmtDestroy(&fmt);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtcFormatStatsDPrefixSet(fmt, "cribl.io");
+    assert_string_equal(mtcFormatStatsDPrefix(fmt), "cribl.io");
+    mtcFormatStatsDPrefixSet(fmt, "");
+    assert_string_equal(mtcFormatStatsDPrefix(fmt), "");
+    mtcFormatStatsDPrefixSet(fmt, "huh");
+    assert_string_equal(mtcFormatStatsDPrefix(fmt), "huh");
+    mtcFormatStatsDPrefixSet(fmt, NULL);
+    assert_string_equal(mtcFormatStatsDPrefix(fmt), DEFAULT_STATSD_PREFIX);
+    mtcFormatDestroy(&fmt);
 }
 
 static void
-fmtStatsDMaxLenSetAndGet(void** state)
+mtcFormatStatsDMaxLenSetAndGet(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
-    fmtStatsDMaxLenSet(fmt, 0);
-    assert_int_equal(fmtStatsDMaxLen(fmt), 0);
-    fmtStatsDMaxLenSet(fmt, UINT_MAX);
-    assert_int_equal(fmtStatsDMaxLen(fmt), UINT_MAX);
-    fmtDestroy(&fmt);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtcFormatStatsDMaxLenSet(fmt, 0);
+    assert_int_equal(mtcFormatStatsDMaxLen(fmt), 0);
+    mtcFormatStatsDMaxLenSet(fmt, UINT_MAX);
+    assert_int_equal(mtcFormatStatsDMaxLen(fmt), UINT_MAX);
+    mtcFormatDestroy(&fmt);
 }
 
 static void
-fmtMtcVerbositySetAndGet(void** state)
+mtcFormatVerbositySetAndGet(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_JSON);
-    fmtMtcVerbositySet(fmt, 0);
-    assert_int_equal(fmtMtcVerbosity(fmt), 0);
-    fmtMtcVerbositySet(fmt, UINT_MAX);
-    assert_int_equal(fmtMtcVerbosity(fmt), CFG_MAX_VERBOSITY);
-    fmtDestroy(&fmt);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_JSON);
+    mtcFormatVerbositySet(fmt, 0);
+    assert_int_equal(mtcFormatVerbosity(fmt), 0);
+    mtcFormatVerbositySet(fmt, UINT_MAX);
+    assert_int_equal(mtcFormatVerbosity(fmt), CFG_MAX_VERBOSITY);
+    mtcFormatDestroy(&fmt);
 }
 
 static void
-fmtCustomTagsSetAndGet(void ** state)
+mtcFormatCustomTagsSetAndGet(void ** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
     {
         custom_tag_t t1 = {"name1", "value1"};
         custom_tag_t t2 = {"name2", "value2"};
         custom_tag_t* tags[] = { &t1, &t2, NULL };
-        fmtCustomTagsSet(fmt, tags);
-        assert_non_null(fmtCustomTags(fmt));
-        assert_string_equal(fmtCustomTags(fmt)[0]->name, "name1");
-        assert_string_equal(fmtCustomTags(fmt)[0]->value, "value1");
-        assert_string_equal(fmtCustomTags(fmt)[1]->name, "name2");
-        assert_string_equal(fmtCustomTags(fmt)[1]->value, "value2");
-        assert_null(fmtCustomTags(fmt)[2]);
+        mtcFormatCustomTagsSet(fmt, tags);
+        assert_non_null(mtcFormatCustomTags(fmt));
+        assert_string_equal(mtcFormatCustomTags(fmt)[0]->name, "name1");
+        assert_string_equal(mtcFormatCustomTags(fmt)[0]->value, "value1");
+        assert_string_equal(mtcFormatCustomTags(fmt)[1]->name, "name2");
+        assert_string_equal(mtcFormatCustomTags(fmt)[1]->value, "value2");
+        assert_null(mtcFormatCustomTags(fmt)[2]);
     }
 
     custom_tag_t* tags[] = { NULL };
-    fmtCustomTagsSet(fmt, tags);
-    assert_null(fmtCustomTags(fmt));
+    mtcFormatCustomTagsSet(fmt, tags);
+    assert_null(mtcFormatCustomTags(fmt));
 
-    fmtCustomTagsSet(fmt, NULL);
-    assert_null(fmtCustomTags(fmt));
+    mtcFormatCustomTagsSet(fmt, NULL);
+    assert_null(mtcFormatCustomTags(fmt));
 
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
 }
 
 static void
-fmtStatsDStringNullEventDoesntCrash(void** state)
+mtcFormatStatsDStringNullEventDoesntCrash(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
-    assert_null(fmtStatsDString(fmt, NULL, NULL));
-    fmtDestroy(&fmt);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    assert_null(mtcFormatStatsDString(fmt, NULL, NULL));
+    mtcFormatDestroy(&fmt);
 }
 
 static void
-fmtStatsDStringNullEventFieldsDoesntCrash(void** state)
+mtcFormatStatsDStringNullEventFieldsDoesntCrash(void** state)
 {
     event_t e = INT_EVENT("useful.apps", 1, CURRENT, NULL);
 
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
-    char* msg = fmtStatsDString(fmt, &e, NULL);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
     assert_string_equal(msg, "useful.apps:1|g\n");
     if (msg) free(msg);
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
 }
 
 static void
-fmtStatsDStringNullFmtDoesntCrash(void** state)
+mtcFormatStatsDStringNullFmtDoesntCrash(void** state)
 {
     event_field_t fields[] = {
         STRFIELD("proc",             "redis",            2),
@@ -155,11 +155,11 @@ fmtStatsDStringNullFmtDoesntCrash(void** state)
     };
     event_t e = INT_EVENT("useful.apps", 1, CURRENT, fields);
 
-    assert_null(fmtStatsDString(NULL, &e, NULL));
+    assert_null(mtcFormatStatsDString(NULL, &e, NULL));
 }
 
 static void
-fmtStatsDStringHappyPath(void** state)
+mtcFormatStatsDStringHappyPath(void** state)
 {
     char* g_hostname = "myhost";
     char* g_procname = "testapp";
@@ -180,11 +180,11 @@ fmtStatsDStringHappyPath(void** state)
     };
     event_t e = INT_EVENT("net.port", g_openPorts, CURRENT, fields);
 
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
-    fmtMtcVerbositySet(fmt, CFG_MAX_VERBOSITY);
+    mtcFormatVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
-    char* msg = fmtStatsDString(fmt, &e, NULL);
+    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
     assert_non_null(msg);
 
     char expected[1024];
@@ -195,12 +195,12 @@ fmtStatsDStringHappyPath(void** state)
     assert_string_equal(expected, msg);
     free(msg);
 
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
     assert_null(fmt);
 }
 
 static void
-fmtStatsDStringHappyPathFilteredFields(void** state)
+mtcFormatStatsDStringHappyPathFilteredFields(void** state)
 {
     char* g_hostname = "myhost";
     char* g_procname = "testapp";
@@ -221,14 +221,14 @@ fmtStatsDStringHappyPathFilteredFields(void** state)
     };
     event_t e = INT_EVENT("net.port", g_openPorts, CURRENT, fields);
 
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
-    fmtMtcVerbositySet(fmt, CFG_MAX_VERBOSITY);
+    mtcFormatVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
     regex_t re;
     assert_int_equal(regcomp(&re, "^[p]", REG_EXTENDED), 0);
 
-    char* msg = fmtStatsDString(fmt, &e, &re);
+    char* msg = mtcFormatStatsDString(fmt, &e, &re);
     assert_non_null(msg);
 
 
@@ -241,40 +241,40 @@ fmtStatsDStringHappyPathFilteredFields(void** state)
     free(msg);
 
     regfree(&re);
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
     assert_null(fmt);
 }
 
 static void
-fmtStatsDStringWithCustomFields(void** state)
+mtcFormatStatsDStringWithCustomFields(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
 
     custom_tag_t t1 = {"name1", "value1"};
     custom_tag_t t2 = {"name2", "value2"};
     custom_tag_t* tags[] = { &t1, &t2, NULL };
-    fmtCustomTagsSet(fmt, tags);
+    mtcFormatCustomTagsSet(fmt, tags);
 
     event_t e = INT_EVENT("statsd.metric", 3, CURRENT, NULL);
 
-    char* msg = fmtStatsDString(fmt, &e, NULL);
+    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
     assert_non_null(msg);
 
     assert_string_equal("statsd.metric:3|g|#name1:value1,name2:value2\n", msg);
     free(msg);
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
 }
 
 static void
-fmtStatsDStringWithCustomAndStatsdFields(void** state)
+mtcFormatStatsDStringWithCustomAndStatsdFields(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
 
     custom_tag_t t1 = {"tag", "value"};
     custom_tag_t* tags[] = { &t1, NULL };
-    fmtCustomTagsSet(fmt, tags);
+    mtcFormatCustomTagsSet(fmt, tags);
 
     event_field_t fields[] = {
         STRFIELD("proc",             "test",                2),
@@ -282,24 +282,24 @@ fmtStatsDStringWithCustomAndStatsdFields(void** state)
     };
     event_t e = INT_EVENT("fs.read", 3, CURRENT, fields);
 
-    char* msg = fmtStatsDString(fmt, &e, NULL);
+    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
     assert_non_null(msg);
 
     assert_string_equal("fs.read:3|g|#tag:value,proc:test\n", msg);
     free(msg);
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
 }
 
 static void
-fmtStatsDStringReturnsNullIfSpaceIsInsufficient(void** state)
+mtcFormatStatsDStringReturnsNullIfSpaceIsInsufficient(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
-    fmtStatsDMaxLenSet(fmt, 28);
-    fmtStatsDPrefixSet(fmt, "98");
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtcFormatStatsDMaxLenSet(fmt, 28);
+    mtcFormatStatsDPrefixSet(fmt, "98");
 
     // Test one that just fits
     event_t e1 = INT_EVENT("A", -1234567890123456789, DELTA_MS, NULL);
-    char* msg = fmtStatsDString(fmt, &e1, NULL);
+    char* msg = mtcFormatStatsDString(fmt, &e1, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "98A:-1234567890123456789|ms\n");
     assert_true(strlen(msg) == 28);
@@ -307,21 +307,21 @@ fmtStatsDStringReturnsNullIfSpaceIsInsufficient(void** state)
 
     // One character too much (longer name)
     event_t e2 = INT_EVENT("AB", e1.value.integer, e1.type, e1.fields);
-    msg = fmtStatsDString(fmt, &e2, NULL);
+    msg = mtcFormatStatsDString(fmt, &e2, NULL);
     assert_null(msg);
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
 }
 
 static void
-fmtStatsDStringReturnsNullIfSpaceIsInsufficientMax(void** state)
+mtcFormatStatsDStringReturnsNullIfSpaceIsInsufficientMax(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
-    fmtStatsDMaxLenSet(fmt, 2+1+315+3);
-    fmtStatsDPrefixSet(fmt, "98");
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtcFormatStatsDMaxLenSet(fmt, 2+1+315+3);
+    mtcFormatStatsDPrefixSet(fmt, "98");
 
     // Test one that just fits
     event_t e1 = FLT_EVENT("A", -DBL_MAX, DELTA_MS, NULL);
-    char* msg = fmtStatsDString(fmt, &e1, NULL);
+    char* msg = mtcFormatStatsDString(fmt, &e1, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "98A:-179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.00|ms\n");
     assert_true(strlen(msg) == 2+1+315+3);
@@ -329,20 +329,20 @@ fmtStatsDStringReturnsNullIfSpaceIsInsufficientMax(void** state)
 
     // One character too much (longer name)
     event_t e2 = FLT_EVENT("AB", e1.value.floating, e1.type, e1.fields);
-    msg = fmtStatsDString(fmt, &e2, NULL);
+    msg = mtcFormatStatsDString(fmt, &e2, NULL);
     assert_null(msg);
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
 }
 
 static void
-fmtStatsDStringVerifyEachStatsDType(void** state)
+mtcFormatStatsDStringVerifyEachStatsDType(void** state)
 {
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
 
     data_type_t t;
     for (t=DELTA; t<=SET; t++) {
         event_t e = INT_EVENT("A", 1, t, NULL);
-        char* msg = fmtStatsDString(fmt, &e, NULL);
+        char* msg = mtcFormatStatsDString(fmt, &e, NULL);
         switch (t) {
             case DELTA:
                 assert_string_equal(msg, "A:1|c\n");
@@ -363,20 +363,20 @@ fmtStatsDStringVerifyEachStatsDType(void** state)
         free(msg);
     }
 
-    assert_int_equal(dbgCountMatchingLines("src/format.c"), 0);
+    assert_int_equal(dbgCountMatchingLines("src/mtcformat.c"), 0);
 
     // In undefined case, just don't crash...
     event_t e = INT_EVENT("A", 1, SET+1, NULL);
-    char* msg = fmtStatsDString(fmt, &e, NULL);
+    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
     if (msg) free(msg);
 
-    assert_int_equal(dbgCountMatchingLines("src/format.c"), 1);
+    assert_int_equal(dbgCountMatchingLines("src/mtcformat.c"), 1);
     dbgInit(); // reset dbg for the rest of the tests
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
 }
 
 static void
-fmtStatsDStringOmitsFieldsIfSpaceIsInsufficient(void** state)
+mtcFormatStatsDStringOmitsFieldsIfSpaceIsInsufficient(void** state)
 {
     event_field_t fields[] = {
         NUMFIELD("J",               222,                    9),
@@ -392,16 +392,16 @@ fmtStatsDStringOmitsFieldsIfSpaceIsInsufficient(void** state)
         FIELDEND
     };
     event_t e = INT_EVENT("metric", 1, DELTA, fields);
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
-    fmtMtcVerbositySet(fmt, CFG_MAX_VERBOSITY);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtcFormatVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
     // Note that this test documents that we don't prioritize
     // the lowest cardinality fields when space is scarce.  We
     // just "fit what we can", while ensuring that we obey
-    // fmtStatsDMaxLen.
+    // mtcFormatStatsDMaxLen.
 
-    fmtStatsDMaxLenSet(fmt, 31);
-    char* msg = fmtStatsDString(fmt, &e, NULL);
+    mtcFormatStatsDMaxLenSet(fmt, 31);
+    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
     assert_non_null(msg);
     //                                 1111111111222222222233
     //                        1234567890123456789012345678901
@@ -409,17 +409,17 @@ fmtStatsDStringOmitsFieldsIfSpaceIsInsufficient(void** state)
     assert_string_equal(msg, "metric:1|c|#J:222,I:V,H:111\n");
     free(msg);
 
-    fmtStatsDMaxLenSet(fmt, 32);
-    msg = fmtStatsDString(fmt, &e, NULL);
+    mtcFormatStatsDMaxLenSet(fmt, 32);
+    msg = mtcFormatStatsDString(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#J:222,I:V,H:111,G:W\n");
     free(msg);
 
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
 }
 
 static void
-fmtStatsDStringHonorsCardinality(void** state)
+mtcFormatStatsDStringHonorsCardinality(void** state)
 {
     event_field_t fields[] = {
         STRFIELD("A",               "Z",                    0),
@@ -435,22 +435,22 @@ fmtStatsDStringHonorsCardinality(void** state)
         FIELDEND
     };
     event_t e = INT_EVENT("metric", 1, DELTA, fields);
-    format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
 
-    fmtMtcVerbositySet(fmt, 0);
-    char* msg = fmtStatsDString(fmt, &e, NULL);
+    mtcFormatVerbositySet(fmt, 0);
+    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#A:Z\n");
     free(msg);
 
-    fmtMtcVerbositySet(fmt, 5);
-    msg = fmtStatsDString(fmt, &e, NULL);
+    mtcFormatVerbositySet(fmt, 5);
+    msg = mtcFormatStatsDString(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#A:Z,B:987,C:Y,D:654,E:X,F:321\n");
     free(msg);
 
-    fmtMtcVerbositySet(fmt, 9);
-    msg = fmtStatsDString(fmt, &e, NULL);
+    mtcFormatVerbositySet(fmt, 9);
+    msg = mtcFormatStatsDString(fmt, &e, NULL);
     assert_non_null(msg);
     // Verify every name is there, 10 in total
     int count =0;
@@ -462,7 +462,7 @@ fmtStatsDStringHonorsCardinality(void** state)
     assert_true(count == 10);
     free(msg);
 
-    fmtDestroy(&fmt);
+    mtcFormatDestroy(&fmt);
 }
 
 
@@ -542,13 +542,13 @@ fmtUrlDecodeToleratesBadData(void** state)
     for (i=0; i<sizeof(bad_input_tests)/sizeof(bad_input_tests[0]); i++) {
         test_case_t* test = &bad_input_tests[i];
 
-        assert_int_equal(dbgCountMatchingLines("src/format.c"), 0);
+        assert_int_equal(dbgCountMatchingLines("src/mtcformat.c"), 0);
 
         char* decoded = fmtUrlDecode(test->encoded);
         assert_non_null(decoded);
         assert_string_equal(decoded, test->decoded);
 
-        assert_int_equal(dbgCountMatchingLines("src/format.c"), 1);
+        assert_int_equal(dbgCountMatchingLines("src/mtcformat.c"), 1);
         dbgInit(); // reset dbg for the rest of the tests
 
         free(decoded);
@@ -561,26 +561,26 @@ main(int argc, char* argv[])
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(fmtCreateReturnsValidPtrForGoodFormat),
-        cmocka_unit_test(fmtCreateReturnsNullPtrForBadFormat),
-        cmocka_unit_test(fmtCreateHasExpectedDefaults),
-        cmocka_unit_test(fmtDestroyNullDoesntCrash),
-        cmocka_unit_test(fmtStatsDPrefixSetAndGet),
-        cmocka_unit_test(fmtStatsDMaxLenSetAndGet),
-        cmocka_unit_test(fmtMtcVerbositySetAndGet),
-        cmocka_unit_test(fmtCustomTagsSetAndGet),
-        cmocka_unit_test(fmtStatsDStringNullEventDoesntCrash),
-        cmocka_unit_test(fmtStatsDStringNullEventFieldsDoesntCrash),
-        cmocka_unit_test(fmtStatsDStringNullFmtDoesntCrash),
-        cmocka_unit_test(fmtStatsDStringHappyPath),
-        cmocka_unit_test(fmtStatsDStringHappyPathFilteredFields),
-        cmocka_unit_test(fmtStatsDStringWithCustomFields),
-        cmocka_unit_test(fmtStatsDStringWithCustomAndStatsdFields),
-        cmocka_unit_test(fmtStatsDStringReturnsNullIfSpaceIsInsufficient),
-        cmocka_unit_test(fmtStatsDStringReturnsNullIfSpaceIsInsufficientMax),
-        cmocka_unit_test(fmtStatsDStringVerifyEachStatsDType),
-        cmocka_unit_test(fmtStatsDStringOmitsFieldsIfSpaceIsInsufficient),
-        cmocka_unit_test(fmtStatsDStringHonorsCardinality),
+        cmocka_unit_test(mtcFormatCreateReturnsValidPtrForGoodFormat),
+        cmocka_unit_test(mtcFormatCreateReturnsNullPtrForBadFormat),
+        cmocka_unit_test(mtcFormatCreateHasExpectedDefaults),
+        cmocka_unit_test(mtcFormatDestroyNullDoesntCrash),
+        cmocka_unit_test(mtcFormatStatsDPrefixSetAndGet),
+        cmocka_unit_test(mtcFormatStatsDMaxLenSetAndGet),
+        cmocka_unit_test(mtcFormatVerbositySetAndGet),
+        cmocka_unit_test(mtcFormatCustomTagsSetAndGet),
+        cmocka_unit_test(mtcFormatStatsDStringNullEventDoesntCrash),
+        cmocka_unit_test(mtcFormatStatsDStringNullEventFieldsDoesntCrash),
+        cmocka_unit_test(mtcFormatStatsDStringNullFmtDoesntCrash),
+        cmocka_unit_test(mtcFormatStatsDStringHappyPath),
+        cmocka_unit_test(mtcFormatStatsDStringHappyPathFilteredFields),
+        cmocka_unit_test(mtcFormatStatsDStringWithCustomFields),
+        cmocka_unit_test(mtcFormatStatsDStringWithCustomAndStatsdFields),
+        cmocka_unit_test(mtcFormatStatsDStringReturnsNullIfSpaceIsInsufficient),
+        cmocka_unit_test(mtcFormatStatsDStringReturnsNullIfSpaceIsInsufficientMax),
+        cmocka_unit_test(mtcFormatStatsDStringVerifyEachStatsDType),
+        cmocka_unit_test(mtcFormatStatsDStringOmitsFieldsIfSpaceIsInsufficient),
+        cmocka_unit_test(mtcFormatStatsDStringHonorsCardinality),
         cmocka_unit_test(fmtUrlEncodeDecodeRoundTrip),
         cmocka_unit_test(fmtUrlDecodeToleratesBadData),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),

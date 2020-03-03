@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include "cfgutils.h"
 #include "dbg.h"
-#include "format.h"
+#include "mtcformat.h"
 #include "scopetypes.h"
 
 #ifndef NO_YAML
@@ -1457,16 +1457,16 @@ initTransport(config_t* cfg, which_transport_t t)
     return transport;
 }
 
-static format_t*
-initFormat(config_t* cfg)
+static mtc_fmt_t*
+initMtcFormat(config_t* cfg)
 {
-    format_t* fmt = fmtCreate(cfgMtcFormat(cfg));
+    mtc_fmt_t* fmt = mtcFormatCreate(cfgMtcFormat(cfg));
     if (!fmt) return NULL;
 
-    fmtStatsDPrefixSet(fmt, cfgMtcStatsDPrefix(cfg));
-    fmtStatsDMaxLenSet(fmt, cfgMtcStatsDMaxLen(cfg));
-    fmtMtcVerbositySet(fmt, cfgMtcVerbosity(cfg));
-    fmtCustomTagsSet(fmt, cfgCustomTags(cfg));
+    mtcFormatStatsDPrefixSet(fmt, cfgMtcStatsDPrefix(cfg));
+    mtcFormatStatsDMaxLenSet(fmt, cfgMtcStatsDMaxLen(cfg));
+    mtcFormatVerbositySet(fmt, cfgMtcVerbosity(cfg));
+    mtcFormatCustomTagsSet(fmt, cfgCustomTags(cfg));
     return fmt;
 }
 
@@ -1498,7 +1498,7 @@ initMtc(config_t* cfg)
     }
     mtcTransportSet(mtc, t);
 
-    format_t* f = initFormat(cfg);
+    mtc_fmt_t* f = initMtcFormat(cfg);
     if (!f) {
         mtcDestroy(&mtc);
         return mtc;

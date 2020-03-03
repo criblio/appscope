@@ -94,7 +94,7 @@ mtcFormatSetAndMtcSendEvent(void** state)
     mtcTransportSet(mtc, t);
 
     event_t e = INT_EVENT("A", 1, DELTA, NULL);
-    format_t* f = fmtCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* f = mtcFormatCreate(CFG_METRIC_STATSD);
     mtcFormatSet(mtc, f);
 
     // Test that format is set by testing side effects of mtcSendMetric

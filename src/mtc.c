@@ -7,7 +7,7 @@
 struct _mtc_t
 {
     transport_t* transport;
-    format_t* format;
+    mtc_fmt_t* format;
     int metric_disabled;
 };
 
@@ -33,7 +33,7 @@ mtcDestroy(mtc_t** mtc)
     if (!mtc || !*mtc) return;
     mtc_t* m = *mtc;
     transportDestroy(&m->transport);
-    fmtDestroy(&m->format);
+    mtcFormatDestroy(&m->format);
     free(m);
     *mtc = NULL;
 }
@@ -53,7 +53,7 @@ mtcSendMetric(mtc_t* mtc, event_t* e)
 
     if (mtc->metric_disabled) return 0;
 
-    char* msg = fmtStatsDString(mtc->format, e, NULL);
+    char* msg = mtcFormatStatsDString(mtc->format, e, NULL);
     int rv = mtcSend(mtc, msg);
     if (msg) free(msg);
     return rv;
@@ -98,12 +98,12 @@ mtcTransportSet(mtc_t* mtc, transport_t* transport)
 }
 
 void
-mtcFormatSet(mtc_t* mtc, format_t* format)
+mtcFormatSet(mtc_t* mtc, mtc_fmt_t* format)
 {
     if (!mtc) return;
 
     // Don't leak if mtcFormatSet is called repeatedly
-    fmtDestroy(&mtc->format);
+    mtcFormatDestroy(&mtc->format);
     mtc->format = format;
 }
 

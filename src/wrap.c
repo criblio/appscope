@@ -248,6 +248,10 @@ doConfig(config_t *cfg)
     g_mtc = initMtc(cfg);
     g_log = log; // Set after initMtc to avoid infinite loop with socket
     ctlEvtSet(g_ctl, initEvtFormat(cfg));
+
+    // Disconnect the old interfaces that were just replaced
+    mtcDisconnect(g_prevmtc);
+    logDisconnect(g_prevlog);
 }
 
 // Process dynamic config change if they are available

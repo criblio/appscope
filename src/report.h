@@ -6,7 +6,6 @@
 #include <sys/types.h>
 
 #include "ctl.h"
-#include "evt.h"
 #include "mtc.h"
 
 typedef enum {

@@ -20,7 +20,7 @@ typedef enum {CFG_SRC_FILE,
               CFG_SRC_CONSOLE,
               CFG_SRC_SYSLOG,
               CFG_SRC_METRIC,
-              CFG_SRC_MAX} cfg_evt_t;
+              CFG_SRC_MAX} watch_t;
 
 
 #define MAX_HOSTNAME 255

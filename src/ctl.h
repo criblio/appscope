@@ -4,7 +4,7 @@
 #include "cfg.h"
 #include "cJSON.h"
 #include "transport.h"
-#include "evt.h"
+#include "evtformat.h"
 
 //////////////////
 // This structure is intended to capture received request data from an
@@ -94,6 +94,6 @@ int                 ctlConnection(ctl_t *);
 int                 ctlConnect(ctl_t *);
 int                 ctlClose(ctl_t *);
 void                ctlTransportSet(ctl_t *, transport_t *);
-void                ctlEvtSet(ctl_t *, evt_t *);
+void                ctlEvtSet(ctl_t *, evt_fmt_t *);
 
 #endif // _CTL_H__

@@ -247,7 +247,7 @@ doConfig(config_t *cfg)
     log_t* log = initLog(cfg);
     g_mtc = initMtc(cfg);
     g_log = log; // Set after initMtc to avoid infinite loop with socket
-    ctlEvtSet(g_ctl, initEvt(cfg));
+    ctlEvtSet(g_ctl, initEvtFormat(cfg));
 }
 
 // Process dynamic config change if they are available

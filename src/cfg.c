@@ -150,7 +150,7 @@ cfgCreateDefault()
     c->mtc.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
     c->evt.format = DEFAULT_CTL_FORMAT;
 
-    cfg_evt_t src;
+    watch_t src;
     for (src=CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
         const char* val_def = valueFilterDefault[src];
         c->evt.valuefilter[src] = (val_def) ? strdup(val_def) : NULL;
@@ -188,7 +188,7 @@ cfgDestroy(config_t** cfg)
     if (c->mtc.statsd.prefix) free(c->mtc.statsd.prefix);
     if (c->mtc.commanddir) free(c->mtc.commanddir);
 
-    cfg_evt_t src;
+    watch_t src;
     for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
         if (c->evt.valuefilter[src]) free (c->evt.valuefilter[src]);
         if (c->evt.fieldfilter[src]) free (c->evt.fieldfilter[src]);
@@ -256,50 +256,50 @@ cfgEventFormat(config_t* cfg)
 }
 
 const char*
-cfgEventValueFilter(config_t* cfg, cfg_evt_t evt)
+cfgEvtFormatValueFilter(config_t* cfg, watch_t src)
 {
-    if (evt >= 0 && evt < CFG_SRC_MAX) {
-        if (cfg) return cfg->evt.valuefilter[evt];
-        return valueFilterDefault[evt];
+    if (src >= 0 && src < CFG_SRC_MAX) {
+        if (cfg) return cfg->evt.valuefilter[src];
+        return valueFilterDefault[src];
     }
 
-    DBG("%d", evt);
+    DBG("%d", src);
     return valueFilterDefault[CFG_SRC_FILE];
 }
 
 const char*
-cfgEventFieldFilter(config_t* cfg, cfg_evt_t evt)
+cfgEvtFormatFieldFilter(config_t* cfg, watch_t src)
 {
-    if (evt >= 0 && evt < CFG_SRC_MAX) {
-        if (cfg) return cfg->evt.fieldfilter[evt];
-        return fieldFilterDefault[evt];
+    if (src >= 0 && src < CFG_SRC_MAX) {
+        if (cfg) return cfg->evt.fieldfilter[src];
+        return fieldFilterDefault[src];
     }
 
-    DBG("%d", evt);
+    DBG("%d", src);
     return fieldFilterDefault[CFG_SRC_FILE];
 }
 
 const char*
-cfgEventNameFilter(config_t* cfg, cfg_evt_t evt)
+cfgEvtFormatNameFilter(config_t* cfg, watch_t src)
 {
-    if (evt >= 0 && evt < CFG_SRC_MAX) {
-        if (cfg) return cfg->evt.namefilter[evt];
-        return nameFilterDefault[evt];
+    if (src >= 0 && src < CFG_SRC_MAX) {
+        if (cfg) return cfg->evt.namefilter[src];
+        return nameFilterDefault[src];
     }
 
-    DBG("%d", evt);
+    DBG("%d", src);
     return nameFilterDefault[CFG_SRC_FILE];
 }
 
 unsigned
-cfgEventSourceEnabled(config_t* cfg, cfg_evt_t evt)
+cfgEvtFormatSourceEnabled(config_t* cfg, watch_t src)
 {
-    if (evt >= 0 && evt < CFG_SRC_MAX) {
-        if (cfg) return cfg->evt.src[evt];
-        return srcEnabledDefault[evt];
+    if (src >= 0 && src < CFG_SRC_MAX) {
+        if (cfg) return cfg->evt.src[src];
+        return srcEnabledDefault[src];
     }
 
-    DBG("%d", evt);
+    DBG("%d", src);
     return srcEnabledDefault[CFG_SRC_FILE];
 }
 
@@ -488,49 +488,49 @@ cfgEventFormatSet(config_t* cfg, cfg_mtc_format_t fmt)
 }
 
 void
-cfgEventValueFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
+cfgEvtFormatValueFilterSet(config_t* cfg, watch_t src, const char* filter)
 {
-    if (!cfg || evt < 0 || evt >= CFG_SRC_MAX) return;
-    if (cfg->evt.valuefilter[evt]) free (cfg->evt.valuefilter[evt]);
+    if (!cfg || src < 0 || src >= CFG_SRC_MAX) return;
+    if (cfg->evt.valuefilter[src]) free (cfg->evt.valuefilter[src]);
     if (!filter || (filter[0] == '\0')) {
-        const char* vdefault = valueFilterDefault[evt];
-        cfg->evt.valuefilter[evt] = (vdefault) ? strdup(vdefault) : NULL;
+        const char* vdefault = valueFilterDefault[src];
+        cfg->evt.valuefilter[src] = (vdefault) ? strdup(vdefault) : NULL;
         return;
     }
-    cfg->evt.valuefilter[evt] = strdup(filter);
+    cfg->evt.valuefilter[src] = strdup(filter);
 }
 
 void
-cfgEventFieldFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
+cfgEvtFormatFieldFilterSet(config_t* cfg, watch_t src, const char* filter)
 {
-    if (!cfg || evt < 0 || evt >= CFG_SRC_MAX) return;
-    if (cfg->evt.fieldfilter[evt]) free (cfg->evt.fieldfilter[evt]);
+    if (!cfg || src < 0 || src >= CFG_SRC_MAX) return;
+    if (cfg->evt.fieldfilter[src]) free (cfg->evt.fieldfilter[src]);
     if (!filter || (filter[0] == '\0')) {
-        const char* fdefault = fieldFilterDefault[evt];
-        cfg->evt.fieldfilter[evt] = (fdefault) ? strdup(fdefault) : NULL;
+        const char* fdefault = fieldFilterDefault[src];
+        cfg->evt.fieldfilter[src] = (fdefault) ? strdup(fdefault) : NULL;
         return;
     }
-    cfg->evt.fieldfilter[evt] = strdup(filter);
+    cfg->evt.fieldfilter[src] = strdup(filter);
 }
 
 void
-cfgEventNameFilterSet(config_t* cfg, cfg_evt_t evt, const char* filter)
+cfgEvtFormatNameFilterSet(config_t* cfg, watch_t src, const char* filter)
 {
-    if (!cfg || evt < 0 || evt >= CFG_SRC_MAX) return;
-    if (cfg->evt.namefilter[evt]) free (cfg->evt.namefilter[evt]);
+    if (!cfg || src < 0 || src >= CFG_SRC_MAX) return;
+    if (cfg->evt.namefilter[src]) free (cfg->evt.namefilter[src]);
     if (!filter || (filter[0] == '\0')) {
-        const char* ndefault = nameFilterDefault[evt];
-        cfg->evt.namefilter[evt] = (ndefault) ? strdup(ndefault) : NULL;
+        const char* ndefault = nameFilterDefault[src];
+        cfg->evt.namefilter[src] = (ndefault) ? strdup(ndefault) : NULL;
         return;
     }
-    cfg->evt.namefilter[evt] = strdup(filter);
+    cfg->evt.namefilter[src] = strdup(filter);
 }
 
 void
-cfgEventSourceEnabledSet(config_t* cfg, cfg_evt_t evt, unsigned val)
+cfgEvtFormatSourceEnabledSet(config_t* cfg, watch_t src, unsigned val)
 {
-    if (!cfg || evt < 0 || evt >= CFG_SRC_MAX) return;
-    cfg->evt.src[evt] = val;
+    if (!cfg || src < 0 || src >= CFG_SRC_MAX) return;
+    cfg->evt.src[src] = val;
 }
 
 void

@@ -5,32 +5,32 @@
 #include <time.h>
 #include <unistd.h>
 #include "dbg.h"
-#include "evt.h"
+#include "evtformat.h"
 
 #include "test.h"
 
 static void
-evtCreateReturnsValidPtr(void** state)
+evtFormatCreateReturnsValidPtr(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
     assert_non_null(evt);
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
     assert_null(evt);
 }
 
 static void
-evtDestroyNullMtcDoesntCrash(void** state)
+evtFormatDestroyNullMtcDoesntCrash(void** state)
 {
-    evtDestroy(NULL);
-    evt_t* evt = NULL;
-    evtDestroy(&evt);
-    // Implicitly shows that calling evtDestroy with NULL is harmless
+    evtFormatDestroy(NULL);
+    evt_fmt_t* evt = NULL;
+    evtFormatDestroy(&evt);
+    // Implicitly shows that calling evtFormatDestroy with NULL is harmless
 }
 
 static void
-evtMetricHappyPath(void** state)
+evtFormatMetricHappyPath(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
     assert_non_null(evt);
 
     event_t e = INT_EVENT("A", 1, DELTA, NULL);
@@ -42,8 +42,8 @@ evtMetricHappyPath(void** state)
                       .id = "host-evttest-cmd-4"};
 
     // when enabled, we should get a non-null json
-    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
-    cJSON* json = evtMetric(evt, &e, 12345, &proc);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+    cJSON* json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
 
     // grab the time value from json to use in our expected output.
@@ -68,13 +68,13 @@ evtMetricHappyPath(void** state)
     free(actual);
     free(expected);
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 }
 
 static void
-evtMetricWithSourceDisabledReturnsNull(void** state)
+evtFormatMetricWithSourceDisabledReturnsNull(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
     assert_non_null(evt);
 
     event_t e = INT_EVENT("A", 1, DELTA, NULL);
@@ -86,30 +86,30 @@ evtMetricWithSourceDisabledReturnsNull(void** state)
                       .id = "host-evttest-cmd-4"};
 
     // default is disabled
-    cJSON* json = evtMetric(evt, &e, 12345, &proc);
+    cJSON* json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_null(json);
 
     // when enabled, we should get a non-null json
-    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
-    json = evtMetric(evt, &e, 12345, &proc);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
     cJSON_Delete(json);
 
     // Set it back to disabled, just to be sure.
-    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 0);
-    json = evtMetric(evt, &e, 12345, &proc);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_METRIC, 0);
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_null(json);
     cJSON_Delete(json);
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 }
 
 static void
-evtMetricWithAndWithoutMatchingNameFilter(void** state)
+evtFormatMetricWithAndWithoutMatchingNameFilter(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
     assert_non_null(evt);
-    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
     event_t e = INT_EVENT("A", 1, DELTA, NULL);
     proc_id_t proc = {.pid = 4848,
@@ -121,30 +121,30 @@ evtMetricWithAndWithoutMatchingNameFilter(void** state)
     cJSON* json;
 
     // Default name filter allows everything
-    json = evtMetric(evt, &e, 12345, &proc);
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
     cJSON_Delete(json);
 
     // Changing the name filter to "^B" shouldn't match.
-    evtNameFilterSet(evt, CFG_SRC_METRIC, "^B");
-    json = evtMetric(evt, &e, 12345, &proc);
+    evtFormatNameFilterSet(evt, CFG_SRC_METRIC, "^B");
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_null(json);
 
     // Changing the name filter to "^A" should match.
-    evtNameFilterSet(evt, CFG_SRC_METRIC, "^A");
-    json = evtMetric(evt, &e, 12345, &proc);
+    evtFormatNameFilterSet(evt, CFG_SRC_METRIC, "^A");
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
     cJSON_Delete(json);
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 }
 
 static void
-evtMetricWithAndWithoutMatchingFieldFilter(void** state)
+evtFormatMetricWithAndWithoutMatchingFieldFilter(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
     assert_non_null(evt);
-    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
     event_field_t fields[] = {
         STRFIELD("proc",             "ps",                  3),
@@ -161,7 +161,7 @@ evtMetricWithAndWithoutMatchingFieldFilter(void** state)
     cJSON* json, *data;
 
     // Default field filter allows both fields
-    json = evtMetric(evt, &e, 12345, &proc);
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
     data = cJSON_GetObjectItem(json, "data");
     assert_non_null(data);
@@ -170,8 +170,8 @@ evtMetricWithAndWithoutMatchingFieldFilter(void** state)
     cJSON_Delete(json);
 
     // Changing the field filter to ".*oc" should match proc but not pid
-    evtFieldFilterSet(evt, CFG_SRC_METRIC, ".*oc");
-    json = evtMetric(evt, &e, 12345, &proc);
+    evtFormatFieldFilterSet(evt, CFG_SRC_METRIC, ".*oc");
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
     data = cJSON_GetObjectItem(json, "data");
     assert_non_null(data);
@@ -179,15 +179,15 @@ evtMetricWithAndWithoutMatchingFieldFilter(void** state)
     assert_null(cJSON_GetObjectItem(data, "pid"));
     cJSON_Delete(json);
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 }
 
 static void
-evtMetricWithAndWithoutMatchingValueFilter(void** state)
+evtFormatMetricWithAndWithoutMatchingValueFilter(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
     assert_non_null(evt);
-    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
     event_t e = INT_EVENT("A", 1, DELTA, NULL);
     proc_id_t proc = {.pid = 4848,
@@ -199,13 +199,13 @@ evtMetricWithAndWithoutMatchingValueFilter(void** state)
     cJSON* json;
 
     // Default value filter allows everything
-    json = evtMetric(evt, &e, 12345, &proc);
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
     cJSON_Delete(json);
 
     // Changing the value filter to "^2" shouldn't match.
-    evtValueFilterSet(evt, CFG_SRC_METRIC, "^2");
-    json = evtMetric(evt, &e, 12345, &proc);
+    evtFormatValueFilterSet(evt, CFG_SRC_METRIC, "^2");
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_null(json);
 
     // Adding a field with value 2 should match.
@@ -215,36 +215,36 @@ evtMetricWithAndWithoutMatchingValueFilter(void** state)
         FIELDEND
     };
     e.fields = fields;
-    json = evtMetric(evt, &e, 12345, &proc);
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
     cJSON_Delete(json);
 
     // Changing the value filter to "^1" should match.
-    evtValueFilterSet(evt, CFG_SRC_METRIC, "^1");
-    json = evtMetric(evt, &e, 12345, &proc);
+    evtFormatValueFilterSet(evt, CFG_SRC_METRIC, "^1");
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
     cJSON_Delete(json);
 
     // Changing the value filter to "ps" should match too.
-    evtValueFilterSet(evt, CFG_SRC_METRIC, "ps");
-    json = evtMetric(evt, &e, 12345, &proc);
+    evtFormatValueFilterSet(evt, CFG_SRC_METRIC, "ps");
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_non_null(json);
     cJSON_Delete(json);
 
     // Changing the value filter to "blah" should not match.
-    evtValueFilterSet(evt, CFG_SRC_METRIC, "blah");
-    json = evtMetric(evt, &e, 12345, &proc);
+    evtFormatValueFilterSet(evt, CFG_SRC_METRIC, "blah");
+    json = evtFormatMetric(evt, &e, 12345, &proc);
     assert_null(json);
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 }
 
 static void
-evtMetricRateLimitReturnsNotice(void** state)
+evtFormatMetricRateLimitReturnsNotice(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
     assert_non_null(evt);
-    evtSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
     event_t e = INT_EVENT("Hey", 1, DELTA, NULL);
     proc_id_t proc = {.pid = 4848,
@@ -260,7 +260,7 @@ evtMetricRateLimitReturnsNotice(void** state)
 
     int i;
     for (i=0; i<=MAXEVENTSPERSEC; i++) {
-        json = evtMetric(evt, &e, 12345, &proc);
+        json = evtFormatMetric(evt, &e, 12345, &proc);
         assert_non_null(json);
 
         time(&current);
@@ -290,13 +290,13 @@ evtMetricRateLimitReturnsNotice(void** state)
         cJSON_Delete(json);
     }
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 }
 
 static void
-evtLogWithSourceDisabledReturnsNull(void** state)
+evtFormatLogWithSourceDisabledReturnsNull(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
     assert_non_null(evt);
 
     proc_id_t proc = {.pid = 4848,
@@ -307,29 +307,29 @@ evtLogWithSourceDisabledReturnsNull(void** state)
                       .id = "host-evttest-cmd-4"};
 
     // default is disabled
-    cJSON* json = evtLog(evt, "stdout", "hey", 4, 12345, &proc);
+    cJSON* json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
     assert_null(json);
 
     // when enabled, we should get a non-null msg
-    evtSourceEnabledSet(evt, CFG_SRC_CONSOLE, 1);
-    json = evtLog(evt, "stdout", "hey", 4, 12345, &proc);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_CONSOLE, 1);
+    json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
     assert_non_null(json);
     cJSON_Delete(json);
 
     // Set it back to disabled, just to be sure.
-    evtSourceEnabledSet(evt, CFG_SRC_CONSOLE, 0);
-    json = evtLog(evt, "stdout", "hey", 4, 12345, &proc);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_CONSOLE, 0);
+    json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
     assert_null(json);
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 }
 
 static void
-evtLogWithAndWithoutMatchingNameFilter(void** state)
+evtFormatLogWithAndWithoutMatchingNameFilter(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
     assert_non_null(evt);
-    evtSourceEnabledSet(evt, CFG_SRC_FILE, 1);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_FILE, 1);
 
     proc_id_t proc = {.pid = 4848,
                       .ppid = 4847,
@@ -339,30 +339,30 @@ evtLogWithAndWithoutMatchingNameFilter(void** state)
                       .id = "host-evttest-cmd-4"};
 
     // default name filter matches anything with log in the path
-    cJSON* json = evtLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
+    cJSON* json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
     assert_non_null(json);
     cJSON_Delete(json);
 
     // Changing the name filter to ".*my[.]log" shouldn't match.
-    evtNameFilterSet(evt, CFG_SRC_FILE, ".*my[.]log");
-    json = evtLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
+    evtFormatNameFilterSet(evt, CFG_SRC_FILE, ".*my[.]log");
+    json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
     assert_null(json);
 
     // Changing the name filter to "^/var/log/.*[.]log$" should match.
-    evtNameFilterSet(evt, CFG_SRC_FILE, "^/var/log/.*[.]log$");
-    json = evtLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
+    evtFormatNameFilterSet(evt, CFG_SRC_FILE, "^/var/log/.*[.]log$");
+    json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
     assert_non_null(json);
     cJSON_Delete(json);
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 }
 
 static void
-evtLogWithAndWithoutMatchingValueFilter(void** state)
+evtFormatLogWithAndWithoutMatchingValueFilter(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
     assert_non_null(evt);
-    evtSourceEnabledSet(evt, CFG_SRC_FILE, 1);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_FILE, 1);
 
     proc_id_t proc = {.pid = 4848,
                       .ppid = 4847,
@@ -372,22 +372,22 @@ evtLogWithAndWithoutMatchingValueFilter(void** state)
                       .id = "host-evttest-cmd-4"};
 
     // default value filter matches anything
-    cJSON* json = evtLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
+    cJSON* json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
     assert_non_null(json);
     cJSON_Delete(json);
 
     // Changing the value filter to "blah" shouldn't match.
-    evtValueFilterSet(evt, CFG_SRC_FILE, "blah");
-    json = evtLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
+    evtFormatValueFilterSet(evt, CFG_SRC_FILE, "blah");
+    json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
     assert_null(json);
 
     // Changing the value filter to "hey" should match.
-    evtValueFilterSet(evt, CFG_SRC_FILE, "hey");
-    json = evtLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
+    evtFormatValueFilterSet(evt, CFG_SRC_FILE, "hey");
+    json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
     assert_non_null(json);
     cJSON_Delete(json);
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 }
 
 static void
@@ -587,160 +587,160 @@ fmtMetricJsonEscapedValues(void** state)
 }
 
 static void
-evtValueFilterSetAndGet(void** state)
+evtFormatValueFilterSetAndGet(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
 
     /*
      * WARNING: This is hardcoded!! 
      * The default is ".*"
      * When the default changes this needs to change
     */
-    regex_t* default_re = evtValueFilter(evt, CFG_SRC_FILE);
+    regex_t* default_re = evtFormatValueFilter(evt, CFG_SRC_FILE);
     assert_non_null(default_re);
     assert_int_equal(regexec(default_re, "anythingmatches", 0, NULL, 0), 0);
 
     // Make sure it can be changed
-    evtValueFilterSet(evt, CFG_SRC_FILE, "myvalue.*");
-    regex_t* new_re = evtValueFilter(evt, CFG_SRC_FILE);
+    evtFormatValueFilterSet(evt, CFG_SRC_FILE, "myvalue.*");
+    regex_t* new_re = evtFormatValueFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
     assert_int_equal(regexec(new_re, "whatever", 0, NULL, 0), REG_NOMATCH);
     assert_int_equal(regexec(new_re, "myvalue.value", 0, NULL, 0), 0);
 
     // Make sure default is returned for null strings
-    evtValueFilterSet(evt, CFG_SRC_FILE, "");
-    new_re = evtValueFilter(evt, CFG_SRC_FILE);
+    evtFormatValueFilterSet(evt, CFG_SRC_FILE, "");
+    new_re = evtFormatValueFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
     assert_int_equal(regexec(new_re, "anythingmatches", 0, NULL, 0), 0);
 
     // Make sure default is returned for bad regex
-    evtValueFilterSet(evt, CFG_SRC_FILE, "W![T^F?");
-    new_re = evtValueFilter(evt, CFG_SRC_FILE);
+    evtFormatValueFilterSet(evt, CFG_SRC_FILE, "W![T^F?");
+    new_re = evtFormatValueFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
     assert_int_equal(regexec(new_re, "anything", 0, NULL, 0), 0);
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 
     // Get a default filter, even if evt is NULL
-    default_re = evtValueFilter(evt, CFG_SRC_FILE);
+    default_re = evtFormatValueFilter(evt, CFG_SRC_FILE);
     assert_non_null(default_re);
     assert_int_equal(regexec(default_re, "whatever", 0, NULL, 0), 0);
 }
 
 static void
-evtFieldFilterSetAndGet(void** state)
+evtFormatFieldFilterSetAndGet(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
 
     /*
      * WARNING: This is hardcoded!! 
      * The default is ".*host.*"
      * When the default changes this needs to change
     */
-    regex_t* default_re = evtFieldFilter(evt, CFG_SRC_FILE);
+    regex_t* default_re = evtFormatFieldFilter(evt, CFG_SRC_FILE);
     assert_non_null(default_re);
     assert_int_equal(regexec(default_re, "host:", 0, NULL, 0), 0);
 
     // Make sure it can be changed
-    evtFieldFilterSet(evt, CFG_SRC_FILE, "myfield.*");
-    regex_t* new_re = evtFieldFilter(evt, CFG_SRC_FILE);
+    evtFormatFieldFilterSet(evt, CFG_SRC_FILE, "myfield.*");
+    regex_t* new_re = evtFormatFieldFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
     assert_int_equal(regexec(new_re, "whatever", 0, NULL, 0), REG_NOMATCH);
     assert_int_equal(regexec(new_re, "myfield.value", 0, NULL, 0), 0);
 
     // Make sure default is returned for null strings
-    evtFieldFilterSet(evt, CFG_SRC_FILE, "");
-    new_re = evtFieldFilter(evt, CFG_SRC_FILE);
+    evtFormatFieldFilterSet(evt, CFG_SRC_FILE, "");
+    new_re = evtFormatFieldFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
     assert_int_equal(regexec(new_re, "host.myhost", 0, NULL, 0), 0);
 
     // Make sure default is returned for bad regex
-    evtFieldFilterSet(evt, CFG_SRC_FILE, "W![T^F?");
-    new_re = evtFieldFilter(evt, CFG_SRC_FILE);
+    evtFormatFieldFilterSet(evt, CFG_SRC_FILE, "W![T^F?");
+    new_re = evtFormatFieldFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
     assert_int_equal(regexec(new_re, "thishost", 0, NULL, 0), 0);
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 
     // Get a default filter, even if evt is NULL
-    default_re = evtFieldFilter(evt, CFG_SRC_FILE);
+    default_re = evtFormatFieldFilter(evt, CFG_SRC_FILE);
     assert_non_null(default_re);
     assert_int_equal(regexec(default_re, "dohost", 0, NULL, 0), 0);
 }
 
 static void
-evtNameFilterSetAndGet(void** state)
+evtFormatNameFilterSetAndGet(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
 
     /*
      * WARNING: This is hardcoded!! 
      * The default is ".*log.*"
      * When the default changes this needs to change
     */
-    regex_t* default_re = evtNameFilter(evt, CFG_SRC_FILE);
+    regex_t* default_re = evtFormatNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(default_re);
     assert_int_equal(regexec(default_re, "anythingwithlogmatches", 0, NULL, 0), 0);
 
     // Make sure it can be changed
-    evtNameFilterSet(evt, CFG_SRC_FILE, "net.*");
-    regex_t* new_re = evtNameFilter(evt, CFG_SRC_FILE);
+    evtFormatNameFilterSet(evt, CFG_SRC_FILE, "net.*");
+    regex_t* new_re = evtFormatNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
     assert_int_equal(regexec(new_re, "whatever", 0, NULL, 0), REG_NOMATCH);
     assert_int_equal(regexec(new_re, "net.tx", 0, NULL, 0), 0);
 
     // Make sure default is returned for null strings
-    evtNameFilterSet(evt, CFG_SRC_FILE, "");
-    new_re = evtNameFilter(evt, CFG_SRC_FILE);
+    evtFormatNameFilterSet(evt, CFG_SRC_FILE, "");
+    new_re = evtFormatNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
     assert_int_equal(regexec(new_re, "anythingwithlogmatches", 0, NULL, 0), 0);
 
     // Make sure default is returned for bad regex
-    evtNameFilterSet(evt, CFG_SRC_FILE, "W![T^F?");
-    new_re = evtNameFilter(evt, CFG_SRC_FILE);
+    evtFormatNameFilterSet(evt, CFG_SRC_FILE, "W![T^F?");
+    new_re = evtFormatNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
     assert_int_equal(regexec(new_re, "anythingwithlog", 0, NULL, 0), 0);
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 
     // Get a default filter, even if evt is NULL
-    default_re = evtNameFilter(evt, CFG_SRC_FILE);
+    default_re = evtFormatNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(default_re);
     assert_int_equal(regexec(default_re, "logthingsmatch", 0, NULL, 0), 0);
 }
 
 static void
-evtSourceEnabledSetAndGet(void** state)
+evtFormatSourceEnabledSetAndGet(void** state)
 {
-    evt_t* evt = evtCreate();
+    evt_fmt_t* evt = evtFormatCreate();
 
     // Set everything to 1
     int i, j;
     for (i=CFG_SRC_FILE; i<CFG_SRC_MAX+1; i++) {
-        evtSourceEnabledSet(evt, i, 1);
+        evtFormatSourceEnabledSet(evt, i, 1);
         if (i >= CFG_SRC_MAX) {
-             assert_int_equal(evtSourceEnabled(evt, i), DEFAULT_SRC_FILE);
-             assert_int_equal(dbgCountMatchingLines("src/evt.c"), 1);
+             assert_int_equal(evtFormatSourceEnabled(evt, i), DEFAULT_SRC_FILE);
+             assert_int_equal(dbgCountMatchingLines("src/evtformat.c"), 1);
              dbgInit(); // reset dbg for the rest of the tests
         } else {
-             assert_int_equal(dbgCountMatchingLines("src/evt.c"), 0);
-             assert_int_equal(evtSourceEnabled(evt, i), 1);
+             assert_int_equal(dbgCountMatchingLines("src/evtformat.c"), 0);
+             assert_int_equal(evtFormatSourceEnabled(evt, i), 1);
         }
     }
 
     // Clear one at a time to see there aren't side effects
     for (i=CFG_SRC_FILE; i<CFG_SRC_MAX; i++) {
-        evtSourceEnabledSet(evt, i, 0); // Clear it
+        evtFormatSourceEnabledSet(evt, i, 0); // Clear it
         for (j=CFG_SRC_FILE; j<CFG_SRC_MAX; j++) {
             if (i==j)
-                 assert_int_equal(evtSourceEnabled(evt, j), 0);
+                 assert_int_equal(evtFormatSourceEnabled(evt, j), 0);
             else
-                 assert_int_equal(evtSourceEnabled(evt, j), 1);
+                 assert_int_equal(evtFormatSourceEnabled(evt, j), 1);
         }
-        evtSourceEnabledSet(evt, i, 1); // Set it back
+        evtFormatSourceEnabledSet(evt, i, 1); // Set it back
     }
 
-    evtDestroy(&evt);
+    evtFormatDestroy(&evt);
 
     // Test get with NULL evt
     for (i=CFG_SRC_FILE; i<CFG_SRC_MAX; i++) {
@@ -760,7 +760,7 @@ evtSourceEnabledSetAndGet(void** state)
                 break;
         }
 
-        assert_int_equal(evtSourceEnabled(evt, i), expected);
+        assert_int_equal(evtFormatSourceEnabled(evt, i), expected);
     }
 }
 
@@ -770,27 +770,27 @@ main(int argc, char* argv[])
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(evtCreateReturnsValidPtr),
-        cmocka_unit_test(evtDestroyNullMtcDoesntCrash),
-        cmocka_unit_test(evtMetricHappyPath),
-        cmocka_unit_test(evtMetricWithSourceDisabledReturnsNull),
-        cmocka_unit_test(evtMetricWithAndWithoutMatchingNameFilter),
-        cmocka_unit_test(evtMetricWithAndWithoutMatchingFieldFilter),
-        cmocka_unit_test(evtMetricWithAndWithoutMatchingValueFilter),
-        cmocka_unit_test(evtMetricRateLimitReturnsNotice),
-        cmocka_unit_test(evtLogWithSourceDisabledReturnsNull),
-        cmocka_unit_test(evtLogWithAndWithoutMatchingNameFilter),
-        cmocka_unit_test(evtLogWithAndWithoutMatchingValueFilter),
+        cmocka_unit_test(evtFormatCreateReturnsValidPtr),
+        cmocka_unit_test(evtFormatDestroyNullMtcDoesntCrash),
+        cmocka_unit_test(evtFormatMetricHappyPath),
+        cmocka_unit_test(evtFormatMetricWithSourceDisabledReturnsNull),
+        cmocka_unit_test(evtFormatMetricWithAndWithoutMatchingNameFilter),
+        cmocka_unit_test(evtFormatMetricWithAndWithoutMatchingFieldFilter),
+        cmocka_unit_test(evtFormatMetricWithAndWithoutMatchingValueFilter),
+        cmocka_unit_test(evtFormatMetricRateLimitReturnsNotice),
+        cmocka_unit_test(evtFormatLogWithSourceDisabledReturnsNull),
+        cmocka_unit_test(evtFormatLogWithAndWithoutMatchingNameFilter),
+        cmocka_unit_test(evtFormatLogWithAndWithoutMatchingValueFilter),
         cmocka_unit_test(fmtEventJsonValue),
         cmocka_unit_test(fmtEventJsonWithEmbeddedNulls),
         cmocka_unit_test(fmtMetricJsonNoFields),
         cmocka_unit_test(fmtMetricJsonWFields),
         cmocka_unit_test(fmtMetricJsonWFilteredFields),
         cmocka_unit_test(fmtMetricJsonEscapedValues),
-        cmocka_unit_test(evtSourceEnabledSetAndGet),
-        cmocka_unit_test(evtValueFilterSetAndGet),
-        cmocka_unit_test(evtFieldFilterSetAndGet),
-        cmocka_unit_test(evtNameFilterSetAndGet),
+        cmocka_unit_test(evtFormatSourceEnabledSetAndGet),
+        cmocka_unit_test(evtFormatValueFilterSetAndGet),
+        cmocka_unit_test(evtFormatFieldFilterSetAndGet),
+        cmocka_unit_test(evtFormatNameFilterSetAndGet),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

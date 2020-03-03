@@ -134,18 +134,3 @@ err:
     if (json_root) cJSON_Delete(json_root);
     return NULL;
 }
-
-cJSON *
-msgEvtMetric(evt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc)
-{
-    return evtMetric(evt, metric, uid, proc);
-}
-
-cJSON *
-msgEvtLog(evt_t *evt, const char *path, const void *buf, size_t len,
-          uint64_t uid, proc_id_t *proc)
-{
-    return evtLog(evt, path, buf, len, uid, proc);
-
-}
-

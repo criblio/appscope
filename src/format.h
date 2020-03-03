@@ -53,7 +53,7 @@ typedef struct event_format {
     proc_id_t* proc;
     unsigned long long uid;
     cJSON *data;
-    cfg_evt_t sourcetype;
+    watch_t sourcetype;
 } event_format_t;
 
 typedef struct _format_t format_t;

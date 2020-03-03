@@ -5,7 +5,7 @@
 #include "ctl.h"
 #include "log.h"
 #include "mtc.h"
-#include "evt.h"
+#include "evtformat.h"
 
 // cfgPath returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
@@ -29,7 +29,7 @@ void cfgProcessCommands(config_t* cfg, FILE* file);
 
 log_t* initLog(config_t* cfg);
 mtc_t* initMtc(config_t* cfg);
-evt_t* initEvt(config_t* cfg);
+evt_fmt_t* initEvtFormat(config_t* cfg);
 ctl_t* initCtl(config_t* cfg);
 
 #endif // __CFGUTILS_H__

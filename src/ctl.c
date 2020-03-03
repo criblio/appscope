@@ -372,7 +372,7 @@ out:
 struct _ctl_t
 {
     transport_t* transport;
-    evt_t* evt;
+    evt_fmt_t* evt;
     cbuf_handle_t evbuf;
 };
 
@@ -403,7 +403,7 @@ ctlDestroy(ctl_t** ctl)
     cbufFree((*ctl)->evbuf);
 
     transportDestroy(&(*ctl)->transport);
-    evtDestroy(&(*ctl)->evt);
+    evtFormatDestroy(&(*ctl)->evt);
 
     free(*ctl);
     *ctl = NULL;
@@ -467,7 +467,7 @@ ctlSendEvent(ctl_t* ctl, event_t* e, uint64_t uid, proc_id_t* proc)
     if (!ctl || !e || !proc) return -1;
 
     // get a cJSON object for the given event
-    cJSON *json = evtMetric(ctl->evt, e, uid, proc);
+    cJSON *json = evtFormatMetric(ctl->evt, e, uid, proc);
 
     // send it
     return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
@@ -479,7 +479,7 @@ ctlSendLog(ctl_t* ctl, const char* path, const void* buf, size_t count, uint64_t
     if (!ctl || !path || !buf || !proc) return -1;
 
     // get a cJSON object for the given log msg
-    cJSON *json = evtLog(ctl->evt, path, buf, count, uid, proc);
+    cJSON *json = evtFormatLog(ctl->evt, path, buf, count, uid, proc);
 
     // send it
     return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
@@ -562,12 +562,12 @@ ctlTransportSet(ctl_t* ctl, transport_t* transport)
 }
 
 void
-ctlEvtSet(ctl_t* ctl, evt_t* evt)
+ctlEvtSet(ctl_t* ctl, evt_fmt_t* evt)
 {
     if (!ctl) return;
 
     // Don't leak if ctlEvtSet is called repeatedly
     // TODO: need to ensure that previous object is no longer in use
-    // evtDestroy(&ctl->evt);
+    // evtFormatDestroy(&ctl->evt);
     ctl->evt = evt;
 }

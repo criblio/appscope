@@ -461,28 +461,28 @@ ctlPostMsg(ctl_t *ctl, cJSON *body, upload_type_t type, request_t *req, bool now
     return rc;
 }
 
-void
-ctlSendMetric(ctl_t* ctl, event_t* e, uint64_t uid, proc_id_t* proc)
+int
+ctlSendEvent(ctl_t* ctl, event_t* e, uint64_t uid, proc_id_t* proc)
 {
-    if (!ctl || !e || !proc) return;
+    if (!ctl || !e || !proc) return -1;
 
-    // get a cJSON object for the given metric
+    // get a cJSON object for the given event
     cJSON *json = evtMetric(ctl->evt, e, uid, proc);
 
     // send it
-    ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
+    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
 }
 
-void
+int
 ctlSendLog(ctl_t* ctl, const char* path, const void* buf, size_t count, uint64_t uid, proc_id_t* proc)
 {
-    if (!ctl || !path || !buf || !proc) return;
+    if (!ctl || !path || !buf || !proc) return -1;
 
     // get a cJSON object for the given log msg
     cJSON *json = evtLog(ctl->evt, path, buf, count, uid, proc);
 
     // send it
-    ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
+    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
 }
 
 static void

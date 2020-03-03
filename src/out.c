@@ -47,7 +47,7 @@ outSend(out_t* out, const char* msg)
 }
 
 int
-outSendEvent(out_t* out, event_t* e)
+outSendMetric(out_t* out, event_t* e)
 {
     if (!out || !e) return -1;
 

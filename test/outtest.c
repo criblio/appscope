@@ -97,17 +97,17 @@ outFormatSetAndOutSendEvent(void** state)
     format_t* f = fmtCreate(CFG_METRIC_STATSD);
     outFormatSet(out, f);
 
-    // Test that format is set by testing side effects of outSendEvent
+    // Test that format is set by testing side effects of outSendMetric
     // affecting the file at file_path when connected to format.
     long file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(outSendEvent(out, &e), 0);
+    assert_int_equal(outSendMetric(out, &e), 0);
     long file_pos_after = fileEndPosition(file_path);
     assert_int_not_equal(file_pos_before, file_pos_after);
 
     // Test that format is cleared by seeing no side effects.
     outFormatSet(out, NULL);
     file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(outSendEvent(out, &e), -1);
+    assert_int_equal(outSendMetric(out, &e), -1);
     file_pos_after = fileEndPosition(file_path);
     assert_int_equal(file_pos_before, file_pos_after);
 

@@ -83,8 +83,8 @@ void                ctlSendMsg(ctl_t *, char *);
 // Messaging protocol send
 int                 ctlPostMsg(ctl_t *ctl, cJSON *body, upload_type_t type,
                         request_t *req, bool now);
-void                ctlSendMetric(ctl_t *, event_t *, uint64_t, proc_id_t*);
-void                ctlSendLog(ctl_t *, const char* path, const void* buf,
+int                 ctlSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t*);
+int                 ctlSendLog(ctl_t *, const char* path, const void* buf,
                         size_t size, uint64_t uid, proc_id_t* proc);
 void                ctlFlush(ctl_t *);
 

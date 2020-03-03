@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 
 #include "atomic.h"
+#include "com.h"
 #include "dbg.h"
 #include "format.h"
 #include "os.h"
@@ -57,10 +58,10 @@ setReportingInterval(int seconds)
 static void
 sendEvent(out_t* out, event_t* e)
 {
-    ctlSendMetric(g_ctl, e, getTime(), &g_proc);
+    cmdSendEvent(g_ctl, e, getTime(), &g_proc);
 
-    if (outSendEvent(out, e) == -1) {
-        scopeLog("ERROR: doProcMetric:CPU:outSendEvent", -1, CFG_LOG_ERROR);
+    if (cmdSendMetric(out, e) == -1) {
+        scopeLog("ERROR: doProcMetric:CPU:cmdSendMetric", -1, CFG_LOG_ERROR);
     }
 }
 
@@ -77,7 +78,7 @@ sendProcessStartMetric()
         FIELDEND
     };
     event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
-    outSendEvent(g_out, &evt);
+    cmdSendMetric(g_out, &evt);
     if (urlEncodedCmd) free(urlEncodedCmd);
 }
 
@@ -131,15 +132,15 @@ doErrorMetric(metric_t type, control_type_t source,
 
         event_t netErrMetric = INT_EVENT("net.error", *value, DELTA, fields);
 
-        ctlSendMetric(g_ctl, &netErrMetric, getTime(), &g_proc);
+        cmdSendEvent(g_ctl, &netErrMetric, getTime(), &g_proc);
 
         // Only report if enabled
         if ((g_summary.net.error) && (source == EVENT_BASED)) {
             return;
         }
 
-        if (outSendEvent(g_out, &netErrMetric)) {
-            scopeLog("ERROR: doErrorMetric:NET:outSendEvent", -1, CFG_LOG_ERROR);
+        if (cmdSendMetric(g_out, &netErrMetric)) {
+            scopeLog("ERROR: doErrorMetric:NET:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
 
         atomicSwapU64(value, 0);
@@ -213,15 +214,15 @@ doErrorMetric(metric_t type, control_type_t source,
 
         event_t fsErrMetric = INT_EVENT(metric, *value, DELTA, fields);
 
-        ctlSendMetric(g_ctl, &fsErrMetric, getTime(), &g_proc);
+        cmdSendEvent(g_ctl, &fsErrMetric, getTime(), &g_proc);
 
         // Only report if enabled
         if (*summarize && (source == EVENT_BASED)) {
             return;
         }
 
-        if (outSendEvent(g_out, &fsErrMetric)) {
-            scopeLog("ERROR: doErrorMetric:FS_ERR:outSendEvent", -1, CFG_LOG_ERROR);
+        if (cmdSendMetric(g_out, &fsErrMetric)) {
+            scopeLog("ERROR: doErrorMetric:FS_ERR:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
 
         atomicSwapU64(value, 0);
@@ -258,15 +259,15 @@ doDNSMetricName(metric_t type, const char *domain, uint64_t duration)
 
         event_t dnsMetric = INT_EVENT("net.dns", g_ctrs.numDNS, DELTA, fields);
 
-        ctlSendMetric(g_ctl, &dnsMetric, getTime(), &g_proc);
+        cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
 
         // Only report if enabled
         if (g_summary.net.dns) {
             return;
         }
 
-        if (outSendEvent(g_out, &dnsMetric)) {
-            scopeLog("ERROR: doDNSMetricName:DNS:outSendEvent", -1, CFG_LOG_ERROR);
+        if (cmdSendMetric(g_out, &dnsMetric)) {
+            scopeLog("ERROR: doDNSMetricName:DNS:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
         atomicSwapU64(&g_ctrs.numDNS, 0);
         break;
@@ -299,15 +300,15 @@ doDNSMetricName(metric_t type, const char *domain, uint64_t duration)
 
         event_t dnsDurMetric = INT_EVENT("net.dns.duration", dur, DELTA_MS, fields);
 
-        ctlSendMetric(g_ctl, &dnsDurMetric, getTime(), &g_proc);
+        cmdSendEvent(g_ctl, &dnsDurMetric, getTime(), &g_proc);
 
         // Only report if enabled
         if (g_summary.net.dns) {
             return;
         }
 
-        if (outSendEvent(g_out, &dnsDurMetric)) {
-            scopeLog("ERROR: doDNSMetricName:DNS_DURATION:outSendEvent", -1, CFG_LOG_ERROR);
+        if (cmdSendMetric(g_out, &dnsDurMetric)) {
+            scopeLog("ERROR: doDNSMetricName:DNS_DURATION:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
         atomicSwapU64(&g_ctrs.dnsDurationNum, 0);
         atomicSwapU64(&g_ctrs.dnsDurationTotal, 0);
@@ -439,14 +440,14 @@ doStatMetric(const char *op, const char *pathname)
     };
 
     event_t e = INT_EVENT("fs.op.stat", 1, DELTA, fields);
-    ctlSendMetric(g_ctl, &e, getTime(), &g_proc);
+    cmdSendEvent(g_ctl, &e, getTime(), &g_proc);
 
     // Only report if enabled
     if (g_summary.fs.stat) {
         return;
     }
 
-    if (outSendEvent(g_out, &e)) {
+    if (cmdSendMetric(g_out, &e)) {
         scopeLog("doStatMetric", -1, CFG_LOG_ERROR);
     }
 
@@ -497,15 +498,15 @@ doFSMetric(metric_t type, int fd, control_type_t source,
             FIELDEND
         };
         event_t e = INT_EVENT("fs.duration", d, HISTOGRAM, fields);
-        ctlSendMetric(g_ctl, &e, g_fsinfo[fd].uid, &g_proc);
+        cmdSendEvent(g_ctl, &e, g_fsinfo[fd].uid, &g_proc);
 
         // Only report if enabled
         if ((g_summary.fs.read_write) && (source == EVENT_BASED)) {
             return;
         }
 
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doFSMetric:FS_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
+        if (cmdSendMetric(g_out, &e)) {
+            scopeLog("ERROR: doFSMetric:FS_DURATION:cmdSendMetric", fd, CFG_LOG_ERROR);
         }
 
         // Reset the info if we tried to report
@@ -530,14 +531,14 @@ doFSMetric(metric_t type, int fd, control_type_t source,
                 numops = &g_fsinfo[fd].numRead;
                 sizebytes = &g_fsinfo[fd].readBytes;
                 global_counter = &g_ctrs.readBytes;
-                err_str = "ERROR: doFSMetric:FS_READ:outSendEvent";
+                err_str = "ERROR: doFSMetric:FS_READ:cmdSendMetric";
                 break;
             case FS_WRITE:
                 metric = "fs.write";
                 numops = &g_fsinfo[fd].numWrite;
                 sizebytes = &g_fsinfo[fd].writeBytes;
                 global_counter = &g_ctrs.writeBytes;
-                err_str = "ERROR: doFSMetric:FS_WRITE:outSendEvent";
+                err_str = "ERROR: doFSMetric:FS_WRITE:cmdSendMetric";
                 break;
             default:
                 DBG(NULL);
@@ -572,7 +573,7 @@ doFSMetric(metric_t type, int fd, control_type_t source,
 
         event_t rwMetric = INT_EVENT(metric, *sizebytes, HISTOGRAM, fields);
 
-        ctlSendMetric(g_ctl, &rwMetric, g_fsinfo[fd].uid, &g_proc);
+        cmdSendEvent(g_ctl, &rwMetric, g_fsinfo[fd].uid, &g_proc);
 
         // Only report if enabled
         if ((g_summary.fs.read_write) && (source == EVENT_BASED)) {
@@ -580,7 +581,7 @@ doFSMetric(metric_t type, int fd, control_type_t source,
         }
 
 
-        if (outSendEvent(g_out, &rwMetric)) {
+        if (cmdSendMetric(g_out, &rwMetric)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
 
@@ -606,21 +607,21 @@ doFSMetric(metric_t type, int fd, control_type_t source,
                 numops = &g_fsinfo[fd].numOpen;
                 global_counter = &g_ctrs.numOpen;
                 summarize = &g_summary.fs.open_close;
-                err_str = "ERROR: doFSMetric:FS_OPEN:outSendEvent";
+                err_str = "ERROR: doFSMetric:FS_OPEN:cmdSendMetric";
                 break;
             case FS_CLOSE:
                 metric = "fs.op.close";
                 numops = &g_fsinfo[fd].numClose;
                 global_counter = &g_ctrs.numClose;
                 summarize = &g_summary.fs.open_close;
-                err_str = "ERROR: doFSMetric:FS_CLOSE:outSendEvent";
+                err_str = "ERROR: doFSMetric:FS_CLOSE:cmdSendMetric";
                 break;
             case FS_SEEK:
                 metric = "fs.op.seek";
                 numops = &g_fsinfo[fd].numSeek;
                 global_counter = &g_ctrs.numSeek;
                 summarize = &g_summary.fs.seek;
-                err_str = "ERROR: doFSMetric:FS_SEEK:outSendEvent";
+                err_str = "ERROR: doFSMetric:FS_SEEK:cmdSendMetric";
                 break;
             default:
                 DBG(NULL);
@@ -648,14 +649,14 @@ doFSMetric(metric_t type, int fd, control_type_t source,
         };
 
         event_t e = INT_EVENT(metric, *numops, DELTA, fields);
-        ctlSendMetric(g_ctl, &e, g_fsinfo[fd].uid, &g_proc);
+        cmdSendEvent(g_ctl, &e, g_fsinfo[fd].uid, &g_proc);
 
         // Only report if enabled
         if ((source == EVENT_BASED) && *summarize) {
             return;
         }
 
-        if (outSendEvent(g_out, &e)) {
+        if (cmdSendMetric(g_out, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
 
@@ -682,78 +683,78 @@ doTotal(metric_t type)
         case TOT_READ:
             metric = "fs.read";
             value = &g_ctrs.readBytes;
-            err_str = "ERROR: doTotal:TOT_READ:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_READ:cmdSendMetric";
             break;
         case TOT_WRITE:
             metric = "fs.write";
             value = &g_ctrs.writeBytes;
-            err_str = "ERROR: doTotal:TOT_WRITE:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_WRITE:cmdSendMetric";
             break;
         case TOT_RX:
             metric = "net.rx";
             value = &g_ctrs.netrxBytes;
-            err_str = "ERROR: doTotal:TOT_RX:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_RX:cmdSendMetric";
             break;
         case TOT_TX:
             metric = "net.tx";
             value = &g_ctrs.nettxBytes;
-            err_str = "ERROR: doTotal:TOT_TX:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_TX:cmdSendMetric";
             break;
         case TOT_SEEK:
             metric = "fs.seek";
             value = &g_ctrs.numSeek;
-            err_str = "ERROR: doTotal:TOT_SEEK:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_SEEK:cmdSendMetric";
             units = "operation";
             break;
         case TOT_STAT:
             metric = "fs.stat";
             value = &g_ctrs.numStat;
-            err_str = "ERROR: doTotal:TOT_STAT:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_STAT:cmdSendMetric";
             units = "operation";
             break;
         case TOT_OPEN:
             metric = "fs.open";
             value = &g_ctrs.numOpen;
-            err_str = "ERROR: doTotal:TOT_OPEN:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_OPEN:cmdSendMetric";
             units = "operation";
             break;
         case TOT_CLOSE:
             metric = "fs.close";
             value = &g_ctrs.numClose;
-            err_str = "ERROR: doTotal:TOT_CLOSE:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_CLOSE:cmdSendMetric";
             units = "operation";
             break;
         case TOT_DNS:
             metric = "net.dns";
             value = &g_ctrs.numDNS;
-            err_str = "ERROR: doTotal:TOT_DNS:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_DNS:cmdSendMetric";
             units = "operation";
             break;
         case TOT_PORTS:
             metric = "net.port";
             value = &g_ctrs.openPorts;
-            err_str = "ERROR: doTotal:TOT_PORTS:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_PORTS:cmdSendMetric";
             units = "instance";
             aggregation_type = CURRENT;
             break;
         case TOT_TCP_CONN:
             metric = "net.tcp";
             value = &g_ctrs.netConnectionsTcp;
-            err_str = "ERROR: doTotal:TOT_TCP_CONN:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_TCP_CONN:cmdSendMetric";
             units = "connection";
             aggregation_type = CURRENT;
             break;
         case TOT_UDP_CONN:
             metric = "net.udp";
             value = &g_ctrs.netConnectionsUdp;
-            err_str = "ERROR: doTotal:TOT_UDP_CONN:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_UDP_CONN:cmdSendMetric";
             units = "connection";
             aggregation_type = CURRENT;
             break;
         case TOT_OTHER_CONN:
             metric = "net.other";
             value = &g_ctrs.netConnectionsOther;
-            err_str = "ERROR: doTotal:TOT_OTHER_CONN:outSendEvent";
+            err_str = "ERROR: doTotal:TOT_OTHER_CONN:cmdSendMetric";
             units = "connection";
             aggregation_type = CURRENT;
             break;
@@ -774,7 +775,7 @@ doTotal(metric_t type)
             FIELDEND
     };
     event_t e = INT_EVENT(metric, *value, aggregation_type, fields);
-    if (outSendEvent(g_out, &e)) {
+    if (cmdSendMetric(g_out, &e)) {
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
@@ -800,7 +801,7 @@ doTotalDuration(metric_t type)
             aggregation_type = HISTOGRAM;
             units = "microsecond";
             factor = 1000;
-            err_str = "ERROR: doTotalDuration:TOT_FS_DURATION:outSendEvent";
+            err_str = "ERROR: doTotalDuration:TOT_FS_DURATION:cmdSendMetric";
             break;
         case TOT_NET_DURATION:
             metric = "net.conn_duration";
@@ -809,7 +810,7 @@ doTotalDuration(metric_t type)
             aggregation_type = DELTA_MS;
             units = "millisecond";
             factor = 1000000;
-            err_str = "ERROR: doTotalDuration:TOT_NET_DURATION:outSendEvent";
+            err_str = "ERROR: doTotalDuration:TOT_NET_DURATION:cmdSendMetric";
             break;
         case TOT_DNS_DURATION:
             metric = "net.dns.duration";
@@ -818,7 +819,7 @@ doTotalDuration(metric_t type)
             aggregation_type = DELTA_MS;
             units = "millisecond";
             factor = 1000000;
-            err_str = "ERROR: doTotalDuration:TOT_DNS_DURATION:outSendEvent";
+            err_str = "ERROR: doTotalDuration:TOT_DNS_DURATION:cmdSendMetric";
             break;
         default:
             DBG(NULL);
@@ -844,7 +845,7 @@ doTotalDuration(metric_t type)
             FIELDEND
     };
     event_t e = INT_EVENT(metric, d, aggregation_type, fields);
-    if (outSendEvent(g_out, &e)) {
+    if (cmdSendMetric(g_out, &e)) {
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
@@ -932,7 +933,7 @@ doNetMetric(metric_t type, int fd, control_type_t source, ssize_t size)
             metric = "net.port";
             value = &g_ctrs.openPorts;
             units = "instance";
-            err_str = "ERROR: doNetMetric:OPEN_PORTS:outSendEvent";
+            err_str = "ERROR: doNetMetric:OPEN_PORTS:cmdSendMetric";
             break;
         case NET_CONNECTIONS:
             if (g_netinfo[fd].type == SOCK_STREAM) {
@@ -946,7 +947,7 @@ doNetMetric(metric_t type, int fd, control_type_t source, ssize_t size)
                 value = &g_ctrs.netConnectionsOther;
             }
             units = "connection";
-            err_str = "ERROR: doNetMetric:NET_CONNECTIONS:outSendEvent";
+            err_str = "ERROR: doNetMetric:NET_CONNECTIONS:cmdSendMetric";
             break;
         default:
             DBG(NULL);
@@ -974,14 +975,14 @@ doNetMetric(metric_t type, int fd, control_type_t source, ssize_t size)
             FIELDEND
         };
         event_t e = INT_EVENT(metric, *value, CURRENT, fields);
-        ctlSendMetric(g_ctl, &e, g_netinfo[fd].uid, &g_proc);
+        cmdSendEvent(g_ctl, &e, g_netinfo[fd].uid, &g_proc);
 
         // Only report if enabled
         if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
             return;
         }
 
-        if (outSendEvent(g_out, &e)) {
+        if (cmdSendMetric(g_out, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
 
@@ -1030,15 +1031,15 @@ doNetMetric(metric_t type, int fd, control_type_t source, ssize_t size)
             FIELDEND
         };
         event_t e = INT_EVENT("net.conn_duration", d, DELTA_MS, fields);
-        ctlSendMetric(g_ctl, &e, g_netinfo[fd].uid, &g_proc);
+        cmdSendEvent(g_ctl, &e, g_netinfo[fd].uid, &g_proc);
 
         // Only report if enabled
         if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
             return;
         }
 
-        if (outSendEvent(g_out, &e)) {
-            scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:outSendEvent", fd, CFG_LOG_ERROR);
+        if (cmdSendMetric(g_out, &e)) {
+            scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:cmdSendMetric", fd, CFG_LOG_ERROR);
         }
 
         atomicSwapU64(&g_netinfo[fd].numDuration, 0);
@@ -1155,14 +1156,14 @@ doNetMetric(metric_t type, int fd, control_type_t source, ssize_t size)
             memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
         }
 
-        ctlSendMetric(g_ctl, &rxMetric, g_netinfo[fd].uid, &g_proc);
+        cmdSendEvent(g_ctl, &rxMetric, g_netinfo[fd].uid, &g_proc);
 
         if ((g_summary.net.rx_tx) && (source == EVENT_BASED)) {
             return;
         }
 
-        if (outSendEvent(g_out, &rxMetric)) {
-            scopeLog("ERROR: doNetMetric:NETRX:outSendEvent", -1, CFG_LOG_ERROR);
+        if (cmdSendMetric(g_out, &rxMetric)) {
+            scopeLog("ERROR: doNetMetric:NETRX:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
 
         // Reset the info if we tried to report
@@ -1279,14 +1280,14 @@ doNetMetric(metric_t type, int fd, control_type_t source, ssize_t size)
             memmove(&txMetric, &txNetMetric, sizeof(event_t));
         }
 
-        ctlSendMetric(g_ctl, &txMetric, g_netinfo[fd].uid, &g_proc);
+        cmdSendEvent(g_ctl, &txMetric, g_netinfo[fd].uid, &g_proc);
 
         if ((g_summary.net.rx_tx) && (source == EVENT_BASED)) {
             return;
         }
 
-        if (outSendEvent(g_out, &txMetric)) {
-            scopeLog("ERROR: doNetMetric:NETTX:outSendEvent", -1, CFG_LOG_ERROR);
+        if (cmdSendMetric(g_out, &txMetric)) {
+            scopeLog("ERROR: doNetMetric:NETTX:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
 
         // Reset the info if we tried to report

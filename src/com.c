@@ -1,5 +1,17 @@
 #include "com.h"
 
+int
+cmdSendEvent(ctl_t *ctl, event_t* e, uint64_t time, proc_id_t* proc)
+{
+    return ctlSendEvent(ctl, e, time, proc);
+}
+
+int
+cmdSendMetric(out_t *out, event_t* e)
+{
+    return outSendMetric(out, e);
+}
+
 
 int
 cmdPostEvtMsg(ctl_t *ctl, cJSON *json)

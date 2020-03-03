@@ -56,11 +56,11 @@ setReportingInterval(int seconds)
 }
 
 static void
-sendEvent(out_t* out, event_t* e)
+sendEvent(mtc_t* mtc, event_t* e)
 {
     cmdSendEvent(g_ctl, e, getTime(), &g_proc);
 
-    if (cmdSendMetric(out, e) == -1) {
+    if (cmdSendMetric(mtc, e) == -1) {
         scopeLog("ERROR: doProcMetric:CPU:cmdSendMetric", -1, CFG_LOG_ERROR);
     }
 }
@@ -78,7 +78,7 @@ sendProcessStartMetric()
         FIELDEND
     };
     event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
-    cmdSendMetric(g_out, &evt);
+    cmdSendMetric(g_mtc, &evt);
     if (urlEncodedCmd) free(urlEncodedCmd);
 }
 
@@ -139,7 +139,7 @@ doErrorMetric(metric_t type, control_type_t source,
             return;
         }
 
-        if (cmdSendMetric(g_out, &netErrMetric)) {
+        if (cmdSendMetric(g_mtc, &netErrMetric)) {
             scopeLog("ERROR: doErrorMetric:NET:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
 
@@ -221,7 +221,7 @@ doErrorMetric(metric_t type, control_type_t source,
             return;
         }
 
-        if (cmdSendMetric(g_out, &fsErrMetric)) {
+        if (cmdSendMetric(g_mtc, &fsErrMetric)) {
             scopeLog("ERROR: doErrorMetric:FS_ERR:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
 
@@ -266,7 +266,7 @@ doDNSMetricName(metric_t type, const char *domain, uint64_t duration)
             return;
         }
 
-        if (cmdSendMetric(g_out, &dnsMetric)) {
+        if (cmdSendMetric(g_mtc, &dnsMetric)) {
             scopeLog("ERROR: doDNSMetricName:DNS:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
         atomicSwapU64(&g_ctrs.numDNS, 0);
@@ -307,7 +307,7 @@ doDNSMetricName(metric_t type, const char *domain, uint64_t duration)
             return;
         }
 
-        if (cmdSendMetric(g_out, &dnsDurMetric)) {
+        if (cmdSendMetric(g_mtc, &dnsDurMetric)) {
             scopeLog("ERROR: doDNSMetricName:DNS_DURATION:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
         atomicSwapU64(&g_ctrs.dnsDurationNum, 0);
@@ -336,7 +336,7 @@ doProcMetric(metric_t type, long long measurement)
                 FIELDEND
             };
             event_t e = INT_EVENT("proc.cpu", measurement, DELTA, fields);
-            sendEvent(g_out, &e);
+            sendEvent(g_mtc, &e);
         }
 
         // Avoid div by zero
@@ -357,7 +357,7 @@ doProcMetric(metric_t type, long long measurement)
             // TBD: switch from using the configured to a measured interval
             double val = measurement * 100.0 / (interval*1000000.0);
             event_t e = FLT_EVENT("proc.cpu_perc", val, CURRENT, fields);
-            sendEvent(g_out, &e);
+            sendEvent(g_mtc, &e);
         }
         break;
     }
@@ -372,7 +372,7 @@ doProcMetric(metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = INT_EVENT("proc.mem", measurement, DELTA, fields);
-        sendEvent(g_out, &e);
+        sendEvent(g_mtc, &e);
         break;
     }
 
@@ -386,7 +386,7 @@ doProcMetric(metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = INT_EVENT("proc.thread", measurement, CURRENT, fields);
-        sendEvent(g_out, &e);
+        sendEvent(g_mtc, &e);
         break;
     }
 
@@ -400,7 +400,7 @@ doProcMetric(metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = INT_EVENT("proc.fd", measurement, CURRENT, fields);
-        sendEvent(g_out, &e);
+        sendEvent(g_mtc, &e);
         break;
     }
 
@@ -414,7 +414,7 @@ doProcMetric(metric_t type, long long measurement)
             FIELDEND
         };
         event_t e = INT_EVENT("proc.child", measurement, CURRENT, fields);
-        sendEvent(g_out, &e);
+        sendEvent(g_mtc, &e);
         break;
     }
 
@@ -447,7 +447,7 @@ doStatMetric(const char *op, const char *pathname)
         return;
     }
 
-    if (cmdSendMetric(g_out, &e)) {
+    if (cmdSendMetric(g_mtc, &e)) {
         scopeLog("doStatMetric", -1, CFG_LOG_ERROR);
     }
 
@@ -505,7 +505,7 @@ doFSMetric(metric_t type, int fd, control_type_t source,
             return;
         }
 
-        if (cmdSendMetric(g_out, &e)) {
+        if (cmdSendMetric(g_mtc, &e)) {
             scopeLog("ERROR: doFSMetric:FS_DURATION:cmdSendMetric", fd, CFG_LOG_ERROR);
         }
 
@@ -581,7 +581,7 @@ doFSMetric(metric_t type, int fd, control_type_t source,
         }
 
 
-        if (cmdSendMetric(g_out, &rwMetric)) {
+        if (cmdSendMetric(g_mtc, &rwMetric)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
 
@@ -656,7 +656,7 @@ doFSMetric(metric_t type, int fd, control_type_t source,
             return;
         }
 
-        if (cmdSendMetric(g_out, &e)) {
+        if (cmdSendMetric(g_mtc, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
 
@@ -775,7 +775,7 @@ doTotal(metric_t type)
             FIELDEND
     };
     event_t e = INT_EVENT(metric, *value, aggregation_type, fields);
-    if (cmdSendMetric(g_out, &e)) {
+    if (cmdSendMetric(g_mtc, &e)) {
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
@@ -845,7 +845,7 @@ doTotalDuration(metric_t type)
             FIELDEND
     };
     event_t e = INT_EVENT(metric, d, aggregation_type, fields);
-    if (cmdSendMetric(g_out, &e)) {
+    if (cmdSendMetric(g_mtc, &e)) {
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
@@ -982,7 +982,7 @@ doNetMetric(metric_t type, int fd, control_type_t source, ssize_t size)
             return;
         }
 
-        if (cmdSendMetric(g_out, &e)) {
+        if (cmdSendMetric(g_mtc, &e)) {
             scopeLog(err_str, fd, CFG_LOG_ERROR);
         }
 
@@ -1038,7 +1038,7 @@ doNetMetric(metric_t type, int fd, control_type_t source, ssize_t size)
             return;
         }
 
-        if (cmdSendMetric(g_out, &e)) {
+        if (cmdSendMetric(g_mtc, &e)) {
             scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:cmdSendMetric", fd, CFG_LOG_ERROR);
         }
 
@@ -1162,7 +1162,7 @@ doNetMetric(metric_t type, int fd, control_type_t source, ssize_t size)
             return;
         }
 
-        if (cmdSendMetric(g_out, &rxMetric)) {
+        if (cmdSendMetric(g_mtc, &rxMetric)) {
             scopeLog("ERROR: doNetMetric:NETRX:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
 
@@ -1286,7 +1286,7 @@ doNetMetric(metric_t type, int fd, control_type_t source, ssize_t size)
             return;
         }
 
-        if (cmdSendMetric(g_out, &txMetric)) {
+        if (cmdSendMetric(g_mtc, &txMetric)) {
             scopeLog("ERROR: doNetMetric:NETTX:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
 

@@ -10,7 +10,7 @@
    that close all file descriptors during initialization, probably to
    avoid leaking file descritors during subsequent fork/exec sequences.
 
-   So, it's possible that the file descriptors for  g_out, g_log, and
+   So, it's possible that the file descriptors for  g_mtc, g_log, and
    g_ctl can get closed out from under the libscope.so library.
 
    This was written to help verify that we correctly detect that our

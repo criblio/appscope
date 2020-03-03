@@ -7,7 +7,7 @@
 
 #include "ctl.h"
 #include "evt.h"
-#include "out.h"
+#include "mtc.h"
 
 typedef enum {
     LOCAL,
@@ -67,7 +67,7 @@ typedef enum {
 
 
 // Interfaces
-extern out_t* g_out;
+extern mtc_t* g_mtc;
 extern ctl_t* g_ctl;
 
 

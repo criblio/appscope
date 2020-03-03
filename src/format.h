@@ -59,13 +59,13 @@ typedef struct event_format {
 typedef struct _format_t format_t;
 
 // Constructors Destructors
-format_t*           fmtCreate(cfg_out_format_t);
+format_t*           fmtCreate(cfg_mtc_format_t);
 void                fmtDestroy(format_t**);
 
 // Accessors
 const char*         fmtStatsDPrefix(format_t*);
 unsigned            fmtStatsDMaxLen(format_t*);
-unsigned            fmtOutVerbosity(format_t*);
+unsigned            fmtMtcVerbosity(format_t*);
 custom_tag_t**      fmtCustomTags(format_t*);
 
 // This function returns a pointer to a malloc()'d buffer.
@@ -75,7 +75,7 @@ char*               fmtStatsDString(format_t*, event_t*, regex_t*);
 // Setters
 void                fmtStatsDPrefixSet(format_t*, const char*);
 void                fmtStatsDMaxLenSet(format_t*, unsigned);
-void                fmtOutVerbositySet(format_t*, unsigned);
+void                fmtMtcVerbositySet(format_t*, unsigned);
 void                fmtCustomTagsSet(format_t*, custom_tag_t**);
 
 // Helper functions - returns a pointer to a malloc'd buffer.

@@ -50,8 +50,8 @@ testFSDuration(void** state)
     char buf[1024];
     char* cpath = cfgPath();
     config_t* cfg = cfgRead(cpath);
-    const char *path = cfgTransportPath(cfg, CFG_OUT);
-    assert_int_equal(cfgOutVerbosity(cfg), CFG_MAX_VERBOSITY);
+    const char *path = cfgTransportPath(cfg, CFG_MTC);
+    assert_int_equal(cfgMtcVerbosity(cfg), CFG_MAX_VERBOSITY);
    
     // Start the duration timer with a read
     fd = open("./scope.sh", O_RDONLY);
@@ -109,8 +109,8 @@ testConnDuration(void** state)
     char *buf;
     char* cpath = cfgPath();
     config_t* cfg = cfgRead(cpath);
-    const char *path = cfgTransportPath(cfg, CFG_OUT);
-    assert_int_equal(cfgOutVerbosity(cfg), CFG_MAX_VERBOSITY);
+    const char *path = cfgTransportPath(cfg, CFG_MTC);
+    assert_int_equal(cfgMtcVerbosity(cfg), CFG_MAX_VERBOSITY);
 
     saddr.sin_family = AF_INET;
     saddr.sin_port = htons(PORT1);

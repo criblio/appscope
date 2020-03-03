@@ -11,11 +11,11 @@
 static void
 verifyDefaults(config_t* config)
 {
-    assert_int_equal       (cfgOutFormat(config), DEFAULT_OUT_FORMAT);
-    assert_string_equal    (cfgOutStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
-    assert_int_equal       (cfgOutStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
-    assert_int_equal       (cfgOutVerbosity(config), DEFAULT_OUT_VERBOSITY);
-    assert_int_equal       (cfgOutPeriod(config), DEFAULT_SUMMARY_PERIOD);
+    assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
+    assert_string_equal    (cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
+    assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
+    assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
+    assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
     assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
     assert_string_equal    (cfgEventValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
@@ -34,11 +34,11 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
     assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
     assert_int_equal       (cfgEventSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
-    assert_int_equal       (cfgTransportType(config, CFG_OUT), CFG_UDP);
-    assert_string_equal    (cfgTransportHost(config, CFG_OUT), "127.0.0.1");
-    assert_string_equal    (cfgTransportPort(config, CFG_OUT), DEFAULT_OUT_PORT);
-    assert_null            (cfgTransportPath(config, CFG_OUT));
-    assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_LINE);
+    assert_int_equal       (cfgTransportType(config, CFG_MTC), CFG_UDP);
+    assert_string_equal    (cfgTransportHost(config, CFG_MTC), "127.0.0.1");
+    assert_string_equal    (cfgTransportPort(config, CFG_MTC), DEFAULT_MTC_PORT);
+    assert_null            (cfgTransportPath(config, CFG_MTC));
+    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), CFG_BUFFER_LINE);
     assert_int_equal       (cfgTransportType(config, CFG_CTL), CFG_TCP);
     assert_string_equal    (cfgTransportHost(config, CFG_CTL), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_CTL), DEFAULT_CTL_PORT);
@@ -48,7 +48,7 @@ verifyDefaults(config_t* config)
     assert_null            (cfgTransportHost(config, CFG_LOG));
     assert_null            (cfgTransportPort(config, CFG_LOG));
     assert_string_equal    (cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
-    assert_int_equal       (cfgTransportBuf(config, CFG_OUT), CFG_BUFFER_LINE);
+    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), CFG_BUFFER_LINE);
     assert_null            (cfgCustomTags(config));
     assert_null            (cfgCustomTagValue(config, "tagname"));
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
@@ -86,69 +86,69 @@ accessorsReturnDefaultsWhenConfigIsNull(void** state)
 }
 
 static void
-cfgOutFormatSetAndGet(void** state)
+cfgMtcFormatSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
-    cfgOutFormatSet(config, CFG_METRIC_JSON);
-    assert_int_equal(cfgOutFormat(config), CFG_METRIC_JSON);
-    cfgOutFormatSet(config, CFG_METRIC_STATSD);
-    assert_int_equal(cfgOutFormat(config), CFG_METRIC_STATSD);
-    cfgOutFormatSet(config, CFG_EVENT_ND_JSON);
-    assert_int_equal(cfgOutFormat(config), CFG_EVENT_ND_JSON);
+    cfgMtcFormatSet(config, CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_JSON);
+    cfgMtcFormatSet(config, CFG_METRIC_STATSD);
+    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_STATSD);
+    cfgMtcFormatSet(config, CFG_EVENT_ND_JSON);
+    assert_int_equal(cfgMtcFormat(config), CFG_EVENT_ND_JSON);
     cfgDestroy(&config);
 }
 
 static void
-cfgOutStatsDPrefixSetAndGet(void** state)
+cfgMtcStatsDPrefixSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
-    cfgOutStatsDPrefixSet(config, "heywithdot.");
-    assert_string_equal(cfgOutStatsDPrefix(config), "heywithdot.");
-    cfgOutStatsDPrefixSet(config, "heywithoutdot");
-    assert_string_equal(cfgOutStatsDPrefix(config), "heywithoutdot.");
-    cfgOutStatsDPrefixSet(config, NULL);
-    assert_string_equal(cfgOutStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
-    cfgOutStatsDPrefixSet(config, "");
-    assert_string_equal(cfgOutStatsDPrefix(config), "");
+    cfgMtcStatsDPrefixSet(config, "heywithdot.");
+    assert_string_equal(cfgMtcStatsDPrefix(config), "heywithdot.");
+    cfgMtcStatsDPrefixSet(config, "heywithoutdot");
+    assert_string_equal(cfgMtcStatsDPrefix(config), "heywithoutdot.");
+    cfgMtcStatsDPrefixSet(config, NULL);
+    assert_string_equal(cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
+    cfgMtcStatsDPrefixSet(config, "");
+    assert_string_equal(cfgMtcStatsDPrefix(config), "");
     cfgDestroy(&config);
 }
 
 static void
-cfgOutStatsDMaxLenSetAndGet(void** state)
+cfgMtcStatsDMaxLenSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
-    cfgOutStatsDMaxLenSet(config, 0);
-    assert_int_equal(cfgOutStatsDMaxLen(config), 0);
-    cfgOutStatsDMaxLenSet(config, UINT_MAX);
-    assert_int_equal(cfgOutStatsDMaxLen(config), UINT_MAX);
+    cfgMtcStatsDMaxLenSet(config, 0);
+    assert_int_equal(cfgMtcStatsDMaxLen(config), 0);
+    cfgMtcStatsDMaxLenSet(config, UINT_MAX);
+    assert_int_equal(cfgMtcStatsDMaxLen(config), UINT_MAX);
     cfgDestroy(&config);
 }
 
 static void
-cfgOutVerbositySetAndGet(void** state)
+cfgMtcVerbositySetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
     int i;
     for (i=0; i<=CFG_MAX_VERBOSITY+1; i++) {
-        cfgOutVerbositySet(config, i);
+        cfgMtcVerbositySet(config, i);
         if (i > CFG_MAX_VERBOSITY)
-            assert_int_equal(cfgOutVerbosity(config), CFG_MAX_VERBOSITY);
+            assert_int_equal(cfgMtcVerbosity(config), CFG_MAX_VERBOSITY);
         else
-            assert_int_equal(cfgOutVerbosity(config), i);
+            assert_int_equal(cfgMtcVerbosity(config), i);
     }
-    cfgOutVerbositySet(config, UINT_MAX);
-    assert_int_equal(cfgOutVerbosity(config), CFG_MAX_VERBOSITY);
+    cfgMtcVerbositySet(config, UINT_MAX);
+    assert_int_equal(cfgMtcVerbosity(config), CFG_MAX_VERBOSITY);
     cfgDestroy(&config);
 }
 
 static void
-cfgOutPeriodSetAndGet(void** state)
+cfgMtcPeriodSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
-    cfgOutPeriodSet(config, 0);
-    assert_int_equal(cfgOutPeriod(config), 0);
-    cfgOutPeriodSet(config, UINT_MAX);
-    assert_int_equal(cfgOutPeriod(config), UINT_MAX);
+    cfgMtcPeriodSet(config, 0);
+    assert_int_equal(cfgMtcPeriod(config), 0);
+    cfgMtcPeriodSet(config, UINT_MAX);
+    assert_int_equal(cfgMtcPeriod(config), UINT_MAX);
     cfgDestroy(&config);
 }
 
@@ -304,34 +304,34 @@ cfgTransportTypeSetAndGet(void** state)
 static void
 cfgTransportHostSetAndGet(void** state)
 {
-    which_transport_t typeOutEvtLog = *(which_transport_t*)state[0];
+    which_transport_t typeMtcCtlLog = *(which_transport_t*)state[0];
     config_t* config = cfgCreateDefault();
 
     // You can no longer hardcode host/port
-    cfgTransportTypeSet(config, typeOutEvtLog, CFG_UDP);
+    cfgTransportTypeSet(config, typeMtcCtlLog, CFG_UDP);
 
-    cfgTransportHostSet(config, typeOutEvtLog, "larrysComputer");
-    assert_string_equal(cfgTransportHost(config, typeOutEvtLog), "larrysComputer");
-    cfgTransportHostSet(config, typeOutEvtLog, "bobsComputer");
-    assert_string_equal(cfgTransportHost(config, typeOutEvtLog), "bobsComputer");
-    cfgTransportHostSet(config, typeOutEvtLog, NULL);
-    assert_null(cfgTransportHost(config, typeOutEvtLog));
+    cfgTransportHostSet(config, typeMtcCtlLog, "larrysComputer");
+    assert_string_equal(cfgTransportHost(config, typeMtcCtlLog), "larrysComputer");
+    cfgTransportHostSet(config, typeMtcCtlLog, "bobsComputer");
+    assert_string_equal(cfgTransportHost(config, typeMtcCtlLog), "bobsComputer");
+    cfgTransportHostSet(config, typeMtcCtlLog, NULL);
+    assert_null(cfgTransportHost(config, typeMtcCtlLog));
     cfgDestroy(&config);
 }
 
 static void
 cfgTransportPortSetAndGet(void** state)
 {
-    which_transport_t typeOutEvtLog = *(which_transport_t*)state[0];
+    which_transport_t typeMtcCtlLog = *(which_transport_t*)state[0];
     config_t* config = cfgCreateDefault();
 
     // You can no longer hardcode host/port
-    cfgTransportTypeSet(config, typeOutEvtLog, CFG_UDP);
+    cfgTransportTypeSet(config, typeMtcCtlLog, CFG_UDP);
 
-    cfgTransportPortSet(config, typeOutEvtLog, "54321");
-    assert_string_equal(cfgTransportPort(config, typeOutEvtLog), "54321");
-    cfgTransportPortSet(config, typeOutEvtLog, "12345");
-    assert_string_equal(cfgTransportPort(config, typeOutEvtLog), "12345");
+    cfgTransportPortSet(config, typeMtcCtlLog, "54321");
+    assert_string_equal(cfgTransportPort(config, typeMtcCtlLog), "54321");
+    cfgTransportPortSet(config, typeMtcCtlLog, "12345");
+    assert_string_equal(cfgTransportPort(config, typeMtcCtlLog), "12345");
     cfgDestroy(&config);
 }
 
@@ -432,7 +432,7 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
-    void* out_state[] = {(void*)CFG_OUT, NULL};
+    void* mtc_state[] = {(void*)CFG_MTC, NULL};
     void* evt_state[] = {(void*)CFG_CTL, NULL};
     void* log_state[] = {(void*)CFG_LOG, NULL};
 
@@ -445,11 +445,11 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgCreateDefaultReturnsValidPtr),
         cmocka_unit_test(accessorValuesForDefaultConfigAreAsExpected),
         cmocka_unit_test(accessorsReturnDefaultsWhenConfigIsNull),
-        cmocka_unit_test(cfgOutFormatSetAndGet),
-        cmocka_unit_test(cfgOutStatsDPrefixSetAndGet),
-        cmocka_unit_test(cfgOutStatsDMaxLenSetAndGet),
-        cmocka_unit_test(cfgOutVerbositySetAndGet),
-        cmocka_unit_test(cfgOutPeriodSetAndGet),
+        cmocka_unit_test(cfgMtcFormatSetAndGet),
+        cmocka_unit_test(cfgMtcStatsDPrefixSetAndGet),
+        cmocka_unit_test(cfgMtcStatsDMaxLenSetAndGet),
+        cmocka_unit_test(cfgMtcVerbositySetAndGet),
+        cmocka_unit_test(cfgMtcPeriodSetAndGet),
         cmocka_unit_test(cfgCmdDirSetAndGet),
         cmocka_unit_test(cfgEventFormatSetAndGet),
 
@@ -470,11 +470,11 @@ main(int argc, char* argv[])
 
         cmocka_unit_test(cfgEventSourceEnabledSetAndGet),
 
-        cmocka_unit_test_prestate(cfgTransportTypeSetAndGet, out_state),
-        cmocka_unit_test_prestate(cfgTransportHostSetAndGet, out_state),
-        cmocka_unit_test_prestate(cfgTransportPortSetAndGet, out_state),
-        cmocka_unit_test_prestate(cfgTransportPathSetAndGet, out_state),
-        cmocka_unit_test_prestate(cfgTransportBufSetAndGet,  out_state),
+        cmocka_unit_test_prestate(cfgTransportTypeSetAndGet, mtc_state),
+        cmocka_unit_test_prestate(cfgTransportHostSetAndGet, mtc_state),
+        cmocka_unit_test_prestate(cfgTransportPortSetAndGet, mtc_state),
+        cmocka_unit_test_prestate(cfgTransportPathSetAndGet, mtc_state),
+        cmocka_unit_test_prestate(cfgTransportBufSetAndGet,  mtc_state),
 
         cmocka_unit_test_prestate(cfgTransportTypeSetAndGet, evt_state),
         cmocka_unit_test_prestate(cfgTransportHostSetAndGet, evt_state),

@@ -254,7 +254,7 @@ ctlParseRxMsgSetCfg(void** state)
             default:
                 fail(); // must have added a test to body[] above.
         }
-        assert_int_equal(cfgOutStatsDMaxLen(req->cfg), expected_statsd_val);
+        assert_int_equal(cfgMtcStatsDMaxLen(req->cfg), expected_statsd_val);
         destroyReq(&req);
     }
 }
@@ -589,7 +589,7 @@ ctlCreateTxMsgEvt(void** state)
 
 
 static void
-ctlSendMsgForNullOutDoesntCrash(void** state)
+ctlSendMsgForNullMtcDoesntCrash(void** state)
 {
     char* msg = strdup("Hey, this is cool!\n");
     ctlSendMsg(NULL, msg);
@@ -608,7 +608,7 @@ ctlSendMsgForNullMessageDoesntCrash(void** state)
 }
 
 static void
-ctlTransportSetAndOutSend(void** state)
+ctlTransportSetAndMtcSend(void** state)
 {
     const char* file_path = "/tmp/my.path";
     ctl_t* ctl = ctlCreate();
@@ -673,9 +673,9 @@ main(int argc, char* argv[])
         cmocka_unit_test(ctlCreateTxMsgInfo),
         cmocka_unit_test(ctlCreateTxMsgResp),
         cmocka_unit_test(ctlCreateTxMsgEvt),
-        cmocka_unit_test(ctlSendMsgForNullOutDoesntCrash),
+        cmocka_unit_test(ctlSendMsgForNullMtcDoesntCrash),
         cmocka_unit_test(ctlSendMsgForNullMessageDoesntCrash),
-        cmocka_unit_test(ctlTransportSetAndOutSend),
+        cmocka_unit_test(ctlTransportSetAndMtcSend),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
 

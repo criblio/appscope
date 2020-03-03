@@ -31,7 +31,7 @@ metric_counters g_ctrs = {0};
 
 
 // interfaces
-out_t* g_out = NULL;
+mtc_t* g_mtc = NULL;
 ctl_t* g_ctl = NULL;
 
 // operational params (not config-based)

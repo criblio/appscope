@@ -16,7 +16,7 @@
 
 struct _format_t
 {
-    cfg_out_format_t format;
+    cfg_mtc_format_t format;
     struct {
         char* prefix;
         unsigned max_len;       // Max length in bytes of a statsd string
@@ -28,7 +28,7 @@ struct _format_t
 
 // Constructors Destructors
 format_t*
-fmtCreate(cfg_out_format_t format)
+fmtCreate(cfg_mtc_format_t format)
 {
     if (format >= CFG_FORMAT_MAX) return NULL;
 
@@ -40,7 +40,7 @@ fmtCreate(cfg_out_format_t format)
     f->format = format;
     f->statsd.prefix = (DEFAULT_STATSD_PREFIX) ? strdup(DEFAULT_STATSD_PREFIX) : NULL;
     f->statsd.max_len = DEFAULT_STATSD_MAX_LEN;
-    f->verbosity = DEFAULT_OUT_VERBOSITY;
+    f->verbosity = DEFAULT_MTC_VERBOSITY;
     f->tags = DEFAULT_CUSTOM_TAGS;
 
     return f;
@@ -258,9 +258,9 @@ fmtStatsDMaxLen(format_t* fmt)
 }
 
 unsigned
-fmtOutVerbosity(format_t* fmt)
+fmtMtcVerbosity(format_t* fmt)
 {
-    return (fmt) ? fmt->verbosity : DEFAULT_OUT_VERBOSITY;
+    return (fmt) ? fmt->verbosity : DEFAULT_MTC_VERBOSITY;
 }
 
 custom_tag_t**
@@ -289,7 +289,7 @@ fmtStatsDMaxLenSet(format_t* fmt, unsigned v)
 }
 
 void
-fmtOutVerbositySet(format_t* fmt, unsigned v)
+fmtMtcVerbositySet(format_t* fmt, unsigned v)
 {
     if (!fmt) return;
     if (v > CFG_MAX_VERBOSITY) v = CFG_MAX_VERBOSITY;

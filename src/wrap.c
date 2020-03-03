@@ -27,7 +27,7 @@ rtconfig g_cfg = {0};
 static thread_timing g_thread = {0};
 static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
-static out_t *g_prevout = NULL;
+static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
 __thread int g_getdelim = 0;
 
@@ -232,21 +232,21 @@ static void
 doConfig(config_t *cfg)
 {
     // Save the current objects to get cleaned up on the periodic thread
-    g_prevout = g_out;
+    g_prevmtc = g_mtc;
     g_prevlog = g_log;
 
-    g_thread.interval = cfgOutPeriod(cfg);
-    setReportingInterval(cfgOutPeriod(cfg));
+    g_thread.interval = cfgMtcPeriod(cfg);
+    setReportingInterval(cfgMtcPeriod(cfg));
     if (!g_thread.startTime) {
         g_thread.startTime = time(NULL) + g_thread.interval;
     }
 
-    setVerbosity(cfgOutVerbosity(cfg));
+    setVerbosity(cfgMtcVerbosity(cfg));
     g_cfg.cmddir = cfgCmdDir(cfg);
 
     log_t* log = initLog(cfg);
-    g_out = initOut(cfg);
-    g_log = log; // Set after initOut to avoid infinite loop with socket
+    g_mtc = initMtc(cfg);
+    g_log = log; // Set after initMtc to avoid infinite loop with socket
     ctlEvtSet(g_ctl, initEvt(cfg));
 }
 
@@ -530,7 +530,7 @@ static void
 handleExit(void)
 {
     reportPeriodicStuff();
-    outFlush(g_out);
+    mtcFlush(g_mtc);
     logFlush(g_log);
     ctlFlush(g_ctl);
 }
@@ -546,14 +546,14 @@ periodic(void *arg)
 
         // TODO: need to ensure that the previous object is no longer in use
         // Clean up previous objects if they exist.
-        //if (g_prevout) outDestroy(&g_prevout);
+        //if (g_prevmtc) mtcDestroy(&g_prevmtc);
         //if (g_prevlog) logDestroy(&g_prevlog);
 
         // Q: What does it mean to connect transports we expect to be
         // "connectionless"?  A: We've observed some processes close all
         // file/socket descriptors during their initialization.
         // If this happens, this the way we manage re-init.
-        if (outNeedsConnection(g_out)) outConnect(g_out);
+        if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
         if (logNeedsConnection(g_log)) logConnect(g_log);
 
         if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl)) {

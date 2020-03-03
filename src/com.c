@@ -7,9 +7,9 @@ cmdSendEvent(ctl_t *ctl, event_t* e, uint64_t time, proc_id_t* proc)
 }
 
 int
-cmdSendMetric(out_t *out, event_t* e)
+cmdSendMetric(mtc_t *mtc, event_t* e)
 {
-    return outSendMetric(out, e);
+    return mtcSendMetric(mtc, e);
 }
 
 

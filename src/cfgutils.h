@@ -4,7 +4,7 @@
 #include "cfg.h"
 #include "ctl.h"
 #include "log.h"
-#include "out.h"
+#include "mtc.h"
 #include "evt.h"
 
 // cfgPath returns a pointer to a malloc()'d buffer.
@@ -28,7 +28,7 @@ void cfgProcessEnvironment(config_t* cfg);
 void cfgProcessCommands(config_t* cfg, FILE* file);
 
 log_t* initLog(config_t* cfg);
-out_t* initOut(config_t* cfg);
+mtc_t* initMtc(config_t* cfg);
 evt_t* initEvt(config_t* cfg);
 ctl_t* initCtl(config_t* cfg);
 

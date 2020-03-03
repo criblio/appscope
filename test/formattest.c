@@ -38,7 +38,7 @@ verifyDefaults(format_t* fmt)
 {
     assert_string_equal(fmtStatsDPrefix(fmt), DEFAULT_STATSD_PREFIX);
     assert_int_equal(fmtStatsDMaxLen(fmt), DEFAULT_STATSD_MAX_LEN);
-    assert_int_equal(fmtOutVerbosity(fmt), DEFAULT_OUT_VERBOSITY);
+    assert_int_equal(fmtMtcVerbosity(fmt), DEFAULT_MTC_VERBOSITY);
     assert_int_equal(fmtCustomTags(fmt), DEFAULT_CUSTOM_TAGS);
 }
 
@@ -89,13 +89,13 @@ fmtStatsDMaxLenSetAndGet(void** state)
 }
 
 static void
-fmtOutVerbositySetAndGet(void** state)
+fmtMtcVerbositySetAndGet(void** state)
 {
     format_t* fmt = fmtCreate(CFG_METRIC_JSON);
-    fmtOutVerbositySet(fmt, 0);
-    assert_int_equal(fmtOutVerbosity(fmt), 0);
-    fmtOutVerbositySet(fmt, UINT_MAX);
-    assert_int_equal(fmtOutVerbosity(fmt), CFG_MAX_VERBOSITY);
+    fmtMtcVerbositySet(fmt, 0);
+    assert_int_equal(fmtMtcVerbosity(fmt), 0);
+    fmtMtcVerbositySet(fmt, UINT_MAX);
+    assert_int_equal(fmtMtcVerbosity(fmt), CFG_MAX_VERBOSITY);
     fmtDestroy(&fmt);
 }
 
@@ -182,7 +182,7 @@ fmtStatsDStringHappyPath(void** state)
 
     format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
-    fmtOutVerbositySet(fmt, CFG_MAX_VERBOSITY);
+    fmtMtcVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
     char* msg = fmtStatsDString(fmt, &e, NULL);
     assert_non_null(msg);
@@ -223,7 +223,7 @@ fmtStatsDStringHappyPathFilteredFields(void** state)
 
     format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
     assert_non_null(fmt);
-    fmtOutVerbositySet(fmt, CFG_MAX_VERBOSITY);
+    fmtMtcVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
     regex_t re;
     assert_int_equal(regcomp(&re, "^[p]", REG_EXTENDED), 0);
@@ -393,7 +393,7 @@ fmtStatsDStringOmitsFieldsIfSpaceIsInsufficient(void** state)
     };
     event_t e = INT_EVENT("metric", 1, DELTA, fields);
     format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
-    fmtOutVerbositySet(fmt, CFG_MAX_VERBOSITY);
+    fmtMtcVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
     // Note that this test documents that we don't prioritize
     // the lowest cardinality fields when space is scarce.  We
@@ -437,19 +437,19 @@ fmtStatsDStringHonorsCardinality(void** state)
     event_t e = INT_EVENT("metric", 1, DELTA, fields);
     format_t* fmt = fmtCreate(CFG_METRIC_STATSD);
 
-    fmtOutVerbositySet(fmt, 0);
+    fmtMtcVerbositySet(fmt, 0);
     char* msg = fmtStatsDString(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#A:Z\n");
     free(msg);
 
-    fmtOutVerbositySet(fmt, 5);
+    fmtMtcVerbositySet(fmt, 5);
     msg = fmtStatsDString(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#A:Z,B:987,C:Y,D:654,E:X,F:321\n");
     free(msg);
 
-    fmtOutVerbositySet(fmt, 9);
+    fmtMtcVerbositySet(fmt, 9);
     msg = fmtStatsDString(fmt, &e, NULL);
     assert_non_null(msg);
     // Verify every name is there, 10 in total
@@ -567,7 +567,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtDestroyNullDoesntCrash),
         cmocka_unit_test(fmtStatsDPrefixSetAndGet),
         cmocka_unit_test(fmtStatsDMaxLenSetAndGet),
-        cmocka_unit_test(fmtOutVerbositySetAndGet),
+        cmocka_unit_test(fmtMtcVerbositySetAndGet),
         cmocka_unit_test(fmtCustomTagsSetAndGet),
         cmocka_unit_test(fmtStatsDStringNullEventDoesntCrash),
         cmocka_unit_test(fmtStatsDStringNullEventFieldsDoesntCrash),

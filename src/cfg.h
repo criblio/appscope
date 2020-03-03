@@ -14,13 +14,13 @@ config_t*           cfgCreateDefault();
 void                cfgDestroy(config_t**);
 
 // Accessors
-cfg_out_format_t    cfgOutFormat(config_t*);
-const char*         cfgOutStatsDPrefix(config_t*);
-unsigned            cfgOutStatsDMaxLen(config_t*);
-unsigned            cfgOutPeriod(config_t*);
+cfg_mtc_format_t    cfgMtcFormat(config_t*);
+const char*         cfgMtcStatsDPrefix(config_t*);
+unsigned            cfgMtcStatsDMaxLen(config_t*);
+unsigned            cfgMtcPeriod(config_t*);
 const char*         cfgCmdDir(config_t*);
-unsigned            cfgOutVerbosity(config_t*);
-cfg_out_format_t    cfgEventFormat(config_t*);
+unsigned            cfgMtcVerbosity(config_t*);
+cfg_mtc_format_t    cfgEventFormat(config_t*);
 const char*         cfgEventValueFilter(config_t*, cfg_evt_t);
 const char*         cfgEventFieldFilter(config_t*, cfg_evt_t);
 const char*         cfgEventNameFilter(config_t*, cfg_evt_t);
@@ -35,13 +35,13 @@ const char*         cfgCustomTagValue(config_t*, const char*);
 cfg_log_level_t     cfgLogLevel(config_t*);
 
 // Setters (modifies config_t, but does not persist modifications)
-void                cfgOutFormatSet(config_t*, cfg_out_format_t);
-void                cfgOutStatsDPrefixSet(config_t*, const char*);
-void                cfgOutStatsDMaxLenSet(config_t*, unsigned);
-void                cfgOutPeriodSet(config_t*, unsigned);
+void                cfgMtcFormatSet(config_t*, cfg_mtc_format_t);
+void                cfgMtcStatsDPrefixSet(config_t*, const char*);
+void                cfgMtcStatsDMaxLenSet(config_t*, unsigned);
+void                cfgMtcPeriodSet(config_t*, unsigned);
 void                cfgCmdDirSet(config_t*, const char*);
-void                cfgOutVerbositySet(config_t*, unsigned);
-void                cfgEventFormatSet(config_t*, cfg_out_format_t);
+void                cfgMtcVerbositySet(config_t*, unsigned);
+void                cfgEventFormatSet(config_t*, cfg_mtc_format_t);
 void                cfgEventValueFilterSet(config_t*, cfg_evt_t, const char*);
 void                cfgEventFieldFilterSet(config_t*, cfg_evt_t, const char*);
 void                cfgEventNameFilterSet(config_t*, cfg_evt_t, const char*);

@@ -19,7 +19,7 @@ evtCreateReturnsValidPtr(void** state)
 }
 
 static void
-evtDestroyNullOutDoesntCrash(void** state)
+evtDestroyNullMtcDoesntCrash(void** state)
 {
     evtDestroy(NULL);
     evt_t* evt = NULL;
@@ -771,7 +771,7 @@ main(int argc, char* argv[])
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(evtCreateReturnsValidPtr),
-        cmocka_unit_test(evtDestroyNullOutDoesntCrash),
+        cmocka_unit_test(evtDestroyNullMtcDoesntCrash),
         cmocka_unit_test(evtMetricHappyPath),
         cmocka_unit_test(evtMetricWithSourceDisabledReturnsNull),
         cmocka_unit_test(evtMetricWithAndWithoutMatchingNameFilter),

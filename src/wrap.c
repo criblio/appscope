@@ -106,14 +106,9 @@ remoteConfig()
     do {
         numtries++;
         rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
-        if (rc == 0) {
-            // The remote side has closed the connection
+        if (rc <= 0) {
+            // Something has happened to our connection
             ctlClose(g_ctl);
-            break;
-        } else if (rc < 0) {
-            // Our own application has closed fds.fd
-            if (errno == EBADF) ctlClose(g_ctl);
-            // We've had an error; abandon the data
             break;
         }
 
@@ -248,6 +243,10 @@ doConfig(config_t *cfg)
     g_mtc = initMtc(cfg);
     g_log = log; // Set after initMtc to avoid infinite loop with socket
     ctlEvtSet(g_ctl, initEvtFormat(cfg));
+
+    // Disconnect the old interfaces that were just replaced
+    mtcDisconnect(g_prevmtc);
+    logDisconnect(g_prevlog);
 }
 
 // Process dynamic config change if they are available

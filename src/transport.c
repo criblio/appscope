@@ -566,6 +566,7 @@ transportSend(transport_t* t, const char* msg)
                 if (rc < 0) {
                     switch (errno) {
                     case EBADF:
+                    case EPIPE:
                         DBG(NULL);
                         transportDisconnect(t);
                         transportConnect(t);

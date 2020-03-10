@@ -521,6 +521,7 @@ reportPeriodicStuff(void)
 
     // Process any events that have been posted
     ctlFlush(g_ctl);
+    mtcFlush(g_mtc);
 
     if (!atomicCasU64(&reentrancy_guard, 1ULL, 0ULL)) {
          DBG(NULL);

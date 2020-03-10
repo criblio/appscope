@@ -69,6 +69,7 @@ run_test test/${OS}/logtest
 run_test test/${OS}/mtctest
 run_test test/${OS}/evtformattest
 run_test test/${OS}/ctltest
+run_test test/${OS}/reporttest
 run_test test/${OS}/mtcformattest
 run_test test/${OS}/circbuftest
 run_test test/${OS}/comtest

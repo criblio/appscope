@@ -761,7 +761,7 @@ doStatFd(int fd, int rc, const char* func)
 int
 doDupFile(int newfd, int oldfd, const char *func)
 {
-    if ((newfd >= g_numFSinfo) || (oldfd >= g_numFSinfo)) {
+    if (!checkFSEntry(newfd) || !checkFSEntry(oldfd)) {
         return -1;
     }
 
@@ -772,7 +772,7 @@ doDupFile(int newfd, int oldfd, const char *func)
 int
 doDupSock(int oldfd, int newfd)
 {
-    if ((newfd >= g_numFSinfo) || (oldfd >= g_numFSinfo)) {
+    if (!checkNetEntry(newfd) || !checkNetEntry(oldfd)) {
         return -1;
     }
 

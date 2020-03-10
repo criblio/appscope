@@ -72,6 +72,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_CONSOLE_NAME "(stdout)|(stderr)"
 #define DEFAULT_SRC_SYSLOG_NAME ".*"
 #define DEFAULT_SRC_METRIC_NAME ".*"
+#define DEFAULT_MTC_IPPORT_VERBOSITY 6
 #define DEFAULT_SRC_FILE 0
 #define DEFAULT_SRC_CONSOLE 0
 #define DEFAULT_SRC_SYSLOG 0

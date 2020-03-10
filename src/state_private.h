@@ -62,6 +62,8 @@ typedef struct net_info_t {
     int active;
     int type;
     bool urlRedirect;
+    bool addrSetLocal;
+    bool addrSetRemote;
     uint64_t numTX;
     uint64_t numRX;
     uint64_t txBytes;
@@ -100,8 +102,8 @@ typedef struct fs_info_t {
 int get_port(int fd, int type, control_type_t which);
 bool checkNetEntry(int fd);
 bool checkFSEntry(int fd);
-net_info* getNetEntry(int fd);
-fs_info* getFSEntry(int fd);
+net_info *getNetEntry(int fd);
+fs_info *getFSEntry(int fd);
 
 
 // Data that lives in state.c, but is used in report.c too.

@@ -21,6 +21,7 @@
 #include "report.h"
 #include "state.h"
 #include "wrap.h"
+#include "runtimecfg.h"
 
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
@@ -29,6 +30,7 @@ static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
+static const char *g_cmddir;
 __thread int g_getdelim = 0;
 
 
@@ -190,15 +192,15 @@ remoteConfig()
                     break;
                 case REQ_BLOCK_PORT:
                     // Assign new value for port blocking
-                    g_blockconn = req->port;
+                    g_cfg.blockconn = req->port;
                     break;
                 case REQ_SWITCH:
                     switch (req->action) {
                         case URL_REDIRECT_ON:
-                            g_urls = 1;
+                            g_cfg.urls = 1;
                             break;
                         case URL_REDIRECT_OFF:
-                            g_urls = 0;
+                            g_cfg.urls = 0;
                             break;
                         default:
                             DBG("%d", req->action);
@@ -237,7 +239,7 @@ doConfig(config_t *cfg)
     }
 
     setVerbosity(cfgMtcVerbosity(cfg));
-    g_cfg.cmddir = cfgCmdDir(cfg);
+    g_cmddir = cfgCmdDir(cfg);
 
     log_t* log = initLog(cfg);
     g_mtc = initMtc(cfg);
@@ -258,7 +260,7 @@ dynConfig(void)
     char path[PATH_MAX];
     static time_t modtime = 0;
 
-    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
+    snprintf(path, sizeof(path), "%s/%s.%d", g_cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
 
     // Is there a command file for this pid
     if (osIsFilePresent(g_proc.pid, path) == -1) return 0;
@@ -751,6 +753,9 @@ init(void)
     if (path) free(path);
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
+
+    g_cfg.staticfg = g_staticfg;
+    g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
     reportProcessStart();
 

@@ -21,10 +21,6 @@
 #define DYN_CONFIG_PREFIX "scope"
 #define MAXTRIES 10
 
-typedef struct rtconfig_t {
-    const char *cmddir;
-} rtconfig;
-
 typedef struct thread_timing_t {
     unsigned interval;                   // in seconds
     time_t startTime; 

@@ -14,9 +14,12 @@
 #include "plattime.h"
 #include "state.h"
 #include "state_private.h"
+#include "runtimecfg.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
+
+extern rtconfig g_cfg;
 
 int g_numNinfo = NET_ENTRIES;
 int g_numFSinfo = FS_ENTRIES;
@@ -31,14 +34,11 @@ metric_counters g_ctrs = {0};
 
 
 // interfaces
-mtc_t* g_mtc = NULL;
-ctl_t* g_ctl = NULL;
+mtc_t *g_mtc = NULL;
+ctl_t *g_ctl = NULL;
 
-// operational params (not config-based)
-int g_urls = 0;
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
-int g_blockconn = DEFAULT_PORTBLOCK;
 
 #define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
 #define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)
@@ -284,7 +284,7 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
 {
     in_port_t port;
 
-    if (g_blockconn == DEFAULT_PORTBLOCK) return 0;
+    if (g_cfg.blockconn == DEFAULT_PORTBLOCK) return 0;
 
     // We expect addr_arg to be supplied for connect() calls
     // and expect it to be NULL for accept() calls.  When it's
@@ -307,7 +307,7 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
         return 0;
     }
 
-    if (g_blockconn == htons(port)) {
+    if (g_cfg.blockconn == htons(port)) {
         scopeLog("doBlockConnection: blocked connection", fd, CFG_LOG_INFO);
         return 1;
     }
@@ -318,16 +318,22 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
 void
 doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, control_type_t endp)
 {
+    net_info *net;
+
     if (!addr || (len <= 0)) {
         return;
     }
 
     // Should we check for at least the size of sockaddr_in?
-    if ((getNetEntry(sd) != NULL) && addr && (len > 0)) {
+    if (((net = getNetEntry(sd)) != NULL) && addr && (len > 0)) {
         if (endp == LOCAL) {
+            if ((net->type == SOCK_STREAM) && (net->addrSetLocal == TRUE)) return;
             memmove(&g_netinfo[sd].localConn, addr, len);
+            if (net->type == SOCK_STREAM) net->addrSetLocal = TRUE;
         } else {
+            if ((net->type == SOCK_STREAM) && (net->addrSetRemote == TRUE)) return;
             memmove(&g_netinfo[sd].remoteConn, addr, len);
+            if (net->type == SOCK_STREAM) net->addrSetRemote = TRUE;
         }
     }
 }
@@ -337,19 +343,33 @@ doSetAddrs(int sockfd)
 {
     struct sockaddr_storage addr;
     socklen_t addrlen = sizeof(struct sockaddr_storage);
+    net_info *net;
 
-    if (getNetEntry(sockfd) == NULL) {
+    // Only do this if output is enabled
+    if ((cfgMtcVerbosity(g_cfg.staticfg) < DEFAULT_MTC_IPPORT_VERBOSITY) &&
+        !cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC)) return 0;
+
+    /*
+     * Only do this for TCP or UDP sockets
+     * If a TCP socket only set the addrs once
+     * It's possible for UDP sockets to change addrs as needed
+     */
+    if (((net = getNetEntry(sockfd)) == NULL) ||
+        ((net->type != SOCK_STREAM) && (net->type != SOCK_DGRAM))) {
         return -1;
     }
 
-    if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
-        doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
+    if ((net->type == SOCK_STREAM) && (net->addrSetLocal == FALSE)) {
+        if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+            doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
+        }
     }
 
-    if (getpeername(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
-        doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, REMOTE);
+    if ((net->type == SOCK_STREAM) && (net->addrSetRemote == FALSE)) {
+        if (getpeername(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+            doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, REMOTE);
+        }
     }
-
     return 0;
 }
 
@@ -537,7 +557,7 @@ getDNSName(int sd, void *pkt, int pktlen)
 int
 doURL(int sockfd, const void *buf, size_t len, metric_t src)
 {
-    if (g_urls == 0) return 0;
+    if (g_cfg.urls == 0) return 0;
 
     if (checkNetEntry(sockfd) == TRUE) {
         if (!g_netinfo[sockfd].active) {

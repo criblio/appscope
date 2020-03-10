@@ -4,11 +4,6 @@
 #include "report.h"
 
 
-// Operational parameters (not configuration)
-extern int g_urls;
-extern int g_blockconn;
-
-
 void initState();
 void resetState();
 

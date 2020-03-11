@@ -778,13 +778,13 @@ doDupSock(int oldfd, int newfd)
 
     bcopy(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct fs_info_t));
     g_netinfo[newfd].active = TRUE;
-    g_netinfo[newfd].numTX = 0;
-    g_netinfo[newfd].numRX = 0;
-    g_netinfo[newfd].txBytes = 0;
-    g_netinfo[newfd].rxBytes = 0;
-    g_netinfo[newfd].startTime = 0;
-    g_netinfo[newfd].totalDuration = 0;
-    g_netinfo[newfd].numDuration = 0;
+    g_netinfo[newfd].numTX = (counters_element_t){.mtc=0, .evt=0};
+    g_netinfo[newfd].numRX = (counters_element_t){.mtc=0, .evt=0};
+    g_netinfo[newfd].txBytes = (counters_element_t){.mtc=0, .evt=0};
+    g_netinfo[newfd].rxBytes = (counters_element_t){.mtc=0, .evt=0};
+    g_netinfo[newfd].startTime = 0ULL;
+    g_netinfo[newfd].totalDuration = (counters_element_t){.mtc=0, .evt=0};
+    g_netinfo[newfd].numDuration = (counters_element_t){.mtc=0, .evt=0};
 
     return 0;
 }

@@ -242,19 +242,20 @@ doReadFileNoSummarization(void** state)
     assert_int_equal(eventCalls("fs.read"), 2);
     assert_int_equal(eventValues("fs.read"), 2*13);
 
-    // open/close summarization doesn't really affect things.
-    // doClose has no unreported doReads
+    // Without open/close summarization, every doClose is output
     clearTestData();
     doClose(16, "closeFunc");
     assert_int_equal(metricCalls("fs.read"), 0);
-    assert_int_equal(metricCalls("fs.op.close"), 1);
     assert_int_equal(eventCalls("fs.read"), 0);
+    assert_int_equal(metricCalls("fs.op.close"), 1);
     assert_int_equal(eventCalls("fs.op.close"), 1);
 
-    // doTotal shouldn't output fs.read
+    // doTotal shouldn't output fs.read or fs.op.close.  It's already reported
     clearTestData();
+    doTotal(TOT_OPEN);
     doTotal(TOT_READ);
-    //assert_int_equal(metricCalls(NULL), 0);
+    doTotal(TOT_CLOSE);
+    assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 }
 
@@ -283,21 +284,24 @@ doReadFileSummarizedOpenCloseNotSummarized(void** state)
     doRead(16, 987, 1, 13, "readFunc");
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 2);
-    //assert_int_equal(eventValues("fs.read"), 2*13);
+    assert_int_equal(eventValues("fs.read"), 2*13);
 
-    // Without open/close summarization, doClose outputs summarized doReads
+    // Without open/close summarization, every doClose is output
     clearTestData();
     doClose(16, "closeFunc");
-    //assert_int_equal(metricCalls("fs.read"), 1);
-    //assert_int_equal(metricValues("fs.read"), 2*13);
-    //assert_int_equal(metricCalls("fs.op.close"), 1);
+    assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 0);
+    assert_int_equal(metricCalls("fs.op.close"), 1);
     assert_int_equal(eventCalls("fs.op.close"), 1);
 
-    // doTotal shouldn't output fs.read
+    // doTotal should output fs.read activity from above
     clearTestData();
+    doTotal(TOT_OPEN);
     doTotal(TOT_READ);
-    //assert_int_equal(metricCalls(NULL), 0);
+    doTotal(TOT_CLOSE);
+    assert_int_equal(metricCalls("fs.read"), 1);
+    assert_int_equal(metricValues("fs.read"), 2*13);
+    assert_int_equal(metricCalls("fs.op.close"), 0);
     assert_int_equal(eventCalls(NULL), 0);
 }
 
@@ -326,24 +330,235 @@ doReadFileFullSummarization(void** state)
     doRead(16, 987, 1, 13, "readFunc");
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 2);
-    //assert_int_equal(eventValues("fs.read"), 2*13);
+    assert_int_equal(eventValues("fs.read"), 2*13);
 
     // With open/close summarization, doClose does not output either
     clearTestData();
     doClose(16, "closeFunc");
     assert_int_equal(metricCalls("fs.read"), 0);
-    assert_int_equal(metricCalls("fs.op.close"), 0);
     assert_int_equal(eventCalls("fs.read"), 0);
+    assert_int_equal(metricCalls("fs.op.close"), 0);
     assert_int_equal(eventCalls("fs.op.close"), 1);
 
     // doTotal should output fs.read
     clearTestData();
+    doTotal(TOT_OPEN);
     doTotal(TOT_READ);
+    doTotal(TOT_CLOSE);
+    assert_int_equal(metricCalls("fs.open"), 1);
     assert_int_equal(metricCalls("fs.read"), 1);
     assert_int_equal(metricValues("fs.read"), 2*13);
-    //assert_int_equal(metricCalls("fs.close"), 1);
+    assert_int_equal(metricCalls("fs.close"), 1);
+    assert_int_equal(eventCalls("fs.op.open"), 0);
     assert_int_equal(eventCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.op.close"), 0);
+}
+
+static void
+doWriteFileNoSummarization(void** state)
+{
+    char* buf = "hey.\n";
+
+    clearTestData();
+    setVerbosity(9);
+    doOpen(16, "/the/file/path", FD, "openFunc");
+    assert_int_equal(metricCalls("fs.op.open"), 1);
+    assert_int_equal(eventCalls("fs.op.open"), 1);
+
+    // Zeros should not be reported on any interface
+    doWrite(16, 987, 1, buf, 0, "writeFunc");
+    assert_int_equal(metricCalls("fs.write"), 0);
+    assert_int_equal(eventCalls("fs.write"), 0);
+
+    // Totals should not be reported if zero either
+    doTotal(TOT_WRITE);
+    assert_int_equal(metricCalls("fs.write"), 0);
+    assert_int_equal(eventCalls("fs.write"), 0);
+
+    // Without read/write summarization, every doWrite is output
+    clearTestData();
+    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc");
+    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc");
+    assert_int_equal(metricCalls("fs.write"), 2);
+    assert_int_equal(metricValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(eventCalls("fs.write"), 2);
+    assert_int_equal(eventValues("fs.write"), 2*sizeof(buf));
+
+    // Without open/close summarization, every doClose is output
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("fs.write"), 0);
+    assert_int_equal(eventCalls("fs.write"), 0);
+    assert_int_equal(metricCalls("fs.op.close"), 1);
+    assert_int_equal(eventCalls("fs.op.close"), 1);
+
+    // doTotal shouldn't output fs.write or fs.op.close.  It's already reported
+    clearTestData();
+    doTotal(TOT_OPEN);
+    doTotal(TOT_WRITE);
+    doTotal(TOT_CLOSE);
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+}
+
+static void
+doWriteFileSummarizedOpenCloseNotSummarized(void** state)
+{
+    char* buf = "hey.\n";
+
+    clearTestData();
+    setVerbosity(6);
+    doOpen(16, "/the/file/path", FD, "openFunc");
+    assert_int_equal(metricCalls("fs.op.open"), 1);
+    assert_int_equal(eventCalls("fs.op.open"), 1);
+
+    // Zeros should not be reported on any interface
+    doWrite(16, 987, 1, buf, 0, "writeFunc");
+    assert_int_equal(metricCalls("fs.write"), 0);
+    assert_int_equal(eventCalls("fs.write"), 0);
+
+    // Totals should not be reported if zero either
+    doTotal(TOT_WRITE);
+    assert_int_equal(metricCalls("fs.write"), 0);
+    assert_int_equal(eventCalls("fs.write"), 0);
+
+    // With read/write summarization, no doWrite is output at the time
+    clearTestData();
+    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc");
+    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc");
+    assert_int_equal(metricCalls("fs.write"), 0);
+    assert_int_equal(eventCalls("fs.write"), 2);
+    assert_int_equal(eventValues("fs.write"), 2*sizeof(buf));
+
+    // Without open/close summarization, every doClose is output
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("fs.write"), 0);
+    assert_int_equal(eventCalls("fs.write"), 0);
+    assert_int_equal(metricCalls("fs.op.close"), 1);
+    assert_int_equal(eventCalls("fs.op.close"), 1);
+
+    // doTotal should output fs.write activity from above
+    clearTestData();
+    doTotal(TOT_OPEN);
+    doTotal(TOT_WRITE);
+    doTotal(TOT_CLOSE);
+    assert_int_equal(metricCalls("fs.write"), 1);
+    assert_int_equal(metricValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(metricCalls("fs.op.close"), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+}
+
+static void
+doWriteFileFullSummarization(void** state)
+{
+    char* buf = "hey.\n";
+
+    clearTestData();
+    setVerbosity(5);
+    doOpen(16, "/the/file/path", FD, "openFunc");
+    assert_int_equal(metricCalls("fs.op.open"), 0);
+    assert_int_equal(eventCalls("fs.op.open"), 1);
+
+    // Zeros should not be reported on any interface
+    doWrite(16, 987, 1, buf, 0, "writeFunc");
+    assert_int_equal(metricCalls("fs.write"), 0);
+    assert_int_equal(eventCalls("fs.write"), 0);
+
+    // Totals should not be reported if zero either
+    doTotal(TOT_WRITE);
+    assert_int_equal(metricCalls("fs.write"), 0);
+    assert_int_equal(eventCalls("fs.write"), 0);
+
+    // With read/write summarization, no doWrite is output at the time
+    clearTestData();
+    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc");
+    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc");
+    assert_int_equal(metricCalls("fs.write"), 0);
+    assert_int_equal(eventCalls("fs.write"), 2);
+    assert_int_equal(eventValues("fs.write"), 2*sizeof(buf));
+
+    // With open/close summarization, doClose does not output either
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("fs.write"), 0);
+    assert_int_equal(eventCalls("fs.write"), 0);
+    assert_int_equal(metricCalls("fs.op.close"), 0);
+    assert_int_equal(eventCalls("fs.op.close"), 1);
+
+    // doTotal should output fs.write
+    clearTestData();
+    doTotal(TOT_OPEN);
+    doTotal(TOT_WRITE);
+    doTotal(TOT_CLOSE);
+    assert_int_equal(metricCalls("fs.open"), 1);
+    assert_int_equal(metricCalls("fs.write"), 1);
+    assert_int_equal(metricValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(metricCalls("fs.close"), 1);
+    assert_int_equal(eventCalls("fs.op.open"), 0);
+    assert_int_equal(eventCalls("fs.write"), 0);
+    assert_int_equal(eventCalls("fs.op.close"), 0);
+}
+
+static void
+doRecvNoSummarization(void** state)
+{
+    struct addrinfo* addr_list = NULL;
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    if (getaddrinfo("localhost", "13456", &hints, &addr_list) || !addr_list) {
+        fail();
+    }
+
+    clearTestData();
+    setVerbosity(9);
+    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    assert_int_equal(metricCalls("net.tcp"), 1);
+    assert_int_equal(metricCalls("net.port"), 1);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // Zeros should not be reported on any interface 
+    // Well, unless it's a change to zero for a gauge
+    doRecv(16, 0);
+    assert_int_equal(metricCalls("net.rx"), 0);
+    assert_int_equal(eventCalls("net.rx"), 0);
+
+    // Totals should not be reported if zero either
+    doTotal(TOT_RX);
+    assert_int_equal(metricCalls("net.rx"), 0);
+    assert_int_equal(eventCalls("net.rx"), 0);
+
+    // Without rx/tx summarization, every doRecv is output
+    clearTestData();
+    doRecv(16, 13);
+    doRecv(16, 13);
+    assert_int_equal(metricCalls("net.rx"), 2);
+    assert_int_equal(metricValues("net.rx"), 2*13);
+    assert_int_equal(eventCalls("net.rx"), 2);
+    assert_int_equal(eventValues("net.rx"), 2*13);
+
+    // Without open/close summarization, every doClose it output
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("net.rx"), 0);
+    assert_int_equal(eventCalls("net.rx"), 0);
+    assert_int_equal(metricCalls("net.tcp"), 1);
+    assert_int_equal(metricCalls("net.port"), 1);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // doTotal shouldn't output anything.  It's already reported
+    clearTestData();
+    doTotal(TOT_PORTS);
+    doTotal(TOT_TCP_CONN);
+    doTotal(TOT_RX);
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    if(addr_list) freeaddrinfo(addr_list);
 }
 
 int
@@ -364,6 +579,10 @@ main(int argc, char* argv[])
         cmocka_unit_test(doReadFileNoSummarization),
         cmocka_unit_test(doReadFileSummarizedOpenCloseNotSummarized),
         cmocka_unit_test(doReadFileFullSummarization),
+        cmocka_unit_test(doWriteFileNoSummarization),
+        cmocka_unit_test(doWriteFileSummarizedOpenCloseNotSummarized),
+        cmocka_unit_test(doWriteFileFullSummarization),
+        cmocka_unit_test(doRecvNoSummarization),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     int test_errors = cmocka_run_group_tests(tests, countTestSetup, countTestTeardown);

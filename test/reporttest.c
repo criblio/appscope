@@ -561,6 +561,319 @@ doRecvNoSummarization(void** state)
     if(addr_list) freeaddrinfo(addr_list);
 }
 
+static void
+doRecvSummarizedOpenCloseNotSummarized(void** state)
+{
+    struct addrinfo* addr_list = NULL;
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    if (getaddrinfo("localhost", "13456", &hints, &addr_list) || !addr_list) {
+        fail();
+    }
+
+    clearTestData();
+    setVerbosity(7);
+    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    assert_int_equal(metricCalls("net.tcp"), 1);
+    assert_int_equal(metricCalls("net.port"), 1);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // Zeros should not be reported on any interface
+    // Well, unless it's a change to zero for a gauge
+    doRecv(16, 0);
+    assert_int_equal(metricCalls("net.rx"), 0);
+    assert_int_equal(eventCalls("net.rx"), 0);
+
+    // Totals should not be reported if zero either
+    doTotal(TOT_RX);
+    assert_int_equal(metricCalls("net.rx"), 0);
+    assert_int_equal(eventCalls("net.rx"), 0);
+
+    // With rx/tx summarization, no doRecv is output at the time
+    clearTestData();
+    doRecv(16, 13);
+    doRecv(16, 13);
+    assert_int_equal(metricCalls("net.rx"), 0);
+    assert_int_equal(eventCalls("net.rx"), 2);
+    assert_int_equal(eventValues("net.rx"), 2*13);
+
+    // Without open/close summarization, every doClose it output
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("net.rx"), 0);
+    assert_int_equal(eventCalls("net.rx"), 0);
+    assert_int_equal(metricCalls("net.tcp"), 1);
+    assert_int_equal(metricCalls("net.port"), 1);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // doTotal should output net.rx activity from above.
+    clearTestData();
+    doTotal(TOT_PORTS);
+    doTotal(TOT_TCP_CONN);
+    doTotal(TOT_RX);
+    assert_int_equal(metricCalls("net.rx"), 1);
+    assert_int_equal(metricValues("net.rx"), 2*13);
+    assert_int_equal(metricCalls("net.tcp"), 0);
+    assert_int_equal(metricCalls("net.port"), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    if(addr_list) freeaddrinfo(addr_list);
+}
+
+static void
+doRecvFullSummarization(void** state)
+{
+    struct addrinfo* addr_list = NULL;
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    if (getaddrinfo("localhost", "13456", &hints, &addr_list) || !addr_list) {
+        fail();
+    }
+
+    clearTestData();
+    setVerbosity(6);
+    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    assert_int_equal(metricCalls("net.tcp"), 0);
+    assert_int_equal(metricCalls("net.port"), 0);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // Zeros should not be reported on any interface
+    // Well, unless it's a change to zero for a gauge
+    doRecv(16, 0);
+    assert_int_equal(metricCalls("net.rx"), 0);
+    assert_int_equal(eventCalls("net.rx"), 0);
+
+    // Totals should not be reported if zero either
+    doTotal(TOT_RX);
+    assert_int_equal(metricCalls("net.rx"), 0);
+    assert_int_equal(eventCalls("net.rx"), 0);
+
+    // With rx/tx summarization, no doRecv is output at the time
+    clearTestData();
+    doRecv(16, 13);
+    doRecv(16, 13);
+    assert_int_equal(metricCalls("net.rx"), 0);
+    assert_int_equal(eventCalls("net.rx"), 2);
+    assert_int_equal(eventValues("net.rx"), 2*13);
+
+    // With open/close summarization, doClose does not output either
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("net.rx"), 0);
+    assert_int_equal(eventCalls("net.rx"), 0);
+    assert_int_equal(metricCalls("net.tcp"), 0);
+    assert_int_equal(metricCalls("net.port"), 0);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // doTotal should output net.rx activity from above.
+    clearTestData();
+    doTotal(TOT_PORTS);
+    doTotal(TOT_TCP_CONN);
+    doTotal(TOT_RX);
+    assert_int_equal(metricCalls("net.rx"), 1);
+    assert_int_equal(metricValues("net.rx"), 2*13);
+    assert_int_equal(metricCalls("net.tcp"), 0);     // Interesting...
+    assert_int_equal(metricCalls("net.port"), 0);    // need high water mark?
+    assert_int_equal(eventCalls(NULL), 0);
+
+    if(addr_list) freeaddrinfo(addr_list);
+}
+
+static void
+doSendNoSummarization(void** state)
+{
+    struct addrinfo* addr_list = NULL;
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    if (getaddrinfo("localhost", "13456", &hints, &addr_list) || !addr_list) {
+        fail();
+    }
+
+    clearTestData();
+    setVerbosity(9);
+    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    assert_int_equal(metricCalls("net.tcp"), 1);
+    assert_int_equal(metricCalls("net.port"), 1);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // Zeros should not be reported on any interface 
+    // Well, unless it's a change to zero for a gauge
+    doSend(16, 0);
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 0);
+
+    // Totals should not be reported if zero either
+    doTotal(TOT_TX);
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 0);
+
+    // Without rx/tx summarization, every doSend is output
+    clearTestData();
+    doSend(16, 13);
+    doSend(16, 13);
+    assert_int_equal(metricCalls("net.tx"), 2);
+    assert_int_equal(metricValues("net.tx"), 2*13);
+    assert_int_equal(eventCalls("net.tx"), 2);
+    assert_int_equal(eventValues("net.tx"), 2*13);
+
+    // Without open/close summarization, every doClose it output
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 0);
+    assert_int_equal(metricCalls("net.tcp"), 1);
+    assert_int_equal(metricCalls("net.port"), 1);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // doTotal shouldn't output anything.  It's already reported
+    clearTestData();
+    doTotal(TOT_PORTS);
+    doTotal(TOT_TCP_CONN);
+    doTotal(TOT_TX);
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    if(addr_list) freeaddrinfo(addr_list);
+}
+
+static void
+doSendSummarizedOpenCloseNotSummarized(void** state)
+{
+    struct addrinfo* addr_list = NULL;
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    if (getaddrinfo("localhost", "13456", &hints, &addr_list) || !addr_list) {
+        fail();
+    }
+
+    clearTestData();
+    setVerbosity(7);
+    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    assert_int_equal(metricCalls("net.tcp"), 1);
+    assert_int_equal(metricCalls("net.port"), 1);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // Zeros should not be reported on any interface
+    // Well, unless it's a change to zero for a gauge
+    doSend(16, 0);
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 0);
+
+    // Totals should not be reported if zero either
+    doTotal(TOT_TX);
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 0);
+
+    // With rx/tx summarization, no doSend is output at the time
+    clearTestData();
+    doSend(16, 13);
+    doSend(16, 13);
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 2);
+    assert_int_equal(eventValues("net.tx"), 2*13);
+
+    // Without open/close summarization, every doClose it output
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 0);
+    assert_int_equal(metricCalls("net.tcp"), 1);
+    assert_int_equal(metricCalls("net.port"), 1);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // doTotal should output net.tx activity from above.
+    clearTestData();
+    doTotal(TOT_PORTS);
+    doTotal(TOT_TCP_CONN);
+    doTotal(TOT_TX);
+    assert_int_equal(metricCalls("net.tx"), 1);
+    assert_int_equal(metricValues("net.tx"), 2*13);
+    assert_int_equal(metricCalls("net.tcp"), 0);
+    assert_int_equal(metricCalls("net.port"), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    if(addr_list) freeaddrinfo(addr_list);
+}
+
+static void
+doSendFullSummarization(void** state)
+{
+    struct addrinfo* addr_list = NULL;
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    if (getaddrinfo("localhost", "13456", &hints, &addr_list) || !addr_list) {
+        fail();
+    }
+
+    clearTestData();
+    setVerbosity(6);
+    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    assert_int_equal(metricCalls("net.tcp"), 0);
+    assert_int_equal(metricCalls("net.port"), 0);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // Zeros should not be reported on any interface
+    // Well, unless it's a change to zero for a gauge
+    doSend(16, 0);
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 0);
+
+    // Totals should not be reported if zero either
+    doTotal(TOT_TX);
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 0);
+
+    // With rx/tx summarization, no doSend is output at the time
+    clearTestData();
+    doSend(16, 13);
+    doSend(16, 13);
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 2);
+    assert_int_equal(eventValues("net.tx"), 2*13);
+
+    // With open/close summarization, doClose does not output either
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 0);
+    assert_int_equal(metricCalls("net.tcp"), 0);
+    assert_int_equal(metricCalls("net.port"), 0);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // doTotal should output net.tx activity from above.
+    clearTestData();
+    doTotal(TOT_PORTS);
+    doTotal(TOT_TCP_CONN);
+    doTotal(TOT_TX);
+    assert_int_equal(metricCalls("net.tx"), 1);
+    assert_int_equal(metricValues("net.tx"), 2*13);
+    assert_int_equal(metricCalls("net.tcp"), 0);     // Interesting...
+    assert_int_equal(metricCalls("net.port"), 0);    // need high water mark?
+    assert_int_equal(eventCalls(NULL), 0);
+
+    if(addr_list) freeaddrinfo(addr_list);
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -583,6 +896,11 @@ main(int argc, char* argv[])
         cmocka_unit_test(doWriteFileSummarizedOpenCloseNotSummarized),
         cmocka_unit_test(doWriteFileFullSummarization),
         cmocka_unit_test(doRecvNoSummarization),
+        cmocka_unit_test(doRecvSummarizedOpenCloseNotSummarized),
+        cmocka_unit_test(doRecvFullSummarization),
+        cmocka_unit_test(doSendNoSummarization),
+        cmocka_unit_test(doSendSummarizedOpenCloseNotSummarized),
+        cmocka_unit_test(doSendFullSummarization),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     int test_errors = cmocka_run_group_tests(tests, countTestSetup, countTestTeardown);

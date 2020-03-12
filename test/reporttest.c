@@ -520,7 +520,7 @@ doRecvNoSummarization(void** state)
     assert_int_equal(eventCalls("net.tcp"), 1);
     assert_int_equal(eventCalls("net.port"), 1);
 
-    // Zeros should not be reported on any interface 
+    // Zeros should not be reported on any interface
     // Well, unless it's a change to zero for a gauge
     doRecv(16, 0);
     assert_int_equal(metricCalls("net.rx"), 0);
@@ -707,7 +707,7 @@ doSendNoSummarization(void** state)
     assert_int_equal(eventCalls("net.tcp"), 1);
     assert_int_equal(eventCalls("net.port"), 1);
 
-    // Zeros should not be reported on any interface 
+    // Zeros should not be reported on any interface
     // Well, unless it's a change to zero for a gauge
     doSend(16, 0);
     assert_int_equal(metricCalls("net.tx"), 0);
@@ -955,7 +955,142 @@ doSeekSummarization(void** state)
     assert_int_equal(metricCalls("fs.seek"), 1);
     assert_int_equal(metricValues("fs.seek"), 2);
     assert_int_equal(eventCalls(NULL), 0);
+}
 
+static void
+doStatPathNoSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(7);
+
+    // Totals should not be reported if zero
+    doTotal(TOT_STAT);
+    assert_int_equal(metricCalls("fs.op.stat"), 0);
+    assert_int_equal(eventCalls("fs.op.stat"), 0);
+
+    // Without stat summarization, every doStat is output
+    clearTestData();
+    doStatPath("/the/path", 0, "statFunc");
+    doStatPath("/the/path", 0, "statFunc");
+    assert_int_equal(metricCalls("fs.op.stat"), 2);
+    assert_int_equal(metricValues("fs.op.stat"), 2);
+    assert_int_equal(eventCalls("fs.op.stat"), 2);
+    assert_int_equal(eventValues("fs.op.stat"), 2);
+
+    // doTotal shouldn't output fs.op.seek or fs.op.close.  It's already reported
+    clearTestData();
+    doTotal(TOT_STAT);
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+}
+
+static void
+doStatPathSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(6);
+
+    // Totals should not be reported if zero
+    doTotal(TOT_STAT);
+    assert_int_equal(metricCalls("fs.op.stat"), 0);
+    assert_int_equal(eventCalls("fs.op.stat"), 0);
+
+    // Without stat summarization, every doStat is output
+    clearTestData();
+    doStatPath("/the/path", 0, "statFunc");
+    doStatPath("/the/path", 0, "statFunc");
+    assert_int_equal(metricCalls("fs.op.stat"), 0);
+    assert_int_equal(metricValues("fs.op.stat"), 0);
+    assert_int_equal(eventCalls("fs.op.stat"), 2);
+    assert_int_equal(eventValues("fs.op.stat"), 2);
+
+    // doTotal shouldn't output fs.op.seek or fs.op.close.  It's already reported
+    clearTestData();
+    doTotal(TOT_STAT);
+    assert_int_equal(metricCalls("fs.stat"), 1);
+    assert_int_equal(metricValues("fs.stat"), 2);
+    assert_int_equal(eventCalls(NULL), 0);
+}
+
+static void
+doStatFdNoSummarization(void** state)
+{
+     clearTestData();
+     setVerbosity(7);
+     doOpen(16, "/the/file/path", FD, "openFunc");
+     assert_int_equal(metricCalls("fs.op.open"), 1);
+     assert_int_equal(eventCalls("fs.op.open"), 1);
+
+     // Totals should not be reported if zero
+     doTotal(TOT_STAT);
+     assert_int_equal(metricCalls("fs.op.stat"), 0);
+     assert_int_equal(eventCalls("fs.op.stat"), 0);
+
+     // Without stat summarization, every doStatFd is output
+     clearTestData();
+     doStatFd(16, 0, "statFunc");
+     doStatFd(16, 0, "statFunc");
+     assert_int_equal(metricCalls("fs.op.stat"), 2);
+     assert_int_equal(metricValues("fs.op.stat"), 2);
+     assert_int_equal(eventCalls("fs.op.stat"), 2);
+     assert_int_equal(eventValues("fs.op.stat"), 2);
+
+     // Without open/close summarization, every doClose is output
+     clearTestData();
+     doClose(16, "closeFunc");
+     assert_int_equal(metricCalls("fs.op.stat"), 0);
+     assert_int_equal(eventCalls("fs.op.stat"), 0);
+     assert_int_equal(metricCalls("fs.op.close"), 1);
+     assert_int_equal(eventCalls("fs.op.close"), 1);
+
+     // doTotal shouldn't output fs.op.stat or fs.op.close.  It's already reported
+     clearTestData();
+     doTotal(TOT_OPEN);
+     doTotal(TOT_STAT);
+     doTotal(TOT_CLOSE);
+     assert_int_equal(metricCalls(NULL), 0);
+     assert_int_equal(eventCalls(NULL), 0);
+}
+
+static void
+doStatFdSummarization(void** state)
+{
+     clearTestData();
+     setVerbosity(6);
+     doOpen(16, "/the/file/path", FD, "openFunc");
+     assert_int_equal(metricCalls("fs.op.open"), 1);
+     assert_int_equal(eventCalls("fs.op.open"), 1);
+
+     // Totals should not be reported if zero
+     doTotal(TOT_STAT);
+     assert_int_equal(metricCalls("fs.op.stat"), 0);
+     assert_int_equal(eventCalls("fs.op.stat"), 0);
+
+     // With stat summarization, doStatFd is is not output
+     clearTestData();
+     doStatFd(16, 0, "statFunc");
+     doStatFd(16, 0, "statFunc");
+     assert_int_equal(metricCalls("fs.op.stat"), 0);
+     assert_int_equal(metricValues("fs.op.stat"), 0);
+     assert_int_equal(eventCalls("fs.op.stat"), 2);
+     assert_int_equal(eventValues("fs.op.stat"), 2);
+
+     // Without open/close summarization, every doClose is output
+     clearTestData();
+     doClose(16, "closeFunc");
+     assert_int_equal(metricCalls("fs.op.stat"), 0);
+     assert_int_equal(eventCalls("fs.op.stat"), 0);
+     assert_int_equal(metricCalls("fs.op.close"), 1);
+     assert_int_equal(eventCalls("fs.op.close"), 1);
+
+     // doTotal shouldn't output fs.op.stat or fs.op.close.  It's already reported
+     clearTestData();
+     doTotal(TOT_OPEN);
+     doTotal(TOT_STAT);
+     doTotal(TOT_CLOSE);
+     assert_int_equal(metricCalls("fs.stat"), 1);
+     assert_int_equal(metricValues("fs.stat"), 2);
+     assert_int_equal(eventCalls(NULL), 0);
 }
 
 int
@@ -987,6 +1122,10 @@ main(int argc, char* argv[])
         cmocka_unit_test(doSendFullSummarization),
         cmocka_unit_test(doSeekNoSummarization),
         cmocka_unit_test(doSeekSummarization),
+        cmocka_unit_test(doStatPathNoSummarization),
+        cmocka_unit_test(doStatPathSummarization),
+        cmocka_unit_test(doStatFdNoSummarization),
+        cmocka_unit_test(doStatFdSummarization),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     int test_errors = cmocka_run_group_tests(tests, countTestSetup, countTestTeardown);

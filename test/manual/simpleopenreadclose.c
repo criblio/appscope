@@ -11,8 +11,8 @@
 int stopLooping = 0;
 int interval = 5; // 5 second default
 
-void 
-sigHandler(int sig_num) 
+void
+sigHandler(int sig_num)
 {
     stopLooping = (sig_num == SIGINT);
 }
@@ -23,7 +23,7 @@ main(int argc, char* argv[])
     printf("Running simpleopenreadclose.c\n");
     printf("... Hit ctl-c when done...\n");
 
-    // Accept a single argument that specifies an integer sleep interval 
+    // Accept a single argument that specifies an integer sleep interval
     // (in seconds)
     if (argc == 2) {
         errno = 0;

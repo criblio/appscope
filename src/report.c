@@ -718,7 +718,7 @@ doFSMetric(metric_t type, int fd, control_type_t source,
         }
 
         // if called from an event, we update counters
-        if (source == EVENT_BASED) {
+        if ((source == EVENT_BASED) && size) {
             addToInterfaceCounts(numops, 1);
             addToInterfaceCounts(global_counter, 1);
         }

@@ -874,6 +874,90 @@ doSendFullSummarization(void** state)
     if(addr_list) freeaddrinfo(addr_list);
 }
 
+static void
+doSeekNoSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(8);
+
+    doOpen(16, "/the/file/path", FD, "openFunc");
+    assert_int_equal(metricCalls("fs.op.open"), 1);
+    assert_int_equal(eventCalls("fs.op.open"), 1);
+
+    // Totals should not be reported if zero
+    doTotal(TOT_SEEK);
+    assert_int_equal(metricCalls("fs.op.seek"), 0);
+    assert_int_equal(eventCalls("fs.op.seek"), 0);
+
+    // Without seek summarization, every doSeek is output
+    clearTestData();
+    doSeek(16, 1, "readFunc");
+    doSeek(16, 1, "readFunc");
+    assert_int_equal(metricCalls("fs.op.seek"), 2);
+    assert_int_equal(metricValues("fs.op.seek"), 2);
+    assert_int_equal(eventCalls("fs.op.seek"), 2);
+    assert_int_equal(eventValues("fs.op.seek"), 2);
+
+    // Without open/close summarization, every doClose is output
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("fs.op.seek"), 0);
+    assert_int_equal(eventCalls("fs.op.seek"), 0);
+    assert_int_equal(metricCalls("fs.op.close"), 1);
+    assert_int_equal(eventCalls("fs.op.close"), 1);
+
+    // doTotal shouldn't output fs.op.seek or fs.op.close.  It's already reported
+    clearTestData();
+    doTotal(TOT_OPEN);
+    doTotal(TOT_SEEK);
+    doTotal(TOT_CLOSE);
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+}
+
+static void
+doSeekSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(7);
+
+    doOpen(16, "/the/file/path", FD, "openFunc");
+    assert_int_equal(metricCalls("fs.op.open"), 1);
+    assert_int_equal(eventCalls("fs.op.open"), 1);
+
+    // Totals should not be reported if zero
+    doTotal(TOT_SEEK);
+    assert_int_equal(metricCalls("fs.op.seek"), 0);
+    assert_int_equal(eventCalls("fs.op.seek"), 0);
+
+    // With seek summarization, no doSeek is output
+    clearTestData();
+    doSeek(16, 1, "readFunc");
+    doSeek(16, 1, "readFunc");
+    assert_int_equal(metricCalls("fs.op.seek"), 0);
+    assert_int_equal(metricValues("fs.op.seek"), 0);
+    assert_int_equal(eventCalls("fs.op.seek"), 2);
+    assert_int_equal(eventValues("fs.op.seek"), 2);
+
+    // Without open/close summarization, every doClose is output
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("fs.op.seek"), 0);
+    assert_int_equal(eventCalls("fs.op.seek"), 0);
+    assert_int_equal(metricCalls("fs.op.close"), 1);
+    assert_int_equal(eventCalls("fs.op.close"), 1);
+
+    // doTotal should output fs.op.seek per the activity above.
+    clearTestData();
+    doTotal(TOT_OPEN);
+    doTotal(TOT_SEEK);
+    doTotal(TOT_CLOSE);
+    assert_int_equal(metricCalls("fs.seek"), 1);
+    assert_int_equal(metricValues("fs.seek"), 2);
+    assert_int_equal(eventCalls(NULL), 0);
+
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -901,6 +985,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(doSendNoSummarization),
         cmocka_unit_test(doSendSummarizedOpenCloseNotSummarized),
         cmocka_unit_test(doSendFullSummarization),
+        cmocka_unit_test(doSeekNoSummarization),
+        cmocka_unit_test(doSeekSummarization),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     int test_errors = cmocka_run_group_tests(tests, countTestSetup, countTestTeardown);

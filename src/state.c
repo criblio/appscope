@@ -721,7 +721,7 @@ doSeek(int fd, int success, const char* func)
     if (success) {
         scopeLog(func, fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, func, 0, NULL);
+            doFSMetric(FS_SEEK, fd, EVENT_BASED, func, 1, NULL);
         }
     } else {
         if (fs) {
@@ -865,7 +865,7 @@ doClose(int fd, const char *func)
     // Check both file desriptor tables
     if ((fsinfo = getFSEntry(fd)) != NULL) {
 
-        doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 0, NULL);
+        doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 1, NULL);
 
         if (func) {
             char buf[64];
@@ -928,7 +928,7 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
         g_fsinfo[fd].uid = getTime();
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
 
-        doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 0, NULL);
+        doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 1, NULL);
         scopeLog(func, fd, CFG_LOG_TRACE);
     }
 }

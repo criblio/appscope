@@ -1259,6 +1259,354 @@ doDNSSendDNSSummarization(void** state)
     if(addr_list) freeaddrinfo(addr_list);
 }
 
+static void
+doFSConnectionErrorNoSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(5);
+    doOpen(16, "/the/file/path", FD, "openFunc");
+
+    // Zeros should not be reported on any interface
+    clearTestData();
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    // Should create "open/close" fs.error and report it immediately
+    doDup(16, -1, "dupFunc", FALSE);
+    doDup(16, -1, "dupFunc", FALSE);
+    assert_int_equal(metricCalls("fs.error"), 2);
+    assert_int_equal(metricValues("fs.error"), 2);
+    assert_int_equal(eventCalls("fs.error"), 2);
+    assert_int_equal(eventValues("fs.error"), 2);
+
+    // Nothing to see here, because it was reported earlier
+    clearTestData();
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    doClose(16, "closeFunc");
+}
+
+static void
+doFSConnectionErrorSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(4);
+    doOpen(16, "/the/file/path", FD, "openFunc");
+
+    // Zeros should not be reported on any interface
+    clearTestData();
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    // Should create "open/close" fs.error but not report it
+    doDup(16, -1, "dupFunc", FALSE);
+    doDup(16, -1, "dupFunc", FALSE);
+    assert_int_equal(metricCalls("fs.error"), 0);
+    assert_int_equal(eventCalls("fs.error"), 2);
+    assert_int_equal(eventValues("fs.error"), 2);
+
+    // Ok, this should report the earlier fs.errors
+    clearTestData();
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls("fs.error"), 1);
+    assert_int_equal(metricValues("fs.error"), 2);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    doClose(16, "closeFunc");
+}
+
+static void
+doNetConnectionErrorNoSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(5);
+    addSock(16, SOCK_STREAM);
+
+    // Zeros should not be reported on any interface
+    clearTestData();
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    // Should create "connection" net.error and report it immediately
+    doDup(16, -1, "dupFunc", TRUE);
+    doDup(16, -1, "dupFunc", TRUE);
+    assert_int_equal(metricCalls("net.error"), 2);
+    assert_int_equal(metricValues("net.error"), 2);
+    assert_int_equal(eventCalls("net.error"), 2);
+    assert_int_equal(eventValues("net.error"), 2);
+
+    // Nothing to see here, because it was reported earlier
+    clearTestData();
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    doClose(16, "closeFunc");
+}
+
+static void
+doNetConnectionErrorSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(4);
+    addSock(16, SOCK_STREAM);
+
+    // Zeros should not be reported on any interface
+    clearTestData();
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    // Should create "connection" net.error but not report it
+    doDup(16, -1, "dupFunc", TRUE);
+    doDup(16, -1, "dupFunc", TRUE);
+    assert_int_equal(metricCalls("net.error"), 0);
+    assert_int_equal(eventCalls("net.error"), 2);
+    assert_int_equal(eventValues("net.error"), 2);
+
+    // Ok, this should report the earlier net.errors
+    clearTestData();
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls("net.error"), 1);
+    assert_int_equal(metricValues("net.error"), 2);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    doClose(16, "closeFunc");
+}
+
+static void
+doFSReadWriteErrorNoSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(5);
+    doOpen(16, "/the/file/path", FD, "openFunc");
+
+    // Zeros should not be reported on any interface
+    clearTestData();
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    // Should create "read/write" fs.error and report it immediately
+    doRead(16, 987, 0, 0, "readFunc");
+    doRead(16, 987, 0, 0, "readFunc");
+    assert_int_equal(metricCalls("fs.error"), 2);
+    assert_int_equal(metricValues("fs.error"), 2);
+    assert_int_equal(eventCalls("fs.error"), 2);
+    assert_int_equal(eventValues("fs.error"), 2);
+
+    // Nothing to see here, becaues it was reported earlier
+    clearTestData();
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    doClose(16, "closeFunc");
+}
+
+static void
+doFSReadWriteErrorSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(4);
+    doOpen(16, "/the/file/path", FD, "openFunc");
+
+    // Zeros should not be reported on any interface
+    clearTestData();
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    // Should create "read/write" fs.error but not report it
+    doRead(16, 987, 0, 0, "readFunc");
+    doRead(16, 987, 0, 0, "readFunc");
+    assert_int_equal(metricCalls("fs.error"), 0);
+    assert_int_equal(eventCalls("fs.error"), 2);
+    assert_int_equal(eventValues("fs.error"), 2);
+
+    // Ok, this should report the ealier fs.errors
+    clearTestData();
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls("fs.error"), 1);
+    assert_int_equal(metricValues("fs.error"), 2);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    doClose(16, "closeFunc");
+}
+
+static void
+doNetRxTxErrorNoSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(5);
+    addSock(16, SOCK_STREAM);
+
+    // Zeros should not be reported on any interface
+    clearTestData();
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    // Should create "rx/tx" net.error and report it immediately
+    doRead(16, 987, 0, 0, "readFunc");
+    doRead(16, 987, 0, 0, "readFunc");
+    assert_int_equal(metricCalls("net.error"), 2);
+    assert_int_equal(metricValues("net.error"), 2);
+    assert_int_equal(eventCalls("net.error"), 2);
+    assert_int_equal(eventValues("net.error"), 2);
+
+    // Nothing to see here, because it was reported earlier
+    clearTestData();
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    doClose(16, "closeFunc");
+}
+
+static void
+doNetRxTxErrorSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(4);
+    addSock(16, SOCK_STREAM);
+
+    // Zeros should not be reported on any interface
+    clearTestData();
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    // Should create "rx/tx" net.error but not report it
+    doRead(16, 987, 0, 0, "readFunc");
+    doRead(16, 987, 0, 0, "readFunc");
+    assert_int_equal(metricCalls("net.error"), 0);
+    assert_int_equal(eventCalls("net.error"), 2);
+    assert_int_equal(eventValues("net.error"), 2);
+
+    // Ok, this should report the earlier net.errors
+    clearTestData();
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls("net.error"), 1);
+    assert_int_equal(metricValues("net.error"), 2);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    doClose(16, "closeFunc");
+}
+
+static void
+doStatErrNoSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(5);
+
+    // Zeros should not be reported on any interface
+    clearTestData();
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    // Should create "stat" fs.error and report it immediately
+    doStatPath("/pathy/path", -1, "statymcstatface");
+    doStatPath("/pathy/path", -1, "statymcstatface");
+    assert_int_equal(metricCalls("fs.error"), 2);
+    assert_int_equal(metricValues("fs.error"), 2);
+    assert_int_equal(eventCalls("fs.error"), 2);
+    assert_int_equal(eventValues("fs.error"), 2);
+
+    // Nothing to see here, because it was reported earlier
+    clearTestData();
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+}
+
+static void
+doStatErrSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(4);
+
+    // Zeros should not be reported on any interface
+    clearTestData();
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    // Should create "stat" fs.error but not report it
+    doStatPath("/pathy/path", -1, "statymcstatface");
+    doStatPath("/pathy/path", -1, "statymcstatface");
+    assert_int_equal(metricCalls("fs.error"), 0);
+    assert_int_equal(eventCalls("fs.error"), 2);
+    assert_int_equal(eventValues("fs.error"), 2);
+
+    // Ok, this should report the earlier fs.errors
+    clearTestData();
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls("fs.error"), 1);
+    assert_int_equal(metricValues("fs.error"), 2);
+    assert_int_equal(eventCalls(NULL), 0);
+}
+
+static void
+doDNSErrNoSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(5);
+
+    // Zeros should not be reported on any interface
+    clearTestData();
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    // Should create "dns" net.error and report it immediately
+    doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname_r", "blah");
+    doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname_r", "blah");
+    assert_int_equal(metricCalls("net.error"), 2);
+    assert_int_equal(metricValues("net.error"), 2);
+    assert_int_equal(eventCalls("net.error"), 2);
+    assert_int_equal(eventValues("net.error"), 2);
+
+    // Nothing to see here, because it was reported earlier
+    clearTestData();
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+}
+
+static void
+doDNSErrSummarization(void** state)
+{
+    clearTestData();
+    setVerbosity(4);
+
+    // Zeros should not be reported on any interface
+    clearTestData();
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    // Should create "dns" net.error but not report it
+    doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname_r", "blah");
+    doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname_r", "blah");
+    assert_int_equal(metricCalls("net.error"), 0);
+    assert_int_equal(eventCalls("net.error"), 2);
+    assert_int_equal(eventValues("net.error"), 2);
+
+    // Nothing to see here, because it was reported earlier
+    clearTestData();
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary");
+    assert_int_equal(metricCalls("net.error"), 1);
+    assert_int_equal(metricValues("net.error"), 2);
+    assert_int_equal(eventCalls(NULL), 0);
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -1294,6 +1642,18 @@ main(int argc, char* argv[])
         cmocka_unit_test(doStatFdSummarization),
         cmocka_unit_test(doDNSSendNoDNSSummarization),
         cmocka_unit_test(doDNSSendDNSSummarization),
+        cmocka_unit_test(doFSConnectionErrorNoSummarization),
+        cmocka_unit_test(doFSConnectionErrorSummarization),
+        cmocka_unit_test(doNetConnectionErrorNoSummarization),
+        cmocka_unit_test(doNetConnectionErrorSummarization),
+        cmocka_unit_test(doFSReadWriteErrorNoSummarization),
+        cmocka_unit_test(doFSReadWriteErrorSummarization),
+        cmocka_unit_test(doNetRxTxErrorNoSummarization),
+        cmocka_unit_test(doNetRxTxErrorSummarization),
+        cmocka_unit_test(doStatErrNoSummarization),
+        cmocka_unit_test(doStatErrSummarization),
+        cmocka_unit_test(doDNSErrNoSummarization),
+        cmocka_unit_test(doDNSErrSummarization),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     int test_errors = cmocka_run_group_tests(tests, countTestSetup, countTestTeardown);

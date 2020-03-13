@@ -1083,7 +1083,7 @@ doStatFdSummarization(void** state)
      assert_int_equal(metricCalls("fs.op.close"), 1);
      assert_int_equal(eventCalls("fs.op.close"), 1);
 
-     // doTotal shouldn't output fs.op.stat or fs.op.close.  It's already reported
+     // doTotal should output fs.stat.
      clearTestData();
      doTotal(TOT_OPEN);
      doTotal(TOT_STAT);
@@ -1091,6 +1091,172 @@ doStatFdSummarization(void** state)
      assert_int_equal(metricCalls("fs.stat"), 1);
      assert_int_equal(metricValues("fs.stat"), 2);
      assert_int_equal(eventCalls(NULL), 0);
+}
+
+static void
+doDNSSendNoDNSSummarization(void** state)
+{
+    struct addrinfo* addr_list = NULL;
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    if (getaddrinfo("localhost", "53", &hints, &addr_list) || !addr_list) {
+        fail();
+    }
+
+    clearTestData();
+    setVerbosity(6);
+    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    assert_int_equal(metricCalls("net.tcp"), 0);
+    assert_int_equal(metricCalls("net.port"), 0);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // Zeros should not be reported on any interface
+    doSend(16, 0);
+    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns"), 0);
+
+    // Totals should not be reported if zero either
+    doTotal(TOT_DNS);
+    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns"), 0);
+
+
+    // Without DNS summarization, every net.dns is output
+    clearTestData();
+
+    // A query to look up www.google.com
+    uint8_t pkt[] = {
+	0xde, 0xaf, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x01, 0x03, 0x77, 0x77, 0x77,
+	0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03,
+	0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01
+    };
+    getDNSName(16, pkt, sizeof(pkt));
+    doSend(16, 13);
+    // Switch from www.google.com to www.reddit.com.
+    // This is because we only report dns domain *changes*.
+    memcpy(&pkt[17], "reddit", 6);
+    getDNSName(16, pkt, sizeof(pkt));
+    doSend(16, 13);
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 2);
+    assert_int_equal(eventValues("net.tx"), 2*13);
+    assert_int_equal(metricCalls("net.dns"), 2);
+    assert_int_equal(metricValues("net.dns"), 2);
+    assert_int_equal(eventCalls("net.dns"), 2);
+    assert_int_equal(eventValues("net.dns"), 2);
+
+
+    // Without open/close summarization, every doClose is output
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 0);
+    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns"), 0);
+    assert_int_equal(metricCalls("net.tcp"), 0);
+    assert_int_equal(metricCalls("net.port"), 0);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // doTotal shouldn't output net.dns.  It's already reported
+    clearTestData();
+    doTotal(TOT_PORTS);
+    doTotal(TOT_TCP_CONN);
+    doTotal(TOT_DNS);
+    doTotal(TOT_TX);
+    assert_int_equal(metricCalls("net.tx"), 1);
+    assert_int_equal(metricValues("net.tx"), 2*13);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    if(addr_list) freeaddrinfo(addr_list);
+}
+
+static void
+doDNSSendDNSSummarization(void** state)
+{
+    struct addrinfo* addr_list = NULL;
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    if (getaddrinfo("localhost", "53", &hints, &addr_list) || !addr_list) {
+        fail();
+    }
+
+    clearTestData();
+    setVerbosity(5);
+    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    assert_int_equal(metricCalls("net.tcp"), 0);
+    assert_int_equal(metricCalls("net.port"), 0);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // Zeros should not be reported on any interface
+    doSend(16, 0);
+    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns"), 0);
+
+    // Totals should not be reported if zero either
+    doTotal(TOT_DNS);
+    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns"), 0);
+
+
+    // With DNS summarization, net.dns is not output
+    clearTestData();
+
+    // A query to look up www.google.com
+    uint8_t pkt[] = {
+	0xde, 0xaf, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x01, 0x03, 0x77, 0x77, 0x77,
+	0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03,
+	0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01
+    };
+    getDNSName(16, pkt, sizeof(pkt));
+    doSend(16, 13);
+    // Switch from www.google.com to www.reddit.com.
+    // This is because we only report dns domain *changes*.
+    memcpy(&pkt[17], "reddit", 6);
+    getDNSName(16, pkt, sizeof(pkt));
+    doSend(16, 13);
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 2);
+    assert_int_equal(eventValues("net.tx"), 2*13);
+    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(metricValues("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns"), 2);
+    assert_int_equal(eventValues("net.dns"), 2);
+
+
+    // Without open/close summarization, every doClose is output
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("net.tx"), 0);
+    assert_int_equal(eventCalls("net.tx"), 0);
+    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns"), 0);
+    assert_int_equal(metricCalls("net.tcp"), 0);
+    assert_int_equal(metricCalls("net.port"), 0);
+    assert_int_equal(eventCalls("net.tcp"), 1);
+    assert_int_equal(eventCalls("net.port"), 1);
+
+    // doTotal should output net.dns and net.tx.  (not reported above)
+    clearTestData();
+    doTotal(TOT_PORTS);
+    doTotal(TOT_TCP_CONN);
+    doTotal(TOT_DNS);
+    doTotal(TOT_TX);
+    assert_int_equal(metricCalls("net.tx"), 1);
+    assert_int_equal(metricValues("net.tx"), 2*13);
+    assert_int_equal(metricCalls("net.dns"), 1);
+    assert_int_equal(metricValues("net.dns"), 2);
+    assert_int_equal(eventCalls(NULL), 0);
+
+    if(addr_list) freeaddrinfo(addr_list);
 }
 
 int
@@ -1126,6 +1292,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(doStatPathSummarization),
         cmocka_unit_test(doStatFdNoSummarization),
         cmocka_unit_test(doStatFdSummarization),
+        cmocka_unit_test(doDNSSendNoDNSSummarization),
+        cmocka_unit_test(doDNSSendDNSSummarization),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     int test_errors = cmocka_run_group_tests(tests, countTestSetup, countTestTeardown);

@@ -88,8 +88,8 @@ if [ "${OS}" = "linux" ]; then
     test/access_rights.sh
     ERR+=$?
 
-    test/unixpeer.sh
-    ERR+=$?
+#    test/unixpeer.sh
+#    ERR+=$?
 fi
 
 

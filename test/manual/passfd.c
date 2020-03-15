@@ -512,6 +512,7 @@ unruly_kid()
 
           for (i = 0; i < numfds; i++) {
               // on the new fd
+              fprintf(stdout, "Child:Sending on %d\n", recvfd[i]);
               if (fstat(recvfd[i], &sbuf) != -1) {
                   if ((sbuf.st_mode & S_IFMT) == S_IFSOCK) {
                       if (send(recvfd[i], test_data, strlen(test_data), 0) == -1) {

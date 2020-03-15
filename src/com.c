@@ -1,15 +1,18 @@
 #include "com.h"
 
+extern rtconfig g_cfg;
+
 int
-cmdSendEvent(ctl_t *ctl, event_t* e, uint64_t time, proc_id_t* proc)
+cmdSendEvent(ctl_t *ctl, event_t *event, uint64_t time, proc_id_t *proc)
 {
-    return ctlSendEvent(ctl, e, time, proc);
+    if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC)) return 0;
+    return ctlSendEvent(ctl, event, time, proc);
 }
 
 int
-cmdSendMetric(mtc_t *mtc, event_t* e)
+cmdSendMetric(mtc_t *mtc, event_t *evt)
 {
-    return mtcSendMetric(mtc, e);
+    return mtcSendMetric(mtc, evt);
 }
 
 
@@ -32,6 +35,12 @@ int
 cmdPostInfoMsg(ctl_t *ctl, cJSON *json)
 {
     return ctlPostMsg(ctl, json, UPLD_INFO, NULL, FALSE);
+}
+
+int
+cmdPostEvent(ctl_t *ctl, char *event)
+{
+    return ctlPostEvent(ctl, event);
 }
 
 int
@@ -58,10 +67,10 @@ cmdParse(const char *cmd)
     return ctlParseRxMsg(cmd);
 }
 
-static cJSON*
-jsonProcessObject(proc_id_t* proc)
+static cJSON *
+jsonProcessObject(proc_id_t *proc)
 {
-    cJSON* root = NULL;
+    cJSON *root = NULL;
 
     if (!proc) goto err;
 
@@ -85,11 +94,11 @@ err:
     return NULL;
 }
 
-cJSON*
-jsonConfigurationObject(config_t* cfg)
+cJSON *
+jsonConfigurationObject(config_t *cfg)
 {
-    cJSON* root = NULL;
-    cJSON* current;
+    cJSON *root = NULL;
+    cJSON *current;
 
     if (!cfg) goto err;
 
@@ -104,7 +113,7 @@ err:
     return NULL;
 }
 
-static cJSON*
+static cJSON *
 jsonEnvironmentObject()
 {
     return cJSON_CreateObject();
@@ -112,11 +121,11 @@ jsonEnvironmentObject()
     // env variables???
 }
 
-cJSON*
-msgStart(proc_id_t* proc, config_t* cfg)
+cJSON *
+msgStart(proc_id_t *proc, config_t *cfg)
 {
-    cJSON* json_root = NULL;
-    cJSON* json_proc, *json_cfg, *json_env;
+    cJSON *json_root = NULL;
+    cJSON *json_proc, *json_cfg, *json_env;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
@@ -134,3 +143,11 @@ err:
     if (json_root) cJSON_Delete(json_root);
     return NULL;
 }
+
+uint64_t
+msgEventGet(ctl_t *ctl)
+{
+    if (!ctl) return (uint64_t) -1;
+    return ctlGetEvent(ctl);
+}
+

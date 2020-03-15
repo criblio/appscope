@@ -56,6 +56,12 @@ typedef enum {
     FS_ERR_OPEN_CLOSE,
     FS_ERR_STAT,
     FS_ERR_READ_WRITE,
+    FS_STAT,
+    EVT_NET,
+    EVT_FS,
+    EVT_STAT,
+    EVT_ERR,
+    EVT_DNS
 } metric_t;
 
 // File types: stream or fd
@@ -66,25 +72,21 @@ typedef enum {
 
 
 // Interfaces
-extern mtc_t* g_mtc;
-extern ctl_t* g_ctl;
+extern mtc_t *g_mtc;
+extern ctl_t *g_ctl;
 
 
 void setReportingInterval(int);
 
 
 void sendProcessStartMetric();
-void doErrorMetric(metric_t type, control_type_t source,
-           const char *func, const char *name);
-void doDNSMetricName(metric_t type, const char *domain, uint64_t duration);
-void doProcMetric(metric_t type, long long measurement);
-void doStatMetric(const char *op, const char *pathname);
-void doFSMetric(metric_t type, int fd, control_type_t source,
-           const char *op, ssize_t size, const char *pathname);
-void doTotal(metric_t type);
-void doTotalDuration(metric_t type);
-void doNetMetric(metric_t type, int fd,
-           control_type_t source, ssize_t size);
+void doErrorMetric(metric_t, control_type_t, const char *, const char *);
+void doDNSMetricName(metric_t, const char *, uint64_t);
+void doProcMetric(metric_t, long long);
+void doStatMetric(const char *, const char *);
+void doTotal(metric_t);
+void doTotalDuration(metric_t);
+void doEvent(void);
 
 
 #endif // __REPORT_H__

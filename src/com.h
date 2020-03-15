@@ -14,12 +14,13 @@
 #include "ctl.h"
 #include "cfgutils.h"
 #include "scopetypes.h"
+#include "runtimecfg.h"
 
 
 // Post a message from report to the command buffer
-int cmdSendEvent(ctl_t *, event_t*, uint64_t, proc_id_t*);
-int cmdSendMetric(mtc_t *, event_t*);
-
+int cmdSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);
+int cmdSendMetric(mtc_t *, event_t* );
+int cmdPostEvent(ctl_t *, char *);
 
 // Post a message to the command buffer
 int cmdPostEvtMsg(ctl_t *, cJSON *);
@@ -39,5 +40,8 @@ cJSON *msgStart(proc_id_t *, config_t *);
 
 // Create a json object describing the current configuration
 cJSON *jsonConfigurationObject(config_t *);
+
+// Retreive messages
+uint64_t msgEventGet(ctl_t *);
 
 #endif // __COM_H__

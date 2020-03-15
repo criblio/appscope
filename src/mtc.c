@@ -9,24 +9,8 @@ struct _mtc_t
 {
     transport_t* transport;
     mtc_fmt_t* format;
-    cbuf_handle_t evbuf;
     int metric_disabled;
 };
-
-static void
-sendBufferedMessages(mtc_t *mtc)
-{
-    if (!mtc) return;
-
-    uint64_t data;
-    while (cbufGet(mtc->evbuf, &data) == 0) {
-        if (data) {
-            char *msg = (char*) data;
-            transportSend(mtc->transport, msg);
-            free(msg);
-        }
-    }
-}
 
 mtc_t *
 mtcCreate()
@@ -41,12 +25,6 @@ mtcCreate()
     // Added 31-Jan-2020 for a demo.
     mtc->metric_disabled = (getenv("SCOPE_METRIC_DISABLE") != NULL);
 
-    mtc->evbuf = cbufInit(DEFAULT_METRIC_CBUF_SIZE);
-    if (!mtc->evbuf) {
-        DBG(NULL);
-        return NULL;
-    }
-
     return mtc;
 }
 
@@ -57,7 +35,6 @@ mtcDestroy(mtc_t **mtc)
     mtc_t *mtcb = *mtc;
     transportDestroy(&mtcb->transport);
     mtcFormatDestroy(&mtcb->format);
-    cbufFree((*mtc)->evbuf);
     free(mtcb);
     *mtc = NULL;
 }
@@ -67,14 +44,7 @@ mtcSend(mtc_t *mtc, const char *msg)
 {
     if (!mtc || !msg) return -1;
 
-    if (cbufPut(mtc->evbuf, (uint64_t)msg) == -1) {
-        // Full; drop and ignore
-        DBG(NULL);
-        free((char *)msg);
-        return -1;
-    }
-
-    return 0;
+    return transportSend(mtc->transport, msg);
 }
 
 int
@@ -86,6 +56,7 @@ mtcSendMetric(mtc_t *mtc, event_t *evt)
 
     char *msg = mtcFormatStatsDString(mtc->format, evt, NULL);
     int rv = mtcSend(mtc, msg);
+    if (msg) free(msg);
     return rv;
 }
 
@@ -93,7 +64,7 @@ void
 mtcFlush(mtc_t *mtc)
 {
     if (!mtc) return;
-    sendBufferedMessages(mtc);
+
     transportFlush(mtc->transport);
 }
 

@@ -150,12 +150,12 @@ server_child()
         perror("ERROR on accept");
         exit(-1);
     }
-    
+
     do {
         rc = read(childfd, buf, sizeof(buf));
         if (rc < 0) perror("read");
         if (rc > 0) {
-            if (verbose > 0) fprintf(stdout, "Parent received %d bytes\n", rc);
+            if (verbose > 0) fprintf(stdout, "Parent received %d bytes on %d\n", rc, childfd);
         }
 
         if (rc == 0) {
@@ -202,6 +202,12 @@ client_child() {
         exit(-1);
     }
 
+    // TODO: need to talk about this
+    // make sure the server reports out after accept
+    ts.tv_sec=0;
+    ts.tv_nsec=010000000; // 10 ms
+    nanosleep(&ts, NULL);
+
     if (verbose > 0) fprintf(stdout, "Child sending: %s\n", test_data);
 
     if (write(clientsock, test_data, strlen(test_data)) == -1) {
@@ -209,6 +215,12 @@ client_child() {
         exit(-1);
     }
 
+    // make sure the server sees this connection before we close
+    ts.tv_sec=0;
+    ts.tv_nsec=010000000; // 10 ms
+    nanosleep(&ts, NULL);
+
+    close(clientsock);
     exit(0);
 }
 
@@ -267,11 +279,11 @@ int main(int argc, char **argv) {
     }
     
     if (events) free(events);
-    
+
     if (unlink(EVENTFILE) == -1) {
         perror("unlink:check_event");
     }
-    
+
     if ((rc == 0) && (WEXITSTATUS(client_stat) == 0) && (WEXITSTATUS(server_stat) == 0)) {
         exit(0);
     } else {

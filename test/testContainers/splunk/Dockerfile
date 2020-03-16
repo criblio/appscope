@@ -1,16 +1,15 @@
-FROM cribl/splunk:7.3.0
+FROM cribl/splunk:8.0.0
 
 
 
 ARG CRIBL_DISTRO=cribl-splunk-app-linux-x64
 RUN sh -c 'echo dash dash/sh boolean false | debconf-set-selections' && \
     sh -c 'DEBIAN_FRONTEND=noninteractive dpkg-reconfigure dash' && \
-    echo "deb [check-valid-until=no] http://archive.debian.org/debian jessie-backports main" > /etc/apt/sources.list.d/jessie-backports.list && \
-    sed -i '/deb http:\/\/deb.debian.org\/debian jessie-updates main/d' /etc/apt/sources.list && \
     apt-get -o Acquire::Check-Valid-Until=false update && \
     apt-get install -y vim nano curl ca-certificates jq
 
-RUN apt-get install -y gcc make \
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get --no-install-recommends install -y gcc make \
     build-essential checkinstall libreadline-gplv2-dev libncursesw5-dev libssl-dev \
     libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev libffi-dev zlib1g-dev
 

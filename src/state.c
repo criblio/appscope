@@ -177,6 +177,26 @@ postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const cha
     // something passed in a param that is not a viable address; ltp does this
     if ((stat_err == EVT_ERR) && (errno == EFAULT)) return;
 
+    if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC)) {
+        if ((stat_err == EVT_STAT) && (g_summary.fs.stat)) return;
+
+        switch (type) {
+        case NET_ERR_CONN:
+        case NET_ERR_RX_TX:
+            if (g_summary.net.error) return;
+            break;
+
+        case FS_ERR_OPEN_CLOSE:
+        case FS_ERR_READ_WRITE:
+        case FS_ERR_STAT:
+        case NET_ERR_DNS:
+            if ((g_summary.fs.error) || (g_summary.net.dnserror)) return;
+            break;
+        default:
+            break;
+        }
+    }
+
     size_t len = sizeof(struct stat_err_info_t);
     stat_err_info *sep = calloc(1, len);
     if (!sep) return;

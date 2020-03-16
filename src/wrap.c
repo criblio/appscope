@@ -509,15 +509,13 @@ reportPeriodicStuff(void)
     doTotalDuration(TOT_DNS_DURATION);
 
     // Report errors
-// TODO
-#if 1 // Not sure; need to discuss
     doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
     doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
     doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary");
     doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary");
     doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary");
     doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary");
-#endif
+
     // report net and file by descriptor
     reportAllFds(PERIODIC);
 

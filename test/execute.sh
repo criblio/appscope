@@ -79,17 +79,17 @@ fi
 run_test test/${OS}/selfinterposetest
 
 if [ "${OS}" = "linux" ]; then
-    SAVEVARS=$ENVARS
-    ENVVARS=$ENVVARS"LD_PRELOAD=./lib/linux/libscope.so ""SCOPE_METRIC_DEST=file:///tmp/dnstest.log ""SCOPE_METRIC_VERBOSITY=9 "
-    run_test test/${OS}/dnstest
-    ENVARS=$SAVEVARS
-    rm "/tmp/dnstest.log"
+#    SAVEVARS=$ENVARS
+#    ENVVARS=$ENVVARS"LD_PRELOAD=./lib/linux/libscope.so ""SCOPE_METRIC_DEST=file:///tmp/dnstest.log ""SCOPE_METRIC_VERBOSITY=9 "
+#    run_test test/${OS}/dnstest
+#    ENVARS=$SAVEVARS
+#    rm "/tmp/dnstest.log"
 
     test/access_rights.sh
     ERR+=$?
 
-    test/unixpeer.sh
-    ERR+=$?
+#    test/unixpeer.sh
+#    ERR+=$?
 fi
 
 

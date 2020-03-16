@@ -28,8 +28,6 @@ services:
     command: -s /opt/test-runner/bin/libscope.so
     volumes:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
-    environment:
-      - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
 
   elastic:
     command: -s /opt/test-runner/bin/libscope.so

@@ -7,8 +7,16 @@
 #include "dbg.h"
 
 
+struct _ctl_t
+{
+    transport_t *transport;
+    evt_fmt_t *evt;
+    cbuf_handle_t evbuf;
+    cbuf_handle_t events;
+};
+
 typedef struct {
-    const char* str;
+    const char *str;
     cmd_t cmd;
 } cmd_map_t;
 
@@ -22,7 +30,7 @@ static cmd_map_t cmd_map[] = {
 };
 
 typedef struct {
-    const char* str;
+    const char *str;
     switch_action_t action;
 } switch_map_t;
 
@@ -33,9 +41,9 @@ static switch_map_t switch_map[] = {
 };
 
 static void
-grab_supplemental_for_block_port(cJSON* json_root, request_t* req)
+grab_supplemental_for_block_port(cJSON *json_root, request_t *req)
 {
-    cJSON* json;
+    cJSON *json;
 
     if (!json_root || !req) return;
 
@@ -57,10 +65,10 @@ grab_supplemental_for_block_port(cJSON* json_root, request_t* req)
 }
 
 static void
-grab_supplemental_for_set_cfg(cJSON* json_root, request_t* req)
+grab_supplemental_for_set_cfg(cJSON * json_root, request_t *req)
 {
-    cJSON* json;
-    char* string = NULL;
+    cJSON *json;
+    char *string = NULL;
 
     if (!json_root || !req) goto error;
 
@@ -90,11 +98,11 @@ error:
 }
 
 static void
-grab_supplemental_for_switch(cJSON* json_root, request_t* req)
+grab_supplemental_for_switch(cJSON *json_root, request_t *req)
 {
-    cJSON* json;
-    char* string = NULL;
-    switch_map_t* map;
+    cJSON *json;
+    char *string = NULL;
+    switch_map_t *map;
 
     if (!json_root || !req) goto error;
 
@@ -123,15 +131,15 @@ error:
     req->cmd=REQ_PARAM_ERR;
 }
 
-request_t*
-ctlParseRxMsg(const char* msg)
+request_t *
+ctlParseRxMsg(const char *msg)
 {
-    cJSON* json_root = NULL;
-    cJSON* json;
-    char* str;
-    cmd_map_t* map;
+    cJSON *json_root = NULL;
+    cJSON *json;
+    char *str;
+    cmd_map_t *map;
 
-    request_t* req = calloc(1, sizeof(request_t));
+    request_t *req = calloc(1, sizeof(request_t));
     if (!req) {
         DBG(NULL);
         goto out;
@@ -223,11 +231,11 @@ out:
 }
 
 void
-destroyReq(request_t** request)
+destroyReq(request_t **request)
 {
     if (!request || !*request) return;
 
-    request_t* req = *request;
+    request_t *req = *request;
 
     if (req->cmd_str) free(req->cmd_str);
     if (req->cfg) cfgDestroy(&req->cfg);
@@ -237,10 +245,10 @@ destroyReq(request_t** request)
     *request=NULL;
 }
 
-static cJSON*
-create_info_json(upload_t* upld)
+static cJSON *
+create_info_json(upload_t *upld)
 {
-    cJSON* json_root = NULL;
+    cJSON *json_root = NULL;
     if (!upld || !upld->body) goto err;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
@@ -255,10 +263,10 @@ err:
     return NULL;
 }
 
-static cJSON*
-create_resp_json(upload_t* upld)
+static cJSON *
+create_resp_json(upload_t *upld)
 {
-    cJSON* json_root = NULL;
+    cJSON *json_root = NULL;
     if (!upld || !upld->req) goto err;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
@@ -278,7 +286,7 @@ create_resp_json(upload_t* upld)
     if (!cJSON_AddNumberToObjLN(json_root, "reqId", upld->req->id)) goto err;
 
     int status = 200;
-    char* message = NULL;
+    char *message = NULL;
      switch (upld->req->cmd) {
         case REQ_PARSE_ERR:
             status = 400;
@@ -318,8 +326,8 @@ err:
     return NULL;
 }
 
-static cJSON*
-create_evt_json(upload_t* upld)
+static cJSON *
+create_evt_json(upload_t *upld)
 {
     cJSON* json_root = NULL;
     if (!upld || !upld->body) goto err;
@@ -335,11 +343,11 @@ err:
     return NULL;
 }
 
-char*
-ctlCreateTxMsg(upload_t* upld)
+char *
+ctlCreateTxMsg(upload_t *upld)
 {
-    cJSON* json = NULL;
-    char* msg = NULL;
+    cJSON *json = NULL;
+    char *msg = NULL;
 
     if (!upld) goto out;
 
@@ -366,20 +374,10 @@ out:
     return msg;
 }
 
-
-
-
-struct _ctl_t
-{
-    transport_t* transport;
-    evt_fmt_t* evt;
-    cbuf_handle_t evbuf;
-};
-
-ctl_t*
+ctl_t *
 ctlCreate()
 {
-    ctl_t* ctl = calloc(1, sizeof(ctl_t));
+    ctl_t *ctl = calloc(1, sizeof(ctl_t));
     if (!ctl) {
         DBG(NULL);
         return NULL;
@@ -391,16 +389,23 @@ ctlCreate()
         return NULL;
     }
 
+    ctl->events = cbufInit(DEFAULT_CBUF_SIZE);
+    if (!ctl->events) {
+        DBG(NULL);
+        return NULL;
+    }
+
     return ctl;
 }
 
 void
-ctlDestroy(ctl_t** ctl)
+ctlDestroy(ctl_t **ctl)
 {
     if (!ctl || !*ctl) return;
 
     ctlFlush(*ctl);
     cbufFree((*ctl)->evbuf);
+    cbufFree((*ctl)->events);
 
     transportDestroy(&(*ctl)->transport);
     evtFormatDestroy(&(*ctl)->evt);
@@ -410,7 +415,7 @@ ctlDestroy(ctl_t** ctl)
 }
 
 void
-ctlSendMsg(ctl_t* ctl, char * msg)
+ctlSendMsg(ctl_t *ctl, char *msg)
 {
     if (!msg) return;
     if (!ctl) {
@@ -462,19 +467,38 @@ ctlPostMsg(ctl_t *ctl, cJSON *body, upload_type_t type, request_t *req, bool now
 }
 
 int
-ctlSendEvent(ctl_t* ctl, event_t* e, uint64_t uid, proc_id_t* proc)
+ctlSendEvent(ctl_t *ctl, event_t *evt, uint64_t uid, proc_id_t *proc)
 {
-    if (!ctl || !e || !proc) return -1;
+    if (!ctl || !evt || !proc) return -1;
 
     // get a cJSON object for the given event
-    cJSON *json = evtFormatMetric(ctl->evt, e, uid, proc);
+    cJSON *json;
+    if ((json = evtFormatMetric(ctl->evt, evt, uid, proc)) == NULL) return -1;
 
     // send it
     return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
 }
 
 int
-ctlSendLog(ctl_t* ctl, const char* path, const void* buf, size_t count, uint64_t uid, proc_id_t* proc)
+ctlPostEvent(ctl_t *ctl, char *event)
+{
+    if (!event) return -1;
+    if (!ctl) {
+        free(event);
+        return -1;
+    }
+
+    if (cbufPut(ctl->events, (uint64_t)event) == -1) {
+        // Full; drop and ignore
+        DBG(NULL);
+        free(event);
+        return -1;
+    }
+    return 0;
+}
+
+int
+ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t uid, proc_id_t *proc)
 {
     if (!ctl || !path || !buf || !proc) return -1;
 
@@ -486,7 +510,7 @@ ctlSendLog(ctl_t* ctl, const char* path, const void* buf, size_t count, uint64_t
 }
 
 static void
-sendBufferedMessages(ctl_t* ctl)
+sendBufferedMessages(ctl_t *ctl)
 {
     if (!ctl) return;
 
@@ -516,7 +540,7 @@ sendBufferedMessages(ctl_t* ctl)
 }
 
 void
-ctlFlush(ctl_t* ctl)
+ctlFlush(ctl_t *ctl)
 {
     if (!ctl) return;
     sendBufferedMessages(ctl);
@@ -552,7 +576,7 @@ ctlClose(ctl_t *ctl)
 }
 
 void
-ctlTransportSet(ctl_t* ctl, transport_t* transport)
+ctlTransportSet(ctl_t *ctl, transport_t *transport)
 {
     if (!ctl) return;
 
@@ -562,7 +586,7 @@ ctlTransportSet(ctl_t* ctl, transport_t* transport)
 }
 
 void
-ctlEvtSet(ctl_t* ctl, evt_fmt_t* evt)
+ctlEvtSet(ctl_t *ctl, evt_fmt_t *evt)
 {
     if (!ctl) return;
 
@@ -570,4 +594,16 @@ ctlEvtSet(ctl_t* ctl, evt_fmt_t* evt)
     // TODO: need to ensure that previous object is no longer in use
     // evtFormatDestroy(&ctl->evt);
     ctl->evt = evt;
+}
+
+uint64_t
+ctlGetEvent(ctl_t *ctl)
+{
+    uint64_t data;
+
+    if (cbufGet(ctl->events, &data) == 0) {
+        return data;
+    } else {
+        return (uint64_t)-1;
+    }
 }

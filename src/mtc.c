@@ -3,6 +3,7 @@
 #include <string.h>
 #include "dbg.h"
 #include "mtc.h"
+#include "circbuf.h"
 
 struct _mtc_t
 {
@@ -11,10 +12,10 @@ struct _mtc_t
     int metric_disabled;
 };
 
-mtc_t*
+mtc_t *
 mtcCreate()
 {
-    mtc_t* mtc = calloc(1, sizeof(mtc_t));
+    mtc_t *mtc = calloc(1, sizeof(mtc_t));
     if (!mtc) {
         DBG(NULL);
         return NULL;
@@ -28,18 +29,18 @@ mtcCreate()
 }
 
 void
-mtcDestroy(mtc_t** mtc)
+mtcDestroy(mtc_t **mtc)
 {
     if (!mtc || !*mtc) return;
-    mtc_t* m = *mtc;
-    transportDestroy(&m->transport);
-    mtcFormatDestroy(&m->format);
-    free(m);
+    mtc_t *mtcb = *mtc;
+    transportDestroy(&mtcb->transport);
+    mtcFormatDestroy(&mtcb->format);
+    free(mtcb);
     *mtc = NULL;
 }
 
 int
-mtcSend(mtc_t* mtc, const char* msg)
+mtcSend(mtc_t *mtc, const char *msg)
 {
     if (!mtc || !msg) return -1;
 
@@ -47,48 +48,49 @@ mtcSend(mtc_t* mtc, const char* msg)
 }
 
 int
-mtcSendMetric(mtc_t* mtc, event_t* e)
+mtcSendMetric(mtc_t *mtc, event_t *evt)
 {
-    if (!mtc || !e) return -1;
+    if (!mtc || !evt) return -1;
 
     if (mtc->metric_disabled) return 0;
 
-    char* msg = mtcFormatStatsDString(mtc->format, e, NULL);
+    char *msg = mtcFormatStatsDString(mtc->format, evt, NULL);
     int rv = mtcSend(mtc, msg);
     if (msg) free(msg);
     return rv;
 }
 
 void
-mtcFlush(mtc_t* mtc)
+mtcFlush(mtc_t *mtc)
 {
     if (!mtc) return;
+
     transportFlush(mtc->transport);
 }
 
 int
-mtcNeedsConnection(mtc_t* mtc)
+mtcNeedsConnection(mtc_t *mtc)
 {
     if (!mtc) return 0;
     return transportNeedsConnection(mtc->transport);
 }
 
 int
-mtcConnect(mtc_t* mtc)
+mtcConnect(mtc_t *mtc)
 {
     if (!mtc) return 0;
     return transportConnect(mtc->transport);
 }
 
 int
-mtcDisconnect(mtc_t* mtc)
+mtcDisconnect(mtc_t *mtc)
 {
     if (!mtc) return 0;
     return transportDisconnect(mtc->transport);
 }
 
 void
-mtcTransportSet(mtc_t* mtc, transport_t* transport)
+mtcTransportSet(mtc_t *mtc, transport_t *transport)
 {
     if (!mtc) return;
 
@@ -98,7 +100,7 @@ mtcTransportSet(mtc_t* mtc, transport_t* transport)
 }
 
 void
-mtcFormatSet(mtc_t* mtc, mtc_fmt_t* format)
+mtcFormatSet(mtc_t *mtc, mtc_fmt_t *format)
 {
     if (!mtc) return;
 

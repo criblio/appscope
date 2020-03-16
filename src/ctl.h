@@ -31,10 +31,10 @@ typedef enum {
 
 typedef struct {
     cmd_t cmd;                 // our interpretation of what we received
-    char* cmd_str;             // command string
+    char *cmd_str;             // command string
     long long id;              // unique request id
 
-    config_t* cfg;             // only used for REQ_SET_CFG
+    config_t *cfg;             // only used for REQ_SET_CFG
     unsigned short port;       // only used for REQ_BLOCK_PORT
     switch_action_t action;    // only used for REQ_SWITCH
 
@@ -59,13 +59,13 @@ typedef enum {
 typedef struct {
     upload_type_t type;
     cJSON* body;
-    request_t* req;            // NULL unless this is UPLD_RESP
+    request_t *req;            // NULL unless this is UPLD_RESP
 } upload_t;
 
 // Functions to help with send/receive messaging
-request_t*          ctlParseRxMsg(const char*);
-void                destroyReq(request_t**);
-char*               ctlCreateTxMsg(upload_t*);
+request_t *   ctlParseRxMsg(const char*);
+void          destroyReq(request_t**);
+char *        ctlCreateTxMsg(upload_t*);
 
 
 //////////////////
@@ -74,26 +74,28 @@ char*               ctlCreateTxMsg(upload_t*);
 typedef struct _ctl_t ctl_t;
 
 // Constructors Destructors
-ctl_t *             ctlCreate();
-void                ctlDestroy(ctl_t **);
+ctl_t * ctlCreate();
+void    ctlDestroy(ctl_t **);
 
 // Raw Send (without messaging protocol)
-void                ctlSendMsg(ctl_t *, char *);
+void    ctlSendMsg(ctl_t *, char *);
 
 // Messaging protocol send
-int                 ctlPostMsg(ctl_t *ctl, cJSON *body, upload_type_t type,
-                        request_t *req, bool now);
-int                 ctlSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t*);
-int                 ctlSendLog(ctl_t *, const char* path, const void* buf,
-                        size_t size, uint64_t uid, proc_id_t* proc);
-void                ctlFlush(ctl_t *);
+int     ctlPostMsg(ctl_t *, cJSON *, upload_type_t, request_t *, bool);
+int     ctlSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);
+int     ctlSendLog(ctl_t *, const char *, const void *, size_t, uint64_t, proc_id_t *);
+void    ctlFlush(ctl_t *);
+int     ctlPostEvent(ctl_t *, char *);
 
 // Connection oriented stuff
-int                 ctlNeedsConnection(ctl_t *);
-int                 ctlConnection(ctl_t *);
-int                 ctlConnect(ctl_t *);
-int                 ctlClose(ctl_t *);
-void                ctlTransportSet(ctl_t *, transport_t *);
-void                ctlEvtSet(ctl_t *, evt_fmt_t *);
+int     ctlNeedsConnection(ctl_t *);
+int     ctlConnection(ctl_t *);
+int     ctlConnect(ctl_t *);
+int     ctlClose(ctl_t *);
+void    ctlTransportSet(ctl_t *, transport_t *);
+void    ctlEvtSet(ctl_t *, evt_fmt_t *);
+
+// Retreive events
+uint64_t   ctlGetEvent(ctl_t *);
 
 #endif // _CTL_H__

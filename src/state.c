@@ -512,6 +512,58 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     }
 }
 
+int
+doProtocol(int sockfd, void *buf, size_t len, metric_t src)
+{
+    if ((buf == NULL) || (len <= 0)) return -1;
+    
+    size_t headsize, copysize;
+    in_port_t lport, rport;
+    net_info *net;
+    char *headend, *header;
+    protocol_info *proto;
+
+    // For now, only doing HTTP headers
+    if ((src == TLSRX) || (src == TLSTX)) {
+        /*
+         * Is it always safe to string search here?
+         * Relying on the caller to ensure data is ready
+         */
+        if (strstr(buf, "HTTP") == NULL) return -1;
+    } else if ((net = getNetEntry(sockfd)) != NULL) { 
+        // Keeps us from doing string searches on bin data
+        lport = get_port(sockfd, g_netinfo[sockfd].localConn.ss_family, LOCAL);
+        rport = get_port(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE);
+
+        if ((rport != 80) && (lport != 80)) return -1;
+    } else {
+        return -1;
+    }
+
+    scopeLog("doProtocol", sockfd, CFG_LOG_INFO);
+    if ((headend = strstr(buf, "\r\n\r\n")) != NULL) {
+        if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) return 0;
+        header = buf;
+        headsize = (headend - (char *)buf) + 4;
+
+        if ((src == NETRX) || (src == TLSRX)){
+            strncpy(proto->header_type, "http-resp", HDRTYPE_MAX);
+        } else if ((src == NETTX) || (src == TLSTX)) {
+            strncpy(proto->header_type, "http-req", HDRTYPE_MAX);
+        } else {
+            strncpy(proto->header_type, "undef-header", HDRTYPE_MAX);
+        }
+
+        copysize = (headsize < sizeof(proto->header)) ? headsize : sizeof(proto->header); 
+        strncat(proto->header, header, copysize);
+        proto->fd = sockfd;
+        proto->evtype = EVT_PROTO;
+        cmdPostEvent(g_ctl, (char *)proto);
+    }
+
+    return 0;
+}
+
 void
 setVerbosity(unsigned verbosity)
 {

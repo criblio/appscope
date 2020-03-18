@@ -539,6 +539,14 @@ sendBufferedMessages(ctl_t *ctl)
     }
 }
 
+int
+ctlSendBin(ctl_t *ctl, char *buf)
+{
+    if (!ctl || !buf) return -1;
+
+    return transportSend(ctl->transport, buf);
+}
+
 void
 ctlFlush(ctl_t *ctl)
 {

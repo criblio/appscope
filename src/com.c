@@ -61,6 +61,12 @@ cmdSendResponse(ctl_t *ctl, request_t *req, cJSON *body)
     return ctlPostMsg(ctl, body, UPLD_RESP, req, TRUE);
 }
 
+int
+cmdSendBin(ctl_t *ctl, char *buf)
+{
+    return ctlSendBin(ctl, buf);
+}
+
 request_t *
 cmdParse(const char *cmd)
 {

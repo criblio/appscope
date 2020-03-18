@@ -61,7 +61,10 @@ typedef enum {
     EVT_FS,
     EVT_STAT,
     EVT_ERR,
-    EVT_DNS
+    EVT_DNS,
+    EVT_PROTO,
+    TLSRX,
+    TLSTX
 } metric_t;
 
 // File types: stream or fd

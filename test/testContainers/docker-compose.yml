@@ -50,3 +50,7 @@ services:
       dockerfile: ./elastic/Dockerfile
 
 
+  tls:
+    build:
+      context: .
+      dockerfile: ./tls/Dockerfile

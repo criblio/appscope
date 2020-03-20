@@ -4,6 +4,9 @@
 #include "ctl.h"
 #include "dbg.h"
 #include "test.h"
+#include "runtimecfg.h"
+
+rtconfig g_cfg = {0};
 
 static void
 cmdPostEvtMsgDoesNotCrash(void** state)

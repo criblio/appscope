@@ -6,6 +6,7 @@
 
 #define PROTOCOL_STR 16
 #define SCOPE_UNIX 99
+#define FUNC_MAX 24
 
 //
 // This file contains implementation details for state.c and reporting.c.
@@ -63,10 +64,28 @@ typedef struct {
     } net;
 } summary_t;
 
+typedef struct evt_type_t {
+    metric_t evtype;
+} evt_type;
+
+typedef struct stat_err_info_t {
+    metric_t evtype;
+    metric_t data_type;
+    char name[PATH_MAX];
+    char funcop[FUNC_MAX];
+    metric_counters counters;
+} stat_err_info;
+
 typedef struct net_info_t {
+    metric_t evtype;
+    metric_t data_type;
+    int fd;
     int active;
     int type;
     bool urlRedirect;
+    bool addrSetLocal;
+    bool addrSetRemote;
+    bool addrSetUnix;
     counters_element_t numTX;
     counters_element_t numRX;
     counters_element_t txBytes;
@@ -81,9 +100,13 @@ typedef struct net_info_t {
     char dnsName[MAX_HOSTNAME];
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;
+    metric_counters counters;
 } net_info;
 
 typedef struct fs_info_t {
+    metric_t evtype;
+    metric_t data_type;
+    int fd;
     int active;
     fs_type_t type;
     counters_element_t numOpen;
@@ -97,17 +120,26 @@ typedef struct fs_info_t {
     counters_element_t totalDuration;
     uint64_t uid;
     char path[PATH_MAX];
+    char funcop[FUNC_MAX];
 } fs_info;
 
 
 
 // Accessor functions defined in state.c, but used in report.c too.
-int get_port(int fd, int type, control_type_t which);
-bool checkNetEntry(int fd);
-bool checkFSEntry(int fd);
-net_info* getNetEntry(int fd);
-fs_info* getFSEntry(int fd);
+int get_port(int, int, control_type_t);
+int get_port_net(net_info *, int, control_type_t);
+bool checkNetEntry(int);
+bool checkFSEntry(int);
+net_info *getNetEntry(int);
+fs_info *getFSEntry(int);
 
+// The hiding of objects forces these to be defined here
+void doFSMetric(metric_t, struct fs_info_t *, control_type_t, const char *, ssize_t, const char *);
+void doNetMetric(metric_t, struct net_info_t *, control_type_t, ssize_t);
+void doUnixEndpoint(int, net_info *);
+void resetInterfaceCounts(counters_element_t*);
+void addToInterfaceCounts(counters_element_t*, uint64_t);
+void subFromInterfaceCounts(counters_element_t*, uint64_t);
 
 // Data that lives in state.c, but is used in report.c too.
 extern summary_t g_summary;

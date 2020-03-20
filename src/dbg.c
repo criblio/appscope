@@ -251,8 +251,11 @@ dbgAddLine(const char* key, const char* fmt, ...)
 }
 
 void
-scopeLog(const char* msg, int fd, cfg_log_level_t level)
+scopeLog(const char *msg, int fd, cfg_log_level_t level)
 {
+    cfg_log_level_t cfg_level = logLevel(g_log);
+
+    if ((cfg_level == CFG_LOG_NONE) || (cfg_level > level)) return;
     if (!g_log || !msg || !g_proc.procname[0]) return;
 
     char buf[strlen(msg) + 128];

@@ -4,48 +4,45 @@
 #include <sys/socket.h>
 #include "report.h"
 
-
-// Operational parameters (not configuration)
-extern int g_urls;
-extern int g_blockconn;
-
+#ifdef __MACOS__
+#ifndef AF_NETLINK
+#define AF_NETLINK 16
+#endif
+#endif // __MACOS__
 
 void initState();
 void resetState();
 
-void setVerbosity(unsigned verbosity);
-void addSock(int fd, int type);
-int doBlockConnection(int fd, const struct sockaddr *addr_arg);
-void doSetConnection(int sd, const struct sockaddr *addr, socklen_t len,
-           control_type_t endp);
-int doSetAddrs(int sockfd);
-int doAddNewSock(int sockfd);
-int getDNSName(int sd, void *pkt, int pktlen);
-int doURL(int sockfd, const void *buf, size_t len, metric_t src);
-int doRecv(int sockfd, ssize_t rc);
-int doSend(int sockfd, ssize_t rc);
-void doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func);
-void reportFD(int fd, control_type_t source);
-void reportAllFds(control_type_t source);
-void doRead(int fd, uint64_t initialTime, int success, ssize_t bytes,
-           const char* func);
-void doWrite(int fd, uint64_t initialTime, int success, const void* buf,
-           ssize_t bytes, const char* func);
-void doSeek(int fd, int success, const char* func);
-void doStatPath(const char* path, int rc, const char* func);
-void doStatFd(int fd, int rc, const char* func);
-int doDupFile(int newfd, int oldfd, const char *func);
-int doDupSock(int oldfd, int newfd);
-void doDup(int fd, int rc, const char* func, int copyNet);
-void doDup2(int oldfd, int newfd, int rc, const char* func);
-void doClose(int fd, const char *func);
-void doOpen(int fd, const char *path, fs_type_t type, const char *func);
-void doSendFile(int out_fd, int in_fd, uint64_t initialTime, int rc,
-           const char* func);
-void doCloseAndReportFailures(int fd, int success, const char* func);
+void setVerbosity(unsigned);
+void addSock(int, int);
+int doBlockConnection(int, const struct sockaddr *);
+void doSetConnection(int, const struct sockaddr *, socklen_t, control_type_t);
+int doSetAddrs(int);
+int doAddNewSock(int);
+int getDNSName(int, void *, int);
+int doURL(int, const void *, size_t, metric_t);
+int doRecv(int, ssize_t);
+int doSend(int, ssize_t);
+void doAccept(int, struct sockaddr *, socklen_t *, char *);
+void reportFD(int, control_type_t);
+void reportAllFds(control_type_t);
+void doRead(int, uint64_t, int, ssize_t, const char *);
+void doWrite(int, uint64_t, int, const void *, ssize_t, const char *);
+void doSeek(int, int, const char *);
+void doStatPath(const char *, int, const char *);
+void doStatFd(int, int, const char *);
+int doDupFile(int, int, const char *);
+int doDupSock(int, int);
+void doDup(int, int, const char *, int);
+void doDup2(int, int, int, const char *);
+void doClose(int, const char *);
+void doOpen(int, const char *, fs_type_t, const char *);
+void doSendFile(int, int, uint64_t, int, const char *);
+void doCloseAndReportFailures(int, int, const char *);
 void doCloseAllStreams();
-int remotePortIsDNS(int sockfd);
-int sockIsTCP(int sockfd);
+int remotePortIsDNS(int);
+int sockIsTCP(int);
+void doUpdateState(metric_t, int, ssize_t, const char *, const char *);
 
 
 #endif // __STATE_H__

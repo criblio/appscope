@@ -14,9 +14,12 @@
 #include "plattime.h"
 #include "state.h"
 #include "state_private.h"
+#include "runtimecfg.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
+
+extern rtconfig g_cfg;
 
 int g_numNinfo = NET_ENTRIES;
 int g_numFSinfo = FS_ENTRIES;
@@ -31,14 +34,11 @@ metric_counters g_ctrs = {0};
 
 
 // interfaces
-mtc_t* g_mtc = NULL;
-ctl_t* g_ctl = NULL;
+mtc_t *g_mtc = NULL;
+ctl_t *g_ctl = NULL;
 
-// operational params (not config-based)
-int g_urls = 0;
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
-int g_blockconn = DEFAULT_PORTBLOCK;
 
 #define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
 #define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)
@@ -87,6 +87,31 @@ get_port(int fd, int type, control_type_t which) {
     return htons(port);
 }
 
+int
+get_port_net(net_info *net, int type, control_type_t which) {
+    in_port_t port;
+    switch (type) {
+    case AF_INET:
+        if (which == LOCAL) {
+            port = ((struct sockaddr_in *)&net->localConn)->sin_port;
+        } else {
+            port = ((struct sockaddr_in *)&net->remoteConn)->sin_port;
+        }
+        break;
+    case AF_INET6:
+        if (which == LOCAL) {
+            port = ((struct sockaddr_in6 *)&net->localConn)->sin6_port;
+        } else {
+            port = ((struct sockaddr_in6 *)&net->remoteConn)->sin6_port;
+        }
+        break;
+    default:
+        port = (in_port_t)0;
+        break;
+    }
+    return htons(port);
+}
+
 void
 initState()
 {
@@ -120,7 +145,7 @@ resetState()
 // DEBUG
 #if 0
 static void
-dumpAddrs(int sd, control_type_t endp)
+dumpAddrs(int sd)
 {
     in_port_t port;
     char ip[INET6_ADDRSTRLEN];
@@ -145,6 +170,478 @@ dumpAddrs(int sd, control_type_t endp)
     }
 }
 #endif
+
+static int
+postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const char *pathname)
+{
+    // something passed in a param that is not a viable address; ltp does this
+    if ((stat_err == EVT_ERR) && (errno == EFAULT)) return FALSE;
+
+    if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC)) {
+        if ((stat_err == EVT_STAT) && (g_summary.fs.stat)) return FALSE;
+
+        switch (type) {
+        case NET_ERR_CONN:
+        case NET_ERR_RX_TX:
+            if (g_summary.net.error) return FALSE;
+            break;
+
+        case FS_ERR_OPEN_CLOSE:
+        case FS_ERR_READ_WRITE:
+        case FS_ERR_STAT:
+        case NET_ERR_DNS:
+            if ((g_summary.fs.error) || (g_summary.net.dnserror)) return FALSE;
+            break;
+        default:
+            break;
+        }
+    }
+
+    size_t len = sizeof(struct stat_err_info_t);
+    stat_err_info *sep = calloc(1, len);
+    if (!sep) return FALSE;
+
+    sep->evtype = stat_err;
+    sep->data_type = type;
+
+    if (pathname) {
+        strncpy(sep->name, pathname, strnlen(pathname, sizeof(sep->name)));
+    }
+
+    if (funcop) {
+        strncpy(sep->funcop, funcop, strnlen(funcop, sizeof(sep->funcop)));
+    }
+
+    memmove(&sep->counters, &g_ctrs, sizeof(g_ctrs));
+
+    cmdPostEvent(g_ctl, (char *)sep);
+
+    int *summarize = NULL;
+    switch (type) {
+        case NET_ERR_CONN:
+        case NET_ERR_RX_TX:
+            summarize = &g_summary.net.error;
+            break;
+        case FS_ERR_OPEN_CLOSE:
+        case FS_ERR_READ_WRITE:
+        case FS_ERR_STAT:
+            summarize = &g_summary.fs.error;
+            break;
+        case NET_ERR_DNS:
+            summarize = &g_summary.net.dnserror;
+            break;
+        case EVT_STAT:
+        case FS_STAT:
+            summarize = &g_summary.fs.stat;
+            break;
+        default:
+            break;
+    }
+    return summarize && !*summarize;
+}
+
+static int
+postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *pathname)
+{
+    if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC) &&
+        !cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_FILE) &&
+        !cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_CONSOLE) &&
+        !cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_SYSLOG)) {
+        switch (type) {
+        case FS_READ:
+        case FS_WRITE:
+        case FS_DURATION:
+            if (g_summary.fs.read_write) return FALSE;
+            break;
+
+        case FS_OPEN:
+        case FS_CLOSE:
+            if (g_summary.fs.open_close) return FALSE;
+            break;
+
+        case FS_SEEK:
+            if (g_summary.fs.seek) return FALSE;
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    size_t len = sizeof(struct fs_info_t);
+    fs_info *fsp = calloc(1, len);
+    if (!fsp) return FALSE;
+
+    bcopy(fs, fsp, len);
+    fsp->fd = fd;
+    fsp->evtype = EVT_FS;
+    fsp->data_type = type;
+
+    if (pathname && (fs->path[0] == '\0')) {
+        strncpy(fsp->path, pathname, strnlen(pathname, sizeof(fsp->path)));
+    }
+
+    if (funcop && (fs->funcop[0] == '\0')) {
+        strncpy(fsp->funcop, funcop, strnlen(funcop, sizeof(fsp->funcop)));
+    }
+
+    cmdPostEvent(g_ctl, (char *)fsp);
+    return TRUE;
+}
+
+static int
+postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char *domain)
+{
+    size_t len = sizeof(struct net_info_t);
+    net_info *netp = calloc(1, len);
+    if (!netp) return FALSE;
+
+    bcopy(net, netp, len);
+    netp->fd = fd;
+    netp->evtype = EVT_DNS;
+    netp->data_type = type;
+
+    if (duration > 0) {
+        addToInterfaceCounts(&netp->totalDuration, duration);
+    }
+
+    if (domain) {
+        strncpy(netp->dnsName, domain, strnlen(domain, sizeof(netp->dnsName)));
+    }
+
+    memmove(&netp->counters, &g_ctrs, sizeof(g_ctrs));
+
+    cmdPostEvent(g_ctl, (char *)netp);
+    return !g_summary.net.dns;
+}
+
+static int
+postNetState(int fd, metric_t type, net_info *net)
+{
+    if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC)) {
+        switch (type) {
+        case OPEN_PORTS:
+        case NET_CONNECTIONS:
+        case CONNECTION_DURATION:
+            if (g_summary.net.open_close) return FALSE;
+            break;
+
+        case NETRX:
+        case NETTX:
+            if (g_summary.net.rx_tx) return FALSE;
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    size_t len = sizeof(struct net_info_t);
+    net_info *netp = calloc(1, len);
+    if (!netp) return FALSE;
+
+    bcopy(net, netp, len);
+    netp->fd = fd;
+    netp->evtype = EVT_NET;
+    netp->data_type = type;
+
+    cmdPostEvent(g_ctl, (char *)netp);
+    return TRUE;
+}
+
+void
+doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const char *pathname)
+{
+    switch (type) {
+    case OPEN_PORTS:
+    {
+        if (!checkNetEntry(fd)) break;
+        if (size < 0) {
+            subFromInterfaceCounts(&g_ctrs.openPorts, labs(size));
+        } else if (size > 0) {
+            addToInterfaceCounts(&g_ctrs.openPorts, size);
+        }
+
+        if (size && !g_netinfo[fd].startTime) {
+            g_netinfo[fd].startTime = getTime();
+        }
+        if (postNetState(fd, type, &g_netinfo[fd])) {
+            // Don't reset the info.  It's a gauge.
+        }
+        break;
+    }
+
+    case NET_CONNECTIONS:
+    {
+        if (!checkNetEntry(fd)) break;
+        counters_element_t* value = NULL;
+
+        if (g_netinfo[fd].type == SOCK_STREAM) {
+            value = &g_ctrs.netConnectionsTcp;
+        } else if (g_netinfo[fd].type == SOCK_DGRAM) {
+            value = &g_ctrs.netConnectionsUdp;
+        } else {
+            value = &g_ctrs.netConnectionsOther;
+        }
+
+        if (size < 0) {
+            subFromInterfaceCounts(value, labs(size));
+        } else if (size > 0) {
+            addToInterfaceCounts(value, size);
+        }
+
+        if (size && !g_netinfo[fd].startTime) {
+            g_netinfo[fd].startTime = getTime();
+        }
+        if (postNetState(fd, type, &g_netinfo[fd])) {
+            // Don't reset the info.  It's a gauge.
+        }
+        break;
+    }
+
+    case CONNECTION_DURATION:
+    {
+        if (!checkNetEntry(fd)) break;
+        uint64_t new_duration = 0ULL;
+        if (g_netinfo[fd].startTime != 0ULL) {
+            new_duration = getDuration(g_netinfo[fd].startTime);
+            g_netinfo[fd].startTime = 0ULL;
+        }
+
+        if (new_duration) {
+            addToInterfaceCounts(&g_netinfo[fd].numDuration, 1);
+            addToInterfaceCounts(&g_netinfo[fd].totalDuration, new_duration);
+            addToInterfaceCounts(&g_ctrs.connDurationNum, 1);
+            addToInterfaceCounts(&g_ctrs.connDurationTotal, new_duration);
+        }
+        if (postNetState(fd, type, &g_netinfo[fd])) {
+            atomicSwapU64(&g_netinfo[fd].numDuration.mtc, 0);
+            atomicSwapU64(&g_netinfo[fd].totalDuration.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.connDurationNum, 1);
+            //subFromInterfaceCounts(&g_ctrs.connDurationTotal, new_duration);
+        }
+        atomicSwapU64(&g_netinfo[fd].numDuration.evt, 0);
+        atomicSwapU64(&g_netinfo[fd].totalDuration.evt, 0);
+        break;
+    }
+
+    case NETRX:
+    {
+        if (!checkNetEntry(fd)) break;
+        addToInterfaceCounts(&g_netinfo[fd].numRX, 1);
+        addToInterfaceCounts(&g_netinfo[fd].rxBytes, size);
+        addToInterfaceCounts(&g_ctrs.netrxBytes, size);
+        if (postNetState(fd, type, &g_netinfo[fd])) {
+            atomicSwapU64(&g_netinfo[fd].numRX.mtc, 0);
+            atomicSwapU64(&g_netinfo[fd].rxBytes.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.netrxBytes, size);
+        }
+        atomicSwapU64(&g_netinfo[fd].numRX.evt, 0);
+        atomicSwapU64(&g_netinfo[fd].rxBytes.evt, 0);
+        break;
+    }
+
+    case NETTX:
+    {
+        if (!checkNetEntry(fd)) break;
+        addToInterfaceCounts(&g_netinfo[fd].numTX, 1);
+        addToInterfaceCounts(&g_netinfo[fd].txBytes, size);
+        addToInterfaceCounts(&g_ctrs.nettxBytes, size);
+        if (postNetState(fd, type, &g_netinfo[fd])) {
+            atomicSwapU64(&g_netinfo[fd].numTX.mtc, 0);
+            atomicSwapU64(&g_netinfo[fd].txBytes.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.nettxBytes, size);
+        }
+        atomicSwapU64(&g_netinfo[fd].numTX.evt, 0);
+        atomicSwapU64(&g_netinfo[fd].txBytes.evt, 0);
+        break;
+    }
+
+    case DNS:
+    {
+        if (!checkNetEntry(fd)) break;
+        addToInterfaceCounts(&g_ctrs.numDNS, 1);
+        if (postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname)) {
+            atomicSubU64(&g_ctrs.numDNS.mtc, 1);
+        }
+        atomicSubU64(&g_ctrs.numDNS.evt, 1);
+        break;
+    }
+
+    case DNS_DURATION:
+    {
+        if (!checkNetEntry(fd)) break;
+        addToInterfaceCounts(&g_ctrs.dnsDurationNum, 1);
+        addToInterfaceCounts(&g_ctrs.dnsDurationTotal, 0);
+        if (postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname)) {
+            atomicSwapU64(&g_ctrs.dnsDurationNum.mtc, 0);
+            atomicSwapU64(&g_ctrs.dnsDurationTotal.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.dnsDurationNum.evt, 0);
+        atomicSwapU64(&g_ctrs.dnsDurationTotal.evt, 0);
+        break;
+    }
+
+    case FS_DURATION:
+    {
+        if (!checkFSEntry(fd)) break;
+        addToInterfaceCounts(&g_fsinfo[fd].numDuration, 1);
+        addToInterfaceCounts(&g_fsinfo[fd].totalDuration, size);
+        addToInterfaceCounts(&g_ctrs.fsDurationNum, 1);
+        addToInterfaceCounts(&g_ctrs.fsDurationTotal, size);
+        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+            atomicSwapU64(&g_fsinfo[fd].numDuration.mtc, 0);
+            atomicSwapU64(&g_fsinfo[fd].totalDuration.mtc, 0);
+        }
+        atomicSwapU64(&g_fsinfo[fd].numDuration.evt, 0);
+        atomicSwapU64(&g_fsinfo[fd].totalDuration.evt, 0);
+        break;
+    }
+
+    case FS_READ:
+    {
+        if (!checkFSEntry(fd)) break;
+        addToInterfaceCounts(&g_fsinfo[fd].numRead, 1);
+        addToInterfaceCounts(&g_fsinfo[fd].readBytes, size);
+        addToInterfaceCounts(&g_ctrs.readBytes, size);
+        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+            atomicSwapU64(&g_fsinfo[fd].numRead.mtc, 0);
+            atomicSwapU64(&g_fsinfo[fd].readBytes.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.readBytes, size);
+        }
+        atomicSwapU64(&g_fsinfo[fd].numRead.evt, 0);
+        atomicSwapU64(&g_fsinfo[fd].readBytes.evt, 0);
+        break;
+    }
+
+    case FS_WRITE:
+    {
+        if (!checkFSEntry(fd)) break;
+        addToInterfaceCounts(&g_fsinfo[fd].numWrite, 1);
+        addToInterfaceCounts(&g_fsinfo[fd].writeBytes, size);
+        addToInterfaceCounts(&g_ctrs.writeBytes, size);
+        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+            atomicSwapU64(&g_fsinfo[fd].numWrite.mtc, 0);
+            atomicSwapU64(&g_fsinfo[fd].writeBytes.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.writeBytes, size);
+        }
+        atomicSwapU64(&g_fsinfo[fd].numWrite.evt, 0);
+        atomicSwapU64(&g_fsinfo[fd].writeBytes.evt, 0);
+        break;
+    }
+
+    case FS_OPEN:
+    {
+        if (!checkFSEntry(fd)) break;
+        addToInterfaceCounts(&g_fsinfo[fd].numOpen, 1);
+        addToInterfaceCounts(&g_ctrs.numOpen, 1);
+        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+            atomicSwapU64(&g_fsinfo[fd].numOpen.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.numOpen, 1);
+        }
+        atomicSwapU64(&g_fsinfo[fd].numOpen.evt, 0);
+        break;
+    }
+
+    case FS_CLOSE:
+    {
+        if (!checkFSEntry(fd)) break;
+        addToInterfaceCounts(&g_fsinfo[fd].numClose, 1);
+        addToInterfaceCounts(&g_ctrs.numClose, 1);
+        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+            atomicSwapU64(&g_fsinfo[fd].numClose.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.numClose, 1);
+        }
+        atomicSwapU64(&g_fsinfo[fd].numClose.evt, 0);
+        break;
+    }
+
+    case FS_SEEK:
+    {
+        if (!checkFSEntry(fd)) break;
+        addToInterfaceCounts(&g_fsinfo[fd].numSeek, 1);
+        addToInterfaceCounts(&g_ctrs.numSeek, 1);
+        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+            atomicSwapU64(&g_fsinfo[fd].numSeek.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.numSeek, 1);
+        }
+        atomicSwapU64(&g_fsinfo[fd].numSeek.evt, 0);
+        break;
+    }
+
+    case NET_ERR_CONN:
+    {
+        addToInterfaceCounts(&g_ctrs.netConnectErrors, 1);
+        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.netConnectErrors.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.netConnectErrors.evt, 0);
+        break;
+    }
+
+    case NET_ERR_RX_TX:
+    {
+        addToInterfaceCounts(&g_ctrs.netTxRxErrors, 1);
+        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.netTxRxErrors.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.netTxRxErrors.evt, 0);
+        break;
+    }
+
+    case FS_ERR_OPEN_CLOSE:
+    {
+        addToInterfaceCounts(&g_ctrs.fsOpenCloseErrors, 1);
+        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.fsOpenCloseErrors.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.fsOpenCloseErrors.evt, 0);
+        break;
+    }
+
+    case FS_ERR_READ_WRITE:
+    {
+        addToInterfaceCounts(&g_ctrs.fsRdWrErrors, 1);
+        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.fsRdWrErrors.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.fsRdWrErrors.evt, 0);
+        break;
+    }
+
+    case FS_ERR_STAT:
+    {
+        addToInterfaceCounts(&g_ctrs.fsStatErrors, 1);
+        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.fsStatErrors.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.fsStatErrors.evt, 0);
+        break;
+    }
+
+    case NET_ERR_DNS:
+    {
+        addToInterfaceCounts(&g_ctrs.netDNSErrors, 1);
+        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.netDNSErrors.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.netDNSErrors.evt, 0);
+        break;
+    }
+
+    case FS_STAT:
+    {
+        addToInterfaceCounts(&g_ctrs.numStat, 1);
+        if (postStatErrState(EVT_STAT, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.numStat.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.numStat.evt, 0);
+        break;
+    }
+    default:
+         return;
+    }
+}
 
 void
 setVerbosity(unsigned verbosity)
@@ -284,7 +781,7 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
 {
     in_port_t port;
 
-    if (g_blockconn == DEFAULT_PORTBLOCK) return 0;
+    if (g_cfg.blockconn == DEFAULT_PORTBLOCK) return 0;
 
     // We expect addr_arg to be supplied for connect() calls
     // and expect it to be NULL for accept() calls.  When it's
@@ -307,7 +804,7 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
         return 0;
     }
 
-    if (g_blockconn == htons(port)) {
+    if (g_cfg.blockconn == htons(port)) {
         scopeLog("doBlockConnection: blocked connection", fd, CFG_LOG_INFO);
         return 1;
     }
@@ -318,16 +815,22 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
 void
 doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, control_type_t endp)
 {
+    net_info *net;
+
     if (!addr || (len <= 0)) {
         return;
     }
 
     // Should we check for at least the size of sockaddr_in?
-    if ((getNetEntry(sd) != NULL) && addr && (len > 0)) {
+    if (((net = getNetEntry(sd)) != NULL) && addr && (len > 0)) {
         if (endp == LOCAL) {
+            if ((net->type == SOCK_STREAM) && (net->addrSetLocal == TRUE)) return;
             memmove(&g_netinfo[sd].localConn, addr, len);
+            if (net->type == SOCK_STREAM) net->addrSetLocal = TRUE;
         } else {
+            if ((net->type == SOCK_STREAM) && (net->addrSetRemote == TRUE)) return;
             memmove(&g_netinfo[sd].remoteConn, addr, len);
+            if (net->type == SOCK_STREAM) net->addrSetRemote = TRUE;
         }
     }
 }
@@ -337,17 +840,46 @@ doSetAddrs(int sockfd)
 {
     struct sockaddr_storage addr;
     socklen_t addrlen = sizeof(struct sockaddr_storage);
+    net_info *net;
 
-    if (getNetEntry(sockfd) == NULL) {
-        return -1;
+    // Only do this if output is enabled
+    if ((cfgMtcVerbosity(g_cfg.staticfg) < DEFAULT_MTC_IPPORT_VERBOSITY) &&
+        !cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC)) return 0;
+
+    /*
+     * Do this for TCP, UDP or UNIX sockets
+     * Not doing connection details for other socket types
+     * If a TCP socket only set the addrs once
+     * It's possible for UDP sockets to change addrs as needed
+     */
+    if ((net = getNetEntry(sockfd)) == NULL) return 0;
+
+    // TODO: dont think LOCAL is correct?
+    if ((net->type == SCOPE_UNIX) ||
+        (net->remoteConn.ss_family == AF_UNIX) ||
+        (net->remoteConn.ss_family == AF_LOCAL) ||
+        (net->remoteConn.ss_family == AF_NETLINK) ||
+        (net->localConn.ss_family == AF_UNIX) ||
+        (net->localConn.ss_family == AF_LOCAL) ||
+        (net->localConn.ss_family == AF_NETLINK)) {
+        if (net->addrSetUnix == TRUE) return 0;
+        doUnixEndpoint(sockfd, net);
+        net->addrSetUnix = TRUE;
+        return 0;
     }
 
-    if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
-        doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
-    }
+    if ((net->type == SOCK_STREAM) || (net->type == SOCK_DGRAM)) {
+        if ((net->type == SOCK_STREAM) && (net->addrSetLocal == FALSE)) {
+            if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+                doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
+            }
+        }
 
-    if (getpeername(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
-        doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, REMOTE);
+        if ((net->type == SOCK_STREAM) && (net->addrSetRemote == FALSE)) {
+            if (getpeername(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+                doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, REMOTE);
+            }
+        }
     }
 
     return 0;
@@ -503,7 +1035,7 @@ getDNSName(int sd, void *pkt, int pktlen)
     }
 
     // We think we have a direct DNS request
-    char* pkt_end = (char*)pkt + pktlen;
+    char *pkt_end = (char *)pkt + pktlen;
 
     while ((*dname != '\0') && (dname < pkt_end)) {
         // handle one label
@@ -537,7 +1069,7 @@ getDNSName(int sd, void *pkt, int pktlen)
 int
 doURL(int sockfd, const void *buf, size_t len, metric_t src)
 {
-    if (g_urls == 0) return 0;
+    if (g_cfg.urls == 0) return 0;
 
     if (checkNetEntry(sockfd) == TRUE) {
         if (!g_netinfo[sockfd].active) {
@@ -574,7 +1106,8 @@ doRecv(int sockfd, ssize_t rc)
         }
 
         doSetAddrs(sockfd);
-        doNetMetric(NETRX, sockfd, EVENT_BASED, rc);
+        doUpdateState(NETRX, sockfd, rc, NULL, NULL);
+
     }
     return 0;
 }
@@ -588,11 +1121,13 @@ doSend(int sockfd, ssize_t rc)
         }
 
         doSetAddrs(sockfd);
-        doNetMetric(NETTX, sockfd, EVENT_BASED, rc);
+        doUpdateState(NETTX, sockfd, rc, NULL, NULL);
 
         if (get_port(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
             // tbd - consider calling doDNSMetricName instead...
-            doNetMetric(DNS, sockfd, EVENT_BASED, 0);
+            if (g_netinfo[sockfd].dnsName[0]) {
+                doUpdateState(DNS, sockfd, (ssize_t)0, NULL, NULL);
+            }
         }
     }
     return 0;
@@ -601,14 +1136,13 @@ doSend(int sockfd, ssize_t rc)
 void
 doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 {
-
     scopeLog(func, sd, CFG_LOG_DEBUG);
     addSock(sd, SOCK_STREAM);
 
     if (getNetEntry(sd) != NULL) {
         if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);
-        doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 1);
-        doNetMetric(NET_CONNECTIONS, sd, EVENT_BASED, 1);
+        doUpdateState(OPEN_PORTS, sd, 1, func, NULL);
+        doUpdateState(NET_CONNECTIONS, sd, 1, func, NULL);
     }
 }
 
@@ -620,28 +1154,32 @@ doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 void
 reportFD(int fd, control_type_t source)
 {
+    if (source == EVENT_BASED) return;
+
     struct net_info_t *ninfo = getNetEntry(fd);
     if (ninfo) {
+        ninfo->fd = fd;
         if (!g_summary.net.rx_tx) {
-            doNetMetric(NETTX, fd, source, 0);
-            doNetMetric(NETRX, fd, source, 0);
+            doNetMetric(NETTX, ninfo, source, 0);
+            doNetMetric(NETRX, ninfo, source, 0);
         }
         if (!g_summary.net.open_close) {
-            doNetMetric(OPEN_PORTS, fd, source, 0);
-            doNetMetric(NET_CONNECTIONS, fd, source, 0);
-            doNetMetric(CONNECTION_DURATION, fd, source, 0);
+            doNetMetric(OPEN_PORTS, ninfo, source, 0);
+            doNetMetric(NET_CONNECTIONS, ninfo, source, 0);
+            doNetMetric(CONNECTION_DURATION, ninfo, source, 0);
         }
     }
 
     struct fs_info_t *finfo = getFSEntry(fd);
     if (finfo) {
+        finfo->fd = fd;
         if (!g_summary.fs.read_write) {
-            doFSMetric(FS_DURATION, fd, source, "read/write", 0, NULL);
-            doFSMetric(FS_READ, fd, source, "read", 0, NULL);
-            doFSMetric(FS_WRITE, fd, source, "write", 0, NULL);
+            doFSMetric(FS_DURATION, finfo, source, "read/write", 0, NULL);
+            doFSMetric(FS_READ, finfo, source, "read", 0, NULL);
+            doFSMetric(FS_WRITE, finfo, source, "write", 0, NULL);
         }
         if (!g_summary.fs.seek) {
-            doFSMetric(FS_SEEK, fd, source, "seek", 0, NULL);
+            doFSMetric(FS_SEEK, finfo, source, "seek", 0, NULL);
         }
     }
 }
@@ -656,7 +1194,7 @@ reportAllFds(control_type_t source)
 }
 
 void
-doRead(int fd, uint64_t initialTime, int success, ssize_t bytes, const char* func)
+doRead(int fd, uint64_t initialTime, int success, ssize_t bytes, const char *func)
 {
     struct fs_info_t *fs = getFSEntry(fd);
     struct net_info_t *net = getNetEntry(fd);
@@ -671,21 +1209,21 @@ doRead(int fd, uint64_t initialTime, int success, ssize_t bytes, const char* fun
             // Don't count data from stdin
             if ((fd > 2) || strncmp(fs->path, "std", 3)) {
                 uint64_t duration = getDuration(initialTime);
-                doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
-                doFSMetric(FS_READ, fd, EVENT_BASED, func, bytes, NULL);
+                doUpdateState(FS_DURATION, fd, duration, func, NULL);
+                doUpdateState(FS_READ, fd, bytes, func, NULL);
             }
         }
     } else {
         if (fs) {
-            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, func, fs->path);
+            doUpdateState(FS_ERR_READ_WRITE, fd, bytes, func, fs->path);
         } else if (net) {
-            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, func, "nopath");
+            doUpdateState(NET_ERR_RX_TX, fd, bytes, func, "nopath");
         }
     }
 }
 
 void
-doWrite(int fd, uint64_t initialTime, int success, const void* buf, ssize_t bytes, const char* func)
+doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t bytes, const char *func)
 {
     struct fs_info_t *fs = getFSEntry(fd);
     struct net_info_t *net = getNetEntry(fd);
@@ -700,45 +1238,45 @@ doWrite(int fd, uint64_t initialTime, int success, const void* buf, ssize_t byte
             // Don't count data from stdout, stderr
             if ((fd > 2) || strncmp(fs->path, "std", 3)) {
                 uint64_t duration = getDuration(initialTime);
-                doFSMetric(FS_DURATION, fd, EVENT_BASED, func, duration, NULL);
-                doFSMetric(FS_WRITE, fd, EVENT_BASED, func, bytes, NULL);
+                doUpdateState(FS_DURATION, fd, duration, func, NULL);
+                doUpdateState(FS_WRITE, fd, bytes, func, NULL);
             }
             ctlSendLog(g_ctl, fs->path, buf, bytes, fs->uid, &g_proc);
         }
     } else {
         if (fs) {
-            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, func, fs->path);
+            doUpdateState(FS_ERR_READ_WRITE, fd, bytes, func, fs->path);
         } else if (net) {
-            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, func, "nopath");
+            doUpdateState(NET_ERR_RX_TX, fd, bytes, func, "nopath");
         }
     }
 }
 
 void
-doSeek(int fd, int success, const char* func)
+doSeek(int fd, int success, const char *func)
 {
     struct fs_info_t *fs = getFSEntry(fd);
     if (success) {
         scopeLog(func, fd, CFG_LOG_DEBUG);
         if (fs) {
-            doFSMetric(FS_SEEK, fd, EVENT_BASED, func, 1, NULL);
+            doUpdateState(FS_SEEK, fd, 0, func, NULL);
         }
     } else {
         if (fs) {
-            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, func, fs->path);
+            doUpdateState(FS_ERR_READ_WRITE, fd, (size_t)0, func, fs->path);
         }
     }
 }
 
 #ifdef __LINUX__
 void
-doStatPath(const char* path, int rc, const char* func)
+doStatPath(const char *path, int rc, const char *func)
 {
     if (rc != -1) {
         scopeLog(func, -1, CFG_LOG_DEBUG);
-        doStatMetric(func, path);
+        doUpdateState(FS_STAT, -1, 0, func, path);
     } else {
-        doErrorMetric(FS_ERR_STAT, EVENT_BASED, func, path);
+        doUpdateState(FS_ERR_STAT, -1, (size_t)0, func, path);
     }
 }
 
@@ -749,10 +1287,12 @@ doStatFd(int fd, int rc, const char* func)
 
     if (rc != -1) {
         scopeLog(func, fd, CFG_LOG_DEBUG);
-        if (fs) doStatMetric(func, fs->path);
+        if (fs) {
+            doUpdateState(FS_STAT, fd, 0, func, fs->path);
+        }
     } else {
         if (fs) {
-            doErrorMetric(FS_ERR_STAT, EVENT_BASED, func, fs->path);
+            doUpdateState(FS_ERR_STAT, fd, (size_t)0, func, fs->path);
         }
     }
 }
@@ -790,7 +1330,7 @@ doDupSock(int oldfd, int newfd)
 }
 
 void
-doDup(int fd, int rc, const char* func, int copyNet)
+doDup(int fd, int rc, const char *func, int copyNet)
 {
     struct fs_info_t *fs = getFSEntry(fd);
     struct net_info_t *net = getNetEntry(fd);
@@ -808,15 +1348,15 @@ doDup(int fd, int rc, const char* func, int copyNet)
         }
     } else {
         if (fs) {
-            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, func, fs->path);
+            doUpdateState(FS_ERR_OPEN_CLOSE, fd, (size_t)0, func, fs->path);
         } else if (net) {
-            doErrorMetric(NET_ERR_CONN, EVENT_BASED, func, "nopath");
+            doUpdateState(NET_ERR_CONN, fd, (size_t)0, func, "nopath");
         }
     }
 }
 
 void
-doDup2(int oldfd, int newfd, int rc, const char* func)
+doDup2(int oldfd, int newfd, int rc, const char *func)
 {
     struct fs_info_t *fs = getFSEntry(oldfd);
     struct net_info_t *net = getNetEntry(oldfd);
@@ -836,9 +1376,9 @@ doDup2(int oldfd, int newfd, int rc, const char* func)
         }
     } else {
         if (fs) {
-            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, func, fs->path);
+            doUpdateState(FS_ERR_OPEN_CLOSE, oldfd, (size_t)0, func, fs->path);
         } else if (net) {
-            doErrorMetric(NET_ERR_CONN, EVENT_BASED, func, "nopath");
+            doUpdateState(NET_ERR_CONN, oldfd, (size_t)0, func, "nopath");
         }
     }
 }
@@ -851,27 +1391,15 @@ doClose(int fd, const char *func)
 
     if ((ninfo = getNetEntry(fd)) != NULL) {
 
-        doNetMetric(OPEN_PORTS, fd, EVENT_BASED, -1);
-        doNetMetric(NET_CONNECTIONS, fd, EVENT_BASED, -1);
-        doNetMetric(CONNECTION_DURATION, fd, EVENT_BASED, -1);
-
-        if (func) {
-            char buf[64];
-            snprintf(buf, sizeof(buf), "%s: network", func);
-            scopeLog(buf, fd, CFG_LOG_DEBUG);
-        }
+        doUpdateState(OPEN_PORTS, fd, -1, func, NULL);
+        doUpdateState(NET_CONNECTIONS, fd, -1, func, NULL);
+        doUpdateState(CONNECTION_DURATION, fd, -1, func, NULL);
     }
 
     // Check both file desriptor tables
     if ((fsinfo = getFSEntry(fd)) != NULL) {
 
-        doFSMetric(FS_CLOSE, fd, EVENT_BASED, func, 1, NULL);
-
-        if (func) {
-            char buf[64];
-            snprintf(buf, sizeof(buf), "%s: file", func);
-            scopeLog(buf, fd, CFG_LOG_TRACE);
-        }
+        doUpdateState(FS_CLOSE, fd, 0, func, NULL);
     }
 
     // report everything before the info is lost
@@ -887,10 +1415,7 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
 {
     if (checkFSEntry(fd) == TRUE) {
         if (g_fsinfo[fd].active) {
-            char buf[128];
-
-            snprintf(buf, sizeof(buf), "%s:doOpen: duplicate(%d)", func, fd);
-            scopeLog(buf, fd, CFG_LOG_DEBUG);
+            scopeLog("doOpen: duplicate", fd, CFG_LOG_DEBUG);
             DBG(NULL);
             doClose(fd, func);
         }
@@ -928,13 +1453,13 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
         g_fsinfo[fd].uid = getTime();
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
 
-        doFSMetric(FS_OPEN, fd, EVENT_BASED, func, 1, NULL);
+        doUpdateState(FS_OPEN, fd, 0, func, path);
         scopeLog(func, fd, CFG_LOG_TRACE);
     }
 }
 
 void
-doSendFile(int out_fd, int in_fd, uint64_t initialTime, int rc, const char* func)
+doSendFile(int out_fd, int in_fd, uint64_t initialTime, int rc, const char *func)
 {
     struct fs_info_t *fsrd = getFSEntry(in_fd);
     struct net_info_t *nettx = getNetEntry(out_fd);
@@ -948,8 +1473,8 @@ doSendFile(int out_fd, int in_fd, uint64_t initialTime, int rc, const char* func
 
         if (fsrd) {
             uint64_t duration = getDuration(initialTime);
-            doFSMetric(FS_DURATION, in_fd, EVENT_BASED, func, duration, NULL);
-            doFSMetric(FS_WRITE, in_fd, EVENT_BASED, func, rc, NULL);
+            doUpdateState(FS_DURATION, in_fd, duration, func, NULL);
+            doUpdateState(FS_WRITE, in_fd, rc, func, NULL);
         }
     } else {
         /*
@@ -958,24 +1483,24 @@ doSendFile(int out_fd, int in_fd, uint64_t initialTime, int rc, const char* func
          * We emit one metric with the input pathname
          */
         if (fsrd) {
-            doErrorMetric(FS_ERR_READ_WRITE, EVENT_BASED, func, fsrd->path);
+            doUpdateState(FS_ERR_READ_WRITE, in_fd, (size_t)0, func, fsrd->path);
         }
 
         if (nettx) {
-            doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, func, "nopath");
+            doUpdateState(NET_ERR_RX_TX, out_fd, (size_t)0, func, "nopath");
         }
     }
 }
 
 void
-doCloseAndReportFailures(int fd, int success, const char* func)
+doCloseAndReportFailures(int fd, int success, const char *func)
 {
     struct fs_info_t *fs;
     if (success) {
         doClose(fd, func);
     } else {
         if ((fs = getFSEntry(fd))) {
-            doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, func, fs->path);
+            doUpdateState(FS_ERR_OPEN_CLOSE, fd, (size_t)0, func, fs->path);
         }
     }
 }

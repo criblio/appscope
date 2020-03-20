@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <unistd.h>
-#include "mtc.h"
+#include <string.h>
 
+#include "mtc.h"
 #include "test.h"
 
 static void
@@ -61,7 +62,8 @@ mtcTransportSetAndMtcSend(void** state)
     // Test that transport is set by testing side effects of mtcSend
     // affecting the file at file_path when connected to a file transport.
     long file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(mtcSend(mtc, "Something to send\n"), 0);
+    char *msg = strdup("Something to send\n");
+    assert_int_equal(mtcSend(mtc, msg), 0);
 
     // With CFG_BUFFER_FULLY, this output only happens with the flush
     long file_pos_after = fileEndPosition(file_path);
@@ -70,13 +72,6 @@ mtcTransportSetAndMtcSend(void** state)
     mtcFlush(mtc);
     file_pos_after = fileEndPosition(file_path);
     assert_int_not_equal(file_pos_before, file_pos_after);
-
-    // Test that transport is cleared by seeing no side effects.
-    mtcTransportSet(mtc, NULL);
-    file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(mtcSend(mtc, "Something to send\n"), -1);
-    file_pos_after = fileEndPosition(file_path);
-    assert_int_equal(file_pos_before, file_pos_after);
 
     if (unlink(file_path))
         fail_msg("Couldn't delete file %s", file_path);
@@ -97,18 +92,11 @@ mtcFormatSetAndMtcSendEvent(void** state)
     mtc_fmt_t* f = mtcFormatCreate(CFG_METRIC_STATSD);
     mtcFormatSet(mtc, f);
 
-    // Test that format is set by testing side effects of mtcSendMetric
-    // affecting the file at file_path when connected to format.
-    long file_pos_before = fileEndPosition(file_path);
-    assert_int_equal(mtcSendMetric(mtc, &e), 0);
-    long file_pos_after = fileEndPosition(file_path);
-    assert_int_not_equal(file_pos_before, file_pos_after);
-
     // Test that format is cleared by seeing no side effects.
     mtcFormatSet(mtc, NULL);
-    file_pos_before = fileEndPosition(file_path);
+    long file_pos_before = fileEndPosition(file_path);
     assert_int_equal(mtcSendMetric(mtc, &e), -1);
-    file_pos_after = fileEndPosition(file_path);
+    long file_pos_after = fileEndPosition(file_path);
     assert_int_equal(file_pos_before, file_pos_after);
 
     if (unlink(file_path))

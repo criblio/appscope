@@ -21,6 +21,7 @@
 #include "report.h"
 #include "state.h"
 #include "wrap.h"
+#include "runtimecfg.h"
 
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
@@ -29,6 +30,7 @@ static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
+static const char *g_cmddir;
 __thread int g_getdelim = 0;
 
 
@@ -190,15 +192,15 @@ remoteConfig()
                     break;
                 case REQ_BLOCK_PORT:
                     // Assign new value for port blocking
-                    g_blockconn = req->port;
+                    g_cfg.blockconn = req->port;
                     break;
                 case REQ_SWITCH:
                     switch (req->action) {
                         case URL_REDIRECT_ON:
-                            g_urls = 1;
+                            g_cfg.urls = 1;
                             break;
                         case URL_REDIRECT_OFF:
-                            g_urls = 0;
+                            g_cfg.urls = 0;
                             break;
                         default:
                             DBG("%d", req->action);
@@ -237,7 +239,7 @@ doConfig(config_t *cfg)
     }
 
     setVerbosity(cfgMtcVerbosity(cfg));
-    g_cfg.cmddir = cfgCmdDir(cfg);
+    g_cmddir = cfgCmdDir(cfg);
 
     log_t* log = initLog(cfg);
     g_mtc = initMtc(cfg);
@@ -258,7 +260,7 @@ dynConfig(void)
     char path[PATH_MAX];
     static time_t modtime = 0;
 
-    snprintf(path, sizeof(path), "%s/%s.%d", g_cfg.cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
+    snprintf(path, sizeof(path), "%s/%s.%d", g_cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
 
     // Is there a command file for this pid
     if (osIsFilePresent(g_proc.pid, path) == -1) return 0;
@@ -507,18 +509,19 @@ reportPeriodicStuff(void)
     doTotalDuration(TOT_DNS_DURATION);
 
     // Report errors
-    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
-    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
-    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary");
-    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary");
-    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary");
-    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
 
     // report net and file by descriptor
     reportAllFds(PERIODIC);
 
     // Process any events that have been posted
-    ctlFlush(g_ctl);
+    doEvent();
+    mtcFlush(g_mtc);
 
     if (!atomicCasU64(&reentrancy_guard, 1ULL, 0ULL)) {
          DBG(NULL);
@@ -752,6 +755,9 @@ init(void)
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
+    g_cfg.staticfg = g_staticfg;
+    g_cfg.blockconn = DEFAULT_PORTBLOCK;
+
     reportProcessStart();
 
     if (atexit(handleExit)) {
@@ -813,11 +819,12 @@ open(const char *pathname, int flags, ...)
 
     WRAP_CHECK(open, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
+
     fd = g_fn.open(pathname, flags, fArgs.arg[0]);
     if (fd != -1) {
         doOpen(fd, pathname, FD, "open");
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "open", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "open", pathname);
     }
 
     return fd;
@@ -835,7 +842,7 @@ openat(int dirfd, const char *pathname, int flags, ...)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "openat");
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "openat", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "openat", pathname);
     }
 
     return fd;
@@ -852,7 +859,7 @@ creat(const char *pathname, mode_t mode)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "creat");
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "creat", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "creat", pathname);
     }
 
     return fd;
@@ -868,7 +875,7 @@ fopen(const char *pathname, const char *mode)
     if (stream != NULL) {
         doOpen(fileno(stream), pathname, STREAM, "fopen");
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "fopen", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "fopen", pathname);
     }
 
     return stream;
@@ -888,7 +895,7 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
             doClose(fileno(orig_stream), "freopen");
         }
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "freopen", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "freopen", pathname);
     }
 
     return stream;
@@ -907,7 +914,7 @@ open64(const char *pathname, int flags, ...)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "open64");
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "open64", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "open64", pathname);
     }
 
     return fd;
@@ -925,7 +932,7 @@ openat64(int dirfd, const char *pathname, int flags, ...)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "openat64");
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "openat64", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "openat64", pathname);
     }
 
     return fd;
@@ -941,7 +948,7 @@ __open_2(const char *file, int oflag)
     if (fd != -1) {
         doOpen(fd, file, FD, "__open_2");
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "__open_2", file);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "__openat_2", file);
     }
 
     return fd;
@@ -957,7 +964,7 @@ __open64_2(const char *file, int oflag)
     if (fd != -1) {
         doOpen(fd, file, FD, "__open_2");
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "__open64_2", file);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "__open64_2", file);
     }
 
     return fd;
@@ -971,7 +978,7 @@ __openat_2(int fd, const char *file, int oflag)
     if (fd != -1) {
         doOpen(fd, file, FD, "__openat_2");
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "__openat_2", file);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "__openat_2", file);
     }
 
     return fd;
@@ -988,7 +995,7 @@ creat64(const char *pathname, mode_t mode)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "creat64");
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "creat64", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "creat64", pathname);
     }
 
     return fd;
@@ -1004,7 +1011,7 @@ fopen64(const char *pathname, const char *mode)
     if (stream != NULL) {
         doOpen(fileno(stream), pathname, STREAM, "fopen64");
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "fopen64", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "fopen64", pathname);
     }
 
     return stream;
@@ -1024,7 +1031,7 @@ freopen64(const char *pathname, const char *mode, FILE *orig_stream)
             doClose(fileno(orig_stream), "freopen64");
         }
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "freopen64", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "freopen64", pathname);
     }
 
     return stream;
@@ -1462,11 +1469,11 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
 
     if ((rc == 0) && (result != NULL)) {
         scopeLog("gethostbyname_r", -1, CFG_LOG_DEBUG);
-        doDNSMetricName(DNS, name, time.duration);
-        doDNSMetricName(DNS_DURATION, name, time.duration);
+        doUpdateState(DNS, -1, time.duration, NULL, name);
+        doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }  else {
-        doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname_r", name);
-        doDNSMetricName(DNS_DURATION, name, time.duration);
+        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname_r", name);
+        doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }
 
     return rc;
@@ -1486,11 +1493,11 @@ gethostbyname2_r(const char *name, int af, struct hostent *ret, char *buf,
 
     if ((rc == 0) && (result != NULL)) {
         scopeLog("gethostbyname2_r", -1, CFG_LOG_DEBUG);
-        doDNSMetricName(DNS, name, time.duration);
-        doDNSMetricName(DNS_DURATION, name, time.duration);
+        doUpdateState(DNS, -1, time.duration, NULL, name);
+        doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }  else {
-        doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname2_r", name);
-        doDNSMetricName(DNS_DURATION, name, time.duration);
+        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname2_r", name);
+        doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }
 
     return rc;
@@ -1594,7 +1601,7 @@ syscall(long number, ...)
             doAccept(rc, (struct sockaddr *)fArgs.arg[1],
                      (socklen_t *)fArgs.arg[2], "accept4");
         } else {
-            doErrorMetric(NET_ERR_CONN, EVENT_BASED, "accept4", "nopath");
+            doUpdateState(NET_ERR_CONN, fArgs.arg[0], (ssize_t)0, "accept4", "nopath");
         }
         return rc;
     }
@@ -1729,7 +1736,7 @@ fcloseall(void)
     if (rc != EOF) {
         doCloseAllStreams();
     } else {
-        doErrorMetric(FS_ERR_OPEN_CLOSE, EVENT_BASED, "fcloseall", "nopath");
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "fcloseall", "nopath");
     }
 
     return rc;
@@ -1788,7 +1795,7 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept$NOCANCEL");
     } else {
-        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "accept$NOCANCEL", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "accept$NOCANCEL", "nopath");
     }
 
     return sd;
@@ -1811,7 +1818,7 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
 
         doSend(sockfd, rc);
     } else {
-        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "__sendto_nocancel", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "__sendto_nocancel", "nopath");
     }
 
     return rc;
@@ -1833,11 +1840,11 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
 
     if (rc == 0) {
         scopeLog("DNSServiceQueryRecord", -1, CFG_LOG_DEBUG);
-        doDNSMetricName(DNS, fullname, time.duration);
-        doDNSMetricName(DNS_DURATION, fullname, time.duration);
+        doUpdateState(DNS, -1, time.duration, NULL, fullname);
+        doUpdateState(DNS_DURATION, -1, time.duration, NULL, fullname);
     } else {
-        doErrorMetric(NET_ERR_DNS, EVENT_BASED, "DNSServiceQueryRecord", fullname);
-        doDNSMetricName(DNS_DURATION, fullname, time.duration);
+        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "DNSServiceQueryRecord", fullname);
+        doUpdateState(DNS_DURATION, -1, time.duration, NULL, fullname);
     }
 
     return rc;
@@ -2432,10 +2439,10 @@ socket(int socket_family, int socket_type, int protocol)
              * a UDP socket is open we say the port is open
              * a UDP socket is closed we say the port is closed
              */
-            doNetMetric(OPEN_PORTS, sd, EVENT_BASED, 1);
+            doUpdateState(OPEN_PORTS, sd, 1, "socket", NULL);
         }
     } else {
-        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "socket", "nopath");
+        doUpdateState(NET_ERR_CONN, sd, (ssize_t)0, "socket", "nopath");
     }
 
     return sd;
@@ -2451,7 +2458,7 @@ shutdown(int sockfd, int how)
     if (rc != -1) {
         doClose(sockfd, "shutdown");
     } else {
-        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "shutdown", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "shutdown", "nopath");
     }
 
     return rc;
@@ -2466,10 +2473,10 @@ listen(int sockfd, int backlog)
     if (rc != -1) {
         scopeLog("listen", sockfd, CFG_LOG_DEBUG);
 
-        doNetMetric(OPEN_PORTS, sockfd, EVENT_BASED, 1);
-        doNetMetric(NET_CONNECTIONS, sockfd, EVENT_BASED, 1);
+        doUpdateState(OPEN_PORTS, sockfd, 1, "listen", NULL);
+        doUpdateState(NET_CONNECTIONS, sockfd, 1, "listen", NULL);
     } else {
-        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "listen", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "listen", "nopath");
     }
 
     return rc;
@@ -2492,7 +2499,7 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept");
     } else {
-        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "accept", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "accept", "nopath");
     }
 
     return sd;
@@ -2515,7 +2522,7 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept4");
     } else {
-        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "accept4", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "accept4", "nopath");
     }
 
     return sd;
@@ -2532,7 +2539,7 @@ bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
         doSetConnection(sockfd, addr, addrlen, LOCAL);
         scopeLog("bind", sockfd, CFG_LOG_DEBUG);
     } else {
-        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "bind", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "bind", "nopath");
     }
 
     return rc;
@@ -2552,11 +2559,11 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     rc = g_fn.connect(sockfd, addr, addrlen);
     if (rc != -1) {
         doSetConnection(sockfd, addr, addrlen, REMOTE);
-        doNetMetric(NET_CONNECTIONS, sockfd, EVENT_BASED, 1);
+        doUpdateState(NET_CONNECTIONS, sockfd, 1, "connect", NULL);
 
         scopeLog("connect", sockfd, CFG_LOG_DEBUG);
     } else {
-        doErrorMetric(NET_ERR_CONN, EVENT_BASED, "connect", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "connect", "nopath");
     }
 
     return rc;
@@ -2577,7 +2584,7 @@ send(int sockfd, const void *buf, size_t len, int flags)
 
         doSend(sockfd, rc);
     } else {
-        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "send", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "send", "nopath");
     }
 
     return rc;
@@ -2600,7 +2607,7 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
 
         doSend(sockfd, rc);
     } else {
-        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "sendto", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendto", "nopath");
     }
 
     return rc;
@@ -2633,7 +2640,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
         
         doSend(sockfd, rc);
     } else {
-        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "sendmsg", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendmsg", "nopath");
     }
 
     return rc;
@@ -2653,7 +2660,7 @@ recv(int sockfd, void *buf, size_t len, int flags)
     if (rc != -1) {
         doRecv(sockfd, rc);
     } else {
-        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "recv", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recv", "nopath");
     }
 
     return rc;
@@ -2671,7 +2678,7 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
         scopeLog("recvfrom", sockfd, CFG_LOG_TRACE);
         doRecv(sockfd, rc);
     } else {
-        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "recvfrom", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvfrom", "nopath");
     }
     return rc;
 }
@@ -2738,7 +2745,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
         doRecv(sockfd, rc);
         doAccessRights(msg);
     } else {
-        doErrorMetric(NET_ERR_RX_TX, EVENT_BASED, "recvmsg", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmsg", "nopath");
     }
     
     return rc;
@@ -2757,11 +2764,11 @@ gethostbyname(const char *name)
 
     if (rc != NULL) {
         scopeLog("gethostbyname", -1, CFG_LOG_DEBUG);
-        doDNSMetricName(DNS, name, time.duration);
-        doDNSMetricName(DNS_DURATION, name, time.duration);
+        doUpdateState(DNS, -1, time.duration, NULL, name);
+        doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     } else {
-        doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname", name);
-        doDNSMetricName(DNS_DURATION, name, time.duration);
+        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname", name);
+        doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }
 
     return rc;
@@ -2780,11 +2787,11 @@ gethostbyname2(const char *name, int af)
 
     if (rc != NULL) {
         scopeLog("gethostbyname2", -1, CFG_LOG_DEBUG);
-        doDNSMetricName(DNS, name, time.duration);
-        doDNSMetricName(DNS_DURATION, name, time.duration);
+        doUpdateState(DNS, -1, time.duration, NULL, name);
+        doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     } else {
-        doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname2", name);
-        doDNSMetricName(DNS_DURATION, name, time.duration);
+        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname2", name);
+        doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }
 
     return rc;
@@ -2805,11 +2812,11 @@ getaddrinfo(const char *node, const char *service,
 
     if (rc == 0) {
         scopeLog("getaddrinfo", -1, CFG_LOG_DEBUG);
-        doDNSMetricName(DNS, node, time.duration);
-        doDNSMetricName(DNS_DURATION, node, time.duration);
+        doUpdateState(DNS, -1, time.duration, NULL, node);
+        doUpdateState(DNS_DURATION, -1, time.duration, NULL, node);
     } else {
-        doErrorMetric(NET_ERR_DNS, EVENT_BASED, "getaddrinfo", node);
-        doDNSMetricName(DNS_DURATION, node, time.duration);
+        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname", node);
+        doUpdateState(DNS_DURATION, -1, time.duration, NULL, node);
     }
 
 

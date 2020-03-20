@@ -8,17 +8,19 @@
 #include <sys/statvfs.h>
 #include <sys/vfs.h>
 
+#include "cfg.h"
 #include "dbg.h"
-#include "circbuf.h"
 #include "test.h"
 #include "state.h"
 #include "report.h"
+#include "runtimecfg.h"
 #include "wrap.h"
 #include "plattime.h"
 
 
 // Normally declared by wrap.c
-interposed_funcs g_fn;
+interposed_funcs g_fn = {0};
+rtconfig g_cfg = {0};
 
 #define BUFSIZE 500
 
@@ -27,28 +29,32 @@ int evtBufNext = 0;
 event_t mtcBuf[BUFSIZE] = {0};
 int mtcBufNext = 0;
 
-void __wrap_ctlSendEvent(ctl_t* ctl, event_t* event, uint64_t uid, proc_id_t* proc)
+// These signatures satisfy --wrap=cmdSendEvent in the Makefile
+void __real_cmdSendEvent(ctl_t*, event_t*, uint64_t, proc_id_t*);
+void __wrap_cmdSendEvent(ctl_t* ctl, event_t* event, uint64_t uid, proc_id_t* proc)
 {
     // Store event for later inspection
     memcpy(&evtBuf[evtBufNext++], event, sizeof(*event));
     if (evtBufNext >= BUFSIZE) fail();
 
-    //__real_ctlSendEvent(ctl, event, uid, proc);
+    __real_cmdSendEvent(ctl, event, uid, proc);
 }
 
-int __wrap_mtcSendMetric(mtc_t* mtc, event_t* metric)
+// These signatures satisfy --wrap=cmdSendMetric in the Makefile
+int __real_cmdSendMetric(mtc_t*, event_t*);
+int __wrap_cmdSendMetric(mtc_t* mtc, event_t* metric)
 {
     // Store metric for later inspection
     memcpy(&mtcBuf[mtcBufNext++], metric, sizeof(*metric));
     if (mtcBufNext >= BUFSIZE) fail();
 
-    //return __real_mtcSendMetric(mtc, metric);
-    return 0;
+    return __real_cmdSendMetric(mtc, metric);
 }
 
 int
 eventCalls(const char* str)
 {
+    doEvent();
     int i, returnVal = 0;
     for (i=0; i<evtBufNext; i++) {
         if (!str || !strcmp(evtBuf[i].name, str)) returnVal++;
@@ -59,6 +65,7 @@ eventCalls(const char* str)
 int
 metricCalls(const char* str)
 {
+    doEvent();
     int i, returnVal = 0;
     for (i=0; i<mtcBufNext; i++) {
         if (!str || !strcmp(mtcBuf[i].name, str)) returnVal++;
@@ -69,6 +76,7 @@ metricCalls(const char* str)
 int
 eventValues(const char* str)
 {
+    doEvent();
     int i, returnVal = 0;
     for (i=0; i < evtBufNext; i++) {
         if (!str || !strcmp(evtBuf[i].name, str)) {
@@ -81,6 +89,7 @@ eventValues(const char* str)
 int
 metricValues(const char* str)
 {
+    doEvent();
     int i, returnVal = 0;
     for (i=0; i < mtcBufNext; i++) {
         if (!str || !strcmp(mtcBuf[i].name, str)) {
@@ -93,6 +102,7 @@ metricValues(const char* str)
 void
 clearTestData(void)
 {
+    doEvent();
     memset(&evtBuf, 0, sizeof(evtBuf));
     evtBufNext = 0;
     memset(&mtcBuf, 0, sizeof(mtcBuf));
@@ -139,10 +149,12 @@ countTestSetup(void** state)
     g_mtc = mtcCreate();
     g_ctl = ctlCreate();
 
-    g_urls = 0;
-    g_blockconn = 0;
-
     initState();
+
+    // Turn on metric events
+    config_t* cfg = cfgCreateDefault();
+    cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_METRIC, 1);
+    g_cfg.staticfg = cfg;
 
     // Call the general groupSetup() too.
     return groupSetup(state);
@@ -155,6 +167,8 @@ countTestTeardown(void** state)
     mtcDestroy(&g_mtc);
     ctlDestroy(&g_ctl);
 
+    cfgDestroy(&g_cfg.staticfg);
+
     // Call the general groupTeardown() too.
     return groupTeardown(state);
 }
@@ -163,21 +177,21 @@ static void
 nothingCrashesBeforeAnyInit(void** state)
 {
     resetState();
+
+    // report.h
     setReportingInterval(10);
     sendProcessStartMetric();
-    scopeLog("hey", 1, CFG_LOG_ERROR);
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "A", "B", NULL);
+    doProcMetric(PROC_CPU, 2345);
+    doStatMetric("statFunc", "/the/path/to/something", NULL);
+    doTotal(TOT_READ);
+    doTotalDuration(TOT_DNS_DURATION);
+    doEvent();
+
+    // state.h
     setVerbosity(9);
     addSock(3, SOCK_SEQPACKET);
     doBlockConnection(4, NULL);
-    doErrorMetric(NET_ERR_CONN, PERIODIC, "A", "B");
-    doDNSMetricName(DNS, "something.com", 1234);
-    doProcMetric(PROC_CPU, 2345);
-    doStatMetric("statFunc", "/the/path/to/something");
-    doFSMetric(FS_DURATION, 5, PERIODIC,
-               "writeFunc", 5432, "/the/path/to/something/else");
-    doTotal(TOT_READ);
-    doTotalDuration(TOT_DNS_DURATION);
-    doNetMetric(NETTX, 6, EVENT_BASED, 6543);
     doSetConnection(7, NULL, 3, LOCAL);
     doSetAddrs(8);
     doAddNewSock(9);
@@ -204,6 +218,7 @@ nothingCrashesBeforeAnyInit(void** state)
     doCloseAllStreams();
     remotePortIsDNS(31);
     sockIsTCP(32);
+    doUpdateState(OPEN_PORTS, 3, 4, "something", "/path/to/something");
     clearTestData();
 }
 
@@ -1268,7 +1283,7 @@ doFSConnectionErrorNoSummarization(void** state)
 
     // Zeros should not be reported on any interface
     clearTestData();
-    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1282,7 +1297,7 @@ doFSConnectionErrorNoSummarization(void** state)
 
     // Nothing to see here, because it was reported earlier
     clearTestData();
-    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1298,7 +1313,7 @@ doFSConnectionErrorSummarization(void** state)
 
     // Zeros should not be reported on any interface
     clearTestData();
-    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1311,7 +1326,7 @@ doFSConnectionErrorSummarization(void** state)
 
     // Ok, this should report the earlier fs.errors
     clearTestData();
-    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls("fs.error"), 1);
     assert_int_equal(metricValues("fs.error"), 2);
     assert_int_equal(eventCalls(NULL), 0);
@@ -1328,7 +1343,7 @@ doNetConnectionErrorNoSummarization(void** state)
 
     // Zeros should not be reported on any interface
     clearTestData();
-    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1342,7 +1357,7 @@ doNetConnectionErrorNoSummarization(void** state)
 
     // Nothing to see here, because it was reported earlier
     clearTestData();
-    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1358,7 +1373,7 @@ doNetConnectionErrorSummarization(void** state)
 
     // Zeros should not be reported on any interface
     clearTestData();
-    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1371,7 +1386,7 @@ doNetConnectionErrorSummarization(void** state)
 
     // Ok, this should report the earlier net.errors
     clearTestData();
-    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls("net.error"), 1);
     assert_int_equal(metricValues("net.error"), 2);
     assert_int_equal(eventCalls(NULL), 0);
@@ -1388,7 +1403,7 @@ doFSReadWriteErrorNoSummarization(void** state)
 
     // Zeros should not be reported on any interface
     clearTestData();
-    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1402,7 +1417,7 @@ doFSReadWriteErrorNoSummarization(void** state)
 
     // Nothing to see here, becaues it was reported earlier
     clearTestData();
-    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1418,7 +1433,7 @@ doFSReadWriteErrorSummarization(void** state)
 
     // Zeros should not be reported on any interface
     clearTestData();
-    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1431,7 +1446,7 @@ doFSReadWriteErrorSummarization(void** state)
 
     // Ok, this should report the ealier fs.errors
     clearTestData();
-    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls("fs.error"), 1);
     assert_int_equal(metricValues("fs.error"), 2);
     assert_int_equal(eventCalls(NULL), 0);
@@ -1448,7 +1463,7 @@ doNetRxTxErrorNoSummarization(void** state)
 
     // Zeros should not be reported on any interface
     clearTestData();
-    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1462,7 +1477,7 @@ doNetRxTxErrorNoSummarization(void** state)
 
     // Nothing to see here, because it was reported earlier
     clearTestData();
-    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1478,7 +1493,7 @@ doNetRxTxErrorSummarization(void** state)
 
     // Zeros should not be reported on any interface
     clearTestData();
-    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1491,7 +1506,7 @@ doNetRxTxErrorSummarization(void** state)
 
     // Ok, this should report the earlier net.errors
     clearTestData();
-    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls("net.error"), 1);
     assert_int_equal(metricValues("net.error"), 2);
     assert_int_equal(eventCalls(NULL), 0);
@@ -1507,7 +1522,7 @@ doStatErrNoSummarization(void** state)
 
     // Zeros should not be reported on any interface
     clearTestData();
-    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1521,7 +1536,7 @@ doStatErrNoSummarization(void** state)
 
     // Nothing to see here, because it was reported earlier
     clearTestData();
-    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 }
@@ -1534,7 +1549,7 @@ doStatErrSummarization(void** state)
 
     // Zeros should not be reported on any interface
     clearTestData();
-    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
@@ -1547,7 +1562,7 @@ doStatErrSummarization(void** state)
 
     // Ok, this should report the earlier fs.errors
     clearTestData();
-    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary");
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls("fs.error"), 1);
     assert_int_equal(metricValues("fs.error"), 2);
     assert_int_equal(eventCalls(NULL), 0);
@@ -1561,13 +1576,13 @@ doDNSErrNoSummarization(void** state)
 
     // Zeros should not be reported on any interface
     clearTestData();
-    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
     // Should create "dns" net.error and report it immediately
-    doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname_r", "blah");
-    doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname_r", "blah");
+    doUpdateState(NET_ERR_DNS, -1, 0, "gethostbyname_r", "blah");
+    doUpdateState(NET_ERR_DNS, -1, 0, "gethostbyname_r", "blah");
     assert_int_equal(metricCalls("net.error"), 2);
     assert_int_equal(metricValues("net.error"), 2);
     assert_int_equal(eventCalls("net.error"), 2);
@@ -1575,7 +1590,7 @@ doDNSErrNoSummarization(void** state)
 
     // Nothing to see here, because it was reported earlier
     clearTestData();
-    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 }
@@ -1588,20 +1603,20 @@ doDNSErrSummarization(void** state)
 
     // Zeros should not be reported on any interface
     clearTestData();
-    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
     // Should create "dns" net.error but not report it
-    doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname_r", "blah");
-    doErrorMetric(NET_ERR_DNS, EVENT_BASED, "gethostbyname_r", "blah");
+    doUpdateState(NET_ERR_DNS, -1, 0, "gethostbyname_r", "blah");
+    doUpdateState(NET_ERR_DNS, -1, 0, "gethostbyname_r", "blah");
     assert_int_equal(metricCalls("net.error"), 0);
     assert_int_equal(eventCalls("net.error"), 2);
     assert_int_equal(eventValues("net.error"), 2);
 
     // Nothing to see here, because it was reported earlier
     clearTestData();
-    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls("net.error"), 1);
     assert_int_equal(metricValues("net.error"), 2);
     assert_int_equal(eventCalls(NULL), 0);

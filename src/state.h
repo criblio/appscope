@@ -43,6 +43,7 @@ void doCloseAllStreams();
 int remotePortIsDNS(int);
 int sockIsTCP(int);
 void doUpdateState(metric_t, int, ssize_t, const char *, const char *);
+int doProtocol(int, void *, size_t, metric_t);
 
 
 #endif // __STATE_H__

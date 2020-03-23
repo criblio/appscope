@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 
+#include "../contrib/tls/tls.h"
 
 #define DEBUG 0
 #define EXPORT __attribute__((visibility("default")))
@@ -111,7 +112,6 @@ typedef struct interposed_funcs_t {
                             struct hostent **, int *);
     int (*getaddrinfo)(const char *, const char *, const struct addrinfo *,
                        struct addrinfo **);
-    // __LINUX__
     /*
      * We need to make these Linux only, but we're holding off until structiural changes are done.
      */
@@ -172,6 +172,11 @@ typedef struct interposed_funcs_t {
     int (*sigsuspend)(const sigset_t *);
     int (*sigaction)(int, const struct sigaction *, struct sigaction *);
 
+    int (*SSL_read)(SSL *, void *, int);
+    int (*SSL_write)(SSL *, const void *, int);
+    ssize_t (*gnutls_record_recv)(gnutls_session_t, void *, size_t);
+    ssize_t (*gnutls_record_send)(gnutls_session_t, const void *, size_t);
+    
 #if defined(__LINUX__) && defined(__STATX__)
     int (*statx)(int, const char *, int, unsigned int, struct statx *);
 #endif // __LINUX__ && __STATX__

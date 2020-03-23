@@ -86,6 +86,7 @@ int     ctlSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);
 int     ctlSendLog(ctl_t *, const char *, const void *, size_t, uint64_t, proc_id_t *);
 void    ctlFlush(ctl_t *);
 int     ctlPostEvent(ctl_t *, char *);
+int     ctlSendBin(ctl_t *, char *);
 
 // Connection oriented stuff
 int     ctlNeedsConnection(ctl_t *);

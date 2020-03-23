@@ -135,6 +135,29 @@ doUnixEndpoint(int sd, net_info *net)
 }
 
 void
+doProtocolMetric(protocol_info *proto)
+{
+    if (!proto) return;
+    
+    char binheader[] = "procid:%s\n{\"type\":\"%s\",\"fd\":%d,\"pid\":%d,\"ppid\":%d}\n";
+    size_t blen = strlen(binheader) +
+        strlen(g_proc.id) + sizeof(int) + (sizeof(pid_t) * 2) +
+        strlen(proto->header_type) + strlen(proto->header);
+    char *bincap = calloc(1, blen);
+    if (!bincap) return;
+
+    // we need to define what's really needed as a header; for now...
+    snprintf(bincap, blen, binheader, g_proc.id, proto->header_type,
+             proto->fd, g_proc.pid, g_proc.ppid);
+    //strncat(bincap, proto->header_type, strlen(proto->header_type));
+    strncat(bincap, proto->header, strlen(proto->header));
+
+    cmdSendBin(g_ctl, bincap);
+
+    free(bincap);
+}
+
+void
 resetInterfaceCounts(counters_element_t* value)
 {
     if (!value) return;
@@ -1418,6 +1441,7 @@ doEvent()
             net_info *net;
             fs_info *fs;
             stat_err_info *staterr;
+            protocol_info *proto;
 
             if (event->evtype == EVT_NET) {
                 net = (net_info *)data;
@@ -1434,6 +1458,9 @@ doEvent()
             } else if (event->evtype == EVT_DNS) {
                 net = (net_info *)data;
                 doDNSMetricName(net->data_type, net->dnsName, &net->totalDuration, &net->counters);
+            } else if (event->evtype == EVT_PROTO) {
+                proto = (protocol_info *)data;
+                doProtocolMetric(proto);
             } else {
                 DBG(NULL);
                 return;

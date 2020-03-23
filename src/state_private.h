@@ -7,6 +7,7 @@
 #define PROTOCOL_STR 16
 #define SCOPE_UNIX 99
 #define FUNC_MAX 24
+#define HDRTYPE_MAX 16
 
 //
 // This file contains implementation details for state.c and reporting.c.
@@ -67,6 +68,13 @@ typedef struct {
 typedef struct evt_type_t {
     metric_t evtype;
 } evt_type;
+
+typedef struct protocol_info_t {
+    metric_t evtype;
+    int fd;
+    char header_type[HDRTYPE_MAX];
+    char header[8 * 1024];
+} protocol_info;
 
 typedef struct stat_err_info_t {
     metric_t evtype;

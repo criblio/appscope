@@ -11,8 +11,8 @@
 typedef enum {
     LOCAL,
     REMOTE,
-    PERIODIC,
-    EVENT_BASED,
+    PERIODIC,    // This means to always ignore summarization rules
+    EVENT_BASED, // This means to follow summarization rules
 } control_type_t;
 
 typedef enum {

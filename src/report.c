@@ -546,8 +546,8 @@ doStatMetric(const char *op, const char *pathname, void* ctr)
     };
 
     if (ctrs->numStat.evt != 0) {
-        event_t e = INT_EVENT("fs.op.stat", ctrs->numStat.evt, DELTA, fields);
-        cmdSendEvent(g_ctl, &e, getTime(), &g_proc);
+        event_t evt = INT_EVENT("fs.op.stat", ctrs->numStat.evt, DELTA, fields);
+        cmdSendEvent(g_ctl, &evt, getTime(), &g_proc);
     }
 
     // Only report if enabled
@@ -558,8 +558,8 @@ doStatMetric(const char *op, const char *pathname, void* ctr)
     // Do not report zeros
     if (ctrs->numStat.mtc == 0) return;
 
-    event_t e = INT_EVENT("fs.op.stat", ctrs->numStat.mtc, DELTA, fields);
-    if (cmdSendMetric(g_mtc, &e)) {
+    event_t evt = INT_EVENT("fs.op.stat", ctrs->numStat.mtc, DELTA, fields);
+    if (cmdSendMetric(g_mtc, &evt)) {
         scopeLog("doStatMetric", -1, CFG_LOG_ERROR);
     }
 }
@@ -574,15 +574,15 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
     case FS_DURATION:
     {
 
-        uint64_t d = 0ULL;
+        uint64_t dur = 0ULL;
         int cachedDurationNum = fs->numDuration.evt; // avoid div by zero
         if (cachedDurationNum >= 1) {
             // factor of 1000 converts ns to us.
-            d = fs->totalDuration.evt / ( 1000 * cachedDurationNum);
+            dur = fs->totalDuration.evt / ( 1000 * cachedDurationNum);
         }
 
         // Don't report zeros.
-        if (d != 0ULL) {
+        if (dur != 0ULL) {
             event_field_t fields[] = {
                 PROC_FIELD(g_proc.procname),
                 PID_FIELD(g_proc.pid),
@@ -595,23 +595,23 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
                 FIELDEND
             };
 
-            event_t e = INT_EVENT("fs.duration", d, HISTOGRAM, fields);
-            cmdSendEvent(g_ctl, &e, fs->uid, &g_proc);
+            event_t evt = INT_EVENT("fs.duration", dur, HISTOGRAM, fields);
+            cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
             atomicSwapU64(&fs->numDuration.evt, 0);
             atomicSwapU64(&fs->totalDuration.evt, 0);
             //atomicSwapU64(&g_ctrs.fsDurationNum.evt, 0);
             //atomicSwapU64(&g_ctrs.fsDurationTotal.evt, 0);
         }
 
-        d = 0ULL;
+        dur = 0ULL;
         cachedDurationNum = fs->numDuration.mtc; // avoid div by zero
         if (cachedDurationNum >= 1) {
             // factor of 1000 converts ns to us.
-            d = fs->totalDuration.mtc / ( 1000 * cachedDurationNum);
+            dur = fs->totalDuration.mtc / ( 1000 * cachedDurationNum);
         }
 
         // Don't report zeros
-        if (d == 0ULL) return;
+        if (dur == 0ULL) return;
 
         // Only report if enabled
         if ((g_summary.fs.read_write) && (source == EVENT_BASED)) {
@@ -629,8 +629,8 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
             UNIT_FIELD("microsecond"),
             FIELDEND
         };
-        event_t e = INT_EVENT("fs.duration", d, HISTOGRAM, fields);
-        if (cmdSendMetric(g_mtc, &e)) {
+        event_t evt = INT_EVENT("fs.duration", dur, HISTOGRAM, fields);
+        if (cmdSendMetric(g_mtc, &evt)) {
             scopeLog("ERROR: doFSMetric:FS_DURATION:cmdSendMetric", fs->fd, CFG_LOG_ERROR);
         }
 
@@ -771,8 +771,8 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
 
         // Don't report zeros.
         if (numops->evt != 0ULL) {
-            event_t e = INT_EVENT(metric, numops->evt, DELTA, fields);
-            cmdSendEvent(g_ctl, &e, fs->uid, &g_proc);
+            event_t evt = INT_EVENT(metric, numops->evt, DELTA, fields);
+            cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
             atomicSwapU64(&numops->evt, 0);
         }
 
@@ -784,8 +784,8 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         // Don't report zeros.
         if (numops->mtc == 0ULL) return;
 
-        event_t e = INT_EVENT(metric, numops->mtc, DELTA, fields);
-        if (cmdSendMetric(g_mtc, &e)) {
+        event_t evt = INT_EVENT(metric, numops->mtc, DELTA, fields);
+        if (cmdSendMetric(g_mtc, &evt)) {
             scopeLog(err_str, fs->fd, CFG_LOG_ERROR);
         }
         subFromInterfaceCounts(global_counter, numops->mtc);
@@ -901,8 +901,8 @@ doTotal(metric_t type)
             CLASS_FIELD("summary"),
             FIELDEND
     };
-    event_t e = INT_EVENT(metric, value->mtc, aggregation_type, fields);
-    if (cmdSendMetric(g_mtc, &e)) {
+    event_t evt = INT_EVENT(metric, value->mtc, aggregation_type, fields);
+    if (cmdSendMetric(g_mtc, &evt)) {
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
@@ -953,15 +953,15 @@ doTotalDuration(metric_t type)
             return;
     }
 
-    uint64_t d = 0ULL;
+    uint64_t dur = 0ULL;
     int cachedDurationNum = num->mtc; // avoid div by zero
     if (cachedDurationNum >= 1) {
         // factor is there to scale from ns to the appropriate units
-        d = value->mtc / ( factor * cachedDurationNum);
+        dur = value->mtc / ( factor * cachedDurationNum);
     }
 
     // Don't report zeros.
-    if (d == 0) return;
+    if (dur == 0) return;
 
     event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
@@ -971,8 +971,8 @@ doTotalDuration(metric_t type)
             CLASS_FIELD("summary"),
             FIELDEND
     };
-    event_t e = INT_EVENT(metric, d, aggregation_type, fields);
-    if (cmdSendMetric(g_mtc, &e)) {
+    event_t evt = INT_EVENT(metric, dur, aggregation_type, fields);
+    if (cmdSendMetric(g_mtc, &evt)) {
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
@@ -1040,8 +1040,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         };
 
         {
-            event_t e = INT_EVENT(metric, value->evt, CURRENT, fields);
-            cmdSendEvent(g_ctl, &e, net->uid, &g_proc);
+            event_t evt = INT_EVENT(metric, value->evt, CURRENT, fields);
+            cmdSendEvent(g_ctl, &evt, net->uid, &g_proc);
             // Don't reset the info if we tried to report.  It's a gauge.
             //atomicSwapU64(value->evt, 0ULL);
         }
@@ -1051,8 +1051,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             return;
         }
 
-        event_t e = INT_EVENT(metric, value->mtc, CURRENT, fields);
-        if (cmdSendMetric(g_mtc, &e)) {
+        event_t evt = INT_EVENT(metric, value->mtc, CURRENT, fields);
+        if (cmdSendMetric(g_mtc, &evt)) {
             scopeLog(err_str, net->fd, CFG_LOG_ERROR);
         }
         // Don't reset the info if we tried to report.  It's a gauge.
@@ -1063,15 +1063,15 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
 
     case CONNECTION_DURATION:
     {
-        uint64_t d = 0ULL;
+        uint64_t dur = 0ULL;
         int cachedDurationNum = net->numDuration.evt; // avoid div by zero
         if (cachedDurationNum >= 1 ) {
             // factor of 1000000 converts ns to ms.
-            d = net->totalDuration.evt / ( 1000000 * cachedDurationNum);
+            dur = net->totalDuration.evt / ( 1000000 * cachedDurationNum);
         }
 
         // Don't report zeros.
-        if (d != 0ULL) {
+        if (dur != 0ULL) {
             event_field_t fields[] = {
                 PROC_FIELD(g_proc.procname),
                 PID_FIELD(g_proc.pid),
@@ -1083,8 +1083,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
                 UNIT_FIELD("millisecond"),
                 FIELDEND
             };
-            event_t e = INT_EVENT("net.conn_duration", d, DELTA_MS, fields);
-            cmdSendEvent(g_ctl, &e, net->uid, &g_proc);
+            event_t evt = INT_EVENT("net.conn_duration", dur, DELTA_MS, fields);
+            cmdSendEvent(g_ctl, &evt, net->uid, &g_proc);
             atomicSwapU64(&net->numDuration.evt, 0);
             atomicSwapU64(&net->totalDuration.evt, 0);
          }
@@ -1094,15 +1094,15 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             return;
         }
 
-        d = 0ULL;
+        dur = 0ULL;
         cachedDurationNum = net->numDuration.mtc; // avoid div by zero
         if (cachedDurationNum >= 1 ) {
             // factor of 1000000 converts ns to ms.
-            d = net->totalDuration.mtc / ( 1000000 * cachedDurationNum);
+            dur = net->totalDuration.mtc / ( 1000000 * cachedDurationNum);
         }
 
         // Don't report zeros.
-        if (d == 0ULL) return;
+        if (dur == 0ULL) return;
 
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
@@ -1115,8 +1115,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             UNIT_FIELD("millisecond"),
             FIELDEND
         };
-        event_t e = INT_EVENT("net.conn_duration", d, DELTA_MS, fields);
-        if (cmdSendMetric(g_mtc, &e)) {
+        event_t evt = INT_EVENT("net.conn_duration", dur, DELTA_MS, fields);
+        if (cmdSendMetric(g_mtc, &evt)) {
             scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:cmdSendMetric", net->fd, CFG_LOG_ERROR);
         }
         atomicSwapU64(&net->numDuration.mtc, 0);

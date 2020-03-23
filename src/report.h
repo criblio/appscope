@@ -11,8 +11,8 @@
 typedef enum {
     LOCAL,
     REMOTE,
-    PERIODIC,
-    EVENT_BASED,
+    PERIODIC,    // This means to always ignore summarization rules
+    EVENT_BASED, // This means to follow summarization rules
 } control_type_t;
 
 typedef enum {
@@ -83,10 +83,9 @@ void setReportingInterval(int);
 
 
 void sendProcessStartMetric();
-void doErrorMetric(metric_t, control_type_t, const char *, const char *);
-void doDNSMetricName(metric_t, const char *, uint64_t);
+void doErrorMetric(metric_t, control_type_t, const char *, const char *, void *);
 void doProcMetric(metric_t, long long);
-void doStatMetric(const char *, const char *);
+void doStatMetric(const char *, const char *, void *);
 void doTotal(metric_t);
 void doTotalDuration(metric_t);
 void doEvent(void);

@@ -1,12 +1,26 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <sys/epoll.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#ifdef __LINUX__
 #include <sys/vfs.h>
+#include <sys/epoll.h>
+#endif // _LINUX_
+
+#ifdef __MACOS__
+
+#ifndef off64_t
+typedef uint64_t off64_t;
+#endif
+#ifndef fpos64_t
+typedef uint64_t fpos64_t;
+#endif
+
+#endif // __MACOS__
 
 #include "cfg.h"
 #include "dbg.h"
@@ -24,31 +38,41 @@ rtconfig g_cfg = {0};
 
 #define BUFSIZE 500
 
-event_t evtBuf[BUFSIZE] = {0};
+event_t evtBuf[BUFSIZE] = {{0}};
 int evtBufNext = 0;
-event_t mtcBuf[BUFSIZE] = {0};
+event_t mtcBuf[BUFSIZE] = {{0}};
 int mtcBufNext = 0;
 
 // These signatures satisfy --wrap=cmdSendEvent in the Makefile
+#ifdef __LINUX__
 void __real_cmdSendEvent(ctl_t*, event_t*, uint64_t, proc_id_t*);
 void __wrap_cmdSendEvent(ctl_t* ctl, event_t* event, uint64_t uid, proc_id_t* proc)
+#endif // __LINUX__
+#ifdef __MACOS__
+int cmdSendEvent(ctl_t* ctl, event_t* event, uint64_t uit, proc_id_t* proc)
+#endif // __MACOS__
 {
     // Store event for later inspection
     memcpy(&evtBuf[evtBufNext++], event, sizeof(*event));
     if (evtBufNext >= BUFSIZE) fail();
 
-    __real_cmdSendEvent(ctl, event, uid, proc);
+    //__real_cmdSendEvent(ctl, event, uid, proc);
 }
 
 // These signatures satisfy --wrap=cmdSendMetric in the Makefile
+#ifdef __LINUX__
 int __real_cmdSendMetric(mtc_t*, event_t*);
 int __wrap_cmdSendMetric(mtc_t* mtc, event_t* metric)
+#endif // __LINUX__
+#ifdef __MACOS__
+int cmdSendMetric(mtc_t* mtc, event_t* metric)
+#endif // __MACOS__
 {
     // Store metric for later inspection
     memcpy(&mtcBuf[mtcBufNext++], metric, sizeof(*metric));
     if (mtcBufNext >= BUFSIZE) fail();
 
-    return __real_cmdSendMetric(mtc, metric);
+    return 0; //__real_cmdSendMetric(mtc, metric);
 }
 
 int
@@ -205,8 +229,10 @@ nothingCrashesBeforeAnyInit(void** state)
     doRead(16, 987, 1, 13, "readFunc");
     doWrite(17, 876, 1, NULL, 0, "writeFunc");
     doSeek(18, 1, "seekymcseekface");
+#ifdef __LINUX__
     doStatPath("/pathy/path", 0, "statymcstatface");
     doStatFd(19, 0, "toomuchstat4u");
+#endif // __LINUX__
     doDupFile(20, 21, "dup");
     doDupSock(22, 23);
     doDup(24, 0, "dupFunc", 1);
@@ -972,6 +998,7 @@ doSeekSummarization(void** state)
     assert_int_equal(eventCalls(NULL), 0);
 }
 
+#ifdef __LINUX__
 static void
 doStatPathNoSummarization(void** state)
 {
@@ -1107,6 +1134,7 @@ doStatFdSummarization(void** state)
      assert_int_equal(metricValues("fs.stat"), 2);
      assert_int_equal(eventCalls(NULL), 0);
 }
+#endif // __LINUX__
 
 static void
 doDNSSendNoDNSSummarization(void** state)
@@ -1514,6 +1542,7 @@ doNetRxTxErrorSummarization(void** state)
     doClose(16, "closeFunc");
 }
 
+#ifdef __LINUX__
 static void
 doStatErrNoSummarization(void** state)
 {
@@ -1567,6 +1596,7 @@ doStatErrSummarization(void** state)
     assert_int_equal(metricValues("fs.error"), 2);
     assert_int_equal(eventCalls(NULL), 0);
 }
+#endif // __LINUX__
 
 static void
 doDNSErrNoSummarization(void** state)
@@ -1651,10 +1681,12 @@ main(int argc, char* argv[])
         cmocka_unit_test(doSendFullSummarization),
         cmocka_unit_test(doSeekNoSummarization),
         cmocka_unit_test(doSeekSummarization),
+#ifdef __LINUX__
         cmocka_unit_test(doStatPathNoSummarization),
         cmocka_unit_test(doStatPathSummarization),
         cmocka_unit_test(doStatFdNoSummarization),
         cmocka_unit_test(doStatFdSummarization),
+#endif // __LINUX__
         cmocka_unit_test(doDNSSendNoDNSSummarization),
         cmocka_unit_test(doDNSSendDNSSummarization),
         cmocka_unit_test(doFSConnectionErrorNoSummarization),
@@ -1665,8 +1697,10 @@ main(int argc, char* argv[])
         cmocka_unit_test(doFSReadWriteErrorSummarization),
         cmocka_unit_test(doNetRxTxErrorNoSummarization),
         cmocka_unit_test(doNetRxTxErrorSummarization),
+#ifdef __LINUX__
         cmocka_unit_test(doStatErrNoSummarization),
         cmocka_unit_test(doStatErrSummarization),
+#endif // __LINUX__
         cmocka_unit_test(doDNSErrNoSummarization),
         cmocka_unit_test(doDNSErrSummarization),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),

@@ -27,10 +27,10 @@ int g_numFSinfo = FS_ENTRIES;
 // These would all be declared static, but the some functions that need
 // this data have been moved into report.c.  This is managed with the
 // include of state_private.h above.
-summary_t g_summary = {0};
+summary_t g_summary = {{0}};
 net_info *g_netinfo;
 fs_info *g_fsinfo;
-metric_counters g_ctrs = {0};
+metric_counters g_ctrs = {{0}};
 
 
 // interfaces

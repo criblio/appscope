@@ -2,6 +2,7 @@
 
 extern rtconfig g_cfg;
 
+// for reporttest on mac __attribute__((weak))
 int
 cmdSendEvent(ctl_t *ctl, event_t *event, uint64_t time, proc_id_t *proc)
 {
@@ -9,6 +10,7 @@ cmdSendEvent(ctl_t *ctl, event_t *event, uint64_t time, proc_id_t *proc)
     return ctlSendEvent(ctl, event, time, proc);
 }
 
+// for reporttest on mac __attribute__((weak))
 int
 cmdSendMetric(mtc_t *mtc, event_t *evt)
 {
@@ -59,6 +61,12 @@ int
 cmdSendResponse(ctl_t *ctl, request_t *req, cJSON *body)
 {
     return ctlPostMsg(ctl, body, UPLD_RESP, req, TRUE);
+}
+
+int
+cmdSendBin(ctl_t *ctl, char *buf)
+{
+    return ctlSendBin(ctl, buf);
 }
 
 request_t *

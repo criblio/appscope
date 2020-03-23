@@ -75,6 +75,7 @@ run_test test/${OS}/comtest
 run_test test/${OS}/dbgtest
 if [ "${OS}" = "linux" ]; then
     run_test test/${OS}/glibcvertest
+    run_test test/${OS}/reporttest
 fi
 run_test test/${OS}/selfinterposetest
 

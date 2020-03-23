@@ -27,10 +27,10 @@ int g_numFSinfo = FS_ENTRIES;
 // These would all be declared static, but the some functions that need
 // this data have been moved into report.c.  This is managed with the
 // include of state_private.h above.
-summary_t g_summary = {0};
+summary_t g_summary = {{0}};
 net_info *g_netinfo;
 fs_info *g_fsinfo;
-metric_counters g_ctrs = {0};
+metric_counters g_ctrs = {{0}};
 
 
 // interfaces
@@ -171,26 +171,26 @@ dumpAddrs(int sd)
 }
 #endif
 
-static void
+static int
 postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const char *pathname)
 {
     // something passed in a param that is not a viable address; ltp does this
-    if ((stat_err == EVT_ERR) && (errno == EFAULT)) return;
+    if ((stat_err == EVT_ERR) && (errno == EFAULT)) return FALSE;
 
     if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC)) {
-        if ((stat_err == EVT_STAT) && (g_summary.fs.stat)) return;
+        if ((stat_err == EVT_STAT) && (g_summary.fs.stat)) return FALSE;
 
         switch (type) {
         case NET_ERR_CONN:
         case NET_ERR_RX_TX:
-            if (g_summary.net.error) return;
+            if (g_summary.net.error) return FALSE;
             break;
 
         case FS_ERR_OPEN_CLOSE:
         case FS_ERR_READ_WRITE:
         case FS_ERR_STAT:
         case NET_ERR_DNS:
-            if ((g_summary.fs.error) || (g_summary.net.dnserror)) return;
+            if ((g_summary.fs.error) || (g_summary.net.dnserror)) return FALSE;
             break;
         default:
             break;
@@ -199,7 +199,7 @@ postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const cha
 
     size_t len = sizeof(struct stat_err_info_t);
     stat_err_info *sep = calloc(1, len);
-    if (!sep) return;
+    if (!sep) return FALSE;
 
     sep->evtype = stat_err;
     sep->data_type = type;
@@ -212,10 +212,35 @@ postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const cha
         strncpy(sep->funcop, funcop, strnlen(funcop, sizeof(sep->funcop)));
     }
 
+    memmove(&sep->counters, &g_ctrs, sizeof(g_ctrs));
+
     cmdPostEvent(g_ctl, (char *)sep);
+
+    int *summarize = NULL;
+    switch (type) {
+        case NET_ERR_CONN:
+        case NET_ERR_RX_TX:
+            summarize = &g_summary.net.error;
+            break;
+        case FS_ERR_OPEN_CLOSE:
+        case FS_ERR_READ_WRITE:
+        case FS_ERR_STAT:
+            summarize = &g_summary.fs.error;
+            break;
+        case NET_ERR_DNS:
+            summarize = &g_summary.net.dnserror;
+            break;
+        case EVT_STAT:
+        case FS_STAT:
+            summarize = &g_summary.fs.stat;
+            break;
+        default:
+            break;
+    }
+    return summarize && !*summarize;
 }
 
-static void
+static int
 postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *pathname)
 {
     if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC) &&
@@ -226,16 +251,16 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
         case FS_READ:
         case FS_WRITE:
         case FS_DURATION:
-            if (g_summary.fs.read_write) return;
+            if (g_summary.fs.read_write) return FALSE;
             break;
 
         case FS_OPEN:
         case FS_CLOSE:
-            if (g_summary.fs.open_close) return;
+            if (g_summary.fs.open_close) return FALSE;
             break;
 
         case FS_SEEK:
-            if (g_summary.fs.seek) return;
+            if (g_summary.fs.seek) return FALSE;
             break;
 
         default:
@@ -245,7 +270,7 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
 
     size_t len = sizeof(struct fs_info_t);
     fs_info *fsp = calloc(1, len);
-    if (!fsp) return;
+    if (!fsp) return FALSE;
 
     bcopy(fs, fsp, len);
     fsp->fd = fd;
@@ -261,14 +286,15 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
     }
 
     cmdPostEvent(g_ctl, (char *)fsp);
+    return TRUE;
 }
 
-static void
+static int
 postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char *domain)
 {
     size_t len = sizeof(struct net_info_t);
     net_info *netp = calloc(1, len);
-    if (!netp) return;
+    if (!netp) return FALSE;
 
     bcopy(net, netp, len);
     netp->fd = fd;
@@ -276,17 +302,20 @@ postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char
     netp->data_type = type;
 
     if (duration > 0) {
-        netp->totalDuration = duration;
+        addToInterfaceCounts(&netp->totalDuration, duration);
     }
 
     if (domain) {
         strncpy(netp->dnsName, domain, strnlen(domain, sizeof(netp->dnsName)));
     }
 
+    memmove(&netp->counters, &g_ctrs, sizeof(g_ctrs));
+
     cmdPostEvent(g_ctl, (char *)netp);
+    return !g_summary.net.dns;
 }
 
-static void
+static int
 postNetState(int fd, metric_t type, net_info *net)
 {
     if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC)) {
@@ -294,12 +323,12 @@ postNetState(int fd, metric_t type, net_info *net)
         case OPEN_PORTS:
         case NET_CONNECTIONS:
         case CONNECTION_DURATION:
-            if (g_summary.net.open_close) return;
+            if (g_summary.net.open_close) return FALSE;
             break;
 
         case NETRX:
         case NETTX:
-            if (g_summary.net.rx_tx) return;
+            if (g_summary.net.rx_tx) return FALSE;
             break;
 
         default:
@@ -309,7 +338,7 @@ postNetState(int fd, metric_t type, net_info *net)
 
     size_t len = sizeof(struct net_info_t);
     net_info *netp = calloc(1, len);
-    if (!netp) return;
+    if (!netp) return FALSE;
 
     bcopy(net, netp, len);
     netp->fd = fd;
@@ -317,6 +346,7 @@ postNetState(int fd, metric_t type, net_info *net)
     netp->data_type = type;
 
     cmdPostEvent(g_ctl, (char *)netp);
+    return TRUE;
 }
 
 void
@@ -325,18 +355,26 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     switch (type) {
     case OPEN_PORTS:
     {
+        if (!checkNetEntry(fd)) break;
         if (size < 0) {
-            atomicSubU64(&g_ctrs.openPorts, labs(size));
-        } else {
-            atomicAddU64(&g_ctrs.openPorts, size);
+            subFromInterfaceCounts(&g_ctrs.openPorts, labs(size));
+        } else if (size > 0) {
+            addToInterfaceCounts(&g_ctrs.openPorts, size);
         }
-        postNetState(fd, type, &g_netinfo[fd]);
+
+        if (size && !g_netinfo[fd].startTime) {
+            g_netinfo[fd].startTime = getTime();
+        }
+        if (postNetState(fd, type, &g_netinfo[fd])) {
+            // Don't reset the info.  It's a gauge.
+        }
         break;
     }
 
     case NET_CONNECTIONS:
     {
-        uint64_t* value = NULL;
+        if (!checkNetEntry(fd)) break;
+        counters_element_t* value = NULL;
 
         if (g_netinfo[fd].type == SOCK_STREAM) {
             value = &g_ctrs.netConnectionsTcp;
@@ -347,20 +385,23 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
         }
 
         if (size < 0) {
-            atomicSubU64(value, labs(size));
-        } else {
-            atomicAddU64(value, size);
+            subFromInterfaceCounts(value, labs(size));
+        } else if (size > 0) {
+            addToInterfaceCounts(value, size);
         }
 
-        if (!g_netinfo[fd].startTime) {
+        if (size && !g_netinfo[fd].startTime) {
             g_netinfo[fd].startTime = getTime();
         }
-        postNetState(fd, type, &g_netinfo[fd]);
+        if (postNetState(fd, type, &g_netinfo[fd])) {
+            // Don't reset the info.  It's a gauge.
+        }
         break;
     }
 
     case CONNECTION_DURATION:
     {
+        if (!checkNetEntry(fd)) break;
         uint64_t new_duration = 0ULL;
         if (g_netinfo[fd].startTime != 0ULL) {
             new_duration = getDuration(g_netinfo[fd].startTime);
@@ -368,148 +409,290 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
         }
 
         if (new_duration) {
-            atomicAddU64(&g_netinfo[fd].numDuration, 1);
-            atomicAddU64(&g_netinfo[fd].totalDuration, new_duration);
-            atomicAddU64(&g_ctrs.connDurationNum, 1);
-            atomicAddU64(&g_ctrs.connDurationTotal, new_duration);
+            addToInterfaceCounts(&g_netinfo[fd].numDuration, 1);
+            addToInterfaceCounts(&g_netinfo[fd].totalDuration, new_duration);
+            addToInterfaceCounts(&g_ctrs.connDurationNum, 1);
+            addToInterfaceCounts(&g_ctrs.connDurationTotal, new_duration);
         }
-        postNetState(fd, type, &g_netinfo[fd]);
+        if (postNetState(fd, type, &g_netinfo[fd])) {
+            atomicSwapU64(&g_netinfo[fd].numDuration.mtc, 0);
+            atomicSwapU64(&g_netinfo[fd].totalDuration.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.connDurationNum, 1);
+            //subFromInterfaceCounts(&g_ctrs.connDurationTotal, new_duration);
+        }
+        atomicSwapU64(&g_netinfo[fd].numDuration.evt, 0);
+        atomicSwapU64(&g_netinfo[fd].totalDuration.evt, 0);
         break;
     }
 
     case NETRX:
     {
-        atomicAddU64(&g_netinfo[fd].numRX, 1);
-        atomicAddU64(&g_netinfo[fd].rxBytes, size);
-        atomicAddU64(&g_ctrs.netrxBytes, size);
-        postNetState(fd, type, &g_netinfo[fd]);
+        if (!checkNetEntry(fd)) break;
+        addToInterfaceCounts(&g_netinfo[fd].numRX, 1);
+        addToInterfaceCounts(&g_netinfo[fd].rxBytes, size);
+        addToInterfaceCounts(&g_ctrs.netrxBytes, size);
+        if (postNetState(fd, type, &g_netinfo[fd])) {
+            atomicSwapU64(&g_netinfo[fd].numRX.mtc, 0);
+            atomicSwapU64(&g_netinfo[fd].rxBytes.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.netrxBytes, size);
+        }
+        atomicSwapU64(&g_netinfo[fd].numRX.evt, 0);
+        atomicSwapU64(&g_netinfo[fd].rxBytes.evt, 0);
         break;
     }
 
     case NETTX:
     {
-        atomicAddU64(&g_netinfo[fd].numTX, 1);
-        atomicAddU64(&g_netinfo[fd].txBytes, size);
-        atomicAddU64(&g_ctrs.nettxBytes, size);
-        postNetState(fd, type, &g_netinfo[fd]);
+        if (!checkNetEntry(fd)) break;
+        addToInterfaceCounts(&g_netinfo[fd].numTX, 1);
+        addToInterfaceCounts(&g_netinfo[fd].txBytes, size);
+        addToInterfaceCounts(&g_ctrs.nettxBytes, size);
+        if (postNetState(fd, type, &g_netinfo[fd])) {
+            atomicSwapU64(&g_netinfo[fd].numTX.mtc, 0);
+            atomicSwapU64(&g_netinfo[fd].txBytes.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.nettxBytes, size);
+        }
+        atomicSwapU64(&g_netinfo[fd].numTX.evt, 0);
+        atomicSwapU64(&g_netinfo[fd].txBytes.evt, 0);
         break;
     }
 
     case DNS:
     {
-        atomicAddU64(&g_ctrs.numDNS, 1);
-        postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname);
+        if (!checkNetEntry(fd)) break;
+        addToInterfaceCounts(&g_ctrs.numDNS, 1);
+        if (postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname)) {
+            atomicSubU64(&g_ctrs.numDNS.mtc, 1);
+        }
+        atomicSubU64(&g_ctrs.numDNS.evt, 1);
         break;
     }
 
     case DNS_DURATION:
     {
-        atomicAddU64(&g_ctrs.dnsDurationNum, 1);
-        atomicAddU64(&g_ctrs.dnsDurationTotal, 0);
-        postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname);
+        if (!checkNetEntry(fd)) break;
+        addToInterfaceCounts(&g_ctrs.dnsDurationNum, 1);
+        addToInterfaceCounts(&g_ctrs.dnsDurationTotal, 0);
+        if (postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname)) {
+            atomicSwapU64(&g_ctrs.dnsDurationNum.mtc, 0);
+            atomicSwapU64(&g_ctrs.dnsDurationTotal.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.dnsDurationNum.evt, 0);
+        atomicSwapU64(&g_ctrs.dnsDurationTotal.evt, 0);
         break;
     }
 
     case FS_DURATION:
     {
-        atomicAddU64(&g_fsinfo[fd].numDuration, 1);
-        atomicAddU64(&g_fsinfo[fd].totalDuration, size);
-        atomicAddU64(&g_ctrs.fsDurationNum, 1);
-        atomicAddU64(&g_ctrs.fsDurationTotal, size);
-        postFSState(fd, type, &g_fsinfo[fd], funcop, pathname);
+        if (!checkFSEntry(fd)) break;
+        addToInterfaceCounts(&g_fsinfo[fd].numDuration, 1);
+        addToInterfaceCounts(&g_fsinfo[fd].totalDuration, size);
+        addToInterfaceCounts(&g_ctrs.fsDurationNum, 1);
+        addToInterfaceCounts(&g_ctrs.fsDurationTotal, size);
+        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+            atomicSwapU64(&g_fsinfo[fd].numDuration.mtc, 0);
+            atomicSwapU64(&g_fsinfo[fd].totalDuration.mtc, 0);
+        }
+        atomicSwapU64(&g_fsinfo[fd].numDuration.evt, 0);
+        atomicSwapU64(&g_fsinfo[fd].totalDuration.evt, 0);
         break;
     }
 
     case FS_READ:
     {
-        atomicAddU64(&g_fsinfo[fd].numRead, 1);
-        atomicAddU64(&g_fsinfo[fd].readBytes, size);
-        atomicAddU64(&g_ctrs.readBytes, size);
-        postFSState(fd, type, &g_fsinfo[fd], funcop, pathname);
+        if (!checkFSEntry(fd)) break;
+        addToInterfaceCounts(&g_fsinfo[fd].numRead, 1);
+        addToInterfaceCounts(&g_fsinfo[fd].readBytes, size);
+        addToInterfaceCounts(&g_ctrs.readBytes, size);
+        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+            atomicSwapU64(&g_fsinfo[fd].numRead.mtc, 0);
+            atomicSwapU64(&g_fsinfo[fd].readBytes.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.readBytes, size);
+        }
+        atomicSwapU64(&g_fsinfo[fd].numRead.evt, 0);
+        atomicSwapU64(&g_fsinfo[fd].readBytes.evt, 0);
         break;
     }
 
     case FS_WRITE:
     {
-        atomicAddU64(&g_fsinfo[fd].numWrite, 1);
-        atomicAddU64(&g_fsinfo[fd].writeBytes, size);
-        atomicAddU64(&g_ctrs.writeBytes, size);
-        postFSState(fd, type, &g_fsinfo[fd], funcop, pathname);
+        if (!checkFSEntry(fd)) break;
+        addToInterfaceCounts(&g_fsinfo[fd].numWrite, 1);
+        addToInterfaceCounts(&g_fsinfo[fd].writeBytes, size);
+        addToInterfaceCounts(&g_ctrs.writeBytes, size);
+        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+            atomicSwapU64(&g_fsinfo[fd].numWrite.mtc, 0);
+            atomicSwapU64(&g_fsinfo[fd].writeBytes.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.writeBytes, size);
+        }
+        atomicSwapU64(&g_fsinfo[fd].numWrite.evt, 0);
+        atomicSwapU64(&g_fsinfo[fd].writeBytes.evt, 0);
         break;
     }
 
     case FS_OPEN:
     {
-        atomicAddU64(&g_fsinfo[fd].numOpen, 1);
-        atomicAddU64(&g_ctrs.numOpen, 1);
-        postFSState(fd, type, &g_fsinfo[fd], funcop, pathname);
+        if (!checkFSEntry(fd)) break;
+        addToInterfaceCounts(&g_fsinfo[fd].numOpen, 1);
+        addToInterfaceCounts(&g_ctrs.numOpen, 1);
+        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+            atomicSwapU64(&g_fsinfo[fd].numOpen.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.numOpen, 1);
+        }
+        atomicSwapU64(&g_fsinfo[fd].numOpen.evt, 0);
         break;
     }
 
     case FS_CLOSE:
     {
-        atomicAddU64(&g_fsinfo[fd].numClose, 1);
-        atomicAddU64(&g_ctrs.numClose, 1);
-        postFSState(fd, type, &g_fsinfo[fd], funcop, pathname);
+        if (!checkFSEntry(fd)) break;
+        addToInterfaceCounts(&g_fsinfo[fd].numClose, 1);
+        addToInterfaceCounts(&g_ctrs.numClose, 1);
+        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+            atomicSwapU64(&g_fsinfo[fd].numClose.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.numClose, 1);
+        }
+        atomicSwapU64(&g_fsinfo[fd].numClose.evt, 0);
         break;
     }
 
     case FS_SEEK:
     {
-        atomicAddU64(&g_fsinfo[fd].numSeek, 1);
-        atomicAddU64(&g_ctrs.numSeek, 1);
-        postFSState(fd, type, &g_fsinfo[fd], funcop, pathname);
+        if (!checkFSEntry(fd)) break;
+        addToInterfaceCounts(&g_fsinfo[fd].numSeek, 1);
+        addToInterfaceCounts(&g_ctrs.numSeek, 1);
+        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+            atomicSwapU64(&g_fsinfo[fd].numSeek.mtc, 0);
+            //subFromInterfaceCounts(&g_ctrs.numSeek, 1);
+        }
+        atomicSwapU64(&g_fsinfo[fd].numSeek.evt, 0);
         break;
     }
 
     case NET_ERR_CONN:
     {
-        atomicAddU64(&g_ctrs.netConnectErrors, 1);
-        postStatErrState(EVT_ERR, type, funcop, pathname);
+        addToInterfaceCounts(&g_ctrs.netConnectErrors, 1);
+        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.netConnectErrors.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.netConnectErrors.evt, 0);
         break;
     }
 
     case NET_ERR_RX_TX:
     {
-        atomicAddU64(&g_ctrs.netTxRxErrors, 1);
-        postStatErrState(EVT_ERR, type, funcop, pathname);
+        addToInterfaceCounts(&g_ctrs.netTxRxErrors, 1);
+        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.netTxRxErrors.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.netTxRxErrors.evt, 0);
         break;
     }
 
     case FS_ERR_OPEN_CLOSE:
     {
-        atomicAddU64(&g_ctrs.fsOpenCloseErrors, 1);
-        postStatErrState(EVT_ERR, type, funcop, pathname);
+        addToInterfaceCounts(&g_ctrs.fsOpenCloseErrors, 1);
+        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.fsOpenCloseErrors.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.fsOpenCloseErrors.evt, 0);
         break;
     }
 
     case FS_ERR_READ_WRITE:
     {
-        atomicAddU64(&g_ctrs.fsRdWrErrors, 1);
-        postStatErrState(EVT_ERR, type, funcop, pathname);
+        addToInterfaceCounts(&g_ctrs.fsRdWrErrors, 1);
+        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.fsRdWrErrors.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.fsRdWrErrors.evt, 0);
         break;
     }
 
     case FS_ERR_STAT:
     {
-        atomicAddU64(&g_ctrs.fsStatErrors, 1);
-        postStatErrState(EVT_ERR, type, funcop, pathname);
+        addToInterfaceCounts(&g_ctrs.fsStatErrors, 1);
+        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.fsStatErrors.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.fsStatErrors.evt, 0);
         break;
     }
 
     case NET_ERR_DNS:
     {
-        atomicAddU64(&g_ctrs.netDNSErrors, 1);
-        postStatErrState(EVT_ERR, type, funcop, pathname);
+        addToInterfaceCounts(&g_ctrs.netDNSErrors, 1);
+        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.netDNSErrors.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.netDNSErrors.evt, 0);
         break;
     }
 
     case FS_STAT:
-        atomicAddU64(&g_ctrs.numStat, 1);
-        postStatErrState(EVT_STAT, type, funcop, pathname);
+    {
+        addToInterfaceCounts(&g_ctrs.numStat, 1);
+        if (postStatErrState(EVT_STAT, type, funcop, pathname)) {
+            atomicSwapU64(&g_ctrs.numStat.mtc, 0);
+        }
+        atomicSwapU64(&g_ctrs.numStat.evt, 0);
+        break;
+    }
     default:
          return;
     }
+}
+
+int
+doProtocol(int sockfd, void *buf, size_t len, metric_t src)
+{
+    if ((buf == NULL) || (len <= 0)) return -1;
+    
+    size_t headsize, copysize;
+    in_port_t lport, rport;
+    net_info *net;
+    char *headend, *header;
+    protocol_info *proto;
+
+    // For now, only doing HTTP headers
+    if ((src == TLSRX) || (src == TLSTX)) {
+        /*
+         * Is it always safe to string search here?
+         * Relying on the caller to ensure data is ready
+         */
+        if (strstr(buf, "HTTP") == NULL) return -1;
+    } else if ((net = getNetEntry(sockfd)) != NULL) { 
+        // Keeps us from doing string searches on bin data
+        lport = get_port(sockfd, g_netinfo[sockfd].localConn.ss_family, LOCAL);
+        rport = get_port(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE);
+
+        if ((rport != 80) && (lport != 80)) return -1;
+    } else {
+        return -1;
+    }
+
+    scopeLog("doProtocol", sockfd, CFG_LOG_INFO);
+    if ((headend = strstr(buf, "\r\n\r\n")) != NULL) {
+        if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) return 0;
+        header = buf;
+        headsize = (headend - (char *)buf) + 4;
+
+        if ((src == NETRX) || (src == TLSRX)){
+            strncpy(proto->header_type, "http-resp", HDRTYPE_MAX);
+        } else if ((src == NETTX) || (src == TLSTX)) {
+            strncpy(proto->header_type, "http-req", HDRTYPE_MAX);
+        } else {
+            strncpy(proto->header_type, "undef-header", HDRTYPE_MAX);
+        }
+
+        copysize = (headsize < sizeof(proto->header)) ? headsize : sizeof(proto->header); 
+        strncat(proto->header, header, copysize);
+        proto->fd = sockfd;
+        proto->evtype = EVT_PROTO;
+        cmdPostEvent(g_ctl, (char *)proto);
+    }
+
+    return 0;
 }
 
 void
@@ -994,7 +1177,9 @@ doSend(int sockfd, ssize_t rc)
 
         if (get_port(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
             // tbd - consider calling doDNSMetricName instead...
-            doUpdateState(DNS, sockfd, (ssize_t)0, NULL, NULL);
+            if (g_netinfo[sockfd].dnsName[0]) {
+                doUpdateState(DNS, sockfd, (ssize_t)0, NULL, NULL);
+            }
         }
     }
     return 0;
@@ -1021,6 +1206,8 @@ doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 void
 reportFD(int fd, control_type_t source)
 {
+    if (source == EVENT_BASED) return;
+
     struct net_info_t *ninfo = getNetEntry(fd);
     if (ninfo) {
         ninfo->fd = fd;
@@ -1166,7 +1353,7 @@ doStatFd(int fd, int rc, const char* func)
 int
 doDupFile(int newfd, int oldfd, const char *func)
 {
-    if ((newfd >= g_numFSinfo) || (oldfd >= g_numFSinfo)) {
+    if (!checkFSEntry(newfd) || !checkFSEntry(oldfd)) {
         return -1;
     }
 
@@ -1177,19 +1364,19 @@ doDupFile(int newfd, int oldfd, const char *func)
 int
 doDupSock(int oldfd, int newfd)
 {
-    if ((newfd >= g_numFSinfo) || (oldfd >= g_numFSinfo)) {
+    if (!checkNetEntry(newfd) || !checkNetEntry(oldfd)) {
         return -1;
     }
 
     bcopy(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct fs_info_t));
     g_netinfo[newfd].active = TRUE;
-    g_netinfo[newfd].numTX = 0;
-    g_netinfo[newfd].numRX = 0;
-    g_netinfo[newfd].txBytes = 0;
-    g_netinfo[newfd].rxBytes = 0;
-    g_netinfo[newfd].startTime = 0;
-    g_netinfo[newfd].totalDuration = 0;
-    g_netinfo[newfd].numDuration = 0;
+    g_netinfo[newfd].numTX = (counters_element_t){.mtc=0, .evt=0};
+    g_netinfo[newfd].numRX = (counters_element_t){.mtc=0, .evt=0};
+    g_netinfo[newfd].txBytes = (counters_element_t){.mtc=0, .evt=0};
+    g_netinfo[newfd].rxBytes = (counters_element_t){.mtc=0, .evt=0};
+    g_netinfo[newfd].startTime = 0ULL;
+    g_netinfo[newfd].totalDuration = (counters_element_t){.mtc=0, .evt=0};
+    g_netinfo[newfd].numDuration = (counters_element_t){.mtc=0, .evt=0};
 
     return 0;
 }

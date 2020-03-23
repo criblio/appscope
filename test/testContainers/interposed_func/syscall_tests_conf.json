@@ -51,7 +51,13 @@
         "write",
         "writev"
       ],
+      "Notes for exclude tests" : [
+        "sendmsg03 was kernel dependent",
+        "bind04 and bind05 were ipv6 dependent" ],
       "exclude_tests": [
+        "sendmsg03",
+        "bind04",
+        "bind05",
         "fork12",
         "fcntl33",
         "fcntl35",

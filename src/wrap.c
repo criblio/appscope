@@ -509,12 +509,12 @@ reportPeriodicStuff(void)
     doTotalDuration(TOT_DNS_DURATION);
 
     // Report errors
-    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary");
-    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary");
-    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary");
-    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary");
-    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary");
-    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary");
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
 
     // report net and file by descriptor
     reportAllFds(PERIODIC);
@@ -678,7 +678,6 @@ init(void)
     g_fn.select = dlsym(RTLD_NEXT, "select");
     g_fn.sigsuspend = dlsym(RTLD_NEXT, "sigsuspend");
     g_fn.sigaction = dlsym(RTLD_NEXT, "sigaction");
-
 #ifdef __MACOS__
     g_fn.close$NOCANCEL = dlsym(RTLD_NEXT, "close$NOCANCEL");
     g_fn.close_nocancel = dlsym(RTLD_NEXT, "close_nocancel");
@@ -731,6 +730,10 @@ init(void)
     g_fn.gethostbyname2_r = dlsym(RTLD_NEXT, "gethostbyname2_r");
     g_fn.syscall = dlsym(RTLD_NEXT, "syscall");
     g_fn.prctl = dlsym(RTLD_NEXT, "prctl");
+    g_fn.SSL_read = dlsym(RTLD_NEXT, "SSL_read");
+    g_fn.SSL_write = dlsym(RTLD_NEXT, "SSL_write");
+    g_fn.gnutls_record_recv = dlsym(RTLD_NEXT, "gnutls_record_recv");
+    g_fn.gnutls_record_send = dlsym(RTLD_NEXT, "gnutls_record_send");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
@@ -1697,6 +1700,80 @@ sendfile64(int out_fd, int in_fd, off64_t *offset, size_t count)
 
     doSendFile(out_fd, in_fd, initialTime, rc, "sendfile64");
 
+    return rc;
+}
+
+EXPORTON int
+SSL_read(SSL *ssl, void *buf, int num)
+{
+    int rc;
+    
+    scopeLog("SSL_read", -1, CFG_LOG_INFO);
+    WRAP_CHECK(SSL_read, -1);
+    rc = g_fn.SSL_read(ssl, buf, num);
+
+    if (rc > 0) {
+        int fd = SSL_get_fd((const SSL *)ssl);
+        doProtocol(fd, buf, (size_t)num, TLSRX);
+    }
+    return rc;
+}
+
+EXPORTON int
+SSL_write(SSL *ssl, const void *buf, int num)
+{
+    int rc;
+    
+    scopeLog("SSL_write", -1, CFG_LOG_INFO);
+    WRAP_CHECK(SSL_write, -1);
+    rc = g_fn.SSL_write(ssl, buf, num);
+
+    if (rc > 0) {
+        int fd = SSL_get_fd((const SSL *)ssl);
+        doProtocol(fd, (void *)buf, (size_t)num, TLSTX);
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
+{
+    size_t rc;
+    
+    scopeLog("gnutls_record_recv", -1, CFG_LOG_INFO);
+    WRAP_CHECK(gnutls_record_recv, -1);
+    rc = g_fn.gnutls_record_recv(session, data, data_size);
+
+    // force check for negative values
+    if ((int)rc > 0) {
+        /*
+         * Note: haven't been able to get an fd in most cases 
+         * In some cases this may work:
+         * int fd = gnutls_transport_get_int(session);
+         */
+        scopeLog("gnutls_record_recv", rc, CFG_LOG_INFO);
+        doProtocol(-1, data, data_size, TLSRX);
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
+{
+    size_t rc;
+    
+    scopeLog("gnutls_record_send", -1, CFG_LOG_INFO);
+    WRAP_CHECK(gnutls_record_send, -1);
+    rc = g_fn.gnutls_record_send(session, data, data_size);
+
+    if ((int)rc > 0) {
+        /*
+         * Note: haven't been able to get an fd in most cases 
+         * In some cases this may work:
+         * int fd = gnutls_transport_get_int(session);
+         */
+        doProtocol(-1, (void *)data, data_size, TLSTX);
+    }
     return rc;
 }
 

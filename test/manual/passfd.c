@@ -55,7 +55,7 @@ usage(char *prog) {
 int
 check_event(char **validation, int numval)
 {
-    int fd, rc, i;
+    int fd, i, rc = 0;
     char *buf;
     struct stat sbuf;
 

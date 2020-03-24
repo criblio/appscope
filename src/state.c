@@ -20,6 +20,7 @@
 #define FS_ENTRIES 1024
 
 extern rtconfig g_cfg;
+extern http_list *g_hlist;
 
 int g_numNinfo = NET_ENTRIES;
 int g_numFSinfo = FS_ENTRIES;
@@ -134,6 +135,10 @@ initState()
 
     // Per RUC...
     g_fsinfo = fsinfoLocal;
+
+    if ((g_hlist = calloc(1, sizeof(struct http_list_t))) == NULL ) {
+        scopeLog("ERROR: HTTP Tracking:Malloc", -1, CFG_LOG_ERROR);
+    }
 }
 
 void
@@ -540,7 +545,7 @@ doProtocol(int sockfd, void *buf, size_t len, metric_t src)
         return -1;
     }
 
-    scopeLog("doProtocol", sockfd, CFG_LOG_INFO);
+    //scopeLog("doProtocol", sockfd, CFG_LOG_INFO);
     if ((headend = strstr(buf, "\r\n\r\n")) != NULL) {
         if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) return 0;
         header = buf;

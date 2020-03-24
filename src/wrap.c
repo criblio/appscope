@@ -31,14 +31,97 @@ static log_t *g_prevlog = NULL;
 static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
+http_list *g_hlist;
 __thread int g_getdelim = 0;
-
 
 // Forward declaration
 static void *periodic(void *);
 static void doConfig(config_t *);
 static void reportProcessStart(void);
 static void threadNow(int);
+
+static http_list *
+hnew()
+{
+
+    return (http_list *)calloc(1, sizeof(struct http_list_t));
+}
+
+static int
+hpush(http_list **hlist, http_list *new)
+{
+    if (!hlist || !new) return -1;
+
+    int i = 0;
+    new->next = *hlist;
+    while (!atomicCasU64((uint64_t *)hlist, (uint64_t)*hlist, (uint64_t)new)) {
+        if (i++ >= NUM_ATTEMPTS) {
+            DBG(NULL);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int
+hrem(http_list **hlist, uint64_t id)
+{
+    if (!hlist) return -1;
+
+    int i = 0;
+    http_list *cur = *hlist;
+    http_list *prev = NULL;
+
+    while (cur != NULL) {
+        if (cur->id == id) break;
+        prev = cur;
+        cur = cur->next;
+    }
+
+    // can't find it
+    if (cur == NULL) return -1;
+
+    // found a match, update the link
+    if(cur == *hlist) {
+        // change head to point to next link
+        while (!atomicCasU64((uint64_t *)hlist, (uint64_t)cur, (uint64_t)cur->next)) {
+            if (i++ >= NUM_ATTEMPTS) {
+                DBG(NULL);
+                return -1;
+            }
+        }
+    } else {
+        // bypass the current link
+        while (!atomicCasU64((uint64_t *)&prev->next, (uint64_t)prev->next, (uint64_t)cur->next)) {
+            if (i++ >= NUM_ATTEMPTS) {
+                DBG(NULL);
+                return -1;
+            }
+        }
+    }
+
+    if (cur->ssl_methods) free(cur->ssl_methods);
+    if (cur->ssl_int_methods) free(cur->ssl_int_methods);
+    if (cur) free(cur);
+
+    return 0;
+}
+
+static http_list *
+hget(http_list *hlist, uint64_t id)
+{
+    if (!g_hlist) return NULL;
+
+    http_list *cur = hlist;
+
+    while (cur != NULL) {
+        if (cur->id == id) return cur;
+        cur = cur->next;
+    }
+
+    return NULL;
+}
 
 static time_t
 fileModTime(const char *path)
@@ -734,6 +817,7 @@ init(void)
     g_fn.SSL_write = dlsym(RTLD_NEXT, "SSL_write");
     g_fn.gnutls_record_recv = dlsym(RTLD_NEXT, "gnutls_record_recv");
     g_fn.gnutls_record_send = dlsym(RTLD_NEXT, "gnutls_record_send");
+    g_fn.SSL_ImportFD = dlsym(RTLD_NEXT, "SSL_ImportFD");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
@@ -1775,6 +1859,106 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
         doProtocol(-1, (void *)data, data_size, TLSTX);
     }
     return rc;
+}
+
+static PRStatus
+nss_close(PRFileDesc *fd)
+{
+    PRStatus rc;
+    http_list *hent;
+    int nfd = PR_FileDesc2NativeHandle(fd);
+
+    if ((hent = hget(g_hlist, nfd)) != NULL) {
+        rc = hent->ssl_methods->close(fd);
+    } else {
+        rc = -1;
+        DBG(NULL);
+        scopeLog("ERROR: ssl_close no list entry", -1, CFG_LOG_ERROR);
+        return rc;
+    }
+
+    if (rc == PR_SUCCESS) hrem(&g_hlist, (uint64_t)nfd);
+
+    return rc;
+}
+
+static PRInt32
+nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime timeout)
+{
+    PRInt32 rc;
+    http_list *hent;
+    int nfd = PR_FileDesc2NativeHandle(fd);
+
+    if ((hent = hget(g_hlist, (uint64_t)nfd)) != NULL) {
+        rc = hent->ssl_methods->send(fd, buf, amount, flags, timeout);
+    } else {
+        rc = -1;
+        DBG(NULL);
+        scopeLog("ERROR: ssl_send no list entry", -1, CFG_LOG_ERROR);
+    }
+
+    if (rc > 0) doProtocol(nfd, (void *)buf, (size_t)amount, TLSTX);
+
+    return rc;
+}
+
+static PRInt32
+nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime timeout)
+{
+    PRInt32 rc;
+    http_list *hent;
+    int nfd = PR_FileDesc2NativeHandle(fd);
+
+    if ((hent = hget(g_hlist, (uint64_t)nfd)) != NULL) {
+        rc = hent->ssl_methods->recv(fd, buf, amount, flags, timeout);
+    } else {
+        rc = -1;
+        DBG(NULL);
+        scopeLog("ERROR: ssl_recv no list entry", -1, CFG_LOG_ERROR);
+    }
+
+    if (rc > 0) doProtocol(nfd, buf, (size_t)amount, TLSRX);
+
+    return rc;
+}
+
+EXPORTON PRFileDesc *
+SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
+{
+    PRFileDesc *result;
+
+    //scopeLog("SSL_ImportFD", -1, CFG_LOG_INFO);
+    WRAP_CHECK(SSL_ImportFD, NULL);
+    result = g_fn.SSL_ImportFD(model, currFd);
+
+    if (result != NULL) {
+        http_list *hent;
+        int nfd = PR_FileDesc2NativeHandle(result);
+
+        if (((hent = hnew()) != NULL) &&
+            ((hent->ssl_methods = calloc(1, sizeof(PRIOMethods))) != NULL) &&
+            ((hent->ssl_int_methods = calloc(1, sizeof(PRIOMethods))) != NULL)) {
+            hent->id = (uint64_t)nfd;
+            bcopy(result->methods, hent->ssl_methods, sizeof(PRIOMethods));
+            bcopy(result->methods, hent->ssl_int_methods, sizeof(PRIOMethods));
+
+            if (hpush(&g_hlist, hent) == 0) {
+                // ref contrib/tls/nss/prio.h struct PRIOMethods
+                // read ... todo? read, recvfrom, acceptread
+                hent->ssl_int_methods->recv = nss_recv;
+
+                // write ... todo? write, writev, sendto, sendfile, transmitfile
+                hent->ssl_int_methods->send = nss_send;
+
+                // shutdown connection ... todo? shutdown
+                hent->ssl_int_methods->close = nss_close;
+
+                // switch to using the wrapped methods
+                result->methods = hent->ssl_int_methods;
+            }
+        }
+    }
+    return result;
 }
 
 #endif // __LINUX__

@@ -21,6 +21,7 @@
 
 #define DYN_CONFIG_PREFIX "scope"
 #define MAXTRIES 10
+#define NUM_ATTEMPTS 100
 
 typedef struct thread_timing_t {
     unsigned interval;                   // in seconds
@@ -176,7 +177,8 @@ typedef struct interposed_funcs_t {
     int (*SSL_write)(SSL *, const void *, int);
     ssize_t (*gnutls_record_recv)(gnutls_session_t, void *, size_t);
     ssize_t (*gnutls_record_send)(gnutls_session_t, const void *, size_t);
-    
+    PRFileDesc *(*SSL_ImportFD)(PRFileDesc *, PRFileDesc *);
+
 #if defined(__LINUX__) && defined(__STATX__)
     int (*statx)(int, const char *, int, unsigned int, struct statx *);
 #endif // __LINUX__ && __STATX__

@@ -61,4 +61,39 @@ fi
 
 rm /opt/test-runner/logs/events.log
 
+echo "==============================================="
+echo "             Testing nss                       "
+echo "==============================================="
+export $preload
+curl --head https://cribl.io
+unset LD_PRELOAD
+
+grep http-req /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+grep "Host: cribl.io" /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+grep http-resp /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+grep HTTP /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+if [ $ERR -eq "0" ]; then
+    echo "*************** nss Success ***************"
+else
+    echo "*************** nss Test Failed ***************"
+#    cat /opt/test-runner/logs/events.log
+fi
+
+rm /opt/test-runner/logs/events.log
+
+if [ $ERR -eq "0" ]; then
+
+    echo "*************** Test Passed ***************"
+else
+    echo "*************** Test Failed ***************"
+fi
+
 exit ${ERR}

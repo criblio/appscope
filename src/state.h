@@ -2,12 +2,29 @@
 #define __STATE_H__
 
 #include "report.h"
+#include "../contrib/tls/tls.h"
 
 #ifdef __MACOS__
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
 #endif
 #endif // __MACOS__
+
+typedef struct http_track_t {
+    int status;
+    uint64_t start_time;
+    uint64_t duration;
+    char method[16];
+    char uri[256];
+} http_track;
+
+typedef struct http_list_t {
+    struct http_list_t *next;
+    uint64_t id;
+    struct http_track_t htrack;
+    PRIOMethods *ssl_methods;
+    PRIOMethods *ssl_int_methods;
+} http_list;
 
 void initState();
 void resetState();
@@ -43,6 +60,5 @@ int remotePortIsDNS(int);
 int sockIsTCP(int);
 void doUpdateState(metric_t, int, ssize_t, const char *, const char *);
 int doProtocol(int, void *, size_t, metric_t);
-
 
 #endif // __STATE_H__

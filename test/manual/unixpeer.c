@@ -114,11 +114,6 @@ server_child()
         exit(-1);
     }
 
-    if (sem_init(sem, 1, 0) == -1) {
-        perror("Server:sem_init");
-        exit(-1);
-    }
-
     // socket: create the parent socket 
     parentfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (parentfd < 0) {

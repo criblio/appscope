@@ -1,6 +1,7 @@
 #ifndef __STATE_H__
 #define __STATE_H__
 
+#include <sys/socket.h>
 #include "report.h"
 #include "../contrib/tls/tls.h"
 

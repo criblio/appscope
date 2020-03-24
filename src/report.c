@@ -158,10 +158,36 @@ doProtocolMetric(protocol_info *proto)
 }
 
 void
+resetInterfaceCounts(counters_element_t* value)
+{
+    if (!value) return;
+    atomicSwapU64(&value->mtc, 0);
+    atomicSwapU64(&value->evt, 0);
+}
+
+void
+addToInterfaceCounts(counters_element_t* value, uint64_t x)
+{
+    if (!value) return;
+    atomicAddU64(&value->mtc, x);
+    atomicAddU64(&value->evt, x);
+}
+
+void
+subFromInterfaceCounts(counters_element_t* value, uint64_t x)
+{
+     if (!value) return;
+     atomicSubU64(&value->mtc, x);
+     atomicSubU64(&value->evt, x);
+}
+
+void
 doErrorMetric(metric_t type, control_type_t source,
-              const char *func, const char *name)
+              const char *func, const char *name, void* ctr)
 {
     if (!func || !name) return;
+
+    metric_counters* ctrs = (ctr) ? (metric_counters*) ctr : &g_ctrs;
 
     const char err_name[] = "EFAULT";
     if (errno == EFAULT) {
@@ -172,28 +198,21 @@ doErrorMetric(metric_t type, control_type_t source,
     case NET_ERR_CONN:
     case NET_ERR_RX_TX:
     {
-        uint64_t *value = NULL;
-        const char *class = "UNKNOWN";
+        counters_element_t* value = NULL;
+        const char* class = "UNKNOWN";
         switch (type) {
             case NET_ERR_CONN:
-                value = &g_ctrs.netConnectErrors;
+                value = &ctrs->netConnectErrors;
                 class = "connection";
                 break;
             case NET_ERR_RX_TX:
-                value = &g_ctrs.netTxRxErrors;
+                value = &ctrs->netTxRxErrors;
                 class = "rx/tx";
                 break;
             default:
                 DBG(NULL);
                 return;
         }
-
-        if (source == EVENT_BASED) {
-            atomicAddU64(value, 1);
-        }
-
-        // Don't report zeros.
-        if (*value == 0) return;
 
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
@@ -205,20 +224,25 @@ doErrorMetric(metric_t type, control_type_t source,
             FIELDEND
         };
 
-        event_t netErrMetric = INT_EVENT("net.error", *value, DELTA, fields);
-
-        cmdSendEvent(g_ctl, &netErrMetric, getTime(), &g_proc);
-
-        // Only report if enabled
-        if (g_summary.net.error) {
-            return;
+        // Don't report zeros.
+        if (value->evt != 0ULL) {
+             event_t netErrMetric = INT_EVENT("net.error", value->evt, DELTA, fields);
+             cmdSendEvent(g_ctl, &netErrMetric, getTime(), &g_proc);
+             atomicSwapU64(&value->evt, 0);
         }
 
+        // Only report if enabled
+        if ((g_summary.net.error) && (source == EVENT_BASED)) {
+            return;
+        }
+        // Don't report zeros.
+        if (value->mtc == 0) return;
+
+        event_t netErrMetric = INT_EVENT("net.error", value->mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &netErrMetric)) {
             scopeLog("ERROR: doErrorMetric:NET:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
-
-        atomicSwapU64(value, 0);
+        atomicSwapU64(&value->mtc, 0);
         break;
     }
 
@@ -228,38 +252,38 @@ doErrorMetric(metric_t type, control_type_t source,
     case NET_ERR_DNS:
     {
 
-        const char *metric = NULL;
-        uint64_t *value = NULL;
-        const char *class = "UNKNOWN";
-        int *summarize = NULL;
+        const char* metric = NULL;
+        counters_element_t* value = NULL;
+        const char* class = "UNKNOWN";
+        int* summarize = NULL;
         event_field_t file_field = FILE_FIELD(name);
         event_field_t domain_field = DOMAIN_FIELD(name);
         event_field_t* name_field;
         switch (type) {
             case FS_ERR_OPEN_CLOSE:
                 metric = "fs.error";
-                value = &g_ctrs.fsOpenCloseErrors;
+                value = &ctrs->fsOpenCloseErrors;
                 class = "open/close";
                 summarize = &g_summary.fs.error;
                 name_field = &file_field;
                 break;
             case FS_ERR_READ_WRITE:
                 metric = "fs.error";
-                value = &g_ctrs.fsRdWrErrors;
+                value = &ctrs->fsRdWrErrors;
                 class = "read/write";
                 summarize = &g_summary.fs.error;
                 name_field = &file_field;
                 break;
             case FS_ERR_STAT:
                 metric = "fs.error";
-                value = &g_ctrs.fsStatErrors;
+                value = &ctrs->fsStatErrors;
                 class = "stat";
                 summarize = &g_summary.fs.error;
                 name_field = &file_field;
                 break;
             case NET_ERR_DNS:
                 metric = "net.error";
-                value = &g_ctrs.netDNSErrors;
+                value = &ctrs->netDNSErrors;
                 class = "dns";
                 summarize = &g_summary.net.dnserror;
                 name_field = &domain_field;
@@ -268,13 +292,6 @@ doErrorMetric(metric_t type, control_type_t source,
                 DBG(NULL);
                 return;
         }
-
-        if (source == EVENT_BASED) {
-            atomicAddU64(value, 1);
-        }
-
-        // Don't report zeros.
-        if (*value == 0) return;
 
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
@@ -287,20 +304,25 @@ doErrorMetric(metric_t type, control_type_t source,
             FIELDEND
         };
 
-        event_t fsErrMetric = INT_EVENT(metric, *value, DELTA, fields);
-
-        cmdSendEvent(g_ctl, &fsErrMetric, getTime(), &g_proc);
-
-        // Only report if enabled
-        if (*summarize) {
-            return;
+        // Don't report zeros.
+        if (value->evt != 0ULL) {
+            event_t fsErrMetric = INT_EVENT(metric, value->evt, DELTA, fields);
+            cmdSendEvent(g_ctl, &fsErrMetric, getTime(), &g_proc);
+            atomicSwapU64(&value->evt, 0);
         }
 
+        // Only report if enabled
+        if ((source == EVENT_BASED) && *summarize) {
+            return;
+        }
+        // Don't report zeros.
+        if (value->mtc == 0) return;
+
+        event_t fsErrMetric = INT_EVENT(metric, value->mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &fsErrMetric)) {
             scopeLog("ERROR: doErrorMetric:FS_ERR:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
-
-        atomicSwapU64(value, 0);
+        atomicSwapU64(&value->mtc, 0);
         break;
     }
 
@@ -310,58 +332,98 @@ doErrorMetric(metric_t type, control_type_t source,
 }
 
 void
-doDNSMetricName(metric_t type, const char *domain, uint64_t duration)
+doDNSMetricName(metric_t type, const char *domain, counters_element_t* duration, void* ctr)
 {
-    if (!domain) return;
+    if (!domain || !domain[0]) return;
+
+    metric_counters* ctrs = (ctr) ? (metric_counters*) ctr : &g_ctrs;
 
     switch (type) {
     case DNS:
     {
-        // This will need to be done if called from an event
-        //atomicAddU64(&g_ctrs.numDNS, 1);
-
         // Don't report zeros.
-        if (g_ctrs.numDNS == 0) return;
-
-        event_field_t fields[] = {
-            PROC_FIELD(g_proc.procname),
-            PID_FIELD(g_proc.pid),
-            HOST_FIELD(g_proc.hostname),
-            DOMAIN_FIELD(domain),
-            DURATION_FIELD(duration / 1000000), // convert ns to ms.
-            UNIT_FIELD("request"),
-            FIELDEND
-        };
-
-        event_t dnsMetric = INT_EVENT("net.dns", g_ctrs.numDNS, DELTA, fields);
-
-        cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
+        if (ctrs->numDNS.evt != 0) {
+            event_field_t fields[] = {
+                PROC_FIELD(g_proc.procname),
+                PID_FIELD(g_proc.pid),
+                HOST_FIELD(g_proc.hostname),
+                DOMAIN_FIELD(domain),
+                DURATION_FIELD(duration->evt / 1000000), // convert ns to ms.
+                UNIT_FIELD("request"),
+                FIELDEND
+            };
+            event_t dnsMetric = INT_EVENT("net.dns", ctrs->numDNS.evt, DELTA, fields);
+            cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
+        }
 
         // Only report if enabled
         if (g_summary.net.dns) {
             return;
         }
 
+        // Don't report zeros.
+        if (ctrs->numDNS.mtc == 0) return;
+
+        event_field_t fields[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            HOST_FIELD(g_proc.hostname),
+            DOMAIN_FIELD(domain),
+            DURATION_FIELD(duration->mtc / 1000000), // convert ns to ms.
+            UNIT_FIELD("request"),
+            FIELDEND
+        };
+        event_t dnsMetric = INT_EVENT("net.dns", ctrs->numDNS.mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &dnsMetric)) {
             scopeLog("ERROR: doDNSMetricName:DNS:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
-        atomicSwapU64(&g_ctrs.numDNS, 0);
         break;
     }
 
     case DNS_DURATION:
     {
-        atomicAddU64(&g_ctrs.dnsDurationNum, 1);
-        atomicAddU64(&g_ctrs.dnsDurationTotal, duration);
+        addToInterfaceCounts(&ctrs->dnsDurationNum, 1);
+        atomicAddU64(&ctrs->dnsDurationTotal.mtc, duration->mtc);
+        atomicAddU64(&ctrs->dnsDurationTotal.evt, duration->evt);
 
         uint64_t dur = 0ULL;
-        int cachedDurationNum = g_ctrs.dnsDurationNum; // avoid div by zero
+        int cachedDurationNum = ctrs->dnsDurationNum.evt; // avoid div by zero
         if (cachedDurationNum >= 1) {
             // factor of 1000000 converts ns to ms.
-            dur = g_ctrs.dnsDurationTotal / ( 1000000 * cachedDurationNum);
+            dur = ctrs->dnsDurationTotal.evt / ( 1000000 * cachedDurationNum);
         }
 
         // Don't report zeros.
+        if (dur != 0ULL) {
+            event_field_t fields[] = {
+                PROC_FIELD(g_proc.procname),
+                PID_FIELD(g_proc.pid),
+                HOST_FIELD(g_proc.hostname),
+                DOMAIN_FIELD(domain),
+                NUMOPS_FIELD(cachedDurationNum),
+                UNIT_FIELD("millisecond"),
+                FIELDEND
+            };
+
+            event_t dnsDurMetric = INT_EVENT("net.dns.duration", dur, DELTA_MS, fields);
+            cmdSendEvent(g_ctl, &dnsDurMetric, getTime(), &g_proc);
+            atomicSwapU64(&ctrs->dnsDurationNum.evt, 0);
+            atomicSwapU64(&ctrs->dnsDurationTotal.evt, 0);
+        }
+
+        // Only report if enabled
+        if (g_summary.net.dns) {
+            return;
+        }
+
+        dur = 0ULL;
+        cachedDurationNum = ctrs->dnsDurationNum.mtc; // avoid div by zero
+        if (cachedDurationNum >= 1) {
+            // factor of 1000000 converts ns to ms.
+            dur = ctrs->dnsDurationTotal.mtc / ( 1000000 * cachedDurationNum);
+        }
+
+        // Don't report zeros
         if (dur == 0ULL) return;
 
         event_field_t fields[] = {
@@ -373,21 +435,12 @@ doDNSMetricName(metric_t type, const char *domain, uint64_t duration)
             UNIT_FIELD("millisecond"),
             FIELDEND
         };
-
         event_t dnsDurMetric = INT_EVENT("net.dns.duration", dur, DELTA_MS, fields);
-
-        cmdSendEvent(g_ctl, &dnsDurMetric, getTime(), &g_proc);
-
-        // Only report if enabled
-        if (g_summary.net.dns) {
-            return;
-        }
-
         if (cmdSendMetric(g_mtc, &dnsDurMetric)) {
             scopeLog("ERROR: doDNSMetricName:DNS_DURATION:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
-        atomicSwapU64(&g_ctrs.dnsDurationNum, 0);
-        atomicSwapU64(&g_ctrs.dnsDurationTotal, 0);
+        atomicSwapU64(&ctrs->dnsDurationNum.mtc, 0);
+        atomicSwapU64(&ctrs->dnsDurationTotal.mtc, 0);
         break;
     }
 
@@ -500,11 +553,10 @@ doProcMetric(metric_t type, long long measurement)
 }
 
 void
-doStatMetric(const char *op, const char *pathname)
+doStatMetric(const char *op, const char *pathname, void* ctr)
 {
 
-    // This will need to done if called from an event
-    //atomicAddU64(&g_ctrs.numStat, 1);
+    metric_counters* ctrs = (ctr) ? (metric_counters*) ctr : &g_ctrs;
 
     event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
@@ -516,19 +568,23 @@ doStatMetric(const char *op, const char *pathname)
             FIELDEND
     };
 
-    event_t evt = INT_EVENT("fs.op.stat", 1, DELTA, fields);
-    cmdSendEvent(g_ctl, &evt, getTime(), &g_proc);
+    if (ctrs->numStat.evt != 0) {
+        event_t evt = INT_EVENT("fs.op.stat", ctrs->numStat.evt, DELTA, fields);
+        cmdSendEvent(g_ctl, &evt, getTime(), &g_proc);
+    }
 
     // Only report if enabled
     if (g_summary.fs.stat) {
         return;
     }
 
+    // Do not report zeros
+    if (ctrs->numStat.mtc == 0) return;
+
+    event_t evt = INT_EVENT("fs.op.stat", ctrs->numStat.mtc, DELTA, fields);
     if (cmdSendMetric(g_mtc, &evt)) {
         scopeLog("doStatMetric", -1, CFG_LOG_ERROR);
     }
-
-    //atomicSwapU64(&g_ctrs.numStat, 0);
 }
 
 void
@@ -540,23 +596,50 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
     switch (type) {
     case FS_DURATION:
     {
-        // if called from an event, we update counters
-        if (source == EVENT_BASED) {
-            atomicAddU64(&fs->numDuration, 1);
-            atomicAddU64(&fs->totalDuration, size);
-            atomicAddU64(&g_ctrs.fsDurationNum, 1);
-            atomicAddU64(&g_ctrs.fsDurationTotal, size);
-        }
 
-        uint64_t ldur = 0ULL;
-        int cachedDurationNum = fs->numDuration; // avoid div by zero
+        uint64_t dur = 0ULL;
+        int cachedDurationNum = fs->numDuration.evt; // avoid div by zero
         if (cachedDurationNum >= 1) {
             // factor of 1000 converts ns to us.
-            ldur = fs->totalDuration / ( 1000 * cachedDurationNum);
+            dur = fs->totalDuration.evt / ( 1000 * cachedDurationNum);
         }
 
         // Don't report zeros.
-        if (ldur == 0ULL) return;
+        if (dur != 0ULL) {
+            event_field_t fields[] = {
+                PROC_FIELD(g_proc.procname),
+                PID_FIELD(g_proc.pid),
+                FD_FIELD(fs->fd),
+                HOST_FIELD(g_proc.hostname),
+                OP_FIELD(op),
+                FILE_FIELD(fs->path),
+                NUMOPS_FIELD(cachedDurationNum),
+                UNIT_FIELD("microsecond"),
+                FIELDEND
+            };
+
+            event_t evt = INT_EVENT("fs.duration", dur, HISTOGRAM, fields);
+            cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
+            atomicSwapU64(&fs->numDuration.evt, 0);
+            atomicSwapU64(&fs->totalDuration.evt, 0);
+            //atomicSwapU64(&g_ctrs.fsDurationNum.evt, 0);
+            //atomicSwapU64(&g_ctrs.fsDurationTotal.evt, 0);
+        }
+
+        dur = 0ULL;
+        cachedDurationNum = fs->numDuration.mtc; // avoid div by zero
+        if (cachedDurationNum >= 1) {
+            // factor of 1000 converts ns to us.
+            dur = fs->totalDuration.mtc / ( 1000 * cachedDurationNum);
+        }
+
+        // Don't report zeros
+        if (dur == 0ULL) return;
+
+        // Only report if enabled
+        if ((g_summary.fs.read_write) && (source == EVENT_BASED)) {
+            return;
+        }
 
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
@@ -569,34 +652,27 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
             UNIT_FIELD("microsecond"),
             FIELDEND
         };
-        event_t event = INT_EVENT("fs.duration", ldur, HISTOGRAM, fields);
-        cmdSendEvent(g_ctl, &event, fs->uid, &g_proc);
-
-        // Only report if enabled
-        if (g_summary.fs.read_write) {
-            return;
-        }
-
-        if (cmdSendMetric(g_mtc, &event)) {
+        event_t evt = INT_EVENT("fs.duration", dur, HISTOGRAM, fields);
+        if (cmdSendMetric(g_mtc, &evt)) {
             scopeLog("ERROR: doFSMetric:FS_DURATION:cmdSendMetric", fs->fd, CFG_LOG_ERROR);
         }
 
         // Reset the info if we tried to report
-        atomicSwapU64(&fs->numDuration, 0);
-        atomicSwapU64(&fs->totalDuration, 0);
-        atomicSwapU64(&g_ctrs.fsDurationNum, 0);
-        atomicSwapU64(&g_ctrs.fsDurationTotal, 0);
+        atomicSwapU64(&fs->numDuration.mtc, 0);
+        atomicSwapU64(&fs->totalDuration.mtc, 0);
+        //atomicSwapU64(&g_ctrs.fsDurationNum.mtc, 0);
+        //atomicSwapU64(&g_ctrs.fsDurationTotal.mtc, 0);
         break;
     }
 
     case FS_READ:
     case FS_WRITE:
     {
-        const char *metric = "UNKNOWN";
-        uint64_t *numops = NULL;
-        uint64_t *sizebytes = NULL;
-        uint64_t *global_counter = NULL;
-        const char *err_str = "UNKNOWN";
+        const char* metric = "UNKNOWN";
+        counters_element_t* numops = NULL;
+        counters_element_t* sizebytes = NULL;
+        counters_element_t* global_counter = NULL;
+        const char* err_str = "UNKNOWN";
         switch (type) {
             case FS_READ:
                 metric = "fs.read";
@@ -617,19 +693,34 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
                 return;
         }
 
-        // if called from an event, we update counters
-        if (source == EVENT_BASED) {
-            atomicAddU64(numops, 1);
-            atomicAddU64(sizebytes, size);
-            atomicAddU64(global_counter, size); // not by fd
+        // Don't report zeros
+        if (sizebytes->evt != 0ULL) {
+            event_field_t fields[] = {
+                PROC_FIELD(g_proc.procname),
+                PID_FIELD(g_proc.pid),
+                FD_FIELD(fs->fd),
+                HOST_FIELD(g_proc.hostname),
+                OP_FIELD(op),
+                FILE_FIELD(fs->path),
+                NUMOPS_FIELD(numops->evt),
+                UNIT_FIELD("byte"),
+                FIELDEND
+            };
+
+            event_t rwMetric = INT_EVENT(metric, sizebytes->evt, HISTOGRAM, fields);
+            cmdSendEvent(g_ctl, &rwMetric, fs->uid, &g_proc);
+            atomicSwapU64(&numops->evt, 0);
+            atomicSwapU64(&sizebytes->evt, 0);
+            //atomicSwapU64(global_counter->evt, 0);
         }
 
-        /*
-         * Don't report zeros.
-         * I think doing this here is right, even if we are
-         * doing events, we don't want to report 0's.
-         */
-        if (*sizebytes == 0ULL) return;
+        // Only report if enabled
+        if ((g_summary.fs.read_write) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        // Don't report zeros
+        if (sizebytes->mtc == 0ULL) return;
 
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
@@ -638,28 +729,19 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
             HOST_FIELD(g_proc.hostname),
             OP_FIELD(op),
             FILE_FIELD(fs->path),
-            NUMOPS_FIELD(*numops),
+            NUMOPS_FIELD(numops->mtc),
             UNIT_FIELD("byte"),
             FIELDEND
         };
 
-        event_t rwMetric = INT_EVENT(metric, *sizebytes, HISTOGRAM, fields);
-
-        cmdSendEvent(g_ctl, &rwMetric, fs->uid, &g_proc);
-
-        // Only report if enabled
-        if (g_summary.fs.read_write) {
-            return;
-        }
+        event_t rwMetric = INT_EVENT(metric, sizebytes->mtc, HISTOGRAM, fields);
 
         if (cmdSendMetric(g_mtc, &rwMetric)) {
             scopeLog(err_str, fs->fd, CFG_LOG_ERROR);
         }
-
-        // Reset the info if we tried to report
-        atomicSwapU64(numops, 0);
-        atomicSwapU64(sizebytes, 0);
-        //atomicSwapU64(global_counter, 0);
+        subFromInterfaceCounts(global_counter, sizebytes->mtc);
+        atomicSwapU64(&numops->mtc, 0);
+        atomicSwapU64(&sizebytes->mtc, 0);
 
         break;
     }
@@ -667,10 +749,10 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
     case FS_CLOSE:
     case FS_SEEK:
     {
-        const char *metric = "UNKNOWN";
-        uint64_t *numops = NULL;
-        uint64_t *global_counter = NULL;
-        int *summarize = NULL;
+        const char* metric = "UNKNOWN";
+        counters_element_t* numops = NULL;
+        counters_element_t* global_counter = NULL;
+        int* summarize = NULL;
         const char* err_str = "UNKNOWN";
         switch (type) {
             case FS_OPEN:
@@ -699,15 +781,6 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
                 return;
         }
 
-        // if called from an event, we update counters
-        if (source == EVENT_BASED) {
-            atomicAddU64(numops, 1);
-            atomicAddU64(global_counter, 1);
-        }
-
-        // Don't report zeros.
-        if (*numops == 0ULL) return;
-
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -719,455 +792,42 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
             FIELDEND
         };
 
-        event_t event = INT_EVENT(metric, *numops, DELTA, fields);
-        cmdSendEvent(g_ctl, &event, fs->uid, &g_proc);
+        // Don't report zeros.
+        if (numops->evt != 0ULL) {
+            event_t evt = INT_EVENT(metric, numops->evt, DELTA, fields);
+            cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
+            atomicSwapU64(&numops->evt, 0);
+        }
 
         // Only report if enabled
-        if (*summarize) {
+        if (*summarize && (source == EVENT_BASED)) {
             return;
         }
 
-        if (cmdSendMetric(g_mtc, &event)) {
+        // Don't report zeros.
+        if (numops->mtc == 0ULL) return;
+
+        event_t evt = INT_EVENT(metric, numops->mtc, DELTA, fields);
+        if (cmdSendMetric(g_mtc, &evt)) {
             scopeLog(err_str, fs->fd, CFG_LOG_ERROR);
         }
-
-        // Reset the info if we tried to report
-        atomicSwapU64(numops, 0);
+        subFromInterfaceCounts(global_counter, numops->mtc);
+        atomicSwapU64(&numops->mtc, 0);
         break;
     }
 
     default:
         DBG(NULL);
-        scopeLog("ERROR: doFSMetric:metric type", fs->fd, CFG_LOG_ERROR);
-    }
-}
-
-void
-doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
-{
-    char proto[PROTOCOL_STR];
-    in_port_t localPort, remotePort;
-
-    if (source == EVENT_BASED) return;
-    if (!net) return;
-
-    getProtocol(net->type, proto, sizeof(proto));
-    localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
-    remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
-
-    switch (type) {
-    case OPEN_PORTS:
-    case NET_CONNECTIONS:
-    {
-        const char *metric = "UNKNOWN";
-        uint64_t *value = NULL;
-        const char *units = "UNKNOWN";
-        const char *err_str = "UNKNOWN";
-
-        switch (type) {
-        case OPEN_PORTS:
-            metric = "net.port";
-            value = &g_ctrs.openPorts;
-            units = "instance";
-            err_str = "ERROR: doNetMetric:OPEN_PORTS:cmdSendMetric";
-            break;
-        case NET_CONNECTIONS:
-            if (net->type == SOCK_STREAM) {
-                metric = "net.tcp";
-                value = &g_ctrs.netConnectionsTcp;
-            } else if (net->type == SOCK_DGRAM) {
-                metric = "net.udp";
-                value = &g_ctrs.netConnectionsUdp;
-            } else {
-                metric = "net.other";
-                value = &g_ctrs.netConnectionsOther;
-            }
-            units = "connection";
-            err_str = "ERROR: doNetMetric:NET_CONNECTIONS:cmdSendMetric";
-            break;
-        default:
-            DBG(NULL);
-            return;
-        }
-
-        // if called from an event, we update counters
-        if ((source == EVENT_BASED) && size) {
-            if (size < 0) {
-               atomicSubU64(value, labs(size));
-            } else {
-               atomicAddU64(value, size);
-            }
-            if (!net->startTime) net->startTime = getTime();
-        }
-
-        event_field_t fields[] = {
-            PROC_FIELD(g_proc.procname),
-            PID_FIELD(g_proc.pid),
-            FD_FIELD(net->fd),
-            HOST_FIELD(g_proc.hostname),
-            PROTO_FIELD(proto),
-            PORT_FIELD(localPort),
-            UNIT_FIELD(units),
-            FIELDEND
-        };
-        event_t event = INT_EVENT(metric, *value, CURRENT, fields);
-        cmdSendEvent(g_ctl, &event, net->uid, &g_proc);
-
-        // Only report if enabled
-        if (g_summary.net.open_close) {
-            return;
-        }
-
-        if (cmdSendMetric(g_mtc, &event)) {
-            scopeLog(err_str, net->fd, CFG_LOG_ERROR);
-        }
-
-        // Don't reset the info if we tried to report.  It's a gauge.
-        // atomicSwapU64(value, 0);
-
-        break;
-    }
-
-    case CONNECTION_DURATION:
-    {
-        uint64_t new_duration = 0ULL;
-
-        if (net->startTime != 0ULL) {
-            new_duration = getDuration(net->startTime);
-            net->startTime = 0ULL;
-        }
-
-        // if called from an event, we update counters
-        if ((source == EVENT_BASED) && new_duration) {
-            atomicAddU64(&net->numDuration, 1);
-            atomicAddU64(&net->totalDuration, new_duration);
-            atomicAddU64(&g_ctrs.connDurationNum, 1);
-            atomicAddU64(&g_ctrs.connDurationTotal, new_duration);
-        }
-
-        uint64_t ldur = 0ULL;
-        int cachedDurationNum = net->numDuration; // avoid div by zero
-        if (cachedDurationNum >= 1 ) {
-            // factor of 1000000 converts ns to ms.
-            ldur = net->totalDuration / ( 1000000 * cachedDurationNum);
-        }
-
-        // Don't report zeros.
-        if (ldur == 0ULL) return;
-
-        event_field_t fields[] = {
-            PROC_FIELD(g_proc.procname),
-            PID_FIELD(g_proc.pid),
-            FD_FIELD(net->fd),
-            HOST_FIELD(g_proc.hostname),
-            PROTO_FIELD(proto),
-            PORT_FIELD(localPort),
-            NUMOPS_FIELD(cachedDurationNum),
-            UNIT_FIELD("millisecond"),
-            FIELDEND
-        };
-        event_t event = INT_EVENT("net.conn_duration", ldur, DELTA_MS, fields);
-        cmdSendEvent(g_ctl, &event, net->uid, &g_proc);
-
-        // Only report if enabled
-        if (g_summary.net.open_close) {
-            return;
-        }
-
-        if (cmdSendMetric(g_mtc, &event)) {
-            scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:cmdSendMetric", net->fd, CFG_LOG_ERROR);
-        }
-
-        atomicSwapU64(&net->numDuration, 0);
-        atomicSwapU64(&net->totalDuration, 0);
-        atomicSwapU64(&g_ctrs.connDurationNum, 0);
-        atomicSwapU64(&g_ctrs.connDurationTotal, 0);
-
-        break;
-    }
-
-    case NETRX:
-    {
-        event_t rxMetric;
-        event_field_t rxFields[20];
-        char lip[INET6_ADDRSTRLEN];
-        char rip[INET6_ADDRSTRLEN];
-        char data[16];
-
-        if (source == EVENT_BASED) {
-            atomicAddU64(&net->numRX, 1);
-            atomicAddU64(&net->rxBytes, size);
-            atomicAddU64(&g_ctrs.netrxBytes, size);
-        }
-
-        // Don't report zeros.
-        if (net->rxBytes == 0ULL) return;
-
-        if ((localPort == 443) || (remotePort == 443)) {
-            strncpy(data, "ssl", sizeof(data));
-        } else {
-            strncpy(data, "clear", sizeof(data));
-        }
-
-        // Do we need to define domain=LOCAL or NETLINK?
-        if ((net->type == SCOPE_UNIX) ||
-            (net->remoteConn.ss_family == AF_UNIX) ||
-            (net->remoteConn.ss_family == AF_LOCAL) ||
-            (net->remoteConn.ss_family == AF_NETLINK) ||
-            (net->localConn.ss_family == AF_UNIX) ||
-            (net->localConn.ss_family == AF_LOCAL) ||
-            (net->localConn.ss_family == AF_NETLINK)) {
-            localPort = net->lnode;
-            remotePort = net->rnode;
-
-            if (net->localConn.ss_family == AF_NETLINK) {
-                strncpy(proto, "NETLINK", sizeof(proto));
-            }
-
-            event_field_t fields[] = {
-                PROC_FIELD(g_proc.procname),
-                PID_FIELD(g_proc.pid),
-                FD_FIELD(net->fd),
-                HOST_FIELD(g_proc.hostname),
-                DOMAIN_FIELD("UNIX"),
-                PROTO_FIELD(proto),
-                LOCALN_FIELD(localPort),
-                REMOTEN_FIELD(remotePort),
-                DATA_FIELD(data),
-                NUMOPS_FIELD(net->numRX),
-                UNIT_FIELD("byte"),
-                FIELDEND
-            };
-            memmove(&rxFields, &fields, sizeof(fields));
-            event_t rxUnixMetric = INT_EVENT("net.rx", net->rxBytes, DELTA, rxFields);
-            memmove(&rxMetric, &rxUnixMetric, sizeof(event_t));
-        } else {
-            if (net->localConn.ss_family == AF_INET) {
-                if (inet_ntop(AF_INET,
-                              &((struct sockaddr_in *)&net->localConn)->sin_addr,
-                              lip, sizeof(lip)) == NULL) {
-                    strncpy(lip, " ", sizeof(lip));
-                }
-            } else if (net->localConn.ss_family == AF_INET6) {
-                if (inet_ntop(AF_INET6,
-                              &((struct sockaddr_in6 *)&net->localConn)->sin6_addr,
-                              lip, sizeof(lip)) == NULL) {
-                    strncpy(lip, " ", sizeof(lip));
-                }
-
-            } else {
-                strncpy(lip, " ", sizeof(lip));
-            }
-
-            if (net->remoteConn.ss_family == AF_INET) {
-                if (inet_ntop(AF_INET,
-                              &((struct sockaddr_in *)&net->remoteConn)->sin_addr,
-                              rip, sizeof(rip)) == NULL) {
-                    strncpy(rip, " ", sizeof(rip));
-                }
-            } else if (net->remoteConn.ss_family == AF_INET6) {
-                if (inet_ntop(AF_INET6,
-                              &((struct sockaddr_in6 *)&net->remoteConn)->sin6_addr,
-                              rip, sizeof(rip)) == NULL) {
-                    strncpy(rip, " ", sizeof(rip));
-                }
-            } else {
-                strncpy(rip, " ", sizeof(rip));
-            }
-            event_field_t fields[] = {
-                PROC_FIELD(g_proc.procname),
-                PID_FIELD(g_proc.pid),
-                FD_FIELD(net->fd),
-                HOST_FIELD(g_proc.hostname),
-                DOMAIN_FIELD("AF_INET"),
-                PROTO_FIELD(proto),
-                LOCALIP_FIELD(lip),
-                LOCALP_FIELD(localPort),
-                REMOTEIP_FIELD(rip),
-                REMOTEP_FIELD(remotePort),
-                DATA_FIELD(data),
-                NUMOPS_FIELD(net->numRX),
-                UNIT_FIELD("byte"),
-                FIELDEND
-            };
-            memmove(&rxFields, &fields, sizeof(fields));
-            event_t rxNetMetric = INT_EVENT("net.rx", net->rxBytes, DELTA, rxFields);
-            memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
-        }
-
-        cmdSendEvent(g_ctl, &rxMetric, net->uid, &g_proc);
-
-        if (g_summary.net.rx_tx) {
-            return;
-        }
-
-        if (cmdSendMetric(g_mtc, &rxMetric)) {
-            scopeLog("ERROR: doNetMetric:NETRX:cmdSendMetric", -1, CFG_LOG_ERROR);
-        }
-
-        // Reset the info if we tried to report
-        atomicSwapU64(&net->numRX, 0);
-        atomicSwapU64(&net->rxBytes, 0);
-        //atomicSwapU64(&g_ctrs.netrx, 0);
-
-        break;
-    }
-
-    case NETTX:
-    {
-        event_t txMetric;
-        event_field_t txFields[20];
-        char lip[INET6_ADDRSTRLEN];
-        char rip[INET6_ADDRSTRLEN];
-        char data[16];
-
-        if (source == EVENT_BASED) {
-            atomicAddU64(&net->numTX, 1);
-            atomicAddU64(&net->txBytes, size);
-            atomicAddU64(&g_ctrs.nettxBytes, size);
-        }
-
-        // Don't report zeros.
-        if (net->txBytes == 0ULL) return;
-
-        if ((localPort == 443) || (remotePort == 443)) {
-            strncpy(data, "ssl", sizeof(data));
-        } else {
-            strncpy(data, "clear", sizeof(data));
-        }
-
-        if ((net->type == SCOPE_UNIX) ||
-            (net->remoteConn.ss_family == AF_UNIX) ||
-            (net->remoteConn.ss_family == AF_LOCAL) ||
-            (net->remoteConn.ss_family == AF_NETLINK) ||
-            (net->localConn.ss_family == AF_UNIX) ||
-            (net->localConn.ss_family == AF_LOCAL) ||
-            (net->localConn.ss_family == AF_NETLINK)) {
-            localPort = net->lnode;
-            remotePort = net->rnode;
-
-            if (net->localConn.ss_family == AF_NETLINK) {
-                strncpy(proto, "NETLINK", sizeof(proto));
-            }
-
-            event_field_t fields[] = {
-                PROC_FIELD(g_proc.procname),
-                PID_FIELD(g_proc.pid),
-                FD_FIELD(net->fd),
-                HOST_FIELD(g_proc.hostname),
-                DOMAIN_FIELD("UNIX"),
-                PROTO_FIELD(proto),
-                LOCALN_FIELD(localPort),
-                REMOTEN_FIELD(remotePort),
-                DATA_FIELD(data),
-                NUMOPS_FIELD(net->numRX),
-                UNIT_FIELD("byte"),
-                FIELDEND
-            };
-            memmove(&txFields, &fields, sizeof(fields));
-            event_t txUnixMetric = INT_EVENT("net.tx", net->txBytes, DELTA, txFields);
-            memmove(&txMetric, &txUnixMetric, sizeof(event_t));
-        } else {
-            if (net->localConn.ss_family == AF_INET) {
-                if (inet_ntop(AF_INET,
-                              &((struct sockaddr_in *)&net->localConn)->sin_addr,
-                              lip, sizeof(lip)) == NULL) {
-                    strncpy(lip, " ", sizeof(lip));
-                }
-            } else if (net->localConn.ss_family == AF_INET6) {
-                if (inet_ntop(AF_INET6,
-                              &((struct sockaddr_in6 *)&net->localConn)->sin6_addr,
-                              lip, sizeof(lip)) == NULL) {
-                    strncpy(lip, " ", sizeof(lip));
-                }
-
-            } else {
-                strncpy(lip, " ", sizeof(lip));
-            }
-
-            if (net->remoteConn.ss_family == AF_INET) {
-                if (inet_ntop(AF_INET,
-                              &((struct sockaddr_in *)&net->remoteConn)->sin_addr,
-                              rip, sizeof(rip)) == NULL) {
-                    strncpy(rip, " ", sizeof(rip));
-                }
-            } else if (net->remoteConn.ss_family == AF_INET6) {
-                if (inet_ntop(AF_INET6,
-                              &((struct sockaddr_in6 *)&net->remoteConn)->sin6_addr,
-                              rip, sizeof(rip)) == NULL) {
-                    strncpy(rip, " ", sizeof(rip));
-                }
-            } else {
-                strncpy(rip, " ", sizeof(rip));
-            }
-
-            event_field_t fields[] = {
-                PROC_FIELD(g_proc.procname),
-                PID_FIELD(g_proc.pid),
-                FD_FIELD(net->fd),
-                HOST_FIELD(g_proc.hostname),
-                DOMAIN_FIELD("AF_INET"),
-                PROTO_FIELD(proto),
-                LOCALIP_FIELD(lip),
-                LOCALP_FIELD(localPort),
-                REMOTEIP_FIELD(rip),
-                REMOTEP_FIELD(remotePort),
-                DATA_FIELD(data),
-                NUMOPS_FIELD(net->numRX),
-                UNIT_FIELD("byte"),
-                FIELDEND
-            };
-            memmove(&txFields, &fields, sizeof(fields));
-            event_t txNetMetric = INT_EVENT("net.tx", net->txBytes, DELTA, txFields);
-            memmove(&txMetric, &txNetMetric, sizeof(event_t));
-        }
-
-        cmdSendEvent(g_ctl, &txMetric, net->uid, &g_proc);
-
-        if (g_summary.net.rx_tx) {
-            return;
-        }
-
-        if (cmdSendMetric(g_mtc, &txMetric)) {
-            scopeLog("ERROR: doNetMetric:NETTX:cmdSendMetric", -1, CFG_LOG_ERROR);
-        }
-
-        // Reset the info if we tried to report
-        atomicSwapU64(&net->numTX, 0);
-        atomicSwapU64(&net->txBytes, 0);
-        //atomicSwapU64(&g_ctrs.nettx, 0);
-
-        break;
-    }
-
-    case DNS:
-    {
-        if (net->dnsSend == FALSE) {
-            break;
-        }
-
-        // For next time
-        net->dnsSend = FALSE;
-
-        // TBD - this is only called by doSend.  Consider calling this directly
-        // from there?
-        doDNSMetricName(DNS, net->dnsName, 0);
-
-        break;
-    }
-
-    default:
-        scopeLog("ERROR: doNetMetric:metric type", -1, CFG_LOG_ERROR);
     }
 }
 
 void
 doTotal(metric_t type)
 {
-    const char *metric = "UNKNOWN";
-    uint64_t *value = NULL;
-    const char *err_str = "UNKNOWN";
-    const char *units = "byte";
+    const char* metric = "UNKNOWN";
+    counters_element_t* value = NULL;
+    const char* err_str = "UNKNOWN";
+    const char* units = "byte";
     data_type_t aggregation_type = DELTA;
     switch (type) {
         case TOT_READ:
@@ -1254,7 +914,7 @@ doTotal(metric_t type)
     }
 
     // Don't report zeros.
-    if (*value == 0) return;
+    if (value->mtc == 0) return;
 
     event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
@@ -1264,25 +924,25 @@ doTotal(metric_t type)
             CLASS_FIELD("summary"),
             FIELDEND
     };
-    event_t event = INT_EVENT(metric, *value, aggregation_type, fields);
-    if (cmdSendMetric(g_mtc, &event)) {
+    event_t evt = INT_EVENT(metric, value->mtc, aggregation_type, fields);
+    if (cmdSendMetric(g_mtc, &evt)) {
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
     // Reset the info we tried to report (if it's not a gauge)
-    if (aggregation_type != CURRENT) atomicSwapU64(value, 0);
+    if (aggregation_type != CURRENT) atomicSwapU64(&value->mtc, 0);
 }
 
 void
 doTotalDuration(metric_t type)
 {
-    const char *metric = "UNKNOWN";
-    uint64_t *value = NULL;
-    uint64_t *num = NULL;
+    const char* metric = "UNKNOWN";
+    counters_element_t* value = NULL;
+    counters_element_t* num = NULL;
     data_type_t aggregation_type = DELTA_MS;
-    const char *units = "UNKNOWN";
+    const char* units = "UNKNOWN";
     uint64_t factor = 1ULL;
-    const char *err_str = "UNKNOWN";
+    const char* err_str = "UNKNOWN";
     switch (type) {
         case TOT_FS_DURATION:
             metric = "fs.duration";
@@ -1316,15 +976,15 @@ doTotalDuration(metric_t type)
             return;
     }
 
-    uint64_t ldur = 0ULL;
-    int cachedDurationNum = *num; // avoid div by zero
+    uint64_t dur = 0ULL;
+    int cachedDurationNum = num->mtc; // avoid div by zero
     if (cachedDurationNum >= 1) {
         // factor is there to scale from ns to the appropriate units
-        ldur = *value / ( factor * cachedDurationNum);
+        dur = value->mtc / ( factor * cachedDurationNum);
     }
 
     // Don't report zeros.
-    if (ldur == 0) return;
+    if (dur == 0) return;
 
     event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
@@ -1334,14 +994,441 @@ doTotalDuration(metric_t type)
             CLASS_FIELD("summary"),
             FIELDEND
     };
-    event_t event = INT_EVENT(metric, ldur, aggregation_type, fields);
-    if (cmdSendMetric(g_mtc, &event)) {
+    event_t evt = INT_EVENT(metric, dur, aggregation_type, fields);
+    if (cmdSendMetric(g_mtc, &evt)) {
         scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
     // Reset the info we tried to report
-    atomicSwapU64(value, 0);
-    atomicSwapU64(num, 0);
+    atomicSwapU64(&value->mtc, 0);
+    atomicSwapU64(&num->mtc, 0);
+}
+
+void
+doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
+{
+    char proto[PROTOCOL_STR];
+    in_port_t localPort, remotePort;
+
+    if (!net) return;
+
+    getProtocol(net->type, proto, sizeof(proto));
+    localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
+    remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
+
+    switch (type) {
+    case OPEN_PORTS:
+    case NET_CONNECTIONS:
+    {
+        const char* metric = "UNKNOWN";
+        counters_element_t* value = NULL;
+        const char* units = "UNKNOWN";
+        const char* err_str = "UNKNOWN";
+
+        switch (type) {
+        case OPEN_PORTS:
+            metric = "net.port";
+            value = &g_ctrs.openPorts;
+            units = "instance";
+            err_str = "ERROR: doNetMetric:OPEN_PORTS:cmdSendMetric";
+            break;
+        case NET_CONNECTIONS:
+            if (net->type == SOCK_STREAM) {
+                metric = "net.tcp";
+                value = &g_ctrs.netConnectionsTcp;
+            } else if (net->type == SOCK_DGRAM) {
+                metric = "net.udp";
+                value = &g_ctrs.netConnectionsUdp;
+            } else {
+                metric = "net.other";
+                value = &g_ctrs.netConnectionsOther;
+            }
+            units = "connection";
+            err_str = "ERROR: doNetMetric:NET_CONNECTIONS:cmdSendMetric";
+            break;
+        default:
+            DBG(NULL);
+            return;
+        }
+
+        event_field_t fields[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            FD_FIELD(net->fd),
+            HOST_FIELD(g_proc.hostname),
+            PROTO_FIELD(proto),
+            PORT_FIELD(localPort),
+            UNIT_FIELD(units),
+            FIELDEND
+        };
+
+        {
+            event_t evt = INT_EVENT(metric, value->evt, CURRENT, fields);
+            cmdSendEvent(g_ctl, &evt, net->uid, &g_proc);
+            // Don't reset the info if we tried to report.  It's a gauge.
+            //atomicSwapU64(value->evt, 0ULL);
+        }
+
+        // Only report if enabled
+        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        event_t evt = INT_EVENT(metric, value->mtc, CURRENT, fields);
+        if (cmdSendMetric(g_mtc, &evt)) {
+            scopeLog(err_str, net->fd, CFG_LOG_ERROR);
+        }
+        // Don't reset the info if we tried to report.  It's a gauge.
+        // atomicSwapU64(value, 0);
+
+        break;
+    }
+
+    case CONNECTION_DURATION:
+    {
+        uint64_t dur = 0ULL;
+        int cachedDurationNum = net->numDuration.evt; // avoid div by zero
+        if (cachedDurationNum >= 1 ) {
+            // factor of 1000000 converts ns to ms.
+            dur = net->totalDuration.evt / ( 1000000 * cachedDurationNum);
+        }
+
+        // Don't report zeros.
+        if (dur != 0ULL) {
+            event_field_t fields[] = {
+                PROC_FIELD(g_proc.procname),
+                PID_FIELD(g_proc.pid),
+                FD_FIELD(net->fd),
+                HOST_FIELD(g_proc.hostname),
+                PROTO_FIELD(proto),
+                PORT_FIELD(localPort),
+                NUMOPS_FIELD(cachedDurationNum),
+                UNIT_FIELD("millisecond"),
+                FIELDEND
+            };
+            event_t evt = INT_EVENT("net.conn_duration", dur, DELTA_MS, fields);
+            cmdSendEvent(g_ctl, &evt, net->uid, &g_proc);
+            atomicSwapU64(&net->numDuration.evt, 0);
+            atomicSwapU64(&net->totalDuration.evt, 0);
+         }
+
+        // Only report if enabled
+        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        dur = 0ULL;
+        cachedDurationNum = net->numDuration.mtc; // avoid div by zero
+        if (cachedDurationNum >= 1 ) {
+            // factor of 1000000 converts ns to ms.
+            dur = net->totalDuration.mtc / ( 1000000 * cachedDurationNum);
+        }
+
+        // Don't report zeros.
+        if (dur == 0ULL) return;
+
+        event_field_t fields[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            FD_FIELD(net->fd),
+            HOST_FIELD(g_proc.hostname),
+            PROTO_FIELD(proto),
+            PORT_FIELD(localPort),
+            NUMOPS_FIELD(cachedDurationNum),
+            UNIT_FIELD("millisecond"),
+            FIELDEND
+        };
+        event_t evt = INT_EVENT("net.conn_duration", dur, DELTA_MS, fields);
+        if (cmdSendMetric(g_mtc, &evt)) {
+            scopeLog("ERROR: doNetMetric:CONNECTION_DURATION:cmdSendMetric", net->fd, CFG_LOG_ERROR);
+        }
+        atomicSwapU64(&net->numDuration.mtc, 0);
+        atomicSwapU64(&net->totalDuration.mtc, 0);
+        //atomicSwapU64(&g_ctrs.connDurationNum, 0);
+        //atomicSwapU64(&g_ctrs.connDurationTotal, 0);
+        break;
+    }
+
+    case NETRX:
+    {
+        event_t rxMetric;
+        event_field_t rxFields[20];
+        char lip[INET6_ADDRSTRLEN];
+        char rip[INET6_ADDRSTRLEN];
+        char data[16];
+
+        // Don't report zeros.
+        if (net->rxBytes.evt == 0ULL) return;
+
+        if ((localPort == 443) || (remotePort == 443)) {
+            strncpy(data, "ssl", sizeof(data));
+        } else {
+            strncpy(data, "clear", sizeof(data));
+        }
+
+        // Do we need to define domain=LOCAL or NETLINK?
+        if ((net->type == SCOPE_UNIX) ||
+            (net->remoteConn.ss_family == AF_UNIX) ||
+            (net->remoteConn.ss_family == AF_LOCAL) ||
+            (net->remoteConn.ss_family == AF_NETLINK) ||
+            (net->localConn.ss_family == AF_UNIX) ||
+            (net->localConn.ss_family == AF_LOCAL) ||
+            (net->localConn.ss_family == AF_NETLINK)) {
+            localPort = net->lnode;
+            remotePort = net->rnode;
+
+            if (net->localConn.ss_family == AF_NETLINK) {
+                strncpy(proto, "NETLINK", sizeof(proto));
+            }
+
+            event_field_t fields[] = {
+                PROC_FIELD(g_proc.procname),
+                PID_FIELD(g_proc.pid),
+                FD_FIELD(net->fd),
+                HOST_FIELD(g_proc.hostname),
+                DOMAIN_FIELD("UNIX"),
+                PROTO_FIELD(proto),
+                LOCALN_FIELD(localPort),
+                REMOTEN_FIELD(remotePort),
+                DATA_FIELD(data),
+                NUMOPS_FIELD(net->numRX.evt),
+                UNIT_FIELD("byte"),
+                FIELDEND
+            };
+            memmove(&rxFields, &fields, sizeof(fields));
+            event_t rxUnixMetric = INT_EVENT("net.rx", net->rxBytes.evt, DELTA, rxFields);
+            memmove(&rxMetric, &rxUnixMetric, sizeof(event_t));
+        } else {
+            if (net->localConn.ss_family == AF_INET) {
+                if (inet_ntop(AF_INET,
+                              &((struct sockaddr_in *)&net->localConn)->sin_addr,
+                              lip, sizeof(lip)) == NULL) {
+                    strncpy(lip, " ", sizeof(lip));
+                }
+            } else if (net->localConn.ss_family == AF_INET6) {
+                if (inet_ntop(AF_INET6,
+                              &((struct sockaddr_in6 *)&net->localConn)->sin6_addr,
+                              lip, sizeof(lip)) == NULL) {
+                    strncpy(lip, " ", sizeof(lip));
+                }
+
+            } else {
+                strncpy(lip, " ", sizeof(lip));
+            }
+
+            if (net->remoteConn.ss_family == AF_INET) {
+                if (inet_ntop(AF_INET,
+                              &((struct sockaddr_in *)&net->remoteConn)->sin_addr,
+                              rip, sizeof(rip)) == NULL) {
+                    strncpy(rip, " ", sizeof(rip));
+                }
+            } else if (net->remoteConn.ss_family == AF_INET6) {
+                if (inet_ntop(AF_INET6,
+                              &((struct sockaddr_in6 *)&net->remoteConn)->sin6_addr,
+                              rip, sizeof(rip)) == NULL) {
+                    strncpy(rip, " ", sizeof(rip));
+                }
+            } else {
+                strncpy(rip, " ", sizeof(rip));
+            }
+            event_field_t fields[] = {
+                PROC_FIELD(g_proc.procname),
+                PID_FIELD(g_proc.pid),
+                FD_FIELD(net->fd),
+                HOST_FIELD(g_proc.hostname),
+                DOMAIN_FIELD("AF_INET"),
+                PROTO_FIELD(proto),
+                LOCALIP_FIELD(lip),
+                LOCALP_FIELD(localPort),
+                REMOTEIP_FIELD(rip),
+                REMOTEP_FIELD(remotePort),
+                DATA_FIELD(data),
+                NUMOPS_FIELD(net->numRX.evt),
+                UNIT_FIELD("byte"),
+                FIELDEND
+            };
+            memmove(&rxFields, &fields, sizeof(fields));
+            event_t rxNetMetric = INT_EVENT("net.rx", net->rxBytes.evt, DELTA, rxFields);
+            memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
+        }
+
+        // Don't report zeros.
+        if (net->rxBytes.evt != 0ULL) {
+
+             cmdSendEvent(g_ctl, &rxMetric, net->uid, &g_proc);
+             atomicSwapU64(&net->numRX.evt, 0);
+             atomicSwapU64(&net->rxBytes.evt, 0);
+        }
+
+        if ((g_summary.net.rx_tx) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        // Don't report zeros.
+        if (net->rxBytes.mtc == 0ULL) return;
+
+        if (cmdSendMetric(g_mtc, &rxMetric)) {
+            scopeLog("ERROR: doNetMetric:NETRX:cmdSendMetric", -1, CFG_LOG_ERROR);
+        }
+
+        // Reset the info if we tried to report
+        subFromInterfaceCounts(&g_ctrs.netrxBytes, net->rxBytes.mtc);
+        atomicSwapU64(&net->numRX.mtc, 0);
+        atomicSwapU64(&net->rxBytes.mtc, 0);
+        break;
+    }
+
+    case NETTX:
+    {
+        event_t txMetric;
+        event_field_t txFields[20];
+        char lip[INET6_ADDRSTRLEN];
+        char rip[INET6_ADDRSTRLEN];
+        char data[16];
+
+        // Don't report zeros.
+        if (net->txBytes.evt == 0ULL) return;
+
+        if ((localPort == 443) || (remotePort == 443)) {
+            strncpy(data, "ssl", sizeof(data));
+        } else {
+            strncpy(data, "clear", sizeof(data));
+        }
+
+        if ((net->type == SCOPE_UNIX) ||
+            (net->remoteConn.ss_family == AF_UNIX) ||
+            (net->remoteConn.ss_family == AF_LOCAL) ||
+            (net->remoteConn.ss_family == AF_NETLINK) ||
+            (net->localConn.ss_family == AF_UNIX) ||
+            (net->localConn.ss_family == AF_LOCAL) ||
+            (net->localConn.ss_family == AF_NETLINK)) {
+            localPort = net->lnode;
+            remotePort = net->rnode;
+
+            if (net->localConn.ss_family == AF_NETLINK) {
+                strncpy(proto, "NETLINK", sizeof(proto));
+            }
+
+            event_field_t fields[] = {
+                PROC_FIELD(g_proc.procname),
+                PID_FIELD(g_proc.pid),
+                FD_FIELD(net->fd),
+                HOST_FIELD(g_proc.hostname),
+                DOMAIN_FIELD("UNIX"),
+                PROTO_FIELD(proto),
+                LOCALN_FIELD(localPort),
+                REMOTEN_FIELD(remotePort),
+                DATA_FIELD(data),
+                NUMOPS_FIELD(net->numRX.evt),
+                UNIT_FIELD("byte"),
+                FIELDEND
+            };
+            memmove(&txFields, &fields, sizeof(fields));
+            event_t txUnixMetric = INT_EVENT("net.tx", net->txBytes.evt, DELTA, txFields);
+            memmove(&txMetric, &txUnixMetric, sizeof(event_t));
+        } else {
+            if (net->localConn.ss_family == AF_INET) {
+                if (inet_ntop(AF_INET,
+                              &((struct sockaddr_in *)&net->localConn)->sin_addr,
+                              lip, sizeof(lip)) == NULL) {
+                    strncpy(lip, " ", sizeof(lip));
+                }
+            } else if (net->localConn.ss_family == AF_INET6) {
+                if (inet_ntop(AF_INET6,
+                              &((struct sockaddr_in6 *)&net->localConn)->sin6_addr,
+                              lip, sizeof(lip)) == NULL) {
+                    strncpy(lip, " ", sizeof(lip));
+                }
+
+            } else {
+                strncpy(lip, " ", sizeof(lip));
+            }
+
+            if (net->remoteConn.ss_family == AF_INET) {
+                if (inet_ntop(AF_INET,
+                              &((struct sockaddr_in *)&net->remoteConn)->sin_addr,
+                              rip, sizeof(rip)) == NULL) {
+                    strncpy(rip, " ", sizeof(rip));
+                }
+            } else if (net->remoteConn.ss_family == AF_INET6) {
+                if (inet_ntop(AF_INET6,
+                              &((struct sockaddr_in6 *)&net->remoteConn)->sin6_addr,
+                              rip, sizeof(rip)) == NULL) {
+                    strncpy(rip, " ", sizeof(rip));
+                }
+            } else {
+                strncpy(rip, " ", sizeof(rip));
+            }
+
+            event_field_t fields[] = {
+                PROC_FIELD(g_proc.procname),
+                PID_FIELD(g_proc.pid),
+                FD_FIELD(net->fd),
+                HOST_FIELD(g_proc.hostname),
+                DOMAIN_FIELD("AF_INET"),
+                PROTO_FIELD(proto),
+                LOCALIP_FIELD(lip),
+                LOCALP_FIELD(localPort),
+                REMOTEIP_FIELD(rip),
+                REMOTEP_FIELD(remotePort),
+                DATA_FIELD(data),
+                NUMOPS_FIELD(net->numRX.evt),
+                UNIT_FIELD("byte"),
+                FIELDEND
+            };
+            memmove(&txFields, &fields, sizeof(fields));
+            event_t txNetMetric = INT_EVENT("net.tx", net->txBytes.evt, DELTA, txFields);
+            memmove(&txMetric, &txNetMetric, sizeof(event_t));
+        }
+
+        // Don't report zeros.
+        if (net->txBytes.evt != 0ULL) {
+
+            cmdSendEvent(g_ctl, &txMetric, net->uid, &g_proc);
+            atomicSwapU64(&net->numTX.evt, 0);
+            atomicSwapU64(&net->txBytes.evt, 0);
+        }
+
+        // Don't report zeros.
+        if (net->txBytes.mtc == 0ULL) return;
+
+        if ((g_summary.net.rx_tx) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        event_t txNetMetric = INT_EVENT("net.tx", net->txBytes.mtc, DELTA, txFields);
+        memmove(&txMetric, &txNetMetric, sizeof(event_t));
+        if (cmdSendMetric(g_mtc, &txMetric)) {
+            scopeLog("ERROR: doNetMetric:NETTX:cmdSendMetric", -1, CFG_LOG_ERROR);
+        }
+
+        // Reset the info if we tried to report
+        subFromInterfaceCounts(&g_ctrs.nettxBytes, net->txBytes.mtc);
+        atomicSwapU64(&net->numTX.mtc, 0);
+        atomicSwapU64(&net->txBytes.mtc, 0);
+
+        break;
+    }
+
+    case DNS:
+    {
+        if (net->dnsSend == FALSE) {
+            break;
+        }
+
+        // For next time
+        net->dnsSend = FALSE;
+
+        // TBD - this is only called by doSend.  Consider calling this directly
+        // from there?
+        doDNSMetricName(DNS, net->dnsName, 0, NULL);
+
+        break;
+    }
+
+    default:
+        scopeLog("ERROR: doNetMetric:metric type", -1, CFG_LOG_ERROR);
+    }
 }
 
 void
@@ -1358,19 +1445,19 @@ doEvent()
 
             if (event->evtype == EVT_NET) {
                 net = (net_info *)data;
-                doNetMetric(net->data_type, net, PERIODIC, 0);
+                doNetMetric(net->data_type, net, EVENT_BASED, 0);
             } else if (event->evtype == EVT_FS) {
                 fs = (fs_info *)data;
-                doFSMetric(fs->data_type, fs, PERIODIC, fs->funcop, 0, fs->path);
+                doFSMetric(fs->data_type, fs, EVENT_BASED, fs->funcop, 0, fs->path);
             } else if (event->evtype == EVT_ERR) {
                 staterr = (stat_err_info *)data;
-                doErrorMetric(staterr->data_type, PERIODIC, staterr->funcop, staterr->name);
+                doErrorMetric(staterr->data_type, EVENT_BASED, staterr->funcop, staterr->name, &staterr->counters);
             } else if (event->evtype == EVT_STAT) {
                 staterr = (stat_err_info *)data;
-                doStatMetric(staterr->funcop, staterr->name);
+                doStatMetric(staterr->funcop, staterr->name, &staterr->counters);
             } else if (event->evtype == EVT_DNS) {
                 net = (net_info *)data;
-                doDNSMetricName(net->data_type, net->dnsName, net->totalDuration);
+                doDNSMetricName(net->data_type, net->dnsName, &net->totalDuration, &net->counters);
             } else if (event->evtype == EVT_PROTO) {
                 proto = (protocol_info *)data;
                 doProtocolMetric(proto);

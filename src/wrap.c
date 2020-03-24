@@ -31,8 +31,9 @@ static log_t *g_prevlog = NULL;
 static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
-http_list *g_hlist;
 __thread int g_getdelim = 0;
+
+extern http_list *g_hlist;
 
 // Forward declaration
 static void *periodic(void *);

@@ -20,7 +20,6 @@
 #define FS_ENTRIES 1024
 
 extern rtconfig g_cfg;
-extern http_list *g_hlist;
 
 int g_numNinfo = NET_ENTRIES;
 int g_numFSinfo = FS_ENTRIES;
@@ -32,7 +31,7 @@ summary_t g_summary = {{0}};
 net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
-
+http_list *g_hlist;
 
 // interfaces
 mtc_t *g_mtc = NULL;

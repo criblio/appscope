@@ -69,11 +69,28 @@ typedef struct evt_type_t {
     metric_t evtype;
 } evt_type;
 
+typedef struct http_post_t {
+    uint64_t start_duration;
+    uint64_t id;
+    char *hdr;
+} http_post;
+
+typedef struct http_map_t {
+    time_t first_time;
+    uint64_t frequency;
+    uint64_t start_time;
+    uint64_t duration;
+    uint64_t id;
+    char *req;
+    char *resp;
+} http_map;
+
 typedef struct protocol_info_t {
     metric_t evtype;
+    metric_t ptype;
+    size_t len;
     int fd;
-    char header_type[HDRTYPE_MAX];
-    char header[8 * 1024];
+    char *data;
 } protocol_info;
 
 typedef struct stat_err_info_t {

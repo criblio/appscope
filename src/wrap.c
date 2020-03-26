@@ -22,6 +22,7 @@
 #include "state.h"
 #include "wrap.h"
 #include "runtimecfg.h"
+#include "hlist.h"
 
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
@@ -33,96 +34,11 @@ static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 __thread int g_getdelim = 0;
 
-extern http_list *g_hlist;
-
 // Forward declaration
 static void *periodic(void *);
 static void doConfig(config_t *);
 static void reportProcessStart(void);
 static void threadNow(int);
-
-static http_list *
-hnew()
-{
-
-    return (http_list *)calloc(1, sizeof(struct http_list_t));
-}
-
-static int
-hpush(http_list **hlist, http_list *new)
-{
-    if (!hlist || !new) return -1;
-
-    int i = 0;
-    new->next = *hlist;
-    while (!atomicCasU64((uint64_t *)hlist, (uint64_t)*hlist, (uint64_t)new)) {
-        if (i++ >= NUM_ATTEMPTS) {
-            DBG(NULL);
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-static int
-hrem(http_list **hlist, uint64_t id)
-{
-    if (!hlist) return -1;
-
-    int i = 0;
-    http_list *cur = *hlist;
-    http_list *prev = NULL;
-
-    while (cur != NULL) {
-        if (cur->id == id) break;
-        prev = cur;
-        cur = cur->next;
-    }
-
-    // can't find it
-    if (cur == NULL) return -1;
-
-    // found a match, update the link
-    if(cur == *hlist) {
-        // change head to point to next link
-        while (!atomicCasU64((uint64_t *)hlist, (uint64_t)cur, (uint64_t)cur->next)) {
-            if (i++ >= NUM_ATTEMPTS) {
-                DBG(NULL);
-                return -1;
-            }
-        }
-    } else {
-        // bypass the current link
-        while (!atomicCasU64((uint64_t *)&prev->next, (uint64_t)prev->next, (uint64_t)cur->next)) {
-            if (i++ >= NUM_ATTEMPTS) {
-                DBG(NULL);
-                return -1;
-            }
-        }
-    }
-
-    if (cur->ssl_methods) free(cur->ssl_methods);
-    if (cur->ssl_int_methods) free(cur->ssl_int_methods);
-    if (cur) free(cur);
-
-    return 0;
-}
-
-static http_list *
-hget(http_list *hlist, uint64_t id)
-{
-    if (!g_hlist) return NULL;
-
-    http_list *cur = hlist;
-
-    while (cur != NULL) {
-        if (cur->id == id) return cur;
-        cur = cur->next;
-    }
-
-    return NULL;
-}
 
 static time_t
 fileModTime(const char *path)
@@ -1799,7 +1715,7 @@ SSL_read(SSL *ssl, void *buf, int num)
 
     if (rc > 0) {
         int fd = SSL_get_fd((const SSL *)ssl);
-        doProtocol(fd, buf, (size_t)num, TLSRX);
+        doProtocol((uint64_t)ssl, fd, buf, (size_t)num, TLSRX);
     }
     return rc;
 }
@@ -1815,7 +1731,7 @@ SSL_write(SSL *ssl, const void *buf, int num)
 
     if (rc > 0) {
         int fd = SSL_get_fd((const SSL *)ssl);
-        doProtocol(fd, (void *)buf, (size_t)num, TLSTX);
+        doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)num, TLSTX);
     }
     return rc;
 }
@@ -1837,7 +1753,7 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
          * int fd = gnutls_transport_get_int(session);
          */
         scopeLog("gnutls_record_recv", rc, CFG_LOG_INFO);
-        doProtocol(-1, data, data_size, TLSRX);
+        doProtocol((uint64_t)session, -1, data, data_size, TLSRX);
     }
     return rc;
 }
@@ -1857,7 +1773,7 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
          * In some cases this may work:
          * int fd = gnutls_transport_get_int(session);
          */
-        doProtocol(-1, (void *)data, data_size, TLSTX);
+        doProtocol((uint64_t)session, -1, (void *)data, data_size, TLSTX);
     }
     return rc;
 }
@@ -1898,7 +1814,7 @@ nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRInterv
         scopeLog("ERROR: ssl_send no list entry", -1, CFG_LOG_ERROR);
     }
 
-    if (rc > 0) doProtocol(nfd, (void *)buf, (size_t)amount, TLSTX);
+    if (rc > 0) doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)amount, TLSTX);
 
     return rc;
 }
@@ -1918,7 +1834,7 @@ nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime
         scopeLog("ERROR: ssl_recv no list entry", -1, CFG_LOG_ERROR);
     }
 
-    if (rc > 0) doProtocol(nfd, buf, (size_t)amount, TLSRX);
+    if (rc > 0) doProtocol((uint64_t)fd, nfd, buf, (size_t)amount, TLSRX);
 
     return rc;
 }

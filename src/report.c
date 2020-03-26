@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #include "atomic.h"
 #include "com.h"
@@ -13,7 +14,7 @@
 #include "plattime.h"
 #include "report.h"
 #include "state_private.h"
-
+#include "hlist.h"
 
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
@@ -41,6 +42,9 @@
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
+#define RATE_FIELD(val)         NUMFIELD("req/sec",        (val),        8)
+#define HREQ_FIELD(val)         STRFIELD("req",            (val),        8)
+#define HRES_FIELD(val)         STRFIELD("resp",           (val),        8)
 
 
 // TBD - Ideally, we'd remove this dependency on the configured interval
@@ -134,27 +138,154 @@ doUnixEndpoint(int sd, net_info *net)
     return;
 }
 
+static void
+destroyProto(protocol_info *proto)
+{
+    if (!proto) return;
+
+    if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
+        http_post *post = (http_post *)proto->data;
+        // TODO: get this when the list entry is removed
+        // if (post && post->hdr) free(post->hdr);
+        if (post) free(post);
+    }
+}
+
+static bool binfmt = FALSE;
+
 void
 doProtocolMetric(protocol_info *proto)
 {
     if (!proto) return;
-    
-    char binheader[] = "procid:%s\n{\"type\":\"%s\",\"fd\":%d,\"pid\":%d,\"ppid\":%d}\n";
-    size_t blen = strlen(binheader) +
-        strlen(g_proc.id) + sizeof(int) + (sizeof(pid_t) * 2) +
-        strlen(proto->header_type) + strlen(proto->header);
-    char *bincap = calloc(1, blen);
-    if (!bincap) return;
 
-    // we need to define what's really needed as a header; for now...
-    snprintf(bincap, blen, binheader, g_proc.id, proto->header_type,
-             proto->fd, g_proc.pid, g_proc.ppid);
-    //strncat(bincap, proto->header_type, strlen(proto->header_type));
-    strncat(bincap, proto->header, strlen(proto->header));
+    char bintype[16];
+    char binheader[] = "(binfmt) procid:%s\n{\"type\":\"%s\",\"duration (us)\":%ld,\"req per sec\":%d,\"len\":%d,\"fd\":%d,\"pid\":%d,\"ppid\":%d}\n";
+    size_t blen = strlen(binheader) + strlen(g_proc.id) + sizeof(bintype) +
+        sizeof(uint64_t) + (sizeof(int) * 3) + (sizeof(pid_t) * 2) + proto->len;
+    char *bincap = NULL;
+    event_t httpEvent;
+    event_field_t httpFields[12];
 
-    cmdSendBin(g_ctl, bincap);
+    if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
+        http_post *post = (http_post *)proto->data;
+        http_map *map;
+        http_list *hentry;
 
-    free(bincap);
+        if ((hentry = hget(g_hlist, post->id)) == NULL) {
+            // lazy open
+            if ((hentry = hnew()) != NULL) {
+                hentry->id = post->id;
+
+                if (hpush(&g_hlist, hentry) == -1) {
+                    DBG(NULL);
+                    destroyProto(proto);
+                    return;
+                }
+            } else {
+                destroyProto(proto);
+                return;
+            }
+        }
+
+        if (hentry->protocol == NULL) {
+            if ((map = calloc(1, sizeof(struct http_map_t))) == NULL) {
+                // nothing we can do w/o a map
+                destroyProto(proto);
+                return;
+            }
+
+            map->first_time = time(NULL);
+            map->id = post->id;
+            hentry->protocol = map;
+        } else {
+            map = hentry->protocol;
+        }
+
+        map->frequency++;
+
+        if (proto->ptype == EVT_HREQ) {
+            map->start_time = post->start_duration;
+            map->req = (char *)post->hdr;
+
+            strncpy(bintype, "http-req", sizeof(bintype));
+
+            if (binfmt == TRUE) {
+                bincap = calloc(1, blen);
+                if (!bincap) {
+                    destroyProto(proto);
+                    return;
+                }
+            } else {
+                bincap = strdup("None");
+                map->resp = bincap;
+            }
+        } else if (proto->ptype == EVT_HRES) {
+            map->duration = getDuration(post->start_duration);
+            map->duration = map->duration / 1000;
+            map->resp = (char *)post->hdr;
+
+            strncpy(bintype, "http-resp", sizeof(bintype));
+
+            if (binfmt == TRUE) {
+                if (map->req) {
+                    bincap = calloc(1, blen + strlen(map->req));
+                    if (!bincap) {
+                        destroyProto(proto);
+                        return;
+                    }
+                } else {
+                    bincap = calloc(1, blen);
+                    if (!bincap) {
+                        destroyProto(proto);
+                        return;
+                    }
+                }
+            } else {
+                if (!map->req) {
+                    bincap = strdup("None");
+                    map->req = bincap;
+                }
+            }
+        }
+
+        int rps = map->frequency;
+        int sec = (map->first_time > 0) ? (int)time(NULL) - map->first_time : 1;
+        if (sec > 0) {
+            rps = map->frequency / sec;
+        }
+
+        if (binfmt == TRUE) {
+            snprintf(bincap, blen, binheader, g_proc.id, bintype, map->duration,
+                     rps, proto->len, proto->fd, g_proc.pid, g_proc.ppid);
+            if ((proto->ptype == EVT_HRES) && map->req) {
+                strncat(bincap, map->req, strlen(map->req));
+            }
+
+            strncat(bincap, post->hdr, proto->len);
+            cmdSendBin(g_ctl, bincap);
+        } else {
+            event_field_t fields[] = {
+                DURATION_FIELD(map->duration),
+                RATE_FIELD(rps),
+                PROC_FIELD(g_proc.procname),
+                FD_FIELD(proto->fd),
+                PID_FIELD(g_proc.pid),
+                HREQ_FIELD(map->req),
+                HRES_FIELD(map->resp),
+                UNIT_FIELD("byte"),
+                FIELDEND
+            };
+
+            memmove(&httpFields, &fields, sizeof(fields));
+            event_t sendEvent = INT_EVENT(bintype, proto->len, DELTA, httpFields);
+            memmove(&httpEvent, &sendEvent, sizeof(event_t));
+
+            cmdSendEvent(g_ctl, &httpEvent, map->id, &g_proc);
+        }
+
+        destroyProto(proto);
+        if (bincap) free(bincap);
+    }
 }
 
 void

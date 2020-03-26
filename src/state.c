@@ -15,9 +15,11 @@
 #include "state.h"
 #include "state_private.h"
 #include "runtimecfg.h"
+#include "hlist.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
+#define NUM_ATTEMPTS 100
 
 extern rtconfig g_cfg;
 
@@ -647,18 +649,102 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     }
 }
 
+http_list *
+hnew()
+{
+
+    return (http_list *)calloc(1, sizeof(struct http_list_t));
+}
+
 int
-doProtocol(int sockfd, void *buf, size_t len, metric_t src)
+hpush(http_list **hlist, http_list *new)
+{
+    if (!hlist || !new) return -1;
+
+    int i = 0;
+    new->next = *hlist;
+    while (!atomicCasU64((uint64_t *)hlist, (uint64_t)*hlist, (uint64_t)new)) {
+        if (i++ >= NUM_ATTEMPTS) {
+            DBG(NULL);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+int
+hrem(http_list **hlist, uint64_t id)
+{
+    if (!hlist) return -1;
+
+    int i = 0;
+    http_list *cur = *hlist;
+    http_list *prev = NULL;
+
+    while (cur != NULL) {
+        if (cur->id == id) break;
+        prev = cur;
+        cur = cur->next;
+    }
+
+    // can't find it
+    if (cur == NULL) return -1;
+
+    // found a match, update the link
+    if(cur == *hlist) {
+        // change head to point to next link
+        while (!atomicCasU64((uint64_t *)hlist, (uint64_t)cur, (uint64_t)cur->next)) {
+            if (i++ >= NUM_ATTEMPTS) {
+                DBG(NULL);
+                return -1;
+            }
+        }
+    } else {
+        // bypass the current link
+        while (!atomicCasU64((uint64_t *)&prev->next, (uint64_t)prev->next, (uint64_t)cur->next)) {
+            if (i++ >= NUM_ATTEMPTS) {
+                DBG(NULL);
+                return -1;
+            }
+        }
+    }
+
+    if (cur->ssl_methods) free(cur->ssl_methods);
+    if (cur->ssl_int_methods) free(cur->ssl_int_methods);
+    if (cur) free(cur);
+
+    return 0;
+}
+
+http_list *
+hget(http_list *hlist, uint64_t id)
+{
+    if (!g_hlist) return NULL;
+
+    http_list *cur = hlist;
+
+    while (cur != NULL) {
+        if (cur->id == id) return cur;
+        cur = cur->next;
+    }
+
+    return NULL;
+}
+
+int
+doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
 {
     if ((buf == NULL) || (len <= 0)) return -1;
     
-    size_t headsize, copysize;
+    size_t headsize;
     in_port_t lport, rport;
     net_info *net;
-    char *headend, *header;
+    char *headend, *header, *hcopy;;
     protocol_info *proto;
+    http_post *post;
 
-    // For now, only doing HTTP headers
+    // For now, only doing HTTP/1.X headers
     if ((src == TLSRX) || (src == TLSTX)) {
         /*
          * Is it always safe to string search here?
@@ -677,22 +763,39 @@ doProtocol(int sockfd, void *buf, size_t len, metric_t src)
 
     //scopeLog("doProtocol", sockfd, CFG_LOG_INFO);
     if ((headend = strstr(buf, "\r\n\r\n")) != NULL) {
-        if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) return 0;
         header = buf;
         headsize = (headend - (char *)buf) + 4;
 
-        if ((src == NETRX) || (src == TLSRX)){
-            strncpy(proto->header_type, "http-resp", HDRTYPE_MAX);
-        } else if ((src == NETTX) || (src == TLSTX)) {
-            strncpy(proto->header_type, "http-req", HDRTYPE_MAX);
-        } else {
-            strncpy(proto->header_type, "undef-header", HDRTYPE_MAX);
+        if ((post = calloc(1, sizeof(struct http_post_t))) == NULL) return -1;
+        if ((hcopy = calloc(1, headsize)) == NULL) {
+            free(post);
+            return -1;
         }
 
-        copysize = (headsize < sizeof(proto->header)) ? headsize : sizeof(proto->header); 
-        strncat(proto->header, header, copysize);
-        proto->fd = sockfd;
+        if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
+            free(post);
+            free(hcopy);
+            return -1;
+        }
+
+        post->start_duration = getTime();
+        post->id = id;
+        strncpy(hcopy, header, headsize);
+        post->hdr = hcopy;
+
+        if ((src == NETRX) || (src == TLSRX)){
+            proto->ptype = EVT_HRES;
+        } else if ((src == NETTX) || (src == TLSTX)) {
+            proto->ptype = EVT_HREQ;
+        } else {
+            DBG(NULL);
+            return -1;
+        }
+
         proto->evtype = EVT_PROTO;
+        proto->len = headsize;
+        proto->fd = sockfd;
+        proto->data = (char *)post;
         cmdPostEvent(g_ctl, (char *)proto);
     }
 

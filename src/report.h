@@ -63,6 +63,8 @@ typedef enum {
     EVT_ERR,
     EVT_DNS,
     EVT_PROTO,
+    EVT_HREQ,
+    EVT_HRES,
     TLSRX,
     TLSTX
 } metric_t;

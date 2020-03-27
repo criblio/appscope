@@ -205,8 +205,8 @@ doProtocolMetric(protocol_info *proto)
                 FIELDEND
             };
 
-            event_t sendEvent = INT_EVENT("http-req", proto->len, CURRENT, fields);
-            cmdSendEvent(g_ctl, &sendEvent, map->id, &g_proc);
+            event_t sendEvent = INT_EVENT("http-req", proto->len, SET, fields);
+            cmdSendHttp(g_ctl, &sendEvent, map->id, &g_proc);
         } else if (proto->ptype == EVT_HRES) {
             int rps = map->frequency;
             int sec = (map->first_time > 0) ? (int)time(NULL) - map->first_time : 1;
@@ -230,8 +230,8 @@ doProtocolMetric(protocol_info *proto)
                 FIELDEND
             };
 
-            event_t hevent = INT_EVENT("http-resp", proto->len, CURRENT, hfields);
-            cmdSendEvent(g_ctl, &hevent, map->id, &g_proc);
+            event_t hevent = INT_EVENT("http-resp", proto->len, SET, hfields);
+            cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
 
             event_field_t mfields[] = {
                 DURATION_FIELD(map->duration),
@@ -243,8 +243,8 @@ doProtocolMetric(protocol_info *proto)
                 FIELDEND
             };
 
-            event_t mevent = INT_EVENT("http-metrics", proto->len, CURRENT, mfields);
-            cmdSendEvent(g_ctl, &mevent, map->id, &g_proc);
+            event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
+            cmdSendHttp(g_ctl, &mevent, map->id, &g_proc);
         }
     }
 

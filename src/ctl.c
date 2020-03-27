@@ -467,6 +467,19 @@ ctlPostMsg(ctl_t *ctl, cJSON *body, upload_type_t type, request_t *req, bool now
 }
 
 int
+ctlSendHttp(ctl_t *ctl, event_t *evt, uint64_t uid, proc_id_t *proc)
+{
+    if (!ctl || !evt || !proc) return -1;
+
+    // get a cJSON object for the given event
+    cJSON *json;
+    if ((json = evtFormatHttp(ctl->evt, evt, uid, proc)) == NULL) return -1;
+
+    // send it
+    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
+}
+
+int
 ctlSendEvent(ctl_t *ctl, event_t *evt, uint64_t uid, proc_id_t *proc)
 {
     if (!ctl || !evt || !proc) return -1;

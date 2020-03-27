@@ -732,8 +732,8 @@ hget(http_list *hlist, uint64_t id)
     return NULL;
 }
 
-int
-doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
+static int
+doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
 {
     if ((buf == NULL) || (len <= 0)) return -1;
     
@@ -761,7 +761,6 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
         return -1;
     }
 
-    //scopeLog("doProtocol", sockfd, CFG_LOG_INFO);
     if ((headend = strstr(buf, "\r\n\r\n")) != NULL) {
         header = buf;
         headsize = (headend - (char *)buf) + 4;
@@ -797,6 +796,16 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
         proto->fd = sockfd;
         proto->data = (char *)post;
         cmdPostEvent(g_ctl, (char *)proto);
+    }
+
+    return 0;
+}
+
+int
+doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
+{
+    if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
+        return doHttp(id, sockfd, buf, len, src);
     }
 
     return 0;

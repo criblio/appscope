@@ -20,6 +20,7 @@
 // Post a message from report to the command buffer
 int cmdSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);
 int cmdSendMetric(mtc_t *, event_t* );
+int cmdSendHttp(ctl_t *, event_t *, uint64_t, proc_id_t *);
 int cmdPostEvent(ctl_t *, char *);
 int cmdSendBin(ctl_t *, char *);
 

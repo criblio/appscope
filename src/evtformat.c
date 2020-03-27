@@ -27,6 +27,7 @@ static enum_map_t watchTypeMap[] = {
     {"console",               CFG_SRC_CONSOLE},
     {"syslog",                CFG_SRC_SYSLOG},
     {"metric",                CFG_SRC_METRIC},
+    {"http",                  CFG_SRC_HTTP},
     {NULL,                    -1}
 };
 
@@ -64,6 +65,7 @@ static const char* valueFilterDefault[] = {
     DEFAULT_SRC_CONSOLE_VALUE,
     DEFAULT_SRC_SYSLOG_VALUE,
     DEFAULT_SRC_METRIC_VALUE,
+    DEFAULT_SRC_HTTP_VALUE,
 };
 
 static const char* fieldFilterDefault[] = {
@@ -71,6 +73,7 @@ static const char* fieldFilterDefault[] = {
     DEFAULT_SRC_CONSOLE_FIELD,
     DEFAULT_SRC_SYSLOG_FIELD,
     DEFAULT_SRC_METRIC_FIELD,
+    DEFAULT_SRC_HTTP_FIELD,
 };
 
 static const char* nameFilterDefault[] = {
@@ -78,6 +81,7 @@ static const char* nameFilterDefault[] = {
     DEFAULT_SRC_CONSOLE_NAME,
     DEFAULT_SRC_SYSLOG_NAME,
     DEFAULT_SRC_METRIC_NAME,
+    DEFAULT_SRC_HTTP_NAME,
 };
 
 static unsigned srcEnabledDefault[] = {
@@ -85,6 +89,7 @@ static unsigned srcEnabledDefault[] = {
     DEFAULT_SRC_CONSOLE,
     DEFAULT_SRC_SYSLOG,
     DEFAULT_SRC_METRIC,
+    DEFAULT_SRC_HTTP,
 };
 
 
@@ -309,7 +314,7 @@ err:
 }
 
 cJSON *
-rateLimitMessage(proc_id_t *proc)
+rateLimitMessage(proc_id_t *proc, watch_t src)
 {
     event_format_t event;
 
@@ -325,7 +330,7 @@ rateLimitMessage(proc_id_t *proc)
         return NULL;
     }
     event.data = cJSON_CreateString(string);
-    event.sourcetype = CFG_SRC_METRIC;
+    event.sourcetype = src;
 
     cJSON* json = fmtEventJson(&event);
     return json;
@@ -411,8 +416,8 @@ err:
     return NULL;
 }
 
-cJSON *
-evtFormatMetric(evt_fmt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
+static cJSON *
+evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, watch_t src)
 {
     event_format_t event;
     struct timeb tb;
@@ -423,8 +428,8 @@ evtFormatMetric(evt_fmt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
     if (!evt || !metric || !proc) return NULL;
 
     // Test for a name field match.  No match, no metric output
-    if (!evtFormatSourceEnabled(evt, CFG_SRC_METRIC) ||
-        !(filter = evtFormatNameFilter(evt, CFG_SRC_METRIC)) ||
+    if (!evtFormatSourceEnabled(evt, src) ||
+        !(filter = evtFormatNameFilter(evt, src)) ||
         (regexec(filter, metric->name, 0, NULL, 0))) {
         return NULL;
     }
@@ -436,7 +441,7 @@ evtFormatMetric(evt_fmt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
     } else if (++evt->ratelimit.evtCount >= MAXEVENTSPERSEC) {
         // one notice per truncate
         if (evt->ratelimit.notified == 0) {
-            cJSON* notice = rateLimitMessage(proc);
+            cJSON* notice = rateLimitMessage(proc, src);
             evt->ratelimit.notified = (notice)?1:0;
             return notice;
         }
@@ -446,7 +451,7 @@ evtFormatMetric(evt_fmt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
      * Loop through all metric fields for at least one matching field value
      * No match, no metric output
      */
-    if (!anyValueFieldMatches(evtFormatValueFilter(evt, CFG_SRC_METRIC), metric)) {
+    if (!anyValueFieldMatches(evtFormatValueFilter(evt, src), metric)) {
         return NULL;
     }
 
@@ -457,11 +462,23 @@ evtFormatMetric(evt_fmt_t *evt, event_t* metric, uint64_t uid, proc_id_t* proc)
     event.uid = uid;
 
     // Format the metric string using the configured metric format type
-    event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, CFG_SRC_METRIC));
+    event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, src));
     if (!event.data) return NULL;
-    event.sourcetype = CFG_SRC_METRIC;
+    event.sourcetype = src;
 
     return fmtEventJson(&event);
+}
+
+cJSON *
+evtFormatMetric(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc)
+{
+    return evtFormatHelper(evt, metric, uid, proc, CFG_SRC_METRIC);
+}
+
+cJSON *
+evtFormatHttp(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc)
+{
+    return evtFormatHelper(evt, metric, uid, proc, CFG_SRC_HTTP);
 }
 
 cJSON *

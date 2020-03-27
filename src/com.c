@@ -10,6 +10,13 @@ cmdSendEvent(ctl_t *ctl, event_t *event, uint64_t time, proc_id_t *proc)
     return ctlSendEvent(ctl, event, time, proc);
 }
 
+int
+cmdSendHttp(ctl_t *ctl, event_t *event, uint64_t time, proc_id_t *proc)
+{
+    if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) return 0;
+    return ctlSendHttp(ctl, event, time, proc);
+}
+
 // for reporttest on mac __attribute__((weak))
 int
 cmdSendMetric(mtc_t *mtc, event_t *evt)

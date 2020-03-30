@@ -33,96 +33,13 @@ static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 __thread int g_getdelim = 0;
 
-extern http_list *g_hlist;
+extern list_t *g_hlist;
 
 // Forward declaration
 static void *periodic(void *);
 static void doConfig(config_t *);
 static void reportProcessStart(void);
 static void threadNow(int);
-
-static http_list *
-hnew()
-{
-
-    return (http_list *)calloc(1, sizeof(struct http_list_t));
-}
-
-static int
-hpush(http_list **hlist, http_list *new)
-{
-    if (!hlist || !new) return -1;
-
-    int i = 0;
-    new->next = *hlist;
-    while (!atomicCasU64((uint64_t *)hlist, (uint64_t)*hlist, (uint64_t)new)) {
-        if (i++ >= NUM_ATTEMPTS) {
-            DBG(NULL);
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-static int
-hrem(http_list **hlist, uint64_t id)
-{
-    if (!hlist) return -1;
-
-    int i = 0;
-    http_list *cur = *hlist;
-    http_list *prev = NULL;
-
-    while (cur != NULL) {
-        if (cur->id == id) break;
-        prev = cur;
-        cur = cur->next;
-    }
-
-    // can't find it
-    if (cur == NULL) return -1;
-
-    // found a match, update the link
-    if(cur == *hlist) {
-        // change head to point to next link
-        while (!atomicCasU64((uint64_t *)hlist, (uint64_t)cur, (uint64_t)cur->next)) {
-            if (i++ >= NUM_ATTEMPTS) {
-                DBG(NULL);
-                return -1;
-            }
-        }
-    } else {
-        // bypass the current link
-        while (!atomicCasU64((uint64_t *)&prev->next, (uint64_t)prev->next, (uint64_t)cur->next)) {
-            if (i++ >= NUM_ATTEMPTS) {
-                DBG(NULL);
-                return -1;
-            }
-        }
-    }
-
-    if (cur->ssl_methods) free(cur->ssl_methods);
-    if (cur->ssl_int_methods) free(cur->ssl_int_methods);
-    if (cur) free(cur);
-
-    return 0;
-}
-
-static http_list *
-hget(http_list *hlist, uint64_t id)
-{
-    if (!g_hlist) return NULL;
-
-    http_list *cur = hlist;
-
-    while (cur != NULL) {
-        if (cur->id == id) return cur;
-        cur = cur->next;
-    }
-
-    return NULL;
-}
 
 static time_t
 fileModTime(const char *path)
@@ -1878,7 +1795,7 @@ nss_close(PRFileDesc *fd)
         return rc;
     }
 
-    if (rc == PR_SUCCESS) hrem(&g_hlist, (uint64_t)nfd);
+    if (rc == PR_SUCCESS) hrem(g_hlist, (uint64_t)nfd);
 
     return rc;
 }
@@ -1933,29 +1850,25 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
     result = g_fn.SSL_ImportFD(model, currFd);
 
     if (result != NULL) {
-        http_list *hent;
-        int nfd = PR_FileDesc2NativeHandle(result);
+        uint64_t nfd = PR_FileDesc2NativeHandle(result);
+        http_list *hent = createListEntry(nfd, result);
 
-        if (((hent = hnew()) != NULL) &&
-            ((hent->ssl_methods = calloc(1, sizeof(PRIOMethods))) != NULL) &&
-            ((hent->ssl_int_methods = calloc(1, sizeof(PRIOMethods))) != NULL)) {
-            hent->id = (uint64_t)nfd;
-            bcopy(result->methods, hent->ssl_methods, sizeof(PRIOMethods));
-            bcopy(result->methods, hent->ssl_int_methods, sizeof(PRIOMethods));
+        if (hent) {
+            // ref contrib/tls/nss/prio.h struct PRIOMethods
+            // read ... todo? read, recvfrom, acceptread
+            hent->ssl_int_methods->recv = nss_recv;
 
-            if (hpush(&g_hlist, hent) == 0) {
-                // ref contrib/tls/nss/prio.h struct PRIOMethods
-                // read ... todo? read, recvfrom, acceptread
-                hent->ssl_int_methods->recv = nss_recv;
+            // write ... todo? write, writev, sendto, sendfile, transmitfile
+            hent->ssl_int_methods->send = nss_send;
 
-                // write ... todo? write, writev, sendto, sendfile, transmitfile
-                hent->ssl_int_methods->send = nss_send;
+            // shutdown connection ... todo? shutdown
+            hent->ssl_int_methods->close = nss_close;
 
-                // shutdown connection ... todo? shutdown
-                hent->ssl_int_methods->close = nss_close;
-
+            if (hpush(g_hlist, hent->id, hent) == 0) {
                 // switch to using the wrapped methods
                 result->methods = hent->ssl_int_methods;
+            } else {
+                freeListEntry(hent);
             }
         }
     }

@@ -2,6 +2,7 @@
 #define __STATE_H__
 
 #include <sys/socket.h>
+#include "linklist.h"
 #include "report.h"
 #include "../contrib/tls/tls.h"
 
@@ -61,5 +62,12 @@ int remotePortIsDNS(int);
 int sockIsTCP(int);
 void doUpdateState(metric_t, int, ssize_t, const char *, const char *);
 int doProtocol(int, void *, size_t, metric_t);
+
+http_list* createListEntry(uint64_t, PRFileDesc*);
+void freeListEntry(void*);
+list_t* hnew(void);
+int hpush(list_t*, uint64_t, http_list*);
+int hrem(list_t*, uint64_t);
+http_list* hget(list_t*, uint64_t);
 
 #endif // __STATE_H__

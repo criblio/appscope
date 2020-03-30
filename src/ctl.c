@@ -476,7 +476,32 @@ ctlSendHttp(ctl_t *ctl, event_t *evt, uint64_t uid, proc_id_t *proc)
     if ((json = evtFormatHttp(ctl->evt, evt, uid, proc)) == NULL) return -1;
 
     // send it
-    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
+    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, TRUE);
+#if 0
+    char *streamMsg;
+    upload_t upld;
+
+    upld.type = UPLD_EVT;
+    upld.body = json;
+    upld.req = NULL;
+    streamMsg = ctlCreateTxMsg(&upld);
+
+    // Add the newline delimiter to the msg.
+    {
+        int strsize = strlen(streamMsg);
+        char *temp = realloc(streamMsg, strsize+2); // room for "\n\0"
+        if (!temp) {
+            DBG(NULL);
+            scopeLog("CTL realloc error", -1, CFG_LOG_INFO);
+            return -1;
+        }
+        streamMsg = temp;
+        streamMsg[strsize] = '\n';
+        streamMsg[strsize+1] = '\0';
+    }
+
+    return transportSend(ctl->transport, streamMsg);
+#endif
 }
 
 int
@@ -553,7 +578,7 @@ sendBufferedMessages(ctl_t *ctl)
 }
 
 int
-ctlSendBin(ctl_t *ctl, char *buf)
+ctlSendBin(ctl_t *ctl, char *buf, size_t len)
 {
     if (!ctl || !buf) return -1;
 

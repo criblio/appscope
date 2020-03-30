@@ -732,33 +732,50 @@ hget(http_list *hlist, uint64_t id)
     return NULL;
 }
 
+static bool
+isHttp(int sockfd, void *buf, size_t len, metric_t src, net_info **pnet)
+{
+    in_port_t lport, rport;
+    net_info *net = getNetEntry(sockfd);
+
+    if (!net) {
+        // TODO: keep the search? Must be bounded.
+        if (((src == TLSRX) || (src == TLSTX)) &&
+            strstr(buf, "HTTP")) {
+            if (pnet) *pnet = NULL;
+            return TRUE;
+        }
+    } else {
+        if (pnet) *pnet = net;
+        lport = get_port_net(net, net->localConn.ss_family, LOCAL);
+        rport = get_port_net(net, net->remoteConn.ss_family, REMOTE);
+        // TODO: add a list of ports
+        if ((rport == 443) || (lport == 443) ||
+            (rport == 80) || (lport == 80)) return TRUE;
+    }
+    return FALSE;
+}
+
+// For now, only doing HTTP/1.X headers
 static int
-doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
+doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, net_info *net)
 {
     if ((buf == NULL) || (len <= 0)) return -1;
     
     size_t headsize;
-    in_port_t lport, rport;
-    net_info *net;
+    uint64_t uid;
     char *headend, *header, *hcopy;;
     protocol_info *proto;
     http_post *post;
 
-    // For now, only doing HTTP/1.X headers
-    if ((src == TLSRX) || (src == TLSTX)) {
-        /*
-         * Is it always safe to string search here?
-         * Relying on the caller to ensure data is ready
-         */
-        if (strstr(buf, "HTTP") == NULL) return -1;
-    } else if ((net = getNetEntry(sockfd)) != NULL) { 
-        // Keeps us from doing string searches on bin data
-        lport = get_port(sockfd, g_netinfo[sockfd].localConn.ss_family, LOCAL);
-        rport = get_port(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE);
-
-        if ((rport != 80) && (lport != 80)) return -1;
+    /*
+     * If we have an fd, use the uid/channel value as it's unique 
+     * else we are likley using TLS, so default to the session ID
+     */
+    if (net) {
+        uid = net->uid;
     } else {
-        return -1;
+        uid = id;
     }
 
     if ((headend = strstr(buf, "\r\n\r\n")) != NULL) {
@@ -778,7 +795,7 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
         }
 
         post->start_duration = getTime();
-        post->id = id;
+        post->id = uid;
         strncpy(hcopy, header, headsize);
         post->hdr = hcopy;
 
@@ -804,8 +821,11 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
 int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
 {
-    if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
-        return doHttp(id, sockfd, buf, len, src);
+    net_info *net;
+
+    if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP) &&
+        (isHttp(sockfd, buf, len, src, &net) == TRUE)) {
+        return doHttp(id, sockfd, buf, len, src, net);
     }
 
     return 0;
@@ -1558,7 +1578,6 @@ doClose(int fd, const char *func)
     struct fs_info_t *fsinfo;
 
     if ((ninfo = getNetEntry(fd)) != NULL) {
-
         doUpdateState(OPEN_PORTS, fd, -1, func, NULL);
         doUpdateState(NET_CONNECTIONS, fd, -1, func, NULL);
         doUpdateState(CONNECTION_DURATION, fd, -1, func, NULL);

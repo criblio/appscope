@@ -145,8 +145,6 @@ destroyProto(protocol_info *proto)
 
     if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
         http_post *post = (http_post *)proto->data;
-        // TODO: get this when the list entry is removed
-        // if (post && post->hdr) free(post->hdr);
         if (post) free(post);
     }
 }
@@ -245,6 +243,12 @@ doProtocolMetric(protocol_info *proto)
 
             event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
             cmdSendHttp(g_ctl, &mevent, map->id, &g_proc);
+
+            // Done; we remove the list entry; complete when reported
+            if (map->req) free(map->req);
+            if (map->resp) free(map->resp);
+            if (map) free(map);
+            if (hrem(&g_hlist, post->id) == -1) DBG(NULL);
         }
     }
 

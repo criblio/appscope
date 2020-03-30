@@ -71,9 +71,9 @@ cmdSendResponse(ctl_t *ctl, request_t *req, cJSON *body)
 }
 
 int
-cmdSendBin(ctl_t *ctl, char *buf)
+cmdSendBin(ctl_t *ctl, char *buf, size_t len)
 {
-    return ctlSendBin(ctl, buf);
+    return ctlSendBin(ctl, buf, len);
 }
 
 request_t *

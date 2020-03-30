@@ -32,6 +32,7 @@ static log_t *g_prevlog = NULL;
 static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
+http_list *g_nsslist;
 __thread int g_getdelim = 0;
 
 // Forward declaration
@@ -1709,7 +1710,6 @@ SSL_read(SSL *ssl, void *buf, int num)
 {
     int rc;
     
-    scopeLog("SSL_read", -1, CFG_LOG_INFO);
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
 
@@ -1725,7 +1725,6 @@ SSL_write(SSL *ssl, const void *buf, int num)
 {
     int rc;
     
-    scopeLog("SSL_write", -1, CFG_LOG_INFO);
     WRAP_CHECK(SSL_write, -1);
     rc = g_fn.SSL_write(ssl, buf, num);
 
@@ -1740,8 +1739,7 @@ EXPORTON ssize_t
 gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
 {
     size_t rc;
-    
-    scopeLog("gnutls_record_recv", -1, CFG_LOG_INFO);
+
     WRAP_CHECK(gnutls_record_recv, -1);
     rc = g_fn.gnutls_record_recv(session, data, data_size);
 
@@ -1752,7 +1750,6 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
          * In some cases this may work:
          * int fd = gnutls_transport_get_int(session);
          */
-        scopeLog("gnutls_record_recv", rc, CFG_LOG_INFO);
         doProtocol((uint64_t)session, -1, data, data_size, TLSRX);
     }
     return rc;
@@ -1762,8 +1759,7 @@ EXPORTON ssize_t
 gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
 {
     size_t rc;
-    
-    scopeLog("gnutls_record_send", -1, CFG_LOG_INFO);
+
     WRAP_CHECK(gnutls_record_send, -1);
     rc = g_fn.gnutls_record_send(session, data, data_size);
 
@@ -1785,7 +1781,7 @@ nss_close(PRFileDesc *fd)
     http_list *hent;
     int nfd = PR_FileDesc2NativeHandle(fd);
 
-    if ((hent = hget(g_hlist, nfd)) != NULL) {
+    if ((hent = hget(g_nsslist, nfd)) != NULL) {
         rc = hent->ssl_methods->close(fd);
     } else {
         rc = -1;
@@ -1794,7 +1790,7 @@ nss_close(PRFileDesc *fd)
         return rc;
     }
 
-    if (rc == PR_SUCCESS) hrem(&g_hlist, (uint64_t)nfd);
+    if (rc == PR_SUCCESS) hrem(&g_nsslist, (uint64_t)nfd);
 
     return rc;
 }
@@ -1806,7 +1802,7 @@ nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRInterv
     http_list *hent;
     int nfd = PR_FileDesc2NativeHandle(fd);
 
-    if ((hent = hget(g_hlist, (uint64_t)nfd)) != NULL) {
+    if ((hent = hget(g_nsslist, (uint64_t)nfd)) != NULL) {
         rc = hent->ssl_methods->send(fd, buf, amount, flags, timeout);
     } else {
         rc = -1;
@@ -1826,7 +1822,7 @@ nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime
     http_list *hent;
     int nfd = PR_FileDesc2NativeHandle(fd);
 
-    if ((hent = hget(g_hlist, (uint64_t)nfd)) != NULL) {
+    if ((hent = hget(g_nsslist, (uint64_t)nfd)) != NULL) {
         rc = hent->ssl_methods->recv(fd, buf, amount, flags, timeout);
     } else {
         rc = -1;
@@ -1859,7 +1855,7 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
             bcopy(result->methods, hent->ssl_methods, sizeof(PRIOMethods));
             bcopy(result->methods, hent->ssl_int_methods, sizeof(PRIOMethods));
 
-            if (hpush(&g_hlist, hent) == 0) {
+            if (hpush(&g_nsslist, hent) == 0) {
                 // ref contrib/tls/nss/prio.h struct PRIOMethods
                 // read ... todo? read, recvfrom, acceptread
                 hent->ssl_int_methods->recv = nss_recv;

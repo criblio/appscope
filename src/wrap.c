@@ -33,6 +33,7 @@ static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 __thread int g_getdelim = 0;
 
+extern list_t *g_hlist;
 
 // Forward declaration
 static void *periodic(void *);
@@ -734,6 +735,7 @@ init(void)
     g_fn.SSL_write = dlsym(RTLD_NEXT, "SSL_write");
     g_fn.gnutls_record_recv = dlsym(RTLD_NEXT, "gnutls_record_recv");
     g_fn.gnutls_record_send = dlsym(RTLD_NEXT, "gnutls_record_send");
+    g_fn.SSL_ImportFD = dlsym(RTLD_NEXT, "SSL_ImportFD");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
@@ -1775,6 +1777,102 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
         doProtocol(-1, (void *)data, data_size, TLSTX);
     }
     return rc;
+}
+
+static PRStatus
+nss_close(PRFileDesc *fd)
+{
+    PRStatus rc;
+    http_list *hent;
+    int nfd = PR_FileDesc2NativeHandle(fd);
+
+    if ((hent = hget(g_hlist, nfd)) != NULL) {
+        rc = hent->ssl_methods->close(fd);
+    } else {
+        rc = -1;
+        DBG(NULL);
+        scopeLog("ERROR: ssl_close no list entry", -1, CFG_LOG_ERROR);
+        return rc;
+    }
+
+    if (rc == PR_SUCCESS) hrem(g_hlist, (uint64_t)nfd);
+
+    return rc;
+}
+
+static PRInt32
+nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime timeout)
+{
+    PRInt32 rc;
+    http_list *hent;
+    int nfd = PR_FileDesc2NativeHandle(fd);
+
+    if ((hent = hget(g_hlist, (uint64_t)nfd)) != NULL) {
+        rc = hent->ssl_methods->send(fd, buf, amount, flags, timeout);
+    } else {
+        rc = -1;
+        DBG(NULL);
+        scopeLog("ERROR: ssl_send no list entry", -1, CFG_LOG_ERROR);
+    }
+
+    if (rc > 0) doProtocol(nfd, (void *)buf, (size_t)amount, TLSTX);
+
+    return rc;
+}
+
+static PRInt32
+nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime timeout)
+{
+    PRInt32 rc;
+    http_list *hent;
+    int nfd = PR_FileDesc2NativeHandle(fd);
+
+    if ((hent = hget(g_hlist, (uint64_t)nfd)) != NULL) {
+        rc = hent->ssl_methods->recv(fd, buf, amount, flags, timeout);
+    } else {
+        rc = -1;
+        DBG(NULL);
+        scopeLog("ERROR: ssl_recv no list entry", -1, CFG_LOG_ERROR);
+    }
+
+    if (rc > 0) doProtocol(nfd, buf, (size_t)amount, TLSRX);
+
+    return rc;
+}
+
+EXPORTON PRFileDesc *
+SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
+{
+    PRFileDesc *result;
+
+    //scopeLog("SSL_ImportFD", -1, CFG_LOG_INFO);
+    WRAP_CHECK(SSL_ImportFD, NULL);
+    result = g_fn.SSL_ImportFD(model, currFd);
+
+    if (result != NULL) {
+        uint64_t nfd = PR_FileDesc2NativeHandle(result);
+        http_list *hent = createListEntry(nfd, result);
+
+        if (hent) {
+            // ref contrib/tls/nss/prio.h struct PRIOMethods
+            // read ... todo? read, recvfrom, acceptread
+            hent->ssl_int_methods->recv = nss_recv;
+
+            // write ... todo? write, writev, sendto, sendfile, transmitfile
+            hent->ssl_int_methods->send = nss_send;
+
+            // shutdown connection ... todo? shutdown
+            hent->ssl_int_methods->close = nss_close;
+
+            if (hpush(g_hlist, hent->id, hent) == 0) {
+                // switch to using the wrapped methods
+                result->methods = hent->ssl_int_methods;
+            } else {
+                freeListEntry(hent);
+            }
+        }
+    }
+    return result;
 }
 
 #endif // __LINUX__

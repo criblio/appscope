@@ -71,6 +71,7 @@ run_test test/${OS}/evtformattest
 run_test test/${OS}/ctltest
 run_test test/${OS}/mtcformattest
 run_test test/${OS}/circbuftest
+run_test test/${OS}/linklisttest
 run_test test/${OS}/comtest
 run_test test/${OS}/dbgtest
 if [ "${OS}" = "linux" ]; then

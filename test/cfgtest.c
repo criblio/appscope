@@ -11,12 +11,14 @@
 static void
 verifyDefaults(config_t* config)
 {
+    assert_int_equal       (cfgMtcEnable(config), DEFAULT_MTC_ENABLE);
     assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
     assert_string_equal    (cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
     assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
     assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
     assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
+    assert_int_equal       (cfgEvtEnable(config), DEFAULT_EVT_ENABLE);
     assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
@@ -83,6 +85,22 @@ accessorsReturnDefaultsWhenConfigIsNull(void** state)
 {
     // Implicitly this verifies no crashes when trying to access a null object
     verifyDefaults(NULL);
+}
+
+static void
+cfgMtcEnableSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgMtcEnableSet(config, TRUE);
+    assert_int_equal(cfgMtcEnable(config), TRUE);
+    cfgMtcEnableSet(config, FALSE);
+    assert_int_equal(cfgMtcEnable(config), FALSE);
+
+    // 2 is outside of allowed range; should be ignored.
+    cfgMtcEnableSet(config, 2);
+    assert_int_equal(cfgMtcEnable(config), FALSE);
+
+    cfgDestroy(&config);
 }
 
 static void
@@ -164,6 +182,22 @@ cfgCmdDirSetAndGet(void** state)
 }
 
 static void
+cfgEvtEnableSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgEvtEnableSet(config, TRUE);
+    assert_int_equal(cfgEvtEnable(config), TRUE);
+    cfgEvtEnableSet(config, FALSE);
+    assert_int_equal(cfgEvtEnable(config), FALSE);
+
+    // 2 is outside of allowed range; should be ignored.
+    cfgEvtEnableSet(config, 2);
+    assert_int_equal(cfgEvtEnable(config), FALSE);
+
+    cfgDestroy(&config);
+}
+
+static void
 cfgEventFormatSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
@@ -234,8 +268,21 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
 
-    // Set everything to 1
+    // 2 is outside of allowed range; should be ignored.
     int i, j;
+    for (i=CFG_SRC_FILE; i<CFG_SRC_MAX+1; i++) {
+        cfgEvtFormatSourceEnabledSet(config, i, 2);
+        if (i >= CFG_SRC_MAX) {
+             assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_FILE);
+             assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 1);
+             dbgInit(); // reset dbg for the rest of the tests
+        } else {
+             assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 0);
+             assert_int_equal(cfgEvtFormatSourceEnabled(config, i), 0);
+        }
+    }
+
+    // Set everything to 1
     for (i=CFG_SRC_FILE; i<CFG_SRC_MAX+1; i++) {
         cfgEvtFormatSourceEnabledSet(config, i, 1);
         if (i >= CFG_SRC_MAX) {
@@ -445,12 +492,14 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgCreateDefaultReturnsValidPtr),
         cmocka_unit_test(accessorValuesForDefaultConfigAreAsExpected),
         cmocka_unit_test(accessorsReturnDefaultsWhenConfigIsNull),
+        cmocka_unit_test(cfgMtcEnableSetAndGet),
         cmocka_unit_test(cfgMtcFormatSetAndGet),
         cmocka_unit_test(cfgMtcStatsDPrefixSetAndGet),
         cmocka_unit_test(cfgMtcStatsDMaxLenSetAndGet),
         cmocka_unit_test(cfgMtcVerbositySetAndGet),
         cmocka_unit_test(cfgMtcPeriodSetAndGet),
         cmocka_unit_test(cfgCmdDirSetAndGet),
+        cmocka_unit_test(cfgEvtEnableSetAndGet),
         cmocka_unit_test(cfgEventFormatSetAndGet),
 
         cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &log),

@@ -19,6 +19,7 @@
 #endif
 
 #define METRIC_NODE          "metric"
+#define ENABLE_NODE              "enable"
 #define FORMAT_NODE              "format"
 #define TYPE_NODE                    "type"
 #define STATSDPREFIX_NODE            "statsdprefix"
@@ -113,12 +114,20 @@ enum_map_t watchTypeMap[] = {
     {NULL,                    -1}
 };
 
+enum_map_t boolMap[] = {
+    {"true",                  TRUE},
+    {"false",                 FALSE},
+    {NULL,                    -1}
+};
+
 // forward declarations
+void cfgMtcEnableSetFromStr(config_t*, const char*);
 void cfgMtcFormatSetFromStr(config_t*, const char*);
 void cfgMtcStatsDPrefixSetFromStr(config_t*, const char*);
 void cfgMtcStatsDMaxLenSetFromStr(config_t*, const char*);
 void cfgMtcPeriodSetFromStr(config_t*, const char*);
 void cfgCmdDirSetFromStr(config_t*, const char*);
+void cfgEvtEnableSetFromStr(config_t*, const char*);
 void cfgEventFormatSetFromStr(config_t*, const char*);
 void cfgEvtFormatValueFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatFieldFilterSetFromStr(config_t*, watch_t, const char*);
@@ -374,7 +383,9 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
     if (!(env_ptr = strchr(env_line, '='))) return;
     if (!(value = doEnvVariableSubstitution(&env_ptr[1]))) return;
 
-    if (startsWith(env_line, "SCOPE_METRIC_FORMAT")) {
+    if (startsWith(env_line, "SCOPE_METRIC_ENABLE")) {
+        cfgMtcEnableSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_METRIC_FORMAT")) {
         cfgMtcFormatSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_STATSD_PREFIX")) {
         cfgMtcStatsDPrefixSetFromStr(cfg, value);
@@ -398,6 +409,8 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         processCmdDebug(value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_CTL, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_ENABLE")) {
+        cfgEvtEnableSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
         cfgEventFormatSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_NAME")) {
@@ -482,6 +495,13 @@ cfgProcessCommands(config_t* cfg, FILE* file)
 }
 
 void
+cfgMtcEnableSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgMtcEnableSet(cfg, strToVal(boolMap, value));
+}
+
+void
 cfgMtcFormatSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
@@ -528,6 +548,13 @@ cfgCmdDirSetFromStr(config_t* cfg, const char* value)
 }
 
 void
+cfgEvtEnableSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgEvtEnableSet(cfg, strToVal(boolMap, value));
+}
+
+void
 cfgEventFormatSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
@@ -559,7 +586,7 @@ void
 cfgEvtFormatSourceEnabledSetFromStr(config_t* cfg, watch_t src, const char* value)
 {
     if (!cfg || !value) return;
-    cfgEvtFormatSourceEnabledSet(cfg, src, !strcmp("true", value));
+    cfgEvtFormatSourceEnabledSet(cfg, src, strToVal(boolMap, value));
 }
 
 void
@@ -856,6 +883,14 @@ processVerbosity(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
+processMetricEnable(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char* value = stringVal(node);
+    cfgMtcEnableSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
 processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_MAPPING_NODE) return;
@@ -897,6 +932,7 @@ processMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
+        {YAML_SCALAR_NODE,    ENABLE_NODE,          processMetricEnable},
         {YAML_MAPPING_NODE,   FORMAT_NODE,          processFormat},
         {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportMetric},
         {YAML_NO_NODE,        NULL,                 NULL}
@@ -906,6 +942,14 @@ processMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     foreach(pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
+}
+
+static void
+processEvtEnable(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char* value = stringVal(node);
+    cfgEvtEnableSetFromStr(config, value);
+    if (value) free(value);
 }
 
 static void
@@ -1028,6 +1072,7 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
+        {YAML_SCALAR_NODE,    ENABLE_NODE,          processEvtEnable},
         {YAML_MAPPING_NODE,   FORMAT_NODE,          processEvtFormat},
         {YAML_SEQUENCE_NODE,  WATCH_NODE,           processWatch},
         {YAML_NO_NODE,        NULL,                 NULL}
@@ -1277,6 +1322,9 @@ createMetricJson(config_t* cfg)
 
     if (!(root = cJSON_CreateObject())) goto err;
 
+    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
+                          valToStr(boolMap, cfgMtcEnable(cfg)))) goto err;
+
     if (!(transport = createTransportJson(cfg, CFG_MTC))) goto err;
     cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
 
@@ -1354,6 +1402,9 @@ createEventJson(config_t* cfg)
     cJSON* format, *watch;
 
     if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
+                          valToStr(boolMap, cfgEvtEnable(cfg)))) goto err;
 
     if (!(format = createEventFormatJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, FORMAT_NODE, format);

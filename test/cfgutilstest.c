@@ -146,6 +146,37 @@ cfgPathHonorsPriorityOrder(void** state)
 }
 
 static void
+cfgProcessEnvironmentMtcEnable(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    cfgMtcEnableSet(cfg, FALSE);
+    assert_int_equal(cfgMtcEnable(cfg), FALSE);
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_METRIC_ENABLE", "true", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgMtcEnable(cfg), TRUE);
+
+    assert_int_equal(setenv("SCOPE_METRIC_ENABLE", "false", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgMtcEnable(cfg), FALSE);
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_METRIC_ENABLE"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgMtcEnable(cfg), FALSE);
+
+    // unrecognised value should not affect cfg
+    assert_int_equal(setenv("SCOPE_METRIC_ENABLE", "blah", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgMtcEnable(cfg), FALSE);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
+static void
 cfgProcessEnvironmentMtcFormat(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -298,6 +329,37 @@ cfgProcessEnvironmentCommandDir(void** state)
     assert_int_equal(setenv("SCOPE_CMD_DIR", "", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_string_equal(cfgCmdDir(cfg), DEFAULT_COMMAND_DIR);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
+static void
+cfgProcessEnvironmentEvtEnable(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    cfgEvtEnableSet(cfg, FALSE);
+    assert_int_equal(cfgEvtEnable(cfg), FALSE);
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_EVENT_ENABLE", "true", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEvtEnable(cfg), TRUE);
+
+    assert_int_equal(setenv("SCOPE_EVENT_ENABLE", "false", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEvtEnable(cfg), FALSE);
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_EVENT_ENABLE"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEvtEnable(cfg), FALSE);
+
+    // unrecognised value should not affect cfg
+    assert_int_equal(setenv("SCOPE_EVENT_ENABLE", "blah", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEvtEnable(cfg), FALSE);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -607,6 +669,7 @@ cfgProcessCommandsFromFile(void** state)
 
     // test everything else once
     writeFile(path,
+        "SCOPE_METRIC_ENABLE=false\n"
         "SCOPE_STATSD_PREFIX=prefix\n"
         "SCOPE_STATSD_MAXLEN=1024\n"
         "SCOPE_SUMMARY_PERIOD=11\n"
@@ -623,6 +686,7 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_TAG_CUSTOM1=val1\n"
         "SCOPE_TAG_CUSTOM2=val2\n"
         "SCOPE_EVENT_DEST=udp://host:1234\n"
+        "SCOPE_EVENT_ENABLE=false\n"
         "SCOPE_EVENT_FORMAT=ndjson\n"
         "SCOPE_EVENT_LOGFILE=true\n"
         "SCOPE_EVENT_CONSOLE=false\n"
@@ -643,6 +707,7 @@ cfgProcessCommandsFromFile(void** state)
     );
 
     openFileAndExecuteCfgProcessCommands(path, cfg);
+    assert_int_equal(cfgMtcEnable(cfg), FALSE);
     assert_string_equal(cfgMtcStatsDPrefix(cfg), "prefix.");
     assert_int_equal(cfgMtcStatsDMaxLen(cfg), 1024);
     assert_int_equal(cfgMtcPeriod(cfg), 11);
@@ -656,6 +721,7 @@ cfgProcessCommandsFromFile(void** state)
     assert_int_equal(cfgTransportType(cfg, CFG_CTL), CFG_UDP);
     assert_string_equal(cfgTransportHost(cfg, CFG_CTL), "host");
     assert_string_equal(cfgTransportPort(cfg, CFG_CTL), "1234");
+    assert_int_equal(cfgEvtEnable(cfg), FALSE);
     assert_int_equal(cfgEventFormat(cfg), CFG_EVENT_ND_JSON);
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
@@ -688,6 +754,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
 
     // test everything else once
     writeFile(path,
+        "SCOPE_METRIC_ENABLE=$MASTER_ENABLE\n"
         "SCOPE_STATSD_PREFIX=$VAR1.$MY_ENV_VAR\n"
         "SCOPE_STATSD_MAXLEN=$MAXLEN\n"
         "SCOPE_SUMMARY_PERIOD=$PERIOD\n"
@@ -700,6 +767,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
         "SCOPE_TAG_whyyoumadbro=Bill owes me $5.00\n"
         "SCOPE_TAG_undefined=$UNDEFINEDENV\n"
         "SCOPE_EVENT_DEST=udp://ho$st:1234\n"
+        "SCOPE_EVENT_ENABLE=$MASTER_ENABLE\n"
         "SCOPE_EVENT_LOGFILE=$TRUTH\n"
         "SCOPE_EVENT_CONSOLE=false\n"
         "SCOPE_EVENT_SYSLOG=$TRUTH\n"
@@ -709,6 +777,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
 
 
     // Set env varibles to test indirect substitution
+    assert_int_equal(setenv("MASTER_ENABLE", "false", 1), 0);
     assert_int_equal(setenv("VAR1", "longer", 1), 0);
     assert_int_equal(setenv("MY_ENV_VAR", "shorter", 1), 0);
     assert_int_equal(setenv("MAXLEN", "1024", 1), 0);
@@ -742,10 +811,14 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_METRIC), 0);
+    // misc
+    assert_int_equal(cfgMtcEnable(cfg), FALSE);
+    assert_int_equal(cfgEvtEnable(cfg), FALSE);
 
     deleteFile(path);
     cfgDestroy(&cfg);
 
+    unsetenv("MASTER_ENABLE");
     unsetenv("VAR1");
     unsetenv("MY_ENV_VAR");
     unsetenv("MAXLEN");
@@ -760,12 +833,14 @@ cfgProcessCommandsEnvSubstitution(void** state)
 static void
 verifyDefaults(config_t* config)
 {
+    assert_int_equal       (cfgMtcEnable(config), DEFAULT_MTC_ENABLE);
     assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
     assert_string_equal    (cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
     assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
     assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
     assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
+    assert_int_equal       (cfgEvtEnable(config), DEFAULT_EVT_ENABLE);
     assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
@@ -811,6 +886,7 @@ cfgReadGoodYaml(void** state)
     const char* yamlText =
         "---\n"
         "metric:\n"
+        "  enable: false\n"
         "  format:\n"
         "    type: metricjson                # metricstatsd, metricjson\n"
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
@@ -824,6 +900,7 @@ cfgReadGoodYaml(void** state)
         "    path: '/var/log/scope.log'\n"
         "    buffering: line\n"
         "event:\n"
+        "  enable: true\n"
         "  format:\n"
         "    type : metricjson               # ndjson\n"
         "  watch:\n"
@@ -852,12 +929,14 @@ cfgReadGoodYaml(void** state)
     writeFile(path, yamlText);
     config_t* config = cfgRead(path);
     assert_non_null(config);
+    assert_int_equal(cfgMtcEnable(config), FALSE);
     assert_int_equal(cfgMtcFormat(config), CFG_METRIC_JSON);
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 1024);
     assert_int_equal(cfgMtcVerbosity(config), 3);
     assert_int_equal(cfgMtcPeriod(config), 11);
     assert_string_equal(cfgCmdDir(config), "/tmp");
+    assert_int_equal(cfgEvtEnable(config), TRUE);
     assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
     assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
     assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_FILE), ".*host.*");
@@ -985,6 +1064,7 @@ cfgReadEveryProcessLevel(void** state)
 const char* jsonText =
     "{\n"
     "  'metric': {\n"
+    "    'enable': 'true',\n"
     "    'format': {\n"
     "      'type': 'metricjson',\n"
     "      'statsdprefix': 'cribl.scope',\n"
@@ -1002,6 +1082,7 @@ const char* jsonText =
     "    }\n"
     "  },\n"
     "  'event': {\n"
+    "    'enable': 'false',\n"
     "    'format': {\n"
     "      'type': 'ndjson'\n"
     "    },\n"
@@ -1034,11 +1115,13 @@ cfgReadGoodJson(void** state)
     writeFile(path, jsonText);
     config_t* config = cfgRead(path);
     assert_non_null(config);
+    assert_int_equal(cfgMtcEnable(config), TRUE);
     assert_int_equal(cfgMtcFormat(config), CFG_METRIC_JSON);
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 42);
     assert_int_equal(cfgMtcVerbosity(config), 0);
     assert_int_equal(cfgMtcPeriod(config), 13);
+    assert_int_equal(cfgEvtEnable(config), FALSE);
     assert_int_equal(cfgEventFormat(config), CFG_EVENT_ND_JSON);
     assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), 1);
@@ -1155,6 +1238,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    - type: metric\n"
         "  format:\n"
         "    type : metricjson\n"
+        "  enable : false\n"
         "libscope:\n"
         "  log:\n"
         "    level: info\n"
@@ -1175,17 +1259,20 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    statsdmaxlen: 4294967295\n"
         "    statsdprefix: 'cribl.scope'\n"
         "    type:  metricstatsd\n"
+        "  enable : false\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     config_t* config = cfgRead(path);
     assert_non_null(config);
+    assert_int_equal(cfgMtcEnable(config), FALSE);
     assert_int_equal(cfgMtcFormat(config), CFG_METRIC_STATSD);
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 4294967295);
     assert_int_equal(cfgMtcVerbosity(config), CFG_MAX_VERBOSITY);
     assert_int_equal(cfgMtcPeriod(config), 42);
+    assert_int_equal(cfgEvtEnable(config), FALSE);
     assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
     assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_SYSLOG), ".*[.]log$");
     assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_SYSLOG), ".*host.*");
@@ -1210,6 +1297,7 @@ cfgReadEnvSubstitution(void** state)
 {
 
     // Set env varibles to test indirect substitution
+    assert_int_equal(setenv("MASTER_ENABLE", "true", 1), 0);
     assert_int_equal(setenv("VAR1", "longer", 1), 0);
     assert_int_equal(setenv("MY_ENV_VAR", "shorter", 1), 0);
     assert_int_equal(setenv("MAXLEN", "1024", 1), 0);
@@ -1225,6 +1313,7 @@ cfgReadEnvSubstitution(void** state)
     const char* yamlText =
         "---\n"
         "metric:\n"
+        "  enable: $MASTER_ENABLE\n"
         "  format:\n"
         "    type: metricjson\n"
         "    statsdprefix : $VAR1.$MY_ENV_VAR\n"
@@ -1239,6 +1328,7 @@ cfgReadEnvSubstitution(void** state)
         "    path: /\\$VAR1/$MY_ENV_VAR/\n"
         "    buffering: line\n"
         "event:\n"
+        "  enable: $MASTER_ENABLE\n"
         "  format:\n"
         "    type : $FORMAT\n"
         "  watch:\n"
@@ -1285,9 +1375,13 @@ cfgReadEnvSubstitution(void** state)
     assert_int_equal(cfgEventFormat(cfg), CFG_METRIC_STATSD);
     assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_FILE), ".*[.]log$");
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
+    // misc
+    assert_int_equal(cfgMtcEnable(cfg), TRUE);
+    assert_int_equal(cfgEvtEnable(cfg), TRUE);
 
     cfgDestroy(&cfg);
 
+    unsetenv("MASTER_ENABLE");
     unsetenv("VAR1");
     unsetenv("MY_ENV_VAR");
     unsetenv("MAXLEN");
@@ -1442,11 +1536,13 @@ main(int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(cfgPathHonorsEnvVar),
         cmocka_unit_test(cfgPathHonorsPriorityOrder),
+        cmocka_unit_test(cfgProcessEnvironmentMtcEnable),
         cmocka_unit_test(cfgProcessEnvironmentMtcFormat),
         cmocka_unit_test(cfgProcessEnvironmentStatsDPrefix),
         cmocka_unit_test(cfgProcessEnvironmentStatsDMaxLen),
         cmocka_unit_test(cfgProcessEnvironmentMtcPeriod),
         cmocka_unit_test(cfgProcessEnvironmentCommandDir),
+        cmocka_unit_test(cfgProcessEnvironmentEvtEnable),
         cmocka_unit_test(cfgProcessEnvironmentEventFormat),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &log),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &con),

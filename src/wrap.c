@@ -1050,7 +1050,7 @@ pread64(int fd, void *buf, size_t count, off_t offset)
 
     ssize_t rc = g_fn.pread64(fd, buf, count, offset);
 
-    doRead(fd, initialTime, (rc != -1), rc, "pread64");
+    doRead(fd, initialTime, (rc != -1), (void *)buf, rc, "pread64", BUF, 0);
 
     return rc;
 }
@@ -1063,7 +1063,7 @@ preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 
     ssize_t rc = g_fn.preadv(fd, iov, iovcnt, offset);
 
-    doRead(fd, initialTime, (rc != -1), rc, "preadv");
+    doRead(fd, initialTime, (rc != -1), iov, rc, "preadv", IOV, iovcnt);
 
     return rc;
 }
@@ -1076,7 +1076,7 @@ preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 
     ssize_t rc = g_fn.preadv2(fd, iov, iovcnt, offset, flags);
 
-    doRead(fd, initialTime, (rc != -1), rc, "preadv2");
+    doRead(fd, initialTime, (rc != -1), iov, rc, "preadv2", IOV, iovcnt);
 
     return rc;
 }
@@ -1089,13 +1089,13 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 
     ssize_t rc = g_fn.preadv64v2(fd, iov, iovcnt, offset, flags);
 
-    doRead(fd, initialTime, (rc != -1), rc, "preadv64v2");
+    doRead(fd, initialTime, (rc != -1), iov, rc, "preadv64v2", IOV, iovcnt);
     
     return rc;
 }
 
 EXPORTON ssize_t
-__pread_chk(int fd, void * buf, size_t nbytes, off_t offset, size_t buflen)
+__pread_chk(int fd, void *buf, size_t nbytes, off_t offset, size_t buflen)
 {
     // TODO: this function aborts & exits on error, add abort functionality
     WRAP_CHECK(__pread_chk, -1);
@@ -1103,7 +1103,7 @@ __pread_chk(int fd, void * buf, size_t nbytes, off_t offset, size_t buflen)
 
     ssize_t rc = g_fn.__pread_chk(fd, buf, nbytes, offset, buflen);
 
-    doRead(fd, initialTime, (rc != -1), rc, "__pread_chk");
+    doRead(fd, initialTime, (rc != -1), (void *)buf, rc, "__pread_chk", BUF, 0);
 
     return rc;
 }
@@ -1117,7 +1117,7 @@ __read_chk(int fd, void *buf, size_t nbytes, size_t buflen)
 
     ssize_t rc = g_fn.__read_chk(fd, buf, nbytes, buflen);
 
-    doRead(fd, initialTime, (rc != -1), rc, "__read_chk");
+    doRead(fd, initialTime, (rc != -1), (void *)buf, rc, "__read_chk", BUF, 0);
 
     return rc;
 }
@@ -1131,7 +1131,7 @@ __fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *
 
     size_t rc = g_fn.__fread_unlocked_chk(ptr, ptrlen, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), rc*size, "__fread_unlocked_chk");
+    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_unlocked_chk", NONE, 0);
 
     return rc;
 }
@@ -1144,7 +1144,7 @@ pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
 
     ssize_t rc = g_fn.pwrite64(fd, buf, nbyte, offset);
 
-    doWrite(fd, initialTime, (rc != -1), buf, rc, "pwrite64");
+    doWrite(fd, initialTime, (rc != -1), buf, rc, "pwrite64", BUF, 0);
 
     return rc;
 }
@@ -1157,7 +1157,7 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 
     ssize_t rc = g_fn.pwritev(fd, iov, iovcnt, offset);
 
-    doWrite(fd, initialTime, (rc != -1), NULL, rc, "pwritev");
+    doWrite(fd, initialTime, (rc != -1), iov, rc, "pwritev", IOV, iovcnt);
 
     return rc;
 }
@@ -1170,7 +1170,7 @@ pwritev64(int fd, const struct iovec *iov, int iovcnt, off64_t offset)
 
     ssize_t rc = g_fn.pwritev64(fd, iov, iovcnt, offset);
 
-    doWrite(fd, initialTime, (rc != -1), NULL, rc, "pwritev64");
+    doWrite(fd, initialTime, (rc != -1), iov, rc, "pwritev64", IOV, iovcnt);
 
     return rc;
 }
@@ -1183,7 +1183,7 @@ pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 
     ssize_t rc = g_fn.pwritev2(fd, iov, iovcnt, offset, flags);
 
-    doWrite(fd, initialTime, (rc != -1), NULL, rc, "pwritev2");
+    doWrite(fd, initialTime, (rc != -1), iov, rc, "pwritev2", IOV, iovcnt);
 
     return rc;
 }
@@ -1196,7 +1196,7 @@ pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
 
     ssize_t rc = g_fn.pwritev64v2(fd, iov, iovcnt, offset, flags);
 
-    doWrite(fd, initialTime, (rc != -1), NULL, rc, "pwritev64v2");
+    doWrite(fd, initialTime, (rc != -1), iov, rc, "pwritev64v2", IOV, iovcnt);
 
     return rc;
 }
@@ -1664,7 +1664,7 @@ fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 
     size_t rc = g_fn.fwrite_unlocked(ptr, size, nitems, stream);
 
-    doWrite(fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite_unlocked");
+    doWrite(fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite_unlocked", BUF, 0);
 
     return rc;
 }
@@ -1715,7 +1715,7 @@ SSL_read(SSL *ssl, void *buf, int num)
 
     if (rc > 0) {
         int fd = SSL_get_fd((const SSL *)ssl);
-        doProtocol((uint64_t)ssl, fd, buf, (size_t)num, TLSRX);
+        doProtocol((uint64_t)ssl, fd, buf, (size_t)num, TLSRX, BUF);
     }
     return rc;
 }
@@ -1730,7 +1730,7 @@ SSL_write(SSL *ssl, const void *buf, int num)
 
     if (rc > 0) {
         int fd = SSL_get_fd((const SSL *)ssl);
-        doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)num, TLSTX);
+        doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)num, TLSTX, BUF);
     }
     return rc;
 }
@@ -1750,7 +1750,7 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
          * In some cases this may work:
          * int fd = gnutls_transport_get_int(session);
          */
-        doProtocol((uint64_t)session, -1, data, data_size, TLSRX);
+        doProtocol((uint64_t)session, -1, data, data_size, TLSRX, BUF);
     }
     return rc;
 }
@@ -1769,7 +1769,7 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
          * In some cases this may work:
          * int fd = gnutls_transport_get_int(session);
          */
-        doProtocol((uint64_t)session, -1, (void *)data, data_size, TLSTX);
+        doProtocol((uint64_t)session, -1, (void *)data, data_size, TLSTX, BUF);
     }
     return rc;
 }
@@ -1810,7 +1810,7 @@ nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRInterv
         scopeLog("ERROR: ssl_send no list entry", -1, CFG_LOG_ERROR);
     }
 
-    if (rc > 0) doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)amount, TLSTX);
+    if (rc > 0) doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)amount, TLSTX, BUF);
 
     return rc;
 }
@@ -1830,7 +1830,7 @@ nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime
         scopeLog("ERROR: ssl_recv no list entry", -1, CFG_LOG_ERROR);
     }
 
-    if (rc > 0) doProtocol((uint64_t)fd, nfd, buf, (size_t)amount, TLSRX);
+    if (rc > 0) doProtocol((uint64_t)fd, nfd, buf, (size_t)amount, TLSRX, BUF);
 
     return rc;
 }
@@ -1990,7 +1990,7 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
             getDNSName(sockfd, (void *)buf, len);
         }
 
-        doSend(sockfd, rc);
+        doSend(sockfd, rc, buf, len, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "__sendto_nocancel", "nopath");
     }
@@ -2133,7 +2133,7 @@ write(int fd, const void *buf, size_t count)
 
     ssize_t rc = g_fn.write(fd, buf, count);
 
-    doWrite(fd, initialTime, (rc != -1), buf, rc, "write");
+    doWrite(fd, initialTime, (rc != -1), buf, rc, "write", BUF, 0);
 
     return rc;
 }
@@ -2146,7 +2146,7 @@ pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
 
     ssize_t rc = g_fn.pwrite(fd, buf, nbyte, offset);
 
-    doWrite(fd, initialTime, (rc != -1), buf, rc, "pwrite");
+    doWrite(fd, initialTime, (rc != -1), buf, rc, "pwrite", BUF, 0);
 
     return rc;
 }
@@ -2159,7 +2159,7 @@ writev(int fd, const struct iovec *iov, int iovcnt)
 
     ssize_t rc = g_fn.writev(fd, iov, iovcnt);
 
-    doWrite(fd, initialTime, (rc != -1), NULL, rc, "writev");
+    doWrite(fd, initialTime, (rc != -1), iov, rc, "writev", IOV, iovcnt);
 
     return rc;
 }
@@ -2172,7 +2172,7 @@ fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 
     size_t rc = g_fn.fwrite(ptr, size, nitems, stream);
 
-    doWrite(fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite");
+    doWrite(fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite", BUF, 0);
 
     return rc;
 }
@@ -2185,7 +2185,7 @@ fputs(const char *s, FILE *stream)
 
     int rc = g_fn.fputs(s, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs");
+    doWrite(fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs", BUF, 0);
 
     return rc;
 }
@@ -2198,7 +2198,7 @@ fputs_unlocked(const char *s, FILE *stream)
 
     int rc = g_fn.fputs_unlocked(s, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs_unlocked");
+    doWrite(fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs_unlocked", BUF, 0);
 
     return rc;
 }
@@ -2211,7 +2211,7 @@ fputws(const wchar_t *ws, FILE *stream)
 
     int rc = g_fn.fputws(ws, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), ws, wcslen(ws) * sizeof(wchar_t), "fputws");
+    doWrite(fileno(stream), initialTime, (rc != EOF), ws, wcslen(ws) * sizeof(wchar_t), "fputws", BUF, 0);
 
     return rc;
 }
@@ -2224,7 +2224,7 @@ read(int fd, void *buf, size_t count)
 
     ssize_t rc = g_fn.read(fd, buf, count);
 
-    doRead(fd, initialTime, (rc != -1), rc, "read");
+    doRead(fd, initialTime, (rc != -1), (void *)buf, rc, "read", BUF, 0);
 
     return rc;
 }
@@ -2237,7 +2237,7 @@ readv(int fd, const struct iovec *iov, int iovcnt)
 
     ssize_t rc = g_fn.readv(fd, iov, iovcnt);
 
-    doRead(fd, initialTime, (rc != -1), rc, "readv");
+    doRead(fd, initialTime, (rc != -1), iov, rc, "readv", IOV, iovcnt);
 
     return rc;
 }
@@ -2250,7 +2250,7 @@ pread(int fd, void *buf, size_t count, off_t offset)
 
     ssize_t rc = g_fn.pread(fd, buf, count, offset);
 
-    doRead(fd, initialTime, (rc != -1), rc, "pread");
+    doRead(fd, initialTime, (rc != -1), (void *)buf, rc, "pread", BUF, 0);
 
     return rc;
 }
@@ -2263,7 +2263,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.fread(ptr, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), rc*size, "fread");
+    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread", NONE, 0);
 
     return rc;
 }
@@ -2277,7 +2277,7 @@ __fread_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.__fread_chk(ptr, ptrlen, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), rc*size, "__fread_chk");
+    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_chk", NONE, 0);
 
     return rc;
 }
@@ -2290,7 +2290,7 @@ fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.fread_unlocked(ptr, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), rc*size, "fread_unlocked");
+    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread_unlocked", NONE, 0);
 
     return rc;
 }
@@ -2303,7 +2303,7 @@ fgets(char *s, int n, FILE *stream)
 
     char* rc = g_fn.fgets(s, n, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), n, "fgets");
+    doRead(fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets", NONE, 0);
 
     return rc;
 }
@@ -2317,7 +2317,7 @@ __fgets_chk(char *s, size_t size, int strsize, FILE *stream)
 
     char* rc = g_fn.__fgets_chk(s, size, strsize, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), size, "__fgets_chk");
+    doRead(fileno(stream), initialTime, (rc != NULL), NULL, size, "__fgets_chk", NONE, 0);
 
     return rc;
 }
@@ -2330,7 +2330,7 @@ fgets_unlocked(char *s, int n, FILE *stream)
 
     char* rc = g_fn.fgets_unlocked(s, n, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), n, "fgets_unlocked");
+    doRead(fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets_unlocked", NONE, 0);
 
     return rc;
 }
@@ -2344,7 +2344,7 @@ __fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
 
     wchar_t* rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), size*sizeof(wchar_t), "__fgetws_chk");
+    doRead(fileno(stream), initialTime, (rc != NULL), NULL, size*sizeof(wchar_t), "__fgetws_chk", NONE, 0);
 
     return rc;
 }
@@ -2357,7 +2357,7 @@ fgetws(wchar_t *ws, int n, FILE *stream)
 
     wchar_t* rc = g_fn.fgetws(ws, n, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), n*sizeof(wchar_t), "fgetws");
+    doRead(fileno(stream), initialTime, (rc != NULL), NULL, n*sizeof(wchar_t), "fgetws", NONE, 0);
 
     return rc;
 }
@@ -2370,7 +2370,7 @@ fgetwc(FILE *stream)
 
     wint_t rc = g_fn.fgetwc(stream);
 
-    doRead(fileno(stream), initialTime, (rc != WEOF), sizeof(wint_t), "fgetwc");
+    doRead(fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "fgetwc", NONE, 0);
 
     return rc;
 }
@@ -2383,7 +2383,7 @@ fgetc(FILE *stream)
 
     int rc = g_fn.fgetc(stream);
 
-    doRead(fileno(stream), initialTime, (rc != EOF), 1, "fgetc");
+    doRead(fileno(stream), initialTime, (rc != EOF), NULL, 1, "fgetc", NONE, 0);
 
     return rc;
 }
@@ -2396,7 +2396,7 @@ fputc(int c, FILE *stream)
 
     int rc = g_fn.fputc(c, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), NULL, 1, "fputc");
+    doWrite(fileno(stream), initialTime, (rc != EOF), NULL, 1, "fputc", NONE, 0);
 
     return rc;
 }
@@ -2409,7 +2409,7 @@ fputc_unlocked(int c, FILE *stream)
 
     int rc = g_fn.fputc_unlocked(c, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), NULL, 1, "fputc_unlocked");
+    doWrite(fileno(stream), initialTime, (rc != EOF), NULL, 1, "fputc_unlocked", NONE, 0);
 
     return rc;
 }
@@ -2422,7 +2422,7 @@ putwc(wchar_t wc, FILE *stream)
 
     wint_t rc = g_fn.putwc(wc, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "putwc");
+    doWrite(fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "putwc", NONE, 0);
 
     return rc;
 }
@@ -2435,7 +2435,7 @@ fputwc(wchar_t wc, FILE *stream)
 
     wint_t rc = g_fn.fputwc(wc, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "fputwc");
+    doWrite(fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "fputwc", NONE, 0);
 
     return rc;
 }
@@ -2453,7 +2453,7 @@ fscanf(FILE *stream, const char *format, ...)
                      fArgs.arg[2], fArgs.arg[3],
                      fArgs.arg[4], fArgs.arg[5]);
 
-    doRead(fileno(stream),initialTime, (rc != EOF), rc, "fscanf");
+    doRead(fileno(stream),initialTime, (rc != EOF), NULL, rc, "fscanf", NONE, 0);
 
     return rc;
 }
@@ -2467,7 +2467,7 @@ getline (char **lineptr, size_t *n, FILE *stream)
     ssize_t rc = g_fn.getline(lineptr, n, stream);
 
     size_t bytes = (n) ? *n : 0;
-    doRead(fileno(stream), initialTime, (rc != -1), bytes, "getline");
+    doRead(fileno(stream), initialTime, (rc != -1), NULL, bytes, "getline", NONE, 0);
 
     return rc;
 }
@@ -2482,7 +2482,7 @@ getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     ssize_t rc = g_fn.getdelim(lineptr, n, delimiter, stream);
 
     size_t bytes = (n) ? *n : 0;
-    doRead(fileno(stream), initialTime, (rc != -1), bytes, "getdelim");
+    doRead(fileno(stream), initialTime, (rc != -1), NULL, bytes, "getdelim", NONE, 0);
 
     return rc;
 }
@@ -2500,7 +2500,7 @@ __getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     }
 
     size_t bytes = (n) ? *n : 0;
-    doRead(fileno(stream), initialTime, (rc != -1), bytes, "__getdelim");
+    doRead(fileno(stream), initialTime, (rc != -1), NULL, bytes, "__getdelim", NONE, 0);
     return rc;
 }
 
@@ -2756,7 +2756,7 @@ send(int sockfd, const void *buf, size_t len, int flags)
             getDNSName(sockfd, (void *)buf, len);
         }
 
-        doSend(sockfd, rc);
+        doSend(sockfd, rc, buf, rc, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "send", "nopath");
     }
@@ -2779,7 +2779,7 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
             getDNSName(sockfd, (void *)buf, len);
         }
 
-        doSend(sockfd, rc);
+        doSend(sockfd, rc, buf, rc, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendto", "nopath");
     }
@@ -2811,8 +2811,8 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
         if (remotePortIsDNS(sockfd)) {
             getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
         }
-        
-        doSend(sockfd, rc);
+
+        doSend(sockfd, rc, msg, rc, MSG);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendmsg", "nopath");
     }
@@ -2832,7 +2832,7 @@ recv(int sockfd, void *buf, size_t len, int flags)
     }
 
     if (rc != -1) {
-        doRecv(sockfd, rc);
+        doRecv(sockfd, rc, buf, rc, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recv", "nopath");
     }
@@ -2850,7 +2850,7 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
         scopeLog("recvfrom", sockfd, CFG_LOG_TRACE);
-        doRecv(sockfd, rc);
+        doRecv(sockfd, rc, buf, rc, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvfrom", "nopath");
     }
@@ -2915,8 +2915,9 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
                                 sizeof(struct sockaddr_in), REMOTE);
             }
         }
-        
-        doRecv(sockfd, rc);
+
+        // implies not getting http headers from here. is that correct?
+        doRecv(sockfd, rc, msg, 0, MSG);
         doAccessRights(msg);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmsg", "nopath");

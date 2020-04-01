@@ -37,6 +37,7 @@ ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=false
 ENV SCOPE_EVENT_CONSOLE=false
 ENV SCOPE_EVENT_METRICS=false
+ENV SCOPE_EVENT_HTTP=true
 ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log

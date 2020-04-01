@@ -1790,7 +1790,7 @@ nss_close(PRFileDesc *fd)
         return rc;
     }
 
-    if (rc == PR_SUCCESS) hrem(&g_nsslist, (uint64_t)nfd);
+    if (rc == PR_SUCCESS) hrem(g_nsslist, (uint64_t)nfd);
 
     return rc;
 }
@@ -1845,29 +1845,26 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
     result = g_fn.SSL_ImportFD(model, currFd);
 
     if (result != NULL) {
-        http_list *hent;
-        int nfd = PR_FileDesc2NativeHandle(result);
+        uint64_t nfd = PR_FileDesc2NativeHandle(result);
+        http_list *hent = createListEntry(nfd, result);
 
-        if (((hent = hnew()) != NULL) &&
-            ((hent->ssl_methods = calloc(1, sizeof(PRIOMethods))) != NULL) &&
-            ((hent->ssl_int_methods = calloc(1, sizeof(PRIOMethods))) != NULL)) {
-            hent->id = (uint64_t)nfd;
-            bcopy(result->methods, hent->ssl_methods, sizeof(PRIOMethods));
-            bcopy(result->methods, hent->ssl_int_methods, sizeof(PRIOMethods));
+        if (hent) {
+            // ref contrib/tls/nss/prio.h struct PRIOMethods
+            // read ... todo? read, recvfrom, acceptread
+            hent->ssl_int_methods->recv = nss_recv;
 
-            if (hpush(&g_nsslist, hent) == 0) {
-                // ref contrib/tls/nss/prio.h struct PRIOMethods
-                // read ... todo? read, recvfrom, acceptread
-                hent->ssl_int_methods->recv = nss_recv;
+            // ref contrib/tls/nss/prio.h struct PRIOMethods
+            // read ... todo? read, recvfrom, acceptread
+            hent->ssl_int_methods->recv = nss_recv;
+            
+            // shutdown connection ... todo? shutdown
+            hent->ssl_int_methods->close = nss_close;
 
-                // write ... todo? write, writev, sendto, sendfile, transmitfile
-                hent->ssl_int_methods->send = nss_send;
-
-                // shutdown connection ... todo? shutdown
-                hent->ssl_int_methods->close = nss_close;
-
+            if (hpush(g_nsslist, hent->id, hent) == 0) {
                 // switch to using the wrapped methods
                 result->methods = hent->ssl_int_methods;
+            } else {
+                freeListEntry(hent);
             }
         }
     }

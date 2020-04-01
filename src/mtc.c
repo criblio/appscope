@@ -9,7 +9,6 @@ struct _mtc_t
 {
     transport_t* transport;
     mtc_fmt_t* format;
-    int metric_disabled;
 };
 
 mtc_t *
@@ -20,10 +19,6 @@ mtcCreate()
         DBG(NULL);
         return NULL;
     }
-
-    // TBD.  This is a quick and dirty way to disable metric output.
-    // Added 31-Jan-2020 for a demo.
-    mtc->metric_disabled = (getenv("SCOPE_METRIC_DISABLE") != NULL);
 
     return mtc;
 }
@@ -51,8 +46,6 @@ int
 mtcSendMetric(mtc_t *mtc, event_t *evt)
 {
     if (!mtc || !evt) return -1;
-
-    if (mtc->metric_disabled) return 0;
 
     char *msg = mtcFormatStatsDString(mtc->format, evt, NULL);
     int rv = mtcSend(mtc, msg);

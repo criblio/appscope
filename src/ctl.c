@@ -343,6 +343,31 @@ err:
     return NULL;
 }
 
+static char *
+prepMessage(upload_t *upld)
+{
+    char *streamMsg;
+
+    if (!upld) return NULL;
+
+    streamMsg = ctlCreateTxMsg(upld);
+
+    // Add the newline delimiter to the msg.
+    int strsize = strlen(streamMsg);
+    char *temp = realloc(streamMsg, strsize+2); // room for "\n\0"
+    if (!temp) {
+        DBG(NULL);
+        scopeLog("CTL realloc error", -1, CFG_LOG_INFO);
+        return NULL;
+    }
+
+    streamMsg = temp;
+    streamMsg[strsize] = '\n';
+    streamMsg[strsize+1] = '\0';
+
+    return streamMsg;
+}
+
 char *
 ctlCreateTxMsg(upload_t *upld)
 {
@@ -469,52 +494,50 @@ ctlPostMsg(ctl_t *ctl, cJSON *body, upload_type_t type, request_t *req, bool now
 int
 ctlSendHttp(ctl_t *ctl, event_t *evt, uint64_t uid, proc_id_t *proc)
 {
+    int rc;
+    char *streamMsg;
+    cJSON *json;
+    upload_t upld;
+
     if (!ctl || !evt || !proc) return -1;
 
     // get a cJSON object for the given event
-    cJSON *json;
     if ((json = evtFormatHttp(ctl->evt, evt, uid, proc)) == NULL) return -1;
 
     // send it
-    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, TRUE);
-#if 0
-    char *streamMsg;
-    upload_t upld;
-
     upld.type = UPLD_EVT;
     upld.body = json;
     upld.req = NULL;
-    streamMsg = ctlCreateTxMsg(&upld);
+    streamMsg = prepMessage(&upld);
 
-    // Add the newline delimiter to the msg.
-    {
-        int strsize = strlen(streamMsg);
-        char *temp = realloc(streamMsg, strsize+2); // room for "\n\0"
-        if (!temp) {
-            DBG(NULL);
-            scopeLog("CTL realloc error", -1, CFG_LOG_INFO);
-            return -1;
-        }
-        streamMsg = temp;
-        streamMsg[strsize] = '\n';
-        streamMsg[strsize+1] = '\0';
-    }
-
-    return transportSend(ctl->transport, streamMsg);
-#endif
+    rc = transportSend(ctl->transport, streamMsg);
+    if (streamMsg) free(streamMsg);
+    return rc;
 }
 
 int
 ctlSendEvent(ctl_t *ctl, event_t *evt, uint64_t uid, proc_id_t *proc)
 {
+    int rc;
+    char *streamMsg;
+    cJSON *json;
+    upload_t upld;
+
     if (!ctl || !evt || !proc) return -1;
 
     // get a cJSON object for the given event
-    cJSON *json;
     if ((json = evtFormatMetric(ctl->evt, evt, uid, proc)) == NULL) return -1;
 
     // send it
-    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
+    upld.type = UPLD_EVT;
+    upld.body = json;
+    upld.req = NULL;
+    streamMsg = prepMessage(&upld);
+
+    rc = transportSend(ctl->transport, streamMsg);
+    if (streamMsg) free(streamMsg);
+    return rc;
+
 }
 
 int

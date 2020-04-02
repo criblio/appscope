@@ -22,7 +22,6 @@
 #include "state.h"
 #include "wrap.h"
 #include "runtimecfg.h"
-#include "hlist.h"
 
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
@@ -32,7 +31,7 @@ static log_t *g_prevlog = NULL;
 static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
-http_list *g_nsslist;
+static list_t *g_nsslist;
 __thread int g_getdelim = 0;
 
 // Forward declaration
@@ -40,6 +39,18 @@ static void *periodic(void *);
 static void doConfig(config_t *);
 static void reportProcessStart(void);
 static void threadNow(int);
+
+static void
+freeNssEntry(void *data)
+{
+    if (!data) return;
+    nss_list *nssentry = data;
+
+    if (!nssentry) return;
+    if (nssentry->ssl_methods) free(nssentry->ssl_methods);
+    if (nssentry->ssl_int_methods) free(nssentry->ssl_int_methods);
+    free(nssentry);
+}
 
 static time_t
 fileModTime(const char *path)
@@ -744,6 +755,8 @@ init(void)
     setProcId(&g_proc);
 
     initState();
+
+    g_nsslist = lstCreate(freeNssEntry);
 
     platform_time_t* time_struct = initTime();
     if (time_struct->tsc_invariant == FALSE) {
@@ -1778,11 +1791,11 @@ static PRStatus
 nss_close(PRFileDesc *fd)
 {
     PRStatus rc;
-    http_list *hent;
+    nss_list *nssentry;
     int nfd = PR_FileDesc2NativeHandle(fd);
 
-    if ((hent = hget(g_nsslist, nfd)) != NULL) {
-        rc = hent->ssl_methods->close(fd);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+        rc = nssentry->ssl_methods->close(fd);
     } else {
         rc = -1;
         DBG(NULL);
@@ -1790,7 +1803,7 @@ nss_close(PRFileDesc *fd)
         return rc;
     }
 
-    if (rc == PR_SUCCESS) hrem(g_nsslist, (uint64_t)nfd);
+    if (rc == PR_SUCCESS) lstDelete(g_nsslist, (uint64_t)nfd);
 
     return rc;
 }
@@ -1799,11 +1812,11 @@ static PRInt32
 nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime timeout)
 {
     PRInt32 rc;
-    http_list *hent;
+    nss_list *nssentry;
     int nfd = PR_FileDesc2NativeHandle(fd);
 
-    if ((hent = hget(g_nsslist, (uint64_t)nfd)) != NULL) {
-        rc = hent->ssl_methods->send(fd, buf, amount, flags, timeout);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+        rc = nssentry->ssl_methods->send(fd, buf, amount, flags, timeout);
     } else {
         rc = -1;
         DBG(NULL);
@@ -1819,11 +1832,12 @@ static PRInt32
 nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime timeout)
 {
     PRInt32 rc;
-    http_list *hent;
-    int nfd = PR_FileDesc2NativeHandle(fd);
+    nss_list *nssentry;
+    int nfd =
+        PR_FileDesc2NativeHandle(fd);
 
-    if ((hent = hget(g_nsslist, (uint64_t)nfd)) != NULL) {
-        rc = hent->ssl_methods->recv(fd, buf, amount, flags, timeout);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+        rc = nssentry->ssl_methods->recv(fd, buf, amount, flags, timeout);
     } else {
         rc = -1;
         DBG(NULL);
@@ -1845,27 +1859,35 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
     result = g_fn.SSL_ImportFD(model, currFd);
 
     if (result != NULL) {
+        nss_list *nssentry;
         uint64_t nfd = PR_FileDesc2NativeHandle(result);
-        http_list *hent = createListEntry(nfd, result);
 
-        if (hent) {
+        if ((((nssentry = calloc(1, sizeof(nss_list))) != NULL)) &&
+            ((nssentry->ssl_methods = calloc(1, sizeof(PRIOMethods))) != NULL) &&
+            ((nssentry->ssl_int_methods = calloc(1, sizeof(PRIOMethods))) != NULL)) {
+
+            nssentry->id = nfd;
+            memmove(nssentry->ssl_methods, result->methods, sizeof(PRIOMethods));
+            memmove(nssentry->ssl_int_methods, result->methods, sizeof(PRIOMethods));
+
             // ref contrib/tls/nss/prio.h struct PRIOMethods
             // read ... todo? read, recvfrom, acceptread
-            hent->ssl_int_methods->recv = nss_recv;
+            nssentry->ssl_int_methods->recv = nss_recv;
 
-            // ref contrib/tls/nss/prio.h struct PRIOMethods
-            // read ... todo? read, recvfrom, acceptread
-            hent->ssl_int_methods->recv = nss_recv;
-            
-            // shutdown connection ... todo? shutdown
-            hent->ssl_int_methods->close = nss_close;
+            // write ... todo? write, writev, sendto, sendfile, transmitfile
+            nssentry->ssl_int_methods->send = nss_send;
 
-            if (hpush(g_nsslist, hent->id, hent) == 0) {
+            // close ... todo? shutdown
+            nssentry->ssl_int_methods->close = nss_close;
+
+            if (lstInsert(g_nsslist, nssentry->id, nssentry)) {
                 // switch to using the wrapped methods
-                result->methods = hent->ssl_int_methods;
+                result->methods = nssentry->ssl_int_methods;
             } else {
-                freeListEntry(hent);
+                freeNssEntry(nssentry);
             }
+        } else {
+            freeNssEntry(nssentry);
         }
     }
     return result;

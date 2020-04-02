@@ -15,7 +15,6 @@
 #include "state.h"
 #include "state_private.h"
 #include "runtimecfg.h"
-#include "hlist.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
@@ -33,7 +32,6 @@ summary_t g_summary = {{0}};
 net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
-list_t *g_hlist;
 
 // interfaces
 mtc_t *g_mtc = NULL;
@@ -63,69 +61,6 @@ ctl_t *g_ctl = NULL;
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
-
-http_list*
-createListEntry(uint64_t nfd, PRFileDesc *result)
-{
-    if (!result) return NULL;
-    http_list* entry = calloc(1, sizeof(http_list));
-    PRIOMethods* ssl_methods = calloc(1, sizeof(PRIOMethods));
-    PRIOMethods* ssl_int_methods = calloc(1, sizeof(PRIOMethods));
-
-    // Handle potential memory issues
-    if (!entry || !ssl_methods || !ssl_int_methods) {
-        if (entry) free(entry);
-        if (ssl_methods) free(ssl_methods);
-        if (ssl_int_methods) free(ssl_int_methods);
-        return NULL;
-    }
-
-    entry->ssl_methods = ssl_methods;
-    entry->ssl_int_methods = ssl_int_methods;
-
-    // assign the contents
-    entry->id = nfd;
-    memmove(entry->ssl_methods, result->methods, sizeof(PRIOMethods));
-    memmove(entry->ssl_int_methods, result->methods, sizeof(PRIOMethods));
-
-    return entry;
-}
-
-void
-freeListEntry(void* arg)
-{
-    http_list* entry = (http_list*)arg;
-    if (!entry) return;
-    if (entry->ssl_methods) free(entry->ssl_methods);
-    if (entry->ssl_int_methods) free(entry->ssl_int_methods);
-    free(entry);
-}
-
-list_t *
-hnew(void)
-{
-    return lstCreate(freeListEntry);
-}
-
-int
-hpush(list_t *hlist, uint64_t id, http_list *data)
-{
-    int success = lstInsert(hlist, id, data);
-    return (success) ? 0 : -1;
-}
-
-int
-hrem(list_t *hlist, uint64_t id)
-{
-    int deleted = lstDelete(hlist, id);
-    return (deleted) ? 0 : -1;
-}
-
-http_list *
-hget(list_t *hlist, uint64_t id)
-{
-    return (http_list*)lstFind(hlist, id);
-}
 
 int
 get_port(int fd, int type, control_type_t which) {
@@ -200,9 +135,7 @@ initState()
     // Per RUC...
     g_fsinfo = fsinfoLocal;
 
-    if (!(g_hlist = hnew())) {
-        scopeLog("ERROR: HTTP Tracking:Malloc", -1, CFG_LOG_ERROR);
-    }
+    initReporting();
 }
 
 void
@@ -734,89 +667,6 @@ memsearch(const char *hay, int haysize, const char *needle, int needlesize) {
         }
     }
     return -1;
-}
-
-http_list *
-hnew()
-{
-
-    return (http_list *)calloc(1, sizeof(struct http_list_t));
-}
-
-int
-hpush(http_list **hlist, http_list *new)
-{
-    if (!hlist || !new) return -1;
-
-    int i = 0;
-    new->next = *hlist;
-    while (!atomicCasU64((uint64_t *)hlist, (uint64_t)*hlist, (uint64_t)new)) {
-        if (i++ >= NUM_ATTEMPTS) {
-            DBG(NULL);
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-int
-hrem(http_list **hlist, uint64_t id)
-{
-    if (!hlist) return -1;
-
-    int i = 0;
-    http_list *cur = *hlist;
-    http_list *prev = NULL;
-
-    while (cur != NULL) {
-        if (cur->id == id) break;
-        prev = cur;
-        cur = cur->next;
-    }
-
-    // can't find it
-    if (cur == NULL) return -1;
-
-    // found a match, update the link
-    if(cur == *hlist) {
-        // change head to point to next link
-        while (!atomicCasU64((uint64_t *)hlist, (uint64_t)cur, (uint64_t)cur->next)) {
-            if (i++ >= NUM_ATTEMPTS) {
-                DBG(NULL);
-                return -1;
-            }
-        }
-    } else {
-        // bypass the current link
-        while (!atomicCasU64((uint64_t *)&prev->next, (uint64_t)prev->next, (uint64_t)cur->next)) {
-            if (i++ >= NUM_ATTEMPTS) {
-                DBG(NULL);
-                return -1;
-            }
-        }
-    }
-
-    if (cur->ssl_methods) free(cur->ssl_methods);
-    if (cur->ssl_int_methods) free(cur->ssl_int_methods);
-    if (cur) free(cur);
-
-    return 0;
-}
-
-http_list *
-hget(http_list *hlist, uint64_t id)
-{
-    if (!g_hlist) return NULL;
-
-    http_list *cur = hlist;
-
-    while (cur != NULL) {
-        if (cur->id == id) return cur;
-        cur = cur->next;
-    }
-
-    return NULL;
 }
 
 // allow all ports if they appear to have an HTTP header

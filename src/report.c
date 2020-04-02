@@ -14,7 +14,7 @@
 #include "plattime.h"
 #include "report.h"
 #include "state_private.h"
-#include "hlist.h"
+#include "linklist.h"
 
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
@@ -51,7 +51,24 @@
 // and replace it with a measured value.  It'd be one less dependency
 // and could be more accurate.
 int g_interval = DEFAULT_SUMMARY_PERIOD;
+static list_t *g_maplist;
 
+static void
+destroyHttpMap(void *data)
+{
+    if (!data) return;
+    http_map *map = (http_map *)data;
+
+    if (map->req) free(map->req);
+    if (map->resp) free(map->resp);
+    if (map) free(map);
+}
+
+void
+initReporting()
+{
+    g_maplist = lstCreate(destroyHttpMap);
+}
 
 void
 setReportingInterval(int seconds)
@@ -159,36 +176,22 @@ doProtocolMetric(protocol_info *proto)
     if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
         http_post *post = (http_post *)proto->data;
         http_map *map;
-        http_list *hentry;
 
-        if ((hentry = hget(g_hlist, post->id)) == NULL) {
+        if ((map = lstFind(g_maplist, post->id)) == NULL) {
             // lazy open
-            if ((hentry = hnew()) != NULL) {
-                hentry->id = post->id;
-
-                if (hpush(&g_hlist, hentry) == -1) {
-                    DBG(NULL);
-                    destroyProto(proto);
-                    return;
-                }
-            } else {
-                destroyProto(proto);
-                return;
-            }
-        }
-
-        if (hentry->protocol == NULL) {
-            if ((map = calloc(1, sizeof(struct http_map_t))) == NULL) {
-                // nothing we can do w/o a map
+            if ((map = calloc(1, sizeof(http_map))) == NULL) {
                 destroyProto(proto);
                 return;
             }
 
-            map->first_time = time(NULL);
+            if (lstInsert(g_maplist, post->id, map) == FALSE) {
+                destroyHttpMap(map);
+                destroyProto(proto);
+                return;
+            }
+
             map->id = post->id;
-            hentry->protocol = map;
-        } else {
-            map = hentry->protocol;
+            map->first_time = time(NULL);
         }
 
         map->frequency++;
@@ -245,10 +248,7 @@ doProtocolMetric(protocol_info *proto)
             cmdSendHttp(g_ctl, &mevent, map->id, &g_proc);
 
             // Done; we remove the list entry; complete when reported
-            if (map->req) free(map->req);
-            if (map->resp) free(map->resp);
-            if (map) free(map);
-            if (hrem(&g_hlist, post->id) == -1) DBG(NULL);
+            if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
         }
     }
 

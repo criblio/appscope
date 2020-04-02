@@ -55,11 +55,4 @@ int sockIsTCP(int);
 void doUpdateState(metric_t, int, ssize_t, const char *, const char *);
 int doProtocol(uint64_t, int, void *, size_t, metric_t, src_data_t);
 
-http_list* createListEntry(uint64_t, PRFileDesc*);
-void freeListEntry(void*);
-list_t* hnew(void);
-int hpush(list_t*, uint64_t, http_list*);
-int hrem(list_t*, uint64_t);
-http_list* hget(list_t*, uint64_t);
-
 #endif // __STATE_H__

@@ -6,7 +6,7 @@ extern rtconfig g_cfg;
 int
 cmdSendEvent(ctl_t *ctl, event_t *event, uint64_t time, proc_id_t *proc)
 {
-    if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC)) return 0;
+    if (!ctlEvtSourceEnabled(ctl, CFG_SRC_METRIC)) return 0;
     return ctlSendEvent(ctl, event, time, proc);
 }
 

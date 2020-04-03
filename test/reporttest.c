@@ -176,9 +176,9 @@ countTestSetup(void** state)
     initState();
 
     // Turn on metric events
-    config_t* cfg = cfgCreateDefault();
-    cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_METRIC, 1);
-    g_cfg.staticfg = cfg;
+    evt_fmt_t * evt_fmt = evtFormatCreate();
+    evtFormatSourceEnabledSet(evt_fmt, CFG_SRC_METRIC, TRUE);
+    ctlEvtSet(g_ctl, evt_fmt);
 
     // Call the general groupSetup() too.
     return groupSetup(state);
@@ -190,8 +190,6 @@ countTestTeardown(void** state)
     logDestroy(&g_log);
     mtcDestroy(&g_mtc);
     ctlDestroy(&g_ctl);
-
-    cfgDestroy(&g_cfg.staticfg);
 
     // Call the general groupTeardown() too.
     return groupTeardown(state);

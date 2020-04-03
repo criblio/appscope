@@ -24,6 +24,22 @@ mtcDestroyNullMtcDoesntCrash(void** state)
 }
 
 static void
+mtcEnabledSetAndGet(void** state)
+{
+    assert_int_equal(mtcEnabled(NULL), DEFAULT_MTC_ENABLE);
+
+    mtc_t* mtc = mtcCreate();
+    assert_int_equal(mtcEnabled(mtc), DEFAULT_MTC_ENABLE);
+
+    mtcEnabledSet(mtc, FALSE);
+    assert_false(mtcEnabled(mtc));
+    mtcEnabledSet(mtc, TRUE);
+    assert_true(mtcEnabled(mtc));
+
+    mtcDestroy(&mtc);
+}
+
+static void
 mtcSendForNullMtcDoesntCrash(void** state)
 {
     const char* msg = "Hey, this is cool!\n";
@@ -114,6 +130,7 @@ main(int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(mtcCreateReturnsValidPtr),
         cmocka_unit_test(mtcDestroyNullMtcDoesntCrash),
+        cmocka_unit_test(mtcEnabledSetAndGet),
         cmocka_unit_test(mtcSendForNullMtcDoesntCrash),
         cmocka_unit_test(mtcSendForNullMessageDoesntCrash),
         cmocka_unit_test(mtcTransportSetAndMtcSend),

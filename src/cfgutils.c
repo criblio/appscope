@@ -1542,6 +1542,8 @@ initMtc(config_t* cfg)
     mtc_t* mtc = mtcCreate();
     if (!mtc) return mtc;
 
+    mtcEnabledSet(mtc, cfgMtcEnable(cfg));
+
     transport_t* t = initTransport(cfg, CFG_MTC);
     if (!t) {
         mtcDestroy(&mtc);
@@ -1567,7 +1569,8 @@ initEvtFormat(config_t *cfg)
 
     watch_t src;
     for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
-        evtFormatSourceEnabledSet(evt, src, cfgEvtFormatSourceEnabled(cfg, src));
+        evtFormatSourceEnabledSet(evt, src,
+                   cfgEvtEnable(cfg) && cfgEvtFormatSourceEnabled(cfg, src));
         evtFormatNameFilterSet(evt, src, cfgEvtFormatNameFilter(cfg, src));
         evtFormatFieldFilterSet(evt, src, cfgEvtFormatFieldFilter(cfg, src));
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));

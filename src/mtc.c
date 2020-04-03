@@ -7,6 +7,7 @@
 
 struct _mtc_t
 {
+    bool enable;
     transport_t* transport;
     mtc_fmt_t* format;
 };
@@ -19,6 +20,7 @@ mtcCreate()
         DBG(NULL);
         return NULL;
     }
+    mtc->enable = DEFAULT_MTC_ENABLE;
 
     return mtc;
 }
@@ -32,6 +34,13 @@ mtcDestroy(mtc_t **mtc)
     mtcFormatDestroy(&mtcb->format);
     free(mtcb);
     *mtc = NULL;
+}
+
+bool
+mtcEnabled(mtc_t *mtc)
+{
+    if (!mtc) return DEFAULT_MTC_ENABLE;
+    return mtc->enable;
 }
 
 int
@@ -80,6 +89,13 @@ mtcDisconnect(mtc_t *mtc)
 {
     if (!mtc) return 0;
     return transportDisconnect(mtc->transport);
+}
+
+void
+mtcEnabledSet(mtc_t *mtc, bool val)
+{
+    if (!mtc || val > 1) return;
+    mtc->enable = val;
 }
 
 void

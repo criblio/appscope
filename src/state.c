@@ -789,10 +789,11 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
         strncpy(hcopy, header, headsize);
         post->hdr = hcopy;
 
-        if (strstr(hcopy, "Host: ") != NULL) {
-            proto->ptype = EVT_HREQ;
-        } else {
+        // If the first 6 chars are HTTP/1, it's a response header
+        if (memsearch(hcopy, strlen("HTTP/1"), "HTTP/1", strlen("HTTP/1")) != -1) {
             proto->ptype = EVT_HRES;
+        } else {
+            proto->ptype = EVT_HREQ;
         }
 
         proto->evtype = EVT_PROTO;

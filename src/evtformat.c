@@ -228,7 +228,7 @@ evtFormatNameFilterSet(evt_fmt_t *evt, watch_t src, const char *str)
 void
 evtFormatSourceEnabledSet(evt_fmt_t* evt, watch_t src, unsigned val)
 {
-    if (!evt || src >= CFG_SRC_MAX) return;
+    if (!evt || src >= CFG_SRC_MAX || val > 1) return;
     evt->enabled[src] = val;
 }
 

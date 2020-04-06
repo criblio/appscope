@@ -917,12 +917,12 @@ doTotal(metric_t type)
     if (value->mtc == 0) return;
 
     event_field_t fields[] = {
-            PROC_FIELD(g_proc.procname),
-            PID_FIELD(g_proc.pid),
-            HOST_FIELD(g_proc.hostname),
-            UNIT_FIELD(units),
-            CLASS_FIELD("summary"),
-            FIELDEND
+        PROC_FIELD(g_proc.procname),
+        PID_FIELD(g_proc.pid),
+        HOST_FIELD(g_proc.hostname),
+        UNIT_FIELD(units),
+        CLASS_FIELD("summary"),
+        FIELDEND
     };
     event_t evt = INT_EVENT(metric, value->mtc, aggregation_type, fields);
     if (cmdSendMetric(g_mtc, &evt)) {
@@ -987,12 +987,12 @@ doTotalDuration(metric_t type)
     if (dur == 0) return;
 
     event_field_t fields[] = {
-            PROC_FIELD(g_proc.procname),
-            PID_FIELD(g_proc.pid),
-            HOST_FIELD(g_proc.hostname),
-            UNIT_FIELD(units),
-            CLASS_FIELD("summary"),
-            FIELDEND
+        PROC_FIELD(g_proc.procname),
+        PID_FIELD(g_proc.pid),
+        HOST_FIELD(g_proc.hostname),
+        UNIT_FIELD(units),
+        CLASS_FIELD("summary"),
+        FIELDEND
     };
     event_t evt = INT_EVENT(metric, dur, aggregation_type, fields);
     if (cmdSendMetric(g_mtc, &evt)) {
@@ -1469,4 +1469,5 @@ doEvent()
             free(event);
         }
     }
+    ctlFlush(g_ctl);
 }

@@ -11,7 +11,7 @@ mtc_t*              mtcCreate();
 void                mtcDestroy(mtc_t**);
 
 // Accessors
-bool                mtcEnabled(mtc_t*);
+unsigned            mtcEnabled(mtc_t*);
 int                 mtcSend(mtc_t*, const char* msg);
 int                 mtcSendMetric(mtc_t*, event_t*);
 void                mtcFlush(mtc_t*);
@@ -20,7 +20,7 @@ void                mtcFlush(mtc_t*);
 int                 mtcNeedsConnection(mtc_t *);
 int                 mtcConnect(mtc_t *);
 int                 mtcDisconnect(mtc_t *);
-void                mtcEnabledSet(mtc_t*, bool);
+void                mtcEnabledSet(mtc_t*, unsigned);
 void                mtcTransportSet(mtc_t*, transport_t*);
 void                mtcFormatSet(mtc_t*, mtc_fmt_t*);
 

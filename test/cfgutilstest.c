@@ -411,6 +411,8 @@ cfgProcessEnvironmentEventSource(void** state)
     source_state_t* data = (source_state_t*)state[0];
 
     config_t* cfg = cfgCreateDefault();
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, data->src), data->default_val);
+
     cfgEvtFormatSourceEnabledSet(cfg, data->src, 0);
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, data->src), 0);
 
@@ -428,10 +430,10 @@ cfgProcessEnvironmentEventSource(void** state)
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, data->src), 0);
 
-    // empty string
-    assert_int_equal(setenv(data->env_name, "", 1), 0);
+    // unrecognised value should not affect cfg
+    assert_int_equal(setenv(data->env_name, "blah", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, data->src), data->default_val);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, data->src), 0);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);

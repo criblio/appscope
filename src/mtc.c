@@ -7,7 +7,7 @@
 
 struct _mtc_t
 {
-    bool enable;
+    unsigned enable;
     transport_t* transport;
     mtc_fmt_t* format;
 };
@@ -36,7 +36,7 @@ mtcDestroy(mtc_t **mtc)
     *mtc = NULL;
 }
 
-bool
+unsigned
 mtcEnabled(mtc_t *mtc)
 {
     if (!mtc) return DEFAULT_MTC_ENABLE;
@@ -92,7 +92,7 @@ mtcDisconnect(mtc_t *mtc)
 }
 
 void
-mtcEnabledSet(mtc_t *mtc, bool val)
+mtcEnabledSet(mtc_t *mtc, unsigned val)
 {
     if (!mtc || val > 1) return;
     mtc->enable = val;

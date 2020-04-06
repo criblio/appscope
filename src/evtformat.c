@@ -50,7 +50,7 @@ struct _evt_fmt_t
     local_re_t value_re[CFG_SRC_MAX];
     local_re_t field_re[CFG_SRC_MAX];
     local_re_t name_re[CFG_SRC_MAX];
-    bool enabled[CFG_SRC_MAX];
+    unsigned enabled[CFG_SRC_MAX];
 
     struct {
         time_t time;
@@ -80,7 +80,7 @@ static const char* nameFilterDefault[] = {
     DEFAULT_SRC_METRIC_NAME,
 };
 
-static bool srcEnabledDefault[] = {
+static unsigned srcEnabledDefault[] = {
     DEFAULT_SRC_FILE,
     DEFAULT_SRC_CONSOLE,
     DEFAULT_SRC_SYSLOG,
@@ -192,7 +192,7 @@ evtFormatNameFilter(evt_fmt_t *evt, watch_t src)
     return NULL;
 }
 
-bool
+unsigned
 evtFormatSourceEnabled(evt_fmt_t *evt, watch_t src)
 {
     if (src < CFG_SRC_MAX) {
@@ -226,7 +226,7 @@ evtFormatNameFilterSet(evt_fmt_t *evt, watch_t src, const char *str)
 }
 
 void
-evtFormatSourceEnabledSet(evt_fmt_t* evt, watch_t src, bool val)
+evtFormatSourceEnabledSet(evt_fmt_t* evt, watch_t src, unsigned val)
 {
     if (!evt || src >= CFG_SRC_MAX || val > 1) return;
     evt->enabled[src] = val;

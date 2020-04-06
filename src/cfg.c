@@ -21,7 +21,7 @@ typedef struct {
 struct _config_t
 {
     struct {
-        bool enable;
+        unsigned enable;
         cfg_mtc_format_t format;
         struct {
             char* prefix;
@@ -33,12 +33,12 @@ struct _config_t
     } mtc;
 
     struct {
-        bool enable;
+        unsigned enable;
         cfg_mtc_format_t format;
         char* valuefilter[CFG_SRC_MAX];
         char* fieldfilter[CFG_SRC_MAX];
         char* namefilter[CFG_SRC_MAX];
-        bool src[CFG_SRC_MAX];
+        unsigned src[CFG_SRC_MAX];
     } evt;
 
     struct {
@@ -95,7 +95,7 @@ static const char* nameFilterDefault[] = {
     DEFAULT_SRC_METRIC_NAME,
 };
 
-static bool srcEnabledDefault[] = {
+static unsigned srcEnabledDefault[] = {
     DEFAULT_SRC_FILE,
     DEFAULT_SRC_CONSOLE,
     DEFAULT_SRC_SYSLOG,
@@ -223,7 +223,7 @@ cfgDestroy(config_t** cfg)
 ///////////////////////////////////
 // Accessors
 ///////////////////////////////////
-bool
+unsigned
 cfgMtcEnable(config_t* cfg)
 {
     return (cfg) ? cfg->mtc.enable : DEFAULT_MTC_ENABLE;
@@ -259,7 +259,7 @@ cfgCmdDir(config_t* cfg)
     return (cfg) ? cfg->mtc.commanddir : DEFAULT_COMMAND_DIR;
 }
 
-bool
+unsigned
 cfgEvtEnable(config_t* cfg)
 {
     return (cfg) ? cfg->evt.enable : DEFAULT_EVT_ENABLE;
@@ -307,7 +307,7 @@ cfgEvtFormatNameFilter(config_t* cfg, watch_t src)
     return nameFilterDefault[CFG_SRC_FILE];
 }
 
-bool
+unsigned
 cfgEvtFormatSourceEnabled(config_t* cfg, watch_t src)
 {
     if (src >= 0 && src < CFG_SRC_MAX) {
@@ -427,7 +427,7 @@ cfgLogLevel(config_t* cfg)
 // Setters 
 ///////////////////////////////////
 void
-cfgMtcEnableSet(config_t* cfg, bool val)
+cfgMtcEnableSet(config_t* cfg, unsigned val)
 {
     if (!cfg || val > 1) return;
     cfg->mtc.enable = val;
@@ -503,7 +503,7 @@ cfgMtcVerbositySet(config_t* cfg, unsigned val)
 }
 
 void
-cfgEvtEnableSet(config_t* cfg, bool val)
+cfgEvtEnableSet(config_t* cfg, unsigned val)
 {
     if (!cfg || val > 1) return;
     cfg->evt.enable = val;
@@ -556,7 +556,7 @@ cfgEvtFormatNameFilterSet(config_t* cfg, watch_t src, const char* filter)
 }
 
 void
-cfgEvtFormatSourceEnabledSet(config_t* cfg, watch_t src, bool val)
+cfgEvtFormatSourceEnabledSet(config_t* cfg, watch_t src, unsigned val)
 {
     if (!cfg || src < 0 || src >= CFG_SRC_MAX || val > 1) return;
     cfg->evt.src[src] = val;

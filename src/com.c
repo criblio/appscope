@@ -14,6 +14,7 @@ cmdSendEvent(ctl_t *ctl, event_t *event, uint64_t time, proc_id_t *proc)
 int
 cmdSendMetric(mtc_t *mtc, event_t *evt)
 {
+    if (!mtcEnabled(mtc)) return 0;
     return mtcSendMetric(mtc, evt);
 }
 

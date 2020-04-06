@@ -56,13 +56,10 @@ setReportingInterval(int seconds)
 }
 
 static void
-sendProcMetricEvent(mtc_t *mtc, event_t *event)
+sendEvent(mtc_t *mtc, event_t *event)
 {
-    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC)) {
-        cmdSendEvent(g_ctl, event, getTime(), &g_proc);
-    }
+    cmdSendEvent(g_ctl, event, getTime(), &g_proc);
 
-    if (!mtcEnabled(mtc)) return;
     if (cmdSendMetric(mtc, event) == -1) {
         scopeLog("ERROR: doProcMetric:CPU:cmdSendMetric", -1, CFG_LOG_ERROR);
     }
@@ -71,8 +68,6 @@ sendProcMetricEvent(mtc_t *mtc, event_t *event)
 void
 sendProcessStartMetric()
 {
-    if (!mtcEnabled(g_mtc)) return;
-
     char *urlEncodedCmd = fmtUrlEncode(g_proc.cmd);
     event_field_t fields[] = {
         PROC_FIELD(g_proc.procname),
@@ -323,11 +318,9 @@ doErrorMetric(metric_t type, control_type_t source,
         // Don't report zeros.
         if (value->mtc == 0) return;
 
-        if (mtcEnabled(g_mtc)) {
-            event_t fsErrMetric = INT_EVENT(metric, value->mtc, DELTA, fields);
-            if (cmdSendMetric(g_mtc, &fsErrMetric)) {
-                scopeLog("ERROR: doErrorMetric:FS_ERR:cmdSendMetric", -1, CFG_LOG_ERROR);
-            }
+        event_t fsErrMetric = INT_EVENT(metric, value->mtc, DELTA, fields);
+        if (cmdSendMetric(g_mtc, &fsErrMetric)) {
+            scopeLog("ERROR: doErrorMetric:FS_ERR:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
         atomicSwapU64(&value->mtc, 0);
         break;
@@ -472,7 +465,7 @@ doProcMetric(metric_t type, long long measurement)
                 FIELDEND
             };
             event_t event = INT_EVENT("proc.cpu", measurement, DELTA, fields);
-            sendProcMetricEvent(g_mtc, &event);
+            sendEvent(g_mtc, &event);
         }
 
         // Avoid div by zero
@@ -493,7 +486,7 @@ doProcMetric(metric_t type, long long measurement)
             // TBD: switch from using the configured to a measured interval
             double val = measurement * 100.0 / (interval*1000000.0);
             event_t event = FLT_EVENT("proc.cpu_perc", val, CURRENT, fields);
-            sendProcMetricEvent(g_mtc, &event);
+            sendEvent(g_mtc, &event);
         }
         break;
     }
@@ -508,7 +501,7 @@ doProcMetric(metric_t type, long long measurement)
             FIELDEND
         };
         event_t event = INT_EVENT("proc.mem", measurement, DELTA, fields);
-        sendProcMetricEvent(g_mtc, &event);
+        sendEvent(g_mtc, &event);
         break;
     }
 
@@ -522,7 +515,7 @@ doProcMetric(metric_t type, long long measurement)
             FIELDEND
         };
         event_t event = INT_EVENT("proc.thread", measurement, CURRENT, fields);
-        sendProcMetricEvent(g_mtc, &event);
+        sendEvent(g_mtc, &event);
         break;
     }
 
@@ -536,7 +529,7 @@ doProcMetric(metric_t type, long long measurement)
             FIELDEND
         };
         event_t event = INT_EVENT("proc.fd", measurement, CURRENT, fields);
-        sendProcMetricEvent(g_mtc, &event);
+        sendEvent(g_mtc, &event);
         break;
     }
 
@@ -550,7 +543,7 @@ doProcMetric(metric_t type, long long measurement)
             FIELDEND
         };
         event_t event = INT_EVENT("proc.child", measurement, CURRENT, fields);
-        sendProcMetricEvent(g_mtc, &event);
+        sendEvent(g_mtc, &event);
         break;
     }
 
@@ -923,20 +916,17 @@ doTotal(metric_t type)
     // Don't report zeros.
     if (value->mtc == 0) return;
 
-    if (mtcEnabled(g_mtc)) {
-
-        event_field_t fields[] = {
-            PROC_FIELD(g_proc.procname),
-            PID_FIELD(g_proc.pid),
-            HOST_FIELD(g_proc.hostname),
-            UNIT_FIELD(units),
-            CLASS_FIELD("summary"),
-            FIELDEND
-        };
-        event_t evt = INT_EVENT(metric, value->mtc, aggregation_type, fields);
-        if (cmdSendMetric(g_mtc, &evt)) {
-            scopeLog(err_str, -1, CFG_LOG_ERROR);
-        }
+    event_field_t fields[] = {
+        PROC_FIELD(g_proc.procname),
+        PID_FIELD(g_proc.pid),
+        HOST_FIELD(g_proc.hostname),
+        UNIT_FIELD(units),
+        CLASS_FIELD("summary"),
+        FIELDEND
+    };
+    event_t evt = INT_EVENT(metric, value->mtc, aggregation_type, fields);
+    if (cmdSendMetric(g_mtc, &evt)) {
+        scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
     // Reset the info we tried to report (if it's not a gauge)
@@ -996,19 +986,17 @@ doTotalDuration(metric_t type)
     // Don't report zeros.
     if (dur == 0) return;
 
-    if (mtcEnabled(g_mtc)) {
-        event_field_t fields[] = {
-            PROC_FIELD(g_proc.procname),
-            PID_FIELD(g_proc.pid),
-            HOST_FIELD(g_proc.hostname),
-            UNIT_FIELD(units),
-            CLASS_FIELD("summary"),
-            FIELDEND
-        };
-        event_t evt = INT_EVENT(metric, dur, aggregation_type, fields);
-        if (cmdSendMetric(g_mtc, &evt)) {
-            scopeLog(err_str, -1, CFG_LOG_ERROR);
-        }
+    event_field_t fields[] = {
+        PROC_FIELD(g_proc.procname),
+        PID_FIELD(g_proc.pid),
+        HOST_FIELD(g_proc.hostname),
+        UNIT_FIELD(units),
+        CLASS_FIELD("summary"),
+        FIELDEND
+    };
+    event_t evt = INT_EVENT(metric, dur, aggregation_type, fields);
+    if (cmdSendMetric(g_mtc, &evt)) {
+        scopeLog(err_str, -1, CFG_LOG_ERROR);
     }
 
     // Reset the info we tried to report

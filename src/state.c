@@ -32,6 +32,7 @@ summary_t g_summary = {{0}};
 net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
+int g_mtc_addr_output = TRUE;
 
 // interfaces
 mtc_t *g_mtc = NULL;
@@ -179,45 +180,6 @@ postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const cha
     // something passed in a param that is not a viable address; ltp does this
     if ((stat_err == EVT_ERR) && (errno == EFAULT)) return FALSE;
 
-    if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC)) {
-        if ((stat_err == EVT_STAT) && (g_summary.fs.stat)) return FALSE;
-
-        switch (type) {
-        case NET_ERR_CONN:
-        case NET_ERR_RX_TX:
-            if (g_summary.net.error) return FALSE;
-            break;
-
-        case FS_ERR_OPEN_CLOSE:
-        case FS_ERR_READ_WRITE:
-        case FS_ERR_STAT:
-        case NET_ERR_DNS:
-            if ((g_summary.fs.error) || (g_summary.net.dnserror)) return FALSE;
-            break;
-        default:
-            break;
-        }
-    }
-
-    size_t len = sizeof(struct stat_err_info_t);
-    stat_err_info *sep = calloc(1, len);
-    if (!sep) return FALSE;
-
-    sep->evtype = stat_err;
-    sep->data_type = type;
-
-    if (pathname) {
-        strncpy(sep->name, pathname, strnlen(pathname, sizeof(sep->name)));
-    }
-
-    if (funcop) {
-        strncpy(sep->funcop, funcop, strnlen(funcop, sizeof(sep->funcop)));
-    }
-
-    memmove(&sep->counters, &g_ctrs, sizeof(g_ctrs));
-
-    cmdPostEvent(g_ctl, (char *)sep);
-
     int *summarize = NULL;
     switch (type) {
         case NET_ERR_CONN:
@@ -239,36 +201,63 @@ postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const cha
         default:
             break;
     }
-    return summarize && !*summarize;
+
+    // Bail if we don't need to post
+    int mtc_needs_reporting = summarize && !*summarize;
+    int need_to_post =
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        (mtcEnabled(g_mtc) && mtc_needs_reporting);
+    if (!need_to_post) return FALSE;
+
+    size_t len = sizeof(struct stat_err_info_t);
+    stat_err_info *sep = calloc(1, len);
+    if (!sep) return FALSE;
+
+    sep->evtype = stat_err;
+    sep->data_type = type;
+
+    if (pathname) {
+        strncpy(sep->name, pathname, strnlen(pathname, sizeof(sep->name)));
+    }
+
+    if (funcop) {
+        strncpy(sep->funcop, funcop, strnlen(funcop, sizeof(sep->funcop)));
+    }
+
+    memmove(&sep->counters, &g_ctrs, sizeof(g_ctrs));
+
+    cmdPostEvent(g_ctl, (char *)sep);
+
+    return mtc_needs_reporting;
 }
 
 static int
 postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *pathname)
 {
-    if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC) &&
-        !cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_FILE) &&
-        !cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_CONSOLE) &&
-        !cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_SYSLOG)) {
-        switch (type) {
+    int *summarize = NULL;
+    switch (type) {
         case FS_READ:
         case FS_WRITE:
         case FS_DURATION:
-            if (g_summary.fs.read_write) return FALSE;
+            summarize = &g_summary.fs.read_write;
             break;
-
         case FS_OPEN:
         case FS_CLOSE:
-            if (g_summary.fs.open_close) return FALSE;
+            summarize = &g_summary.fs.open_close;
             break;
-
         case FS_SEEK:
-            if (g_summary.fs.seek) return FALSE;
+            summarize = &g_summary.fs.seek;
             break;
-
         default:
             break;
-        }
     }
+
+    // Bail if we don't need to post
+    int mtc_needs_reporting = summarize && !*summarize;
+    int need_to_post =
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        (mtcEnabled(g_mtc) && mtc_needs_reporting);
+    if (!need_to_post) return FALSE;
 
     size_t len = sizeof(struct fs_info_t);
     fs_info *fsp = calloc(1, len);
@@ -288,12 +277,20 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
     }
 
     cmdPostEvent(g_ctl, (char *)fsp);
-    return TRUE;
+
+    return mtc_needs_reporting;
 }
 
 static int
 postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char *domain)
 {
+    // Bail if we don't need to post
+    int mtc_needs_reporting = !g_summary.net.dns;
+    int need_to_post =
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        (mtcEnabled(g_mtc) && mtc_needs_reporting);
+    if (!need_to_post) return FALSE;
+
     size_t len = sizeof(struct net_info_t);
     net_info *netp = calloc(1, len);
     if (!netp) return FALSE;
@@ -314,29 +311,34 @@ postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char
     memmove(&netp->counters, &g_ctrs, sizeof(g_ctrs));
 
     cmdPostEvent(g_ctl, (char *)netp);
-    return !g_summary.net.dns;
+
+    return mtc_needs_reporting;
 }
 
 static int
 postNetState(int fd, metric_t type, net_info *net)
 {
-    if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC)) {
-        switch (type) {
+    int *summarize = NULL;
+    switch (type) {
         case OPEN_PORTS:
         case NET_CONNECTIONS:
         case CONNECTION_DURATION:
-            if (g_summary.net.open_close) return FALSE;
+            summarize = &g_summary.net.open_close;
             break;
-
         case NETRX:
         case NETTX:
-            if (g_summary.net.rx_tx) return FALSE;
+            summarize = &g_summary.net.rx_tx;
             break;
-
         default:
             break;
-        }
     }
+
+    // Bail if we don't need to post
+    int mtc_needs_reporting = summarize && !*summarize;
+    int need_to_post =
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        (mtcEnabled(g_mtc) && mtc_needs_reporting);
+    if (!need_to_post) return FALSE;
 
     size_t len = sizeof(struct net_info_t);
     net_info *netp = calloc(1, len);
@@ -348,7 +350,7 @@ postNetState(int fd, metric_t type, net_info *net)
     netp->data_type = type;
 
     cmdPostEvent(g_ctl, (char *)netp);
-    return TRUE;
+    return mtc_needs_reporting;
 }
 
 void
@@ -821,6 +823,7 @@ void
 setVerbosity(unsigned verbosity)
 {
     summary_t *summarize = &g_summary;
+    g_mtc_addr_output = verbosity >= DEFAULT_MTC_IPPORT_VERBOSITY;
 
     summarize->fs.error =       (verbosity < 5);
     summarize->fs.open_close =  (verbosity < 6);
@@ -1017,8 +1020,10 @@ doSetAddrs(int sockfd)
     net_info *net;
 
     // Only do this if output is enabled
-    if ((cfgMtcVerbosity(g_cfg.staticfg) < DEFAULT_MTC_IPPORT_VERBOSITY) &&
-        !cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_METRIC)) return 0;
+    int need_to_track_addrs =
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        (mtcEnabled(g_mtc) && g_mtc_addr_output);
+    if (!need_to_track_addrs) return 0;
 
     /*
      * Do this for TCP, UDP or UNIX sockets

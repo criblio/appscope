@@ -21,6 +21,7 @@ typedef struct {
 struct _config_t
 {
     struct {
+        unsigned enable;
         cfg_mtc_format_t format;
         struct {
             char* prefix;
@@ -32,6 +33,7 @@ struct _config_t
     } mtc;
 
     struct {
+        unsigned enable;
         cfg_mtc_format_t format;
         char* valuefilter[CFG_SRC_MAX];
         char* fieldfilter[CFG_SRC_MAX];
@@ -146,12 +148,14 @@ cfgCreateDefault()
         DBG(NULL);
         return NULL;
     }
+    c->mtc.enable = DEFAULT_MTC_ENABLE;
     c->mtc.format = DEFAULT_MTC_FORMAT;
     c->mtc.statsd.prefix = (DEFAULT_STATSD_PREFIX) ? strdup(DEFAULT_STATSD_PREFIX) : NULL;
     c->mtc.statsd.maxlen = DEFAULT_STATSD_MAX_LEN;
     c->mtc.period = DEFAULT_SUMMARY_PERIOD;
     c->mtc.verbosity = DEFAULT_MTC_VERBOSITY;
     c->mtc.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
+    c->evt.enable = DEFAULT_EVT_ENABLE;
     c->evt.format = DEFAULT_CTL_FORMAT;
 
     watch_t src;
@@ -223,6 +227,12 @@ cfgDestroy(config_t** cfg)
 ///////////////////////////////////
 // Accessors
 ///////////////////////////////////
+unsigned
+cfgMtcEnable(config_t* cfg)
+{
+    return (cfg) ? cfg->mtc.enable : DEFAULT_MTC_ENABLE;
+}
+
 cfg_mtc_format_t
 cfgMtcFormat(config_t* cfg)
 {
@@ -251,6 +261,12 @@ const char *
 cfgCmdDir(config_t* cfg)
 {
     return (cfg) ? cfg->mtc.commanddir : DEFAULT_COMMAND_DIR;
+}
+
+unsigned
+cfgEvtEnable(config_t* cfg)
+{
+    return (cfg) ? cfg->evt.enable : DEFAULT_EVT_ENABLE;
 }
 
 cfg_mtc_format_t
@@ -306,7 +322,6 @@ cfgEvtFormatSourceEnabled(config_t* cfg, watch_t src)
     DBG("%d", src);
     return srcEnabledDefault[CFG_SRC_FILE];
 }
-
 
 unsigned
 cfgMtcVerbosity(config_t* cfg)
@@ -416,6 +431,13 @@ cfgLogLevel(config_t* cfg)
 // Setters 
 ///////////////////////////////////
 void
+cfgMtcEnableSet(config_t* cfg, unsigned val)
+{
+    if (!cfg || val > 1) return;
+    cfg->mtc.enable = val;
+}
+
+void
 cfgMtcFormatSet(config_t* cfg, cfg_mtc_format_t fmt)
 {
     if (!cfg || fmt < 0 || fmt >= CFG_FORMAT_MAX) return;
@@ -485,6 +507,13 @@ cfgMtcVerbositySet(config_t* cfg, unsigned val)
 }
 
 void
+cfgEvtEnableSet(config_t* cfg, unsigned val)
+{
+    if (!cfg || val > 1) return;
+    cfg->evt.enable = val;
+}
+
+void
 cfgEventFormatSet(config_t* cfg, cfg_mtc_format_t fmt)
 {
     if (!cfg || fmt < 0 || fmt >= CFG_FORMAT_MAX) return;
@@ -533,7 +562,7 @@ cfgEvtFormatNameFilterSet(config_t* cfg, watch_t src, const char* filter)
 void
 cfgEvtFormatSourceEnabledSet(config_t* cfg, watch_t src, unsigned val)
 {
-    if (!cfg || src < 0 || src >= CFG_SRC_MAX) return;
+    if (!cfg || src < 0 || src >= CFG_SRC_MAX || val > 1) return;
     cfg->evt.src[src] = val;
 }
 

@@ -1,7 +1,8 @@
 ---
 metric:
+  enable: true                      # true, false
   format:
-    type : metricstatsd             # metricstatsd, metricjson
+    type : metricstatsd             # metricstatsd
     #statsdprefix : 'cribl.scope'    # prepends each statsd metric
     statsdmaxlen : 512              # max size of a formatted statsd string
     verbosity : 4                   # 0-9 (0 is least verbose, 9 is most)
@@ -43,6 +44,7 @@ metric:
     port: 8125
 
 event:
+  enable: true                      # true, false
   format:
     type : ndjson                   # ndjson
   watch:

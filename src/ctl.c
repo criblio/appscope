@@ -40,6 +40,13 @@ static switch_map_t switch_map[] = {
     {NULL,               NO_ACTION}
 };
 
+static bool srcEnabledDefault[] = {
+    DEFAULT_SRC_FILE,
+    DEFAULT_SRC_CONSOLE,
+    DEFAULT_SRC_SYSLOG,
+    DEFAULT_SRC_METRIC,
+};
+
 static void
 grab_supplemental_for_block_port(cJSON *json_root, request_t *req)
 {
@@ -663,6 +670,18 @@ ctlEvtSet(ctl_t *ctl, evt_fmt_t *evt)
     // TODO: need to ensure that previous object is no longer in use
     // evtFormatDestroy(&ctl->evt);
     ctl->evt = evt;
+}
+
+bool
+ctlEvtSourceEnabled(ctl_t *ctl, watch_t src)
+{
+    if (src < CFG_SRC_MAX) {
+        if (ctl && ctl->evt) return evtFormatSourceEnabled(ctl->evt, src);
+        return srcEnabledDefault[src];
+    }
+
+    DBG("%d", src);
+    return srcEnabledDefault[CFG_SRC_FILE];
 }
 
 uint64_t

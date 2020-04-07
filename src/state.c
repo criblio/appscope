@@ -811,7 +811,7 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
 int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
-    if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP) &&
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP) &&
         (isHttp(sockfd, &buf, len, src, dtype) == TRUE)) {
         return doHttp(id, sockfd, buf, len, src);
     }

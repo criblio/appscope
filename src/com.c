@@ -3,6 +3,15 @@
 extern rtconfig g_cfg;
 
 // for reporttest on mac __attribute__((weak))
+/*
+ * Note: there are 2 config values to check to see if
+ * events; metrics, logs, console, http are enabled.
+ * 1) the overall event enable/disable
+ * 2) the individual source; metric, log, console, http
+ *
+ * The function ctlEvtSourceEnabled() tests for both conditions.
+ * That is enabled in cfgutils.c:initEvtFormat()
+ */
 int
 cmdSendEvent(ctl_t *ctl, event_t *event, uint64_t time, proc_id_t *proc)
 {
@@ -13,7 +22,7 @@ cmdSendEvent(ctl_t *ctl, event_t *event, uint64_t time, proc_id_t *proc)
 int
 cmdSendHttp(ctl_t *ctl, event_t *event, uint64_t time, proc_id_t *proc)
 {
-    if (!cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) return 0;
+    if (!ctlEvtSourceEnabled(ctl, CFG_SRC_HTTP)) return 0;
     return ctlSendHttp(ctl, event, time, proc);
 }
 

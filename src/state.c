@@ -18,6 +18,7 @@
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
+#define NUM_ATTEMPTS 100
 
 extern rtconfig g_cfg;
 
@@ -31,7 +32,6 @@ summary_t g_summary = {{0}};
 net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
-list_t *g_hlist;
 int g_mtc_addr_output = TRUE;
 
 // interfaces
@@ -62,69 +62,6 @@ ctl_t *g_ctl = NULL;
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
-
-http_list*
-createListEntry(uint64_t nfd, PRFileDesc *result)
-{
-    if (!result) return NULL;
-    http_list* entry = calloc(1, sizeof(http_list));
-    PRIOMethods* ssl_methods = calloc(1, sizeof(PRIOMethods));
-    PRIOMethods* ssl_int_methods = calloc(1, sizeof(PRIOMethods));
-
-    // Handle potential memory issues
-    if (!entry || !ssl_methods || !ssl_int_methods) {
-        if (entry) free(entry);
-        if (ssl_methods) free(ssl_methods);
-        if (ssl_int_methods) free(ssl_int_methods);
-        return NULL;
-    }
-
-    entry->ssl_methods = ssl_methods;
-    entry->ssl_int_methods = ssl_int_methods;
-
-    // assign the contents
-    entry->id = nfd;
-    memmove(entry->ssl_methods, result->methods, sizeof(PRIOMethods));
-    memmove(entry->ssl_int_methods, result->methods, sizeof(PRIOMethods));
-
-    return entry;
-}
-
-void
-freeListEntry(void* arg)
-{
-    http_list* entry = (http_list*)arg;
-    if (!entry) return;
-    if (entry->ssl_methods) free(entry->ssl_methods);
-    if (entry->ssl_int_methods) free(entry->ssl_int_methods);
-    free(entry);
-}
-
-list_t *
-hnew(void)
-{
-    return lstCreate(freeListEntry);
-}
-
-int
-hpush(list_t *hlist, uint64_t id, http_list *data)
-{
-    int success = lstInsert(hlist, id, data);
-    return (success) ? 0 : -1;
-}
-
-int
-hrem(list_t *hlist, uint64_t id)
-{
-    int deleted = lstDelete(hlist, id);
-    return (deleted) ? 0 : -1;
-}
-
-http_list *
-hget(list_t *hlist, uint64_t id)
-{
-    return (http_list*)lstFind(hlist, id);
-}
 
 int
 get_port(int fd, int type, control_type_t which) {
@@ -199,9 +136,7 @@ initState()
     // Per RUC...
     g_fsinfo = fsinfoLocal;
 
-    if (!(g_hlist = hnew())) {
-        scopeLog("ERROR: HTTP Tracking:Malloc", -1, CFG_LOG_ERROR);
-    }
+    initReporting();
 }
 
 void
@@ -712,53 +647,173 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     }
 }
 
-int
-doProtocol(int sockfd, void *buf, size_t len, metric_t src)
+/*
+ * String search with limits.
+ * Should be safe to search binary data.
+ *
+ */
+static int
+memsearch(const char *hay, int haysize, const char *needle, int needlesize) {
+    int haypos, needlepos;
+
+    haysize -= needlesize;
+    for (haypos = 0; haypos <= haysize; haypos++) {
+        for (needlepos = 0; needlepos < needlesize; needlepos++) {
+            if (hay[haypos + needlepos] != needle[needlepos]) {
+                // Next character in haystack.
+                break;
+            }
+        }
+        if (needlepos == needlesize) {
+            return haypos;
+        }
+    }
+    return -1;
+}
+
+// allow all ports if they appear to have an HTTP header
+static bool
+isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
+{
+    if (!buf || !*buf) return FALSE;
+
+    /*
+     * If we have an fd check for TCP
+     * If we don't have a socket it can mean we are
+     * called from certain TLS sessions; not an error
+     */
+    struct net_info_t *net;
+    if ((sockfd != -1) && ((net = getNetEntry(sockfd)))) {
+        if (net->type != SOCK_STREAM) return FALSE;
+    }
+
+    // Handle the data in it's various format
+    switch (dtype) {
+        case BUF:
+        {
+            if ((memsearch(*buf, len, "HTTP/1", strlen("HTTP/1")) != -1) &&
+                (memsearch(*buf, len, "\r\n\r\n", strlen("\r\n\r\n")) != -1)) {
+                return TRUE;
+            }
+            break;
+        }
+
+        case MSG:
+        {
+            int i;
+            struct msghdr *msg = (struct msghdr *)*buf;
+            struct iovec *iov;
+
+            for (i = 0; i < msg->msg_iovlen; i++) {
+                iov = &msg->msg_iov[i];
+                if (iov && iov->iov_base) {
+                    if ((memsearch(iov->iov_base, iov->iov_len, "HTTP/1", strlen("HTTP/1")) != -1) &&
+                        (memsearch(iov->iov_base, iov->iov_len, "\r\n\r\n", strlen("\r\n\r\n")) != -1)) {
+                        // might as well point to the header since we have it here
+                        *buf = iov->iov_base;
+                        return TRUE;
+                    }
+                }
+            }
+            break;
+        }
+
+        case IOV:
+        {
+            int i;
+            struct iovec *iov = (struct iovec *)*buf;
+
+            // len is expected to be an iovcnt for an IOV data type
+            for (i = 0; i < len; i++) {
+                if (iov[i].iov_base) {
+                    if ((memsearch(iov[i].iov_base, iov[i].iov_len, "HTTP/1", strlen("HTTP/1")) != -1) &&
+                        (memsearch(iov[i].iov_base, iov[i].iov_len, "\r\n\r\n", strlen("\r\n\r\n")) != -1)) {
+                        // might as well point to the header since we have it here
+                        *buf = iov[i].iov_base; 
+                        return TRUE;
+                    }
+                }
+            }
+            break;
+        }
+
+        case NONE:
+        default:
+            break;
+    }
+
+    return FALSE;
+}
+
+// For now, only doing HTTP/1.X headers
+static int
+doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
 {
     if ((buf == NULL) || (len <= 0)) return -1;
     
-    size_t headsize, copysize;
-    in_port_t lport, rport;
-    net_info *net;
-    char *headend, *header;
+    size_t headsize;
+    uint64_t uid;
+    char *headend, *header, *hcopy;
     protocol_info *proto;
+    http_post *post;
+    net_info *net;
 
-    // For now, only doing HTTP headers
-    if ((src == TLSRX) || (src == TLSTX)) {
-        /*
-         * Is it always safe to string search here?
-         * Relying on the caller to ensure data is ready
-         */
-        if (strstr(buf, "HTTP") == NULL) return -1;
-    } else if ((net = getNetEntry(sockfd)) != NULL) { 
-        // Keeps us from doing string searches on bin data
-        lport = get_port(sockfd, g_netinfo[sockfd].localConn.ss_family, LOCAL);
-        rport = get_port(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE);
-
-        if ((rport != 80) && (lport != 80)) return -1;
+    /*
+     * If we have an fd, use the uid/channel value as it's unique 
+     * else we are likley using TLS, so default to the session ID
+     */
+    if ((sockfd != -1) && ((net = getNetEntry(sockfd)) != NULL)) {
+        uid = net->uid;
+    } else if (id != -1) {
+        uid = id;
     } else {
         return -1;
     }
 
-    //scopeLog("doProtocol", sockfd, CFG_LOG_INFO);
     if ((headend = strstr(buf, "\r\n\r\n")) != NULL) {
-        if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) return 0;
         header = buf;
-        headsize = (headend - (char *)buf) + 4;
+        headsize = (headend - (char *)buf);
 
-        if ((src == NETRX) || (src == TLSRX)){
-            strncpy(proto->header_type, "http-resp", HDRTYPE_MAX);
-        } else if ((src == NETTX) || (src == TLSTX)) {
-            strncpy(proto->header_type, "http-req", HDRTYPE_MAX);
-        } else {
-            strncpy(proto->header_type, "undef-header", HDRTYPE_MAX);
+        if ((post = calloc(1, sizeof(struct http_post_t))) == NULL) return -1;
+        if ((hcopy = calloc(1, headsize + 4)) == NULL) {
+            free(post);
+            return -1;
         }
 
-        copysize = (headsize < sizeof(proto->header)) ? headsize : sizeof(proto->header); 
-        strncat(proto->header, header, copysize);
-        proto->fd = sockfd;
+        if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
+            free(post);
+            free(hcopy);
+            return -1;
+        }
+
+        post->start_duration = getTime();
+        post->id = uid;
+        strncpy(hcopy, header, headsize);
+        post->hdr = hcopy;
+
+        // If the first 6 chars are HTTP/1, it's a response header
+        if (memsearch(hcopy, strlen("HTTP/1"), "HTTP/1", strlen("HTTP/1")) != -1) {
+            proto->ptype = EVT_HRES;
+        } else {
+            proto->ptype = EVT_HREQ;
+        }
+
         proto->evtype = EVT_PROTO;
+        proto->len = headsize;
+        proto->fd = sockfd;
+        proto->data = (char *)post;
         cmdPostEvent(g_ctl, (char *)proto);
+    }
+
+    return 0;
+}
+
+int
+doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
+{
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP) &&
+        (isHttp(sockfd, &buf, len, src, dtype) == TRUE)) {
+        return doHttp(id, sockfd, buf, len, src);
     }
 
     return 0;
@@ -1222,7 +1277,7 @@ doURL(int sockfd, const void *buf, size_t len, metric_t src)
 }
 
 int
-doRecv(int sockfd, ssize_t rc)
+doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
 {
     if (checkNetEntry(sockfd) == TRUE) {
         if (!g_netinfo[sockfd].active) {
@@ -1232,12 +1287,15 @@ doRecv(int sockfd, ssize_t rc)
         doSetAddrs(sockfd);
         doUpdateState(NETRX, sockfd, rc, NULL, NULL);
 
+        if ((sockfd != -1) && buf && (len > 0)) {
+            doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETRX, src);
+        }
     }
     return 0;
 }
 
 int
-doSend(int sockfd, ssize_t rc)
+doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
 {
     if (checkNetEntry(sockfd) == TRUE) {
         if (!g_netinfo[sockfd].active) {
@@ -1252,6 +1310,11 @@ doSend(int sockfd, ssize_t rc)
             if (g_netinfo[sockfd].dnsName[0]) {
                 doUpdateState(DNS, sockfd, (ssize_t)0, NULL, NULL);
             }
+        }
+
+
+        if ((sockfd != -1) && buf && (len > 0)) {
+            doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETTX, src);
         }
     }
     return 0;
@@ -1318,7 +1381,8 @@ reportAllFds(control_type_t source)
 }
 
 void
-doRead(int fd, uint64_t initialTime, int success, ssize_t bytes, const char *func)
+doRead(int fd, uint64_t initialTime, int success, const void *buf, ssize_t bytes,
+       const char *func, src_data_t src, size_t cnt)
 {
     struct fs_info_t *fs = getFSEntry(fd);
     struct net_info_t *net = getNetEntry(fd);
@@ -1328,7 +1392,11 @@ doRead(int fd, uint64_t initialTime, int success, ssize_t bytes, const char *fun
         if (net) {
             // This is a network descriptor
             doSetAddrs(fd);
-            doRecv(fd, bytes);
+            if (src == IOV) {
+                doRecv(fd, bytes, buf, cnt, src);
+            } else {
+                doRecv(fd, bytes, buf, bytes, src);
+            }
         } else if (fs) {
             // Don't count data from stdin
             if ((fd > 2) || strncmp(fs->path, "std", 3)) {
@@ -1347,7 +1415,8 @@ doRead(int fd, uint64_t initialTime, int success, ssize_t bytes, const char *fun
 }
 
 void
-doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t bytes, const char *func)
+doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t bytes,
+        const char *func, src_data_t src, size_t cnt)
 {
     struct fs_info_t *fs = getFSEntry(fd);
     struct net_info_t *net = getNetEntry(fd);
@@ -1357,7 +1426,11 @@ doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t byte
         if (net) {
             // This is a network descriptor
             doSetAddrs(fd);
-            doSend(fd, bytes);
+            if (src == IOV) {
+                doSend(fd, bytes, buf, cnt, src);
+            } else {
+                doSend(fd, bytes, buf, bytes, src);
+            }
         } else if (fs) {
             // Don't count data from stdout, stderr
             if ((fd > 2) || strncmp(fs->path, "std", 3)) {
@@ -1514,7 +1587,6 @@ doClose(int fd, const char *func)
     struct fs_info_t *fsinfo;
 
     if ((ninfo = getNetEntry(fd)) != NULL) {
-
         doUpdateState(OPEN_PORTS, fd, -1, func, NULL);
         doUpdateState(NET_CONNECTIONS, fd, -1, func, NULL);
         doUpdateState(CONNECTION_DURATION, fd, -1, func, NULL);
@@ -1592,7 +1664,7 @@ doSendFile(int out_fd, int in_fd, uint64_t initialTime, int rc, const char *func
         scopeLog(func, in_fd, CFG_LOG_TRACE);
         if (nettx) {
             doSetAddrs(out_fd);
-            doSend(out_fd, rc);
+            doSend(out_fd, rc, NULL, 0, NONE);
         }
 
         if (fsrd) {

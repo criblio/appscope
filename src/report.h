@@ -63,6 +63,8 @@ typedef enum {
     EVT_ERR,
     EVT_DNS,
     EVT_PROTO,
+    EVT_HREQ,
+    EVT_HRES,
     TLSRX,
     TLSTX
 } metric_t;
@@ -78,10 +80,8 @@ typedef enum {
 extern mtc_t *g_mtc;
 extern ctl_t *g_ctl;
 
-
+void initReporting(void);
 void setReportingInterval(int);
-
-
 void sendProcessStartMetric();
 void doErrorMetric(metric_t, control_type_t, const char *, const char *, void *);
 void doProcMetric(metric_t, long long);
@@ -89,6 +89,5 @@ void doStatMetric(const char *, const char *, void *);
 void doTotal(metric_t);
 void doTotalDuration(metric_t);
 void doEvent(void);
-
 
 #endif // __REPORT_H__

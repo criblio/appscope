@@ -71,6 +71,12 @@ event:
 #      field: ^[^h]+                 # whitelist ex regex describing field names
 #      value: .*
 
+    # Enable extraction of HTTP headers
+#    - type: http
+#      name: .*                      # .*-res | .*-req | .*-metrics
+#      field: ^[^h]+                 # ^[^h]+ whitelist ex regex describing field names
+#      value: .*
+
 libscope:
   transport:
     type: tcp                       # udp, tcp, unix, file, syslog

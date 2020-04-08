@@ -21,7 +21,12 @@
 
 #define DYN_CONFIG_PREFIX "scope"
 #define MAXTRIES 10
-#define NUM_ATTEMPTS 100
+
+typedef struct nss_list_t {
+    uint64_t id;
+    PRIOMethods *ssl_methods;
+    PRIOMethods *ssl_int_methods;
+} nss_list;
 
 typedef struct thread_timing_t {
     unsigned interval;                   // in seconds

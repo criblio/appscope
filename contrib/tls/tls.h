@@ -12,7 +12,9 @@ struct ssl_session_def;
 typedef struct ssl_session_def SSL;
 
 ssize_t gnutls_record_recv(gnutls_session_t, void *, size_t);
-ssize_t gnutls_record_send_early_data(gnutls_session_t, const void *, size_t);
+ssize_t gnutls_record_send(gnutls_session_t, const void *, size_t);
+int     gnutls_transport_get_int(gnutls_session_t);
+void    gnutls_transport_get_int2(gnutls_session_t, int *, int *);
 
 int SSL_read(SSL *, void *, int);
 int SSL_write(SSL *, const void *, int);

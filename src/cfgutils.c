@@ -111,6 +111,7 @@ enum_map_t watchTypeMap[] = {
     {"console",               CFG_SRC_CONSOLE},
     {"syslog",                CFG_SRC_SYSLOG},
     {"metric",                CFG_SRC_METRIC},
+    {"http",                  CFG_SRC_HTTP},
     {NULL,                    -1}
 };
 
@@ -421,6 +422,8 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_METRIC_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_NAME")) {
+        cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_FIELD")) {
@@ -429,6 +432,8 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_METRIC_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_FIELD")) {
+        cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_VALUE")) {
@@ -437,6 +442,8 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_METRIC_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_VALUE")) {
+        cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE")) {
@@ -445,6 +452,8 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_SYSLOG, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_METRIC")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_METRIC, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP")) {
+        cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_HTTP, value);
     }
 
     free(value);

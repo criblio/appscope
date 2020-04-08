@@ -219,13 +219,13 @@ nothingCrashesBeforeAnyInit(void** state)
     doAddNewSock(9);
     getDNSName(10, NULL, 0);
     doURL(11, NULL, 0, NETRX);
-    doRecv(12, 4312);
-    doSend(13, 6682);
+    doRecv(12, 4312, NULL, 0, BUF);
+    doSend(13, 6682, NULL, 0, BUF);
     doAccept(14, NULL, 0, "acceptFunc");
     reportFD(15, EVENT_BASED);
     reportAllFds(PERIODIC);
-    doRead(16, 987, 1, 13, "readFunc");
-    doWrite(17, 876, 1, NULL, 0, "writeFunc");
+    doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
+    doWrite(17, 876, 1, NULL, 0, "writeFunc", BUF, 0);
     doSeek(18, 1, "seekymcseekface");
 #ifdef __LINUX__
     doStatPath("/pathy/path", 0, "statymcstatface");
@@ -263,7 +263,7 @@ doReadFileNoSummarization(void** state)
     assert_int_equal(eventCalls("fs.op.open"), 1);
 
     // Zeros should not be reported on any interface
-    doRead(16, 987, 1, 0, "readFunc");
+    doRead(16, 987, 1, NULL, 0, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 0);
 
@@ -274,8 +274,8 @@ doReadFileNoSummarization(void** state)
 
     // Without read/write summarization, every doRead is output
     clearTestData();
-    doRead(16, 987, 1, 13, "readFunc");
-    doRead(16, 987, 1, 13, "readFunc");
+    doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
+    doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 2);
     assert_int_equal(metricValues("fs.read"), 2*13);
     assert_int_equal(eventCalls("fs.read"), 2);
@@ -308,7 +308,7 @@ doReadFileSummarizedOpenCloseNotSummarized(void** state)
     assert_int_equal(eventCalls("fs.op.open"), 1);
 
     // Zeros should not be reported on any interface
-    doRead(16, 987, 1, 0, "readFunc");
+    doRead(16, 987, 1, NULL, 0, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 0);
 
@@ -319,8 +319,8 @@ doReadFileSummarizedOpenCloseNotSummarized(void** state)
 
     // With read/write summarization, no doRead is output at the time
     clearTestData();
-    doRead(16, 987, 1, 13, "readFunc");
-    doRead(16, 987, 1, 13, "readFunc");
+    doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
+    doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 2);
     assert_int_equal(eventValues("fs.read"), 2*13);
@@ -354,7 +354,7 @@ doReadFileFullSummarization(void** state)
     assert_int_equal(eventCalls("fs.op.open"), 1);
 
     // Zeros should not be reported on any interface
-    doRead(16, 987, 1, 0, "readFunc");
+    doRead(16, 987, 1, NULL, 0, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 0);
 
@@ -365,8 +365,8 @@ doReadFileFullSummarization(void** state)
 
     // With read/write summarization, no doRead is output at the time
     clearTestData();
-    doRead(16, 987, 1, 13, "readFunc");
-    doRead(16, 987, 1, 13, "readFunc");
+    doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
+    doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 2);
     assert_int_equal(eventValues("fs.read"), 2*13);
@@ -405,7 +405,7 @@ doWriteFileNoSummarization(void** state)
     assert_int_equal(eventCalls("fs.op.open"), 1);
 
     // Zeros should not be reported on any interface
-    doWrite(16, 987, 1, buf, 0, "writeFunc");
+    doWrite(16, 987, 1, buf, 0, "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 0);
     assert_int_equal(eventCalls("fs.write"), 0);
 
@@ -416,8 +416,8 @@ doWriteFileNoSummarization(void** state)
 
     // Without read/write summarization, every doWrite is output
     clearTestData();
-    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc");
-    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc");
+    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
+    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 2);
     assert_int_equal(metricValues("fs.write"), 2*sizeof(buf));
     assert_int_equal(eventCalls("fs.write"), 2);
@@ -452,7 +452,7 @@ doWriteFileSummarizedOpenCloseNotSummarized(void** state)
     assert_int_equal(eventCalls("fs.op.open"), 1);
 
     // Zeros should not be reported on any interface
-    doWrite(16, 987, 1, buf, 0, "writeFunc");
+    doWrite(16, 987, 1, buf, 0, "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 0);
     assert_int_equal(eventCalls("fs.write"), 0);
 
@@ -463,8 +463,8 @@ doWriteFileSummarizedOpenCloseNotSummarized(void** state)
 
     // With read/write summarization, no doWrite is output at the time
     clearTestData();
-    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc");
-    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc");
+    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
+    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 0);
     assert_int_equal(eventCalls("fs.write"), 2);
     assert_int_equal(eventValues("fs.write"), 2*sizeof(buf));
@@ -500,7 +500,7 @@ doWriteFileFullSummarization(void** state)
     assert_int_equal(eventCalls("fs.op.open"), 1);
 
     // Zeros should not be reported on any interface
-    doWrite(16, 987, 1, buf, 0, "writeFunc");
+    doWrite(16, 987, 1, buf, 0, "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 0);
     assert_int_equal(eventCalls("fs.write"), 0);
 
@@ -511,8 +511,8 @@ doWriteFileFullSummarization(void** state)
 
     // With read/write summarization, no doWrite is output at the time
     clearTestData();
-    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc");
-    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc");
+    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
+    doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 0);
     assert_int_equal(eventCalls("fs.write"), 2);
     assert_int_equal(eventValues("fs.write"), 2*sizeof(buf));
@@ -561,7 +561,7 @@ doRecvNoSummarization(void** state)
 
     // Zeros should not be reported on any interface
     // Well, unless it's a change to zero for a gauge
-    doRecv(16, 0);
+    doRecv(16, 0, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.rx"), 0);
     assert_int_equal(eventCalls("net.rx"), 0);
 
@@ -572,8 +572,8 @@ doRecvNoSummarization(void** state)
 
     // Without rx/tx summarization, every doRecv is output
     clearTestData();
-    doRecv(16, 13);
-    doRecv(16, 13);
+    doRecv(16, 13, NULL, 0, BUF);
+    doRecv(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.rx"), 2);
     assert_int_equal(metricValues("net.rx"), 2*13);
     assert_int_equal(eventCalls("net.rx"), 2);
@@ -622,7 +622,7 @@ doRecvSummarizedOpenCloseNotSummarized(void** state)
 
     // Zeros should not be reported on any interface
     // Well, unless it's a change to zero for a gauge
-    doRecv(16, 0);
+    doRecv(16, 0, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.rx"), 0);
     assert_int_equal(eventCalls("net.rx"), 0);
 
@@ -633,8 +633,8 @@ doRecvSummarizedOpenCloseNotSummarized(void** state)
 
     // With rx/tx summarization, no doRecv is output at the time
     clearTestData();
-    doRecv(16, 13);
-    doRecv(16, 13);
+    doRecv(16, 13, NULL, 0, BUF);
+    doRecv(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.rx"), 0);
     assert_int_equal(eventCalls("net.rx"), 2);
     assert_int_equal(eventValues("net.rx"), 2*13);
@@ -685,7 +685,7 @@ doRecvFullSummarization(void** state)
 
     // Zeros should not be reported on any interface
     // Well, unless it's a change to zero for a gauge
-    doRecv(16, 0);
+    doRecv(16, 0, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.rx"), 0);
     assert_int_equal(eventCalls("net.rx"), 0);
 
@@ -696,8 +696,8 @@ doRecvFullSummarization(void** state)
 
     // With rx/tx summarization, no doRecv is output at the time
     clearTestData();
-    doRecv(16, 13);
-    doRecv(16, 13);
+    doRecv(16, 13, NULL, 0, BUF);
+    doRecv(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.rx"), 0);
     assert_int_equal(eventCalls("net.rx"), 2);
     assert_int_equal(eventValues("net.rx"), 2*13);
@@ -748,7 +748,7 @@ doSendNoSummarization(void** state)
 
     // Zeros should not be reported on any interface
     // Well, unless it's a change to zero for a gauge
-    doSend(16, 0);
+    doSend(16, 0, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 0);
 
@@ -759,8 +759,8 @@ doSendNoSummarization(void** state)
 
     // Without rx/tx summarization, every doSend is output
     clearTestData();
-    doSend(16, 13);
-    doSend(16, 13);
+    doSend(16, 13, NULL, 0, BUF);
+    doSend(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 2);
     assert_int_equal(metricValues("net.tx"), 2*13);
     assert_int_equal(eventCalls("net.tx"), 2);
@@ -809,7 +809,7 @@ doSendSummarizedOpenCloseNotSummarized(void** state)
 
     // Zeros should not be reported on any interface
     // Well, unless it's a change to zero for a gauge
-    doSend(16, 0);
+    doSend(16, 0, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 0);
 
@@ -820,8 +820,8 @@ doSendSummarizedOpenCloseNotSummarized(void** state)
 
     // With rx/tx summarization, no doSend is output at the time
     clearTestData();
-    doSend(16, 13);
-    doSend(16, 13);
+    doSend(16, 13, NULL, 0, BUF);
+    doSend(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
     assert_int_equal(eventValues("net.tx"), 2*13);
@@ -872,7 +872,7 @@ doSendFullSummarization(void** state)
 
     // Zeros should not be reported on any interface
     // Well, unless it's a change to zero for a gauge
-    doSend(16, 0);
+    doSend(16, 0, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 0);
 
@@ -883,8 +883,8 @@ doSendFullSummarization(void** state)
 
     // With rx/tx summarization, no doSend is output at the time
     clearTestData();
-    doSend(16, 13);
-    doSend(16, 13);
+    doSend(16, 13, NULL, 0, BUF);
+    doSend(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
     assert_int_equal(eventValues("net.tx"), 2*13);
@@ -1155,7 +1155,7 @@ doDNSSendNoDNSSummarization(void** state)
     assert_int_equal(eventCalls("net.port"), 1);
 
     // Zeros should not be reported on any interface
-    doSend(16, 0);
+    doSend(16, 0, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.dns"), 0);
     assert_int_equal(eventCalls("net.dns"), 0);
 
@@ -1176,12 +1176,12 @@ doDNSSendNoDNSSummarization(void** state)
 	0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01
     };
     getDNSName(16, pkt, sizeof(pkt));
-    doSend(16, 13);
+    doSend(16, 13, NULL, 0, BUF);
     // Switch from www.google.com to www.reddit.com.
     // This is because we only report dns domain *changes*.
     memcpy(&pkt[17], "reddit", 6);
     getDNSName(16, pkt, sizeof(pkt));
-    doSend(16, 13);
+    doSend(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
     assert_int_equal(eventValues("net.tx"), 2*13);
@@ -1237,7 +1237,7 @@ doDNSSendDNSSummarization(void** state)
     assert_int_equal(eventCalls("net.port"), 1);
 
     // Zeros should not be reported on any interface
-    doSend(16, 0);
+    doSend(16, 0, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.dns"), 0);
     assert_int_equal(eventCalls("net.dns"), 0);
 
@@ -1258,12 +1258,12 @@ doDNSSendDNSSummarization(void** state)
 	0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01
     };
     getDNSName(16, pkt, sizeof(pkt));
-    doSend(16, 13);
+    doSend(16, 13, NULL, 0, BUF);
     // Switch from www.google.com to www.reddit.com.
     // This is because we only report dns domain *changes*.
     memcpy(&pkt[17], "reddit", 6);
     getDNSName(16, pkt, sizeof(pkt));
-    doSend(16, 13);
+    doSend(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
     assert_int_equal(eventValues("net.tx"), 2*13);
@@ -1434,8 +1434,8 @@ doFSReadWriteErrorNoSummarization(void** state)
     assert_int_equal(eventCalls(NULL), 0);
 
     // Should create "read/write" fs.error and report it immediately
-    doRead(16, 987, 0, 0, "readFunc");
-    doRead(16, 987, 0, 0, "readFunc");
+    doRead(16, 987, 0, NULL, 0, "readFunc", BUF, 0);
+    doRead(16, 987, 0, NULL, 0, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.error"), 2);
     assert_int_equal(metricValues("fs.error"), 2);
     assert_int_equal(eventCalls("fs.error"), 2);
@@ -1464,8 +1464,8 @@ doFSReadWriteErrorSummarization(void** state)
     assert_int_equal(eventCalls(NULL), 0);
 
     // Should create "read/write" fs.error but not report it
-    doRead(16, 987, 0, 0, "readFunc");
-    doRead(16, 987, 0, 0, "readFunc");
+    doRead(16, 987, 0, NULL, 0, "readFunc", BUF, 0);
+    doRead(16, 987, 0, NULL, 0, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.error"), 0);
     assert_int_equal(eventCalls("fs.error"), 2);
     assert_int_equal(eventValues("fs.error"), 2);
@@ -1494,8 +1494,8 @@ doNetRxTxErrorNoSummarization(void** state)
     assert_int_equal(eventCalls(NULL), 0);
 
     // Should create "rx/tx" net.error and report it immediately
-    doRead(16, 987, 0, 0, "readFunc");
-    doRead(16, 987, 0, 0, "readFunc");
+    doRead(16, 987, 0, NULL, 0, "readFunc", BUF, 0);
+    doRead(16, 987, 0, NULL, 0, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("net.error"), 2);
     assert_int_equal(metricValues("net.error"), 2);
     assert_int_equal(eventCalls("net.error"), 2);
@@ -1524,8 +1524,8 @@ doNetRxTxErrorSummarization(void** state)
     assert_int_equal(eventCalls(NULL), 0);
 
     // Should create "rx/tx" net.error but not report it
-    doRead(16, 987, 0, 0, "readFunc");
-    doRead(16, 987, 0, 0, "readFunc");
+    doRead(16, 987, 0, NULL, 0, "readFunc", BUF, 0);
+    doRead(16, 987, 0, NULL, 0, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("net.error"), 0);
     assert_int_equal(eventCalls("net.error"), 2);
     assert_int_equal(eventValues("net.error"), 2);

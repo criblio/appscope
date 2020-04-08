@@ -171,8 +171,6 @@ doProtocolMetric(protocol_info *proto)
 {
     if (!proto) return;
 
-    char *tmpmsg = NULL;
-
     if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
         http_post *post = (http_post *)proto->data;
         http_map *map;
@@ -220,8 +218,7 @@ doProtocolMetric(protocol_info *proto)
             map->resp = (char *)post->hdr;
 
             if (!map->req) {
-                tmpmsg = strdup("None");
-                map->req = tmpmsg;
+                map->req = strdup("None");
             }
 
             event_field_t hfields[] = {
@@ -253,7 +250,6 @@ doProtocolMetric(protocol_info *proto)
     }
 
     destroyProto(proto);
-    if (tmpmsg) free(tmpmsg);
 }
 
 void

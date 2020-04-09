@@ -1723,6 +1723,7 @@ SSL_read(SSL *ssl, void *buf, int num)
 {
     int rc;
     
+    scopeLog("SSL_read", -1, CFG_LOG_ERROR);
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
 
@@ -1738,6 +1739,7 @@ SSL_write(SSL *ssl, const void *buf, int num)
 {
     int rc;
     
+    scopeLog("SSL_write", -1, CFG_LOG_ERROR);
     WRAP_CHECK(SSL_write, -1);
     rc = g_fn.SSL_write(ssl, buf, num);
 
@@ -1753,8 +1755,72 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
 {
     size_t rc;
 
+    scopeLog("gnutls_record_recv", -1, CFG_LOG_ERROR);
     WRAP_CHECK(gnutls_record_recv, -1);
     rc = g_fn.gnutls_record_recv(session, data, data_size);
+
+    // force check for negative values
+    if ((int)rc > 0) {
+        /*
+         * Note: haven't been able to get an fd in most cases 
+         * In some cases this may work:
+         * int fd = gnutls_transport_get_int(session);
+         */
+        doProtocol((uint64_t)session, -1, data, data_size, TLSRX, BUF);
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+gnutls_record_recv_early_data(gnutls_session_t session, void *data, size_t data_size)
+{
+    size_t rc;
+
+    scopeLog("gnutls_record_recv_early_data", -1, CFG_LOG_ERROR);
+    WRAP_CHECK(gnutls_record_recv_early_data, -1);
+    rc = g_fn.gnutls_record_recv_early_data(session, data, data_size);
+
+    // force check for negative values
+    if ((int)rc > 0) {
+        /*
+         * Note: haven't been able to get an fd in most cases 
+         * In some cases this may work:
+         * int fd = gnutls_transport_get_int(session);
+         */
+        doProtocol((uint64_t)session, -1, data, data_size, TLSRX, BUF);
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+gnutls_record_recv_packet(gnutls_session_t session, gnutls_packet_t *packet)
+{
+    size_t rc;
+
+    scopeLog("gnutls_record_recv_packet", -1, CFG_LOG_ERROR);
+    WRAP_CHECK(gnutls_record_recv_packet, -1);
+    rc = g_fn.gnutls_record_recv_packet(session, packet);
+
+    // force check for negative values
+    if ((int)rc > 0) {
+        /*
+         * Note: haven't been able to get an fd in most cases 
+         * In some cases this may work:
+         * int fd = gnutls_transport_get_int(session);
+         */
+        //doProtocol((uint64_t)session, -1, data, data_size, TLSRX, BUF);
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+gnutls_record_recv_seq(gnutls_session_t session, void *data, size_t data_size, unsigned char *seq)
+{
+    size_t rc;
+
+    scopeLog("gnutls_record_recv_seq", -1, CFG_LOG_ERROR);
+    WRAP_CHECK(gnutls_record_recv_seq, -1);
+    rc = g_fn.gnutls_record_recv_seq(session, data, data_size, seq);
 
     // force check for negative values
     if ((int)rc > 0) {
@@ -1773,8 +1839,72 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
 {
     size_t rc;
 
+    scopeLog("gnutls_record_send", -1, CFG_LOG_ERROR);
     WRAP_CHECK(gnutls_record_send, -1);
     rc = g_fn.gnutls_record_send(session, data, data_size);
+
+    if ((int)rc > 0) {
+        /*
+         * Note: haven't been able to get an fd in most cases 
+         * In some cases this may work:
+         * int fd = gnutls_transport_get_int(session);
+         */
+        doProtocol((uint64_t)session, -1, (void *)data, data_size, TLSTX, BUF);
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size,
+                    size_t pad, unsigned flags)
+{
+    size_t rc;
+
+    scopeLog("gnutls_record_send2", -1, CFG_LOG_ERROR);
+    WRAP_CHECK(gnutls_record_send2, -1);
+    rc = g_fn.gnutls_record_send2(session, data, data_size, pad, flags);
+
+    if ((int)rc > 0) {
+        /*
+         * Note: haven't been able to get an fd in most cases 
+         * In some cases this may work:
+         * int fd = gnutls_transport_get_int(session);
+         */
+        doProtocol((uint64_t)session, -1, (void *)data, data_size, TLSTX, BUF);
+    }
+    return rc;
+}
+
+
+EXPORTON ssize_t
+gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t data_size)
+{
+    size_t rc;
+
+    scopeLog("gnutls_record_send_early_data", -1, CFG_LOG_ERROR);
+    WRAP_CHECK(gnutls_record_send_early_data, -1);
+    rc = g_fn.gnutls_record_send_early_data(session, data, data_size);
+
+    if ((int)rc > 0) {
+        /*
+         * Note: haven't been able to get an fd in most cases 
+         * In some cases this may work:
+         * int fd = gnutls_transport_get_int(session);
+         */
+        doProtocol((uint64_t)session, -1, (void *)data, data_size, TLSTX, BUF);
+    }
+    return rc;
+}
+
+EXPORTON ssize_t
+gnutls_record_send_range(gnutls_session_t session, const void *data, size_t data_size,
+                         const gnutls_range_st *range)
+{
+    size_t rc;
+
+    scopeLog("gnutls_record_send_range", -1, CFG_LOG_ERROR);
+    WRAP_CHECK(gnutls_record_send_range, -1);
+    rc = g_fn.gnutls_record_send_range(session, data, data_size, range);
 
     if ((int)rc > 0) {
         /*
@@ -1794,12 +1924,13 @@ nss_close(PRFileDesc *fd)
     nss_list *nssentry;
     int nfd = PR_FileDesc2NativeHandle(fd);
 
+    scopeLog("nss_recv", nfd, CFG_LOG_ERROR);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
         rc = nssentry->ssl_methods->close(fd);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog("ERROR: ssl_close no list entry", -1, CFG_LOG_ERROR);
+        scopeLog("ERROR: nss_close no list entry", -1, CFG_LOG_ERROR);
         return rc;
     }
 
@@ -1815,12 +1946,13 @@ nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRInterv
     nss_list *nssentry;
     int nfd = PR_FileDesc2NativeHandle(fd);
 
+    scopeLog("nss_send", nfd, CFG_LOG_ERROR);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
         rc = nssentry->ssl_methods->send(fd, buf, amount, flags, timeout);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog("ERROR: ssl_send no list entry", -1, CFG_LOG_ERROR);
+        scopeLog("ERROR: nss_send no list entry", -1, CFG_LOG_ERROR);
     }
 
     if (rc > 0) doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)amount, TLSTX, BUF);
@@ -1833,15 +1965,122 @@ nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd =
-        PR_FileDesc2NativeHandle(fd);
+    int nfd = PR_FileDesc2NativeHandle(fd);
 
+    scopeLog("nss_recv", nfd, CFG_LOG_ERROR);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
         rc = nssentry->ssl_methods->recv(fd, buf, amount, flags, timeout);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog("ERROR: ssl_recv no list entry", -1, CFG_LOG_ERROR);
+        scopeLog("ERROR: nss_recv no list entry", -1, CFG_LOG_ERROR);
+    }
+
+    if (rc > 0) doProtocol((uint64_t)fd, nfd, buf, (size_t)amount, TLSRX, BUF);
+
+    return rc;
+}
+
+static PRInt32
+nss_read(PRFileDesc *fd, void *buf, PRInt32 amount)
+{
+    PRInt32 rc;
+    nss_list *nssentry;
+    int nfd = PR_FileDesc2NativeHandle(fd);
+
+    scopeLog("nss_read", nfd, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+        rc = nssentry->ssl_methods->read(fd, buf, amount);
+    } else {
+        rc = -1;
+        DBG(NULL);
+        scopeLog("ERROR: nss_read no list entry", -1, CFG_LOG_ERROR);
+    }
+
+    if (rc > 0) doProtocol((uint64_t)fd, nfd, buf, (size_t)amount, TLSRX, BUF);
+
+    return rc;
+}
+
+static PRInt32
+nss_write(PRFileDesc *fd, const void *buf, PRInt32 amount)
+{
+    PRInt32 rc;
+    nss_list *nssentry;
+    int nfd = PR_FileDesc2NativeHandle(fd);
+
+    scopeLog("nss_write", nfd, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+        rc = nssentry->ssl_methods->write(fd, buf, amount);
+    } else {
+        rc = -1;
+        DBG(NULL);
+        scopeLog("ERROR: nss_write no list entry", -1, CFG_LOG_ERROR);
+    }
+
+    if (rc > 0) doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)amount, TLSRX, BUF);
+
+    return rc;
+}
+
+static PRInt32
+nss_writev(PRFileDesc *fd, const PRIOVec *iov, PRInt32 iov_size, PRIntervalTime timeout)
+{
+    PRInt32 rc;
+    nss_list *nssentry;
+    int nfd = PR_FileDesc2NativeHandle(fd);
+
+    scopeLog("nss_writev", nfd, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+        rc = nssentry->ssl_methods->writev(fd, iov, iov_size, timeout);
+    } else {
+        rc = -1;
+        DBG(NULL);
+        scopeLog("ERROR: nss_writev no list entry", -1, CFG_LOG_ERROR);
+    }
+
+    if (rc > 0) doProtocol((uint64_t)fd, nfd, (void *)iov, (size_t)iov_size, TLSRX, IOV);
+
+    return rc;
+}
+
+static PRInt32
+nss_sendto(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags,
+           const PRNetAddr *addr, PRIntervalTime timeout)
+{
+    PRInt32 rc;
+    nss_list *nssentry;
+    int nfd = PR_FileDesc2NativeHandle(fd);
+
+    scopeLog("nss_sendto", nfd, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+        rc = nssentry->ssl_methods->sendto(fd, (void *)buf, amount, flags, addr, timeout);
+    } else {
+        rc = -1;
+        DBG(NULL);
+        scopeLog("ERROR: nss_write no list entry", -1, CFG_LOG_ERROR);
+    }
+
+    if (rc > 0) doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)amount, TLSRX, BUF);
+
+    return rc;
+}
+
+static PRInt32
+nss_recvfrom(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags,
+             PRNetAddr *addr, PRIntervalTime timeout)
+{
+    PRInt32 rc;
+    nss_list *nssentry;
+    int nfd = PR_FileDesc2NativeHandle(fd);
+
+    scopeLog("nss_recvfrom", nfd, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+        rc = nssentry->ssl_methods->recvfrom(fd, buf, amount, flags, addr, timeout);
+    } else {
+        rc = -1;
+        DBG(NULL);
+        scopeLog("ERROR: nss_write no list entry", -1, CFG_LOG_ERROR);
     }
 
     if (rc > 0) doProtocol((uint64_t)fd, nfd, buf, (size_t)amount, TLSRX, BUF);
@@ -1873,9 +2112,14 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
             // ref contrib/tls/nss/prio.h struct PRIOMethods
             // read ... todo? read, recvfrom, acceptread
             nssentry->ssl_int_methods->recv = nss_recv;
+            nssentry->ssl_int_methods->read = nss_read;
+            nssentry->ssl_int_methods->recvfrom = nss_recvfrom;
 
             // write ... todo? write, writev, sendto, sendfile, transmitfile
             nssentry->ssl_int_methods->send = nss_send;
+            nssentry->ssl_int_methods->write = nss_write;
+            nssentry->ssl_int_methods->writev = nss_writev;
+            nssentry->ssl_int_methods->sendto = nss_sendto;
 
             // close ... todo? shutdown
             nssentry->ssl_int_methods->close = nss_close;

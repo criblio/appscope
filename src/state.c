@@ -691,7 +691,7 @@ isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
     switch (dtype) {
         case BUF:
         {
-            if ((memsearch(*buf, len, "HTTP/1", strlen("HTTP/1")) != -1) &&
+            if ((memsearch(*buf, len, "HTTP/", strlen("HTTP/")) != -1) &&
                 (memsearch(*buf, len, "\r\n\r\n", strlen("\r\n\r\n")) != -1)) {
                 return TRUE;
             }
@@ -707,7 +707,7 @@ isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
             for (i = 0; i < msg->msg_iovlen; i++) {
                 iov = &msg->msg_iov[i];
                 if (iov && iov->iov_base) {
-                    if ((memsearch(iov->iov_base, iov->iov_len, "HTTP/1", strlen("HTTP/1")) != -1) &&
+                    if ((memsearch(iov->iov_base, iov->iov_len, "HTTP/", strlen("HTTP/")) != -1) &&
                         (memsearch(iov->iov_base, iov->iov_len, "\r\n\r\n", strlen("\r\n\r\n")) != -1)) {
                         // might as well point to the header since we have it here
                         *buf = iov->iov_base;
@@ -726,7 +726,7 @@ isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
             // len is expected to be an iovcnt for an IOV data type
             for (i = 0; i < len; i++) {
                 if (iov[i].iov_base) {
-                    if ((memsearch(iov[i].iov_base, iov[i].iov_len, "HTTP/1", strlen("HTTP/1")) != -1) &&
+                    if ((memsearch(iov[i].iov_base, iov[i].iov_len, "HTTP/", strlen("HTTP/")) != -1) &&
                         (memsearch(iov[i].iov_base, iov[i].iov_len, "\r\n\r\n", strlen("\r\n\r\n")) != -1)) {
                         // might as well point to the header since we have it here
                         *buf = iov[i].iov_base; 
@@ -751,6 +751,7 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
 {
     if ((buf == NULL) || (len <= 0)) return -1;
     
+    in_port_t localPort, remotePort;
     size_t headsize;
     uint64_t uid;
     char *headend, *header, *hcopy;
@@ -791,8 +792,18 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
         strncpy(hcopy, header, headsize);
         post->hdr = hcopy;
 
-        // If the first 6 chars are HTTP/1, it's a response header
-        if (memsearch(hcopy, strlen("HTTP/1"), "HTTP/1", strlen("HTTP/1")) != -1) {
+        localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
+        remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
+
+        if ((src == TLSTX) || (src == TLSRX) ||
+            (localPort == 443) || (remotePort == 443)) {
+            post->ssl = 1;
+        } else {
+            post->ssl = 0;
+        }
+
+        // If the first 6 chars are HTTP/, it's a response header
+        if (memsearch(hcopy, strlen("HTTP/"), "HTTP/", strlen("HTTP/")) != -1) {
             proto->ptype = EVT_HRES;
         } else {
             proto->ptype = EVT_HREQ;

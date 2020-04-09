@@ -42,7 +42,7 @@
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
-#define RATE_FIELD(val)         NUMFIELD("req/sec",        (val),        8)
+#define RATE_FIELD(val)         NUMFIELD("req_per_sec",    (val),        8)
 #define HREQ_FIELD(val)         STRFIELD("req",            (val),        8)
 #define HRES_FIELD(val)         STRFIELD("resp",           (val),        8)
 
@@ -299,7 +299,7 @@ doErrorMetric(metric_t type, control_type_t source,
                 break;
             case NET_ERR_RX_TX:
                 value = &ctrs->netTxRxErrors;
-                class = "rx/tx";
+                class = "rx_tx";
                 break;
             default:
                 DBG(NULL);
@@ -355,14 +355,14 @@ doErrorMetric(metric_t type, control_type_t source,
             case FS_ERR_OPEN_CLOSE:
                 metric = "fs.error";
                 value = &ctrs->fsOpenCloseErrors;
-                class = "open/close";
+                class = "open_close";
                 summarize = &g_summary.fs.error;
                 name_field = &file_field;
                 break;
             case FS_ERR_READ_WRITE:
                 metric = "fs.error";
                 value = &ctrs->fsRdWrErrors;
-                class = "read/write";
+                class = "read_write";
                 summarize = &g_summary.fs.error;
                 name_field = &file_field;
                 break;
@@ -914,10 +914,10 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
 }
 
 const char *bucketName[SOCK_NUM_BUCKETS] = {
-    "inet/tcp", //    INET_TCP,
-    "inet/udp", //    INET_UDP,
-    "unix/tcp", //    UNIX_TCP,
-    "unix/udp", //    UNIX_UDP,
+    "inet_tcp", //    INET_TCP,
+    "inet_udp", //    INET_UDP,
+    "unix_tcp", //    UNIX_TCP,
+    "unix_udp", //    UNIX_UDP,
     "other"     //    SOCK_OTHER,
 };
 

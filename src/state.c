@@ -434,7 +434,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
         if (!checkNetEntry(fd)) break;
         addToInterfaceCounts(&g_netinfo[fd].numRX, 1);
         addToInterfaceCounts(&g_netinfo[fd].rxBytes, size);
-        addToInterfaceCounts(&g_ctrs.netrxBytes, size);
+        sock_summary_bucket_t bucket = getNetRxTxBucket(&g_netinfo[fd]);
+        addToInterfaceCounts(&g_ctrs.netrxBytes[bucket], size);
         if (postNetState(fd, type, &g_netinfo[fd])) {
             atomicSwapU64(&g_netinfo[fd].numRX.mtc, 0);
             atomicSwapU64(&g_netinfo[fd].rxBytes.mtc, 0);
@@ -450,7 +451,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
         if (!checkNetEntry(fd)) break;
         addToInterfaceCounts(&g_netinfo[fd].numTX, 1);
         addToInterfaceCounts(&g_netinfo[fd].txBytes, size);
-        addToInterfaceCounts(&g_ctrs.nettxBytes, size);
+        sock_summary_bucket_t bucket = getNetRxTxBucket(&g_netinfo[fd]);
+        addToInterfaceCounts(&g_ctrs.nettxBytes[bucket], size);
         if (postNetState(fd, type, &g_netinfo[fd])) {
             atomicSwapU64(&g_netinfo[fd].numTX.mtc, 0);
             atomicSwapU64(&g_netinfo[fd].txBytes.mtc, 0);
@@ -1034,13 +1036,8 @@ doSetAddrs(int sockfd)
     if ((net = getNetEntry(sockfd)) == NULL) return 0;
 
     // TODO: dont think LOCAL is correct?
-    if ((net->type == SCOPE_UNIX) ||
-        (net->remoteConn.ss_family == AF_UNIX) ||
-        (net->remoteConn.ss_family == AF_LOCAL) ||
-        (net->remoteConn.ss_family == AF_NETLINK) ||
-        (net->localConn.ss_family == AF_UNIX) ||
-        (net->localConn.ss_family == AF_LOCAL) ||
-        (net->localConn.ss_family == AF_NETLINK)) {
+    if (addrIsUnixDomain(&net->remoteConn) ||
+        addrIsUnixDomain(&net->localConn)) {
         if (net->addrSetUnix == TRUE) return 0;
         doUnixEndpoint(sockfd, net);
         net->addrSetUnix = TRUE;
@@ -1072,36 +1069,28 @@ doSetAddrs(int sockfd)
 int
 doAddNewSock(int sockfd)
 {
-    struct sockaddr addr;
-    socklen_t addrlen = sizeof(struct sockaddr);
+    struct sockaddr_storage addr;
+    socklen_t addrlen = sizeof(addr);
 
     scopeLog("doAddNewSock: adding socket", sockfd, CFG_LOG_DEBUG);
-    if (getsockname(sockfd, &addr, &addrlen) != -1) {
-        if ((addr.sa_family == AF_INET) || (addr.sa_family == AF_INET6)) {
-            int type;
-            socklen_t len = sizeof(socklen_t);
+    if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+        int type;
+        socklen_t len = sizeof(type);
 
-            if (getsockopt(sockfd, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
-                addSock(sockfd, type);
-            } else {
-                // Really can't add the socket at this point
-                scopeLog("ERROR: doAddNewSock:getsockopt", sockfd, CFG_LOG_ERROR);
-            }
-        } else if (addr.sa_family == AF_UNIX) {
-            // added, not a socket type, want to know if it's a UNIX socket
-            addSock(sockfd, SCOPE_UNIX);
+        if (getsockopt(sockfd, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
+            addSock(sockfd, type);
         } else {
-            // is RAW a viable default?
-            addSock(sockfd, SOCK_RAW);
+            // Really can't add the socket at this point
+            scopeLog("ERROR: doAddNewSock:getsockopt", sockfd, CFG_LOG_ERROR);
         }
-        doSetConnection(sockfd, &addr, addrlen, LOCAL);
+        doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
     } else {
         addSock(sockfd, SOCK_RAW);
     }
 
-    addrlen = sizeof(struct sockaddr);
-    if (getpeername(sockfd, &addr, &addrlen) != -1) {
-        doSetConnection(sockfd, &addr, addrlen, REMOTE);
+    addrlen = sizeof(addr);
+    if (getpeername(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+        doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, REMOTE);
     }
 
     return 0;
@@ -1731,3 +1720,35 @@ sockIsTCP(int sockfd)
     return (net->type == SOCK_STREAM);
 }
 
+bool
+addrIsUnixDomain(struct sockaddr_storage* sock)
+{
+    if (!sock) return FALSE;
+
+    return  ((sock->ss_family == AF_UNIX) ||
+             (sock->ss_family == AF_LOCAL) ||
+             (sock->ss_family == AF_NETLINK));
+}
+
+sock_summary_bucket_t
+getNetRxTxBucket(net_info* net)
+{
+    if (!net) return SOCK_OTHER;
+
+    sock_summary_bucket_t bucket = SOCK_OTHER;
+    if (!net->addrSetUnix) {
+        if (net->type == SOCK_STREAM) {
+            bucket = INET_TCP;
+        } else if (net->type == SOCK_DGRAM) {
+            bucket = INET_UDP;
+        }
+    } else {
+        if (net->type == SOCK_STREAM) {
+            bucket = UNIX_TCP;
+        } else if (net->type == SOCK_DGRAM) {
+            bucket = UNIX_UDP;
+        }
+    }
+
+    return bucket;
+}

@@ -171,7 +171,6 @@ doProtocolMetric(protocol_info *proto)
 {
     if (!proto) return;
 
-    char *tmpmsg = NULL;
     char ssl[8];
 
     if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
@@ -261,7 +260,6 @@ doProtocolMetric(protocol_info *proto)
     }
 
     destroyProto(proto);
-    //if (tmpmsg) free(tmpmsg);
 }
 
 void

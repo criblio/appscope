@@ -765,8 +765,11 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
      */
     if ((sockfd != -1) && ((net = getNetEntry(sockfd)) != NULL)) {
         uid = net->uid;
+        localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
+        remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
     } else if (id != -1) {
         uid = id;
+        localPort = remotePort = 0;
     } else {
         return -1;
     }
@@ -791,9 +794,6 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
         post->id = uid;
         strncpy(hcopy, header, headsize);
         post->hdr = hcopy;
-
-        localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
-        remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
 
         if ((src == TLSTX) || (src == TLSRX) ||
             (localPort == 443) || (remotePort == 443)) {

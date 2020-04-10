@@ -22,7 +22,11 @@
 #include "state.h"
 #include "wrap.h"
 #include "runtimecfg.h"
+
+// will move this later...
+#ifdef __LINUX__
 #include <funchook.h>
+#endif
 
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
@@ -603,6 +607,8 @@ reportProcessStart(void)
     cmdSendInfoMsg(g_ctl, json);
 }
 
+// temp; will move this later
+#ifdef __LINUX__
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
 
@@ -616,8 +622,12 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
     int rc;
 
     scopeLog("ssl_read_hook", -1, CFG_LOG_ERROR);
-    //WRAP_CHECK(SSL_read, -1);
+    WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
+    if (rc > 0) {
+    //    int fd = SSL_get_fd((const SSL *)ssl);
+        doProtocol((uint64_t)ssl, -1, buf, (size_t)num, TLSRX, BUF);
+    }
 
     return rc;
 }
@@ -628,8 +638,12 @@ ssl_write_hook(SSL *ssl, void *buf, int num)
     int rc;
 
     scopeLog("ssl_write_hook", -1, CFG_LOG_ERROR);
-    //WRAP_CHECK(SSL_write, -1);
+    WRAP_CHECK(SSL_write, -1);
     rc = g_fn.SSL_write(ssl, buf, num);
+    if (rc > 0) {
+        //int fd = SSL_get_fd((const SSL *)ssl);
+        doProtocol((uint64_t)ssl, -1, (void *)buf, (size_t)rc, TLSTX, BUF);
+    }
 
     return rc;
 }
@@ -667,6 +681,9 @@ initHook()
     funchook_t *funchook;
     int rc;
     //ssl_func_t ssl_func_real = NULL;
+
+    // is libssl loaded dynamically?
+    //if ((g_fn.SSL_read != NULL) || (g_fn.write != NULL)) return;
     
     funchook = funchook_create();
 
@@ -691,6 +708,14 @@ initHook()
         return;
     }
 }
+#else
+static void
+initHook()
+{
+    return;
+}
+
+#endif // __LINUX__
 
 __attribute__((constructor)) void
 init(void)
@@ -1809,7 +1834,7 @@ sendfile64(int out_fd, int in_fd, off64_t *offset, size_t count)
 
     return rc;
 }
-#if 0 // DEBUG
+
 EXPORTON int
 SSL_read(SSL *ssl, void *buf, int num)
 {
@@ -1841,7 +1866,7 @@ SSL_write(SSL *ssl, const void *buf, int num)
     }
     return rc;
 }
-#endif
+
 EXPORTON ssize_t
 gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
 {

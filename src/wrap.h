@@ -182,6 +182,12 @@ typedef struct interposed_funcs_t {
     int (*SSL_write)(SSL *, const void *, int);
     ssize_t (*gnutls_record_recv)(gnutls_session_t, void *, size_t);
     ssize_t (*gnutls_record_send)(gnutls_session_t, const void *, size_t);
+    ssize_t (*gnutls_record_recv_early_data)(gnutls_session_t, void *, size_t);
+    ssize_t (*gnutls_record_recv_packet)(gnutls_session_t, gnutls_packet_t *);
+    ssize_t (*gnutls_record_recv_seq)(gnutls_session_t, void *, size_t, unsigned char *);
+    ssize_t (*gnutls_record_send2)(gnutls_session_t, const void *, size_t, size_t, unsigned);
+    ssize_t (*gnutls_record_send_early_data)(gnutls_session_t, const void *, size_t);
+    ssize_t (*gnutls_record_send_range)(gnutls_session_t, const void *, size_t, const gnutls_range_st *);
     PRFileDesc *(*SSL_ImportFD)(PRFileDesc *, PRFileDesc *);
 
 #if defined(__LINUX__) && defined(__STATX__)

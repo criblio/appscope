@@ -24,7 +24,7 @@
 #include "runtimecfg.h"
 
 #ifdef __LINUX__
-#include "funchook.h"
+#include "../contrib/tls/funchook.h"
 #endif
 
 interposed_funcs g_fn;

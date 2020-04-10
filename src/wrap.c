@@ -23,9 +23,8 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 
-// will move this later...
 #ifdef __LINUX__
-#include <funchook.h>
+#include "funchook.h"
 #endif
 
 interposed_funcs g_fn;

@@ -22,6 +22,7 @@
 #include "state.h"
 #include "wrap.h"
 #include "runtimecfg.h"
+#include <funchook.h>
 
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
@@ -602,6 +603,95 @@ reportProcessStart(void)
     cmdSendInfoMsg(g_ctl, json);
 }
 
+#define SSL_FUNC_READ "SSL_read"
+#define SSL_FUNC_WRITE "SSL_write"
+
+typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
+typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
+typedef int (*ssl_func_t)(SSL *, void *, int);
+
+static int
+ssl_read_hook(SSL *ssl, void *buf, int num)
+{
+    int rc;
+
+    scopeLog("ssl_read_hook", -1, CFG_LOG_ERROR);
+    //WRAP_CHECK(SSL_read, -1);
+    rc = g_fn.SSL_read(ssl, buf, num);
+
+    return rc;
+}
+
+static int
+ssl_write_hook(SSL *ssl, void *buf, int num)
+{
+    int rc;
+
+    scopeLog("ssl_write_hook", -1, CFG_LOG_ERROR);
+    //WRAP_CHECK(SSL_write, -1);
+    rc = g_fn.SSL_write(ssl, buf, num);
+
+    return rc;
+}
+
+static void *
+load_func(const char *module, const char *func)
+{
+    void *addr;
+    char buf[128];
+    
+    void *handle = dlopen(module, RTLD_LAZY | RTLD_NOLOAD);
+    if (handle == NULL) {
+        snprintf(buf, sizeof(buf), "ERROR: Could not open file %s.\n", module ? module : "(null)");
+        scopeLog(buf, -1, CFG_LOG_ERROR);
+        return NULL;
+    }
+
+    addr = dlsym(handle, func);
+    dlclose(handle);
+
+    if (addr == NULL) {
+        snprintf(buf, sizeof(buf), "ERROR: Could not get function address of %s.\n", func);
+        scopeLog(buf, -1, CFG_LOG_ERROR);
+        return NULL;
+    }
+
+    snprintf(buf, sizeof(buf), "%s:%d %s found at %p\n", __FUNCTION__, __LINE__, func, addr);
+    scopeLog(buf, -1, CFG_LOG_ERROR);
+    return addr;
+}
+
+static void
+initHook()
+{
+    funchook_t *funchook;
+    int rc;
+    //ssl_func_t ssl_func_real = NULL;
+    
+    funchook = funchook_create();
+
+    //ssl_func_real
+    g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
+    //ssl_func_real = g_fn.SSL_read;
+    
+    rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
+
+    //ssl_func_real
+    g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
+
+    rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
+
+    /* hook SSL_read and SSL_write*/
+    rc = funchook_install(funchook, 0);
+    if (rc != 0) {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "ERROR: failed to install SSL_read hook. (%s)\n",
+                funchook_error_message(funchook));
+        scopeLog(buf, -1, CFG_LOG_ERROR);
+        return;
+    }
+}
+
 __attribute__((constructor)) void
 init(void)
 {
@@ -782,6 +872,8 @@ init(void)
         DBG(NULL);
     }
 
+    initHook();
+    
     threadInit();
 }
 
@@ -1717,7 +1809,7 @@ sendfile64(int out_fd, int in_fd, off64_t *offset, size_t count)
 
     return rc;
 }
-
+#if 0 // DEBUG
 EXPORTON int
 SSL_read(SSL *ssl, void *buf, int num)
 {
@@ -1747,7 +1839,7 @@ SSL_write(SSL *ssl, const void *buf, int num)
     }
     return rc;
 }
-
+#endif
 EXPORTON ssize_t
 gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
 {

@@ -615,6 +615,12 @@ typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
 typedef int (*ssl_func_t)(SSL *, void *, int);
 
+void *
+memcpy(void *dest, const void *src, size_t n)
+{
+    return memmove(dest, src, n);
+}
+
 static int
 ssl_read_hook(SSL *ssl, void *buf, int num)
 {

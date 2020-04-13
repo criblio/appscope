@@ -167,6 +167,7 @@ bool checkNetEntry(int);
 bool checkFSEntry(int);
 net_info *getNetEntry(int);
 fs_info *getFSEntry(int);
+bool addrIsNetDomain(struct sockaddr_storage*);
 bool addrIsUnixDomain(struct sockaddr_storage*);
 sock_summary_bucket_t getNetRxTxBucket(net_info*);
 

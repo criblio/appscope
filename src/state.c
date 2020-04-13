@@ -1074,14 +1074,19 @@ doAddNewSock(int sockfd)
 
     scopeLog("doAddNewSock: adding socket", sockfd, CFG_LOG_DEBUG);
     if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
-        int type;
-        socklen_t len = sizeof(type);
+        if (addrIsNetDomain(&addr) || addrIsUnixDomain(&addr)) {
+            int type;
+            socklen_t len = sizeof(type);
 
-        if (getsockopt(sockfd, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
-            addSock(sockfd, type);
+            if (getsockopt(sockfd, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
+                addSock(sockfd, type);
+            } else {
+                // Really can't add the socket at this point
+                scopeLog("ERROR: doAddNewSock:getsockopt", sockfd, CFG_LOG_ERROR);
+            }
         } else {
-            // Really can't add the socket at this point
-            scopeLog("ERROR: doAddNewSock:getsockopt", sockfd, CFG_LOG_ERROR);
+            // is RAW a viable default?
+            addSock(sockfd, SOCK_RAW);
         }
         doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
     } else {
@@ -1721,13 +1726,21 @@ sockIsTCP(int sockfd)
 }
 
 bool
+addrIsNetDomain(struct sockaddr_storage* sock)
+{
+    if (!sock) return FALSE;
+
+    return  ((sock->ss_family == AF_INET) ||
+             (sock->ss_family == AF_INET6));
+}
+
+bool
 addrIsUnixDomain(struct sockaddr_storage* sock)
 {
     if (!sock) return FALSE;
 
     return  ((sock->ss_family == AF_UNIX) ||
-             (sock->ss_family == AF_LOCAL) ||
-             (sock->ss_family == AF_NETLINK));
+             (sock->ss_family == AF_LOCAL));
 }
 
 sock_summary_bucket_t
@@ -1736,18 +1749,25 @@ getNetRxTxBucket(net_info* net)
     if (!net) return SOCK_OTHER;
 
     sock_summary_bucket_t bucket = SOCK_OTHER;
-    if (!net->addrSetUnix) {
+
+    if (addrIsNetDomain(&net->localConn) ||
+        addrIsNetDomain(&net->remoteConn)) {
+
         if (net->type == SOCK_STREAM) {
             bucket = INET_TCP;
         } else if (net->type == SOCK_DGRAM) {
             bucket = INET_UDP;
         }
-    } else {
+
+    } else if (addrIsUnixDomain(&net->localConn) ||
+               addrIsUnixDomain(&net->remoteConn)) {
+
         if (net->type == SOCK_STREAM) {
             bucket = UNIX_TCP;
         } else if (net->type == SOCK_DGRAM) {
             bucket = UNIX_UDP;
         }
+
     }
 
     return bucket;

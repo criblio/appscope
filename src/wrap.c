@@ -24,7 +24,7 @@
 #include "runtimecfg.h"
 
 #ifdef __LINUX__
-#include "../contrib/tls/funchook.h"
+#include "../contrib/funchook/funchook.h"
 #endif
 
 interposed_funcs g_fn;
@@ -677,22 +677,43 @@ load_func(const char *module, const char *func)
 static void
 initHook()
 {
+    void *addr;
     funchook_t *funchook;
     int rc;
-    //ssl_func_t ssl_func_real = NULL;
-
-    // is libssl loaded dynamically?
-    //if ((g_fn.SSL_read != NULL) || (g_fn.write != NULL)) return;
     
+    void *handle = dlopen(NULL, RTLD_LAZY | RTLD_NOLOAD);
+    if (handle == NULL) {
+        return;
+    }
+
+    addr = dlsym(handle, "SSL_read");
+    dlclose(handle);
+
+    /*
+     * There are 3x SSL_read functions to consider:
+     * 1) the one in this file used to interpose SSL_read
+     * from a dynamic lib load (ex. curl)
+     *
+     * 2) the one in an ELF file for the process (main)
+     * included from a static link lib (ex. node.js)
+     *
+     * 3) the one in a dynamic lib (ex. libssl.so)
+     *
+     * Only perform the hot patch in the case where 
+     * we find a symbol from the local process (main)
+     * that is not our interposed function.
+     *
+     */
+    if (addr == SSL_read) {
+        return;
+    }
+
     funchook = funchook_create();
 
-    //ssl_func_real
     g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
-    //ssl_func_real = g_fn.SSL_read;
     
     rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
 
-    //ssl_func_real
     g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
 
     rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
@@ -1839,7 +1860,7 @@ SSL_read(SSL *ssl, void *buf, int num)
 {
     int rc;
     
-    scopeLog("SSL_read", -1, CFG_LOG_ERROR);
+    //scopeLog("SSL_read", -1, CFG_LOG_ERROR);
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
 
@@ -1855,7 +1876,7 @@ SSL_write(SSL *ssl, const void *buf, int num)
 {
     int rc;
     
-    scopeLog("SSL_write", -1, CFG_LOG_ERROR);
+    //scopeLog("SSL_write", -1, CFG_LOG_ERROR);
     WRAP_CHECK(SSL_write, -1);
     rc = g_fn.SSL_write(ssl, buf, num);
 

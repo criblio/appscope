@@ -42,7 +42,7 @@
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
-#define RATE_FIELD(val)         NUMFIELD("req/sec",        (val),        8)
+#define RATE_FIELD(val)         NUMFIELD("req_per_sec",    (val),        8)
 #define HREQ_FIELD(val)         STRFIELD("req",            (val),        8)
 #define HRES_FIELD(val)         STRFIELD("resp",           (val),        8)
 
@@ -114,9 +114,6 @@ getProtocol(int type, char *proto, size_t len)
         strncpy(proto, "TCP", len);
     } else if (type == SOCK_DGRAM) {
         strncpy(proto, "UDP", len);
-    } else if (type == SCOPE_UNIX) {
-        // added, not a socket type, want to know if it's a UNIX socket
-        strncpy(proto, "UNIX", len);
     } else if (type == SOCK_RAW) {
         strncpy(proto, "RAW", len);
     } else if (type == SOCK_RDM) {
@@ -312,7 +309,7 @@ doErrorMetric(metric_t type, control_type_t source,
                 break;
             case NET_ERR_RX_TX:
                 value = &ctrs->netTxRxErrors;
-                class = "rx/tx";
+                class = "rx_tx";
                 break;
             default:
                 DBG(NULL);
@@ -368,14 +365,14 @@ doErrorMetric(metric_t type, control_type_t source,
             case FS_ERR_OPEN_CLOSE:
                 metric = "fs.error";
                 value = &ctrs->fsOpenCloseErrors;
-                class = "open/close";
+                class = "open_close";
                 summarize = &g_summary.fs.error;
                 name_field = &file_field;
                 break;
             case FS_ERR_READ_WRITE:
                 metric = "fs.error";
                 value = &ctrs->fsRdWrErrors;
-                class = "read/write";
+                class = "read_write";
                 summarize = &g_summary.fs.error;
                 name_field = &file_field;
                 break;
@@ -926,6 +923,62 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
     }
 }
 
+const char *bucketName[SOCK_NUM_BUCKETS] = {
+    "inet_tcp", //    INET_TCP,
+    "inet_udp", //    INET_UDP,
+    "unix_tcp", //    UNIX_TCP,
+    "unix_udp", //    UNIX_UDP,
+    "other"     //    SOCK_OTHER,
+};
+
+static void
+doTotalNetRxTx(metric_t type)
+{
+    // This just exists because TOT_RX and TOT_TX have sub-buckets...
+    const char* metric = "UNKNOWN";
+    counters_element_t (*value)[SOCK_NUM_BUCKETS] = NULL;
+    const char* err_str = "UNKNOWN";
+    const char* units = "byte";
+    switch (type) {
+        case TOT_RX:
+            metric = "net.rx";
+            value = &g_ctrs.netrxBytes;
+            err_str = "ERROR: doTotal:TOT_RX:cmdSendMetric";
+            break;
+        case TOT_TX:
+            metric = "net.tx";
+            value = &g_ctrs.nettxBytes;
+            err_str = "ERROR: doTotal:TOT_TX:cmdSendMetric";
+            break;
+        default:
+            DBG(NULL);
+            return;
+    }
+
+    sock_summary_bucket_t bucket;
+    for (bucket = INET_TCP; bucket < SOCK_NUM_BUCKETS; bucket++) {
+
+        // Don't report zeros.
+        if ((*value)[bucket].mtc == 0) continue;
+
+        event_field_t fields[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            HOST_FIELD(g_proc.hostname),
+            UNIT_FIELD(units),
+            CLASS_FIELD(bucketName[bucket]),
+            FIELDEND
+        };
+        event_t evt = INT_EVENT(metric, (*value)[bucket].mtc, DELTA, fields);
+        if (cmdSendMetric(g_mtc, &evt)) {
+            scopeLog(err_str, -1, CFG_LOG_ERROR);
+        }
+
+        // Reset the info we tried to report (if it's not a gauge)
+        atomicSwapU64(&(*value)[bucket].mtc, 0);
+    }
+}
+
 void
 doTotal(metric_t type)
 {
@@ -946,15 +999,9 @@ doTotal(metric_t type)
             err_str = "ERROR: doTotal:TOT_WRITE:cmdSendMetric";
             break;
         case TOT_RX:
-            metric = "net.rx";
-            value = &g_ctrs.netrxBytes;
-            err_str = "ERROR: doTotal:TOT_RX:cmdSendMetric";
-            break;
         case TOT_TX:
-            metric = "net.tx";
-            value = &g_ctrs.nettxBytes;
-            err_str = "ERROR: doTotal:TOT_TX:cmdSendMetric";
-            break;
+            doTotalNetRxTx(type);
+            return;   // <--  We're doing the work above; nothing to see here.
         case TOT_SEEK:
             metric = "fs.seek";
             value = &g_ctrs.numSeek;
@@ -1272,13 +1319,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         }
 
         // Do we need to define domain=LOCAL or NETLINK?
-        if ((net->type == SCOPE_UNIX) ||
-            (net->remoteConn.ss_family == AF_UNIX) ||
-            (net->remoteConn.ss_family == AF_LOCAL) ||
-            (net->remoteConn.ss_family == AF_NETLINK) ||
-            (net->localConn.ss_family == AF_UNIX) ||
-            (net->localConn.ss_family == AF_LOCAL) ||
-            (net->localConn.ss_family == AF_NETLINK)) {
+        if (addrIsUnixDomain(&net->remoteConn) ||
+            addrIsUnixDomain(&net->localConn)) {
             localPort = net->lnode;
             remotePort = net->rnode;
 
@@ -1377,7 +1419,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         }
 
         // Reset the info if we tried to report
-        subFromInterfaceCounts(&g_ctrs.netrxBytes, net->rxBytes.mtc);
+        sock_summary_bucket_t bucket = getNetRxTxBucket(net);
+        subFromInterfaceCounts(&g_ctrs.netrxBytes[bucket], net->rxBytes.mtc);
         atomicSwapU64(&net->numRX.mtc, 0);
         atomicSwapU64(&net->rxBytes.mtc, 0);
         break;
@@ -1400,13 +1443,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             strncpy(data, "clear", sizeof(data));
         }
 
-        if ((net->type == SCOPE_UNIX) ||
-            (net->remoteConn.ss_family == AF_UNIX) ||
-            (net->remoteConn.ss_family == AF_LOCAL) ||
-            (net->remoteConn.ss_family == AF_NETLINK) ||
-            (net->localConn.ss_family == AF_UNIX) ||
-            (net->localConn.ss_family == AF_LOCAL) ||
-            (net->localConn.ss_family == AF_NETLINK)) {
+        if (addrIsUnixDomain(&net->remoteConn) ||
+            addrIsUnixDomain(&net->localConn)) {
             localPort = net->lnode;
             remotePort = net->rnode;
 
@@ -1508,7 +1546,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         }
 
         // Reset the info if we tried to report
-        subFromInterfaceCounts(&g_ctrs.nettxBytes, net->txBytes.mtc);
+        sock_summary_bucket_t bucket = getNetRxTxBucket(net);
+        subFromInterfaceCounts(&g_ctrs.nettxBytes[bucket], net->txBytes.mtc);
         atomicSwapU64(&net->numTX.mtc, 0);
         atomicSwapU64(&net->txBytes.mtc, 0);
 

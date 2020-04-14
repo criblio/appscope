@@ -5,7 +5,6 @@
 #include <sys/socket.h>
 
 #define PROTOCOL_STR 16
-#define SCOPE_UNIX 99
 #define FUNC_MAX 24
 #define HDRTYPE_MAX 16
 
@@ -14,6 +13,17 @@
 // It is expected that state.c and report.c will both directly include
 // this file, but it is not recommended that any other file include it.
 //
+
+typedef enum
+{
+    INET_TCP,
+    INET_UDP,
+    UNIX_TCP,
+    UNIX_UDP,
+    SOCK_OTHER,
+    SOCK_NUM_BUCKETS
+} sock_summary_bucket_t;
+
 
 typedef struct {
     uint64_t mtc;
@@ -25,8 +35,8 @@ typedef struct metric_counters_t {
     counters_element_t  netConnectionsUdp;
     counters_element_t  netConnectionsTcp;
     counters_element_t  netConnectionsOther;
-    counters_element_t  netrxBytes;
-    counters_element_t  nettxBytes;
+    counters_element_t  netrxBytes[SOCK_NUM_BUCKETS];
+    counters_element_t  nettxBytes[SOCK_NUM_BUCKETS];
     counters_element_t  readBytes;
     counters_element_t  writeBytes;
     counters_element_t  numSeek;
@@ -158,6 +168,9 @@ bool checkNetEntry(int);
 bool checkFSEntry(int);
 net_info *getNetEntry(int);
 fs_info *getFSEntry(int);
+bool addrIsNetDomain(struct sockaddr_storage*);
+bool addrIsUnixDomain(struct sockaddr_storage*);
+sock_summary_bucket_t getNetRxTxBucket(net_info*);
 
 // The hiding of objects forces these to be defined here
 void doFSMetric(metric_t, struct fs_info_t *, control_type_t, const char *, ssize_t, const char *);

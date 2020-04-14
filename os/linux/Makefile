@@ -17,7 +17,7 @@ TEST_INCLUDES=-I./src -I./contrib/cmocka/include
 TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
 
 .PHONY: all clean test
-all: funchook libscope.so
+all: libscope.so
 
 funchook:
 	@echo "Building funchook and distorm"

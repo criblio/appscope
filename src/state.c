@@ -19,6 +19,7 @@
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
 #define NUM_ATTEMPTS 100
+#define ASIZE 256
 
 extern rtconfig g_cfg;
 
@@ -33,6 +34,10 @@ net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
+bool g_predone = FALSE;
+int g_http_start[ASIZE];
+int g_http_end[ASIZE];
+
 
 // interfaces
 mtc_t *g_mtc = NULL;
@@ -650,26 +655,45 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 }
 
 /*
- * String search with limits.
- * Should be safe to search binary data.
+ * This is an implementation of the Horspool
+ * string search algorithm.
+ * ref: https://www-igm.univ-mlv.fr/~lecroq/string/node18.html
  *
+ * Pre-compute the array from the needle.
  */
-static int
-memsearch(const char *hay, int haysize, const char *needle, int needlesize) {
-    int haypos, needlepos;
+static void
+preComp(unsigned char *needle, int nlen, int bmBc[]) {
+   int i;
 
-    haysize -= needlesize;
-    for (haypos = 0; haypos <= haysize; haypos++) {
-        for (needlepos = 0; needlepos < needlesize; needlepos++) {
-            if (hay[haypos + needlepos] != needle[needlepos]) {
-                // Next character in haystack.
-                break;
-            }
-        }
-        if (needlepos == needlesize) {
-            return haypos;
-        }
+   for (i = 0; i < ASIZE; ++i)
+      bmBc[i] = nlen;
+   for (i = 0; i < nlen - 1; ++i)
+       bmBc[needle[i]] = nlen - i - 1;
+}
+
+static int
+strsrch(char *needle, int nlen, char *haystack, int hlen, int *bmBc) {
+    int j;
+    unsigned char c;
+
+    /* Preprocessing; passed in as bmBc */
+    if (g_predone == FALSE) {
+        preComp((unsigned char *)"HTTP/", strlen("HTTP/"), g_http_start);
+        preComp((unsigned char *)"\r\n\r\n", strlen("\r\n\r\n"), g_http_end);
+        g_predone = TRUE;
     }
+
+    /* Searching */
+    j = 0;
+    while (j <= hlen - nlen) {
+        c = haystack[j + nlen - 1];
+        if (needle[nlen - 1] == c && memcmp(needle, haystack + j, nlen - 1) == 0) {
+            return j;
+        }
+
+        j += bmBc[c];
+    }
+
     return -1;
 }
 
@@ -693,8 +717,8 @@ isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
     switch (dtype) {
         case BUF:
         {
-            if ((memsearch(*buf, len, "HTTP/", strlen("HTTP/")) != -1) &&
-                (memsearch(*buf, len, "\r\n\r\n", strlen("\r\n\r\n")) != -1)) {
+            if ((strsrch("HTTP/", strlen("HTTP/"), *buf, len, g_http_start) != -1) &&
+                (strsrch("\r\n\r\n", strlen("\r\n\r\n"), *buf, len, g_http_end) != -1)) {
                 return TRUE;
             }
             break;
@@ -709,8 +733,8 @@ isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
             for (i = 0; i < msg->msg_iovlen; i++) {
                 iov = &msg->msg_iov[i];
                 if (iov && iov->iov_base) {
-                    if ((memsearch(iov->iov_base, iov->iov_len, "HTTP/", strlen("HTTP/")) != -1) &&
-                        (memsearch(iov->iov_base, iov->iov_len, "\r\n\r\n", strlen("\r\n\r\n")) != -1)) {
+                    if ((strsrch("HTTP/", strlen("HTTP/"), iov->iov_base, iov->iov_len, g_http_start) != -1) &&
+                        (strsrch("\r\n\r\n", strlen("\r\n\r\n"), iov->iov_base, iov->iov_len, g_http_end) != -1)) {
                         // might as well point to the header since we have it here
                         *buf = iov->iov_base;
                         return TRUE;
@@ -728,8 +752,8 @@ isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
             // len is expected to be an iovcnt for an IOV data type
             for (i = 0; i < len; i++) {
                 if (iov[i].iov_base) {
-                    if ((memsearch(iov[i].iov_base, iov[i].iov_len, "HTTP/", strlen("HTTP/")) != -1) &&
-                        (memsearch(iov[i].iov_base, iov[i].iov_len, "\r\n\r\n", strlen("\r\n\r\n")) != -1)) {
+                    if ((strsrch("HTTP/", strlen("HTTP/"), iov[i].iov_base, iov[i].iov_len, g_http_start) != -1) &&
+                        (strsrch("\r\n\r\n", strlen("\r\n\r\n"), iov[i].iov_base, iov[i].iov_len, g_http_end) != -1)) {
                         // might as well point to the header since we have it here
                         *buf = iov[i].iov_base; 
                         return TRUE;
@@ -805,7 +829,7 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
         }
 
         // If the first 6 chars are HTTP/, it's a response header
-        if (memsearch(hcopy, strlen("HTTP/"), "HTTP/", strlen("HTTP/")) != -1) {
+        if (strsrch("HTTP/", strlen("HTTP/"), hcopy, strlen("HTTP/"), g_http_start) != -1) {
             proto->ptype = EVT_HRES;
         } else {
             proto->ptype = EVT_HREQ;

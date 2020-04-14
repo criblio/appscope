@@ -908,7 +908,7 @@ getFSEntry(int fd)
 }
 
 void
-addSock(int fd, int type)
+addSock(int fd, int type, int family)
 {
     if (checkNetEntry(fd) == TRUE) {
         if (g_netinfo[fd].active) {
@@ -946,6 +946,7 @@ addSock(int fd, int type)
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].active = TRUE;
         g_netinfo[fd].type = type;
+        g_netinfo[fd].localConn.ss_family = family;
         g_netinfo[fd].uid = getTime();
 #ifdef __LINUX__
         // Clear these bits so comparisons of type will work
@@ -1079,18 +1080,18 @@ doAddNewSock(int sockfd)
             socklen_t len = sizeof(type);
 
             if (getsockopt(sockfd, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
-                addSock(sockfd, type);
+                addSock(sockfd, type, addr.ss_family);
             } else {
                 // Really can't add the socket at this point
                 scopeLog("ERROR: doAddNewSock:getsockopt", sockfd, CFG_LOG_ERROR);
             }
         } else {
             // is RAW a viable default?
-            addSock(sockfd, SOCK_RAW);
+            addSock(sockfd, SOCK_RAW, addr.ss_family);
         }
         doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
     } else {
-        addSock(sockfd, SOCK_RAW);
+        addSock(sockfd, SOCK_RAW, 0);
     }
 
     addrlen = sizeof(addr);
@@ -1318,7 +1319,7 @@ void
 doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 {
     scopeLog(func, sd, CFG_LOG_DEBUG);
-    addSock(sd, SOCK_STREAM);
+    if (addr) addSock(sd, SOCK_STREAM, addr->sa_family);
 
     if (getNetEntry(sd) != NULL) {
         if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);
@@ -1507,7 +1508,7 @@ doDupSock(int oldfd, int newfd)
         return -1;
     }
 
-    bcopy(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct fs_info_t));
+    memmove(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct fs_info_t));
     g_netinfo[newfd].active = TRUE;
     g_netinfo[newfd].numTX = (counters_element_t){.mtc=0, .evt=0};
     g_netinfo[newfd].numRX = (counters_element_t){.mtc=0, .evt=0};

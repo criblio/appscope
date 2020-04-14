@@ -1,0 +1,6 @@
+#define _GNU_SOURCE
+#define GNU_SPECIFIC_STRERROR_R 1
+/* #undef DISASM_CAPSTONE */
+#define DISASM_DISTORM 1
+/* #undef DISASM_ZYDIS */
+#define SIZEOF_VOID_P 8

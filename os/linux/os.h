@@ -24,6 +24,7 @@
 #include <linux/unix_diag.h>
 
 #include "../../src/plattime.h"
+#include "../../contrib/funchook/include/funchook.h"
 
 // Anecdotal evidence that a proc entry should be max 4096 bytes
 #define MAX_PROC 4096

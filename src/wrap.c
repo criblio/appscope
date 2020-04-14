@@ -23,10 +23,6 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 
-#ifdef __LINUX__
-#include "../contrib/funchook/funchook.h"
-#endif
-
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
 static thread_timing g_thread = {0};

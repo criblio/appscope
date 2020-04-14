@@ -1,0 +1,1 @@
+/usr/bin/cc  -Wall -fPIC -O3 -DNDEBUG  -rdynamic CMakeFiles/funchook_test_shared.dir/test_main.c.o  -o funchook_test_shared -Wl,-rpath,/home/donn/build:/home/donn/build/test ../libfunchook.so.1.1.0 libfunchook_test.so -ldl 

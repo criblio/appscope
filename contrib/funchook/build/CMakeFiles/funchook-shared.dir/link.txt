@@ -1,0 +1,1 @@
+/usr/bin/cc -fPIC  -Wall -fPIC -O3 -DNDEBUG  -shared -Wl,-soname,libfunchook.so.1 -o libfunchook.so.1.1.0 CMakeFiles/funchook-shared.dir/src/funchook.c.o CMakeFiles/funchook-shared.dir/src/funchook_x86.c.o CMakeFiles/funchook-shared.dir/src/funchook_unix.c.o CMakeFiles/funchook-shared.dir/src/disasm_distorm.c.o libdistorm.a -ldl 

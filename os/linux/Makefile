@@ -5,7 +5,7 @@ CFLAGS=-fPIC -g -Wall -Wno-nonnull -D__LINUX__
 SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -D__LINUX__
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
-LD_FLAGS=-Lcontrib/funchook -ldl -lpthread -lrt -lfunchook -ldistorm -e __scope_main
+LD_FLAGS=-Lcontrib/funchook/build -ldl -lpthread -lrt -lfunchook -ldistorm -e __scope_main
 INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS)
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 YAML_SRC=$(wildcard contrib/libyaml/src/*.c)
@@ -17,7 +17,11 @@ TEST_INCLUDES=-I./src -I./contrib/cmocka/include
 TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
 
 .PHONY: all clean test
-all: libscope.so
+all: funchook libscope.so
+
+funchook:
+	@echo "Building funchook and distorm"
+	cd contrib/funchook/build && make funchook-static
 
 libscope.so: src/wrap.c src/state.c src/report.c src/plattime.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c $(YAML_SRC) contrib/cJSON/cJSON.c
 	@echo "Building libscope.so ..."
@@ -26,7 +30,7 @@ libscope.so: src/wrap.c src/state.c src/report.c src/plattime.c os/$(OS)/os.c sr
 	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/
 
 clean:
-	rm -f ./lib/$(OS)/libscope.so
+	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))

@@ -1,0 +1,14 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/donn/funchook/test/libfunchook_test.c
+suffix.list
+/home/donn/funchook/test/suffix.list
+
+/home/donn/funchook/test/suffix.list
+

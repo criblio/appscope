@@ -24,7 +24,7 @@ void initState();
 void resetState();
 
 void setVerbosity(unsigned);
-void addSock(int, int);
+void addSock(int, int, int);
 int doBlockConnection(int, const struct sockaddr *);
 void doSetConnection(int, const struct sockaddr *, socklen_t, control_type_t);
 int doSetAddrs(int);

@@ -1,1 +1,0 @@
-/usr/bin/cc -fPIC  -Wall -fPIC -O3 -DNDEBUG  -shared -Wl,-soname,libfunchook_test.so -o libfunchook_test.so CMakeFiles/funchook_test.dir/libfunchook_test.c.o CMakeFiles/funchook_test.dir/libfunchook_test_x86_64_gas.S.o 

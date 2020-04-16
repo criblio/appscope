@@ -3004,7 +3004,7 @@ socket(int socket_family, int socket_type, int protocol)
     sd = g_fn.socket(socket_family, socket_type, protocol);
     if (sd != -1) {
         scopeLog("socket", sd, CFG_LOG_DEBUG);
-        addSock(sd, socket_type);
+        addSock(sd, socket_type, socket_family);
 
         if ((socket_family == AF_INET) || (socket_family == AF_INET6)) {
 

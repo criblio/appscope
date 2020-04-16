@@ -212,7 +212,7 @@ nothingCrashesBeforeAnyInit(void** state)
 
     // state.h
     setVerbosity(9);
-    addSock(3, SOCK_SEQPACKET);
+    addSock(3, SOCK_SEQPACKET, 0);
     doBlockConnection(4, NULL);
     doSetConnection(7, NULL, 3, LOCAL);
     doSetAddrs(8);
@@ -1365,7 +1365,7 @@ doNetConnectionErrorNoSummarization(void** state)
 {
     clearTestData();
     setVerbosity(5);
-    addSock(16, SOCK_STREAM);
+    addSock(16, SOCK_STREAM, 0);
 
     // Zeros should not be reported on any interface
     clearTestData();
@@ -1395,7 +1395,7 @@ doNetConnectionErrorSummarization(void** state)
 {
     clearTestData();
     setVerbosity(4);
-    addSock(16, SOCK_STREAM);
+    addSock(16, SOCK_STREAM, 0);
 
     // Zeros should not be reported on any interface
     clearTestData();
@@ -1485,7 +1485,7 @@ doNetRxTxErrorNoSummarization(void** state)
 {
     clearTestData();
     setVerbosity(5);
-    addSock(16, SOCK_STREAM);
+    addSock(16, SOCK_STREAM, 0);
 
     // Zeros should not be reported on any interface
     clearTestData();
@@ -1515,7 +1515,7 @@ doNetRxTxErrorSummarization(void** state)
 {
     clearTestData();
     setVerbosity(4);
-    addSock(16, SOCK_STREAM);
+    addSock(16, SOCK_STREAM, 0);
 
     // Zeros should not be reported on any interface
     clearTestData();

@@ -961,17 +961,20 @@ doTotalNetRxTx(metric_t type)
         // Don't report zeros.
         if ((*value)[bucket].mtc == 0) continue;
 
-        event_field_t fields[] = {
-            PROC_FIELD(g_proc.procname),
-            PID_FIELD(g_proc.pid),
-            HOST_FIELD(g_proc.hostname),
-            UNIT_FIELD(units),
-            CLASS_FIELD(bucketName[bucket]),
-            FIELDEND
-        };
-        event_t evt = INT_EVENT(metric, (*value)[bucket].mtc, DELTA, fields);
-        if (cmdSendMetric(g_mtc, &evt)) {
-            scopeLog(err_str, -1, CFG_LOG_ERROR);
+        if (g_summary.net.rx_tx) {
+
+            event_field_t fields[] = {
+                PROC_FIELD(g_proc.procname),
+                PID_FIELD(g_proc.pid),
+                HOST_FIELD(g_proc.hostname),
+                UNIT_FIELD(units),
+                CLASS_FIELD(bucketName[bucket]),
+                FIELDEND
+            };
+            event_t evt = INT_EVENT(metric, (*value)[bucket].mtc, DELTA, fields);
+            if (cmdSendMetric(g_mtc, &evt)) {
+                scopeLog(err_str, -1, CFG_LOG_ERROR);
+            }
         }
 
         // Reset the info we tried to report (if it's not a gauge)
@@ -1414,6 +1417,12 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // Don't report zeros.
         if (net->rxBytes.mtc == 0ULL) return;
 
+        if ((g_summary.net.rx_tx) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        event_t rxNetMetric = INT_EVENT("net.rx", net->rxBytes.mtc, DELTA, rxFields);
+        memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
         if (cmdSendMetric(g_mtc, &rxMetric)) {
             scopeLog("ERROR: doNetMetric:NETRX:cmdSendMetric", -1, CFG_LOG_ERROR);
         }
@@ -1462,7 +1471,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
                 LOCALN_FIELD(localPort),
                 REMOTEN_FIELD(remotePort),
                 DATA_FIELD(data),
-                NUMOPS_FIELD(net->numRX.evt),
+                NUMOPS_FIELD(net->numTX.evt),
                 UNIT_FIELD("byte"),
                 FIELDEND
             };
@@ -1515,7 +1524,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
                 REMOTEIP_FIELD(rip),
                 REMOTEP_FIELD(remotePort),
                 DATA_FIELD(data),
-                NUMOPS_FIELD(net->numRX.evt),
+                NUMOPS_FIELD(net->numTX.evt),
                 UNIT_FIELD("byte"),
                 FIELDEND
             };

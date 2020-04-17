@@ -89,6 +89,7 @@ typedef unsigned int bool;
 #define MAXEVENTSPERSEC 10000
 #define DEFAULT_PORTBLOCK 0
 #define DEFAULT_METRIC_CBUF_SIZE 50 * 1024
+#define DEFAULT_LOG_PATH "/tmp/scope.log"
 
 /*
  * This calculation is not what we need in the long run.

@@ -9,6 +9,7 @@
 #endif
 #include <sys/syscall.h>
 #include <sys/stat.h>
+
 #include "atomic.h"
 #include "cfg.h"
 #include "cfgutils.h"
@@ -23,6 +24,9 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 
+#define SSL_FUNC_READ "SSL_read"
+#define SSL_FUNC_WRITE "SSL_write"
+
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
 static thread_timing g_thread = {0};
@@ -32,6 +36,10 @@ static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 static list_t *g_nsslist;
+typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
+typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
+
+
 __thread int g_getdelim = 0;
 
 // Forward declaration
@@ -602,15 +610,8 @@ reportProcessStart(void)
     cmdSendInfoMsg(g_ctl, json);
 }
 
-// temp; will move this later
+// TODO; should this move to os/linux/os.c?
 #ifdef __LINUX__
-#define SSL_FUNC_READ "SSL_read"
-#define SSL_FUNC_WRITE "SSL_write"
-
-typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
-typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
-typedef int (*ssl_func_t)(SSL *, void *, int);
-
 void *
 memcpy(void *dest, const void *src, size_t n)
 {
@@ -622,7 +623,7 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
 {
     int rc;
 
-    scopeLog("ssl_read_hook", -1, CFG_LOG_ERROR);
+    scopeLog("ssl_read_hook", -1, CFG_LOG_DEBUG);
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
     if (rc > 0) {
@@ -638,7 +639,7 @@ ssl_write_hook(SSL *ssl, void *buf, int num)
 {
     int rc;
 
-    scopeLog("ssl_write_hook", -1, CFG_LOG_ERROR);
+    scopeLog("ssl_write_hook", -1, CFG_LOG_DEBUG);
     WRAP_CHECK(SSL_write, -1);
     rc = g_fn.SSL_write(ssl, buf, num);
     if (rc > 0) {
@@ -676,41 +677,72 @@ load_func(const char *module, const char *func)
     return addr;
 }
 
+static int 
+hookCallback(struct dl_phdr_info *info, size_t size, void *data)
+{
+    int len = strlen(info->dlpi_name);
+    int libscope_so_len = 11;
+
+    if(len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
+        *(char **)data = (char *) info->dlpi_name;
+        return 1;
+    }
+    return 0;
+}
+
+/*
+ * There are 3x SSL_read functions to consider:
+ * 1) the one in this file used to interpose SSL_read
+ * from a dynamic lib load (ex. curl)
+ *
+ * 2) the one in an ELF file for the process (main)
+ * included from a static link lib (ex. node.js)
+ *
+ * 3) the one in a dynamic lib (ex. libssl.so)
+ *
+ * Only perform the hot patch in the case where
+ * we find a symbol from the local process (main)
+ * that is not our interposed function.
+ *
+ * We start by getting the address of SSL_read from
+ * libscope.so by locating the path to this lib, then
+ * get a handle and lookup the symbol.
+ */
+
 static void
 initHook()
 {
-    void *addr;
-    funchook_t *funchook;
     int rc;
-    
-    void *handle = dlopen(NULL, RTLD_LAZY | RTLD_NOLOAD);
-    if (handle == NULL) {
-        return;
+    funchook_t *funchook;
+    char *full_path;
+    bool should_we_patch = FALSE;
+
+    if (dl_iterate_phdr(hookCallback, &full_path)) {
+        void *handle = dlopen(full_path, RTLD_NOW);
+        if (handle == NULL) {
+            dlclose(handle);
+            return;
+        }
+
+        void *addr = dlsym(handle, "SSL_read");
+        if (addr != SSL_read) {
+            should_we_patch = TRUE;
+        }
+
+        dlclose(handle);
     }
 
-    addr = dlsym(handle, "SSL_read");
-    dlclose(handle);
-
-    /*
-     * There are 3x SSL_read functions to consider:
-     * 1) the one in this file used to interpose SSL_read
-     * from a dynamic lib load (ex. curl)
-     *
-     * 2) the one in an ELF file for the process (main)
-     * included from a static link lib (ex. node.js)
-     *
-     * 3) the one in a dynamic lib (ex. libssl.so)
-     *
-     * Only perform the hot patch in the case where 
-     * we find a symbol from the local process (main)
-     * that is not our interposed function.
-     *
-     */
-    if (addr == SSL_read) {
-        return;
+    if (!should_we_patch) {
+      scopeLog("not installing SSL_read and SSL_write hooks...", -1, CFG_LOG_DEBUG);
+      return;
     }
 
     funchook = funchook_create();
+
+    if (logLevel(g_log) <= CFG_LOG_DEBUG) {
+        // TODO: add some mechanism to get the config'd log file path
+        funchook_set_debug_file(DEFAULT_LOG_PATH);
+    }
 
     g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
     

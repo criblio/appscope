@@ -22,6 +22,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/sock_diag.h>
 #include <linux/unix_diag.h>
+#include <link.h>
 
 #include "../../src/plattime.h"
 #include "../../contrib/funchook/include/funchook.h"

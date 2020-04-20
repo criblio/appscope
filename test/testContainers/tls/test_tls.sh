@@ -89,6 +89,35 @@ fi
 
 rm /opt/test-runner/logs/events.log
 
+echo "==============================================="
+echo "      Testing hot patch with node.js           "
+echo "==============================================="
+export $preload
+echo "Running node wih an HTTPS request"
+node /opt/test-runner/bin/nodehttp.ts > /dev/null
+unset LD_PRELOAD
+
+grep http-req /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+grep "Host: cribl.io" /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+grep http-resp /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+grep HTTP /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+if [ $ERR -eq "0" ]; then
+    echo "*************** hot patch Success ***************"
+else
+    echo "*************** host patch Test Failed ***************"
+#    cat /opt/test-runner/logs/events.log
+fi
+
+rm /opt/test-runner/logs/events.log
+
 if [ $ERR -eq "0" ]; then
 
     echo "*************** Test Passed ***************"

@@ -9,6 +9,9 @@ RUN yum -y install gnutls-devel
 RUN yum -y install openssl-devel
 RUN yum -y install wget automake
 
+run curl -sL https://rpm.nodesource.com/setup_11.x | bash -
+RUN yum -y install nodejs
+
 RUN mkdir /opt/test-runner/
 RUN mkdir /opt/test-runner/logs/
 
@@ -43,6 +46,7 @@ ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV LD_PRELOAD=/usr/lib/libscope.so
 
+COPY ./tls/nodehttp.ts /opt/test-runner/bin/nodehttp.ts
 COPY ./tls/test_tls.sh /opt/test-runner/bin/test_tls.sh
 RUN chmod +x /opt/test-runner/bin/test_tls.sh
 

@@ -168,6 +168,8 @@ doProtocolMetric(protocol_info *proto)
 {
     if (!proto) return;
 
+    char ssl[8];
+
     if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
         http_post *post = (http_post *)proto->data;
         http_map *map;
@@ -191,12 +193,19 @@ doProtocolMetric(protocol_info *proto)
 
         map->frequency++;
 
+        if (post->ssl) {
+            strncpy(ssl, "ssl", sizeof(ssl));
+        } else {
+            strncpy(ssl, "clear", sizeof(ssl));
+        }
+
         if (proto->ptype == EVT_HREQ) {
             map->start_time = post->start_duration;
             map->req = (char *)post->hdr;
 
             event_field_t fields[] = {
                 HREQ_FIELD(map->req),
+                DATA_FIELD(ssl),
                 UNIT_FIELD("byte"),
                 FIELDEND
             };
@@ -221,6 +230,7 @@ doProtocolMetric(protocol_info *proto)
             event_field_t hfields[] = {
                 HREQ_FIELD(map->req),
                 HRES_FIELD(map->resp),
+                DATA_FIELD(ssl),
                 UNIT_FIELD("byte"),
                 FIELDEND
             };

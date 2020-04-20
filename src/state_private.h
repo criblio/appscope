@@ -80,6 +80,7 @@ typedef struct evt_type_t {
 } evt_type;
 
 typedef struct http_post_t {
+    int ssl;
     uint64_t start_duration;
     uint64_t id;
     char *hdr;

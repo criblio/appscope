@@ -1,3 +1,6 @@
+# Added for direct linking to libscope.so
+add_compile_options( -fPIC )
+
 # GIT_SHALLOW requires cmake 3.6.
 cmake_minimum_required(VERSION 3.6)
 

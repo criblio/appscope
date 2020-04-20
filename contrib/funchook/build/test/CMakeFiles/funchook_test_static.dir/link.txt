@@ -1,1 +1,0 @@
-/usr/bin/cc  -Wall -fPIC -O3 -DNDEBUG  -rdynamic CMakeFiles/funchook_test_static.dir/test_main.c.o  -o funchook_test_static -Wl,-rpath,/home/donn/build/test ../libfunchook.a libfunchook_test.so -ldl ../libdistorm.a 

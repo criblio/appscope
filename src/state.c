@@ -20,6 +20,8 @@
 #define FS_ENTRIES 1024
 #define NUM_ATTEMPTS 100
 #define ASIZE 256
+#define HTTP_START "HTTP/"
+#define HTTP_END "\r\n\r\n"
 
 extern rtconfig g_cfg;
 
@@ -37,6 +39,7 @@ int g_mtc_addr_output = TRUE;
 bool g_predone = FALSE;
 int g_http_start[ASIZE];
 int g_http_end[ASIZE];
+int g_http_redirect[ASIZE];
 
 
 // interfaces
@@ -678,8 +681,9 @@ strsrch(char *needle, int nlen, char *haystack, int hlen, int *bmBc) {
 
     /* Preprocessing; passed in as bmBc */
     if (g_predone == FALSE) {
-        preComp((unsigned char *)"HTTP/", strlen("HTTP/"), g_http_start);
-        preComp((unsigned char *)"\r\n\r\n", strlen("\r\n\r\n"), g_http_end);
+        preComp((unsigned char *)HTTP_START, strlen(HTTP_START), g_http_start);
+        preComp((unsigned char *)HTTP_END, strlen(HTTP_END), g_http_end);
+        preComp((unsigned char *)REDIRECTURL, strlen(REDIRECTURL), g_http_redirect);
         g_predone = TRUE;
     }
 
@@ -703,6 +707,9 @@ isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
 {
     if (!buf || !*buf) return FALSE;
 
+    size_t startLen = strlen(HTTP_START);
+    size_t endLen = strlen(HTTP_END);
+
     /*
      * If we have an fd check for TCP
      * If we don't have a socket it can mean we are
@@ -717,8 +724,9 @@ isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
     switch (dtype) {
         case BUF:
         {
-            if ((strsrch("HTTP/", strlen("HTTP/"), *buf, len, g_http_start) != -1) &&
-                (strsrch("\r\n\r\n", strlen("\r\n\r\n"), *buf, len, g_http_end) != -1)) {
+            if ((strsrch(HTTP_START, startLen, *buf, len, g_http_start) != -1) &&
+                (strsrch(HTTP_END, endLen, *buf, len, g_http_end) != -1)) {
+
                 return TRUE;
             }
             break;
@@ -733,8 +741,8 @@ isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
             for (i = 0; i < msg->msg_iovlen; i++) {
                 iov = &msg->msg_iov[i];
                 if (iov && iov->iov_base) {
-                    if ((strsrch("HTTP/", strlen("HTTP/"), iov->iov_base, iov->iov_len, g_http_start) != -1) &&
-                        (strsrch("\r\n\r\n", strlen("\r\n\r\n"), iov->iov_base, iov->iov_len, g_http_end) != -1)) {
+                    if ((strsrch(HTTP_START, startLen, iov->iov_base, iov->iov_len, g_http_start) != -1) &&
+                        (strsrch(HTTP_END, endLen, iov->iov_base, iov->iov_len, g_http_end) != -1)) {
                         // might as well point to the header since we have it here
                         *buf = iov->iov_base;
                         return TRUE;
@@ -752,8 +760,8 @@ isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
             // len is expected to be an iovcnt for an IOV data type
             for (i = 0; i < len; i++) {
                 if (iov[i].iov_base) {
-                    if ((strsrch("HTTP/", strlen("HTTP/"), iov[i].iov_base, iov[i].iov_len, g_http_start) != -1) &&
-                        (strsrch("\r\n\r\n", strlen("\r\n\r\n"), iov[i].iov_base, iov[i].iov_len, g_http_end) != -1)) {
+                    if ((strsrch(HTTP_START, startLen, iov[i].iov_base, iov[i].iov_len, g_http_start) != -1) &&
+                        (strsrch(HTTP_END, endLen, iov[i].iov_base, iov[i].iov_len, g_http_end) != -1)) {
                         // might as well point to the header since we have it here
                         *buf = iov[i].iov_base; 
                         return TRUE;
@@ -776,7 +784,8 @@ static int
 doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
 {
     if ((buf == NULL) || (len <= 0)) return -1;
-    
+
+    int endix;
     in_port_t localPort, remotePort;
     size_t headsize;
     uint64_t uid;
@@ -784,6 +793,8 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
     protocol_info *proto;
     http_post *post;
     net_info *net;
+    size_t startLen = strlen(HTTP_START);
+    size_t endLen = strlen(HTTP_END);
 
     /*
      * If we have an fd, use the uid/channel value as it's unique 
@@ -800,9 +811,13 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
         return -1;
     }
 
-    if ((headend = strstr(buf, "\r\n\r\n")) != NULL) {
+    if (((endix = strsrch(HTTP_END, endLen, buf, len, g_http_end)) != -1) &&
+        (endix < len) && (endix > 0)) {
         header = buf;
-        headsize = (headend - (char *)buf);
+        headend = &header[endix];
+        headsize = (headend - header);
+
+        if (headsize < startLen) return -1;
 
         if ((post = calloc(1, sizeof(struct http_post_t))) == NULL) return -1;
         if ((hcopy = calloc(1, headsize + 4)) == NULL) {
@@ -828,8 +843,8 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
             post->ssl = 0;
         }
 
-        // If the first 6 chars are HTTP/, it's a response header
-        if (strsrch("HTTP/", strlen("HTTP/"), hcopy, strlen("HTTP/"), g_http_start) != -1) {
+        // If the first 5 chars are HTTP/, it's a response header
+        if (strsrch(HTTP_START, startLen, hcopy, startLen, g_http_start) != -1) {
             proto->ptype = EVT_HRES;
         } else {
             proto->ptype = EVT_HREQ;
@@ -943,7 +958,7 @@ getFSEntry(int fd)
 }
 
 void
-addSock(int fd, int type)
+addSock(int fd, int type, int family)
 {
     if (checkNetEntry(fd) == TRUE) {
         if (g_netinfo[fd].active) {
@@ -981,6 +996,7 @@ addSock(int fd, int type)
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].active = TRUE;
         g_netinfo[fd].type = type;
+        g_netinfo[fd].localConn.ss_family = family;
         g_netinfo[fd].uid = getTime();
 #ifdef __LINUX__
         // Clear these bits so comparisons of type will work
@@ -1114,18 +1130,18 @@ doAddNewSock(int sockfd)
             socklen_t len = sizeof(type);
 
             if (getsockopt(sockfd, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
-                addSock(sockfd, type);
+                addSock(sockfd, type, addr.ss_family);
             } else {
                 // Really can't add the socket at this point
                 scopeLog("ERROR: doAddNewSock:getsockopt", sockfd, CFG_LOG_ERROR);
             }
         } else {
             // is RAW a viable default?
-            addSock(sockfd, SOCK_RAW);
+            addSock(sockfd, SOCK_RAW, addr.ss_family);
         }
         doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
     } else {
-        addSock(sockfd, SOCK_RAW);
+        addSock(sockfd, SOCK_RAW, 0);
     }
 
     addrlen = sizeof(addr);
@@ -1287,7 +1303,9 @@ doURL(int sockfd, const void *buf, size_t len, metric_t src)
         doSetAddrs(sockfd);
     }
 
-    if ((src == NETTX) && (strstr(buf, REDIRECTURL) != NULL)) {
+
+    if ((src == NETTX) && (strsrch(REDIRECTURL, strlen(REDIRECTURL),
+                                   (char *)buf, len, g_http_redirect) != -1)) {
         g_netinfo[sockfd].urlRedirect = TRUE;
         return 0;
     }
@@ -1353,7 +1371,7 @@ void
 doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 {
     scopeLog(func, sd, CFG_LOG_DEBUG);
-    addSock(sd, SOCK_STREAM);
+    if (addr) addSock(sd, SOCK_STREAM, addr->sa_family);
 
     if (getNetEntry(sd) != NULL) {
         if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);
@@ -1542,7 +1560,7 @@ doDupSock(int oldfd, int newfd)
         return -1;
     }
 
-    bcopy(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct fs_info_t));
+    memmove(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct fs_info_t));
     g_netinfo[newfd].active = TRUE;
     g_netinfo[newfd].numTX = (counters_element_t){.mtc=0, .evt=0};
     g_netinfo[newfd].numRX = (counters_element_t){.mtc=0, .evt=0};

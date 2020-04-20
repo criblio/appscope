@@ -67,7 +67,6 @@ struct _config_t
 #define DEFAULT_LOG_TYPE CFG_FILE
 #define DEFAULT_LOG_HOST NULL
 #define DEFAULT_LOG_PORT NULL
-#define DEFAULT_LOG_PATH "/tmp/scope.log"
 #define DEFAULT_LOG_BUF CFG_BUFFER_FULLY
 #define DEFAULT_TAGS NULL
 #define DEFAULT_NUM_TAGS 8

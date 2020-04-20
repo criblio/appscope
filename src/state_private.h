@@ -16,6 +16,14 @@
 
 typedef enum
 {
+    PROT_START,
+    HTTP1,
+    HTTP2,
+    NOSCAN
+} protocol_type;
+
+typedef enum
+{
     INET_TCP,
     INET_UDP,
     UNIX_TCP,
@@ -118,6 +126,7 @@ typedef struct net_info_t {
     int fd;
     int active;
     int type;
+    size_t clen;
     bool urlRedirect;
     bool addrSetLocal;
     bool addrSetRemote;
@@ -137,6 +146,7 @@ typedef struct net_info_t {
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;
     metric_counters counters;
+    protocol_type protocol;
 } net_info;
 
 typedef struct fs_info_t {

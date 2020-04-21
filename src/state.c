@@ -737,6 +737,14 @@ isHttp(int sockfd, net_info *net, void **buf, size_t len, metric_t src, src_data
      * If we have an fd check for TCP
      * If we don't have a socket it can mean we are
      * called from certain TLS sessions; not an error
+     *
+     * If we are working down a content length, no
+     * need to scan for a header
+     *
+     * Note that, at this point, we are not able to
+     * use a content length optimization with gnutls
+     * because it does not return a file descriptor
+     * that is usable
      */
     if (net) {
         if (net->type != SOCK_STREAM) return FALSE;
@@ -759,8 +767,8 @@ isHttp(int sockfd, net_info *net, void **buf, size_t len, metric_t src, src_data
              */
             if ((strsrch(HTTP_START, startLen, *buf, len, g_http_start) != -1) &&
                 (strsrch(HTTP_END, endLen, *buf, len, g_http_end) != -1)) {
-                if ((clen = getContentLength(*buf, len)) != -1) {
-                    if (net && (len < clen)) {
+                if (net && (clen = getContentLength(*buf, len)) != -1) {
+                    if (len < clen) {
                         net->clen = clen;
                         net->clen -= len;
                     }
@@ -783,8 +791,8 @@ isHttp(int sockfd, net_info *net, void **buf, size_t len, metric_t src, src_data
                         (strsrch(HTTP_END, endLen, iov->iov_base, iov->iov_len, g_http_end) != -1)) {
                         // might as well point to the header since we have it here
                         *buf = iov->iov_base;
-                        if ((clen = getContentLength(*buf, len)) != -1) {
-                            if (net && (len < clen)) {
+                        if (net && (clen = getContentLength(*buf, len)) != -1) {
+                            if (len < clen) {
                                 net->clen = clen;
                                 net->clen -= len;
                             }
@@ -808,8 +816,8 @@ isHttp(int sockfd, net_info *net, void **buf, size_t len, metric_t src, src_data
                         (strsrch(HTTP_END, endLen, iov[i].iov_base, iov[i].iov_len, g_http_end) != -1)) {
                         // might as well point to the header since we have it here
                         *buf = iov[i].iov_base; 
-                        if ((clen = getContentLength(*buf, len)) != -1) {
-                            if (net && (len < clen)) {
+                        if (net && (clen = getContentLength(*buf, len)) != -1) {
+                            if (len < clen) {
                                 net->clen = clen;
                                 net->clen -= len;
                             }
@@ -835,7 +843,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, void *buf, size_t len, metric_t s
 {
     if ((buf == NULL) || (len <= 0)) return -1;
 
-    int endix;
+    unsigned int endix;
     in_port_t localPort, remotePort;
     size_t headsize;
     uint64_t uid;
@@ -866,6 +874,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, void *buf, size_t len, metric_t s
         headend = &header[endix];
         headsize = (headend - header);
 
+        // if the header size is < what we need to check for then just bail
         if (headsize < startLen) return -1;
 
         if ((post = calloc(1, sizeof(struct http_post_t))) == NULL) return -1;

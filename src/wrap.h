@@ -180,6 +180,7 @@ typedef struct interposed_funcs_t {
 
     int (*SSL_read)(SSL *, void *, int);
     int (*SSL_write)(SSL *, const void *, int);
+    int (*SSL_get_fd)(const SSL *);
     ssize_t (*gnutls_record_recv)(gnutls_session_t, void *, size_t);
     ssize_t (*gnutls_record_send)(gnutls_session_t, const void *, size_t);
     ssize_t (*gnutls_record_recv_early_data)(gnutls_session_t, void *, size_t);
@@ -227,45 +228,5 @@ struct FuncArgs{
         a.arg[5] = va_arg(__args, uint64_t);    \
         va_end(__args);                         \
     }while(0)
-
-#ifdef __LINUX__
-extern void *_dl_sym(void *, const char *, void *);
-#define WRAP_CHECK(func, rc)                                           \
-    if (g_fn.func == NULL ) {                                          \
-        if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {   \
-            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
-            return rc;                                                 \
-       }                                                               \
-    }                                                                  \
-    doThread();
-
-#define WRAP_CHECK_VOID(func)                                          \
-    if (g_fn.func == NULL ) {                                          \
-        if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {   \
-            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
-            return;                                                    \
-       }                                                               \
-    }                                                                  \
-    doThread();
-
-#else
-#define WRAP_CHECK(func, rc)                                           \
-    if (g_fn.func == NULL ) {                                          \
-        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
-            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
-            return rc;                                                 \
-       }                                                               \
-    }                                                                  \
-    doThread();
-
-#define WRAP_CHECK_VOID(func)                                          \
-    if (g_fn.func == NULL ) {                                          \
-        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
-            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
-            return;                                                    \
-       }                                                               \
-    }                                                                  \
-    doThread();
-#endif // __LINUX__
 
 #endif // __WRAP_H__

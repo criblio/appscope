@@ -48,6 +48,118 @@ static void doConfig(config_t *);
 static void reportProcessStart(void);
 static void threadNow(int);
 
+#ifdef __LINUX__
+
+typedef struct
+{
+    char *in_symbol;
+    void *out_addr;
+    int   after_scope;
+} param_t;
+
+// When used with dl_iterate_phdr(), this has a similar result to
+// _dl_sym(RTLD_NEXT, ).  But, unlike _dl_sym(RTLD_NEXT, )
+// it will never return a symbol in our library.  This is
+// particularly useful for finding symbols in shared libraries
+// that are dynamically loaded after our constructor has run.
+// Not to point fingers, but I'm looking at you python.
+//
+static int
+findSymbol(struct dl_phdr_info *info, size_t size, void *data)
+{
+    param_t* param = (param_t*)data;
+
+    // Don't bother looking inside libraries until after we've seen our library.
+    if (!param->after_scope) {
+        param->after_scope = (strstr(info->dlpi_name, "libscope.so") != NULL);
+        return 0;
+    }
+
+    // Now start opening libraries and looking for param->in_symbol
+    void *handle = dlopen(info->dlpi_name, RTLD_NOW);
+    if (!handle) return 0;
+    void *addr = dlsym(handle, param->in_symbol);
+    dlclose(handle);
+
+    // if we don't find addr, keep going
+    if (!addr)  return 0;
+
+    // We found an addr, and it's not in our library!  Return it!
+    param->out_addr = addr;
+    return 1;
+}
+
+#define WRAP_CHECK(func, rc)                                           \
+    if (g_fn.func == NULL ) {                                          \
+        param_t param = {.in_symbol = #func, .out_addr = NULL,         \
+                         .after_scope = FALSE};                        \
+        if (!dl_iterate_phdr(findSymbol, &param)) {                    \
+            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
+            return rc;                                                 \
+        }                                                              \
+        g_fn.func = param.out_addr;                                    \
+    }                                                                  \
+    doThread();
+
+#define WRAP_CHECK_VOID(func)                                          \
+    if (g_fn.func == NULL ) {                                          \
+        param_t param = {.in_symbol = #func, .out_addr = NULL,         \
+                         .after_scope = FALSE};                        \
+        if (!dl_iterate_phdr(findSymbol, &param)) {                    \
+            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
+            return;                                                    \
+        }                                                              \
+        g_fn.func = param.out_addr;                                    \
+    }                                                                  \
+    doThread();
+
+#define SYMBOL_LOADED(func) ({                                         \
+    int retval;                                                        \
+    if (g_fn.func == NULL) {                                           \
+        param_t param = {.in_symbol = #func, .out_addr = NULL,         \
+                         .after_scope = FALSE};                        \
+        if (dl_iterate_phdr(findSymbol, &param)) {                     \
+            g_fn.func = param.out_addr;                                \
+        }                                                              \
+    }                                                                  \
+    retval = (g_fn.func != NULL);                                      \
+    retval;                                                            \
+})
+
+#else
+
+#define WRAP_CHECK(func, rc)                                           \
+    if (g_fn.func == NULL ) {                                          \
+        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
+            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
+            return rc;                                                 \
+       }                                                               \
+    }                                                                  \
+    doThread();
+
+#define WRAP_CHECK_VOID(func)                                          \
+    if (g_fn.func == NULL ) {                                          \
+        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
+            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
+            return;                                                    \
+       }                                                               \
+    }                                                                  \
+    doThread();
+
+#define SYMBOL_LOADED(func) ({                                         \
+    int retval;                                                        \
+    if (g_fn.func == NULL) {                                           \
+        g_fn.func = dlsym(RTLD_NEXT, #func);                           \
+    }                                                                  \
+    retval = (g_fn.func != NULL);                                      \
+    retval;                                                            \
+})
+
+#endif // __LINUX__
+
+
+
+
 static void
 freeNssEntry(void *data)
 {
@@ -626,8 +738,8 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
     scopeLog("ssl_read_hook", -1, CFG_LOG_DEBUG);
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
-    if (rc > 0) {
-    //    int fd = SSL_get_fd((const SSL *)ssl);
+    if (rc > 0) { // && SYMBOL_LOADED(SSL_get_fd)
+    //    int fd = g_fn.SSL_get_fd(ssl);
         doProtocol((uint64_t)ssl, -1, buf, (size_t)num, TLSRX, BUF);
     }
 
@@ -642,8 +754,8 @@ ssl_write_hook(SSL *ssl, void *buf, int num)
     scopeLog("ssl_write_hook", -1, CFG_LOG_DEBUG);
     WRAP_CHECK(SSL_write, -1);
     rc = g_fn.SSL_write(ssl, buf, num);
-    if (rc > 0) {
-        //int fd = SSL_get_fd((const SSL *)ssl);
+    if (rc > 0) { // && SYMBOL_LOADED(SSL_get_fd)
+        //int fd = g_fn.SSL_get_fd(ssl);
         doProtocol((uint64_t)ssl, -1, (void *)buf, (size_t)rc, TLSTX, BUF);
     }
 
@@ -913,6 +1025,7 @@ init(void)
     g_fn.prctl = dlsym(RTLD_NEXT, "prctl");
     g_fn.SSL_read = dlsym(RTLD_NEXT, "SSL_read");
     g_fn.SSL_write = dlsym(RTLD_NEXT, "SSL_write");
+    g_fn.SSL_get_fd = dlsym(RTLD_NEXT, "SSL_get_fd");
     g_fn.gnutls_record_recv = dlsym(RTLD_NEXT, "gnutls_record_recv");
     g_fn.gnutls_record_send = dlsym(RTLD_NEXT, "gnutls_record_send");
     g_fn.gnutls_record_recv_early_data = dlsym(RTLD_NEXT, "gnutls_record_recv_early_data");
@@ -1904,8 +2017,8 @@ SSL_read(SSL *ssl, void *buf, int num)
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
 
-    if (rc > 0) {
-        int fd = SSL_get_fd((const SSL *)ssl);
+    if ((rc > 0) && SYMBOL_LOADED(SSL_get_fd)) {
+        int fd = g_fn.SSL_get_fd(ssl);
         doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
     }
     return rc;
@@ -1918,10 +2031,11 @@ SSL_write(SSL *ssl, const void *buf, int num)
     
     //scopeLog("SSL_write", -1, CFG_LOG_ERROR);
     WRAP_CHECK(SSL_write, -1);
+
     rc = g_fn.SSL_write(ssl, buf, num);
 
-    if (rc > 0) {
-        int fd = SSL_get_fd((const SSL *)ssl);
+    if ((rc > 0) && SYMBOL_LOADED(SSL_get_fd)) {
+        int fd = g_fn.SSL_get_fd(ssl);
         doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
     }
     return rc;

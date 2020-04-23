@@ -171,7 +171,7 @@ testEachLineInStreamWithActualLibraryData(void** state)
     testEachLineInStream(f_in, LATEST_LIBC_VER_NEEDED, &result, stdout);
     assert_true(result.lines_tested > 350);            // 383 when written
     assert_true(result.lines_glibc > 40);              // 54 when written
-    assert_int_equal(result.lines_glibc_private,  1);  // _dl_sym
+    assert_int_equal(result.lines_glibc_private,  1);  // because of _dl_sym
     assert_int_equal(result.lines_failed, 0);
     pclose(f_in);
     //fclose(f_out);

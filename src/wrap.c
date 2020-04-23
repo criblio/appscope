@@ -64,6 +64,8 @@ typedef struct
 // that are dynamically loaded after our constructor has run.
 // Not to point fingers, but I'm looking at you python.
 //
+extern void *_dl_sym(void *, const char *, void *);
+
 static int
 findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 {
@@ -91,6 +93,12 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 
 #define WRAP_CHECK(func, rc)                                           \
     if (g_fn.func == NULL ) {                                          \
+       if (!g_ctl) {                                                   \
+         if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {  \
+             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);     \
+             return rc;                                                \
+         }                                                             \
+       } else {                                                        \
         param_t param = {.in_symbol = #func, .out_addr = NULL,         \
                          .after_scope = FALSE};                        \
         if (!dl_iterate_phdr(findSymbol, &param)) {                    \
@@ -98,11 +106,18 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
             return rc;                                                 \
         }                                                              \
         g_fn.func = param.out_addr;                                    \
+       }                                                               \
     }                                                                  \
     doThread();
 
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
+       if (!g_ctl) {                                                   \
+         if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {  \
+             scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);     \
+             return;                                                   \
+         }                                                             \
+       } else {                                                        \
         param_t param = {.in_symbol = #func, .out_addr = NULL,         \
                          .after_scope = FALSE};                        \
         if (!dl_iterate_phdr(findSymbol, &param)) {                    \
@@ -110,6 +125,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
             return;                                                    \
         }                                                              \
         g_fn.func = param.out_addr;                                    \
+      }                                                                \
     }                                                                  \
     doThread();
 
@@ -735,12 +751,16 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
 {
     int rc;
 
-    scopeLog("ssl_read_hook", -1, CFG_LOG_DEBUG);
+    scopeLog("ssl_read_hook", -1, CFG_LOG_TRACE);
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
-    if (rc > 0) { // && SYMBOL_LOADED(SSL_get_fd)
-    //    int fd = g_fn.SSL_get_fd(ssl);
-        doProtocol((uint64_t)ssl, -1, buf, (size_t)num, TLSRX, BUF);
+    if (rc > 0) {
+        if (SYMBOL_LOADED(SSL_get_fd)) {
+            int fd = g_fn.SSL_get_fd(ssl);
+            doProtocol((uint64_t)ssl, fd, buf, (size_t)num, TLSRX, BUF);
+        } else {
+            doProtocol((uint64_t)ssl, -1, buf, (size_t)num, TLSRX, BUF);
+        }
     }
 
     return rc;
@@ -751,12 +771,16 @@ ssl_write_hook(SSL *ssl, void *buf, int num)
 {
     int rc;
 
-    scopeLog("ssl_write_hook", -1, CFG_LOG_DEBUG);
+    scopeLog("ssl_write_hook", -1, CFG_LOG_TRACE);
     WRAP_CHECK(SSL_write, -1);
     rc = g_fn.SSL_write(ssl, buf, num);
-    if (rc > 0) { // && SYMBOL_LOADED(SSL_get_fd)
-        //int fd = g_fn.SSL_get_fd(ssl);
-        doProtocol((uint64_t)ssl, -1, (void *)buf, (size_t)rc, TLSTX, BUF);
+    if (rc > 0) {
+        if (SYMBOL_LOADED(SSL_get_fd)) {
+            int fd = g_fn.SSL_get_fd(ssl);
+            doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
+        } else {
+            doProtocol((uint64_t)ssl, -1, (void *)buf, (size_t)rc, TLSTX, BUF);
+        }
     }
 
     return rc;
@@ -2017,9 +2041,13 @@ SSL_read(SSL *ssl, void *buf, int num)
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
 
-    if ((rc > 0) && SYMBOL_LOADED(SSL_get_fd)) {
-        int fd = g_fn.SSL_get_fd(ssl);
-        doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
+    if (rc > 0) {
+        if (SYMBOL_LOADED(SSL_get_fd)) {
+            int fd = g_fn.SSL_get_fd(ssl);
+            doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
+        } else {
+            doProtocol((uint64_t)ssl, -1, buf, (size_t)rc, TLSRX, BUF);
+        }
     }
     return rc;
 }
@@ -2034,9 +2062,13 @@ SSL_write(SSL *ssl, const void *buf, int num)
 
     rc = g_fn.SSL_write(ssl, buf, num);
 
-    if ((rc > 0) && SYMBOL_LOADED(SSL_get_fd)) {
-        int fd = g_fn.SSL_get_fd(ssl);
-        doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
+    if (rc > 0) {
+        if (SYMBOL_LOADED(SSL_get_fd)) {
+            int fd = g_fn.SSL_get_fd(ssl);
+            doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
+        } else {
+            doProtocol((uint64_t)ssl, -1, (void *)buf, (size_t)rc, TLSTX, BUF);
+        }
     }
     return rc;
 }

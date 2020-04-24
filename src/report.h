@@ -65,6 +65,7 @@ typedef enum {
     EVT_PROTO,
     EVT_HREQ,
     EVT_HRES,
+    EVT_DETECT,
     TLSRX,
     TLSTX
 } metric_t;

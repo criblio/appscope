@@ -2,6 +2,9 @@
 #define __STATE_H__
 
 #include <sys/socket.h>
+#include <regex.h>
+
+#include "runtimecfg.h"
 #include "linklist.h"
 #include "report.h"
 #include "../contrib/tls/tls.h"
@@ -18,7 +21,6 @@ typedef enum {
     IOV,
     NONE
 } src_data_t;
-
 
 void initState();
 void resetState();

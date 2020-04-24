@@ -9,12 +9,12 @@
 #include "atomic.h"
 #include "com.h"
 #include "dbg.h"
+#include "runtimecfg.h"
 #include "dns.h"
 #include "mtcformat.h"
 #include "plattime.h"
 #include "state.h"
 #include "state_private.h"
-#include "runtimecfg.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
@@ -23,6 +23,8 @@
 #define HTTP_START "HTTP/"
 #define HTTP_END "\r\n\r\n"
 #define CONTENT_LENGTH "Content-Length:"
+#define Redis "^[*][[:digit:]]+|^[+][[:alpha:]]+|^[$][[:digit:]]+"
+#define Mongo "^[XXX]"
 
 extern rtconfig g_cfg;
 
@@ -38,11 +40,11 @@ fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
 bool g_predone = FALSE;
-int g_http_start[ASIZE];
-int g_http_end[ASIZE];
-int g_http_redirect[ASIZE];
-int g_http_clen[ASIZE];
-
+static int g_http_start[ASIZE];
+static int g_http_end[ASIZE];
+static int g_http_redirect[ASIZE];
+static int g_http_clen[ASIZE];
+static list_t *g_protlist;
 
 // interfaces
 mtc_t *g_mtc = NULL;
@@ -123,6 +125,51 @@ get_port_net(net_info *net, int type, control_type_t which) {
     return htons(port);
 }
 
+static void
+destroyProtEntry(void *data)
+{
+    if (!data) return;
+
+    protocol_re_t *pre = data;
+    regfree(&pre->re);
+    free(pre);
+}
+
+static bool
+addProtocol(char *pname, char *dname, protocol_type ptype)
+{
+    int rc;
+    protocol_re_t *prep;
+
+    if ((prep = calloc(1, sizeof(protocol_re_t))) == NULL) return FALSE;
+
+    if ((rc = regcomp(&prep->re, pname, REG_EXTENDED | REG_NOSUB)) != 0) {
+        //DEBUG
+        char ebuf[128];
+        regerror(rc, (const regex_t *)&prep->re, ebuf, sizeof(ebuf));
+        scopeLog(ebuf, -1, CFG_LOG_ERROR);
+        free(prep);
+        return FALSE;
+    }
+
+    strncpy(prep->protStr, dname, strnlen(dname, sizeof(prep->protStr)));
+    prep->type = ptype;
+
+    if (lstInsert(g_protlist, prep->type, prep) == FALSE) {
+        destroyProtEntry(prep);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static void
+initProtocolDetection()
+{
+    addProtocol(Redis, "Redis", REDIS);
+    addProtocol(Mongo, "Mongo", MONGO);
+}
+
 void
 initState()
 {
@@ -145,6 +192,9 @@ initState()
 
     // Per RUC...
     g_fsinfo = fsinfoLocal;
+
+    g_protlist = lstCreate(destroyProtEntry);
+    initProtocolDetection();
 
     initReporting();
 }
@@ -918,20 +968,110 @@ doHttp(uint64_t id, int sockfd, net_info *net, void *buf, size_t len, metric_t s
     return 0;
 }
 
+static void
+setProtocol(protocol_re_t *pre, net_info *net)
+{
+    protocol_info *proto;
+
+    if (!pre) return;
+
+    net->protocol = pre->type;
+    pre->uid = net->uid;
+
+    if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
+        return;
+    }
+
+    proto->evtype = EVT_PROTO;
+    proto->ptype = EVT_DETECT;
+    proto->len = sizeof(protocol_re_t);
+    proto->fd = net->fd;
+    proto->data = (char *)pre;
+    cmdPostEvent(g_ctl, (char *)proto);
+}
+
+static void
+detectProtocol(int sockfd, net_info *net, void **buf, size_t len, metric_t src, src_data_t dtype)
+{
+    protocol_type ptype;
+    protocol_re_t *pre;
+
+    scopeLog("detectProtocol", sockfd, CFG_LOG_ERROR);
+    if (!buf || !*buf || !net || (net->protocol != 0)) return;
+
+    for (ptype = PROT_START; ptype != PROT_END; ptype++) {
+        if ((pre = lstFind(g_protlist, ptype)) != NULL) {
+            switch (dtype) {
+            case BUF:
+            {
+                int rc;
+                if ((rc = regexec(&pre->re, (const char *)*buf, 0, NULL, 0)) == 0) {
+                    setProtocol(pre, net);
+                } else {
+                    //DEBUG
+                    char ebuf[128];
+                    regerror(rc, (const regex_t *)&pre->re, ebuf, sizeof(ebuf));
+                    scopeLog(ebuf, sockfd, CFG_LOG_ERROR);
+                }
+                break;
+            }
+
+            case MSG:
+            {
+                int i;
+                struct msghdr *msg = (struct msghdr *)*buf;
+                struct iovec *iov;
+
+                for (i = 0; i < msg->msg_iovlen; i++) {
+                    iov = &msg->msg_iov[i];
+                    if (iov && iov->iov_base) {
+                        if (regexec(&pre->re, (const char *)iov->iov_base, 0, NULL, 0) == 0) {
+                            setProtocol(pre, net);
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
+
+            case IOV:
+            {
+                int i;
+                struct iovec *iov = (struct iovec *)*buf;
+
+                // len is expected to be an iovcnt for an IOV data type
+                for (i = 0; i < len; i++) {
+                    if (iov[i].iov_base) {
+                        if (regexec(&pre->re, (const char *)iov->iov_base, 0, NULL, 0) == 0) {
+                            setProtocol(pre, net);
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
+
+            default:
+                break;
+            }
+        }
+    }
+}
+
 int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
-    net_info *net;
+    net_info *net = getNetEntry(sockfd);
 
-    if (!ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) return 0;
-
-    net = getNetEntry(sockfd);
-
-    if (isHttp(sockfd, net, &buf, len, src, dtype) == TRUE) {
-        // not doing anything with protocol...yet
-        if (net) net->protocol = HTTP1;
-        return doHttp(id, sockfd, net, buf, len, src);
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
+        if (isHttp(sockfd, net, &buf, len, src, dtype) == TRUE) {
+            // not doing anything with protocol...yet
+            if (net) net->protocol = HTTP1;
+            return doHttp(id, sockfd, net, buf, len, src);
+        }
     }
+
+    detectProtocol(sockfd, net, &buf, len, src, dtype);
 
     return 0;
 }

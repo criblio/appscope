@@ -4,6 +4,19 @@ RUN yum -y update
 RUN yum -y install centos-release-scl
 RUN yum -y install epel-release
 RUN yum -y install redis
+RUN yum -y install wget
+RUN yum -y install gdb
+
+RUN wget https://repo.mongodb.org/yum/redhat/6Server/mongodb-org/4.2/x86_64/RPMS/mongodb-org-4.2.6-1.el6.x86_64.rpm
+RUN wget https://repo.mongodb.org/yum/redhat/6Server/mongodb-org/4.2/x86_64/RPMS/mongodb-org-server-4.2.6-1.el6.x86_64.rpm
+RUN wget https://repo.mongodb.org/yum/redhat/6Server/mongodb-org/4.2/x86_64/RPMS/mongodb-org-shell-4.2.6-1.el6.x86_64.rpm
+RUN wget https://repo.mongodb.org/yum/redhat/6Server/mongodb-org/4.2/x86_64/RPMS/mongodb-org-mongos-4.2.6-1.el6.x86_64.rpm
+RUN wget https://repo.mongodb.org/yum/redhat/6Server/mongodb-org/4.2/x86_64/RPMS/mongodb-org-tools-4.2.6-1.el6.x86_64.rpm
+
+
+RUN rpm -ihv mongodb-org-tools-4.2.6-1.el6.x86_64.rpm mongodb-org-mongos-4.2.6-1.el6.x86_64.rpm mongodb-org-shell-4.2.6-1.el6.x86_64.rpm mongodb-org-4.2.6-1.el6.x86_64.rpm mongodb-org-server-4.2.6-1.el6.x86_64.rpm
+
+RUN rm *.rpm
 
 ADD entrypoint.sh /sbin/entrypoint.sh
 ADD loaddata.sh /sbin/loaddata.sh

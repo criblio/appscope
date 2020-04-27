@@ -676,10 +676,12 @@ preComp(unsigned char *needle, int nlen, int bmBc[]) {
        bmBc[needle[i]] = nlen - i - 1;
 }
 
-static ssize_t
-strsrch(char *needle, int nlen, char *haystack, ssize_t hlen, int *bmBc) {
-    ssize_t j;
+static int
+strsrch(char *needle, int nlen, char *haystack, int hlen, int *bmBc) {
+    int j;
     unsigned char c;
+
+    if ((hlen < 0) || (nlen < 0)) return -1;
 
     /* Preprocessing; passed in as bmBc */
     if (g_predone == FALSE) {

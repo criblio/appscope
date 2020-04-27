@@ -14,13 +14,12 @@
 // this file, but it is not recommended that any other file include it.
 //
 
-typedef enum
-{
-    PROT_START,
-    HTTP1,
-    HTTP2,
-    NOSCAN
-} protocol_type;
+typedef struct {
+    regex_t re;
+    protocol_type type;
+    uint64_t uid;
+    char protStr[16];
+} protocol_re_t;
 
 typedef enum
 {
@@ -31,7 +30,6 @@ typedef enum
     SOCK_OTHER,
     SOCK_NUM_BUCKETS
 } sock_summary_bucket_t;
-
 
 typedef struct {
     uint64_t mtc;

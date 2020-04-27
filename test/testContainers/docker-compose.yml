@@ -10,6 +10,8 @@ services:
     build:
       context: .
       dockerfile: ./splunk/Dockerfile
+    ports:
+      - "8000:8000"
 
     privileged: true
 
@@ -54,3 +56,9 @@ services:
     build:
       context: .
       dockerfile: ./tls/Dockerfile
+
+  detect_proto:
+    build:
+      context: detect_proto
+    ports:
+      - 6379:6379

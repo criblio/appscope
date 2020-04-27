@@ -22,6 +22,7 @@
 #define ASIZE 256
 #define HTTP_START "HTTP/"
 #define HTTP_END "\r\n\r\n"
+#define CONTENT_LENGTH "Content-Length:"
 
 extern rtconfig g_cfg;
 
@@ -40,6 +41,7 @@ bool g_predone = FALSE;
 int g_http_start[ASIZE];
 int g_http_end[ASIZE];
 int g_http_redirect[ASIZE];
+int g_http_clen[ASIZE];
 
 
 // interfaces
@@ -679,11 +681,14 @@ strsrch(char *needle, int nlen, char *haystack, int hlen, int *bmBc) {
     int j;
     unsigned char c;
 
+    if ((hlen < 0) || (nlen < 0)) return -1;
+
     /* Preprocessing; passed in as bmBc */
     if (g_predone == FALSE) {
         preComp((unsigned char *)HTTP_START, strlen(HTTP_START), g_http_start);
         preComp((unsigned char *)HTTP_END, strlen(HTTP_END), g_http_end);
         preComp((unsigned char *)REDIRECTURL, strlen(REDIRECTURL), g_http_redirect);
+        preComp((unsigned char *)CONTENT_LENGTH, strlen(CONTENT_LENGTH), g_http_clen);
         g_predone = TRUE;
     }
 
@@ -701,35 +706,124 @@ strsrch(char *needle, int nlen, char *haystack, int hlen, int *bmBc) {
     return -1;
 }
 
-// allow all ports if they appear to have an HTTP header
-static bool
-isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
+static size_t
+getContentLength(char *header, size_t len)
 {
-    if (!buf || !*buf) return FALSE;
+    size_t ix;
+    size_t rc;
+    char *val;
+
+    // ex: Content-Length: 559\r\n
+    if ((ix = strsrch(CONTENT_LENGTH, strlen(CONTENT_LENGTH), header, len, g_http_clen)) == -1) return -1;
+
+    if ((ix <= 0) || (ix > len) || ((ix + strlen(CONTENT_LENGTH)) > len)) return -1;
+
+    val = &header[ix + strlen(CONTENT_LENGTH)];
+
+    errno = 0;
+    rc = strtoull(val, NULL, 0);
+    if ((errno != 0) || (rc == 0)) {
+        return -1;
+    }
+    return rc;
+}
+
+/*
+ * If we have an fd check for TCP
+ * If we don't have a socket it can mean we are
+ * called from certain TLS sessions; not an error
+ *
+ * If we are working down a content length, no
+ * need to scan for a header
+ *
+ * Note that, at this point, we are not able to
+ * use a content length optimization with gnutls
+ * because it does not return a file descriptor
+ * that is usable
+*/
+static bool
+scanFoundHttpHeader(net_info *net, char *buf, size_t len)
+{
+    if (!buf) return FALSE;
+
+    // By default, turn off Content-Length skipping.
+    // Only scan streams for http headers.
+    if (net) {
+        net->clen = 0;
+        if (net->type != SOCK_STREAM) return FALSE;
+    }
 
     size_t startLen = strlen(HTTP_START);
     size_t endLen = strlen(HTTP_END);
 
-    /*
-     * If we have an fd check for TCP
-     * If we don't have a socket it can mean we are
-     * called from certain TLS sessions; not an error
-     */
-    struct net_info_t *net;
-    if ((sockfd != -1) && ((net = getNetEntry(sockfd)))) {
-        if (net->type != SOCK_STREAM) return FALSE;
+    // find the start of http header data
+    size_t header_start =
+        strsrch(HTTP_START, startLen, buf, len, g_http_start);
+    if (header_start == -1) return FALSE;
+    header_start += startLen;
+
+    // find the end of http header data
+    size_t header_end =
+        strsrch(HTTP_END, endLen,
+                &buf[header_start], len-header_start, g_http_end);
+    if (header_end == -1) return FALSE;
+    header_end += header_start;  // was measured from header_start
+    header_end += endLen;
+
+    // Only look for Content-Length header if we're able to save it for later
+    if (net) {
+        // if there is not a contentLength header, bail.
+        size_t clen = getContentLength(&buf[header_start], header_end - header_start);
+        if (clen == -1) return TRUE; // We found a complete header in buf
+
+        // There is a Content-Length header!  Remember how much we can skip.
+        size_t content_in_this_buf = len - header_end;
+        if (clen >= content_in_this_buf) {
+            net->clen = clen - content_in_this_buf;
+        }
     }
+    return TRUE; // We found a complete header in buf
+}
+
+static size_t
+bytesToSkip(net_info *net, size_t len)
+{
+    // don't skip anything because we don't know anything about it
+    // or because content length skipping is off
+    if (!net || (net->clen == 0)) return 0;
+
+    // skip the rest of the remaining content length
+    // and turn off content length skipping
+    if (len > net->clen) {
+        size_t rv = net->clen;
+        net->clen = 0;
+        return rv;
+    }
+
+    // skip this whole buf and maintain content length
+    net->clen -= len;
+    return len;
+}
+
+
+// allow all ports if they appear to have an HTTP header
+static bool
+isHttp(int sockfd, net_info *net, void **buf, size_t *len, metric_t src, src_data_t dtype)
+{
+    if (!buf || !*buf || !len) return FALSE;
 
     // Handle the data in it's various format
     switch (dtype) {
         case BUF:
         {
-            if ((strsrch(HTTP_START, startLen, *buf, len, g_http_start) != -1) &&
-                (strsrch(HTTP_END, endLen, *buf, len, g_http_end) != -1)) {
-
-                return TRUE;
-            }
-            break;
+            /*
+             * TODO: if the entire header is not contained in this buffer we will drop
+             * the header. Need to keep state such that we can cross buffer boundaries
+             * at some point.
+             */
+            size_t bts = bytesToSkip(net, *len);
+            if (bts == *len) return FALSE;
+            return scanFoundHttpHeader(net, &(((char*)*buf)[bts]), *len - bts);
         }
 
         case MSG:
@@ -737,38 +831,47 @@ isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
             int i;
             struct msghdr *msg = (struct msghdr *)*buf;
             struct iovec *iov;
+            int http_header_found = FALSE;
 
             for (i = 0; i < msg->msg_iovlen; i++) {
                 iov = &msg->msg_iov[i];
                 if (iov && iov->iov_base) {
-                    if ((strsrch(HTTP_START, startLen, iov->iov_base, iov->iov_len, g_http_start) != -1) &&
-                        (strsrch(HTTP_END, endLen, iov->iov_base, iov->iov_len, g_http_end) != -1)) {
-                        // might as well point to the header since we have it here
+                    size_t bts = bytesToSkip(net, iov->iov_len);
+                    if (bts == iov->iov_len) continue;
+                    // TODO: we only return the first match
+                    if (http_header_found) continue;
+                    if (scanFoundHttpHeader(net, &(((char*)iov->iov_base)[bts]), iov->iov_len - bts)) {
                         *buf = iov->iov_base;
-                        return TRUE;
+                        *len = iov->iov_len;
+                        http_header_found = TRUE;
                     }
                 }
             }
-            break;
+            return http_header_found;
         }
 
         case IOV:
         {
             int i;
-            struct iovec *iov = (struct iovec *)*buf;
-
             // len is expected to be an iovcnt for an IOV data type
-            for (i = 0; i < len; i++) {
+            int iovcnt = *len;
+            struct iovec *iov = (struct iovec *)*buf;
+            int http_header_found = FALSE;
+
+            for (i = 0; i < iovcnt; i++) {
                 if (iov[i].iov_base) {
-                    if ((strsrch(HTTP_START, startLen, iov[i].iov_base, iov[i].iov_len, g_http_start) != -1) &&
-                        (strsrch(HTTP_END, endLen, iov[i].iov_base, iov[i].iov_len, g_http_end) != -1)) {
-                        // might as well point to the header since we have it here
-                        *buf = iov[i].iov_base; 
-                        return TRUE;
+                    size_t bts = bytesToSkip(net, iov[i].iov_len);
+                    if (bts == iov[i].iov_len) continue;
+                    // TODO: we only return the first match
+                    if (http_header_found) continue;
+                    if (scanFoundHttpHeader(net, &(((char*)iov[i].iov_base)[bts]), iov[i].iov_len - bts)) {
+                        *buf = iov[i].iov_base;
+                        *len = iov[i].iov_len;
+                        http_header_found = TRUE;
                     }
                 }
             }
-            break;
+            return http_header_found;
         }
 
         case NONE:
@@ -781,18 +884,17 @@ isHttp(int sockfd, void **buf, size_t len, metric_t src, src_data_t dtype)
 
 // For now, only doing HTTP/1.X headers
 static int
-doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
+doHttp(uint64_t id, int sockfd, net_info *net, void *buf, size_t len, metric_t src)
 {
     if ((buf == NULL) || (len <= 0)) return -1;
 
-    int endix;
+    unsigned int endix;
     in_port_t localPort, remotePort;
     size_t headsize;
     uint64_t uid;
     char *headend, *header, *hcopy;
     protocol_info *proto;
     http_post *post;
-    net_info *net;
     size_t startLen = strlen(HTTP_START);
     size_t endLen = strlen(HTTP_END);
 
@@ -800,7 +902,7 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
      * If we have an fd, use the uid/channel value as it's unique 
      * else we are likley using TLS, so default to the session ID
      */
-    if ((sockfd != -1) && ((net = getNetEntry(sockfd)) != NULL)) {
+    if (net) {
         uid = net->uid;
         localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
         remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
@@ -817,6 +919,7 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
         headend = &header[endix];
         headsize = (headend - header);
 
+        // if the header size is < what we need to check for then just bail
         if (headsize < startLen) return -1;
 
         if ((post = calloc(1, sizeof(struct http_post_t))) == NULL) return -1;
@@ -863,9 +966,16 @@ doHttp(uint64_t id, int sockfd, void *buf, size_t len, metric_t src)
 int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
-    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP) &&
-        (isHttp(sockfd, &buf, len, src, dtype) == TRUE)) {
-        return doHttp(id, sockfd, buf, len, src);
+    net_info *net;
+
+    if (!ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) return 0;
+
+    net = getNetEntry(sockfd);
+
+    if (isHttp(sockfd, net, &buf, &len, src, dtype) == TRUE) {
+        // not doing anything with protocol...yet
+        if (net) net->protocol = HTTP1;
+        return doHttp(id, sockfd, net, buf, len, src);
     }
 
     return 0;

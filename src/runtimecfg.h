@@ -9,15 +9,4 @@ typedef struct rtconfig_t {
     config_t *staticfg;
 } rtconfig;
 
-typedef enum
-{
-    PROT_START,
-    HTTP1,
-    HTTP2,
-    REDIS,
-    MONGO,
-    NOSCAN,
-    PROT_END
-} protocol_type;
-
 #endif // __RUNTIMECFG_H__

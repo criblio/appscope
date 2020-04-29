@@ -256,18 +256,18 @@ doHttpHeader(protocol_info *proto)
 static void
 doDetection(protocol_info *proto)
 {
-    protocol_re_t *pre;
+    protocol_def_t *pre;
 
     if (!proto) return;
 
-    pre = (protocol_re_t *)proto->data;
+    pre = (protocol_def_t *)proto->data;
 
     event_field_t fields[] = {
         PROC_FIELD(g_proc.procname),
         PID_FIELD(g_proc.pid),
         FD_FIELD(proto->fd),
         HOST_FIELD(g_proc.hostname),
-        DETECT_PROTO(pre->protStr),
+        DETECT_PROTO(pre->protname),
         FIELDEND
     };
 

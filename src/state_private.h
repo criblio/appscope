@@ -14,13 +14,6 @@
 // this file, but it is not recommended that any other file include it.
 //
 
-typedef struct {
-    regex_t re;
-    protocol_type type;
-    uint64_t uid;
-    char protStr[16];
-} protocol_re_t;
-
 typedef enum
 {
     INET_TCP,
@@ -144,7 +137,7 @@ typedef struct net_info_t {
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;
     metric_counters counters;
-    protocol_type protocol;
+    unsigned int protocol;
 } net_info;
 
 typedef struct fs_info_t {

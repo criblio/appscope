@@ -348,13 +348,21 @@ remoteConfig()
                             g_cfg.urls = 1;
                             break;
                         case URL_REDIRECT_OFF:
-                            g_cfg.urls = 0;
+                             g_cfg.urls = 0;
                             break;
                         default:
                             DBG("%d", req->action);
                     }
                     break;
-                default:
+                case REQ_ADD_PROTOCOL:
+                    // define a new protocol
+                    addProtocol(req);
+                    break;
+                case REQ_DEL_PROTOCOL:
+                    // remove a protocol
+                    delProtocol(req);
+                    break;
+            default:
                     DBG(NULL);
             }
             

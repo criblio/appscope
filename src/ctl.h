@@ -21,6 +21,8 @@ typedef enum {
     REQ_GET_DIAG,
     REQ_BLOCK_PORT,
     REQ_SWITCH,
+    REQ_ADD_PROTOCOL,
+    REQ_DEL_PROTOCOL,
 } cmd_t;
 
 typedef enum {
@@ -30,6 +32,17 @@ typedef enum {
 } switch_action_t;
 
 typedef struct {
+    bool binary;
+    char *regex;
+    regex_t re;
+    unsigned char *bincompare;
+    unsigned int binlen;
+    unsigned int type;
+    uint64_t uid;
+    char *protname;
+} protocol_def_t;
+
+typedef struct {
     cmd_t cmd;                 // our interpretation of what we received
     char *cmd_str;             // command string
     long long id;              // unique request id
@@ -37,6 +50,7 @@ typedef struct {
     config_t *cfg;             // only used for REQ_SET_CFG
     unsigned short port;       // only used for REQ_BLOCK_PORT
     switch_action_t action;    // only used for REQ_SWITCH
+    protocol_def_t *protocol;  // define a protocol to detect
 
     // other params/structure as we define it,
     // presumably these will be received in body field

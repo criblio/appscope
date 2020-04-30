@@ -1,6 +1,6 @@
 #ifndef __EVT_FORMAT_H__
 #define __EVT_FORMAT_H__
-#include <regex.h>
+#include "pcre2posix.h"
 #include <stdint.h>
 #include "cJSON.h"
 #include "mtcformat.h"

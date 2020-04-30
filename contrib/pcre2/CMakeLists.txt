@@ -1,3 +1,7 @@
+# Added for direct linking to libscope.so
+add_compile_options( -fPIC )
+add_compile_options( -fvisibility=hidden )
+
 # CMakeLists.txt
 #
 #

@@ -1,3 +1,6 @@
+#ifndef __PCRE2POSIX_H__
+#define __PCRE2POSIX_H__
+
 /*************************************************
 *      Perl-Compatible Regular Expressions       *
 *************************************************/
@@ -168,3 +171,5 @@ them having to maintain their own patch, but are not documented by PCRE2. */
 #endif
 
 /* End of pcre2posix.h */
+
+#endif // __PCRE2POSIX_H__

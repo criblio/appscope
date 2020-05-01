@@ -2,7 +2,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <pwd.h>
-#include <regex.h>
+#include "pcre2posix.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>

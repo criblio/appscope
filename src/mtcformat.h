@@ -1,7 +1,7 @@
 #ifndef __MTC_FORMAT_H__
 #define __MTC_FORMAT_H__
 
-#include <regex.h>
+#include "pcre2posix.h"
 #include "scopetypes.h"
 #include "cfg.h"
 #include "cJSON.h"

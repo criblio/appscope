@@ -1,0 +1,29 @@
+diff --git b/contrib/pcre2/CMakeLists.txt a/contrib/pcre2/CMakeLists.txt
+index 9a3e5da..e2e1d93 100644
+--- b/contrib/pcre2/CMakeLists.txt
++++ a/contrib/pcre2/CMakeLists.txt
+@@ -1,3 +1,7 @@
++# Added for direct linking to libscope.so
++add_compile_options( -fPIC )
++add_compile_options( -fvisibility=hidden )
++
+ # CMakeLists.txt
+ #
+ #
+diff --git b/contrib/pcre2/src/pcre2posix.h a/contrib/pcre2/src/pcre2posix.h
+index 3a663b9..ad79eeb 100644
+--- b/contrib/pcre2/src/pcre2posix.h
++++ a/contrib/pcre2/src/pcre2posix.h
+@@ -1,3 +1,6 @@
++#ifndef __PCRE2POSIX_H__
++#define __PCRE2POSIX_H__
++
+ /*************************************************
+ *      Perl-Compatible Regular Expressions       *
+ *************************************************/
+@@ -168,3 +171,5 @@ them having to maintain their own patch, but are not documented by PCRE2. */
+ #endif
+ 
+ /* End of pcre2posix.h */
++
++#endif // __PCRE2POSIX_H__

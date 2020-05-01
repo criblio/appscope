@@ -6,6 +6,7 @@ coverage/
 venv
 test/selfinterpose/
 contrib/funchook/build/
+contrib/pcre2/build
 
 test/testContainers/logs
 test/testContainers/docker-compose.override.yml

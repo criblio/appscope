@@ -227,6 +227,12 @@ cfgPath(void)
     return cfgPathSearch(CFG_FILE_NAME);
 }
 
+char *
+protocolPath(void)
+{
+    return cfgPathSearch(PROTOCOL_FILE_NAME);
+}
+
 static void
 processCustomTag(config_t* cfg, const char* e, const char* value)
 {

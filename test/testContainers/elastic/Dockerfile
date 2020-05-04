@@ -19,7 +19,8 @@ ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV SCOPE_OUT_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=true
 ENV SCOPE_EVENT_CONSOLE=true
-ENV SCOPE_EVENT_METRICS=true
+ENV SCOPE_EVENT_METRIC=true
+ENV SCOPE_EVENT_HTTP=true
 #ENV SCOPE_EVENT_DEST=tcp://172.16.198.132:9109
 
 COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt

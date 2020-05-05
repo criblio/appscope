@@ -2,7 +2,7 @@
 #define __STATE_H__
 
 #include <sys/socket.h>
-#include <regex.h>
+#include "pcre2posix.h"
 
 #include "runtimecfg.h"
 #include "linklist.h"

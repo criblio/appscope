@@ -143,8 +143,7 @@ error:
 static void
 grab_supplemental_for_def_protocol(cJSON * json_root, request_t *req)
 {
-    int i;
-    cJSON *json, *jarray, *body;
+    cJSON *json, *body;
     char *str;
     protocol_def_t *prot;
 
@@ -163,28 +162,22 @@ grab_supplemental_for_def_protocol(cJSON * json_root, request_t *req)
     if (!(str = cJSON_GetStringValue(json))) goto err;
     if (strncmp("true", str, strlen(str)) == 0) {
         prot->binary = TRUE;
-        prot->regex = NULL;
-
-        json = cJSON_GetObjectItem(body, "bincompare");
-        if (!json || !cJSON_IsArray(json)) goto err;
-
-        if ((prot->binlen = cJSON_GetArraySize(json)) == 0) goto err;
-        if ((prot->bincompare = calloc(1, prot->binlen)) == NULL) goto err;
-        for (i = 0; i < prot->binlen; i++) {
-            if ((jarray = cJSON_GetArrayItem(json, i)) == NULL) goto err;
-            if (!jarray || !cJSON_IsNumber(jarray)) goto err;
-            prot->bincompare[i] = jarray->valueint;
-        }
     } else {
         prot->binary = FALSE;
-        prot->bincompare = NULL;
-        prot->binlen = 0;
-
-        json = cJSON_GetObjectItem(body, "regex");
-        if (!json) goto err;
-        if (!(str = cJSON_GetStringValue(json))) goto err;
-        prot->regex = strdup(str);
     }
+
+    // len is optional
+    json = cJSON_GetObjectItem(body, "len");
+    if (!json || !cJSON_IsNumber(json)) {
+        prot->len = 0;
+    } else {
+        prot->len = json->valueint;
+    }
+
+    json = cJSON_GetObjectItem(body, "regex");
+    if (!json) goto err;
+    if (!(str = cJSON_GetStringValue(json))) goto err;
+    prot->regex = strdup(str);
 
     json = cJSON_GetObjectItem(body, "pname");
     if (!json) goto err;
@@ -197,7 +190,6 @@ grab_supplemental_for_def_protocol(cJSON * json_root, request_t *req)
 err:
     req->cmd=REQ_PARAM_ERR;
     if (prot && prot->regex) free(prot->regex);
-    if (prot && prot->bincompare) free(prot->bincompare);
     if (prot && prot->protname) free(prot->protname);
     if (prot) free(prot);
 }

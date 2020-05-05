@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <errno.h>
 #include <limits.h>
@@ -6,6 +7,9 @@
 #include <string.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <dlfcn.h>
+#include <fcntl.h>
+
 #include "atomic.h"
 #include "com.h"
 #include "dbg.h"
@@ -14,6 +18,7 @@
 #include "plattime.h"
 #include "state.h"
 #include "state_private.h"
+#include "pcre2.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
@@ -22,9 +27,7 @@
 #define HTTP_START "HTTP/"
 #define HTTP_END "\r\n\r\n"
 #define CONTENT_LENGTH "Content-Length:"
-
-char Mongo[] = "{\"type\": \"req\",\"req\": \"AddProto\",\"reqId\":6391,\"body\":{\"binary\":\"true\",\"regex\":\"\",\"pname\":\"Mongo\",\"bincompare\":[ 36, 01, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 212, 07 ]}}";
-char Redis[] = "{\"type\": \"req\",\"req\": \"AddProto\",\"reqId\":6392,\"body\":{\"binary\":\"false\",\"regex\":\"^[*][[:digit:]]+|^[+][[:alpha:]]+|^[$][[:digit:]]+\",\"pname\":\"Redis\",\"bincompare\":[]}}";
+#define MAX_CONVERT (size_t)256
 
 extern rtconfig g_cfg;
 
@@ -134,10 +137,9 @@ destroyProtEntry(void *data)
     protocol_def_t *pre = data;
     if (pre->binary == FALSE) {
         // should be safe as we bail if regcomp fails
-        regfree(&pre->re);
+        pcre2_code_free(pre->re);
     }
 
-    if (pre->bincompare) free(pre->bincompare);
     if (pre->regex) free(pre->regex);
     if (pre->protname) free(pre->protname);
     free(pre);
@@ -168,6 +170,8 @@ delProtocol(request_t *req)
 bool
 addProtocol(request_t *req)
 {
+    int errornumber;
+    PCRE2_SIZE erroroffset;
     protocol_def_t *proto;
 
     if (!req) return FALSE;
@@ -175,8 +179,10 @@ addProtocol(request_t *req)
     proto = req->protocol;
     proto->type = ++g_prot_sequence;
 
-    if ((proto->binary == FALSE) &&
-        regcomp(&proto->re, proto->regex, REG_EXTENDED | REG_NOSUB) != 0) {
+    proto->re = pcre2_compile((PCRE2_SPTR)proto->regex,PCRE2_ZERO_TERMINATED, 0,
+                              &errornumber, &erroroffset, NULL);
+
+    if (proto->re == NULL) {
         destroyProtEntry(proto);
         return FALSE;
     }
@@ -205,8 +211,30 @@ defaultProtocol(char *msg)
 static void
 initProtocolDetection()
 {
-    defaultProtocol(Redis);
-    defaultProtocol(Mongo);
+    size_t len = 0;
+    char *pline = NULL;
+    char *ppath = protocolPath();
+
+    if (!ppath) return;
+
+    FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
+    ssize_t (*ni_getline)(char **, size_t *, FILE *) = dlsym(RTLD_NEXT, "getline");
+    int (*ni_fclose)(FILE *) = dlsym(RTLD_NEXT, "fclose");
+    FILE *pfile = NULL;
+
+    if (!ni_fopen || !ni_getline || !ni_fclose || ((pfile = ni_fopen(ppath, "r")) == NULL)) {
+        if (ni_fclose) ni_fclose(pfile);
+        if (ppath) free(ppath);
+        return;
+    }
+
+    while (ni_getline(&pline, &len, pfile) != -1) {
+        defaultProtocol(pline);
+    }
+
+    free(pline);
+    free(ppath);
+    ni_fclose(pfile);
 }
 
 void
@@ -1053,26 +1081,70 @@ doHttp(uint64_t id, int sockfd, net_info *net, void *buf, size_t len, metric_t s
 }
 
 static bool
-setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf)
+setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t len)
 {
-    bool success = FALSE;
+    char *data, *cpdata = NULL;
+    pcre2_match_data *match_data;
     protocol_info *proto;
 
-    if (pre->binary == FALSE) {
-        if (regexec(&pre->re, (const char *)buf, 0, NULL, 0) == 0) {
-            success = TRUE;
-        }
-    } else {
-        if (memcmp(buf, pre->bincompare, pre->binlen) == 0) {
-            success = TRUE;
-        }
+    // nothing we can do; don't risk reading past end of a buffer
+    if ((len <= 0) && (pre->len <= 0)) {
+        net->protocol = -1;
+        return FALSE;
     }
 
-    if (success) {
+    /*
+     * precedence to a len defined with the protocol definition
+     * if a len was not provided in the definition use the one passed
+     * therefore, len is now pre->len
+     */
+    if (pre->len <= 0) pre->len = len;
+
+
+    if (pre->binary == FALSE) {
+        if ((pre->len > MAX_CONVERT) ||
+            (strnlen(buf, MAX_CONVERT)) > MAX_CONVERT) {
+            if ((cpdata = calloc(1, MAX_CONVERT)) == NULL) {
+                net->protocol = -1;
+                return FALSE;
+            }
+
+            strncpy(cpdata, buf, MAX_CONVERT);
+            data = cpdata;
+        } else {
+            data = buf;
+        }
+    } else {
+        int i;
+        size_t cvlen = (pre->len < MAX_CONVERT) ? pre->len : MAX_CONVERT;
+        size_t alen = cvlen * 4;
+        char sstr[4];
+
+        if ((cpdata = calloc(1, alen)) == NULL) {
+            net->protocol = -1;
+            return FALSE;
+        }
+
+        for (i = 0; i < cvlen; i++) {
+            snprintf(sstr, sizeof(sstr), "%02x", (unsigned char)buf[i]);
+            strncat(cpdata, sstr, alen);
+        }
+
+        //DEBUG
+        scopeLog((char *)cpdata, sockfd, CFG_LOG_ERROR);
+        data = cpdata;
+    }
+
+    match_data = pcre2_match_data_create_from_pattern(pre->re, NULL);
+    if (pcre2_match(pre->re, (PCRE2_SPTR)data, (PCRE2_SIZE)pre->len, 0, 0,
+                    match_data, NULL) > 0) {
+        //DEBUG
+        scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_ERROR);
         net->protocol = pre->type;
         pre->uid = net->uid;
 
         if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
+            if (cpdata) free(cpdata);
             return FALSE;
         }
 
@@ -1082,9 +1154,15 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf)
         proto->fd = sockfd;
         proto->data = (char *)pre;
         cmdPostEvent(g_ctl, (char *)proto);
+    } else {
+        net->protocol = -1;
     }
 
-    return success;
+    if (match_data) pcre2_match_data_free(match_data);
+    if (cpdata) free(cpdata);
+
+    // return true implies no error and not a match; completed a scan
+    return TRUE;
 }
 
 static void
@@ -1094,12 +1172,19 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     protocol_def_t *pre;
 
     if (!buf || !net || (net->protocol != 0)) return;
+    //DEBUG
+    scopeLog("detectProtocol: new connection", sockfd, CFG_LOG_ERROR);
 
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((pre = lstFind(g_protlist, ptype)) != NULL) {
+            //DEBUG
+            char msg[128];
+            snprintf(msg, sizeof(msg), "detectProtocol(%d): bin %d prot: %s", sockfd, pre->binary, pre->protname);
+            scopeLog(msg, sockfd, CFG_LOG_ERROR);
+
             switch (dtype) {
             case BUF:
-                setProtocol(sockfd, pre, net, buf);
+                setProtocol(sockfd, pre, net, buf, len);
                 break;
 
             case MSG:
@@ -1111,8 +1196,8 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
                 for (i = 0; i < msg->msg_iovlen; i++) {
                     iov = &msg->msg_iov[i];
                     if (iov && iov->iov_base) {
-                        // only need to detect this once per connection
-                        if (setProtocol(sockfd, pre, net, iov->iov_base) == TRUE) break;
+                        // check every vector?
+                        setProtocol(sockfd, pre, net, iov->iov_base, iov->iov_len);
                     }
                 }
                 break;
@@ -1125,9 +1210,10 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
 
                 // len is expected to be an iovcnt for an IOV data type
                 for (i = 0; i < len; i++) {
-                    if (iov[i].iov_base) {
+                    if ((iov[i].iov_base) && (iov[i].iov_len > 0)) {
                         // once per connection
-                        if (setProtocol(sockfd, pre, net, iov[i].iov_base) == TRUE) break;
+                        // check every vector?
+                        setProtocol(sockfd, pre, net, iov[i].iov_base, iov[i].iov_len);
                     }
                 }
                 break;
@@ -1412,7 +1498,6 @@ doAddNewSock(int sockfd)
     struct sockaddr_storage addr;
     socklen_t addrlen = sizeof(addr);
 
-    scopeLog("doAddNewSock: adding socket", sockfd, CFG_LOG_DEBUG);
     if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
         if (addrIsNetDomain(&addr) || addrIsUnixDomain(&addr)) {
             int type;

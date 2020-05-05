@@ -6,6 +6,9 @@
 #include "transport.h"
 #include "evtformat.h"
 
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include "pcre2.h"
+
 //////////////////
 // This structure is intended to capture received request data from an
 // instance of logstream.
@@ -34,9 +37,8 @@ typedef enum {
 typedef struct {
     bool binary;
     char *regex;
-    regex_t re;
-    unsigned char *bincompare;
-    unsigned int binlen;
+    pcre2_code *re;
+    unsigned int len;
     unsigned int type;
     uint64_t uid;
     char *protname;

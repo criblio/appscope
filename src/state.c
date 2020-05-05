@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <errno.h>
 #include <limits.h>
@@ -6,6 +7,9 @@
 #include <string.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <dlfcn.h>
+#include <fcntl.h>
+
 #include "atomic.h"
 #include "com.h"
 #include "dbg.h"
@@ -14,7 +18,7 @@
 #include "plattime.h"
 #include "state.h"
 #include "state_private.h"
-#include "runtimecfg.h"
+#include "pcre2.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
@@ -23,6 +27,7 @@
 #define HTTP_START "HTTP/"
 #define HTTP_END "\r\n\r\n"
 #define CONTENT_LENGTH "Content-Length:"
+#define MAX_CONVERT (size_t)256
 
 extern rtconfig g_cfg;
 
@@ -38,11 +43,12 @@ fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
 bool g_predone = FALSE;
-int g_http_start[ASIZE];
-int g_http_end[ASIZE];
-int g_http_redirect[ASIZE];
-int g_http_clen[ASIZE];
-
+static int g_http_start[ASIZE];
+static int g_http_end[ASIZE];
+static int g_http_redirect[ASIZE];
+static int g_http_clen[ASIZE];
+static list_t *g_protlist;
+static unsigned int g_prot_sequence = 0;
 
 // interfaces
 mtc_t *g_mtc = NULL;
@@ -123,6 +129,114 @@ get_port_net(net_info *net, int type, control_type_t which) {
     return htons(port);
 }
 
+static void
+destroyProtEntry(void *data)
+{
+    if (!data) return;
+
+    protocol_def_t *pre = data;
+    if (pre->binary == FALSE) {
+        // should be safe as we bail if regcomp fails
+        pcre2_code_free(pre->re);
+    }
+
+    if (pre->regex) free(pre->regex);
+    if (pre->protname) free(pre->protname);
+    free(pre);
+}
+
+bool
+delProtocol(request_t *req)
+{
+    unsigned int ptype;
+    protocol_def_t *protoreq, *protolist;
+
+    if (!req) return FALSE;
+
+    protoreq = req->protocol;
+
+    for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
+        if ((protolist = lstFind(g_protlist, ptype)) != NULL) {
+            if (strncmp(protoreq->protname, protolist->protname, strlen(protolist->protname)) == 0) {
+                // decrement g_prot_sequence?: values are assigned to an entry, used as a key
+                lstDelete(g_protlist, ptype);
+            }
+        }
+    }
+
+    return TRUE;
+}
+
+bool
+addProtocol(request_t *req)
+{
+    int errornumber;
+    PCRE2_SIZE erroroffset;
+    protocol_def_t *proto;
+
+    if (!req) return FALSE;
+
+    proto = req->protocol;
+    proto->type = ++g_prot_sequence;
+
+    proto->re = pcre2_compile((PCRE2_SPTR)proto->regex,PCRE2_ZERO_TERMINATED, 0,
+                              &errornumber, &erroroffset, NULL);
+
+    if (proto->re == NULL) {
+        destroyProtEntry(proto);
+        return FALSE;
+    }
+
+    if (lstInsert(g_protlist, proto->type, proto) == FALSE) {
+        destroyProtEntry(proto);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static bool
+defaultProtocol(char *msg)
+{
+    request_t *req;
+
+    if (!msg) return FALSE;
+
+    req = cmdParse(msg);
+    if (!req || (req->cmd != REQ_ADD_PROTOCOL)) return FALSE;
+
+    return addProtocol(req);
+}
+
+static void
+initProtocolDetection()
+{
+    size_t len = 0;
+    char *pline = NULL;
+    char *ppath = protocolPath();
+
+    if (!ppath) return;
+
+    FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
+    ssize_t (*ni_getline)(char **, size_t *, FILE *) = dlsym(RTLD_NEXT, "getline");
+    int (*ni_fclose)(FILE *) = dlsym(RTLD_NEXT, "fclose");
+    FILE *pfile = NULL;
+
+    if (!ni_fopen || !ni_getline || !ni_fclose || ((pfile = ni_fopen(ppath, "r")) == NULL)) {
+        if (ni_fclose) ni_fclose(pfile);
+        if (ppath) free(ppath);
+        return;
+    }
+
+    while (ni_getline(&pline, &len, pfile) != -1) {
+        defaultProtocol(pline);
+    }
+
+    free(pline);
+    free(ppath);
+    ni_fclose(pfile);
+}
+
 void
 initState()
 {
@@ -145,6 +259,9 @@ initState()
 
     // Per RUC...
     g_fsinfo = fsinfoLocal;
+
+    g_protlist = lstCreate(destroyProtEntry);
+    initProtocolDetection();
 
     initReporting();
 }
@@ -963,19 +1080,167 @@ doHttp(uint64_t id, int sockfd, net_info *net, void *buf, size_t len, metric_t s
     return 0;
 }
 
+static bool
+setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t len)
+{
+    char *data, *cpdata = NULL;
+    pcre2_match_data *match_data;
+    protocol_info *proto;
+
+    // nothing we can do; don't risk reading past end of a buffer
+    if ((len <= 0) && (pre->len <= 0)) {
+        net->protocol = -1;
+        return FALSE;
+    }
+
+    /*
+     * precedence to a len defined with the protocol definition
+     * if a len was not provided in the definition use the one passed
+     * therefore, len is now pre->len
+     */
+    if (pre->len <= 0) pre->len = len;
+
+
+    if (pre->binary == FALSE) {
+        if ((pre->len > MAX_CONVERT) ||
+            (strnlen(buf, MAX_CONVERT)) > MAX_CONVERT) {
+            if ((cpdata = calloc(1, MAX_CONVERT)) == NULL) {
+                net->protocol = -1;
+                return FALSE;
+            }
+
+            strncpy(cpdata, buf, MAX_CONVERT);
+            data = cpdata;
+        } else {
+            data = buf;
+        }
+    } else {
+        int i;
+        size_t cvlen = (pre->len < MAX_CONVERT) ? pre->len : MAX_CONVERT;
+        size_t alen = cvlen * 4;
+        char sstr[4];
+
+        if ((cpdata = calloc(1, alen)) == NULL) {
+            net->protocol = -1;
+            return FALSE;
+        }
+
+        for (i = 0; i < cvlen; i++) {
+            snprintf(sstr, sizeof(sstr), "%02x", (unsigned char)buf[i]);
+            strncat(cpdata, sstr, alen);
+        }
+
+        //DEBUG
+        scopeLog((char *)cpdata, sockfd, CFG_LOG_ERROR);
+        data = cpdata;
+    }
+
+    match_data = pcre2_match_data_create_from_pattern(pre->re, NULL);
+    if (pcre2_match(pre->re, (PCRE2_SPTR)data, (PCRE2_SIZE)pre->len, 0, 0,
+                    match_data, NULL) > 0) {
+        //DEBUG
+        scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_ERROR);
+        net->protocol = pre->type;
+        pre->uid = net->uid;
+
+        if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
+            if (cpdata) free(cpdata);
+            return FALSE;
+        }
+
+        proto->evtype = EVT_PROTO;
+        proto->ptype = EVT_DETECT;
+        proto->len = sizeof(protocol_def_t);
+        proto->fd = sockfd;
+        proto->data = (char *)pre;
+        cmdPostEvent(g_ctl, (char *)proto);
+    } else {
+        net->protocol = -1;
+    }
+
+    if (match_data) pcre2_match_data_free(match_data);
+    if (cpdata) free(cpdata);
+
+    // return true implies no error and not a match; completed a scan
+    return TRUE;
+}
+
+static void
+detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
+{
+    unsigned int ptype;
+    protocol_def_t *pre;
+
+    if (!buf || !net || (net->protocol != 0)) return;
+    //DEBUG
+    scopeLog("detectProtocol: new connection", sockfd, CFG_LOG_ERROR);
+
+    for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
+        if ((pre = lstFind(g_protlist, ptype)) != NULL) {
+            //DEBUG
+            char msg[128];
+            snprintf(msg, sizeof(msg), "detectProtocol(%d): bin %d prot: %s", sockfd, pre->binary, pre->protname);
+            scopeLog(msg, sockfd, CFG_LOG_ERROR);
+
+            switch (dtype) {
+            case BUF:
+                setProtocol(sockfd, pre, net, buf, len);
+                break;
+
+            case MSG:
+            {
+                int i;
+                struct msghdr *msg = (struct msghdr *)buf;
+                struct iovec *iov;
+
+                for (i = 0; i < msg->msg_iovlen; i++) {
+                    iov = &msg->msg_iov[i];
+                    if (iov && iov->iov_base) {
+                        // check every vector?
+                        setProtocol(sockfd, pre, net, iov->iov_base, iov->iov_len);
+                    }
+                }
+                break;
+            }
+
+            case IOV:
+            {
+                int i;
+                struct iovec *iov = (struct iovec *)buf;
+
+                // len is expected to be an iovcnt for an IOV data type
+                for (i = 0; i < len; i++) {
+                    if ((iov[i].iov_base) && (iov[i].iov_len > 0)) {
+                        // once per connection
+                        // check every vector?
+                        setProtocol(sockfd, pre, net, iov[i].iov_base, iov[i].iov_len);
+                    }
+                }
+                break;
+            }
+
+            default:
+                break;
+            }
+        }
+    }
+}
+
 int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
-    net_info *net;
+    net_info *net = getNetEntry(sockfd);
 
-    if (!ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) return 0;
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
+        if (isHttp(sockfd, net, &buf, &len, src, dtype) == TRUE) {
+            // not doing anything with protocol...yet
+            if (net) net->protocol = 1;
+            return doHttp(id, sockfd, net, buf, len, src);
+        }
+    }
 
-    net = getNetEntry(sockfd);
-
-    if (isHttp(sockfd, net, &buf, &len, src, dtype) == TRUE) {
-        // not doing anything with protocol...yet
-        if (net) net->protocol = HTTP1;
-        return doHttp(id, sockfd, net, buf, len, src);
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC)) {
+        detectProtocol(sockfd, net, buf, len, src, dtype);
     }
 
     return 0;
@@ -1233,7 +1498,6 @@ doAddNewSock(int sockfd)
     struct sockaddr_storage addr;
     socklen_t addrlen = sizeof(addr);
 
-    scopeLog("doAddNewSock: adding socket", sockfd, CFG_LOG_DEBUG);
     if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
         if (addrIsNetDomain(&addr) || addrIsUnixDomain(&addr)) {
             int type;
@@ -1444,7 +1708,7 @@ doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         doSetAddrs(sockfd);
         doUpdateState(NETRX, sockfd, rc, NULL, NULL);
 
-        if ((sockfd != -1) && buf && (len > 0)) {
+        if ((sockfd != -1) && buf) {
             doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETRX, src);
         }
     }

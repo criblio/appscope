@@ -26,6 +26,8 @@ static cmd_map_t cmd_map[] = {
     {"GetDiag",          REQ_GET_DIAG},
     {"BlockPort",        REQ_BLOCK_PORT},
     {"Switch",           REQ_SWITCH},
+    {"AddProto",         REQ_ADD_PROTOCOL},
+    {"DelProto",         REQ_DEL_PROTOCOL},
     {NULL,               REQ_UNKNOWN}
 };
 
@@ -138,6 +140,90 @@ error:
     req->cmd=REQ_PARAM_ERR;
 }
 
+static void
+grab_supplemental_for_def_protocol(cJSON * json_root, request_t *req)
+{
+    cJSON *json, *body;
+    char *str;
+    protocol_def_t *prot;
+
+    if (!json_root || !req) goto err;
+
+    // The body includes the definition of a protocol
+    body = cJSON_GetObjectItem(json_root, "body");
+    if (!body || !cJSON_IsObject(body)) goto err;
+
+    if ((prot = calloc(1, sizeof(protocol_def_t))) == NULL) goto err;
+
+    req->protocol = prot;
+
+    json = cJSON_GetObjectItem(body, "binary");
+    if (!json) goto err;
+    if (!(str = cJSON_GetStringValue(json))) goto err;
+    if (strncmp("true", str, strlen(str)) == 0) {
+        prot->binary = TRUE;
+    } else {
+        prot->binary = FALSE;
+    }
+
+    // len is optional
+    json = cJSON_GetObjectItem(body, "len");
+    if (!json || !cJSON_IsNumber(json)) {
+        prot->len = 0;
+    } else {
+        prot->len = json->valueint;
+    }
+
+    json = cJSON_GetObjectItem(body, "regex");
+    if (!json) goto err;
+    if (!(str = cJSON_GetStringValue(json))) goto err;
+    prot->regex = strdup(str);
+
+    json = cJSON_GetObjectItem(body, "pname");
+    if (!json) goto err;
+    if (!(str = cJSON_GetStringValue(json))) goto err;
+    prot->protname = strdup(str);
+
+    prot->uid = 0;
+    return;
+
+err:
+    req->cmd=REQ_PARAM_ERR;
+    if (prot && prot->regex) free(prot->regex);
+    if (prot && prot->protname) free(prot->protname);
+    if (prot) free(prot);
+}
+
+static void
+grab_supplemental_for_del_protocol(cJSON * json_root, request_t *req)
+{
+    cJSON *json, *body;
+    char *str;
+    protocol_def_t *prot;
+
+    if (!json_root || !req) goto err;
+
+    // The body includes the definition of a protocol
+    body = cJSON_GetObjectItem(json_root, "body");
+    if (!body || !cJSON_IsObject(body)) goto err;
+
+    if ((prot = calloc(1, sizeof(protocol_def_t))) == NULL) goto err;
+
+    req->protocol = prot;
+
+    json = cJSON_GetObjectItem(body, "pname");
+    if (!json) goto err;
+    if (!(str = cJSON_GetStringValue(json))) goto err;
+    prot->protname = strdup(str);
+
+    return;
+
+err:
+    req->cmd=REQ_PARAM_ERR;
+    if (prot && prot->protname) free(prot->protname);
+    if (prot) free(prot);
+}
+
 request_t *
 ctlParseRxMsg(const char *msg)
 {
@@ -228,6 +314,12 @@ ctlParseRxMsg(const char *msg)
         case REQ_SWITCH:
             grab_supplemental_for_switch(json_root, req);
             break;
+        case REQ_ADD_PROTOCOL:
+            grab_supplemental_for_def_protocol(json_root, req);
+            break;
+        case REQ_DEL_PROTOCOL:
+            grab_supplemental_for_del_protocol(json_root, req);
+            break;
         default:
             DBG("Unknown Cmd: %d", req->cmd);
     }
@@ -246,7 +338,7 @@ destroyReq(request_t **request)
 
     if (req->cmd_str) free(req->cmd_str);
     if (req->cfg) cfgDestroy(&req->cfg);
-
+    // Note: don't mess with the protocol object here
     free(req);
 
     *request=NULL;
@@ -316,6 +408,8 @@ create_resp_json(upload_t *upld)
         case REQ_GET_DIAG:
         case REQ_BLOCK_PORT:
         case REQ_SWITCH:
+        case REQ_ADD_PROTOCOL:
+        case REQ_DEL_PROTOCOL:
             break;
         default:
             DBG(NULL);

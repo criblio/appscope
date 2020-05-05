@@ -50,3 +50,9 @@ services:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+
+  detect_proto:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so

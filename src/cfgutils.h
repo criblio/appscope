@@ -10,6 +10,7 @@
 // cfgPath returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
 char* cfgPath(void);
+char *protocolPath(void);
 
 // reads cfg from yaml file
 config_t* cfgRead(const char* path);

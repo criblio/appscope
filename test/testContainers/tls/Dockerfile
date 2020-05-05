@@ -8,8 +8,9 @@ RUN yum -y groupinstall 'Development Tools'
 RUN yum -y install gnutls-devel
 RUN yum -y install openssl-devel
 RUN yum -y install wget automake
+RUN yum -y install python-pip
 
-run curl -sL https://rpm.nodesource.com/setup_11.x | bash -
+RUN curl -sL https://rpm.nodesource.com/setup_11.x | bash -
 RUN yum -y install nodejs
 
 RUN mkdir /opt/test-runner/
@@ -49,6 +50,10 @@ ENV LD_PRELOAD=/usr/lib/libscope.so
 COPY ./tls/nodehttp.ts /opt/test-runner/bin/nodehttp.ts
 COPY ./tls/test_tls.sh /opt/test-runner/bin/test_tls.sh
 RUN chmod +x /opt/test-runner/bin/test_tls.sh
+
+RUN /opt/rh/rh-python36/root/usr/bin/python3.6 -m pip install --upgrade pip
+#RUN /opt/rh/rh-python36/root/usr/bin/pip3.6 install pyopenssl
+COPY ./tls/testssl.py /opt/test-runner/bin/testssl.py
 
 ENTRYPOINT ["/opt/test-runner/bin/test_tls.sh"]
 #ENTRYPOINT ["tail", "-f", "/dev/null"]

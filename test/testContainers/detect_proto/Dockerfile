@@ -18,6 +18,8 @@ RUN rpm -ihv mongodb-org-tools-4.2.6-1.el6.x86_64.rpm mongodb-org-mongos-4.2.6-1
 
 RUN rm *.rpm
 
+COPY mongod.conf /etc/.
+
 ADD entrypoint.sh /sbin/entrypoint.sh
 ADD loaddata.sh /sbin/loaddata.sh
 ADD session.csv /data/session.csv

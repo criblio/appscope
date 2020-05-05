@@ -62,3 +62,4 @@ services:
       context: detect_proto
     ports:
       - 6379:6379
+      - 27017:27017

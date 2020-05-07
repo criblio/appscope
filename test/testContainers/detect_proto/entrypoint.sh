@@ -7,7 +7,7 @@ if [ "$1" = "start" ]; then
     redis-server --protected-mode no &
     service mongod start
 
-#    /opt/test-runner/bin/test_protocols.sh
-    tail -f /dev/null
+    /opt/test-runner/bin/test_protocols.sh
+#    tail -f /dev/null
 fi
 

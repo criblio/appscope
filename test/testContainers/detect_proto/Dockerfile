@@ -13,12 +13,9 @@ RUN wget https://repo.mongodb.org/yum/redhat/6Server/mongodb-org/4.2/x86_64/RPMS
 RUN wget https://repo.mongodb.org/yum/redhat/6Server/mongodb-org/4.2/x86_64/RPMS/mongodb-org-mongos-4.2.6-1.el6.x86_64.rpm
 RUN wget https://repo.mongodb.org/yum/redhat/6Server/mongodb-org/4.2/x86_64/RPMS/mongodb-org-tools-4.2.6-1.el6.x86_64.rpm
 
-
 RUN rpm -ihv mongodb-org-tools-4.2.6-1.el6.x86_64.rpm mongodb-org-mongos-4.2.6-1.el6.x86_64.rpm mongodb-org-shell-4.2.6-1.el6.x86_64.rpm mongodb-org-4.2.6-1.el6.x86_64.rpm mongodb-org-server-4.2.6-1.el6.x86_64.rpm
 
 RUN rm *.rpm
-
-COPY mongod.conf /etc/.
 
 ADD entrypoint.sh /sbin/entrypoint.sh
 ADD loaddata.sh /sbin/loaddata.sh
@@ -28,6 +25,10 @@ CMD ["start"]
 RUN mkdir /opt/test-runner/
 RUN mkdir /opt/test-runner/logs/
 RUN mkdir /opt/test-runner/bin
+
+COPY mongod.conf /etc/.
+COPY scope_protocol.yml /opt/test-runner/bin/.
+COPY mongo.js /opt/test-runner/bin/.
 
 ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so
@@ -45,6 +46,7 @@ ENV SCOPE_METRIC_ENABLE=false
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
+ENV SCOPE_HOME=/opt/test-runner/bin
 
 COPY test_protocols.sh /opt/test-runner/bin/test_protocols.sh
 RUN chmod +x /opt/test-runner/bin/test_protocols.sh

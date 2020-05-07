@@ -135,11 +135,7 @@ destroyProtEntry(void *data)
     if (!data) return;
 
     protocol_def_t *pre = data;
-    if (pre->binary == FALSE) {
-        // should be safe as we bail if regcomp fails
-        pcre2_code_free(pre->re);
-    }
-
+    if (pre->re) pcre2_code_free(pre->re);
     if (pre->regex) free(pre->regex);
     if (pre->protname) free(pre->protname);
     free(pre);
@@ -179,8 +175,8 @@ addProtocol(request_t *req)
     proto = req->protocol;
     proto->type = ++g_prot_sequence;
 
-    proto->re = pcre2_compile((PCRE2_SPTR)proto->regex,PCRE2_ZERO_TERMINATED, 0,
-                              &errornumber, &erroroffset, NULL);
+    proto->re = pcre2_compile((PCRE2_SPTR)proto->regex, PCRE2_ZERO_TERMINATED,
+                              0, &errornumber, &erroroffset, NULL);
 
     if (proto->re == NULL) {
         destroyProtEntry(proto);
@@ -195,46 +191,30 @@ addProtocol(request_t *req)
     return TRUE;
 }
 
-static bool
-defaultProtocol(char *msg)
-{
-    request_t *req;
-
-    if (!msg) return FALSE;
-
-    req = cmdParse(msg);
-    if (!req || (req->cmd != REQ_ADD_PROTOCOL)) return FALSE;
-
-    return addProtocol(req);
-}
-
 static void
 initProtocolDetection()
 {
-    size_t len = 0;
-    char *pline = NULL;
+    int i;
+    list_t *plist = lstCreate(NULL);
     char *ppath = protocolPath();
+    protocol_def_t *prot;
 
-    if (!ppath) return;
+    if (!ppath || !plist) return;
 
-    FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
-    ssize_t (*ni_getline)(char **, size_t *, FILE *) = dlsym(RTLD_NEXT, "getline");
-    int (*ni_fclose)(FILE *) = dlsym(RTLD_NEXT, "fclose");
-    FILE *pfile = NULL;
+    protocolRead(ppath, plist);
 
-    if (!ni_fopen || !ni_getline || !ni_fclose || ((pfile = ni_fopen(ppath, "r")) == NULL)) {
-        if (ni_fclose) ni_fclose(pfile);
-        if (ppath) free(ppath);
-        return;
+    for (i = 0; ; i++) {
+        if ((prot = lstFind(plist, i)) != NULL) {
+            request_t req;
+
+            req.protocol = prot;
+            addProtocol(&req);
+        } else {
+            break;
+        }
     }
 
-    while (ni_getline(&pline, &len, pfile) != -1) {
-        defaultProtocol(pline);
-    }
-
-    free(pline);
-    free(ppath);
-    ni_fclose(pfile);
+    lstDestroy(&plist);
 }
 
 void
@@ -1088,7 +1068,7 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     protocol_info *proto;
 
     // nothing we can do; don't risk reading past end of a buffer
-    if ((len <= 0) && (pre->len <= 0)) {
+    if (((len <= 0) && (pre->len <= 0)) || !pre->re) {
         net->protocol = -1;
         return FALSE;
     }
@@ -1131,7 +1111,7 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
         }
 
         //DEBUG
-        scopeLog((char *)cpdata, sockfd, CFG_LOG_ERROR);
+        //scopeLog((char *)cpdata, sockfd, CFG_LOG_ERROR);
         data = cpdata;
     }
 
@@ -1139,12 +1119,14 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     if (pcre2_match(pre->re, (PCRE2_SPTR)data, (PCRE2_SIZE)pre->len, 0, 0,
                     match_data, NULL) > 0) {
         //DEBUG
-        scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_ERROR);
+        //scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_ERROR);
         net->protocol = pre->type;
         pre->uid = net->uid;
 
         if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
             if (cpdata) free(cpdata);
+            if (match_data) pcre2_match_data_free(match_data);
+            net->protocol = -1;
             return FALSE;
         }
 
@@ -1171,16 +1153,17 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     unsigned int ptype;
     protocol_def_t *pre;
 
+    // check once per connection
     if (!buf || !net || (net->protocol != 0)) return;
     //DEBUG
-    scopeLog("detectProtocol: new connection", sockfd, CFG_LOG_ERROR);
+    //scopeLog("detectProtocol: new connection", sockfd, CFG_LOG_ERROR);
 
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((pre = lstFind(g_protlist, ptype)) != NULL) {
             //DEBUG
-            char msg[128];
-            snprintf(msg, sizeof(msg), "detectProtocol(%d): bin %d prot: %s", sockfd, pre->binary, pre->protname);
-            scopeLog(msg, sockfd, CFG_LOG_ERROR);
+            //char msg[128];
+            //snprintf(msg, sizeof(msg), "detectProtocol(%d): bin %d prot: %s", sockfd, pre->binary, pre->protname);
+            //scopeLog(msg, sockfd, CFG_LOG_ERROR);
 
             switch (dtype) {
             case BUF:
@@ -1195,7 +1178,7 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
 
                 for (i = 0; i < msg->msg_iovlen; i++) {
                     iov = &msg->msg_iov[i];
-                    if (iov && iov->iov_base) {
+                    if (iov && iov->iov_base && (iov->iov_len > 0)) {
                         // check every vector?
                         setProtocol(sockfd, pre, net, iov->iov_base, iov->iov_len);
                     }
@@ -1210,8 +1193,7 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
 
                 // len is expected to be an iovcnt for an IOV data type
                 for (i = 0; i < len; i++) {
-                    if ((iov[i].iov_base) && (iov[i].iov_len > 0)) {
-                        // once per connection
+                    if (iov[i].iov_base && (iov[i].iov_len > 0)) {
                         // check every vector?
                         setProtocol(sockfd, pre, net, iov[i].iov_base, iov[i].iov_len);
                     }

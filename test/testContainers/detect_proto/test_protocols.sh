@@ -26,4 +26,27 @@ fi
 
 rm /opt/test-runner/logs/events.log
 
+echo "==============================================="
+echo "             Testing Mongo                     "
+echo "==============================================="
+
+export $preload
+mongo /opt/test-runner/bin/mongo.js
+unset LD_PRELOAD
+
+grep remote_protocol /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+grep '"protocol":"Mongo"' /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+
+if [ $ERR -eq "0" ]; then
+    echo "*************** Mongo Success ***************"
+else
+    echo "*************** Mongo Test Failed ***************"
+#    cat /opt/test-runner/logs/events.log
+fi
+
+rm /opt/test-runner/logs/events.log
 exit ${ERR}

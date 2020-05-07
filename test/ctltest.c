@@ -655,7 +655,7 @@ ctlTransportSetAndMtcSend(void** state)
 static void
 ctlAddProtocol(void** state)
 {
-    char dummy[] = "{\"type\": \"req\",\"req\": \"AddProto\",\"reqId\":6393,\"body\":{\"binary\":\"false\",\"regex\":\"^[*][[:digit:]]+\",\"pname\":\"Dummy\",\"bincompare\":[]}}";
+    char dummy[] = "{\"type\": \"req\",\"req\": \"AddProto\",\"reqId\":6393,\"body\":{\"binary\":\"false\",\"regex\":\"^[*][[:digit:]]+\",\"pname\":\"Dummy\",\"len\":12}}";
 
     request_t *req = ctlParseRxMsg(dummy);
     assert_non_null(req);
@@ -671,7 +671,7 @@ static void
 ctlDelProtocol(void** state)
 {
     char deldummy[] = "{\"type\": \"req\",\"req\": \"DelProto\",\"reqId\":6394,\"body\":{\"pname\":\"Dummy\"}}";
-    char dummy[] = "{\"type\": \"req\",\"req\": \"AddProto\",\"reqId\":6393,\"body\":{\"binary\":\"false\",\"regex\":\"^[*][[:digit:]]+\",\"pname\":\"Dummy\",\"bincompare\":[]}}";
+    char dummy[] = "{\"type\": \"req\",\"req\": \"AddProto\",\"reqId\":6393,\"body\":{\"binary\":\"false\",\"regex\":\"^[*][[:digit:]]+\",\"pname\":\"Dummy\",\"len\":789}}";
 
     request_t* req = ctlParseRxMsg(dummy);
     assert_non_null(req);

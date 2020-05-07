@@ -1514,6 +1514,56 @@ initCtlReturnsPtr(void** state)
     cfgDestroy(&cfg);
 }
 
+static void
+cfgReadProtocol(void **state)
+{
+    // protocol config in yaml format
+    const char *yamlText =
+        "---\n"
+        "protocol:\n"
+        "  - name: test1\n"
+        "    binary: 'true'\n"
+        "    regex: 'sup?'\n"
+        "    len: 111\n"
+        "\n"
+        "  - name: test2\n"
+        "    binary: 'false'\n"
+        "    regex: 'sup up?'\n"
+        "    len: 222\n"
+        "...\n";
+
+    char *name[2] = {"test1", "test2"};
+    char *regex[2] = {"sup?", "sup up?"};
+    int *binary[2] = {1, 0};
+    int *len[2] = {111, 222};
+    int i;
+    list_t *plist = lstCreate(NULL);
+    char *ppath = PROTOCOL_FILE_NAME;
+    protocol_def_t *prot;
+
+    writeFile(ppath, yamlText);
+    
+    assert_non_null(ppath);
+    assert_non_null(plist);
+
+    protocolRead(ppath, plist);
+
+    for (i = 0; i < 2; i++) {
+        if ((prot = lstFind(plist, i)) != NULL) {
+            assert_non_null(prot);
+            assert_string_equal(prot->protname, name[i]);
+            assert_string_equal(prot->regex, regex[i]);
+            assert_int_equal(prot->binary, binary[i]);
+            assert_int_equal(prot->len, len[i]);
+        } else {
+            break;
+        }
+    }
+
+    lstDestroy(&plist);
+    deleteFile(ppath);
+}
+
 // Defined in src/cfgutils.c
 // This is not a proper test, it just exists to make valgrind output
 // more readable when analyzing this test, by deallocating the compiled
@@ -1575,6 +1625,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(initEvtFormatReturnsPtr),
         cmocka_unit_test(initCtlReturnsPtr),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
+        cmocka_unit_test(cfgReadProtocol),
         cmocka_unit_test(envRegexFree),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

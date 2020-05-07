@@ -160,10 +160,10 @@ grab_supplemental_for_def_protocol(cJSON * json_root, request_t *req)
     json = cJSON_GetObjectItem(body, "binary");
     if (!json) goto err;
     if (!(str = cJSON_GetStringValue(json))) goto err;
-    if (strncmp("true", str, strlen(str)) == 0) {
-        prot->binary = TRUE;
-    } else {
+    if (strncmp("false", str, strlen(str)) == 0) {
         prot->binary = FALSE;
+    } else {
+        prot->binary = TRUE;
     }
 
     // len is optional

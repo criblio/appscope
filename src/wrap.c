@@ -1055,6 +1055,7 @@ init(void)
     g_fn.gethostbyname2_r = dlsym(RTLD_NEXT, "gethostbyname2_r");
     g_fn.syscall = dlsym(RTLD_NEXT, "syscall");
     g_fn.prctl = dlsym(RTLD_NEXT, "prctl");
+    g_fn._exit = dlsym(RTLD_NEXT, "_exit");
     g_fn.SSL_read = dlsym(RTLD_NEXT, "SSL_read");
     g_fn.SSL_write = dlsym(RTLD_NEXT, "SSL_write");
     g_fn.SSL_get_fd = dlsym(RTLD_NEXT, "SSL_get_fd");
@@ -2461,6 +2462,18 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
         }
     }
     return result;
+}
+
+EXPORTON void
+_exit(int status)
+{
+    handleExit();
+    if (g_fn._exit) {
+        g_fn._exit(status);
+    } else {
+        exit(status);
+    }
+    __builtin_unreachable();
 }
 
 #endif // __LINUX__

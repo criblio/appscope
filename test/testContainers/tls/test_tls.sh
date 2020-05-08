@@ -157,4 +157,33 @@ fi
 
 rm /opt/test-runner/logs/events.log
 
+echo ""
+echo "==============================================="
+echo "      Testing Rust app with HTTPS                "
+echo "==============================================="
+export $preload
+echo "Running a Rust app with an HTTPS request"
+/opt/test-runner/bin/http_test > /dev/null
+
+grep http-req /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+grep "Host: cribl.io" /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+grep http-resp /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+grep HTTP /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
+if [ $ERR -eq "0" ]; then
+    echo "*************** Rust Success ***************"
+else
+    echo "*************** Rust Test Failed ***************"
+#    cat /opt/test-runner/logs/events.log
+fi
+
+rm /opt/test-runner/logs/events.log
+
 exit ${ERR}

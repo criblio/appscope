@@ -14,7 +14,8 @@ RUN curl -sL https://rpm.nodesource.com/setup_11.x | bash -
 RUN yum -y install nodejs
 
 RUN mkdir /opt/test-runner/
-RUN mkdir /opt/test-runner/logs/
+RUN mkdir /opt/test-runner/logs
+RUN mkdir /opt/test-runner/bin
 
 RUN mkdir /opt/test
 RUN cd /opt/test && wget https://curl.haxx.se/download/curl-7.69.1.tar.gz
@@ -30,6 +31,9 @@ RUN mv /opt/test/curl-7.69.1 /opt/test/curltls
 RUN cd /opt/test/curltls && ./buildconf
 RUN cd /opt/test/curltls && ./configure --with-gnutls --without-ssl
 RUN cd /opt/test/curltls && make
+
+RUN /opt/test/src/curl https://sh.rustup.rs -sSf | sh -s -- -y
+COPY ./tls/rust/http_test/target/debug/http_test /opt/test-runner/bin/.
 
 RUN rm -f /opt/test/curl-7.69.1.tar.gz
 COPY ./tls/test_cert.pem /opt/test/.

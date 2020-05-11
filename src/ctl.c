@@ -184,7 +184,6 @@ grab_supplemental_for_def_protocol(cJSON * json_root, request_t *req)
     if (!(str = cJSON_GetStringValue(json))) goto err;
     prot->protname = strdup(str);
 
-    prot->uid = 0;
     return;
 
 err:

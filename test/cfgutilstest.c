@@ -30,7 +30,8 @@ cfgPathHonorsEnvVar(void** state)
     char origdir[MAX_PATH];
     assert_non_null(getcwd(origdir, sizeof(origdir)));
     // create newdir, and switch to it
-    char newdir[MAX_PATH];
+    char newdir[MAX_PATH + 12];
+
     snprintf(newdir, sizeof(newdir), "%s/%s", origdir, "newdir");
     assert_int_equal(mkdir(newdir, 0777), 0);
     assert_int_equal(chdir(newdir), 0);
@@ -84,8 +85,8 @@ cfgPathHonorsPriorityOrder(void** state)
 
     // get the basedir, set cwd and scopeHome from it
     char basedir[MAX_PATH];
-    char cwd[MAX_PATH];
-    char scopeHome[MAX_PATH];
+    char cwd[MAX_PATH * 2];
+    char scopeHome[MAX_PATH * 3];
     assert_non_null(getcwd(basedir, sizeof(basedir)));
     snprintf(cwd, sizeof(cwd), "%s/%s", basedir, newdir[0]);
     snprintf(scopeHome, sizeof(scopeHome), "%s/%s", basedir, newdir[1]);
@@ -98,7 +99,7 @@ cfgPathHonorsPriorityOrder(void** state)
 
     // Create the paths we want to test
     const char file[] = CFG_FILE_NAME; // scope.yml
-    char path[6][MAX_PATH];
+    char path[6][MAX_PATH * 4];
     // Lowest priority first
     snprintf(path[0], sizeof(path[0]), "%s/%s", cwd, file);
     snprintf(path[1], sizeof(path[1]), "%s/conf/%s", cwd, file);
@@ -1534,8 +1535,8 @@ cfgReadProtocol(void **state)
 
     char *name[2] = {"test1", "test2"};
     char *regex[2] = {"sup?", "sup up?"};
-    int *binary[2] = {1, 0};
-    int *len[2] = {111, 222};
+    int binary[2] = {1, 0};
+    int len[2] = {111, 222};
     int i;
     list_t *plist = lstCreate(NULL);
     char *ppath = PROTOCOL_FILE_NAME;

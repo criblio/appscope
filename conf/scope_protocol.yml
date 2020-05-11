@@ -1,0 +1,11 @@
+---
+protocol:
+  - name: Redis
+    binary: false
+    regex: "^[*]\\d+|^[+]\\w+|^[$]\\d+"
+
+  - name: Mongo
+    binary: true
+    regex: "^240100000000000000000000d407"
+    len: 32
+---

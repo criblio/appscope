@@ -1640,7 +1640,7 @@ bool
 protocolRead(const char *path, list_t *plist)
 {
     FILE *protFile = NULL;
-    protocol_def_t *prot;
+    protocol_def_t *prot = NULL;
     int parser_successful = 0;
     int doc_successful = 0;
     int num_found = 0;
@@ -1649,7 +1649,7 @@ protocolRead(const char *path, list_t *plist)
     yaml_document_t doc;
     yaml_node_t *node;
     yaml_node_pair_t *root_pair, *prot_pair;
-    yaml_node_t *root_value, *plist_key, *prot_key, *prot_value;
+    yaml_node_t *root_value, *root_key, *plist_key, *prot_key, *prot_value;
     yaml_node_item_t *pitem;
 
     // ni for "not-interposed"... a direct glibc call without scope.
@@ -1682,6 +1682,10 @@ protocolRead(const char *path, list_t *plist)
         root_value = yaml_document_get_node(&doc, root_pair->value);
         if (root_value->type != YAML_SEQUENCE_NODE) goto cleanup;
 
+        root_key = yaml_document_get_node(&doc, root_pair->key);
+        if (!root_key || (root_key->type != YAML_SCALAR_NODE)) goto cleanup;
+        if (strcmp((char *)root_key->data.scalar.value, "protocol") != 0) goto cleanup;
+
         foreach(pitem, root_value->data.sequence.items) {
             // 2nd level
             // get an item here instead of a node for the array
@@ -1700,9 +1704,11 @@ protocolRead(const char *path, list_t *plist)
                 if (!prot_value) goto cleanup;
 
                 if (!strcmp((char *)prot_key->data.scalar.value, "name")) {
+                    if (prot->protname) free(prot->protname);
                     prot->protname = strdup((char *)prot_value->data.scalar.value);
                     found = TRUE; // at least need to have a name
                 } else if (!strcmp((char *)prot_key->data.scalar.value, "regex")) {
+                    if (prot->regex) free(prot->regex);
                     prot->regex = strdup((char *)prot_value->data.scalar.value);
                 } else if (!strcmp((char *)prot_key->data.scalar.value, "binary")) {
                     prot->binary = (!strcmp((char *)prot_value->data.scalar.value, "false")) ?
@@ -1720,6 +1726,7 @@ protocolRead(const char *path, list_t *plist)
                 if (lstInsert(plist, num_found, prot) == FALSE) {
                     if (prot && prot->protname) free(prot->protname);
                     if (prot && prot->regex) free(prot->regex);
+                    if (prot) free(prot);
                     goto cleanup;
                 }
                 num_found++;
@@ -1728,6 +1735,11 @@ protocolRead(const char *path, list_t *plist)
     }
 
 cleanup:
+    if (num_found == 0) {
+        if (prot && prot->regex) free(prot->regex);
+        if (prot) free(prot);
+    }
+
     if (doc_successful) yaml_document_delete(&doc);
     if (parser_successful) yaml_parser_delete(&parser);
     if (protFile) ni_fclose(protFile);

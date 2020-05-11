@@ -256,23 +256,25 @@ doHttpHeader(protocol_info *proto)
 static void
 doDetection(protocol_info *proto)
 {
-    protocol_def_t *pre;
+    char *protname;
 
     if (!proto) return;
 
-    pre = (protocol_def_t *)proto->data;
+    protname = (char *)proto->data;
+    if (!protname) return;
 
     event_field_t fields[] = {
         PROC_FIELD(g_proc.procname),
         PID_FIELD(g_proc.pid),
         FD_FIELD(proto->fd),
         HOST_FIELD(g_proc.hostname),
-        DETECT_PROTO(pre->protname),
+        DETECT_PROTO(protname),
         FIELDEND
     };
 
     event_t evt = INT_EVENT("remote_protocol", proto->fd, SET, fields);
-    cmdSendEvent(g_ctl, &evt, pre->uid, &g_proc);
+    cmdSendEvent(g_ctl, &evt, proto->uid, &g_proc);
+    free(protname);
  }
 
 void

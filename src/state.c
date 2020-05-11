@@ -199,7 +199,15 @@ initProtocolDetection()
     char *ppath = protocolPath();
     protocol_def_t *prot;
 
-    if (!ppath || !plist) return;
+    if (!plist) {
+        if (ppath) free(ppath);
+        return;
+    }
+
+    if (!ppath) {
+        if (plist) lstDestroy(&plist);
+        return;
+    }
 
     protocolRead(ppath, plist);
 
@@ -214,6 +222,7 @@ initProtocolDetection()
         }
     }
 
+    if (ppath) free(ppath);
     lstDestroy(&plist);
 }
 
@@ -1079,25 +1088,13 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
      * therefore, len is now pre->len
      */
     if (pre->len <= 0) pre->len = len;
-
+    pre->len = (pre->len < MAX_CONVERT) ? pre->len : MAX_CONVERT;
 
     if (pre->binary == FALSE) {
-        if ((pre->len > MAX_CONVERT) ||
-            (strnlen(buf, MAX_CONVERT)) > MAX_CONVERT) {
-            if ((cpdata = calloc(1, MAX_CONVERT)) == NULL) {
-                net->protocol = -1;
-                return FALSE;
-            }
-
-            strncpy(cpdata, buf, MAX_CONVERT);
-            data = cpdata;
-        } else {
-            data = buf;
-        }
+        data = buf;
     } else {
         int i;
-        size_t cvlen = (pre->len < MAX_CONVERT) ? pre->len : MAX_CONVERT;
-        size_t alen = cvlen * 4;
+        size_t alen = pre->len * 4;
         char sstr[4];
 
         if ((cpdata = calloc(1, alen)) == NULL) {
@@ -1105,13 +1102,11 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
             return FALSE;
         }
 
-        for (i = 0; i < cvlen; i++) {
+        for (i = 0; i < pre->len; i++) {
             snprintf(sstr, sizeof(sstr), "%02x", (unsigned char)buf[i]);
             strncat(cpdata, sstr, alen);
         }
 
-        //DEBUG
-        //scopeLog((char *)cpdata, sockfd, CFG_LOG_ERROR);
         data = cpdata;
     }
 
@@ -1121,7 +1116,6 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
         //DEBUG
         //scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_ERROR);
         net->protocol = pre->type;
-        pre->uid = net->uid;
 
         if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
             if (cpdata) free(cpdata);
@@ -1134,7 +1128,8 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
         proto->ptype = EVT_DETECT;
         proto->len = sizeof(protocol_def_t);
         proto->fd = sockfd;
-        proto->data = (char *)pre;
+        proto->uid = net->uid;
+        proto->data = (char *)strdup(pre->protname);
         cmdPostEvent(g_ctl, (char *)proto);
     } else {
         net->protocol = -1;
@@ -1155,16 +1150,9 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
 
     // check once per connection
     if (!buf || !net || (net->protocol != 0)) return;
-    //DEBUG
-    //scopeLog("detectProtocol: new connection", sockfd, CFG_LOG_ERROR);
 
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((pre = lstFind(g_protlist, ptype)) != NULL) {
-            //DEBUG
-            //char msg[128];
-            //snprintf(msg, sizeof(msg), "detectProtocol(%d): bin %d prot: %s", sockfd, pre->binary, pre->protname);
-            //scopeLog(msg, sockfd, CFG_LOG_ERROR);
-
             switch (dtype) {
             case BUF:
                 setProtocol(sockfd, pre, net, buf, len);

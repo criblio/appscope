@@ -40,7 +40,6 @@ typedef struct {
     pcre2_code *re;
     unsigned int len;
     unsigned int type;
-    uint64_t uid;
     char *protname;
 } protocol_def_t;
 

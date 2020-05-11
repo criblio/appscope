@@ -100,6 +100,7 @@ typedef struct protocol_info_t {
     metric_t ptype;
     size_t len;
     int fd;
+    uint64_t uid;
     char *data;
 } protocol_info;
 

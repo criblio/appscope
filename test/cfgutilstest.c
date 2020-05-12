@@ -1538,7 +1538,7 @@ cfgReadProtocol(void **state)
     int binary[2] = {1, 0};
     int len[2] = {111, 222};
     int i;
-    list_t *plist = lstCreate(NULL);
+    list_t *plist = lstCreate(destroyProtEntry);
     char *ppath = PROTOCOL_FILE_NAME;
     protocol_def_t *prot;
 

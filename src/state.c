@@ -173,7 +173,6 @@ addProtocol(request_t *req)
     if (!req) return FALSE;
 
     proto = req->protocol;
-    proto->type = ++g_prot_sequence;
 
     proto->re = pcre2_compile((PCRE2_SPTR)proto->regex, PCRE2_ZERO_TERMINATED,
                               0, &errornumber, &erroroffset, NULL);
@@ -183,8 +182,11 @@ addProtocol(request_t *req)
         return FALSE;
     }
 
+    proto->type = ++g_prot_sequence;
+
     if (lstInsert(g_protlist, proto->type, proto) == FALSE) {
         destroyProtEntry(proto);
+        --g_prot_sequence;
         return FALSE;
     }
 

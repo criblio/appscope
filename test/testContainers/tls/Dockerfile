@@ -50,5 +50,11 @@ COPY ./tls/nodehttp.ts /opt/test-runner/bin/nodehttp.ts
 COPY ./tls/test_tls.sh /opt/test-runner/bin/test_tls.sh
 RUN chmod +x /opt/test-runner/bin/test_tls.sh
 
+RUN yum -y install ruby
+RUN mkdir /opt/test-runner/ruby
+COPY ./tls/ruby/server.rb /opt/test-runner/ruby
+COPY ./tls/ruby/client.rb /opt/test-runner/ruby
+RUN chmod u+x /opt/test-runner/ruby/*rb
+
 ENTRYPOINT ["/opt/test-runner/bin/test_tls.sh"]
 #ENTRYPOINT ["tail", "-f", "/dev/null"]

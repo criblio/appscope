@@ -119,10 +119,39 @@ fi
 rm /opt/test-runner/logs/events.log
 
 if [ $ERR -eq "0" ]; then
-
     echo "*************** Test Passed ***************"
 else
     echo "*************** Test Failed ***************"
 fi
+
+echo "==============================================="
+echo "             Testing ruby                      "
+echo "==============================================="
+
+echo "Creating key files for ruby client and server"
+(cd /opt/test-runner/ruby && openssl req -x509 -newkey rsa:4096 -keyout priv.pem -out cert.pem -days 365 -nodes -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost")
+export $preload
+echo "Starting to test ruby"
+RUBY_HTTP_START=$(grep http- /opt/test-runner/logs/events.log | grep -c 10101)
+(cd /opt/test-runner/ruby && ./server.rb 10101 &)
+sleep 1
+(cd /opt/test-runner/ruby && ./client.rb 127.0.0.1 10101)
+sleep 1
+echo "Done testing ruby"
+RUBY_HTTP_END=$(grep http- /opt/test-runner/logs/events.log | grep -c 10101)
+
+if (( $RUBY_HTTP_END - $RUBY_HTTP_START >= 6 )); then
+    echo "*************** Test Passed ***************"
+else
+    echo "*************** Test Failed ***************"
+    echo RUBY_HTTP_START=$RUBY_HTTP_START
+    echo RUBY_HTTP_END=$RUBY_HTTP_END
+    ERR+=1
+fi
+
+
+grep http-req /opt/test-runner/logs/events.log > /dev/null
+ERR+=$?
+
 
 exit ${ERR}

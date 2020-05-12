@@ -111,7 +111,8 @@
         "sendfile09_64",
         "sendfile09",
         "creat07",
-        "sendmsg02"
+        "sendmsg02",
+        "sendto02"
       ]
     },
     {

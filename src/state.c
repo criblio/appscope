@@ -23,7 +23,6 @@
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
 #define NUM_ATTEMPTS 100
-#define ASIZE 256
 #define HTTP_START "HTTP/"
 #define HTTP_END "\r\n\r\n"
 #define CONTENT_LENGTH "Content-Length:"
@@ -774,7 +773,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
  *
  * Pre-compute the array from the needle.
  */
-static void
+void
 preComp(unsigned char *needle, int nlen, int bmBc[]) {
    int i;
 
@@ -784,7 +783,7 @@ preComp(unsigned char *needle, int nlen, int bmBc[]) {
        bmBc[needle[i]] = nlen - i - 1;
 }
 
-static int
+ int
 strsrch(char *needle, int nlen, char *haystack, int hlen, int *bmBc) {
     int j;
     unsigned char c;

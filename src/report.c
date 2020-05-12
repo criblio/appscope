@@ -41,12 +41,14 @@
 #define PID_FIELD(val)          NUMFIELD("pid",            (val),        7)
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
+#define HTTPSTAT_FIELD(val)     NUMFIELD("http_status",    (val),        4)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
 #define RATE_FIELD(val)         NUMFIELD("req_per_sec",    (val),        8)
 #define HREQ_FIELD(val)         STRFIELD("req",            (val),        8)
 #define HRES_FIELD(val)         STRFIELD("resp",           (val),        8)
 #define DETECT_PROTO(val)       STRFIELD("protocol",       (val),        8)
 
+#define HTTP_STATUS "HTTP/1."
 
 // TBD - Ideally, we'd remove this dependency on the configured interval
 // and replace it with a measured value.  It'd be one less dependency
@@ -153,6 +155,31 @@ doUnixEndpoint(int sd, net_info *net)
     return;
 }
 
+static size_t
+getHttpStatus(char *header, size_t len)
+{
+    size_t ix;
+    size_t rc;
+    char *val;
+    int http_status[ASIZE];
+
+    preComp((unsigned char *)HTTP_STATUS, strlen(HTTP_STATUS), http_status);
+
+    // ex: HTTP/1.1 200 OK\r\n
+    if ((ix = strsrch(HTTP_STATUS, strlen(HTTP_STATUS), header, len, http_status)) == -1) return -1;
+
+    if ((ix < 0) || (ix > len) || ((ix + strlen(HTTP_STATUS)) > len)) return -1;
+
+    val = &header[ix + strlen(HTTP_STATUS) + 1];
+
+    errno = 0;
+    rc = strtoull(val, NULL, 0);
+    if ((errno != 0) || (rc == 0)) {
+        return -1;
+    }
+    return rc;
+}
+
 static void
 destroyProto(protocol_info *proto)
 {
@@ -236,9 +263,12 @@ doHttpHeader(protocol_info *proto)
         event_t hevent = INT_EVENT("http-resp", proto->len, SET, hfields);
         cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
 
+        size_t status = getHttpStatus((char *)map->resp, proto->len);
+
         event_field_t mfields[] = {
             DURATION_FIELD(map->duration),
             RATE_FIELD(rps),
+            HTTPSTAT_FIELD(status),
             PROC_FIELD(g_proc.procname),
             FD_FIELD(proto->fd),
             PID_FIELD(g_proc.pid),
@@ -248,6 +278,21 @@ doHttpHeader(protocol_info *proto)
 
         event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
         cmdSendHttp(g_ctl, &mevent, map->id, &g_proc);
+
+        // emit a statsd metric, if enabled.
+        if (mtcEnabled(g_mtc)) {
+            event_field_t efields[] = {
+                PROC_FIELD(g_proc.procname),
+                PID_FIELD(g_proc.pid),
+                FD_FIELD(proto->fd),
+                HOST_FIELD(g_proc.hostname),
+                HTTPSTAT_FIELD(status),
+                FIELDEND
+                };
+
+            event_t httpStat = INT_EVENT("http.status", 1, DELTA, efields);
+            cmdSendMetric(g_mtc, &httpStat);
+        }
 
         // Done; we remove the list entry; complete when reported
         if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);

@@ -148,6 +148,8 @@ delProtocol(request_t *req)
         }
     }
 
+    if (protoreq && protoreq->protname) free(protoreq->protname);
+    if (protoreq) free(protoreq);
     return TRUE;
 }
 

@@ -158,15 +158,13 @@ destroyProto(protocol_info *proto)
 {
     if (!proto) return;
 
-    if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
-        http_post *post = (http_post *)proto->data;
-        if (post && post->hdr) free (post->hdr);
-        if (post) free(post);
-    } else if (proto->ptype == EVT_DETECT) {
-        char *protname = (char *)proto->data;
-        if (protname) free(protname);
-    }
-    free(proto);
+    /*
+     * for future reference;
+     * proto is freed as event in doEvent().
+     * post->data is the http header and is freed in destroyHttpMap()
+     * when the list entry is deleted.
+     */
+    if (proto->data) free (proto->data);
 }
 
 static void

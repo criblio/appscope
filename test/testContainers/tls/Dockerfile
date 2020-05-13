@@ -65,6 +65,10 @@ RUN /opt/rh/rh-python36/root/usr/bin/python3.6 -m pip install --upgrade pip
 #RUN /opt/rh/rh-python36/root/usr/bin/pip3.6 install pyopenssl
 COPY ./tls/testssl.py /opt/test-runner/bin/testssl.py
 
+RUN yum -y install php
+RUN mkdir /opt/test-runner/php
+COPY ./tls/php/sslclient.php /opt/test-runner/php
+
 
 ENTRYPOINT ["/opt/test-runner/bin/test_tls.sh"]
 #ENTRYPOINT ["tail", "-f", "/dev/null"]

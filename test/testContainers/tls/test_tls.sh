@@ -212,4 +212,27 @@ fi
 
 rm /opt/test-runner/logs/events.log
 
+
+echo ""
+echo "==============================================="
+echo "      Testing php with HTTPS                   "
+echo "==============================================="
+export $preload
+echo "Starting to test php"
+PHP_HTTP_START=$(grep http- /opt/test-runner/logs/events.log | grep -c sslclient.php)
+php /opt/test-runner/php/sslclient.php > /dev/null
+echo "Done testing php"
+PHP_HTTP_END=$(grep http- /opt/test-runner/logs/events.log | grep -c sslclient.php)
+
+# We really expect *3*, not *2*.  We're missing http-req right now.
+if (( $PHP_HTTP_END - $PHP_HTTP_START >= 2 )); then
+    echo "*************** php Passed ***************"
+else
+    echo "*************** php Failed ***************"
+    echo PHP_HTTP_START=$PHP_HTTP_START
+    echo PHP_HTTP_END=$PHP_HTTP_END
+    ERR+=1
+fi
+
+
 exit ${ERR}

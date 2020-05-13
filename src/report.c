@@ -168,7 +168,7 @@ getHttpStatus(char *header, size_t len)
     // ex: HTTP/1.1 200 OK\r\n
     if ((ix = strsrch(HTTP_STATUS, strlen(HTTP_STATUS), header, len, http_status)) == -1) return -1;
 
-    if ((ix < 0) || (ix > len) || ((ix + strlen(HTTP_STATUS)) > len)) return -1;
+    if ((ix < 0) || (ix > len) || ((ix + strlen(HTTP_STATUS) + 1) > len)) return -1;
 
     val = &header[ix + strlen(HTTP_STATUS) + 1];
 

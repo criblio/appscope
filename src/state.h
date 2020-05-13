@@ -2,6 +2,9 @@
 #define __STATE_H__
 
 #include <sys/socket.h>
+#include "pcre2posix.h"
+
+#include "runtimecfg.h"
 #include "linklist.h"
 #include "report.h"
 #include "../contrib/tls/tls.h"
@@ -18,7 +21,6 @@ typedef enum {
     IOV,
     NONE
 } src_data_t;
-
 
 void initState();
 void resetState();
@@ -54,5 +56,7 @@ int remotePortIsDNS(int);
 int sockIsTCP(int);
 void doUpdateState(metric_t, int, ssize_t, const char *, const char *);
 int doProtocol(uint64_t, int, void *, size_t, metric_t, src_data_t);
+bool addProtocol(request_t *);
+bool delProtocol(request_t *);
 
 #endif // __STATE_H__

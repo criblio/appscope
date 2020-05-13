@@ -16,14 +16,6 @@
 
 typedef enum
 {
-    PROT_START,
-    HTTP1,
-    HTTP2,
-    NOSCAN
-} protocol_type;
-
-typedef enum
-{
     INET_TCP,
     INET_UDP,
     UNIX_TCP,
@@ -31,7 +23,6 @@ typedef enum
     SOCK_OTHER,
     SOCK_NUM_BUCKETS
 } sock_summary_bucket_t;
-
 
 typedef struct {
     uint64_t mtc;
@@ -109,6 +100,7 @@ typedef struct protocol_info_t {
     metric_t ptype;
     size_t len;
     int fd;
+    uint64_t uid;
     char *data;
 } protocol_info;
 
@@ -146,7 +138,7 @@ typedef struct net_info_t {
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;
     metric_counters counters;
-    protocol_type protocol;
+    unsigned int protocol;
 } net_info;
 
 typedef struct fs_info_t {

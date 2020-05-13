@@ -45,6 +45,7 @@
 #define RATE_FIELD(val)         NUMFIELD("req_per_sec",    (val),        8)
 #define HREQ_FIELD(val)         STRFIELD("req",            (val),        8)
 #define HRES_FIELD(val)         STRFIELD("resp",           (val),        8)
+#define DETECT_PROTO(val)       STRFIELD("protocol",       (val),        8)
 
 
 // TBD - Ideally, we'd remove this dependency on the configured interval
@@ -157,10 +158,135 @@ destroyProto(protocol_info *proto)
 {
     if (!proto) return;
 
-    if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
-        http_post *post = (http_post *)proto->data;
-        if (post) free(post);
+    /*
+     * for future reference;
+     * proto is freed as event in doEvent().
+     * post->data is the http header and is freed in destroyHttpMap()
+     * when the list entry is deleted.
+     */
+    if (proto->data) free (proto->data);
+}
+
+static void
+doHttpHeader(protocol_info *proto)
+{
+    if (!proto || !proto->data) {
+        destroyProto(proto);
+        return;
     }
+
+    char ssl[8];
+    http_post *post = (http_post *)proto->data;
+    http_map *map;
+
+    if ((map = lstFind(g_maplist, post->id)) == NULL) {
+        // lazy open
+        if ((map = calloc(1, sizeof(http_map))) == NULL) {
+            destroyProto(proto);
+            return;
+        }
+
+        if (lstInsert(g_maplist, post->id, map) == FALSE) {
+            destroyHttpMap(map);
+            destroyProto(proto);
+            return;
+        }
+
+        map->id = post->id;
+        map->first_time = time(NULL);
+    }
+
+    map->frequency++;
+
+    if (post->ssl) {
+        strncpy(ssl, "ssl", sizeof(ssl));
+    } else {
+        strncpy(ssl, "clear", sizeof(ssl));
+    }
+
+    if (proto->ptype == EVT_HREQ) {
+        map->start_time = post->start_duration;
+        map->req = (char *)post->hdr;
+
+        event_field_t fields[] = {
+            HREQ_FIELD(map->req),
+            DATA_FIELD(ssl),
+            UNIT_FIELD("byte"),
+            FIELDEND
+        };
+
+        event_t sendEvent = INT_EVENT("http-req", proto->len, SET, fields);
+        cmdSendHttp(g_ctl, &sendEvent, map->id, &g_proc);
+    } else if (proto->ptype == EVT_HRES) {
+        int rps = map->frequency;
+        int sec = (map->first_time > 0) ? (int)time(NULL) - map->first_time : 1;
+        if (sec > 0) {
+            rps = map->frequency / sec;
+        }
+
+        map->duration = getDuration(post->start_duration);
+        map->duration = map->duration / 1000;
+        map->resp = (char *)post->hdr;
+
+        if (!map->req) {
+            map->req = strdup("None");
+        }
+
+        event_field_t hfields[] = {
+            HREQ_FIELD(map->req),
+            HRES_FIELD(map->resp),
+            DATA_FIELD(ssl),
+            UNIT_FIELD("byte"),
+            FIELDEND
+        };
+
+        event_t hevent = INT_EVENT("http-resp", proto->len, SET, hfields);
+        cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
+
+        event_field_t mfields[] = {
+            DURATION_FIELD(map->duration),
+            RATE_FIELD(rps),
+            PROC_FIELD(g_proc.procname),
+            FD_FIELD(proto->fd),
+            PID_FIELD(g_proc.pid),
+            UNIT_FIELD("byte"),
+            FIELDEND
+        };
+
+        event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
+        cmdSendHttp(g_ctl, &mevent, map->id, &g_proc);
+
+        // Done; we remove the list entry; complete when reported
+        if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
+    }
+    destroyProto(proto);
+}
+
+static void
+doDetection(protocol_info *proto)
+{
+    char *protname;
+
+    if (!proto) return;
+
+    protname = (char *)proto->data;
+    if (!protname) {
+        destroyProto(proto);
+        return;
+    }
+
+    event_field_t fields[] = {
+        PROC_FIELD(g_proc.procname),
+        PID_FIELD(g_proc.pid),
+        FD_FIELD(proto->fd),
+        HOST_FIELD(g_proc.hostname),
+        DETECT_PROTO(protname),
+        FIELDEND
+    };
+
+    event_t evt = INT_EVENT("remote_protocol", proto->fd, SET, fields);
+    cmdSendEvent(g_ctl, &evt, proto->uid, &g_proc);
+    destroyProto(proto);
 }
 
 void
@@ -168,95 +294,11 @@ doProtocolMetric(protocol_info *proto)
 {
     if (!proto) return;
 
-    char ssl[8];
-
     if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
-        http_post *post = (http_post *)proto->data;
-        http_map *map;
-
-        if ((map = lstFind(g_maplist, post->id)) == NULL) {
-            // lazy open
-            if ((map = calloc(1, sizeof(http_map))) == NULL) {
-                destroyProto(proto);
-                return;
-            }
-
-            if (lstInsert(g_maplist, post->id, map) == FALSE) {
-                destroyHttpMap(map);
-                destroyProto(proto);
-                return;
-            }
-
-            map->id = post->id;
-            map->first_time = time(NULL);
-        }
-
-        map->frequency++;
-
-        if (post->ssl) {
-            strncpy(ssl, "ssl", sizeof(ssl));
-        } else {
-            strncpy(ssl, "clear", sizeof(ssl));
-        }
-
-        if (proto->ptype == EVT_HREQ) {
-            map->start_time = post->start_duration;
-            map->req = (char *)post->hdr;
-
-            event_field_t fields[] = {
-                HREQ_FIELD(map->req),
-                DATA_FIELD(ssl),
-                UNIT_FIELD("byte"),
-                FIELDEND
-            };
-
-            event_t sendEvent = INT_EVENT("http-req", proto->len, SET, fields);
-            cmdSendHttp(g_ctl, &sendEvent, map->id, &g_proc);
-        } else if (proto->ptype == EVT_HRES) {
-            int rps = map->frequency;
-            int sec = (map->first_time > 0) ? (int)time(NULL) - map->first_time : 1;
-            if (sec > 0) {
-                rps = map->frequency / sec;
-            }
-
-            map->duration = getDuration(post->start_duration);
-            map->duration = map->duration / 1000;
-            map->resp = (char *)post->hdr;
-
-            if (!map->req) {
-                map->req = strdup("None");
-            }
-
-            event_field_t hfields[] = {
-                HREQ_FIELD(map->req),
-                HRES_FIELD(map->resp),
-                DATA_FIELD(ssl),
-                UNIT_FIELD("byte"),
-                FIELDEND
-            };
-
-            event_t hevent = INT_EVENT("http-resp", proto->len, SET, hfields);
-            cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
-
-            event_field_t mfields[] = {
-                DURATION_FIELD(map->duration),
-                RATE_FIELD(rps),
-                PROC_FIELD(g_proc.procname),
-                FD_FIELD(proto->fd),
-                PID_FIELD(g_proc.pid),
-                UNIT_FIELD("byte"),
-                FIELDEND
-            };
-
-            event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
-            cmdSendHttp(g_ctl, &mevent, map->id, &g_proc);
-
-            // Done; we remove the list entry; complete when reported
-            if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
-        }
+        doHttpHeader(proto);
+    } else if (proto->ptype == EVT_DETECT) {
+        doDetection(proto);
     }
-
-    destroyProto(proto);
 }
 
 void

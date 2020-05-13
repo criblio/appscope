@@ -158,15 +158,23 @@ destroyProto(protocol_info *proto)
 {
     if (!proto) return;
 
-    if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
-        http_post *post = (http_post *)proto->data;
-        if (post) free(post);
-    }
+    /*
+     * for future reference;
+     * proto is freed as event in doEvent().
+     * post->data is the http header and is freed in destroyHttpMap()
+     * when the list entry is deleted.
+     */
+    if (proto->data) free (proto->data);
 }
 
 static void
 doHttpHeader(protocol_info *proto)
 {
+    if (!proto || !proto->data) {
+        destroyProto(proto);
+        return;
+    }
+
     char ssl[8];
     http_post *post = (http_post *)proto->data;
     http_map *map;
@@ -252,6 +260,7 @@ doHttpHeader(protocol_info *proto)
         // Done; we remove the list entry; complete when reported
         if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
     }
+    destroyProto(proto);
 }
 
 static void
@@ -262,7 +271,10 @@ doDetection(protocol_info *proto)
     if (!proto) return;
 
     protname = (char *)proto->data;
-    if (!protname) return;
+    if (!protname) {
+        destroyProto(proto);
+        return;
+    }
 
     event_field_t fields[] = {
         PROC_FIELD(g_proc.procname),
@@ -275,8 +287,8 @@ doDetection(protocol_info *proto)
 
     event_t evt = INT_EVENT("remote_protocol", proto->fd, SET, fields);
     cmdSendEvent(g_ctl, &evt, proto->uid, &g_proc);
-    free(protname);
- }
+    destroyProto(proto);
+}
 
 void
 doProtocolMetric(protocol_info *proto)
@@ -288,8 +300,6 @@ doProtocolMetric(protocol_info *proto)
     } else if (proto->ptype == EVT_DETECT) {
         doDetection(proto);
     }
-
-    destroyProto(proto);
 }
 
 void

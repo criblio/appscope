@@ -129,18 +129,6 @@ get_port_net(net_info *net, int type, control_type_t which) {
     return htons(port);
 }
 
-static void
-destroyProtEntry(void *data)
-{
-    if (!data) return;
-
-    protocol_def_t *pre = data;
-    if (pre->re) pcre2_code_free(pre->re);
-    if (pre->regex) free(pre->regex);
-    if (pre->protname) free(pre->protname);
-    free(pre);
-}
-
 bool
 delProtocol(request_t *req)
 {
@@ -160,6 +148,8 @@ delProtocol(request_t *req)
         }
     }
 
+    if (protoreq && protoreq->protname) free(protoreq->protname);
+    if (protoreq) free(protoreq);
     return TRUE;
 }
 
@@ -1079,7 +1069,10 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     protocol_info *proto;
 
     // nothing we can do; don't risk reading past end of a buffer
-    if (((len <= 0) && (pre->len <= 0)) || !pre->re) {
+    size_t cvlen = (len < MAX_CONVERT) ? len : MAX_CONVERT;
+    if (((len <= 0) && (pre->len <= 0)) ||   // no len
+        !pre->re ||                          // no regex
+        (pre->len > cvlen)) {                // not enough buf for pre->len
         net->protocol = -1;
         return FALSE;
     }
@@ -1089,14 +1082,15 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
      * if a len was not provided in the definition use the one passed
      * therefore, len is now pre->len
      */
-    if (pre->len <= 0) pre->len = len;
-    pre->len = (pre->len < MAX_CONVERT) ? pre->len : MAX_CONVERT;
+    if (pre->len > 0) {
+        cvlen = pre->len;
+    }
 
     if (pre->binary == FALSE) {
         data = buf;
     } else {
         int i;
-        size_t alen = pre->len * 4;
+        size_t alen = (cvlen * 2) + 1;
         char sstr[4];
 
         if ((cpdata = calloc(1, alen)) == NULL) {
@@ -1104,16 +1098,17 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
             return FALSE;
         }
 
-        for (i = 0; i < pre->len; i++) {
+        for (i = 0; i < cvlen; i++) {
             snprintf(sstr, sizeof(sstr), "%02x", (unsigned char)buf[i]);
             strncat(cpdata, sstr, alen);
         }
 
         data = cpdata;
+        cvlen = cvlen * 2;
     }
 
     match_data = pcre2_match_data_create_from_pattern(pre->re, NULL);
-    if (pcre2_match(pre->re, (PCRE2_SPTR)data, (PCRE2_SIZE)pre->len, 0, 0,
+    if (pcre2_match(pre->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0,
                     match_data, NULL) > 0) {
         //DEBUG
         //scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_ERROR);

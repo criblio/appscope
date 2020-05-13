@@ -227,6 +227,12 @@ cfgPath(void)
     return cfgPathSearch(CFG_FILE_NAME);
 }
 
+char *
+protocolPath(void)
+{
+    return cfgPathSearch(PROTOCOL_FILE_NAME);
+}
+
 static void
 processCustomTag(config_t* cfg, const char* e, const char* value)
 {
@@ -1614,4 +1620,134 @@ initCtl(config_t *cfg)
     ctlEvtSet(ctl, evt);
 
     return ctl;
+}
+
+/*
+ * It goes like this:
+ * the protocol config file is 3 levels deep
+ *
+ * the root node is "protocol:"
+ * 2nd level is an array of protocols: a mapping node
+ * 3rd level is the definition of a specific protocol
+ *
+ * a specific protocol contains:
+ * name: a string, display name of the protocol
+ * binary: a string, true or false
+ * regex: a string, the regex pattern
+ * len: an integer, len is optional, should be supplied for a binary protocol
+ */
+bool
+protocolRead(const char *path, list_t *plist)
+{
+    FILE *protFile = NULL;
+    protocol_def_t *prot = NULL;
+    int parser_successful = 0;
+    int doc_successful = 0;
+    int num_found = 0;
+    bool name_found = FALSE;
+    yaml_parser_t parser;
+    yaml_document_t doc;
+    yaml_node_t *node;
+    yaml_node_pair_t *root_pair, *prot_pair;
+    yaml_node_t *root_value, *root_key, *plist_key, *prot_key, *prot_value;
+    yaml_node_item_t *pitem;
+
+    // ni for "not-interposed"... a direct glibc call without scope.
+    FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
+    int (*ni_fclose)(FILE*) = dlsym(RTLD_NEXT, "fclose");
+
+    if (!ni_fopen || !ni_fclose || !path) goto cleanup;
+
+    protFile = ni_fopen(path, "r");
+    if (!protFile) goto cleanup;
+
+    parser_successful = yaml_parser_initialize(&parser);
+    if (!parser_successful) goto cleanup;
+
+    yaml_parser_set_input_file(&parser, protFile);
+
+    doc_successful = yaml_parser_load(&parser, &doc);
+    if (!doc_successful) goto cleanup;
+
+    node = yaml_document_get_root_node(&doc);
+    if (node->type != YAML_MAPPING_NODE) goto cleanup;
+
+    /*
+     * as defined, no need to loop on the root node
+     * in case we need to add more to the config doc...
+     * same for the 2nd level
+     */
+    foreach (root_pair, node->data.mapping.pairs) {
+        // 1st level
+        root_value = yaml_document_get_node(&doc, root_pair->value);
+        if (root_value->type != YAML_SEQUENCE_NODE) goto cleanup;
+
+        root_key = yaml_document_get_node(&doc, root_pair->key);
+        if (!root_key || (root_key->type != YAML_SCALAR_NODE)) goto cleanup;
+        if (strcmp((char *)root_key->data.scalar.value, "protocol") != 0) goto cleanup;
+
+        foreach(pitem, root_value->data.sequence.items) {
+            // 2nd level
+            // get an item here instead of a node for the array
+            // use the key because there is no value
+            plist_key = yaml_document_get_node(&doc, *pitem);
+            if (plist_key->type != YAML_MAPPING_NODE) goto cleanup;
+
+            if ((prot = calloc(1, sizeof(protocol_def_t))) == NULL) goto cleanup;
+            name_found = FALSE;
+
+            foreach (prot_pair, (yaml_node_pair_t *)plist_key->data.sequence.items) {
+                // 3rd level
+                prot_key = yaml_document_get_node(&doc, prot_pair->key);
+                if (!prot_key || (prot_key->type != YAML_SCALAR_NODE)) goto cleanup;
+
+                prot_value = yaml_document_get_node(&doc, prot_pair->value);
+                if (!prot_value) goto cleanup;
+
+                if (!strcmp((char *)prot_key->data.scalar.value, "name")) {
+                    if (prot->protname) free(prot->protname);
+                    prot->protname = strdup((char *)prot_value->data.scalar.value);
+                    name_found = TRUE; // at least need to have a name
+                } else if (!strcmp((char *)prot_key->data.scalar.value, "regex")) {
+                    if (prot->regex) free(prot->regex);
+                    prot->regex = strdup((char *)prot_value->data.scalar.value);
+                } else if (!strcmp((char *)prot_key->data.scalar.value, "binary")) {
+                    prot->binary = (!strcmp((char *)prot_value->data.scalar.value, "false")) ?
+                        FALSE : TRUE; // seems like it should default to true
+                } else if (!strcmp((char *)prot_key->data.scalar.value, "len")) {
+                    errno = 0;
+                    prot->len = strtoull((char *)prot_value->data.scalar.value, NULL, 0);
+                    if (errno != 0) prot->len = 0;
+                } else {
+                    continue;
+                }
+            }
+
+            if (!name_found  || (lstInsert(plist, num_found, prot) == FALSE)) {
+                destroyProtEntry(prot);
+            } else {
+                num_found++;
+            }
+            prot = NULL;
+        }
+    }
+
+cleanup:
+    if (prot) destroyProtEntry(prot);
+    if (doc_successful) yaml_document_delete(&doc);
+    if (parser_successful) yaml_parser_delete(&parser);
+    if (protFile) ni_fclose(protFile);
+    return TRUE;
+}
+
+void
+destroyProtEntry(void *data)
+{
+    if (!data) return;
+
+    protocol_def_t *pre = data;
+    if (pre->re) pcre2_code_free(pre->re);
+    if (pre->regex) free(pre->regex);
+    if (pre->protname) free(pre->protname);
+    free(pre);
 }

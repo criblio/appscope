@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include "ctl.h"
 #include "dbg.h"
-
+#include "cfgutils.h"
 #include "test.h"
 
 static void
@@ -652,6 +652,34 @@ ctlTransportSetAndMtcSend(void** state)
     ctlDestroy(&ctl);
 }
 
+static void
+ctlAddProtocol(void** state)
+{
+    char dummy[] = "{\"type\": \"req\",\"req\": \"AddProto\",\"reqId\":6393,\"body\":{\"binary\":\"false\",\"regex\":\"^[*][[:digit:]]+\",\"pname\":\"Dummy\",\"len\":12}}";
+
+    request_t *req = ctlParseRxMsg(dummy);
+    assert_non_null(req);
+
+    assert_int_equal(req->cmd, REQ_ADD_PROTOCOL);
+    assert_string_equal(req->cmd_str, "AddProto");
+    assert_string_equal(req->protocol->protname, "Dummy");
+
+    destroyProtEntry(req->protocol);
+    destroyReq(&req);
+}
+
+static void
+ctlDelProtocol(void** state)
+{
+    char deldummy[] = "{\"type\": \"req\",\"req\": \"DelProto\",\"reqId\":6394,\"body\":{\"pname\":\"Dummy\"}}";
+
+    request_t *req = ctlParseRxMsg(deldummy);
+    assert_non_null(req);
+    assert_string_equal(req->cmd_str, "DelProto");
+
+    destroyProtEntry(req->protocol);
+    destroyReq(&req);
+}
 
 int
 main(int argc, char* argv[])
@@ -676,6 +704,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(ctlSendMsgForNullMtcDoesntCrash),
         cmocka_unit_test(ctlSendMsgForNullMessageDoesntCrash),
         cmocka_unit_test(ctlTransportSetAndMtcSend),
+        cmocka_unit_test(ctlAddProtocol),
+        cmocka_unit_test(ctlDelProtocol),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
 

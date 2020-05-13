@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include "ctl.h"
 #include "dbg.h"
-
+#include "cfgutils.h"
 #include "test.h"
 
 static void
@@ -664,6 +664,7 @@ ctlAddProtocol(void** state)
     assert_string_equal(req->cmd_str, "AddProto");
     assert_string_equal(req->protocol->protname, "Dummy");
 
+    destroyProtEntry(req->protocol);
     destroyReq(&req);
 }
 
@@ -671,17 +672,12 @@ static void
 ctlDelProtocol(void** state)
 {
     char deldummy[] = "{\"type\": \"req\",\"req\": \"DelProto\",\"reqId\":6394,\"body\":{\"pname\":\"Dummy\"}}";
-    char dummy[] = "{\"type\": \"req\",\"req\": \"AddProto\",\"reqId\":6393,\"body\":{\"binary\":\"false\",\"regex\":\"^[*][[:digit:]]+\",\"pname\":\"Dummy\",\"len\":789}}";
 
-    request_t* req = ctlParseRxMsg(dummy);
-    assert_non_null(req);
-
-    assert_string_equal(req->protocol->protname, "Dummy");
-
-    req = ctlParseRxMsg(deldummy);
+    request_t *req = ctlParseRxMsg(deldummy);
     assert_non_null(req);
     assert_string_equal(req->cmd_str, "DelProto");
 
+    destroyProtEntry(req->protocol);
     destroyReq(&req);
 }
 

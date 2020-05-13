@@ -1644,7 +1644,7 @@ protocolRead(const char *path, list_t *plist)
     int parser_successful = 0;
     int doc_successful = 0;
     int num_found = 0;
-    bool found = FALSE;
+    bool name_found = FALSE;
     yaml_parser_t parser;
     yaml_document_t doc;
     yaml_node_t *node;
@@ -1694,6 +1694,7 @@ protocolRead(const char *path, list_t *plist)
             if (plist_key->type != YAML_MAPPING_NODE) goto cleanup;
 
             if ((prot = calloc(1, sizeof(protocol_def_t))) == NULL) goto cleanup;
+            name_found = FALSE;
 
             foreach (prot_pair, (yaml_node_pair_t *)plist_key->data.sequence.items) {
                 // 3rd level
@@ -1706,7 +1707,7 @@ protocolRead(const char *path, list_t *plist)
                 if (!strcmp((char *)prot_key->data.scalar.value, "name")) {
                     if (prot->protname) free(prot->protname);
                     prot->protname = strdup((char *)prot_value->data.scalar.value);
-                    found = TRUE; // at least need to have a name
+                    name_found = TRUE; // at least need to have a name
                 } else if (!strcmp((char *)prot_key->data.scalar.value, "regex")) {
                     if (prot->regex) free(prot->regex);
                     prot->regex = strdup((char *)prot_value->data.scalar.value);
@@ -1722,26 +1723,31 @@ protocolRead(const char *path, list_t *plist)
                 }
             }
 
-            if (found == TRUE) {
-                if (lstInsert(plist, num_found, prot) == FALSE) {
-                    if (prot && prot->protname) free(prot->protname);
-                    if (prot && prot->regex) free(prot->regex);
-                    if (prot) free(prot);
-                    goto cleanup;
-                }
+            if (!name_found  || (lstInsert(plist, num_found, prot) == FALSE)) {
+                destroyProtEntry(prot);
+            } else {
                 num_found++;
             }
+            prot = NULL;
         }
     }
 
 cleanup:
-    if (num_found == 0) {
-        if (prot && prot->regex) free(prot->regex);
-        if (prot) free(prot);
-    }
-
+    if (prot) destroyProtEntry(prot);
     if (doc_successful) yaml_document_delete(&doc);
     if (parser_successful) yaml_parser_delete(&parser);
     if (protFile) ni_fclose(protFile);
     return TRUE;
+}
+
+void
+destroyProtEntry(void *data)
+{
+    if (!data) return;
+
+    protocol_def_t *pre = data;
+    if (pre->re) pcre2_code_free(pre->re);
+    if (pre->regex) free(pre->regex);
+    if (pre->protname) free(pre->protname);
+    free(pre);
 }

@@ -224,18 +224,21 @@ doHttpHeader(protocol_info *proto)
             rps = map->frequency / sec;
         }
 
-        map->duration = getDuration(post->start_duration);
-        map->duration = map->duration / 1000;
         map->resp = (char *)post->hdr;
 
         if (!map->req) {
             map->req = strdup("None");
+            map->duration = 0;
+        } else {
+            map->duration = getDurationNow(post->start_duration, map->start_time);
+            map->duration = map->duration / 1000;
         }
 
         event_field_t hfields[] = {
             HREQ_FIELD(map->req),
             HRES_FIELD(map->resp),
             DATA_FIELD(ssl),
+            DURATION_FIELD(map->duration),
             UNIT_FIELD("byte"),
             FIELDEND
         };

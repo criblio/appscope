@@ -55,6 +55,7 @@
 // and could be more accurate.
 int g_interval = DEFAULT_SUMMARY_PERIOD;
 static list_t *g_maplist;
+static int g_http_status[ASIZE];
 
 static void
 destroyHttpMap(void *data)
@@ -71,6 +72,7 @@ void
 initReporting()
 {
     g_maplist = lstCreate(destroyHttpMap);
+    preComp((unsigned char *)HTTP_STATUS, strlen(HTTP_STATUS), g_http_status);
 }
 
 void
@@ -161,12 +163,9 @@ getHttpStatus(char *header, size_t len)
     size_t ix;
     size_t rc;
     char *val;
-    int http_status[ASIZE];
-
-    preComp((unsigned char *)HTTP_STATUS, strlen(HTTP_STATUS), http_status);
 
     // ex: HTTP/1.1 200 OK\r\n
-    if ((ix = strsrch(HTTP_STATUS, strlen(HTTP_STATUS), header, len, http_status)) == -1) return -1;
+    if ((ix = strsrch(HTTP_STATUS, strlen(HTTP_STATUS), header, len, g_http_status)) == -1) return -1;
 
     if ((ix < 0) || (ix > len) || ((ix + strlen(HTTP_STATUS) + 1) > len)) return -1;
 
@@ -261,19 +260,20 @@ doHttpHeader(protocol_info *proto)
             map->duration = map->duration / 1000;
         }
 
+        size_t status = getHttpStatus((char *)map->resp, proto->len);
+
         event_field_t hfields[] = {
             HREQ_FIELD(map->req),
             HRES_FIELD(map->resp),
             DATA_FIELD(ssl),
             DURATION_FIELD(map->duration),
+            HTTPSTAT_FIELD(status),
             UNIT_FIELD("byte"),
             FIELDEND
         };
 
         event_t hevent = INT_EVENT("http-resp", proto->len, SET, hfields);
         cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
-
-        size_t status = getHttpStatus((char *)map->resp, proto->len);
 
         event_field_t mfields[] = {
             DURATION_FIELD(map->duration),

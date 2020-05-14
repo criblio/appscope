@@ -83,4 +83,28 @@ getDuration(uint64_t start)
 
 }
 
+// Return the time delta from start to now in nanoseconds
+static inline uint64_t
+getDurationNow(uint64_t now, uint64_t start)
+{
+    // before the constructor runs, g_time.freq is zero.
+    // Avoid div by zero during this time.
+    if (!g_time.freq) return 0ULL;
+
+    /*
+     * The clock frequency is in Mhz.
+     * In order to get NS resolution we
+     * multiply the difference by 1000.
+     *
+     * If the counter rolls over we adjust
+     * by using the max value of the counter.
+     * A roll over is rare. But, we should handle it.
+     */
+    if (start < now) {
+        return ((now - start) * 1000) / g_time.freq;
+    } else {
+        return (((ULONG_MAX - start) + now) * 1000) / g_time.freq;
+    }
+}
+
 #endif // __TIME_H__

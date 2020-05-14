@@ -38,19 +38,6 @@ COPY ./tls/rust/http_test/target/debug/http_test /opt/test-runner/bin/.
 RUN rm -f /opt/test/curl-7.69.1.tar.gz
 COPY ./tls/test_cert.pem /opt/test/.
 
-ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
-RUN chmod 755 /usr/lib/libscope.so
-ENV SCOPE_LOG_LEVEL=info
-ENV SCOPE_METRIC_VERBOSITY=4
-ENV SCOPE_EVENT_LOGFILE=false
-ENV SCOPE_EVENT_CONSOLE=false
-ENV SCOPE_EVENT_METRIC=false
-ENV SCOPE_EVENT_HTTP=true
-ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
-ENV SCOPE_METRIC_DEST=udp://localhost:8125
-ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
-ENV LD_PRELOAD=/usr/lib/libscope.so
-
 COPY ./tls/nodehttp.ts /opt/test-runner/bin/nodehttp.ts
 COPY ./tls/test_tls.sh /opt/test-runner/bin/test_tls.sh
 RUN chmod +x /opt/test-runner/bin/test_tls.sh
@@ -69,6 +56,18 @@ RUN yum -y install php
 RUN mkdir /opt/test-runner/php
 COPY ./tls/php/sslclient.php /opt/test-runner/php
 
+ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
+RUN chmod 755 /usr/lib/libscope.so
+ENV SCOPE_LOG_LEVEL=info
+ENV SCOPE_METRIC_VERBOSITY=4
+ENV SCOPE_EVENT_LOGFILE=false
+ENV SCOPE_EVENT_CONSOLE=false
+ENV SCOPE_EVENT_METRIC=false
+ENV SCOPE_EVENT_HTTP=true
+ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
+ENV SCOPE_METRIC_DEST=udp://localhost:8125
+ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
+ENV LD_PRELOAD=/usr/lib/libscope.so
 
 ENTRYPOINT ["/opt/test-runner/bin/test_tls.sh"]
 #ENTRYPOINT ["tail", "-f", "/dev/null"]

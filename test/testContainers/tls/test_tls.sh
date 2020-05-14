@@ -118,12 +118,6 @@ fi
 
 rm /opt/test-runner/logs/events.log
 
-if [ $ERR -eq "0" ]; then
-    echo "*************** Test Passed ***************"
-else
-    echo "*************** Test Failed ***************"
-fi
-
 echo "==============================================="
 echo "             Testing Ruby                      "
 echo "==============================================="
@@ -234,5 +228,12 @@ else
     ERR+=1
 fi
 
+if [ $ERR -eq "0" ]; then
+    echo ""
+    echo ""
+    echo "*************** Test Passed ***************"
+else
+    echo "*************** Test Failed ***************"
+fi
 
 exit ${ERR}

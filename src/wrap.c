@@ -110,6 +110,18 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
     }                                                                  \
     doThread();
 
+#define WRAP_CHECK_DLOPEN(func, rc)                                    \
+    if (g_fn.func == NULL ) {                                          \
+        param_t param = {.in_symbol = #func, .out_addr = NULL,         \
+                         .after_scope = FALSE};                        \
+        if (!dl_iterate_phdr(findSymbol, &param)) {                    \
+            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
+            return rc;                                                 \
+        }                                                              \
+        g_fn.func = param.out_addr;                                    \
+    }                                                                  \
+    doThread();
+
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
@@ -1068,6 +1080,7 @@ init(void)
     g_fn.gnutls_record_send_early_data = dlsym(RTLD_NEXT, "gnutls_record_send_early_data");
     g_fn.gnutls_record_send_range = dlsym(RTLD_NEXT, "gnutls_record_send_range");
     g_fn.SSL_ImportFD = dlsym(RTLD_NEXT, "SSL_ImportFD");
+    g_fn.PR_FileDesc2NativeHandle = dlsym(RTLD_NEXT, "PR_FileDesc2NativeHandle");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
@@ -2249,7 +2262,7 @@ nss_close(PRFileDesc *fd)
 {
     PRStatus rc;
     nss_list *nssentry;
-    int nfd = PR_FileDesc2NativeHandle(fd);
+    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
 
     //scopeLog("nss_close", nfd, CFG_LOG_ERROR);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
@@ -2271,7 +2284,7 @@ nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRInterv
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = PR_FileDesc2NativeHandle(fd);
+    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
 
     //scopeLog("nss_send", nfd, CFG_LOG_ERROR);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
@@ -2292,7 +2305,7 @@ nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = PR_FileDesc2NativeHandle(fd);
+    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
 
     //scopeLog("nss_recv", nfd, CFG_LOG_ERROR);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
@@ -2313,7 +2326,7 @@ nss_read(PRFileDesc *fd, void *buf, PRInt32 amount)
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = PR_FileDesc2NativeHandle(fd);
+    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
 
     //scopeLog("nss_read", nfd, CFG_LOG_ERROR);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
@@ -2334,7 +2347,7 @@ nss_write(PRFileDesc *fd, const void *buf, PRInt32 amount)
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = PR_FileDesc2NativeHandle(fd);
+    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
 
     //scopeLog("nss_write", nfd, CFG_LOG_ERROR);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
@@ -2355,7 +2368,7 @@ nss_writev(PRFileDesc *fd, const PRIOVec *iov, PRInt32 iov_size, PRIntervalTime 
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = PR_FileDesc2NativeHandle(fd);
+    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
 
     //scopeLog("nss_writev", nfd, CFG_LOG_ERROR);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
@@ -2377,7 +2390,7 @@ nss_sendto(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags,
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = PR_FileDesc2NativeHandle(fd);
+    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
 
     //scopeLog("nss_sendto", nfd, CFG_LOG_ERROR);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
@@ -2399,7 +2412,7 @@ nss_recvfrom(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags,
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = PR_FileDesc2NativeHandle(fd);
+    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
 
     //scopeLog("nss_recvfrom", nfd, CFG_LOG_ERROR);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
@@ -2422,11 +2435,12 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
 
     //scopeLog("SSL_ImportFD", -1, CFG_LOG_INFO);
     WRAP_CHECK(SSL_ImportFD, NULL);
-    result = g_fn.SSL_ImportFD(model, currFd);
+    WRAP_CHECK_DLOPEN(PR_FileDesc2NativeHandle, NULL);
 
+    result = g_fn.SSL_ImportFD(model, currFd);
     if (result != NULL) {
         nss_list *nssentry;
-        uint64_t nfd = PR_FileDesc2NativeHandle(result);
+        uint64_t nfd = g_fn.PR_FileDesc2NativeHandle(result);
 
         if ((((nssentry = calloc(1, sizeof(nss_list))) != NULL)) &&
             ((nssentry->ssl_methods = calloc(1, sizeof(PRIOMethods))) != NULL) &&

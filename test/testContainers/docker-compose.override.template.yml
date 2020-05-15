@@ -7,6 +7,7 @@ services:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
+    privileged: true
 
   splunk:
     command: -s /opt/test-runner/bin/libscope.so
@@ -15,6 +16,7 @@ services:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
+    privileged: true
 
   nginx:
     command: -s /opt/test-runner/bin/libscope.so
@@ -23,11 +25,13 @@ services:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
+    privileged: true
 
   interposed_func:
     command: -s /opt/test-runner/bin/libscope.so
     volumes:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    privileged: true
 
   elastic:
     command: -s /opt/test-runner/bin/libscope.so
@@ -36,6 +40,7 @@ services:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
+    privileged: true
 
   kafka:
     command: -s /opt/test-runner/bin/libscope.so
@@ -44,15 +49,18 @@ services:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
+    privileged: true
 
   tls:
     volumes:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
 
   detect_proto:
     volumes:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true

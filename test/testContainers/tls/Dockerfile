@@ -56,6 +56,9 @@ RUN yum -y install php
 RUN mkdir /opt/test-runner/php
 COPY ./tls/php/sslclient.php /opt/test-runner/php
 
+RUN yum -y install httpd mod_ssl
+COPY ./tls/httpd /etc/sysconfig/httpd
+
 ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so
 ENV SCOPE_LOG_LEVEL=info

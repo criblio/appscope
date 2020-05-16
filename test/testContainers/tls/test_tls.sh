@@ -228,6 +228,30 @@ else
     ERR+=1
 fi
 
+echo ""
+echo "==============================================="
+echo "      Testing apache with HTTPS                "
+echo "==============================================="
+export $preload
+echo "Starting to test apache"
+APACHE_HTTP_START=$(grep http- /opt/test-runner/logs/events.log | grep -c httpd)
+service httpd start
+sleep 1
+curl -k https://localhost:443/ > /dev/null
+sleep 1
+service httpd stop
+echo "Done testing apache"
+APACHE_HTTP_END=$(grep http- /opt/test-runner/logs/events.log | grep -c httpd)
+
+if (( $APACHE_HTTP_END - $APACHE_HTTP_START >= 3 )); then
+    echo "*************** apache Passed ***************"
+else
+    echo "*************** apache Failed ***************"
+    echo APACHE_HTTP_START=$APACHE_HTTP_START
+    echo APACHE_HTTP_END=$APACHE_HTTP_END
+    ERR+=1
+fi
+
 if [ $ERR -eq "0" ]; then
     echo ""
     echo ""

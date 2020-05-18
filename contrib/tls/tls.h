@@ -4,6 +4,7 @@
 #define XP_UNIX
 
 #include "nss/pprio.h"
+#include "nss/prerror.h"
 
 struct gnutls_session_def;
 typedef struct gnutls_session_def *gnutls_session_t;

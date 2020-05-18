@@ -110,18 +110,6 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
     }                                                                  \
     doThread();
 
-#define WRAP_CHECK_DLOPEN(func, rc)                                    \
-    if (g_fn.func == NULL ) {                                          \
-        param_t param = {.in_symbol = #func, .out_addr = NULL,         \
-                         .after_scope = FALSE};                        \
-        if (!dl_iterate_phdr(findSymbol, &param)) {                    \
-            scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);      \
-            return rc;                                                 \
-        }                                                              \
-        g_fn.func = param.out_addr;                                    \
-    }                                                                  \
-    doThread();
-
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
@@ -1081,6 +1069,7 @@ init(void)
     g_fn.gnutls_record_send_range = dlsym(RTLD_NEXT, "gnutls_record_send_range");
     g_fn.SSL_ImportFD = dlsym(RTLD_NEXT, "SSL_ImportFD");
     g_fn.PR_FileDesc2NativeHandle = dlsym(RTLD_NEXT, "PR_FileDesc2NativeHandle");
+    g_fn.PR_SetError = dlsym(RTLD_NEXT, "PR_SetError");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
@@ -2262,19 +2251,21 @@ nss_close(PRFileDesc *fd)
 {
     PRStatus rc;
     nss_list *nssentry;
-    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
 
-    //scopeLog("nss_close", nfd, CFG_LOG_ERROR);
-    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+    // Note: NSS docs don't define that PR_GetError should be called on failure
+    if (!fd) return PR_FAILURE;
+
+    //scopeLog("nss_close", (uint64_t)fd->methods, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->close(fd);
     } else {
-        rc = -1;
+        rc = PR_FAILURE;
         DBG(NULL);
         scopeLog("ERROR: nss_close no list entry", -1, CFG_LOG_ERROR);
         return rc;
     }
 
-    if (rc == PR_SUCCESS) lstDelete(g_nsslist, (uint64_t)nfd);
+    if (rc == PR_SUCCESS) lstDelete(g_nsslist, (uint64_t)fd->methods);
 
     return rc;
 }
@@ -2284,10 +2275,23 @@ nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRInterv
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+    int nfd;
 
-    //scopeLog("nss_send", nfd, CFG_LOG_ERROR);
-    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+    /*
+     * Best guess as to an error code.
+     * If the call is made when fd is null, it segfaults.
+     * Set the OS specific error to 0 such that the app
+     * can call PR_GetOSError() as needed.
+     */
+    if (!fd) {
+        if (SYMBOL_LOADED(PR_SetError)) {
+            g_fn.PR_SetError(PR_BAD_DESCRIPTOR_ERROR, (PRInt32)0);
+        }
+        return -1;
+    }
+
+    //scopeLog("nss_send", (uint64_t)fd->methods, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->send(fd, buf, amount, flags, timeout);
     } else {
         rc = -1;
@@ -2295,7 +2299,15 @@ nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRInterv
         scopeLog("ERROR: nss_send no list entry", -1, CFG_LOG_ERROR);
     }
 
-    if (rc > 0) doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)rc, TLSTX, BUF);
+    if (rc > 0) {
+        if (SYMBOL_LOADED(PR_FileDesc2NativeHandle)) {
+            nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+        } else {
+            nfd = -1;
+        }
+
+        doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)rc, TLSTX, BUF);
+    }
 
     return rc;
 }
@@ -2305,10 +2317,17 @@ nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+    int nfd;
 
-    //scopeLog("nss_recv", nfd, CFG_LOG_ERROR);
-    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+    if (!fd) {
+        if (SYMBOL_LOADED(PR_SetError)) {
+            g_fn.PR_SetError(PR_BAD_DESCRIPTOR_ERROR, (PRInt32)0);
+        }
+        return -1;
+    }
+
+    //scopeLog("nss_recv", (uint64_t)fd->methods, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->recv(fd, buf, amount, flags, timeout);
     } else {
         rc = -1;
@@ -2316,7 +2335,15 @@ nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime
         scopeLog("ERROR: nss_recv no list entry", -1, CFG_LOG_ERROR);
     }
 
-    if (rc > 0) doProtocol((uint64_t)fd, nfd, buf, (size_t)rc, TLSRX, BUF);
+    if (rc > 0) {
+        if (SYMBOL_LOADED(PR_FileDesc2NativeHandle)) {
+            nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+        } else {
+            nfd = -1;
+        }
+
+        doProtocol((uint64_t)fd, nfd, buf, (size_t)rc, TLSRX, BUF);
+    }
 
     return rc;
 }
@@ -2326,10 +2353,17 @@ nss_read(PRFileDesc *fd, void *buf, PRInt32 amount)
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+    int nfd;
 
-    //scopeLog("nss_read", nfd, CFG_LOG_ERROR);
-    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+    if (!fd) {
+        if (SYMBOL_LOADED(PR_SetError)) {
+            g_fn.PR_SetError(PR_BAD_DESCRIPTOR_ERROR, (PRInt32)0);
+        }
+        return -1;
+    }
+
+    //scopeLog("nss_read", (uint64_t)fd->methods, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->read(fd, buf, amount);
     } else {
         rc = -1;
@@ -2337,7 +2371,15 @@ nss_read(PRFileDesc *fd, void *buf, PRInt32 amount)
         scopeLog("ERROR: nss_read no list entry", -1, CFG_LOG_ERROR);
     }
 
-    if (rc > 0) doProtocol((uint64_t)fd, nfd, buf, (size_t)rc, TLSRX, BUF);
+    if (rc > 0) {
+        if (SYMBOL_LOADED(PR_FileDesc2NativeHandle)) {
+            nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+        } else {
+            nfd = -1;
+        }
+
+        doProtocol((uint64_t)fd, nfd, buf, (size_t)rc, TLSRX, BUF);
+    }
 
     return rc;
 }
@@ -2347,10 +2389,17 @@ nss_write(PRFileDesc *fd, const void *buf, PRInt32 amount)
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+    int nfd;
 
-    //scopeLog("nss_write", nfd, CFG_LOG_ERROR);
-    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+    if (!fd) {
+        if (SYMBOL_LOADED(PR_SetError)) {
+            g_fn.PR_SetError(PR_BAD_DESCRIPTOR_ERROR, (PRInt32)0);
+        }
+        return -1;
+    }
+
+    //scopeLog("nss_write", fd->methods, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->write(fd, buf, amount);
     } else {
         rc = -1;
@@ -2358,7 +2407,15 @@ nss_write(PRFileDesc *fd, const void *buf, PRInt32 amount)
         scopeLog("ERROR: nss_write no list entry", -1, CFG_LOG_ERROR);
     }
 
-    if (rc > 0) doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)rc, TLSRX, BUF);
+    if (rc > 0) {
+        if (SYMBOL_LOADED(PR_FileDesc2NativeHandle)) {
+            nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+        } else {
+            nfd = -1;
+        }
+
+        doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)rc, TLSRX, BUF);
+    }
 
     return rc;
 }
@@ -2368,10 +2425,17 @@ nss_writev(PRFileDesc *fd, const PRIOVec *iov, PRInt32 iov_size, PRIntervalTime 
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+    int nfd;
 
-    //scopeLog("nss_writev", nfd, CFG_LOG_ERROR);
-    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+    if (!fd) {
+        if (SYMBOL_LOADED(PR_SetError)) {
+            g_fn.PR_SetError(PR_BAD_DESCRIPTOR_ERROR, (PRInt32)0);
+        }
+        return -1;
+    }
+
+    //scopeLog("nss_writev", fd->methods, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->writev(fd, iov, iov_size, timeout);
     } else {
         rc = -1;
@@ -2379,7 +2443,15 @@ nss_writev(PRFileDesc *fd, const PRIOVec *iov, PRInt32 iov_size, PRIntervalTime 
         scopeLog("ERROR: nss_writev no list entry", -1, CFG_LOG_ERROR);
     }
 
-    if (rc > 0) doProtocol((uint64_t)fd, nfd, (void *)iov, (size_t)iov_size, TLSRX, IOV);
+    if (rc > 0) {
+        if (SYMBOL_LOADED(PR_FileDesc2NativeHandle)) {
+            nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+        } else {
+            nfd = -1;
+        }
+
+        doProtocol((uint64_t)fd, nfd, (void *)iov, (size_t)iov_size, TLSRX, IOV);
+    }
 
     return rc;
 }
@@ -2390,10 +2462,17 @@ nss_sendto(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags,
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+    int nfd;
 
-    //scopeLog("nss_sendto", nfd, CFG_LOG_ERROR);
-    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+    if (!fd) {
+        if (SYMBOL_LOADED(PR_SetError)) {
+            g_fn.PR_SetError(PR_BAD_DESCRIPTOR_ERROR, (PRInt32)0);
+        }
+        return -1;
+    }
+
+    //scopeLog("nss_sendto", fd->methods, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->sendto(fd, (void *)buf, amount, flags, addr, timeout);
     } else {
         rc = -1;
@@ -2401,7 +2480,15 @@ nss_sendto(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags,
         scopeLog("ERROR: nss_sendto no list entry", -1, CFG_LOG_ERROR);
     }
 
-    if (rc > 0) doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)amount, TLSRX, BUF);
+    if (rc > 0) {
+        if (SYMBOL_LOADED(PR_FileDesc2NativeHandle)) {
+            nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+        } else {
+            nfd = -1;
+        }
+
+        doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)amount, TLSRX, BUF);
+    }
 
     return rc;
 }
@@ -2412,10 +2499,17 @@ nss_recvfrom(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags,
 {
     PRInt32 rc;
     nss_list *nssentry;
-    int nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+    int nfd;
 
-    //scopeLog("nss_recvfrom", nfd, CFG_LOG_ERROR);
-    if ((nssentry = lstFind(g_nsslist, (uint64_t)nfd)) != NULL) {
+    if (!fd) {
+        if (SYMBOL_LOADED(PR_SetError)) {
+            g_fn.PR_SetError(PR_BAD_DESCRIPTOR_ERROR, (PRInt32)0);
+        }
+        return -1;
+    }
+
+    //scopeLog("nss_recvfrom", fd->methods, CFG_LOG_ERROR);
+    if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->recvfrom(fd, buf, amount, flags, addr, timeout);
     } else {
         rc = -1;
@@ -2423,7 +2517,15 @@ nss_recvfrom(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags,
         scopeLog("ERROR: nss_recvfrom no list entry", -1, CFG_LOG_ERROR);
     }
 
-    if (rc > 0) doProtocol((uint64_t)fd, nfd, buf, (size_t)amount, TLSRX, BUF);
+    if (rc > 0) {
+        if (SYMBOL_LOADED(PR_FileDesc2NativeHandle)) {
+            nfd = g_fn.PR_FileDesc2NativeHandle(fd);
+        } else {
+            nfd = -1;
+        }
+
+        doProtocol((uint64_t)fd, nfd, buf, (size_t)amount, TLSRX, BUF);
+    }
 
     return rc;
 }
@@ -2433,22 +2535,20 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
 {
     PRFileDesc *result;
 
-    //scopeLog("SSL_ImportFD", -1, CFG_LOG_INFO);
     WRAP_CHECK(SSL_ImportFD, NULL);
-    WRAP_CHECK_DLOPEN(PR_FileDesc2NativeHandle, NULL);
 
     result = g_fn.SSL_ImportFD(model, currFd);
     if (result != NULL) {
         nss_list *nssentry;
-        uint64_t nfd = g_fn.PR_FileDesc2NativeHandle(result);
 
         if ((((nssentry = calloc(1, sizeof(nss_list))) != NULL)) &&
             ((nssentry->ssl_methods = calloc(1, sizeof(PRIOMethods))) != NULL) &&
             ((nssentry->ssl_int_methods = calloc(1, sizeof(PRIOMethods))) != NULL)) {
 
-            nssentry->id = nfd;
             memmove(nssentry->ssl_methods, result->methods, sizeof(PRIOMethods));
             memmove(nssentry->ssl_int_methods, result->methods, sizeof(PRIOMethods));
+            nssentry->id = (uint64_t)nssentry->ssl_int_methods;
+            //scopeLog("SSL_ImportFD", (uint64_t)nssentry->id, CFG_LOG_INFO);
 
             // ref contrib/tls/nss/prio.h struct PRIOMethods
             // read ... todo? read, recvfrom, acceptread

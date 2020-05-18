@@ -257,7 +257,7 @@ doHttpHeader(protocol_info *proto)
             map->duration = 0;
         } else {
             map->duration = getDurationNow(post->start_duration, map->start_time);
-            map->duration = map->duration / 1000;
+            map->duration = map->duration / 1000000;
         }
 
         size_t status = getHttpStatus((char *)map->resp, proto->len);

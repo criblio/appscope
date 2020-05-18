@@ -192,6 +192,8 @@ typedef struct interposed_funcs_t {
     ssize_t (*gnutls_record_send_range)(gnutls_session_t, const void *, size_t, const gnutls_range_st *);
     PRFileDesc *(*SSL_ImportFD)(PRFileDesc *, PRFileDesc *);
     void *(*dlopen)(const char *filename, int flags);
+    int (*PR_FileDesc2NativeHandle)(PRFileDesc *);
+    void (*PR_SetError)(PRErrorCode, PRInt32);
 
 #if defined(__LINUX__) && defined(__STATX__)
     int (*statx)(int, const char *, int, unsigned int, struct statx *);

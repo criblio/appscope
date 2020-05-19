@@ -78,7 +78,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
     }
 
     // Now start opening libraries and looking for param->in_symbol
-    void *handle = dlopen(info->dlpi_name, RTLD_NOW);
+    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
     if (!handle) return 0;
     void *addr = dlsym(handle, param->in_symbol);
     dlclose(handle);
@@ -800,7 +800,7 @@ load_func(const char *module, const char *func)
     void *addr;
     char buf[128];
     
-    void *handle = dlopen(module, RTLD_LAZY | RTLD_NOLOAD);
+    void *handle = g_fn.dlopen(module, RTLD_LAZY | RTLD_NOLOAD);
     if (handle == NULL) {
         snprintf(buf, sizeof(buf), "ERROR: Could not open file %s.\n", module ? module : "(null)");
         scopeLog(buf, -1, CFG_LOG_ERROR);
@@ -862,7 +862,7 @@ initHook()
     bool should_we_patch = FALSE;
 
     if (dl_iterate_phdr(hookCallback, &full_path)) {
-        void *handle = dlopen(full_path, RTLD_NOW);
+        void *handle = g_fn.dlopen(full_path, RTLD_NOW);
         if (handle == NULL) {
             dlclose(handle);
             return;
@@ -1068,6 +1068,7 @@ init(void)
     g_fn.gnutls_record_send_early_data = dlsym(RTLD_NEXT, "gnutls_record_send_early_data");
     g_fn.gnutls_record_send_range = dlsym(RTLD_NEXT, "gnutls_record_send_range");
     g_fn.SSL_ImportFD = dlsym(RTLD_NEXT, "SSL_ImportFD");
+    g_fn.dlopen = dlsym(RTLD_NEXT, "dlopen");
     g_fn.PR_FileDesc2NativeHandle = dlsym(RTLD_NEXT, "PR_FileDesc2NativeHandle");
     g_fn.PR_SetError = dlsym(RTLD_NEXT, "PR_SetError");
 #ifdef __STATX__
@@ -2576,6 +2577,34 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
         }
     }
     return result;
+}
+
+EXPORTON void *
+dlopen(const char *filename, int flags)
+{
+    char buf[1024];
+    char fbuf[256];
+    fbuf[0] = '\0';
+    if (flags & RTLD_LAZY) strcat(fbuf, "RTLD_LAZY|");
+    if (flags & RTLD_NOW) strcat(fbuf, "RTLD_NOW|");
+    if (flags & RTLD_GLOBAL) strcat(fbuf, "RTLD_GLOBAL|");
+    if (flags & RTLD_LOCAL) strcat(fbuf, "RTLD_LOCAL|");
+    if (flags & RTLD_NODELETE) strcat(fbuf, "RTLD_NODELETE|");
+    if (flags & RTLD_NOLOAD) strcat(fbuf, "RTLD_NOLOAD|");
+    if (flags & RTLD_DEEPBIND) strcat(fbuf, "RTLD_DEEPBIND|");
+    snprintf(buf, sizeof(buf), "dlopen called for %s with %s", filename, fbuf);
+    scopeLog(buf, -1, CFG_LOG_DEBUG);
+
+    WRAP_CHECK(dlopen, NULL);
+
+    // temporary apache-specific fix
+    if (filename && strstr(filename, "mod_ssl") && (flags | RTLD_DEEPBIND)) {
+        DBG("Ignoring RTLD_DEEPBIND for mod_ssl");
+        scopeLog("Ignoring RTLD_DEEPBIND for mod_ssl", -1, CFG_LOG_DEBUG);
+        flags = flags & ~RTLD_DEEPBIND;
+    }
+    void* handle = g_fn.dlopen(filename, flags);
+    return handle;
 }
 
 EXPORTON void

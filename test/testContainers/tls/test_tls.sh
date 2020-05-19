@@ -1,263 +1,238 @@
 #! /bin/bash
 
-declare -i ERR=0
-preload=`env | grep LD_PRELOAD`
+DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
 
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+PRELOAD=`env | grep LD_PRELOAD`
+EVT_FILE="/opt/test-runner/logs/events.log"
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "==============================================="
+    echo "             Testing $CURRENT_TEST             "
+    echo "==============================================="
+    export $PRELOAD
+    ERR=0
+}
+
+evaltest(){
+    echo "             Evaluating $CURRENT_TEST"
+    unset LD_PRELOAD
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "*************** $CURRENT_TEST $RESULT ***************"
+    echo ""
+    echo ""
+
+    # copy the EVT_FILE to help with debugging
+    if (( $DEBUG )) || [ $RESULT == "FAILED" ]; then
+        cp $EVT_FILE $EVT_FILE.$CURRENT_TEST
+    fi
+
+    rm $EVT_FILE
+}
+
+
+#
+# OpenSSL
+#
+starttest OpenSSL
 cd /opt/test
-
-echo "==============================================="
-echo "             Testing OpenSSL                   "
-echo "==============================================="
-
 ./curlssl/src/curl --head https://cribl.io
-unset LD_PRELOAD
+evaltest
 
-grep http-req /opt/test-runner/logs/events.log > /dev/null
+grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep "Host: cribl.io" /opt/test-runner/logs/events.log > /dev/null
+grep "Host: cribl.io" $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp /opt/test-runner/logs/events.log > /dev/null
+grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep HTTP /opt/test-runner/logs/events.log > /dev/null
+grep HTTP $EVT_FILE > /dev/null
 ERR+=$?
+endtest
 
-if [ $ERR -eq "0" ]; then
-    echo "*************** OpenSSL Success ***************"
-else
-    echo "*************** OpenSSL Test Failed ***************"
-#    cat /opt/test-runner/logs/events.log
-fi
 
-rm /opt/test-runner/logs/events.log
-
-echo "==============================================="
-echo "             Testing gnutls                    "
-echo "==============================================="
-export $preload
+#
+# gnutls
+#
+starttest gnutls
 ./curltls/src/curl --head https://cribl.io
-unset LD_PRELOAD
+evaltest
 
-grep http-req /opt/test-runner/logs/events.log > /dev/null
+grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep "Host: cribl.io" /opt/test-runner/logs/events.log > /dev/null
+grep "Host: cribl.io" $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp /opt/test-runner/logs/events.log > /dev/null
+grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep HTTP /opt/test-runner/logs/events.log > /dev/null
+grep HTTP $EVT_FILE > /dev/null
 ERR+=$?
+endtest
 
-if [ $ERR -eq "0" ]; then
-    echo "*************** gnutls Success ***************"
-else
-    echo "*************** gnutls Test Failed ***************"
-#    cat /opt/test-runner/logs/events.log
-fi
 
-rm /opt/test-runner/logs/events.log
-
-echo "==============================================="
-echo "             Testing nss                       "
-echo "==============================================="
-export $preload
+#
+# nss
+#
+starttest nss
 curl --head https://cribl.io
-unset LD_PRELOAD
+evaltest
 
-grep http-req /opt/test-runner/logs/events.log > /dev/null
+grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep "Host: cribl.io" /opt/test-runner/logs/events.log > /dev/null
+grep "Host: cribl.io" $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp /opt/test-runner/logs/events.log > /dev/null
+grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep HTTP /opt/test-runner/logs/events.log > /dev/null
+grep HTTP $EVT_FILE > /dev/null
 ERR+=$?
+endtest
 
-if [ $ERR -eq "0" ]; then
-    echo "*************** nss Success ***************"
-else
-    echo "*************** nss Test Failed ***************"
-#    cat /opt/test-runner/logs/events.log
-fi
 
-rm /opt/test-runner/logs/events.log
-
-echo "==============================================="
-echo "      Testing hot patch with node.js           "
-echo "==============================================="
-export $preload
-echo "Running node wih an HTTPS request"
+#
+# node.js
+#
+starttest "node.js"
 node /opt/test-runner/bin/nodehttp.ts > /dev/null
-unset LD_PRELOAD
+evaltest
 
-grep http-req /opt/test-runner/logs/events.log > /dev/null
+grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep "Host: cribl.io" /opt/test-runner/logs/events.log > /dev/null
+grep "Host: cribl.io" $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp /opt/test-runner/logs/events.log > /dev/null
+grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep HTTP /opt/test-runner/logs/events.log > /dev/null
+grep HTTP $EVT_FILE > /dev/null
 ERR+=$?
+endtest
 
-if [ $ERR -eq "0" ]; then
-    echo "*************** hot patch Success ***************"
-else
-    echo "*************** host patch Test Failed ***************"
-#    cat /opt/test-runner/logs/events.log
-fi
 
-rm /opt/test-runner/logs/events.log
-
-echo "==============================================="
-echo "             Testing Ruby                      "
-echo "==============================================="
-
+#
+# Ruby
+#
 echo "Creating key files for ruby client and server"
 (cd /opt/test-runner/ruby && openssl req -x509 -newkey rsa:4096 -keyout priv.pem -out cert.pem -days 365 -nodes -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost")
-export $preload
-echo "Starting to test ruby"
-RUBY_HTTP_START=$(grep http- /opt/test-runner/logs/events.log | grep -c 10101)
+starttest Ruby
+RUBY_HTTP_START=$(grep http- $EVT_FILE | grep -c 10101)
 (cd /opt/test-runner/ruby && ./server.rb 10101 &)
 sleep 1
 (cd /opt/test-runner/ruby && ./client.rb 127.0.0.1 10101)
 sleep 1
-echo "Done testing ruby"
-RUBY_HTTP_END=$(grep http- /opt/test-runner/logs/events.log | grep -c 10101)
+evaltest
+RUBY_HTTP_END=$(grep http- $EVT_FILE | grep -c 10101)
 
-if (( $RUBY_HTTP_END - $RUBY_HTTP_START >= 6 )); then
-    echo "*************** Ruby Passed ***************"
-else
-    echo "*************** Ruby Failed ***************"
-    echo RUBY_HTTP_START=$RUBY_HTTP_START
-    echo RUBY_HTTP_END=$RUBY_HTTP_END
+if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 6 )); then
     ERR+=1
 fi
+endtest
 
-rm /opt/test-runner/logs/events.log
 
-echo ""
-echo "==============================================="
-echo "      Testing Python with HTTPS                "
-echo "==============================================="
+#
+# Python
+#
 /opt/rh/rh-python36/root/usr/bin/pip3.6 install pyopenssl
-export $preload
-echo "Running Python wih an HTTPS request"
+starttest Python
 /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py create_certs
 /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py start_server&
 /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py run_client
+evaltest
 
-grep http-req /opt/test-runner/logs/events.log > /dev/null
-ERR+=$?
-
-grep "Host: cribl.io" /opt/test-runner/logs/events.log > /dev/null
-ERR+=$?
-
-grep http-resp /opt/test-runner/logs/events.log > /dev/null
-ERR+=$?
-
-grep HTTP /opt/test-runner/logs/events.log > /dev/null
-ERR+=$?
-
-if [ $ERR -eq "0" ]; then
-    echo "*************** Python Success ***************"
-else
-    echo "*************** Python Test Failed ***************"
-#    cat /opt/test-runner/logs/events.log
+COUNT=$(grep -c http- $EVT_FILE)
+if (( $COUNT < 6 )); then
+    ERR+=1
 fi
+endtest
 
-rm /opt/test-runner/logs/events.log
 
-echo ""
-echo "==============================================="
-echo "      Testing Rust app with HTTPS                "
-echo "==============================================="
-export $preload
-echo "Running a Rust app with an HTTPS request"
+#
+# Rust
+#
+starttest Rust
 /opt/test-runner/bin/http_test > /dev/null
+evaltest
 
-grep http-req /opt/test-runner/logs/events.log > /dev/null
+grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep "Host: cribl.io" /opt/test-runner/logs/events.log > /dev/null
+grep "host: cribl.io" $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp /opt/test-runner/logs/events.log > /dev/null
+grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep HTTP /opt/test-runner/logs/events.log > /dev/null
+grep HTTP $EVT_FILE > /dev/null
 ERR+=$?
-
-if [ $ERR -eq "0" ]; then
-    echo "*************** Rust Success ***************"
-else
-    echo "*************** Rust Test Failed ***************"
-#    cat /opt/test-runner/logs/events.log
-fi
-
-rm /opt/test-runner/logs/events.log
+endtest
 
 
-echo ""
-echo "==============================================="
-echo "      Testing php with HTTPS                   "
-echo "==============================================="
-export $preload
-echo "Starting to test php"
-PHP_HTTP_START=$(grep http- /opt/test-runner/logs/events.log | grep -c sslclient.php)
+#
+# php
+#
+starttest php
+PHP_HTTP_START=$(grep http- $EVT_FILE | grep -c sslclient.php)
 php /opt/test-runner/php/sslclient.php > /dev/null
-echo "Done testing php"
-PHP_HTTP_END=$(grep http- /opt/test-runner/logs/events.log | grep -c sslclient.php)
+evaltest
+
+PHP_HTTP_END=$(grep http- $EVT_FILE | grep -c sslclient.php)
 
 # We really expect *3*, not *2*.  We're missing http-req right now.
-if (( $PHP_HTTP_END - $PHP_HTTP_START >= 2 )); then
-    echo "*************** php Passed ***************"
-else
-    echo "*************** php Failed ***************"
-    echo PHP_HTTP_START=$PHP_HTTP_START
-    echo PHP_HTTP_END=$PHP_HTTP_END
+if (( $PHP_HTTP_END - $PHP_HTTP_START < 2 )); then
     ERR+=1
 fi
+endtest
 
-echo ""
-echo "==============================================="
-echo "      Testing apache with HTTPS                "
-echo "==============================================="
-export $preload
-echo "Starting to test apache"
-APACHE_HTTP_START=$(grep http- /opt/test-runner/logs/events.log | grep -c httpd)
+
+#
+# apache
+#
+starttest apache
+APACHE_HTTP_START=$(grep http- $EVT_FILE | grep -c httpd)
 service httpd start
-sleep 1
 curl -k https://localhost:443/ > /dev/null
-sleep 1
 service httpd stop
-echo "Done testing apache"
-APACHE_HTTP_END=$(grep http- /opt/test-runner/logs/events.log | grep -c httpd)
+evaltest
+APACHE_HTTP_END=$(grep http- $EVT_FILE | grep -c httpd)
 
-if (( $APACHE_HTTP_END - $APACHE_HTTP_START >= 3 )); then
-    echo "*************** apache Passed ***************"
-else
-    echo "*************** apache Failed ***************"
-    echo APACHE_HTTP_START=$APACHE_HTTP_START
-    echo APACHE_HTTP_END=$APACHE_HTTP_END
+if (( $APACHE_HTTP_END - $APACHE_HTTP_START < 3 )); then
     ERR+=1
 fi
+endtest
 
-if [ $ERR -eq "0" ]; then
+
+if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""
     echo ""
-    echo "*************** Test Passed ***************"
+    echo "*************** ALL TESTS PASSED ***************"
 else
-    echo "*************** Test Failed ***************"
+    echo "*************** SOME TESTS FAILED ***************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+    echo "Refer to these files for more info:"
+    for FAILED_TEST in $FAILED_TEST_LIST; do
+        echo "  $EVT_FILE.$FAILED_TEST"
+    done
 fi
 
-exit ${ERR}
+exit ${FAILED_TEST_COUNT}

@@ -483,7 +483,7 @@ osThreadInit(void(*handler)(int), unsigned interval)
     return TRUE;
 }
 
-static const char scope_help[] =
+static const char scope_help_overview[] =
 "OVERVIEW:\n"
 "    The Scope library supports extraction of data from within applications.\n"
 "    As a general rule applications consist of one or more processes.\n"
@@ -503,7 +503,9 @@ static const char scope_help[] =
 "\n"
 "    Scope logs to a configurable destination along with a configurable verbosity level. The default\n"
 "    verbosity setting is level 4 and the default destination is the file /tmp/scope.log.\n"
-"\n"
+"\n";
+
+static const char scope_help_configuration[] =
 "CONFIGURATION:\n"
 "    Configuration File:\n"
 "       A YAML config file enables control of all available settings.\n"
@@ -628,7 +630,9 @@ static const char scope_help[] =
 "        (e.g. SCOPE_CMD_DBG_PATH=/tmp/outfile.txt)  It changes the\n"
 "        configuration to match the new settings, and deletes the\n"
 "        scope.<pid> file when it's complete.\n"
-"\n"
+"\n";
+
+static const char scope_help_metrics[] =
 "METRICS:\n"
 "    Metrics can be enabled or disabled with a single config element.\n"
 "    Specific types of metrics and spcific field content are managed\n"
@@ -660,7 +664,9 @@ static const char scope_help[] =
 "\n"
 "    The http.status metric is emitted when the http watch type has been enabled as an event.\n"
 "    The http.status metric is not controlled with summurization settings.\n"
-"\n"
+"\n";
+
+static const char scope_help_events[] =
 "EVENTS:\n"
 "     All events can be enabled or disabled with a single config element.\n"
 "     In contrast to metrics, event content is not managed with verbosity settings.\n"
@@ -683,7 +689,9 @@ static const char scope_help[] =
 "        sequence. A response event includes the corresponding request, status and duration fields.\n"
 "        An HTTP metric event provides fields describing bytes received, requests per second,\n"
 "        duration and status.\n"
-"\n"
+"\n";
+
+static const char scope_help_protocol[] =
 "PROTOCOL DETECTION:\n"
 "     Any definbed network protocol can be detected by Scope. A protocol definition is provided in a\n"
 "     separate YAML confg file. Protocol specifics are described in one or more regex definitions.\n"
@@ -698,22 +706,106 @@ static const char scope_help[] =
 "\n";
 
 
+typedef struct {
+    const char* cmd;
+    const char* text;
+} help_list_t;
+
+static const help_list_t help_list[] = {
+    {"overview", scope_help_overview},
+    {"configuration", scope_help_configuration},
+    {"metrics", scope_help_metrics},
+    {"events", scope_help_events},
+    {"protocol", scope_help_protocol},
+    {NULL, NULL}
+};
+
 // assumes that we're only building for 64 bit...
 char const __invoke_dynamic_linker__[] __attribute__ ((section (".interp"))) = "/lib64/ld-linux-x86-64.so.2";
+extern char** _dl_argv;
 
-void
-__scope_main(void)
+static int
+args_are_all_valid(int argc, char **argv)
+{
+    int i,j;
+    for (i=1; i<argc; i++) {
+        if (i==1 && !strcmp(argv[i], "help")) continue;
+        if (i==1 && !strcmp(argv[i], "all")) continue;
+
+        int found = FALSE;
+        for (j=0; help_list[j].cmd; j++) {
+            if (!strcmp(argv[i], help_list[j].cmd)) {
+                found = TRUE;
+                break;
+            }
+        }
+        if (found) continue;
+
+        printf("%s is not a valid argument.  Printing help instead...\n\n", argv[i]);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static void
+print_version(char* path)
 {
     printf("Scope Version: " SCOPE_VER "\n");
+    printf("\n");
+    printf("    Usage: LD_PRELOAD=%s <command name>\n", path);
+    printf("    For more info: %s help\n", path);
+    printf("\n");
+}
 
+static void
+print_help(char* path)
+{
+    int i;
+    printf( "Welcome to the help for libscope.so!\n\n"
+            "    For this message:\n        %1$s help\n"
+            "    To print all help:\n        %1$s all\n"
+            "    Or to print help by section:\n", path);
+    for (i=0; help_list[i].cmd; i++) {
+        printf("        %s %s\n", path, help_list[i].cmd);
+    }
+    printf("\n");
+}
+
+
+void
+__scope_main(int argc)
+{
+    // Get the full path to the library, or provide default if not possible.
     char path[1024] = {0};
-    if (readlink("/proc/self/exe", path, sizeof(path)) == -1) exit(0);
-    printf("\n");
-    printf("   Usage: LD_PRELOAD=%s <command name>\n ", path);
-    printf("\n");
-    printf("\n");
-    printf("%s", scope_help);
-    printf("\n");
+    if (readlink("/proc/self/exe", path, sizeof(path)) == -1) {
+        snprintf(path, sizeof(path), "libscope.so");
+    }
+
+    if (argc < 2) {
+        print_version(path);
+    } else if (!args_are_all_valid(argc, _dl_argv)) {
+        print_help(path);
+    } else {
+        int i,j;
+        if (!strcmp(_dl_argv[1], "help")) {
+            print_help(path);
+        }
+        // print all help sections
+        if (!strcmp(_dl_argv[1], "all")) {
+            for (i=0; help_list[i].text; i++) {
+                printf("    %s\n", help_list[i].text);
+            }
+        }
+        // print matching help sections
+        for (i=1; i<argc; i++) {
+            for (j=0; help_list[j].cmd; j++) {
+                if (!strcmp(_dl_argv[i], help_list[j].cmd)) {
+                    printf("%s", help_list[j].text);
+                    break;
+                }
+            }
+        }
+    }
     exit(0);
 }
 

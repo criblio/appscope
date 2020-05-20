@@ -483,21 +483,66 @@ osThreadInit(void(*handler)(int), unsigned interval)
     return TRUE;
 }
 
-static const char scope_help[] =
-"ENV VARIABLES:\n"
+static const char scope_help_overview[] =
+"OVERVIEW:\n"
+"    The Scope library supports extraction of data from within applications.\n"
+"    As a general rule applications consist of one or more processes.\n"
+"    The Scope library is capable of being loaded into any process as the\n"
+"    process starts.\n"
+"    The primary means of defining which processes include the Scope library\n"
+"    is by exporting the environment variable LD_PRELOAD. The LD_PRELOAD\n"
+"    variable is set to point to the path name of the Scope library.\n"
 "\n"
+"    Scope emits data as metrics and/or events.\n"
+"    Scope is fully configurable by means of a configuration file and/or \n"
+"    environment variables.\n"
+"\n"
+"    Metrics are emitted in StatsD format over a configurable link. By default\n"
+"    metrics are sent over a UDP socket using localhost and port 8125.\n"
+"\n"
+"    Events are emitted in JSON format over a configurable link. By default\n"
+"    events are sent over a TCP socket using localhost and port 9109.\n"
+"\n"
+"    Scope logs to a configurable destination along with a configurable\n"
+"    verbosity level. The default verbosity setting is level 4 and the\n"
+"    default destination is the file /tmp/scope.log.\n"
+"\n";
+
+static const char scope_help_configuration[] =
+"CONFIGURATION:\n"
+"    Configuration File:\n"
+"       A YAML config file enables control of all available settings.\n"
+"       The config file is optional. Environment variables take precedence\n"
+"       over settings in a config file.\n"
+"\n"
+"    Config File Resolution\n"
+"        If the SCOPE_CONF_PATH env variable is defined and points to a\n"
+"        file that can be opened, it will use this as the config file. If\n"
+"        not, it searches for the config file in this priority order using\n"
+"        the first one it finds. If this fails too, it will look for\n"
+"        scope.yml in the same directory as LD_PRELOAD.\n"
+"\n"
+"            $SCOPE_HOME/conf/scope.yml\n"
+"            $SCOPE_HOME/scope.yml\n"
+"            /etc/scope/scope.yml\n"
+"            ~/conf/scope.yml\n"
+"            ~/scope.yml\n"
+"            ./conf/scope.yml\n"
+"            ./scope.yml\n"
+"\n"
+"    Environment Variables:\n"
 "    SCOPE_CONF_PATH\n"
 "        Directly specify location and name of config file.\n"
 "        Used only at start-time.\n"
 "    SCOPE_HOME\n"
 "        Specify a directory from which conf/scope.yml or ./scope.yml can\n"
-"        be found.  Used only at start-time only if SCOPE_CONF_PATH does\n"
-"        not exist.  For more info see Config File Resolution below.\n"
+"        be found. Used only at start-time only if SCOPE_CONF_PATH does\n"
+"        not exist. For more info see Config File Resolution below.\n"
 "    SCOPE_METRIC_ENABLE\n"
 "        Single flag to make it possible to disable all metric output.\n"
 "        true,false  Default is true\n"
 "    SCOPE_METRIC_VERBOSITY\n"
-"        0-9 are valid values.  Default is 4.\n"
+"        0-9 are valid values. Default is 4.\n"
 "        For more info see Metric Verbosity below.\n"
 "    SCOPE_METRIC_DEST\n"
 "        Default is udp://localhost:8125\n"
@@ -514,7 +559,7 @@ static const char scope_help[] =
 "    SCOPE_STATSD_MAXLEN\n"
 "        Default is 512\n"
 "    SCOPE_SUMMARY_PERIOD\n"
-"        Number of seconds between output summarizations.  Default is 10\n"
+"        Number of seconds between output summarizations. Default is 10\n"
 "    SCOPE_EVENT_ENABLE\n"
 "        Single flag to make it possible to disable all event output.\n"
 "        true,false  Default is true\n"
@@ -529,57 +574,72 @@ static const char scope_help[] =
 "        true,false  Default is false.\n"
 "    SCOPE_EVENT_LOGFILE_NAME\n"
 "        An extended regular expression that describes log file names.\n"
-"        Only used if SCOPE_EVENT_LOGFILE is true.  Default is .*log.*\n"
+"        Only used if SCOPE_EVENT_LOGFILE is true. Default is .*log.*\n"
 "    SCOPE_EVENT_LOGFILE_VALUE\n"
 "        An extended regular expression that describes field values.\n"
-"        Only used if SCOPE_EVENT_LOGFILE is true.  Default is .*\n"
+"        Only used if SCOPE_EVENT_LOGFILE is true. Default is .*\n"
 "    SCOPE_EVENT_CONSOLE\n"
 "        Create events from stdout, stderr.\n"
 "        true,false  Default is false.\n"
 "    SCOPE_EVENT_CONSOLE_NAME\n"
 "        An extended regular expression that includes stdout, stderr.\n"
-"        Only used if SCOPE_EVENT_CONSOLE is true.  Default is .*\n"
+"        Only used if SCOPE_EVENT_CONSOLE is true. Default is .*\n"
 "    SCOPE_EVENT_CONSOLE_VALUE\n"
 "        An extended regular expression that describes field values.\n"
-"        Only used if SCOPE_EVENT_CONSOLE is true.  Default is .*\n"
+"        Only used if SCOPE_EVENT_CONSOLE is true. Default is .*\n"
 "    SCOPE_EVENT_METRIC\n"
 "        Create events from metrics.\n"
 "        true,false  Default is false.\n"
 "    SCOPE_EVENT_METRIC_NAME\n"
 "        An extended regular expression that describes metric names.\n"
-"        Only used if SCOPE_EVENT_METRIC is true.  Default is .*\n"
+"        Only used if SCOPE_EVENT_METRIC is true. Default is .*\n"
 "    SCOPE_EVENT_METRIC_FIELD\n"
 "        An extended regular expression that describes field names.\n"
-"        Only used if SCOPE_EVENT_METRIC is true.  Default is .*\n"
+"        Only used if SCOPE_EVENT_METRIC is true. Default is .*\n"
 "    SCOPE_EVENT_METRIC_VALUE\n"
 "        An extended regular expression that describes field values.\n"
-"        Only used if SCOPE_EVENT_METRIC is true.  Default is .*\n"
+"        Only used if SCOPE_EVENT_METRIC is true. Default is .*\n"
 "    SCOPE_EVENT_HTTP\n"
 "        Create events from HTTP headers.\n"
 "        true,false  Default is false.\n"
 "    SCOPE_EVENT_HTTP_NAME\n"
 "        An extended regular expression that describes http names.\n"
-"        Only used if SCOPE_EVENT_HTTP is true.  Default is .*\n"
+"        Only used if SCOPE_EVENT_HTTP is true. Default is .*\n"
 "    SCOPE_EVENT_HTTP_FIELD\n"
 "        An extended regular expression that describes field names.\n"
-"        Only used if SCOPE_EVENT_HTTP is true.  Default is .*\n"
+"        Only used if SCOPE_EVENT_HTTP is true. Default is .*\n"
 "    SCOPE_EVENT_HTTP_VALUE\n"
 "        An extended regular expression that describes field values.\n"
-"        Only used if SCOPE_EVENT_HTTP is true.  Default is .*\n"
+"        Only used if SCOPE_EVENT_HTTP is true. Default is .*\n"
 "    SCOPE_LOG_LEVEL\n"
-"        debug, info, warning, error, none.  Default is error.\n"
+"        debug, info, warning, error, none. Default is error.\n"
 "    SCOPE_LOG_DEST\n"
 "        same format as SCOPE_METRIC_DEST above.\n"
 "        Default is file:///tmp/scope.log\n"
 "    SCOPE_TAG_\n"
-"        Specify a tag to be applied to every metric.  Environment variable\n"
+"        Specify a tag to be applied to every metric. Environment variable\n"
 "        expansion is available e.g. SCOPE_TAG_user=$USER\n"
 "    SCOPE_CMD_DIR\n"
 "        Specifies a directory to look for dynamic configuration files.\n"
 "        See Dynamic Configuration below.\n"
 "        Default is /tmp\n"
 "\n"
-"FEATURES:\n"
+"    Dynamic Configuration:\n"
+"        Dynamic Configuration allows configuration settings to be\n"
+"        changed on the fly after process start-time. At every\n"
+"        SCOPE_SUMMARY_PERIOD the library looks in SCOPE_CMD_DIR to\n"
+"        see if a file scope.<pid> exists. If it exists, it processes\n"
+"        every line, looking for environment variable-style commands.\n"
+"        (e.g. SCOPE_CMD_DBG_PATH=/tmp/outfile.txt) It changes the\n"
+"        configuration to match the new settings, and deletes the\n"
+"        scope.<pid> file when it's complete.\n"
+"\n";
+
+static const char scope_help_metrics[] =
+"METRICS:\n"
+"    Metrics can be enabled or disabled with a single config element.\n"
+"    Specific types of metrics and specific field content are managed\n"
+"    with a verbosity setting.\n"
 "\n"
 "    Metric Verbosity\n"
 "        Controls two different aspects of metric output - \n"
@@ -605,50 +665,157 @@ static const char scope_help[] =
 "            8   turns off 'filesystem seek'\n"
 "            9   turns off 'filesystem read/write' and 'network send/receive'\n"
 "\n"
-"    The http.status metric is emitted when the http watch type has been enabled as an event.\n"
-"    The http.status metric is not controlled with summurization settings.\n"
+"    The http.status metric is emitted when the http watch type has been\n"
+"    enabled as an event. The http.status metric is not controlled with\n"
+"    summarization settings.\n"
+"\n";
+
+static const char scope_help_events[] =
+"EVENTS:\n"
+"    All events can be enabled or disabled with a single config element.\n"
+"    Unlike metrics, event content is not managed with verbosity settings.\n"
+"    Event content is managed by means of regex filters that manage which\n"
+"    specific metric is to be included, what field types should be included\n"
+"    and what values in fields should be included.\n"
 "\n"
-"    Config File Resolution\n"
-"        If the SCOPE_CONF_PATH env variable is defined and points to a\n"
-"        file that can be opened, it will use this as the config file.  If\n"
-"        not, it searches for the config file in this priority order using the\n"
-"        first it finds.  If this fails too, it will look for scope.yml in the\n"
-"        same directory as LD_PRELOAD.\n"
+"     Events are organized as 4 watch types: \n"
+"     1) File Content. Provide a pathname and all data written to the file\n"
+"        will be organized in JSON format and emitted over the event channel.\n"
+"     2) Console Output. Select stdin &/or stdout and all data written to\n"
+"        these endpoints will be formatted in JSON and emitted over the event\n"
+"        channel\n"
+"     3) Metrics. Content that is much the same as that extracted for StatsD\n"
+"        metrics is formatted in JSON and emitted over the event channel.\n"
+"        Metrics emitted as events are not summarized and controlled with\n"
+"        verbosity settings. Rather regex filters manage which metric,\n"
+"        specific fields in a metric and value patterns within a field.\n"
+"     4) HTTP Headers. HTTP headers are extracted, formatted in JSON and\n"
+"        emitted over the event channel. There are 3 types of events created\n"
+"        for HTTP headers; 1) HTTP request events, 2) HTTP response events,\n"
+"        and 3) a metric event corresponding to the request and response\n"
+"        sequence. A response event includes the corresponding request,\n"
+"        status and duration fields. An HTTP metric event provides fields\n"
+"        describing bytes received, requests per second, duration and status.\n"
+"\n";
+
+static const char scope_help_protocol[] =
+"PROTOCOL DETECTION:\n"
+"     Any defined network protocol can be detected by Scope. A protocol\n"
+"     definition is provided in a separate YAML config file. Protocol specifics\n"
+"     are described in one or more regex definitions. PCRE2 regular\n"
+"     expressions are supported. Binary and string protocols are detected.\n"
+"     Detection events formatted in JSON are emitted over the event channel.\n"
 "\n"
-"            $SCOPE_HOME/conf/scope.yml\n"
-"            $SCOPE_HOME/scope.yml\n"
-"            /etc/scope/scope.yml\n"
-"            ~/conf/scope.yml\n"
-"            ~/scope.yml\n"
-"            ./conf/scope.yml\n"
-"            ./scope.yml\n"
+"     The event metric watch type should be enabled in order for protocols to\n"
+"     be detected.\n"
 "\n"
-"    Dynamic Configuration\n"
-"        Dynamic Configuration allows configuration settings to be\n"
-"        changed on the fly after process start-time.  At every\n"
-"        SCOPE_SUMMARY_PERIOD the library looks in SCOPE_CMD_DIR to\n"
-"        see if a file scope.<pid> exists.  If it exists, it processes\n"
-"        every line, looking for environment variable-style commands.\n"
-"        (e.g. SCOPE_CMD_DBG_PATH=/tmp/outfile.txt)  It changes the\n"
-"        configuration to match the new settings, and deletes the\n"
-"        scope.<pid> file when it's complete.\n";
+"     The protocol detection config file should be named scope_protocol.yml.\n"
+"     The file should be placed in the directory defined by the SCOPE_HOME \n"
+"     environment variable. Alternatively, the protocol definition config file\n"
+"     can be found in the same search order as that described for config files.\n"
+"\n";
+
+
+typedef struct {
+    const char* cmd;
+    const char* text;
+} help_list_t;
+
+static const help_list_t help_list[] = {
+    {"overview", scope_help_overview},
+    {"configuration", scope_help_configuration},
+    {"metrics", scope_help_metrics},
+    {"events", scope_help_events},
+    {"protocol", scope_help_protocol},
+    {NULL, NULL}
+};
 
 // assumes that we're only building for 64 bit...
 char const __invoke_dynamic_linker__[] __attribute__ ((section (".interp"))) = "/lib64/ld-linux-x86-64.so.2";
+extern char** _dl_argv;
 
-void
-__scope_main(void)
+static int
+args_are_all_valid(int argc, char **argv)
+{
+    int i,j;
+    for (i=1; i<argc; i++) {
+        if (i==1 && !strcmp(argv[i], "help")) continue;
+        if (i==1 && !strcmp(argv[i], "all")) continue;
+
+        int found = FALSE;
+        for (j=0; help_list[j].cmd; j++) {
+            if (!strcmp(argv[i], help_list[j].cmd)) {
+                found = TRUE;
+                break;
+            }
+        }
+        if (found) continue;
+
+        printf("%s is not a valid argument.  Printing help instead...\n\n", argv[i]);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static void
+print_version(char* path)
 {
     printf("Scope Version: " SCOPE_VER "\n");
+    printf("\n");
+    printf("    Usage: LD_PRELOAD=%s <command name>\n", path);
+    printf("    For more info: %s help\n", path);
+    printf("\n");
+}
 
+static void
+print_help(char* path)
+{
+    int i;
+    printf( "Welcome to the help for libscope.so!\n\n"
+            "    For this message:\n        %1$s help\n"
+            "    To print all help:\n        %1$s all\n"
+            "    Or to print help by section:\n", path);
+    for (i=0; help_list[i].cmd; i++) {
+        printf("        %s %s\n", path, help_list[i].cmd);
+    }
+    printf("\n");
+}
+
+
+void
+__scope_main(int argc)
+{
+    // Get the full path to the library, or provide default if not possible.
     char path[1024] = {0};
-    if (readlink("/proc/self/exe", path, sizeof(path)) == -1) exit(0);
-    printf("\n");
-    printf("   Usage: LD_PRELOAD=%s <command name>\n ", path);
-    printf("\n");
-    printf("\n");
-    printf("%s", scope_help);
-    printf("\n");
+    if (readlink("/proc/self/exe", path, sizeof(path)) == -1) {
+        snprintf(path, sizeof(path), "libscope.so");
+    }
+
+    if (argc < 2) {
+        print_version(path);
+    } else if (!args_are_all_valid(argc, _dl_argv)) {
+        print_help(path);
+    } else {
+        int i,j;
+        if (!strcmp(_dl_argv[1], "help")) {
+            print_help(path);
+        }
+        // print all help sections
+        if (!strcmp(_dl_argv[1], "all")) {
+            for (i=0; help_list[i].text; i++) {
+                printf("    %s\n", help_list[i].text);
+            }
+        }
+        // print matching help sections
+        for (i=1; i<argc; i++) {
+            for (j=0; help_list[j].cmd; j++) {
+                if (!strcmp(_dl_argv[i], help_list[j].cmd)) {
+                    printf("%s", help_list[j].text);
+                    break;
+                }
+            }
+        }
+    }
     exit(0);
 }
 

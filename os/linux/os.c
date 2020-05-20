@@ -638,7 +638,7 @@ static const char scope_help_configuration[] =
 static const char scope_help_metrics[] =
 "METRICS:\n"
 "    Metrics can be enabled or disabled with a single config element.\n"
-"    Specific types of metrics and spcific field content are managed\n"
+"    Specific types of metrics and specific field content are managed\n"
 "    with a verbosity setting.\n"
 "\n"
 "    Metric Verbosity\n"
@@ -700,8 +700,8 @@ static const char scope_help_events[] =
 
 static const char scope_help_protocol[] =
 "PROTOCOL DETECTION:\n"
-"     Any definbed network protocol can be detected by Scope. A protocol\n"
-"     definition is provided in a separate YAML confg file. Protocol specifics\n"
+"     Any defined network protocol can be detected by Scope. A protocol\n"
+"     definition is provided in a separate YAML config file. Protocol specifics\n"
 "     are described in one or more regex definitions. PCRE2 regular\n"
 "     expressions are supported. Binary and string protocols are detected.\n"
 "     Detection events formatted in JSON are emitted over the event channel.\n"

@@ -34,12 +34,13 @@ export $preload
 mongo /opt/test-runner/bin/mongo.js
 unset LD_PRELOAD
 
-grep remote_protocol /opt/test-runner/logs/events.log > /dev/null
+grep remote_protocol /opt/test-runner/logs/events.log
 ERR+=$?
 
-grep '"protocol":"Mongo"' /opt/test-runner/logs/events.log > /dev/null
+grep '"protocol":"Mongo"' /opt/test-runner/logs/events.log
 ERR+=$?
 
+cat /opt/test-runner/logs/events.log
 
 if [ $ERR -eq "0" ]; then
     echo "*************** Mongo Success ***************"

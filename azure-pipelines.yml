@@ -86,6 +86,11 @@ stages:
         parameters:
           name: kafka
           containerName: kafka
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: tls
+          containerName: tls
   - stage: publish
     displayName: Publish artifacts to S3
     dependsOn:

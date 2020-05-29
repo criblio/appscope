@@ -40,7 +40,6 @@ ERR+=$?
 grep '"protocol":"Mongo"' /opt/test-runner/logs/events.log > /dev/null
 ERR+=$?
 
-
 if [ $ERR -eq "0" ]; then
     echo "*************** Mongo Success ***************"
 else

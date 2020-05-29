@@ -6,5 +6,10 @@ protocol:
 
   - name: Mongo
     binary: true
-    regex: "^510100000000000000000000d407"
+    regex: "^....0000........00000000d4070000"
     len: 32
+    notes: "from https://docs.mongodb.com/manual/reference/mongodb-wire-protocol"
+    notes: "  messageLength < 65536"
+    notes: "  requestID == *"
+    notes: "  responseTo = 00000000"
+    notes: "  opCode is OP_QUERY (0xd407 is 2004 decimal w/byte ordering)"

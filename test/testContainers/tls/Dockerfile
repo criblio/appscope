@@ -62,7 +62,7 @@ RUN mkdir /opt/test-runner/php
 COPY ./tls/php/sslclient.php /opt/test-runner/php
 
 RUN yum -y install httpd mod_ssl
-COPY ./tls/httpd /etc/sysconfig/httpd
+
 COPY ./tls/alias /root/.alias
 COPY ./tls/gdbinit /root/.gdbinit
 

@@ -210,9 +210,9 @@ endtest
 #
 starttest apache
 APACHE_HTTP_START=$(grep http- $EVT_FILE | grep -c httpd)
-service httpd start
+httpd -k start
 curl -k https://localhost:443/ > /dev/null
-service httpd stop
+httpd -k stop
 evaltest
 APACHE_HTTP_END=$(grep http- $EVT_FILE | grep -c httpd)
 

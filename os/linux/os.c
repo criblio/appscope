@@ -483,6 +483,67 @@ osThreadInit(void(*handler)(int), unsigned interval)
     return TRUE;
 }
 
+/*
+ * Example from /proc/self/maps:
+ * 7f1b23bd4000-7f1b23bd7000 rw-p 001e3000 08:01 402063                     /usr/lib/x86_64-linux-gnu/libc-2.29.so
+ */
+int
+osGetPageProt(uint64_t addr)
+{
+    int prot = 0;
+    size_t len = 0;
+    char *buf = NULL;
+    char log[128];
+
+    if ((addr == 0) || !g_fn.fopen || !g_fn.getline || !g_fn.fclose) {
+        return -1;
+    }
+
+    FILE *fstream = g_fn.fopen("/proc/self/maps", "r");
+    if (fstream == NULL) return -1;
+    errno = 0;
+
+    while (g_fn.getline(&buf, &len, fstream) != -1) {
+        char *end = NULL;
+        uint64_t addr1 = strtoull(buf, &end, 0x10);
+        if ((addr1 == 0) || (errno != 0)) {
+            if (buf) free(buf);
+            return -1;
+        }
+
+        uint64_t addr2 = strtoull(end + 1, &end, 0x10);
+        if ((addr2 == 0) || (errno != 0)) {
+            if (buf) free(buf);
+            return -1;
+        }
+
+        snprintf(log, sizeof(log), "addr 0x%lux addr1 0x%lux addr2 0x%lux\n", addr, addr1, addr2);
+        scopeLog(log, -1, CFG_LOG_TRACE);
+
+        if ((addr >= addr1) && (addr <= addr2)) {
+            char *perms = end + 1;
+            snprintf(log, sizeof(log), "matched 0x%lx to 0x%lx-0x%lx\n\t%c%c%c",
+                     addr, addr1, addr2, perms[0], perms[1], perms[2]);
+            scopeLog(log, -1, CFG_LOG_DEBUG);
+            prot |= perms[0] == 'r' ? PROT_READ : 0;
+            prot |= perms[1] == 'w' ? PROT_WRITE : 0;
+            prot |= perms[2] == 'x' ? PROT_EXEC : 0;
+            if (buf) free(buf);
+            break;
+        }
+
+        if (buf) {
+            free(buf);
+            buf = NULL;
+        }
+
+        len = 0;
+    }
+
+    g_fn.fclose(fstream);
+    return prot;
+}
+
 static const char scope_help_overview[] =
 "OVERVIEW:\n"
 "    The Scope library supports extraction of data from within applications.\n"

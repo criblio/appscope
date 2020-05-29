@@ -754,6 +754,14 @@ ctlTransportSet(ctl_t *ctl, transport_t *transport)
     ctl->transport = transport;
 }
 
+cfg_transport_t
+ctlTransportType(ctl_t *ctl)
+{
+    if (!ctl) return (cfg_transport_t)-1;
+
+    return transportType(ctl->transport);
+}
+
 void
 ctlEvtSet(ctl_t *ctl, evt_fmt_t *evt)
 {

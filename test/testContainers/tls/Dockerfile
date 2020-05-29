@@ -10,6 +10,11 @@ RUN yum -y install openssl-devel
 RUN yum -y install wget automake
 RUN yum -y install python-pip
 
+RUN yum --enablerepo=centos-sclo-rh-testing install devtoolset-8-gdb
+# Note: to use the new version of GDB this must be sourced:
+# . scl_source enable devtoolset-8
+# It's added to /root/.alias therefore '. /root/.alias'
+
 RUN curl -sL https://rpm.nodesource.com/setup_11.x | bash -
 RUN yum -y install nodejs
 
@@ -58,6 +63,8 @@ COPY ./tls/php/sslclient.php /opt/test-runner/php
 
 RUN yum -y install httpd mod_ssl
 COPY ./tls/httpd /etc/sysconfig/httpd
+COPY ./tls/alias /root/.alias
+COPY ./tls/gdbinit /root/.gdbinit
 
 ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so

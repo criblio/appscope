@@ -11,9 +11,7 @@ RUN yum -y install wget automake
 RUN yum -y install python-pip
 
 RUN yum -y --enablerepo=centos-sclo-rh-testing install devtoolset-8-gdb
-# Note: to use the new version of GDB this must be sourced:
-# . scl_source enable devtoolset-8
-# It's added to /root/.alias therefore '. /root/.alias'
+RUN source scl_source enable devtoolset-8
 
 RUN curl -sL https://rpm.nodesource.com/setup_11.x | bash -
 RUN yum -y install nodejs

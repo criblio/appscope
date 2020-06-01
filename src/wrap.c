@@ -205,6 +205,12 @@ doGotcha(struct link_map *lm, got_list *hook, Elf64_Rela *rel, Elf64_Sym *sym, c
          * ELF64_R_SYM macro, which shifts the elf value >> 32. The dyn sym
          * tab offset is added to the start of the string table (str) to get
          * the string name. Compare the str entry with a symbol in the list.
+         *
+         * Note, it would be nice to check the array bounds before indexing the
+         * sym[] table. However, DT_SYMENT gives the byte size of a single entry.
+         * According to the ELF spec there is no size/number of entries for the
+         * symbol table at the program header table level. This is not needed at
+         * runtime as the symbol lookup always go through the hash table; ELF64_R_SYM.
          */
         if (!strcmp(sym[ELF64_R_SYM(rel[i].r_info)].st_name + str, hook->symbol)) {
             uint64_t *gfn = hook->gfn;
@@ -2733,7 +2739,7 @@ dlopen(const char *filename, int flags)
      * GOT entries.
      */
     handle = g_fn.dlopen(filename, flags);
-    if (handle && (flags | RTLD_DEEPBIND)) {
+    if (handle && (flags & RTLD_DEEPBIND)) {
         Elf64_Sym *sym = NULL;
         Elf64_Rela *rel = NULL;
         char *str = NULL;

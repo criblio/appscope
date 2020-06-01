@@ -1,4 +1,4 @@
-set environment LD_PRELOAD=/opt/test-runner/bin/scope/lib/linux/libscope.so
+set environment LD_PRELOAD=/opt/test-runner/bin/libscope.so
 set breakpoint pending on
 handle SIGUSR2 pass nostop
 

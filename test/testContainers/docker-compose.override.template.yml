@@ -5,8 +5,6 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
-    environment:
-      - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
     privileged: true
 
   splunk:
@@ -14,8 +12,6 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
-    environment:
-      - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
     privileged: true
 
   nginx:
@@ -23,8 +19,6 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
-    environment:
-      - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
     privileged: true
 
   interposed_func:
@@ -38,8 +32,6 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
-    environment:
-      - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
     privileged: true
 
   kafka:
@@ -47,8 +39,6 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
-    environment:
-      - SCOPE_EVENT_DEST=tcp://172.16.198.1:9109
     privileged: true
 
   tls:

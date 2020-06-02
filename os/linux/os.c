@@ -847,8 +847,12 @@ print_help(char* path)
 
 
 void
-__scope_main(int argc)
+__scope_main()
 {
+    // This depends on _dl_argv being NULL terminated.
+    int argc = 0;
+    while (_dl_argv[argc]) argc++;
+
     // Get the full path to the library, or provide default if not possible.
     char path[1024] = {0};
     if (readlink("/proc/self/exe", path, sizeof(path)) == -1) {

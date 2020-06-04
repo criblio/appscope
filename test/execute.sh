@@ -75,6 +75,7 @@ run_test test/${OS}/linklisttest
 run_test test/${OS}/comtest
 run_test test/${OS}/dbgtest
 run_test test/${OS}/searchtest
+run_test test/${OS}/httpstatetest
 if [ "${OS}" = "linux" ]; then
     run_test test/${OS}/glibcvertest
     run_test test/${OS}/reporttest

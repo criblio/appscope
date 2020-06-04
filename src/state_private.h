@@ -7,7 +7,6 @@
 #define PROTOCOL_STR 16
 #define FUNC_MAX 24
 #define HDRTYPE_MAX 16
-#define ASIZE 256
 
 //
 // This file contains implementation details for state.c and reporting.c.
@@ -182,8 +181,6 @@ void doUnixEndpoint(int, net_info *);
 void resetInterfaceCounts(counters_element_t*);
 void addToInterfaceCounts(counters_element_t*, uint64_t);
 void subFromInterfaceCounts(counters_element_t*, uint64_t);
-void preComp(unsigned char *, int, int[]);
-int strsrch(char *, int, char *, int, int *);
 
 // Data that lives in state.c, but is used in report.c too.
 extern summary_t g_summary;

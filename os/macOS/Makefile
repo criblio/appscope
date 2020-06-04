@@ -26,7 +26,7 @@ $(PCRE2_AR):
 	cd contrib/pcre2/build && cmake ..
 	cd contrib/pcre2/build && make
 
-libscope.so: src/wrap.c src/state.c src/report.c src/plattime.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c $(YAML_SRC) contrib/cJSON/cJSON.c
+libscope.so: src/wrap.c src/state.c src/report.c src/plattime.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c src/search.c $(YAML_SRC) contrib/cJSON/cJSON.c
 	@echo "Building libscope.so ..."
 	make $(PCRE2_AR)
 	$(CC) $(CFLAGS) -shared -fvisibility=hidden -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ -e,prog_version $(LD_FLAGS)
@@ -56,7 +56,7 @@ test: $(C_FILES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/mtctest mtctest.o mtc.o log.o transport.o mtcformat.o dbg.o circbuf.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/evtformattest evtformattest.o evtformat.o log.o transport.o mtcformat.o dbg.o cfg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ctltest ctltest.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	#$(CC) $(TEST_CFLAGS) -o test/$(OS)/reporttest reporttest.o report.o state.o com.o plattime.o os.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	#$(CC) $(TEST_CFLAGS) -o test/$(OS)/reporttest reporttest.o report.o state.o com.o plattime.o os.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o search.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/mtcformattest mtcformattest.o mtcformat.o dbg.o log.o transport.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/circbuftest circbuftest.o circbuf.o dbg.o log.o transport.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/linklisttest linklisttest.o linklist.o dbg.o log.o transport.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
@@ -64,6 +64,7 @@ test: $(C_FILES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dbgtest dbgtest.o dbg.o log.o transport.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/selfinterposetest selfinterposetest.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dnstest dnstest.o dbg.o log.o transport.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/searchtest searchtest.o search.o dbg.o log.o transport.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	@echo "Running Tests and Generating Test Coverage"
 	test/execute.sh
 # see file:///Users/cribl/scope/coverage/index.html

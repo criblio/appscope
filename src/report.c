@@ -13,6 +13,7 @@
 #include "os.h"
 #include "plattime.h"
 #include "report.h"
+#include "search.h"
 #include "state_private.h"
 #include "linklist.h"
 
@@ -55,7 +56,7 @@
 // and could be more accurate.
 int g_interval = DEFAULT_SUMMARY_PERIOD;
 static list_t *g_maplist;
-static int g_http_status[ASIZE];
+static needle_t *g_http_status = NULL;
 
 static void
 destroyHttpMap(void *data)
@@ -72,7 +73,7 @@ void
 initReporting()
 {
     g_maplist = lstCreate(destroyHttpMap);
-    preComp((unsigned char *)HTTP_STATUS, strlen(HTTP_STATUS), g_http_status);
+    g_http_status = needleCreate(HTTP_STATUS);
 }
 
 void
@@ -165,7 +166,7 @@ getHttpStatus(char *header, size_t len)
     char *val;
 
     // ex: HTTP/1.1 200 OK\r\n
-    if ((ix = strsrch(HTTP_STATUS, strlen(HTTP_STATUS), header, len, g_http_status)) == -1) return -1;
+    if ((ix = needleFind(g_http_status, header, len)) == -1) return -1;
 
     if ((ix < 0) || (ix > len) || ((ix + strlen(HTTP_STATUS) + 1) > len)) return -1;
 

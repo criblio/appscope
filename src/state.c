@@ -16,6 +16,7 @@
 #include "dns.h"
 #include "mtcformat.h"
 #include "plattime.h"
+#include "search.h"
 #include "state.h"
 #include "state_private.h"
 #include "pcre2.h"
@@ -41,11 +42,10 @@ net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
-bool g_predone = FALSE;
-static int g_http_start[ASIZE];
-static int g_http_end[ASIZE];
-static int g_http_redirect[ASIZE];
-static int g_http_clen[ASIZE];
+static needle_t* g_http_start = NULL;
+static needle_t* g_http_end = NULL;
+static needle_t* g_http_redirect = NULL;
+static needle_t* g_http_clen = NULL;
 static list_t *g_protlist;
 static unsigned int g_prot_sequence = 0;
 
@@ -239,6 +239,11 @@ initState()
 
     // Per RUC...
     g_fsinfo = fsinfoLocal;
+
+    g_http_start = needleCreate(HTTP_START);
+    g_http_end = needleCreate(HTTP_END);
+    g_http_redirect = needleCreate(REDIRECTURL);
+    g_http_clen = needleCreate(CONTENT_LENGTH);
 
     g_protlist = lstCreate(destroyProtEntry);
     initProtocolDetection();
@@ -756,53 +761,6 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     }
 }
 
-/*
- * This is an implementation of the Horspool
- * string search algorithm.
- * ref: https://www-igm.univ-mlv.fr/~lecroq/string/node18.html
- *
- * Pre-compute the array from the needle.
- */
-void
-preComp(unsigned char *needle, int nlen, int bmBc[]) {
-   int i;
-
-   for (i = 0; i < ASIZE; ++i)
-      bmBc[i] = nlen;
-   for (i = 0; i < nlen - 1; ++i)
-       bmBc[needle[i]] = nlen - i - 1;
-}
-
- int
-strsrch(char *needle, int nlen, char *haystack, int hlen, int *bmBc) {
-    int j;
-    unsigned char c;
-
-    if ((hlen < 0) || (nlen < 0)) return -1;
-
-    /* Preprocessing; passed in as bmBc */
-    if (g_predone == FALSE) {
-        preComp((unsigned char *)HTTP_START, strlen(HTTP_START), g_http_start);
-        preComp((unsigned char *)HTTP_END, strlen(HTTP_END), g_http_end);
-        preComp((unsigned char *)REDIRECTURL, strlen(REDIRECTURL), g_http_redirect);
-        preComp((unsigned char *)CONTENT_LENGTH, strlen(CONTENT_LENGTH), g_http_clen);
-        g_predone = TRUE;
-    }
-
-    /* Searching */
-    j = 0;
-    while (j <= hlen - nlen) {
-        c = haystack[j + nlen - 1];
-        if (needle[nlen - 1] == c && memcmp(needle, haystack + j, nlen - 1) == 0) {
-            return j;
-        }
-
-        j += bmBc[c];
-    }
-
-    return -1;
-}
-
 static size_t
 getContentLength(char *header, size_t len)
 {
@@ -811,11 +769,11 @@ getContentLength(char *header, size_t len)
     char *val;
 
     // ex: Content-Length: 559\r\n
-    if ((ix = strsrch(CONTENT_LENGTH, strlen(CONTENT_LENGTH), header, len, g_http_clen)) == -1) return -1;
+    if ((ix = needleFind(g_http_clen, header, len)) == -1) return -1;
 
-    if ((ix <= 0) || (ix > len) || ((ix + strlen(CONTENT_LENGTH)) > len)) return -1;
+    if ((ix <= 0) || (ix > len) || ((ix + needleLen(g_http_clen)) > len)) return -1;
 
-    val = &header[ix + strlen(CONTENT_LENGTH)];
+    val = &header[ix + needleLen(g_http_clen)];
 
     errno = 0;
     rc = strtoull(val, NULL, 0);
@@ -850,19 +808,18 @@ scanFoundHttpHeader(net_info *net, char *buf, size_t len)
         if (net->type != SOCK_STREAM) return FALSE;
     }
 
-    size_t startLen = strlen(HTTP_START);
-    size_t endLen = strlen(HTTP_END);
+    size_t startLen = needleLen(g_http_start);
+    size_t endLen = needleLen(g_http_end);
 
     // find the start of http header data
     size_t header_start =
-        strsrch(HTTP_START, startLen, buf, len, g_http_start);
+        needleFind(g_http_start, buf, len);
     if (header_start == -1) return FALSE;
     header_start += startLen;
 
     // find the end of http header data
     size_t header_end =
-        strsrch(HTTP_END, endLen,
-                &buf[header_start], len-header_start, g_http_end);
+        needleFind(g_http_end, &buf[header_start], len-header_start);
     if (header_end == -1) return FALSE;
     header_end += header_start;  // was measured from header_start
     header_end += endLen;
@@ -992,8 +949,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, void *buf, size_t len, metric_t s
     char *headend, *header, *hcopy;
     protocol_info *proto;
     http_post *post;
-    size_t startLen = strlen(HTTP_START);
-    size_t endLen = strlen(HTTP_END);
+    size_t startLen = needleLen(g_http_start);
 
     /*
      * If we have an fd, use the uid/channel value as it's unique 
@@ -1010,7 +966,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, void *buf, size_t len, metric_t s
         return -1;
     }
 
-    if (((endix = strsrch(HTTP_END, endLen, buf, len, g_http_end)) != -1) &&
+    if (((endix = needleFind(g_http_end, buf, len)) != -1) &&
         (endix < len) && (endix > 0)) {
         header = buf;
         headend = &header[endix];
@@ -1044,7 +1000,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, void *buf, size_t len, metric_t s
         }
 
         // If the first 5 chars are HTTP/, it's a response header
-        if (strsrch(HTTP_START, startLen, hcopy, startLen, g_http_start) != -1) {
+        if (needleFind(g_http_start, hcopy, startLen) != -1) {
             proto->ptype = EVT_HRES;
         } else {
             proto->ptype = EVT_HREQ;
@@ -1644,8 +1600,7 @@ doURL(int sockfd, const void *buf, size_t len, metric_t src)
     }
 
 
-    if ((src == NETTX) && (strsrch(REDIRECTURL, strlen(REDIRECTURL),
-                                   (char *)buf, len, g_http_redirect) != -1)) {
+    if ((src == NETTX) && (needleFind(g_http_redirect, (char *)buf, len) != -1)) {
         g_netinfo[sockfd].urlRedirect = TRUE;
         return 0;
     }

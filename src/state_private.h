@@ -112,13 +112,26 @@ typedef struct stat_err_info_t {
     metric_counters counters;
 } stat_err_info;
 
+typedef enum {
+    HTTP_NONE,
+    HTTP_HDR,
+    HTTP_DATA
+} http_enum_t;
+
+typedef struct {
+    http_enum_t state;
+    char* hdr;          // Used if state == HDR
+    size_t hdrlen;
+    size_t clen;        // Used if state==HTTP_DATA
+} http_state_t;
+
 typedef struct net_info_t {
     metric_t evtype;
     metric_t data_type;
     int fd;
     int active;
     int type;
-    size_t clen;
+    http_state_t http;
     bool urlRedirect;
     bool addrSetLocal;
     bool addrSetRemote;

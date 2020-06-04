@@ -892,10 +892,10 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     net_info *net = getNetEntry(sockfd);
 
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
-        if (isHttp(sockfd, net, &buf, &len, src, dtype) == TRUE) {
-            // not doing anything with protocol...yet
+        if (doHttp(id, sockfd, net, buf, len, src, dtype)) {
+            // not doing anything with protocol... yet
             if (net) net->protocol = 1;
-            return doHttp(id, sockfd, net, buf, len, src);
+            return 0;
         }
     }
 

@@ -24,6 +24,10 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 
+#include <jni.h>
+#include <jvmti.h>
+#include "javabci.h"
+
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
 
@@ -915,6 +919,119 @@ initHook()
 
 #endif // __LINUX__
 
+//JAVA agent 
+
+static void check_error(jvmtiEnv *jvmti, jvmtiError errnum, const char *str) {
+    if (errnum != JVMTI_ERROR_NONE) {
+        char *errnum_str = NULL;
+        (void) (*jvmti)->GetErrorName(jvmti, errnum, &errnum_str);
+        printf("ERROR: JVMTI: [%d] %s - %s\n", errnum, (errnum_str == NULL ? "Unknown": errnum_str), (str == NULL? "" : str));
+    }
+}
+
+void JNICALL ClassFileLoadHook(jvmtiEnv *jvmti_env,
+    JNIEnv* jni_env,
+    jclass class_being_redefined,
+    jobject loader,
+    const char* name,
+    jobject protection_domain,
+    jint class_data_len,
+    const unsigned char* class_data,
+    jint* new_class_data_len,
+    unsigned char** new_class_data) {
+    
+    if (name != NULL && strcmp(name, "sun/security/ssl/CipherBox") == 0) {
+        scopeLog("installing Java SSL hooks...", -1, CFG_LOG_DEBUG);
+        java_class_t *classInfo = javaReadClass((void *)class_data);
+
+        int methodIndex = javaFindMethodIndex(classInfo, "encrypt", "([BII)I");
+        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__encrypt");
+        javaConvertMethodToNative(classInfo, methodIndex);
+
+        methodIndex = javaFindMethodIndex(classInfo, "decrypt", "([BIII)I");
+        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__decrypt");
+        javaConvertMethodToNative(classInfo, methodIndex);
+
+        unsigned char *dest;
+        (*jvmti_env)->Allocate(jvmti_env, classInfo->length, &dest);
+        javaWriteClass(dest, classInfo);
+
+        *new_class_data_len = classInfo->length;
+        *new_class_data = dest;
+        javaDestroy(&classInfo);
+    }
+}
+
+JNIEXPORT jint JNICALL Java_sun_security_ssl_CipherBox_encrypt(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) {
+    //TODO: get t
+    jbyte *byteBuf = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
+    doProtocol((uint64_t)0x1111, -1, &byteBuf[offset], (size_t)len, TLSTX, BUF);
+    (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
+    
+    jclass clazz  = (*jni)->FindClass(jni, "sun/security/ssl/CipherBox");
+    jmethodID mid = (*jni)->GetMethodID(jni, clazz, "__encrypt", "([BII)I");
+    jint res      = (*jni)->CallIntMethod(jni, obj, mid, buf, offset, len);
+    return res;
+}
+
+JNIEXPORT jint JNICALL Java_sun_security_ssl_CipherBox_decrypt(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len, jint tagLen) {
+    jclass clazz  = (*jni)->FindClass(jni, "sun/security/ssl/CipherBox");
+    jmethodID mid = (*jni)->GetMethodID(jni, clazz, "__decrypt", "([BIII)I");
+    jint res      = (*jni)->CallIntMethod(jni, obj, mid, buf, offset, len, tagLen);
+
+    jbyte *byteBuf = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
+    doProtocol((uint64_t)0x1111, -1, &byteBuf[offset], (size_t)len, TLSRX, BUF);
+    (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
+
+    return res;
+}
+
+JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
+    jvmtiError error;
+    jint result;
+    jvmtiEnv *env;
+    jvmtiEventCallbacks callbacks;
+
+    result = (*jvm)->GetEnv(jvm, (void **) &env, JVMTI_VERSION_1_0);
+    if (result != 0) {
+        scopeLog("ERROR: GetEnv failed\n", -1, CFG_LOG_ERROR);
+        return JNI_ERR;
+    }
+
+    jvmtiCapabilities capabilities;
+    memset(&capabilities,0, sizeof(capabilities));
+
+    capabilities.can_generate_all_class_hook_events = 1;
+    error = (*env)->AddCapabilities(env, &capabilities);
+    check_error(env, error, "AddCapabilities");
+
+    error = (*env)->SetEventNotificationMode(env, JVMTI_ENABLE, JVMTI_EVENT_CLASS_FILE_LOAD_HOOK, NULL);
+    check_error(env, error, "SetEventNotificationMode->JVMTI_EVENT_CLASS_FILE_LOAD_HOOK");
+
+    memset(&callbacks, 0, sizeof(callbacks));
+    callbacks.ClassFileLoadHook = &ClassFileLoadHook;
+    error = (*env)->SetEventCallbacks(env, &callbacks, sizeof(callbacks));
+    check_error(env, error, "SetEventCallbacks");
+    
+    return JNI_OK;
+}
+
+static void
+initJavaAgent() {
+    //TODO: 
+    // - check if we are in a java process
+    // - preserve existing _JAVA_OPTIONS
+    char *var = getenv("LD_PRELOAD");
+    if (var != NULL) {
+        char buf[1024];
+        snprintf(buf, sizeof(buf), "-agentpath:%s", var);
+        int result = setenv("_JAVA_OPTIONS", buf, 1);
+        if (result) {
+            scopeLog("ERROR: Could not set _JAVA_OPTIONS failed\n", -1, CFG_LOG_ERROR);
+        }
+    }
+}
+
 __attribute__((constructor)) void
 init(void)
 {
@@ -1109,6 +1226,8 @@ init(void)
     initHook();
     
     threadInit();
+
+    initJavaAgent();
 }
 
 EXPORTOFF int

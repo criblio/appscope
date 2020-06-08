@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -10,6 +11,18 @@
 #include <sys/vfs.h>
 #include <sys/epoll.h>
 #endif // _LINUX_
+
+
+#ifdef __MACOS__
+
+#ifndef off64_t
+typedef uint64_t off64_t;
+#endif
+#ifndef fpos64_t
+typedef uint64_t fpos64_t;
+#endif
+
+#endif // __MACOS__
 
 #include "ctl.h"
 #include "httpstate.h"

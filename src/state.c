@@ -1670,6 +1670,7 @@ doClose(int fd, const char *func)
         doUpdateState(OPEN_PORTS, fd, -1, func, NULL);
         doUpdateState(NET_CONNECTIONS, fd, -1, func, NULL);
         doUpdateState(CONNECTION_DURATION, fd, -1, func, NULL);
+        resetHttp(&ninfo->http);
     }
 
     // Check both file desriptor tables

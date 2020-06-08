@@ -115,6 +115,7 @@ typedef struct stat_err_info_t {
 typedef enum {
     HTTP_NONE,
     HTTP_HDR,
+    HTTP_HDREND,
     HTTP_DATA
 } http_enum_t;
 

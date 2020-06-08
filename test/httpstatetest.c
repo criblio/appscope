@@ -91,18 +91,18 @@ doHttpWithSingleBufferWithNet(void** state)
         "Host: www.google.com\r\n"
         "Connection: close\r\n"
         "\r\n";
+    size_t buflen = strlen(buffer);
 
     net_info net = {0};
     net.type = SOCK_STREAM;
 
-    size_t buflen = strlen(buffer);
     assert_true(doHttp(13, 3, &net, buffer, buflen, NETRX, BUF));
     assert_non_null(g_msg);
     struct http_post_t *post = (struct http_post_t*) g_msg->data;
     assert_non_null(post);
     char *header = post->hdr;
     assert_non_null(header);
-    assert_string_equal(header, "GET / HTTP/1.0\r\nHost: www.google.com\r\nConnection: close");
+    assert_string_equal(header, "GET / HTTP/1.0\r\nHost: www.google.com\r\nConnection: close\r\n");
     freeMsg(&g_msg);
 }
 
@@ -114,16 +114,75 @@ doHttpWithSingleBufferWithoutNet(void** state)
         "Host: www.google.com\r\n"
         "Connection: close\r\n"
         "\r\n";
-
     size_t buflen = strlen(buffer);
+
     assert_true(doHttp(13, 3, NULL, buffer, buflen, NETRX, BUF));
     assert_non_null(g_msg);
     struct http_post_t *post = (struct http_post_t*) g_msg->data;
     assert_non_null(post);
     char *header = post->hdr;
     assert_non_null(header);
-    assert_string_equal(header, "GET / HTTP/1.0\r\nHost: www.google.com\r\nConnection: close");
+    assert_string_equal(header, "GET / HTTP/1.0\r\nHost: www.google.com\r\nConnection: close\r\n");
     freeMsg(&g_msg);
+}
+
+static void
+doHttpWithPartialHeaderBeforeClose(void** state)
+{
+    char *buffer =
+        "GET / HTTP/1.0\r\n"
+        "Host: www.google.com\r\n";
+    size_t buflen = strlen(buffer);
+
+    net_info net = {0};
+    net.type = SOCK_STREAM;
+
+    assert_false(doHttp(13, 3, &net, buffer, buflen, NETRX, BUF));
+    assert_null(g_msg);
+
+    assert_non_null(net.http.hdr);
+
+    // This acts like a virtual doClose()
+    resetHttp(&net.http);
+
+    assert_null(net.http.hdr);
+}
+
+static void
+doHttpWithConsecutiveHeaders(void** state)
+{
+    char *buffer =
+        "GET / HTTP/1.0\r\n"
+        "Host: www.google.com\r\n"
+        "Connection: close\r\n"
+        "\r\n";
+    size_t buflen = strlen(buffer);
+
+    net_info net = {0};
+    net.type = SOCK_STREAM;
+
+    {
+        assert_true(doHttp(13, 3, &net, buffer, buflen, NETRX, BUF));
+        assert_non_null(g_msg);
+        struct http_post_t *post = (struct http_post_t*) g_msg->data;
+        assert_non_null(post);
+        char *header = post->hdr;
+        assert_non_null(header);
+        assert_string_equal(header, "GET / HTTP/1.0\r\nHost: www.google.com\r\nConnection: close\r\n");
+        freeMsg(&g_msg);
+    }
+
+    {
+        assert_true(doHttp(13, 3, &net, buffer, buflen, NETRX, BUF));
+        assert_non_null(g_msg);
+        struct http_post_t *post = (struct http_post_t*) g_msg->data;
+        assert_non_null(post);
+        char *header = post->hdr;
+        assert_non_null(header);
+        assert_string_equal(header, "GET / HTTP/1.0\r\nHost: www.google.com\r\nConnection: close\r\n");
+        freeMsg(&g_msg);
+    }
+
 }
 
 static void
@@ -140,8 +199,10 @@ doHttpWithSplitBuffer(void** state)
     int i;
 
     for (i=0; buffers[i]; i++) {
+        printf("i = %d\n", i);
         size_t buflen = strlen(buffers[i]);
-        assert_false(doHttp(13, 3, &net, (void*)buffers[i], buflen, NETRX, BUF));
+        bool returnValue = doHttp(13, 3, &net, (void*)buffers[i], buflen, NETRX, BUF);
+        assert_true( i < 3 ? returnValue == FALSE : returnValue == TRUE);
     }
 }
 
@@ -153,6 +214,8 @@ main(int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(doHttpWithSingleBufferWithNet),
         cmocka_unit_test(doHttpWithSingleBufferWithoutNet),
+        cmocka_unit_test(doHttpWithPartialHeaderBeforeClose),
+        cmocka_unit_test(doHttpWithConsecutiveHeaders),
         cmocka_unit_test(doHttpWithSplitBuffer),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };

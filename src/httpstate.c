@@ -14,7 +14,7 @@ typedef struct
 } reportParams_t;
 
 #define HTTP_START "HTTP/"
-#define HTTP_END "\r\n\r\n"
+#define HTTP_END "\r\n"
 #define CONTENT_LENGTH "Content-Length:"
 static needle_t* g_http_start = NULL;
 static needle_t* g_http_end = NULL;
@@ -22,9 +22,7 @@ static needle_t* g_http_clen = NULL;
 
 static void setHttpState(http_state_t *httpstate, http_enum_t toState);
 static void appendHeader(http_state_t *httpstate, char* buf, size_t len);
-static void freeHeader(http_state_t *httpstate);
 static size_t getContentLength(char *header, size_t len);
-static void setContentLength(http_state_t *httpstate, size_t content_in_this_buf);
 static size_t bytesToSkipForContentLength(http_state_t *httpstate, size_t len);
 static bool setReportParams(reportParams_t *rptparms, net_info *net, int sockfd, uint64_t id, metric_t src);
 static int reportHttp(http_state_t *httpstate, reportParams_t *rptparms);
@@ -37,11 +35,11 @@ setHttpState(http_state_t *httpstate, http_enum_t toState)
     if (!httpstate) return;
     switch (toState) {
         case HTTP_NONE:
-            freeHeader(httpstate);
+            if (httpstate->hdr) free(httpstate->hdr);
             memset(httpstate, 0, sizeof(*httpstate));
             break;
         case HTTP_HDR:
-            break;
+        case HTTP_HDREND:
         case HTTP_DATA:
             break;
         default:
@@ -68,15 +66,6 @@ appendHeader(http_state_t *httpstate, char* buf, size_t len)
     httpstate->hdrlen += len;
 }
 
-static void
-freeHeader(http_state_t *httpstate)
-{
-    if (!httpstate) return;
-    if (httpstate->hdr) free(httpstate->hdr);
-    httpstate->hdr = NULL;
-    httpstate->hdrlen = 0;
-}
-
 static size_t
 getContentLength(char *header, size_t len)
 {
@@ -97,26 +86,6 @@ getContentLength(char *header, size_t len)
         return -1;
     }
     return rc;
-}
-
-
-static void
-setContentLength(http_state_t *httpstate, size_t content_in_this_buf)
-{
-    if (!httpstate) return;
-
-    size_t clen = getContentLength(httpstate->hdr, httpstate->hdrlen);
-    // There is not a contentLength header
-    if (clen == -1) {
-        return;
-    }
-
-    // There is a Content-Length header!  Remember how much we can skip.
-    if (clen >= content_in_this_buf) {
-        httpstate->clen = clen - content_in_this_buf;
-        setHttpState(httpstate, HTTP_DATA);
-    }
-
 }
 
 static size_t
@@ -182,7 +151,6 @@ reportHttp(http_state_t *httpstate, reportParams_t *rptparms)
         DBG(NULL);
         if (post) free(post);
         if (proto) free(proto);
-        freeHeader(httpstate);
         return -1;
     }
 
@@ -243,42 +211,64 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, reportParams_t
     }
 
     // Look for start of http header
-    size_t header_start = 0;
     if (httpstate->state == HTTP_NONE) {
 
         // find the start of http header data
-        header_start = needleFind(g_http_start, buf, len);
-        if (header_start == -1) return FALSE;
+        if (needleFind(g_http_start, buf, len) == -1) return FALSE;
 
         setHttpState(httpstate, HTTP_HDR);
-        header_start += needleLen(g_http_start);
     }
 
-    // Look for the end of http header
+    // Look for header data
+    size_t header_start = 0;
     size_t header_end = -1;
-    if (httpstate->state == HTTP_HDR) {
+    int found_end_of_all_headers = FALSE;
+    while (header_start < len) {
 
         header_end =
             needleFind(g_http_end, &buf[header_start], len-header_start);
 
         if (header_end == -1) {
-            // We never found the end, append what we did find to what
-            // we've found before
-            appendHeader(httpstate, buf, len);
+            // We didn't find an end in this buffer, append the rest of the
+            // buffer to what we've found before.
+            appendHeader(httpstate, &buf[header_start], len-header_start);
+            setHttpState(httpstate, HTTP_HDR);
+            break;
         } else {
-            // We found the complete header!
-            header_end += header_start;  // was measured from header_start
-            appendHeader(httpstate, buf, header_end);
-            header_end += needleLen(g_http_end);
+            found_end_of_all_headers =
+                ((httpstate->state == HTTP_HDREND) && (header_end == 0));
+            if (found_end_of_all_headers) break;
 
-            // if content length header is there, change state to HTTP_DATA
-            setContentLength(httpstate, len - header_end);
-            // post and event containing the header we found
-            reportHttp(httpstate, rptparms);
+            // We found a complete header!
+            header_end += header_start;  // was measured from header_start
+            header_end += needleLen(g_http_end);
+            appendHeader(httpstate, &buf[header_start], header_end-header_start);
+            header_start = header_end;
+            setHttpState(httpstate, HTTP_HDREND);
         }
     }
 
-    return (header_end != -1); // We found a complete header in buf
+    // Found the end of all headers!  Time to report something!
+    if (found_end_of_all_headers) {
+
+        // change httpstate to HTTP_DATA per Content-Length or HTTP_NONE
+        size_t clen = getContentLength(httpstate->hdr, httpstate->hdrlen);
+        size_t content_in_this_buf = len - header_end;
+
+        // post and event containing the header we found
+        reportHttp(httpstate, rptparms);
+
+        // There is a Content-Length header, and it extends into future
+        // buffers.  Remember how much we can skip.
+        if ((clen != -1) && (clen >= content_in_this_buf)) {
+            httpstate->clen = clen - content_in_this_buf;
+            setHttpState(httpstate, HTTP_DATA);
+        } else {
+            setHttpState(httpstate, HTTP_NONE);
+        }
+    }
+
+    return (found_end_of_all_headers);
 }
 
 void
@@ -366,5 +356,11 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
     }
 
     return http_header_found;
+}
+
+void
+resetHttp(http_state_t *httpstate)
+{
+    setHttpState(httpstate, HTTP_NONE);
 }
 

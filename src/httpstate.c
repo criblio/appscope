@@ -13,6 +13,9 @@ typedef struct
     int isSsl;
 } reportParams_t;
 
+#define MIN_HDR_ALLOC (4  * 1024)
+#define MAX_HDR_ALLOC (16 * 1024)
+
 #define HTTP_START "HTTP/"
 #define HTTP_END "\r\n"
 #define CONTENT_LENGTH "Content-Length:"
@@ -54,14 +57,34 @@ appendHeader(http_state_t *httpstate, char* buf, size_t len)
 {
     if (!httpstate || !buf) return;
 
-    char* temp = realloc(httpstate->hdr, httpstate->hdrlen+len);
-    if (!temp) {
-        DBG(NULL);
-        // Don't return partial headers...  All or nothing.
-        setHttpState(httpstate, HTTP_NONE);
-        return;
+    // make sure we have enough allocated space
+    size_t content_size = httpstate->hdrlen+len;
+    size_t alloc_size = (!httpstate->hdralloc) ? MIN_HDR_ALLOC : httpstate->hdralloc;
+    while (alloc_size < content_size) {
+        alloc_size = alloc_size << 2; // same as multiplying by 4
+        if (alloc_size > MAX_HDR_ALLOC) {
+             DBG(NULL);
+             // More than we're willing to allocate for one header.
+             // We might have missed the end of the header???
+             setHttpState(httpstate, HTTP_NONE);
+             return;
+        }
     }
-    httpstate->hdr = temp;
+
+    // If we need more space, realloc
+    if (alloc_size != httpstate->hdralloc) {
+        char* temp = realloc(httpstate->hdr, alloc_size);
+        if (!temp) {
+            DBG(NULL);
+            // Don't return partial headers...  All or nothing.
+            setHttpState(httpstate, HTTP_NONE);
+            return;
+        }
+        httpstate->hdr = temp;
+        httpstate->hdralloc = alloc_size;
+    }
+
+    // Append the data
     memcpy(&httpstate->hdr[httpstate->hdrlen], buf, len);
     httpstate->hdrlen += len;
 }
@@ -223,7 +246,8 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, reportParams_t
     size_t header_start = 0;
     size_t header_end = -1;
     int found_end_of_all_headers = FALSE;
-    while (header_start < len) {
+    while ((httpstate->state == HTTP_HDR || httpstate->state == HTTP_HDREND) &&
+           (header_start < len)) {
 
         header_end =
             needleFind(g_http_end, &buf[header_start], len-header_start);
@@ -231,8 +255,8 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, reportParams_t
         if (header_end == -1) {
             // We didn't find an end in this buffer, append the rest of the
             // buffer to what we've found before.
-            appendHeader(httpstate, &buf[header_start], len-header_start);
             setHttpState(httpstate, HTTP_HDR);
+            appendHeader(httpstate, &buf[header_start], len-header_start);
             break;
         } else {
             found_end_of_all_headers =
@@ -240,26 +264,28 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, reportParams_t
             if (found_end_of_all_headers) break;
 
             // We found a complete header!
+            setHttpState(httpstate, HTTP_HDREND);
             header_end += header_start;  // was measured from header_start
             header_end += needleLen(g_http_end);
             appendHeader(httpstate, &buf[header_start], header_end-header_start);
             header_start = header_end;
-            setHttpState(httpstate, HTTP_HDREND);
         }
     }
 
     // Found the end of all headers!  Time to report something!
     if (found_end_of_all_headers) {
 
-        // change httpstate to HTTP_DATA per Content-Length or HTTP_NONE
+        // append a null terminator to allow us to treat it as a string
+        appendHeader(httpstate, "\0", 1);
+
+        // check to see if there is a Content-Length in the header
         size_t clen = getContentLength(httpstate->hdr, httpstate->hdrlen);
         size_t content_in_this_buf = len - header_end;
 
         // post and event containing the header we found
         reportHttp(httpstate, rptparms);
 
-        // There is a Content-Length header, and it extends into future
-        // buffers.  Remember how much we can skip.
+        // change httpstate to HTTP_DATA per Content-Length or HTTP_NONE
         if ((clen != -1) && (clen >= content_in_this_buf)) {
             httpstate->clen = clen - content_in_this_buf;
             setHttpState(httpstate, HTTP_DATA);

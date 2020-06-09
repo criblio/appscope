@@ -123,6 +123,7 @@ typedef struct {
     http_enum_t state;
     char* hdr;          // Used if state == HDR
     size_t hdrlen;
+    size_t hdralloc;
     size_t clen;        // Used if state==HTTP_DATA
 } http_state_t;
 

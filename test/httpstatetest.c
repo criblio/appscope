@@ -24,6 +24,7 @@ typedef uint64_t fpos64_t;
 
 #endif // __MACOS__
 
+#include "dbg.h"
 #include "ctl.h"
 #include "httpstate.h"
 #include "plattime.h"
@@ -115,7 +116,7 @@ doHttpWithSingleBufferWithNet(void** state)
     assert_non_null(post);
     char *header = post->hdr;
     assert_non_null(header);
-    assert_string_equal(header, "GET / HTTP/1.0\r\nHost: www.google.com\r\nConnection: close\r\n");
+    assert_string_equal(post->hdr, "GET / HTTP/1.0\r\nHost: www.google.com\r\nConnection: close\r\n");
     freeMsg(&g_msg);
 }
 
@@ -199,7 +200,7 @@ doHttpWithConsecutiveHeaders(void** state)
 }
 
 static void
-doHttpWithSplitBuffer(void** state)
+doHttpWithSplitHeader(void** state)
 {
     char *buffers[] = {
         "GET / HTTP/1.0\r\n",
@@ -212,12 +213,67 @@ doHttpWithSplitBuffer(void** state)
     int i;
 
     for (i=0; buffers[i]; i++) {
-        printf("i = %d\n", i);
         size_t buflen = strlen(buffers[i]);
         bool returnValue = doHttp(13, 3, &net, (void*)buffers[i], buflen, NETRX, BUF);
         assert_true( i < 3 ? returnValue == FALSE : returnValue == TRUE);
     }
 }
+
+static void
+doHttpWhichRequiresRealloc(void** state)
+{
+    char *buffers[] = {
+        "GET / HTTP/1.0\r\n",
+        "0123456789ABCD\r\n", // <-- repeat this one a bunch, 16 bytes at a time
+        "X\r\n\r\n",
+        NULL };
+    net_info net = {0};
+    net.type = SOCK_STREAM;
+    int headersize = 0;
+
+    while (headersize < 4096) {
+        char *buffer = (!headersize) ? buffers[0] : buffers[1];
+
+        size_t buflen = strlen(buffer);
+        bool returnValue = doHttp(13, 3, &net, (void*)buffer, buflen, NETRX, BUF);
+        assert_false(returnValue);
+        headersize += buflen;
+    }
+
+    // buffers[2] takes us 3 bytes past the original 4096 limit.
+    assert_true(doHttp(13, 3, &net, (void*)buffers[2], strlen(buffers[2]), NETRX, BUF));
+}
+
+static void
+doHttpWhichExceedsReallocSize(void** state)
+{
+    char *buffers[] = {
+        "GET / HTTP/1.0\r\n",
+        "0123456789ABCD\r\n", // <-- repeat this one a bunch, 16 bytes at a time
+        "X\r\n\r\n",
+        NULL };
+    net_info net = {0};
+    net.type = SOCK_STREAM;
+    int headersize = 0;
+
+    while (headersize < 4*4096) {
+        char *buffer = (!headersize) ? buffers[0] : buffers[1];
+
+        size_t buflen = strlen(buffer);
+        bool returnValue = doHttp(13, 3, &net, (void*)buffer, buflen, NETRX, BUF);
+        assert_false(returnValue);
+        headersize += buflen;
+    }
+
+    // buffers[2] takes us 3 bytes past the max (4*4096) limit.
+    assert_false(doHttp(13, 3, &net, (void*)buffers[2], strlen(buffers[2]), NETRX, BUF));
+
+    // exceeding the limit leaves a breadcrumb in dbg.
+    assert_int_equal(dbgCountMatchingLines("src/httpstate.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
+
+}
+
 
 int
 main(int argc, char* argv[])
@@ -229,7 +285,9 @@ main(int argc, char* argv[])
         cmocka_unit_test(doHttpWithSingleBufferWithoutNet),
         cmocka_unit_test(doHttpWithPartialHeaderBeforeClose),
         cmocka_unit_test(doHttpWithConsecutiveHeaders),
-        cmocka_unit_test(doHttpWithSplitBuffer),
+        cmocka_unit_test(doHttpWithSplitHeader),
+        cmocka_unit_test(doHttpWhichRequiresRealloc),
+        cmocka_unit_test(doHttpWhichExceedsReallocSize),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, needleTestSetup, groupTeardown);

@@ -208,7 +208,7 @@ void javaConvertMethodToNative(java_class_t *info, int methodIndex) {
   uint16_t accessFlags     = readUInt16(methodAddr); 
   uint16_t attributesCount = 0;
 
-  *((uint16_t *)addr)        = htobe16(accessFlags | ACC_NATIVE);
+  *((uint16_t *)addr)        = htobe16(accessFlags | ACC_NATIVE | ACC_PUBLIC);
   *((uint16_t *)(addr + 6))  = htobe16(attributesCount);
 
   info->length += bufsize - len;

@@ -940,27 +940,60 @@ void JNICALL ClassFileLoadHook(jvmtiEnv *jvmti_env,
     jint* new_class_data_len,
     unsigned char** new_class_data) {
     
-    if (name != NULL && strcmp(name, "sun/security/ssl/CipherBox") == 0) {
+    // if (name != NULL && strcmp(name, "sun/security/ssl/CipherBox") == 0) {
+    //     scopeLog("installing Java SSL hooks...", -1, CFG_LOG_DEBUG);
+    //     java_class_t *classInfo = javaReadClass((void *)class_data);
+
+    //     int methodIndex = javaFindMethodIndex(classInfo, "encrypt", "([BII)I");
+    //     javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__encrypt");
+    //     javaConvertMethodToNative(classInfo, methodIndex);
+
+    //     methodIndex = javaFindMethodIndex(classInfo, "decrypt", "([BIII)I");
+    //     javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__decrypt");
+    //     javaConvertMethodToNative(classInfo, methodIndex);
+
+    //     unsigned char *dest;
+    //     (*jvmti_env)->Allocate(jvmti_env, classInfo->length, &dest);
+    //     javaWriteClass(dest, classInfo);
+
+    //     *new_class_data_len = classInfo->length;
+    //     *new_class_data = dest;
+    //     javaDestroy(&classInfo);
+    // }
+    if (name != NULL && strcmp(name, "sun/security/ssl/SSLSocketImpl") == 0) {
         scopeLog("installing Java SSL hooks...", -1, CFG_LOG_DEBUG);
         java_class_t *classInfo = javaReadClass((void *)class_data);
 
-        int methodIndex = javaFindMethodIndex(classInfo, "encrypt", "([BII)I");
-        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__encrypt");
+        int methodIndex = javaFindMethodIndex(classInfo, "readDataRecord", "(Lsun/security/ssl/InputRecord;)V");
+        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__readDataRecord");
         javaConvertMethodToNative(classInfo, methodIndex);
 
-        methodIndex = javaFindMethodIndex(classInfo, "decrypt", "([BIII)I");
-        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__decrypt");
-        javaConvertMethodToNative(classInfo, methodIndex);
+
+        // methodIndex = javaFindMethodIndex(classInfo, "decrypt", "([BIII)I");
+        // javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__decrypt");
+        // javaConvertMethodToNative(classInfo, methodIndex);
 
         unsigned char *dest;
         (*jvmti_env)->Allocate(jvmti_env, classInfo->length, &dest);
         javaWriteClass(dest, classInfo);
+
 
         *new_class_data_len = classInfo->length;
         *new_class_data = dest;
         javaDestroy(&classInfo);
     }
 }
+
+JNIEXPORT void JNICALL Java_sun_security_ssl_SSLSocketImpl_readDataRecord(JNIEnv *jni, jobject obj, jobject inputRecord) {
+    printf("call\n");
+    jclass clazz  = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl");
+    jmethodID mid = (*jni)->GetMethodID(jni, clazz, "__readDataRecord", "(Lsun/security/ssl/InputRecord;)V");
+    (*jni)->CallVoidMethod(jni, obj, mid, inputRecord);
+
+    //jclass clazz  = (*jni)->FindClass(jni, "sun/security/ssl/InputRecord");
+
+}
+
 
 JNIEXPORT jint JNICALL Java_sun_security_ssl_CipherBox_encrypt(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) {
     //TODO: get t
@@ -974,17 +1007,17 @@ JNIEXPORT jint JNICALL Java_sun_security_ssl_CipherBox_encrypt(JNIEnv *jni, jobj
     return res;
 }
 
-JNIEXPORT jint JNICALL Java_sun_security_ssl_CipherBox_decrypt(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len, jint tagLen) {
-    jclass clazz  = (*jni)->FindClass(jni, "sun/security/ssl/CipherBox");
-    jmethodID mid = (*jni)->GetMethodID(jni, clazz, "__decrypt", "([BIII)I");
-    jint res      = (*jni)->CallIntMethod(jni, obj, mid, buf, offset, len, tagLen);
+// JNIEXPORT jint JNICALL Java_sun_security_ssl_CipherBox_decrypt(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len, jint tagLen) {
+//     jclass clazz  = (*jni)->FindClass(jni, "sun/security/ssl/CipherBox");
+//     jmethodID mid = (*jni)->GetMethodID(jni, clazz, "__decrypt", "([BIII)I");
+//     jint res      = (*jni)->CallIntMethod(jni, obj, mid, buf, offset, len, tagLen);
 
-    jbyte *byteBuf = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
-    doProtocol((uint64_t)0x1111, -1, &byteBuf[offset], (size_t)len, TLSRX, BUF);
-    (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
+//     jbyte *byteBuf = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
+//     doProtocol((uint64_t)0x1111, -1, &byteBuf[offset], (size_t)len, TLSRX, BUF);
+//     (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
 
-    return res;
-}
+//     return res;
+// }
 
 JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) {
     jvmtiError error;

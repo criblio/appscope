@@ -345,7 +345,7 @@ java_class_t* javaReadClass(void *buf) {
   }
 
   classInfo->methods_count       = readUInt16(off); off += 2;
-  classInfo->_methods_count      = classInfo->_methods_count;
+  classInfo->_methods_count      = classInfo->methods_count;
   classInfo->methods             = (void **) calloc(100 + classInfo->methods_count, sizeof(void *));
   for (int i=0;i<classInfo->methods_count;i++) {
     classInfo->methods[i] = off;
@@ -369,12 +369,13 @@ void javaDestroy(java_class_t **classInfo) {
   for(i = (*classInfo)->_constant_pool_count - 1;i<(*classInfo)->constant_pool_count - 1;i++) {
     free((*classInfo)->constant_pool[i]);
   }
-  for(i = (*classInfo)->_methods_count - 1;i<(*classInfo)->methods_count;i++) {
+  for(i = (*classInfo)->_methods_count;i<(*classInfo)->methods_count;i++) {
     free((*classInfo)->methods[i]);
   }
   free((*classInfo)->constant_pool);
   free((*classInfo)->fields);
   free((*classInfo)->methods);
   free((*classInfo)->attributes);
+  free(*classInfo);
   *classInfo = NULL;
 }

@@ -984,14 +984,37 @@ void JNICALL ClassFileLoadHook(jvmtiEnv *jvmti_env,
     }
 }
 
+static void printBuf(JNIEnv* jni, jobject buf_param, char *method) {
+  jint len = (*jni)->GetArrayLength(jni, buf_param);
+  printf("METHOD = %s, LEN = %d\nBUFFER=", method, len);
+
+  jbyte *buf = (*jni)->GetPrimitiveArrayCritical(jni, buf_param, 0);
+  for(int i=0; i<len; i++) {
+    if (buf[i]>31 && buf[i]<127) printf("%c", buf[i]);
+  }
+  printf("\n\n");
+  (*jni)->ReleasePrimitiveArrayCritical(jni, buf_param, buf, 0);
+}
+
 JNIEXPORT void JNICALL Java_sun_security_ssl_SSLSocketImpl_readDataRecord(JNIEnv *jni, jobject obj, jobject inputRecord) {
-    printf("call\n");
     jclass clazz  = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl");
+    jclass inputRecordClass  = (*jni)->FindClass(jni, "sun/security/ssl/InputRecord");
+
     jmethodID mid = (*jni)->GetMethodID(jni, clazz, "__readDataRecord", "(Lsun/security/ssl/InputRecord;)V");
     (*jni)->CallVoidMethod(jni, obj, mid, inputRecord);
 
-    //jclass clazz  = (*jni)->FindClass(jni, "sun/security/ssl/InputRecord");
+    jfieldID fid = (*jni)->GetFieldID(jni, inputRecordClass, "buf", "[B");
+    jbyteArray buf = (*jni)->GetObjectField(jni, inputRecord, fid);
 
+    jfieldID fid2 = (*jni)->GetFieldID(jni, inputRecordClass, "pos", "I");
+    jint offset = (*jni)->GetIntField(jni, inputRecord, fid2);
+
+    jfieldID fid3 = (*jni)->GetFieldID(jni, inputRecordClass, "count", "I");
+    jint count = (*jni)->GetIntField(jni, inputRecord, fid3);
+    
+    jbyte *byteBuf = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
+    doProtocol((uint64_t)0x1111, -1, &byteBuf[offset], (size_t)(count - offset), TLSRX, BUF);
+    (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
 }
 
 

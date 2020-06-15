@@ -5,6 +5,19 @@
 #include <jvmti.h>
 #include "javabci.h"
 
+static jmethodID g_mid_Object_hashCode = NULL;
+static jfieldID g_fid_InputRecord_buf = NULL;
+static jfieldID g_fid_InputRecord_pos = NULL;
+static jfieldID g_fid_InputRecord_count = NULL;
+static jmethodID g_mid_InputRecord_contentType = NULL;
+
+static jfieldID g_fid_OutputRecord_buf = NULL;
+static jfieldID g_fid_OutputRecord_count = NULL;
+static jmethodID g_mid_OutputRecord_contentType = NULL;
+static jint g_record_headerSize = 0;
+
+#define CT_APPLICATION_DATA 23
+
 static void check_error(jvmtiEnv *jvmti, jvmtiError errnum, const char *str) {
     if (errnum != JVMTI_ERROR_NONE) {
         char *errnum_str = NULL;
@@ -15,7 +28,7 @@ static void check_error(jvmtiEnv *jvmti, jvmtiError errnum, const char *str) {
 
 void JNICALL 
 ClassFileLoadHook(jvmtiEnv *jvmti_env,
-    JNIEnv* jni_env,
+    JNIEnv* jni,
     jclass class_being_redefined,
     jobject loader,
     const char* name,
@@ -28,6 +41,26 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     
     if (name != NULL && strcmp(name, "sun/security/ssl/SSLSocketImpl") == 0) {
         scopeLog("installing Java SSL hooks...", -1, CFG_LOG_DEBUG);
+
+        jclass objectClass  = (*jni)->FindClass(jni, "java/lang/Object");
+        g_mid_Object_hashCode = (*jni)->GetMethodID(jni, objectClass, "hashCode", "()I");
+
+        jclass recordClass  = (*jni)->FindClass(jni, "sun/security/ssl/Record");
+        jfieldID fid = (*jni)->GetStaticFieldID(jni, recordClass, "headerSize", "I");
+        g_record_headerSize = (*jni)->GetStaticIntField(jni, recordClass, fid);
+
+        jclass inputRecordClass  = (*jni)->FindClass(jni, "sun/security/ssl/InputRecord");
+        g_mid_InputRecord_contentType = (*jni)->GetMethodID(jni, inputRecordClass, "contentType", "()B");
+        g_fid_InputRecord_buf = (*jni)->GetFieldID(jni, inputRecordClass, "buf", "[B");
+        g_fid_InputRecord_pos = (*jni)->GetFieldID(jni, inputRecordClass, "pos", "I");
+        g_fid_InputRecord_count = (*jni)->GetFieldID(jni, inputRecordClass, "count", "I");
+
+        jclass outputRecordClass  = (*jni)->FindClass(jni, "sun/security/ssl/OutputRecord");
+        g_mid_OutputRecord_contentType = (*jni)->GetMethodID(jni, outputRecordClass, "contentType", "()B");
+        g_fid_OutputRecord_buf = (*jni)->GetFieldID(jni, outputRecordClass, "buf", "[B");
+        g_fid_OutputRecord_count = (*jni)->GetFieldID(jni, outputRecordClass, "count", "I");
+    
+        //modify SSLSocketImpl class
         java_class_t *classInfo = javaReadClass((void *)class_data);
 
         int methodIndex = javaFindMethodIndex(classInfo, "readDataRecord", "(Lsun/security/ssl/InputRecord;)V");
@@ -48,72 +81,62 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     }
 }
 
-static void printBuf(JNIEnv* jni, jobject buf_param, char *method) {
-  jint len = (*jni)->GetArrayLength(jni, buf_param);
-  printf("METHOD = %s, LEN = %d\nBUFFER=", method, len);
+// static void printBuf(JNIEnv* jni, jobject buf_param, char *method, int offset, int len) {
+//     //jint len = (*jni)->GetArrayLength(jni, buf_param);
+//     printf("METHOD = %s, LEN = %d. OFFSET = %d \nBUFFER=", method, len, offset);
 
-  jbyte *buf = (*jni)->GetPrimitiveArrayCritical(jni, buf_param, 0);
-  for(int i=0; i<len; i++) {
-    if (buf[i]>31 && buf[i]<127) printf("%c", buf[i]);
-  }
-  printf("\n\n");
-  (*jni)->ReleasePrimitiveArrayCritical(jni, buf_param, buf, 0);
-}
+//     jbyte *buf = (*jni)->GetPrimitiveArrayCritical(jni, buf_param, 0);
+//     for(int i=0; i<len; i++) {
+//         printf("%c", buf[i + offset]);
+//     }
+//     printf("\n\n");
+//     (*jni)->ReleasePrimitiveArrayCritical(jni, buf_param, buf, 0);
+// }
 
 JNIEXPORT void JNICALL 
 Java_sun_security_ssl_SSLSocketImpl_readDataRecord(JNIEnv *jni, jobject obj, jobject inputRecord) 
 {
-    jclass clazz  = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl");
-    jclass inputRecordClass  = (*jni)->FindClass(jni, "sun/security/ssl/InputRecord");
+    jclass clazz   = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl");
+    jmethodID mid  = (*jni)->GetMethodID(jni, clazz, "__readDataRecord", "(Lsun/security/ssl/InputRecord;)V");
 
-    jmethodID mid = (*jni)->GetMethodID(jni, clazz, "__readDataRecord", "(Lsun/security/ssl/InputRecord;)V");
+    //call the original method
     (*jni)->CallVoidMethod(jni, obj, mid, inputRecord);
 
-    jfieldID fid = (*jni)->GetFieldID(jni, inputRecordClass, "buf", "[B");
-    jbyteArray buf = (*jni)->GetObjectField(jni, inputRecord, fid);
-
-    jfieldID fid2 = (*jni)->GetFieldID(jni, inputRecordClass, "pos", "I");
-    jint offset = (*jni)->GetIntField(jni, inputRecord, fid2);
-
-    jfieldID fid3 = (*jni)->GetFieldID(jni, inputRecordClass, "count", "I");
-    jint count = (*jni)->GetIntField(jni, inputRecord, fid3);
-
-    jclass objectClass  = (*jni)->FindClass(jni, "java/lang/Object");
-
-    jmethodID hashCodeId = (*jni)->GetMethodID(jni, objectClass, "hashCode", "()I");
-    jint hash = (*jni)->CallIntMethod(jni, obj, hashCodeId);
-
-    
-    jbyte *byteBuf = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
-    doProtocol((uint64_t)hash, -1, &byteBuf[offset], (size_t)(count - offset), TLSRX, BUF);
-    (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
+    jbyte contentType = (*jni)->CallByteMethod(jni, inputRecord, g_mid_InputRecord_contentType);
+    if (contentType == CT_APPLICATION_DATA) {
+        jbyteArray buf = (*jni)->GetObjectField(jni, inputRecord, g_fid_InputRecord_buf);
+        jint offset    = (*jni)->GetIntField(jni, inputRecord, g_fid_InputRecord_pos);
+        jint count     = (*jni)->GetIntField(jni, inputRecord, g_fid_InputRecord_count);
+        jint hash      = (*jni)->CallIntMethod(jni, obj, g_mid_Object_hashCode);
+        jbyte *byteBuf = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
+        doProtocol((uint64_t)hash, -1, &byteBuf[offset], (size_t)(count - offset), TLSRX, BUF);
+        (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
+    }
 }
 
 JNIEXPORT void JNICALL 
-Java_sun_security_ssl_SSLSocketImpl_writeRecord(JNIEnv *jni, jobject obj, jobject inputRecord, jboolean boolarg) 
+Java_sun_security_ssl_SSLSocketImpl_writeRecord(JNIEnv *jni, jobject obj, jobject outputRecord, jboolean boolArg) 
 {
+    jbyte contentType = (*jni)->CallByteMethod(jni, outputRecord, g_mid_OutputRecord_contentType);
+    if (contentType == CT_APPLICATION_DATA) {
+        jbyteArray buf    = (*jni)->GetObjectField(jni, outputRecord, g_fid_OutputRecord_buf);
+        jint count        = (*jni)->GetIntField(jni, outputRecord, g_fid_OutputRecord_count);
+        jint hash         = (*jni)->CallIntMethod(jni, obj, g_mid_Object_hashCode);
+        jbyte *byteBuf    = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
+        jint headerSize   = g_record_headerSize;
+
+        //skip zeros
+        while(byteBuf[headerSize]==0 && headerSize<count) headerSize++;
+
+        doProtocol((uint64_t)hash, -1, &byteBuf[headerSize], (size_t)(count - headerSize), TLSTX, BUF);
+        (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
+    }
+
+    //call the original method
     jclass clazz  = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl");
-    jclass inputRecordClass  = (*jni)->FindClass(jni, "sun/security/ssl/OutputRecord");
-
-    jfieldID fid = (*jni)->GetFieldID(jni, inputRecordClass, "buf", "[B");
-    jbyteArray buf = (*jni)->GetObjectField(jni, inputRecord, fid);
-
-    jfieldID fid3 = (*jni)->GetFieldID(jni, inputRecordClass, "count", "I");
-    jint count = (*jni)->GetIntField(jni, inputRecord, fid3);
-
-    jclass objectClass  = (*jni)->FindClass(jni, "java/lang/Object");
-
-    jmethodID hashCodeId = (*jni)->GetMethodID(jni, objectClass, "hashCode", "()I");
-    jint hash = (*jni)->CallIntMethod(jni, obj, hashCodeId);
-
-    jbyte *byteBuf = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
-    doProtocol((uint64_t)hash, -1, &byteBuf[0], (size_t)(count), TLSTX, BUF);
-    (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
-
     jmethodID mid = (*jni)->GetMethodID(jni, clazz, "__writeRecord", "(Lsun/security/ssl/OutputRecord;Z)V");
-    (*jni)->CallVoidMethod(jni, obj, mid, inputRecord, boolarg);
+    (*jni)->CallVoidMethod(jni, obj, mid, outputRecord, boolArg);
 }
-
 
 JNIEXPORT jint JNICALL 
 Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) 

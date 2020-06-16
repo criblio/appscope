@@ -75,19 +75,6 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     }
 }
 
-// static void printBuf(JNIEnv* jni, char *method, jobject buf_param,  int offset, int len) {
-//     printf("METHOD = %s, LEN = %d. OFFSET = %d \nBUFFER=", method, len, offset);
-
-//     jbyte *buf = (*jni)->GetPrimitiveArrayCritical(jni, buf_param, 0);
-//     for(int i=0; i<len; i++) {
-//         if (buf[i + offset]==0) 
-//             printf("0");
-//         else 
-//             printf("%c",  buf[i + offset]);
-//     }
-//     printf("\n\n");
-//     (*jni)->ReleasePrimitiveArrayCritical(jni, buf_param, buf, 0);
-// }
 static void 
 doJavaProtocol(JNIEnv *jni, jobject socket, jbyteArray buf, jint offset, jint len, metric_t src)
 {

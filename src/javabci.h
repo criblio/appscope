@@ -42,7 +42,7 @@
 #define ACC_STRICT                    0x0800
 #define ACC_SYNTHETIC                 0x1000
 
-
+//based on ClassFile structure from https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.1
 typedef struct {
   uint8_t        magic[4];
 	uint16_t       minor_version;
@@ -62,8 +62,8 @@ typedef struct {
   unsigned char  **attributes;
   uint32_t       length;
 
-  uint16_t       _constant_pool_count;
-  uint16_t       _methods_count;
+  uint16_t       _constant_pool_count;  //original constant pool count
+  uint16_t       _methods_count;        //original method count
 } java_class_t;
 
 

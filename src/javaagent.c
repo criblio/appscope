@@ -12,12 +12,12 @@ static jfieldID  g_fid_AppOutputStream_socket   = NULL;
 static jmethodID g_mid_AppInputStream___read    = NULL;
 static jfieldID  g_fid_AppInputStream_socket    = NULL;
 
-static void check_error(jvmtiEnv *jvmti, jvmtiError errnum, const char *str) {
-    if (errnum != JVMTI_ERROR_NONE) {
-        char *errnum_str = NULL;
-        (void) (*jvmti)->GetErrorName(jvmti, errnum, &errnum_str);
-        printf("ERROR: JVMTI: [%d] %s - %s\n", errnum, (errnum_str == NULL ? "Unknown": errnum_str), (str == NULL? "" : str));
-    }
+static void logJvmtiError(jvmtiEnv *jvmti, jvmtiError errnum, const char *str) {
+    char buf[1024];
+    char *errnum_str = NULL;
+    (*jvmti)->GetErrorName(jvmti, errnum, &errnum_str);
+    snprintf(buf, sizeof(buf), "ERROR: JVMTI: [%d] %s - %s\n", errnum, (errnum_str == NULL ? "Unknown": errnum_str), (str == NULL? "" : str));
+    scopeLog(buf, -1, CFG_LOG_ERROR);
 }
 
 void JNICALL 
@@ -41,7 +41,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         jclass sslSocketImplClass = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl");
         g_mid_SSLSocketImpl_getSession = (*jni)->GetMethodID(jni, sslSocketImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
     
-        java_class_t *classInfo = javaReadClass((void *)class_data);
+        java_class_t *classInfo = javaReadClass(class_data);
 
         int methodIndex = javaFindMethodIndex(classInfo, "write", "([BII)V");
         javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__write");
@@ -59,7 +59,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     if (name != NULL && strcmp(name, "sun/security/ssl/AppInputStream") == 0) {
         scopeLog("installing Java SSL hooks for AppInputStream class...", -1, CFG_LOG_DEBUG);
 
-        java_class_t *classInfo = javaReadClass((void *)class_data);
+        java_class_t *classInfo = javaReadClass(class_data);
 
         int methodIndex = javaFindMethodIndex(classInfo, "read", "([BII)I");
         javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__read");
@@ -136,11 +136,9 @@ JNIEXPORT jint JNICALL
 Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) 
 {
     jvmtiError error;
-    jint result;
     jvmtiEnv *env;
-    jvmtiEventCallbacks callbacks;
 
-    result = (*jvm)->GetEnv(jvm, (void **) &env, JVMTI_VERSION_1_0);
+    jint result = (*jvm)->GetEnv(jvm, (void **) &env, JVMTI_VERSION_1_0);
     if (result != 0) {
         scopeLog("ERROR: GetEnv failed\n", -1, CFG_LOG_ERROR);
         return JNI_ERR;
@@ -151,15 +149,25 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
 
     capabilities.can_generate_all_class_hook_events = 1;
     error = (*env)->AddCapabilities(env, &capabilities);
-    check_error(env, error, "AddCapabilities");
+    if (error != JVMTI_ERROR_NONE) {
+        logJvmtiError(env, error, "AddCapabilities");
+        return JNI_ERR;
+    }
 
     error = (*env)->SetEventNotificationMode(env, JVMTI_ENABLE, JVMTI_EVENT_CLASS_FILE_LOAD_HOOK, NULL);
-    check_error(env, error, "SetEventNotificationMode->JVMTI_EVENT_CLASS_FILE_LOAD_HOOK");
-
+    if (error != JVMTI_ERROR_NONE) {
+        logJvmtiError(env, error, "SetEventNotificationMode");
+        return JNI_ERR;
+    }
+   
+    jvmtiEventCallbacks callbacks;
     memset(&callbacks, 0, sizeof(callbacks));
     callbacks.ClassFileLoadHook = &ClassFileLoadHook;
     error = (*env)->SetEventCallbacks(env, &callbacks, sizeof(callbacks));
-    check_error(env, error, "SetEventCallbacks");
+    if (error != JVMTI_ERROR_NONE) {
+        logJvmtiError(env, error, "SetEventCallbacks");
+        return JNI_ERR;
+    }
     
     return JNI_OK;
 }

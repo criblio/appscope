@@ -62,6 +62,9 @@ javaGetTagLength(unsigned char *addr)
   return len;
 }
 
+/*
+Adds a tag to the constant pool and returns the tag's index
+*/
 static uint16_t 
 addTag(java_class_t *info, unsigned char *tag) 
 {
@@ -71,6 +74,10 @@ addTag(java_class_t *info, unsigned char *tag)
   return idx + 1;
 }
 
+/*
+Adds a utf8 tag to the constant pool
+see: https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.4.7
+*/
 static uint16_t 
 addUtf8Tag(java_class_t *info, const char *str) 
 {
@@ -84,6 +91,10 @@ addUtf8Tag(java_class_t *info, const char *str)
   return addTag(info, utf8Tag);
 }
 
+/*
+Adds a name and type tag to the constant pool
+see: https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.4.6
+*/
 uint16_t 
 javaAddNameAndTypeTag(java_class_t *info, const char *name, const char *desc) 
 {
@@ -98,6 +109,10 @@ javaAddNameAndTypeTag(java_class_t *info, const char *name, const char *desc)
   return addTag(info, tag);
 }
 
+/*
+Adds a method ref tag to the contant pool
+see: https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.4.2
+*/
 uint16_t 
 javaAddMethodRefTag(java_class_t *info, uint16_t classIndex, uint16_t nameAndTypeIndex) 
 {
@@ -107,6 +122,20 @@ javaAddMethodRefTag(java_class_t *info, uint16_t classIndex, uint16_t nameAndTyp
   *((uint16_t *)(tag + 1)) = htobe16(classIndex);
   *((uint16_t *)(tag + 3)) = htobe16(nameAndTypeIndex);
   info->length += bufsize;
+  return addTag(info, tag);
+}
+
+/*
+Adds a string tag to the constant pool
+see: https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.4.3
+*/
+uint16_t 
+javaAddStringTag(java_class_t *info, const char* str)
+{
+  uint16_t idx = addUtf8Tag(info, str);
+  unsigned char *tag = malloc(3);
+  *((uint8_t *)tag)        = CONSTANT_String;
+  *((uint16_t *)(tag + 1)) = htobe16(idx);
   return addTag(info, tag);
 }
 
@@ -147,16 +176,6 @@ getCodeAttributeAddress(java_class_t *info, unsigned char *method)
     off += attr_length + 6;
   }
   return code;
-}
-
-uint16_t 
-javaAddStringTag(java_class_t *info, const char* str)
-{
-  uint16_t idx = addUtf8Tag(info, str);
-  unsigned char *tag = malloc(3);
-  *((uint8_t *)tag)        = CONSTANT_String;
-  *((uint16_t *)(tag + 1)) = htobe16(idx);
-  return addTag(info, tag);
 }
 
 int 
@@ -239,7 +258,16 @@ javaAddMethod(java_class_t *info, const char* name, const char* descriptor,
               uint16_t accessFlags, uint16_t maxStack, uint16_t maxLocals, uint8_t *code, uint32_t codeLen) 
 {
   size_t codeAttrLen = 12 + codeLen;
-  size_t bufsize = 8 + 6 + codeAttrLen;
+  /*
+  total buf size = method info (8 bytes) + 
+                   attribute index (2 bytes) + 
+                   attribute length (4 bytes) + 
+                   length of the buffer which holds the code attribute
+  
+  Code attribute specs : https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.7.3
+  Method info specs: https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.6
+  */
+  size_t bufsize = 8 + 2 + 4 + codeAttrLen;  
 
   if (code == NULL) {
     codeAttrLen = 0;
@@ -311,7 +339,7 @@ javaWriteClass(unsigned char *dest, java_class_t *info)
   *((uint16_t *)addr) = htobe16(info->super_class);           addr += 2;
   *((uint16_t *)addr) = htobe16(info->interfaces_count);      addr += 2;
   memcpy(addr, info->interfaces, info->interfaces_count * 2); addr += info->interfaces_count * 2;
-
+  //write fields
   *((uint16_t *)addr) = htobe16(info->fields_count); addr += 2;
   for (int i=0;i<info->fields_count;i++) {
     unsigned char *field = info->fields[i];

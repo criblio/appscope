@@ -917,8 +917,6 @@ initHook()
 
 #endif // __LINUX__
 
-
-
 __attribute__((constructor)) void
 init(void)
 {

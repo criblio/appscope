@@ -45,9 +45,9 @@
 //based on ClassFile structure from https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.1
 typedef struct {
   uint8_t        magic[4];
-	uint16_t       minor_version;
-	uint16_t       major_version;
-	uint16_t       constant_pool_count;
+  uint16_t       minor_version;
+  uint16_t       major_version;
+  uint16_t       constant_pool_count;
   unsigned char  **constant_pool;
   uint16_t       access_flags;
   uint16_t       this_class;

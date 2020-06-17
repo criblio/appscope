@@ -46,50 +46,49 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     jint* new_class_data_len,
     unsigned char** new_class_data) 
 {
-    // if (name != NULL && strcmp(name, "sun/security/ssl/AppOutputStream") == 0) {
-    //     scopeLog("installing Java SSL hooks for AppOutputStream class...", -1, CFG_LOG_DEBUG);
+    if (name != NULL && strcmp(name, "sun/security/ssl/AppOutputStream") == 0) {
+        scopeLog("installing Java SSL hooks for AppOutputStream class...", -1, CFG_LOG_DEBUG);
 
-    //     jclass objectClass = (*jni)->FindClass(jni, "java/lang/Object");
-    //     g_mid_Object_hashCode = (*jni)->GetMethodID(jni, objectClass, "hashCode", "()I");
+        jclass objectClass = (*jni)->FindClass(jni, "java/lang/Object");
+        g_mid_Object_hashCode = (*jni)->GetMethodID(jni, objectClass, "hashCode", "()I");
 
-    //     jclass sslSocketImplClass = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl");
-    //     g_mid_SSLSocketImpl_getSession = (*jni)->GetMethodID(jni, sslSocketImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
+        jclass sslSocketImplClass = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl");
+        g_mid_SSLSocketImpl_getSession = (*jni)->GetMethodID(jni, sslSocketImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
     
-    //     java_class_t *classInfo = javaReadClass(class_data);
+        java_class_t *classInfo = javaReadClass(class_data);
 
-    //     int methodIndex = javaFindMethodIndex(classInfo, "write", "([BII)V");
-    //     javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__write");
-    //     javaConvertMethodToNative(classInfo, methodIndex);
+        int methodIndex = javaFindMethodIndex(classInfo, "write", "([BII)V");
+        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__write");
+        javaConvertMethodToNative(classInfo, methodIndex);
 
-    //     unsigned char *dest;
-    //     (*jvmti_env)->Allocate(jvmti_env, classInfo->length, &dest);
-    //     javaWriteClass(dest, classInfo);
+        unsigned char *dest;
+        (*jvmti_env)->Allocate(jvmti_env, classInfo->length, &dest);
+        javaWriteClass(dest, classInfo);
 
-    //     *new_class_data_len = classInfo->length;
-    //     *new_class_data = dest;
-    //     javaDestroy(&classInfo);
-    // }
+        *new_class_data_len = classInfo->length;
+        *new_class_data = dest;
+        javaDestroy(&classInfo);
+    }
 
-    // if (name != NULL && strcmp(name, "sun/security/ssl/AppInputStream") == 0) {
-    //     scopeLog("installing Java SSL hooks for AppInputStream class...", -1, CFG_LOG_DEBUG);
+    if (name != NULL && strcmp(name, "sun/security/ssl/AppInputStream") == 0) {
+        scopeLog("installing Java SSL hooks for AppInputStream class...", -1, CFG_LOG_DEBUG);
 
-    //     java_class_t *classInfo = javaReadClass(class_data);
+        java_class_t *classInfo = javaReadClass(class_data);
 
-    //     int methodIndex = javaFindMethodIndex(classInfo, "read", "([BII)I");
-    //     javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__read");
-    //     javaConvertMethodToNative(classInfo, methodIndex);
+        int methodIndex = javaFindMethodIndex(classInfo, "read", "([BII)I");
+        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__read");
+        javaConvertMethodToNative(classInfo, methodIndex);
 
-    //     unsigned char *dest;
-    //     (*jvmti_env)->Allocate(jvmti_env, classInfo->length, &dest);
-    //     javaWriteClass(dest, classInfo);
+        unsigned char *dest;
+        (*jvmti_env)->Allocate(jvmti_env, classInfo->length, &dest);
+        javaWriteClass(dest, classInfo);
 
-    //     *new_class_data_len = classInfo->length;
-    //     *new_class_data = dest;
-    //     javaDestroy(&classInfo);
-    // }
+        *new_class_data_len = classInfo->length;
+        *new_class_data = dest;
+        javaDestroy(&classInfo);
+    }
 
     if (name != NULL && strcmp(name, "sun/security/ssl/SSLEngineImpl") == 0) {
-        printf("installing Java SSL hooks for SSLEngineImpl class...\n");
         scopeLog("installing Java SSL hooks for SSLEngineImpl class...", -1, CFG_LOG_DEBUG);
 
         java_class_t *classInfo = javaReadClass(class_data);
@@ -137,9 +136,12 @@ doJavaProtocol(JNIEnv *jni, jobject socket, jbyteArray buf, jint offset, jint le
 JNIEXPORT jobject JNICALL 
 Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject netData, jobjectArray appData, jint offset, jint len)
 {
-    jclass appOutputStreamClass   = (*jni)->FindClass(jni, "sun/security/ssl/SSLEngineImpl");
-    jmethodID wrapMid = (*jni)->GetMethodID(jni, appOutputStreamClass, "__unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
-
+    jclass sslEngineImplClass   = (*jni)->FindClass(jni, "sun/security/ssl/SSLEngineImpl");
+    jmethodID wrapMid = (*jni)->GetMethodID(jni, sslEngineImplClass, "__unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
+    jmethodID getSessionMid = (*jni)->GetMethodID(jni, sslEngineImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
+    jobject session   = (*jni)->CallObjectMethod(jni, obj, getSessionMid);
+    jint    hash      = (*jni)->CallIntMethod(jni, session, g_mid_Object_hashCode);
+    
     //call the original method
     jobject res = (*jni)->CallObjectMethod(jni, obj, wrapMid, netData, appData, offset, len);
 
@@ -150,16 +152,16 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject net
     jmethodID positionMid = (*jni)->GetMethodID(jni, bufferClass, "position", "()I");
 
     for(int i=0;i<len;i++) {
-        jobject bufEl = (*jni)->GetObjectArrayElement(jni, appData, i);
+        jobject bufEl = (*jni)->GetObjectArrayElement(jni, appData, offset + i);
 
         jint pos = (*jni)->CallIntMethod(jni, bufEl, positionMid);
         jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, arrayMid);
 
         jbyte   *byteBuf  = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
-        doProtocol((uint64_t)1111, -1, byteBuf, (size_t)pos, TLSRX, BUF);
+        doProtocol((uint64_t)hash, -1, byteBuf, (size_t)pos, TLSRX, BUF);
         (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
         
-        printBuf(jni, "read", buf, 0, pos);
+        //printBuf(jni, "read", buf, 0, pos);
     }
     
     return res;
@@ -168,8 +170,12 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject net
 JNIEXPORT jobject JNICALL 
 Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray appData, jint offset, jint len, jobject netData) 
 {
-    jclass appOutputStreamClass   = (*jni)->FindClass(jni, "sun/security/ssl/SSLEngineImpl");
-    jmethodID wrapMid = (*jni)->GetMethodID(jni, appOutputStreamClass, "__wrap", "([Ljava/nio/ByteBuffer;IILjava/nio/ByteBuffer;)Ljavax/net/ssl/SSLEngineResult;");
+    jclass sslEngineImplClass   = (*jni)->FindClass(jni, "sun/security/ssl/SSLEngineImpl");
+    jmethodID wrapMid = (*jni)->GetMethodID(jni, sslEngineImplClass, "__wrap", "([Ljava/nio/ByteBuffer;IILjava/nio/ByteBuffer;)Ljavax/net/ssl/SSLEngineResult;");
+    jmethodID getSessionMid = (*jni)->GetMethodID(jni, sslEngineImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
+    jobject session   = (*jni)->CallObjectMethod(jni, obj, getSessionMid);
+    jint    hash      = (*jni)->CallIntMethod(jni, session, g_mid_Object_hashCode);
+    
 
     jclass byteBufferClass   = (*jni)->FindClass(jni, "java/nio/ByteBuffer");
     jmethodID arrayMid = (*jni)->GetMethodID(jni, byteBufferClass, "array", "()[B");
@@ -179,14 +185,14 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
     jmethodID limitMid = (*jni)->GetMethodID(jni, bufferClass, "limit", "()I");
         
     for(int i=0;i<len;i++) {
-        jobject bufEl = (*jni)->GetObjectArrayElement(jni, appData, i);
+        jobject bufEl = (*jni)->GetObjectArrayElement(jni, appData, offset + i);
 
         jint pos = (*jni)->CallIntMethod(jni, bufEl, positionMid);
         jint limit = (*jni)->CallIntMethod(jni, bufEl, limitMid);
         jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, arrayMid);
 
         jbyte   *byteBuf  = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
-        doProtocol((uint64_t)1111, -1, &byteBuf[pos], (size_t)(limit), TLSTX, BUF);
+        doProtocol((uint64_t)hash, -1, &byteBuf[pos], (size_t)(limit), TLSTX, BUF);
         (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
         
         //printBuf(jni, "write", buf, pos, limit);

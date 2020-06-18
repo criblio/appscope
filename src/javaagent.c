@@ -62,6 +62,10 @@ initAppOutputStreamGlobals(JNIEnv *jni)
 {
     if (g_mid_AppOutputStream___write != NULL) return;
     jclass appOutputStreamClass    = (*jni)->FindClass(jni, "sun/security/ssl/AppOutputStream");
+    if (appOutputStreamClass == NULL) {
+        // JDK 11
+        appOutputStreamClass = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl$AppOutputStream");
+    }
     g_mid_AppOutputStream___write  = (*jni)->GetMethodID(jni, appOutputStreamClass, "__write", "([BII)V");
     g_fid_AppOutputStream_socket   = (*jni)->GetFieldID(jni, appOutputStreamClass, "c", "Lsun/security/ssl/SSLSocketImpl;");
     if (g_fid_AppOutputStream_socket == NULL) {
@@ -70,6 +74,10 @@ initAppOutputStreamGlobals(JNIEnv *jni)
         //support for JDK 9, JDK 10
         g_fid_AppOutputStream_socket = (*jni)->GetFieldID(jni, appOutputStreamClass, "socket", "Lsun/security/ssl/SSLSocketImpl;");
     }
+    if (g_fid_AppOutputStream_socket == NULL) {
+        jboolean flag = (*jni)->ExceptionCheck(jni);
+        if (flag) (*jni)->ExceptionClear(jni);
+    }
 }
 
 static void
@@ -77,6 +85,10 @@ initAppInputStreamGlobals(JNIEnv *jni)
 {
     if (g_mid_AppInputStream___read != NULL) return;
     jclass appInputStreamClass     = (*jni)->FindClass(jni, "sun/security/ssl/AppInputStream");
+    if (appInputStreamClass == NULL) {
+        // JDK 11
+        appInputStreamClass  = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl$AppInputStream");
+    }
     g_mid_AppInputStream___read    = (*jni)->GetMethodID(jni, appInputStreamClass, "__read", "([BII)I");
     g_fid_AppInputStream_socket    = (*jni)->GetFieldID(jni, appInputStreamClass, "c", "Lsun/security/ssl/SSLSocketImpl;");
     if (g_fid_AppInputStream_socket == NULL) {
@@ -84,6 +96,10 @@ initAppInputStreamGlobals(JNIEnv *jni)
         if (flag) (*jni)->ExceptionClear(jni);   
         //support for JDK 9, JDK 10
         g_fid_AppInputStream_socket = (*jni)->GetFieldID(jni, appInputStreamClass, "socket", "Lsun/security/ssl/SSLSocketImpl;");
+    }
+    if (g_fid_AppInputStream_socket == NULL) {
+        jboolean flag = (*jni)->ExceptionCheck(jni);
+        if (flag) (*jni)->ExceptionClear(jni);   
     }
 }
 
@@ -109,7 +125,11 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     jint* new_class_data_len,
     unsigned char** new_class_data) 
 {
-    if (name != NULL && strcmp(name, "sun/security/ssl/AppOutputStream") == 0) {
+    //printf("loading class %s\n", name);
+    if (name != NULL && 
+        (strcmp(name, "sun/security/ssl/AppOutputStream") == 0 || 
+         strcmp(name, "sun/security/ssl/SSLSocketImpl$AppOutputStream") == 0)) {
+
         scopeLog("installing Java SSL hooks for AppOutputStream class...", -1, CFG_LOG_DEBUG);
 
         java_class_t *classInfo = javaReadClass(class_data);
@@ -132,7 +152,10 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (name != NULL && strcmp(name, "sun/security/ssl/AppInputStream") == 0) {
+    if (name != NULL && 
+        (strcmp(name, "sun/security/ssl/AppInputStream") == 0 ||
+         strcmp(name, "sun/security/ssl/SSLSocketImpl$AppInputStream") == 0)) {
+
         scopeLog("installing Java SSL hooks for AppInputStream class...", -1, CFG_LOG_DEBUG);
 
         java_class_t *classInfo = javaReadClass(class_data);
@@ -241,20 +264,35 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
     return res;
 } 
 
+
+
 JNIEXPORT void JNICALL 
 Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
     initJniGlobals(jni);
     initAppOutputStreamGlobals(jni);
 
-    jobject socket  = (*jni)->GetObjectField(jni, obj, g_fid_AppOutputStream_socket);
-    jobject session = (*jni)->CallObjectMethod(jni, socket, g_mid_SSLSocketImpl_getSession);
+    jobject session;
+    if (g_fid_AppOutputStream_socket != NULL) {
+        jobject socket  = (*jni)->GetObjectField(jni, obj, g_fid_AppOutputStream_socket);
+        session = (*jni)->CallObjectMethod(jni, socket, g_mid_SSLSocketImpl_getSession);
+    } else {
+        session = obj;
+    }
+    
     doJavaProtocol(jni, session, buf, offset, len, TLSTX);
     //printBuf(jni, "write", buf, offset, len);
     
     //call the original method
     (*jni)->CallVoidMethod(jni, obj, g_mid_AppOutputStream___write, buf, offset, len);
-} 
+}
+
+
+JNIEXPORT void JNICALL 
+Java_sun_security_ssl_SSLSocketImpl_00024AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) {
+    Java_sun_security_ssl_AppOutputStream_write(jni, obj, buf, offset, len);
+}
+
 
 JNIEXPORT jint JNICALL 
 Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
@@ -265,13 +303,25 @@ Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray b
     //call the original method
     jint res = (*jni)->CallIntMethod(jni, obj, g_mid_AppInputStream___read, buf, offset, len);
 
-    jobject socket  = (*jni)->GetObjectField(jni, obj, g_fid_AppInputStream_socket);
-    jobject session = (*jni)->CallObjectMethod(jni, socket, g_mid_SSLSocketImpl_getSession);
+    jobject session = NULL;
+
+    if (g_fid_AppInputStream_socket != NULL) {
+        jobject socket  = (*jni)->GetObjectField(jni, obj, g_fid_AppInputStream_socket);
+        session = (*jni)->CallObjectMethod(jni, socket, g_mid_SSLSocketImpl_getSession);
+    } else {
+        session = obj;
+    }
     doJavaProtocol(jni, session, buf, offset, res, TLSRX);
 
     //printBuf(jni, "read", buf, offset, res);
     return res;
 }
+
+JNIEXPORT void JNICALL 
+Java_sun_security_ssl_SSLSocketImpl_00024AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) {
+    Java_sun_security_ssl_AppInputStream_read(jni, obj, buf, offset, len);
+}
+
 
 JNIEXPORT jint JNICALL 
 Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) 

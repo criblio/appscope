@@ -10,9 +10,6 @@
 
 #include "dbg.h"
 
-//#include "scopetypes.h"
-//#include "wrap.h"
-
 #define HEAP_SIZE (size_t)(200 * 1024)
 // 1Mb + an 8kb guard
 #define STACK_SIZE (size_t)(1024 * 1024) + (8 * 1024)
@@ -348,7 +345,6 @@ sys_exec(const char *buf, const char *path, int argc, const char **argv, const c
     scopeLog("sys_exec type:", ehdr->e_type, CFG_LOG_DEBUG);
 
     lastaddr = load_elf((char *)buf);
-
     set_go((char *)buf, argc, argv, env, lastaddr);
 
     return 0;

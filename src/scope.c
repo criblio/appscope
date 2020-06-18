@@ -15,6 +15,7 @@
 
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
+extern char **environ;
 extern int sys_exec(const char *, const char *, int, char **, char **);
 
 static void
@@ -141,8 +142,12 @@ main(int argc, char **argv, char **env)
         (!is_static(buf))) {
         printf("%s:%d not a static file\n", __FUNCTION__, __LINE__);
 
+        if (setenv("LD_PRELOAD", "libscope.so", 0) == -1) {
+            perror("setenv");
+        }
+
         if (fork() == 0) {
-            execve(argv[1], &argv[1], env);
+            execve(argv[1], &argv[1], environ);
             perror("execve");
             exit(-1);
         }

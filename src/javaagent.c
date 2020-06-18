@@ -55,15 +55,42 @@ initJniGlobals(JNIEnv *jni)
     g_mid_ByteBuffer_array         = (*jni)->GetMethodID(jni, byteBufferClass, "array", "()[B");
     g_mid_ByteBuffer_position      = (*jni)->GetMethodID(jni, bufferClass, "position", "()I");
     g_mid_ByteBuffer_limit         = (*jni)->GetMethodID(jni, bufferClass, "limit", "()I");
+}
 
+static void 
+initAppOutputStreamGlobals(JNIEnv *jni)
+{
+    if (g_mid_AppOutputStream___write != NULL) return;
     jclass appOutputStreamClass    = (*jni)->FindClass(jni, "sun/security/ssl/AppOutputStream");
     g_mid_AppOutputStream___write  = (*jni)->GetMethodID(jni, appOutputStreamClass, "__write", "([BII)V");
     g_fid_AppOutputStream_socket   = (*jni)->GetFieldID(jni, appOutputStreamClass, "c", "Lsun/security/ssl/SSLSocketImpl;");
+    if (g_fid_AppOutputStream_socket == NULL) {
+        jboolean flag = (*jni)->ExceptionCheck(jni);
+        if (flag) (*jni)->ExceptionClear(jni);
+        //support for JDK 9, JDK 10
+        g_fid_AppOutputStream_socket = (*jni)->GetFieldID(jni, appOutputStreamClass, "socket", "Lsun/security/ssl/SSLSocketImpl;");
+    }
+}
 
+static void
+initAppInputStreamGlobals(JNIEnv *jni)
+{
+    if (g_mid_AppInputStream___read != NULL) return;
     jclass appInputStreamClass     = (*jni)->FindClass(jni, "sun/security/ssl/AppInputStream");
     g_mid_AppInputStream___read    = (*jni)->GetMethodID(jni, appInputStreamClass, "__read", "([BII)I");
     g_fid_AppInputStream_socket    = (*jni)->GetFieldID(jni, appInputStreamClass, "c", "Lsun/security/ssl/SSLSocketImpl;");
+    if (g_fid_AppInputStream_socket == NULL) {
+        jboolean flag = (*jni)->ExceptionCheck(jni);
+        if (flag) (*jni)->ExceptionClear(jni);   
+        //support for JDK 9, JDK 10
+        g_fid_AppInputStream_socket = (*jni)->GetFieldID(jni, appInputStreamClass, "socket", "Lsun/security/ssl/SSLSocketImpl;");
+    }
+}
 
+static void
+initSSLEngineImplGlobals(JNIEnv *jni) 
+{
+    if (g_mid_SSLEngineImpl___unwrap != NULL) return;
     jclass sslEngineImplClass      = (*jni)->FindClass(jni, "sun/security/ssl/SSLEngineImpl");
     g_mid_SSLEngineImpl___unwrap   = (*jni)->GetMethodID(jni, sslEngineImplClass, "__unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
     g_mid_SSLEngineImpl___wrap     = (*jni)->GetMethodID(jni, sslEngineImplClass, "__wrap", "([Ljava/nio/ByteBuffer;IILjava/nio/ByteBuffer;)Ljavax/net/ssl/SSLEngineResult;");
@@ -175,6 +202,7 @@ JNIEXPORT jobject JNICALL
 Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject netData, jobjectArray appData, jint offset, jint len)
 {
     initJniGlobals(jni);
+    initSSLEngineImplGlobals(jni);
 
     //call the original method
     jobject res = (*jni)->CallObjectMethod(jni, obj, g_mid_SSLEngineImpl___unwrap, netData, appData, offset, len);
@@ -195,6 +223,7 @@ JNIEXPORT jobject JNICALL
 Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray appData, jint offset, jint len, jobject netData) 
 {
     initJniGlobals(jni);
+    initSSLEngineImplGlobals(jni);
 
     jobject session = (*jni)->CallObjectMethod(jni, obj, g_mid_SSLEngineImpl_getSession);
     for(int i=offset;i<len - offset;i++) {
@@ -216,6 +245,7 @@ JNIEXPORT void JNICALL
 Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
     initJniGlobals(jni);
+    initAppOutputStreamGlobals(jni);
 
     jobject socket  = (*jni)->GetObjectField(jni, obj, g_fid_AppOutputStream_socket);
     jobject session = (*jni)->CallObjectMethod(jni, socket, g_mid_SSLSocketImpl_getSession);
@@ -230,6 +260,7 @@ JNIEXPORT jint JNICALL
 Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
     initJniGlobals(jni);
+    initAppInputStreamGlobals(jni);
 
     //call the original method
     jint res = (*jni)->CallIntMethod(jni, obj, g_mid_AppInputStream___read, buf, offset, len);

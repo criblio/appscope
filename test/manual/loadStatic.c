@@ -15,8 +15,12 @@
 #include <alloca.h>
 #include <elf.h>
 #include <sys/auxv.h>
+#include <sys/prctl.h>
 
 #define USE_MMAP 1
+#define HEAP_SIZE (size_t)(200 * 1024)
+// 1Mb + an 8kb guard
+#define STACK_SIZE (size_t)(1024 * 1024) + (8 * 1024)
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 #define AUX_ENT(id, val) \
@@ -29,7 +33,7 @@ static char *g_exec_file;
 
 void
 usage(char *prog) {
-  fprintf(stderr,"usage: %s [-v] -f static-executable\n", prog);
+  fprintf(stderr,"usage: %s static-executable args-for-executable\n", prog);
   exit(-1);
 }
 
@@ -126,7 +130,7 @@ load_sections(char *buf, char *addr, size_t mlen)
     return 0;
 }
 
-static int
+static Elf64_Addr
 map_segment(char *buf, Elf64_Phdr *phead)
 {
     int prot;
@@ -161,24 +165,26 @@ map_segment(char *buf, Elf64_Phdr *phead)
         return -1;
     }
 
-    return 0;
+    laddr = addr + phead->p_memsz;
+    return (Elf64_Addr)ROUND_UP((Elf64_Addr)laddr, pgsz);
 }
 
-static int
+static Elf64_Addr
 load_elf(char *buf)
 {
     int i;
     Elf64_Ehdr *elf = (Elf64_Ehdr *)buf;
     Elf64_Phdr *phead = (Elf64_Phdr *)&buf[elf->e_phoff];
     Elf64_Half pnum = elf->e_phnum;
+    Elf64_Addr endaddr = 0;
 
     for (i = 0; i < pnum; i++) {
         if (phead[i].p_type == PT_LOAD) {
-            map_segment(buf, &phead[i]);
+            endaddr = map_segment(buf, &phead[i]);
         }
     }
 
-    return 0;
+    return endaddr;
 }
 
 static uint64_t
@@ -230,6 +236,47 @@ get_symbol(char *buf, char *sname)
 }
 
 static int
+unmap_all(char *buf)
+{
+    // wait on this until we are in the library
+    return 0;
+    
+    Elf64_Half phnum;
+    int flen, i;
+    int pgsz = sysconf(_SC_PAGESIZE);;
+    Elf64_Phdr *phead;
+    
+    if ((flen = get_file_size(g_exec_file)) == -1) {
+        printf("%s:%d ERROR: file size\n", __FUNCTION__, __LINE__);
+        return -1;
+    }
+
+    dump_elf(buf, flen);
+
+    if ((phead = (Elf64_Phdr *)getauxval(AT_PHDR)) == 0) {
+        perror("unmap_all: getauxval");
+        return -1;
+    }
+
+    if ((phnum = (Elf64_Half)getauxval(AT_PHNUM)) == 0) {
+        perror("unmap_all: getauxval");
+        return -1;
+    }
+
+    for (i = 0; i < phnum; i++) {
+        if (phead[i].p_type == PT_LOAD) {
+            if (munmap((void *)ROUND_DOWN(phead[i].p_vaddr, pgsz), phead[i].p_memsz) == -1) {
+                perror("unmap_all: munmap");
+                return -1;
+            }
+        }
+
+    }
+
+    return 0;
+}
+
+static int
 copy_strings(char *buf, uint64_t sp, int argc, char **argv, char **env)
 {
     int i;
@@ -237,7 +284,7 @@ copy_strings(char *buf, uint64_t sp, int argc, char **argv, char **env)
     Elf64_Ehdr *elf;
     Elf64_Phdr *phead;
     char **spp = (char **)sp;
-    uint64_t cnt = (uint64_t)argc;
+    uint64_t cnt = (uint64_t)argc - 1;
     Elf64_Addr *elf_info;
     
     if (!buf || !spp || !argv || !*argv || !env || !*env) return -1;
@@ -248,10 +295,10 @@ copy_strings(char *buf, uint64_t sp, int argc, char **argv, char **env)
     // do argc
     *spp++ = (char *)cnt;
     
-    // do argv
-    for (i = 0; i < argc; i++) {
-        if (&argv[i] && spp) {
-            *spp++ = argv[i];
+    // do argv; start at argv[1] to get the app's args
+    for (i = 0; i < (argc - 1); i++) {
+        if (&argv[i + 1] && spp) {
+            *spp++ = argv[i + 1];
         } else {
             printf("%s:%d ERROR: arg entry is not correct\n", __FUNCTION__, __LINE__);
             return -1;
@@ -317,14 +364,15 @@ copy_strings(char *buf, uint64_t sp, int argc, char **argv, char **env)
    
 //The first six integer or pointer arguments are passed in registers RDI, RSI, RDX, RCX, R8, R9
 static int
-set_go(char *buf, int argc, char **argv, char **env)
+set_go(char *buf, int argc, char **argv, char **env, Elf64_Addr laddr)
 {
+    //int pgsz = sysconf(_SC_PAGESIZE);
     uint64_t res;
     char *sp, *heap;
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
 
-    // create a heap
-    if ((heap = mmap(NULL, (size_t)(200 * 1024),
+    // create a heap (void *)ROUND_UP(laddr + pgsz, pgsz)  | MAP_FIXED
+    if ((heap = mmap(NULL, HEAP_SIZE,
                      PROT_READ | PROT_WRITE,
                      MAP_PRIVATE | MAP_ANONYMOUS,
                      -1, (off_t)NULL)) == MAP_FAILED) {
@@ -332,8 +380,8 @@ set_go(char *buf, int argc, char **argv, char **env)
         return -1;
     }
 
-    // create a stack
-    if ((sp = mmap(NULL, (size_t)(1024 * 1024) + (8 * 1024),
+    // create a stack (void *)ROUND_UP(laddr + pgsz + HEAP_SIZE, pgsz)  | MAP_FIXED
+    if ((sp = mmap(NULL, STACK_SIZE,
                    PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN,
                    -1, (off_t)NULL)) == MAP_FAILED) {
@@ -343,8 +391,20 @@ set_go(char *buf, int argc, char **argv, char **env)
 
     // build the stack and change the heap
     copy_strings(buf, (uint64_t)sp, argc, argv, env);
+
+    unmap_all(buf);
     brk(heap);
-    
+#if 0
+    if (prctl(PR_SET_MM, PR_SET_MM_START_STACK, (unsigned long)sp,
+              (unsigned long)0, (unsigned long)0) == -1) {
+        perror("set_go:prctl:PR_SET_MM_START_STACK");
+    }
+
+    if (prctl(PR_SET_MM, PR_SET_MM_BRK, (unsigned long)heap,
+              (unsigned long)0, (unsigned long)0) == -1) {
+        perror("set_go:prctl:PR_SET_MM_BRK");
+    }
+#endif    
     __asm__ volatile (
         "mov %1, %%r12 \n"
         "mov %2, %%rsp \n"
@@ -422,27 +482,20 @@ get_elf(char *path)
 int
 main(int argc, char **argv, char **env)
 {
-    int opt, verbose = 0, flen;
+    int flen;
     char *buf;
     Elf64_Ehdr *ehdr;
-    //int (*statexec)(int, char **);
-
+    Elf64_Addr lastaddr;
+    
     printf("Starting interpose test\n");
 
     //check command line arguments 
-    if (argc != 2) {
+    if (argc < 2) {
         usage(argv[0]);
         exit(1);
     }
-    
-    while ((opt = getopt(argc, argv, "vhf:")) > 0) {
-        switch (opt) {
-        case 'v': verbose++; break;
-        case 'f': g_exec_file = optarg; break;
-        case 'h': default: usage(argv[0]); break;
-        }
-    }
-    
+
+    g_exec_file = argv[1];
     printf("%s:%d loading %s\n", __FUNCTION__, __LINE__, g_exec_file);
 
     if ((buf = get_elf(g_exec_file)) == NULL) {
@@ -465,10 +518,11 @@ main(int argc, char **argv, char **env)
     ehdr = (Elf64_Ehdr *)buf;
     printf("%s:%d type: %d\n", __FUNCTION__, __LINE__, ehdr->e_type);
 
-    load_elf(buf);
+    lastaddr = load_elf(buf);
+    printf("%s:%d last mapped addr 0x%lx\n", __FUNCTION__, __LINE__, lastaddr);
     printf("%s:%d sym @ 0x%lx\n", __FUNCTION__, __LINE__, get_symbol(buf, "__environ"));
 
-    set_go(buf, argc, argv, env);
+    set_go(buf, argc, argv, env, lastaddr);
 
     if ((flen = get_file_size(g_exec_file)) == -1) {
         printf("%s:%d ERROR: file size\n", __FUNCTION__, __LINE__);

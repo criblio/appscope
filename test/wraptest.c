@@ -54,7 +54,7 @@ testFSDuration(void** state)
     assert_int_equal(cfgMtcVerbosity(cfg), CFG_MAX_VERBOSITY);
    
     // Start the duration timer with a read
-    fd = open("./scope.sh", O_RDONLY);
+    fd = open("./scope_env.sh", O_RDONLY);
     assert_return_code(fd, errno);
 
     rc = read(fd, buf, 16);

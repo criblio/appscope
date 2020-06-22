@@ -77,6 +77,15 @@ initAppOutputStreamGlobals(JNIEnv *jni)
     if (g_fid_AppOutputStream_socket == NULL) {
         jboolean flag = (*jni)->ExceptionCheck(jni);
         if (flag) (*jni)->ExceptionClear(jni);
+        //support for JDK 11 - 14
+        g_fid_AppOutputStream_socket = (*jni)->GetFieldID(jni, appOutputStreamClass, "this$0", "Lsun/security/ssl/SSLSocketImpl;");
+        if ( g_fid_AppOutputStream_socket != NULL) {
+            printf("g_fid_AppOutputStream_socket found\n");
+        }
+    }
+    if (g_fid_AppOutputStream_socket == NULL) {
+        jboolean flag = (*jni)->ExceptionCheck(jni);
+        if (flag) (*jni)->ExceptionClear(jni);
     }
 }
 
@@ -99,7 +108,16 @@ initAppInputStreamGlobals(JNIEnv *jni)
     }
     if (g_fid_AppInputStream_socket == NULL) {
         jboolean flag = (*jni)->ExceptionCheck(jni);
-        if (flag) (*jni)->ExceptionClear(jni);   
+        if (flag) (*jni)->ExceptionClear(jni);  
+        //support for JDK 11 - 14
+        g_fid_AppInputStream_socket = (*jni)->GetFieldID(jni, appInputStreamClass, "this$0", "Lsun/security/ssl/SSLSocketImpl;");
+        if ( g_fid_AppInputStream_socket != NULL) {
+            printf("g_fid_AppInputStream_socket found\n");
+        }
+    }
+    if (g_fid_AppInputStream_socket == NULL) {
+        jboolean flag = (*jni)->ExceptionCheck(jni);
+        if (flag) (*jni)->ExceptionClear(jni);
     }
 }
 

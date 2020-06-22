@@ -29,16 +29,17 @@ struct _transport_t
                        const struct addrinfo *,
                        struct addrinfo **);
     int (*fclose)(FILE*);
-    FILE* (*fdopen)(int, const char *);
+    FILE *(*fdopen)(int, const char *);
     union {
         struct {
             int sock;
-            char* host;
-            char* port;
+            int connect;
+            char *host;
+            char *port;
         } net;
         struct {
-            char* path;
-            FILE* stream;
+            char *path;
+            FILE *stream;
             int stdout;  // Flag to indicate that stream is stdout
             int stderr;  // Flag to indicate that stream is stderr
             cfg_buffer_t buf_policy;
@@ -117,6 +118,14 @@ placeDescriptor(int fd, transport_t *t)
     return -1;
 }
 
+cfg_transport_t
+transportType(transport_t *trans)
+{
+    if (!trans) return (cfg_transport_t)-1;
+
+    return trans->type;
+}
+
 int
 transportConnection(transport_t *trans)
 {
@@ -149,7 +158,7 @@ transportNeedsConnection(transport_t *trans)
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            return (trans->net.sock == -1);
+            return (trans->net.connect != 1);
         case CFG_FILE:
             // This checks to see if our file descriptor has been
             // closed by our process.  (errno == EBADF) Stream buffering
@@ -178,6 +187,7 @@ transportDisconnect(transport_t *trans)
         case CFG_UDP:
         case CFG_TCP:
             if (trans->net.sock != -1) trans->close(trans->net.sock);
+            trans->net.connect = 0;
             trans->net.sock = -1;
             break;
         case CFG_FILE:
@@ -197,11 +207,77 @@ transportDisconnect(transport_t *trans)
 }
 
 static int
+isConnected(transport_t *trans)
+{
+    int rc, opt, flags;
+    fd_set fdset;
+    socklen_t slen;
+    struct timeval tv; 
+
+    tv.tv_sec = 0;
+    tv.tv_usec = 50000;  // TODO: ummm....
+
+    FD_ZERO(&fdset);
+    FD_SET(trans->net.sock, &fdset);
+    rc = select(1, NULL, &fdset, NULL, &tv);
+    if (rc == 0) {
+        // We timed out, reset
+        trans->net.connect = 0;
+    } else if (rc > 0) {
+        // Socket selected for write, next check for an error
+        slen = sizeof(int);
+        if (getsockopt(trans->net.sock, SOL_SOCKET, SO_ERROR, (void*)(&opt), &slen) < 0) {
+            scopeLog("ERROR:isConnected:getsockopt", trans->net.sock, CFG_LOG_DEBUG);
+            return 0;
+        }
+
+        // Check the value returned...
+        if (opt) {
+            scopeLog("ERROR:isConnected:getsockopt:value", trans->net.sock, CFG_LOG_DEBUG);
+            return 0;
+        }
+
+        // Move this descriptor up out of the way
+        trans->net.sock = placeDescriptor(trans->net.sock, trans);
+        if (trans->net.sock == -1) return 0;
+
+        // Set the socket to close on exec
+        flags = trans->fcntl(trans->net.sock, F_GETFD, 0);
+        if (trans->fcntl(trans->net.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
+            DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
+        }
+
+        return 1;
+    }
+
+    return 0;
+}
+
+static int
 transportConnectSocket(transport_t *trans)
 {
+    int flags;
     struct addrinfo* addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
+
+    // Trying to connect
+    if (trans->net.connect == -1) {
+        if (isConnected(trans)) {
+            trans->net.connect = 1;
+
+            if (trans->type == CFG_TCP) {
+                // Set a TCP socket to blocking
+                flags = trans->fcntl(trans->net.sock, F_GETFL, 0);
+                flags &= (~O_NONBLOCK);
+                if (trans->fcntl(trans->net.sock, F_SETFL, flags) == -1) {
+                    DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
+                }
+            }
+        }
+        return 0;
+    }
+
     switch (trans->type) {
         case CFG_UDP:
             hints.ai_socktype = SOCK_DGRAM;  // For UDP
@@ -229,9 +305,22 @@ transportConnectSocket(transport_t *trans)
 
         if (trans->net.sock == -1) continue;
 
+        // Connect will hang in some cases; start by setting non-blocking
+        if ((flags = trans->fcntl(trans->net.sock, F_GETFL, NULL)) < 0) continue;
+
+        if ((flags & O_NONBLOCK) == 0) {
+            flags |= O_NONBLOCK;
+            if (trans->fcntl(trans->net.sock, F_SETFL, flags) < 0) continue;
+        }
+
         if (trans->connect(trans->net.sock,
                            addr->ai_addr,
                            addr->ai_addrlen) == -1) {
+
+            if (errno == EINPROGRESS) {
+                trans->net.connect = -1;
+                break;
+            }
 
             // We could create a sock, but not connect.  Clean up.
             transportDisconnect(trans);
@@ -242,27 +331,6 @@ transportConnectSocket(transport_t *trans)
     }
 
     if (addr_list) freeaddrinfo(addr_list);
-
-    // If no connection was made above, then there's nothing more to do
-    if (trans->net.sock == -1) return 0;
-
-    // Move this descriptor up out of the way
-    trans->net.sock = placeDescriptor(trans->net.sock, trans);
-    if (trans->net.sock == -1) return 0;
-
-    // Set the socket to close on exec
-    int flags = trans->fcntl(trans->net.sock, F_GETFD, 0);
-    if (trans->fcntl(trans->net.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
-        DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
-    }
-
-    if (trans->type == CFG_UDP) {
-        // Set the socket to non blocking
-        int flags = trans->fcntl(trans->net.sock, F_GETFL, 0);
-        if (trans->fcntl(trans->net.sock, F_SETFL, flags | O_NONBLOCK) == -1) {
-            DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
-        }
-    }
 
     return (trans->net.sock != -1);
 }
@@ -372,7 +440,7 @@ transportCreateTCP(const char *host, const char *port)
         return trans;
     }
 
-    if (!transportConnect(trans)) return trans;
+    transportConnect(trans);
 
     return trans;
 }
@@ -398,7 +466,7 @@ transportCreateUdp(const char* host, const char* port)
         return t;
     }
 
-    if (!transportConnect(t))  return t;
+    transportConnect(t);
 
     return t;
 }
@@ -425,7 +493,7 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
     t->file.stdout = !strcmp(path, "stdout");
     t->file.stderr = !strcmp(path, "stderr");
 
-    if (!transportConnect(t)) return t;
+    transportConnect(t);
 
     return t;
 }
@@ -507,25 +575,25 @@ transportDestroy(transport_t** transport)
 }
 
 int
-transportSend(transport_t* t, const char* msg)
+transportSend(transport_t *trans, const char *msg)
 {
-    if (!t || !msg) return -1;
+    if (!trans || !msg) return -1;
 
-    switch (t->type) {
+    switch (trans->type) {
         case CFG_UDP:
-            if (t->net.sock != -1) {
-                if (!t->send) {
+            if (trans->net.sock != -1) {
+                if (!trans->send) {
                     DBG(NULL);
                     break;
                 }
-                int rc = t->send(t->net.sock, msg, strlen(msg), 0);
+                int rc = trans->send(trans->net.sock, msg, strlen(msg), 0);
 
                 if (rc < 0) {
                     switch (errno) {
                     case EBADF:
                         DBG(NULL);
-                        transportDisconnect(t);
-                        transportConnect(t);
+                        transportDisconnect(trans);
+                        transportConnect(trans);
                         return -1;
                     case EWOULDBLOCK:
                         DBG(NULL);
@@ -534,11 +602,15 @@ transportSend(transport_t* t, const char* msg)
                         DBG(NULL);
                     }
                 }
+            } else {
+                // A socket is configured, but we don't have a socket, so...
+                transportDisconnect(trans);
+                transportConnect(trans);
             }
             break;
         case CFG_TCP:
-            if (t->net.sock != -1) {
-                if (!t->send) {
+            if (trans->net.sock != -1) {
+                if (!trans->send) {
                     DBG(NULL);
                     break;
                 }
@@ -552,7 +624,7 @@ transportSend(transport_t* t, const char* msg)
                 int rc;
 
                 while (bytes_to_send > 0) {
-                    rc = t->send(t->net.sock, &msg[bytes_sent], bytes_to_send, flags);
+                    rc = trans->send(trans->net.sock, &msg[bytes_sent], bytes_to_send, flags);
                     if (rc <= 0) break;
 
                     if (rc != bytes_to_send) {
@@ -568,24 +640,28 @@ transportSend(transport_t* t, const char* msg)
                     case EBADF:
                     case EPIPE:
                         DBG(NULL);
-                        transportDisconnect(t);
-                        transportConnect(t);
+                        transportDisconnect(trans);
+                        transportConnect(trans);
                         return -1;
                     default:
                         DBG(NULL);
                     }
                 }
+            } else {
+                // A socket is configured, but we don't have a socket, so...
+                transportDisconnect(trans);
+                transportConnect(trans);
             }
             break;
         case CFG_FILE:
-            if (t->file.stream) {
+            if (trans->file.stream) {
                 size_t msg_size = strlen(msg);
-                int bytes = t->fwrite(msg, 1, msg_size, t->file.stream);
+                int bytes = trans->fwrite(msg, 1, msg_size, trans->file.stream);
                 if (bytes != msg_size) {
                     if (errno == EBADF) {
                         DBG("%d %d", bytes, msg_size);
-                        transportDisconnect(t);
-                        transportConnect(t);
+                        transportDisconnect(trans);
+                        transportConnect(trans);
                         return -1;
                     }
                     DBG("%d %d", bytes, msg_size);
@@ -598,7 +674,7 @@ transportSend(transport_t* t, const char* msg)
         case CFG_SHM:
             return -1;
         default:
-            DBG("%d", t->type);
+            DBG("%d", trans->type);
             return -1;
     }
      return 0;

@@ -212,17 +212,30 @@ isConnected(transport_t *trans)
     int rc, opt, flags;
     fd_set fdset;
     socklen_t slen;
-    struct timeval tv; 
+    struct timeval tv;
+    //static int retries = 0;
 
     tv.tv_sec = 0;
-    tv.tv_usec = 50000;  // TODO: ummm....
+    tv.tv_usec = 0; //1000;  // 5 sec reset; 1ms timer * 5000 times
 
     FD_ZERO(&fdset);
     FD_SET(trans->net.sock, &fdset);
     rc = select(1, NULL, &fdset, NULL, &tv);
-    if (rc == 0) {
+    if (rc < 0) {
+        if (errno == EBADF) {
+            transportDisconnect(trans);
+            trans->net.connect = 0;
+        }
+    /*
+    } else if (rc == 0) {
         // We timed out, reset
-        trans->net.connect = 0;
+        if (++retries > 5000) {
+            transportDisconnect(trans);
+            trans->net.connect = 0;
+            retries = 0;
+        }
+
+    */
     } else if (rc > 0) {
         // Socket selected for write, next check for an error
         slen = sizeof(int);
@@ -247,6 +260,15 @@ isConnected(transport_t *trans)
             DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
         }
 
+        if (trans->type == CFG_TCP) {
+            // Set a TCP socket to blocking
+            flags = trans->fcntl(trans->net.sock, F_GETFL, 0);
+            flags &= (~O_NONBLOCK);
+            if (trans->fcntl(trans->net.sock, F_SETFL, flags) == -1) {
+                DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
+            }
+        }
+
         return 1;
     }
 
@@ -265,15 +287,6 @@ transportConnectSocket(transport_t *trans)
     if (trans->net.connect == -1) {
         if (isConnected(trans)) {
             trans->net.connect = 1;
-
-            if (trans->type == CFG_TCP) {
-                // Set a TCP socket to blocking
-                flags = trans->fcntl(trans->net.sock, F_GETFL, 0);
-                flags &= (~O_NONBLOCK);
-                if (trans->fcntl(trans->net.sock, F_SETFL, flags) == -1) {
-                    DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
-                }
-            }
         }
         return 0;
     }

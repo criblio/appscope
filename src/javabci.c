@@ -211,7 +211,7 @@ javaFindMethodIndex(java_class_t *info, const char *method, const char *signatur
         char *method_desc = javaGetUtf8String(info, descriptor_index);
 
         if (strcmp(method, method_name) == 0 && strcmp(signature, method_desc) == 0) {
-        idx = i;
+            idx = i;
         }
         free(method_name);
         free(method_desc);
@@ -247,7 +247,7 @@ javaConvertMethodToNative(java_class_t *info, int methodIndex)
     uint16_t accessFlags     = be16toh(*((uint16_t *)methodAddr));
     uint16_t attributesCount = 0;
 
-    *((uint16_t *)addr)        = htobe16(accessFlags | ACC_NATIVE | ACC_PUBLIC);
+    *((uint16_t *)addr)        = htobe16(accessFlags | ACC_NATIVE);
     *((uint16_t *)(addr + 6))  = htobe16(attributesCount);
 
     info->length += bufsize - len;
@@ -330,9 +330,17 @@ javaWriteClass(unsigned char *dest, java_class_t *info)
     *((uint16_t *)addr) = htobe16(info->constant_pool_count);   addr += 2;
     for(int i=0;i<info->constant_pool_count - 1;i++) {
         unsigned char *cp = info->constant_pool[i];
+        unsigned char tag = *((unsigned char *)cp);
         uint16_t size = javaGetTagLength(cp);
         memcpy(addr, cp, size);
         addr += size;
+        if (tag == CONSTANT_Double || tag == CONSTANT_Long) {
+            //WTF: here is what JVM spec says
+            //If a CONSTANT_Long_info or CONSTANT_Double_info structure is the entry at index n in the constant_pool table, 
+            //then the next usable entry in the table is located at index n+2. The constant_pool index n+1 must be valid but is 
+            //considered unusable.
+            i++;
+        }
     }
     *((uint16_t *)addr) = htobe16(info->access_flags);          addr += 2;
     *((uint16_t *)addr) = htobe16(info->this_class);            addr += 2;
@@ -383,6 +391,14 @@ javaReadClass(const unsigned char* classData)
     classInfo->constant_pool        = (unsigned char **) calloc(100 + (classInfo->constant_pool_count - 1), sizeof(unsigned char *));
     for(int i=1;i<classInfo->constant_pool_count;i++) {
         classInfo->constant_pool[i - 1] = (unsigned char *)off;
+        unsigned char tag = *((unsigned char *)off);
+        if (tag == CONSTANT_Double || tag == CONSTANT_Long) {
+            //WTF: here is what JVM spec says
+            //If a CONSTANT_Long_info or CONSTANT_Double_info structure is the entry at index n in the constant_pool table, 
+            //then the next usable entry in the table is located at index n+2. The constant_pool index n+1 must be valid but is 
+            //considered unusable.
+            i++;
+        }
         off += javaGetTagLength(off);
     }
 

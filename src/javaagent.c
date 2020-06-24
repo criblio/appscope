@@ -140,7 +140,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         (strcmp(name, "sun/security/ssl/AppOutputStream") == 0 || 
          strcmp(name, "sun/security/ssl/SSLSocketImpl$AppOutputStream") == 0)) {
 
-        scopeLog("installing Java SSL hooks for AppOutputStream class...", -1, CFG_LOG_DEBUG);
+        scopeLog("installing Java SSL hooks for AppOutputStream class...", -1, CFG_LOG_INFO);
 
         java_class_t *classInfo = javaReadClass(class_data);
 
@@ -166,7 +166,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         (strcmp(name, "sun/security/ssl/AppInputStream") == 0 ||
          strcmp(name, "sun/security/ssl/SSLSocketImpl$AppInputStream") == 0)) {
 
-        scopeLog("installing Java SSL hooks for AppInputStream class...", -1, CFG_LOG_DEBUG);
+        scopeLog("installing Java SSL hooks for AppInputStream class...", -1, CFG_LOG_INFO);
 
         java_class_t *classInfo = javaReadClass(class_data);
 
@@ -189,7 +189,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     }
 
     if (name != NULL && strcmp(name, "sun/security/ssl/SSLEngineImpl") == 0) {
-        scopeLog("installing Java SSL hooks for SSLEngineImpl class...", -1, CFG_LOG_DEBUG);
+        scopeLog("installing Java SSL hooks for SSLEngineImpl class...", -1, CFG_LOG_INFO);
 
         java_class_t *classInfo = javaReadClass(class_data);
 

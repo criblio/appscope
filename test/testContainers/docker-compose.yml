@@ -51,7 +51,6 @@ services:
       context: .
       dockerfile: ./elastic/Dockerfile
 
-
   tls:
     build:
       context: .
@@ -63,3 +62,8 @@ services:
     ports:
       - 6379:6379
       - 27017:27017
+
+  java:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile

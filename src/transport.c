@@ -117,6 +117,14 @@ placeDescriptor(int fd, transport_t *t)
     return -1;
 }
 
+cfg_transport_t
+transportType(transport_t *trans)
+{
+    if (!trans) return (cfg_transport_t)-1;
+
+    return trans->type;
+}
+
 int
 transportConnection(transport_t *trans)
 {

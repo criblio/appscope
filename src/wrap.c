@@ -220,6 +220,7 @@ remoteConfig()
     int timeout;
     struct pollfd fds;
     int rc, success, numtries;
+    cfg_transport_t ttype = ctlTransportType(g_ctl);
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
@@ -228,7 +229,14 @@ remoteConfig()
     timeout = (g_thread.interval * 1000);
     bzero(&fds, sizeof(fds));
     fds.fd = ctlConnection(g_ctl);
-    fds.events = POLLIN;
+
+    if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
+        (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {
+        fds.events = 0;
+    } else {
+        fds.events = POLLIN;
+    }
+
     rc = poll(&fds, 1, timeout);
 
     /*

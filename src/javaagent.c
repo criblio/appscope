@@ -219,7 +219,6 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         *new_class_data = dest;
         javaDestroy(&classInfo);
     }
-
 }
 
 static void 
@@ -268,9 +267,7 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
     //call the original method
     jobject res = (*jni)->CallObjectMethod(jni, obj, g_mid_SSLEngineImpl___wrap, appData, offset, len, netData);
     return res;
-} 
-
-
+}
 
 JNIEXPORT void JNICALL 
 Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
@@ -292,12 +289,11 @@ Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray
     (*jni)->CallVoidMethod(jni, obj, g_mid_AppOutputStream___write, buf, offset, len);
 }
 
-
+ //support for JDK 11 - 14 where AppOutputStream in a nested class defined inside SSLSocketImpl
 JNIEXPORT void JNICALL 
 Java_sun_security_ssl_SSLSocketImpl_00024AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) {
     Java_sun_security_ssl_AppOutputStream_write(jni, obj, buf, offset, len);
 }
-
 
 JNIEXPORT jint JNICALL 
 Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
@@ -322,11 +318,11 @@ Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray b
     return res;
 }
 
+//support for JDK 11 - 14 where AppInputStream in a nested class defined inside SSLSocketImpl
 JNIEXPORT void JNICALL 
 Java_sun_security_ssl_SSLSocketImpl_00024AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) {
     Java_sun_security_ssl_AppInputStream_read(jni, obj, buf, offset, len);
 }
-
 
 JNIEXPORT jint JNICALL 
 Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) 

@@ -169,7 +169,7 @@ getCodeAttributeAddress(java_class_t *info, unsigned char *method)
         uint32_t attr_length     = be32toh(*((uint32_t *)(off + 2)));
         char *attr_name          = javaGetUtf8String(info, attr_name_index);
         if (strcmp(attr_name, "Code")==0) {
-        code = off;
+            code = off;
         }
         free(attr_name);
         if (code != NULL) break;
@@ -186,12 +186,12 @@ javaFindClassIndex(java_class_t *info, const char *className)
         unsigned char *cp_info = info->constant_pool[i - 1];
         uint8_t tag = *((uint8_t *)cp_info);
         if(tag == CONSTANT_Class) {
-        uint16_t name_index = be16toh(*((uint16_t *)(cp_info + 1)));
-        char *name = javaGetUtf8String(info, name_index);
-        if (strcmp(name, className) == 0) {
-            idx = i;
-        }
-        free(name);
+            uint16_t name_index = be16toh(*((uint16_t *)(cp_info + 1)));
+            char *name = javaGetUtf8String(info, name_index);
+            if (strcmp(name, className) == 0) {
+                idx = i;
+            }
+            free(name);
         }
         if (idx != -1) break;
     }
@@ -237,18 +237,18 @@ void
 javaConvertMethodToNative(java_class_t *info, int methodIndex) 
 {
     unsigned char *methodAddr = info->methods[methodIndex];
-    uint32_t len     = javaGetMethodLength(methodAddr);
-    size_t bufsize   = 8;
-    unsigned char *addr       = malloc(bufsize);
+    uint32_t len   = javaGetMethodLength(methodAddr);
+    size_t bufsize = 8;
+    unsigned char *addr        = malloc(bufsize);
     info->methods[methodIndex] = addr;
 
     memcpy(addr, methodAddr, bufsize);
 
-    uint16_t accessFlags     = be16toh(*((uint16_t *)methodAddr));
-    uint16_t attributesCount = 0;
+    uint16_t accessFlags      = be16toh(*((uint16_t *)methodAddr));
+    uint16_t attributesCount  = 0;
 
-    *((uint16_t *)addr)        = htobe16(accessFlags | ACC_NATIVE);
-    *((uint16_t *)(addr + 6))  = htobe16(attributesCount);
+    *((uint16_t *)addr)       = htobe16(accessFlags | ACC_NATIVE);
+    *((uint16_t *)(addr + 6)) = htobe16(attributesCount);
 
     info->length += bufsize - len;
 }
@@ -335,7 +335,7 @@ javaWriteClass(unsigned char *dest, java_class_t *info)
         memcpy(addr, cp, size);
         addr += size;
         if (tag == CONSTANT_Double || tag == CONSTANT_Long) {
-            //WTF: here is what JVM spec says
+            //this is what JVM spec says here: https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.4.5
             //If a CONSTANT_Long_info or CONSTANT_Double_info structure is the entry at index n in the constant_pool table, 
             //then the next usable entry in the table is located at index n+2. The constant_pool index n+1 must be valid but is 
             //considered unusable.
@@ -393,7 +393,7 @@ javaReadClass(const unsigned char* classData)
         classInfo->constant_pool[i - 1] = (unsigned char *)off;
         unsigned char tag = *((unsigned char *)off);
         if (tag == CONSTANT_Double || tag == CONSTANT_Long) {
-            //WTF: here is what JVM spec says
+            //this is what JVM spec says here: https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.4.5
             //If a CONSTANT_Long_info or CONSTANT_Double_info structure is the entry at index n in the constant_pool table, 
             //then the next usable entry in the table is located at index n+2. The constant_pool index n+1 must be valid but is 
             //considered unusable.

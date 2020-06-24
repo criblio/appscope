@@ -54,13 +54,20 @@ static void
 initAppOutputStreamGlobals(JNIEnv *jni)
 {
     if (g_mid_AppOutputStream___write != NULL) return;
-    jclass appOutputStreamClass    = (*jni)->FindClass(jni, "sun/security/ssl/AppOutputStream");
+    jclass appOutputStreamClass = (*jni)->FindClass(jni, "sun/security/ssl/AppOutputStream");
     if (appOutputStreamClass == NULL) {
         // JDK 11
         appOutputStreamClass = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl$AppOutputStream");
     }
-    g_mid_AppOutputStream___write  = (*jni)->GetMethodID(jni, appOutputStreamClass, "__write", "([BII)V");
-    g_fid_AppOutputStream_socket   = (*jni)->GetFieldID(jni, appOutputStreamClass, "c", "Lsun/security/ssl/SSLSocketImpl;");
+    g_mid_AppOutputStream___write = (*jni)->GetMethodID(jni, appOutputStreamClass, "__write", "([BII)V");
+    /*
+    We are trying to find a private field of type SSLSocketImpl which holds a reference to the socket object.
+    - in JDK 6-8 the field is called "c"
+    - in JDK 9-10 the field is called "socket"
+    - in JDK 11-14 AppOutputStream is a nested private class inside the SSLSocketImpl class, 
+      so we need to find a reference to the instance of its enclosing class which is an implicit field called "this$0"
+    */
+    g_fid_AppOutputStream_socket = (*jni)->GetFieldID(jni, appOutputStreamClass, "c", "Lsun/security/ssl/SSLSocketImpl;");
     if (g_fid_AppOutputStream_socket == NULL) {
         //support for JDK 9, JDK 10
         g_fid_AppOutputStream_socket = (*jni)->GetFieldID(jni, appOutputStreamClass, "socket", "Lsun/security/ssl/SSLSocketImpl;");
@@ -79,13 +86,20 @@ static void
 initAppInputStreamGlobals(JNIEnv *jni)
 {
     if (g_mid_AppInputStream___read != NULL) return;
-    jclass appInputStreamClass     = (*jni)->FindClass(jni, "sun/security/ssl/AppInputStream");
+    jclass appInputStreamClass = (*jni)->FindClass(jni, "sun/security/ssl/AppInputStream");
     if (appInputStreamClass == NULL) {
         // JDK 11
         appInputStreamClass  = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl$AppInputStream");
     }
-    g_mid_AppInputStream___read    = (*jni)->GetMethodID(jni, appInputStreamClass, "__read", "([BII)I");
-    g_fid_AppInputStream_socket    = (*jni)->GetFieldID(jni, appInputStreamClass, "c", "Lsun/security/ssl/SSLSocketImpl;");
+    g_mid_AppInputStream___read = (*jni)->GetMethodID(jni, appInputStreamClass, "__read", "([BII)I");
+    /*
+    We are trying to find a private field of type SSLSocketImpl which holds a reference to the socket object.
+    - in JDK 6-8 the field is called "c"
+    - in JDK 9-10 the field is called "socket"
+    - in JDK 11-14 AppInputStream is a nested private class inside the SSLSocketImpl class, 
+      so we need to find a reference to the instance of its enclosing class which is an implicit field called "this$0"
+    */
+    g_fid_AppInputStream_socket = (*jni)->GetFieldID(jni, appInputStreamClass, "c", "Lsun/security/ssl/SSLSocketImpl;");
     if (g_fid_AppInputStream_socket == NULL) {
         //support for JDK 9, JDK 10
         g_fid_AppInputStream_socket = (*jni)->GetFieldID(jni, appInputStreamClass, "socket", "Lsun/security/ssl/SSLSocketImpl;");

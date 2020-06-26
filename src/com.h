@@ -16,6 +16,11 @@
 #include "scopetypes.h"
 #include "runtimecfg.h"
 
+#define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
+#define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
+
+extern uint64_t *g_currsheap;
+extern uint64_t *g_heapend;
 
 // Post a message from report to the command buffer
 int cmdSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);

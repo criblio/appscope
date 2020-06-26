@@ -1,7 +1,7 @@
 CWD = $(shell pwd)
 OS=linux
 CC=gcc
-CFLAGS=-fPIC -g -Wall -Wno-nonnull -D__LINUX__
+CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -D__LINUX__
 SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -D__LINUX__
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
@@ -19,7 +19,7 @@ TEST_INCLUDES=-I./src -I./contrib/cmocka/include
 TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
 
 .PHONY: all clean test
-all: libscope.so
+all: libscope.so scope
 
 $(PCRE2_AR):
 	@echo "Building pcre2"
@@ -33,7 +33,7 @@ $(FUNCHOOK_AR):
 	cd contrib/funchook/build && cmake -DCMAKE_BUILD_TYPE=Release ..
 	cd contrib/funchook/build && make distorm funchook-static
 
-libscope.so: src/wrap.c src/state.c src/report.c src/plattime.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c src/sysexec.c $(YAML_SRC) contrib/cJSON/cJSON.c
+libscope.so: src/wrap.c src/state.c src/report.c src/plattime.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c src/sysexec.c src/gocontext.S $(YAML_SRC) contrib/cJSON/cJSON.c
 	@echo "Building libscope.so ..."
 	make $(FUNCHOOK_AR)
 	make $(PCRE2_AR)
@@ -41,8 +41,11 @@ libscope.so: src/wrap.c src/state.c src/report.c src/plattime.c os/$(OS)/os.c sr
 	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
 	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/
 
+scope: src/scope.c
+	gcc -Wall -g src/scope.c -L./lib/linux -lscope -o scope
+
 clean:
-	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a
+	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a scope
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))

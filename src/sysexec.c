@@ -7,14 +7,18 @@
 #include <sys/mman.h>
 #include <elf.h>
 #include <sys/auxv.h>
+#include <sys/syscall.h>
+#include <asm/prctl.h>
+#include <sys/prctl.h>
 
 #include "dbg.h"
+#include "os.h"
+#include "com.h"
+#include "state.h"
 
 #define HEAP_SIZE (size_t)(200 * 1024)
 // 1Mb + an 8kb guard
 #define STACK_SIZE (size_t)(1024 * 1024) + (8 * 1024)
-#define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
-#define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 #define AUX_ENT(id, val) \
 	do { \
 		elf_info[i++] = id; \
@@ -47,6 +51,185 @@ get_file_size(const char *path)
     return sbuf.st_size;
 }
 #endif
+
+static void *
+getSymbol(const char *buf, char *sname)
+{
+    int i, nsyms = 0;
+    Elf64_Addr symaddr = 0;
+    Elf64_Ehdr *ehdr;
+    Elf64_Shdr *sections;
+    Elf64_Sym *symtab = NULL;
+    const char *section_strtab = NULL;
+    const char *strtab = NULL;
+    const char *sec_name = NULL;
+
+    ehdr = (Elf64_Ehdr *)buf;
+    sections = (Elf64_Shdr *)((char *)buf + ehdr->e_shoff);
+    section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
+
+    for (i = 0; i < ehdr->e_shnum; i++) {
+        sec_name = section_strtab + sections[i].sh_name;
+
+        if (sections[i].sh_type == SHT_SYMTAB) {
+            symtab = (Elf64_Sym *)((char *)buf + sections[i].sh_offset);
+            nsyms = sections[i].sh_size / sections[i].sh_entsize;
+        } else if (sections[i].sh_type == SHT_STRTAB && strcmp(sec_name, ".strtab") == 0) {
+            strtab = (const char *)(buf + sections[i].sh_offset);
+        }
+
+        if ((strtab != NULL) && (symtab != NULL)) break;
+        /*printf("section %s type = %d flags = 0x%lx addr = 0x%lx-0x%lx, size = 0x%lx off = 0x%lx\n",
+               sec_name,
+               sections[i].sh_type,
+               sections[i].sh_flags,
+               sections[i].sh_addr,
+               sections[i].sh_addr + sections[i].sh_size,
+               sections[i].sh_size,
+               sections[i].sh_offset);*/
+    }
+
+    for (i=0; i < nsyms; i++) {
+        if (strcmp(sname, strtab + symtab[i].st_name) == 0) {
+            symaddr = symtab[i].st_value;
+            printf("symbol found %s = 0x%08lx\n", strtab + symtab[i].st_name, symtab[i].st_value);
+            break;
+        }
+    }
+
+    return (void *)symaddr;
+}
+
+ssize_t (*go_syscall_write)(int, const void *, size_t);
+int (*go_syscall_open)(const char *, int, int, mode_t);
+int (*runtime_lock)(void);
+int (*runtime_unlock)(void);
+uint64_t scope_stack;
+uint64_t go_stack;
+uint64_t go_params[10];
+unsigned long scope_fs, go_fs;
+int go_what;
+
+extern int go_hook_write();
+extern int go_hook_open();
+extern void threadNow(int);
+extern int arch_prctl(int, unsigned long);
+#if 0
+static int res;
+go_hook_write() {
+__asm__ volatile  (
+    "mov %1, %%rax \n"
+    "jmp *%%rax \n"
+    : "=r"(res) /* output */
+    : "r"(go_syscall_write)
+    : "%rax"         /* clobbered register */
+    );
+}
+#endif
+#if 1
+EXPORTON int
+go_hook_test(void)
+{
+    int rc = 0;
+    int fd;
+    //int flag;
+    size_t len;
+    //mode_t mode;
+    const void *buf;
+    size_t count;
+    uint64_t initialTime;
+
+    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+        scopeLog("set_go:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    puts("from Scope");
+    calloc(1, 1024);
+
+    switch (go_what) {
+    case 1:
+        fd = (int)go_params[0];
+        buf = (void *)go_params[1];
+        count = (size_t)go_params[2];
+        initialTime = getTime();
+        doWrite(fd, initialTime, 1, buf, count, "write", BUF, 0);
+        break;
+
+    case 2:
+        buf = (char *)go_params[0];
+        len = (size_t)go_params[1];
+        //flag = (int)go_params[2];
+        //mode = (mode_t)go_params[3];
+        char path[PATH_MAX];
+
+        if (buf && (len < (PATH_MAX - 1))) {
+            memmove(path, buf, len);
+            path[len] = '\0';
+        } else {
+            scopeLog("go_hook_test:Open: null pathname", -1, CFG_LOG_ERROR);
+            break;
+        }
+
+        doOpen(-1, path, FD, "open");
+        break;
+
+    default:
+        scopeLog("go_hook_test:bad go_what", -1, CFG_LOG_ERROR);
+        break;
+    }
+
+
+
+    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
+        scopeLog("go_hook_test:arch_prctl", -1, CFG_LOG_ERROR);
+        // what to do here?
+        return -1;
+    }
+
+    return rc;
+}
+#endif
+
+static void
+initGoHook(const char *buf)
+{
+    int rc;
+    funchook_t *funchook;
+
+    if ((go_syscall_write = getSymbol(buf, "syscall.write")) == 0) {
+        return;
+    }
+
+    if ((go_syscall_open = getSymbol(buf, "os.OpenFile")) == 0) {
+        return;
+    }
+
+    //DEBUG
+    runtime_lock = getSymbol(buf, "runtime.lock");
+    runtime_unlock = getSymbol(buf, "runtime.unlock");
+    getSymbol(buf, "os.(*File).Write");
+
+    funchook = funchook_create();
+
+    if (logLevel(g_log) <= CFG_LOG_DEBUG) {
+        // TODO: add some mechanism to get the config'd log file path
+        funchook_set_debug_file(DEFAULT_LOG_PATH);
+    }
+
+    rc = funchook_prepare(funchook, (void**)&go_syscall_write, go_hook_write);
+    rc = funchook_prepare(funchook, (void**)&go_syscall_open, go_hook_open);
+
+    // hook a few Go funcs
+    rc = funchook_install(funchook, 0);
+    if (rc != 0) {
+        char msg[128];
+        snprintf(msg, sizeof(msg), "ERROR: failed to install SSL_read hook. (%s)\n",
+                funchook_error_message(funchook));
+        scopeLog(msg, -1, CFG_LOG_ERROR);
+        return;
+    }
+}
 
 static int
 load_sections(char *buf, char *addr, size_t mlen)
@@ -282,19 +465,21 @@ static int
 set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr laddr)
 {
     //int pgsz = sysconf(_SC_PAGESIZE);
-    uint64_t res;
-    char *sp, *heap;
+    uint64_t res = 0;
+    char *sp;
     Elf64_Addr start;
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
 
     // create a heap (void *)ROUND_UP(laddr + pgsz, pgsz)  | MAP_FIXED
-    if ((heap = mmap(NULL, HEAP_SIZE,
-                     PROT_READ | PROT_WRITE,
-                     MAP_PRIVATE | MAP_ANONYMOUS,
-                     -1, (off_t)NULL)) == MAP_FAILED) {
+    if ((g_currsheap = mmap(NULL, HEAP_SIZE,
+                            PROT_READ | PROT_WRITE,
+                            MAP_PRIVATE | MAP_ANONYMOUS,
+                            -1, (off_t)NULL)) == MAP_FAILED) {
         scopeLog("set_go:mmap", -1, CFG_LOG_ERROR);
         return -1;
     }
+
+    g_heapend = g_currsheap + HEAP_SIZE;
 
     // create a stack (void *)ROUND_UP(laddr + pgsz + HEAP_SIZE, pgsz)  | MAP_FIXED
     if ((sp = mmap(NULL, STACK_SIZE,
@@ -305,30 +490,46 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr ladd
         return -1;
     }
 
-    // build the stack and change the heap
+    // build the stack
     copy_strings(buf, (uint64_t)sp, argc, argv, env);
     start = ehdr->e_entry;
-    
+
+    if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
+        scopeLog("set_go:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
     unmap_all(buf, argv);
-    brk(heap);
+
 #if 0
+    rc = syscall(SYS_brk, heap);
+    printf("%s:%d rc 0x%lx heap %p\n", __FUNCTION__, __LINE__, rc, heap);
+    //if (brk(heap) == -1) scopeLog("set_go:brk", -1, CFG_LOG_ERROR);
+
     if (prctl(PR_SET_MM, PR_SET_MM_START_STACK, (unsigned long)sp,
               (unsigned long)0, (unsigned long)0) == -1) {
         scopeLog("set_go:prctl:PR_SET_MM_START_STACK", -1, CFG_LOG_ERROR);
+    } else {
+        printf("%s:%d\n", __FUNCTION__, __LINE__);
     }
 
     if (prctl(PR_SET_MM, PR_SET_MM_BRK, (unsigned long)heap,
               (unsigned long)0, (unsigned long)0) == -1) {
         scopeLog("set_go:prctl:PR_SET_MM_BRK", -1, CFG_LOG_ERROR);
+    } else {
+        printf("%s:%d heap %p sbrk %p\n", __FUNCTION__, __LINE__, heap, sbrk(0));
     }
 #endif    
+
     __asm__ volatile (
-        "mov %1, %%r12 \n"
+        "lea scope_stack(%%rip), %%r11 \n"
+        "mov %%rsp, (%%r11)  \n"
+        "mov %1, %%r11 \n"
         "mov %2, %%rsp \n"
-        "jmp *%%r12 \n"
+        "jmp *%%r11 \n"
         : "=r"(res) /* output */
         : "r"(start), "r"(sp)
-        : "%rax"         /* clobbered register */
+        : "%r11"         /* clobbered register */
     );
 
     return 0;
@@ -345,6 +546,10 @@ sys_exec(const char *buf, const char *path, int argc, const char **argv, const c
     scopeLog("sys_exec type:", ehdr->e_type, CFG_LOG_DEBUG);
 
     lastaddr = load_elf((char *)buf);
+    initGoHook(buf);
+
+    threadNow(0);
+
     set_go((char *)buf, argc, argv, env, lastaddr);
 
     return 0;

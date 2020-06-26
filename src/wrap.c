@@ -29,6 +29,7 @@
 
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
+
 static thread_timing g_thread = {0};
 static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
@@ -36,6 +37,7 @@ static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 static list_t *g_nsslist;
+
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
 
@@ -46,7 +48,7 @@ __thread int g_getdelim = 0;
 static void *periodic(void *);
 static void doConfig(config_t *);
 static void reportProcessStart(void);
-static void threadNow(int);
+void threadNow(int);
 
 #ifdef __LINUX__
 
@@ -453,7 +455,7 @@ dynConfig(void)
     return 0;
 }
 
-static void
+void
 threadNow(int sig)
 {
     static uint64_t serialize;
@@ -524,7 +526,7 @@ threadNow(int sig)
  * not started until after the app starts and is
  * past it's own init. We no longer need to rely
  * on the thread being created when an interposed
- * function is called. For nopw, we are leaving
+ * function is called. For now, we are leaving
  * the check for the thread in each interposed
  * function as a back up in case the timer has
  * an issue of some sort.
@@ -532,6 +534,8 @@ threadNow(int sig)
 static void
 threadInit()
 {
+    // DEBUG
+    return;
     if (osThreadInit(threadNow, g_thread.interval) == FALSE) {
         scopeLog("ERROR: threadInit:osThreadInit", -1, CFG_LOG_ERROR);
     }
@@ -1083,6 +1087,11 @@ init(void)
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
 #endif // __LINUX__
+
+    g_fn.calloc = dlsym(RTLD_NEXT, "calloc");
+    g_fn.malloc = dlsym(RTLD_NEXT, "malloc");
+    g_fn.free = dlsym(RTLD_NEXT, "free");
+    g_fn.realloc = dlsym(RTLD_NEXT, "realloc");
 
     setProcId(&g_proc);
 
@@ -3749,4 +3758,71 @@ getaddrinfo(const char *node, const char *service,
 
 
     return rc;
+}
+
+EXPORTON void *
+malloc(size_t size)
+{
+    uint64_t *mem;
+
+    WRAP_CHECK(malloc, NULL);
+
+    if (!g_currsheap) return g_fn.malloc(size);
+
+    atomicSwapU64((uint64_t *)&mem, (uint64_t)g_currsheap);
+
+    if ((mem + size) > g_heapend) {
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    atomicSwapU64((uint64_t *)&g_currsheap, (uint64_t)(g_currsheap + size));
+
+    return mem;
+
+}
+
+EXPORTON void *
+calloc(size_t nmemb, size_t size)
+{
+    uint64_t *mem;
+
+    WRAP_CHECK(calloc, NULL);
+
+    if (!g_currsheap) return g_fn.calloc(nmemb, size);
+
+    mem = malloc(nmemb * size);
+    if (mem) memset(mem, 0, nmemb * size);
+    return mem;
+}
+
+EXPORTON void
+free(void *ptr)
+{
+    WRAP_CHECK_VOID(free);
+
+    if (!g_currsheap) return g_fn.free(ptr);
+}
+
+EXPORTON void *
+realloc(void *ptr, size_t size)
+{
+    uint64_t *mem;
+
+    WRAP_CHECK(realloc, NULL);
+
+    if (!g_currsheap) return g_fn.realloc(ptr, size);
+
+    if (size == 0) {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    // need old size and to free ptr...not able to do that yet
+    mem = malloc(ROUND_UP(size, sizeof(uint64_t)));
+    if (!ptr) return mem;
+
+    if (mem) memmove(mem, ptr, size);
+
+    return mem;
 }

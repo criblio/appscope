@@ -69,7 +69,7 @@ endtest
 
 starttest SSLSocketClient
 cd /opt/javassl
-java -Djavax.net.ssl.trustStore=/opt/tomcat/certs/tomcat.p12 -Djavax.net.ssl.trustStorePassword=changeit SSLSocketClient > /dev/null
+java -Djavax.net.ssl.trustStore=/opt/tomcat/certs/tomcat.p12 -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=pkcs12 SSLSocketClient > /dev/null
 evaltest
 grep http-req $EVT_FILE > /dev/null
 ERR+=$?

@@ -1,8 +1,9 @@
 ARG JDK_VERSION=8
 FROM openjdk:$JDK_VERSION
 
-ENV TOMCAT_MAJOR_VERSION 8
-ENV TOMCAT_MINOR_VERSION 8.0.49
+ARG TOMCAT_MAJOR_VERSION=8
+ARG TOMCAT_MINOR_VERSION=8.0.49
+
 ENV CATALINA_HOME /opt/tomcat
 ENV PATH $PATH:$CATALINA_HOME/bin
 
@@ -25,8 +26,6 @@ RUN chmod +x /opt/test-runner/bin/test-ssl.sh
 RUN mkdir -p /opt/javassl
 COPY ./java/SSLSocketClient.java /opt/javassl/SSLSocketClient.java
 RUN javac -d /opt/javassl/ /opt/javassl/SSLSocketClient.java
-
-# EXPOSE 8443
 
 ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so

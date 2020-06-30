@@ -63,6 +63,15 @@ services:
       - 6379:6379
       - 27017:27017
 
+  java6:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 6
+        TOMCAT_MAJOR_VERSION: 7
+        TOMCAT_MINOR_VERSION: 7.0.10
+
   java7:
     build:
       context: .

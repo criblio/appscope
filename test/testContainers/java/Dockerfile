@@ -1,15 +1,15 @@
-FROM openjdk:14
-
-RUN yum install -y wget
+ARG JDK_VERSION=8
+FROM openjdk:$JDK_VERSION
 
 ENV TOMCAT_MAJOR_VERSION 8
 ENV TOMCAT_MINOR_VERSION 8.0.49
 ENV CATALINA_HOME /opt/tomcat
 ENV PATH $PATH:$CATALINA_HOME/bin
 
-RUN wget -q https://archive.apache.org/dist/tomcat/tomcat-${TOMCAT_MAJOR_VERSION}/v${TOMCAT_MINOR_VERSION}/bin/apache-tomcat-${TOMCAT_MINOR_VERSION}.tar.gz && \
-    tar zxf apache-tomcat-*.tar.gz && \
-    rm apache-tomcat-*.tar.gz && \
+ADD https://archive.apache.org/dist/tomcat/tomcat-${TOMCAT_MAJOR_VERSION}/v${TOMCAT_MINOR_VERSION}/bin/apache-tomcat-${TOMCAT_MINOR_VERSION}.tar.gz /apache-tomcat.tar.gz
+
+RUN tar zxf apache-tomcat.tar.gz && \
+    rm apache-tomcat.tar.gz && \
     mv apache-tomcat* $CATALINA_HOME
 
 RUN mkdir /opt/tomcat/certs && \
@@ -22,7 +22,11 @@ COPY ./java/server.xml $CATALINA_HOME/conf/server.xml
 COPY ./java/test-ssl.sh /opt/test-runner/bin/test-ssl.sh
 RUN chmod +x /opt/test-runner/bin/test-ssl.sh
 
-EXPOSE 8443
+RUN mkdir -p /opt/javassl
+COPY ./java/SSLSocketClient.java /opt/javassl/SSLSocketClient.java
+RUN javac -d /opt/javassl/ /opt/javassl/SSLSocketClient.java
+
+# EXPOSE 8443
 
 ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so

@@ -63,7 +63,58 @@ services:
       - 6379:6379
       - 27017:27017
 
-  java:
+  java7:
     build:
       context: .
       dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 7
+
+  java8:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 8
+  
+  java9:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 9
+
+  java10:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 10
+
+  java11:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 11
+  
+  java12:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 12
+
+  java13:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 13
+
+  java14:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 14

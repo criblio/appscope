@@ -15,7 +15,7 @@ public class SSLSocketClient {
             SSLSocketFactory factory =
                 (SSLSocketFactory)SSLSocketFactory.getDefault();
             SSLSocket socket =
-                (SSLSocket)factory.createSocket("localhost", 443);
+                (SSLSocket)factory.createSocket("localhost", 8443);
 
             /*
              * send http request
@@ -45,7 +45,6 @@ public class SSLSocketClient {
                                   socket.getOutputStream())));
 
             out.print("GET / HTTP/1.0\r\n");
-            out.print("Host: www.google.com\r\n");
             out.print("User-Agent: SSLSocketClient\r\n");
             out.print("Accept: */*\r\n");
             out.print("\r\n\r\n");

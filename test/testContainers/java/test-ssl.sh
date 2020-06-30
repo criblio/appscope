@@ -56,7 +56,6 @@ do
 done
 
 sleep 2
-/opt/tomcat/bin/catalina.sh stop
 grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
@@ -66,6 +65,23 @@ ERR+=$?
 grep HTTP $EVT_FILE > /dev/null
 ERR+=$?
 endtest
+
+
+starttest SSLSocketClient
+cd /opt/javassl
+java -Djavax.net.ssl.trustStore=/opt/tomcat/certs/tomcat.p12 -Djavax.net.ssl.trustStorePassword=changeit SSLSocketClient > /dev/null
+evaltest
+grep http-req $EVT_FILE > /dev/null
+ERR+=$?
+
+grep http-resp $EVT_FILE > /dev/null
+ERR+=$?
+
+grep HTTP $EVT_FILE > /dev/null
+ERR+=$?
+endtest
+
+/opt/tomcat/bin/catalina.sh stop
 
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""

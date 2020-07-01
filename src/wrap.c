@@ -218,8 +218,8 @@ remoteConfig()
     int timeout;
     struct pollfd fds;
     int rc, success, numtries;
-    FILE *fs;
     cfg_transport_t ttype = ctlTransportType(g_ctl);
+    FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
     

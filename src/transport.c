@@ -33,7 +33,7 @@ struct _transport_t
     union {
         struct {
             int sock;
-            int connect;
+            fd_set pending_connect;
             char *host;
             char *port;
         } net;
@@ -115,6 +115,7 @@ placeDescriptor(int fd, transport_t *t)
         }
     }
     DBG("%d", t->type);
+    t->close(fd);
     return -1;
 }
 
@@ -158,7 +159,7 @@ transportNeedsConnection(transport_t *trans)
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            return (trans->net.connect != 1);
+            return (trans->net.sock == -1);
         case CFG_FILE:
             // This checks to see if our file descriptor has been
             // closed by our process.  (errno == EBADF) Stream buffering
@@ -187,8 +188,13 @@ transportDisconnect(transport_t *trans)
         case CFG_UDP:
         case CFG_TCP:
             if (trans->net.sock != -1) trans->close(trans->net.sock);
-            trans->net.connect = 0;
             trans->net.sock = -1;
+            int i;
+            for (i=0; i<FD_SETSIZE; i++) {
+                if (!FD_ISSET(i, &trans->net.pending_connect)) continue;
+                trans->close(i);
+                FD_CLR(i, &trans->net.pending_connect);
+            }
             break;
         case CFG_FILE:
             if (!trans->file.stdout && !trans->file.stderr) {
@@ -207,89 +213,100 @@ transportDisconnect(transport_t *trans)
 }
 
 static int
-isConnected(transport_t *trans)
+setSocketBlocking(int (*myfcntl)(int, int, ...), int sock, bool block)
 {
-    int rc, opt, flags;
-    fd_set fdset;
-    socklen_t slen;
-    struct timeval tv;
-    //static int retries = 0;
+    int current_flags = myfcntl(sock, F_GETFL, NULL);
+    if (current_flags < 0) return FALSE;
 
-    tv.tv_sec = 0;
-    tv.tv_usec = 0; //1000;  // 5 sec reset; 1ms timer * 5000 times
-
-    FD_ZERO(&fdset);
-    FD_SET(trans->net.sock, &fdset);
-    rc = select(1, NULL, &fdset, NULL, &tv);
-    if (rc < 0) {
-        if (errno == EBADF) {
-            transportDisconnect(trans);
-            trans->net.connect = 0;
-        }
-    /*
-    } else if (rc == 0) {
-        // We timed out, reset
-        if (++retries > 5000) {
-            transportDisconnect(trans);
-            trans->net.connect = 0;
-            retries = 0;
-        }
-
-    */
-    } else if (rc > 0) {
-        // Socket selected for write, next check for an error
-        slen = sizeof(int);
-        if (getsockopt(trans->net.sock, SOL_SOCKET, SO_ERROR, (void*)(&opt), &slen) < 0) {
-            scopeLog("ERROR:isConnected:getsockopt", trans->net.sock, CFG_LOG_DEBUG);
-            return 0;
-        }
-
-        // Check the value returned...
-        if (opt) {
-            scopeLog("ERROR:isConnected:getsockopt:value", trans->net.sock, CFG_LOG_DEBUG);
-            return 0;
-        }
-
-        // Move this descriptor up out of the way
-        trans->net.sock = placeDescriptor(trans->net.sock, trans);
-        if (trans->net.sock == -1) return 0;
-
-        // Set the socket to close on exec
-        flags = trans->fcntl(trans->net.sock, F_GETFD, 0);
-        if (trans->fcntl(trans->net.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
-            DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
-        }
-
-        if (trans->type == CFG_TCP) {
-            // Set a TCP socket to blocking
-            flags = trans->fcntl(trans->net.sock, F_GETFL, 0);
-            flags &= (~O_NONBLOCK);
-            if (trans->fcntl(trans->net.sock, F_SETFL, flags) == -1) {
-                DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
-            }
-        }
-
-        return 1;
+    int desired_flags;
+    if (block) {
+        desired_flags = current_flags & ~O_NONBLOCK;
+    } else {
+        desired_flags = current_flags | O_NONBLOCK;
     }
 
-    return 0;
+    // We're successful; the flag is as desired
+    if (current_flags == desired_flags) return TRUE;
+
+    // myfcntl returns 0 if successful
+    return (myfcntl(sock, F_SETFL, desired_flags) == 0);
 }
 
 static int
-transportConnectSocket(transport_t *trans)
+socketConnectIsPending(transport_t *trans)
 {
-    int flags;
+    int i;
+    for (i=0; i<FD_SETSIZE; i++) {
+        if (FD_ISSET(i, &trans->net.pending_connect)) return TRUE;
+    }
+    return FALSE;
+}
+
+static int
+checkPendingSocketStatus(transport_t *trans)
+{
+    int rc;
+    struct timeval tv = {0};
+    fd_set pending_results = trans->net.pending_connect;
+    rc = select(FD_SETSIZE, NULL, &pending_results, NULL, &tv);
+    if (rc < 0) {
+        DBG(NULL);
+        transportDisconnect(trans);
+        return 0;
+    } else if (rc == 0) {
+        // No new status is available
+        return 0;
+    }
+
+    int i;
+    for (i=0; i<FD_SETSIZE; i++) {
+        if (!FD_ISSET(i, &pending_results)) continue;
+
+        // If we can't get socket status, or the status is an error, close the
+        // socket that failed to connect and remove it from the pending list.
+        int opt;
+        socklen_t optlen = sizeof(opt);
+        if ((getsockopt(i, SOL_SOCKET, SO_ERROR, (void*)(&opt), &optlen) < 0)
+            || opt) {
+            scopeLog("ERROR:checkPendingSocketStatus:getsockopt", i, CFG_LOG_DEBUG);
+            FD_CLR(i, &trans->net.pending_connect);
+            trans->close(i);
+            continue;
+        }
+
+        // Hey!  We found one that will work!
+        // Move this descriptor up out of the way
+        FD_CLR(i, &trans->net.pending_connect);
+        trans->net.sock = placeDescriptor(i, trans);
+        if (trans->net.sock == -1) continue;
+
+        // Set the TCP socket to blocking
+        if ((trans->type == CFG_TCP) && !setSocketBlocking(trans->fcntl, i, TRUE)) {
+            DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
+        }
+        break;
+    }
+
+    // If we were successful, we can stop looking.  Clean up pending sockets.
+    if (trans->net.sock != -1) {
+        for (i=0; i<FD_SETSIZE; i++) {
+            if (FD_ISSET(i, &trans->net.pending_connect)) {
+                trans->close(i);
+                FD_CLR(i, &trans->net.pending_connect);
+            }
+        }
+    }
+
+    return 1;
+}
+
+
+static int
+socketConnectionStart(transport_t *trans)
+{
     struct addrinfo* addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
-
-    // Trying to connect
-    if (trans->net.connect == -1) {
-        if (isConnected(trans)) {
-            trans->net.connect = 1;
-        }
-        return 0;
-    }
 
     switch (trans->type) {
         case CFG_UDP:
@@ -312,35 +329,47 @@ transportConnectSocket(transport_t *trans)
     // Loop through the addresses until one works
     struct addrinfo* addr;
     for (addr = addr_list; addr; addr = addr->ai_next) {
-        trans->net.sock = trans->socket(addr->ai_family,
-                                        addr->ai_socktype,
-                                        addr->ai_protocol);
+        int sock;
+        sock = trans->socket(addr->ai_family,
+                             addr->ai_socktype,
+                             addr->ai_protocol);
 
-        if (trans->net.sock == -1) continue;
+        if (sock == -1) continue;
 
-        // Connect will hang in some cases; start by setting non-blocking
-        if ((flags = trans->fcntl(trans->net.sock, F_GETFL, NULL)) < 0) continue;
-
-        if ((flags & O_NONBLOCK) == 0) {
-            flags |= O_NONBLOCK;
-            if (trans->fcntl(trans->net.sock, F_SETFL, flags) < 0) continue;
+        // Set the socket to close on exec
+        int flags = trans->fcntl(sock, F_GETFD, 0);
+        if (trans->fcntl(sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
+            DBG("%d %s %s", sock, trans->net.host, trans->net.port);
         }
 
-        if (trans->connect(trans->net.sock,
-                           addr->ai_addr,
-                           addr->ai_addrlen) == -1) {
-
-            if (errno == EINPROGRESS) {
-                trans->net.connect = -1;
-                break;
-            }
-
-            // We could create a sock, but not connect.  Clean up.
+        // Connect will hang in some cases; start by setting non-blocking
+        if (!setSocketBlocking(trans->fcntl, sock, FALSE)) {
+            DBG("%d %s %s", sock, trans->net.host, trans->net.port);
             transportDisconnect(trans);
             continue;
         }
 
-        break; // Success!
+        errno = 0;
+        if (trans->connect(sock,
+                           addr->ai_addr,
+                           addr->ai_addrlen) == -1) {
+
+            if (errno != EINPROGRESS) {
+                // We could create a sock, but not connect.  Clean up.
+                transportDisconnect(trans);
+                continue;
+            }
+            FD_SET(sock, &trans->net.pending_connect);
+            continue;
+        }
+
+        if (trans->type == CFG_UDP) {
+            // connect on udp sockets normally succeeds immediately.
+            trans->net.sock = placeDescriptor(sock, trans);
+            if (trans->net.sock != -1) break;
+        } else {
+            DBG(NULL); // with non-blocking tcp sockets, we always expect -1
+        }
     }
 
     if (addr_list) freeaddrinfo(addr_list);
@@ -422,7 +451,13 @@ transportConnect(transport_t *trans)
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            return transportConnectSocket(trans);
+            if (!socketConnectIsPending(trans)) {
+                // socketConnectionStart can directly connect (udp).
+                // If it does, we're done.
+                if (socketConnectionStart(trans)) return 1;
+            }
+            // Check to see if the a pending connetion has been successful.
+            return checkPendingSocketStatus(trans);
         case CFG_FILE:
             return transportConnectFile(trans);
         default:
@@ -444,6 +479,7 @@ transportCreateTCP(const char *host, const char *port)
 
     trans->type = CFG_TCP;
     trans->net.sock = -1;
+    FD_ZERO(&trans->net.pending_connect);
     trans->net.host = strdup(host);
     trans->net.port = strdup(port);
 
@@ -470,6 +506,7 @@ transportCreateUdp(const char* host, const char* port)
 
     t->type = CFG_UDP;
     t->net.sock = -1;
+    FD_ZERO(&t->net.pending_connect);
     t->net.host = strdup(host);
     t->net.port = strdup(port);
 
@@ -615,10 +652,6 @@ transportSend(transport_t *trans, const char *msg)
                         DBG(NULL);
                     }
                 }
-            } else {
-                // A socket is configured, but we don't have a socket, so...
-                transportDisconnect(trans);
-                transportConnect(trans);
             }
             break;
         case CFG_TCP:
@@ -660,10 +693,6 @@ transportSend(transport_t *trans, const char *msg)
                         DBG(NULL);
                     }
                 }
-            } else {
-                // A socket is configured, but we don't have a socket, so...
-                transportDisconnect(trans);
-                transportConnect(trans);
             }
             break;
         case CFG_FILE:

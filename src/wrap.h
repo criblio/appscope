@@ -22,6 +22,12 @@
 #define DYN_CONFIG_PREFIX "scope"
 #define MAXTRIES 10
 
+typedef struct got_list_t {
+    const char *symbol;
+    void *func;
+    void *gfn;
+} got_list;
+
 typedef struct nss_list_t {
     uint64_t id;
     PRIOMethods *ssl_methods;
@@ -194,7 +200,6 @@ typedef struct interposed_funcs_t {
     void *(*dlopen)(const char *, int);
     int (*PR_FileDesc2NativeHandle)(PRFileDesc *);
     void (*PR_SetError)(PRErrorCode, PRInt32);
-
 #if defined(__LINUX__) && defined(__STATX__)
     int (*statx)(int, const char *, int, unsigned int, struct statx *);
 #endif // __LINUX__ && __STATX__

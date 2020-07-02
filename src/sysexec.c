@@ -104,14 +104,27 @@ ssize_t (*go_syscall_write)(int, const void *, size_t);
 int (*go_syscall_open)(const char *, int, int, mode_t);
 int (*runtime_lock)(void);
 int (*runtime_unlock)(void);
+int (*runtime_schedEnableUser)(void);
+int (*runtime_entersyscall)(void);
+int (*runtime_exitsyscall)(void);
+int (*runtime_morestack_noctxt)(void);
+int (*go2go)();
 uint64_t scope_stack;
 uint64_t go_stack;
+uint64_t go_stack_in, go_stack_out;
 uint64_t go_params[10];
+uint64_t go_results[4];
+uint64_t go_stack_saves[32];
 unsigned long scope_fs, go_fs;
 int go_what;
 
+extern int go_start();
+extern int go_end();
 extern int go_hook_write();
 extern int go_hook_open();
+extern int go_hook_entersyscall();
+extern int go_hook_exitsyscall();
+extern int go_hook_morestack_noctxt();
 extern void threadNow(int);
 extern int arch_prctl(int, unsigned long);
 #if 0
@@ -132,12 +145,10 @@ go_hook_test(void)
 {
     int rc = 0;
     int fd;
-    //int flag;
     size_t len;
-    //mode_t mode;
     const void *buf;
-    size_t count;
     uint64_t initialTime;
+    char path[PATH_MAX];
 
     if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
         scopeLog("set_go:arch_prctl", -1, CFG_LOG_ERROR);
@@ -145,25 +156,18 @@ go_hook_test(void)
     }
 
     puts("from Scope");
-    calloc(1, 1024);
+    //calloc(1, 1024);
 
     switch (go_what) {
     case 1:
         fd = (int)go_params[0];
         buf = (void *)go_params[1];
-        count = (size_t)go_params[2];
+        len = (size_t)go_params[2];
         initialTime = getTime();
-        doWrite(fd, initialTime, 1, buf, count, "write", BUF, 0);
-        break;
 
-    case 2:
-        buf = (char *)go_params[0];
-        len = (size_t)go_params[1];
-        //flag = (int)go_params[2];
-        //mode = (mode_t)go_params[3];
-        char path[PATH_MAX];
+        if ((len <= 0) || (len >= PATH_MAX)) break;
 
-        if (buf && (len < (PATH_MAX - 1))) {
+        if (buf) {
             memmove(path, buf, len);
             path[len] = '\0';
         } else {
@@ -171,7 +175,25 @@ go_hook_test(void)
             break;
         }
 
-        doOpen(-1, path, FD, "open");
+        doWrite(fd, initialTime, 1, path, len, "write", BUF, 0);
+        break;
+
+    case 2:
+        if ((fd = (int)go_results[0]) == -1) break;
+        buf = (char *)go_params[1];
+        len = (size_t)go_params[2];
+
+        if ((len <= 0) || (len >= PATH_MAX)) break;
+
+        if (buf) {
+            memmove(path, buf, len);
+            path[len] = '\0';
+        } else {
+            scopeLog("go_hook_test:Open: null pathname", -1, CFG_LOG_ERROR);
+            break;
+        }
+
+        doOpen(fd, path, FD, "open");
         break;
 
     default:
@@ -197,19 +219,6 @@ initGoHook(const char *buf)
     int rc;
     funchook_t *funchook;
 
-    if ((go_syscall_write = getSymbol(buf, "syscall.write")) == 0) {
-        return;
-    }
-
-    if ((go_syscall_open = getSymbol(buf, "os.OpenFile")) == 0) {
-        return;
-    }
-
-    //DEBUG
-    runtime_lock = getSymbol(buf, "runtime.lock");
-    runtime_unlock = getSymbol(buf, "runtime.unlock");
-    getSymbol(buf, "os.(*File).Write");
-
     funchook = funchook_create();
 
     if (logLevel(g_log) <= CFG_LOG_DEBUG) {
@@ -217,8 +226,33 @@ initGoHook(const char *buf)
         funchook_set_debug_file(DEFAULT_LOG_PATH);
     }
 
-    rc = funchook_prepare(funchook, (void**)&go_syscall_write, go_hook_write);
-    rc = funchook_prepare(funchook, (void**)&go_syscall_open, go_hook_open);
+    if ((go_syscall_write = getSymbol(buf, "syscall.write")) != 0) {
+        go_syscall_write += 19;
+        rc = funchook_prepare(funchook, (void**)&go_syscall_write, go_hook_write);
+    }
+
+    if ((go_syscall_open = getSymbol(buf, "syscall.openat")) != 0) {
+        go_syscall_open += 19;
+        rc = funchook_prepare(funchook, (void**)&go_syscall_open, go_hook_open);
+    }
+/*
+    if ((runtime_entersyscall = getSymbol(buf, "runtime.entersyscall")) != 0) {
+        rc = funchook_prepare(funchook, (void**)&runtime_entersyscall, go_hook_entersyscall);
+    }
+
+    if ((runtime_exitsyscall = getSymbol(buf, "runtime.exitsyscall")) != 0) {
+        rc = funchook_prepare(funchook, (void**)&runtime_exitsyscall, go_hook_exitsyscall);
+    }
+
+    if ((runtime_morestack_noctxt = getSymbol(buf, "runtime.morestack_noctxt")) != 0) {
+        rc = funchook_prepare(funchook, (void**)&runtime_morestack_noctxt, go_hook_morestack_noctxt);
+    }
+*/
+    //DEBUG
+    runtime_lock = getSymbol(buf, "runtime.lock");
+    runtime_unlock = getSymbol(buf, "runtime.unlock");
+    runtime_schedEnableUser = getSymbol(buf, "runtime.schedEnableUser");
+    getSymbol(buf, "os.(*File).Write");
 
     // hook a few Go funcs
     rc = funchook_install(funchook, 0);
@@ -262,6 +296,11 @@ load_sections(char *buf, char *addr, size_t mlen)
                 memmove(laddr, &buf[sections[i].sh_offset], len);
             } else if (type == SHT_NOBITS) {
                 memset(laddr, 0, len);
+            }
+
+            if (strcmp(sec_name, ".text") == 0) {
+                go2go = (int (*)())laddr + len + 8;
+                memmove(laddr + len + 8, go_start, go_end - go_start);
             }
 
             snprintf(msg, sizeof(msg), "%s:%d %s addr %p - %p\n",

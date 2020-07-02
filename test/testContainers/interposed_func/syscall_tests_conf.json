@@ -55,8 +55,10 @@
         "sendmsg03 was kernel dependent",
         "bind04 and bind05 were ipv6 dependent",
         "bind06 timed out after 10 min",
-        "sendto02 requires the sctp protocol"],
+        "sendto02 requires the sctp protocol",
+        "connect02 is kernel specific, works on ubuntu 19 not on 18"],
       "exclude_tests": [
+        "connect02",
         "sendmsg03",
         "bind04",
         "bind05",

@@ -157,7 +157,9 @@ endtest
 starttest Python
 /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py create_certs
 /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py start_server&
+sleep 1
 /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py run_client
+sleep 1
 evaltest
 
 COUNT=$(grep -c http- $EVT_FILE)

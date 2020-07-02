@@ -131,3 +131,9 @@ osUnixSockPeer(ino_t lnode)
 {
     return -1;
 }
+
+int
+osGetPageProt(uint64_t addr)
+{
+    return -1;
+}

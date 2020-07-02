@@ -213,9 +213,11 @@ transportDisconnect(transport_t *trans)
 }
 
 static int
-setSocketBlocking(int (*myfcntl)(int, int, ...), int sock, bool block)
+setSocketBlocking(transport_t *trans, int sock, bool block)
 {
-    int current_flags = myfcntl(sock, F_GETFL, NULL);
+    if (!trans) return 0;
+
+    int current_flags = trans->fcntl(sock, F_GETFL, NULL);
     if (current_flags < 0) return FALSE;
 
     int desired_flags;
@@ -228,8 +230,8 @@ setSocketBlocking(int (*myfcntl)(int, int, ...), int sock, bool block)
     // We're successful; the flag is as desired
     if (current_flags == desired_flags) return TRUE;
 
-    // myfcntl returns 0 if successful
-    return (myfcntl(sock, F_SETFL, desired_flags) == 0);
+    // fcntl returns 0 if successful
+    return (trans->fcntl(sock, F_SETFL, desired_flags) == 0);
 }
 
 static int
@@ -281,7 +283,7 @@ checkPendingSocketStatus(transport_t *trans)
         if (trans->net.sock == -1) continue;
 
         // Set the TCP socket to blocking
-        if ((trans->type == CFG_TCP) && !setSocketBlocking(trans->fcntl, i, TRUE)) {
+        if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {
             DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
         }
         break;
@@ -343,7 +345,7 @@ socketConnectionStart(transport_t *trans)
         }
 
         // Connect will hang in some cases; start by setting non-blocking
-        if (!setSocketBlocking(trans->fcntl, sock, FALSE)) {
+        if (!setSocketBlocking(trans, sock, FALSE)) {
             DBG("%d %s %s", sock, trans->net.host, trans->net.port);
             transportDisconnect(trans);
             continue;

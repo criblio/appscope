@@ -343,6 +343,8 @@ transportConnectFile(transport_t *t)
 int
 transportConnect(transport_t *trans)
 {
+    if (!trans) return 1;
+
     // We're already connected.  Do nothing.
     if (!transportNeedsConnection(trans)) return 1;
 

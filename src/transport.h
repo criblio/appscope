@@ -14,12 +14,12 @@ transport_t*        transportCreateShm(void);
 void                transportDestroy(transport_t **);
 
 // Accessors
-int               transportSend(transport_t *, const char *);
-int               transportFlush(transport_t *);
-int               transportNeedsConnection(transport_t *);
-int               transportConnect(transport_t *);
-int               transportConnection(transport_t *);
-int               transportDisconnect(transport_t *);
-cfg_transport_t   transportType(transport_t *);
+int                 transportSend(transport_t *, const char *);
+int                 transportFlush(transport_t *);
+int                 transportNeedsConnection(transport_t *);
+int                 transportConnect(transport_t *);
+int                 transportConnection(transport_t *);
+int                 transportDisconnect(transport_t *);
+cfg_transport_t     transportType(transport_t *);
 
 #endif // __TRANSPORT_H__

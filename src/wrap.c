@@ -359,6 +359,7 @@ remoteConfig()
     }
 
     fds.fd = ctlConnection(g_ctl);
+
     rc = poll(&fds, 1, timeout);
 
     /*

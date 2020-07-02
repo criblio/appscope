@@ -131,3 +131,12 @@ osUnixSockPeer(ino_t lnode)
 {
     return -1;
 }
+
+/*
+ * Placeholder for future
+ */
+void
+osInitJavaAgent(void)
+{
+    return;
+}

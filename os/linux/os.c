@@ -4,7 +4,7 @@
 #include "../../src/wrap.h"
 
 extern struct interposed_funcs_t g_fn;
-
+extern void initJavaAgent(void);
 
 static int
 sendNL(int sd, ino_t node)
@@ -482,6 +482,14 @@ osThreadInit(void(*handler)(int), unsigned interval)
     }
     return TRUE;
 }
+
+void
+osInitJavaAgent(void)
+{
+    initJavaAgent();
+}
+
+
 
 static const char scope_help_overview[] =
 "OVERVIEW:\n"

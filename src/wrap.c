@@ -1120,7 +1120,7 @@ init(void)
     
     threadInit();
 
-    initJavaAgent();
+    osInitJavaAgent();
 }
 
 EXPORTOFF int

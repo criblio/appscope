@@ -37,7 +37,7 @@ clean:
 	rm -f ./lib/$(OS)/libscope.so
 
 SRC_C_FILES:=$(wildcard src/*.c)
-SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))
+SRC_C_FILES:=$(filter-out src/wrap.c src/javaagent.c src/javabci.c, $(SRC_C_FILES))
 TEST_C_FILES:=$(wildcard test/*.c)
 TEST_C_FILES:=$(filter-out test/glibcvertest.c test/wraptest.c, $(TEST_C_FILES))
 C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c

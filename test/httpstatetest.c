@@ -196,7 +196,6 @@ doHttpWithConsecutiveHeaders(void** state)
         assert_string_equal(header, "GET / HTTP/1.0\r\nHost: www.google.com\r\nConnection: close\r\n");
         freeMsg(&g_msg);
     }
-
 }
 
 static void
@@ -215,7 +214,56 @@ doHttpWithSplitHeader(void** state)
     for (i=0; buffers[i]; i++) {
         size_t buflen = strlen(buffers[i]);
         bool returnValue = doHttp(13, 3, &net, (void*)buffers[i], buflen, NETRX, BUF);
-        assert_true( i < 3 ? returnValue == FALSE : returnValue == TRUE);
+        if (i == 3) {
+            assert_true(returnValue);
+            assert_non_null(g_msg);
+            struct http_post_t *post = (struct http_post_t*) g_msg->data;
+            assert_non_null(post);
+            char *header = post->hdr;
+            assert_non_null(header);
+            assert_string_equal(post->hdr, "GET / HTTP/1.0\r\nHost: www.google.com\r\nConnection: close\r\n");
+            freeMsg(&g_msg);
+        } else {
+            assert_false(returnValue);
+            assert_null(g_msg);
+        }
+    }
+}
+
+static void
+doHttpWithInterleavedEncryption(void** state)
+{
+    char *buffers[] = {
+        "GET / HTTP/1.0\r\n",
+        "\x17\x03\x03",
+        "Host: www.google.com\r\n",
+        "\x17\x03\x03",
+        "Connection: close\r\n",
+        "\x17\x03\x03",
+        "\r\n",
+        "\x17\x03\x03",
+        NULL };
+    net_info net = {0};
+    net.type = SOCK_STREAM;
+    int i;
+
+    for (i=0; buffers[i]; i++) {
+        size_t buflen = strlen(buffers[i]);
+        int encrypted = buffers[i][0] == '\x17';
+        bool returnValue = doHttp(13, 3, &net, (void*)buffers[i], buflen, (encrypted) ? TLSRX : NETRX, BUF);
+        if (i == 6) {
+            assert_true(returnValue);
+            assert_non_null(g_msg);
+            struct http_post_t *post = (struct http_post_t*) g_msg->data;
+            assert_non_null(post);
+            char *header = post->hdr;
+            assert_non_null(header);
+            assert_string_equal(post->hdr, "GET / HTTP/1.0\r\nHost: www.google.com\r\nConnection: close\r\n");
+            freeMsg(&g_msg);
+        } else {
+            assert_false(returnValue);
+            assert_null(g_msg);
+        }
     }
 }
 
@@ -286,6 +334,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(doHttpWithPartialHeaderBeforeClose),
         cmocka_unit_test(doHttpWithConsecutiveHeaders),
         cmocka_unit_test(doHttpWithSplitHeader),
+        cmocka_unit_test(doHttpWithInterleavedEncryption),
         cmocka_unit_test(doHttpWhichRequiresRealloc),
         cmocka_unit_test(doHttpWhichExceedsReallocSize),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),

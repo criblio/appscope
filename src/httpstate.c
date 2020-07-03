@@ -6,12 +6,6 @@
 #include "plattime.h"
 #include "search.h"
 
-typedef struct
-{
-    uint64_t uid;
-    int sockfd;
-    int isSsl;
-} reportParams_t;
 
 #define MIN_HDR_ALLOC (4  * 1024)
 #define MAX_HDR_ALLOC (16 * 1024)
@@ -27,9 +21,9 @@ static void setHttpState(http_state_t *httpstate, http_enum_t toState);
 static void appendHeader(http_state_t *httpstate, char* buf, size_t len);
 static size_t getContentLength(char *header, size_t len);
 static size_t bytesToSkipForContentLength(http_state_t *httpstate, size_t len);
-static bool setReportParams(reportParams_t *rptparms, net_info *net, int sockfd, uint64_t id, metric_t src);
-static int reportHttp(http_state_t *httpstate, reportParams_t *rptparms);
-static bool scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, reportParams_t *rptparms);
+static bool setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src);
+static int reportHttp(http_state_t *httpstate);
+static bool scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId);
 
 
 static void
@@ -132,9 +126,9 @@ bytesToSkipForContentLength(http_state_t *httpstate, size_t len)
 }
 
 static bool
-setReportParams(reportParams_t *rptparms, net_info *net, int sockfd, uint64_t id, metric_t src)
+setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src)
 {
-    if (!rptparms) return FALSE;
+    if (!httpId) return FALSE;
 
     /*
      * If we have an fd, use the uid/channel value as it's unique
@@ -142,30 +136,30 @@ setReportParams(reportParams_t *rptparms, net_info *net, int sockfd, uint64_t id
      */
     in_port_t localPort, remotePort;
     if (net) {
-        rptparms->uid = net->uid;
+        httpId->uid = net->uid;
         localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
         remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
     } else if (id != -1) {
-        rptparms->uid = id;
+        httpId->uid = id;
         localPort = remotePort = 0;
     } else {
         DBG(NULL);
         return FALSE;
     }
 
-    rptparms->isSsl = ((src == TLSTX) || (src == TLSRX) ||
+    httpId->isSsl = ((src == TLSTX) || (src == TLSRX) ||
                     (localPort == 443) || (remotePort == 443));
 
-    rptparms->sockfd = sockfd;
+    httpId->sockfd = sockfd;
 
     return TRUE;
 }
 
 // For now, only doing HTTP/1.X headers
 static int
-reportHttp(http_state_t *httpstate, reportParams_t *rptparms)
+reportHttp(http_state_t *httpstate)
 {
-    if (!httpstate || !httpstate->hdr || !httpstate->hdrlen || !rptparms) return -1;
+    if (!httpstate || !httpstate->hdr || !httpstate->hdrlen) return -1;
 
     protocol_info *proto = calloc(1, sizeof(struct protocol_info_t));
     http_post *post = calloc(1, sizeof(struct http_post_t));
@@ -185,14 +179,14 @@ reportHttp(http_state_t *httpstate, reportParams_t *rptparms)
     proto->evtype = EVT_PROTO;
     proto->ptype = (isResponse) ? EVT_HRES : EVT_HREQ;
     proto->len = httpstate->hdrlen;
-    proto->fd = rptparms->sockfd;
-    proto->uid = rptparms->uid;
+    proto->fd = httpstate->id.sockfd;
+    proto->uid = httpstate->id.uid;
     proto->data = (char *)post;
 
     // Set post info
-    post->ssl = rptparms->isSsl;
+    post->ssl = httpstate->id.isSsl;
     post->start_duration = getTime();
-    post->id = rptparms->uid;
+    post->id = httpstate->id.uid;
 
     // "transfer ownership" of dynamically allocated header from
     // httpstate object to post object
@@ -220,9 +214,16 @@ reportHttp(http_state_t *httpstate, reportParams_t *rptparms)
  * that is usable
 */
 static bool
-scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, reportParams_t *rptparms)
+scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId)
 {
     if (!buf) return FALSE;
+
+    // We need to handle "double interception" when ssl is involved, e.g.
+    // intercepting an SSL_write(), then intercepting the write() it calls.
+    // We use the isSSL flag to prevent interleaving ssl and non-ssl data.
+    int headerCaptureInProgress = httpstate->state != HTTP_NONE;
+    int isSslIsConsistent = httpstate->id.isSsl == httpId->isSsl;
+    if (headerCaptureInProgress && !isSslIsConsistent) return FALSE;
 
     // Skip data if instructed to do so by previous content length
     if (httpstate->state == HTTP_DATA) {
@@ -240,6 +241,7 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, reportParams_t
         if (needleFind(g_http_start, buf, len) == -1) return FALSE;
 
         setHttpState(httpstate, HTTP_HDR);
+        httpstate->id = *httpId;
     }
 
     // Look for header data
@@ -283,7 +285,7 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, reportParams_t
         size_t content_in_this_buf = len - header_end;
 
         // post and event containing the header we found
-        reportHttp(httpstate, rptparms);
+        reportHttp(httpstate);
 
         // change httpstate to HTTP_DATA per Content-Length or HTTP_NONE
         if ((clen != -1) && (clen >= content_in_this_buf)) {
@@ -314,8 +316,8 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
     // If we know it's we're not looking at a stream, bail.
     if (net && net->type != SOCK_STREAM) return FALSE;
 
-    reportParams_t rptparms = {0};
-    if (!setReportParams(&rptparms, net, sockfd, id, src)) return FALSE;
+    httpId_t httpId = {0};
+    if (!setHttpId(&httpId, net, sockfd, id, src)) return FALSE;
 
     int http_header_found = FALSE;
 
@@ -331,7 +333,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
     switch (dtype) {
         case BUF:
         {
-            http_header_found = scanForHttpHeader(httpstate, buf, len, &rptparms);
+            http_header_found = scanForHttpHeader(httpstate, buf, len, &httpId);
             break;
         }
 
@@ -344,7 +346,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
             for (i = 0; i < msg->msg_iovlen; i++) {
                 iov = &msg->msg_iov[i];
                 if (iov && iov->iov_base) {
-                    if (scanForHttpHeader(httpstate, (char*)&iov->iov_base, iov->iov_len, &rptparms)) {
+                    if (scanForHttpHeader(httpstate, (char*)&iov->iov_base, iov->iov_len, &httpId)) {
                         http_header_found = TRUE;
                         // stay in loop to count down content length
                     }
@@ -362,7 +364,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
 
             for (i = 0; i < iovcnt; i++) {
                 if (iov[i].iov_base) {
-                    if (scanForHttpHeader(httpstate, (char*)&iov[i].iov_base, iov[i].iov_len, &rptparms)) {
+                    if (scanForHttpHeader(httpstate, (char*)&iov[i].iov_base, iov[i].iov_len, &httpId)) {
                         http_header_found = TRUE;
                         // stay in loop to count down content length
                     }

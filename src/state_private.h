@@ -119,12 +119,20 @@ typedef enum {
     HTTP_DATA
 } http_enum_t;
 
+typedef struct
+{
+    uint64_t uid;
+    int sockfd;
+    int isSsl;
+} httpId_t;
+
 typedef struct {
     http_enum_t state;
     char* hdr;          // Used if state == HDR
     size_t hdrlen;
     size_t hdralloc;
     size_t clen;        // Used if state==HTTP_DATA
+    httpId_t id;
 } http_state_t;
 
 typedef struct net_info_t {

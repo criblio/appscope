@@ -114,7 +114,7 @@ void             ctlEvtSet(ctl_t *, evt_fmt_t *);
 cfg_transport_t  ctlTransportType(ctl_t *);
 
 // Accessor for performance
-bool    ctlEvtSourceEnabled(ctl_t *, watch_t);
+bool            ctlEvtSourceEnabled(ctl_t *, watch_t);
 
 // Retreive events
 uint64_t   ctlGetEvent(ctl_t *);

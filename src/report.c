@@ -87,7 +87,7 @@ sendEvent(mtc_t *mtc, event_t *event)
     cmdSendEvent(g_ctl, event, getTime(), &g_proc);
 
     if (cmdSendMetric(mtc, event) == -1) {
-        scopeLog("ERROR: doProcMetric:CPU:cmdSendMetric", -1, CFG_LOG_ERROR);
+        scopeLog("ERROR: sendEvent:cmdSendMetric", -1, CFG_LOG_ERROR);
     }
 }
 

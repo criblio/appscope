@@ -16,7 +16,7 @@
 #include "com.h"
 #include "state.h"
 
-#define HEAP_SIZE (size_t)(200 * 1024)
+#define HEAP_SIZE (size_t)(500 * 1024)
 // 1Mb + an 8kb guard
 #define STACK_SIZE (size_t)(1024 * 1024) + (8 * 1024)
 #define AUX_ENT(id, val) \
@@ -101,6 +101,7 @@ getSymbol(const char *buf, char *sname)
 }
 
 ssize_t (*go_syscall_write)(int, const void *, size_t);
+ssize_t (*go_syscall_read)(int, const void *, size_t);
 int (*go_syscall_open)(const char *, int, int, mode_t);
 int (*runtime_lock)(void);
 int (*runtime_unlock)(void);
@@ -121,25 +122,14 @@ int go_what;
 extern int go_start();
 extern int go_end();
 extern int go_hook_write();
+extern int go_hook_read();
 extern int go_hook_open();
 extern int go_hook_entersyscall();
 extern int go_hook_exitsyscall();
 extern int go_hook_morestack_noctxt();
 extern void threadNow(int);
 extern int arch_prctl(int, unsigned long);
-#if 0
-static int res;
-go_hook_write() {
-__asm__ volatile  (
-    "mov %1, %%rax \n"
-    "jmp *%%rax \n"
-    : "=r"(res) /* output */
-    : "r"(go_syscall_write)
-    : "%rax"         /* clobbered register */
-    );
-}
-#endif
-#if 1
+
 EXPORTON int
 go_hook_test(void)
 {
@@ -171,7 +161,7 @@ go_hook_test(void)
             memmove(path, buf, len);
             path[len] = '\0';
         } else {
-            scopeLog("go_hook_test:Open: null pathname", -1, CFG_LOG_ERROR);
+            scopeLog("go_hook_test:write: null pathname", -1, CFG_LOG_ERROR);
             break;
         }
 
@@ -196,6 +186,20 @@ go_hook_test(void)
         doOpen(fd, path, FD, "open");
         break;
 
+    case 3:
+        fd = (int)go_params[0];
+        buf = (void *)go_params[1];
+        len = (size_t)go_params[2];
+        initialTime = getTime();
+
+        char msg[128];
+        snprintf(msg, sizeof(msg), "%s:%d fd %d len %ld",
+                 __FUNCTION__, __LINE__, fd, len);
+        scopeLog(msg, -1, CFG_LOG_ERROR);
+
+        doRead(fd, initialTime, 1, buf, len, "read", BUF, 0);
+        break;
+
     default:
         scopeLog("go_hook_test:bad go_what", -1, CFG_LOG_ERROR);
         break;
@@ -211,7 +215,6 @@ go_hook_test(void)
 
     return rc;
 }
-#endif
 
 static void
 initGoHook(const char *buf)
@@ -235,6 +238,12 @@ initGoHook(const char *buf)
         go_syscall_open += 19;
         rc = funchook_prepare(funchook, (void**)&go_syscall_open, go_hook_open);
     }
+
+    if ((go_syscall_read = getSymbol(buf, "syscall.read")) != 0) {
+        go_syscall_read += 19;
+        rc = funchook_prepare(funchook, (void**)&go_syscall_read, go_hook_read);
+    }
+
 /*
     if ((runtime_entersyscall = getSymbol(buf, "runtime.entersyscall")) != 0) {
         rc = funchook_prepare(funchook, (void**)&runtime_entersyscall, go_hook_entersyscall);

@@ -1,7 +1,7 @@
 #include <sys/syscall.h>
 #include <asm/prctl.h>
     
-.global	go_hook_write, go_hook_open, go_start, go_end, do_go
+.global	go_hook_write, go_hook_open, go_hook_read, go_start, go_end, do_go
 .global go_hook_entersyscall, go_hook_exitsyscall, go_hook_morestack_noctxt
     
 .text
@@ -82,6 +82,36 @@ open_ret:
     lea go_what@GOTPCREL(%rip), %r11
     mov (%r11), %r11
     movl $2, (%r11)
+    jmp do_go
+
+go_hook_read:
+    # save the return address
+    lea go_stack_saves@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%rsp), %r10
+    mov %r10, (%r11)
+
+    # change return addr on the Go stack to come back here
+    movabs $read_ret, %r11
+    mov %r11, (%rsp)
+
+    # do the Go function
+    lea go_syscall_read@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    jmp *%r11
+
+read_ret:
+    # restore the original return address
+    lea go_stack_saves@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # tell the lib code where we came from
+    lea go_what@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    movl $3, (%r11)
     jmp do_go
 
 do_go:

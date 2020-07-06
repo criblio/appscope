@@ -52,9 +52,6 @@ static void doConfig(config_t *);
 static void reportProcessStart(void);
 void threadNow(int);
 
-#define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
-#define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
-
 #ifdef __LINUX__
 static got_list hook_list[] = {
     {"SSL_read", SSL_read, &g_fn.SSL_read},
@@ -3929,7 +3926,7 @@ malloc(size_t size)
 
     atomicSwapU64((uint64_t *)&g_currsheap, (uint64_t)(g_currsheap + size));
 
-    return mem;
+    return mem; //(uint64_t *)ROUND_UP((uint64_t)mem, sizeof(char));
 
 }
 
@@ -3970,7 +3967,7 @@ realloc(void *ptr, size_t size)
     }
 
     // need old size and to free ptr...not able to do that yet
-    mem = malloc(ROUND_UP(size, sizeof(uint64_t)));
+    mem = malloc(size);
     if (!ptr) return mem;
 
     if (mem) memmove(mem, ptr, size);

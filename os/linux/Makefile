@@ -73,6 +73,7 @@ test: $(C_FILES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/glibcvertest glibcvertest.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/selfinterposetest selfinterposetest.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dnstest dnstest.o dbg.o log.o transport.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/javabcitest javabcitest.o javabci.o dbg.o log.o transport.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) test/manual/passfd.c -lpthread -o test/$(OS)/passfd
 	$(CC) $(TEST_CFLAGS) test/manual/unixpeer.c -lpthread -o test/$(OS)/unixpeer
 	@echo "Running Tests and Generating Test Coverage"

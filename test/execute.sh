@@ -79,6 +79,7 @@ if [ "${OS}" = "linux" ]; then
     run_test test/${OS}/reporttest
 fi
 run_test test/${OS}/selfinterposetest
+run_test test/${OS}/javabcitest
 
 if [ "${OS}" = "linux" ]; then
 #    SAVEVARS=$ENVARS

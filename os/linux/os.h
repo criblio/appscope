@@ -23,6 +23,7 @@
 #include <linux/sock_diag.h>
 #include <linux/unix_diag.h>
 #include <link.h>
+#include <sys/mman.h>
 
 #include "../../src/plattime.h"
 #include "../../contrib/funchook/include/funchook.h"
@@ -54,5 +55,6 @@ extern int osGetCmdline(pid_t, char **);
 extern bool osThreadInit(void(*handler)(int), unsigned);
 extern int osUnixSockPeer(ino_t);
 extern void osInitJavaAgent(void);
+extern int osGetPageProt(unsigned long);
 
 #endif  //__OS_H__

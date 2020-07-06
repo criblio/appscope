@@ -140,3 +140,9 @@ osInitJavaAgent(void)
 {
     return;
 }
+
+int
+osGetPageProt(uint64_t addr)
+{
+    return -1;
+}

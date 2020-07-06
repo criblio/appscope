@@ -6,9 +6,11 @@
 #include <sys/poll.h>
 #ifdef __LINUX__
 #include <sys/prctl.h>
+#include <link.h>
 #endif
 #include <sys/syscall.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 
 #include "atomic.h"
 #include "cfg.h"
@@ -50,7 +52,15 @@ static void doConfig(config_t *);
 static void reportProcessStart(void);
 static void threadNow(int);
 
+#define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
+#define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
+
 #ifdef __LINUX__
+static got_list hook_list[] = {
+    {"SSL_read", SSL_read, &g_fn.SSL_read},
+    {"SSL_write", SSL_write, &g_fn.SSL_write},
+    {NULL, NULL, NULL}
+};
 
 typedef struct
 {
@@ -175,8 +185,122 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 
 #endif // __LINUX__
 
+// macOS doesn't use ELF binaries
+#ifdef __LINUX__
+/*
+ * Find the GOT ptr as defined in RELA/DYNSYM (.rela.dyn) for symbol & hook it.
+ * .rela.dyn section:
+ * The address of relocation entries associated solely with the PLT.
+ * The relocation table's entries have a one-to-one correspondence with the PLT.
+ */
+static int
+doGotcha(struct link_map *lm, got_list *hook, Elf64_Rela *rel, Elf64_Sym *sym, char *str, int rsz)
+{
+    int i, match = -1;
+    char buf[128];
 
+    for (i = 0; i < rsz / sizeof(Elf64_Rela); i++) {
+        /*
+         * Index into the dynamic symbol table (not the 'symbol' table)
+         * with the index from the current relocation entry and get the
+         * sym tab offset (st_name). The index is calculated with the
+         * ELF64_R_SYM macro, which shifts the elf value >> 32. The dyn sym
+         * tab offset is added to the start of the string table (str) to get
+         * the string name. Compare the str entry with a symbol in the list.
+         *
+         * Note, it would be nice to check the array bounds before indexing the
+         * sym[] table. However, DT_SYMENT gives the byte size of a single entry.
+         * According to the ELF spec there is no size/number of entries for the
+         * symbol table at the program header table level. This is not needed at
+         * runtime as the symbol lookup always go through the hash table; ELF64_R_SYM.
+         */
+        if (!strcmp(sym[ELF64_R_SYM(rel[i].r_info)].st_name + str, hook->symbol)) {
+            uint64_t *gfn = hook->gfn;
+            uint64_t *gaddr = (uint64_t *)(rel[i].r_offset + lm->l_addr);
+            int page_size = getpagesize();
+            size_t saddr = ROUND_DOWN((size_t)gaddr, page_size);
+            int prot = osGetPageProt((uint64_t)gaddr);
 
+            if (prot != -1) {
+                if ((prot & PROT_WRITE) == 0) {
+                    // mprotect if write perms are not set
+                    if (mprotect((void *)saddr, (size_t)16, PROT_WRITE | prot) == -1) {
+                        scopeLog("doGotcha: mprotect failed", -1, CFG_LOG_DEBUG);
+                        return -1;
+                    }
+                }
+            } else {
+                /*
+                 * We don't have a valid protection setting for the GOT page.
+                 * It's "almost assuredly" safe to set perms to RD | WR as this is
+                 * a GOT page; we know what settings are expected. However, it
+                 * may be safest to just bail out at this point.
+                 */
+                return -1;
+            }
+
+            /*
+             * The offset from the matching relocation entry defines the GOT
+             * entry associated with 'symbol'. ELF docs describe that this
+             * is an offset and not a virtual address. Take the load address
+             * of the shared module as defined in the link map's l_addr + offset.
+             * as in: rel[i].r_offset + lm->l_addr
+             */
+            *gfn =  *gaddr;
+            *gaddr = (uint64_t)hook->func;
+            snprintf(buf, sizeof(buf), "%s:%d offset 0x%lx GOT entry %p saddr 0x%lx",
+                     __FUNCTION__, __LINE__, rel[i].r_offset, gaddr, saddr);
+            scopeLog(buf, -1, CFG_LOG_TRACE);
+
+            if ((prot & PROT_WRITE) == 0) {
+                // if we didn't mod above leave prot settings as is
+                if (mprotect((void *)saddr, (size_t)16, prot) == -1) {
+                    scopeLog("doGotcha: mprotect failed", -1, CFG_LOG_DEBUG);
+                    return -1;
+                }
+            }
+            match = 0;
+            break;
+        }
+    }
+
+    return match;
+}
+
+// Locate the needed elf entries from a given link map.
+static int
+getElfEntries(struct link_map *lm, Elf64_Rela **rel, Elf64_Sym **sym, char **str, int *rsz)
+{
+    Elf64_Dyn *dyn = NULL;
+    char *got = NULL; // TODO; got is not needed, debug, remove
+    char buf[256];
+
+    for (dyn = lm->l_ld; dyn->d_tag != DT_NULL; dyn++) {
+        if (dyn->d_tag == DT_SYMTAB) {
+            *sym = (Elf64_Sym *)dyn->d_un.d_ptr;
+        } else if (dyn->d_tag == DT_STRTAB) {
+            *str = (char *)dyn->d_un.d_ptr;
+        } else if (dyn->d_tag == DT_JMPREL) {
+            *rel = (Elf64_Rela *)dyn->d_un.d_ptr;
+        } else if (dyn->d_tag == DT_PLTRELSZ) {
+            *rsz = dyn->d_un.d_val;
+        } else if (dyn->d_tag == DT_PLTGOT) {
+            got = (char *)dyn->d_un.d_ptr;
+        }
+    }
+
+    snprintf(buf, sizeof(buf), "%s:%d dyn %p sym %p rel %p str %p rsz %d got %p laddr 0x%lx\n",
+             __FUNCTION__, __LINE__, dyn, *sym, *rel, *str, *rsz, got, lm->l_addr);
+    scopeLog(buf, -1, CFG_LOG_TRACE);
+
+    if (*sym == NULL || *rel == NULL || (*rsz < sizeof(Elf64_Rela))) {
+        return -1;
+    }
+
+    return 0;
+}
+
+#endif // __LINUX__
 
 static void
 freeNssEntry(void *data)
@@ -228,7 +352,6 @@ remoteConfig()
     // MS
     timeout = (g_thread.interval * 1000);
     bzero(&fds, sizeof(fds));
-    fds.fd = ctlConnection(g_ctl);
 
     if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
         (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {
@@ -236,6 +359,8 @@ remoteConfig()
     } else {
         fds.events = POLLIN;
     }
+
+    fds.fd = ctlConnection(g_ctl);
 
     rc = poll(&fds, 1, timeout);
 
@@ -707,7 +832,6 @@ static void *
 periodic(void *arg)
 {
     while (1) {
-        reportPeriodicStuff();
 
         // Process dynamic config changes, if any
         dynConfig();
@@ -730,6 +854,8 @@ periodic(void *arg)
             cJSON *json = msgStart(&g_proc, g_staticfg);
             cmdSendInfoMsg(g_ctl, json);
         }
+
+        reportPeriodicStuff();
 
         remoteConfig();
     }
@@ -2594,8 +2720,11 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
 EXPORTON void *
 dlopen(const char *filename, int flags)
 {
+    void *handle;
+    struct link_map *lm;
     char buf[1024];
     char fbuf[256];
+
     fbuf[0] = '\0';
     if (flags & RTLD_LAZY) strcat(fbuf, "RTLD_LAZY|");
     if (flags & RTLD_NOW) strcat(fbuf, "RTLD_NOW|");
@@ -2609,13 +2738,36 @@ dlopen(const char *filename, int flags)
 
     WRAP_CHECK(dlopen, NULL);
 
-    // temporary apache-specific fix
-    if (filename && strstr(filename, "mod_ssl") && (flags | RTLD_DEEPBIND)) {
-        DBG("Ignoring RTLD_DEEPBIND for mod_ssl");
-        scopeLog("Ignoring RTLD_DEEPBIND for mod_ssl", -1, CFG_LOG_DEBUG);
-        flags = flags & ~RTLD_DEEPBIND;
+    /*
+     * Attempting to hook a number of GOT entries based on a static list.
+     * Get the link map and the ELF sections once since they are used for
+     * all symbols. Then loop over the list to locate and hook appropriate
+     * GOT entries.
+     */
+    handle = g_fn.dlopen(filename, flags);
+    if (handle && (flags & RTLD_DEEPBIND)) {
+        Elf64_Sym *sym = NULL;
+        Elf64_Rela *rel = NULL;
+        char *str = NULL;
+        int i, rsz = 0;
+
+        // Get the link map and ELF sections in advance of something matching
+        if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) &&
+            (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+            snprintf(buf, sizeof(buf), "\tlibrary:  %s", lm->l_name);
+            scopeLog(buf, -1, CFG_LOG_DEBUG);
+
+            // for each symbol in the list try to hook
+            for (i=0; hook_list[i].symbol; i++) {
+                if ((dlsym(handle, hook_list[i].symbol)) &&
+                    (doGotcha(lm, (got_list *)&hook_list[i], rel, sym, str, rsz) != -1)) {
+                    snprintf(buf, sizeof(buf), "\tdlopen interposed  %s", hook_list[i].symbol);
+                    scopeLog(buf, -1, CFG_LOG_DEBUG);
+                }
+            }
+        }
     }
-    void* handle = g_fn.dlopen(filename, flags);
+
     return handle;
 }
 

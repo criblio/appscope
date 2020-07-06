@@ -77,9 +77,9 @@ run_test test/${OS}/dbgtest
 if [ "${OS}" = "linux" ]; then
     run_test test/${OS}/glibcvertest
     run_test test/${OS}/reporttest
+    run_test test/${OS}/javabcitest
 fi
 run_test test/${OS}/selfinterposetest
-run_test test/${OS}/javabcitest
 
 if [ "${OS}" = "linux" ]; then
 #    SAVEVARS=$ENVARS

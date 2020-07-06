@@ -125,7 +125,8 @@ main(int argc, char* argv[])
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(javaBciReadAndWriteClassWithoutModifications),
-        cmocka_unit_test(javaBciCopyMethod)
+        cmocka_unit_test(javaBciCopyMethod),
+        cmocka_unit_test(dbgHasNoUnexpectedFailures)
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

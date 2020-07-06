@@ -68,7 +68,6 @@ unsigned char JavaTest_class[] = {
   0x08, 0x00, 0x10, 0x00, 0x0e, 0x00, 0x11, 0x00, 0x01, 0x00, 0x19, 0x00,
   0x00, 0x00, 0x02, 0x00, 0x1a
 };
-unsigned int JavaTest_class_len = 677;
 
 static void
 javaBciReadAndWriteClassWithoutModifications(void** state)
@@ -78,6 +77,7 @@ javaBciReadAndWriteClassWithoutModifications(void** state)
 
     assert_int_equal(classInfo->methods_count, 4);
     assert_int_equal(classInfo->fields_count, 3);
+    assert_int_equal(classInfo->length, sizeof(JavaTest_class));
     int methodIndex = javaFindMethodIndex(classInfo, "print", "(Ljava/lang/String;)V");
     assert_int_equal(methodIndex, 1);
 
@@ -87,12 +87,34 @@ javaBciReadAndWriteClassWithoutModifications(void** state)
     methodIndex = javaFindMethodIndex(classInfo, "main", "([Ljava/lang/String;)V");
     assert_int_equal(methodIndex, 3);
 
-    unsigned char *dest = malloc(JavaTest_class_len);
+    unsigned char *dest = malloc(sizeof(JavaTest_class));
     javaWriteClass(dest, classInfo);
     javaDestroy(&classInfo);
     assert_null(classInfo);
 
-    assert_true(memcmp(JavaTest_class, dest, JavaTest_class_len) == 0);
+    assert_true(memcmp(JavaTest_class, dest, sizeof(JavaTest_class)) == 0);
+    free(dest);
+}
+
+static void
+javaBciCopyMethod(void** state)
+{
+    java_class_t *classInfo = javaReadClass(JavaTest_class);
+    assert_non_null(classInfo);
+
+    int methodIndex = javaFindMethodIndex(classInfo, "print", "(Ljava/lang/String;)V");
+    javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__print");
+    
+    unsigned char *dest = malloc(classInfo->length);
+    javaWriteClass(dest, classInfo);
+    javaDestroy(&classInfo);
+
+    java_class_t *modClassInfo = javaReadClass(dest);
+
+    methodIndex = javaFindMethodIndex(modClassInfo, "__print", "(Ljava/lang/String;)V");
+    assert_int_equal(methodIndex, 4);
+
+    javaDestroy(&modClassInfo);
     free(dest);
 }
 
@@ -103,6 +125,7 @@ main(int argc, char* argv[])
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(javaBciReadAndWriteClassWithoutModifications),
+        cmocka_unit_test(javaBciCopyMethod)
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

@@ -221,9 +221,11 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *http
     // We need to handle "double interception" when ssl is involved, e.g.
     // intercepting an SSL_write(), then intercepting the write() it calls.
     // We use the isSSL flag to prevent interleaving ssl and non-ssl data.
-    int headerCaptureInProgress = httpstate->state != HTTP_NONE;
-    int isSslIsConsistent = httpstate->id.isSsl == httpId->isSsl;
-    if (headerCaptureInProgress && !isSslIsConsistent) return FALSE;
+    {
+        int headerCaptureInProgress = httpstate->state != HTTP_NONE;
+        int isSslIsConsistent = httpstate->id.isSsl == httpId->isSsl;
+        if (headerCaptureInProgress && !isSslIsConsistent) return FALSE;
+    }
 
     // Skip data if instructed to do so by previous content length
     if (httpstate->state == HTTP_DATA) {

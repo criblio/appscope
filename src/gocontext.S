@@ -76,7 +76,9 @@ open_ret:
     # get the result from the open call
     lea go_results@GOTPCREL(%rip), %r11
     mov (%r11), %r11
-    mov %rax, (%r11)
+    #mov %rax, (%r11)
+    mov 0x30(%rsp), %r10
+    mov %r10, (%r11)
 
     # tell the lib code where we came from
     lea go_what@GOTPCREL(%rip), %r11

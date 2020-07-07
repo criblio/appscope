@@ -56,7 +56,7 @@
 // and could be more accurate.
 int g_interval = DEFAULT_SUMMARY_PERIOD;
 static list_t *g_maplist;
-static needle_t *g_http_status = NULL;
+static search_t *g_http_status = NULL;
 
 static void
 destroyHttpMap(void *data)
@@ -73,7 +73,7 @@ void
 initReporting()
 {
     g_maplist = lstCreate(destroyHttpMap);
-    g_http_status = needleCreate(HTTP_STATUS);
+    g_http_status = searchComp(HTTP_STATUS);
 }
 
 void
@@ -166,7 +166,7 @@ getHttpStatus(char *header, size_t len)
     char *val;
 
     // ex: HTTP/1.1 200 OK\r\n
-    if ((ix = needleFind(g_http_status, header, len)) == -1) return -1;
+    if ((ix = searchExec(g_http_status, header, len)) == -1) return -1;
 
     if ((ix < 0) || (ix > len) || ((ix + strlen(HTTP_STATUS) + 1) > len)) return -1;
 

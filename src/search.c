@@ -5,7 +5,7 @@
 
 #define ASIZE 256
 
-struct _needle_t
+struct _search_t
 {
     int nlen;
     unsigned char* str;
@@ -17,18 +17,18 @@ struct _needle_t
  * string search algorithm.
  * ref: https://www-igm.univ-mlv.fr/~lecroq/string/node18.html
  *
- * Pre-compute the array from the needle.
+ * Pre-compute the array from the input_str.
  */
-needle_t*
-needleCreate(const char *needle_str)
+search_t*
+searchComp(const char *input_str)
 {
-    if (!needle_str) return NULL;
+    if (!input_str) return NULL;
 
-    needle_t* handle = calloc(1, sizeof(needle_t));
+    search_t* handle = calloc(1, sizeof(search_t));
     if (!handle) goto failed;
-    handle->nlen = strlen(needle_str);
+    handle->nlen = strlen(input_str);
     if (!handle->nlen) goto failed;
-    handle->str = (unsigned char*)strdup(needle_str);
+    handle->str = (unsigned char*)strdup(input_str);
     if (!handle->str) goto failed;
 
     int i;
@@ -40,45 +40,45 @@ needleCreate(const char *needle_str)
     return handle;
 
 failed:
-    needleDestroy(&handle);
+    searchFree(&handle);
     return handle;
 }
 
 void
-needleDestroy(needle_t **needle_ptr)
+searchFree(search_t **handle_ptr)
 {
-    if (!needle_ptr || !*needle_ptr) return;
-    needle_t *needle = *needle_ptr;
-    if (needle && needle->str) free(needle->str);
-    if (needle) free(needle);
-    *needle_ptr = NULL;
+    if (!handle_ptr || !*handle_ptr) return;
+    search_t *handle = *handle_ptr;
+    if (handle && handle->str) free(handle->str);
+    if (handle) free(handle);
+    *handle_ptr = NULL;
 }
 
 int
-needleLen(needle_t *needle)
+searchLen(search_t *handle)
 {
-    if (!needle) return 0;
-    return needle->nlen;
+    if (!handle) return 0;
+    return handle->nlen;
 }
 
 int
-needleFind(needle_t *needle, char *haystack, int hlen)
+searchExec(search_t *handle, char *haystack, int hlen)
 {
     int j;
     unsigned char c;
 
-    if (!needle || !haystack || hlen < 0) return -1;
+    if (!handle || !haystack || hlen < 0) return -1;
 
     /* Searching */
     j = 0;
-    while (j <= hlen - needle->nlen) {
-        c = haystack[j + needle->nlen - 1];
-        if (needle->str[needle->nlen - 1] == c &&
-            memcmp(needle->str, haystack + j, needle->nlen - 1) == 0) {
+    while (j <= hlen - handle->nlen) {
+        c = haystack[j + handle->nlen - 1];
+        if (handle->str[handle->nlen - 1] == c &&
+            memcmp(handle->str, haystack + j, handle->nlen - 1) == 0) {
             return j;
         }
 
-        j += needle->bmBc[c];
+        j += handle->bmBc[c];
     }
 
     return -1;

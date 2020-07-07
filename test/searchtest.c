@@ -4,102 +4,102 @@
 #include "test.h"
 
 static void
-needleCreateReturnsNullForNullArg(void** state)
+searchCompReturnsNullForNullArg(void** state)
 {
-    needle_t *needle = needleCreate(NULL);
-    assert_null(needle);
+    search_t *handle = searchComp(NULL);
+    assert_null(handle);
 }
 
 static void
-needleCreateReturnsNullForEmptyString(void** state)
+searchCompReturnsNullForEmptyString(void** state)
 {
-    needle_t *needle = needleCreate("");
-    assert_null(needle);
+    search_t *handle = searchComp("");
+    assert_null(handle);
 }
 
 static void
-needleCreateReturnsValidPtrInHappyPath(void** state)
+searchCompReturnsValidPtrInHappyPath(void** state)
 {
-    needle_t *needle = needleCreate("hey");
-    assert_non_null (needle);
+    search_t *handle = searchComp("hey");
+    assert_non_null (handle);
 
-    needleDestroy(&needle);
+    searchFree(&handle);
 }
 
 static void
-needleDestroyHandlesNullArg(void** state)
+searchFreeHandlesNullArg(void** state)
 {
-    needle_t *needle = needleCreate("hey");
-    assert_non_null (needle);
+    search_t *handle = searchComp("hey");
+    assert_non_null (handle);
 
-    // test needleDestroy too
-    needleDestroy(&needle);
-    assert_null(needle);
-    needleDestroy(&needle);
-    needleDestroy(NULL);
+    // test searchFree too
+    searchFree(&handle);
+    assert_null(handle);
+    searchFree(&handle);
+    searchFree(NULL);
 }
 
 static void
-needleLenReturnsZeroForNullArg(void** state)
+searchLenReturnsZeroForNullArg(void** state)
 {
-    assert_int_equal(needleLen(NULL), 0);
+    assert_int_equal(searchLen(NULL), 0);
 }
 
 static void
-needleLenReturnsLengthOfOriginalStr(void** state)
+searchLenReturnsLengthOfOriginalStr(void** state)
 {
-    needle_t *needle = needleCreate("hey");
-    assert_int_equal(needleLen(needle), strlen("hey"));
-    needleDestroy(&needle);
+    search_t *handle = searchComp("hey");
+    assert_int_equal(searchLen(handle), strlen("hey"));
+    searchFree(&handle);
 }
 
 static void
-needleFindReturnsMinusOneForBadArgs(void** state)
+searchExecReturnsMinusOneForBadArgs(void** state)
 {
     char *buf = "hey";
-    needle_t *needle = needleCreate("hey");
+    search_t *handle = searchComp("hey");
 
-    assert_int_equal(needleFind(NULL, buf, sizeof(buf)), -1);
+    assert_int_equal(searchExec(NULL, buf, sizeof(buf)), -1);
 
-    assert_int_equal(needleFind(needle, NULL, sizeof(buf)), -1);
+    assert_int_equal(searchExec(handle, NULL, sizeof(buf)), -1);
 
-    assert_int_equal(needleFind(needle, buf, -1), -1);
+    assert_int_equal(searchExec(handle, buf, -1), -1);
 
-    needleDestroy(&needle);
+    searchFree(&handle);
 }
 
 static void
-needleFindReturnsExpectedResultsInHappyPath(void** state)
+searchExecReturnsExpectedResultsInHappyPath(void** state)
 {
     char *buf = "hey";
-    needle_t *needle = needleCreate("hey");
+    search_t *handle = searchComp("hey");
 
     // exact match
-    assert_int_equal(needleFind(needle, buf, strlen(buf)), 0);
+    assert_int_equal(searchExec(handle, buf, strlen(buf)), 0);
 
-    // almost match; needle longer than buf size
-    assert_int_equal(needleFind(needle, buf, strlen(buf)-1), -1);
+    // almost match; handle longer than buf size
+    assert_int_equal(searchExec(handle, buf, strlen(buf)-1), -1);
 
     // match at end of buf
-    assert_int_equal(needleFind(needle, " hey", strlen(" hey")), 1);
-    assert_int_equal(needleFind(needle, "  hey", strlen("  hey")), 2);
+    assert_int_equal(searchExec(handle, " hey", strlen(" hey")), 1);
+    assert_int_equal(searchExec(handle, "  hey", strlen("  hey")), 2);
 
     // first possible match
-    assert_int_equal(needleFind(needle, " heyhey", strlen(" heyhey")), 1);
-    needleDestroy(&needle);
+    assert_int_equal(searchExec(handle, " heyhey", strlen(" heyhey")), 1);
+    searchFree(&handle);
 
-    // Minimum possible needles
-    needle = needleCreate("h");
-    assert_int_equal(needleFind(needle, buf, strlen(buf)), 0);
-    needleDestroy(&needle);
+    // Minimum possible handles
+    handle = searchComp("h");
+    assert_int_equal(searchExec(handle, buf, strlen(buf)), 0);
+    searchFree(&handle);
 
-    needle = needleCreate("e");
-    assert_int_equal(needleFind(needle, buf, strlen(buf)), 1);
-    needleDestroy(&needle);
+    handle = searchComp("e");
+    assert_int_equal(searchExec(handle, buf, strlen(buf)), 1);
+    searchFree(&handle);
 
-    needle = needleCreate("y");
-    assert_int_equal(needleFind(needle, buf, strlen(buf)), 2);
-    needleDestroy(&needle);
+    handle = searchComp("y");
+    assert_int_equal(searchExec(handle, buf, strlen(buf)), 2);
+    searchFree(&handle);
 }
 
 int
@@ -108,14 +108,14 @@ main(int argc, char* argv[])
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(needleCreateReturnsNullForNullArg),
-        cmocka_unit_test(needleCreateReturnsNullForEmptyString),
-        cmocka_unit_test(needleCreateReturnsValidPtrInHappyPath),
-        cmocka_unit_test(needleDestroyHandlesNullArg),
-        cmocka_unit_test(needleLenReturnsZeroForNullArg),
-        cmocka_unit_test(needleLenReturnsLengthOfOriginalStr),
-        cmocka_unit_test(needleFindReturnsMinusOneForBadArgs),
-        cmocka_unit_test(needleFindReturnsExpectedResultsInHappyPath),
+        cmocka_unit_test(searchCompReturnsNullForNullArg),
+        cmocka_unit_test(searchCompReturnsNullForEmptyString),
+        cmocka_unit_test(searchCompReturnsValidPtrInHappyPath),
+        cmocka_unit_test(searchFreeHandlesNullArg),
+        cmocka_unit_test(searchLenReturnsZeroForNullArg),
+        cmocka_unit_test(searchLenReturnsLengthOfOriginalStr),
+        cmocka_unit_test(searchExecReturnsMinusOneForBadArgs),
+        cmocka_unit_test(searchExecReturnsExpectedResultsInHappyPath),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

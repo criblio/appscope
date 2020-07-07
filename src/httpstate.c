@@ -13,9 +13,9 @@
 #define HTTP_START "HTTP/"
 #define HTTP_END "\r\n"
 #define CONTENT_LENGTH "Content-Length:"
-static needle_t* g_http_start = NULL;
-static needle_t* g_http_end = NULL;
-static needle_t* g_http_clen = NULL;
+static search_t* g_http_start = NULL;
+static search_t* g_http_end = NULL;
+static search_t* g_http_clen = NULL;
 
 static void setHttpState(http_state_t *httpstate, http_enum_t toState);
 static void appendHeader(http_state_t *httpstate, char* buf, size_t len);
@@ -91,11 +91,11 @@ getContentLength(char *header, size_t len)
     char *val;
 
     // ex: Content-Length: 559\r\n
-    if ((ix = needleFind(g_http_clen, header, len)) == -1) return -1;
+    if ((ix = searchExec(g_http_clen, header, len)) == -1) return -1;
 
-    if ((ix <= 0) || (ix > len) || ((ix + needleLen(g_http_clen)) > len)) return -1;
+    if ((ix <= 0) || (ix > len) || ((ix + searchLen(g_http_clen)) > len)) return -1;
 
-    val = &header[ix + needleLen(g_http_clen)];
+    val = &header[ix + searchLen(g_http_clen)];
 
     errno = 0;
     rc = strtoull(val, NULL, 0);
@@ -173,7 +173,7 @@ reportHttp(http_state_t *httpstate)
 
     // If the first 5 chars are HTTP/, it's a response header
     int isResponse =
-      (needleFind(g_http_start, httpstate->hdr, needleLen(g_http_start)) != -1);
+      (searchExec(g_http_start, httpstate->hdr, searchLen(g_http_start)) != -1);
 
     // Set proto info
     proto->evtype = EVT_PROTO;
@@ -238,7 +238,7 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *http
     if (httpstate->state == HTTP_NONE) {
 
         // find the start of http header data
-        if (needleFind(g_http_start, buf, len) == -1) return FALSE;
+        if (searchExec(g_http_start, buf, len) == -1) return FALSE;
 
         setHttpState(httpstate, HTTP_HDR);
         httpstate->id = *httpId;
@@ -252,7 +252,7 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *http
            (header_start < len)) {
 
         header_end =
-            needleFind(g_http_end, &buf[header_start], len-header_start);
+            searchExec(g_http_end, &buf[header_start], len-header_start);
 
         if (header_end == -1) {
             // We didn't find an end in this buffer, append the rest of the
@@ -268,7 +268,7 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *http
             // We found a complete header!
             setHttpState(httpstate, HTTP_HDREND);
             header_end += header_start;  // was measured from header_start
-            header_end += needleLen(g_http_end);
+            header_end += searchLen(g_http_end);
             appendHeader(httpstate, &buf[header_start], header_end-header_start);
             header_start = header_end;
         }
@@ -302,9 +302,9 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *http
 void
 initHttpState(void)
 {
-    g_http_start = needleCreate(HTTP_START);
-    g_http_end = needleCreate(HTTP_END);
-    g_http_clen = needleCreate(CONTENT_LENGTH);
+    g_http_start = searchComp(HTTP_START);
+    g_http_end = searchComp(HTTP_END);
+    g_http_clen = searchComp(CONTENT_LENGTH);
 }
 
 // allow all ports if they appear to have an HTTP header

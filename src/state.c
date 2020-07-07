@@ -40,7 +40,7 @@ net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
-static needle_t* g_http_redirect = NULL;
+static search_t* g_http_redirect = NULL;
 static list_t *g_protlist;
 static unsigned int g_prot_sequence = 0;
 
@@ -236,7 +236,7 @@ initState()
     g_fsinfo = fsinfoLocal;
 
     initHttpState();
-    g_http_redirect = needleCreate(REDIRECTURL);
+    g_http_redirect = searchComp(REDIRECTURL);
 
     g_protlist = lstCreate(destroyProtEntry);
     initProtocolDetection();
@@ -1338,7 +1338,7 @@ doURL(int sockfd, const void *buf, size_t len, metric_t src)
     }
 
 
-    if ((src == NETTX) && (needleFind(g_http_redirect, (char *)buf, len) != -1)) {
+    if ((src == NETTX) && (searchExec(g_http_redirect, (char *)buf, len) != -1)) {
         g_netinfo[sockfd].urlRedirect = TRUE;
         return 0;
     }

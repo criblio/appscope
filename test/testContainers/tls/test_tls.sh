@@ -200,8 +200,7 @@ evaltest
 
 PHP_HTTP_END=$(grep http- $EVT_FILE | grep -c sslclient.php)
 
-# We really expect *3*, not *2*.  We're missing http-req right now.
-if (( $PHP_HTTP_END - $PHP_HTTP_START < 2 )); then
+if (( $PHP_HTTP_END - $PHP_HTTP_START < 3 )); then
     ERR+=1
 fi
 endtest

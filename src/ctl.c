@@ -145,7 +145,7 @@ grab_supplemental_for_def_protocol(cJSON * json_root, request_t *req)
 {
     cJSON *json, *body;
     char *str;
-    protocol_def_t *prot;
+    protocol_def_t *prot = NULL;
 
     if (!json_root || !req) goto err;
 
@@ -187,7 +187,7 @@ grab_supplemental_for_def_protocol(cJSON * json_root, request_t *req)
     return;
 
 err:
-    req->cmd=REQ_PARAM_ERR;
+    if (req) req->cmd=REQ_PARAM_ERR;
     if (prot && prot->regex) free(prot->regex);
     if (prot && prot->protname) free(prot->protname);
     if (prot) free(prot);
@@ -198,7 +198,7 @@ grab_supplemental_for_del_protocol(cJSON * json_root, request_t *req)
 {
     cJSON *json, *body;
     char *str;
-    protocol_def_t *prot;
+    protocol_def_t *prot = NULL;
 
     if (!json_root || !req) goto err;
 
@@ -218,7 +218,7 @@ grab_supplemental_for_del_protocol(cJSON * json_root, request_t *req)
     return;
 
 err:
-    req->cmd=REQ_PARAM_ERR;
+    if (req) req->cmd=REQ_PARAM_ERR;
     if (prot && prot->protname) free(prot->protname);
     if (prot) free(prot);
 }

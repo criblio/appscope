@@ -348,7 +348,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
             for (i = 0; i < msg->msg_iovlen; i++) {
                 iov = &msg->msg_iov[i];
                 if (iov && iov->iov_base) {
-                    if (scanForHttpHeader(httpstate, (char*)&iov->iov_base, iov->iov_len, &httpId)) {
+                    if (scanForHttpHeader(httpstate, iov->iov_base, iov->iov_len, &httpId)) {
                         http_header_found = TRUE;
                         // stay in loop to count down content length
                     }
@@ -366,7 +366,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
 
             for (i = 0; i < iovcnt; i++) {
                 if (iov[i].iov_base) {
-                    if (scanForHttpHeader(httpstate, (char*)&iov[i].iov_base, iov[i].iov_len, &httpId)) {
+                    if (scanForHttpHeader(httpstate, iov[i].iov_base, iov[i].iov_len, &httpId)) {
                         http_header_found = TRUE;
                         // stay in loop to count down content length
                     }

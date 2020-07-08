@@ -368,16 +368,17 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
 
 void
 initJavaAgent() {
-    //TODO: 
-    // - check if we are in a java process
-    // - preserve existing _JAVA_OPTIONS
     char *var = getenv("LD_PRELOAD");
     if (var != NULL) {
+        /*
+        set JAVA_TOOL_OPTIONS so that JVM can load libscope.so as a java agent
+        https://docs.oracle.com/javase/8/docs/platform/jvmti/jvmti.html#tooloptions
+        */
         char buf[1024];
         snprintf(buf, sizeof(buf), "-agentpath:%s", var);
-        int result = setenv("_JAVA_OPTIONS", buf, 1);
+        int result = setenv("JAVA_TOOL_OPTIONS", buf, 1);
         if (result) {
-            scopeLog("ERROR: Could not set _JAVA_OPTIONS failed\n", -1, CFG_LOG_ERROR);
+            scopeLog("ERROR: Could not set JAVA_TOOL_OPTIONS failed\n", -1, CFG_LOG_ERROR);
         }
     }
 }

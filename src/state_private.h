@@ -7,7 +7,6 @@
 #define PROTOCOL_STR 16
 #define FUNC_MAX 24
 #define HDRTYPE_MAX 16
-#define ASIZE 256
 
 //
 // This file contains implementation details for state.c and reporting.c.
@@ -113,13 +112,36 @@ typedef struct stat_err_info_t {
     metric_counters counters;
 } stat_err_info;
 
+typedef enum {
+    HTTP_NONE,
+    HTTP_HDR,
+    HTTP_HDREND,
+    HTTP_DATA
+} http_enum_t;
+
+typedef struct
+{
+    uint64_t uid;
+    int sockfd;
+    int isSsl;
+} httpId_t;
+
+typedef struct {
+    http_enum_t state;
+    char* hdr;          // Used if state == HDR
+    size_t hdrlen;
+    size_t hdralloc;
+    size_t clen;        // Used if state==HTTP_DATA
+    httpId_t id;
+} http_state_t;
+
 typedef struct net_info_t {
     metric_t evtype;
     metric_t data_type;
     int fd;
     int active;
     int type;
-    size_t clen;
+    http_state_t http;
     bool urlRedirect;
     bool addrSetLocal;
     bool addrSetRemote;
@@ -182,8 +204,6 @@ void doUnixEndpoint(int, net_info *);
 void resetInterfaceCounts(counters_element_t*);
 void addToInterfaceCounts(counters_element_t*, uint64_t);
 void subFromInterfaceCounts(counters_element_t*, uint64_t);
-void preComp(unsigned char *, int, int[]);
-int strsrch(char *, int, char *, int, int *);
 
 // Data that lives in state.c, but is used in report.c too.
 extern summary_t g_summary;

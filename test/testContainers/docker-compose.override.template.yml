@@ -54,3 +54,67 @@ services:
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
     privileged: true
+
+  java6:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java7:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java8:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java9:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java10:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java11:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java12:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java13:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java14:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+

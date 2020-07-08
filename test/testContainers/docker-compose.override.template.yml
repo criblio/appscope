@@ -1,13 +1,13 @@
 version: '3.5'
 services:
-  cribl:
+  interposed_func:
     command: -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     privileged: true
 
-  splunk:
+  cribl:
     command: -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
@@ -21,9 +21,10 @@ services:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     privileged: true
 
-  interposed_func:
+  splunk:
     command: -s /opt/test-runner/bin/libscope.so
     volumes:
+      - ./logs:/opt/test-runner/logs
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     privileged: true
 

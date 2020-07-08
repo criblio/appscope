@@ -1,11 +1,23 @@
 version: '3.5'
 services:
+  interposed_func:
+    build:
+      context: .
+      dockerfile: ./interposed_func/Dockerfile
+    privileged: true
+
   cribl:
     build:
       context: .
       dockerfile: ./cribl/Dockerfile
     ports:
       - "9000:9000"
+
+  nginx:
+    build:
+      context: .
+      dockerfile: ./nginx/Dockerfile
+
   splunk:
     build:
       context: .
@@ -15,10 +27,10 @@ services:
 
     privileged: true
 
-  nginx:
+  elastic:
     build:
       context: .
-      dockerfile: ./nginx/Dockerfile
+      dockerfile: ./elastic/Dockerfile
 
   kafka:
     ports:                                                                                                                                                                              
@@ -39,17 +51,6 @@ services:
     build:
       context: .
       dockerfile: ./kafka/Dockerfile
-
-  interposed_func:
-    build:
-      context: .
-      dockerfile: ./interposed_func/Dockerfile
-    privileged: true
-
-  elastic:
-    build:
-      context: .
-      dockerfile: ./elastic/Dockerfile
 
   tls:
     build:

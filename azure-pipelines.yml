@@ -96,6 +96,51 @@ stages:
         parameters:
           name: detect_proto
           containerName: detect_proto
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: java6
+          containerName: java6
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: java7
+          containerName: java7
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: java8
+          containerName: java8
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: java9
+          containerName: java9
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: java10
+          containerName: java10
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: java11
+          containerName: java11
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: java12
+          containerName: java12
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: java13
+          containerName: java13
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: java14
+          containerName: java14
   - stage: publish
     displayName: Publish artifacts to S3
     dependsOn:

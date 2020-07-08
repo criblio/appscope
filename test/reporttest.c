@@ -75,6 +75,10 @@ int cmdSendMetric(mtc_t* mtc, event_t* metric)
     return 0; //__real_cmdSendMetric(mtc, metric);
 }
 
+// Needed by linux/os.c
+void initJavaAgent(void) {}
+
+
 int
 eventCalls(const char* str)
 {

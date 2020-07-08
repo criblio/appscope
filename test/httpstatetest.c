@@ -85,6 +85,9 @@ init_g_fn()
     g_fn.__xstat = dlsym(RTLD_NEXT, "__xstat");
 }
 
+// Needed by linux/os.c
+void initJavaAgent(void) {}
+
 
 static int
 needleTestSetup(void** state)

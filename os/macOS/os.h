@@ -38,4 +38,5 @@ extern int osIsFilePresent(pid_t, const char *);
 extern int osGetCmdline(pid_t, char **);
 extern bool osThreadInit(void(*handler)(int), unsigned);
 extern int osUnixSockPeer(ino_t);
+extern void osInitJavaAgent(void);
 extern int osGetPageProt(uint64_t);

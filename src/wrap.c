@@ -26,6 +26,8 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 
+#include "javaagent.h"
+
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
 
@@ -1243,6 +1245,8 @@ init(void)
     initHook();
     
     threadInit();
+
+    osInitJavaAgent();
 }
 
 EXPORTOFF int

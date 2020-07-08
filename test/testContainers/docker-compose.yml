@@ -51,7 +51,6 @@ services:
       context: .
       dockerfile: ./elastic/Dockerfile
 
-
   tls:
     build:
       context: .
@@ -63,3 +62,68 @@ services:
     ports:
       - 6379:6379
       - 27017:27017
+
+  java6:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 6
+        TOMCAT_MAJOR_VERSION: 7
+        TOMCAT_MINOR_VERSION: 7.0.10
+
+  java7:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 7
+
+  java8:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 8
+  
+  java9:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 9
+
+  java10:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 10
+
+  java11:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 11
+  
+  java12:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 12
+
+  java13:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 13
+
+  java14:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_VERSION: 14

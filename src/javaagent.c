@@ -374,15 +374,22 @@ initJavaAgent() {
         set JAVA_TOOL_OPTIONS so that JVM can load libscope.so as a java agent
         https://docs.oracle.com/javase/8/docs/platform/jvmti/jvmti.html#tooloptions
         */
+        char opt[1024];
+        snprintf(opt, sizeof(opt), "-agentpath:%s", var);
+
         char *buf;
-        size_t bufsize = strlen(var) + 13;
+        size_t bufsize = strlen(opt) + 1;
 
         char *env = getenv("JAVA_TOOL_OPTIONS");
         if (env != NULL) {
-            bufsize += strlen(env);
+            if (strstr(env, opt) != NULL) {
+                //agentpath is already set, do nothing
+                return;
+            }
+            bufsize += strlen(env) + 1;
         }
         buf = malloc(bufsize);
-        snprintf(buf, bufsize, "%s%s-agentpath:%s", env != NULL ? env : "", env != NULL ? " " : "", var);
+        snprintf(buf, bufsize, "%s%s%s", env != NULL ? env : "", env != NULL ? " " : "", opt);
 
         int result = setenv("JAVA_TOOL_OPTIONS", buf, 1);
         if (result) {

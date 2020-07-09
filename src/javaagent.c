@@ -374,11 +374,20 @@ initJavaAgent() {
         set JAVA_TOOL_OPTIONS so that JVM can load libscope.so as a java agent
         https://docs.oracle.com/javase/8/docs/platform/jvmti/jvmti.html#tooloptions
         */
-        char buf[1024];
-        snprintf(buf, sizeof(buf), "-agentpath:%s", var);
+        char *buf;
+        size_t bufsize = strlen(var) + 13;
+
+        char *env = getenv("JAVA_TOOL_OPTIONS");
+        if (env != NULL) {
+            bufsize += strlen(env);
+        }
+        buf = malloc(bufsize);
+        snprintf(buf, bufsize, "%s%s-agentpath:%s", env != NULL ? env : "", env != NULL ? " " : "", var);
+
         int result = setenv("JAVA_TOOL_OPTIONS", buf, 1);
         if (result) {
             scopeLog("ERROR: Could not set JAVA_TOOL_OPTIONS failed\n", -1, CFG_LOG_ERROR);
         }
+        free(buf);
     }
 }

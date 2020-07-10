@@ -15,7 +15,9 @@
 #include "os.h"
 #include "com.h"
 #include "state.h"
+#include "gocontext.h"
 
+#define MAX_STORES 256
 #define HEAP_SIZE (size_t)(500 * 1024)
 // 1Mb + an 8kb guard
 #define STACK_SIZE (size_t)(1024 * 1024) + (8 * 1024)
@@ -100,9 +102,11 @@ getSymbol(const char *buf, char *sname)
     return (void *)symaddr;
 }
 
+ssize_t (*go_syscall_socket)(int, const void *, size_t);
 ssize_t (*go_syscall_write)(int, const void *, size_t);
 ssize_t (*go_syscall_read)(int, const void *, size_t);
 int (*go_syscall_open)(const char *, int, int, mode_t);
+void (*go_runtime_cgocall)(void);
 int (*runtime_lock)(void);
 int (*runtime_unlock)(void);
 int (*runtime_schedEnableUser)(void);
@@ -118,6 +122,7 @@ uint64_t go_results[4];
 uint64_t go_stack_saves[32];
 unsigned long scope_fs, go_fs;
 int go_what;
+__thread uint64_t testtls;
 
 extern int go_start();
 extern int go_end();
@@ -130,18 +135,74 @@ extern int go_hook_morestack_noctxt();
 extern void threadNow(int);
 extern int arch_prctl(int, unsigned long);
 
+typedef struct go_store {
+    uint64_t tcb;
+    uint64_t store;
+} go_store_t;
+
+go_store_t g_gostore[MAX_STORES];
+
+EXPORTON go_store_t *
+go_get_store(uint64_t tcb)
+{
+    int i;
+    go_store_t *storep;
+
+    for (i = 0, storep = g_gostore; i < MAX_STORES; i++) {
+        if (storep[i].tcb == tcb) {
+            return &storep[i];
+        } else if (storep[i].tcb == (uint64_t)0) {
+            storep[i].tcb = tcb;
+            return &storep[i];
+        }
+    }
+
+    scopeLog("ERROR:go_get_store: Not good; no stack store available", -1, CFG_LOG_ERROR);
+    return NULL;
+}
+
+EXPORTON void
+go_reset_store(uint64_t tcb)
+{
+    int i;
+    go_store_t *storep;
+
+    for (i = 0, storep = g_gostore; i < MAX_STORES; i++) {
+        if (storep[i].tcb == tcb) {
+            storep[i].tcb = (uint64_t)0;
+            return;
+        }
+    }
+
+    scopeLog("ERROR:go_reset_Store: didn't find the stack store", -1, CFG_LOG_ERROR);
+}
+
+EXPORTON size_t
+go_hook_save(uint64_t *stackaddr)
+{
+    size_t rc = 0;
+    //uint64_t fd = *((uint64_t *)((char *)(stackaddr) + 0x8));
+    //uint64_t buf = *((uint64_t *)((char *)(stackaddr) + 0x10));
+    //uint64_t len = *((uint64_t *)((char *)(stackaddr) + 0x18));
+
+    //char *mem = calloc(1, 100);
+    return rc;
+
+}
+
 EXPORTON int
 go_hook_test(void)
 {
     int rc = 0;
     int fd;
     size_t len;
+    //go_funcs_t gofuncs;
     const void *buf;
     uint64_t initialTime;
     char path[PATH_MAX];
 
     if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-        scopeLog("set_go:arch_prctl", -1, CFG_LOG_ERROR);
+        scopeLog("go_hook_test:arch_prctl", -1, CFG_LOG_ERROR);
         return -1;
     }
 
@@ -149,7 +210,7 @@ go_hook_test(void)
     //calloc(1, 1024);
 
     switch (go_what) {
-    case 1:
+    case SYSCALL_WRITE:
         fd = (int)go_params[0];
         buf = (void *)go_params[1];
         len = (size_t)go_params[2];
@@ -168,7 +229,7 @@ go_hook_test(void)
         doWrite(fd, initialTime, 1, path, len, "write", BUF, 0);
         break;
 
-    case 2:
+    case SYSCALL_OPEN:
         if ((fd = (int)go_results[0]) == -1) break;
         buf = (char *)go_params[1];
         len = (size_t)go_params[2];
@@ -186,7 +247,7 @@ go_hook_test(void)
         doOpen(fd, path, FD, "open");
         break;
 
-    case 3:
+    case SYSCALL_READ:
         fd = (int)go_params[0];
         buf = (void *)go_params[1];
         len = (size_t)go_params[2];
@@ -242,6 +303,18 @@ initGoHook(const char *buf)
     if ((go_syscall_read = getSymbol(buf, "syscall.read")) != 0) {
         go_syscall_read += 19;
         rc = funchook_prepare(funchook, (void**)&go_syscall_read, go_hook_read);
+    }
+
+    /*
+     * Note: calling runtime.cgocall results in the Go error
+     *       "fatal error: cgocall unavailable"
+     * Calling runtime.asmcgocall does work. Possibly becasue we
+     * are entering the Go func past the runtime stack check?
+     * Need to investigate later.
+     */
+    if ((go_runtime_cgocall = getSymbol(buf, "runtime.asmcgocall")) == 0) {
+        printf("ERROR: can't get the address for runtime.cgocall\n");
+        exit(-1);
     }
 
 /*
@@ -596,8 +669,12 @@ sys_exec(const char *buf, const char *path, int argc, const char **argv, const c
     lastaddr = load_elf((char *)buf);
     initGoHook(buf);
 
+    memset(g_gostore, 0, sizeof(go_store_t) * MAX_STORES);
+
     threadNow(0);
 
+    testtls = 0xdeadbeef;
+    printf("tls 0x%lx\n", testtls);
     set_go((char *)buf, argc, argv, env, lastaddr);
 
     return 0;

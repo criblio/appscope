@@ -1,6 +1,8 @@
 #include <sys/syscall.h>
 #include <asm/prctl.h>
-    
+
+#include "gocontext.h"
+
 .global	go_hook_write, go_hook_open, go_hook_read, go_start, go_end, do_go
 .global go_hook_entersyscall, go_hook_exitsyscall, go_hook_morestack_noctxt
     
@@ -20,6 +22,106 @@ go_start:
 go_end:
 
 go_hook_write:
+    # put args on the stack for the cgo call
+    sub $0x20,%rsp
+    mov %fs:0xfffffffffffffff8, %r11
+    push %r11
+    lea go_get_store@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # call cgo
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+
+    test %rax, %rax
+    jle write_out
+    # housekeeping
+    pop %r10
+    pop %r10
+    add $0x20,%rsp
+
+    # save the return address
+    mov (%rsp), %r11
+    mov %r11, 0x08(%rax)
+
+    # change the return addr on the Go stack to come back here
+    movabs $write_toc, %r11
+    mov %r11, (%rsp)
+
+    # do the Go function
+    lea go_syscall_write@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    jmp *%r11
+
+write_toc:
+    # restore the original return address
+    sub $0x20,%rsp
+    mov %fs:0xfffffffffffffff8, %r11
+    push %r11
+    lea go_reset_store@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # call cgo
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+
+    # get the return address
+    mov 0x08(%rax), %r11
+
+    # housekeeping
+    pop %r10
+    pop %r10
+    add $0x20,%rsp
+
+    # restore the original return address
+    push %r11
+    mov %rsp, %r11
+
+    # put args on the stack for the cgo call
+    sub $0x20,%rsp
+    push %r11
+    lea go_hook_save@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # call cgo
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+
+write_out:
+    pop %r11
+    pop %r11
+    add $0x20,%rsp
+    ret
+
+    mov %rsp, %r10
+    mov (%rsp), %r11
+    push %rdi
+    push %rsi
+    push %rdx
+    push %rax
+    mov %r11, %rdi
+    mov %r10, %rsi
+    mov %fs:0xfffffffffffffff8,%rdx
+
+    lea go_hook_save@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    call *%r11
+
+    pop %rax
+    pop %rdx
+    pop %rsi
+    pop %rdi
+
     # save the return address
     lea go_stack_saves@GOTPCREL(%rip), %r11
     mov (%r11), %r11
@@ -46,7 +148,7 @@ write_ret:
     # tell the lib code where we came from
     lea go_what@GOTPCREL(%rip), %r11
     mov (%r11), %r11
-    movl $1, (%r11)
+    movl $SYSCALL_WRITE, (%r11)
     jmp do_go
 
 go_hook_open:
@@ -83,7 +185,7 @@ open_ret:
     # tell the lib code where we came from
     lea go_what@GOTPCREL(%rip), %r11
     mov (%r11), %r11
-    movl $2, (%r11)
+    movl $SYSCALL_OPEN, (%r11)
     jmp do_go
 
 go_hook_read:
@@ -113,7 +215,43 @@ read_ret:
     # tell the lib code where we came from
     lea go_what@GOTPCREL(%rip), %r11
     mov (%r11), %r11
-    movl $3, (%r11)
+    movl $SYSCALL_READ, (%r11)
+    jmp do_go
+
+go_hook_socket:
+    # save the return address
+    lea go_stack_saves@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%rsp), %r10
+    mov %r10, (%r11)
+
+    # change return addr on the Go stack to come back here
+    movabs $socket_ret, %r11
+    mov %r11, (%rsp)
+
+    # do the Go function
+    lea go_syscall_socket@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    jmp *%r11
+
+socket_ret:
+    # restore the original return address
+    lea go_stack_saves@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # get the result from the socket call
+    lea go_results@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov 0x28(%rsp), %r10
+    mov %r10, (%r11)
+
+    # tell the lib code where we came from
+    lea go_what@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    movl $SYSCALL_SOCKET, (%r11)
     jmp do_go
 
 do_go:

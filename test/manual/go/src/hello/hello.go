@@ -5,6 +5,8 @@ import (
 	"time"
     "io/ioutil"
     "os"
+//    "net"
+//    "bufio"
 )
 
 func check(e error) {
@@ -46,6 +48,15 @@ func main() {
     fmt.Printf("%d bytes: %s\n", n1, string(b1[:n1]))
 
     f.Close()
+/*
+    conn, err := net.Dial("tcp", "golang.org:80")
+    if err != nil {
+	   // handle error
+    }
 
+    fmt.Fprintf(conn, "GET / HTTP/1.0\r\n\r\n")
+    status, err := bufio.NewReader(conn).ReadString('\n')
+    fmt.Printf("http status: %s", status)
+*/
     time.Sleep(20 * time.Second)
 }

@@ -10,12 +10,18 @@
 #include <sys/syscall.h>
 #include <asm/prctl.h>
 #include <sys/prctl.h>
+#include <signal.h>
 
 #include "dbg.h"
 #include "os.h"
 #include "com.h"
 #include "state.h"
 #include "gocontext.h"
+
+typedef struct go_store {
+    uint64_t tcb;
+    uint64_t store;
+} go_store_t;
 
 #define MAX_STORES 256
 #define HEAP_SIZE (size_t)(500 * 1024)
@@ -122,10 +128,11 @@ uint64_t go_results[4];
 uint64_t go_stack_saves[32];
 unsigned long scope_fs, go_fs;
 int go_what;
-__thread uint64_t testtls;
+uint64_t *g_currsheap = NULL;
+uint64_t *g_heapend = NULL;
+bool g_ongostack = FALSE;
+go_store_t g_gostore[MAX_STORES];
 
-extern int go_start();
-extern int go_end();
 extern int go_hook_write();
 extern int go_hook_read();
 extern int go_hook_open();
@@ -135,12 +142,22 @@ extern int go_hook_morestack_noctxt();
 extern void threadNow(int);
 extern int arch_prctl(int, unsigned long);
 
-typedef struct go_store {
-    uint64_t tcb;
-    uint64_t store;
-} go_store_t;
+EXPORTON go_store_t *
+go_new_store(uint64_t tcb)
+{
+    int i;
+    go_store_t *storep;
 
-go_store_t g_gostore[MAX_STORES];
+    for (i = 0, storep = g_gostore; i < MAX_STORES; i++) {
+        if (storep[i].tcb == (uint64_t)0) {
+            storep[i].tcb = tcb;
+            return &storep[i];
+        }
+    }
+
+    scopeLog("ERROR:go_get_store: Not good; no stack store available", -1, CFG_LOG_ERROR);
+    return NULL;
+}
 
 EXPORTON go_store_t *
 go_get_store(uint64_t tcb)
@@ -161,7 +178,7 @@ go_get_store(uint64_t tcb)
     return NULL;
 }
 
-EXPORTON void
+EXPORTON go_store_t *
 go_reset_store(uint64_t tcb)
 {
     int i;
@@ -170,22 +187,166 @@ go_reset_store(uint64_t tcb)
     for (i = 0, storep = g_gostore; i < MAX_STORES; i++) {
         if (storep[i].tcb == tcb) {
             storep[i].tcb = (uint64_t)0;
-            return;
+            return &storep[i];
         }
     }
 
     scopeLog("ERROR:go_reset_Store: didn't find the stack store", -1, CFG_LOG_ERROR);
+    return NULL;
+}
+
+int
+regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
+             regmatch_t pmatch[], int eflags)
+{
+    int rc;
+    uint64_t res;
+    uint64_t tcb = 0;
+    go_store_t *store;
+
+    if (g_ongostack == TRUE) {
+        // TODO: tcb is 0. need a __thread value?
+        __asm__ volatile (
+            "mov %%fs:0xfffffffffffffff8, %%r11  \n"
+            "mov %%r11, %0  \n"
+            : "=r"(tcb)                      // output
+            :                                // inputs
+            : "%r11"                         // clobbered regs
+            );
+
+        if ((store = go_new_store(tcb)) == NULL) return REG_NOMATCH;
+
+        // RDI, RSI, RDX, RCX, R8, R9
+        __asm__ volatile (
+            "mov %1, %%r11 \n"
+            "mov %%rsp, 0x8(%%r11)  \n"          // save the current stack
+            "lea scope_stack(%%rip), %%r11 \n"
+            "mov (%%r11), %%rsp \n"              // switch the stack
+            "mov %2, %%rdi  \n"
+            "mov %3, %%rsi  \n"
+            "mov %4, %%rdx  \n"
+            "mov %5, %%rcx  \n"
+            "mov %6, %%r8d  \n"
+            "callq pcre2_regexec  \n"
+            : "=r"(rc)                        // output
+            : "r"(store), "r"(preg), "r"(string),
+              "r"(nmatch), "r"(pmatch), "r"(eflags)   // input
+            : "%r11"                          // clobbered register
+            );
+
+        __asm__ volatile (
+            "mov %1, %%r11 \n"
+            "mov 0x8(%%r11), %%rsp \n"        // switch the stack
+            : "=r"(res)                       // output
+            : "r"(store)                      // inputs
+            : "%r11"                          // clobbered register
+            );
+
+        go_reset_store(tcb);
+    } else {
+        rc = pcre2_regexec(preg, string, nmatch, pmatch, eflags);
+    }
+
+    return rc;
 }
 
 EXPORTON size_t
-go_hook_save(uint64_t *stackaddr)
+go_write(uint64_t *stackaddr)
 {
     size_t rc = 0;
-    //uint64_t fd = *((uint64_t *)((char *)(stackaddr) + 0x8));
-    //uint64_t buf = *((uint64_t *)((char *)(stackaddr) + 0x10));
-    //uint64_t len = *((uint64_t *)((char *)(stackaddr) + 0x18));
+    sigset_t mask;
+    uint64_t fd = *((uint64_t *)((char *)(stackaddr) + 0x8));
+    uint64_t buf = *((uint64_t *)((char *)(stackaddr) + 0x10));
+    uint64_t len = *((uint64_t *)((char *)(stackaddr) + 0x18));
+    uint64_t initialTime = getTime();
 
-    //char *mem = calloc(1, 100);
+    puts("Scope: write");
+
+    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("go_write:blocking signals", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
+        scopeLog("go_write:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+        scopeLog("go_write_test:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    doWrite(fd, initialTime, 1, (char *)buf, len, "write", BUF, 0);
+
+    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
+        scopeLog("go_write:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("go_write:blocking signals", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    return rc;
+
+}
+
+EXPORTON size_t
+go_open(uint64_t *stackaddr)
+{
+    char *path = NULL;
+    size_t rc = 0;
+    sigset_t mask;
+    uint64_t fd = *((uint64_t *)((char *)(stackaddr) + 0x30));
+    uint64_t buf = *((uint64_t *)((char *)(stackaddr) + 0x10));
+    uint64_t len = *((uint64_t *)((char *)(stackaddr) + 0x18));
+
+    if ((len <= 0) || (len >= PATH_MAX)) return -1;
+
+    puts("Scope: open");
+
+    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("go_open:blocking signals", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
+        scopeLog("go_open:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+        scopeLog("go_open_test:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (buf) {
+        if ((path = calloc(1, len)) == NULL) return -1;
+        memmove(path, (char *)buf, len);
+        path[len] = '\0';
+    } else {
+        scopeLog("ERROR:go_open: null pathname", -1, CFG_LOG_ERROR);
+        puts("Scope:ERROR:open:no path");
+        if (path) free(path);
+        return -1;
+    }
+
+    doOpen(fd, path, FD, "open");
+
+    if (path) free(path);
+
+    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
+        scopeLog("go_open:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("go_open:blocking signals", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
     return rc;
 
 }
@@ -299,12 +460,12 @@ initGoHook(const char *buf)
         go_syscall_open += 19;
         rc = funchook_prepare(funchook, (void**)&go_syscall_open, go_hook_open);
     }
-
+/*
     if ((go_syscall_read = getSymbol(buf, "syscall.read")) != 0) {
         go_syscall_read += 19;
         rc = funchook_prepare(funchook, (void**)&go_syscall_read, go_hook_read);
     }
-
+*/
     /*
      * Note: calling runtime.cgocall results in the Go error
      *       "fatal error: cgocall unavailable"
@@ -378,11 +539,6 @@ load_sections(char *buf, char *addr, size_t mlen)
                 memmove(laddr, &buf[sections[i].sh_offset], len);
             } else if (type == SHT_NOBITS) {
                 memset(laddr, 0, len);
-            }
-
-            if (strcmp(sec_name, ".text") == 0) {
-                go2go = (int (*)())laddr + len + 8;
-                memmove(laddr + len + 8, go_start, go_end - go_start);
             }
 
             snprintf(msg, sizeof(msg), "%s:%d %s addr %p - %p\n",
@@ -642,15 +798,16 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr ladd
     }
 #endif    
 
+    g_ongostack = TRUE;
     __asm__ volatile (
         "lea scope_stack(%%rip), %%r11 \n"
         "mov %%rsp, (%%r11)  \n"
         "mov %1, %%r11 \n"
         "mov %2, %%rsp \n"
         "jmp *%%r11 \n"
-        : "=r"(res) /* output */
+        : "=r"(res)                   //output
         : "r"(start), "r"(sp)
-        : "%r11"         /* clobbered register */
+        : "%r11"                      //clobbered register
     );
 
     return 0;
@@ -673,8 +830,6 @@ sys_exec(const char *buf, const char *path, int argc, const char **argv, const c
 
     threadNow(0);
 
-    testtls = 0xdeadbeef;
-    printf("tls 0x%lx\n", testtls);
     set_go((char *)buf, argc, argv, env, lastaddr);
 
     return 0;

@@ -2,9 +2,6 @@
 
 extern rtconfig g_cfg;
 
-uint64_t *g_currsheap = NULL;
-uint64_t *g_heapend = NULL;
-
 // for reporttest on mac __attribute__((weak))
 /*
  * Note: there are 2 config values to check to see if
@@ -178,3 +175,13 @@ msgEventGet(ctl_t *ctl)
     if (!ctl) return (uint64_t) -1;
     return ctlGetEvent(ctl);
 }
+
+#ifndef __GO__
+int
+regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
+             regmatch_t pmatch[], int eflags)
+{
+    return pcre2_regexec(preg, string, nmatch, pmatch, eflags);
+}
+#endif  // __GO__
+

@@ -24,6 +24,9 @@ func main() {
     check(err)
     fmt.Printf("wrote %s\n", d1)
 
+    time.Sleep(20 * time.Second)
+    return
+
     dat, err := ioutil.ReadFile("/tmp/dat1")
     check(err)
     if (dat == nil) {fmt.Print(string(dat))}

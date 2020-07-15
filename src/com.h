@@ -19,9 +19,6 @@
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
-extern uint64_t *g_currsheap;
-extern uint64_t *g_heapend;
-
 // Post a message from report to the command buffer
 int cmdSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);
 int cmdSendMetric(mtc_t *, event_t* );
@@ -50,5 +47,8 @@ cJSON *jsonConfigurationObject(config_t *);
 
 // Retreive messages
 uint64_t msgEventGet(ctl_t *);
+
+// Regex wrapper
+int regexec_wrap(const regex_t *, const char *, size_t, regmatch_t *, int);
 
 #endif // __COM_H__

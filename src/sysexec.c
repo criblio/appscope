@@ -108,10 +108,10 @@ getSymbol(const char *buf, char *sname)
     return (void *)symaddr;
 }
 
-ssize_t (*go_syscall_socket)(int, const void *, size_t);
 ssize_t (*go_syscall_write)(int, const void *, size_t);
-ssize_t (*go_syscall_read)(int, const void *, size_t);
 int (*go_syscall_open)(const char *, int, int, mode_t);
+int (*go_syscall_socket)(int, int, int);
+ssize_t (*go_syscall_read)(int, const void *, size_t);
 void (*go_runtime_cgocall)(void);
 int (*runtime_lock)(void);
 int (*runtime_unlock)(void);
@@ -134,8 +134,9 @@ bool g_ongostack = FALSE;
 go_store_t g_gostore[MAX_STORES];
 
 extern int go_hook_write();
-extern int go_hook_read();
 extern int go_hook_open();
+extern int go_hook_socket();
+extern int go_hook_read();
 extern int go_hook_entersyscall();
 extern int go_hook_exitsyscall();
 extern int go_hook_morestack_noctxt();
@@ -352,6 +353,50 @@ go_open(uint64_t *stackaddr)
 }
 
 EXPORTON int
+go_socket(char *stackaddr)
+{
+    sigset_t mask;
+
+    uint64_t domain = *(uint64_t*)(stackaddr + 0x8);  // aka family
+    uint64_t type   = *(uint64_t*)(stackaddr + 0x10);
+    //uint64_t proto  = *(uint64_t*)(stackaddr + 0x18);
+    uint64_t sd     = *(uint64_t*)(stackaddr + 0x20);
+
+    if (sd == -1) return -1;
+
+    puts("Scope: socket");
+
+    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("go_socket:blocking signals", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
+        scopeLog("go_socket:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+        scopeLog("go_socket_test:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    addSock(sd, type, domain);
+
+    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
+        scopeLog("go_socket:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("go_socket:blocking signals", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    return sd;
+}
+
+EXPORTON int
 go_hook_test(void)
 {
     int rc = 0;
@@ -460,6 +505,12 @@ initGoHook(const char *buf)
         go_syscall_open += 19;
         rc = funchook_prepare(funchook, (void**)&go_syscall_open, go_hook_open);
     }
+
+    if ((go_syscall_socket = getSymbol(buf, "syscall.socket")) != 0) {
+        go_syscall_socket += 19;
+        rc = funchook_prepare(funchook, (void**)&go_syscall_socket, go_hook_socket);
+    }
+
 /*
     if ((go_syscall_read = getSymbol(buf, "syscall.read")) != 0) {
         go_syscall_read += 19;

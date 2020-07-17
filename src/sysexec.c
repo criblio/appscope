@@ -252,13 +252,13 @@ regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
 }
 
 EXPORTON size_t
-go_write(uint64_t *stackaddr)
+go_write(char *stackaddr)
 {
-    size_t rc = 0;
     sigset_t mask;
-    uint64_t fd = *((uint64_t *)((char *)(stackaddr) + 0x8));
-    uint64_t buf = *((uint64_t *)((char *)(stackaddr) + 0x10));
-    uint64_t len = *((uint64_t *)((char *)(stackaddr) + 0x18));
+    uint64_t fd  = *(uint64_t *)(stackaddr + 0x8);
+    uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
+    //uint64_t len = *(uint64_t *)(stackaddr + 0x18);
+    uint64_t rc  = *(uint64_t *)(stackaddr + 0x28); // <- should be 0x20, we thought?
     uint64_t initialTime = getTime();
 
     puts("Scope: write");
@@ -278,7 +278,7 @@ go_write(uint64_t *stackaddr)
         return -1;
     }
 
-    doWrite(fd, initialTime, 1, (char *)buf, len, "write", BUF, 0);
+    doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
         scopeLog("go_write:arch_prctl", -1, CFG_LOG_ERROR);
@@ -396,6 +396,50 @@ go_socket(char *stackaddr)
     return sd;
 }
 
+EXPORTON ssize_t
+go_read(char *stackaddr)
+{
+    sigset_t mask;
+    uint64_t fd    = *(uint64_t*)(stackaddr + 0x8);
+    uint64_t buf   = *(uint64_t*)(stackaddr + 0x10);
+    //uint64_t len   = *(uint64_t*)(stackaddr + 0x18);
+    uint64_t rc    = *(uint64_t*)(stackaddr + 0x28); // <- should be 0x20, we thought?
+    uint64_t initialTime = getTime();
+
+    if (rc == -1) return -1;
+
+    puts("Scope: read");
+
+    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("go_read:blocking signals", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
+        scopeLog("go_read:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+        scopeLog("go_read_test:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    doRead(fd, initialTime, (rc != -1), (void*)buf, rc, "go_read", BUF, 0);
+
+    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
+        scopeLog("go_read:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("go_read:blocking signals", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    return rc;
+}
+
 EXPORTON int
 go_hook_test(void)
 {
@@ -511,12 +555,11 @@ initGoHook(const char *buf)
         rc = funchook_prepare(funchook, (void**)&go_syscall_socket, go_hook_socket);
     }
 
-/*
     if ((go_syscall_read = getSymbol(buf, "syscall.read")) != 0) {
         go_syscall_read += 19;
         rc = funchook_prepare(funchook, (void**)&go_syscall_read, go_hook_read);
     }
-*/
+
     /*
      * Note: calling runtime.cgocall results in the Go error
      *       "fatal error: cgocall unavailable"

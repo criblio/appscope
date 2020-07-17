@@ -358,14 +358,33 @@ socket_out:
 
 
 go_hook_read:
-    # save the return address
-    lea go_stack_saves@GOTPCREL(%rip), %r11
+    # put args on the stack for the cgo call
+    sub $0x20,%rsp
+    mov %fs:0xfffffffffffffff8, %r11
+    push %r11
+    lea go_new_store@GOTPCREL(%rip), %r11
     mov (%r11), %r11
-    mov (%rsp), %r10
-    mov %r10, (%r11)
+    push %r11
 
-    # change return addr on the Go stack to come back here
-    movabs $read_ret, %r11
+    # call cgo
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+
+    test %rax, %rax
+    jle read_out
+    # housekeeping
+    pop %r10
+    pop %r10
+    add $0x20,%rsp
+
+    # save the return address
+    mov (%rsp), %r11
+    mov %r11, 0x08(%rax)
+
+    # change the return addr on the Go stack to come back here
+    movabs $read_toc, %r11
     mov %r11, (%rsp)
 
     # do the Go function
@@ -374,18 +393,56 @@ go_hook_read:
     mov (%r11), %r11
     jmp *%r11
 
-read_ret:
+read_toc:
     # restore the original return address
-    lea go_stack_saves@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
+    sub $0x20,%rsp
+    mov %fs:0xfffffffffffffff8, %r11
+    push %r11
+    lea go_reset_store@GOTPCREL(%rip), %r11
     mov (%r11), %r11
     push %r11
 
-    # tell the lib code where we came from
-    lea go_what@GOTPCREL(%rip), %r11
+    # call cgo
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
     mov (%r11), %r11
-    movl $SYSCALL_READ, (%r11)
-    jmp do_go
+    mov (%r11), %r11
+    call *%r11
+
+    test %rax, %rax
+    jle read_out
+
+    # get the return address
+    mov 0x08(%rax), %r11
+
+    # housekeeping
+    pop %r10
+    pop %r10
+    add $0x20,%rsp
+
+    # restore the original return address
+    push %r11
+    mov %rsp, %r11
+
+    # put args on the stack for the cgo call
+    sub $0x20,%rsp
+    push %r11
+    lea go_read@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # call cgo
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+
+read_out:
+    pop %r11
+    pop %r11
+    add $0x20,%rsp
+    ret
+
+
 
 do_go:
     # save the Go stack

@@ -69,7 +69,7 @@ services:
       context: .
       dockerfile: ./java/Dockerfile
       args:
-        JDK_VERSION: 6
+        JDK_IMAGE: openjdk:6
         TOMCAT_MAJOR_VERSION: 7
         TOMCAT_MINOR_VERSION: 7.0.10
 
@@ -78,53 +78,93 @@ services:
       context: .
       dockerfile: ./java/Dockerfile
       args:
-        JDK_VERSION: 7
+        JDK_IMAGE: openjdk:7
 
   java8:
     build:
       context: .
       dockerfile: ./java/Dockerfile
       args:
-        JDK_VERSION: 8
+        JDK_IMAGE: openjdk:8
   
   java9:
     build:
       context: .
       dockerfile: ./java/Dockerfile
       args:
-        JDK_VERSION: 9
+        JDK_IMAGE: openjdk:9
 
   java10:
     build:
       context: .
       dockerfile: ./java/Dockerfile
       args:
-        JDK_VERSION: 10
+        JDK_IMAGE: openjdk:10
 
   java11:
     build:
       context: .
       dockerfile: ./java/Dockerfile
       args:
-        JDK_VERSION: 11
+        JDK_IMAGE: openjdk:11
   
   java12:
     build:
       context: .
       dockerfile: ./java/Dockerfile
       args:
-        JDK_VERSION: 12
+        JDK_IMAGE: openjdk:12
 
   java13:
     build:
       context: .
       dockerfile: ./java/Dockerfile
       args:
-        JDK_VERSION: 13
+        JDK_IMAGE: openjdk:13
 
   java14:
     build:
       context: .
       dockerfile: ./java/Dockerfile
       args:
-        JDK_VERSION: 14
+        JDK_IMAGE: openjdk:14
+
+  oracle_java8:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: sgrio/java:jdk_8_ubuntu
+        KEYTOOL: /usr/lib/jvm/java-8-oracle/bin/keytool
+
+  oracle_java11:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: sgrio/java:jdk_11_ubuntu
+        KEYTOOL: /usr/lib/jvm/java-11-oracle/bin/keytool
+
+  oracle_java12:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: sgrio/java:jdk_12_ubuntu
+        KEYTOOL: /usr/lib/jvm/java-12-oracle/bin/keytool
+
+  oracle_java13:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: sgrio/java:jdk_13_ubuntu
+        KEYTOOL: /usr/lib/jvm/java-13-oracle/bin/keytool
+
+  oracle_java14:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: sgrio/java:jdk_14_ubuntu
+        KEYTOOL: /usr/lib/jvm/java-14-oracle/bin/keytool

@@ -1,8 +1,9 @@
-ARG JDK_VERSION=8
-FROM openjdk:$JDK_VERSION
+ARG JDK_IMAGE=openjdk:8
+FROM $JDK_IMAGE
 
 ARG TOMCAT_MAJOR_VERSION=8
 ARG TOMCAT_MINOR_VERSION=8.0.49
+ARG KEYTOOL=keytool
 
 ENV CATALINA_HOME /opt/tomcat
 ENV PATH $PATH:$CATALINA_HOME/bin
@@ -17,7 +18,7 @@ RUN mkdir /opt/tomcat/certs && \
     mkdir -p /opt/test-runner/logs && \
     mkdir -p /opt/test-runner/bin
 
-RUN keytool -genkey -alias "tomcat" -dname "CN=scope,O=cribl" -keyalg RSA -storetype pkcs12 -keystore /opt/tomcat/certs/tomcat.p12 -storepass changeit -keypass changeit
+RUN ${KEYTOOL} -genkey -alias "tomcat" -dname "CN=scope,O=cribl" -keyalg RSA -storetype pkcs12 -keystore /opt/tomcat/certs/tomcat.p12 -storepass changeit -keypass changeit
 
 COPY ./java/server.xml $CATALINA_HOME/conf/server.xml
 COPY ./java/test-ssl.sh /opt/test-runner/bin/test-ssl.sh

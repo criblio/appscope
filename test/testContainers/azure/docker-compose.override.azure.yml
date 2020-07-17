@@ -92,7 +92,6 @@ services:
       - ./libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
-
   java7:
     build:
       cache_from:
@@ -103,7 +102,6 @@ services:
       - ./libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
-
   java8:
     build:
       cache_from:
@@ -114,7 +112,6 @@ services:
       - ./libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
-
   java9:
     build:
       cache_from:
@@ -125,7 +122,6 @@ services:
       - ./libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
-
   java10:
     build:
       cache_from:
@@ -136,7 +132,6 @@ services:
       - ./libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
-
   java11:
     build:
       cache_from:
@@ -147,7 +142,6 @@ services:
       - ./libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
-
   java12:
     build:
       cache_from:
@@ -158,7 +152,6 @@ services:
       - ./libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
-
   java13:
     build:
       cache_from:
@@ -169,12 +162,62 @@ services:
       - ./libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
-
   java14:
     build:
       cache_from:
         - criblci/scope-java14-it:latest
     image: criblci/scope-java14-it
+    volumes:
+      - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+
+  oracle_java8:
+    build:
+      cache_from:
+        - criblci/scope-oracle-java8-it:latest
+    image: criblci/scope-oracle-java8-it
+    volumes:
+      - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+  oracle_java11:
+    build:
+      cache_from:
+        - criblci/scope-oracle-java11-it:latest
+    image: criblci/scope-oracle-java11-it
+    volumes:
+      - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+  oracle_java12:
+    build:
+      cache_from:
+        - criblci/scope-oracle-java12-it:latest
+    image: criblci/scope-oracle-java12-it
+    volumes:
+      - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+  oracle_java13:
+    build:
+      cache_from:
+        - criblci/scope-oracle-java13-it:latest
+    image: criblci/scope-oracle-java13-it
+    volumes:
+      - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+  oracle_java14:
+    build:
+      cache_from:
+        - criblci/scope-oracle-java14-it:latest
+    image: criblci/scope-oracle-java14-it
     volumes:
       - ./logs:/opt/test-runner/logs
       - ./libscope.so:/opt/test-runner/bin/libscope.so

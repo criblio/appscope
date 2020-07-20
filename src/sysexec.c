@@ -111,7 +111,9 @@ getSymbol(const char *buf, char *sname)
 ssize_t (*go_syscall_write)(int, const void *, size_t);
 int (*go_syscall_open)(const char *, int, int, mode_t);
 int (*go_syscall_socket)(int, int, int);
+int (*go_syscall_accept4)(int, void*, int, int);
 ssize_t (*go_syscall_read)(int, const void *, size_t);
+int (*go_syscall_close)(int);
 void (*go_runtime_cgocall)(void);
 int (*runtime_lock)(void);
 int (*runtime_unlock)(void);
@@ -136,7 +138,9 @@ go_store_t g_gostore[MAX_STORES];
 extern int go_hook_write();
 extern int go_hook_open();
 extern int go_hook_socket();
+extern int go_hook_accept4();
 extern int go_hook_read();
+extern int go_hook_close();
 extern int go_hook_entersyscall();
 extern int go_hook_exitsyscall();
 extern int go_hook_morestack_noctxt();
@@ -261,7 +265,6 @@ go_write(char *stackaddr)
     uint64_t rc  = *(uint64_t *)(stackaddr + 0x28); // <- should be 0x20, we thought?
     uint64_t initialTime = getTime();
 
-    puts("Scope: write");
 
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_write:blocking signals", -1, CFG_LOG_ERROR);
@@ -278,6 +281,7 @@ go_write(char *stackaddr)
         return -1;
     }
 
+    printf("Scope: write of %ld\n", fd);
     doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
@@ -306,7 +310,6 @@ go_open(uint64_t *stackaddr)
 
     if ((len <= 0) || (len >= PATH_MAX)) return -1;
 
-    puts("Scope: open");
 
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_open:blocking signals", -1, CFG_LOG_ERROR);
@@ -323,6 +326,7 @@ go_open(uint64_t *stackaddr)
         return -1;
     }
 
+    printf("Scope: open of %ld\n", rc);
     if (buf) {
         if ((path = calloc(1, len)) == NULL) return -1;
         memmove(path, (char *)buf, len);
@@ -364,7 +368,6 @@ go_socket(char *stackaddr)
 
     if (sd == -1) return -1;
 
-    puts("Scope: socket");
 
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_socket:blocking signals", -1, CFG_LOG_ERROR);
@@ -381,6 +384,7 @@ go_socket(char *stackaddr)
         return -1;
     }
 
+    printf("Scope: socket of %ld\n", sd);
     addSock(sd, type, domain);
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
@@ -396,6 +400,50 @@ go_socket(char *stackaddr)
     return sd;
 }
 
+EXPORTON int
+go_accept4(char *stackaddr)
+{
+    sigset_t mask;
+    //uint64_t sd_in   = *(uint64_t*)(stackaddr + 0x08);
+    struct sockaddr *addr  = *(struct sockaddr **)(stackaddr + 0x10);
+    socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
+    //uint64_t flags   = *(uint64_t*)(stackaddr + 0x20);
+    uint64_t sd_out  = *(uint64_t*)(stackaddr + 0x28);
+
+
+    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("go_accept4:blocking signals", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
+        scopeLog("go_accept4:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+        scopeLog("go_accept4:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    printf("Scope: accept4 of %ld\n", sd_out);
+    if (sd_out != -1) {
+        doAccept(sd_out, addr, addrlen, "go_accept4");
+    }
+
+    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
+        scopeLog("go_accept4:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("go_accept4:blocking signals", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    return sd_out;
+}
+
 EXPORTON ssize_t
 go_read(char *stackaddr)
 {
@@ -408,7 +456,6 @@ go_read(char *stackaddr)
 
     if (rc == -1) return -1;
 
-    puts("Scope: read");
 
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_read:blocking signals", -1, CFG_LOG_ERROR);
@@ -425,6 +472,7 @@ go_read(char *stackaddr)
         return -1;
     }
 
+    printf("Scope: read of %ld\n", fd);
     doRead(fd, initialTime, (rc != -1), (void*)buf, rc, "go_read", BUF, 0);
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
@@ -439,6 +487,47 @@ go_read(char *stackaddr)
 
     return rc;
 }
+
+
+EXPORTON int
+go_close(char *stackaddr)
+{
+    sigset_t mask;
+    uint64_t fd  = *(uint64_t*)(stackaddr + 0x8);
+    uint64_t rc  = *(uint64_t*)(stackaddr + 0x10);
+
+
+    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("go_close:blocking signals", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
+        scopeLog("go_close:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+        scopeLog("go_close:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    printf("Scope: close of %ld\n", fd);
+    doCloseAndReportFailures(fd, (rc != -1), "go_close");
+
+    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
+        scopeLog("go_close:arch_prctl", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("go_close:blocking signals", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    return rc;
+}
+
 
 EXPORTON int
 go_hook_test(void)
@@ -555,9 +644,19 @@ initGoHook(const char *buf)
         rc = funchook_prepare(funchook, (void**)&go_syscall_socket, go_hook_socket);
     }
 
+    if ((go_syscall_accept4 = getSymbol(buf, "syscall.accept4")) != 0) {
+        go_syscall_accept4 += 19;
+        rc = funchook_prepare(funchook, (void**)&go_syscall_accept4, go_hook_accept4);
+    }
+
     if ((go_syscall_read = getSymbol(buf, "syscall.read")) != 0) {
         go_syscall_read += 19;
         rc = funchook_prepare(funchook, (void**)&go_syscall_read, go_hook_read);
+    }
+
+    if ((go_syscall_close = getSymbol(buf, "syscall.Close")) != 0) {
+        go_syscall_close += 19;
+        rc = funchook_prepare(funchook, (void**)&go_syscall_close, go_hook_close);
     }
 
     /*

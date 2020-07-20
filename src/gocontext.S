@@ -3,7 +3,8 @@
 
 #include "gocontext.h"
 
-.global	go_hook_write, go_hook_open, go_hook_socket, go_hook_read, do_go
+.global	go_hook_write, go_hook_open, go_hook_socket, go_hook_accept4
+.global go_hook_read, go_hook_close, do_go
 .global go_hook_entersyscall, go_hook_exitsyscall, go_hook_morestack_noctxt
     
 .text
@@ -357,6 +358,93 @@ socket_out:
     ret
 
 
+go_hook_accept4:
+    # put args on the stack for the cgo call
+    sub $0x20,%rsp
+    mov %fs:0xfffffffffffffff8, %r11
+    push %r11
+    lea go_new_store@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # call cgo
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+
+    test %rax, %rax
+    jle accept4_out
+    # housekeeping
+    pop %r10
+    pop %r10
+    add $0x20,%rsp
+
+    # save the return address
+    mov (%rsp), %r11
+    mov %r11, 0x08(%rax)
+
+    # change the return addr on the Go stack to come back here
+    movabs $accept4_toc, %r11
+    mov %r11, (%rsp)
+
+    # do the Go function
+    lea go_syscall_accept4@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    jmp *%r11
+
+accept4_toc:
+    # restore the original return address
+    sub $0x20,%rsp
+    mov %fs:0xfffffffffffffff8, %r11
+    push %r11
+    lea go_reset_store@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # call cgo
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+
+    test %rax, %rax
+    jle accept4_out
+
+    # get the return address
+    mov 0x08(%rax), %r11
+
+    # housekeeping
+    pop %r10
+    pop %r10
+    add $0x20,%rsp
+
+    # restore the original return address
+    push %r11
+    mov %rsp, %r11
+
+    # put args on the stack for the cgo call
+    sub $0x20,%rsp
+    push %r11
+    lea go_accept4@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # call cgo
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+
+accept4_out:
+    pop %r11
+    pop %r11
+    add $0x20,%rsp
+    ret
+
+
+
 go_hook_read:
     # put args on the stack for the cgo call
     sub $0x20,%rsp
@@ -441,6 +529,92 @@ read_out:
     pop %r11
     add $0x20,%rsp
     ret
+
+go_hook_close:
+    # put args on the stack for the cgo call
+    sub $0x20,%rsp
+    mov %fs:0xfffffffffffffff8, %r11
+    push %r11
+    lea go_new_store@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # call cgo
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+
+    test %rax, %rax
+    jle close_out
+    # housekeeping
+    pop %r10
+    pop %r10
+    add $0x20,%rsp
+
+    # save the return address
+    mov (%rsp), %r11
+    mov %r11, 0x08(%rax)
+
+    # change the return addr on the Go stack to come back here
+    movabs $close_toc, %r11
+    mov %r11, (%rsp)
+
+    # do the Go function
+    lea go_syscall_close@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    jmp *%r11
+
+close_toc:
+    # restore the original return address
+    sub $0x20,%rsp
+    mov %fs:0xfffffffffffffff8, %r11
+    push %r11
+    lea go_reset_store@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # call cgo
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+
+    test %rax, %rax
+    jle close_out
+
+    # get the return address
+    mov 0x08(%rax), %r11
+
+    # housekeeping
+    pop %r10
+    pop %r10
+    add $0x20,%rsp
+
+    # restore the original return address
+    push %r11
+    mov %rsp, %r11
+
+    # put args on the stack for the cgo call
+    sub $0x20,%rsp
+    push %r11
+    lea go_close@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # call cgo
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+
+close_out:
+    pop %r11
+    pop %r11
+    add $0x20,%rsp
+    ret
+
 
 
 

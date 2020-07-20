@@ -11,6 +11,7 @@
 #include <asm/prctl.h>
 #include <sys/prctl.h>
 #include <signal.h>
+#include <pthread.h>
 
 #include "dbg.h"
 #include "os.h"
@@ -160,26 +161,7 @@ go_new_store(uint64_t tcb)
         }
     }
 
-    scopeLog("ERROR:go_get_store: Not good; no stack store available", -1, CFG_LOG_ERROR);
-    return NULL;
-}
-
-EXPORTON go_store_t *
-go_get_store(uint64_t tcb)
-{
-    int i;
-    go_store_t *storep;
-
-    for (i = 0, storep = g_gostore; i < MAX_STORES; i++) {
-        if (storep[i].tcb == tcb) {
-            return &storep[i];
-        } else if (storep[i].tcb == (uint64_t)0) {
-            storep[i].tcb = tcb;
-            return &storep[i];
-        }
-    }
-
-    scopeLog("ERROR:go_get_store: Not good; no stack store available", -1, CFG_LOG_ERROR);
+    scopeLog("ERROR:go_new_store: Not good; no stack store available", -1, CFG_LOG_ERROR);
     return NULL;
 }
 
@@ -206,20 +188,12 @@ regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
 {
     int rc;
     uint64_t res;
-    uint64_t tcb = 0;
     go_store_t *store;
+    pthread_t self;
 
     if (g_ongostack == TRUE) {
-        // TODO: tcb is 0. need a __thread value?
-        __asm__ volatile (
-            "mov %%fs:0xfffffffffffffff8, %%r11  \n"
-            "mov %%r11, %0  \n"
-            : "=r"(tcb)                      // output
-            :                                // inputs
-            : "%r11"                         // clobbered regs
-            );
-
-        if ((store = go_new_store(tcb)) == NULL) return REG_NOMATCH;
+        self = pthread_self();
+        if ((store = go_new_store(self)) == NULL) return REG_NOMATCH;
 
         // RDI, RSI, RDX, RCX, R8, R9
         __asm__ volatile (
@@ -247,7 +221,7 @@ regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
             : "%r11"                          // clobbered register
             );
 
-        go_reset_store(tcb);
+        go_reset_store(self);
     } else {
         rc = pcre2_regexec(preg, string, nmatch, pmatch, eflags);
     }

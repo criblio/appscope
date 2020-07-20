@@ -302,7 +302,7 @@ go_open(uint64_t *stackaddr)
 
     printf("Scope: open of %ld\n", rc);
     if (buf) {
-        if ((path = calloc(1, len)) == NULL) return -1;
+        if ((path = calloc(1, len+1)) == NULL) return -1;
         memmove(path, (char *)buf, len);
         path[len] = '\0';
     } else {

@@ -21,13 +21,15 @@
 
 typedef struct go_store {
     uint64_t tcb;
-    uint64_t store;
+    uint64_t go_return_addr;
+    uint64_t scope_return_addr;
 } go_store_t;
 
 #define MAX_STORES 256
 #define HEAP_SIZE (size_t)(500 * 1024)
 // 1Mb + an 8kb guard
 #define STACK_SIZE (size_t)(1024 * 1024) + (8 * 1024)
+#define SCOPE_STACK_SIZE (size_t)(64 * 1024)
 #define AUX_ENT(id, val) \
 	do { \
 		elf_info[i++] = id; \
@@ -123,6 +125,7 @@ uint64_t *g_currsheap = NULL;
 uint64_t *g_heapend = NULL;
 bool g_ongostack = FALSE;
 go_store_t g_gostore[MAX_STORES];
+uint64_t go_text;
 
 extern int go_hook_write();
 extern int go_hook_open();
@@ -130,6 +133,8 @@ extern int go_hook_socket();
 extern int go_hook_accept4();
 extern int go_hook_read();
 extern int go_hook_close();
+extern int go_start();
+extern int go_end();
 extern void threadNow(int);
 extern int arch_prctl(int, unsigned long);
 
@@ -173,17 +178,25 @@ regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
 {
     int rc;
     uint64_t res;
-    go_store_t *store;
-    pthread_t self;
+    uint64_t store = 0;
+    //uint64_t *new_stack;
 
     if (g_ongostack == TRUE) {
-        self = pthread_self();
-        if ((store = go_new_store(self)) == NULL) return REG_NOMATCH;
-
+        // create a thread specific stack
+#if 0
+        if ((new_stack = mmap(NULL, SCOPE_STACK_SIZE,
+                              PROT_READ | PROT_WRITE,
+                              MAP_PRIVATE | MAP_ANONYMOUS,
+                              -1, (off_t)NULL)) == MAP_FAILED) {
+            scopeLog("regexec_wrap:mmap", -1, CFG_LOG_ERROR);
+            return -1;
+        }
+#endif
         // RDI, RSI, RDX, RCX, R8, R9
         __asm__ volatile (
             "mov %1, %%r11 \n"
-            "mov %%rsp, 0x8(%%r11)  \n"          // save the current stack
+            "mov %%rsp, (%%r11)  \n"             // save the current stack
+            //"mov %7, %%r11 \n"
             "lea scope_stack(%%rip), %%r11 \n"
             "mov (%%r11), %%rsp \n"              // switch the stack
             "mov %2, %%rdi  \n"
@@ -193,20 +206,25 @@ regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
             "mov %6, %%r8d  \n"
             "callq pcre2_regexec  \n"
             : "=r"(rc)                        // output
-            : "r"(store), "r"(preg), "r"(string),
-              "r"(nmatch), "r"(pmatch), "r"(eflags)   // input
+            : "r"(&store), "r"(preg), "r"(string),    // inputs
+              "r"(nmatch), "r"(pmatch), "r"(eflags) //, "r"(new_stack)
             : "%r11"                          // clobbered register
             );
+#if 0
+        if (munmap(new_stack, SCOPE_STACK_SIZE) == -1) {
+            scopeLog("ERROR: regexec_wrap: munmap(1)", -1, CFG_LOG_ERROR);
+            return -1;
+        }
+#endif
 
         __asm__ volatile (
             "mov %1, %%r11 \n"
-            "mov 0x8(%%r11), %%rsp \n"        // switch the stack
+            "mov %%r11, %%rsp \n"        // switch the stack
             : "=r"(res)                       // output
-            : "r"(store)                      // inputs
+            : "r"(&store)                      // inputs
             : "%r11"                          // clobbered register
             );
 
-        go_reset_store(self);
     } else {
         rc = pcre2_regexec(preg, string, nmatch, pmatch, eflags);
     }
@@ -585,6 +603,13 @@ load_sections(char *buf, char *addr, size_t mlen)
                 memmove(laddr, &buf[sections[i].sh_offset], len);
             } else if (type == SHT_NOBITS) {
                 memset(laddr, 0, len);
+            }
+
+            // TODO: look at memory in .text. do we need the + 8?
+            //       need a check for enough .text section size
+            if (strcmp(sec_name, ".text") == 0) {
+                go_text = (uint64_t)laddr + len + 8;
+                memmove(laddr + len + 8, go_start, go_end - go_start);
             }
 
             snprintf(msg, sizeof(msg), "%s:%d %s addr %p - %p\n",

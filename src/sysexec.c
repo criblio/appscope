@@ -116,21 +116,9 @@ int (*go_syscall_accept4)(int, void*, int, int);
 ssize_t (*go_syscall_read)(int, const void *, size_t);
 int (*go_syscall_close)(int);
 void (*go_runtime_cgocall)(void);
-int (*runtime_lock)(void);
-int (*runtime_unlock)(void);
-int (*runtime_schedEnableUser)(void);
-int (*runtime_entersyscall)(void);
-int (*runtime_exitsyscall)(void);
-int (*runtime_morestack_noctxt)(void);
-int (*go2go)();
+
 uint64_t scope_stack;
-uint64_t go_stack;
-uint64_t go_stack_in, go_stack_out;
-uint64_t go_params[10];
-uint64_t go_results[4];
-uint64_t go_stack_saves[32];
 unsigned long scope_fs, go_fs;
-int go_what;
 uint64_t *g_currsheap = NULL;
 uint64_t *g_heapend = NULL;
 bool g_ongostack = FALSE;
@@ -142,9 +130,6 @@ extern int go_hook_socket();
 extern int go_hook_accept4();
 extern int go_hook_read();
 extern int go_hook_close();
-extern int go_hook_entersyscall();
-extern int go_hook_exitsyscall();
-extern int go_hook_morestack_noctxt();
 extern void threadNow(int);
 extern int arch_prctl(int, unsigned long);
 
@@ -503,93 +488,6 @@ go_close(char *stackaddr)
 }
 
 
-EXPORTON int
-go_hook_test(void)
-{
-    int rc = 0;
-    int fd;
-    size_t len;
-    //go_funcs_t gofuncs;
-    const void *buf;
-    uint64_t initialTime;
-    char path[PATH_MAX];
-
-    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-        scopeLog("go_hook_test:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
-    }
-
-    puts("from Scope");
-    //calloc(1, 1024);
-
-    switch (go_what) {
-    case SYSCALL_WRITE:
-        fd = (int)go_params[0];
-        buf = (void *)go_params[1];
-        len = (size_t)go_params[2];
-        initialTime = getTime();
-
-        if ((len <= 0) || (len >= PATH_MAX)) break;
-
-        if (buf) {
-            memmove(path, buf, len);
-            path[len] = '\0';
-        } else {
-            scopeLog("go_hook_test:write: null pathname", -1, CFG_LOG_ERROR);
-            break;
-        }
-
-        doWrite(fd, initialTime, 1, path, len, "write", BUF, 0);
-        break;
-
-    case SYSCALL_OPEN:
-        if ((fd = (int)go_results[0]) == -1) break;
-        buf = (char *)go_params[1];
-        len = (size_t)go_params[2];
-
-        if ((len <= 0) || (len >= PATH_MAX)) break;
-
-        if (buf) {
-            memmove(path, buf, len);
-            path[len] = '\0';
-        } else {
-            scopeLog("go_hook_test:Open: null pathname", -1, CFG_LOG_ERROR);
-            break;
-        }
-
-        doOpen(fd, path, FD, "open");
-        break;
-
-    case SYSCALL_READ:
-        fd = (int)go_params[0];
-        buf = (void *)go_params[1];
-        len = (size_t)go_params[2];
-        initialTime = getTime();
-
-        char msg[128];
-        snprintf(msg, sizeof(msg), "%s:%d fd %d len %ld",
-                 __FUNCTION__, __LINE__, fd, len);
-        scopeLog(msg, -1, CFG_LOG_ERROR);
-
-        doRead(fd, initialTime, 1, buf, len, "read", BUF, 0);
-        break;
-
-    default:
-        scopeLog("go_hook_test:bad go_what", -1, CFG_LOG_ERROR);
-        break;
-    }
-
-
-
-    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-        scopeLog("go_hook_test:arch_prctl", -1, CFG_LOG_ERROR);
-        // what to do here?
-        return -1;
-    }
-
-    return rc;
-}
-
 static void
 initGoHook(const char *buf)
 {
@@ -644,25 +542,6 @@ initGoHook(const char *buf)
         printf("ERROR: can't get the address for runtime.cgocall\n");
         exit(-1);
     }
-
-/*
-    if ((runtime_entersyscall = getSymbol(buf, "runtime.entersyscall")) != 0) {
-        rc = funchook_prepare(funchook, (void**)&runtime_entersyscall, go_hook_entersyscall);
-    }
-
-    if ((runtime_exitsyscall = getSymbol(buf, "runtime.exitsyscall")) != 0) {
-        rc = funchook_prepare(funchook, (void**)&runtime_exitsyscall, go_hook_exitsyscall);
-    }
-
-    if ((runtime_morestack_noctxt = getSymbol(buf, "runtime.morestack_noctxt")) != 0) {
-        rc = funchook_prepare(funchook, (void**)&runtime_morestack_noctxt, go_hook_morestack_noctxt);
-    }
-*/
-    //DEBUG
-    runtime_lock = getSymbol(buf, "runtime.lock");
-    runtime_unlock = getSymbol(buf, "runtime.unlock");
-    runtime_schedEnableUser = getSymbol(buf, "runtime.schedEnableUser");
-    getSymbol(buf, "os.(*File).Write");
 
     // hook a few Go funcs
     rc = funchook_install(funchook, 0);

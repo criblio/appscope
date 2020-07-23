@@ -63,3 +63,10 @@ services:
     ports:
       - 6379:6379
       - 27017:27017
+
+  go_14:
+    build:
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.14.4

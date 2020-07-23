@@ -13,18 +13,21 @@
 #include <signal.h>
 #include <pthread.h>
 
+#include "atomic.h"
 #include "dbg.h"
 #include "os.h"
 #include "com.h"
 #include "state.h"
 #include "gocontext.h"
-#include "atomic.h"
 
 typedef struct go_store {
     uint64_t tcb;
     uint64_t go_return_addr;
     uint64_t scope_return_addr;
 } go_store_t;
+
+uint64_t g_glibc_guard = 0LL;
+uint64_t g_tcb_guard = 0LL;
 
 #define MAX_STORES 256
 #define HEAP_SIZE (size_t)(500 * 1024)
@@ -128,7 +131,6 @@ uint64_t *g_heapend = NULL;
 bool g_ongostack = FALSE;
 go_store_t g_gostore[MAX_STORES];
 uint64_t go_text;
-uint64_t g_tcb_guard = 0LL;
 
 extern int go_hook_write();
 extern int go_hook_open();
@@ -147,8 +149,10 @@ go_new_store(uint64_t tcb)
     int i;
     go_store_t *storep = g_gostore;
     go_store_t *returnval = NULL;
+
     // Beginning of critical section.
     while (!atomicCasU64(&g_tcb_guard, 0ULL, 1ULL)) ;
+
     for (i = 0; i < MAX_STORES; i++) {
         if (storep[i].tcb == (uint64_t)0) {
             storep[i].tcb = tcb;
@@ -156,21 +160,27 @@ go_new_store(uint64_t tcb)
             break;
         }
     }
+
     // End of critical section.
     atomicCasU64(&g_tcb_guard, 1ULL, 0ULL);
+
     if (!returnval) {
         scopeLog("ERROR:go_new_store: Not good; no stack store available", -1, CFG_LOG_ERROR);
     }
     return returnval;
+
 }
+
 EXPORTON go_store_t *
 go_reset_store(uint64_t tcb)
 {
     int i;
     go_store_t *storep = g_gostore;
     go_store_t *returnval = NULL;
+
     // Beginning of critical section.
     while (!atomicCasU64(&g_tcb_guard, 0ULL, 1ULL)) ;
+
     for (i = 0; i < MAX_STORES; i++) {
         if (storep[i].tcb == tcb) {
             storep[i].tcb = (uint64_t)0;
@@ -178,13 +188,16 @@ go_reset_store(uint64_t tcb)
             break;
         }
     }
+
     // End of critical section.
     atomicCasU64(&g_tcb_guard, 1ULL, 0ULL);
+
     if (!returnval) {
         scopeLog("ERROR:go_reset_store: didn't find the stack store", -1, CFG_LOG_ERROR);
     }
     return returnval;
 }
+
 int
 regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
              regmatch_t pmatch[], int eflags)
@@ -254,6 +267,7 @@ go_write(char *stackaddr)
     uint64_t rc;
     uint64_t error;
     uint64_t initialTime = getTime();
+    int task_switching_successful = FALSE;
 
     // doing ROP; update return codes
     char *retvals = (char *)(stackaddr - ROP_STACK);
@@ -262,19 +276,22 @@ go_write(char *stackaddr)
     error = *(uint64_t *)(retvals + 0x30);
     *(uint64_t *)(stackaddr + 0x30) = error;
 
+    // Beginning of critical section.
+    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
+
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_write:blocking signals", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
         scopeLog("go_write:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
         scopeLog("go_write_test:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     printf("Scope: write of %ld\n", fd);
@@ -282,16 +299,19 @@ go_write(char *stackaddr)
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
         scopeLog("go_write:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_write:blocking signals", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
-    return rc;
-
+    task_switching_successful = TRUE;
+out:
+    // End of critical section.
+    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
+    return (task_switching_successful) ? rc : -1;
 }
 
 EXPORTON size_t
@@ -304,6 +324,7 @@ go_open(char *stackaddr)
     uint64_t len = *((uint64_t *)((char *)(stackaddr) + 0x18));
     uint64_t fd;
     uint64_t error;
+    int task_switching_successful = FALSE;
 
     // doing ROP; update return codes
     char *retvals = (char *)(stackaddr - ROP_STACK);
@@ -315,31 +336,34 @@ go_open(char *stackaddr)
 
     if ((len <= 0) || (len >= PATH_MAX)) return -1;
 
+    // Beginning of critical section.
+    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
+
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_open:blocking signals", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
         scopeLog("go_open:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
         scopeLog("go_open_test:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     printf("Scope: open of %ld\n", rc);
     if (buf) {
-        if ((path = calloc(1, len+1)) == NULL) return -1;
+        if ((path = calloc(1, len+1)) == NULL) goto out;
         memmove(path, (char *)buf, len);
         path[len] = '\0';
     } else {
         scopeLog("ERROR:go_open: null pathname", -1, CFG_LOG_ERROR);
         puts("Scope:ERROR:open:no path");
         if (path) free(path);
-        return -1;
+        goto out;
     }
 
     doOpen(fd, path, FD, "open");
@@ -348,16 +372,18 @@ go_open(char *stackaddr)
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
         scopeLog("go_open:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_open:blocking signals", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
-    return rc;
-
+    task_switching_successful = TRUE;
+out:
+    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
+    return (task_switching_successful) ? rc : -1;
 }
 
 EXPORTON int
@@ -369,6 +395,7 @@ go_socket(char *stackaddr)
     uint64_t type   = *(uint64_t*)(stackaddr + 0x10);
     uint64_t sd;
     uint64_t error;
+    int task_switching_successful = FALSE;
 
     // doing ROP; update return codes
     char *retvals = (char *)(stackaddr - ROP_STACK);
@@ -379,20 +406,22 @@ go_socket(char *stackaddr)
 
     if (sd == -1) return -1;
 
+    // Beginning of critical section.
+    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
 
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_socket:blocking signals", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
         scopeLog("go_socket:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
         scopeLog("go_socket_test:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     printf("Scope: socket of %ld\n", sd);
@@ -400,15 +429,18 @@ go_socket(char *stackaddr)
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
         scopeLog("go_socket:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_socket:blocking signals", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
-    return sd;
+    task_switching_successful = TRUE;
+out:
+    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
+    return (task_switching_successful) ? sd : -1;
 }
 
 EXPORTON int
@@ -419,6 +451,7 @@ go_accept4(char *stackaddr)
     socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
     uint64_t sd_out;
     uint64_t error;
+    int task_switching_successful = FALSE;
 
     // doing ROP; update return codes
     char *retvals = (char *)(stackaddr - ROP_STACK);
@@ -427,19 +460,22 @@ go_accept4(char *stackaddr)
     error = *(uint64_t *)(retvals + 0x30);
     *(uint64_t *)(stackaddr + 0x30) = error;
 
+    // Beginning of critical section.
+    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
+
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_accept4:blocking signals", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
         scopeLog("go_accept4:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
         scopeLog("go_accept4:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     printf("Scope: accept4 of %ld\n", sd_out);
@@ -449,15 +485,18 @@ go_accept4(char *stackaddr)
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
         scopeLog("go_accept4:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_accept4:blocking signals", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
-    return sd_out;
+    task_switching_successful = TRUE;
+out:
+    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
+    return (task_switching_successful) ? sd_out : -1;
 }
 
 EXPORTON ssize_t
@@ -469,6 +508,7 @@ go_read(char *stackaddr)
     uint64_t rc; //    = *(uint64_t*)(stackaddr + 0x28); // <- should be 0x20, we thought?
     uint64_t error;
     uint64_t initialTime = getTime();
+    int task_switching_successful = FALSE;
 
     // doing ROP; update return codes
     char *retvals = (char *)(stackaddr - ROP_STACK);
@@ -479,19 +519,22 @@ go_read(char *stackaddr)
 
     if (rc == -1) return -1;
 
+    // Beginning of critical section.
+    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
+
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_read:blocking signals", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
         scopeLog("go_read:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
         scopeLog("go_read_test:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     printf("Scope: read of %ld\n", fd);
@@ -499,15 +542,18 @@ go_read(char *stackaddr)
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
         scopeLog("go_read:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_read:blocking signals", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
-    return rc;
+    task_switching_successful = TRUE;
+out:
+    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
+    return (task_switching_successful) ? rc : -1;
 }
 
 
@@ -517,25 +563,29 @@ go_close(char *stackaddr)
     sigset_t mask;
     uint64_t fd  = *(uint64_t*)(stackaddr + 0x8);
     uint64_t rc;
+    int task_switching_successful = FALSE;
 
     // doing ROP; update return codes
     char *retvals = (char *)(stackaddr - ROP_STACK);
     rc = *(uint64_t *)(retvals + 0x10);
     *(uint64_t *)(stackaddr + 0x10) = rc;
 
+    // Beginning of critical section.
+    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
+
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_close:blocking signals", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
         scopeLog("go_close:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
         scopeLog("go_close:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     printf("Scope: close of %ld\n", fd);
@@ -543,15 +593,18 @@ go_close(char *stackaddr)
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
         scopeLog("go_close:arch_prctl", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
     if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_close:blocking signals", -1, CFG_LOG_ERROR);
-        return -1;
+        goto out;
     }
 
-    return rc;
+    task_switching_successful = TRUE;
+out:
+    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
+    return (task_switching_successful) ? rc : -1;
 }
 
 

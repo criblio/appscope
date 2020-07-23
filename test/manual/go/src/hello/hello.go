@@ -24,12 +24,15 @@ func main() {
     check(err)
     fmt.Printf("wrote %s\n", d1)
 
-    time.Sleep(20 * time.Second)
-    return
+    //time.Sleep(20 * time.Second)
+    //return
 
     dat, err := ioutil.ReadFile("/tmp/dat1")
     check(err)
     if (dat == nil) {fmt.Print(string(dat))}
+
+    //time.Sleep(20 * time.Second)
+    //return
 
     f, err := os.Create("/tmp/dat2")
     check(err)
@@ -48,7 +51,7 @@ func main() {
     b1 := make([]byte, 10)
     n1, err := f.Read(b1)
     check(err)
-    fmt.Printf("%d bytes: %s\n", n1, string(b1[:n1]))
+    fmt.Printf("read %d bytes: %s\n", n1, string(b1[:n1]))
 
     f.Close()
 /*

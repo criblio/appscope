@@ -18,6 +18,7 @@
 #include "com.h"
 #include "state.h"
 #include "gocontext.h"
+#include "atomic.h"
 
 typedef struct go_store {
     uint64_t tcb;
@@ -118,7 +119,8 @@ int (*go_syscall_accept4)(int, void*, int, int);
 ssize_t (*go_syscall_read)(int, const void *, size_t);
 int (*go_syscall_close)(int);
 void (*go_runtime_cgocall)(void);
-
+void (*go_syscall_rop)(void);
+int go_rop_stack;
 uint64_t scope_stack;
 unsigned long scope_fs, go_fs;
 uint64_t *g_currsheap = NULL;
@@ -126,6 +128,7 @@ uint64_t *g_heapend = NULL;
 bool g_ongostack = FALSE;
 go_store_t g_gostore[MAX_STORES];
 uint64_t go_text;
+uint64_t g_tcb_guard = 0LL;
 
 extern int go_hook_write();
 extern int go_hook_open();
@@ -142,36 +145,46 @@ EXPORTON go_store_t *
 go_new_store(uint64_t tcb)
 {
     int i;
-    go_store_t *storep;
-
-    for (i = 0, storep = g_gostore; i < MAX_STORES; i++) {
+    go_store_t *storep = g_gostore;
+    go_store_t *returnval = NULL;
+    // Beginning of critical section.
+    while (!atomicCasU64(&g_tcb_guard, 0ULL, 1ULL)) ;
+    for (i = 0; i < MAX_STORES; i++) {
         if (storep[i].tcb == (uint64_t)0) {
             storep[i].tcb = tcb;
-            return &storep[i];
+            returnval = &storep[i];
+            break;
         }
     }
-
-    scopeLog("ERROR:go_new_store: Not good; no stack store available", -1, CFG_LOG_ERROR);
-    return NULL;
+    // End of critical section.
+    atomicCasU64(&g_tcb_guard, 1ULL, 0ULL);
+    if (!returnval) {
+        scopeLog("ERROR:go_new_store: Not good; no stack store available", -1, CFG_LOG_ERROR);
+    }
+    return returnval;
 }
-
 EXPORTON go_store_t *
 go_reset_store(uint64_t tcb)
 {
     int i;
-    go_store_t *storep;
-
-    for (i = 0, storep = g_gostore; i < MAX_STORES; i++) {
+    go_store_t *storep = g_gostore;
+    go_store_t *returnval = NULL;
+    // Beginning of critical section.
+    while (!atomicCasU64(&g_tcb_guard, 0ULL, 1ULL)) ;
+    for (i = 0; i < MAX_STORES; i++) {
         if (storep[i].tcb == tcb) {
             storep[i].tcb = (uint64_t)0;
-            return &storep[i];
+            returnval = &storep[i];
+            break;
         }
     }
-
-    scopeLog("ERROR:go_reset_Store: didn't find the stack store", -1, CFG_LOG_ERROR);
-    return NULL;
+    // End of critical section.
+    atomicCasU64(&g_tcb_guard, 1ULL, 0ULL);
+    if (!returnval) {
+        scopeLog("ERROR:go_reset_store: didn't find the stack store", -1, CFG_LOG_ERROR);
+    }
+    return returnval;
 }
-
 int
 regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
              regmatch_t pmatch[], int eflags)
@@ -238,10 +251,16 @@ go_write(char *stackaddr)
     sigset_t mask;
     uint64_t fd  = *(uint64_t *)(stackaddr + 0x8);
     uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
-    //uint64_t len = *(uint64_t *)(stackaddr + 0x18);
-    uint64_t rc  = *(uint64_t *)(stackaddr + 0x28); // <- should be 0x20, we thought?
+    uint64_t rc;
+    uint64_t error;
     uint64_t initialTime = getTime();
 
+    // doing ROP; update return codes
+    char *retvals = (char *)(stackaddr - ROP_STACK);
+    rc = *(uint64_t *)(retvals + 0x28);
+    *(uint64_t *)(stackaddr + 0x28) = rc;
+    error = *(uint64_t *)(retvals + 0x30);
+    *(uint64_t *)(stackaddr + 0x30) = error;
 
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_write:blocking signals", -1, CFG_LOG_ERROR);
@@ -276,17 +295,25 @@ go_write(char *stackaddr)
 }
 
 EXPORTON size_t
-go_open(uint64_t *stackaddr)
+go_open(char *stackaddr)
 {
     char *path = NULL;
     size_t rc = 0;
     sigset_t mask;
-    uint64_t fd = *((uint64_t *)((char *)(stackaddr) + 0x30));
     uint64_t buf = *((uint64_t *)((char *)(stackaddr) + 0x10));
     uint64_t len = *((uint64_t *)((char *)(stackaddr) + 0x18));
+    uint64_t fd;
+    uint64_t error;
+
+    // doing ROP; update return codes
+    char *retvals = (char *)(stackaddr - ROP_STACK);
+    fd = *(uint64_t *)(retvals + 0x30);
+    *(uint64_t *)(stackaddr + 0x30) = fd;
+    error = *(uint64_t *)(retvals + 0x38);
+    *(uint64_t *)(stackaddr + 0x38) = error;
+    rc = fd;
 
     if ((len <= 0) || (len >= PATH_MAX)) return -1;
-
 
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_open:blocking signals", -1, CFG_LOG_ERROR);
@@ -340,8 +367,15 @@ go_socket(char *stackaddr)
 
     uint64_t domain = *(uint64_t*)(stackaddr + 0x8);  // aka family
     uint64_t type   = *(uint64_t*)(stackaddr + 0x10);
-    //uint64_t proto  = *(uint64_t*)(stackaddr + 0x18);
-    uint64_t sd     = *(uint64_t*)(stackaddr + 0x20);
+    uint64_t sd;
+    uint64_t error;
+
+    // doing ROP; update return codes
+    char *retvals = (char *)(stackaddr - ROP_STACK);
+    sd = *(uint64_t *)(retvals + 0x20);
+    *(uint64_t *)(stackaddr + 0x20) = sd;
+    error = *(uint64_t *)(retvals + 0x28);
+    *(uint64_t *)(stackaddr + 0x28) = error;
 
     if (sd == -1) return -1;
 
@@ -381,12 +415,17 @@ EXPORTON int
 go_accept4(char *stackaddr)
 {
     sigset_t mask;
-    //uint64_t sd_in   = *(uint64_t*)(stackaddr + 0x08);
     struct sockaddr *addr  = *(struct sockaddr **)(stackaddr + 0x10);
     socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
-    //uint64_t flags   = *(uint64_t*)(stackaddr + 0x20);
-    uint64_t sd_out  = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t sd_out;
+    uint64_t error;
 
+    // doing ROP; update return codes
+    char *retvals = (char *)(stackaddr - ROP_STACK);
+    sd_out = *(uint64_t *)(retvals + 0x28);
+    *(uint64_t *)(stackaddr + 0x28) = sd_out;
+    error = *(uint64_t *)(retvals + 0x30);
+    *(uint64_t *)(stackaddr + 0x30) = error;
 
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_accept4:blocking signals", -1, CFG_LOG_ERROR);
@@ -427,12 +466,18 @@ go_read(char *stackaddr)
     sigset_t mask;
     uint64_t fd    = *(uint64_t*)(stackaddr + 0x8);
     uint64_t buf   = *(uint64_t*)(stackaddr + 0x10);
-    //uint64_t len   = *(uint64_t*)(stackaddr + 0x18);
-    uint64_t rc    = *(uint64_t*)(stackaddr + 0x28); // <- should be 0x20, we thought?
+    uint64_t rc; //    = *(uint64_t*)(stackaddr + 0x28); // <- should be 0x20, we thought?
+    uint64_t error;
     uint64_t initialTime = getTime();
 
-    if (rc == -1) return -1;
+    // doing ROP; update return codes
+    char *retvals = (char *)(stackaddr - ROP_STACK);
+    rc = *(uint64_t *)(retvals + 0x28);
+    *(uint64_t *)(stackaddr + 0x28) = rc;
+    error = *(uint64_t *)(retvals + 0x30);
+    *(uint64_t *)(stackaddr + 0x30) = error;
 
+    if (rc == -1) return -1;
 
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_read:blocking signals", -1, CFG_LOG_ERROR);
@@ -471,8 +516,12 @@ go_close(char *stackaddr)
 {
     sigset_t mask;
     uint64_t fd  = *(uint64_t*)(stackaddr + 0x8);
-    uint64_t rc  = *(uint64_t*)(stackaddr + 0x10);
+    uint64_t rc;
 
+    // doing ROP; update return codes
+    char *retvals = (char *)(stackaddr - ROP_STACK);
+    rc = *(uint64_t *)(retvals + 0x10);
+    *(uint64_t *)(stackaddr + 0x10) = rc;
 
     if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("go_close:blocking signals", -1, CFG_LOG_ERROR);
@@ -561,6 +610,14 @@ initGoHook(const char *buf)
         exit(-1);
     }
 
+    if ((go_syscall_rop = getSymbol(buf, ROP_FUNC)) == 0) {
+        printf("ERROR: can't get the address for syscall.runtime_envs\n");
+        exit(-1);
+    }
+
+    go_syscall_rop += ROP_OFFSET;
+    go_rop_stack = ROP_STACK;
+
     // hook a few Go funcs
     rc = funchook_install(funchook, 0);
     if (rc != 0) {
@@ -607,11 +664,17 @@ load_sections(char *buf, char *addr, size_t mlen)
 
             // TODO: look at memory in .text. do we need the + 8?
             //       need a check for enough .text section size
+/*
             if (strcmp(sec_name, ".text") == 0) {
-                go_text = (uint64_t)laddr + len + 8;
-                memmove(laddr + len + 8, go_start, go_end - go_start);
-            }
+                if ((go_text = (uint64_t)getSymbol(buf, "runtime.f32equal")) == 0) {
+                    fprintf(stderr, "ERROR: can't find addr for runtime.f32equal\n");
+                    exit(-1);
+                }
 
+                go_text += 0x22;
+                memmove((void *)go_text, go_start, go_end - go_start);
+            }
+*/
             snprintf(msg, sizeof(msg), "%s:%d %s addr %p - %p\n",
                      __FUNCTION__, __LINE__, sec_name, laddr, laddr + len);
             scopeLog(msg, -1, CFG_LOG_DEBUG);

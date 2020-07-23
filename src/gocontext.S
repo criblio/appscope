@@ -5,7 +5,6 @@
 
 .global	go_hook_write, go_hook_open, go_hook_socket, go_hook_accept4
 .global go_hook_read, go_hook_close
-.global go_start, go_end
 
 // The macro interpose takes 3 params
 // the name of the global variable as defined above ex: go_hook_write
@@ -39,19 +38,42 @@
     pop %r10
     add $0x20, %rsp
 
-    # save the return address
-    # we have an entry to save the return addr given to us from go_new_store
     mov (%rsp), %r11
     mov %r11, 0x08(%rax)
-    movabs $toc_\a_func, %r11
-    mov %r11, 0x10(%rax)
+    mov %rsp, %r10
+    mov %r10, 0x10(%rax)
 
-    # change the return addr on the Go stack to the go .text copied code
-    #movabs $toc_\a_func, %r11
-    lea go_text@GOTPCREL(%rip), %r11
+    movabs $toc_\a_func, %r11
+    mov %r11, (%rsp)
+
+    # Get our stack frame size
+    lea go_rop_stack@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    sub %r11, %rsp
+
+    # Get the ROP address
+    lea go_syscall_rop@GOTPCREL(%rip), %r11
     mov (%r11), %r11
     mov (%r11), %r11
     mov %r11, (%rsp)
+
+    mov 0x08(%r10), %r11
+    mov %r11, 0x08(%rsp)
+    mov 0x10(%r10), %r11
+    mov %r11, 0x10(%rsp)
+    mov 0x18(%r10), %r11
+    mov %r11, 0x18(%rsp)
+    mov 0x20(%r10), %r11
+    mov %r11, 0x20(%rsp)
+    mov 0x28(%r10), %r11
+    mov %r11, 0x28(%rsp)
+    mov 0x30(%r10), %r11
+    mov %r11, 0x30(%rsp)
+    mov 0x38(%r10), %r11
+    mov %r11, 0x38(%rsp)
+    mov 0x40(%r10), %r11
+    mov %r11, 0x40(%rsp)
 
     # do the Go function
     lea \go_func@GOTPCREL(%rip), %r11
@@ -60,10 +82,30 @@
     jmp *%r11
 
 toc_\a_func:
-    # we get here from code in Go .text space
-    # see go_start below
-    # $rax has the address of the store slot
-    # get the return address
+    # restore the original return address
+    sub $0x20, %rsp
+    mov %fs:0xfffffffffffffff8, %r11
+    push %r11
+    lea go_reset_store@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    push %r11
+
+    # call cgo to execute go_reset_store(tcb)
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+
+    # check the return value
+    test %rax, %rax
+    jz err_\a_func
+
+    # housekeeping
+    pop %r10
+    pop %r10
+    add $0x20, %rsp
+
+    # get original Go routine return address
     mov 0x08(%rax), %r11
 
     # restore the original return address
@@ -90,6 +132,10 @@ out_\a_func:
     add $0x20, %rsp
     ret
 
+err_\a_func:
+    # should not get here: check the C code
+    # it's not supposed to return on error
+    hlt
 .endm
 
 .text
@@ -99,39 +145,3 @@ out_\a_func:
     interpose go_hook_accept4, go_syscall_accept4, go_accept4
     interpose go_hook_read, go_syscall_read, go_read
     interpose go_hook_close, go_syscall_close, go_close
-
-get_back:
-    # restore the original return address
-    sub $0x20, %rsp
-    mov %fs:0xfffffffffffffff8, %r11
-    push %r11
-    lea go_reset_store@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    push %r11
-
-    # call cgo to execute go_reset_store(tcb)
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov (%r11), %r11
-    call *%r11
-
-    # check the return value
-    test %rax, %rax
-    jz out
-
-    # get the return address
-    mov 0x10(%rax), %r11
-
-    # housekeeping
-    pop %r10
-    pop %r10
-    add $0x20, %rsp
-    jmp *%r11
-out:
-    # TODO: Ummmmm!!!
-    hlt
-
-go_start:
-    movabs $get_back, %r11
-    jmp *%r11
-go_end:

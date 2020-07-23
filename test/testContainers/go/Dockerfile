@@ -18,6 +18,13 @@ RUN cd /go/thread && CGO_ENABLED=0 go build fileThread.go
 RUN mkdir /go/net
 COPY ./go/net/plainServer.go /go/net
 RUN cd /go/net && CGO_ENABLED=0 go build plainServer.go
+COPY ./go/net/tlsServer.go /go/net
+RUN cd /go/net && CGO_ENABLED=0 go build tlsServer.go
+RUN cd /go/net && openssl genrsa -out server.key 2048 && \
+                  openssl ecparam -genkey -name secp384r1 -out server.key && \
+                  openssl req -new -x509 -sha256 -key server.key -out server.crt \
+       -days 3650 -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost"
+
 
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4

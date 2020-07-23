@@ -71,6 +71,33 @@ endtest
 
 
 #
+# tlsServer
+#
+starttest tlsServer
+cd /go/net
+scope ./tlsServer &
+
+# this sleep gives the server a chance to bind to the port (4430)
+# before we try to hit it with curl
+sleep 0.5
+curl -k --key server.key --cert server.crt https://localhost:4430/hello
+ERR+=$?
+
+# this sleep gives tlsServer a chance to report its events,
+# assuming SCOPE_SUMMARY_PERIOD is its default 10s
+sleep 10
+# This stops tlsServer
+kill $!
+
+evaltest
+
+grep tlsServer $EVT_FILE | grep http- > /dev/null
+ERR+=$?
+
+endtest
+
+
+#
 # fileThread
 #
 starttest fileThread

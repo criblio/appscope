@@ -144,5 +144,5 @@ stages:
                 targetFolder: 'dl/scope/latest/'
               ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:
                 targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
-              filesAcl: 'public-read'
+              filesAcl: 'bucket-owner-full-control'
 

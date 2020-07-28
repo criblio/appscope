@@ -23,7 +23,9 @@
     // Call the 'C' handler with the current stack pointer
     // as argument, e.g.:
     // go_write(stackptr)
-    mov %rsp, 0x08(%rsp)
+    mov %rsp, %r11
+    add $0x20, %r11
+    mov %r11, 0x08(%rsp)
     lea \c_func@GOTPCREL(%rip), %r11
     mov (%r11), %r11
     mov %r11, (%rsp)

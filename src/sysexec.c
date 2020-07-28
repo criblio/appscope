@@ -14,12 +14,23 @@
 #include <signal.h>
 #include <pthread.h>
 
-#include "atomic.h"
 #include "dbg.h"
 #include "os.h"
 #include "com.h"
 #include "state.h"
 #include "gocontext.h"
+
+
+#ifdef ENABLE_CAS_IN_SYSEXEC
+#include "atomic.h"
+#else
+// This disables the CAS spinlocks by default.  Aint nobody got time for that.
+bool
+atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
+{
+    return TRUE;
+}
+#endif
 
 #define HEAP_SIZE (size_t)(500 * 1024)
 // 1Mb + an 8kb guard
@@ -33,7 +44,6 @@
 #define EXPORTON __attribute__((visibility("default")))
 
 uint64_t g_glibc_guard = 0LL;
-uint64_t g_tcb_guard = 0LL;
 void (*go_runtime_cgocall)(void);
 uint64_t scope_stack;
 unsigned long scope_fs, go_fs;
@@ -241,6 +251,49 @@ regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
     return rc;
 }
 
+int
+switch_tcb_to_glibc(sigset_t *mask)
+{
+// This disables the signal masking by default.
+#ifdef ENABLE_SIGNAL_MASKING_IN_SYSEXEC
+    if ((sigfillset(mask) == -1) || (sigprocmask(SIG_SETMASK, mask, NULL) == -1)) {
+        scopeLog("blocking signals", -1, CFG_LOG_ERROR);
+        return 0;
+    }
+#endif
+
+    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
+        scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
+        return 0;
+    }
+
+    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+        scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+        return 0;
+    }
+    return -1;
+}
+
+int
+switch_tcb_to_go(sigset_t *mask)
+{
+    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
+        scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
+        return 0;
+    }
+
+// This disables the signal masking by default.
+#ifdef ENABLE_SIGNAL_MASKING_IN_SYSEXEC
+    if ((sigemptyset(mask) == -1) || (sigprocmask(SIG_SETMASK, mask, NULL) == -1)) {
+        scopeLog("unblocking signals", -1, CFG_LOG_ERROR);
+        return 0;
+    }
+#endif
+    return -1;
+}
+
+
+
 EXPORTON void*
 go_write(char *stackptr)
 {
@@ -253,35 +306,12 @@ go_write(char *stackptr)
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-
-    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("go_write:blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
-        scopeLog("go_write:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-        scopeLog("go_write_test:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
+    if (!switch_tcb_to_glibc(&mask)) goto out;
 
     sysprint("Scope: write of %ld\n", fd);
     doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
 
-    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-        scopeLog("go_write:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("go_write:blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
+    if (!switch_tcb_to_go(&mask)) goto out;
 out:
     // End of critical section.
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
@@ -302,21 +332,7 @@ go_open(char *stackptr)
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-
-    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("go_open:blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
-        scopeLog("go_open:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-        scopeLog("go_open_test:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
+    if (!switch_tcb_to_glibc(&mask)) goto out;
 
     sysprint("Scope: open of %ld\n", fd);
     if (buf) {
@@ -334,16 +350,7 @@ go_open(char *stackptr)
 
     if (path) free(path);
 
-    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-        scopeLog("go_open:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("go_open:blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
+    if (!switch_tcb_to_go(&mask)) goto out;
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
     return return_addr(go_hook_open);
@@ -363,35 +370,12 @@ go_socket(char *stackptr)
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-
-    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("go_socket:blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
-        scopeLog("go_socket:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-        scopeLog("go_socket_test:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
+    if (!switch_tcb_to_glibc(&mask)) goto out;
 
     sysprint("Scope: socket of %ld\n", sd);
     addSock(sd, type, domain);
 
-    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-        scopeLog("go_socket:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("go_socket:blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
+    if (!switch_tcb_to_go(&mask)) goto out;
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
     return return_addr(go_hook_socket);
@@ -408,37 +392,14 @@ go_accept4(char *stackptr)
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-
-    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("go_accept4:blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
-        scopeLog("go_accept4:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-        scopeLog("go_accept4:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
+    if (!switch_tcb_to_glibc(&mask)) goto out;
 
     sysprint("Scope: accept4 of %ld\n", sd_out);
     if (sd_out != -1) {
         doAccept(sd_out, addr, addrlen, "go_accept4");
     }
 
-    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-        scopeLog("go_accept4:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("go_accept4:blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
+    if (!switch_tcb_to_go(&mask)) goto out;
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
     return return_addr(go_hook_accept4);
@@ -458,35 +419,12 @@ go_read(char *stackptr)
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-
-    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("go_read:blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
-        scopeLog("go_read:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-        scopeLog("go_read_test:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
+    if (!switch_tcb_to_glibc(&mask)) goto out;
 
     sysprint("Scope: read of %ld\n", fd);
     doRead(fd, initialTime, (rc != -1), (void*)buf, rc, "go_read", BUF, 0);
 
-    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-        scopeLog("go_read:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("go_read:blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
+    if (!switch_tcb_to_go(&mask)) goto out;
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
     return return_addr(go_hook_read);
@@ -503,35 +441,12 @@ go_close(char *stackptr)
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-
-    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("go_close:blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
-        scopeLog("go_close:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-        scopeLog("go_close:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
+    if (!switch_tcb_to_glibc(&mask)) goto out;
 
     sysprint("Scope: close of %ld\n", fd);
     doCloseAndReportFailures(fd, (rc != -1), "go_close");
 
-    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-        scopeLog("go_close:arch_prctl", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("go_close:blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
+    if (!switch_tcb_to_go(&mask)) goto out;
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
     return return_addr(go_hook_close);

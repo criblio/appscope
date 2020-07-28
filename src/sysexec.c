@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -44,50 +45,66 @@ extern void threadNow(int);
 extern int arch_prctl(int, unsigned long);
 
 // Define the interposed function seta
+typedef void (*assembly_fn)(void);
 extern void go_hook_write(void);
 extern void go_hook_open(void);
 extern void go_hook_socket(void);
 extern void go_hook_accept4(void);
 extern void go_hook_read(void);
 extern void go_hook_close(void);
-void* go_write(char*);
-void* go_open(char*);
-void* go_socket(char*);
-void* go_accept4(char*);
-void* go_read(char*);
-void* go_close(char*);
-
-typedef void* (*tap_fn_t)(char*);
 
 typedef struct {
     // These are constants at build time
     char *   func_name;    // name of go function
     uint64_t byte_off;     // patch offset into go function
     void *   assembly_fn;  // scope handler function (in assembly)
-    tap_fn_t handler_fn;   // scope handler function (c)
 
     // This is set at runtime.
     void *   return_addr;  // addr of where in go to resume after patch
 } tap_t;
 
 tap_t g_go_tap[] = {
-    {"syscall.write",   0x9d, go_hook_write,   go_write,   NULL},
-    {"syscall.openat", 0x101, go_hook_open,    go_open,    NULL},
-    {"syscall.socket",  0x85, go_hook_socket,  go_socket,  NULL},
-    {"syscall.accept4", 0xc1, go_hook_accept4, go_accept4, NULL},
-    {"syscall.read",    0x9d, go_hook_read,    go_read,    NULL},
-    {"syscall.Close",   0x6a, go_hook_close,   go_close,   NULL},
+    {"syscall.write",   0x9d, go_hook_write,   NULL},
+    {"syscall.openat", 0x101, go_hook_open,    NULL},
+    {"syscall.socket",  0x85, go_hook_socket,  NULL},
+    {"syscall.accept4", 0xc1, go_hook_accept4, NULL},
+    {"syscall.read",    0x9d, go_hook_read,    NULL},
+    {"syscall.Close",   0x6a, go_hook_close,   NULL},
     {"TAP_TABLE_END",    0x0, NULL, NULL}
 };
 
 static void *
-return_addr(tap_fn_t fn)
+return_addr(assembly_fn fn)
 {
     tap_t* tap = NULL;
-    for (tap = g_go_tap; tap->handler_fn; tap++) {
-        if (tap->handler_fn == fn) return tap->return_addr;
+    for (tap = g_go_tap; tap->assembly_fn; tap++) {
+        if (tap->assembly_fn == fn) return tap->return_addr;
     }
     return NULL;
+}
+
+void
+sysprint(const char* fmt, ...)
+{
+    return; // Comment this out if you want output.  =)
+
+    // Create the string
+    char* str = NULL;
+    if (fmt) {
+        va_list args;
+        va_start(args, fmt);
+        int rv = vasprintf(&str, fmt, args);
+        va_end(args);
+        if (rv == -1) {
+            if (str) free(str);
+            str = NULL;
+        }
+    }
+    // Output the string
+    if (str) {
+        printf("%s", str);
+        free(str);
+    }
 }
 
 #if 0
@@ -228,7 +245,7 @@ EXPORTON void*
 go_write(char *stackptr)
 {
     sigset_t mask;
-    char * stackaddr = stackptr + 0x50+0x20;
+    char * stackaddr = stackptr + 0x50;
     uint64_t fd  = *(uint64_t *)(stackaddr + 0x8);
     uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
     uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
@@ -252,7 +269,7 @@ go_write(char *stackptr)
         goto out;
     }
 
-    printf("Scope: write of %ld\n", fd);
+    sysprint("Scope: write of %ld\n", fd);
     doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
@@ -268,7 +285,7 @@ go_write(char *stackptr)
 out:
     // End of critical section.
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_write);
+    return return_addr(go_hook_write);
 }
 
 EXPORTON void*
@@ -276,12 +293,12 @@ go_open(char *stackptr)
 {
     char *path = NULL;
     sigset_t mask;
-    char * stackaddr = stackptr + 0x78+0x20;
+    char * stackaddr = stackptr + 0x78;
     uint64_t fd  = *((uint64_t *)(stackaddr + 0x30));
     uint64_t buf = *((uint64_t *)(stackaddr + 0x10));
     uint64_t len = *((uint64_t *)(stackaddr + 0x18));
 
-    if ((len <= 0) || (len >= PATH_MAX)) return return_addr(go_open);
+    if ((len <= 0) || (len >= PATH_MAX)) return return_addr(go_hook_open);
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
@@ -301,7 +318,7 @@ go_open(char *stackptr)
         goto out;
     }
 
-    printf("Scope: open of %ld\n", fd);
+    sysprint("Scope: open of %ld\n", fd);
     if (buf) {
         if ((path = calloc(1, len+1)) == NULL) goto out;
         memmove(path, (char *)buf, len);
@@ -329,7 +346,7 @@ go_open(char *stackptr)
 
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_open);
+    return return_addr(go_hook_open);
 }
 
 EXPORTON void*
@@ -337,12 +354,12 @@ go_socket(char *stackptr)
 {
     sigset_t mask;
 
-    char * stackaddr = stackptr + 0x48+0x20;
+    char * stackaddr = stackptr + 0x48;
     uint64_t domain = *(uint64_t*)(stackaddr + 0x8);  // aka family
     uint64_t type   = *(uint64_t*)(stackaddr + 0x10);
     uint64_t sd     = *(uint64_t*)(stackaddr + 0x20);
 
-    if (sd == -1) return return_addr(go_socket);
+    if (sd == -1) return return_addr(go_hook_socket);
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
@@ -362,7 +379,7 @@ go_socket(char *stackptr)
         goto out;
     }
 
-    printf("Scope: socket of %ld\n", sd);
+    sysprint("Scope: socket of %ld\n", sd);
     addSock(sd, type, domain);
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
@@ -377,14 +394,14 @@ go_socket(char *stackptr)
 
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_socket);
+    return return_addr(go_hook_socket);
 }
 
 EXPORTON void*
 go_accept4(char *stackptr)
 {
     sigset_t mask;
-    char * stackaddr = stackptr + 0x70+0x20;
+    char * stackaddr = stackptr + 0x70;
     struct sockaddr *addr  = *(struct sockaddr **)(stackaddr + 0x10);
     socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
     uint64_t sd_out = *(uint64_t*)(stackaddr + 0x28);
@@ -407,7 +424,7 @@ go_accept4(char *stackptr)
         goto out;
     }
 
-    printf("Scope: accept4 of %ld\n", sd_out);
+    sysprint("Scope: accept4 of %ld\n", sd_out);
     if (sd_out != -1) {
         doAccept(sd_out, addr, addrlen, "go_accept4");
     }
@@ -424,20 +441,20 @@ go_accept4(char *stackptr)
 
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_accept4);
+    return return_addr(go_hook_accept4);
 }
 
 EXPORTON void*
 go_read(char *stackptr)
 {
     sigset_t mask;
-    char * stackaddr = stackptr + 0x50+0x20;
+    char * stackaddr = stackptr + 0x50;
     uint64_t fd    = *(uint64_t*)(stackaddr + 0x8);
     uint64_t buf   = *(uint64_t*)(stackaddr + 0x10);
     uint64_t rc    = *(uint64_t*)(stackaddr + 0x28);
     uint64_t initialTime = getTime();
 
-    if (rc == -1) return return_addr(go_read);
+    if (rc == -1) return return_addr(go_hook_read);
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
@@ -457,7 +474,7 @@ go_read(char *stackptr)
         goto out;
     }
 
-    printf("Scope: read of %ld\n", fd);
+    sysprint("Scope: read of %ld\n", fd);
     doRead(fd, initialTime, (rc != -1), (void*)buf, rc, "go_read", BUF, 0);
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
@@ -472,7 +489,7 @@ go_read(char *stackptr)
 
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_read);
+    return return_addr(go_hook_read);
 }
 
 
@@ -480,7 +497,7 @@ EXPORTON void*
 go_close(char *stackptr)
 {
     sigset_t mask;
-    char * stackaddr = stackptr + 0x40+0x20;
+    char * stackaddr = stackptr + 0x40;
     uint64_t fd  = *(uint64_t*)(stackaddr + 0x8);
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x10);
 
@@ -502,7 +519,7 @@ go_close(char *stackptr)
         goto out;
     }
 
-    printf("Scope: close of %ld\n", fd);
+    sysprint("Scope: close of %ld\n", fd);
     doCloseAndReportFailures(fd, (rc != -1), "go_close");
 
     if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
@@ -517,7 +534,7 @@ go_close(char *stackptr)
 
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_close);
+    return return_addr(go_hook_close);
 }
 
 

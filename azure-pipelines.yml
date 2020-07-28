@@ -135,7 +135,7 @@ stages:
             displayName: New_S3_Upload
             condition: succeeded()
             inputs:
-              awsCredentials: 'azure-pipeline-aws'
+              awsCredentials: 'azure-pipeline-aws-core'
               regionName: 'us-west-2'
               bucketName: 'io.cribl.cdn'
               sourceFolder: '$(Build.BinariesDirectory)/lib/'
@@ -144,5 +144,5 @@ stages:
                 targetFolder: 'dl/scope/latest/'
               ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:
                 targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
-              filesAcl: 'bucket-owner-full-control'
+              filesAcl: 'public-read'
 

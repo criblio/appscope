@@ -4,7 +4,7 @@
 #include "gocontext.h"
 
 .global	go_hook_write, go_hook_open, go_hook_socket, go_hook_accept4
-.global go_hook_read, go_hook_close
+.global go_hook_read, go_hook_close, go_hook_tls_read, go_hook_tls_write
 
 // The macro interpose takes 3 params
 // the name of the global variable as defined above ex: go_hook_write
@@ -63,4 +63,6 @@
     interpose go_hook_accept4, go_accept4
     interpose go_hook_read, go_read
     interpose go_hook_close, go_close
+    interpose go_hook_tls_read, go_tls_read
+    interpose go_hook_tls_write, go_tls_write
 

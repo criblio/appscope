@@ -62,6 +62,8 @@ extern void go_hook_socket(void);
 extern void go_hook_accept4(void);
 extern void go_hook_read(void);
 extern void go_hook_close(void);
+extern void go_hook_tls_read(void);
+extern void go_hook_tls_write(void);
 
 typedef struct {
     // These are constants at build time
@@ -80,6 +82,8 @@ tap_t g_go_tap[] = {
     {"syscall.accept4", 0xc1, go_hook_accept4, NULL},
     {"syscall.read",    0x9d, go_hook_read,    NULL},
     {"syscall.Close",   0x6a, go_hook_close,   NULL},
+    {"net/http.(*connReader).Read",           0x183, go_hook_tls_read,   NULL},
+    {"net/http.checkConnErrorWriter.Write",   0x93,  go_hook_tls_write,  NULL},
     {"TAP_TABLE_END",    0x0, NULL, NULL}
 };
 
@@ -452,6 +456,53 @@ out:
     return return_addr(go_hook_close);
 }
 
+EXPORTON void*
+go_tls_read(char *stackptr)
+{
+    sigset_t mask;
+    char * stackaddr = stackptr + 0x58;
+    uint64_t conn = *(uint64_t*)(stackaddr + 0x8);
+    uint64_t buf  = *(uint64_t*)(stackaddr + 0x10);
+    // buf len 0x18
+    // buf cap 0x20
+    uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
+
+    // Beginning of critical section.
+    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
+    if (!switch_tcb_to_glibc(&mask)) goto out;
+
+    sysprint("Scope: go_tls_read of %ld\n", -1);
+    doProtocol(conn, -1, (void*)buf, rc, TLSRX, BUF);
+
+    if (!switch_tcb_to_go(&mask)) goto out;
+out:
+    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
+    return return_addr(go_hook_tls_read);
+}
+
+EXPORTON void*
+go_tls_write(char *stackptr)
+{
+    sigset_t mask;
+    char * stackaddr = stackptr + 0x58;
+    uint64_t conn = *(uint64_t*)(stackaddr + 0x8);
+    uint64_t buf  = *(uint64_t*)(stackaddr + 0x10);
+    // buf len 0x18
+    // buf cap 0x20
+    uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
+
+    // Beginning of critical section.
+    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
+    if (!switch_tcb_to_glibc(&mask)) goto out;
+
+    sysprint("Scope: go_tls_write of %ld\n", -1);
+    doProtocol(conn, -1, (void*)buf, rc, TLSTX, BUF);
+
+    if (!switch_tcb_to_go(&mask)) goto out;
+out:
+    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
+    return return_addr(go_hook_tls_write);
+}
 
 static void
 initGoHook(const char *buf)

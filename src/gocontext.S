@@ -12,130 +12,46 @@
 // the name of the C function interposed handler
 .macro interpose a_func, go_func, c_func
 \a_func:
-    # put args on the stack for the cgo call
-    # fnc is the C handler go_new_store()
-    # arg is a pointer to the stack
-    sub $0x20, %rsp
-    mov %fs:0xfffffffffffffff8, %r11
-    push %r11
-    lea go_new_store@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    push %r11
+    // This creates a stack frame of 0x20 bytes
+    // The add grows the stacks by 0x18
+    // The push decrements the stack pointer, $rsp, by 8
+    // then stores the register, the stack frame then is
+    // 0x18 + 0x08 = 0x20
+    sub $0x18, %rsp
+    push %rax
 
-    # call cgo
-    # runtime.asmcgocall(go_new_store, stackpointer)
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov (%r11), %r11
-    call *%r11
-
-    # check the return value
-    test %rax, %rax
-    jle out_\a_func
-
-    # housekeeping
-    pop %r10
-    pop %r10
-    add $0x20, %rsp
-
-    mov (%rsp), %r11
-    mov %r11, 0x08(%rax)
-    mov %rsp, %r10
-    mov %r10, 0x10(%rax)
-
-    movabs $toc_\a_func, %r11
-    mov %r11, (%rsp)
-
-    # Get our stack frame size
-    lea go_rop_stack@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov (%r11), %r11
-    sub %r11, %rsp
-
-    # Get the ROP address
-    lea go_syscall_rop@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov (%r11), %r11
-    mov %r11, (%rsp)
-
-    mov 0x08(%r10), %r11
-    mov %r11, 0x08(%rsp)
-    mov 0x10(%r10), %r11
-    mov %r11, 0x10(%rsp)
-    mov 0x18(%r10), %r11
-    mov %r11, 0x18(%rsp)
-    mov 0x20(%r10), %r11
-    mov %r11, 0x20(%rsp)
-    mov 0x28(%r10), %r11
-    mov %r11, 0x28(%rsp)
-    mov 0x30(%r10), %r11
-    mov %r11, 0x30(%rsp)
-    mov 0x38(%r10), %r11
-    mov %r11, 0x38(%rsp)
-    mov 0x40(%r10), %r11
-    mov %r11, 0x40(%rsp)
-
-    # do the Go function
-    lea \go_func@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov (%r11), %r11
-    jmp *%r11
-
-toc_\a_func:
-    # restore the original return address
-    sub $0x20, %rsp
-    mov %fs:0xfffffffffffffff8, %r11
-    push %r11
-    lea go_reset_store@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    push %r11
-
-    # call cgo to execute go_reset_store(tcb)
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov (%r11), %r11
-    call *%r11
-
-    # check the return value
-    test %rax, %rax
-    jz err_\a_func
-
-    # housekeeping
-    pop %r10
-    pop %r10
-    add $0x20, %rsp
-
-    # get original Go routine return address
-    mov 0x08(%rax), %r11
-
-    # restore the original return address
-    # must be a push in order to keep the stack right
-    push %r11
-    mov %rsp, %r11
-
-    # put args on the stack for the cgo call
-    sub $0x20, %rsp
-    push %r11
+    // Call the 'C' handler with the current stack pointer
+    // as argument, e.g.:
+    // go_write(stackptr)
+    mov %rsp, 0x08(%rsp)
     lea \c_func@GOTPCREL(%rip), %r11
     mov (%r11), %r11
-    push %r11
+    mov %r11, (%rsp)
 
-    # call cgo c_func(stackpointer)
+    // We call a 'C' function by passing the function
+    // address and a param to the Go function cgocall.
+    // Function: syscall.asmcgocall(fnc, arg)
+    // cgocall (or asmcgocall) switches from the Go stack
+    // to what the Go runtime calls a system stack
+    // then calls fnc and returns a value. We are
+    // using the fact that the return value remains in %rax.
+    // The return value is also on the stack. We may need to
+    // extract it from the stack if Go syscall code changes.
     lea go_runtime_cgocall@GOTPCREL(%rip), %r11
     mov (%r11), %r11
     mov (%r11), %r11
     call *%r11
+    mov %rax, %r11    
 
-out_\a_func:
-    pop %r11
-    pop %r11
-    add $0x20, %rsp
-    ret
+    # housekeeping
+    pop %rax
+    add $0x18, %rsp
 
-err_\a_func:
-    # should not get here: check the C code
-    # it's not supposed to return on error
-    hlt
+    // The value returned from our 'C' handler function is always
+    // the address of the trampoline that gets us back to the
+    // original Go function. The correct trampoline address is
+    // created by funchook_prepapre().
+    jmp *%r11
 .endm
 
 .text
@@ -145,3 +61,4 @@ err_\a_func:
     interpose go_hook_accept4, go_syscall_accept4, go_accept4
     interpose go_hook_read, go_syscall_read, go_read
     interpose go_hook_close, go_syscall_close, go_close
+

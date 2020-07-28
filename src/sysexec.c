@@ -20,6 +20,52 @@
 #include "state.h"
 #include "gocontext.h"
 
+extern void go_hook_write(void);
+extern void go_hook_open(void);
+extern void go_hook_socket(void);
+extern void go_hook_accept4(void);
+extern void go_hook_read(void);
+extern void go_hook_close(void);
+void* go_write(char*);
+void* go_open(char*);
+void* go_socket(char*);
+void* go_accept4(char*);
+void* go_read(char*);
+void* go_close(char*);
+
+typedef void* (*tap_fn_t)(char*);
+
+typedef struct {
+    // These are constants at build time
+    char *   func_name;    // name of go function
+    uint64_t byte_off;     // patch offset into go function
+    void *   assembly_fn;  // scope handler function (in assembly)
+    tap_fn_t handler_fn;   // scope handler function (c)
+
+    // This is set at runtime.
+    void *   return_addr;  // addr of where in go to resume after patch
+} tap_t;
+
+tap_t g_go_tap[] = {
+    {"syscall.write",   0x9d, go_hook_write,   go_write,   NULL},
+    {"syscall.openat", 0x101, go_hook_open,    go_open,    NULL},
+    {"syscall.socket",  0x85, go_hook_socket,  go_socket,  NULL},
+    {"syscall.accept4", 0xc1, go_hook_accept4, go_accept4, NULL},
+    {"syscall.read",    0x9d, go_hook_read,    go_read,    NULL},
+    {"syscall.Close",   0x6a, go_hook_close,   go_close,   NULL},
+    {"TAP_TABLE_END",    0x0, NULL, NULL}
+};
+
+static void *
+return_addr(tap_fn_t fn)
+{
+    tap_t* tap = NULL;
+    for (tap = g_go_tap; tap->handler_fn; tap++) {
+        if (tap->handler_fn == fn) return tap->return_addr;
+    }
+    return NULL;
+}
+
 typedef struct go_store {
     uint64_t tcb;
     uint64_t go_return_addr;
@@ -122,8 +168,6 @@ int (*go_syscall_accept4)(int, void*, int, int);
 ssize_t (*go_syscall_read)(int, const void *, size_t);
 int (*go_syscall_close)(int);
 void (*go_runtime_cgocall)(void);
-void (*go_syscall_rop)(void);
-int go_rop_stack;
 uint64_t scope_stack;
 unsigned long scope_fs, go_fs;
 uint64_t *g_currsheap = NULL;
@@ -132,12 +176,6 @@ bool g_ongostack = FALSE;
 go_store_t g_gostore[MAX_STORES];
 uint64_t go_text;
 
-extern int go_hook_write();
-extern int go_hook_open();
-extern int go_hook_socket();
-extern int go_hook_accept4();
-extern int go_hook_read();
-extern int go_hook_close();
 extern int go_start();
 extern int go_end();
 extern void threadNow(int);
@@ -258,23 +296,15 @@ regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
     return rc;
 }
 
-EXPORTON size_t
-go_write(char *stackaddr)
+EXPORTON void*
+go_write(char *stackptr)
 {
     sigset_t mask;
+    char * stackaddr = stackptr + 0x50+0x20;
     uint64_t fd  = *(uint64_t *)(stackaddr + 0x8);
     uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
-    uint64_t rc;
-    uint64_t error;
+    uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
     uint64_t initialTime = getTime();
-    int task_switching_successful = FALSE;
-
-    // doing ROP; update return codes
-    char *retvals = (char *)(stackaddr - ROP_STACK);
-    rc = *(uint64_t *)(retvals + 0x28);
-    *(uint64_t *)(stackaddr + 0x28) = rc;
-    error = *(uint64_t *)(retvals + 0x30);
-    *(uint64_t *)(stackaddr + 0x30) = error;
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
@@ -307,34 +337,23 @@ go_write(char *stackaddr)
         goto out;
     }
 
-    task_switching_successful = TRUE;
 out:
     // End of critical section.
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return (task_switching_successful) ? rc : -1;
+    return return_addr(go_write);
 }
 
-EXPORTON size_t
-go_open(char *stackaddr)
+EXPORTON void*
+go_open(char *stackptr)
 {
     char *path = NULL;
-    size_t rc = 0;
     sigset_t mask;
-    uint64_t buf = *((uint64_t *)((char *)(stackaddr) + 0x10));
-    uint64_t len = *((uint64_t *)((char *)(stackaddr) + 0x18));
-    uint64_t fd;
-    uint64_t error;
-    int task_switching_successful = FALSE;
+    char * stackaddr = stackptr + 0x78+0x20;
+    uint64_t fd  = *((uint64_t *)(stackaddr + 0x30));
+    uint64_t buf = *((uint64_t *)(stackaddr + 0x10));
+    uint64_t len = *((uint64_t *)(stackaddr + 0x18));
 
-    // doing ROP; update return codes
-    char *retvals = (char *)(stackaddr - ROP_STACK);
-    fd = *(uint64_t *)(retvals + 0x30);
-    *(uint64_t *)(stackaddr + 0x30) = fd;
-    error = *(uint64_t *)(retvals + 0x38);
-    *(uint64_t *)(stackaddr + 0x38) = error;
-    rc = fd;
-
-    if ((len <= 0) || (len >= PATH_MAX)) return -1;
+    if ((len <= 0) || (len >= PATH_MAX)) return return_addr(go_open);
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
@@ -354,7 +373,7 @@ go_open(char *stackaddr)
         goto out;
     }
 
-    printf("Scope: open of %ld\n", rc);
+    printf("Scope: open of %ld\n", fd);
     if (buf) {
         if ((path = calloc(1, len+1)) == NULL) goto out;
         memmove(path, (char *)buf, len);
@@ -380,31 +399,22 @@ go_open(char *stackaddr)
         goto out;
     }
 
-    task_switching_successful = TRUE;
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return (task_switching_successful) ? rc : -1;
+    return return_addr(go_open);
 }
 
-EXPORTON int
-go_socket(char *stackaddr)
+EXPORTON void*
+go_socket(char *stackptr)
 {
     sigset_t mask;
 
+    char * stackaddr = stackptr + 0x48+0x20;
     uint64_t domain = *(uint64_t*)(stackaddr + 0x8);  // aka family
     uint64_t type   = *(uint64_t*)(stackaddr + 0x10);
-    uint64_t sd;
-    uint64_t error;
-    int task_switching_successful = FALSE;
+    uint64_t sd     = *(uint64_t*)(stackaddr + 0x20);
 
-    // doing ROP; update return codes
-    char *retvals = (char *)(stackaddr - ROP_STACK);
-    sd = *(uint64_t *)(retvals + 0x20);
-    *(uint64_t *)(stackaddr + 0x20) = sd;
-    error = *(uint64_t *)(retvals + 0x28);
-    *(uint64_t *)(stackaddr + 0x28) = error;
-
-    if (sd == -1) return -1;
+    if (sd == -1) return return_addr(go_socket);
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
@@ -437,28 +447,19 @@ go_socket(char *stackaddr)
         goto out;
     }
 
-    task_switching_successful = TRUE;
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return (task_switching_successful) ? sd : -1;
+    return return_addr(go_socket);
 }
 
-EXPORTON int
-go_accept4(char *stackaddr)
+EXPORTON void*
+go_accept4(char *stackptr)
 {
     sigset_t mask;
+    char * stackaddr = stackptr + 0x70+0x20;
     struct sockaddr *addr  = *(struct sockaddr **)(stackaddr + 0x10);
     socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
-    uint64_t sd_out;
-    uint64_t error;
-    int task_switching_successful = FALSE;
-
-    // doing ROP; update return codes
-    char *retvals = (char *)(stackaddr - ROP_STACK);
-    sd_out = *(uint64_t *)(retvals + 0x28);
-    *(uint64_t *)(stackaddr + 0x28) = sd_out;
-    error = *(uint64_t *)(retvals + 0x30);
-    *(uint64_t *)(stackaddr + 0x30) = error;
+    uint64_t sd_out = *(uint64_t*)(stackaddr + 0x28);
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
@@ -493,31 +494,22 @@ go_accept4(char *stackaddr)
         goto out;
     }
 
-    task_switching_successful = TRUE;
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return (task_switching_successful) ? sd_out : -1;
+    return return_addr(go_accept4);
 }
 
-EXPORTON ssize_t
-go_read(char *stackaddr)
+EXPORTON void*
+go_read(char *stackptr)
 {
     sigset_t mask;
+    char * stackaddr = stackptr + 0x50+0x20;
     uint64_t fd    = *(uint64_t*)(stackaddr + 0x8);
     uint64_t buf   = *(uint64_t*)(stackaddr + 0x10);
-    uint64_t rc; //    = *(uint64_t*)(stackaddr + 0x28); // <- should be 0x20, we thought?
-    uint64_t error;
+    uint64_t rc    = *(uint64_t*)(stackaddr + 0x28);
     uint64_t initialTime = getTime();
-    int task_switching_successful = FALSE;
 
-    // doing ROP; update return codes
-    char *retvals = (char *)(stackaddr - ROP_STACK);
-    rc = *(uint64_t *)(retvals + 0x28);
-    *(uint64_t *)(stackaddr + 0x28) = rc;
-    error = *(uint64_t *)(retvals + 0x30);
-    *(uint64_t *)(stackaddr + 0x30) = error;
-
-    if (rc == -1) return -1;
+    if (rc == -1) return return_addr(go_read);
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
@@ -550,25 +542,19 @@ go_read(char *stackaddr)
         goto out;
     }
 
-    task_switching_successful = TRUE;
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return (task_switching_successful) ? rc : -1;
+    return return_addr(go_read);
 }
 
 
-EXPORTON int
-go_close(char *stackaddr)
+EXPORTON void*
+go_close(char *stackptr)
 {
     sigset_t mask;
+    char * stackaddr = stackptr + 0x40+0x20;
     uint64_t fd  = *(uint64_t*)(stackaddr + 0x8);
-    uint64_t rc;
-    int task_switching_successful = FALSE;
-
-    // doing ROP; update return codes
-    char *retvals = (char *)(stackaddr - ROP_STACK);
-    rc = *(uint64_t *)(retvals + 0x10);
-    *(uint64_t *)(stackaddr + 0x10) = rc;
+    uint64_t rc  = *(uint64_t*)(stackaddr + 0x10);
 
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
@@ -601,10 +587,9 @@ go_close(char *stackaddr)
         goto out;
     }
 
-    task_switching_successful = TRUE;
 out:
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return (task_switching_successful) ? rc : -1;
+    return return_addr(go_close);
 }
 
 
@@ -621,34 +606,19 @@ initGoHook(const char *buf)
         funchook_set_debug_file(DEFAULT_LOG_PATH);
     }
 
-    if ((go_syscall_write = getSymbol(buf, "syscall.write")) != 0) {
-        go_syscall_write += 19;
-        rc = funchook_prepare(funchook, (void**)&go_syscall_write, go_hook_write);
-    }
-
-    if ((go_syscall_open = getSymbol(buf, "syscall.openat")) != 0) {
-        go_syscall_open += 19;
-        rc = funchook_prepare(funchook, (void**)&go_syscall_open, go_hook_open);
-    }
-
-    if ((go_syscall_socket = getSymbol(buf, "syscall.socket")) != 0) {
-        go_syscall_socket += 19;
-        rc = funchook_prepare(funchook, (void**)&go_syscall_socket, go_hook_socket);
-    }
-
-    if ((go_syscall_accept4 = getSymbol(buf, "syscall.accept4")) != 0) {
-        go_syscall_accept4 += 19;
-        rc = funchook_prepare(funchook, (void**)&go_syscall_accept4, go_hook_accept4);
-    }
-
-    if ((go_syscall_read = getSymbol(buf, "syscall.read")) != 0) {
-        go_syscall_read += 19;
-        rc = funchook_prepare(funchook, (void**)&go_syscall_read, go_hook_read);
-    }
-
-    if ((go_syscall_close = getSymbol(buf, "syscall.Close")) != 0) {
-        go_syscall_close += 19;
-        rc = funchook_prepare(funchook, (void**)&go_syscall_close, go_hook_close);
+    tap_t* tap = NULL;
+    for (tap = g_go_tap; tap->assembly_fn; tap++) {
+        void* orig_func = getSymbol(buf, tap->func_name);
+        if (!orig_func) {
+            scopeLog(tap->func_name, -1, CFG_LOG_ERROR);
+            continue;
+        }
+        orig_func += tap->byte_off;
+        if (funchook_prepare(funchook, (void**)&orig_func, tap->assembly_fn)) {
+            scopeLog(tap->func_name, -1, CFG_LOG_ERROR);
+            continue;
+        }
+        tap->return_addr = orig_func;
     }
 
     /*
@@ -662,14 +632,6 @@ initGoHook(const char *buf)
         printf("ERROR: can't get the address for runtime.cgocall\n");
         exit(-1);
     }
-
-    if ((go_syscall_rop = getSymbol(buf, ROP_FUNC)) == 0) {
-        printf("ERROR: can't get the address for syscall.runtime_envs\n");
-        exit(-1);
-    }
-
-    go_syscall_rop += ROP_OFFSET;
-    go_rop_stack = ROP_STACK;
 
     // hook a few Go funcs
     rc = funchook_install(funchook, 0);

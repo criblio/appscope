@@ -10,7 +10,7 @@
 // the name of the global variable as defined above ex: go_hook_write
 // the name of the Go function that will be called
 // the name of the C function interposed handler
-.macro interpose a_func, go_func, c_func
+.macro interpose a_func, c_func
 \a_func:
     // This creates a stack frame of 0x20 bytes
     // The add grows the stacks by 0x18
@@ -55,10 +55,10 @@
 .endm
 
 .text
-    interpose go_hook_write, go_syscall_write, go_write
-    interpose go_hook_open, go_syscall_open, go_open
-    interpose go_hook_socket, go_syscall_socket, go_socket
-    interpose go_hook_accept4, go_syscall_accept4, go_accept4
-    interpose go_hook_read, go_syscall_read, go_read
-    interpose go_hook_close, go_syscall_close, go_close
+    interpose go_hook_write, go_write
+    interpose go_hook_open, go_open
+    interpose go_hook_socket, go_socket
+    interpose go_hook_accept4, go_accept4
+    interpose go_hook_read, go_read
+    interpose go_hook_close, go_close
 

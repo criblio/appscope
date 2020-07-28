@@ -20,6 +20,30 @@
 #include "state.h"
 #include "gocontext.h"
 
+#define HEAP_SIZE (size_t)(500 * 1024)
+// 1Mb + an 8kb guard
+#define STACK_SIZE (size_t)(1024 * 1024) + (8 * 1024)
+#define SCOPE_STACK_SIZE (size_t)(64 * 1024)
+#define AUX_ENT(id, val) \
+	do { \
+		elf_info[i++] = id; \
+		elf_info[i++] = val; \
+	} while (0)
+#define EXPORTON __attribute__((visibility("default")))
+
+uint64_t g_glibc_guard = 0LL;
+uint64_t g_tcb_guard = 0LL;
+void (*go_runtime_cgocall)(void);
+uint64_t scope_stack;
+unsigned long scope_fs, go_fs;
+uint64_t *g_currsheap = NULL;
+uint64_t *g_heapend = NULL;
+bool g_ongostack = FALSE;
+
+extern void threadNow(int);
+extern int arch_prctl(int, unsigned long);
+
+// Define the interposed function seta
 extern void go_hook_write(void);
 extern void go_hook_open(void);
 extern void go_hook_socket(void);
@@ -65,27 +89,6 @@ return_addr(tap_fn_t fn)
     }
     return NULL;
 }
-
-typedef struct go_store {
-    uint64_t tcb;
-    uint64_t go_return_addr;
-    uint64_t scope_return_addr;
-} go_store_t;
-
-uint64_t g_glibc_guard = 0LL;
-uint64_t g_tcb_guard = 0LL;
-
-#define MAX_STORES 256
-#define HEAP_SIZE (size_t)(500 * 1024)
-// 1Mb + an 8kb guard
-#define STACK_SIZE (size_t)(1024 * 1024) + (8 * 1024)
-#define SCOPE_STACK_SIZE (size_t)(64 * 1024)
-#define AUX_ENT(id, val) \
-	do { \
-		elf_info[i++] = id; \
-		elf_info[i++] = val; \
-	} while (0)
-#define EXPORTON __attribute__((visibility("default")))
 
 #if 0
 static int
@@ -159,81 +162,6 @@ getSymbol(const char *buf, char *sname)
     }
 
     return (void *)symaddr;
-}
-
-ssize_t (*go_syscall_write)(int, const void *, size_t);
-int (*go_syscall_open)(const char *, int, int, mode_t);
-int (*go_syscall_socket)(int, int, int);
-int (*go_syscall_accept4)(int, void*, int, int);
-ssize_t (*go_syscall_read)(int, const void *, size_t);
-int (*go_syscall_close)(int);
-void (*go_runtime_cgocall)(void);
-uint64_t scope_stack;
-unsigned long scope_fs, go_fs;
-uint64_t *g_currsheap = NULL;
-uint64_t *g_heapend = NULL;
-bool g_ongostack = FALSE;
-go_store_t g_gostore[MAX_STORES];
-uint64_t go_text;
-
-extern int go_start();
-extern int go_end();
-extern void threadNow(int);
-extern int arch_prctl(int, unsigned long);
-
-EXPORTON go_store_t *
-go_new_store(uint64_t tcb)
-{
-    int i;
-    go_store_t *storep = g_gostore;
-    go_store_t *returnval = NULL;
-
-    // Beginning of critical section.
-    while (!atomicCasU64(&g_tcb_guard, 0ULL, 1ULL)) ;
-
-    for (i = 0; i < MAX_STORES; i++) {
-        if (storep[i].tcb == (uint64_t)0) {
-            storep[i].tcb = tcb;
-            returnval = &storep[i];
-            break;
-        }
-    }
-
-    // End of critical section.
-    atomicCasU64(&g_tcb_guard, 1ULL, 0ULL);
-
-    if (!returnval) {
-        scopeLog("ERROR:go_new_store: Not good; no stack store available", -1, CFG_LOG_ERROR);
-    }
-    return returnval;
-
-}
-
-EXPORTON go_store_t *
-go_reset_store(uint64_t tcb)
-{
-    int i;
-    go_store_t *storep = g_gostore;
-    go_store_t *returnval = NULL;
-
-    // Beginning of critical section.
-    while (!atomicCasU64(&g_tcb_guard, 0ULL, 1ULL)) ;
-
-    for (i = 0; i < MAX_STORES; i++) {
-        if (storep[i].tcb == tcb) {
-            storep[i].tcb = (uint64_t)0;
-            returnval = &storep[i];
-            break;
-        }
-    }
-
-    // End of critical section.
-    atomicCasU64(&g_tcb_guard, 1ULL, 0ULL);
-
-    if (!returnval) {
-        scopeLog("ERROR:go_reset_store: didn't find the stack store", -1, CFG_LOG_ERROR);
-    }
-    return returnval;
 }
 
 int
@@ -677,19 +605,6 @@ load_sections(char *buf, char *addr, size_t mlen)
                 memset(laddr, 0, len);
             }
 
-            // TODO: look at memory in .text. do we need the + 8?
-            //       need a check for enough .text section size
-/*
-            if (strcmp(sec_name, ".text") == 0) {
-                if ((go_text = (uint64_t)getSymbol(buf, "runtime.f32equal")) == 0) {
-                    fprintf(stderr, "ERROR: can't find addr for runtime.f32equal\n");
-                    exit(-1);
-                }
-
-                go_text += 0x22;
-                memmove((void *)go_text, go_start, go_end - go_start);
-            }
-*/
             snprintf(msg, sizeof(msg), "%s:%d %s addr %p - %p\n",
                      __FUNCTION__, __LINE__, sec_name, laddr, laddr + len);
             scopeLog(msg, -1, CFG_LOG_DEBUG);
@@ -974,8 +889,6 @@ sys_exec(const char *buf, const char *path, int argc, const char **argv, const c
 
     lastaddr = load_elf((char *)buf);
     initGoHook(buf);
-
-    memset(g_gostore, 0, sizeof(go_store_t) * MAX_STORES);
 
     threadNow(0);
 

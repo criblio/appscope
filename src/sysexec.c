@@ -20,7 +20,8 @@
 #include "state.h"
 #include "gocontext.h"
 
-
+#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
+#define ENABLE_CAS_IN_SYSEXEC 1
 #ifdef ENABLE_CAS_IN_SYSEXEC
 #include "atomic.h"
 #else
@@ -43,6 +44,8 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 	} while (0)
 #define EXPORTON __attribute__((visibility("default")))
 
+static __thread char *tstack;
+static __thread char *gstack;
 uint64_t g_glibc_guard = 0LL;
 void (*go_runtime_cgocall)(void);
 uint64_t scope_stack;
@@ -94,7 +97,9 @@ return_addr(assembly_fn fn)
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
         if (tap->assembly_fn == fn) return tap->return_addr;
     }
-    return NULL;
+
+    scopeLog("FATAL ERROR: no return addr", -1, CFG_LOG_ERROR);
+    exit(-1);
 }
 
 void
@@ -196,66 +201,6 @@ getSymbol(const char *buf, char *sname)
 }
 
 int
-regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
-             regmatch_t pmatch[], int eflags)
-{
-    int rc;
-    uint64_t res;
-    uint64_t store = 0;
-    //uint64_t *new_stack;
-
-    if (g_ongostack == TRUE) {
-        // create a thread specific stack
-#if 0
-        if ((new_stack = mmap(NULL, SCOPE_STACK_SIZE,
-                              PROT_READ | PROT_WRITE,
-                              MAP_PRIVATE | MAP_ANONYMOUS,
-                              -1, (off_t)NULL)) == MAP_FAILED) {
-            scopeLog("regexec_wrap:mmap", -1, CFG_LOG_ERROR);
-            return -1;
-        }
-#endif
-        // RDI, RSI, RDX, RCX, R8, R9
-        __asm__ volatile (
-            "mov %1, %%r11 \n"
-            "mov %%rsp, (%%r11)  \n"             // save the current stack
-            //"mov %7, %%r11 \n"
-            "lea scope_stack(%%rip), %%r11 \n"
-            "mov (%%r11), %%rsp \n"              // switch the stack
-            "mov %2, %%rdi  \n"
-            "mov %3, %%rsi  \n"
-            "mov %4, %%rdx  \n"
-            "mov %5, %%rcx  \n"
-            "mov %6, %%r8d  \n"
-            "callq pcre2_regexec  \n"
-            : "=r"(rc)                        // output
-            : "r"(&store), "r"(preg), "r"(string),    // inputs
-              "r"(nmatch), "r"(pmatch), "r"(eflags) //, "r"(new_stack)
-            : "%r11"                          // clobbered register
-            );
-#if 0
-        if (munmap(new_stack, SCOPE_STACK_SIZE) == -1) {
-            scopeLog("ERROR: regexec_wrap: munmap(1)", -1, CFG_LOG_ERROR);
-            return -1;
-        }
-#endif
-
-        __asm__ volatile (
-            "mov %1, %%r11 \n"
-            "mov %%r11, %%rsp \n"        // switch the stack
-            : "=r"(res)                       // output
-            : "r"(&store)                      // inputs
-            : "%r11"                          // clobbered register
-            );
-
-    } else {
-        rc = pcre2_regexec(preg, string, nmatch, pmatch, eflags);
-    }
-
-    return rc;
-}
-
-int
 switch_tcb_to_glibc(sigset_t *mask)
 {
 // This disables the signal masking by default.
@@ -296,194 +241,209 @@ switch_tcb_to_go(sigset_t *mask)
     return -1;
 }
 
-
-
-EXPORTON void*
-go_write(char *stackptr)
+inline static void *
+go_switch(char *stackptr, void *cfunc, void *gfunc)
 {
     sigset_t mask;
+    uint64_t rc;
+
+    // Switch the TCB and stack from Go to libc
+    // Beginning of critical section.
+    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
+    if (!switch_tcb_to_glibc(&mask)) goto out;
+
+    if (tstack == NULL) {
+        if ((tstack = mmap(NULL, SCOPE_STACK_SIZE,
+                           PROT_READ | PROT_WRITE,
+                           MAP_PRIVATE | MAP_ANONYMOUS,
+                           -1, (off_t)NULL)) == MAP_FAILED) {
+            scopeLog("go_write:mmap", -1, CFG_LOG_ERROR);
+            exit(-1);
+        }
+        tstack += SCOPE_STACK_SIZE;
+        printf("Scope: write stack %p\n", tstack);
+    }
+
+    __asm__ volatile (
+        "mov %%rsp, %2 \n"
+        "mov %1, %%rsp \n"
+        "mov %3, %%rdi  \n"
+        "callq *%4  \n"
+        : "=r"(rc)                        // output
+        : "m"(tstack), "m"(gstack),       // input
+          "m"(stackptr), "r"(cfunc)
+        :                                // clobbered register
+        );
+
+    // Switch TCB and stack back to Go
+    __asm__ volatile (
+        "mov %1, %%rsp \n"
+        : "=r"(rc)                        // output
+        : "r"(gstack)                     // inputs
+        :                                 // clobbered register
+        );
+
+    if (!switch_tcb_to_go(&mask)) goto out;
+out:
+    // End of critical section.
+    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
+    return return_addr(gfunc);
+}
+
+static void
+c_write(char *stackptr)
+{
     char * stackaddr = stackptr + 0x50;
     uint64_t fd  = *(uint64_t *)(stackaddr + 0x8);
     uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
     uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
     uint64_t initialTime = getTime();
 
-    // Beginning of critical section.
-    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-    if (!switch_tcb_to_glibc(&mask)) goto out;
-
-    sysprint("Scope: write of %ld\n", fd);
+    sysprint("Scope: write fd %ld rc %ld buf 0x%lx\n", fd, rc, buf);
     doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
-
-    if (!switch_tcb_to_go(&mask)) goto out;
-out:
-    // End of critical section.
-    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_hook_write);
 }
 
-EXPORTON void*
-go_open(char *stackptr)
+EXPORTON void *
+go_write(char *stackptr)
+{
+    return go_switch(stackptr, c_write, go_hook_write);
+}
+
+static void
+c_open(char *stackptr)
 {
     char *path = NULL;
-    sigset_t mask;
     char * stackaddr = stackptr + 0x78;
     uint64_t fd  = *((uint64_t *)(stackaddr + 0x30));
     uint64_t buf = *((uint64_t *)(stackaddr + 0x10));
     uint64_t len = *((uint64_t *)(stackaddr + 0x18));
 
-    if ((len <= 0) || (len >= PATH_MAX)) return return_addr(go_hook_open);
-
-    // Beginning of critical section.
-    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-    if (!switch_tcb_to_glibc(&mask)) goto out;
+    if ((len <= 0) || (len >= PATH_MAX)) return;
 
     sysprint("Scope: open of %ld\n", fd);
     if (buf) {
-        if ((path = calloc(1, len+1)) == NULL) goto out;
+        if ((path = calloc(1, len+1)) == NULL) return;
         memmove(path, (char *)buf, len);
         path[len] = '\0';
     } else {
         scopeLog("ERROR:go_open: null pathname", -1, CFG_LOG_ERROR);
         puts("Scope:ERROR:open:no path");
         if (path) free(path);
-        goto out;
+        return;
     }
 
     doOpen(fd, path, FD, "open");
 
     if (path) free(path);
-
-    if (!switch_tcb_to_go(&mask)) goto out;
-out:
-    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_hook_open);
 }
 
-EXPORTON void*
-go_socket(char *stackptr)
+EXPORTON void *
+go_open(char *stackptr)
 {
-    sigset_t mask;
-
-    char * stackaddr = stackptr + 0x48;
-    uint64_t domain = *(uint64_t*)(stackaddr + 0x8);  // aka family
-    uint64_t type   = *(uint64_t*)(stackaddr + 0x10);
-    uint64_t sd     = *(uint64_t*)(stackaddr + 0x20);
-
-    if (sd == -1) return return_addr(go_hook_socket);
-
-    // Beginning of critical section.
-    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-    if (!switch_tcb_to_glibc(&mask)) goto out;
-
-    sysprint("Scope: socket of %ld\n", sd);
-    addSock(sd, type, domain);
-
-    if (!switch_tcb_to_go(&mask)) goto out;
-out:
-    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_hook_socket);
+    return go_switch(stackptr, c_open, go_hook_open);
 }
 
-EXPORTON void*
-go_accept4(char *stackptr)
+static void
+c_close(char *stackptr)
 {
-    sigset_t mask;
-    char * stackaddr = stackptr + 0x70;
-    struct sockaddr *addr  = *(struct sockaddr **)(stackaddr + 0x10);
-    socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
-    uint64_t sd_out = *(uint64_t*)(stackaddr + 0x28);
+    char * stackaddr = stackptr + 0x40;
+    uint64_t fd  = *(uint64_t*)(stackaddr + 0x8);
+    uint64_t rc  = *(uint64_t*)(stackaddr + 0x10);
 
-    // Beginning of critical section.
-    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-    if (!switch_tcb_to_glibc(&mask)) goto out;
-
-    sysprint("Scope: accept4 of %ld\n", sd_out);
-    if (sd_out != -1) {
-        doAccept(sd_out, addr, addrlen, "go_accept4");
-    }
-
-    if (!switch_tcb_to_go(&mask)) goto out;
-out:
-    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_hook_accept4);
+    sysprint("Scope: close of %ld\n", fd);
+    doCloseAndReportFailures(fd, (rc != -1), "go_close");
 }
 
-EXPORTON void*
-go_read(char *stackptr)
+EXPORTON void *
+go_close(char *stackptr)
 {
-    sigset_t mask;
+    return go_switch(stackptr, c_close, go_hook_close);
+}
+
+static void
+c_read(char *stackptr)
+{
     char * stackaddr = stackptr + 0x50;
     uint64_t fd    = *(uint64_t*)(stackaddr + 0x8);
     uint64_t buf   = *(uint64_t*)(stackaddr + 0x10);
     uint64_t rc    = *(uint64_t*)(stackaddr + 0x28);
     uint64_t initialTime = getTime();
 
-    if (rc == -1) return return_addr(go_hook_read);
-
-    // Beginning of critical section.
-    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-    if (!switch_tcb_to_glibc(&mask)) goto out;
+    if (rc == -1) return;
 
     sysprint("Scope: read of %ld\n", fd);
     doRead(fd, initialTime, (rc != -1), (void*)buf, rc, "go_read", BUF, 0);
-
-    if (!switch_tcb_to_go(&mask)) goto out;
-out:
-    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_hook_read);
 }
 
-
-EXPORTON void*
-go_close(char *stackptr)
+EXPORTON void *
+go_read(char *stackptr)
 {
-    sigset_t mask;
-    char * stackaddr = stackptr + 0x40;
-    uint64_t fd  = *(uint64_t*)(stackaddr + 0x8);
-    uint64_t rc  = *(uint64_t*)(stackaddr + 0x10);
-
-    // Beginning of critical section.
-    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-    if (!switch_tcb_to_glibc(&mask)) goto out;
-
-    sysprint("Scope: close of %ld\n", fd);
-    doCloseAndReportFailures(fd, (rc != -1), "go_close");
-
-    if (!switch_tcb_to_go(&mask)) goto out;
-out:
-    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_hook_close);
+    return go_switch(stackptr, c_read, go_hook_read);
 }
 
-EXPORTON void*
-go_tls_read(char *stackptr)
+static void
+c_socket(char *stackptr)
 {
-    sigset_t mask;
+    char * stackaddr = stackptr + 0x48;
+    uint64_t domain = *(uint64_t*)(stackaddr + 0x8);  // aka family
+    uint64_t type   = *(uint64_t*)(stackaddr + 0x10);
+    uint64_t sd     = *(uint64_t*)(stackaddr + 0x20);
+
+    if (sd == -1) return;
+
+    sysprint("Scope: socket of %ld\n", sd);
+    addSock(sd, type, domain);
+}
+
+EXPORTON void *
+go_socket(char *stackptr)
+{
+    return go_switch(stackptr, c_socket, go_hook_socket);
+}
+
+static void
+c_accept4(char *stackptr)
+{
+    char * stackaddr = stackptr + 0x70;
+    struct sockaddr *addr  = *(struct sockaddr **)(stackaddr + 0x10);
+    socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
+    uint64_t sd_out = *(uint64_t*)(stackaddr + 0x28);
+
+    sysprint("Scope: accept4 of %ld\n", sd_out);
+    if (sd_out != -1) {
+        doAccept(sd_out, addr, addrlen, "go_accept4");
+    }
+}
+
+EXPORTON void *
+go_accept4(char *stackptr)
+{
+    return go_switch(stackptr, c_accept4, go_hook_accept4);
+}
+
+static void
+c_tls_read(char *stackptr)
+{
     char * stackaddr = stackptr + 0x58;
     uint64_t conn = *(uint64_t*)(stackaddr + 0x8);
     uint64_t buf  = *(uint64_t*)(stackaddr + 0x10);
     // buf len 0x18
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
-
-    // Beginning of critical section.
-    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-    if (!switch_tcb_to_glibc(&mask)) goto out;
 
     sysprint("Scope: go_tls_read of %ld\n", -1);
     doProtocol(conn, -1, (void*)buf, rc, TLSRX, BUF);
-
-    if (!switch_tcb_to_go(&mask)) goto out;
-out:
-    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_hook_tls_read);
 }
 
-EXPORTON void*
-go_tls_write(char *stackptr)
+EXPORTON void *
+go_tls_read(char *stackptr)
 {
-    sigset_t mask;
+    return go_switch(stackptr, c_tls_read, go_hook_tls_read);
+}
+
+static void
+c_tls_write(char *stackptr)
+{
     char * stackaddr = stackptr + 0x58;
     uint64_t conn = *(uint64_t*)(stackaddr + 0x8);
     uint64_t buf  = *(uint64_t*)(stackaddr + 0x10);
@@ -491,17 +451,14 @@ go_tls_write(char *stackptr)
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
 
-    // Beginning of critical section.
-    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-    if (!switch_tcb_to_glibc(&mask)) goto out;
-
     sysprint("Scope: go_tls_write of %ld\n", -1);
     doProtocol(conn, -1, (void*)buf, rc, TLSTX, BUF);
+}
 
-    if (!switch_tcb_to_go(&mask)) goto out;
-out:
-    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-    return return_addr(go_hook_tls_write);
+EXPORTON void *
+go_tls_write(char *stackptr)
+{
+    return go_switch(stackptr, c_tls_write, go_hook_tls_write);
 }
 
 static void

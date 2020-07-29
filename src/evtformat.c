@@ -495,11 +495,11 @@ evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
     regex_t* filter;
     if (evtFormatSourceEnabled(evt, CFG_SRC_CONSOLE) &&
        (filter = evtFormatNameFilter(evt, CFG_SRC_CONSOLE)) &&
-       (!regexec_wrap(filter, path, 0, NULL, 0))) {
+       (!regexec(filter, path, 0, NULL, 0))) {
         logType = CFG_SRC_CONSOLE;
     } else if (evtFormatSourceEnabled(evt, CFG_SRC_FILE) &&
        (filter = evtFormatNameFilter(evt, CFG_SRC_FILE)) &&
-       (!regexec_wrap(filter, path, 0, NULL, 0))) {
+       (!regexec(filter, path, 0, NULL, 0))) {
         logType = CFG_SRC_FILE;
     } else {
         return NULL;
@@ -521,7 +521,7 @@ evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
     cJSON* dataField = cJSON_GetObjectItem(json, "data");
     if (dataField && dataField->valuestring) {
         filter = evtFormatValueFilter(evt, logType);
-        if (filter && regexec_wrap(filter, dataField->valuestring, 0, NULL, 0)) {
+        if (filter && regexec(filter, dataField->valuestring, 0, NULL, 0)) {
             // This event doesn't match.  Drop it on the floor.
             cJSON_Delete(json);
             return NULL;

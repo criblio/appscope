@@ -48,7 +48,4 @@ cJSON *jsonConfigurationObject(config_t *);
 // Retreive messages
 uint64_t msgEventGet(ctl_t *);
 
-// Regex wrapper
-int regexec_wrap(const regex_t *, const char *, size_t, regmatch_t *, int);
-
 #endif // __COM_H__

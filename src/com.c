@@ -175,13 +175,3 @@ msgEventGet(ctl_t *ctl)
     if (!ctl) return (uint64_t) -1;
     return ctlGetEvent(ctl);
 }
-
-#ifndef __GO__
-int
-regexec_wrap(const regex_t *preg, const char *string, size_t nmatch,
-             regmatch_t pmatch[], int eflags)
-{
-    return pcre2_regexec(preg, string, nmatch, pmatch, eflags);
-}
-#endif  // __GO__
-

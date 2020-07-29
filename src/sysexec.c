@@ -22,6 +22,7 @@
 
 #define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
 #define ENABLE_CAS_IN_SYSEXEC 1
+
 #ifdef ENABLE_CAS_IN_SYSEXEC
 #include "atomic.h"
 #else

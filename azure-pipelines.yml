@@ -136,8 +136,24 @@ stages:
 
       - template: test/testContainers/azure/it-test-job-template.yml
         parameters:
+          name: oracle_java6
+          containerName: oracle_java6
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: oracle_java7
+          containerName: oracle_java7
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
           name: oracle_java8
           containerName: oracle_java8
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: oracle_java9
+          containerName: oracle_java9
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: oracle_java10
+          containerName: oracle_java10
       - template: test/testContainers/azure/it-test-job-template.yml
         parameters:
           name: oracle_java11

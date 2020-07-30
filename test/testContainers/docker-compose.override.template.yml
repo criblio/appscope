@@ -119,7 +119,35 @@ services:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
     privileged: true
 
+  oracle_java6:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+  
+  oracle_java7:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
   oracle_java8:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  oracle_java9:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  oracle_java10:
     volumes:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     environment:

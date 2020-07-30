@@ -1,6 +1,5 @@
 FROM centos:6
 
-ARG SSL_SOCKET_CLASS
 ADD https://cdn.cribl.io/dl/lb/java/jre/jre-6u45-linux-x64-rpm.bin /tmp/jre-rpm.bin
 WORKDIR /tmp
 RUN chmod +x ./jre-rpm.bin && \
@@ -32,7 +31,7 @@ COPY ./java/test-ssl.sh /opt/test-runner/bin/test-ssl.sh
 RUN chmod +x /opt/test-runner/bin/test-ssl.sh
 
 RUN mkdir -p /opt/javassl
-COPY ./java/${SSL_SOCKET_CLASS} /opt/javassl/SSLSocketClient.class
+COPY ./java/SSLSocketClient.class /opt/javassl/SSLSocketClient.class
 
 ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 RUN chmod 755 /usr/lib/libscope.so

@@ -191,7 +191,7 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
         return pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
     }
 
-    if ((pcre_stack = malloc(PCRE_STACK_SIZE))) {
+    if ((pcre_stack = malloc(PCRE_STACK_SIZE)) == NULL) {
         scopeLog("ERROR; pcre2_match_wrapper: malloc", -1, CFG_LOG_ERROR);
         return -1;
     }
@@ -225,15 +225,15 @@ int
 regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
                 regmatch_t *pmatch, int eflags)
 {
-    int rc;
+    int rc, arc;
     char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
 
     if (g_need_stack_expand == FALSE) {
         return regexec(preg, string, nmatch, pmatch, eflags);
     }
 
-    if ((pcre_stack = malloc(PCRE_STACK_SIZE))) {
-        scopeLog("ERROR; pcre2_match_wrapper: malloc", -1, CFG_LOG_ERROR);
+    if ((pcre_stack = malloc(PCRE_STACK_SIZE)) == NULL) {
+        scopeLog("ERROR; regexec_wrapper: malloc", -1, CFG_LOG_ERROR);
         return -1;
     }
 
@@ -243,7 +243,7 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
     __asm__ volatile (
         "mov %%rsp, %2 \n"
         "mov %1, %%rsp \n"
-        : "=r"(rc)                   // output
+        : "=r"(arc)                   // output
         : "m"(tstack), "m"(gstack)   // input
         :                            // clobbered register
         );
@@ -253,7 +253,7 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
     // Switch stack back to the original stack
     __asm__ volatile (
         "mov %1, %%rsp \n"
-        : "=r"(rc)                        // output
+        : "=r"(arc)                        // output
         : "r"(gstack)                     // inputs
         :                                 // clobbered register
         );

@@ -37,7 +37,7 @@ libscope.so: src/wrap.c src/state.c src/report.c src/plattime.c os/$(OS)/os.c sr
 	@echo "Building libscope.so ..."
 	make $(FUNCHOOK_AR)
 	make $(PCRE2_AR)
-	$(CC) $(CFLAGS) -shared -fvisibility=hidden -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ $(LD_FLAGS)
+	$(CC) $(CFLAGS) -shared -fvisibility=hidden -fno-stack-protector -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ $(LD_FLAGS)
 	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
 	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/
 
@@ -61,15 +61,15 @@ test: $(C_FILES)
 	make $(YAML_AR)
 	make $(JSON_AR)
 	make $(TEST_LIB)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest cfgutilstest.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o com.o transport.o mtcformat.o dbg.o circbuf.o linklist.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest cfgutilstest.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o mtcformat.o com.o dbg.o circbuf.o linklist.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest cfgtest.o cfg.o dbg.o log.o transport.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/transporttest transporttest.o transport.o dbg.o log.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/logtest logtest.o log.o transport.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/mtctest mtctest.o mtc.o log.o transport.o mtcformat.o dbg.o circbuf.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/mtctest mtctest.o mtc.o log.o transport.o mtcformat.o com.o ctl.o evtformat.o cfg.o cfgutils.o dbg.o circbuf.o linklist.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/evtformattest evtformattest.o evtformat.o log.o transport.o mtcformat.o dbg.o cfg.o com.o ctl.o mtc.o circbuf.o cfgutils.o linklist.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ctltest ctltest.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o com.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/reporttest reporttest.o report.o state.o com.o plattime.o os.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -lrt -Wl,--wrap=cmdSendEvent -Wl,--wrap=cmdSendMetric
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/mtcformattest mtcformattest.o mtcformat.o dbg.o log.o transport.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/mtcformattest mtcformattest.o mtcformat.o dbg.o log.o transport.o com.o ctl.o mtc.o evtformat.o cfg.o cfgutils.o linklist.o circbuf.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/circbuftest circbuftest.o circbuf.o dbg.o log.o transport.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/linklisttest linklisttest.o linklist.o dbg.o log.o transport.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/comtest comtest.o com.o ctl.o log.o transport.o evtformat.o circbuf.o mtcformat.o cfgutils.o cfg.o mtc.o dbg.o linklist.o test.o $(TEST_AR) $(TEST_LD_FLAGS)

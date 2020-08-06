@@ -43,7 +43,7 @@
     mov (%r11), %r11
     mov (%r11), %r11
     call *%r11
-    mov %rax, %r11    
+    mov %rax, %r11
 
     # housekeeping
     pop %rax
@@ -65,4 +65,26 @@
     interpose go_hook_close, go_close
     interpose go_hook_tls_read, go_tls_read
     interpose go_hook_tls_write, go_tls_write
+/*
+go_hook_write_1:
+    sub $0x18, %rsp
+    push %rax
 
+    mov %rsp, %r11
+    add $0x20, %r11
+    mov %r11, 0x08(%rsp)
+    lea go_write@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov %r11, (%rsp)
+
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+    mov %rax, %r11
+
+    pop %rax
+    add $0x18, %rsp
+
+    jmp *%r11
+*/

@@ -20,7 +20,7 @@
 #include "state.h"
 #include "gocontext.h"
 
-#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
+//#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
 #define ENABLE_CAS_IN_SYSEXEC 1
 
 #ifdef ENABLE_CAS_IN_SYSEXEC
@@ -37,7 +37,8 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 #define HEAP_SIZE (size_t)(500 * 1024)
 // 1Mb + an 8kb guard
 #define STACK_SIZE (size_t)(1024 * 1024) + (8 * 1024)
-#define SCOPE_STACK_SIZE (size_t)(64 * 1024)
+#define SCOPE_STACK_SIZE (size_t)(32 * 1024)
+
 #define AUX_ENT(id, val) \
 	do { \
 		elf_info[i++] = id; \
@@ -45,15 +46,12 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 	} while (0)
 #define EXPORTON __attribute__((visibility("default")))
 
-static __thread char *tstack;
-static __thread char *gstack;
 uint64_t g_glibc_guard = 0LL;
 void (*go_runtime_cgocall)(void);
 uint64_t scope_stack;
-unsigned long scope_fs, go_fs;
+unsigned long scope_fs;
 uint64_t *g_currsheap = NULL;
 uint64_t *g_heapend = NULL;
-bool g_ongostack = FALSE;
 
 extern void threadNow(int);
 extern int arch_prctl(int, unsigned long);
@@ -201,82 +199,68 @@ getSymbol(const char *buf, char *sname)
     return (void *)symaddr;
 }
 
-int
-switch_tcb_to_glibc(sigset_t *mask)
+/*
+ * Switch from the Go system stack to a single libc stack
+ * Switch from the 'm' TCB to the libc TCB
+ * Call the C handler
+ * Switch 'g' and 'm' state back
+ * Return to the calling 'g'
+ *
+ * This implementation of go_switch uses
+ * a single libc stack for all 'g'.
+ * As such it must create a critical section around the
+ * stack switch in order serialize acess to the libc stack.
+ *
+ * The signal masking is not needed. It's left in place and
+ * disabled so that it can be compiled in to test as needed.
+ *
+ * go_switch_one_stack
+ */
+inline static void *
+go_switch_one_stack(char *stackptr, void *cfunc, void *gfunc)
 {
+    uint64_t rc;
+    unsigned long go_tls, *go_ptr;
+    char *gstack;
+    char *go_g = NULL, *go_m = NULL;
+
 // This disables the signal masking by default.
 #ifdef ENABLE_SIGNAL_MASKING_IN_SYSEXEC
-    if ((sigfillset(mask) == -1) || (sigprocmask(SIG_SETMASK, mask, NULL) == -1)) {
+    sigset_t mask;
+    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
         scopeLog("blocking signals", -1, CFG_LOG_ERROR);
-        return 0;
+        goto out;
     }
 #endif
 
-    if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
-        scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
-        return 0;
-    }
+    // Get the Go routine's struct g
+    __asm__ volatile (
+        "mov %%fs:0xfffffffffffffff8, %%r11 \n"
+        "mov %%r11, %1  \n"
+        : "=r"(rc)                        // output
+        : "m"(go_g)                       // inputs
+        :                                 // clobbered register
+        );
 
     if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
         scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
-        return 0;
-    }
-    return -1;
-}
-
-int
-switch_tcb_to_go(sigset_t *mask)
-{
-    if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-        scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
-        return 0;
+        goto out;
     }
 
-// This disables the signal masking by default.
-#ifdef ENABLE_SIGNAL_MASKING_IN_SYSEXEC
-    if ((sigemptyset(mask) == -1) || (sigprocmask(SIG_SETMASK, mask, NULL) == -1)) {
-        scopeLog("unblocking signals", -1, CFG_LOG_ERROR);
-        return 0;
-    }
-#endif
-    return -1;
-}
-
-inline static void *
-go_switch(char *stackptr, void *cfunc, void *gfunc)
-{
-    sigset_t mask;
-    uint64_t rc;
-
-    // Switch the TCB and stack from Go to libc
     // Beginning of critical section.
     while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-    if (!switch_tcb_to_glibc(&mask)) goto out;
-
-    if (tstack == NULL) {
-        if ((tstack = mmap(NULL, SCOPE_STACK_SIZE,
-                           PROT_READ | PROT_WRITE,
-                           MAP_PRIVATE | MAP_ANONYMOUS,
-                           -1, (off_t)NULL)) == MAP_FAILED) {
-            scopeLog("go_write:mmap", -1, CFG_LOG_ERROR);
-            exit(-1);
-        }
-        tstack += SCOPE_STACK_SIZE;
-        printf("Scope: write stack %p\n", tstack);
-    }
-
     __asm__ volatile (
         "mov %%rsp, %2 \n"
         "mov %1, %%rsp \n"
         "mov %3, %%rdi  \n"
         "callq *%4  \n"
-        : "=r"(rc)                        // output
-        : "m"(tstack), "m"(gstack),       // input
-          "m"(stackptr), "r"(cfunc)
-        :                                // clobbered register
+        : "=r"(rc)                         // output
+        : "m"(scope_stack), "m"(gstack),   // input
+          "r"(stackptr), "r"(cfunc)
+        :                                  // clobbered register
         );
 
-    // Switch TCB and stack back to Go
+    // Switch stack back to Go
     __asm__ volatile (
         "mov %1, %%rsp \n"
         : "=r"(rc)                        // output
@@ -284,10 +268,181 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
         :                                 // clobbered register
         );
 
-    if (!switch_tcb_to_go(&mask)) goto out;
-out:
     // End of critical section.
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
+
+    // get struct m from g
+    go_ptr = (unsigned long *)(go_g + 0x30);
+    go_tls = *go_ptr;
+    go_m = (char *)go_tls;
+    go_tls = (unsigned long)(go_m + 0x88);
+
+    if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
+        scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
+        goto out;
+    }
+
+// This disables the signal masking by default.
+#ifdef ENABLE_SIGNAL_MASKING_IN_SYSEXEC
+    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
+        scopeLog("unblocking signals", -1, CFG_LOG_ERROR);
+        goto out;
+    }
+#endif
+
+out:
+    return return_addr(gfunc);
+}
+
+/*
+ * Switch from the Go system stack to a new libc stack
+ * Switch from the 'm' TCB to the libc TCB
+ * Call the C handler
+ * Switch 'g' and 'm' state back
+ * Return to the calling 'g'
+ *
+ * This implementation of go_switch creates
+ * a new libc stack for every calling 'g'.
+ * As such no signal mask or guard is required.
+ *
+ *go_switch_new_stack
+ */
+inline static void *
+go_switch_new_stack(char *stackptr, void *cfunc, void *gfunc)
+{
+    uint64_t rc;
+    unsigned long go_tls, *go_ptr;
+    char *gstack;
+    char *tstack = NULL, *sstack = NULL;
+    char *go_g = NULL, *go_m = NULL;
+
+    // Get the Go routine's struct g
+    __asm__ volatile (
+        "mov %%fs:0xfffffffffffffff8, %%r11 \n"
+        "mov %%r11, %1  \n"
+        : "=r"(rc)                        // output
+        : "m"(go_g)                       // inputs
+        :                                 // clobbered register
+        );
+
+    // Swtich to the libc TCB
+    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+        scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+        goto out;
+    }
+
+    // Get a libc stack
+    if (tstack == NULL) {
+        if ((sstack = mmap(NULL, SCOPE_STACK_SIZE,
+                           PROT_READ | PROT_WRITE,
+                           MAP_PRIVATE | MAP_ANONYMOUS,
+                           -1, (off_t)NULL)) == MAP_FAILED) {
+            scopeLog("go_write:mmap", -1, CFG_LOG_ERROR);
+            exit(-1);
+        }
+        tstack = sstack + SCOPE_STACK_SIZE;
+    }
+
+    // save the 'g' stack, switch to the tstack, call the C handler
+    __asm__ volatile (
+        "mov %%rsp, %2 \n"
+        "mov %1, %%rsp \n"
+        "mov %3, %%rdi  \n"
+        "callq *%4  \n"
+        : "=r"(rc)                    // output
+        : "m"(tstack), "m"(gstack),   // input
+          "r"(stackptr), "r"(cfunc)
+        :                            // clobbered register
+        );
+
+    // Switch stack back to the 'g' stack
+    __asm__ volatile (
+        "mov %1, %%rsp \n"
+        : "=r"(rc)                        // output
+        : "r"(gstack)                     // inputs
+        :                                 // clobbered register
+        );
+
+    // get struct m from g and pull out the TLS from 'm'
+    go_ptr = (unsigned long *)(go_g + 0x30);
+    go_tls = *go_ptr;
+    go_m = (char *)go_tls;
+    go_tls = (unsigned long)(go_m + 0x88);
+
+    // Switch back to the 'm' TLS
+    if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
+        scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
+        goto out;
+    }
+
+out:
+    if (munmap(sstack, SCOPE_STACK_SIZE) != 0) {
+        scopeLog("munmap", -1, CFG_LOG_ERROR);
+    }
+    return return_addr(gfunc);
+}
+
+/*
+ * Switch from the 'm' TCB to the libc TCB
+ * Call the C handler
+ * Switch 'm' state back
+ * Return to the calling 'g'
+ *
+ * This implementation of go_switch does not
+ * create a new libc stack. All C functions
+ * are run on the Go system stack. There are
+ * several C functions that require a larger
+ * stack than that provided by the Go system
+ * stack, namely specifici pcre2 functions.
+ * We use wrapper functions to give those
+ * functions a larger stack.
+ *
+ * go_switch_no_stack
+ */
+inline static void *
+go_switch(char *stackptr, void *cfunc, void *gfunc)
+{
+    uint64_t rc;
+    unsigned long go_tls, *go_ptr;
+    char *go_g = NULL, *go_m = NULL;
+
+    // Get the Go routine's struct g
+    __asm__ volatile (
+        "mov %%fs:0xfffffffffffffff8, %%r11 \n"
+        "mov %%r11, %1  \n"
+        : "=r"(rc)                        // output
+        : "m"(go_g)                       // inputs
+        :                                 // clobbered register
+        );
+
+    // Switch to the libc TCB
+    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+        scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+        goto out;
+    }
+
+    // call the C handler
+    __asm__ volatile (
+        "mov %1, %%rdi  \n"
+        "callq *%2  \n"
+        : "=r"(rc)                    // output
+        : "r"(stackptr), "r"(cfunc)   // inputs
+        :                             // clobbered register
+        );
+
+    // get struct m from g and pull out the TLS from 'm'
+    go_ptr = (unsigned long *)(go_g + 0x30);
+    go_tls = *go_ptr;
+    go_m = (char *)go_tls;
+    go_tls = (unsigned long)(go_m + 0x88);
+
+    // Switch back to the 'm' TLS
+    if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
+        scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
+        goto out;
+    }
+
+out:
     return return_addr(gfunc);
 }
 
@@ -467,6 +622,9 @@ initGoHook(const char *buf)
 {
     int rc;
     funchook_t *funchook;
+
+    // A go app may need to expand stacks for some C functions
+    g_need_stack_expand = TRUE;
 
     funchook = funchook_create();
 
@@ -803,7 +961,6 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr ladd
     }
 #endif    
 
-    g_ongostack = TRUE;
     __asm__ volatile (
         "lea scope_stack(%%rip), %%r11 \n"
         "mov %%rsp, (%%r11)  \n"

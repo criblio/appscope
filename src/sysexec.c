@@ -581,14 +581,28 @@ static void
 c_tls_read(char *stackptr)
 {
     char * stackaddr = stackptr + 0x58;
-    uint64_t conn = *(uint64_t*)(stackaddr + 0x8);
-    uint64_t buf  = *(uint64_t*)(stackaddr + 0x10);
+    uint64_t connReader = *(uint64_t*)(stackaddr + 0x8);
+    uint64_t buf        = *(uint64_t*)(stackaddr + 0x10);
     // buf len 0x18
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
 
-    sysprint("Scope: go_tls_read of %ld\n", -1);
-    doProtocol(conn, -1, (void*)buf, rc, TLSRX, BUF);
+//  type connReader struct {
+//        conn *conn
+    uint64_t conn =  *(uint64_t*)connReader;
+//  type conn struct {
+//          server *Server
+//          cancelCtx context.CancelFunc
+//          rwc net.Conn
+//          remoteAddr string
+//          tlsState *tls.ConnectionState
+    uint64_t tlsState =   *(uint64_t*)(conn + 0x30);
+
+    // if tlsState is non-zero, then this is a tls connection
+    if (tlsState != 0ULL) {
+        sysprint("Scope: go_tls_read of %ld\n", -1);
+        doProtocol(tlsState, -1, (void*)buf, rc, TLSRX, BUF);
+    }
 }
 
 EXPORTON void *
@@ -607,8 +621,13 @@ c_tls_write(char *stackptr)
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
 
-    sysprint("Scope: go_tls_write of %ld\n", -1);
-    doProtocol(conn, -1, (void*)buf, rc, TLSTX, BUF);
+    uint64_t tlsState = *(uint64_t*)(conn + 0x30);
+
+    // if tlsState is non-zero, then this is a tls connection
+    if (tlsState != 0ULL) {
+        sysprint("Scope: go_tls_write of %ld\n", -1);
+        doProtocol(tlsState, -1, (void*)buf, rc, TLSTX, BUF);
+    }
 }
 
 EXPORTON void *

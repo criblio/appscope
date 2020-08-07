@@ -178,19 +178,6 @@ stages:
               artifact: 'macOS_build'
               path: $(Build.BinariesDirectory)/lib/macOS/
           - task: S3Upload@1
-            condition: succeeded()
-            inputs:
-              awsCredentials: 'azure-pipeline-aws'
-              regionName: 'us-west-2'
-              bucketName: 'cdn.cribl.io'
-              sourceFolder: '$(Build.BinariesDirectory)/lib/'
-              globExpressions: '**/*.so'
-              ${{ if eq(variables['Build.SourceBranchName'], 'master') }}:
-                targetFolder: 'dl/scope/latest/'
-              ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:
-                targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
-              filesAcl: 'public-read'
-          - task: S3Upload@1
             displayName: New_S3_Upload
             condition: succeeded()
             inputs:

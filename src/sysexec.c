@@ -137,11 +137,23 @@ frame_size(assembly_fn fn)
     exit(-1);
 }
 
-void
+////////////////
+// compile-time control for debugging
+////////////////
+//#define funcprint sysprint
+#define funcprint devnull
+//#define patchprint sysprint
+#define patchprint devnull
+
+static void
+devnull(const char* fmt, ...)
+{
+    return;
+}
+
+static void
 sysprint(const char* fmt, ...)
 {
-    return; // Comment this out if you want output.  =)
-
     // Create the string
     char* str = NULL;
     if (fmt) {
@@ -227,7 +239,7 @@ getSymbol(const char *buf, char *sname)
     for (i=0; i < nsyms; i++) {
         if (strcmp(sname, strtab + symtab[i].st_name) == 0) {
             symaddr = symtab[i].st_value;
-            printf("symbol found %s = 0x%08lx\n", strtab + symtab[i].st_name, symtab[i].st_value);
+            sysprint("symbol found %s = 0x%08lx\n", strtab + symtab[i].st_name, symtab[i].st_value);
             break;
         }
     }
@@ -502,7 +514,7 @@ c_write(char *stackaddr)
     uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
     uint64_t initialTime = getTime();
 
-    sysprint("Scope: write fd %ld rc %ld buf 0x%lx\n", fd, rc, buf);
+    funcprint("Scope: write fd %ld rc %ld buf 0x%lx\n", fd, rc, buf);
     doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
 }
 
@@ -524,7 +536,7 @@ c_open(char *stackaddr)
         return;
     }
 
-    sysprint("Scope: open of %ld\n", fd);
+    funcprint("Scope: open of %ld\n", fd);
     doOpen(fd, path, FD, "open");
 
     if (path) free(path);
@@ -542,7 +554,7 @@ c_close(char *stackaddr)
     uint64_t fd  = *(uint64_t*)(stackaddr + 0x8);
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x10);
 
-    sysprint("Scope: close of %ld\n", fd);
+    funcprint("Scope: close of %ld\n", fd);
     doCloseAndReportFailures(fd, (rc != -1), "go_close");
 }
 
@@ -562,7 +574,7 @@ c_read(char *stackaddr)
 
     if (rc == -1) return;
 
-    sysprint("Scope: read of %ld\n", fd);
+    funcprint("Scope: read of %ld\n", fd);
     doRead(fd, initialTime, (rc != -1), (void*)buf, rc, "go_read", BUF, 0);
 }
 
@@ -581,7 +593,7 @@ c_socket(char *stackaddr)
 
     if (sd == -1) return;
 
-    sysprint("Scope: socket of %ld\n", sd);
+    funcprint("Scope: socket of %ld\n", sd);
     addSock(sd, type, domain);
 }
 
@@ -598,7 +610,7 @@ c_accept4(char *stackaddr)
     socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
     uint64_t sd_out = *(uint64_t*)(stackaddr + 0x28);
 
-    sysprint("Scope: accept4 of %ld\n", sd_out);
+    funcprint("Scope: accept4 of %ld\n", sd_out);
     if (sd_out != -1) {
         doAccept(sd_out, addr, addrlen, "go_accept4");
     }
@@ -634,7 +646,7 @@ c_tls_read(char *stackaddr)
 
     // if tlsState is non-zero, then this is a tls connection
     if (tlsState != 0ULL) {
-        sysprint("Scope: go_tls_read of %ld\n", -1);
+        funcprint("Scope: go_tls_read of %ld\n", -1);
         doProtocol(tlsState, -1, (void*)buf, rc, TLSRX, BUF);
     }
 }
@@ -659,7 +671,7 @@ c_tls_write(char *stackaddr)
 
     // if tlsState is non-zero, then this is a tls connection
     if (tlsState != 0ULL) {
-        sysprint("Scope: go_tls_write of %ld\n", -1);
+        funcprint("Scope: go_tls_write of %ld\n", -1);
         doProtocol(tlsState, -1, (void*)buf, rc, TLSTX, BUF);
     }
 }
@@ -725,7 +737,7 @@ addr_to_patch(_DecodedInst* asm_inst, unsigned int asm_count, tap_t* tap)
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && looks_like_first_inst_of_go_func(&asm_inst[i])) break;
 
-        sysprint("%0*lx (%02d) %-24s %s%s%s\n",
+        patchprint("%0*lx (%02d) %-24s %s%s%s\n",
                16,
                asm_inst[i].offset,
                asm_inst[i].size,
@@ -748,11 +760,11 @@ addr_to_patch(_DecodedInst* asm_inst, unsigned int asm_count, tap_t* tap)
             if (ret_count == tap->ret_num) {
                 return_val = (void*)asm_inst[i-1].offset;
                 tap->frame_size = add_arg;
-                sysprint("patched 0x%p with frame size 0x%x\n", return_val, tap->frame_size);
+                patchprint("patched 0x%p with frame size 0x%x\n", return_val, tap->frame_size);
             }
         }
     }
-    sysprint("\n\n");
+    patchprint("\n\n");
     return return_val;
 }
 
@@ -777,7 +789,7 @@ initGoHook(const char *buf)
     char* go_runtime_version = NULL;
     if (!(go_ver= getSymbol(buf, "runtime.buildVersion")) ||
         !(go_runtime_version = c_str(go_ver))) {
-        printf("ERROR: can't get the address for runtime.buildVersion\n");
+        sysprint("ERROR: can't get the address for runtime.buildVersion\n");
         return;
     }
     sysprint("go_runtime_version = %s\n", go_runtime_version);
@@ -802,9 +814,9 @@ initGoHook(const char *buf)
             continue;
         }
 
-        sysprint ("********************************\n");
-        sysprint ("** %s  %s **\n", go_runtime_version, tap->func_name);
-        sysprint ("********************************\n");
+        patchprint ("********************************\n");
+        patchprint ("** %s  %s **\n", go_runtime_version, tap->func_name);
+        patchprint ("********************************\n");
         void* patch_addr = addr_to_patch(asm_inst, asm_count, tap);
         if (!patch_addr) continue;
 
@@ -823,15 +835,15 @@ initGoHook(const char *buf)
      * Need to investigate later.
      */
     if ((go_runtime_cgocall = getSymbol(buf, "runtime.asmcgocall")) == 0) {
-        printf("ERROR: can't get the address for runtime.cgocall\n");
+        sysprint("ERROR: can't get the address for runtime.cgocall\n");
         exit(-1);
     }
 
     // hook a few Go funcs
     rc = funchook_install(funchook, 0);
     if (rc != 0) {
-        char msg[128];
-        snprintf(msg, sizeof(msg), "ERROR: failed to install SSL_read hook. (%s)\n",
+        char msg[1024];
+        sysprint(msg, "ERROR: failed to install SSL_read hook. (%s)\n",
                 funchook_error_message(funchook));
         scopeLog(msg, -1, CFG_LOG_ERROR);
         return;
@@ -871,7 +883,7 @@ load_sections(char *buf, char *addr, size_t mlen)
                 memset(laddr, 0, len);
             }
 
-            snprintf(msg, sizeof(msg), "%s:%d %s addr %p - %p\n",
+            sysprint(msg, "%s:%d %s addr %p - %p\n",
                      __FUNCTION__, __LINE__, sec_name, laddr, laddr + len);
             scopeLog(msg, -1, CFG_LOG_DEBUG);
 
@@ -903,7 +915,7 @@ map_segment(char *buf, Elf64_Phdr *phead)
 
     laddr = (char *)ROUND_DOWN(phead->p_vaddr, pgsz);
     
-    snprintf(msg, sizeof(msg), "%s:%d vaddr 0x%lx size 0x%lx\n",
+    sysprint(msg, "%s:%d vaddr 0x%lx size 0x%lx\n",
              __FUNCTION__, __LINE__, phead->p_vaddr, (size_t)phead->p_memsz);
     scopeLog(msg, -1, CFG_LOG_DEBUG);
 

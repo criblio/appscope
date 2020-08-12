@@ -75,7 +75,8 @@ endtest
 #
 starttest tlsServer
 cd /go/net
-GODEBUG=http2server=0 scope ./tlsServer &
+STRUCT_PATH=/go/net/go_offsets.txt
+SCOPE_GO_STRUCT_PATH=$STRUCT_PATH GODEBUG=http2server=0 scope ./tlsServer &
 
 # this sleep gives the server a chance to bind to the port (4430)
 # before we try to hit it with curl
@@ -94,6 +95,21 @@ evaltest
 grep tlsServer $EVT_FILE | grep http- > /dev/null
 ERR+=$?
 
+endtest
+
+
+#
+# test_go_struct.sh
+#
+starttest test_go_struct.sh
+cd /go
+
+./test_go_struct.sh $STRUCT_PATH
+ERR+=$?
+
+evaltest
+
+touch $EVT_FILE
 endtest
 
 

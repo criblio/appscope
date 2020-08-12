@@ -21,6 +21,19 @@
 #include "gocontext.h"
 #include "../contrib/funchook/distorm/include/distorm.h"
 
+
+typedef struct {            // Structure                     Field              Offset
+    int g_to_m;             // "runtime.g"                   "m"                "48"
+    int m_to_tls;           // "runtime.m"                   "tls"              "136"
+    int connReader_to_conn; // "net/http.connReader"         "conn"             "0"
+    int conn_to_tlsState;   // "net/http.conn"               "tlsState"         "48"
+} go_offsets_t;
+
+go_offsets_t g_go = {.g_to_m=48,              // 0x30
+                     .m_to_tls=136,           // 0x88
+                     .connReader_to_conn=0,   // 0x0
+                     .conn_to_tlsState=48};   // 0x30
+
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
 #define ENABLE_CAS_IN_SYSEXEC 1
 
@@ -324,10 +337,10 @@ go_switch_one_stack(char *stackptr, void *cfunc, void *gfunc)
     atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
 
     // get struct m from g
-    go_ptr = (unsigned long *)(go_g + 0x30);
+    go_ptr = (unsigned long *)(go_g + g_go.g_to_m);
     go_tls = *go_ptr;
     go_m = (char *)go_tls;
-    go_tls = (unsigned long)(go_m + 0x88);
+    go_tls = (unsigned long)(go_m + g_go.m_to_tls);
 
     if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
         scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
@@ -420,10 +433,10 @@ go_switch_new_stack(char *stackptr, void *cfunc, void *gfunc)
         );
 
     // get struct m from g and pull out the TLS from 'm'
-    go_ptr = (unsigned long *)(go_g + 0x30);
+    go_ptr = (unsigned long *)(go_g + g_go.g_to_m);
     go_tls = *go_ptr;
     go_m = (char *)go_tls;
-    go_tls = (unsigned long)(go_m + 0x88);
+    go_tls = (unsigned long)(go_m + g_go.m_to_tls);
 
     // Switch back to the 'm' TLS
     if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
@@ -491,10 +504,10 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
         );
 
     // get struct m from g and pull out the TLS from 'm'
-    go_ptr = (unsigned long *)(go_g + 0x30);
+    go_ptr = (unsigned long *)(go_g + g_go.g_to_m);
     go_tls = *go_ptr;
     go_m = (char *)go_tls;
-    go_tls = (unsigned long)(go_m + 0x88);
+    go_tls = (unsigned long)(go_m + g_go.m_to_tls);
 
     // Switch back to the 'm' TLS
     if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
@@ -634,7 +647,7 @@ c_tls_read(char *stackaddr)
 
 //  type connReader struct {
 //        conn *conn
-    uint64_t conn =  *(uint64_t*)connReader;
+    uint64_t conn =  *(uint64_t*)(connReader + g_go.connReader_to_conn);
     if (!conn) return;         // protect from dereferencing null
 //  type conn struct {
 //          server *Server
@@ -642,7 +655,7 @@ c_tls_read(char *stackaddr)
 //          rwc net.Conn
 //          remoteAddr string
 //          tlsState *tls.ConnectionState
-    uint64_t tlsState =   *(uint64_t*)(conn + 0x30);
+    uint64_t tlsState =   *(uint64_t*)(conn + g_go.conn_to_tlsState);
 
     // if tlsState is non-zero, then this is a tls connection
     if (tlsState != 0ULL) {
@@ -667,7 +680,7 @@ c_tls_write(char *stackaddr)
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
 
-    uint64_t tlsState = *(uint64_t*)(conn + 0x30);
+    uint64_t tlsState = *(uint64_t*)(conn + g_go.conn_to_tlsState);
 
     // if tlsState is non-zero, then this is a tls connection
     if (tlsState != 0ULL) {
@@ -793,6 +806,26 @@ initGoHook(const char *buf)
         return;
     }
     sysprint("go_runtime_version = %s\n", go_runtime_version);
+
+    // go 1.8 has a different m_to_tls offset than other supported versions.
+    if (strstr(go_runtime_version, "go1.8.")) g_go.m_to_tls = 96; // 0x60
+
+
+    // This creates a file specified by test/testContainers/go/test_go.sh
+    // and used by test/testContainers/go/test_go_struct.sh.
+    //
+    // Why?  To test structure offsets in go that might change.  (like in 1.8
+    // immediately above)
+    char* debug_file;
+    int fd;
+    if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
+        ((fd = open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
+        dprintf(fd, "runtime.g|m=%d\n", g_go.g_to_m);
+        dprintf(fd, "runtime.m|tls=%d\n", g_go.m_to_tls);
+        dprintf(fd, "net/http.connReader|conn=%d\n", g_go.connReader_to_conn);
+        dprintf(fd, "net/http.conn|tlsState=%d\n", g_go.conn_to_tlsState);
+        close(fd);
+    }
 
 
     tap_t* tap = NULL;

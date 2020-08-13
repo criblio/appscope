@@ -84,11 +84,16 @@ extern void go_hook_tls_read(void);
 extern void go_hook_tls_write(void);
 
 
+// Go strings are not null delimited like c strings.
+// Instead, go strings have structure which includes a length field.
 typedef struct {
-    char* str;
-    int   len;
+    char* str;  // 0x0 offset
+    int   len;  // 0x8 offset
 } gostring_t;
 
+// c_str() is provided to convert a go-style string to a c-style string.
+// The resulting c_str will need to be passed to free() when it is no
+// longer needed.
 char*
 c_str(gostring_t* go_str)
 {
@@ -106,7 +111,6 @@ c_str(gostring_t* go_str)
 typedef struct {
     // These are constants at build time
     char *   func_name;    // name of go function
-    uint64_t ret_num;      // which retq to patch (1 is first)
     void *   assembly_fn;  // scope handler function (in assembly)
 
     // These are set at runtime.
@@ -115,15 +119,15 @@ typedef struct {
 } tap_t;
 
 tap_t g_go_tap[] = {
-    {"syscall.write",                         1, go_hook_write,       NULL, 0},
-    {"syscall.openat",                        1, go_hook_open,        NULL, 0},
-    {"syscall.socket",                        1, go_hook_socket,      NULL, 0},
-    {"syscall.accept4",                       1, go_hook_accept4,     NULL, 0},
-    {"syscall.read",                          1, go_hook_read,        NULL, 0},
-    {"syscall.Close",                         1, go_hook_close,       NULL, 0},
-    {"net/http.(*connReader).Read",           2, go_hook_tls_read,    NULL, 0},
-    {"net/http.checkConnErrorWriter.Write",   1,  go_hook_tls_write,  NULL, 0},
-    {"TAP_TABLE_END", 0, NULL, NULL, 0}
+    {"syscall.write",                         go_hook_write,       NULL, 0},
+    {"syscall.openat",                        go_hook_open,        NULL, 0},
+    {"syscall.socket",                        go_hook_socket,      NULL, 0},
+    {"syscall.accept4",                       go_hook_accept4,     NULL, 0},
+    {"syscall.read",                          go_hook_read,        NULL, 0},
+    {"syscall.Close",                         go_hook_close,       NULL, 0},
+    {"net/http.(*connReader).Read",           go_hook_tls_read,    NULL, 0},
+    {"net/http.checkConnErrorWriter.Write",   go_hook_tls_write,   NULL, 0},
+    {"TAP_TABLE_END", NULL, NULL, 0}
 };
 
 static void *
@@ -182,6 +186,7 @@ sysprint(const char* fmt, ...)
     // Output the string
     if (str) {
         printf("%s", str);
+        scopeLog(str, -1, CFG_LOG_DEBUG);
         free(str);
     }
 }
@@ -541,6 +546,7 @@ static void
 c_open(char *stackaddr)
 {
     uint64_t fd  = *((uint64_t *)(stackaddr + 0x30));
+    // The gostring_t* here has an implicit len field at stackaddr + 0x18
     char *path = c_str((gostring_t*)(stackaddr + 0x10));
 
     if (!path) {
@@ -732,13 +738,12 @@ add_argument(_DecodedInst* asm_inst)
     return 0;
 }
 
-static void*
-addr_to_patch(_DecodedInst* asm_inst, unsigned int asm_count, tap_t* tap)
+static void
+patch_return_addrs(funchook_t *funchook,
+                   _DecodedInst* asm_inst, unsigned int asm_count, tap_t* tap)
 {
-    if (!asm_inst || !asm_count || !tap) return 0;
+    if (!funchook || !asm_inst || !asm_count || !tap) return;
 
-    void* return_val = NULL;
-    uint64_t ret_count = 0;
     int i;
     for (i=0; i<asm_count; i++) {
 
@@ -748,7 +753,11 @@ addr_to_patch(_DecodedInst* asm_inst, unsigned int asm_count, tap_t* tap)
         if (i == 0 && !looks_like_first_inst_of_go_func(&asm_inst[i])) break;
 
         // Stop when it looks like we've hit another goroutine
-        if (i > 0 && looks_like_first_inst_of_go_func(&asm_inst[i])) break;
+        if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
+                  (!strcmp((const char*)asm_inst[i].mnemonic.p, "INT 3") &&
+                  asm_inst[i].size == 1 ))) {
+            break;
+        }
 
         patchprint("%0*lx (%02d) %-24s %s%s%s\n",
                16,
@@ -767,18 +776,25 @@ addr_to_patch(_DecodedInst* asm_inst, unsigned int asm_count, tap_t* tap)
              !strcmp((const char*)asm_inst[i-1].mnemonic.p, "ADD") &&
              (add_arg = add_argument(&asm_inst[i-1]))) {
 
-            // Usually we want to patch the first RET in a go_function, but
-            // sometimes we want to patch a later RET
-            ret_count += 1;
-            if (ret_count == tap->ret_num) {
-                return_val = (void*)asm_inst[i-1].offset;
-                tap->frame_size = add_arg;
-                patchprint("patched 0x%p with frame size 0x%x\n", return_val, tap->frame_size);
+            void *pre_patch_addr = (void*)asm_inst[i-1].offset;
+            void *patch_addr = (void*)asm_inst[i-1].offset;
+
+            // all add_arg values within a function should be the same
+            if (tap->frame_size && (tap->frame_size != add_arg)) {
+                patchprint("aborting patch of 0x%p due to mismatched frame size 0x%x\n", pre_patch_addr, add_arg);
+                break;
             }
+
+            if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
+                patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+                continue;
+            }
+            patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+            tap->return_addr = patch_addr;
+            tap->frame_size = add_arg;
         }
     }
     patchprint("\n\n");
-    return return_val;
 }
 
 
@@ -798,7 +814,7 @@ initGoHook(const char *buf)
         funchook_set_debug_file(DEFAULT_LOG_PATH);
     }
 
-    gostring_t* go_ver;
+    gostring_t* go_ver; // There is an implicit len field at go_ver + 0x8
     char* go_runtime_version = NULL;
     if (!(go_ver= getSymbol(buf, "runtime.buildVersion")) ||
         !(go_runtime_version = c_str(go_ver))) {
@@ -832,7 +848,7 @@ initGoHook(const char *buf)
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
         void* orig_func = getSymbol(buf, tap->func_name);
         if (!orig_func) {
-            scopeLog(tap->func_name, -1, CFG_LOG_ERROR);
+            sysprint("ERROR: can't get the address for %s\n", tap->func_name);
             continue;
         }
 
@@ -850,14 +866,8 @@ initGoHook(const char *buf)
         patchprint ("********************************\n");
         patchprint ("** %s  %s **\n", go_runtime_version, tap->func_name);
         patchprint ("********************************\n");
-        void* patch_addr = addr_to_patch(asm_inst, asm_count, tap);
-        if (!patch_addr) continue;
 
-        if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
-            scopeLog(tap->func_name, -1, CFG_LOG_ERROR);
-            continue;
-        }
-        tap->return_addr = patch_addr;
+        patch_return_addrs(funchook, asm_inst, asm_count, tap);
     }
 
     /*
@@ -875,10 +885,8 @@ initGoHook(const char *buf)
     // hook a few Go funcs
     rc = funchook_install(funchook, 0);
     if (rc != 0) {
-        char msg[1024];
-        sysprint(msg, "ERROR: failed to install SSL_read hook. (%s)\n",
+        sysprint("ERROR: funchook_install failed.  (%s)\n",
                 funchook_error_message(funchook));
-        scopeLog(msg, -1, CFG_LOG_ERROR);
         return;
     }
 }
@@ -894,7 +902,6 @@ load_sections(char *buf, char *addr, size_t mlen)
     const char *sec_name;
     const char *section_strtab = NULL;
     char *laddr;
-    char msg[1024];
     
     ehdr = (Elf64_Ehdr *)buf;
     sections = (Elf64_Shdr *)((char *)buf + ehdr->e_shoff);
@@ -916,9 +923,8 @@ load_sections(char *buf, char *addr, size_t mlen)
                 memset(laddr, 0, len);
             }
 
-            sysprint(msg, "%s:%d %s addr %p - %p\n",
+            sysprint("%s:%d %s addr %p - %p\n",
                      __FUNCTION__, __LINE__, sec_name, laddr, laddr + len);
-            scopeLog(msg, -1, CFG_LOG_DEBUG);
 
             if (!strcmp(sec_name, ".text")) {
                 g_text_addr = (unsigned char*)laddr;
@@ -937,7 +943,6 @@ map_segment(char *buf, Elf64_Phdr *phead)
     int pgsz = sysconf(_SC_PAGESIZE);
     void *addr;
     char *laddr;
-    char msg[1024];    
 
     if ((phead->p_vaddr == 0) || (phead->p_memsz <= 0) || (phead->p_flags == 0)) return -1;
 
@@ -948,9 +953,8 @@ map_segment(char *buf, Elf64_Phdr *phead)
 
     laddr = (char *)ROUND_DOWN(phead->p_vaddr, pgsz);
     
-    sysprint(msg, "%s:%d vaddr 0x%lx size 0x%lx\n",
+    sysprint("%s:%d vaddr 0x%lx size 0x%lx\n",
              __FUNCTION__, __LINE__, phead->p_vaddr, (size_t)phead->p_memsz);
-    scopeLog(msg, -1, CFG_LOG_DEBUG);
 
     if ((addr = mmap(laddr, (size_t)phead->p_memsz,
                      prot | PROT_WRITE,

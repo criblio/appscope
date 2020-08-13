@@ -106,3 +106,10 @@ services:
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.14
+  go_15:
+    build:
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.15
+

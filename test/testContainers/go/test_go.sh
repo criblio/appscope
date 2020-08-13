@@ -64,7 +64,11 @@ kill $!
 
 evaltest
 
-grep plainServer $EVT_FILE | grep http- > /dev/null
+grep plainServer $EVT_FILE | grep http-req > /dev/null
+ERR+=$?
+grep plainServer $EVT_FILE | grep http-resp > /dev/null
+ERR+=$?
+grep plainServer $EVT_FILE | grep http-metrics > /dev/null
 ERR+=$?
 
 endtest
@@ -92,7 +96,11 @@ kill $!
 
 evaltest
 
-grep tlsServer $EVT_FILE | grep http- > /dev/null
+grep tlsServer $EVT_FILE | grep http-req > /dev/null
+ERR+=$?
+grep tlsServer $EVT_FILE | grep http-resp > /dev/null
+ERR+=$?
+grep tlsServer $EVT_FILE | grep http-metrics > /dev/null
 ERR+=$?
 
 endtest

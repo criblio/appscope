@@ -10,6 +10,7 @@ RUN chmod 755 /usr/lib/libscope.so
 COPY ./scope /usr/bin/scope
 
 COPY ./go/test_go.sh /go
+COPY ./go/test_go_struct.sh /go
 
 RUN mkdir /go/thread
 COPY ./go/thread/fileThread.go /go/thread

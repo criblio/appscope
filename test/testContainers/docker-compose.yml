@@ -64,9 +64,52 @@ services:
       - 6379:6379
       - 27017:27017
 
+  go_8:
+    build:
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.8
+  go_9:
+    build:
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.9
+  go_10:
+    build:
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.10
+  go_11:
+    build:
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.11
+  go_12:
+    build:
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.12
+  go_13:
+    build:
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.13
   go_14:
     build:
       context: .
       dockerfile: ./go/Dockerfile
       args:
-        GO_IMAGE_VER: golang:1.14.4
+        GO_IMAGE_VER: golang:1.14
+  go_15:
+    build:
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.15
+

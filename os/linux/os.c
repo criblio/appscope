@@ -4,7 +4,7 @@
 #include "../../src/wrap.h"
 
 extern struct interposed_funcs_t g_fn;
-
+extern void initJavaAgent(void);
 
 static int
 sendNL(int sd, ino_t node)
@@ -483,6 +483,13 @@ osThreadInit(void(*handler)(int), unsigned interval)
     return TRUE;
 }
 
+void
+osInitJavaAgent(void)
+{
+    initJavaAgent();
+}
+
+
 /*
  * Example from /proc/self/maps:
  * 7f1b23bd4000-7f1b23bd7000 rw-p 001e3000 08:01 402063 /usr/lib/x86_64-linux-gnu/libc-2.29.so
@@ -714,12 +721,11 @@ static const char scope_help_metrics[] =
 "            1   adds 'data', 'unit'\n"
 "            2   adds 'class', 'proto'\n"
 "            3   adds 'op'\n"
-"            4   adds 'host', 'proc', 'http_status'\n"
+"            4   adds 'pid', 'host', 'proc', 'http_status'\n"
 "            5   adds 'domain', 'file'\n"
 "            6   adds 'localip', 'remoteip', 'localp', 'port', 'remotep'\n"
-"            7   adds 'fd', 'pid', 'args'\n"
-"            8   adds 'duration'\n"
-"            9   adds 'numops'\n"
+"            7   adds 'fd', 'args'\n"
+"            8   adds 'duration', 'numops', 'req_per_sec', 'req', 'resp', 'protocol'\n"
 "\n"
 "        Summarization\n"
 "            0-4 has full event summarization\n"

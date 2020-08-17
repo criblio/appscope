@@ -13,6 +13,7 @@
 #include "os.h"
 #include "plattime.h"
 #include "report.h"
+#include "search.h"
 #include "state_private.h"
 #include "linklist.h"
 
@@ -26,8 +27,10 @@
 #define CLASS_FIELD(val)        STRFIELD("class",          (val),        2)
 #define PROTO_FIELD(val)        STRFIELD("proto",          (val),        2)
 #define OP_FIELD(val)           STRFIELD("op",             (val),        3)
+#define PID_FIELD(val)          NUMFIELD("pid",            (val),        4)
 #define HOST_FIELD(val)         STRFIELD("host",           (val),        4)
 #define PROC_FIELD(val)         STRFIELD("proc",           (val),        4)
+#define HTTPSTAT_FIELD(val)     NUMFIELD("http_status",    (val),        4)
 #define DOMAIN_FIELD(val)       STRFIELD("domain",         (val),        5)
 #define FILE_FIELD(val)         STRFIELD("file",           (val),        5)
 #define LOCALIP_FIELD(val)      STRFIELD("localip",        (val),        6)
@@ -38,10 +41,8 @@
 #define REMOTEP_FIELD(val)      NUMFIELD("remotep",        (val),        6)
 #define REMOTEN_FIELD(val)      NUMFIELD("remoten",        (val),        6)
 #define FD_FIELD(val)           NUMFIELD("fd",             (val),        7)
-#define PID_FIELD(val)          NUMFIELD("pid",            (val),        7)
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
-#define HTTPSTAT_FIELD(val)     NUMFIELD("http_status",    (val),        4)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
 #define RATE_FIELD(val)         NUMFIELD("req_per_sec",    (val),        8)
 #define HREQ_FIELD(val)         STRFIELD("req",            (val),        8)
@@ -55,7 +56,7 @@
 // and could be more accurate.
 int g_interval = DEFAULT_SUMMARY_PERIOD;
 static list_t *g_maplist;
-static int g_http_status[ASIZE];
+static search_t *g_http_status = NULL;
 
 static void
 destroyHttpMap(void *data)
@@ -72,7 +73,7 @@ void
 initReporting()
 {
     g_maplist = lstCreate(destroyHttpMap);
-    preComp((unsigned char *)HTTP_STATUS, strlen(HTTP_STATUS), g_http_status);
+    g_http_status = searchComp(HTTP_STATUS);
 }
 
 void
@@ -165,7 +166,7 @@ getHttpStatus(char *header, size_t len)
     char *val;
 
     // ex: HTTP/1.1 200 OK\r\n
-    if ((ix = strsrch(HTTP_STATUS, strlen(HTTP_STATUS), header, len, g_http_status)) == -1) return -1;
+    if ((ix = searchExec(g_http_status, header, len)) == -1) return -1;
 
     if ((ix < 0) || (ix > len) || ((ix + strlen(HTTP_STATUS) + 1) > len)) return -1;
 

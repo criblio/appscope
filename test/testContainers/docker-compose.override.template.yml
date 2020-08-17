@@ -1,13 +1,13 @@
 version: '3.5'
 services:
-  cribl:
+  interposed_func:
     command: -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     privileged: true
 
-  splunk:
+  cribl:
     command: -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
@@ -21,9 +21,10 @@ services:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     privileged: true
 
-  interposed_func:
+  splunk:
     command: -s /opt/test-runner/bin/libscope.so
     volumes:
+      - ./logs:/opt/test-runner/logs
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     privileged: true
 
@@ -49,6 +50,104 @@ services:
     privileged: true
 
   detect_proto:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java6:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java7:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java8:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java9:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java10:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java11:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java12:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java13:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  java14:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  oracle_java8:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  oracle_java11:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  oracle_java12:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  oracle_java13:
+    volumes:
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+    privileged: true
+
+  oracle_java14:
     volumes:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     environment:

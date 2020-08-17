@@ -1,11 +1,23 @@
 version: '3.5'
 services:
+  interposed_func:
+    build:
+      context: .
+      dockerfile: ./interposed_func/Dockerfile
+    privileged: true
+
   cribl:
     build:
       context: .
       dockerfile: ./cribl/Dockerfile
     ports:
       - "9000:9000"
+
+  nginx:
+    build:
+      context: .
+      dockerfile: ./nginx/Dockerfile
+
   splunk:
     build:
       context: .
@@ -15,10 +27,10 @@ services:
 
     privileged: true
 
-  nginx:
+  elastic:
     build:
       context: .
-      dockerfile: ./nginx/Dockerfile
+      dockerfile: ./elastic/Dockerfile
 
   kafka:
     ports:                                                                                                                                                                              
@@ -39,18 +51,6 @@ services:
     build:
       context: .
       dockerfile: ./kafka/Dockerfile
-
-  interposed_func:
-    build:
-      context: .
-      dockerfile: ./interposed_func/Dockerfile
-    privileged: true
-
-  elastic:
-    build:
-      context: .
-      dockerfile: ./elastic/Dockerfile
-
 
   tls:
     build:
@@ -113,3 +113,107 @@ services:
       args:
         GO_IMAGE_VER: golang:1.15
 
+  java6:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: openjdk:6
+        TOMCAT_MAJOR_VERSION: 7
+        TOMCAT_MINOR_VERSION: 7.0.10
+
+  java7:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: openjdk:7
+
+  java8:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: openjdk:8
+  
+  java9:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: openjdk:9
+
+  java10:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: openjdk:10
+
+  java11:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: openjdk:11
+  
+  java12:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: openjdk:12
+
+  java13:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: openjdk:13
+
+  java14:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: openjdk:14
+
+  oracle_java8:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: sgrio/java:jdk_8_ubuntu
+        KEYTOOL: /usr/lib/jvm/java-8-oracle/bin/keytool
+
+  oracle_java11:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: sgrio/java:jdk_11_ubuntu
+        KEYTOOL: /usr/lib/jvm/java-11-oracle/bin/keytool
+
+  oracle_java12:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: sgrio/java:jdk_12_ubuntu
+        KEYTOOL: /usr/lib/jvm/java-12-oracle/bin/keytool
+
+  oracle_java13:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: sgrio/java:jdk_13_ubuntu
+        KEYTOOL: /usr/lib/jvm/java-13-oracle/bin/keytool
+
+  oracle_java14:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: sgrio/java:jdk_14_ubuntu
+        KEYTOOL: /usr/lib/jvm/java-14-oracle/bin/keytool

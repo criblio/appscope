@@ -14,8 +14,10 @@
 #include "com.h"
 #include "dbg.h"
 #include "dns.h"
+#include "httpstate.h"
 #include "mtcformat.h"
 #include "plattime.h"
+#include "search.h"
 #include "state.h"
 #include "state_private.h"
 #include "pcre2.h"
@@ -23,9 +25,6 @@
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
 #define NUM_ATTEMPTS 100
-#define HTTP_START "HTTP/"
-#define HTTP_END "\r\n\r\n"
-#define CONTENT_LENGTH "Content-Length:"
 #define MAX_CONVERT (size_t)256
 
 extern rtconfig g_cfg;
@@ -41,11 +40,7 @@ net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
-bool g_predone = FALSE;
-static int g_http_start[ASIZE];
-static int g_http_end[ASIZE];
-static int g_http_redirect[ASIZE];
-static int g_http_clen[ASIZE];
+static search_t* g_http_redirect = NULL;
 static list_t *g_protlist;
 static unsigned int g_prot_sequence = 0;
 
@@ -239,6 +234,9 @@ initState()
 
     // Per RUC...
     g_fsinfo = fsinfoLocal;
+
+    initHttpState();
+    g_http_redirect = searchComp(REDIRECTURL);
 
     g_protlist = lstCreate(destroyProtEntry);
     initProtocolDetection();
@@ -756,310 +754,6 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     }
 }
 
-/*
- * This is an implementation of the Horspool
- * string search algorithm.
- * ref: https://www-igm.univ-mlv.fr/~lecroq/string/node18.html
- *
- * Pre-compute the array from the needle.
- */
-void
-preComp(unsigned char *needle, int nlen, int bmBc[]) {
-   int i;
-
-   for (i = 0; i < ASIZE; ++i)
-      bmBc[i] = nlen;
-   for (i = 0; i < nlen - 1; ++i)
-       bmBc[needle[i]] = nlen - i - 1;
-}
-
- int
-strsrch(char *needle, int nlen, char *haystack, int hlen, int *bmBc) {
-    int j;
-    unsigned char c;
-
-    if ((hlen < 0) || (nlen < 0)) return -1;
-
-    /* Preprocessing; passed in as bmBc */
-    if (g_predone == FALSE) {
-        preComp((unsigned char *)HTTP_START, strlen(HTTP_START), g_http_start);
-        preComp((unsigned char *)HTTP_END, strlen(HTTP_END), g_http_end);
-        preComp((unsigned char *)REDIRECTURL, strlen(REDIRECTURL), g_http_redirect);
-        preComp((unsigned char *)CONTENT_LENGTH, strlen(CONTENT_LENGTH), g_http_clen);
-        g_predone = TRUE;
-    }
-
-    /* Searching */
-    j = 0;
-    while (j <= hlen - nlen) {
-        c = haystack[j + nlen - 1];
-        if (needle[nlen - 1] == c && memcmp(needle, haystack + j, nlen - 1) == 0) {
-            return j;
-        }
-
-        j += bmBc[c];
-    }
-
-    return -1;
-}
-
-static size_t
-getContentLength(char *header, size_t len)
-{
-    size_t ix;
-    size_t rc;
-    char *val;
-
-    // ex: Content-Length: 559\r\n
-    if ((ix = strsrch(CONTENT_LENGTH, strlen(CONTENT_LENGTH), header, len, g_http_clen)) == -1) return -1;
-
-    if ((ix <= 0) || (ix > len) || ((ix + strlen(CONTENT_LENGTH)) > len)) return -1;
-
-    val = &header[ix + strlen(CONTENT_LENGTH)];
-
-    errno = 0;
-    rc = strtoull(val, NULL, 0);
-    if ((errno != 0) || (rc == 0)) {
-        return -1;
-    }
-    return rc;
-}
-
-/*
- * If we have an fd check for TCP
- * If we don't have a socket it can mean we are
- * called from certain TLS sessions; not an error
- *
- * If we are working down a content length, no
- * need to scan for a header
- *
- * Note that, at this point, we are not able to
- * use a content length optimization with gnutls
- * because it does not return a file descriptor
- * that is usable
-*/
-static bool
-scanFoundHttpHeader(net_info *net, char *buf, size_t len)
-{
-    if (!buf) return FALSE;
-
-    // By default, turn off Content-Length skipping.
-    // Only scan streams for http headers.
-    if (net) {
-        net->clen = 0;
-        if (net->type != SOCK_STREAM) return FALSE;
-    }
-
-    size_t startLen = strlen(HTTP_START);
-    size_t endLen = strlen(HTTP_END);
-
-    // find the start of http header data
-    size_t header_start =
-        strsrch(HTTP_START, startLen, buf, len, g_http_start);
-    if (header_start == -1) return FALSE;
-    header_start += startLen;
-
-    // find the end of http header data
-    size_t header_end =
-        strsrch(HTTP_END, endLen,
-                &buf[header_start], len-header_start, g_http_end);
-    if (header_end == -1) return FALSE;
-    header_end += header_start;  // was measured from header_start
-    header_end += endLen;
-
-    // Only look for Content-Length header if we're able to save it for later
-    if (net) {
-        // if there is not a contentLength header, bail.
-        size_t clen = getContentLength(&buf[header_start], header_end - header_start);
-        if (clen == -1) return TRUE; // We found a complete header in buf
-
-        // There is a Content-Length header!  Remember how much we can skip.
-        size_t content_in_this_buf = len - header_end;
-        if (clen >= content_in_this_buf) {
-            net->clen = clen - content_in_this_buf;
-        }
-    }
-    return TRUE; // We found a complete header in buf
-}
-
-static size_t
-bytesToSkip(net_info *net, size_t len)
-{
-    // don't skip anything because we don't know anything about it
-    // or because content length skipping is off
-    if (!net || (net->clen == 0)) return 0;
-
-    // skip the rest of the remaining content length
-    // and turn off content length skipping
-    if (len > net->clen) {
-        size_t rv = net->clen;
-        net->clen = 0;
-        return rv;
-    }
-
-    // skip this whole buf and maintain content length
-    net->clen -= len;
-    return len;
-}
-
-
-// allow all ports if they appear to have an HTTP header
-static bool
-isHttp(int sockfd, net_info *net, void **buf, size_t *len, metric_t src, src_data_t dtype)
-{
-    if (!buf || !*buf || !len) return FALSE;
-
-    // Handle the data in it's various format
-    switch (dtype) {
-        case BUF:
-        {
-            /*
-             * TODO: if the entire header is not contained in this buffer we will drop
-             * the header. Need to keep state such that we can cross buffer boundaries
-             * at some point.
-             */
-            size_t bts = bytesToSkip(net, *len);
-            if (bts == *len) return FALSE;
-            return scanFoundHttpHeader(net, &(((char*)*buf)[bts]), *len - bts);
-        }
-
-        case MSG:
-        {
-            int i;
-            struct msghdr *msg = (struct msghdr *)*buf;
-            struct iovec *iov;
-            int http_header_found = FALSE;
-
-            for (i = 0; i < msg->msg_iovlen; i++) {
-                iov = &msg->msg_iov[i];
-                if (iov && iov->iov_base) {
-                    size_t bts = bytesToSkip(net, iov->iov_len);
-                    if (bts == iov->iov_len) continue;
-                    // TODO: we only return the first match
-                    if (http_header_found) continue;
-                    if (scanFoundHttpHeader(net, &(((char*)iov->iov_base)[bts]), iov->iov_len - bts)) {
-                        *buf = iov->iov_base;
-                        *len = iov->iov_len;
-                        http_header_found = TRUE;
-                    }
-                }
-            }
-            return http_header_found;
-        }
-
-        case IOV:
-        {
-            int i;
-            // len is expected to be an iovcnt for an IOV data type
-            int iovcnt = *len;
-            struct iovec *iov = (struct iovec *)*buf;
-            int http_header_found = FALSE;
-
-            for (i = 0; i < iovcnt; i++) {
-                if (iov[i].iov_base) {
-                    size_t bts = bytesToSkip(net, iov[i].iov_len);
-                    if (bts == iov[i].iov_len) continue;
-                    // TODO: we only return the first match
-                    if (http_header_found) continue;
-                    if (scanFoundHttpHeader(net, &(((char*)iov[i].iov_base)[bts]), iov[i].iov_len - bts)) {
-                        *buf = iov[i].iov_base;
-                        *len = iov[i].iov_len;
-                        http_header_found = TRUE;
-                    }
-                }
-            }
-            return http_header_found;
-        }
-
-        case NONE:
-        default:
-            break;
-    }
-
-    return FALSE;
-}
-
-// For now, only doing HTTP/1.X headers
-static int
-doHttp(uint64_t id, int sockfd, net_info *net, void *buf, size_t len, metric_t src)
-{
-    if ((buf == NULL) || (len <= 0)) return -1;
-
-    unsigned int endix;
-    in_port_t localPort, remotePort;
-    size_t headsize;
-    uint64_t uid;
-    char *headend, *header, *hcopy;
-    protocol_info *proto;
-    http_post *post;
-    size_t startLen = strlen(HTTP_START);
-    size_t endLen = strlen(HTTP_END);
-
-    /*
-     * If we have an fd, use the uid/channel value as it's unique 
-     * else we are likley using TLS, so default to the session ID
-     */
-    if (net) {
-        uid = net->uid;
-        localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
-        remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
-    } else if (id != -1) {
-        uid = id;
-        localPort = remotePort = 0;
-    } else {
-        return -1;
-    }
-
-    if (((endix = strsrch(HTTP_END, endLen, buf, len, g_http_end)) != -1) &&
-        (endix < len) && (endix > 0)) {
-        header = buf;
-        headend = &header[endix];
-        headsize = (headend - header);
-
-        // if the header size is < what we need to check for then just bail
-        if (headsize < startLen) return -1;
-
-        if ((post = calloc(1, sizeof(struct http_post_t))) == NULL) return -1;
-        if ((hcopy = calloc(1, headsize + 4)) == NULL) {
-            free(post);
-            return -1;
-        }
-
-        if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
-            free(post);
-            free(hcopy);
-            return -1;
-        }
-
-        post->start_duration = getTime();
-        post->id = uid;
-        strncpy(hcopy, header, headsize);
-        post->hdr = hcopy;
-
-        if ((src == TLSTX) || (src == TLSRX) ||
-            (localPort == 443) || (remotePort == 443)) {
-            post->ssl = 1;
-        } else {
-            post->ssl = 0;
-        }
-
-        // If the first 5 chars are HTTP/, it's a response header
-        if (strsrch(HTTP_START, startLen, hcopy, startLen, g_http_start) != -1) {
-            proto->ptype = EVT_HRES;
-        } else {
-            proto->ptype = EVT_HREQ;
-        }
-
-        proto->evtype = EVT_PROTO;
-        proto->len = headsize;
-        proto->fd = sockfd;
-        proto->data = (char *)post;
-        cmdPostEvent(g_ctl, (char *)proto);
-    }
-
-    return 0;
-}
-
 static bool
 setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t len)
 {
@@ -1198,10 +892,10 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     net_info *net = getNetEntry(sockfd);
 
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
-        if (isHttp(sockfd, net, &buf, &len, src, dtype) == TRUE) {
-            // not doing anything with protocol...yet
+        if (doHttp(id, sockfd, net, buf, len, src, dtype)) {
+            // not doing anything with protocol... yet
             if (net) net->protocol = 1;
-            return doHttp(id, sockfd, net, buf, len, src);
+            return 0;
         }
     }
 
@@ -1644,8 +1338,7 @@ doURL(int sockfd, const void *buf, size_t len, metric_t src)
     }
 
 
-    if ((src == NETTX) && (strsrch(REDIRECTURL, strlen(REDIRECTURL),
-                                   (char *)buf, len, g_http_redirect) != -1)) {
+    if ((src == NETTX) && (searchExec(g_http_redirect, (char *)buf, len) != -1)) {
         g_netinfo[sockfd].urlRedirect = TRUE;
         return 0;
     }
@@ -1977,6 +1670,7 @@ doClose(int fd, const char *func)
         doUpdateState(OPEN_PORTS, fd, -1, func, NULL);
         doUpdateState(NET_CONNECTIONS, fd, -1, func, NULL);
         doUpdateState(CONNECTION_DURATION, fd, -1, func, NULL);
+        resetHttp(&ninfo->http);
     }
 
     // Check both file desriptor tables

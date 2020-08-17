@@ -132,6 +132,15 @@ osUnixSockPeer(ino_t lnode)
     return -1;
 }
 
+/*
+ * Placeholder for future
+ */
+void
+osInitJavaAgent(void)
+{
+    return;
+}
+
 int
 osGetPageProt(uint64_t addr)
 {

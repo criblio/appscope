@@ -26,6 +26,8 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 
+#include "javaagent.h"
+
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
 
@@ -831,7 +833,6 @@ static void *
 periodic(void *arg)
 {
     while (1) {
-        reportPeriodicStuff();
 
         // Process dynamic config changes, if any
         dynConfig();
@@ -854,6 +855,8 @@ periodic(void *arg)
             cJSON *json = msgStart(&g_proc, g_staticfg);
             cmdSendInfoMsg(g_ctl, json);
         }
+
+        reportPeriodicStuff();
 
         remoteConfig();
     }
@@ -1248,6 +1251,8 @@ init(void)
     initHook();
     
     threadInit();
+
+    osInitJavaAgent();
 }
 
 EXPORTOFF int

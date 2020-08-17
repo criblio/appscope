@@ -53,10 +53,12 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 #define STACK_SIZE (size_t)(1024 * 1024) + (8 * 1024)
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 
-#define AUX_ENT(id, val) \
+#define AUX_ENT(id, val)                        \
 	do { \
-		elf_info[i++] = id; \
-		elf_info[i++] = val; \
+		*elf_info = (Elf64_Addr)id; \
+        elf_info++;     \
+		*elf_info = (Elf64_Addr)val; \
+        elf_info++;     \
 	} while (0)
 #define EXPORTON __attribute__((visibility("default")))
 
@@ -1039,7 +1041,8 @@ static int
 copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **env)
 {
     int i;
-    unsigned long auxindex;
+    Elf64_auxv_t *auxv;
+    char **astart;
     Elf64_Ehdr *elf;
     Elf64_Phdr *phead;
     char **spp = (char **)sp;
@@ -1068,6 +1071,9 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     *spp++ = NULL;
     
     // do env
+    // Note that the env array on the stack are pointers to strings.
+    // We are pointing to the strings provided from the executable,
+    // re-using them for the new app we are starting.
     for (i = 0; env[i]; i++) {
         if ((&env[i]) && spp) {
             *spp++ = (char *)env[i];
@@ -1081,43 +1087,41 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     *spp++ = NULL;
 
     elf_info = (Elf64_Addr *)spp;
-    memset(elf_info, 0, sizeof(Elf64_Addr) * (AT_EXECFN + 1) * 2);
+    memset(elf_info, 0, sizeof(Elf64_Addr) * ((AT_EXECFN + 1) * 2));
 
-    for (auxindex = 1, i = 0; auxindex < 32; auxindex++) {
-        unsigned long val;
+    // auxv entries start right after env is null
+    astart = (char **)env;    // leaving env in place for debugging
+    while(*astart++ != NULL);
 
-        switch (auxindex) {
+    for (auxv = (Elf64_auxv_t *)astart; auxv->a_type != AT_NULL; auxv++) {
+        switch ((unsigned long)auxv->a_type) {
         case AT_PHDR:
-            AUX_ENT(auxindex, (Elf64_Addr)phead);
+            AUX_ENT(auxv->a_type, (Elf64_Addr)phead);
             break;
 
         case AT_PHNUM:
-            AUX_ENT(auxindex, elf->e_phnum);
+            AUX_ENT(auxv->a_type, elf->e_phnum);
             break;
 
         case AT_BASE:
-            AUX_ENT(auxindex, -1);
+            AUX_ENT(auxv->a_type, -1);
             break;
 
         case AT_ENTRY:
-            AUX_ENT(auxindex, elf->e_entry);
+            AUX_ENT(auxv->a_type, elf->e_entry);
             break;
 
         case AT_EXECFN:
-            AUX_ENT(auxindex, (unsigned long)argv[1]);
-            break;
-
-        case AT_EXECFD:
-            //AUX_ENT(auxindex, );
+            AUX_ENT(auxv->a_type, (unsigned long)argv[1]);
             break;
 
         default:
-            if ((val = getauxval(auxindex)) != 0) {
-                AUX_ENT(auxindex, val);
-            }
+            AUX_ENT(auxv->a_type, auxv->a_un.a_val);
+            break;
         }
     }
 
+    AUX_ENT(0, 0);
     return 0;
 }
    

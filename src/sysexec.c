@@ -806,6 +806,12 @@ initGoHook(const char *buf)
     int rc;
     funchook_t *funchook;
 
+    int (*ni_open)(const char *pathname, int flags, mode_t mode);
+    ni_open = dlsym(RTLD_NEXT, "open");
+    int (*ni_close)(int fd);
+    ni_close = dlsym(RTLD_NEXT, "close");
+    if (!ni_open || !ni_close) return;
+
     // A go app may need to expand stacks for some C functions
     g_need_stack_expand = TRUE;
 
@@ -837,12 +843,12 @@ initGoHook(const char *buf)
     char* debug_file;
     int fd;
     if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
-        ((fd = open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
+        ((fd = ni_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
         dprintf(fd, "runtime.g|m=%d\n", g_go.g_to_m);
         dprintf(fd, "runtime.m|tls=%d\n", g_go.m_to_tls);
         dprintf(fd, "net/http.connReader|conn=%d\n", g_go.connReader_to_conn);
         dprintf(fd, "net/http.conn|tlsState=%d\n", g_go.conn_to_tlsState);
-        close(fd);
+        ni_close(fd);
     }
 
 

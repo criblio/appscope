@@ -28,7 +28,7 @@
 //     "                 U __stack_chk_fail@@GLIBC_2.4\n",
 //
 
-#define LATEST_LIBC_VER_NEEDED "2.16"
+#define LATEST_LIBC_VER_NEEDED "2.12"
 #define LIBC "GLIBC_"
 
 #define PRIVATE "PRIVATE"

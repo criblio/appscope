@@ -658,8 +658,6 @@ threadNow(int sig)
 static void
 threadInit()
 {
-    // DEBUG
-    return;
     if (osThreadInit(threadNow, g_thread.interval) == FALSE) {
         scopeLog("ERROR: threadInit:osThreadInit", -1, CFG_LOG_ERROR);
     }

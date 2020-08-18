@@ -37,7 +37,7 @@ clean:
 	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a
 
 SRC_C_FILES:=$(wildcard src/*.c)
-SRC_C_FILES:=$(filter-out src/wrap.c src/wrap.c src/sysexec.c src/scope.c src/javaagent.c src/javabci.c, $(SRC_C_FILES))
+SRC_C_FILES:=$(filter-out src/wrap.c src/wrap_go.c src/sysexec.c src/scope.c src/javaagent.c src/javabci.c, $(SRC_C_FILES))
 TEST_C_FILES:=$(wildcard test/*.c)
 TEST_C_FILES:=$(filter-out test/glibcvertest.c test/wraptest.c, $(TEST_C_FILES))
 C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c

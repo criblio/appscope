@@ -1,7 +1,3 @@
-#include <sys/syscall.h>
-#include <asm/prctl.h>
-
-#include "gocontext.h"
 
 .global	go_hook_write, go_hook_open, go_hook_socket, go_hook_accept4
 .global go_hook_read, go_hook_close, go_hook_tls_read, go_hook_tls_write
@@ -66,6 +62,24 @@
     interpose go_hook_tls_read, go_tls_read
     interpose go_hook_tls_write, go_tls_write
 /*
+    Debug hint:
+    When you need to change the assy code, 
+    it's a pain to step through the code
+    in macro form. What has worked much better
+    is to copy/paste the code from the macro
+    and execute it as one of the interposition
+    handlers. The code below is a replica of
+    what's in the macro with comments removed
+    and labels changed (if any).
+
+    In order to use this as go_hook_write, for
+    example,
+    1) uncomment the code below
+    2) change go_hook_write_1 to go_hook_write
+    3) comment the macro instance above
+       #interpose go_hook_write, go_write
+    4) build
+
 go_hook_write_1:
     sub $0x18, %rsp
     push %rax

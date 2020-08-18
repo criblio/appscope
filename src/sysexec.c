@@ -799,6 +799,40 @@ patch_return_addrs(funchook_t *funchook,
     patchprint("\n\n");
 }
 
+// If possible, we want to set GODEBUG=http2server=0
+// This tells go not to upgrade servers to http2, which allows
+// our http1 protocol capture stuff to do it's thing.
+// We consider this temporary, because when we support http2
+// it will not be necessary.
+#define GO_ENV_VAR "GODEBUG"
+#define GO_ENV_VALUE "http2server"
+static void
+setGoHttpEnvVariable(void)
+{
+    char *cur_val = getenv(GO_ENV_VAR);
+
+    // If GODEBUG isn't set, try to set it to http2server=0
+    if (!cur_val) {
+        if (setenv(GO_ENV_VAR, GO_ENV_VALUE "=0", 1)) {
+            scopeLog("ERROR: Could not set GODEBUG to http2server=0\n", -1, CFG_LOG_ERROR);
+        }
+        return;
+    }
+
+    // GODEBUG is set.
+    // If http2server wasn't specified, let's append ",http2server=0"
+    if (!strstr(cur_val, GO_ENV_VALUE)) {
+        char *new_val = NULL;
+        if ((asprintf(&new_val, "%s,%s=0", cur_val, GO_ENV_VALUE) == -1)) {
+            scopeLog("ERROR: Could not create GODEBUG value\n", -1, CFG_LOG_ERROR);
+            return;
+        }
+        if (setenv(GO_ENV_VAR, new_val, 1)) {
+            scopeLog("ERROR: Could not append http2server=0 to GODEBUG\n", -1, CFG_LOG_ERROR);
+        }
+        if (new_val) free(new_val);
+    }
+}
 
 static void
 initGoHook(const char *buf)
@@ -821,6 +855,8 @@ initGoHook(const char *buf)
         // TODO: add some mechanism to get the config'd log file path
         funchook_set_debug_file(DEFAULT_LOG_PATH);
     }
+
+    setGoHttpEnvVariable();
 
     gostring_t* go_ver; // There is an implicit len field at go_ver + 0x8
     char* go_runtime_version = NULL;
@@ -1207,12 +1243,12 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr ladd
 }
 
 EXPORTON int
-sys_exec(const char *buf, const char *path, int argc, const char **argv, const char **env)
+sys_exec(const char *buf, const char *path, int argc, const char **argv)
 {
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
     Elf64_Addr lastaddr;
 
-    if (!buf || !path || !argv || !env || (argc < 1)) return -1;
+    if (!buf || !path || !argv || (argc < 1)) return -1;
 
     scopeLog("sys_exec type:", ehdr->e_type, CFG_LOG_DEBUG);
 
@@ -1221,7 +1257,7 @@ sys_exec(const char *buf, const char *path, int argc, const char **argv, const c
 
     threadNow(0);
 
-    set_go((char *)buf, argc, argv, env, lastaddr);
+    set_go((char *)buf, argc, argv, (const char**) environ, lastaddr);
 
     return 0;
 }

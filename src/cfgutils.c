@@ -13,6 +13,7 @@
 #include "dbg.h"
 #include "mtcformat.h"
 #include "scopetypes.h"
+#include "com.h"
 
 #ifndef NO_YAML
 #include "yaml.h"
@@ -297,7 +298,7 @@ doEnvVariableSubstitution(const char* value)
     char* outptr = outval;       // "tail" pointer where text can be appended
     char* inptr = (char*) value; // "current" pointer as we scan through value
 
-    while (re && !regexec(re, inptr, 1, &match, 0)) {
+    while (re && !regexec_wrapper(re, inptr, 1, &match, 0)) {
 
         int match_size = match.rm_eo - match.rm_so;
 

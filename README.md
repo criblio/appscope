@@ -14,9 +14,9 @@ Run these commands to do everything: checkout the scope codebase, install necess
 
     git clone git@bitbucket.org:cribl/scope.git
     cd scope
-    ./scope.sh build
+    ./scope_env.sh build
 
-`./scope.sh build` is a good command to know, it does everything needed to get a brand new environment up and running, but can also be run on an existing environment to rebuild, and rerun tests.  If desired, individual parts of `./scope.sh build` can be run individually from the scope directory.
+`./scope_env.sh build` is a good command to know, it does everything needed to get a brand new environment up and running, but can also be run on an existing environment to rebuild, and rerun tests.  If desired, individual parts of `./scope_env.sh build` can be run individually from the scope directory.
 
     ./install_build_tools.sh
     make all
@@ -33,7 +33,7 @@ TBD
 # Run
 In order to run any given process in a mode where detailed information about the process can be extracted, without changes to code or the executable, you simply need to run the process with one or more environment variables set. You can set the environment variables defined below as needed.  Or, just start the executable with the Scope wrapper. Here's how: From the top level Scope directory execute the command:
 
-    ./scope.sh run your_command params
+    ./scope_env.sh run your_command params
 Where "your_command" is any executable and "params" are any parameters needed for the executable.  
  
 # Developer notes

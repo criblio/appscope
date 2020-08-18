@@ -6,6 +6,7 @@
 
 #include "dbg.h"
 #include "evtformat.h"
+#include "com.h"
 
 // key names for event JSON
 #define HOST "host"
@@ -259,7 +260,7 @@ anyValueFieldMatches(regex_t* filter, event_t* metric)
             DBG(NULL);
     }
     if (valbuf[0]) {
-        if (!regexec(filter, valbuf, 0, NULL, 0)) return MATCH_FOUND;
+        if (!regexec_wrapper(filter, valbuf, 0, NULL, 0)) return MATCH_FOUND;
     }
 
     // Handle the case where there are no fields...
@@ -277,7 +278,7 @@ anyValueFieldMatches(regex_t* filter, event_t* metric)
             }
         }
 
-        if (str && !regexec(filter, str, 0, NULL, 0)) return MATCH_FOUND;
+        if (str && !regexec_wrapper(filter, str, 0, NULL, 0)) return MATCH_FOUND;
     }
 
     return NO_MATCH_FOUND;
@@ -366,7 +367,7 @@ addJsonFields(event_field_t* fields, regex_t* fieldFilter, cJSON* json)
     for (fld = fields; fld->value_type != FMT_END; fld++) {
 
         // skip outputting anything that doesn't match fieldFilter
-        if (fieldFilter && regexec(fieldFilter, fld->name, 0, NULL, 0)) continue;
+        if (fieldFilter && regexec_wrapper(fieldFilter, fld->name, 0, NULL, 0)) continue;
 
         if (fld->value_type == FMT_STR) {
             if (!cJSON_AddStringToObjLN(json, fld->name, fld->value.str)) return FALSE;
@@ -430,7 +431,7 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
     // Test for a name field match.  No match, no metric output
     if (!evtFormatSourceEnabled(evt, src) ||
         !(filter = evtFormatNameFilter(evt, src)) ||
-        (regexec(filter, metric->name, 0, NULL, 0))) {
+        (regexec_wrapper(filter, metric->name, 0, NULL, 0))) {
         return NULL;
     }
 
@@ -494,11 +495,11 @@ evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
     regex_t* filter;
     if (evtFormatSourceEnabled(evt, CFG_SRC_CONSOLE) &&
        (filter = evtFormatNameFilter(evt, CFG_SRC_CONSOLE)) &&
-       (!regexec(filter, path, 0, NULL, 0))) {
+       (!regexec_wrapper(filter, path, 0, NULL, 0))) {
         logType = CFG_SRC_CONSOLE;
     } else if (evtFormatSourceEnabled(evt, CFG_SRC_FILE) &&
        (filter = evtFormatNameFilter(evt, CFG_SRC_FILE)) &&
-       (!regexec(filter, path, 0, NULL, 0))) {
+       (!regexec_wrapper(filter, path, 0, NULL, 0))) {
         logType = CFG_SRC_FILE;
     } else {
         return NULL;
@@ -520,7 +521,7 @@ evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
     cJSON* dataField = cJSON_GetObjectItem(json, "data");
     if (dataField && dataField->valuestring) {
         filter = evtFormatValueFilter(evt, logType);
-        if (filter && regexec(filter, dataField->valuestring, 0, NULL, 0)) {
+        if (filter && regexec_wrapper(filter, dataField->valuestring, 0, NULL, 0)) {
             // This event doesn't match.  Drop it on the floor.
             cJSON_Delete(json);
             return NULL;

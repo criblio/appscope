@@ -4,6 +4,7 @@
  * gcc -Wall -g src/scope.c -L./lib/linux -lscope -o scope
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -15,7 +16,6 @@
 
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
-extern char **environ;
 extern int sys_exec(const char *, const char *, int, char **, char **);
 
 static void

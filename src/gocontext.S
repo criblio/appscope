@@ -1,12 +1,11 @@
 
-.global	go_hook_write, go_hook_open, go_hook_socket, go_hook_accept4
-.global go_hook_read, go_hook_close, go_hook_tls_read, go_hook_tls_write
-
 // The macro interpose takes 3 params
 // the name of the global variable as defined above ex: go_hook_write
 // the name of the Go function that will be called
 // the name of the C function interposed handler
 .macro interpose a_func, c_func
+.global \a_func
+.hidden \c_func
 \a_func:
     // This creates a stack frame of 0x20 bytes
     // The add grows the stacks by 0x18

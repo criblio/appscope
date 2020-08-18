@@ -76,6 +76,41 @@ c_str(gostring_t* go_str)
     return path;
 }
 
+// If possible, we want to set GODEBUG=http2server=0
+// This tells go not to upgrade servers to http2, which allows
+// our http1 protocol capture stuff to do it's thing.
+// We consider this temporary, because when we support http2
+// it will not be necessary.
+#define GO_ENV_VAR "GODEBUG"
+#define GO_ENV_VALUE "http2server"
+static void
+setGoHttpEnvVariable(void)
+{
+    char *cur_val = getenv(GO_ENV_VAR);
+
+    // If GODEBUG isn't set, try to set it to http2server=0
+    if (!cur_val) {
+        if (setenv(GO_ENV_VAR, GO_ENV_VALUE "=0", 1)) {
+            scopeLog("ERROR: Could not set GODEBUG to http2server=0\n", -1, CFG_LOG_ERROR);
+        }
+        return;
+    }
+
+    // GODEBUG is set.
+    // If http2server wasn't specified, let's append ",http2server=0"
+    if (!strstr(cur_val, GO_ENV_VALUE)) {
+        char *new_val = NULL;
+        if ((asprintf(&new_val, "%s,%s=0", cur_val, GO_ENV_VALUE) == -1)) {
+            scopeLog("ERROR: Could not create GODEBUG value\n", -1, CFG_LOG_ERROR);
+            return;
+        }
+        if (setenv(GO_ENV_VAR, new_val, 1)) {
+            scopeLog("ERROR: Could not append http2server=0 to GODEBUG\n", -1, CFG_LOG_ERROR);
+        }
+        if (new_val) free(new_val);
+    }
+}
+
 static bool
 looks_like_first_inst_of_go_func(_DecodedInst* asm_inst)
 {
@@ -170,7 +205,6 @@ patch_return_addrs(funchook_t *funchook,
     patchprint("\n\n");
 }
 
-
 void
 initGoHook(const char *buf)
 {
@@ -186,6 +220,9 @@ initGoHook(const char *buf)
         // TODO: add some mechanism to get the config'd log file path
         funchook_set_debug_file(DEFAULT_LOG_PATH);
     }
+
+    // ask Go to use HTTP 1 instead of HTTP 2 by default
+    setGoHttpEnvVariable();
 
     gostring_t* go_ver; // There is an implicit len field at go_ver + 0x8
     char* go_runtime_version = NULL;

@@ -48,7 +48,7 @@ endtest(){
 #
 starttest plainServer
 cd /go/net
-GODEBUG=http2server=0 scope ./plainServer &
+scope ./plainServer &
 
 # this sleep gives the server a chance to bind to the port (80)
 # before we try to hit it with curl
@@ -80,7 +80,7 @@ endtest
 starttest tlsServer
 cd /go/net
 STRUCT_PATH=/go/net/go_offsets.txt
-SCOPE_GO_STRUCT_PATH=$STRUCT_PATH GODEBUG=http2server=0 scope ./tlsServer &
+SCOPE_GO_STRUCT_PATH=$STRUCT_PATH scope ./tlsServer &
 
 # this sleep gives the server a chance to bind to the port (4430)
 # before we try to hit it with curl

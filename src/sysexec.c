@@ -314,13 +314,26 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     // end of argv
     *spp++ = NULL;
     
-    // do env
-    // Note that the env array on the stack are pointers to strings.
-    // We are pointing to the strings provided from the executable,
-    // re-using them for the new app we are starting.
-    for (i = 0; env[i]; i++) {
-        if ((&env[i]) && spp) {
-            *spp++ = (char *)env[i];
+    /* do env
+     * Note that the env array on the stack are pointers to strings.
+     * We are pointing to the strings provided from the executable, main,
+     * re-using them for the new app we are starting.
+     *
+     * We are using 2 different values for env. 
+     * First, is the environ variable from libc. Any call to setenv updates
+     * environ and not env. Therefore, to ensure we set env for the new
+     * app being started with any additional variables since main started
+     * we need environ and not env.
+     *
+     * Second, we use env that was passed from main because it is the
+     * pointer to what's on the stack. We need to locate the aux vectors
+     * on the stack. They exist immediately after the env pointers.
+     * Therefore, we need to start from the env on the stack in order to 
+     * locate aux vectors.
+    */
+    for (i = 0; environ[i]; i++) {
+        if ((&environ[i]) && spp) {
+            *spp++ = (char *)environ[i];
         } else {
             scopeLog("ERROR:copy_strings: environ string is not correct", -1, CFG_LOG_ERROR);
             return -1;
@@ -450,7 +463,7 @@ sys_exec(const char *buf, const char *path, int argc, const char **argv, const c
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
     Elf64_Addr lastaddr;
 
-    if (!buf || !path || !argv || !env || (argc < 1)) return -1;
+    if (!buf || !path || !argv || (argc < 1)) return -1;
 
     scopeLog("sys_exec type:", ehdr->e_type, CFG_LOG_DEBUG);
 

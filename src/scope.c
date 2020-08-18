@@ -16,7 +16,7 @@
 
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
-extern int sys_exec(const char *, const char *, int, char **);
+extern int sys_exec(const char *, const char *, int, char **, char **);
 
 static void
 usage(char *prog) {
@@ -125,7 +125,7 @@ get_elf(char *path)
 }
 
 int
-main(int argc, char **argv)
+main(int argc, char **argv, char **env)
 {
     int flen;
     char *buf;
@@ -162,7 +162,7 @@ main(int argc, char **argv)
         exit(0);
     }
 
-    sys_exec(buf, argv[1], argc, argv);
+    sys_exec(buf, argv[1], argc, argv, env);
 
     return 0;
 }

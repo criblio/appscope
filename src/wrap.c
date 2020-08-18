@@ -1211,11 +1211,6 @@ init(void)
 #endif // __STATX__
 #endif // __LINUX__
 
-    g_fn.calloc = dlsym(RTLD_NEXT, "calloc");
-    g_fn.malloc = dlsym(RTLD_NEXT, "malloc");
-    g_fn.free = dlsym(RTLD_NEXT, "free");
-    g_fn.realloc = dlsym(RTLD_NEXT, "realloc");
-
     setProcId(&g_proc);
 
     initState();

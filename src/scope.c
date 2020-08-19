@@ -13,10 +13,18 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <elf.h>
+#include <sys/syscall.h>
+#include <sys/utsname.h>
+#include <stddef.h>
+#include <sys/wait.h>
+#include <dlfcn.h>
 
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
-extern int sys_exec(const char *, const char *, int, char **, char **);
+extern unsigned char _binary___lib_linux_libscope_so_start;
+extern unsigned char _binary___lib_linux_libscope_so_end;
+
+//extern int sys_exec(const char *, const char *, int, char **, char **);
 
 static void
 usage(char *prog) {
@@ -124,11 +132,17 @@ get_elf(char *path)
     return buf;
 }
 
+
 int
 main(int argc, char **argv, char **env)
 {
     int flen;
     char *buf;
+    char path[1024];
+    int fd;
+    int (*sys_exec)(const char *, const char *, int, char **, char **);
+    void *handle;
+    size_t libsize;
     
     //check command line arguments 
     if (argc < 2) {
@@ -136,31 +150,64 @@ main(int argc, char **argv, char **env)
         exit(1);
     }
 
+    fd = memfd_create("", 0);
+    if (fd == -1) {
+        perror("memfd_create");
+        exit(EXIT_FAILURE);
+    }
+    libsize = (size_t) (&_binary___lib_linux_libscope_so_end - &_binary___lib_linux_libscope_so_start);
+    if (write(fd, &_binary___lib_linux_libscope_so_start, libsize) != libsize) {
+        perror("write");
+        close(fd);
+        exit(EXIT_FAILURE);
+    }
+    
+    snprintf(path, sizeof(path), "/proc/%i/fd/%i", getpid(), fd);
+    printf("LD_PRELOAD=%s\n", path);
+
     printf("%s:%d loading %s\n", __FUNCTION__, __LINE__, argv[1]);
 
     if (((buf = get_elf(argv[1])) == NULL) ||
         (!is_static(buf))) {
         printf("%s:%d not a static file\n", __FUNCTION__, __LINE__);
 
-        if (setenv("LD_PRELOAD", "libscope.so", 0) == -1) {
-            perror("setenv");
-        }
-
-        if (fork() == 0) {
-            execve(argv[1], &argv[1], environ);
-            perror("execve");
-            exit(-1);
-        }
-
         if ((flen = get_file_size(argv[1])) == -1) {
             printf("%s:%d ERROR: file size\n", __FUNCTION__, __LINE__);
-            exit(-1);
+            exit(EXIT_FAILURE);
         }
 
         dump_elf(buf, flen);
-
-        exit(0);
+        
+        if (setenv("LD_PRELOAD", path, 0) == -1) {
+            perror("setenv");
+            exit(EXIT_FAILURE);
+        }
+        
+        pid_t pid = fork();
+        if (pid == -1) {
+            perror("fork");
+            exit(EXIT_FAILURE);
+        } else if (pid > 0) {
+            int status;
+            waitpid(pid, &status, 0);
+            close(fd);
+            exit(status);
+        } else  {
+            execve(argv[1], &argv[1], environ);
+        }
     }
+
+    handle = dlopen(path, RTLD_LAZY);
+    if (!handle) {
+        perror("dlopen");
+        exit(EXIT_FAILURE);
+    }
+    sys_exec = dlsym(handle, "sys_exec");
+    if (!sys_exec) {
+        perror("dlsym");
+        exit(EXIT_FAILURE);
+    }
+    close(fd);
 
     sys_exec(buf, argv[1], argc, argv, env);
 

@@ -3,8 +3,7 @@ FROM centos:6
 ENV JAVA_HOME /usr/lib/java
 ARG JRE_TGZ
 
-#ADD https://cdn.cribl.io/dl/lb/java/jre/${JRE_TGZ} /tmp/
-ADD https://sobolewsk.s3.eu-west-2.amazonaws.com/jdk/${JRE_TGZ} /jdk.tar.gz
+ADD https://cdn.cribl.io/dl/lb/java/${JRE_TGZ} /jdk.tar.gz
 RUN mkdir -p ${JAVA_HOME} && \
     tar -xz -C ${JAVA_HOME} --strip-components=1 -f /jdk.tar.gz && \
     rm -rf /jdk.tar.gz && \

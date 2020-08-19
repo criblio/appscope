@@ -143,53 +143,53 @@ services:
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
-        JRE_TGZ: jre-7u80-linux-x64.tar.gz
+        JRE_TGZ: jre/jre-7u80-linux-x64.tar.gz
 
   oracle_java8:
     build:
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
-        JRE_TGZ: jre-8u251-linux-x64.tar.gz
+        JRE_TGZ: jre/jre-8u251-linux-x64.tar.gz
 
   oracle_java9:
     build:
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
-        JRE_TGZ: jre-9.0.4_linux-x64_bin.tar.gz
+        JRE_TGZ: jre/jre-9.0.4_linux-x64_bin.tar.gz
 
   oracle_java10:
     build:
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
-        JRE_TGZ: jre-10.0.2_linux-x64_bin.tar.gz
+        JRE_TGZ: jre/jre-10.0.2_linux-x64_bin.tar.gz
 
   oracle_java11:
     build:
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
-        JRE_TGZ: jdk-11.0.6_linux-x64_bin.tar.gz
+        JRE_TGZ: jdk/jdk-11.0.6_linux-x64_bin.tar.gz
 
   oracle_java12:
     build:
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
-        JRE_TGZ: jdk-12.0.2_linux-x64_bin.tar.gz
+        JRE_TGZ: jdk/jdk-12.0.2_linux-x64_bin.tar.gz
 
   oracle_java13:
     build:
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
-        JRE_TGZ: jdk-13.0.2_linux-x64_bin.tar.gz
+        JRE_TGZ: jdk/jdk-13.0.2_linux-x64_bin.tar.gz
 
   oracle_java14:
     build:
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
-        JRE_TGZ: jdk-14.0.2_linux-x64_bin.tar.gz
+        JRE_TGZ: jdk/jdk-14.0.2_linux-x64_bin.tar.gz

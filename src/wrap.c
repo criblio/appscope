@@ -33,6 +33,7 @@
 
 interposed_funcs g_fn;
 rtconfig g_cfg = {0};
+
 static thread_timing g_thread = {0};
 static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
@@ -40,6 +41,7 @@ static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 static list_t *g_nsslist;
+
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
 
@@ -50,10 +52,7 @@ __thread int g_getdelim = 0;
 static void *periodic(void *);
 static void doConfig(config_t *);
 static void reportProcessStart(void);
-static void threadNow(int);
-
-#define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
-#define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
+void threadNow(int);
 
 #ifdef __LINUX__
 static got_list hook_list[] = {
@@ -580,7 +579,7 @@ dynConfig(void)
     return 0;
 }
 
-static void
+void
 threadNow(int sig)
 {
     static uint64_t serialize;
@@ -651,7 +650,7 @@ threadNow(int sig)
  * not started until after the app starts and is
  * past it's own init. We no longer need to rely
  * on the thread being created when an interposed
- * function is called. For nopw, we are leaving
+ * function is called. For now, we are leaving
  * the check for the thread in each interposed
  * function as a back up in case the timer has
  * an issue of some sort.

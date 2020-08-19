@@ -184,7 +184,6 @@ typedef struct interposed_funcs_t {
     int (*sigsuspend)(const sigset_t *);
     int (*sigaction)(int, const struct sigaction *, struct sigaction *);
     void (*_exit)(int);
-
     int (*SSL_read)(SSL *, void *, int);
     int (*SSL_write)(SSL *, const void *, int);
     int (*SSL_get_fd)(const SSL *);

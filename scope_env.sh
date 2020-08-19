@@ -2,12 +2,12 @@
 
 print_help() {
     echo "Usage Examples:"
-    echo "    ./scope.sh run <cmd and args>     (executes cmd with scope library)"
-    echo "    ./scope.sh version                (identifies the scope library version)"
-    echo "    ./scope.sh platform               (returns Linux or macOS)"
-    echo "    ./scope.sh pkg_mgr                (returns yum, apt-get, or brew)"
-    echo "    ./scope.sh build                  (clones, installs tools, and builds scope)"
-    echo "    ./scope.sh help                   (prints this message)"
+    echo "    ./scope_env.sh run <cmd and args>     (executes cmd with scope library)"
+    echo "    ./scope_env.sh version                (identifies the scope library version)"
+    echo "    ./scope_env.sh platform               (returns Linux or macOS)"
+    echo "    ./scope_env.sh pkg_mgr                (returns yum, apt-get, or brew)"
+    echo "    ./scope_env.sh build                  (clones, installs tools, and builds scope)"
+    echo "    ./scope_env.sh help                   (prints this message)"
 }
 
 determine_lib_path() {
@@ -109,10 +109,10 @@ install_brew() {
 
 platform_and_pkgmgr_defined() {
     if [ ${PLATFORM} = "Error" ]; then
-        echo "scope.sh does not support this platform type.  Exiting."
+        echo "scope_env.sh does not support this platform type.  Exiting."
         exit 1
     elif [ ${PKG_MGR} = "Error" ]; then
-        echo "scope.sh does not support this package menager.  Exiting."
+        echo "scope_env.sh does not support this package menager.  Exiting."
         exit 1
     else
         echo "Platform type is ${PLATFORM} with package manager ${PKG_MGR}."
@@ -206,7 +206,7 @@ clone_scope() {
     if git clone git@bitbucket.org:cribl/scope.git; then
         echo "Clone of scope.git was successful."
         cd scope
-        #rm ../scope.sh
+        #rm ../scope_env.sh
     else
         echo "Clone of scope.git was unsuccessful.  Exiting."
         exit 1
@@ -244,7 +244,7 @@ run_make() {
 
 
 build_scope() {
-    echo "Running scope.sh."
+    echo "Running scope_env.sh."
 
     PLATFORM=$(determine_platform)
     PKG_MGR=$(determine_pkg_mgr)
@@ -266,7 +266,7 @@ build_scope() {
 
 
 if [ "$#" = 0 ]; then
-    echo "Expected at least one argument.  Try './scope.sh help; for more info."
+    echo "Expected at least one argument.  Try './scope_env.sh help; for more info."
     exit 1
 fi
 
@@ -292,7 +292,7 @@ for arg in "$@"; do
         print_help
         ;;
     *)
-        echo "Argument $arg is not expected.  Try './scope.sh help' for expected arguments."
+        echo "Argument $arg is not expected.  Try './scope_env.sh help' for expected arguments."
         ;;
     esac
 done

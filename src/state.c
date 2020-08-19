@@ -801,8 +801,8 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     }
 
     match_data = pcre2_match_data_create_from_pattern(pre->re, NULL);
-    if (pcre2_match(pre->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0,
-                    match_data, NULL) > 0) {
+    if (pcre2_match_wrapper(pre->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0,
+                            match_data, NULL) > 0) {
         //DEBUG
         //scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_ERROR);
         net->protocol = pre->type;

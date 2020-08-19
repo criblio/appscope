@@ -1,6 +1,9 @@
 #include "com.h"
+#include "dbg.h"
 
 extern rtconfig g_cfg;
+
+bool g_need_stack_expand = FALSE;
 
 // for reporttest on mac __attribute__((weak))
 /*
@@ -176,3 +179,85 @@ msgEventGet(ctl_t *ctl)
     return ctlGetEvent(ctl);
 }
 
+int
+pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
+                    PCRE2_SIZE startoffset, uint32_t options,
+                    pcre2_match_data *match_data, pcre2_match_context *mcontext)
+{
+    int rc;
+    char *pcre_stack, *tstack, *gstack;
+
+    if (g_need_stack_expand == FALSE) {
+        return pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
+    }
+
+    if ((pcre_stack = malloc(PCRE_STACK_SIZE)) == NULL) {
+        scopeLog("ERROR; pcre2_match_wrapper: malloc", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    tstack = pcre_stack + PCRE_STACK_SIZE;
+
+    // save the original stack, switch to the tstack
+    __asm__ volatile (
+        "mov %%rsp, %2 \n"
+        "mov %1, %%rsp \n"
+        : "=r"(rc)                   // output
+        : "m"(tstack), "m"(gstack)   // input
+        :                            // clobbered register
+        );
+
+    rc = pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
+
+    // Switch stack back to the original stack
+    __asm__ volatile (
+        "mov %1, %%rsp \n"
+        : "=r"(rc)                        // output
+        : "r"(gstack)                     // inputs
+        :                                 // clobbered register
+        );
+
+    if (pcre_stack) free(pcre_stack);
+    return rc;
+}
+
+int
+regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
+                regmatch_t *pmatch, int eflags)
+{
+    int rc, arc;
+    char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
+
+    if (g_need_stack_expand == FALSE) {
+        return regexec(preg, string, nmatch, pmatch, eflags);
+    }
+
+    if ((pcre_stack = malloc(PCRE_STACK_SIZE)) == NULL) {
+        scopeLog("ERROR; regexec_wrapper: malloc", -1, CFG_LOG_ERROR);
+        return -1;
+    }
+
+    tstack = pcre_stack + PCRE_STACK_SIZE;
+
+    // save the original stack, switch to the tstack
+    __asm__ volatile (
+        "mov %%rsp, %2 \n"
+        "mov %1, %%rsp \n"
+        : "=r"(arc)                   // output
+        : "m"(tstack), "m"(gstack)   // input
+        :                            // clobbered register
+        );
+
+    rc = regexec(preg, string, nmatch, pmatch, eflags);
+
+    // Switch stack back to the original stack
+    __asm__ volatile (
+        "mov %1, %%rsp \n"
+        : "=r"(arc)                        // output
+        : "r"(gstack)                     // inputs
+        :                                 // clobbered register
+        );
+
+    if (pcre_stack) free(pcre_stack);
+    return rc;
+}

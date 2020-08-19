@@ -9,6 +9,7 @@
 #include "dbg.h"
 #include "mtcformat.h"
 #include "scopetypes.h"
+#include "com.h"
 
 #define TRUE 1
 #define FALSE 0
@@ -148,7 +149,7 @@ addStatsdFields(mtc_fmt_t* fmt, event_field_t* fields, char** end, int* bytes, i
     event_field_t* f;
     for (f = fields; f->value_type != FMT_END; f++) {
 
-        if (fieldFilter && regexec(fieldFilter, f->name, 0, NULL, 0)) continue;
+        if (fieldFilter && regexec_wrapper(fieldFilter, f->name, 0, NULL, 0)) continue;
 
         // Honor Verbosity
         if (f->cardinality > fmt->verbosity) continue;

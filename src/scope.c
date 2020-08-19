@@ -1,7 +1,8 @@
 /*
  * Load and run static executables
  *
- * gcc -Wall -g src/scope.c -L./lib/linux -lscope -o scope
+ * objcopy -I binary -O elf64-x86-64 -B i386 ./lib/linux/libscope.so ./lib/linux/libscope.o
+ * gcc -Wall -g src/scope.c -ldl -o scope ./lib/linux/libscope.o
  */
 
 #define _GNU_SOURCE
@@ -23,8 +24,6 @@
 
 extern unsigned char _binary___lib_linux_libscope_so_start;
 extern unsigned char _binary___lib_linux_libscope_so_end;
-
-//extern int sys_exec(const char *, const char *, int, char **, char **);
 
 static void
 usage(char *prog) {

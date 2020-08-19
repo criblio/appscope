@@ -14,8 +14,6 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <elf.h>
-#include <sys/syscall.h>
-#include <sys/utsname.h>
 #include <stddef.h>
 #include <sys/wait.h>
 #include <dlfcn.h>
@@ -142,16 +140,18 @@ main(int argc, char **argv, char **env)
     int (*sys_exec)(const char *, const char *, int, char **, char **);
     void *handle;
     size_t libsize;
+    char shm_name[255];
     
     //check command line arguments 
     if (argc < 2) {
         usage(argv[0]);
         exit(1);
     }
+    snprintf(shm_name, sizeof(shm_name), "libscope%i", getpid());
 
-    fd = memfd_create("", 0);
+    fd = shm_open(shm_name, O_RDWR | O_CREAT, S_IRWXU);
     if (fd == -1) {
-        perror("memfd_create");
+        perror("shm_open");
         exit(EXIT_FAILURE);
     }
     libsize = (size_t) (&_binary___lib_linux_libscope_so_end - &_binary___lib_linux_libscope_so_start);
@@ -160,8 +160,10 @@ main(int argc, char **argv, char **env)
         close(fd);
         exit(EXIT_FAILURE);
     }
+
+    close(fd);
     
-    snprintf(path, sizeof(path), "/proc/%i/fd/%i", getpid(), fd);
+    snprintf(path, sizeof(path), "/dev/shm/%s", shm_name);
     printf("LD_PRELOAD=%s\n", path);
 
     printf("%s:%d loading %s\n", __FUNCTION__, __LINE__, argv[1]);
@@ -189,7 +191,7 @@ main(int argc, char **argv, char **env)
         } else if (pid > 0) {
             int status;
             waitpid(pid, &status, 0);
-            close(fd);
+            shm_unlink(shm_name);
             exit(status);
         } else  {
             execve(argv[1], &argv[1], environ);
@@ -206,7 +208,7 @@ main(int argc, char **argv, char **env)
         perror("dlsym");
         exit(EXIT_FAILURE);
     }
-    close(fd);
+    shm_unlink(shm_name);
 
     sys_exec(buf, argv[1], argc, argv, env);
 

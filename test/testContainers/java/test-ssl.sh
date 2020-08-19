@@ -49,7 +49,7 @@ starttest Tomcat
 /opt/tomcat/bin/catalina.sh run &
 evaltest
 
-until [ "`curl -k --silent --connect-timeout 1 -I https://localhost:8443 | grep 'Coyote'`" != "" ];
+until [ "`curl $CURL_PARAMS  -k --silent --connect-timeout 1 -I https://localhost:8443 | grep 'Coyote'`" != "" ];
 do
     echo waiting for tomcat...
     sleep 1

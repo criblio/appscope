@@ -178,42 +178,67 @@ services:
       args:
         JDK_IMAGE: openjdk:14
 
+  oracle_java6:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile.oracle6
+      args:
+        TOMCAT_MAJOR_VERSION: 7
+        TOMCAT_MINOR_VERSION: 7.0.10
+        KEYTOOL: /usr/java/jre1.6.0_45/bin/keytool
+
+  oracle_java7:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile.oracle
+      args:
+        JRE_TGZ: jre/jre-7u80-linux-x64.tar.gz
+
   oracle_java8:
     build:
       context: .
-      dockerfile: ./java/Dockerfile
+      dockerfile: ./java/Dockerfile.oracle
       args:
-        JDK_IMAGE: sgrio/java:jdk_8_ubuntu
-        KEYTOOL: /usr/lib/jvm/java-8-oracle/bin/keytool
+        JRE_TGZ: jre/jre-8u251-linux-x64.tar.gz
+
+  oracle_java9:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile.oracle
+      args:
+        JRE_TGZ: jre/jre-9.0.4_linux-x64_bin.tar.gz
+
+  oracle_java10:
+    build:
+      context: .
+      dockerfile: ./java/Dockerfile.oracle
+      args:
+        JRE_TGZ: jre/jre-10.0.2_linux-x64_bin.tar.gz
 
   oracle_java11:
     build:
       context: .
-      dockerfile: ./java/Dockerfile
+      dockerfile: ./java/Dockerfile.oracle
       args:
-        JDK_IMAGE: sgrio/java:jdk_11_ubuntu
-        KEYTOOL: /usr/lib/jvm/java-11-oracle/bin/keytool
+        JRE_TGZ: jdk/jdk-11.0.6_linux-x64_bin.tar.gz
 
   oracle_java12:
     build:
       context: .
-      dockerfile: ./java/Dockerfile
+      dockerfile: ./java/Dockerfile.oracle
       args:
-        JDK_IMAGE: sgrio/java:jdk_12_ubuntu
-        KEYTOOL: /usr/lib/jvm/java-12-oracle/bin/keytool
+        JRE_TGZ: jdk/jdk-12.0.2_linux-x64_bin.tar.gz
 
   oracle_java13:
     build:
       context: .
-      dockerfile: ./java/Dockerfile
+      dockerfile: ./java/Dockerfile.oracle
       args:
-        JDK_IMAGE: sgrio/java:jdk_13_ubuntu
-        KEYTOOL: /usr/lib/jvm/java-13-oracle/bin/keytool
+        JRE_TGZ: jdk/jdk-13.0.2_linux-x64_bin.tar.gz
 
   oracle_java14:
     build:
       context: .
-      dockerfile: ./java/Dockerfile
+      dockerfile: ./java/Dockerfile.oracle
       args:
-        JDK_IMAGE: sgrio/java:jdk_14_ubuntu
-        KEYTOOL: /usr/lib/jvm/java-14-oracle/bin/keytool
+        JRE_TGZ: jdk/jdk-14.0.2_linux-x64_bin.tar.gz

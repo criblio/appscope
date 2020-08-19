@@ -173,11 +173,51 @@ services:
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
 
+  oracle_java6:
+    build:
+      cache_from:
+        - criblci/scope-oracle-java6-it:latest
+    image: criblci/scope-oracle-java6-it
+    volumes:
+      - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+  oracle_java7:
+    build:
+      cache_from:
+        - criblci/scope-oracle-java7-it:latest
+    image: criblci/scope-oracle-java7-it
+    volumes:
+      - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   oracle_java8:
     build:
       cache_from:
         - criblci/scope-oracle-java8-it:latest
     image: criblci/scope-oracle-java8-it
+    volumes:
+      - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+  oracle_java9:
+    build:
+      cache_from:
+        - criblci/scope-oracle-java9-it:latest
+    image: criblci/scope-oracle-java9-it
+    volumes:
+      - ./logs:/opt/test-runner/logs
+      - ./libscope.so:/opt/test-runner/bin/libscope.so
+    environment:
+      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
+  oracle_java10:
+    build:
+      cache_from:
+        - criblci/scope-oracle-java10-it:latest
+    image: criblci/scope-oracle-java10-it
     volumes:
       - ./logs:/opt/test-runner/logs
       - ./libscope.so:/opt/test-runner/bin/libscope.so

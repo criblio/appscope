@@ -42,7 +42,9 @@ libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/plattime.c 
 	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/ && rm ./test/selfinterpose/wrap_go.o
 
 scope: src/scope.c
-	gcc -Wall -g src/scope.c -L./lib/linux -lscope -o scope
+	objcopy -I binary -O elf64-x86-64 -B i386 ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
+	gcc -Wall  -g src/scope.c -ldl -o scope ./lib/$(OS)/libscope.o
+	rm -f ./lib/$(OS)/libscope.o
 
 clean:
 	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a scope

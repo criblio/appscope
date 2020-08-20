@@ -7,7 +7,12 @@ jobs:
       - task: DownloadPipelineArtifact@2
         inputs:
           source: current
-          artifact: linux_build
+          artifact: linux_app
+          path: ./test/testContainers/
+      - task: DownloadPipelineArtifact@2
+        inputs:
+          source: current
+          artifact: linux_lib
           path: ./test/testContainers/
       - script: chmod +x ./test/testContainers/libscope.so
       - script: docker login -u $HUB_USERNAME  --password-stdin <<< $HUB_PASSWORD

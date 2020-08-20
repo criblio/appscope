@@ -104,6 +104,39 @@ stages:
 
       - template: test/testContainers/azure/it-test-job-template.yml
         parameters:
+          name: go_8
+          containerName: go_8
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_9
+          containerName: go_9
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_10
+          containerName: go_10
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_11
+          containerName: go_11
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_12
+          containerName: go_12
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_13
+          containerName: go_13
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_14
+          containerName: go_14
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_15
+          containerName: go_15
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
           name: java6
           containerName: java6
       - template: test/testContainers/azure/it-test-job-template.yml

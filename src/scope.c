@@ -17,11 +17,25 @@
 #include <stddef.h>
 #include <sys/wait.h>
 #include <dlfcn.h>
+#include <sys/utsname.h>
 
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
+#define __NR_memfd_create 319
 
 extern unsigned char _binary___lib_linux_libscope_so_start;
 extern unsigned char _binary___lib_linux_libscope_so_end;
+
+typedef struct {
+    char *path;
+    char *shm_name;
+    int fd;
+    int use_memfd;
+} libscope_info_t;
+
+// Wrapper to call memfd_create syscall
+static inline int _memfd_create(const char *name, unsigned int flags) {
+	return syscall(__NR_memfd_create, name, flags);
+}
 
 static void
 usage(char *prog) {
@@ -129,43 +143,104 @@ get_elf(char *path)
     return buf;
 }
 
+/**
+ * Checks if kernel version is >= 3.17
+ */
+static int
+check_kernel_version(void)
+{
+    struct utsname buffer;
+    char *token;
+	char *separator = ".";
+    int val;
+
+	uname(&buffer);
+	token = strtok(buffer.release, separator);
+    val = atoi(token);
+	if (val < 3) {
+		return 0;
+	} else if (val > 3){
+		return 1;
+	}
+
+	token = strtok(NULL, separator);
+	return atoi(token) < 17 ? 0 : 1;
+}
+
+static libscope_info_t *
+setup_libscope()
+{
+    int fd;
+    size_t libsize;
+    char shm_name[255];
+
+    int use_memfd = check_kernel_version();
+    if (use_memfd) {
+        fd = _memfd_create("", 0);
+    } else {
+        snprintf(shm_name, sizeof(shm_name), "libscope%i", getpid());
+        fd = shm_open(shm_name, O_RDWR | O_CREAT, S_IRWXU);
+    }
+    if (fd == -1) {
+        perror(use_memfd ? "memfd_create" : "shm_open");
+        return NULL;
+    }
+    
+    libsize = (size_t) (&_binary___lib_linux_libscope_so_end - &_binary___lib_linux_libscope_so_start);
+    if (write(fd, &_binary___lib_linux_libscope_so_start, libsize) != libsize) {
+        perror("write");
+        close(fd);
+        return NULL;
+    }
+
+    libscope_info_t *info = malloc(sizeof(libscope_info_t));
+
+    info->fd = fd;
+    info->use_memfd = use_memfd;
+
+    if (use_memfd) {
+        asprintf(&info->path, "/proc/%i/fd/%i", getpid(), fd);
+    } else {
+        asprintf(&info->path, "/dev/shm/%s", shm_name);
+        asprintf(&info->shm_name, "%s", shm_name);
+    }
+
+    return info;
+}
+
+static void
+release_libscope(libscope_info_t **info) {
+    close((*info)->fd);
+    if ((*info)->shm_name) {
+        shm_unlink((*info)->shm_name);
+        free((*info)->shm_name);
+    }
+    free((*info)->path);
+    free(*info);
+    *info = NULL;
+}
 
 int
 main(int argc, char **argv, char **env)
 {
     int flen;
     char *buf;
-    char path[1024];
-    int fd;
     int (*sys_exec)(const char *, const char *, int, char **, char **);
     void *handle;
-    size_t libsize;
-    char shm_name[255];
-    
+    libscope_info_t *info;
+
     //check command line arguments 
     if (argc < 2) {
         usage(argv[0]);
         exit(1);
     }
-    snprintf(shm_name, sizeof(shm_name), "libscope%i", getpid());
-
-    fd = shm_open(shm_name, O_RDWR | O_CREAT, S_IRWXU);
-    if (fd == -1) {
-        perror("shm_open");
-        exit(EXIT_FAILURE);
-    }
-    libsize = (size_t) (&_binary___lib_linux_libscope_so_end - &_binary___lib_linux_libscope_so_start);
-    if (write(fd, &_binary___lib_linux_libscope_so_start, libsize) != libsize) {
-        perror("write");
-        close(fd);
+    info = setup_libscope();
+    if (!info) {
+        fprintf(stderr, "%s:%d ERROR: unable to set up libscope\n", __FUNCTION__, __LINE__);
         exit(EXIT_FAILURE);
     }
 
-    close(fd);
-    
-    snprintf(path, sizeof(path), "/dev/shm/%s", shm_name);
-    printf("LD_PRELOAD=%s\n", path);
-
+    printf("LD_PRELOAD=%s\n", info->path);
     printf("%s:%d loading %s\n", __FUNCTION__, __LINE__, argv[1]);
 
     if (((buf = get_elf(argv[1])) == NULL) ||
@@ -174,13 +249,15 @@ main(int argc, char **argv, char **env)
 
         if ((flen = get_file_size(argv[1])) == -1) {
             printf("%s:%d ERROR: file size\n", __FUNCTION__, __LINE__);
+            release_libscope(&info);
             exit(EXIT_FAILURE);
         }
 
         dump_elf(buf, flen);
         
-        if (setenv("LD_PRELOAD", path, 0) == -1) {
+        if (setenv("LD_PRELOAD", info->path, 0) == -1) {
             perror("setenv");
+            release_libscope(&info);
             exit(EXIT_FAILURE);
         }
         
@@ -191,24 +268,26 @@ main(int argc, char **argv, char **env)
         } else if (pid > 0) {
             int status;
             waitpid(pid, &status, 0);
-            shm_unlink(shm_name);
+            release_libscope(&info);
             exit(status);
         } else  {
             execve(argv[1], &argv[1], environ);
         }
     }
 
-    handle = dlopen(path, RTLD_LAZY);
+    handle = dlopen(info->path, RTLD_LAZY);
     if (!handle) {
         perror("dlopen");
+        release_libscope(&info);
         exit(EXIT_FAILURE);
     }
     sys_exec = dlsym(handle, "sys_exec");
     if (!sys_exec) {
         perror("dlsym");
+        release_libscope(&info);
         exit(EXIT_FAILURE);
     }
-    shm_unlink(shm_name);
+    release_libscope(&info);
 
     sys_exec(buf, argv[1], argc, argv, env);
 

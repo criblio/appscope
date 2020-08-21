@@ -23,6 +23,8 @@
 #define __NR_memfd_create   319
 #define _MFD_CLOEXEC		0x0001U
 #define SHM_NAME            "libscope"
+#define TRUE 1
+#define FALSE 0
 
 extern unsigned char _binary___lib_linux_libscope_so_start;
 extern unsigned char _binary___lib_linux_libscope_so_end;
@@ -156,9 +158,8 @@ check_kernel_version(void)
     char *separator = ".";
     int val;
 
-    if (uname(&buffer) == 1) {
-        perror("check_kernel_version:uname");
-        return -1;
+    if (uname(&buffer)) {
+        return 0;
     }
     token = strtok(buffer.release, separator);
     val = atoi(token);
@@ -172,81 +173,74 @@ check_kernel_version(void)
     return atoi(token) < 17 ? 0 : 1;
 }
 
+static void
+release_libscope(libscope_info_t **info_ptr) {
+    if (!info_ptr || !*info_ptr) return;
+
+    libscope_info_t *info = *info_ptr;
+
+    if (info->fd != -1) close(info->fd);
+    if (info->shm_name) {
+        if (info->fd != -1) shm_unlink(info->shm_name);
+        free(info->shm_name);
+    }
+    if (info->path) free(info->path);
+    free(info);
+    *info_ptr = NULL;
+}
+
 static libscope_info_t *
 setup_libscope()
 {
-    int fd;
-    size_t libsize;
-    char shm_name[255];
-    libscope_info_t *info;
-    int use_memfd;
+    libscope_info_t *info = NULL;
+    int everything_successful = FALSE;
 
-    if ((use_memfd = check_kernel_version()) == -1) {
-        return NULL;
-    }
-    
-    if (use_memfd) {
-        fd = _memfd_create(SHM_NAME, _MFD_CLOEXEC);
-    } else {
-        if (snprintf(shm_name, sizeof(shm_name), "%s%i", SHM_NAME, getpid()) == -1) {
-            return NULL;
-        }
-        fd = shm_open(shm_name, O_RDWR | O_CREAT, S_IRWXU);
-    }
-    if (fd == -1) {
-        perror(use_memfd ? "setup_libscope:memfd_create" : "setup_libscope:shm_open");
-        return NULL;
-    }
-    
-    libsize = (size_t) (&_binary___lib_linux_libscope_so_end - &_binary___lib_linux_libscope_so_start);
-    if (write(fd, &_binary___lib_linux_libscope_so_start, libsize) != libsize) {
-        perror("setup_libscope:write");
-        goto err;
-    }
-
-    if ((info = calloc(1, sizeof(libscope_info_t))) == NULL ) {
+    if (!(info = calloc(1, sizeof(libscope_info_t)))) {
         perror("setup_libscope:calloc");
         goto err;
     }
 
-    info->fd = fd;
-    info->use_memfd = use_memfd;
-
-    if (use_memfd) {
-        if (asprintf(&info->path, "/proc/%i/fd/%i", getpid(), fd) == -1) {
-            goto err;
-        }
+    info->fd = -1;
+    info->use_memfd = check_kernel_version();
+    
+    if (info->use_memfd) {
+        info->fd = _memfd_create(SHM_NAME, _MFD_CLOEXEC);
     } else {
-        if (asprintf(&info->path, "/dev/shm/%s", shm_name) == -1) {
+        if (asprintf(&info->shm_name, "%s%i", SHM_NAME, getpid()) == -1) {
+            perror("setup_libscope:shm_name");
+            info->shm_name = NULL; // failure leaves info->shm_name undefined
             goto err;
         }
-        if (asprintf(&info->shm_name, "%s", shm_name) == -1) {
-            goto err;
-        }
+        info->fd = shm_open(info->shm_name, O_RDWR | O_CREAT, S_IRWXU);
+    }
+    if (info->fd == -1) {
+        perror(info->use_memfd ? "setup_libscope:memfd_create" : "setup_libscope:shm_open");
+        goto err;
+    }
+    
+    size_t libsize = (size_t) (&_binary___lib_linux_libscope_so_end - &_binary___lib_linux_libscope_so_start);
+    if (write(info->fd, &_binary___lib_linux_libscope_so_start, libsize) != libsize) {
+        perror("setup_libscope:write");
+        goto err;
     }
 
+    int rv;
+    if (info->use_memfd) {
+        rv = asprintf(&info->path, "/proc/%i/fd/%i", getpid(), info->fd);
+    } else {
+        rv = asprintf(&info->path, "/dev/shm/%s", info->shm_name);
+    }
+    if (rv == -1) {
+        perror("setup_libscope:path");
+        info->path = NULL; // failure leaves info->path undefined
+        goto err;
+    }
+
+    everything_successful = TRUE;
+
+err:
+    if (!everything_successful) release_libscope(&info);
     return info;
-err: 
-    close(fd);
-    if (info) {
-        if (info->path) free(info->path);
-        if (info->shm_name) free(info->shm_name);
-        free(info);
-    }
-    return NULL;
-}
-
-static void
-release_libscope(libscope_info_t **info) {
-    if (!info || !*info) return;
-    close((*info)->fd);
-    if ((*info)->shm_name) {
-        shm_unlink((*info)->shm_name);
-        free((*info)->shm_name);
-    }
-    if ((*info)->path) free((*info)->path);
-    free(*info);
-    *info = NULL;
 }
 
 int

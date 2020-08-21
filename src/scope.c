@@ -289,7 +289,7 @@ main(int argc, char **argv, char **env)
         } else if (pid > 0) {
             int status;
             waitpid(pid, &status, 0);
-            release_libscope(&info);
+            //release_libscope(&info);
             exit(status);
         } else {
             execve(argv[1], &argv[1], environ);
@@ -306,12 +306,12 @@ main(int argc, char **argv, char **env)
         fprintf(stderr, "%s\n", dlerror());
         goto err;
     }
-    release_libscope(&info);
+    //release_libscope(&info);
 
     sys_exec(buf, argv[1], argc, argv, env);
 
     return 0;
 err:
-    release_libscope(&info);
+    //release_libscope(&info);
     exit(EXIT_FAILURE);
 }

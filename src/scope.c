@@ -153,23 +153,23 @@ check_kernel_version(void)
 {
     struct utsname buffer;
     char *token;
-	char *separator = ".";
+    char *separator = ".";
     int val;
 
-	if (uname(&buffer) == 1) {
+    if (uname(&buffer) == 1) {
         perror("check_kernel_version:uname");
         return -1;
     }
-	token = strtok(buffer.release, separator);
+    token = strtok(buffer.release, separator);
     val = atoi(token);
-	if (val < 3) {
-		return 0;
-	} else if (val > 3){
-		return 1;
-	}
+    if (val < 3) {
+        return 0;
+    } else if (val > 3){
+        return 1;
+    }
 
-	token = strtok(NULL, separator);
-	return atoi(token) < 17 ? 0 : 1;
+    token = strtok(NULL, separator);
+    return atoi(token) < 17 ? 0 : 1;
 }
 
 static libscope_info_t *

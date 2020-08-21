@@ -20,7 +20,9 @@
 #include <sys/utsname.h>
 
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
-#define __NR_memfd_create 319
+#define __NR_memfd_create   319
+#define _MFD_CLOEXEC		0x0001U
+#define SHM_NAME            "libscope"
 
 extern unsigned char _binary___lib_linux_libscope_so_start;
 extern unsigned char _binary___lib_linux_libscope_so_end;
@@ -102,23 +104,23 @@ get_elf(char *path)
     struct stat sbuf;
 
     if ((fd = open(path, O_RDONLY)) == -1) {
-        perror("open:get_elf");
+        perror("get_elf:open");
         return NULL;
     }
 
     if (fstat(fd, &sbuf) == -1) {
-        perror("fstat:get_elf");
+        perror("get_elf:fstat");
         return NULL;        
     }
 
     if ((buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
                     PROT_READ, MAP_PRIVATE, fd, (off_t)NULL)) == MAP_FAILED) {
-        perror("mmap:get_elf");
+        perror("get_elf:mmap");
         return NULL;
     }
 
     if (close(fd) == -1) {
-        perror("close:get_elf");
+        perror("get_elf:close");
         dump_elf(buf, sbuf.st_size);
         return NULL;        
     }
@@ -154,7 +156,10 @@ check_kernel_version(void)
 	char *separator = ".";
     int val;
 
-	uname(&buffer);
+	if (uname(&buffer) == 1) {
+        perror("check_kernel_version:uname");
+        return -1;
+    }
 	token = strtok(buffer.release, separator);
     val = atoi(token);
 	if (val < 3) {
@@ -173,49 +178,73 @@ setup_libscope()
     int fd;
     size_t libsize;
     char shm_name[255];
+    libscope_info_t *info;
+    int use_memfd;
 
-    int use_memfd = check_kernel_version();
+    if ((use_memfd = check_kernel_version()) == -1) {
+        return NULL;
+    }
+    
     if (use_memfd) {
-        fd = _memfd_create("", 0);
+        fd = _memfd_create(SHM_NAME, _MFD_CLOEXEC);
     } else {
-        snprintf(shm_name, sizeof(shm_name), "libscope%i", getpid());
+        if (snprintf(shm_name, sizeof(shm_name), "%s%i", SHM_NAME, getpid()) == -1) {
+            return NULL;
+        }
         fd = shm_open(shm_name, O_RDWR | O_CREAT, S_IRWXU);
     }
     if (fd == -1) {
-        perror(use_memfd ? "memfd_create" : "shm_open");
+        perror(use_memfd ? "setup_libscope:memfd_create" : "setup_libscope:shm_open");
         return NULL;
     }
     
     libsize = (size_t) (&_binary___lib_linux_libscope_so_end - &_binary___lib_linux_libscope_so_start);
     if (write(fd, &_binary___lib_linux_libscope_so_start, libsize) != libsize) {
-        perror("write");
-        close(fd);
-        return NULL;
+        perror("setup_libscope:write");
+        goto err;
     }
 
-    libscope_info_t *info = malloc(sizeof(libscope_info_t));
+    if ((info = calloc(1, sizeof(libscope_info_t))) == NULL ) {
+        perror("setup_libscope:calloc");
+        goto err;
+    }
 
     info->fd = fd;
     info->use_memfd = use_memfd;
 
     if (use_memfd) {
-        asprintf(&info->path, "/proc/%i/fd/%i", getpid(), fd);
+        if (asprintf(&info->path, "/proc/%i/fd/%i", getpid(), fd) == -1) {
+            goto err;
+        }
     } else {
-        asprintf(&info->path, "/dev/shm/%s", shm_name);
-        asprintf(&info->shm_name, "%s", shm_name);
+        if (asprintf(&info->path, "/dev/shm/%s", shm_name) == -1) {
+            goto err;
+        }
+        if (asprintf(&info->shm_name, "%s", shm_name) == -1) {
+            goto err;
+        }
     }
 
     return info;
+err: 
+    close(fd);
+    if (info) {
+        if (info->path) free(info->path);
+        if (info->shm_name) free(info->shm_name);
+        free(info);
+    }
+    return NULL;
 }
 
 static void
 release_libscope(libscope_info_t **info) {
+    if (!info || !*info) return;
     close((*info)->fd);
     if ((*info)->shm_name) {
         shm_unlink((*info)->shm_name);
         free((*info)->shm_name);
     }
-    free((*info)->path);
+    if ((*info)->path) free((*info)->path);
     free(*info);
     *info = NULL;
 }
@@ -240,7 +269,6 @@ main(int argc, char **argv, char **env)
         exit(EXIT_FAILURE);
     }
 
-    printf("LD_PRELOAD=%s\n", info->path);
     printf("%s:%d loading %s\n", __FUNCTION__, __LINE__, argv[1]);
 
     if (((buf = get_elf(argv[1])) == NULL) ||
@@ -248,48 +276,48 @@ main(int argc, char **argv, char **env)
         printf("%s:%d not a static file\n", __FUNCTION__, __LINE__);
 
         if ((flen = get_file_size(argv[1])) == -1) {
-            printf("%s:%d ERROR: file size\n", __FUNCTION__, __LINE__);
-            release_libscope(&info);
-            exit(EXIT_FAILURE);
+            fprintf(stderr, "%s:%d ERROR: file size\n", __FUNCTION__, __LINE__);
+            goto err;
         }
 
         dump_elf(buf, flen);
         
         if (setenv("LD_PRELOAD", info->path, 0) == -1) {
             perror("setenv");
-            release_libscope(&info);
-            exit(EXIT_FAILURE);
+            goto err;
         }
+        printf("LD_PRELOAD=%s\n", info->path);
         
         pid_t pid = fork();
         if (pid == -1) {
             perror("fork");
-            exit(EXIT_FAILURE);
+            goto err;
         } else if (pid > 0) {
             int status;
             waitpid(pid, &status, 0);
             release_libscope(&info);
             exit(status);
-        } else  {
+        } else {
             execve(argv[1], &argv[1], environ);
         }
     }
 
     handle = dlopen(info->path, RTLD_LAZY);
     if (!handle) {
-        perror("dlopen");
-        release_libscope(&info);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "%s\n", dlerror());
+        goto err;
     }
     sys_exec = dlsym(handle, "sys_exec");
     if (!sys_exec) {
-        perror("dlsym");
-        release_libscope(&info);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "%s\n", dlerror());
+        goto err;
     }
     release_libscope(&info);
 
     sys_exec(buf, argv[1], argc, argv, env);
 
     return 0;
+err:
+    release_libscope(&info);
+    exit(EXIT_FAILURE);
 }

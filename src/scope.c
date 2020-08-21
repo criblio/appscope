@@ -2,7 +2,7 @@
  * Load and run static executables
  *
  * objcopy -I binary -O elf64-x86-64 -B i386 ./lib/linux/libscope.so ./lib/linux/libscope.o
- * gcc -Wall -g src/scope.c -ldl -o scope ./lib/linux/libscope.o
+ * gcc -Wall -g src/scope.c -ldl -lrt -o scope ./lib/linux/libscope.o
  */
 
 #define _GNU_SOURCE

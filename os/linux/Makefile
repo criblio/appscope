@@ -41,13 +41,13 @@ libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/plattime.c 
 	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
 	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/ && rm ./test/selfinterpose/wrap_go.o
 
-scope: src/scope.c
+scope: src/scope.c libscope.so
 	objcopy -I binary -O elf64-x86-64 -B i386 ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
-	gcc -Wall  -g src/scope.c -ldl -lrt -o scope ./lib/$(OS)/libscope.o
+	gcc -Wall  -g src/scope.c -ldl -lrt -o ./bin/$(OS)/scope ./lib/$(OS)/libscope.o
 	rm -f ./lib/$(OS)/libscope.o
 
 clean:
-	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a scope
+	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a bin/$(OS)/scope
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))

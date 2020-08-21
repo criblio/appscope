@@ -82,6 +82,71 @@ services:
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
 
+  go_8:
+    build:
+      cache_from:
+        - criblci/scope-go_8-it:latest
+    image: criblci/scope-go_8-it
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+  go_9:
+    build:
+      cache_from:
+        - criblci/scope-go_9-it:latest
+    image: criblci/scope-go_9-it
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+  go_10:
+    build:
+      cache_from:
+        - criblci/scope-go_10-it:latest
+    image: criblci/scope-go_10-it
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+  go_11:
+    build:
+      cache_from:
+        - criblci/scope-go_11-it:latest
+    image: criblci/scope-go_11-it
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+  go_12:
+    build:
+      cache_from:
+        - criblci/scope-go_12-it:latest
+    image: criblci/scope-go_12-it
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+  go_13:
+    build:
+      cache_from:
+        - criblci/scope-go_13-it:latest
+    image: criblci/scope-go_13-it
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+  go_14:
+    build:
+      cache_from:
+        - criblci/scope-go_14-it:latest
+    image: criblci/scope-go_14-it
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+  go_15:
+    build:
+      cache_from:
+        - criblci/scope-go_15-it:latest
+    image: criblci/scope-go_15-it
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+
   java6:
     build:
       cache_from:

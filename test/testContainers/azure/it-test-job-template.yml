@@ -9,6 +9,7 @@ jobs:
           source: current
           artifact: linux_app
           path: ./test/testContainers/
+      - script: chmod +x ./test/testContainers/scope
       - task: DownloadPipelineArtifact@2
         inputs:
           source: current

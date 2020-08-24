@@ -161,12 +161,8 @@ check_kernel_version(void)
     if (uname(&buffer)) {
         return 0;
     }
-    printf("uname release = %s\n", buffer.release);
-
     token = strtok(buffer.release, separator);
     val = atoi(token);
-    printf("major version = %d\n", val);
-
     if (val < 3) {
         return 0;
     } else if (val > 3){
@@ -175,7 +171,6 @@ check_kernel_version(void)
 
     token = strtok(NULL, separator);
     val = atoi(token);
-    printf("minor version = %d\n", val);
     return (val < 17) ? 0 : 1;
 }
 

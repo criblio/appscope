@@ -62,45 +62,45 @@ stages:
     dependsOn: build
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
     jobs:
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: syscalls
-          containerName: interposed_func
-
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: cribl
-          containerName: cribl
-
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: nginx
-          containerName: nginx
-
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: splunk
-          containerName: splunk
-
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: elastic
-          containerName: elastic
-
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: kafka
-          containerName: kafka
-
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: tls
-          containerName: tls
-
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: detect_proto
-          containerName: detect_proto
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: syscalls
+#          containerName: interposed_func
+#
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: cribl
+#          containerName: cribl
+#
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: nginx
+#          containerName: nginx
+#
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: splunk
+#          containerName: splunk
+#
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: elastic
+#          containerName: elastic
+#
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: kafka
+#          containerName: kafka
+#
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: tls
+#          containerName: tls
+#
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: detect_proto
+#          containerName: detect_proto
 
       - template: test/testContainers/azure/it-test-job-template.yml
         parameters:
@@ -135,79 +135,79 @@ stages:
           name: go_15
           containerName: go_15
 
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: java6
-          containerName: java6
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: java7
-          containerName: java7
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: java8
-          containerName: java8
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: java9
-          containerName: java9
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: java10
-          containerName: java10
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: java11
-          containerName: java11
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: java12
-          containerName: java12
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: java13
-          containerName: java13
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: java14
-          containerName: java14
-
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: oracle_java6
-          containerName: oracle_java6
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: oracle_java7
-          containerName: oracle_java7
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: oracle_java8
-          containerName: oracle_java8
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: oracle_java9
-          containerName: oracle_java9
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: oracle_java10
-          containerName: oracle_java10
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: oracle_java11
-          containerName: oracle_java11
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: oracle_java12
-          containerName: oracle_java12
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: oracle_java13
-          containerName: oracle_java13
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: oracle_java14
-          containerName: oracle_java14
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: java6
+#          containerName: java6
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: java7
+#          containerName: java7
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: java8
+#          containerName: java8
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: java9
+#          containerName: java9
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: java10
+#          containerName: java10
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: java11
+#          containerName: java11
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: java12
+#          containerName: java12
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: java13
+#          containerName: java13
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: java14
+#          containerName: java14
+#
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: oracle_java6
+#          containerName: oracle_java6
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: oracle_java7
+#          containerName: oracle_java7
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: oracle_java8
+#          containerName: oracle_java8
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: oracle_java9
+#          containerName: oracle_java9
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: oracle_java10
+#          containerName: oracle_java10
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: oracle_java11
+#          containerName: oracle_java11
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: oracle_java12
+#          containerName: oracle_java12
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: oracle_java13
+#          containerName: oracle_java13
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: oracle_java14
+#          containerName: oracle_java14
 
   - stage: publish
     displayName: Publish artifacts to S3

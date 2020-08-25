@@ -56,6 +56,47 @@ services:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
     privileged: true
 
+  go_8:
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+    privileged: true
+  go_9:
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+    privileged: true
+  go_10:
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+    privileged: true
+  go_11:
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+    privileged: true
+  go_12:
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+    privileged: true
+  go_13:
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+    privileged: true
+  go_14:
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+    privileged: true
+  go_15:
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+    privileged: true
+
   java6:
     volumes:
       - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so

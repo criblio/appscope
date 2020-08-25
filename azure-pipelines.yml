@@ -6,8 +6,8 @@ stages:
         timeoutInMinutes: 10
         strategy:
           matrix:
-            ubuntu16_04:
-              imageName: 'ubuntu-16.04'
+            ubuntu20_04:
+              imageName: 'ubuntu-20.04'
             mac10_14:
               imageName: 'macos-10.14'
         #      windows_2017:
@@ -41,15 +41,20 @@ stages:
           #  steps:
           #  - script: ./scope.sh build
           #    displayName: scope.sh build
-          - publish: ./lib/linux/libscope.so
-            displayName: publish linux build
+          - publish: ./bin/linux/scope
+            displayName: publish linux application
             condition: and(succeeded(), eq(variables['Agent.OS'], 'Linux'))
-            artifact: linux_build
+            artifact: linux_app
+
+          - publish: ./lib/linux/libscope.so
+            displayName: publish linux library
+            condition: and(succeeded(), eq(variables['Agent.OS'], 'Linux'))
+            artifact: linux_lib
 
           - publish: ./lib/macOS/libscope.so
-            displayName: publish macos build
+            displayName: publish macos library
             condition: and(succeeded(), eq(variables['Agent.OS'], 'Darwin'))
-            artifact: macOS_build
+            artifact: macOS_lib
 
 
   - stage: integration_tests
@@ -96,6 +101,39 @@ stages:
         parameters:
           name: detect_proto
           containerName: detect_proto
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_8
+          containerName: go_8
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_9
+          containerName: go_9
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_10
+          containerName: go_10
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_11
+          containerName: go_11
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_12
+          containerName: go_12
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_13
+          containerName: go_13
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_14
+          containerName: go_14
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
+          name: go_15
+          containerName: go_15
 
       - template: test/testContainers/azure/it-test-job-template.yml
         parameters:
@@ -187,27 +225,33 @@ stages:
         steps:
           - task: DownloadPipelineArtifact@2
             inputs:
-              artifact: 'linux_build'
-              path: $(Build.BinariesDirectory)/lib/linux/
-          - task: DownloadPipelineArtifact@2
-            inputs:
-              artifact: 'macOS_build'
-              path: $(Build.BinariesDirectory)/lib/macOS/
+              artifact: 'linux_app'
+              path: $(Build.BinariesDirectory)/bin/linux/
           - task: S3Upload@1
+            displayName: S3_Upload_Apps
             condition: succeeded()
             inputs:
-              awsCredentials: 'azure-pipeline-aws'
+              awsCredentials: 'azure-pipeline-aws-core'
               regionName: 'us-west-2'
-              bucketName: 'cdn.cribl.io'
-              sourceFolder: '$(Build.BinariesDirectory)/lib/'
-              globExpressions: '**/*.so'
+              bucketName: 'io.cribl.cdn'
+              sourceFolder: '$(Build.BinariesDirectory)/bin/'
+              globExpressions: '**/scope'
               ${{ if eq(variables['Build.SourceBranchName'], 'master') }}:
                 targetFolder: 'dl/scope/latest/'
               ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:
                 targetFolder: ${{ format('dl/scope/branch/{0}/', variables['Build.SourceBranchName']) }}
               filesAcl: 'public-read'
+
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifact: 'linux_lib'
+              path: $(Build.BinariesDirectory)/lib/linux/
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              artifact: 'macOS_lib'
+              path: $(Build.BinariesDirectory)/lib/macOS/
           - task: S3Upload@1
-            displayName: New_S3_Upload
+            displayName: S3_Upload_Libs
             condition: succeeded()
             inputs:
               awsCredentials: 'azure-pipeline-aws-core'

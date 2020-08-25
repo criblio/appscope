@@ -48,11 +48,6 @@ endtest(){
 #
 starttest plainServer
 cd /go/net
-uname -a
-ls -al /usr/bin/scope
-strings /usr/bin/scope | grep "(Scope Version"
-mount | grep shm
-file ./plainServer
 scope ./plainServer &
 
 # this sleep gives the server a chance to bind to the port (80)

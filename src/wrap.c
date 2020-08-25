@@ -818,7 +818,7 @@ reportPeriodicStuff(void)
     }
 }
 
-static void
+void
 handleExit(void)
 {
     reportPeriodicStuff();

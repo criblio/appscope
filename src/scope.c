@@ -170,7 +170,8 @@ check_kernel_version(void)
     }
 
     token = strtok(NULL, separator);
-    return atoi(token) < 17 ? 0 : 1;
+    val = atoi(token);
+    return (val < 17) ? 0 : 1;
 }
 
 static void

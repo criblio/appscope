@@ -60,6 +60,9 @@
     interpose go_hook_close, go_close
     interpose go_hook_tls_read, go_tls_read
     interpose go_hook_tls_write, go_tls_write
+    interpose go_hook_exit, go_exit
+    interpose go_hook_die, go_die
+
 /*
     Debug hint:
     When you need to change the assy code, 

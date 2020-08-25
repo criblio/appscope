@@ -6,8 +6,8 @@ stages:
         timeoutInMinutes: 10
         strategy:
           matrix:
-            ubuntu16_04:
-              imageName: 'ubuntu-16.04'
+            ubuntu20_04:
+              imageName: 'ubuntu-20.04'
             mac10_14:
               imageName: 'macos-10.14'
         #      windows_2017:

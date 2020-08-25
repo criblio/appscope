@@ -56,11 +56,12 @@ sleep 0.5
 curl http://localhost/hello
 ERR+=$?
 
-# this sleep gives plainServer a chance to report its events,
-# assuming SCOPE_SUMMARY_PERIOD is its default 10s
-sleep 10
 # This stops plainServer
 kill $!
+
+# this sleep gives plainServer a chance to report its events on exit
+sleep 0.5
+
 
 evaltest
 
@@ -88,11 +89,11 @@ sleep 0.5
 curl -k --key server.key --cert server.crt https://localhost:4430/hello
 ERR+=$?
 
-# this sleep gives tlsServer a chance to report its events,
-# assuming SCOPE_SUMMARY_PERIOD is its default 10s
-sleep 10
 # This stops tlsServer
 kill $!
+
+# this sleep gives tlsServer a chance to report its events on exit
+sleep 0.5
 
 evaltest
 
@@ -135,25 +136,6 @@ ERR+=$?
 
 endtest
 
-
-#
-# Ruby
-#
-#echo "Creating key files for ruby client and server"
-#(cd /opt/test-runner/ruby && openssl req -x509 -newkey rsa:4096 -keyout priv.pem -out cert.pem -days 365 -nodes -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost")
-#starttest Ruby
-#RUBY_HTTP_START=$(grep http- $EVT_FILE | grep -c 10101)
-#(cd /opt/test-runner/ruby && ./server.rb 10101 &)
-#sleep 1
-#(cd /opt/test-runner/ruby && ./client.rb 127.0.0.1 10101)
-#sleep 1
-#evaltest
-#RUBY_HTTP_END=$(grep http- $EVT_FILE | grep -c 10101)
-#
-#if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 6 )); then
-#    ERR+=1
-#fi
-#endtest
 
 
 

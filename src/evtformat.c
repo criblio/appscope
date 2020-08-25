@@ -1,7 +1,6 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/timeb.h>
 #include <time.h>
 
 #include "dbg.h"
@@ -319,9 +318,9 @@ rateLimitMessage(proc_id_t *proc, watch_t src)
 {
     event_format_t event;
 
-    struct timeb tb;
-    ftime(&tb);
-    event.timestamp = tb.time + tb.millitm/1000;
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    event.timestamp = ts.tv_sec + ts.tv_nsec/1000000000;
     event.src = "notice";
     event.proc = proc;
     event.uid = 0ULL;
@@ -421,7 +420,6 @@ static cJSON *
 evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, watch_t src)
 {
     event_format_t event;
-    struct timeb tb;
     time_t now;
     
     regex_t *filter;
@@ -456,8 +454,9 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
         return NULL;
     }
 
-    ftime(&tb);
-    event.timestamp = tb.time + tb.millitm/1000;
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    event.timestamp = ts.tv_sec + ts.tv_nsec/1000000000;
     event.src = metric->name;
     event.proc = proc;
     event.uid = uid;
@@ -487,7 +486,6 @@ evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
        uint64_t uid, proc_id_t* proc)
 {
     event_format_t event;
-    struct timeb tb;
     watch_t logType;
 
     if (!evt || !path || !buf || !proc) return NULL;
@@ -505,8 +503,9 @@ evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
         return NULL;
     }
 
-    ftime(&tb);
-    event.timestamp = tb.time + tb.millitm/1000;
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    event.timestamp = ts.tv_sec + ts.tv_nsec/1000000000;
     event.src = path;
     event.proc = proc;
     event.uid = uid;

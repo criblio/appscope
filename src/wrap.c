@@ -350,7 +350,7 @@ remoteConfig()
     
     // MS
     timeout = (g_thread.interval * 1000);
-    bzero(&fds, sizeof(fds));
+    memset(&fds, 0x0, sizeof(fds));
 
     if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
         (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {

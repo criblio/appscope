@@ -12,6 +12,7 @@
 #include <asm/prctl.h>
 #include <sys/prctl.h>
 #include <pthread.h>
+#include <dlfcn.h>
 
 #include "dbg.h"
 #include "os.h"
@@ -19,6 +20,8 @@
 #include "state.h"
 #include "gocontext.h"
 
+#define SYSPRINT_CONSOLE 0
+#define PRINT_BUF_SIZE 1024
 #define HEAP_SIZE (size_t)(500 * 1024)
 // 1Mb + an 8kb guard
 #define STACK_SIZE (size_t)(1024 * 1024) + (8 * 1024)
@@ -44,23 +47,21 @@ void
 sysprint(const char* fmt, ...)
 {
     // Create the string
-    char* str = NULL;
+    char str[PRINT_BUF_SIZE];
+
     if (fmt) {
         va_list args;
         va_start(args, fmt);
-        int rv = vasprintf(&str, fmt, args);
+        int rv = vsnprintf(str, PRINT_BUF_SIZE, fmt, args);
         va_end(args);
-        if (rv == -1) {
-            if (str) free(str);
-            str = NULL;
-        }
+        if (rv == -1) return;
     }
+
     // Output the string
-    if (str) {
-        printf("%s", str);
-        scopeLog(str, -1, CFG_LOG_DEBUG);
-        free(str);
-    }
+#if SYSPRINT_CONSOLE > 0
+    printf("%s", str);
+#endif
+    scopeLog(str, -1, CFG_LOG_DEBUG);
 }
 
 #if 0
@@ -100,6 +101,8 @@ getSymbol(const char *buf, char *sname)
     const char *section_strtab = NULL;
     const char *strtab = NULL;
     const char *sec_name = NULL;
+
+    if (!buf || !sname) return NULL;
 
     ehdr = (Elf64_Ehdr *)buf;
     sections = (Elf64_Shdr *)((char *)buf + ehdr->e_shoff);
@@ -161,9 +164,8 @@ load_sections(char *buf, char *addr, size_t mlen)
         
         if ((laddr >= addr) && (laddr <= (addr + mlen))) {
             sec_name = section_strtab + sections[i].sh_name;
-
+            //sysprint("load_sections: laddr = %p len = 0x%lx end = %p section: %s\n", laddr, len, laddr + len, sec_name);
             if ((type != SHT_NOBITS) && ((flags & SHF_ALLOC) || (flags & SHF_EXECINSTR))) {
-
                 memmove(laddr, &buf[sections[i].sh_offset], len);
             } else if (type == SHT_NOBITS) {
                 memset(laddr, 0, len);
@@ -173,7 +175,7 @@ load_sections(char *buf, char *addr, size_t mlen)
                      __FUNCTION__, __LINE__, sec_name, laddr, laddr + len);
 
             if (!strcmp(sec_name, ".text")) {
-                g_text_addr = (unsigned char*)laddr;
+                g_text_addr = (unsigned char *)laddr;
                 g_text_len = len;
             }
         }
@@ -198,16 +200,20 @@ map_segment(char *buf, Elf64_Phdr *phead)
     prot |= (phead->p_flags & PF_X) ? PROT_EXEC : 0;
 
     laddr = (char *)ROUND_DOWN(phead->p_vaddr, pgsz);
-    
+
     sysprint("%s:%d vaddr 0x%lx size 0x%lx\n",
              __FUNCTION__, __LINE__, phead->p_vaddr, (size_t)phead->p_memsz);
 
-    if ((addr = mmap(laddr, (size_t)phead->p_memsz,
+    if ((addr = mmap(laddr, ROUND_UP((size_t)phead->p_memsz, phead->p_align),
                      prot | PROT_WRITE,
                      MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED,
                      -1, (off_t)NULL)) == MAP_FAILED) {
         scopeLog("ERROR: load_segment:mmap", -1, CFG_LOG_ERROR);
         return -1;
+    }
+
+    if (laddr != addr) {
+        scopeLog("ERROR: load_segment:mmap:laddr mismatch", -1, CFG_LOG_ERROR);
     }
 
     load_sections(buf, (char *)phead->p_vaddr, (size_t)phead->p_memsz);
@@ -245,7 +251,7 @@ unmap_all(char *buf, const char **argv)
 #if 0
     Elf64_Half phnum;
     int flen, i;
-    int pgsz = sysconf(_SC_PAGESIZE);;
+    int pgsz = sysconf(_SC_PAGESIZE);
     Elf64_Phdr *phead;
     
     if ((flen = get_file_size(argv[1])) == -1) {

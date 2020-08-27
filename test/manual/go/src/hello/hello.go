@@ -17,6 +17,17 @@ func check(e error) {
 
 
 func main() {
+/*    conn, errc := net.Dial("tcp", "golang.org:80")
+    //conn, errc := net.Dial("tcp", "216.58.193.81:80")
+    if errc != nil {
+	   // handle error
+    }
+
+    fmt.Printf("using %s\n", conn.LocalAddr());
+    fmt.Fprintf(conn, "GET / HTTP/1.0\r\n\r\n")
+    status, errc := bufio.NewReader(conn).ReadString('\n')
+    fmt.Printf("http status: %s", status)
+*/
     fmt.Printf("Hello, World\n")
 
     d1 := []byte("hello\ngo\n")
@@ -55,11 +66,13 @@ func main() {
 
     f.Close()
 
-    conn, err := net.Dial("tcp", "golang.org:80")
+    //conn, err := net.Dial("tcp", "golang.org:80")
+    conn, err := net.Dial("tcp", "216.58.193.81:80")
     if err != nil {
 	   // handle error
     }
 
+    fmt.Printf("using %s\n", conn.LocalAddr());
     fmt.Fprintf(conn, "GET / HTTP/1.0\r\n\r\n")
     status, err := bufio.NewReader(conn).ReadString('\n')
     fmt.Printf("http status: %s", status)

@@ -4,12 +4,26 @@ jobs:
     pool:
       vmImage: 'ubuntu-16.04'
     steps:
+      - script: uname -a
+        displayName: Print kernel version
       - task: DownloadPipelineArtifact@2
         inputs:
           source: current
-          artifact: linux_build
+          artifact: linux_app
+          path: ./test/testContainers/
+      - script: chmod +x ./test/testContainers/scope
+        displayName: Add execute permissions to scope
+      - script: strings ./test/testContainers/scope | grep "(Scope Version"
+        displayName: Print scope version
+      - task: DownloadPipelineArtifact@2
+        inputs:
+          source: current
+          artifact: linux_lib
           path: ./test/testContainers/
       - script: chmod +x ./test/testContainers/libscope.so
+        displayName: Add execute permissions to libscope.so
+      - script: ./test/testContainers/libscope.so
+        displayName: Print libscope.so version
       - script: docker login -u $HUB_USERNAME  --password-stdin <<< $HUB_PASSWORD
         displayName: Login to Docker
         env:
@@ -25,6 +39,7 @@ jobs:
       - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml run  ${{ parameters.containerName }}
         displayName: Run tests
         workingDirectory: ./test/testContainers/
+        timeoutInMinutes: 10
       - task: CopyFiles@2
         condition: always()
         inputs:

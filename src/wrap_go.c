@@ -47,6 +47,8 @@ tap_t g_go_tap[] = {
     {"syscall.Close",                         go_hook_close,       NULL, 0},
     {"net/http.(*connReader).Read",           go_hook_tls_read,    NULL, 0},
     {"net/http.checkConnErrorWriter.Write",   go_hook_tls_write,   NULL, 0},
+    {"runtime.exit",                          go_hook_exit,        NULL, 0},
+    {"runtime.dieFromSignal",                 go_hook_die,         NULL, 0},
     {"TAP_TABLE_END", NULL, NULL, 0}
 };
 
@@ -148,11 +150,67 @@ add_argument(_DecodedInst* asm_inst)
     return 0;
 }
 
+// Caution!  patch_first_instruction can only be used for things
+// that won't trigger a stackscan in go.  If your go function contains
+// a call to runtime.morestack_noctxt or calls any other function that
+// does, it can trigger a stackscan.  And you'll end up here trying
+// to understand what this comment is telling you.
+static void
+patch_first_instruction(funchook_t *funchook,
+               _DecodedInst* asm_inst, unsigned int asm_count, tap_t* tap)
+{
+    int i;
+    for (i=0; i<asm_count; i++) {
+
+        // Stop when it looks like we've hit another goroutine
+        if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
+                  (!strcmp((const char*)asm_inst[i].mnemonic.p, "INT 3") &&
+                  asm_inst[i].size == 1 ))) {
+            break;
+        }
+
+        patchprint("%0*lx (%02d) %-24s %s%s%s\n",
+               16,
+               asm_inst[i].offset,
+               asm_inst[i].size,
+               (char*)asm_inst[i].instructionHex.p,
+               (char*)asm_inst[i].mnemonic.p,
+               asm_inst[i].operands.length != 0 ? " " : "",
+               (char*)asm_inst[i].operands.p);
+
+        uint32_t add_arg=8; // not used, but can't be zero because of go_switch
+        if (i == 0) {
+
+            void *pre_patch_addr = (void*)asm_inst[i].offset;
+            void *patch_addr = (void*)asm_inst[i].offset;
+
+            if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
+                patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+                continue;
+            }
+            patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+            tap->return_addr = patch_addr;
+            tap->frame_size = add_arg;
+        }
+    }
+    patchprint("\n\n");
+}
+
+
 static void
 patch_return_addrs(funchook_t *funchook,
                    _DecodedInst* asm_inst, unsigned int asm_count, tap_t* tap)
 {
     if (!funchook || !asm_inst || !asm_count || !tap) return;
+
+    // special handling for runtime.exit, runtime.dieFromSignal
+    // since the go folks wrote them in assembly, they don't follow
+    // conventions that other go functions do.
+    if ((tap->assembly_fn == go_hook_exit) ||
+        (tap->assembly_fn == go_hook_die)) {
+        patch_first_instruction(funchook, asm_inst, asm_count, tap);
+        return;
+    }
 
     int i;
     for (i=0; i<asm_count; i++) {
@@ -216,6 +274,12 @@ initGoHook(const char *buf)
     char *estr;
     char *go_runtime_version = NULL;
 
+    int (*ni_open)(const char *pathname, int flags, mode_t mode);
+    ni_open = dlsym(RTLD_NEXT, "open");
+    int (*ni_close)(int fd);
+    ni_close = dlsym(RTLD_NEXT, "close");
+    if (!ni_open || !ni_close) return;
+
     // A go app may need to expand stacks for some C functions
     g_need_stack_expand = TRUE;
 
@@ -259,12 +323,12 @@ initGoHook(const char *buf)
     char* debug_file;
     int fd;
     if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
-        ((fd = open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
+        ((fd = ni_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
         dprintf(fd, "runtime.g|m=%d\n", g_go.g_to_m);
         dprintf(fd, "runtime.m|tls=%d\n", g_go.m_to_tls);
         dprintf(fd, "net/http.connReader|conn=%d\n", g_go.connReader_to_conn);
         dprintf(fd, "net/http.conn|tlsState=%d\n", g_go.conn_to_tlsState);
-        close(fd);
+        ni_close(fd);
     }
 
 
@@ -791,4 +855,25 @@ EXPORTON void *
 go_tls_write(char *stackptr)
 {
     return go_switch(stackptr, c_tls_write, go_hook_tls_write);
+}
+
+extern void handleExit(void);
+static void
+c_exit(char *stackaddr)
+{
+    // don't use stackaddr; patch_first_instruction() does not provide
+    // frame_size, so stackaddr isn't useable
+    handleExit();
+}
+
+EXPORTON void *
+go_exit(char *stackptr)
+{
+    return go_switch(stackptr, c_exit, go_hook_exit);
+}
+
+EXPORTON void *
+go_die(char *stackptr)
+{
+    return go_switch(stackptr, c_exit, go_hook_die);
 }

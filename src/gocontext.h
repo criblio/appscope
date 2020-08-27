@@ -50,5 +50,7 @@ extern void go_hook_read(void);
 extern void go_hook_close(void);
 extern void go_hook_tls_read(void);
 extern void go_hook_tls_write(void);
+extern void go_hook_exit(void);
+extern void go_hook_die(void);
 
 #endif // __GOTCONTEXT_H__

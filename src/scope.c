@@ -2,7 +2,7 @@
  * Load and run static executables
  *
  * objcopy -I binary -O elf64-x86-64 -B i386 ./lib/linux/libscope.so ./lib/linux/libscope.o
- * gcc -Wall -g src/scope.c -ldl -o scope ./lib/linux/libscope.o
+ * gcc -Wall -g src/scope.c -ldl -lrt -o scope ./lib/linux/libscope.o
  */
 
 #define _GNU_SOURCE
@@ -14,14 +14,18 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <elf.h>
-#include <sys/syscall.h>
-#include <sys/utsname.h>
 #include <stddef.h>
 #include <sys/wait.h>
 #include <dlfcn.h>
+#include <sys/utsname.h>
 
 #define DEVMODE 0
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
+#define __NR_memfd_create   319
+#define _MFD_CLOEXEC		0x0001U
+#define SHM_NAME            "libscope"
+#define TRUE 1
+#define FALSE 0
 
 extern unsigned char _binary___lib_linux_libscope_so_start;
 extern unsigned char _binary___lib_linux_libscope_so_end;
@@ -30,6 +34,18 @@ typedef struct elf_buf_t {
     char *buf;
     int len;
 } elf_buf;
+
+typedef struct {
+    char *path;
+    char *shm_name;
+    int fd;
+    int use_memfd;
+} libscope_info_t;
+
+// Wrapper to call memfd_create syscall
+static inline int _memfd_create(const char *name, unsigned int flags) {
+	return syscall(__NR_memfd_create, name, flags);
+}
 
 static void
 usage(char *prog) {
@@ -99,12 +115,12 @@ get_elf(char *path)
     }
 
     if ((fd = open(path, O_RDONLY)) == -1) {
-        perror("open:get_elf");
+        perror("get_elf:open");
         return NULL;
     }
 
     if (fstat(fd, &sbuf) == -1) {
-        perror("fstat:get_elf");
+        perror("get_elf:fstat");
         return NULL;        
     }
 
@@ -112,12 +128,12 @@ get_elf(char *path)
 
     if ((ebuf->buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
                           PROT_READ, MAP_PRIVATE, fd, (off_t)NULL)) == MAP_FAILED) {
-        perror("mmap:get_elf");
+        perror("get_elf:mmap");
         return NULL;
     }
 
     if (close(fd) == -1) {
-        perror("close:get_elf");
+        perror("get_elf:close");
         dump_elf(ebuf->buf, sbuf.st_size);
         if (ebuf) free(ebuf);
         return NULL;        
@@ -129,7 +145,7 @@ get_elf(char *path)
        (elf->e_ident[EI_CLASS] != ELFCLASS64) ||
        (elf->e_ident[EI_DATA] != ELFDATA2LSB) ||
        (elf->e_machine != EM_X86_64)) {
-        printf("%s:%d ERROR: %s is not a viable ELF file\n", __FUNCTION__, __LINE__, path);
+        //printf("%s:%d ERROR: %s is not a viable ELF file\n", __FUNCTION__, __LINE__, path);
         dump_elf(ebuf->buf, sbuf.st_size);
         if (ebuf) free(ebuf);
         return NULL;
@@ -145,56 +161,139 @@ get_elf(char *path)
     return ebuf;
 }
 
+/**
+ * Checks if kernel version is >= 3.17
+ */
+static int
+check_kernel_version(void)
+{
+    struct utsname buffer;
+    char *token;
+    char *separator = ".";
+    int val;
+
+    if (uname(&buffer)) {
+        return 0;
+    }
+    token = strtok(buffer.release, separator);
+    val = atoi(token);
+    if (val < 3) {
+        return 0;
+    } else if (val > 3){
+        return 1;
+    }
+
+    token = strtok(NULL, separator);
+    val = atoi(token);
+    return (val < 17) ? 0 : 1;
+}
+
+static void
+release_libscope(libscope_info_t **info_ptr) {
+    if (!info_ptr || !*info_ptr) return;
+
+    libscope_info_t *info = *info_ptr;
+
+    if (info->fd != -1) close(info->fd);
+    if (info->shm_name) {
+        if (info->fd != -1) shm_unlink(info->shm_name);
+        free(info->shm_name);
+    }
+    if (info->path) free(info->path);
+    free(info);
+    *info_ptr = NULL;
+}
+
+static libscope_info_t *
+setup_libscope()
+{
+    libscope_info_t *info = NULL;
+    int everything_successful = FALSE;
+
+    if (!(info = calloc(1, sizeof(libscope_info_t)))) {
+        perror("setup_libscope:calloc");
+        goto err;
+    }
+
+    info->fd = -1;
+    info->use_memfd = check_kernel_version();
+    
+    if (info->use_memfd) {
+        info->fd = _memfd_create(SHM_NAME, _MFD_CLOEXEC);
+    } else {
+        if (asprintf(&info->shm_name, "%s%i", SHM_NAME, getpid()) == -1) {
+            perror("setup_libscope:shm_name");
+            info->shm_name = NULL; // failure leaves info->shm_name undefined
+            goto err;
+        }
+        info->fd = shm_open(info->shm_name, O_RDWR | O_CREAT, S_IRWXU);
+    }
+    if (info->fd == -1) {
+        perror(info->use_memfd ? "setup_libscope:memfd_create" : "setup_libscope:shm_open");
+        goto err;
+    }
+    
+    size_t libsize = (size_t) (&_binary___lib_linux_libscope_so_end - &_binary___lib_linux_libscope_so_start);
+    if (write(info->fd, &_binary___lib_linux_libscope_so_start, libsize) != libsize) {
+        perror("setup_libscope:write");
+        goto err;
+    }
+
+    int rv;
+    if (info->use_memfd) {
+        rv = asprintf(&info->path, "/proc/%i/fd/%i", getpid(), info->fd);
+    } else {
+        rv = asprintf(&info->path, "/dev/shm/%s", info->shm_name);
+    }
+    if (rv == -1) {
+        perror("setup_libscope:path");
+        info->path = NULL; // failure leaves info->path undefined
+        goto err;
+    }
+
+#if DEVMODE == 1
+    snprintf(info->path, sizeof(info->path), "./lib/linux/libscope.so");
+    printf("LD_PRELOAD=%s\n", info->path);
+    printf("%s:%d loading %s\n", __FUNCTION__, __LINE__, argv[1]);
+#endif
+
+    everything_successful = TRUE;
+
+err:
+    if (!everything_successful) release_libscope(&info);
+    return info;
+}
 
 int
 main(int argc, char **argv, char **env)
 {
     elf_buf *ebuf;
-    char path[1024];
-    int fd;
     int (*sys_exec)(const char *, const char *, int, char **, char **);
     void *handle;
-    size_t libsize;
-    
+    libscope_info_t *info;
+
     //check command line arguments 
     if (argc < 2) {
         usage(argv[0]);
         exit(1);
     }
-
-    fd = memfd_create("", 0);
-    if (fd == -1) {
-        perror("memfd_create");
+    info = setup_libscope();
+    if (!info) {
+        fprintf(stderr, "%s:%d ERROR: unable to set up libscope\n", __FUNCTION__, __LINE__);
         exit(EXIT_FAILURE);
     }
-    libsize = (size_t) (&_binary___lib_linux_libscope_so_end - &_binary___lib_linux_libscope_so_start);
-    if (write(fd, &_binary___lib_linux_libscope_so_start, libsize) != libsize) {
-        perror("write");
-        close(fd);
-        exit(EXIT_FAILURE);
-    }
-
-#if DEVMODE == 1
-    snprintf(path, sizeof(path), "./lib/linux/libscope.so");
-    printf("LD_PRELOAD=%s\n", path);
-    printf("%s:%d loading %s\n", __FUNCTION__, __LINE__, argv[1]);
-#else
-    snprintf(path, sizeof(path), "/proc/%i/fd/%i", getpid(), fd);
-#endif
 
     ebuf = get_elf(argv[1]);
 
     if ((ebuf != NULL) && (app_type(ebuf->buf, SHT_NOTE, ".note.go.buildid") != 0)) {
         if (setenv("SCOPE_APP_TYPE", "go", 1) == -1) {
             perror("setenv");
-            if (ebuf) free(ebuf);
-            exit(EXIT_FAILURE);
+            goto err;
         }
     } else {
         if (setenv("SCOPE_APP_TYPE", "native", 1) == -1) {
             perror("setenv");
-            if (ebuf) free(ebuf);
-            exit(EXIT_FAILURE);
+            goto err;
         }
     }
 
@@ -204,51 +303,53 @@ main(int argc, char **argv, char **env)
 
         if (ebuf) dump_elf(ebuf->buf, ebuf->len);
         
-        if (setenv("LD_PRELOAD", path, 0) == -1) {
+        if (setenv("LD_PRELOAD", info->path, 0) == -1) {
             perror("setenv");
-            if (ebuf) free(ebuf);
-            exit(EXIT_FAILURE);
+            goto err;
         }
 
         if (setenv("SCOPE_EXEC_TYPE", "dynamic", 1) == -1) {
             perror("setenv");
-            if (ebuf) free(ebuf);
-            exit(EXIT_FAILURE);
+            goto err;
         }
         
         pid_t pid = fork();
         if (pid == -1) {
             perror("fork");
-            exit(EXIT_FAILURE);
+            goto err;
         } else if (pid > 0) {
             int status;
             waitpid(pid, &status, 0);
-            close(fd);
+            release_libscope(&info);
             exit(status);
-        } else  {
+        } else {
             execve(argv[1], &argv[1], environ);
         }
     }
 
     // Static executable path
-    handle = dlopen(path, RTLD_LAZY);
+    handle = dlopen(info->path, RTLD_LAZY);
     if (!handle) {
-        perror("dlopen");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "%s\n", dlerror());
+        goto err;
     }
     sys_exec = dlsym(handle, "sys_exec");
     if (!sys_exec) {
-        perror("dlsym");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "%s\n", dlerror());
+        goto err;
     }
-    close(fd);
+    release_libscope(&info);
 
     if (setenv("SCOPE_EXEC_TYPE", "static", 1) == -1) {
         perror("setenv");
-        exit(EXIT_FAILURE);
+        goto err;
     }
 
     sys_exec(ebuf->buf, argv[1], argc, argv, env);
 
     return 0;
+err:
+    release_libscope(&info);
+    if (ebuf) free(ebuf);
+    exit(EXIT_FAILURE);
 }

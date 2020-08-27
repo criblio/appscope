@@ -368,7 +368,7 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
     fs_info *fsp = calloc(1, len);
     if (!fsp) return FALSE;
 
-    bcopy(fs, fsp, len);
+    memmove(fsp, fs, len);
     fsp->fd = fd;
     fsp->evtype = EVT_FS;
     fsp->data_type = type;
@@ -400,7 +400,7 @@ postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char
     net_info *netp = calloc(1, len);
     if (!netp) return FALSE;
 
-    bcopy(net, netp, len);
+    memmove(netp, net, len);
     netp->fd = fd;
     netp->evtype = EVT_DNS;
     netp->data_type = type;
@@ -449,7 +449,7 @@ postNetState(int fd, metric_t type, net_info *net)
     net_info *netp = calloc(1, len);
     if (!netp) return FALSE;
 
-    bcopy(net, netp, len);
+    memmove(netp, net, len);
     netp->fd = fd;
     netp->evtype = EVT_NET;
     netp->data_type = type;

@@ -56,5 +56,6 @@ extern bool osThreadInit(void(*handler)(int), unsigned);
 extern int osUnixSockPeer(ino_t);
 extern void osInitJavaAgent(void);
 extern int osGetPageProt(unsigned long);
+extern char *osGetExePath();
 
 #endif  //__OS_H__

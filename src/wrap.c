@@ -7,6 +7,7 @@
 #ifdef __LINUX__
 #include <sys/prctl.h>
 #include <link.h>
+#include <asm/prctl.h>
 #endif
 #include <sys/syscall.h>
 #include <sys/stat.h>
@@ -25,8 +26,8 @@
 #include "state.h"
 #include "wrap.h"
 #include "runtimecfg.h"
-
 #include "javaagent.h"
+#include "gocontext.h"
 
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
@@ -45,7 +46,6 @@ static list_t *g_nsslist;
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
 
-
 __thread int g_getdelim = 0;
 
 // Forward declaration
@@ -55,6 +55,8 @@ static void reportProcessStart(void);
 void threadNow(int);
 
 #ifdef __LINUX__
+extern void initGoHook(const char *);
+
 static got_list hook_list[] = {
     {"SSL_read", SSL_read, &g_fn.SSL_read},
     {"SSL_write", SSL_write, &g_fn.SSL_write},
@@ -68,6 +70,11 @@ typedef struct
     int   after_scope;
 } param_t;
 
+typedef struct elf_buf_t {
+    char *buf;
+    int len;
+} elf_buf;
+
 // When used with dl_iterate_phdr(), this has a similar result to
 // _dl_sym(RTLD_NEXT, ).  But, unlike _dl_sym(RTLD_NEXT, )
 // it will never return a symbol in our library.  This is
@@ -76,6 +83,7 @@ typedef struct
 // Not to point fingers, but I'm looking at you python.
 //
 extern void *_dl_sym(void *, const char *, void *);
+
 
 static int
 findSymbol(struct dl_phdr_info *info, size_t size, void *data)
@@ -186,6 +194,108 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 
 // macOS doesn't use ELF binaries
 #ifdef __LINUX__
+static void
+freeElf(char *buf, size_t len)
+{
+    if (!buf) return;
+
+    if (munmap(buf, len) == -1) {
+        scopeLog("freeElf: munmap failed", -1, CFG_LOG_ERROR);
+    }
+}
+
+static elf_buf *
+getElf(char *path)
+{
+    int fd, i;
+    elf_buf *ebuf;
+    Elf64_Ehdr *elf;
+    struct stat sbuf;
+    Elf64_Ehdr *ehdr;
+    Elf64_Shdr *sections;
+    const char *sec_name;
+    const char *section_strtab = NULL;
+    char msg[128];
+
+    if ((ebuf = calloc(1, sizeof(struct elf_buf_t))) == NULL) {
+        scopeLog("getElf: memory alloc failed", -1, CFG_LOG_ERROR);
+        return NULL;
+    }
+
+    if ((!g_fn.open) || (((fd = g_fn.open(path, O_RDONLY)) == -1))) {
+        scopeLog("getElf: open failed", -1, CFG_LOG_ERROR);
+        if (ebuf) free(ebuf);
+        return NULL;
+    }
+
+    if (fstat(fd, &sbuf) == -1) {
+        scopeLog("getElf: fstat failed", fd, CFG_LOG_ERROR);
+        if (g_fn.close) g_fn.close(fd);
+        if (ebuf) free(ebuf);
+        return NULL;
+    }
+
+    ebuf->len = sbuf.st_size;
+
+    if ((ebuf->buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
+                          PROT_READ, MAP_PRIVATE, fd, (off_t)NULL)) == MAP_FAILED) {
+        scopeLog("getElf: mmap failed", fd, CFG_LOG_ERROR);
+        if (g_fn.close) g_fn.close(fd);
+        if (ebuf) free(ebuf);
+        return NULL;
+    }
+
+    if ((!g_fn.close) || (g_fn.close(fd) == -1)) {
+        scopeLog("getElf: close failed", fd, CFG_LOG_ERROR);
+        freeElf(ebuf->buf, sbuf.st_size);
+        if (ebuf) free(ebuf);
+        return NULL;
+    }
+
+    elf = (Elf64_Ehdr *)ebuf->buf;
+    if((elf->e_ident[EI_MAG0] != 0x7f) ||
+       strncmp((char *)&elf->e_ident[EI_MAG1], "ELF", 3) ||
+       (elf->e_ident[EI_CLASS] != ELFCLASS64) ||
+       (elf->e_ident[EI_DATA] != ELFDATA2LSB) ||
+       (elf->e_machine != EM_X86_64)) {
+        char emsg[64];
+        snprintf(emsg, sizeof(emsg), "%s:%d ERROR: %s is not a viable ELF file\n",
+                 __FUNCTION__, __LINE__, path);
+        scopeLog(emsg, fd, CFG_LOG_ERROR);
+        freeElf(ebuf->buf, sbuf.st_size);
+        if (ebuf) free(ebuf);
+        return NULL;
+    }
+
+    if (elf->e_type != ET_EXEC) {
+        char emsg[64];
+        snprintf(emsg, sizeof(emsg), "%s:%d %s is not an executable\n",
+                 __FUNCTION__, __LINE__, path);
+        scopeLog(emsg, fd, CFG_LOG_ERROR);
+        freeElf(ebuf->buf, sbuf.st_size);
+        if (ebuf) free(ebuf);
+        return NULL;
+    }
+
+    ehdr = (Elf64_Ehdr *)ebuf->buf;
+    sections = (Elf64_Shdr *)((char *)ebuf->buf + ehdr->e_shoff);
+    section_strtab = (char *)ebuf->buf + sections[ehdr->e_shstrndx].sh_offset;
+
+    for (i = 0; i < ehdr->e_shnum; i++) {
+        sec_name = section_strtab + sections[i].sh_name;
+
+        if (!strcmp(sec_name, ".text")) {
+            g_text_addr = (unsigned char *)sections[i].sh_addr;
+            g_text_len = sections[i].sh_size;
+            snprintf(msg, sizeof(msg), "%s:%d %s addr %p - %p\n",
+                     __FUNCTION__, __LINE__, sec_name, g_text_addr, g_text_addr + g_text_len);
+            scopeLog(msg, -1, CFG_LOG_DEBUG);
+        }
+    }
+
+    return ebuf;
+}
+
 /*
  * Find the GOT ptr as defined in RELA/DYNSYM (.rela.dyn) for symbol & hook it.
  * .rela.dyn section:
@@ -993,8 +1103,37 @@ initHook()
 {
     int rc;
     funchook_t *funchook;
-    char *full_path;
+    char *full_path, *estr;
     bool should_we_patch = FALSE;
+    elf_buf *ebuf;
+
+    // default to a native app
+    // Are we a Go dynamic app
+    if (((estr = getenv("SCOPE_APP_TYPE")) != NULL) &&
+        (strncmp(estr, "go", strlen(estr)) == 0) &&
+        ((estr = getenv("SCOPE_EXEC_TYPE")) != NULL) &&
+        (strncmp(estr, "dynamic", strlen(estr)) == 0) &&
+        ((full_path = osGetExePath()) != NULL) &&
+        ((ebuf = getElf(full_path)) != NULL)) {
+        initGoHook(ebuf->buf);
+        threadNow(0);
+
+        if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
+            scopeLog("initGoHook:arch_prctl", -1, CFG_LOG_ERROR);
+        }
+
+        __asm__ volatile (
+            "lea scope_stack(%%rip), %%r11 \n"
+            "mov %%rsp, (%%r11)  \n"
+            : "=r"(rc)                    //output
+            :
+            : "%r11"                      //clobbered register
+            );
+
+        if (full_path) free(full_path);
+        if (ebuf) freeElf(ebuf->buf, ebuf->len);
+        return;
+    }
 
     if (dl_iterate_phdr(hookCallback, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
@@ -3901,7 +4040,6 @@ getaddrinfo(const char *node, const char *service,
         doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname", node);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, node);
     }
-
 
     return rc;
 }

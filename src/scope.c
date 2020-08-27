@@ -19,6 +19,7 @@
 #include <dlfcn.h>
 #include <sys/utsname.h>
 
+#define DEVMODE 0
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 #define __NR_memfd_create   319
 #define _MFD_CLOEXEC		0x0001U
@@ -28,6 +29,11 @@
 
 extern unsigned char _binary___lib_linux_libscope_so_start;
 extern unsigned char _binary___lib_linux_libscope_so_end;
+
+typedef struct elf_buf_t {
+    char *buf;
+    int len;
+} elf_buf;
 
 typedef struct {
     char *path;
@@ -48,30 +54,6 @@ usage(char *prog) {
 }
 
 static int
-get_file_size(char *path)
-{
-    int fd;
-    struct stat sbuf;
-
-    if ((fd = open(path, O_RDONLY)) == -1) {
-        perror("get_file_size:open");
-        return -1;
-    }
-
-    if (fstat(fd, &sbuf) == -1) {
-        perror("get_file_size:fstat");
-        return -1;
-    }
-
-    if (close(fd) == -1) {
-        perror("get_file_size:close");
-        return -1;        
-    }
-
-    return sbuf.st_size;
-}
-
-static int
 is_static(char *buf)
 {
     int i;
@@ -87,6 +69,28 @@ is_static(char *buf)
     return 1;
 }
 
+static int
+app_type(char *buf, const uint32_t sh_type, const char *sh_name)
+{
+    int i = 0;
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
+    Elf64_Shdr *sections;
+    const char *section_strtab = NULL;
+    const char *sec_name = NULL;
+
+    sections = (Elf64_Shdr *)(buf + ehdr->e_shoff);
+    section_strtab = buf + sections[ehdr->e_shstrndx].sh_offset;
+
+    for (i = 0; i < ehdr->e_shnum; i++) {
+        sec_name = section_strtab + sections[i].sh_name;
+        //printf("section %s type = %d \n", sec_name, sections[i].sh_type);
+        if (sections[i].sh_type == sh_type && strcmp(sec_name, sh_name) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void
 dump_elf(char *buf, size_t len)
 {
@@ -97,13 +101,18 @@ dump_elf(char *buf, size_t len)
     }
 }
 
-static char *
+static elf_buf *
 get_elf(char *path)
 {
     int fd;
-    char *buf;
+    elf_buf *ebuf;
     Elf64_Ehdr *elf;
     struct stat sbuf;
+
+    if ((ebuf = calloc(1, sizeof(struct elf_buf_t))) == NULL) {
+        perror("calloc:get_elf");
+        return NULL;
+    }
 
     if ((fd = open(path, O_RDONLY)) == -1) {
         perror("get_elf:open");
@@ -115,36 +124,41 @@ get_elf(char *path)
         return NULL;        
     }
 
-    if ((buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
-                    PROT_READ, MAP_PRIVATE, fd, (off_t)NULL)) == MAP_FAILED) {
+    ebuf->len = sbuf.st_size;
+
+    if ((ebuf->buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
+                          PROT_READ, MAP_PRIVATE, fd, (off_t)NULL)) == MAP_FAILED) {
         perror("get_elf:mmap");
         return NULL;
     }
 
     if (close(fd) == -1) {
         perror("get_elf:close");
-        dump_elf(buf, sbuf.st_size);
+        dump_elf(ebuf->buf, sbuf.st_size);
+        if (ebuf) free(ebuf);
         return NULL;        
     }
 
-    elf = (Elf64_Ehdr *)buf;
+    elf = (Elf64_Ehdr *)ebuf->buf;
     if((elf->e_ident[EI_MAG0] != 0x7f) ||
        strncmp((char *)&elf->e_ident[EI_MAG1], "ELF", 3) ||
        (elf->e_ident[EI_CLASS] != ELFCLASS64) ||
        (elf->e_ident[EI_DATA] != ELFDATA2LSB) ||
        (elf->e_machine != EM_X86_64)) {
-        printf("%s:%d ERROR: %s is not a viable ELF file\n", __FUNCTION__, __LINE__, path);
-        dump_elf(buf, sbuf.st_size);
+        //printf("%s:%d ERROR: %s is not a viable ELF file\n", __FUNCTION__, __LINE__, path);
+        dump_elf(ebuf->buf, sbuf.st_size);
+        if (ebuf) free(ebuf);
         return NULL;
     }
 
     if (elf->e_type != ET_EXEC) {
-        printf("%s:%d %s is not a static executable\n", __FUNCTION__, __LINE__, path);
-        dump_elf(buf, sbuf.st_size);
+        //printf("%s:%d %s is not a static executable\n", __FUNCTION__, __LINE__, path);
+        dump_elf(ebuf->buf, sbuf.st_size);
+        if (ebuf) free(ebuf);
         return NULL;
     }
 
-    return buf;
+    return ebuf;
 }
 
 /**
@@ -237,6 +251,17 @@ setup_libscope()
         goto err;
     }
 
+/*
+ * DEVMODE is here only to help with gdb. The debugger has
+ * a problem reading symbols from a /proc pathname.
+ * This is expected to be enabled only by developers and
+ * only when using the debugger.
+ */
+#if DEVMODE == 1
+    asprintf(&info->path, "./lib/linux/libscope.so");
+    printf("LD_PRELOAD=%s\n", info->path);
+#endif
+
     everything_successful = TRUE;
 
 err:
@@ -247,8 +272,7 @@ err:
 int
 main(int argc, char **argv, char **env)
 {
-    int flen;
-    char *buf;
+    elf_buf *ebuf;
     int (*sys_exec)(const char *, const char *, int, char **, char **);
     void *handle;
     libscope_info_t *info;
@@ -264,24 +288,35 @@ main(int argc, char **argv, char **env)
         exit(EXIT_FAILURE);
     }
 
-    printf("%s:%d loading %s\n", __FUNCTION__, __LINE__, argv[1]);
+    ebuf = get_elf(argv[1]);
 
-    if (((buf = get_elf(argv[1])) == NULL) ||
-        (!is_static(buf))) {
-        printf("%s:%d not a static file\n", __FUNCTION__, __LINE__);
-
-        if ((flen = get_file_size(argv[1])) == -1) {
-            fprintf(stderr, "%s:%d ERROR: file size\n", __FUNCTION__, __LINE__);
+    if ((ebuf != NULL) && (app_type(ebuf->buf, SHT_NOTE, ".note.go.buildid") != 0)) {
+        if (setenv("SCOPE_APP_TYPE", "go", 1) == -1) {
+            perror("setenv");
             goto err;
         }
+    } else {
+        if (setenv("SCOPE_APP_TYPE", "native", 1) == -1) {
+            perror("setenv");
+            goto err;
+        }
+    }
 
-        dump_elf(buf, flen);
+    if ((ebuf == NULL) || (!is_static(ebuf->buf))) {
+        // Dynamic executable path
+        //printf("%s:%d not a static file\n", __FUNCTION__, __LINE__);
+
+        if (ebuf) dump_elf(ebuf->buf, ebuf->len);
         
         if (setenv("LD_PRELOAD", info->path, 0) == -1) {
             perror("setenv");
             goto err;
         }
-        printf("LD_PRELOAD=%s\n", info->path);
+
+        if (setenv("SCOPE_EXEC_TYPE", "dynamic", 1) == -1) {
+            perror("setenv");
+            goto err;
+        }
         
         pid_t pid = fork();
         if (pid == -1) {
@@ -297,6 +332,7 @@ main(int argc, char **argv, char **env)
         }
     }
 
+    // Static executable path
     handle = dlopen(info->path, RTLD_LAZY);
     if (!handle) {
         fprintf(stderr, "%s\n", dlerror());
@@ -309,10 +345,16 @@ main(int argc, char **argv, char **env)
     }
     release_libscope(&info);
 
-    sys_exec(buf, argv[1], argc, argv, env);
+    if (setenv("SCOPE_EXEC_TYPE", "static", 1) == -1) {
+        perror("setenv");
+        goto err;
+    }
+
+    sys_exec(ebuf->buf, argv[1], argc, argv, env);
 
     return 0;
 err:
     release_libscope(&info);
+    if (ebuf) free(ebuf);
     exit(EXIT_FAILURE);
 }

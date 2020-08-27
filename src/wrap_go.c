@@ -12,7 +12,6 @@
 #include "../contrib/funchook/distorm/include/distorm.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
-#define funcprint devnull
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
 #define ENABLE_CAS_IN_SYSEXEC 1
 
@@ -27,8 +26,8 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 }
 #endif
 
-
 // compile-time control for debugging
+#define NEEDEVNULL 1
 //#define funcprint sysprint
 #define funcprint devnull
 //#define patchprint sysprint
@@ -54,23 +53,26 @@ tap_t g_go_tap[] = {
 };
 
 uint64_t g_glibc_guard = 0LL;
+uint64_t g_go_static = 0LL;
 void (*go_runtime_cgocall)(void);
 
+#if NEEDEVNULL > 0
 static void
 devnull(const char* fmt, ...)
 {
     return;
 }
+#endif
 
 // c_str() is provided to convert a go-style string to a c-style string.
 // The resulting c_str will need to be passed to free() when it is no
 // longer needed.
 static char *
-c_str(gostring_t* go_str)
+c_str(gostring_t *go_str)
 {
     if (!go_str || go_str->len <= 0) return NULL;
 
-    char * path;
+    char *path;
     if ((path = calloc(1, go_str->len+1)) == NULL) return NULL;
     memmove(path, go_str->str, go_str->len);
     path[go_str->len] = '\0';
@@ -268,6 +270,9 @@ initGoHook(const char *buf)
 {
     int rc;
     funchook_t *funchook;
+    gostring_t *go_ver; // There is an implicit len field at go_ver + 0x8
+    char *estr;
+    char *go_runtime_version = NULL;
 
     int (*ni_open)(const char *pathname, int flags, mode_t mode);
     ni_open = dlsym(RTLD_NEXT, "open");
@@ -288,13 +293,22 @@ initGoHook(const char *buf)
     // ask Go to use HTTP 1 instead of HTTP 2 by default
     setGoHttpEnvVariable();
 
-    gostring_t* go_ver; // There is an implicit len field at go_ver + 0x8
-    char* go_runtime_version = NULL;
+    // default to a dynamic app?
+    if (((estr = getenv("SCOPE_EXEC_TYPE")) != NULL) &&
+        (strncmp(estr, "static", strlen(estr)) == 0)) {
+        g_go_static = 1LL;
+        sysprint("This is a static app: %s\n", estr);
+    } else {
+        g_go_static = 0LL;
+        sysprint("This is a dynamic app: %s\n", estr);
+    }
+
     if (!(go_ver= getSymbol(buf, "runtime.buildVersion")) ||
         !(go_runtime_version = c_str(go_ver))) {
         sysprint("ERROR: can't get the address for runtime.buildVersion\n");
         return;
     }
+
     sysprint("go_runtime_version = %s\n", go_runtime_version);
 
     // go 1.8 has a different m_to_tls offset than other supported versions.
@@ -334,6 +348,9 @@ initGoHook(const char *buf)
                                  g_text_len - offset_into_txt,
                                  Decode64Bits, asm_inst, MAX_INST, &asm_count);
         if (rc == DECRES_INPUTERR) {
+            sysprint("ERROR: disassembler fails: %s\n\tlen %d dt %d code %p result %d\n\ttext addr %p text len %d oinfotext %p\n",
+                     tap->func_name, g_text_len - offset_into_txt, Decode64Bits,
+                     orig_func, sizeof(asm_inst), g_text_addr, g_text_len, offset_into_txt);
             continue;
         }
 
@@ -495,100 +512,8 @@ out:
     return return_addr(gfunc);
 }
 
-/*
- * Switch from the Go system stack to a new libc stack
- * Switch from the 'm' TCB to the libc TCB
- * Call the C handler
- * Switch 'g' and 'm' state back
- * Return to the calling 'g'
- *
- * This implementation of go_switch creates
- * a new libc stack for every calling 'g'.
- * As such no signal mask or guard is required.
- *
- *go_switch_new_stack
- */
 inline static void *
-go_switch_new_stack(char *stackptr, void *cfunc, void *gfunc)
-{
-    uint64_t rc;
-    unsigned long go_tls, *go_ptr;
-    char *gstack;
-    char *tstack = NULL, *sstack = NULL;
-    char *go_g = NULL, *go_m = NULL;
-
-    // Get the Go routine's struct g
-    __asm__ volatile (
-        "mov %%fs:0xfffffffffffffff8, %%r11 \n"
-        "mov %%r11, %1  \n"
-        : "=r"(rc)                        // output
-        : "m"(go_g)                       // inputs
-        :                                 // clobbered register
-        );
-
-    // Swtich to the libc TCB
-    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-        scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    // Get a libc stack
-    if (tstack == NULL) {
-        if ((sstack = mmap(NULL, SCOPE_STACK_SIZE,
-                           PROT_READ | PROT_WRITE,
-                           MAP_PRIVATE | MAP_ANONYMOUS,
-                           -1, (off_t)NULL)) == MAP_FAILED) {
-            scopeLog("go_write:mmap", -1, CFG_LOG_ERROR);
-            exit(-1);
-        }
-        tstack = sstack + SCOPE_STACK_SIZE;
-    }
-
-    uint32_t frame_offset = frame_size(gfunc);
-    if (!frame_offset) goto out;
-    stackptr += frame_offset;
-
-    // save the 'g' stack, switch to the tstack, call the C handler
-    __asm__ volatile (
-        "mov %%rsp, %2 \n"
-        "mov %1, %%rsp \n"
-        "mov %3, %%rdi  \n"
-        "callq *%4  \n"
-        : "=r"(rc)                    // output
-        : "m"(tstack), "m"(gstack),   // input
-          "r"(stackptr), "r"(cfunc)
-        :                            // clobbered register
-        );
-
-    // Switch stack back to the 'g' stack
-    __asm__ volatile (
-        "mov %1, %%rsp \n"
-        : "=r"(rc)                        // output
-        : "r"(gstack)                     // inputs
-        :                                 // clobbered register
-        );
-
-    // get struct m from g and pull out the TLS from 'm'
-    go_ptr = (unsigned long *)(go_g + g_go.g_to_m);
-    go_tls = *go_ptr;
-    go_m = (char *)go_tls;
-    go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-
-    // Switch back to the 'm' TLS
-    if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
-        scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-out:
-    if (munmap(sstack, SCOPE_STACK_SIZE) != 0) {
-        scopeLog("munmap", -1, CFG_LOG_ERROR);
-    }
-    return return_addr(gfunc);
-}
-
-inline static void *
-go_switch(char *stackptr, void *cfunc, void *gfunc)
+go_switch_static(char *stackptr, void *cfunc, void *gfunc)
 {
     uint64_t rc;
     unsigned long go_tls, *go_ptr;
@@ -632,6 +557,93 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
     if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
         scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
         goto out;
+    }
+
+out:
+    return return_addr(gfunc);
+}
+
+inline static void *
+go_switch_dynamic(char *stackptr, void *cfunc, void *gfunc)
+{
+    uint64_t rc;
+    uint32_t frame_offset = frame_size(gfunc);
+
+    if (!frame_offset) goto out;
+    stackptr += frame_offset;
+
+    // call the C handler
+    __asm__ volatile (
+        "mov %1, %%rdi  \n"
+        "callq *%2  \n"
+        : "=r"(rc)                    // output
+        : "r"(stackptr), "r"(cfunc)   // inputs
+        :                             // clobbered register
+        );
+out:
+    return return_addr(gfunc);
+}
+
+/*
+ * This go_switch() is meant to support static
+ * and dynamic apps at the same time. It depends
+ * on an env var being set in the scope
+ * executable. In initGoHook() we get the
+ * env var and set the variable g_go_static.
+ * If not 0 the executable is static.
+ *
+ * In the static case we swtich TLS/TCB.
+ * In the dynamic case we do not switch TLS/TCB.
+ */
+inline static void *
+go_switch(char *stackptr, void *cfunc, void *gfunc)
+{
+    uint64_t rc;
+    unsigned long go_tls, *go_ptr;
+    char *go_g = NULL, *go_m = NULL;
+
+    if (g_go_static) {
+        // Get the Go routine's struct g
+        __asm__ volatile (
+            "mov %%fs:0xfffffffffffffff8, %%r11 \n"
+            "mov %%r11, %1  \n"
+            : "=r"(rc)                        // output
+            : "m"(go_g)                       // inputs
+            :                                 // clobbered register
+            );
+
+        // Switch to the libc TCB
+        if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+            scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+            goto out;
+        }
+    }
+
+    uint32_t frame_offset = frame_size(gfunc);
+    if (!frame_offset) goto out;
+    stackptr += frame_offset;
+
+    // call the C handler
+    __asm__ volatile (
+        "mov %1, %%rdi  \n"
+        "callq *%2  \n"
+        : "=r"(rc)                    // output
+        : "r"(stackptr), "r"(cfunc)   // inputs
+        :                             // clobbered register
+        );
+
+    if (g_go_static && go_g) {
+        // get struct m from g and pull out the TLS from 'm'
+        go_ptr = (unsigned long *)(go_g + g_go.g_to_m);
+        go_tls = *go_ptr;
+        go_m = (char *)go_tls;
+        go_tls = (unsigned long)(go_m + g_go.m_to_tls);
+
+        // Switch back to the 'm' TLS
+        if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
+            scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
+            goto out;
+        }
     }
 
 out:

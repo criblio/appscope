@@ -251,10 +251,15 @@ setup_libscope()
         goto err;
     }
 
+/*
+ * DEVMODE is here only to help with gdb. The debugger has
+ * a problem reading symbols from a /proc pathname.
+ * This is expected to be enabled only by developers and
+ * only when using the debugger.
+ */
 #if DEVMODE == 1
-    snprintf(info->path, sizeof(info->path), "./lib/linux/libscope.so");
+    asprintf(&info->path, "./lib/linux/libscope.so");
     printf("LD_PRELOAD=%s\n", info->path);
-    printf("%s:%d loading %s\n", __FUNCTION__, __LINE__, argv[1]);
 #endif
 
     everything_successful = TRUE;

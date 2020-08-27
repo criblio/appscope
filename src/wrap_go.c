@@ -632,7 +632,7 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
         :                             // clobbered register
         );
 
-    if (g_go_static) {
+    if (g_go_static && go_g) {
         // get struct m from g and pull out the TLS from 'm'
         go_ptr = (unsigned long *)(go_g + g_go.g_to_m);
         go_tls = *go_ptr;

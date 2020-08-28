@@ -29,6 +29,12 @@ RUN cd /go/net && openssl genrsa -out server.key 2048 && \
                   openssl req -new -x509 -sha256 -key server.key -out server.crt \
        -days 3650 -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost"
 
+RUN mkdir /go/cgo
+COPY ./go/cgo/Makefile /go/cgo
+COPY ./go/cgo/myc.c /go/cgo
+COPY ./go/cgo/myc.h /go/cgo
+COPY ./go/cgo/mygo.go /go/cgo
+RUN cd /go/cgo && make all
 
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4

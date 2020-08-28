@@ -202,6 +202,37 @@ ERR+=$?
 endtest
 
 
+#
+# cgoDynamic
+#
+starttest cgoDynamic
+cd /go/cgo
+LD_LIBRARY_PATH=. scope ./cgoDynamic
+ERR+=$?
+evaltest
+
+grep cgoDynamic $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+
+#
+# cgoStatic
+#
+starttest cgoStatic
+cd /go/cgo
+LD_LIBRARY_PATH=. scope ./cgoStatic
+ERR+=$?
+evaltest
+
+grep cgoStatic $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+
+
 
 
 

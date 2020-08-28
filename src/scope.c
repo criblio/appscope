@@ -269,6 +269,41 @@ err:
     return info;
 }
 
+// If possible, we want to set GODEBUG=http2server=0
+// This tells go not to upgrade servers to http2, which allows
+// our http1 protocol capture stuff to do it's thing.
+// We consider this temporary, because when we support http2
+// it will not be necessary.
+#define GO_ENV_VAR "GODEBUG"
+#define GO_ENV_VALUE "http2server"
+static void
+setGoHttpEnvVariable(void)
+{
+    char *cur_val = getenv(GO_ENV_VAR);
+
+    // If GODEBUG isn't set, try to set it to http2server=0
+    if (!cur_val) {
+        if (setenv(GO_ENV_VAR, GO_ENV_VALUE "=0", 1)) {
+            perror("setGoHttpEnvVariable:setenv");
+        }
+        return;
+    }
+
+    // GODEBUG is set.
+    // If http2server wasn't specified, let's append ",http2server=0"
+    if (!strstr(cur_val, GO_ENV_VALUE)) {
+        char *new_val = NULL;
+        if ((asprintf(&new_val, "%s,%s=0", cur_val, GO_ENV_VALUE) == -1)) {
+            perror("setGoHttpEnvVariable:setenv");
+            return;
+        }
+        if (setenv(GO_ENV_VAR, new_val, 1)) {
+            perror("setGoHttpEnvVariable:setenv");
+        }
+        if (new_val) free(new_val);
+    }
+}
+
 int
 main(int argc, char **argv, char **env)
 {
@@ -295,6 +330,9 @@ main(int argc, char **argv, char **env)
             perror("setenv");
             goto err;
         }
+
+        // ask Go to use HTTP 1 instead of HTTP 2 by default
+        setGoHttpEnvVariable();
     } else {
         if (setenv("SCOPE_APP_TYPE", "native", 1) == -1) {
             perror("setenv");

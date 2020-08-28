@@ -12,8 +12,10 @@
 package main
 
 import (
-    "net/http"
+    "fmt"
     "log"
+    "net/http"
+    "os"
 )
 
 func HelloServer(w http.ResponseWriter, req *http.Request) {
@@ -22,8 +24,13 @@ func HelloServer(w http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
+    if len(os.Args) < 2 {
+        log.Fatal("Missing required arg of port")
+    }
+    port := fmt.Sprint(":", os.Args[1])
+
     http.HandleFunc("/hello", HelloServer)
-    err := http.ListenAndServeTLS(":4430", "server.crt", "server.key", nil)
+    err := http.ListenAndServeTLS(port, "server.crt", "server.key", nil)
     if err != nil {
         log.Fatal("ListenAndServe: ", err)
     }

@@ -44,64 +44,129 @@ endtest(){
 
 
 #
-# plainServer
+# plainServerDynamic
 #
-starttest plainServer
+starttest plainServerDynamic
 cd /go/net
-scope ./plainServer &
+PORT=80
+scope ./plainServerDynamic ${PORT} &
 
-# this sleep gives the server a chance to bind to the port (80)
+# this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
 sleep 0.5
-curl http://localhost/hello
+curl http://localhost:${PORT}/hello
 ERR+=$?
 
-# This stops plainServer
-kill $!
+# This stops plainServerDynamic
+pkill -f plainServerDynamic
 
-# this sleep gives plainServer a chance to report its events on exit
+# this sleep gives plainServerDynamic a chance to report its events on exit
 sleep 0.5
-
 
 evaltest
 
-grep plainServer $EVT_FILE | grep http-req > /dev/null
+grep plainServerDynamic $EVT_FILE | grep http-req > /dev/null
 ERR+=$?
-grep plainServer $EVT_FILE | grep http-resp > /dev/null
+grep plainServerDynamic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
-grep plainServer $EVT_FILE | grep http-metrics > /dev/null
+grep plainServerDynamic $EVT_FILE | grep http-metrics > /dev/null
 ERR+=$?
 
 endtest
 
 
 #
-# tlsServer
+# plainServerStatic
 #
-starttest tlsServer
+starttest plainServerStatic
 cd /go/net
-STRUCT_PATH=/go/net/go_offsets.txt
-SCOPE_GO_STRUCT_PATH=$STRUCT_PATH scope ./tlsServer &
+PORT=81
+scope ./plainServerStatic ${PORT} &
 
-# this sleep gives the server a chance to bind to the port (4430)
+# this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
 sleep 0.5
-curl -k --key server.key --cert server.crt https://localhost:4430/hello
+curl http://localhost:${PORT}/hello
 ERR+=$?
 
-# This stops tlsServer
+# This stops plainServerStatic
 kill $!
 
-# this sleep gives tlsServer a chance to report its events on exit
+# this sleep gives plainServerStatic a chance to report its events on exit
 sleep 0.5
 
 evaltest
 
-grep tlsServer $EVT_FILE | grep http-req > /dev/null
+grep plainServerStatic $EVT_FILE | grep http-req > /dev/null
 ERR+=$?
-grep tlsServer $EVT_FILE | grep http-resp > /dev/null
+grep plainServerStatic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
-grep tlsServer $EVT_FILE | grep http-metrics > /dev/null
+grep plainServerStatic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+
+endtest
+
+
+#
+# tlsServerDynamic
+#
+starttest tlsServerDynamic
+cd /go/net
+PORT=4430
+scope ./tlsServerDynamic ${PORT} &
+
+# this sleep gives the server a chance to bind to the port
+# before we try to hit it with curl
+sleep 0.5
+curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
+ERR+=$?
+
+# This stops tlsServerDynamic
+pkill -f tlsServerDynamic
+
+# this sleep gives tlsServerDynamic a chance to report its events on exit
+sleep 0.5
+
+evaltest
+
+grep tlsServerDynamic $EVT_FILE | grep http-req > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep http-resp > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+
+endtest
+
+
+#
+# tlsServerStatic
+#
+starttest tlsServerStatic
+cd /go/net
+PORT=4431
+STRUCT_PATH=/go/net/go_offsets.txt
+SCOPE_GO_STRUCT_PATH=$STRUCT_PATH scope ./tlsServerStatic ${PORT} &
+
+# this sleep gives the server a chance to bind to the port
+# before we try to hit it with curl
+sleep 0.5
+curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
+ERR+=$?
+
+# This stops tlsServerStatic
+kill $!
+
+# this sleep gives tlsServerStatic a chance to report its events on exit
+sleep 0.5
+
+evaltest
+
+grep tlsServerStatic $EVT_FILE | grep http-req > /dev/null
+ERR+=$?
+grep tlsServerStatic $EVT_FILE | grep http-resp > /dev/null
+ERR+=$?
+grep tlsServerStatic $EVT_FILE | grep http-metrics > /dev/null
 ERR+=$?
 
 endtest

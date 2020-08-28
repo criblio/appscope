@@ -5,7 +5,7 @@ FAILURE_COUNT=0
 # Capture a dump of the .zdebug_info from the elf file
 # This contains debug info which describes structures and the offsets
 # of their fields.
-GO_APP=`pwd`/net/tlsServer
+GO_APP=`pwd`/net/tlsServerStatic
 APP_STRUCT_FILE=`pwd`/readelf.dump
 readelf --debug-dump=info $GO_APP > $APP_STRUCT_FILE
 

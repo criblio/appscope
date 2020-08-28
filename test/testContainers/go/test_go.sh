@@ -222,7 +222,7 @@ endtest
 #
 starttest cgoStatic
 cd /go/cgo
-LD_LIBRARY_PATH=. scope ./cgoStatic
+scope ./cgoStatic
 ERR+=$?
 evaltest
 

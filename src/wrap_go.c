@@ -594,6 +594,10 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
         :                             // clobbered register
         );
 
+    // We'd like to switch back to go_tls every time we switch to scope_fs
+    // above, however, we've seen a case where on process exit static cgo
+    // apps do not have a go_g while they're exiting.  With a null go_g,
+    // there is no way to do the processing here...
     if (g_go_static && go_g) {
         // get struct m from g and pull out the TLS from 'm'
         go_ptr = (unsigned long *)(go_g + g_go.g_to_m);

@@ -214,6 +214,7 @@ map_segment(char *buf, Elf64_Phdr *phead)
 
     if (laddr != addr) {
         scopeLog("ERROR: load_segment:mmap:laddr mismatch", -1, CFG_LOG_ERROR);
+        return -1;
     }
 
     load_sections(buf, (char *)phead->p_vaddr, (size_t)phead->p_memsz);

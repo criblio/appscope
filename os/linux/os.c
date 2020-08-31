@@ -339,7 +339,7 @@ osInitTSC(platform_time_t *cfg)
      * Anecdotal evidence that there is a max size to proc entrires.
      * In any case this should be big enough.
      */    
-    if ((buf = malloc(MAX_PROC)) == NULL) {
+    if ((buf = calloc(1, MAX_PROC)) == NULL) {
         DBG(NULL);
         g_fn.close(fd);
         return -1;
@@ -466,8 +466,8 @@ bool
 osThreadInit(void(*handler)(int), unsigned interval)
 {
     struct sigaction sact;
-    struct sigevent sevent;
-    timer_t timerid;
+    struct sigevent sevent = {0};
+    timer_t timerid = 0;
     struct itimerspec tspec;
 
     sigemptyset(&sact.sa_mask);

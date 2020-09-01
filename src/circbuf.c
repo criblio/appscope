@@ -62,7 +62,7 @@ cbufPut(cbuf_handle_t cbuf, uint64_t data)
             // Note: we commented this out as it caused a
             // double free error when running with 100,000
             // Go routines. We should determine why.
-            //DBG("maxlen: %"PRIu64, cbuf->maxlen); // Full
+            DBG("maxlen: %"PRIu64, cbuf->maxlen); // Full
             break;
         }
         success = atomicCas32(&cbuf->head, head, head_next);

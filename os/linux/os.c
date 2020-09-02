@@ -166,9 +166,14 @@ osGetExePath()
 {
     char *path;
 
-    if (((path = calloc(1, PATH_MAX)) == NULL) ||
-        readlink("/proc/self/exe", path, PATH_MAX) == -1) {
+    if (!(path = calloc(1, PATH_MAX))) {
+        scopeLog("ERROR:calloc in osGetExePath", -1, CFG_LOG_ERROR);
+        return NULL;
+    }
+
+    if (readlink("/proc/self/exe", path, PATH_MAX - 1) == -1) {
         scopeLog("osGetPath: can't get path to self exe", -1, CFG_LOG_ERROR);
+        free(path);
         return NULL;
     }
 

@@ -90,7 +90,7 @@ get_file_size(const char *path)
 }
 #endif
 
-void *
+EXPORTON void *
 getSymbol(const char *buf, char *sname)
 {
     int i, nsyms = 0;

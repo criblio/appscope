@@ -17,8 +17,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/*
 #ifdef __MACOS__
+#include <sys/mount.h>
 
 #ifndef off64_t
 typedef uint64_t off64_t;
@@ -28,7 +28,6 @@ typedef uint64_t fpos64_t;
 #endif
 
 #endif // __MACOS__
-*/
 
 
 typedef struct {
@@ -148,8 +147,6 @@ typedef struct {
     int (*fsetpos64)(FILE *stream, const fpos64_t *pos);
     int (*statfs64)(const char *, struct statfs64 *);
     int (*fstatfs64)(int, struct statfs64 *);
-    int (*statvfs64)(const char *, struct statvfs64 *);
-    int (*fstatvfs64)(int, struct statvfs64 *);
     int (*fstatat64)(int, const char *, struct stat64 *, int);
     int (*__xstat)(int, const char *, struct stat *);
     int (*__xstat64)(int, const char *, struct stat64 *);
@@ -163,7 +160,6 @@ typedef struct {
     long (*syscall)(long, ...);
     int (*prctl)(int, unsigned long, unsigned long, unsigned long, unsigned long);
     int (*nanosleep)(const struct timespec *, struct timespec *);
-    int (*epoll_wait)(int, struct epoll_event *, int, int);
     int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
     int (*sigsuspend)(const sigset_t *);
     int (*sigaction)(int, const struct sigaction *, struct sigaction *);
@@ -183,6 +179,14 @@ typedef struct {
     void *(*dlopen)(const char *, int);
     int (*PR_FileDesc2NativeHandle)(PRFileDesc *);
     void (*PR_SetError)(PRErrorCode, PRInt32);
+
+#ifdef __LINUX__
+    // Couldn't easily get struct definitions for these on mac
+    int (*statvfs64)(const char *, struct statvfs64 *);
+    int (*fstatvfs64)(int, struct statvfs64 *);
+    int (*epoll_wait)(int, struct epoll_event *, int, int);
+#endif // __LINUX__
+
 #if defined(__LINUX__) && defined(__STATX__)
     int (*statx)(int, const char *, int, unsigned int, struct statx *);
 #endif // __LINUX__ && __STATX__

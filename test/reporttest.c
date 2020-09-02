@@ -25,8 +25,8 @@ int mtcBufNext = 0;
 
 // These signatures satisfy --wrap=cmdSendEvent in the Makefile
 #ifdef __LINUX__
-void __real_cmdSendEvent(ctl_t*, event_t*, uint64_t, proc_id_t*);
-void __wrap_cmdSendEvent(ctl_t* ctl, event_t* event, uint64_t uid, proc_id_t* proc)
+int __real_cmdSendEvent(ctl_t*, event_t*, uint64_t, proc_id_t*);
+int __wrap_cmdSendEvent(ctl_t* ctl, event_t* event, uint64_t uid, proc_id_t* proc)
 #endif // __LINUX__
 #ifdef __MACOS__
 int cmdSendEvent(ctl_t* ctl, event_t* event, uint64_t uit, proc_id_t* proc)
@@ -36,7 +36,7 @@ int cmdSendEvent(ctl_t* ctl, event_t* event, uint64_t uit, proc_id_t* proc)
     memcpy(&evtBuf[evtBufNext++], event, sizeof(*event));
     if (evtBufNext >= BUFSIZE) fail();
 
-    //__real_cmdSendEvent(ctl, event, uid, proc);
+    return 0; //__real_cmdSendEvent(ctl, event, uid, proc);
 }
 
 // These signatures satisfy --wrap=cmdSendMetric in the Makefile

@@ -87,7 +87,6 @@ initFn(void)
     g_fn.gethostbyname2 = dlsym(RTLD_NEXT, "gethostbyname2");
     g_fn.getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo");
     g_fn.nanosleep = dlsym(RTLD_NEXT, "nanosleep");
-    g_fn.epoll_wait = dlsym(RTLD_NEXT, "epoll_wait");
     g_fn.select = dlsym(RTLD_NEXT, "select");
     g_fn.sigsuspend = dlsym(RTLD_NEXT, "sigsuspend");
     g_fn.sigaction = dlsym(RTLD_NEXT, "sigaction");
@@ -101,6 +100,7 @@ initFn(void)
 #endif // __MACOS__
 
 #ifdef __LINUX__
+    g_fn.epoll_wait = dlsym(RTLD_NEXT, "epoll_wait");
     g_fn.open64 = dlsym(RTLD_NEXT, "open64");
     g_fn.openat64 = dlsym(RTLD_NEXT, "openat64");
     g_fn.__open_2 = dlsym(RTLD_NEXT, "__open_2");

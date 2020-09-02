@@ -27,7 +27,6 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 #include "javaagent.h"
-#include "gocontext.h"
 
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
@@ -54,6 +53,9 @@ static void reportProcessStart(void);
 void threadNow(int);
 
 #ifdef __LINUX__
+extern int arch_prctl(int, unsigned long);
+extern unsigned long scope_fs;
+
 extern void initGoHook(elf_buf_t*);
 
 static got_list_t hook_list[] = {
@@ -1016,13 +1018,6 @@ nanosleep(const struct timespec *req, struct timespec *rem)
 }
 
 EXPORTOFF int
-epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
-{
-    WRAP_CHECK(epoll_wait, -1);
-    return g_fn.epoll_wait(epfd, events, maxevents, timeout);
-}
-
-EXPORTOFF int
 select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
 {
     WRAP_CHECK(select, -1);
@@ -1143,6 +1138,13 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
 }
 
 #ifdef __LINUX__
+EXPORTOFF int
+epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
+{
+    WRAP_CHECK(epoll_wait, -1);
+    return g_fn.epoll_wait(epfd, events, maxevents, timeout);
+}
+
 EXPORTON int
 open64(const char *pathname, int flags, ...)
 {

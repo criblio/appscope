@@ -463,9 +463,13 @@ main(int argc, char **argv, char **env)
                     goto err;
                 }
 
+                // read should not return > PATH_MAX, needed?
                 if (plen > PATH_MAX) plen = PATH_MAX;
                 memset(*argv, 0, plen);
                 strncpy(*argv, PARENT_PROC_NAME, plen);
+
+                // for the case where PARENT_PROC_NAME > plen
+                argv[plen] = '\0';
 
                 waitpid(pid, &status, 0);
                 release_libscope(&info);

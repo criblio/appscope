@@ -326,8 +326,8 @@ setGoHttpEnvVariable(void)
  * in glibc. This function sets an env var that disables the use of
  * the tcache.
  *
- * Return value of 1 indicates that the env variable was set before
- * we set it ourselves. Conversely a 0 indicates that the env var was not set.
+ * Return value of TRUE indicates that the env variable was set before
+ * we set it ourselves. Conversely a FALSE indicates that the env var was not set.
  */
 static int
 setGlibcEnvVariable(void)
@@ -339,7 +339,7 @@ setGlibcEnvVariable(void)
         if (setenv(GLIBC_ENV_VAR, GLIBC_ENV_VALUE, 1) == -1) {
             perror("setenv");
         }
-        return 0;
+        return FALSE;
     }
 
     // the env var is set.
@@ -348,20 +348,20 @@ setGlibcEnvVariable(void)
         char *new_val = NULL;
 
         if ((asprintf(&new_val, "%s:%s", cur_val, GLIBC_ENV_VALUE) == -1)) {
-            perror("setGlibcHttpEnvVariable:asprintf");
-            return 0;
+            perror("setGlibcEnvVariable:asprintf");
+            return FALSE;
         }
 
         if (setenv(GLIBC_ENV_VAR, new_val, 1)) {
-            perror("setGlibcHttpEnvVariable:setenv");
-            return 0;
+            perror("setGlibcEnvVariable:setenv");
+            return FALSE;
         }
 
         if (new_val) free(new_val);
-        return 0;
+        return FALSE;
     }
 
-    return 1;
+    return TRUE;
 }
 
 int
@@ -428,7 +428,7 @@ main(int argc, char **argv, char **env)
          * want to start a new process.
          */
         if ((getSymbol(ebuf->buf, "__libc_start_main") == NULL) &&
-            (glibcenv == 0)) {
+            (glibcenv == FALSE)) {
 
             pid = fork();
             if (pid == -1) {

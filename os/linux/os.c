@@ -164,18 +164,18 @@ osUnixSockPeer(ino_t lnode)
 char *
 osGetExePath()
 {
-    ssize_t rc;
     char *path;
 
-    if (((path = calloc(1, PATH_MAX)) == NULL) ||
-        ((rc = readlink("/proc/self/exe", path, PATH_MAX)) == -1)) {
-        scopeLog("osGetPath: can't get path to self exe", -1, CFG_LOG_ERROR);
+    if (!(path = calloc(1, PATH_MAX))) {
+        scopeLog("ERROR:calloc in osGetExePath", -1, CFG_LOG_ERROR);
         return NULL;
     }
 
-    // readlink should truncate and never return > PATH_MAX, needed?
-    if (rc > PATH_MAX) rc = PATH_MAX;
-    path[rc] = '\0';
+    if (readlink("/proc/self/exe", path, PATH_MAX - 1) == -1) {
+        scopeLog("osGetPath: can't get path to self exe", -1, CFG_LOG_ERROR);
+        free(path);
+        return NULL;
+    }
 
     return path;
 }

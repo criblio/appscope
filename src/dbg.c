@@ -250,20 +250,15 @@ dbgAddLine(const char* key, const char* fmt, ...)
 
 }
 
-void
+
+// This is declared weak so it can be overridden by the strong
+// definition in src/wrap.c.  The scope library will do this.
+// This weak definition allows us to not have to define this symbol
+// for unit tests and allows for a different definition for the
+// scope executable.
+void __attribute__((weak))
 scopeLog(const char *msg, int fd, cfg_log_level_t level)
 {
-    cfg_log_level_t cfg_level = logLevel(g_log);
-
-    if ((cfg_level == CFG_LOG_NONE) || (cfg_level > level)) return;
-    if (!g_log || !msg || !g_proc.procname[0]) return;
-
-    char buf[strlen(msg) + 128];
-    if (fd != -1) {
-        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): fd:%d %s\n", g_proc.procname, g_proc.pid, fd, msg);
-    } else {
-        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): %s\n", g_proc.procname, g_proc.pid, msg);
-    }
-    logSend(g_log, buf, level);
+    return;
 }
 

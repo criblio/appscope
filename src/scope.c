@@ -18,22 +18,17 @@
 #include <sys/wait.h>
 #include <dlfcn.h>
 #include <sys/utsname.h>
+#include "fn.h"
+#include "scopeelf.h"
+#include "scopetypes.h"
 
 #define DEVMODE 0
-#define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 #define __NR_memfd_create   319
 #define _MFD_CLOEXEC		0x0001U
 #define SHM_NAME            "libscope"
-#define TRUE 1
-#define FALSE 0
 
 extern unsigned char _binary___lib_linux_libscope_so_start;
 extern unsigned char _binary___lib_linux_libscope_so_end;
-
-typedef struct elf_buf_t {
-    char *buf;
-    int len;
-} elf_buf;
 
 typedef struct {
     char *path;
@@ -89,76 +84,6 @@ app_type(char *buf, const uint32_t sh_type, const char *sh_name)
         }
     }
     return 0;
-}
-
-static void
-dump_elf(char *buf, size_t len)
-{
-    if (!buf) return;
-
-    if (munmap(buf, len) == -1) {
-        perror("dump_elf: munmap");
-    }
-}
-
-static elf_buf *
-get_elf(char *path)
-{
-    int fd;
-    elf_buf *ebuf;
-    Elf64_Ehdr *elf;
-    struct stat sbuf;
-
-    if ((ebuf = calloc(1, sizeof(struct elf_buf_t))) == NULL) {
-        perror("calloc:get_elf");
-        return NULL;
-    }
-
-    if ((fd = open(path, O_RDONLY)) == -1) {
-        perror("get_elf:open");
-        return NULL;
-    }
-
-    if (fstat(fd, &sbuf) == -1) {
-        perror("get_elf:fstat");
-        return NULL;        
-    }
-
-    ebuf->len = sbuf.st_size;
-
-    if ((ebuf->buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
-                          PROT_READ, MAP_PRIVATE, fd, (off_t)NULL)) == MAP_FAILED) {
-        perror("get_elf:mmap");
-        return NULL;
-    }
-
-    if (close(fd) == -1) {
-        perror("get_elf:close");
-        dump_elf(ebuf->buf, sbuf.st_size);
-        if (ebuf) free(ebuf);
-        return NULL;        
-    }
-
-    elf = (Elf64_Ehdr *)ebuf->buf;
-    if((elf->e_ident[EI_MAG0] != 0x7f) ||
-       strncmp((char *)&elf->e_ident[EI_MAG1], "ELF", 3) ||
-       (elf->e_ident[EI_CLASS] != ELFCLASS64) ||
-       (elf->e_ident[EI_DATA] != ELFDATA2LSB) ||
-       (elf->e_machine != EM_X86_64)) {
-        //printf("%s:%d ERROR: %s is not a viable ELF file\n", __FUNCTION__, __LINE__, path);
-        dump_elf(ebuf->buf, sbuf.st_size);
-        if (ebuf) free(ebuf);
-        return NULL;
-    }
-
-    if (elf->e_type != ET_EXEC) {
-        //printf("%s:%d %s is not a static executable\n", __FUNCTION__, __LINE__, path);
-        dump_elf(ebuf->buf, sbuf.st_size);
-        if (ebuf) free(ebuf);
-        return NULL;
-    }
-
-    return ebuf;
 }
 
 /**
@@ -307,10 +232,13 @@ setGoHttpEnvVariable(void)
 int
 main(int argc, char **argv, char **env)
 {
-    elf_buf *ebuf;
-    int (*sys_exec)(const char *, const char *, int, char **, char **);
+    elf_buf_t *ebuf;
+    int (*sys_exec)(elf_buf_t *, const char *, int, char **, char **);
     void *handle;
     libscope_info_t *info;
+
+    // Use dlsym to get addresses for everything in g_fn
+    initFn();
 
     //check command line arguments 
     if (argc < 2) {
@@ -323,7 +251,7 @@ main(int argc, char **argv, char **env)
         exit(EXIT_FAILURE);
     }
 
-    ebuf = get_elf(argv[1]);
+    ebuf = getElf(argv[1]);
 
     if ((ebuf != NULL) && (app_type(ebuf->buf, SHT_NOTE, ".note.go.buildid") != 0)) {
         if (setenv("SCOPE_APP_TYPE", "go", 1) == -1) {
@@ -344,7 +272,7 @@ main(int argc, char **argv, char **env)
         // Dynamic executable path
         //printf("%s:%d not a static file\n", __FUNCTION__, __LINE__);
 
-        if (ebuf) dump_elf(ebuf->buf, ebuf->len);
+        if (ebuf) freeElf(ebuf->buf, ebuf->len);
         
         if (setenv("LD_PRELOAD", info->path, 0) == -1) {
             perror("setenv");
@@ -388,7 +316,7 @@ main(int argc, char **argv, char **env)
         goto err;
     }
 
-    sys_exec(ebuf->buf, argv[1], argc, argv, env);
+    sys_exec(ebuf, argv[1], argc, argv, env);
 
     return 0;
 err:

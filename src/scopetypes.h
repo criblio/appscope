@@ -23,6 +23,8 @@ typedef enum {CFG_SRC_FILE,
               CFG_SRC_HTTP,
               CFG_SRC_MAX} watch_t;
 
+#define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
+#define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
 #define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128

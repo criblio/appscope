@@ -1,5 +1,6 @@
 #ifndef __GOTCONTEXT_H__
 #define __GOTCONTEXT_H__
+#include "scopeelf.h"
 
 #define EXPORTON __attribute__((visibility("default")))
 
@@ -31,14 +32,12 @@ typedef void (*assembly_fn)(void);
 
 extern go_offsets_t g_go;
 extern tap_t g_go_tap[];
-extern unsigned char *g_text_addr;
 extern unsigned long scope_fs;
 extern uint64_t scope_stack;
-extern uint64_t g_text_len;
 
 extern int arch_prctl(int, unsigned long);
 extern void threadNow(int);
-extern void initGoHook(const char *);
+extern void initGoHook(elf_buf_t*);
 extern void sysprint(const char *, ...);
 extern void *getSymbol(const char *, char *);
 

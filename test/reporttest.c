@@ -1,39 +1,19 @@
 #define _GNU_SOURCE
-#include <dlfcn.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <sys/stat.h>
-#include <sys/statvfs.h>
-#ifdef __LINUX__
-#include <sys/vfs.h>
-#include <sys/epoll.h>
-#endif // _LINUX_
-
-#ifdef __MACOS__
-
-#ifndef off64_t
-typedef uint64_t off64_t;
-#endif
-#ifndef fpos64_t
-typedef uint64_t fpos64_t;
-#endif
-
-#endif // __MACOS__
-
 #include "cfg.h"
 #include "dbg.h"
-#include "test.h"
-#include "state.h"
+#include "fn.h"
+#include "plattime.h"
 #include "report.h"
 #include "runtimecfg.h"
-#include "wrap.h"
-#include "plattime.h"
+#include "state.h"
+#include "test.h"
 
 
 // Normally declared by wrap.c
-interposed_funcs g_fn = {0};
 rtconfig g_cfg = {0};
 
 #define BUFSIZE 500
@@ -74,9 +54,6 @@ int cmdSendMetric(mtc_t* mtc, event_t* metric)
 
     return 0; //__real_cmdSendMetric(mtc, metric);
 }
-
-// Needed by linux/os.c
-void initJavaAgent(void) {}
 
 
 int
@@ -138,22 +115,6 @@ clearTestData(void)
 }
 
 static void
-init_g_fn()
-{
-    // Currently this just initializes stuff that is used in os.c
-    // if maintaining this becomes a pain, we could refactor part of the
-    // constructor in wrap.c to be a separate function we could call here.
-    g_fn.open = dlsym(RTLD_NEXT, "open");
-    g_fn.close = dlsym(RTLD_NEXT, "close");
-    g_fn.read = dlsym(RTLD_NEXT, "read");
-    g_fn.socket = dlsym(RTLD_NEXT, "socket");
-    g_fn.sendmsg = dlsym(RTLD_NEXT, "sendmsg");
-    g_fn.recvmsg = dlsym(RTLD_NEXT, "recvmsg");
-    g_fn.sigaction = dlsym(RTLD_NEXT, "sigaction");
-    g_fn.__xstat = dlsym(RTLD_NEXT, "__xstat");
-}
-
-static void
 init_g_proc()
 {
     g_proc.pid = 50;
@@ -169,7 +130,7 @@ countTestSetup(void** state)
 {
     // init objects unique to this test that are external to count
     initTime();
-    init_g_fn();
+    initFn();
 
     // init objects that count has
     init_g_proc();

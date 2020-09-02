@@ -40,8 +40,6 @@ uint64_t scope_stack;
 unsigned long scope_fs;
 uint64_t *g_currsheap = NULL;
 uint64_t *g_heapend = NULL;
-unsigned char *g_text_addr = NULL;
-uint64_t g_text_len = -1;
 
 void
 sysprint(const char* fmt, ...)
@@ -90,56 +88,6 @@ get_file_size(const char *path)
 }
 #endif
 
-void *
-getSymbol(const char *buf, char *sname)
-{
-    int i, nsyms = 0;
-    Elf64_Addr symaddr = 0;
-    Elf64_Ehdr *ehdr;
-    Elf64_Shdr *sections;
-    Elf64_Sym *symtab = NULL;
-    const char *section_strtab = NULL;
-    const char *strtab = NULL;
-    const char *sec_name = NULL;
-
-    if (!buf || !sname) return NULL;
-
-    ehdr = (Elf64_Ehdr *)buf;
-    sections = (Elf64_Shdr *)((char *)buf + ehdr->e_shoff);
-    section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
-
-    for (i = 0; i < ehdr->e_shnum; i++) {
-        sec_name = section_strtab + sections[i].sh_name;
-
-        if (sections[i].sh_type == SHT_SYMTAB) {
-            symtab = (Elf64_Sym *)((char *)buf + sections[i].sh_offset);
-            nsyms = sections[i].sh_size / sections[i].sh_entsize;
-        } else if (sections[i].sh_type == SHT_STRTAB && strcmp(sec_name, ".strtab") == 0) {
-            strtab = (const char *)(buf + sections[i].sh_offset);
-        }
-
-        if ((strtab != NULL) && (symtab != NULL)) break;
-        /*printf("section %s type = %d flags = 0x%lx addr = 0x%lx-0x%lx, size = 0x%lx off = 0x%lx\n",
-               sec_name,
-               sections[i].sh_type,
-               sections[i].sh_flags,
-               sections[i].sh_addr,
-               sections[i].sh_addr + sections[i].sh_size,
-               sections[i].sh_size,
-               sections[i].sh_offset);*/
-    }
-
-    for (i=0; i < nsyms; i++) {
-        if (strcmp(sname, strtab + symtab[i].st_name) == 0) {
-            symaddr = symtab[i].st_value;
-            sysprint("symbol found %s = 0x%08lx\n", strtab + symtab[i].st_name, symtab[i].st_value);
-            break;
-        }
-    }
-
-    return (void *)symaddr;
-}
-
 static int
 load_sections(char *buf, char *addr, size_t mlen)
 {
@@ -173,11 +121,6 @@ load_sections(char *buf, char *addr, size_t mlen)
 
             sysprint("%s:%d %s addr %p - %p\n",
                      __FUNCTION__, __LINE__, sec_name, laddr, laddr + len);
-
-            if (!strcmp(sec_name, ".text")) {
-                g_text_addr = (unsigned char *)laddr;
-                g_text_len = len;
-            }
         }
     }
 
@@ -465,23 +408,23 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr ladd
 }
 
 EXPORTON int
-sys_exec(const char *buf, const char *path, int argc, const char **argv, const char **env)
+sys_exec(elf_buf_t *ebuf, const char *path, int argc, const char **argv, const char **env)
 {
-    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
     Elf64_Addr lastaddr;
 
-    if (!buf || !path || !argv || (argc < 1)) return -1;
+    if (!ebuf || !path || !argv || (argc < 1)) return -1;
 
     scopeLog("sys_exec type:", ehdr->e_type, CFG_LOG_DEBUG);
 
-    lastaddr = load_elf((char *)buf);
+    lastaddr = load_elf((char *)ebuf->buf);
 
     // TODO: are we loading a Go app or a glibc app?
-    initGoHook(buf);
+    initGoHook(ebuf);
 
     threadNow(0);
 
-    set_go((char *)buf, argc, argv, env, lastaddr);
+    set_go((char *)ebuf->buf, argc, argv, env, lastaddr);
 
     return 0;
 }

@@ -472,7 +472,16 @@ main(int argc, char **argv, char **env)
                 release_libscope(&info);
                 exit(status);
             } else {
-                execve(argv[0], argv, environ);
+                ssize_t rc;
+                char path[PATH_MAX];
+
+                if ((rc = readlink("/proc/self/exe", path, PATH_MAX - 1)) == -1) {
+                    perror("readlink");
+                    goto err;
+                }
+
+                path[rc] = '\0';
+                execve(path, argv, environ);
                 perror("execve");
                 goto err;
             }

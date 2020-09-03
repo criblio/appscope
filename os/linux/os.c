@@ -171,7 +171,7 @@ osGetExePath()
         return NULL;
     }
 
-    if (readlink("/proc/self/exe", path, PATH_MAX) == -1) {
+    if (readlink("/proc/self/exe", path, PATH_MAX - 1) == -1) {
         scopeLog("osGetPath: can't get path to self exe", -1, CFG_LOG_ERROR);
         free(path);
         return NULL;

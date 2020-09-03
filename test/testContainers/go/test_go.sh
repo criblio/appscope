@@ -90,7 +90,7 @@ curl http://localhost:${PORT}/hello
 ERR+=$?
 
 # This stops plainServerStatic
-kill $!
+pkill -f plainServerStatic
 
 # this sleep gives plainServerStatic a chance to report its events on exit
 sleep 0.5
@@ -155,7 +155,7 @@ curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
 ERR+=$?
 
 # This stops tlsServerStatic
-kill $!
+pkill -f tlsServerStatic
 
 # this sleep gives tlsServerStatic a chance to report its events on exit
 sleep 0.5

@@ -68,7 +68,7 @@ getElf(char *path)
         goto out;
     }
 
-    if ((fd = ni_open(path, O_RDONLY) == -1)) {
+    if ((fd = ni_open(path, O_RDONLY)) == -1) {
         scopeLog("getElf: open failed", -1, CFG_LOG_ERROR);
         goto out;
     }

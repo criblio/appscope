@@ -231,7 +231,7 @@ patch_return_addrs(funchook_t *funchook,
 }
 
 void
-initGoHook(const char *buf)
+initGoHook(elf_buf_t *ebuf)
 {
     int rc;
     funchook_t *funchook;
@@ -265,7 +265,7 @@ initGoHook(const char *buf)
         sysprint("This is a dynamic app: %s\n", estr);
     }
 
-    if (!(go_ver= getSymbol(buf, "runtime.buildVersion")) ||
+    if (!(go_ver= getSymbol(ebuf->buf, "runtime.buildVersion")) ||
         !(go_runtime_version = c_str(go_ver))) {
         sysprint("ERROR: can't get the address for runtime.buildVersion\n");
         return;
@@ -296,7 +296,7 @@ initGoHook(const char *buf)
 
     tap_t* tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
-        void* orig_func = getSymbol(buf, tap->func_name);
+        void* orig_func = getSymbol(ebuf->buf, tap->func_name);
         if (!orig_func) {
             sysprint("ERROR: can't get the address for %s\n", tap->func_name);
             continue;
@@ -305,14 +305,14 @@ initGoHook(const char *buf)
         const int MAX_INST = 250;
         unsigned int asm_count = 0;
         _DecodedInst asm_inst[MAX_INST];
-        uint64_t offset_into_txt = (uint64_t)orig_func - (uint64_t)g_text_addr;
+        uint64_t offset_into_txt = (uint64_t)orig_func - (uint64_t)ebuf->text_addr;
         int rc = distorm_decode((uint64_t)orig_func, orig_func,
-                                 g_text_len - offset_into_txt,
+                                 ebuf->text_len - offset_into_txt,
                                  Decode64Bits, asm_inst, MAX_INST, &asm_count);
         if (rc == DECRES_INPUTERR) {
             sysprint("ERROR: disassembler fails: %s\n\tlen %d dt %d code %p result %d\n\ttext addr %p text len %d oinfotext %p\n",
-                     tap->func_name, g_text_len - offset_into_txt, Decode64Bits,
-                     orig_func, sizeof(asm_inst), g_text_addr, g_text_len, offset_into_txt);
+                     tap->func_name, ebuf->text_len - offset_into_txt, Decode64Bits,
+                     orig_func, sizeof(asm_inst), ebuf->text_addr, ebuf->text_len, offset_into_txt);
             continue;
         }
 
@@ -330,7 +330,7 @@ initGoHook(const char *buf)
      * are entering the Go func past the runtime stack check?
      * Need to investigate later.
      */
-    if ((go_runtime_cgocall = getSymbol(buf, "runtime.asmcgocall")) == 0) {
+    if ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
         sysprint("ERROR: can't get the address for runtime.cgocall\n");
         exit(-1);
     }
@@ -594,6 +594,10 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
         :                             // clobbered register
         );
 
+    // We'd like to switch back to go_tls every time we switch to scope_fs
+    // above, however, we've seen a case where on process exit static cgo
+    // apps do not have a go_g while they're exiting.  With a null go_g,
+    // there is no way to do the processing here...
     if (g_go_static && go_g) {
         // get struct m from g and pull out the TLS from 'm'
         go_ptr = (unsigned long *)(go_g + g_go.g_to_m);

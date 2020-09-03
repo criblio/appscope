@@ -17,8 +17,6 @@
 #include "runtimecfg.h"
 #include "pcre2.h"
 
-#define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
-#define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 #define PCRE_STACK_SIZE (32 * 1024)
 
 extern bool g_need_stack_expand;

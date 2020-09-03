@@ -1,15 +1,15 @@
+#define _GNU_SOURCE
+#include <sys/param.h>
+#include <time.h>
 #include "os.h"
 #include "../../src/dbg.h"
+#include "../../src/fn.h"
 #include "../../src/scopetypes.h"
-#include "../../src/wrap.h"
-
-extern struct interposed_funcs_t g_fn;
-extern void initJavaAgent(void);
 
 static int
 sendNL(int sd, ino_t node)
 {
-    if (g_fn.sendmsg == NULL) return -1;
+    if (!g_fn.sendmsg) return -1;
 
     struct sockaddr_nl nladdr = {
         .nl_family = AF_NETLINK
@@ -60,7 +60,7 @@ sendNL(int sd, ino_t node)
 static ino_t
 getNL(int sd)
 {
-    if (g_fn.recvmsg == NULL) return -1;
+    if (!g_fn.recvmsg) return -1;
 
     int rc;
     char buf[sizeof(struct nlmsghdr) + (sizeof(long) * 4)];
@@ -344,7 +344,7 @@ osInitTSC(platform_time_t *cfg)
      * Anecdotal evidence that there is a max size to proc entrires.
      * In any case this should be big enough.
      */    
-    if ((buf = malloc(MAX_PROC)) == NULL) {
+    if ((buf = calloc(1, MAX_PROC)) == NULL) {
         DBG(NULL);
         g_fn.close(fd);
         return -1;
@@ -399,7 +399,8 @@ osInitTSC(platform_time_t *cfg)
 int
 osIsFilePresent(pid_t pid, const char *path)
 {
-    struct stat sb = {};
+    struct stat sb = {0};
+
     if (!g_fn.__xstat) {
         return -1;
     }
@@ -471,15 +472,17 @@ bool
 osThreadInit(void(*handler)(int), unsigned interval)
 {
     struct sigaction sact;
-    struct sigevent sevent;
-    timer_t timerid;
+    struct sigevent sevent = {0};
+    timer_t timerid = 0;
     struct itimerspec tspec;
 
     sigemptyset(&sact.sa_mask);
     sact.sa_handler = handler;
     sact.sa_flags = 0;
 
-    if (!g_fn.sigaction || g_fn.sigaction(SIGUSR2, &sact, NULL) == -1) {
+    if (!g_fn.sigaction) return FALSE;
+
+    if (g_fn.sigaction(SIGUSR2, &sact, NULL) == -1) {
         DBG("errno %d", errno);
         return FALSE;
     }
@@ -502,6 +505,15 @@ osThreadInit(void(*handler)(int), unsigned interval)
     return TRUE;
 }
 
+// In linux, this is declared weak so it can be overridden by the strong
+// definition in src/javaagent.c.  The scope library will do this.
+// This weak definition allows us to not have to define this symbol for
+// unit tests or for the scope executable.
+void __attribute__((weak))
+initJavaAgent() {
+     return;
+}
+
 void
 osInitJavaAgent(void)
 {
@@ -521,7 +533,11 @@ osGetPageProt(uint64_t addr)
     char *buf = NULL;
     char log[128];
 
-    if ((addr == 0) || !g_fn.fopen || !g_fn.getline || !g_fn.fclose) {
+    if (!g_fn.fopen || !g_fn.getline || !g_fn.fclose) {
+        return -1;
+    }
+
+    if (addr == 0) {
         return -1;
     }
 

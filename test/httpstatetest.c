@@ -1,38 +1,17 @@
 #define _GNU_SOURCE
-#include <dlfcn.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <sys/stat.h>
-#include <sys/statvfs.h>
-#ifdef __LINUX__
-#include <sys/vfs.h>
-#include <sys/epoll.h>
-#endif // _LINUX_
-
-
-#ifdef __MACOS__
-
-#ifndef off64_t
-typedef uint64_t off64_t;
-#endif
-#ifndef fpos64_t
-typedef uint64_t fpos64_t;
-#endif
-
-#endif // __MACOS__
-
-#include "dbg.h"
 #include "ctl.h"
+#include "dbg.h"
+#include "fn.h"
 #include "httpstate.h"
 #include "plattime.h"
-#include "wrap.h"
 #include "test.h"
 
 
-interposed_funcs g_fn = {0};
 ctl_t *g_ctl = NULL;
 struct protocol_info_t* g_msg = NULL;
 
@@ -69,31 +48,11 @@ cmdPostEvent(ctl_t *ctl, char *event)
 }
 
 
-static void
-init_g_fn()
-{
-    // Currently this just initializes stuff that is used in os.c
-    // if maintaining this becomes a pain, we could refactor part of the
-    // constructor in wrap.c to be a separate function we could call here.
-    g_fn.open = dlsym(RTLD_NEXT, "open");
-    g_fn.close = dlsym(RTLD_NEXT, "close");
-    g_fn.read = dlsym(RTLD_NEXT, "read");
-    g_fn.socket = dlsym(RTLD_NEXT, "socket");
-    g_fn.sendmsg = dlsym(RTLD_NEXT, "sendmsg");
-    g_fn.recvmsg = dlsym(RTLD_NEXT, "recvmsg");
-    g_fn.sigaction = dlsym(RTLD_NEXT, "sigaction");
-    g_fn.__xstat = dlsym(RTLD_NEXT, "__xstat");
-}
-
-// Needed by linux/os.c
-void initJavaAgent(void) {}
-
-
 static int
 needleTestSetup(void** state)
 {
     initTime();
-    init_g_fn();
+    initFn();
     initHttpState();
 
     // Call the general groupSetup() too.

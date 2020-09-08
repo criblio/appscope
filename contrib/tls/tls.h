@@ -18,6 +18,8 @@ typedef struct gnutls_range_def *gnutls_range_st;
 struct ssl_session_def;
 typedef struct ssl_session_def SSL;
 
+typedef int *gnutls_transport_ptr_t;
+
 ssize_t gnutls_record_recv(gnutls_session_t, void *, size_t);
 ssize_t gnutls_record_send(gnutls_session_t, const void *, size_t);
 ssize_t gnutls_record_recv_early_data(gnutls_session_t, void *, size_t);
@@ -26,8 +28,7 @@ ssize_t gnutls_record_recv_seq(gnutls_session_t, void *, size_t, unsigned char *
 ssize_t gnutls_record_send2(gnutls_session_t, const void *, size_t, size_t, unsigned);
 ssize_t gnutls_record_send_early_data(gnutls_session_t, const void *, size_t);
 ssize_t gnutls_record_send_range(gnutls_session_t, const void *, size_t, const gnutls_range_st *);
-int     gnutls_transport_get_int(gnutls_session_t);
-void    gnutls_transport_get_int2(gnutls_session_t, int *, int *);
+gnutls_transport_ptr_t gnutls_transport_get_ptr(gnutls_session_t);
 
 int SSL_read(SSL *, void *, int);
 int SSL_write(SSL *, const void *, int);

@@ -341,6 +341,7 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr ladd
     char *sp;
     Elf64_Addr start;
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
+    char *rtld_fini = NULL;
 
     // create a heap (void *)ROUND_UP(laddr + pgsz, pgsz)  | MAP_FIXED
     if ((g_currsheap = mmap(NULL, HEAP_SIZE,
@@ -398,9 +399,10 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr ladd
         "mov %%rsp, (%%r11)  \n"
         "mov %1, %%r11 \n"
         "mov %2, %%rsp \n"
+        "mov %3, %%rdx \n"
         "jmp *%%r11 \n"
         : "=r"(res)                   //output
-        : "r"(start), "r"(sp)
+        : "r"(start), "r"(sp), "r"(rtld_fini)
         : "%r11"                      //clobbered register
     );
 

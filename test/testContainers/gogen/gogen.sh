@@ -51,6 +51,9 @@ starttest gogen
 cd /gogen
 
 # start something to receive the network activity
+#
+# tcpserver is an app built from git@bitbucket.org:cribl/scope.git
+# gcc -g test/manual/tcpserver.c -lpthread -o tcpserver
 RX_FILE="/gogen/receive.log"
 tcpserver 12345 > $RX_FILE &
 

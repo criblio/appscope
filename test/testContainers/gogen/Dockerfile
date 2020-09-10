@@ -16,6 +16,8 @@ ADD http://cdn.cribl.io/dl/scope/latest/linux/scope /usr/bin/scope
 #COPY ./scope /usr/bin/scope
 RUN chmod 755 /usr/bin/scope
 
+# tcpserver is an app built from git@bitbucket.org:cribl/scope.git
+# gcc -g test/manual/tcpserver.c -lpthread -o tcpserver
 ADD gogen/tcpserver /usr/bin/tcpserver
 ADD gogen/gogen.sh /gogen/gogen.sh
 

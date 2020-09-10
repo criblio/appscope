@@ -22,8 +22,8 @@ static void appendHeader(http_state_t *httpstate, char* buf, size_t len);
 static size_t getContentLength(char *header, size_t len);
 static size_t bytesToSkipForContentLength(http_state_t *httpstate, size_t len);
 static bool setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src);
-static int reportHttp(http_state_t *httpstate);
-static bool scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId);
+static int reportHttp(http_state_t *httpstate, char *ipPort);
+static bool scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId, char *ipPort);
 
 
 static void
@@ -157,7 +157,7 @@ setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src
 
 // For now, only doing HTTP/1.X headers
 static int
-reportHttp(http_state_t *httpstate)
+reportHttp(http_state_t *httpstate, char *ipPort)
 {
     if (!httpstate || !httpstate->hdr || !httpstate->hdrlen) return -1;
 
@@ -214,7 +214,7 @@ reportHttp(http_state_t *httpstate)
  * that is usable
 */
 static bool
-scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId)
+scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId, char *ipPort)
 {
     if (!buf) return FALSE;
 
@@ -287,7 +287,7 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *http
         size_t content_in_this_buf = len - header_end;
 
         // post and event containing the header we found
-        reportHttp(httpstate);
+        reportHttp(httpstate, ipPort);
 
         // change httpstate to HTTP_DATA per Content-Length or HTTP_NONE
         if ((clen != -1) && (clen >= content_in_this_buf)) {
@@ -311,7 +311,7 @@ initHttpState(void)
 
 // allow all ports if they appear to have an HTTP header
 bool
-doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
+doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype, char *ipPort)
 {
     if (!buf || !len) return FALSE;
 
@@ -335,7 +335,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
     switch (dtype) {
         case BUF:
         {
-            http_header_found = scanForHttpHeader(httpstate, buf, len, &httpId);
+            http_header_found = scanForHttpHeader(httpstate, buf, len, &httpId, ipPort);
             break;
         }
 
@@ -348,7 +348,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
             for (i = 0; i < msg->msg_iovlen; i++) {
                 iov = &msg->msg_iov[i];
                 if (iov && iov->iov_base) {
-                    if (scanForHttpHeader(httpstate, iov->iov_base, iov->iov_len, &httpId)) {
+                    if (scanForHttpHeader(httpstate, iov->iov_base, iov->iov_len, &httpId, ipPort)) {
                         http_header_found = TRUE;
                         // stay in loop to count down content length
                     }
@@ -366,7 +366,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
 
             for (i = 0; i < iovcnt; i++) {
                 if (iov[i].iov_base) {
-                    if (scanForHttpHeader(httpstate, iov[i].iov_base, iov[i].iov_len, &httpId)) {
+                    if (scanForHttpHeader(httpstate, iov[i].iov_base, iov[i].iov_len, &httpId, ipPort)) {
                         http_header_found = TRUE;
                         // stay in loop to count down content length
                     }

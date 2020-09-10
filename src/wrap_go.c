@@ -33,10 +33,11 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 //#define patchprint sysprint
 #define patchprint devnull
 
-go_offsets_t g_go = {.g_to_m=48,              // 0x30
-                     .m_to_tls=136,           // 0x88
-                     .connReader_to_conn=0,   // 0x0
-                     .conn_to_tlsState=48};   // 0x30
+go_offsets_t g_go = {.g_to_m=48,               // 0x30
+                     .m_to_tls=136,            // 0x88
+                     .connReader_to_conn=0,    // 0x0
+                     .conn_to_tlsState=48,     // 0x30
+                     .conn_to_remoteAddr=32};  // 0x20
 
 tap_t g_go_tap[] = {
     {"syscall.write",                         go_hook_write,       NULL, 0},
@@ -290,6 +291,7 @@ initGoHook(elf_buf_t *ebuf)
         dprintf(fd, "runtime.m|tls=%d\n", g_go.m_to_tls);
         dprintf(fd, "net/http.connReader|conn=%d\n", g_go.connReader_to_conn);
         dprintf(fd, "net/http.conn|tlsState=%d\n", g_go.conn_to_tlsState);
+        dprintf(fd, "net/http.conn|remoteAddr=%d\n", g_go.conn_to_remoteAddr);
         ni_close(fd);
     }
 
@@ -777,18 +779,22 @@ c_tls_read(char *stackaddr)
 //        conn *conn
     uint64_t conn =  *(uint64_t*)(connReader + g_go.connReader_to_conn);
     if (!conn) return;         // protect from dereferencing null
+//  reference: net/http/server.go
 //  type conn struct {
 //          server *Server
 //          cancelCtx context.CancelFunc
 //          rwc net.Conn
 //          remoteAddr string
 //          tlsState *tls.ConnectionState
+    char **rap = NULL, *remoteAddr = NULL;
+    if ((rap = (char **)(conn + g_go.conn_to_remoteAddr)) != NULL) remoteAddr = *rap;
+
     uint64_t tlsState =   *(uint64_t*)(conn + g_go.conn_to_tlsState);
 
     // if tlsState is non-zero, then this is a tls connection
     if (tlsState != 0ULL) {
         funcprint("Scope: go_tls_read of %ld\n", -1);
-        doProtocol(tlsState, -1, (void*)buf, rc, TLSRX, BUF);
+        doSSL(tlsState, -1, (void*)buf, rc, TLSRX, BUF, remoteAddr);
     }
 }
 
@@ -808,12 +814,15 @@ c_tls_write(char *stackaddr)
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
 
+    char **rap = NULL, *remoteAddr = NULL;
+    if ((rap = (char **)(conn + g_go.conn_to_remoteAddr)) != NULL) remoteAddr = *rap;
+
     uint64_t tlsState = *(uint64_t*)(conn + g_go.conn_to_tlsState);
 
     // if tlsState is non-zero, then this is a tls connection
     if (tlsState != 0ULL) {
         funcprint("Scope: go_tls_write of %ld\n", -1);
-        doProtocol(tlsState, -1, (void*)buf, rc, TLSTX, BUF);
+        doSSL(tlsState, -1, (void*)buf, rc, TLSTX, BUF, remoteAddr);
     }
 }
 

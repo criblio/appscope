@@ -64,6 +64,11 @@ services:
       - 6379:6379
       - 27017:27017
 
+  gogen:
+    build:
+      context: .
+      dockerfile: ./gogen/Dockerfile
+
   go_8:
     build:
       context: .

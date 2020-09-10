@@ -82,6 +82,15 @@ services:
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
 
+  gogen:
+    build:
+      cache_from:
+        - criblci/scope-gogen-it:latest
+    image: criblci/scope-gogen-it
+    volumes:
+      - ./libscope.so:/usr/lib/libscope.so
+      - ./scope:/usr/bin/scope
+
   go_8:
     build:
       cache_from:

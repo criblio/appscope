@@ -39,7 +39,7 @@ jobs:
       - script: docker-compose -f docker-compose.yml -f azure/docker-compose.override.azure.yml run  ${{ parameters.containerName }}
         displayName: Run tests
         workingDirectory: ./test/testContainers/
-        timeoutInMinutes: 60
+        timeoutInMinutes: 10
       - task: CopyFiles@2
         condition: always()
         inputs:

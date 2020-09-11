@@ -1994,13 +1994,12 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
     rc = g_fn.gnutls_record_recv(session, data, data_size);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
@@ -2018,13 +2017,12 @@ gnutls_record_recv_early_data(gnutls_session_t session, void *data, size_t data_
     rc = g_fn.gnutls_record_recv_early_data(session, data, data_size);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
@@ -2057,13 +2055,12 @@ gnutls_record_recv_seq(gnutls_session_t session, void *data, size_t data_size, u
     rc = g_fn.gnutls_record_recv_seq(session, data, data_size, seq);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
@@ -2081,13 +2078,12 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
     rc = g_fn.gnutls_record_send(session, data, data_size);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
@@ -2106,13 +2102,12 @@ gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size
     rc = g_fn.gnutls_record_send2(session, data, data_size, pad, flags);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
@@ -2130,13 +2125,12 @@ gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t
     rc = g_fn.gnutls_record_send_early_data(session, data, data_size);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
@@ -2155,13 +2149,12 @@ gnutls_record_send_range(gnutls_session_t session, const void *data, size_t data
     rc = g_fn.gnutls_record_send_range(session, data, data_size, range);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);

@@ -175,6 +175,7 @@ typedef struct {
     ssize_t (*gnutls_record_send2)(gnutls_session_t, const void *, size_t, size_t, unsigned);
     ssize_t (*gnutls_record_send_early_data)(gnutls_session_t, const void *, size_t);
     ssize_t (*gnutls_record_send_range)(gnutls_session_t, const void *, size_t, const gnutls_range_st *);
+    gnutls_transport_ptr_t (*gnutls_transport_get_ptr)(gnutls_session_t);
     PRFileDesc *(*SSL_ImportFD)(PRFileDesc *, PRFileDesc *);
     void *(*dlopen)(const char *, int);
     int (*PR_FileDesc2NativeHandle)(PRFileDesc *);

@@ -892,7 +892,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     net_info *net = getNetEntry(sockfd);
 
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
-        if (doHttp(id, sockfd, net, buf, len, src, dtype)) {
+        if (doHttp(id, sockfd, net, buf, len, src, dtype, NULL)) {
             // not doing anything with protocol... yet
             if (net) net->protocol = 1;
             return 0;
@@ -901,6 +901,22 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
 
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC)) {
         detectProtocol(sockfd, net, buf, len, src, dtype);
+    }
+
+    return 0;
+}
+
+int
+doSSL(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype, char *ipPort)
+{
+    net_info *net = getNetEntry(sockfd);
+
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
+        if (doHttp(id, sockfd, net, buf, len, src, dtype, ipPort)) {
+            // not doing anything with protocol... yet
+            if (net) net->protocol = 1;
+            return 0;
+        }
     }
 
     return 0;

@@ -9,6 +9,7 @@ typedef struct {            // Structure                     Field              
     int m_to_tls;           // "runtime.m"                   "tls"              "136"
     int connReader_to_conn; // "net/http.connReader"         "conn"             "0"
     int conn_to_tlsState;   // "net/http.conn"               "tlsState"         "48"
+    int conn_to_remoteAddr; // "net/http.conn"               "remoteAddr"       "32"
 } go_offsets_t;
 
 typedef struct {

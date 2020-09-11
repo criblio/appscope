@@ -104,6 +104,11 @@ stages:
 
       - template: test/testContainers/azure/it-test-job-template.yml
         parameters:
+          name: gogen
+          containerName: gogen
+
+      - template: test/testContainers/azure/it-test-job-template.yml
+        parameters:
           name: go_8
           containerName: go_8
       - template: test/testContainers/azure/it-test-job-template.yml

@@ -30,8 +30,8 @@ COPY mongod.conf /etc/.
 COPY scope_protocol.yml /opt/test-runner/bin/.
 COPY mongo.js /opt/test-runner/bin/.
 
-ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
-RUN chmod 755 /usr/lib/libscope.so
+#ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
+#RUN chmod 755 /usr/lib/libscope.so
 ENV LD_PRELOAD=/usr/lib/libscope.so
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///tmp/scope.log

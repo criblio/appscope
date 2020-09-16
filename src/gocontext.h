@@ -37,7 +37,7 @@ extern unsigned long scope_fs;
 extern uint64_t scope_stack;
 
 extern int arch_prctl(int, unsigned long);
-extern void threadNow(int);
+extern void threadInit();
 extern void initGoHook(elf_buf_t*);
 extern void sysprint(const char *, ...);
 extern void *getSymbol(const char *, char *);

@@ -22,6 +22,7 @@
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include <limits.h>
+#include <errno.h>
 
 #define DEVMODE 0
 #define __NR_memfd_create   319
@@ -390,7 +391,11 @@ main(int argc, char **argv, char **env)
                 memset(*argv, 0, plen);
                 strncpy(*argv, PARENT_PROC_NAME, plen - 1);
 
-                waitpid(pid, &status, 0);
+                int ret;
+                do {
+                    ret = waitpid(pid, &status, 0);
+                } while (ret == -1 && errno == EINTR);
+
                 release_libscope(&info);
                 exit(status);
             } else {
@@ -434,7 +439,11 @@ main(int argc, char **argv, char **env)
             perror("fork");
             goto err;
         } else if (pid > 0) {
-            waitpid(pid, &status, 0);
+            int ret;
+            do {
+                ret = waitpid(pid, &status, 0);
+            } while (ret == -1 && errno == EINTR);
+
             release_libscope(&info);
             exit(status);
         } else {

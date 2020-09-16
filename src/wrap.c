@@ -50,7 +50,7 @@ __thread int g_getdelim = 0;
 static void *periodic(void *);
 static void doConfig(config_t *);
 static void reportProcessStart(void);
-void threadNow(int);
+static void threadNow(int);
 
 #ifdef __LINUX__
 extern int arch_prctl(int, unsigned long);
@@ -467,7 +467,7 @@ dynConfig(void)
     return 0;
 }
 
-void
+static void
 threadNow(int sig)
 {
     static uint64_t serialize;
@@ -543,7 +543,7 @@ threadNow(int sig)
  * function as a back up in case the timer has
  * an issue of some sort.
  */
-static void
+void
 threadInit()
 {
     if (osThreadInit(threadNow, g_thread.interval) == FALSE) {

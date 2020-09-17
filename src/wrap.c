@@ -467,7 +467,7 @@ dynConfig(void)
     return 0;
 }
 
-static void
+void
 threadNow(int sig)
 {
     static uint64_t serialize;
@@ -543,7 +543,7 @@ threadNow(int sig)
  * function as a back up in case the timer has
  * an issue of some sort.
  */
-void
+static void
 threadInit()
 {
     if (osThreadInit(threadNow, g_thread.interval) == FALSE) {
@@ -1005,7 +1005,12 @@ init(void)
 
     initHook();
     
-    threadInit();
+    char *execType = getenv("SCOPE_EXEC_TYPE");
+    if (execType != NULL && strcmp(execType, "static") == 0) {
+        threadNow(0);
+    } else {
+        threadInit();
+    }
 
     osInitJavaAgent();
 }

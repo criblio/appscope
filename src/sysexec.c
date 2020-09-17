@@ -424,8 +424,6 @@ sys_exec(elf_buf_t *ebuf, const char *path, int argc, const char **argv, const c
     // TODO: are we loading a Go app or a glibc app?
     initGoHook(ebuf);
 
-    threadInit();
-
     set_go((char *)ebuf->buf, argc, argv, env, lastaddr);
 
     return 0;

@@ -325,11 +325,11 @@ main(int argc, char **argv, char **env)
         setGoHttpEnvVariable();
         glibcenv = setGlibcEnvVariable();
 
-        handle = dlopen(info->path, RTLD_LAZY);
-        if (!handle) {
-            fprintf(stderr, "%s\n", dlerror());
-            goto err;
-        }
+        // handle = dlopen(info->path, RTLD_LAZY);
+        // if (!handle) {
+        //     fprintf(stderr, "%s\n", dlerror());
+        //     goto err;
+        // }
 
         /*
          * This is indeed as "weird" as it looks.
@@ -453,6 +453,11 @@ main(int argc, char **argv, char **env)
         }
     }
 
+    if (setenv("SCOPE_EXEC_TYPE", "static", 1) == -1) {
+        perror("setenv");
+        goto err;
+    }
+
     // Static executable path
     if (!handle) {
         if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
@@ -467,11 +472,6 @@ main(int argc, char **argv, char **env)
         goto err;
     }
     release_libscope(&info);
-
-    if (setenv("SCOPE_EXEC_TYPE", "static", 1) == -1) {
-        perror("setenv");
-        goto err;
-    }
 
     sys_exec(ebuf, argv[1], argc, argv, env);
 

@@ -28,28 +28,36 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 
 // compile-time control for debugging
 #define NEEDEVNULL 1
-//#define funcprint sysprint
-#define funcprint devnull
+#define funcprint sysprint
+//#define funcprint devnull
 //#define patchprint sysprint
 #define patchprint devnull
 
-go_offsets_t g_go = {.g_to_m=48,               // 0x30
-                     .m_to_tls=136,            // 0x88
-                     .connReader_to_conn=0,    // 0x0
-                     .conn_to_tlsState=48,     // 0x30
-                     .conn_to_remoteAddr=32};  // 0x20
+go_offsets_t g_go = {.g_to_m=48,                 // 0x30
+                     .m_to_tls=136,              // 0x88
+                     .connReader_to_conn=0,      // 0x00
+                     .conn_to_tlsState=48,       // 0x30
+                     .conn_to_rwc=24,            // 0x18
+                     .persistConn_to_conn=88,    // 0x58
+                     .persistConn_to_bufrd=104,  // 0x68
+                     .bufrd_to_buf=0,            // 0x00
+                     .iface_data=8,              // 0x08
+                     .netfd_to_pd=0,             // 0x00
+                     .pd_to_fd=16};              // 0x10
 
 tap_t g_go_tap[] = {
-    {"syscall.write",                         go_hook_write,       NULL, 0},
-    {"syscall.openat",                        go_hook_open,        NULL, 0},
-    {"syscall.socket",                        go_hook_socket,      NULL, 0},
-    {"syscall.accept4",                       go_hook_accept4,     NULL, 0},
-    {"syscall.read",                          go_hook_read,        NULL, 0},
-    {"syscall.Close",                         go_hook_close,       NULL, 0},
-    {"net/http.(*connReader).Read",           go_hook_tls_read,    NULL, 0},
-    {"net/http.checkConnErrorWriter.Write",   go_hook_tls_write,   NULL, 0},
-    {"runtime.exit",                          go_hook_exit,        NULL, 0},
-    {"runtime.dieFromSignal",                 go_hook_die,         NULL, 0},
+    {"syscall.write",                        go_hook_write,        NULL, 0},
+    {"syscall.openat",                       go_hook_open,         NULL, 0},
+    {"syscall.socket",                       go_hook_socket,       NULL, 0},
+    {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
+    {"syscall.read",                         go_hook_read,         NULL, 0},
+    {"syscall.Close",                        go_hook_close,        NULL, 0},
+    {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
+    {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
+    {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
+    {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
+    {"runtime.exit",                         go_hook_exit,         NULL, 0},
+    {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
     {"TAP_TABLE_END", NULL, NULL, 0}
 };
 
@@ -291,10 +299,15 @@ initGoHook(elf_buf_t *ebuf)
         dprintf(fd, "runtime.m|tls=%d\n", g_go.m_to_tls);
         dprintf(fd, "net/http.connReader|conn=%d\n", g_go.connReader_to_conn);
         dprintf(fd, "net/http.conn|tlsState=%d\n", g_go.conn_to_tlsState);
-        dprintf(fd, "net/http.conn|remoteAddr=%d\n", g_go.conn_to_remoteAddr);
+        dprintf(fd, "net/http.persistConn|conn=%d\n", g_go.persistConn_to_conn);
+        dprintf(fd, "net/http.persistConn|br=%d\n", g_go.persistConn_to_bufrd);
+        dprintf(fd, "runtime/iface|data=%d\n", g_go.iface_data);
+        dprintf(fd, "internal/poll.FD|Sysfd=%d\n", g_go.pd_to_fd);
+        dprintf(fd, "net/netFD|pfd=%d\n", g_go.netfd_to_pd);
+        dprintf(fd, "bufio.Reader|buf=%d\n", g_go.bufrd_to_buf);
+        dprintf(fd, "net/http.conn|rwc=%d\n", g_go.conn_to_rwc);
         ni_close(fd);
     }
-
 
     tap_t* tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
@@ -753,8 +766,8 @@ c_accept4(char *stackaddr)
     socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
     uint64_t sd_out = *(uint64_t*)(stackaddr + 0x28);
 
-    funcprint("Scope: accept4 of %ld\n", sd_out);
     if (sd_out != -1) {
+        funcprint("Scope: accept4 of %ld\n", sd_out);
         doAccept(sd_out, addr, addrlen, "go_accept4");
     }
 }
@@ -765,15 +778,28 @@ go_accept4(char *stackptr)
     return go_switch(stackptr, c_accept4, go_hook_accept4);
 }
 
+/*
+  net/http.(*connReader).Read
+  /usr/local/go/src/net/http/server.go:758
+
+  cr = stackaddr + 0x08
+  cr.conn = *cr
+  cr.conn.rwc = cr.conn + 0x18
+  netFD = cr.conn.rwc + 0x08
+  pfd = *netFD
+  fd = netFD + 0x10
+ */
 static void
 c_tls_read(char *stackaddr)
 {
+    int fd = -1;
     uint64_t connReader = *(uint64_t*)(stackaddr + 0x8);
     if (!connReader) return;   // protect from dereferencing null
     uint64_t buf        = *(uint64_t*)(stackaddr + 0x10);
     // buf len 0x18
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t cr_conn, cr_conn_rwc, netFD, pfd;
 
 //  type connReader struct {
 //        conn *conn
@@ -786,15 +812,20 @@ c_tls_read(char *stackaddr)
 //          rwc net.Conn
 //          remoteAddr string
 //          tlsState *tls.ConnectionState
-    char **rap = NULL, *remoteAddr = NULL;
-    if ((rap = (char **)(conn + g_go.conn_to_remoteAddr)) != NULL) remoteAddr = *rap;
+
+    if (((cr_conn = *(uint64_t *)connReader) != 0) &&
+        ((cr_conn_rwc = *(uint64_t *)(cr_conn + g_go.conn_to_rwc))) &&
+        ((netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data)) != 0) &&
+        ((pfd = *(uint64_t *)netFD) != g_go.netfd_to_pd)) {
+        fd = *(int *)(pfd + g_go.pd_to_fd);
+    }
 
     uint64_t tlsState =   *(uint64_t*)(conn + g_go.conn_to_tlsState);
 
     // if tlsState is non-zero, then this is a tls connection
     if (tlsState != 0ULL) {
-        funcprint("Scope: go_tls_read of %ld\n", -1);
-        doSSL(tlsState, -1, (void*)buf, rc, TLSRX, BUF, remoteAddr);
+        funcprint("Scope: go_tls_read of %ld\n", fd);
+        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
     }
 }
 
@@ -804,25 +835,40 @@ go_tls_read(char *stackptr)
     return go_switch(stackptr, c_tls_read, go_hook_tls_read);
 }
 
+/*
+  net/http.checkConnErrorWriter.Write
+  /usr/local/go/src/net/http/server.go:3433
+
+  conn = stackaddr + 0x08
+  conn.rwc = conn + 0x18
+  netFD = conn.rwc + 0x08
+  pfd = *netFD
+  fd = pfd + 0x10
+ */
 static void
 c_tls_write(char *stackaddr)
 {
+    int fd = -1;
     uint64_t conn = *(uint64_t*)(stackaddr + 0x8);
     if (!conn) return;         // protect from dereferencing null
     uint64_t buf  = *(uint64_t*)(stackaddr + 0x10);
     // buf len 0x18
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t w_conn_rwc, netFD, pfd;
 
-    char **rap = NULL, *remoteAddr = NULL;
-    if ((rap = (char **)(conn + g_go.conn_to_remoteAddr)) != NULL) remoteAddr = *rap;
+    if (((w_conn_rwc = *(uint64_t *)(conn + g_go.conn_to_rwc)) != 0) &&
+        ((netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data)) != 0) &&
+        ((pfd = *(uint64_t *)netFD) != g_go.netfd_to_pd)) {
+        fd = *(int *)(pfd + g_go.pd_to_fd);
+    }
 
     uint64_t tlsState = *(uint64_t*)(conn + g_go.conn_to_tlsState);
 
     // if tlsState is non-zero, then this is a tls connection
     if (tlsState != 0ULL) {
-        funcprint("Scope: go_tls_write of %ld\n", -1);
-        doSSL(tlsState, -1, (void*)buf, rc, TLSTX, BUF, remoteAddr);
+        funcprint("Scope: go_tls_write of %ld\n", fd);
+        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF);
     }
 }
 
@@ -830,6 +876,91 @@ EXPORTON void *
 go_tls_write(char *stackptr)
 {
     return go_switch(stackptr, c_tls_write, go_hook_tls_write);
+}
+
+/*
+  net/http.persistConnWriter.Write
+  /usr/local/go/src/net/http/transport.go:1662
+
+  p = stackaddr + 0x10  (request buffer)
+  *p = request string
+
+  w = stackaddr + 0x08     (net/http.persistConnWriter *)
+  w.pc = stackaddr + 0x08  (net/http.persistConn *)
+  w.pc.conn = w.pc + 0x58  (net.conn->TCPConn)
+  netFD = w.pc.conn + 0x08 (netFD)
+  pfd = netFD + 0x0        (poll.FD)
+  fd = pfd + 0x10          (pfd.sysfd)
+ */
+static void
+c_pc_write(char *stackaddr)
+{
+    int fd = -1;
+    uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
+    uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x08);
+    uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
+    uint64_t w_pc_conn, netFD, pfd;
+
+    if (rc > 0) {
+        if (((w_pc_conn = *(uint64_t *)(w_pc + g_go.persistConn_to_conn)) != 0) &&
+            ((netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data)) != 0) &&
+            ((pfd = *(uint64_t *)(netFD)) != g_go.netfd_to_pd)) {
+            fd = *(int *)(pfd + g_go.pd_to_fd);
+            doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
+            funcprint("Scope: c_pc_write of %d\n", fd);
+        }
+    }
+}
+
+EXPORTON void *
+go_pc_write(char *stackptr)
+{
+    return go_switch(stackptr, c_pc_write, go_hook_pc_write);
+}
+
+/*
+  net/http.(*persistConn).readResponse
+  /usr/local/go/src/net/http/transport.go:2161
+
+  pc = stackaddr + 0x08    (net/http.persistConn *)
+
+  pc.conn = pc + 0x58      (net.conn->TCPConn)
+  netFD = pc.conn + 0x08   (netFD)
+  pfd = netFD + 0x0        (poll.FD)
+  fd = pfd + 0x10          (pfd.sysfd)
+
+  pc.br = pc.conn + 0x68   (bufio.Reader)
+  len = pc.br + 0x08       (bufio.Reader)
+  resp = buf + 0x0         (bufio.Reader.buf)
+  resp = http response     (char *)
+ */
+static void
+c_readResponse(char *stackaddr)
+{
+    int fd = -1;
+    uint64_t pc  = *(uint64_t *)(stackaddr + 0x08);
+    uint64_t pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
+
+    if (((pc_conn = *(uint64_t *)(pc + g_go.persistConn_to_conn)) != 0) &&
+        ((netFD = *(uint64_t *)(pc_conn + g_go.iface_data)) != 0) &&
+        ((pfd = *(uint64_t *)netFD) != g_go.netfd_to_pd)) {
+        fd = *(int *)(pfd + g_go.pd_to_fd);
+    }
+
+    if ((pc_br = *(uint64_t *)(pc + g_go.persistConn_to_bufrd)) != 0) {
+        buf = *(uint64_t *)(pc_br + g_go.bufrd_to_buf);
+        // len is part of the []byte struct; the func doesn't return a len
+        len = *(uint64_t *)(pc_br + 0x08);
+    }
+
+    doProtocol((uint64_t)0, fd, (void *)buf, len, TLSRX, BUF);
+    funcprint("Scope: c_readResponse of %d\n", fd);
+}
+
+EXPORTON void *
+go_readResponse(char *stackptr)
+{
+    return go_switch(stackptr, c_readResponse, go_hook_readResponse);
 }
 
 extern void handleExit(void);

@@ -325,12 +325,6 @@ main(int argc, char **argv, char **env)
         setGoHttpEnvVariable();
         glibcenv = setGlibcEnvVariable();
 
-        // handle = dlopen(info->path, RTLD_LAZY);
-        // if (!handle) {
-        //     fprintf(stderr, "%s\n", dlerror());
-        //     goto err;
-        // }
-
         /*
          * This is indeed as "weird" as it looks.
          * We require that glibc is initialized with the env var
@@ -459,11 +453,9 @@ main(int argc, char **argv, char **env)
     }
 
     // Static executable path
-    if (!handle) {
-        if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
-            fprintf(stderr, "%s\n", dlerror());
-            goto err;
-        }
+    if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
+        fprintf(stderr, "%s\n", dlerror());
+        goto err;
     }
 
     sys_exec = dlsym(handle, "sys_exec");

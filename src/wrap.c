@@ -467,7 +467,7 @@ dynConfig(void)
     return 0;
 }
 
-void
+static void
 threadNow(int sig)
 {
     static uint64_t serialize;
@@ -718,6 +718,17 @@ handleExit(void)
 static void *
 periodic(void *arg)
 {
+    // Mask all the signals for this thread to avoid issues with go runtime.
+    // Go runtime installs their own signal handlers so the go signal handler 
+    // may get executed in the context of this thread, which will cause the app to 
+    // crash because the go runtime won't be able to find a "g" in the TLS.
+    // Since we can’t predict the thread that will be chosen to run the signal handler, 
+    // the only reasonable solution seems to be masking the signals for this thread
+
+    sigset_t mask;
+    sigfillset(&mask);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+
     while (1) {
 
         // Process dynamic config changes, if any
@@ -1005,8 +1016,8 @@ init(void)
 
     initHook();
     
-    char *execType = getenv("SCOPE_EXEC_TYPE");
-    if (execType != NULL && strcmp(execType, "static") == 0) {
+    char *execType = getenv("SCOPE_APP_TYPE");
+    if (execType != NULL && strcmp(execType, "go") == 0) {
         threadNow(0);
     } else {
         threadInit();

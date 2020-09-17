@@ -511,7 +511,7 @@ osThreadInit(void(*handler)(int), unsigned interval)
 // unit tests or for the scope executable.
 void __attribute__((weak))
 initJavaAgent() {
-     return;
+    return;
 }
 
 void

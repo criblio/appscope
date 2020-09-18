@@ -31,8 +31,8 @@
 #define PARENT_PROC_NAME "start_scope"
 #define GO_ENV_VAR "GODEBUG"
 #define GO_ENV_VALUE "http2server"
-#define GLIBC_ENV_VAR "GLIBC_TUNABLES"
-#define GLIBC_ENV_VALUE "glibc.malloc.tcache_count=0"
+#define GLIBC_ENV_VAR "XXX"// "XGLIBC_TUNABLES"
+#define GLIBC_ENV_VALUE "xxx" //"glibc.malloc.tcache_count=0"
 
 extern unsigned char _binary___lib_linux_libscope_so_start;
 extern unsigned char _binary___lib_linux_libscope_so_end;

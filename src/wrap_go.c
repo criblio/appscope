@@ -3,6 +3,7 @@
 #include <asm/prctl.h>
 #include <sys/prctl.h>
 #include <signal.h>
+#include <pthread.h>
 
 #include "dbg.h"
 #include "os.h"
@@ -10,6 +11,7 @@
 #include "state.h"
 #include "gocontext.h"
 #include "../contrib/funchook/distorm/include/distorm.h"
+#include "linklist.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
@@ -56,6 +58,8 @@ tap_t g_go_tap[] = {
 uint64_t g_glibc_guard = 0LL;
 uint64_t g_go_static = 0LL;
 void (*go_runtime_cgocall)(void);
+
+static list_t *g_threadlist;
 
 #if NEEDEVNULL > 0
 static void
@@ -239,6 +243,8 @@ initGoHook(elf_buf_t *ebuf)
     gostring_t *go_ver; // There is an implicit len field at go_ver + 0x8
     char *estr;
     char *go_runtime_version = NULL;
+
+    g_threadlist = lstCreate(NULL);
 
     int (*ni_open)(const char *pathname, int flags, mode_t mode);
     ni_open = dlsym(RTLD_NEXT, "open");
@@ -559,12 +565,30 @@ out:
  * In the static case we swtich TLS/TCB.
  * In the dynamic case we do not switch TLS/TCB.
  */
+
+static void *
+dumb_thread(void *arg)
+{
+    sigset_t mask;
+    sigfillset(&mask);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+    while (1) {
+        sleep(1000);
+    }
+    return NULL;
+}
+
+
 inline static void *
 go_switch(char *stackptr, void *cfunc, void *gfunc)
 {
     uint64_t rc;
     unsigned long go_tls, *go_ptr;
     char *go_g = NULL, *go_m = NULL;
+
+    unsigned long go_fs;
+
+    arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs);
 
     if (g_go_static) {
         // Get the Go routine's struct g
@@ -581,8 +605,25 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
             scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
             goto out;
         }
+
+        void *thread_fs;
+        if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
+            pthread_t thread;
+            pthread_create(&thread, NULL, dumb_thread, NULL);
+            
+            printf("New thread created TCB = 0x%08lx\n", (unsigned long)thread);
+            lstInsert(g_threadlist, go_fs, (void *)thread);
+            thread_fs = (void *)thread;
+        } 
+        
+        if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
+            scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+            goto out;
+        }
     }
 
+    //printf("THREAD ID=0x%08lx, scope fs=0x%08lx\n", go_fs, scope_fs);
+  
     uint32_t frame_offset = frame_size(gfunc);
     if (!frame_offset) goto out;
     stackptr += frame_offset;
@@ -657,7 +698,13 @@ c_write(char *stackaddr)
     uint64_t initialTime = getTime();
 
     funcprint("Scope: write fd %ld rc %ld buf 0x%lx\n", fd, rc, buf);
-    doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
+
+    // this makes fileThread crash when running with tcache
+    for(int i=1;i<100;i++) {
+        char *a = malloc(i * 1000);
+        doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
+        free(a);
+    }
 }
 
 EXPORTON void *

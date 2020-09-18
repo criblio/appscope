@@ -600,14 +600,13 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
             :                                 // clobbered register
             );
 
-        // Switch to the libc TCB
-        if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-            scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
-            goto out;
-        }
-
         void *thread_fs;
         if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
+            // Switch to the main thread TCB
+            if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+                goto out;
+            }
             pthread_t thread;
             pthread_create(&thread, NULL, dumb_thread, NULL);
             

@@ -58,7 +58,7 @@ circbufPutGetTest(void **state)
     data = 6;
     assert_int_equal(cbufPut(ch, data), -1);
     // Note we removed the DBG statement as it caused a crash with 100k Go routines
-    //assert_int_equal(dbgCountMatchingLines("src/circbuf.c"), 1);
+    assert_int_equal(dbgCountMatchingLines("src/circbuf.c"), 1);
     dbgInit(); // reset dbg for the rest of the tests
 
     // Did we get the correct data?

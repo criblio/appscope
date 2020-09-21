@@ -82,10 +82,11 @@ stages:
           name: splunk
           containerName: splunk
 
-      - template: test/testContainers/azure/it-test-job-template.yml
-        parameters:
-          name: elastic
-          containerName: elastic
+# Elastic was hanging on azure starting on 11-Sept-2020
+#      - template: test/testContainers/azure/it-test-job-template.yml
+#        parameters:
+#          name: elastic
+#          containerName: elastic
 
       - template: test/testContainers/azure/it-test-job-template.yml
         parameters:

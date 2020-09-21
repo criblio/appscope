@@ -50,7 +50,7 @@ __thread int g_getdelim = 0;
 static void *periodic(void *);
 static void doConfig(config_t *);
 static void reportProcessStart(void);
-void threadNow(int);
+static void threadNow(int);
 
 #ifdef __LINUX__
 extern int arch_prctl(int, unsigned long);
@@ -467,7 +467,7 @@ dynConfig(void)
     return 0;
 }
 
-void
+static void
 threadNow(int sig)
 {
     static uint64_t serialize;
@@ -718,6 +718,17 @@ handleExit(void)
 static void *
 periodic(void *arg)
 {
+    // Mask all the signals for this thread to avoid issues with go runtime.
+    // Go runtime installs their own signal handlers so the go signal handler 
+    // may get executed in the context of this thread, which will cause the app to 
+    // crash because the go runtime won't be able to find a "g" in the TLS.
+    // Since we can’t predict the thread that will be chosen to run the signal handler, 
+    // the only reasonable solution seems to be masking the signals for this thread
+
+    sigset_t mask;
+    sigfillset(&mask);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+
     while (1) {
 
         // Process dynamic config changes, if any
@@ -1005,7 +1016,12 @@ init(void)
 
     initHook();
     
-    threadInit();
+    char *execType = getenv("SCOPE_APP_TYPE");
+    if (execType != NULL && strcmp(execType, "go") == 0) {
+        threadNow(0);
+    } else {
+        threadInit();
+    }
 
     osInitJavaAgent();
 }
@@ -1994,13 +2010,12 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
     rc = g_fn.gnutls_record_recv(session, data, data_size);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
@@ -2018,13 +2033,12 @@ gnutls_record_recv_early_data(gnutls_session_t session, void *data, size_t data_
     rc = g_fn.gnutls_record_recv_early_data(session, data, data_size);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
@@ -2057,13 +2071,12 @@ gnutls_record_recv_seq(gnutls_session_t session, void *data, size_t data_size, u
     rc = g_fn.gnutls_record_recv_seq(session, data, data_size, seq);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
@@ -2081,13 +2094,12 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
     rc = g_fn.gnutls_record_send(session, data, data_size);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
@@ -2106,13 +2118,12 @@ gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size
     rc = g_fn.gnutls_record_send2(session, data, data_size, pad, flags);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
@@ -2130,13 +2141,12 @@ gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t
     rc = g_fn.gnutls_record_send_early_data(session, data, data_size);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
@@ -2155,13 +2165,12 @@ gnutls_record_send_range(gnutls_session_t session, const void *data, size_t data
     rc = g_fn.gnutls_record_send_range(session, data, data_size, range);
 
     if (rc > 0) {
-        int fd;
+        int fd = -1;
         gnutls_transport_ptr_t fdp;
 
-        if ((fdp = gnutls_transport_get_ptr(session)) != NULL) {
+        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
             fd = *fdp;
-        } else {
-            fd = -1;
         }
 
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);

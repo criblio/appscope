@@ -155,6 +155,7 @@ initFn(void)
     g_fn.gnutls_record_send2 = dlsym(RTLD_NEXT, "gnutls_record_send2");
     g_fn.gnutls_record_send_early_data = dlsym(RTLD_NEXT, "gnutls_record_send_early_data");
     g_fn.gnutls_record_send_range = dlsym(RTLD_NEXT, "gnutls_record_send_range");
+    g_fn.gnutls_transport_get_ptr = dlsym(RTLD_NEXT, "gnutls_transport_get_ptr");
     g_fn.SSL_ImportFD = dlsym(RTLD_NEXT, "SSL_ImportFD");
     g_fn.dlopen = dlsym(RTLD_NEXT, "dlopen");
     g_fn.PR_FileDesc2NativeHandle = dlsym(RTLD_NEXT, "PR_FileDesc2NativeHandle");

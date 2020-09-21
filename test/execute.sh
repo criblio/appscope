@@ -95,6 +95,9 @@ if [ "${OS}" = "linux" ]; then
 
     test/unixpeer.sh
     ERR+=$?
+
+    test/undefined_sym.sh
+    ERR+=$?
 fi
 
 

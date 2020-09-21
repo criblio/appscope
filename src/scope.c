@@ -22,6 +22,7 @@
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include <limits.h>
+#include <errno.h>
 
 #define DEVMODE 0
 #define __NR_memfd_create   319
@@ -340,12 +341,6 @@ main(int argc, char **argv, char **env)
         setGoHttpEnvVariable();
         glibcenv = setGlibcEnvVariable();
 
-        handle = dlopen(info->path, RTLD_LAZY);
-        if (!handle) {
-            fprintf(stderr, "%s\n", dlerror());
-            goto err;
-        }
-
         /*
          * This is indeed as "weird" as it looks.
          * We require that glibc is initialized with the env var
@@ -406,7 +401,11 @@ main(int argc, char **argv, char **env)
                 memset(*argv, 0, plen);
                 strncpy(*argv, PARENT_PROC_NAME, plen - 1);
 
-                waitpid(pid, &status, 0);
+                int ret;
+                do {
+                    ret = waitpid(pid, &status, 0);
+                } while (ret == -1 && errno == EINTR);
+
                 release_libscope(&info);
                 exit(status);
             } else {
@@ -450,7 +449,11 @@ main(int argc, char **argv, char **env)
             perror("fork");
             goto err;
         } else if (pid > 0) {
-            waitpid(pid, &status, 0);
+            int ret;
+            do {
+                ret = waitpid(pid, &status, 0);
+            } while (ret == -1 && errno == EINTR);
+
             release_libscope(&info);
             exit(status);
         } else {
@@ -460,12 +463,15 @@ main(int argc, char **argv, char **env)
         }
     }
 
+    if (setenv("SCOPE_EXEC_TYPE", "static", 1) == -1) {
+        perror("setenv");
+        goto err;
+    }
+
     // Static executable path
-    if (!handle) {
-        if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
-            fprintf(stderr, "%s\n", dlerror());
-            goto err;
-        }
+    if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
+        fprintf(stderr, "%s\n", dlerror());
+        goto err;
     }
 
     sys_exec = dlsym(handle, "sys_exec");
@@ -474,11 +480,6 @@ main(int argc, char **argv, char **env)
         goto err;
     }
     release_libscope(&info);
-
-    if (setenv("SCOPE_EXEC_TYPE", "static", 1) == -1) {
-        perror("setenv");
-        goto err;
-    }
 
     sys_exec(ebuf, argv[1], argc, argv, env);
 

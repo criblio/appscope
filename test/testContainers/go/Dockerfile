@@ -28,6 +28,12 @@ RUN cd /go/net && openssl genrsa -out server.key 2048 && \
                   openssl ecparam -genkey -name secp384r1 -out server.key && \
                   openssl req -new -x509 -sha256 -key server.key -out server.crt \
        -days 3650 -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost"
+COPY ./go/net/plainClient.go /go/net
+RUN cd /go/net && go build -o plainClientDynamic plainClient.go
+RUN cd /go/net && CGO_ENABLED=0 go build -o plainClientStatic plainClient.go
+COPY ./go/net/tlsClient.go /go/net
+RUN cd /go/net && go build -o tlsClientDynamic tlsClient.go
+RUN cd /go/net && CGO_ENABLED=0 go build -o tlsClientStatic tlsClient.go
 
 RUN mkdir /go/cgo
 COPY ./go/cgo/Makefile /go/cgo

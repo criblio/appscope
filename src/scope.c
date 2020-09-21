@@ -31,8 +31,6 @@
 #define PARENT_PROC_NAME "start_scope"
 #define GO_ENV_VAR "GODEBUG"
 #define GO_ENV_VALUE "http2server"
-#define GLIBC_ENV_VAR "XXX"// "XGLIBC_TUNABLES"
-#define GLIBC_ENV_VALUE "xxx" //"glibc.malloc.tcache_count=0"
 
 extern unsigned char _binary___lib_linux_libscope_so_start;
 extern unsigned char _binary___lib_linux_libscope_so_end;
@@ -234,68 +232,12 @@ setGoHttpEnvVariable(void)
     }
 }
 
-/*
- * This is compilcated. Trying to be succint.
- * When a Go app executes, the interposition handlers run in the context
- * of a Go routine. Those same handlers call glibc functions. Many of
- * the glibc functions use thread local storage and as such expect that
- * only one thread at a time is accessing the TLS variable. The glibc
- * context knows only about 2 threads; the one started at init time and
- * the periodic thread, which is not involved at this point. However,
- * there is the possibility that there are many threads executing
- * due to Go routines connected to an 'm' and a 'p'. This leads to
- * a reality where multiple threads are updating variables in glibc
- * that are expected to be limited to a single thread.
- *
- * One of the variables that gets updated by multiple threads and
- * can result in a segfault is tcache used by the malloc subsystem
- * in glibc. This function sets an env var that disables the use of
- * the tcache.
- *
- * Return value of TRUE indicates that the env variable was set before
- * we set it ourselves. Conversely a FALSE indicates that the env var was not set.
- */
-static int
-setGlibcEnvVariable(void)
-{
-    char *cur_val = getenv(GLIBC_ENV_VAR);
-
-    // If GLIBC_ENV_VAR is not set
-    if (!cur_val) {
-        if (setenv(GLIBC_ENV_VAR, GLIBC_ENV_VALUE, 1) == -1) {
-            perror("setenv");
-        }
-        return FALSE;
-    }
-
-    // the env var is set.
-    // if GLIBC_ENV_VALUE is not present, add it
-    if (!strstr(cur_val, GLIBC_ENV_VALUE)) {
-        char *new_val = NULL;
-
-        if ((asprintf(&new_val, "%s:%s", cur_val, GLIBC_ENV_VALUE) == -1)) {
-            perror("setGlibcEnvVariable:asprintf");
-            return FALSE;
-        }
-
-        if (setenv(GLIBC_ENV_VAR, new_val, 1)) {
-            perror("setGlibcEnvVariable:setenv");
-            return FALSE;
-        }
-
-        if (new_val) free(new_val);
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
 int
 main(int argc, char **argv, char **env)
 {
     elf_buf_t *ebuf;
     int (*sys_exec)(elf_buf_t *, const char *, int, char **, char **);
-    int status, glibcenv = 0;
+    int status;
     pid_t pid;
     void *handle = NULL;
     libscope_info_t *info;
@@ -323,90 +265,7 @@ main(int argc, char **argv, char **env)
         }
 
         setGoHttpEnvVariable();
-        glibcenv = setGlibcEnvVariable();
 
-        /*
-         * This is indeed as "weird" as it looks.
-         * We require that glibc is initialized with the env var
-         * set by setGlibcEnvVariable() in order to avoid issues
-         * with TLS variables in glibc. Refer to the comment for
-         * setGlibcEnvVariable() above.
-         *
-         * Given that the required glibc env var is not set, we
-         * need to set the env var and init glibc with that setting.
-         * Since we can't re-init glibc we start a new proc that has
-         * the env var set before starting.
-         *
-         * Go routines that use cgo are started by using the glibc
-         * start methodology; _start() calls __libc_start_main().
-         * Go routines that do not use cgo do not init glibc.
-         *
-         * Therefore, if __libc_start_main is present we do not
-         * want to start a new process.
-         */
-        if ((getSymbol(ebuf->buf, "__libc_start_main") == NULL) &&
-            (glibcenv == FALSE)) {
-
-            pid = fork();
-            if (pid == -1) {
-                perror("fork");
-                goto err;
-            } else if (pid > 0) {
-                int fd, plen;
-                char path[PATH_MAX];
-
-                /*
-                 * Change the name of the first scope process so that
-                 * output from ps, /proc, et. al. will look "better".
-                 *
-                 * We use cmdline as opposed to exe because we want
-                 * to clear the entire command line, not just the path
-                 * in the first scope process name. The only way to get
-                 * the size of the command line is to read the whole thing.
-                 * Can't stat a /proc entry.
-                 */
-                if ((fd = open("/proc/self/cmdline", O_RDONLY)) == -1) {
-                    perror("open");
-                    goto err;
-                }
-
-                if ((plen = read(fd, path, sizeof(path))) == -1) {
-                    perror("read");
-                    goto err;
-                }
-
-                if (close(fd) == -1) {
-                    perror("close");
-                    goto err;
-                }
-
-                // null everything, then set as much as we can without
-                // overwriting the last null
-                memset(*argv, 0, plen);
-                strncpy(*argv, PARENT_PROC_NAME, plen - 1);
-
-                int ret;
-                do {
-                    ret = waitpid(pid, &status, 0);
-                } while (ret == -1 && errno == EINTR);
-
-                release_libscope(&info);
-                exit(status);
-            } else {
-                ssize_t rc;
-                char path[PATH_MAX];
-
-                if ((rc = readlink("/proc/self/exe", path, PATH_MAX - 1)) == -1) {
-                    perror("readlink");
-                    goto err;
-                }
-
-                path[rc] = '\0';
-                execve(path, argv, environ);
-                perror("execve");
-                goto err;
-            }
-        }
     } else {
         if (setenv("SCOPE_APP_TYPE", "native", 1) == -1) {
             perror("setenv");

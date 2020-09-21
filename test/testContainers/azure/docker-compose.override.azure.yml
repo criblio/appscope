@@ -8,7 +8,9 @@ services:
     command: -v -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
 
   cribl:
     build:
@@ -18,7 +20,9 @@ services:
     command: -v -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
 
   nginx:
     build:
@@ -28,7 +32,9 @@ services:
     command: -v -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
 
   splunk:
     build:
@@ -38,7 +44,9 @@ services:
     command: -v -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
 
   elastic:
     build:
@@ -48,7 +56,9 @@ services:
     command: -v -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
 
   kafka:
     build:
@@ -58,7 +68,9 @@ services:
     command: -v -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
 
   tls:
     build:
@@ -67,7 +79,9 @@ services:
     image: criblci/scope-tls-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
 
@@ -78,7 +92,9 @@ services:
     image: criblci/scope-detect_proto-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
 
@@ -88,8 +104,12 @@ services:
         - criblci/scope-gogen-it:latest
     image: criblci/scope-gogen-it
     volumes:
-      - ./libscope.so:/usr/lib/libscope.so
-      - ./scope:/usr/bin/scope
+      - type: bind
+        source: ./libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ./scope
+        target: /usr/bin/scope
 
   go_8:
     build:
@@ -97,64 +117,96 @@ services:
         - criblci/scope-go_8-it:latest
     image: criblci/scope-go_8-it
     volumes:
-      - ./libscope.so:/usr/lib/libscope.so
-      - ./scope:/usr/bin/scope
+      - type: bind
+        source: ./libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ./scope
+        target: /usr/bin/scope
   go_9:
     build:
       cache_from:
         - criblci/scope-go_9-it:latest
     image: criblci/scope-go_9-it
     volumes:
-      - ./libscope.so:/usr/lib/libscope.so
-      - ./scope:/usr/bin/scope
+      - type: bind
+        source: ./libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ./scope
+        target: /usr/bin/scope
   go_10:
     build:
       cache_from:
         - criblci/scope-go_10-it:latest
     image: criblci/scope-go_10-it
     volumes:
-      - ./libscope.so:/usr/lib/libscope.so
-      - ./scope:/usr/bin/scope
+      - type: bind
+        source: ./libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ./scope
+        target: /usr/bin/scope
   go_11:
     build:
       cache_from:
         - criblci/scope-go_11-it:latest
     image: criblci/scope-go_11-it
     volumes:
-      - ./libscope.so:/usr/lib/libscope.so
-      - ./scope:/usr/bin/scope
+      - type: bind
+        source: ./libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ./scope
+        target: /usr/bin/scope
   go_12:
     build:
       cache_from:
         - criblci/scope-go_12-it:latest
     image: criblci/scope-go_12-it
     volumes:
-      - ./libscope.so:/usr/lib/libscope.so
-      - ./scope:/usr/bin/scope
+      - type: bind
+        source: ./libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ./scope
+        target: /usr/bin/scope
   go_13:
     build:
       cache_from:
         - criblci/scope-go_13-it:latest
     image: criblci/scope-go_13-it
     volumes:
-      - ./libscope.so:/usr/lib/libscope.so
-      - ./scope:/usr/bin/scope
+      - type: bind
+        source: ./libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ./scope
+        target: /usr/bin/scope
   go_14:
     build:
       cache_from:
         - criblci/scope-go_14-it:latest
     image: criblci/scope-go_14-it
     volumes:
-      - ./libscope.so:/usr/lib/libscope.so
-      - ./scope:/usr/bin/scope
+      - type: bind
+        source: ./libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ./scope
+        target: /usr/bin/scope
   go_15:
     build:
       cache_from:
         - criblci/scope-go_15-it:latest
     image: criblci/scope-go_15-it
     volumes:
-      - ./libscope.so:/usr/lib/libscope.so
-      - ./scope:/usr/bin/scope
+      - type: bind
+        source: ./libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ./scope
+        target: /usr/bin/scope
 
   java6:
     build:
@@ -163,7 +215,9 @@ services:
     image: criblci/scope-java6-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   java7:
@@ -173,7 +227,9 @@ services:
     image: criblci/scope-java7-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   java8:
@@ -183,7 +239,9 @@ services:
     image: criblci/scope-java8-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   java9:
@@ -193,7 +251,9 @@ services:
     image: criblci/scope-java9-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   java10:
@@ -203,7 +263,9 @@ services:
     image: criblci/scope-java10-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   java11:
@@ -213,7 +275,9 @@ services:
     image: criblci/scope-java11-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   java12:
@@ -223,7 +287,9 @@ services:
     image: criblci/scope-java12-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   java13:
@@ -233,7 +299,9 @@ services:
     image: criblci/scope-java13-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   java14:
@@ -243,7 +311,9 @@ services:
     image: criblci/scope-java14-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
 
@@ -254,7 +324,9 @@ services:
     image: criblci/scope-oracle-java6-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   oracle_java7:
@@ -264,7 +336,9 @@ services:
     image: criblci/scope-oracle-java7-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   oracle_java8:
@@ -274,7 +348,9 @@ services:
     image: criblci/scope-oracle-java8-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   oracle_java9:
@@ -284,7 +360,9 @@ services:
     image: criblci/scope-oracle-java9-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   oracle_java10:
@@ -294,7 +372,9 @@ services:
     image: criblci/scope-oracle-java10-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   oracle_java11:
@@ -304,7 +384,9 @@ services:
     image: criblci/scope-oracle-java11-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   oracle_java12:
@@ -314,7 +396,9 @@ services:
     image: criblci/scope-oracle-java12-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   oracle_java13:
@@ -324,7 +408,9 @@ services:
     image: criblci/scope-oracle-java13-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
   oracle_java14:
@@ -334,7 +420,9 @@ services:
     image: criblci/scope-oracle-java14-it
     volumes:
       - ./logs:/opt/test-runner/logs
-      - ./libscope.so:/opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ./libscope.so
+        target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
 

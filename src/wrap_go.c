@@ -37,13 +37,13 @@ go_offsets_t g_go = {.g_to_m=48,                 // 0x30
                      .m_to_tls=136,              // 0x88
                      .connReader_to_conn=0,      // 0x00
                      .conn_to_tlsState=48,       // 0x30
-                     .conn_to_rwc=24,            // 0x18
-                     .persistConn_to_conn=88,    // 0x58
+                     .persistConn_to_conn=80,    // 0x50
                      .persistConn_to_bufrd=104,  // 0x68
-                     .bufrd_to_buf=0,            // 0x00
                      .iface_data=8,              // 0x08
                      .netfd_to_pd=0,             // 0x00
-                     .pd_to_fd=16};              // 0x10
+                     .pd_to_fd=16,               // 0x10
+                     .bufrd_to_buf=0,            // 0x00
+                     .conn_to_rwc=16};           // 0x10
 
 tap_t g_go_tap[] = {
     {"syscall.write",                        go_hook_write,        NULL, 0},
@@ -239,6 +239,46 @@ patch_return_addrs(funchook_t *funchook,
     patchprint("\n\n");
 }
 
+static void
+adjustGoStructOffsetsForVersion(const char* go_runtime_version)
+{
+    if (!go_runtime_version) {
+        sysprint("ERROR: can't determine major go version\n");
+        return;
+    }
+
+    sysprint("go_runtime_version = %s\n", go_runtime_version);
+
+    char buf[256] = {0};
+    strncpy(buf, go_runtime_version, sizeof(buf)-1);
+
+    char *token = strtok(buf, ".");
+    token = strtok(NULL, ".");
+    if (!token) {
+        sysprint("ERROR: can't determine major go version\n");
+        return;
+    }
+
+    errno = 0;
+    long val = strtol(token, NULL, 10);
+    if (errno || val <= 0) {
+        sysprint("ERROR: can't determine major go version\n");
+        return;
+    }
+
+    // go 1.8 has a different m_to_tls offset than other supported versions.
+    if (val == 8) {
+        g_go.m_to_tls = 96; // 0x60
+    }
+
+    // before go 1.12, persistConn_to_conn and persistConn_to_bufrd
+    // have different values than 12 and after
+    if (val < 12) {
+        g_go.persistConn_to_conn = 72;  // 0x48
+        g_go.persistConn_to_bufrd = 96; // 0x60
+    }
+}
+
 void
 initGoHook(elf_buf_t *ebuf)
 {
@@ -280,32 +320,35 @@ initGoHook(elf_buf_t *ebuf)
         return;
     }
 
-    sysprint("go_runtime_version = %s\n", go_runtime_version);
-
-    // go 1.8 has a different m_to_tls offset than other supported versions.
-    if (strstr(go_runtime_version, "go1.8.")) g_go.m_to_tls = 96; // 0x60
-
+    adjustGoStructOffsetsForVersion(go_runtime_version);
 
     // This creates a file specified by test/testContainers/go/test_go.sh
     // and used by test/testContainers/go/test_go_struct.sh.
     //
-    // Why?  To test structure offsets in go that might change.  (like in 1.8
-    // immediately above)
+    // Why?  To test structure offsets in go that might change.
+    // See adjustGoStructOffsetsForVersion() immediately above.
+    //
+    // The format is:
+    //   StructureName|FieldName=DecimalOffsetValue|OptionalTag
+    //
+    // If an OptionalTag is provided, test_go_struct.sh will not process
+    // the line unless it matches a TAG_FILTER which is provided as an
+    // argument to the test_go_struct.sh.
     char* debug_file;
     int fd;
     if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
         ((fd = ni_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
-        dprintf(fd, "runtime.g|m=%d\n", g_go.g_to_m);
-        dprintf(fd, "runtime.m|tls=%d\n", g_go.m_to_tls);
-        dprintf(fd, "net/http.connReader|conn=%d\n", g_go.connReader_to_conn);
-        dprintf(fd, "net/http.conn|tlsState=%d\n", g_go.conn_to_tlsState);
-        dprintf(fd, "net/http.persistConn|conn=%d\n", g_go.persistConn_to_conn);
-        dprintf(fd, "net/http.persistConn|br=%d\n", g_go.persistConn_to_bufrd);
-        dprintf(fd, "runtime/iface|data=%d\n", g_go.iface_data);
-        dprintf(fd, "internal/poll.FD|Sysfd=%d\n", g_go.pd_to_fd);
-        dprintf(fd, "net/netFD|pfd=%d\n", g_go.netfd_to_pd);
-        dprintf(fd, "bufio.Reader|buf=%d\n", g_go.bufrd_to_buf);
-        dprintf(fd, "net/http.conn|rwc=%d\n", g_go.conn_to_rwc);
+        dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
+        dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
+        dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
+        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
+        dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go.persistConn_to_conn);
+        dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go.persistConn_to_bufrd);
+        dprintf(fd, "runtime.iface|data=%d|\n", g_go.iface_data);
+        dprintf(fd, "net.netFD|pfd=%d|\n", g_go.netfd_to_pd);
+        dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go.pd_to_fd);
+        dprintf(fd, "bufio.Reader|buf=%d|\n", g_go.bufrd_to_buf);
+        dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go.conn_to_rwc);
         ni_close(fd);
     }
 
@@ -799,7 +842,7 @@ c_tls_read(char *stackaddr)
     // buf len 0x18
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
-    uint64_t cr_conn, cr_conn_rwc, netFD, pfd;
+    uint64_t cr_conn_rwc, netFD, pfd;
 
 //  type connReader struct {
 //        conn *conn
@@ -813,12 +856,12 @@ c_tls_read(char *stackaddr)
 //          remoteAddr string
 //          tlsState *tls.ConnectionState
 
-    if (((cr_conn = *(uint64_t *)connReader) != 0) &&
-        ((cr_conn_rwc = *(uint64_t *)(cr_conn + g_go.conn_to_rwc))) &&
-        ((netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data)) != 0) &&
-        ((pfd = *(uint64_t *)netFD) != g_go.netfd_to_pd)) {
-        fd = *(int *)(pfd + g_go.pd_to_fd);
-    }
+    cr_conn_rwc = (conn + g_go.conn_to_rwc);
+    netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data);
+    if (!netFD) return;
+    pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+    if (!pfd) return;
+    fd = *(int *)(pfd + g_go.pd_to_fd);
 
     uint64_t tlsState =   *(uint64_t*)(conn + g_go.conn_to_tlsState);
 
@@ -857,11 +900,12 @@ c_tls_write(char *stackaddr)
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
     uint64_t w_conn_rwc, netFD, pfd;
 
-    if (((w_conn_rwc = *(uint64_t *)(conn + g_go.conn_to_rwc)) != 0) &&
-        ((netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data)) != 0) &&
-        ((pfd = *(uint64_t *)netFD) != g_go.netfd_to_pd)) {
-        fd = *(int *)(pfd + g_go.pd_to_fd);
-    }
+    w_conn_rwc = (conn + g_go.conn_to_rwc);
+    netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data);
+    if (!netFD) return;
+    pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+    if (!pfd) return;
+    fd = *(int *)(pfd + g_go.pd_to_fd);
 
     uint64_t tlsState = *(uint64_t*)(conn + g_go.conn_to_tlsState);
 
@@ -901,15 +945,15 @@ c_pc_write(char *stackaddr)
     uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
     uint64_t w_pc_conn, netFD, pfd;
 
-    if (rc > 0) {
-        if (((w_pc_conn = *(uint64_t *)(w_pc + g_go.persistConn_to_conn)) != 0) &&
-            ((netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data)) != 0) &&
-            ((pfd = *(uint64_t *)(netFD)) != g_go.netfd_to_pd)) {
-            fd = *(int *)(pfd + g_go.pd_to_fd);
-            doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
-            funcprint("Scope: c_pc_write of %d\n", fd);
-        }
-    }
+    if (rc < 1) return;
+    w_pc_conn = (w_pc + g_go.persistConn_to_conn);
+    netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data);
+    if (!netFD) return;
+    pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+    if (!pfd) return;
+    fd = *(int *)(pfd + g_go.pd_to_fd);
+    doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
+    funcprint("Scope: c_pc_write of %d\n", fd);
 }
 
 EXPORTON void *
@@ -941,11 +985,12 @@ c_readResponse(char *stackaddr)
     uint64_t pc  = *(uint64_t *)(stackaddr + 0x08);
     uint64_t pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
 
-    if (((pc_conn = *(uint64_t *)(pc + g_go.persistConn_to_conn)) != 0) &&
-        ((netFD = *(uint64_t *)(pc_conn + g_go.iface_data)) != 0) &&
-        ((pfd = *(uint64_t *)netFD) != g_go.netfd_to_pd)) {
-        fd = *(int *)(pfd + g_go.pd_to_fd);
-    }
+    pc_conn = (pc + g_go.persistConn_to_conn);
+    netFD = *(uint64_t *)(pc_conn + g_go.iface_data);
+    if (!netFD) return;
+    pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+    if (!pfd) return;
+    fd = *(int *)(pfd + g_go.pd_to_fd);
 
     if ((pc_br = *(uint64_t *)(pc + g_go.persistConn_to_bufrd)) != 0) {
         buf = *(uint64_t *)(pc_br + g_go.bufrd_to_buf);

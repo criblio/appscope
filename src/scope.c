@@ -29,7 +29,8 @@
 #define SHM_NAME            "libscope"
 #define PARENT_PROC_NAME "start_scope"
 #define GO_ENV_VAR "GODEBUG"
-#define GO_ENV_VALUE "http2server"
+#define GO_ENV_SERVER_VALUE "http2server"
+#define GO_ENV_CLIENT_VALUE "http2client"
 #define GLIBC_ENV_VAR "GLIBC_TUNABLES"
 #define GLIBC_ENV_VALUE "glibc.malloc.tcache_count=0"
 
@@ -200,8 +201,8 @@ err:
     return info;
 }
 
-// If possible, we want to set GODEBUG=http2server=0
-// This tells go not to upgrade servers to http2, which allows
+// If possible, we want to set GODEBUG=http2server=0,http2client=0
+// This tells go not to upgrade to http2, which allows
 // our http1 protocol capture stuff to do it's thing.
 // We consider this temporary, because when we support http2
 // it will not be necessary.
@@ -210,9 +211,9 @@ setGoHttpEnvVariable(void)
 {
     char *cur_val = getenv(GO_ENV_VAR);
 
-    // If GODEBUG isn't set, try to set it to http2server=0
+    // If GODEBUG isn't set, try to set it to http2server=0,http2client=0
     if (!cur_val) {
-        if (setenv(GO_ENV_VAR, GO_ENV_VALUE "=0", 1)) {
+        if (setenv(GO_ENV_VAR, GO_ENV_SERVER_VALUE "=0," GO_ENV_CLIENT_VALUE "=0", 1)) {
             perror("setGoHttpEnvVariable:setenv");
         }
         return;
@@ -220,9 +221,24 @@ setGoHttpEnvVariable(void)
 
     // GODEBUG is set.
     // If http2server wasn't specified, let's append ",http2server=0"
-    if (!strstr(cur_val, GO_ENV_VALUE)) {
+    if (!strstr(cur_val, GO_ENV_SERVER_VALUE)) {
         char *new_val = NULL;
-        if ((asprintf(&new_val, "%s,%s=0", cur_val, GO_ENV_VALUE) == -1)) {
+        if ((asprintf(&new_val, "%s,%s=0", cur_val, GO_ENV_SERVER_VALUE) == -1)) {
+            perror("setGoHttpEnvVariable:asprintf");
+            return;
+        }
+        if (setenv(GO_ENV_VAR, new_val, 1)) {
+            perror("setGoHttpEnvVariable:setenv");
+        }
+        if (new_val) free(new_val);
+    }
+
+    cur_val = getenv(GO_ENV_VAR);
+
+    // If http2client wasn't specified, let's append ",http2client=0"
+    if (!strstr(cur_val, GO_ENV_CLIENT_VALUE)) {
+        char *new_val = NULL;
+        if ((asprintf(&new_val, "%s,%s=0", cur_val, GO_ENV_CLIENT_VALUE) == -1)) {
             perror("setGoHttpEnvVariable:asprintf");
             return;
         }

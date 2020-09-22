@@ -700,13 +700,7 @@ c_write(char *stackaddr)
     uint64_t initialTime = getTime();
 
     funcprint("Scope: write fd %ld rc %ld buf 0x%lx\n", fd, rc, buf);
-
-    // this makes fileThread crash when running with tcache
-    for(int i=1;i<100;i++) {
-        char *a = malloc(i * 1000);
-        doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
-        free(a);
-    }
+    doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
 }
 
 EXPORTON void *

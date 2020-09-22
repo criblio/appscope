@@ -583,24 +583,35 @@ inline static void *
 go_switch(char *stackptr, void *cfunc, void *gfunc)
 {
     uint64_t rc;
-    unsigned long go_tls, *go_ptr;
-    char *go_g = NULL, *go_m = NULL;
-
-    unsigned long go_fs;
-
-    arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs);
-
+    unsigned long go_tls = 0;
+    unsigned long go_fs = 0;
+    unsigned long go_m = 0;
+    char *go_g = NULL;
+    
     if (g_go_static) {
         // Get the Go routine's struct g
-        __asm__ volatile (
-            "mov %%fs:0xfffffffffffffff8, %%r11 \n"
-            "mov %%r11, %1  \n"
-            : "=r"(rc)                        // output
-            : "m"(go_g)                       // inputs
+       __asm__ volatile (
+            "mov %%fs:-8, %0"
+            : "=r"(go_g)                      // output
+            :                                 // inputs
             :                                 // clobbered register
             );
+        if (go_g) {
+            // get struct m from g and pull out the TLS from 'm'
+            go_m = *((unsigned long *)(go_g + g_go.g_to_m));
+            go_tls = (unsigned long)(go_m + g_go.m_to_tls);
+            go_fs = go_tls + 8; //go compiler uses -8(FS)
+        } else {
+            // We've seen a case where on process exit static cgo
+            // apps do not have a go_g while they're exiting. 
+            // In this case we need to pull the TLS from the kernel
+            if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
+                scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+        }
 
-        void *thread_fs;
+        void *thread_fs = NULL;
         if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
             // Switch to the main thread TCB
             if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
@@ -608,10 +619,16 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
             pthread_t thread;
-            pthread_create(&thread, NULL, dumb_thread, NULL);
+            if (pthread_create(&thread, NULL, dumb_thread, NULL) != 0) {
+                scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+            sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
             
-            printf("New thread created TCB = 0x%08lx\n", (unsigned long)thread);
-            lstInsert(g_threadlist, go_fs, (void *)thread);
+            if (lstInsert(g_threadlist, go_fs, (void *)thread) == FALSE) {
+                scopeLog("lstInsert failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
             thread_fs = (void *)thread;
         } 
         
@@ -620,9 +637,7 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
             goto out;
         }
     }
-
-    //printf("THREAD ID=0x%08lx, scope fs=0x%08lx\n", go_fs, scope_fs);
-  
+    
     uint32_t frame_offset = frame_size(gfunc);
     if (!frame_offset) goto out;
     stackptr += frame_offset;
@@ -635,26 +650,14 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
         : "r"(stackptr), "r"(cfunc)   // inputs
         :                             // clobbered register
         );
-
-    // We'd like to switch back to go_tls every time we switch to scope_fs
-    // above, however, we've seen a case where on process exit static cgo
-    // apps do not have a go_g while they're exiting.  With a null go_g,
-    // there is no way to do the processing here...
-    if (g_go_static && go_g) {
-        // get struct m from g and pull out the TLS from 'm'
-        go_ptr = (unsigned long *)(go_g + g_go.g_to_m);
-        go_tls = *go_ptr;
-        go_m = (char *)go_tls;
-        go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-
+out:
+    if (g_go_static && go_fs) {
         // Switch back to the 'm' TLS
-        if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
+        if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
             scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
             goto out;
         }
     }
-
-out:
     return return_addr(gfunc);
 }
 

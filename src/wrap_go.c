@@ -33,17 +33,19 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 //#define patchprint sysprint
 #define patchprint devnull
 
-go_offsets_t g_go = {.g_to_m=48,                 // 0x30
-                     .m_to_tls=136,              // 0x88
-                     .connReader_to_conn=0,      // 0x00
-                     .conn_to_tlsState=48,       // 0x30
-                     .persistConn_to_conn=80,    // 0x50
-                     .persistConn_to_bufrd=104,  // 0x68
-                     .iface_data=8,              // 0x08
-                     .netfd_to_pd=0,             // 0x00
-                     .pd_to_fd=16,               // 0x10
-                     .bufrd_to_buf=0,            // 0x00
-                     .conn_to_rwc=16};           // 0x10
+#define UNDEF_OFFSET (-1)
+go_offsets_t g_go = {.g_to_m=48,                   // 0x30
+                     .m_to_tls=136,                // 0x88
+                     .connReader_to_conn=0,        // 0x00
+                     .conn_to_tlsState=48,         // 0x30
+                     .persistConn_to_conn=80,      // 0x50
+                     .persistConn_to_bufrd=104,    // 0x68
+                     .iface_data=8,                // 0x08
+                     .netfd_to_pd=0,               // 0x00
+                     .pd_to_fd=16,                 // 0x10
+                     .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 (defined for go1.8)
+                     .bufrd_to_buf=0,              // 0x00
+                     .conn_to_rwc=16};             // 0x10
 
 tap_t g_go_tap[] = {
     {"syscall.write",                        go_hook_write,        NULL, 0},
@@ -271,12 +273,59 @@ adjustGoStructOffsetsForVersion(const char* go_runtime_version)
         g_go.m_to_tls = 96; // 0x60
     }
 
+    // go 1.8 is the only version that directly goes from netfd to sysfd.
+    if (val == 8) {
+        g_go.netfd_to_sysfd = 16;
+    }
+
     // before go 1.12, persistConn_to_conn and persistConn_to_bufrd
     // have different values than 12 and after
     if (val < 12) {
         g_go.persistConn_to_conn = 72;  // 0x48
         g_go.persistConn_to_bufrd = 96; // 0x60
     }
+
+
+    // This creates a file specified by test/testContainers/go/test_go.sh
+    // and used by test/testContainers/go/test_go_struct.sh.
+    //
+    // Why?  To test structure offsets in go that can vary. (above)
+    //
+    // The format is:
+    //   StructureName|FieldName=DecimalOffsetValue|OptionalTag
+    //
+    // If an OptionalTag is provided, test_go_struct.sh will not process
+    // the line unless it matches a TAG_FILTER which is provided as an
+    // argument to the test_go_struct.sh.
+    int (*ni_open)(const char *pathname, int flags, mode_t mode);
+    ni_open = dlsym(RTLD_NEXT, "open");
+    int (*ni_close)(int fd);
+    ni_close = dlsym(RTLD_NEXT, "close");
+    if (!ni_open || !ni_close) return;
+
+    char* debug_file;
+    int fd;
+    if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
+        ((fd = ni_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
+        dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
+        dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
+        dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
+        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
+        dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go.persistConn_to_conn);
+        dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go.persistConn_to_bufrd);
+        dprintf(fd, "runtime.iface|data=%d|\n", g_go.iface_data);
+        // go 1.8 has a direct netfd_to_sysfd field, others are less direct
+        if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+            dprintf(fd, "net.netFD|pfd=%d|\n", g_go.netfd_to_pd);
+            dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go.pd_to_fd);
+        } else {
+            dprintf(fd, "net.netFD|sysfd=%d|\n", g_go.netfd_to_sysfd);
+        }
+        dprintf(fd, "bufio.Reader|buf=%d|\n", g_go.bufrd_to_buf);
+        dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go.conn_to_rwc);
+        ni_close(fd);
+    }
+
 }
 
 void
@@ -287,12 +336,6 @@ initGoHook(elf_buf_t *ebuf)
     gostring_t *go_ver; // There is an implicit len field at go_ver + 0x8
     char *estr;
     char *go_runtime_version = NULL;
-
-    int (*ni_open)(const char *pathname, int flags, mode_t mode);
-    ni_open = dlsym(RTLD_NEXT, "open");
-    int (*ni_close)(int fd);
-    ni_close = dlsym(RTLD_NEXT, "close");
-    if (!ni_open || !ni_close) return;
 
     // A go app may need to expand stacks for some C functions
     g_need_stack_expand = TRUE;
@@ -321,36 +364,6 @@ initGoHook(elf_buf_t *ebuf)
     }
 
     adjustGoStructOffsetsForVersion(go_runtime_version);
-
-    // This creates a file specified by test/testContainers/go/test_go.sh
-    // and used by test/testContainers/go/test_go_struct.sh.
-    //
-    // Why?  To test structure offsets in go that might change.
-    // See adjustGoStructOffsetsForVersion() immediately above.
-    //
-    // The format is:
-    //   StructureName|FieldName=DecimalOffsetValue|OptionalTag
-    //
-    // If an OptionalTag is provided, test_go_struct.sh will not process
-    // the line unless it matches a TAG_FILTER which is provided as an
-    // argument to the test_go_struct.sh.
-    char* debug_file;
-    int fd;
-    if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
-        ((fd = ni_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
-        dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
-        dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
-        dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
-        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
-        dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go.persistConn_to_conn);
-        dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go.persistConn_to_bufrd);
-        dprintf(fd, "runtime.iface|data=%d|\n", g_go.iface_data);
-        dprintf(fd, "net.netFD|pfd=%d|\n", g_go.netfd_to_pd);
-        dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go.pd_to_fd);
-        dprintf(fd, "bufio.Reader|buf=%d|\n", g_go.bufrd_to_buf);
-        dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go.conn_to_rwc);
-        ni_close(fd);
-    }
 
     tap_t* tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
@@ -859,9 +872,13 @@ c_tls_read(char *stackaddr)
     cr_conn_rwc = (conn + g_go.conn_to_rwc);
     netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data);
     if (!netFD) return;
-    pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-    if (!pfd) return;
-    fd = *(int *)(pfd + g_go.pd_to_fd);
+    if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+        pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+        if (!pfd) return;
+        fd = *(int *)(pfd + g_go.pd_to_fd);
+    } else {
+        fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+    }
 
     uint64_t tlsState =   *(uint64_t*)(conn + g_go.conn_to_tlsState);
 
@@ -903,9 +920,13 @@ c_tls_write(char *stackaddr)
     w_conn_rwc = (conn + g_go.conn_to_rwc);
     netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data);
     if (!netFD) return;
-    pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-    if (!pfd) return;
-    fd = *(int *)(pfd + g_go.pd_to_fd);
+    if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+        pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+        if (!pfd) return;
+        fd = *(int *)(pfd + g_go.pd_to_fd);
+    } else {
+        fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+    }
 
     uint64_t tlsState = *(uint64_t*)(conn + g_go.conn_to_tlsState);
 
@@ -949,9 +970,14 @@ c_pc_write(char *stackaddr)
     w_pc_conn = (w_pc + g_go.persistConn_to_conn);
     netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data);
     if (!netFD) return;
-    pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-    if (!pfd) return;
-    fd = *(int *)(pfd + g_go.pd_to_fd);
+    if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+        pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+        if (!pfd) return;
+        fd = *(int *)(pfd + g_go.pd_to_fd);
+    } else {
+        fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+    }
+
     doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
     funcprint("Scope: c_pc_write of %d\n", fd);
 }
@@ -988,9 +1014,13 @@ c_readResponse(char *stackaddr)
     pc_conn = (pc + g_go.persistConn_to_conn);
     netFD = *(uint64_t *)(pc_conn + g_go.iface_data);
     if (!netFD) return;
-    pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-    if (!pfd) return;
-    fd = *(int *)(pfd + g_go.pd_to_fd);
+    if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+        pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+        if (!pfd) return;
+        fd = *(int *)(pfd + g_go.pd_to_fd);
+    } else {
+        fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+    }
 
     if ((pc_br = *(uint64_t *)(pc + g_go.persistConn_to_bufrd)) != 0) {
         buf = *(uint64_t *)(pc_br + g_go.bufrd_to_buf);

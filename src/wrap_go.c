@@ -569,11 +569,17 @@ out:
 static void *
 dumb_thread(void *arg)
 {
+    pthread_barrier_t *pbarrier = (pthread_barrier_t *)arg;
     sigset_t mask;
+
     sigfillset(&mask);
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
+    
+    if (pthread_barrier_wait(pbarrier) == -1) {
+        scopeLog("pthread_barrier_wait failed", -1, CFG_LOG_ERROR);
+    }
     while (1) {
-        sleep(1000);
+        sleep(0xffffffff);
     }
     return NULL;
 }
@@ -590,7 +596,7 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
     
     if (g_go_static) {
         // Get the Go routine's struct g
-       __asm__ volatile (
+        __asm__ volatile (
             "mov %%fs:-8, %0"
             : "=r"(go_g)                      // output
             :                                 // inputs
@@ -610,8 +616,8 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
         }
-
         void *thread_fs = NULL;
+        int newThread = FALSE;
         if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
             // Switch to the main thread TCB
             if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
@@ -619,22 +625,42 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
             pthread_t thread;
-            if (pthread_create(&thread, NULL, dumb_thread, NULL) != 0) {
+            pthread_barrier_t barrier;
+
+            if (pthread_barrier_init(&barrier, NULL, 2) != 0) {
+                scopeLog("pthread_barrier_init failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+            
+            if (pthread_create(&thread, NULL, dumb_thread, &barrier) != 0) {
                 scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
                 goto out;
             }
-            sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
-            
-            if (lstInsert(g_threadlist, go_fs, (void *)thread) == FALSE) {
-                scopeLog("lstInsert failed", -1, CFG_LOG_ERROR);
+
+            //wait until the thread starts
+            if (pthread_barrier_wait(&barrier) != 0) {
+                scopeLog("pthread_barrier_wait failed", -1, CFG_LOG_ERROR);
                 goto out;
             }
+
+            if (pthread_barrier_destroy(&barrier) != 0) {
+                scopeLog("pthread_barrier_destroy failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+            newThread =TRUE;
             thread_fs = (void *)thread;
         } 
         
         if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
             scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
             goto out;
+        }
+        if (newThread) {
+            if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
+                scopeLog("lstInsert failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+            sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
         }
     }
     

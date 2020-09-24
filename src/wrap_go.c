@@ -647,7 +647,7 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
                 scopeLog("pthread_barrier_destroy failed", -1, CFG_LOG_ERROR);
                 goto out;
             }
-            newThread =TRUE;
+            newThread = TRUE;
             thread_fs = (void *)thread;
         } 
         

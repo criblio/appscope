@@ -574,10 +574,10 @@ dumb_thread(void *arg)
 
     sigfillset(&mask);
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
-    
-    if (pthread_barrier_wait(pbarrier) == -1) {
-        scopeLog("pthread_barrier_wait failed", -1, CFG_LOG_ERROR);
-    }
+
+    void *dummy = calloc(1, 32);
+    if (dummy) free(dummy);
+    pthread_barrier_wait(pbarrier);
     while (1) {
         sleep(0xffffffff);
     }
@@ -593,7 +593,7 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
     unsigned long go_fs = 0;
     unsigned long go_m = 0;
     char *go_g = NULL;
-    
+
     if (g_go_static) {
         // Get the Go routine's struct g
         __asm__ volatile (
@@ -602,11 +602,26 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
             :                                 // inputs
             :                                 // clobbered register
             );
+
         if (go_g) {
             // get struct m from g and pull out the TLS from 'm'
             go_m = *((unsigned long *)(go_g + g_go.g_to_m));
+            if (go_m == 0) {
+                scopeLog("go_m = 0", -1, CFG_LOG_ERROR);
+                if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
+                    scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
+                    goto out;
+                }
+            }
             go_tls = (unsigned long)(go_m + g_go.m_to_tls);
             go_fs = go_tls + 8; //go compiler uses -8(FS)
+            if (go_fs == 8) {
+                scopeLog("go_fs = 8", -1, CFG_LOG_ERROR);
+                if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
+                    scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
+                    goto out;
+                }
+            }
         } else {
             // We've seen a case where on process exit static cgo
             // apps do not have a go_g while they're exiting. 
@@ -616,8 +631,8 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
         }
+
         void *thread_fs = NULL;
-        int newThread = FALSE;
         if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
             // Switch to the main thread TCB
             if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
@@ -626,7 +641,6 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
             }
             pthread_t thread;
             pthread_barrier_t barrier;
-
             if (pthread_barrier_init(&barrier, NULL, 2) != 0) {
                 scopeLog("pthread_barrier_init failed", -1, CFG_LOG_ERROR);
                 goto out;
@@ -638,8 +652,12 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
             }
 
             //wait until the thread starts
-            if (pthread_barrier_wait(&barrier) != 0) {
-                scopeLog("pthread_barrier_wait failed", -1, CFG_LOG_ERROR);
+            pthread_barrier_wait(&barrier);
+
+            thread_fs = (void *)thread;
+
+            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
+                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
                 goto out;
             }
 
@@ -647,20 +665,18 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
                 scopeLog("pthread_barrier_destroy failed", -1, CFG_LOG_ERROR);
                 goto out;
             }
-            newThread = TRUE;
-            thread_fs = (void *)thread;
-        } 
-        
-        if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-            scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
-            goto out;
-        }
-        if (newThread) {
+
             if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
                 scopeLog("lstInsert failed", -1, CFG_LOG_ERROR);
                 goto out;
             }
+
             sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
+        } else {
+            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
+                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+                goto out;
+            }
         }
     }
     
@@ -681,7 +697,6 @@ out:
         // Switch back to the 'm' TLS
         if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
             scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
-            goto out;
         }
     }
     return return_addr(gfunc);

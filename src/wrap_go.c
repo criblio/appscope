@@ -606,26 +606,13 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
         if (go_g) {
             // get struct m from g and pull out the TLS from 'm'
             go_m = *((unsigned long *)(go_g + g_go.g_to_m));
-            if (go_m == 0) {
-                scopeLog("go_m = 0", -1, CFG_LOG_ERROR);
-                if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
-                    scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
-                    goto out;
-                }
-            }
             go_tls = (unsigned long)(go_m + g_go.m_to_tls);
             go_fs = go_tls + 8; //go compiler uses -8(FS)
-            if (go_fs == 8) {
-                scopeLog("go_fs = 8", -1, CFG_LOG_ERROR);
-                if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
-                    scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
-                    goto out;
-                }
-            }
         } else {
             // We've seen a case where on process exit static cgo
             // apps do not have a go_g while they're exiting. 
             // In this case we need to pull the TLS from the kernel
+            scopeLog("go_switch:did not get a 'g'; using fs from the kernel", -1, CFG_LOG_DEBUG);
             if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
                 scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
                 goto out;

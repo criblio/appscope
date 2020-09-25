@@ -840,7 +840,8 @@ go_accept4(char *stackptr)
 
   cr = stackaddr + 0x08
   cr.conn = *cr
-  cr.conn.rwc = cr.conn + 0x18
+  cr.conn.rwc_if = cr.conn + 0x10
+  cr.conn.rwc = cr.conn.rwc_if + 0x08
   netFD = cr.conn.rwc + 0x08
   pfd = *netFD
   fd = netFD + 0x10
@@ -855,7 +856,7 @@ c_tls_read(char *stackaddr)
     // buf len 0x18
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
-    uint64_t cr_conn_rwc, netFD, pfd;
+    uint64_t cr_conn_rwc_if, cr_conn_rwc, netFD, pfd;
 
 //  type connReader struct {
 //        conn *conn
@@ -869,7 +870,8 @@ c_tls_read(char *stackaddr)
 //          remoteAddr string
 //          tlsState *tls.ConnectionState
 
-    cr_conn_rwc = (conn + g_go.conn_to_rwc);
+    cr_conn_rwc_if = (conn + g_go.conn_to_rwc);
+    cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go.iface_data);
     netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data);
     if (!netFD) return;
     if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
@@ -900,7 +902,8 @@ go_tls_read(char *stackptr)
   /usr/local/go/src/net/http/server.go:3433
 
   conn = stackaddr + 0x08
-  conn.rwc = conn + 0x18
+  conn.rwc_if = conn + 0x10
+  conn.rwc = conn.rwc_if + 0x08
   netFD = conn.rwc + 0x08
   pfd = *netFD
   fd = pfd + 0x10
@@ -915,9 +918,10 @@ c_tls_write(char *stackaddr)
     // buf len 0x18
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
-    uint64_t w_conn_rwc, netFD, pfd;
+    uint64_t w_conn_rwc_if, w_conn_rwc, netFD, pfd;
 
-    w_conn_rwc = (conn + g_go.conn_to_rwc);
+    w_conn_rwc_if = (conn + g_go.conn_to_rwc);
+    w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go.iface_data);
     netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data);
     if (!netFD) return;
     if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
@@ -950,12 +954,13 @@ go_tls_write(char *stackptr)
   p = stackaddr + 0x10  (request buffer)
   *p = request string
 
-  w = stackaddr + 0x08     (net/http.persistConnWriter *)
-  w.pc = stackaddr + 0x08  (net/http.persistConn *)
-  w.pc.conn = w.pc + 0x58  (net.conn->TCPConn)
-  netFD = w.pc.conn + 0x08 (netFD)
-  pfd = netFD + 0x0        (poll.FD)
-  fd = pfd + 0x10          (pfd.sysfd)
+  w = stackaddr + 0x08        (net/http.persistConnWriter *)
+  w.pc = stackaddr + 0x08     (net/http.persistConn *)
+  w.pc.conn_if = w.pc + 0x50  (interface)
+  w.pc.conn = w.pc.conn_if + 0x08 (net.conn->TCPConn)
+  netFD = w.pc.conn + 0x08    (netFD)
+  pfd = netFD + 0x0           (poll.FD)
+  fd = pfd + 0x10             (pfd.sysfd)
  */
 static void
 c_pc_write(char *stackaddr)
@@ -964,10 +969,12 @@ c_pc_write(char *stackaddr)
     uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
     uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x08);
     uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
-    uint64_t w_pc_conn, netFD, pfd;
+    uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
     if (rc < 1) return;
-    w_pc_conn = (w_pc + g_go.persistConn_to_conn);
+
+    pc_conn_if = (w_pc + g_go.persistConn_to_conn);
+    w_pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
     netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data);
     if (!netFD) return;
     if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
@@ -994,8 +1001,9 @@ go_pc_write(char *stackptr)
 
   pc = stackaddr + 0x08    (net/http.persistConn *)
 
-  pc.conn = pc + 0x58      (net.conn->TCPConn)
-  netFD = pc.conn + 0x08   (netFD)
+  pc.conn_if = pc + 0x50   (interface)
+  conn.data = pc.conn_if + 0x08 (net.conn->TCPConn)
+  netFD = conn.data + 0x08 (netFD)
   pfd = netFD + 0x0        (poll.FD)
   fd = pfd + 0x10          (pfd.sysfd)
 
@@ -1009,9 +1017,10 @@ c_readResponse(char *stackaddr)
 {
     int fd = -1;
     uint64_t pc  = *(uint64_t *)(stackaddr + 0x08);
-    uint64_t pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
+    uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
 
-    pc_conn = (pc + g_go.persistConn_to_conn);
+    pc_conn_if = (pc + g_go.persistConn_to_conn);
+    pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
     netFD = *(uint64_t *)(pc_conn + g_go.iface_data);
     if (!netFD) return;
     if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
@@ -1028,8 +1037,10 @@ c_readResponse(char *stackaddr)
         len = *(uint64_t *)(pc_br + 0x08);
     }
 
-    doProtocol((uint64_t)0, fd, (void *)buf, len, TLSRX, BUF);
-    funcprint("Scope: c_readResponse of %d\n", fd);
+    if (buf && (len > 0)) {
+        doProtocol((uint64_t)0, fd, (void *)buf, len, TLSRX, BUF);
+        funcprint("Scope: c_readResponse of %d\n", fd);
+    }
 }
 
 EXPORTON void *

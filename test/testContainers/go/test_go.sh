@@ -173,12 +173,119 @@ endtest
 
 
 #
-# test_go_struct.sh
+# plainClientDynamic
 #
-starttest test_go_struct.sh
+starttest plainClientDynamic
+cd /go/net
+scope ./plainClientDynamic
+ERR+=$?
+
+# this sleep gives plainClientDynamic a chance to report its events on exit
+sleep 0.5
+
+evaltest
+
+grep plainClientDynamic $EVT_FILE | grep http-req > /dev/null
+ERR+=$?
+grep plainClientDynamic $EVT_FILE | grep http-resp > /dev/null
+ERR+=$?
+grep plainClientDynamic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+
+endtest
+
+
+#
+# plainClientStatic
+#
+starttest plainClientStatic
+cd /go/net
+scope ./plainClientStatic
+ERR+=$?
+
+# this sleep gives plainClientStatic a chance to report its events on exit
+sleep 0.5
+
+evaltest
+
+grep plainClientStatic $EVT_FILE | grep http-req > /dev/null
+ERR+=$?
+grep plainClientStatic $EVT_FILE | grep http-resp > /dev/null
+ERR+=$?
+grep plainClientStatic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+
+endtest
+
+
+#
+# tlsClientDynamic
+#
+starttest tlsClientDynamic
+cd /go/net
+scope ./tlsClientDynamic
+ERR+=$?
+
+# this sleep gives tlsClientDynamic a chance to report its events on exit
+sleep 0.5
+
+evaltest
+
+grep tlsClientDynamic $EVT_FILE | grep http-req > /dev/null
+ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep http-resp > /dev/null
+ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+
+endtest
+
+
+#
+# tlsClientStatic
+#
+starttest tlsClientStatic
+cd /go/net
+SCOPE_GO_STRUCT_PATH=$STRUCT_PATH scope ./tlsClientStatic
+ERR+=$?
+
+# this sleep gives tlsClientStatic a chance to report its events on exit
+sleep 0.5
+
+evaltest
+
+grep tlsClientStatic $EVT_FILE | grep http-req > /dev/null
+ERR+=$?
+grep tlsClientStatic $EVT_FILE | grep http-resp > /dev/null
+ERR+=$?
+grep tlsClientStatic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+
+endtest
+
+
+#
+# test_go_struct_server
+#
+starttest test_go_struct_server
 cd /go
 
-./test_go_struct.sh $STRUCT_PATH
+./test_go_struct.sh $STRUCT_PATH /go/net/tlsServerStatic Server
+ERR+=$?
+
+evaltest
+
+touch $EVT_FILE
+endtest
+
+
+#
+# test_go_struct_client
+#
+starttest test_go_struct_client
+cd /go
+
+./test_go_struct.sh $STRUCT_PATH /go/net/tlsClientStatic Client
 ERR+=$?
 
 evaltest

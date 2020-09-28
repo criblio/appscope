@@ -3,6 +3,7 @@
 #include <asm/prctl.h>
 #include <sys/prctl.h>
 #include <signal.h>
+#include <pthread.h>
 
 #include "dbg.h"
 #include "os.h"
@@ -10,6 +11,7 @@
 #include "state.h"
 #include "gocontext.h"
 #include "../contrib/funchook/distorm/include/distorm.h"
+#include "linklist.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
@@ -66,6 +68,8 @@ tap_t g_go_tap[] = {
 uint64_t g_glibc_guard = 0LL;
 uint64_t g_go_static = 0LL;
 void (*go_runtime_cgocall)(void);
+
+static list_t *g_threadlist;
 
 #if NEEDEVNULL > 0
 static void
@@ -336,6 +340,8 @@ initGoHook(elf_buf_t *ebuf)
     gostring_t *go_ver; // There is an implicit len field at go_ver + 0x8
     char *estr;
     char *go_runtime_version = NULL;
+
+    g_threadlist = lstCreate(NULL);
 
     // A go app may need to expand stacks for some C functions
     g_need_stack_expand = TRUE;
@@ -628,30 +634,108 @@ out:
  * In the static case we swtich TLS/TCB.
  * In the dynamic case we do not switch TLS/TCB.
  */
+
+static void *
+dumb_thread(void *arg)
+{
+    pthread_barrier_t *pbarrier = (pthread_barrier_t *)arg;
+    sigset_t mask;
+
+    sigfillset(&mask);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+
+    void *dummy = calloc(1, 32);
+    if (dummy) free(dummy);
+    pthread_barrier_wait(pbarrier);
+    while (1) {
+        sleep(0xffffffff);
+    }
+    return NULL;
+}
+
+
 inline static void *
 go_switch(char *stackptr, void *cfunc, void *gfunc)
 {
     uint64_t rc;
-    unsigned long go_tls, *go_ptr;
-    char *go_g = NULL, *go_m = NULL;
+    unsigned long go_tls = 0;
+    unsigned long go_fs = 0;
+    unsigned long go_m = 0;
+    char *go_g = NULL;
 
     if (g_go_static) {
         // Get the Go routine's struct g
         __asm__ volatile (
-            "mov %%fs:0xfffffffffffffff8, %%r11 \n"
-            "mov %%r11, %1  \n"
-            : "=r"(rc)                        // output
-            : "m"(go_g)                       // inputs
+            "mov %%fs:-8, %0"
+            : "=r"(go_g)                      // output
+            :                                 // inputs
             :                                 // clobbered register
             );
 
-        // Switch to the libc TCB
-        if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-            scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
-            goto out;
+        if (go_g) {
+            // get struct m from g and pull out the TLS from 'm'
+            go_m = *((unsigned long *)(go_g + g_go.g_to_m));
+            go_tls = (unsigned long)(go_m + g_go.m_to_tls);
+            go_fs = go_tls + 8; //go compiler uses -8(FS)
+        } else {
+            // We've seen a case where on process exit static cgo
+            // apps do not have a go_g while they're exiting. 
+            // In this case we need to pull the TLS from the kernel
+            scopeLog("go_switch:did not get a 'g'; using fs from the kernel", -1, CFG_LOG_DEBUG);
+            if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
+                scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+        }
+
+        void *thread_fs = NULL;
+        if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
+            // Switch to the main thread TCB
+            if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+            pthread_t thread;
+            pthread_barrier_t barrier;
+            if (pthread_barrier_init(&barrier, NULL, 2) != 0) {
+                scopeLog("pthread_barrier_init failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+            
+            if (pthread_create(&thread, NULL, dumb_thread, &barrier) != 0) {
+                scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+
+            //wait until the thread starts
+            pthread_barrier_wait(&barrier);
+
+            thread_fs = (void *)thread;
+
+            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
+                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+
+            if (pthread_barrier_destroy(&barrier) != 0) {
+                scopeLog("pthread_barrier_destroy failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+
+            if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
+                scopeLog("lstInsert failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+
+            sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
+        } else {
+            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
+                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+                goto out;
+            }
         }
     }
-
+    
     uint32_t frame_offset = frame_size(gfunc);
     if (!frame_offset) goto out;
     stackptr += frame_offset;
@@ -664,26 +748,13 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
         : "r"(stackptr), "r"(cfunc)   // inputs
         :                             // clobbered register
         );
-
-    // We'd like to switch back to go_tls every time we switch to scope_fs
-    // above, however, we've seen a case where on process exit static cgo
-    // apps do not have a go_g while they're exiting.  With a null go_g,
-    // there is no way to do the processing here...
-    if (g_go_static && go_g) {
-        // get struct m from g and pull out the TLS from 'm'
-        go_ptr = (unsigned long *)(go_g + g_go.g_to_m);
-        go_tls = *go_ptr;
-        go_m = (char *)go_tls;
-        go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-
+out:
+    if (g_go_static && go_fs) {
         // Switch back to the 'm' TLS
-        if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
+        if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
             scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
-            goto out;
         }
     }
-
-out:
     return return_addr(gfunc);
 }
 

@@ -60,6 +60,8 @@
     interpose go_hook_close, go_close
     interpose go_hook_tls_read, go_tls_read
     interpose go_hook_tls_write, go_tls_write
+    interpose go_hook_readResponse, go_readResponse
+    interpose go_hook_pc_write, go_pc_write
     interpose go_hook_exit, go_exit
     interpose go_hook_die, go_die
 

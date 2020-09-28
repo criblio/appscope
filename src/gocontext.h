@@ -4,12 +4,19 @@
 
 #define EXPORTON __attribute__((visibility("default")))
 
-typedef struct {            // Structure                     Field              Offset
-    int g_to_m;             // "runtime.g"                   "m"                "48"
-    int m_to_tls;           // "runtime.m"                   "tls"              "136"
-    int connReader_to_conn; // "net/http.connReader"         "conn"             "0"
-    int conn_to_tlsState;   // "net/http.conn"               "tlsState"         "48"
-    int conn_to_remoteAddr; // "net/http.conn"               "remoteAddr"       "32"
+typedef struct {              // Structure               Field       Offset
+    int g_to_m;               // "runtime.g"             "m"         "48"
+    int m_to_tls;             // "runtime.m"             "tls"       "136"
+    int connReader_to_conn;   // "net/http.connReader"   "conn"      "0"
+    int conn_to_tlsState;     // "net/http.conn"         "tlsState"  "48"
+    int persistConn_to_conn;  // "net/http.persistConn"  "conn"      "88"
+    int persistConn_to_bufrd; // "net/http.persistConn"  "br"        "104"
+    int iface_data;           // "runtime.iface"         "data"      "8"
+    int netfd_to_pd;          // "net.netFD"             "pfd"       "0"
+    int pd_to_fd;             // "internal/poll.FD"      "sysfd"     "16"
+    int netfd_to_sysfd;       // "net.netFD"             "sysfd"     "16"
+    int bufrd_to_buf;         // "bufio/Reader"          "buf"       "0"
+    int conn_to_rwc;          // "net/http.conn"         "rwc"       "0"
 } go_offsets_t;
 
 typedef struct {
@@ -49,6 +56,8 @@ extern void go_hook_read(void);
 extern void go_hook_close(void);
 extern void go_hook_tls_read(void);
 extern void go_hook_tls_write(void);
+extern void go_hook_readResponse(void);
+extern void go_hook_pc_write(void);
 extern void go_hook_exit(void);
 extern void go_hook_die(void);
 

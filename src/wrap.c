@@ -1002,8 +1002,9 @@ void patchClone()
             printf("mprotect failed\n");
         }
 
-        uint8_t ass[1] = { 
-            0xc3  //retq
+        uint8_t ass[6] = { 
+            0xc3,                             // retq
+            0xb8, 0x00, 0x00, 0x00, 0x00      // mov $0x0,%eax
         };
         memcpy(clone, ass, sizeof(ass));
 

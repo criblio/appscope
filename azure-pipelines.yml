@@ -60,7 +60,7 @@ stages:
   - stage: integration_tests
     displayName: Run integration tests
     dependsOn: build
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'master'))
     jobs:
       - template: test/testContainers/azure/it-test-job-template.yml
         parameters:

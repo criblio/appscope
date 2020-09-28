@@ -1003,8 +1003,8 @@ void patchClone()
         }
 
         uint8_t ass[6] = { 
-            0xc3,                             // retq
-            0xb8, 0x00, 0x00, 0x00, 0x00      // mov $0x0,%eax
+            0xb8, 0x00, 0x00, 0x00, 0x00,      // mov $0x0,%eax
+            0xc3                               // retq
         };
         memcpy(clone, ass, sizeof(ass));
 

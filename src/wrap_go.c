@@ -569,21 +569,23 @@ out:
 static void *
 dumb_thread(void *arg)
 {
-    pthread_barrier_t *pbarrier = (pthread_barrier_t *)arg;
-    sigset_t mask;
+    // pthread_barrier_t *pbarrier = (pthread_barrier_t *)arg;
+    // sigset_t mask;
 
-    sigfillset(&mask);
-    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+    // sigfillset(&mask);
+    // pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
-    void *dummy = calloc(1, 32);
-    if (dummy) free(dummy);
-    pthread_barrier_wait(pbarrier);
-    while (1) {
-        sleep(0xffffffff);
-    }
+    // void *dummy = calloc(1, 32);
+    // if (dummy) free(dummy);
+    // pthread_barrier_wait(pbarrier);
+    // while (1) {
+    //     sleep(0xffffffff);
+    // }
     return NULL;
 }
 
+
+extern void __ctype_init (void);
 
 inline static void *
 go_switch(char *stackptr, void *cfunc, void *gfunc)
@@ -627,19 +629,20 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
             pthread_t thread;
-            pthread_barrier_t barrier;
-            if (pthread_barrier_init(&barrier, NULL, 2) != 0) {
-                scopeLog("pthread_barrier_init failed", -1, CFG_LOG_ERROR);
-                goto out;
-            }
+            // pthread_barrier_t barrier;
+            // if (pthread_barrier_init(&barrier, NULL, 2) != 0) {
+            //     scopeLog("pthread_barrier_init failed", -1, CFG_LOG_ERROR);
+            //     goto out;
+            // }
             
-            if (pthread_create(&thread, NULL, dumb_thread, &barrier) != 0) {
+            if (pthread_create(&thread, NULL, dumb_thread, NULL) != 0) {
                 scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
                 goto out;
             }
 
+
             //wait until the thread starts
-            pthread_barrier_wait(&barrier);
+            //pthread_barrier_wait(&barrier);
 
             thread_fs = (void *)thread;
 
@@ -648,10 +651,12 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
 
-            if (pthread_barrier_destroy(&barrier) != 0) {
-                scopeLog("pthread_barrier_destroy failed", -1, CFG_LOG_ERROR);
-                goto out;
-            }
+            __ctype_init();
+
+            // if (pthread_barrier_destroy(&barrier) != 0) {
+            //     scopeLog("pthread_barrier_destroy failed", -1, CFG_LOG_ERROR);
+            //     goto out;
+            // }
 
             if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
                 scopeLog("lstInsert failed", -1, CFG_LOG_ERROR);

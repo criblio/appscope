@@ -868,6 +868,17 @@ hookCallback(struct dl_phdr_info *info, size_t size, void *data)
     return 0;
 }
 
+static int 
+checkEnv(char *env, char* val)
+{
+    char *estr;
+    if (((estr = getenv(env)) != NULL) &&
+       (strncmp(estr, val, strlen(estr)) == 0)) {
+        return TRUE;
+    }
+    return FALSE;
+}
+
 /*
  * There are 3x SSL_read functions to consider:
  * 1) the one in this file used to interpose SSL_read
@@ -978,6 +989,28 @@ initHook()
 
 #endif // __LINUX__
 
+
+static
+void patchClone() 
+{
+    void *clone = dlsym(RTLD_DEFAULT, "__clone");
+    if (clone) {
+        size_t pageSize = getpagesize();
+        void *addr = (void *)((ptrdiff_t) clone & ~(pageSize - 1));
+        // unprotect the page
+        if (mprotect(addr, pageSize, PROT_WRITE | PROT_READ | PROT_EXEC)) {
+            printf("mprotect failed\n");
+        }
+
+        uint8_t ass[1] = { 
+            0xc3  //retq
+        };
+        memcpy(clone, ass, sizeof(ass));
+
+        printf("CLONE PATCHED\n");
+    }
+}
+
 __attribute__((constructor)) void
 init(void)
 {
@@ -1016,9 +1049,10 @@ init(void)
 
     initHook();
     
-    char *execType = getenv("SCOPE_APP_TYPE");
-    if (execType != NULL && strcmp(execType, "go") == 0) {
+    if (checkEnv("SCOPE_APP_TYPE", "go") && 
+        checkEnv("SCOPE_EXEC_TYPE", "static")) {
         threadNow(0);
+        patchClone();
     } else {
         threadInit();
     }

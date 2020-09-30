@@ -60,6 +60,7 @@ uint64_t g_go_static = 0LL;
 void (*go_runtime_cgocall)(void);
 
 static list_t *g_threadlist;
+void *g_stack;
 
 #if NEEDEVNULL > 0
 static void
@@ -244,6 +245,7 @@ initGoHook(elf_buf_t *ebuf)
     char *estr;
     char *go_runtime_version = NULL;
 
+    g_stack = malloc(32 * 1024);
     g_threadlist = lstCreate(NULL);
 
     int (*ni_open)(const char *pathname, int flags, mode_t mode);
@@ -595,6 +597,8 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
     unsigned long go_fs = 0;
     unsigned long go_m = 0;
     char *go_g = NULL;
+    int newThread = FALSE;
+    unsigned long rsp;
 
     if (g_go_static) {
         // Get the Go routine's struct g
@@ -629,44 +633,50 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
             pthread_t thread;
-            // pthread_barrier_t barrier;
-            // if (pthread_barrier_init(&barrier, NULL, 2) != 0) {
-            //     scopeLog("pthread_barrier_init failed", -1, CFG_LOG_ERROR);
-            //     goto out;
-            // }
-            
             if (pthread_create(&thread, NULL, dumb_thread, NULL) != 0) {
                 scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
                 goto out;
             }
-
-
-            //wait until the thread starts
-            //pthread_barrier_wait(&barrier);
-
             thread_fs = (void *)thread;
+            newThread = TRUE;            
+        } 
 
-            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
-                goto out;
-            }
+        if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
+            scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+            goto out;
+        }
 
+        if (newThread) {
+            while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) {};
+
+            //Initialize pointers to locale data.
             __ctype_init();
 
-            // if (pthread_barrier_destroy(&barrier) != 0) {
-            //     scopeLog("pthread_barrier_destroy failed", -1, CFG_LOG_ERROR);
-            //     goto out;
-            // }
+            //switch to a bigger stack
+            __asm__ volatile (
+                "mov %%rsp, %0 \n"
+                "mov %1, %%rsp \n"
+                : "=r"(rsp) 
+                : "m"(g_stack)
+                : 
+            );
+
+            //initialize tcache
+            void *buf = calloc(1, 0xff);
+            free(buf);
+
+            //restore stack
+            __asm__ volatile (
+                "mov %0, %%rsp \n"
+                : 
+                : "r"(rsp)
+                : 
+            );
+             
+            atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
 
             if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
                 scopeLog("lstInsert failed", -1, CFG_LOG_ERROR);
-                goto out;
-            }
-
-            sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
-        } else {
-            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
                 goto out;
             }
         }

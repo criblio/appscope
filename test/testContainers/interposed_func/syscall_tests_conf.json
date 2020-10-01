@@ -56,6 +56,7 @@
         "bind04 and bind05 were ipv6 dependent",
         "bind06 timed out after 10 min",
         "sendto02 requires the sctp protocol",
+        "sendto03 fails with kernel vulnerability that exists in aws instances",
         "connect02 is kernel specific, works on ubuntu 19 not on 18"],
       "exclude_tests": [
         "connect02",
@@ -115,7 +116,8 @@
         "sendfile09",
         "creat07",
         "sendmsg02",
-        "sendto02"
+        "sendto02",
+        "sendto03"
       ]
     },
     {

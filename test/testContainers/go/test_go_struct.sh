@@ -2,13 +2,6 @@
 
 FAILURE_COUNT=0
 
-# Capture a dump of the .zdebug_info from the elf file
-# This contains debug info which describes structures and the offsets
-# of their fields.
-GO_APP=`pwd`/net/tlsServerStatic
-APP_STRUCT_FILE=`pwd`/readelf.dump
-readelf --debug-dump=info $GO_APP > $APP_STRUCT_FILE
-
 # What a structure entry looks like in this readelf output:
 #      <1><66239>: Abbrev Number: 37 (DW_TAG_structure_type)
 #         <6623a>   DW_AT_name        : net/http.connReader
@@ -29,6 +22,16 @@ function test_structure() {
   STRUCT_NAME=$1
   FIELD_NAME=$2
   FIELD_OFFSET=$3
+  TAGS=$4
+
+  # If TAGS are defined for this line, skip the line unless
+  # TAGS matches TAG_FILTER.
+  if [ -n "$TAGS" ]; then
+      if [ "$TAGS" != "$TAG_FILTER" ]; then
+          echo "  Skipping line because $TAGS is not equal to $TAG_FILTER."
+          return 1
+      fi
+  fi
 
   # We want to find the line number of the start of our structure
   # and the line number of the start of the next structure
@@ -78,7 +81,7 @@ function test_structure() {
 }
 
 
-function check_expected_file_arg() {
+function check_expected_file_args() {
   if [ -z $1 ]; then
       echo "test_go_struct.sh is missing a required arg; the path to an expected structure file"
       echo "Example contents of this file:"
@@ -100,29 +103,56 @@ function check_expected_file_arg() {
       echo " net/http.conn|tlsState=48"
       exit 1
   fi
+
+  if [ -z $2 ]; then
+      echo "test_go_struct.sh is missing a required arg; the path to a go execuable"
+      exit 1
+  fi
+
+  GO_APP=$2
+
+  if [ ! -x "$GO_APP" ]; then
+      echo "test_go_struct.sh cannot access $GO_APP as an executable"
+      exit 1
+  fi
+
+  if [ -z $3 ]; then
+      echo "test_go_struct.sh is missing a required arg; a tag filter"
+      exit 1
+  fi
+
+  TAG_FILTER=$3
 }
 
 
 function test_each_line() {
-  check_expected_file_arg $1
-
-  echo "Using $SCOPE_STRUCT_FILE as the list of what structure offsets scope uses"
-  echo "Using $APP_STRUCT_FILE from $GO_APP as the source of truth"
+  echo "  Using $SCOPE_STRUCT_FILE as the list of what structure offsets scope uses"
+  echo "  Using $APP_STRUCT_FILE from $GO_APP as the source of truth"
+  echo "  Skipping lines that have an optional tag, unless it matches '$TAG_FILTER'"
 
   while read LINE; do
       echo "Evaluating $LINE"
-      #format example:"runtime.g|m=48"
+      #format example:"runtime.g|m=48|"
       STRUCT_NAME=$(echo $LINE | cut -d'|' -f1)
       FIELD_NAME=$(echo $LINE | cut -d'|' -f2 | cut -d= -f1)
-      FIELD_OFFSET=$(echo $LINE | cut -d= -f2)
+      FIELD_OFFSET=$(echo $LINE | cut -d= -f2 | cut -d'|' -f1)
+      TAGS=$(echo $LINE | cut -d= -f2 | cut -d'|' -f2)
 
-      test_structure $STRUCT_NAME $FIELD_NAME $FIELD_OFFSET
+      test_structure $STRUCT_NAME $FIELD_NAME $FIELD_OFFSET $TAGS
   done <$SCOPE_STRUCT_FILE
 }
 
 
 echo "executing test_go_struct.sh"
-test_each_line $1
+check_expected_file_args $1 $2 $3
+
+# Capture a dump of the .zdebug_info from the elf file
+# This contains debug info which describes structures and the offsets
+# of their fields.
+APP_STRUCT_FILE=$GO_APP.readelf.dump
+readelf --debug-dump=info $GO_APP > $APP_STRUCT_FILE
+
+test_each_line
 
 if [ $FAILURE_COUNT -eq 0 ]; then
     echo "test_go_struct.sh PASSED"

@@ -34,28 +34,38 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 
 // compile-time control for debugging
 #define NEEDEVNULL 1
-//#define funcprint sysprint
-#define funcprint devnull
+#define funcprint sysprint
+//#define funcprint devnull
 //#define patchprint sysprint
 #define patchprint devnull
 
-go_offsets_t g_go = {.g_to_m=48,               // 0x30
-                     .m_to_tls=136,            // 0x88
-                     .connReader_to_conn=0,    // 0x0
-                     .conn_to_tlsState=48,     // 0x30
-                     .conn_to_remoteAddr=32};  // 0x20
+#define UNDEF_OFFSET (-1)
+go_offsets_t g_go = {.g_to_m=48,                   // 0x30
+                     .m_to_tls=136,                // 0x88
+                     .connReader_to_conn=0,        // 0x00
+                     .conn_to_tlsState=48,         // 0x30
+                     .persistConn_to_conn=80,      // 0x50
+                     .persistConn_to_bufrd=104,    // 0x68
+                     .iface_data=8,                // 0x08
+                     .netfd_to_pd=0,               // 0x00
+                     .pd_to_fd=16,                 // 0x10
+                     .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 (defined for go1.8)
+                     .bufrd_to_buf=0,              // 0x00
+                     .conn_to_rwc=16};             // 0x10
 
 tap_t g_go_tap[] = {
-    {"syscall.write",                         go_hook_write,       NULL, 0},
-    {"syscall.openat",                        go_hook_open,        NULL, 0},
-    {"syscall.socket",                        go_hook_socket,      NULL, 0},
-    {"syscall.accept4",                       go_hook_accept4,     NULL, 0},
-    {"syscall.read",                          go_hook_read,        NULL, 0},
-    {"syscall.Close",                         go_hook_close,       NULL, 0},
-    {"net/http.(*connReader).Read",           go_hook_tls_read,    NULL, 0},
-    {"net/http.checkConnErrorWriter.Write",   go_hook_tls_write,   NULL, 0},
-    {"runtime.exit",                          go_hook_exit,        NULL, 0},
-    {"runtime.dieFromSignal",                 go_hook_die,         NULL, 0},
+    {"syscall.write",                        go_hook_write,        NULL, 0},
+    {"syscall.openat",                       go_hook_open,         NULL, 0},
+    {"syscall.socket",                       go_hook_socket,       NULL, 0},
+    {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
+    {"syscall.read",                         go_hook_read,         NULL, 0},
+    {"syscall.Close",                        go_hook_close,        NULL, 0},
+    {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
+    {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
+    {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
+    {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
+    {"runtime.exit",                         go_hook_exit,         NULL, 0},
+    {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
     {"TAP_TABLE_END", NULL, NULL, 0}
 };
 
@@ -271,6 +281,92 @@ patchClone()
             return;
         }
     }
+
+static void
+adjustGoStructOffsetsForVersion(const char* go_runtime_version)
+{
+    if (!go_runtime_version) {
+        sysprint("ERROR: can't determine major go version\n");
+        return;
+    }
+
+    sysprint("go_runtime_version = %s\n", go_runtime_version);
+
+    char buf[256] = {0};
+    strncpy(buf, go_runtime_version, sizeof(buf)-1);
+
+    char *token = strtok(buf, ".");
+    token = strtok(NULL, ".");
+    if (!token) {
+        sysprint("ERROR: can't determine major go version\n");
+        return;
+    }
+
+    errno = 0;
+    long val = strtol(token, NULL, 10);
+    if (errno || val <= 0) {
+        sysprint("ERROR: can't determine major go version\n");
+        return;
+    }
+
+    // go 1.8 has a different m_to_tls offset than other supported versions.
+    if (val == 8) {
+        g_go.m_to_tls = 96; // 0x60
+    }
+
+    // go 1.8 is the only version that directly goes from netfd to sysfd.
+    if (val == 8) {
+        g_go.netfd_to_sysfd = 16;
+    }
+
+    // before go 1.12, persistConn_to_conn and persistConn_to_bufrd
+    // have different values than 12 and after
+    if (val < 12) {
+        g_go.persistConn_to_conn = 72;  // 0x48
+        g_go.persistConn_to_bufrd = 96; // 0x60
+    }
+
+
+    // This creates a file specified by test/testContainers/go/test_go.sh
+    // and used by test/testContainers/go/test_go_struct.sh.
+    //
+    // Why?  To test structure offsets in go that can vary. (above)
+    //
+    // The format is:
+    //   StructureName|FieldName=DecimalOffsetValue|OptionalTag
+    //
+    // If an OptionalTag is provided, test_go_struct.sh will not process
+    // the line unless it matches a TAG_FILTER which is provided as an
+    // argument to the test_go_struct.sh.
+    int (*ni_open)(const char *pathname, int flags, mode_t mode);
+    ni_open = dlsym(RTLD_NEXT, "open");
+    int (*ni_close)(int fd);
+    ni_close = dlsym(RTLD_NEXT, "close");
+    if (!ni_open || !ni_close) return;
+
+    char* debug_file;
+    int fd;
+    if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
+        ((fd = ni_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
+        dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
+        dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
+        dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
+        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
+        dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go.persistConn_to_conn);
+        dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go.persistConn_to_bufrd);
+        dprintf(fd, "runtime.iface|data=%d|\n", g_go.iface_data);
+        // go 1.8 has a direct netfd_to_sysfd field, others are less direct
+        if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+            dprintf(fd, "net.netFD|pfd=%d|\n", g_go.netfd_to_pd);
+            dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go.pd_to_fd);
+        } else {
+            dprintf(fd, "net.netFD|sysfd=%d|\n", g_go.netfd_to_sysfd);
+        }
+        dprintf(fd, "bufio.Reader|buf=%d|\n", g_go.bufrd_to_buf);
+        dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go.conn_to_rwc);
+        ni_close(fd);
+    }
+
 }
 
 void
@@ -283,12 +379,6 @@ initGoHook(elf_buf_t *ebuf)
 
     g_stack = malloc(32 * 1024);
     g_threadlist = lstCreate(NULL);
-
-    int (*ni_open)(const char *pathname, int flags, mode_t mode);
-    ni_open = dlsym(RTLD_NEXT, "open");
-    int (*ni_close)(int fd);
-    ni_close = dlsym(RTLD_NEXT, "close");
-    if (!ni_open || !ni_close) return;
 
     // A go app may need to expand stacks for some C functions
     g_need_stack_expand = TRUE;
@@ -330,29 +420,7 @@ initGoHook(elf_buf_t *ebuf)
         return;
     }
 
-    sysprint("go_runtime_version = %s\n", go_runtime_version);
-
-    // go 1.8 has a different m_to_tls offset than other supported versions.
-    if (strstr(go_runtime_version, "go1.8.")) g_go.m_to_tls = 96; // 0x60
-
-
-    // This creates a file specified by test/testContainers/go/test_go.sh
-    // and used by test/testContainers/go/test_go_struct.sh.
-    //
-    // Why?  To test structure offsets in go that might change.  (like in 1.8
-    // immediately above)
-    char* debug_file;
-    int fd;
-    if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
-        ((fd = ni_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
-        dprintf(fd, "runtime.g|m=%d\n", g_go.g_to_m);
-        dprintf(fd, "runtime.m|tls=%d\n", g_go.m_to_tls);
-        dprintf(fd, "net/http.connReader|conn=%d\n", g_go.connReader_to_conn);
-        dprintf(fd, "net/http.conn|tlsState=%d\n", g_go.conn_to_tlsState);
-        dprintf(fd, "net/http.conn|remoteAddr=%d\n", g_go.conn_to_remoteAddr);
-        ni_close(fd);
-    }
-
+    adjustGoStructOffsetsForVersion(go_runtime_version);
 
     tap_t* tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
@@ -844,8 +912,8 @@ c_accept4(char *stackaddr)
     socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
     uint64_t sd_out = *(uint64_t*)(stackaddr + 0x28);
 
-    funcprint("Scope: accept4 of %ld\n", sd_out);
     if (sd_out != -1) {
+        funcprint("Scope: accept4 of %ld\n", sd_out);
         doAccept(sd_out, addr, addrlen, "go_accept4");
     }
 }
@@ -856,15 +924,29 @@ go_accept4(char *stackptr)
     return go_switch(stackptr, c_accept4, go_hook_accept4);
 }
 
+/*
+  net/http.(*connReader).Read
+  /usr/local/go/src/net/http/server.go:758
+
+  cr = stackaddr + 0x08
+  cr.conn = *cr
+  cr.conn.rwc_if = cr.conn + 0x10
+  cr.conn.rwc = cr.conn.rwc_if + 0x08
+  netFD = cr.conn.rwc + 0x08
+  pfd = *netFD
+  fd = netFD + 0x10
+ */
 static void
 c_tls_read(char *stackaddr)
 {
+    int fd = -1;
     uint64_t connReader = *(uint64_t*)(stackaddr + 0x8);
     if (!connReader) return;   // protect from dereferencing null
     uint64_t buf        = *(uint64_t*)(stackaddr + 0x10);
     // buf len 0x18
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t cr_conn_rwc_if, cr_conn_rwc, netFD, pfd;
 
 //  type connReader struct {
 //        conn *conn
@@ -877,15 +959,25 @@ c_tls_read(char *stackaddr)
 //          rwc net.Conn
 //          remoteAddr string
 //          tlsState *tls.ConnectionState
-    char **rap = NULL, *remoteAddr = NULL;
-    if ((rap = (char **)(conn + g_go.conn_to_remoteAddr)) != NULL) remoteAddr = *rap;
+
+    cr_conn_rwc_if = (conn + g_go.conn_to_rwc);
+    cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go.iface_data);
+    netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data);
+    if (!netFD) return;
+    if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+        pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+        if (!pfd) return;
+        fd = *(int *)(pfd + g_go.pd_to_fd);
+    } else {
+        fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+    }
 
     uint64_t tlsState =   *(uint64_t*)(conn + g_go.conn_to_tlsState);
 
     // if tlsState is non-zero, then this is a tls connection
     if (tlsState != 0ULL) {
-        funcprint("Scope: go_tls_read of %ld\n", -1);
-        doSSL(tlsState, -1, (void*)buf, rc, TLSRX, BUF, remoteAddr);
+        funcprint("Scope: go_tls_read of %ld\n", fd);
+        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
     }
 }
 
@@ -895,25 +987,47 @@ go_tls_read(char *stackptr)
     return go_switch(stackptr, c_tls_read, go_hook_tls_read);
 }
 
+/*
+  net/http.checkConnErrorWriter.Write
+  /usr/local/go/src/net/http/server.go:3433
+
+  conn = stackaddr + 0x08
+  conn.rwc_if = conn + 0x10
+  conn.rwc = conn.rwc_if + 0x08
+  netFD = conn.rwc + 0x08
+  pfd = *netFD
+  fd = pfd + 0x10
+ */
 static void
 c_tls_write(char *stackaddr)
 {
+    int fd = -1;
     uint64_t conn = *(uint64_t*)(stackaddr + 0x8);
     if (!conn) return;         // protect from dereferencing null
     uint64_t buf  = *(uint64_t*)(stackaddr + 0x10);
     // buf len 0x18
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t w_conn_rwc_if, w_conn_rwc, netFD, pfd;
 
-    char **rap = NULL, *remoteAddr = NULL;
-    if ((rap = (char **)(conn + g_go.conn_to_remoteAddr)) != NULL) remoteAddr = *rap;
+    w_conn_rwc_if = (conn + g_go.conn_to_rwc);
+    w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go.iface_data);
+    netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data);
+    if (!netFD) return;
+    if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+        pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+        if (!pfd) return;
+        fd = *(int *)(pfd + g_go.pd_to_fd);
+    } else {
+        fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+    }
 
     uint64_t tlsState = *(uint64_t*)(conn + g_go.conn_to_tlsState);
 
     // if tlsState is non-zero, then this is a tls connection
     if (tlsState != 0ULL) {
-        funcprint("Scope: go_tls_write of %ld\n", -1);
-        doSSL(tlsState, -1, (void*)buf, rc, TLSTX, BUF, remoteAddr);
+        funcprint("Scope: go_tls_write of %ld\n", fd);
+        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF);
     }
 }
 
@@ -921,6 +1035,108 @@ EXPORTON void *
 go_tls_write(char *stackptr)
 {
     return go_switch(stackptr, c_tls_write, go_hook_tls_write);
+}
+
+/*
+  net/http.persistConnWriter.Write
+  /usr/local/go/src/net/http/transport.go:1662
+
+  p = stackaddr + 0x10  (request buffer)
+  *p = request string
+
+  w = stackaddr + 0x08        (net/http.persistConnWriter *)
+  w.pc = stackaddr + 0x08     (net/http.persistConn *)
+  w.pc.conn_if = w.pc + 0x50  (interface)
+  w.pc.conn = w.pc.conn_if + 0x08 (net.conn->TCPConn)
+  netFD = w.pc.conn + 0x08    (netFD)
+  pfd = netFD + 0x0           (poll.FD)
+  fd = pfd + 0x10             (pfd.sysfd)
+ */
+static void
+c_pc_write(char *stackaddr)
+{
+    int fd = -1;
+    uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
+    uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x08);
+    uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
+    uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
+
+    if (rc < 1) return;
+
+    pc_conn_if = (w_pc + g_go.persistConn_to_conn);
+    w_pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
+    netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data);
+    if (!netFD) return;
+    if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+        pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+        if (!pfd) return;
+        fd = *(int *)(pfd + g_go.pd_to_fd);
+    } else {
+        fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+    }
+
+    doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
+    funcprint("Scope: c_pc_write of %d\n", fd);
+}
+
+EXPORTON void *
+go_pc_write(char *stackptr)
+{
+    return go_switch(stackptr, c_pc_write, go_hook_pc_write);
+}
+
+/*
+  net/http.(*persistConn).readResponse
+  /usr/local/go/src/net/http/transport.go:2161
+
+  pc = stackaddr + 0x08    (net/http.persistConn *)
+
+  pc.conn_if = pc + 0x50   (interface)
+  conn.data = pc.conn_if + 0x08 (net.conn->TCPConn)
+  netFD = conn.data + 0x08 (netFD)
+  pfd = netFD + 0x0        (poll.FD)
+  fd = pfd + 0x10          (pfd.sysfd)
+
+  pc.br = pc.conn + 0x68   (bufio.Reader)
+  len = pc.br + 0x08       (bufio.Reader)
+  resp = buf + 0x0         (bufio.Reader.buf)
+  resp = http response     (char *)
+ */
+static void
+c_readResponse(char *stackaddr)
+{
+    int fd = -1;
+    uint64_t pc  = *(uint64_t *)(stackaddr + 0x08);
+    uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
+
+    pc_conn_if = (pc + g_go.persistConn_to_conn);
+    pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
+    netFD = *(uint64_t *)(pc_conn + g_go.iface_data);
+    if (!netFD) return;
+    if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+        pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+        if (!pfd) return;
+        fd = *(int *)(pfd + g_go.pd_to_fd);
+    } else {
+        fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+    }
+
+    if ((pc_br = *(uint64_t *)(pc + g_go.persistConn_to_bufrd)) != 0) {
+        buf = *(uint64_t *)(pc_br + g_go.bufrd_to_buf);
+        // len is part of the []byte struct; the func doesn't return a len
+        len = *(uint64_t *)(pc_br + 0x08);
+    }
+
+    if (buf && (len > 0)) {
+        doProtocol((uint64_t)0, fd, (void *)buf, len, TLSRX, BUF);
+        funcprint("Scope: c_readResponse of %d\n", fd);
+    }
+}
+
+EXPORTON void *
+go_readResponse(char *stackptr)
+{
+    return go_switch(stackptr, c_readResponse, go_hook_readResponse);
 }
 
 extern void handleExit(void);

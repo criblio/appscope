@@ -281,6 +281,7 @@ patchClone()
             return;
         }
     }
+}
 
 static void
 adjustGoStructOffsetsForVersion(const char* go_runtime_version)

@@ -958,7 +958,7 @@ c_tls_read(char *stackaddr)
     // if tlsState is non-zero, then this is a tls connection
     if (tlsState != 0ULL) {
         funcprint("Scope: go_tls_read of %ld\n", fd);
-        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
+        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF, NULL);
     }
 }
 
@@ -1008,7 +1008,7 @@ c_tls_write(char *stackaddr)
     // if tlsState is non-zero, then this is a tls connection
     if (tlsState != 0ULL) {
         funcprint("Scope: go_tls_write of %ld\n", fd);
-        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF);
+        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF, NULL);
     }
 }
 
@@ -1056,7 +1056,7 @@ c_pc_write(char *stackaddr)
         fd = *(int *)(netFD + g_go.netfd_to_sysfd);
     }
 
-    doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
+    doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF, NULL);
     funcprint("Scope: c_pc_write of %d\n", fd);
 }
 
@@ -1109,7 +1109,7 @@ c_readResponse(char *stackaddr)
     }
 
     if (buf && (len > 0)) {
-        doProtocol((uint64_t)0, fd, (void *)buf, len, TLSRX, BUF);
+        doProtocol((uint64_t)0, fd, (void *)buf, len, TLSRX, BUF, NULL);
         funcprint("Scope: c_readResponse of %d\n", fd);
     }
 }

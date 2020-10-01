@@ -18,6 +18,9 @@ typedef struct {
     jmethodID mid_SSLEngineImpl___wrap;
     jmethodID mid_SSLEngineImpl___unwrap;
     jmethodID mid_SSLEngineImpl_getSession;
+    jmethodID mid_Socket_getInetAddress;
+    jmethodID mid_Socket_getPort;
+    jmethodID mid_InetAddress_getHostAddress;
 } java_global_t;
 
 static java_global_t g_java = {0};
@@ -39,6 +42,25 @@ clearJniException(JNIEnv *jni)
     if (flag) (*jni)->ExceptionClear(jni);
 }
 
+static int 
+getHostAddress(JNIEnv *jni, char *buf, size_t bufSize, jobject host, jint port)
+{
+    int res;
+    const char* tmpStr = (*jni)->GetStringUTFChars(jni, host, NULL);
+    res = snprintf(buf, bufSize, "%s:%d", tmpStr, port);
+    (*jni)->ReleaseStringUTFChars(jni, host, tmpStr);
+    return res;
+}
+
+static int 
+getHostAddressFromSocket(JNIEnv *jni, char *buf, size_t bufSize, jobject socket)
+{
+    jobject addr = (*jni)->CallObjectMethod(jni, socket, g_java.mid_Socket_getInetAddress);
+    jobject host = (*jni)->CallObjectMethod(jni, addr, g_java.mid_InetAddress_getHostAddress);
+    jint port = (*jni)->CallIntMethod(jni, socket, g_java.mid_Socket_getPort);
+    return getHostAddress(jni, buf, bufSize, host, port);
+}
+
 static void 
 initJniGlobals(JNIEnv *jni) 
 {
@@ -53,6 +75,13 @@ initJniGlobals(JNIEnv *jni)
         clearJniException(jni);
     }
     g_java.mid_SSLSocketImpl_getSession = (*jni)->GetMethodID(jni, sslSocketImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
+
+    jclass socketImplClass         = (*jni)->FindClass(jni, "java/net/Socket");
+    g_java.mid_Socket_getInetAddress = (*jni)->GetMethodID(jni, socketImplClass, "getInetAddress", "()Ljava/net/InetAddress;");
+    g_java.mid_Socket_getPort      = (*jni)->GetMethodID(jni, socketImplClass, "getPort", "()I");
+
+    jclass inetAddressClass        = (*jni)->FindClass(jni, "java/net/InetAddress");
+    g_java.mid_InetAddress_getHostAddress = (*jni)->GetMethodID(jni, inetAddressClass, "getHostAddress", "()Ljava/lang/String;");
 
     jclass byteBufferClass         = (*jni)->FindClass(jni, "java/nio/ByteBuffer");
     jclass bufferClass             = (*jni)->FindClass(jni, "java/nio/Buffer");
@@ -258,11 +287,11 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
 }
 
 static void 
-doJavaProtocol(JNIEnv *jni, jobject session, jbyteArray buf, jint offset, jint len, metric_t src)
+doJavaProtocol(JNIEnv *jni, jobject session, jbyteArray buf, jint offset, jint len, metric_t src, char *ipPort)
 {
     jint  hash      = (*jni)->CallIntMethod(jni, session, g_java.mid_Object_hashCode);
     jbyte *byteBuf  = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
-    doProtocol((uint64_t)hash, -1, &byteBuf[offset], (size_t)(len - offset), src, BUF);
+    doProtocol((uint64_t)hash, -1, &byteBuf[offset], (size_t)(len - offset), src, BUF, ipPort);
     (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
 }
 
@@ -280,7 +309,7 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject net
         jobject bufEl  = (*jni)->GetObjectArrayElement(jni, appData, i);
         jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
         jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-        doJavaProtocol(jni, session, buf, 0, pos, TLSRX);
+        doJavaProtocol(jni, session, buf, 0, pos, TLSRX, NULL);
     }
     return res;
 }
@@ -303,7 +332,7 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
         jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
         jint limit     = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_limit);
         jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-        doJavaProtocol(jni, session, buf, pos, limit, TLSTX);
+        doJavaProtocol(jni, session, buf, pos, limit, TLSTX, NULL);
     }
     
     //call the original method
@@ -320,6 +349,9 @@ Java_com_sun_net_ssl_internal_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, j
 JNIEXPORT void JNICALL 
 Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
+    char str[30];
+    char *hostAddr = NULL;
+
     initJniGlobals(jni);
     initAppOutputStreamGlobals(jni);
 
@@ -327,11 +359,14 @@ Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray
     if (g_java.fid_AppOutputStream_socket != NULL) {
         jobject socket  = (*jni)->GetObjectField(jni, obj, g_java.fid_AppOutputStream_socket);
         session = (*jni)->CallObjectMethod(jni, socket, g_java.mid_SSLSocketImpl_getSession);
+        if (getHostAddressFromSocket(jni, str, sizeof(str), socket) > 0) {
+            hostAddr = str;
+        }
     } else {
         session = obj;
     }
     
-    doJavaProtocol(jni, session, buf, offset, len, TLSTX);
+    doJavaProtocol(jni, session, buf, offset, len, TLSTX, hostAddr);
     
     //call the original method
     (*jni)->CallVoidMethod(jni, obj, g_java.mid_AppOutputStream___write, buf, offset, len);
@@ -353,6 +388,9 @@ Java_com_sun_net_ssl_internal_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj
 JNIEXPORT jint JNICALL 
 Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
+    char str[30];
+    char *hostAddr = NULL;
+
     initJniGlobals(jni);
     initAppInputStreamGlobals(jni);
 
@@ -364,11 +402,14 @@ Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray b
     if (g_java.fid_AppInputStream_socket != NULL) {
         jobject socket  = (*jni)->GetObjectField(jni, obj, g_java.fid_AppInputStream_socket);
         session = (*jni)->CallObjectMethod(jni, socket, g_java.mid_SSLSocketImpl_getSession);
+        if (getHostAddressFromSocket(jni, str, sizeof(str), socket) > 0) {
+            hostAddr = str;
+        }
     } else {
         session = obj;
     }
     
-    doJavaProtocol(jni, session, buf, offset, res, TLSRX);
+    doJavaProtocol(jni, session, buf, offset, res, TLSRX, hostAddr);
 
     return res;
 }

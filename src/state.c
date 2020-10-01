@@ -887,12 +887,12 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
 }
 
 int
-doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
+doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype, char *ipPort)
 {
     net_info *net = getNetEntry(sockfd);
 
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
-        if (doHttp(id, sockfd, net, buf, len, src, dtype, NULL)) {
+        if (doHttp(id, sockfd, net, buf, len, src, dtype, ipPort)) {
             // not doing anything with protocol... yet
             if (net) net->protocol = 1;
             return 0;
@@ -1384,7 +1384,7 @@ doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         doUpdateState(NETRX, sockfd, rc, NULL, NULL);
 
         if ((sockfd != -1) && buf) {
-            doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETRX, src);
+            doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETRX, src, NULL);
         }
     }
     return 0;
@@ -1410,7 +1410,7 @@ doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
 
 
         if ((sockfd != -1) && buf && (len > 0)) {
-            doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETTX, src);
+            doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETTX, src, NULL);
         }
     }
     return 0;

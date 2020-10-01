@@ -799,9 +799,9 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
     if (rc > 0) {
         if (SYMBOL_LOADED(SSL_get_fd)) {
             int fd = g_fn.SSL_get_fd(ssl);
-            doProtocol((uint64_t)ssl, fd, buf, (size_t)num, TLSRX, BUF);
+            doProtocol((uint64_t)ssl, fd, buf, (size_t)num, TLSRX, BUF, NULL);
         } else {
-            doProtocol((uint64_t)ssl, -1, buf, (size_t)num, TLSRX, BUF);
+            doProtocol((uint64_t)ssl, -1, buf, (size_t)num, TLSRX, BUF, NULL);
         }
     }
 
@@ -819,9 +819,9 @@ ssl_write_hook(SSL *ssl, void *buf, int num)
     if (rc > 0) {
         if (SYMBOL_LOADED(SSL_get_fd)) {
             int fd = g_fn.SSL_get_fd(ssl);
-            doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
+            doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF, NULL);
         } else {
-            doProtocol((uint64_t)ssl, -1, (void *)buf, (size_t)rc, TLSTX, BUF);
+            doProtocol((uint64_t)ssl, -1, (void *)buf, (size_t)rc, TLSTX, BUF, NULL);
         }
     }
 
@@ -1971,9 +1971,9 @@ SSL_read(SSL *ssl, void *buf, int num)
     if (rc > 0) {
         if (SYMBOL_LOADED(SSL_get_fd)) {
             int fd = g_fn.SSL_get_fd(ssl);
-            doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
+            doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF, NULL);
         } else {
-            doProtocol((uint64_t)ssl, -1, buf, (size_t)rc, TLSRX, BUF);
+            doProtocol((uint64_t)ssl, -1, buf, (size_t)rc, TLSRX, BUF, NULL);
         }
     }
     return rc;
@@ -1992,9 +1992,9 @@ SSL_write(SSL *ssl, const void *buf, int num)
     if (rc > 0) {
         if (SYMBOL_LOADED(SSL_get_fd)) {
             int fd = g_fn.SSL_get_fd(ssl);
-            doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
+            doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF, NULL);
         } else {
-            doProtocol((uint64_t)ssl, -1, (void *)buf, (size_t)rc, TLSTX, BUF);
+            doProtocol((uint64_t)ssl, -1, (void *)buf, (size_t)rc, TLSTX, BUF, NULL);
         }
     }
     return rc;
@@ -2018,7 +2018,7 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
             fd = *fdp;
         }
 
-        doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
+        doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF, NULL);
     }
     return rc;
 }
@@ -2041,7 +2041,7 @@ gnutls_record_recv_early_data(gnutls_session_t session, void *data, size_t data_
             fd = *fdp;
         }
 
-        doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
+        doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF, NULL);
     }
     return rc;
 }
@@ -2079,7 +2079,7 @@ gnutls_record_recv_seq(gnutls_session_t session, void *data, size_t data_size, u
             fd = *fdp;
         }
 
-        doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
+        doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF, NULL);
     }
     return rc;
 }
@@ -2102,7 +2102,7 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
             fd = *fdp;
         }
 
-        doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
+        doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF, NULL);
     }
     return rc;
 }
@@ -2126,7 +2126,7 @@ gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size
             fd = *fdp;
         }
 
-        doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
+        doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF, NULL);
     }
     return rc;
 }
@@ -2149,7 +2149,7 @@ gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t
             fd = *fdp;
         }
 
-        doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
+        doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF, NULL);
     }
     return rc;
 }
@@ -2173,7 +2173,7 @@ gnutls_record_send_range(gnutls_session_t session, const void *data, size_t data
             fd = *fdp;
         }
 
-        doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
+        doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF, NULL);
     }
     return rc;
 }
@@ -2238,7 +2238,7 @@ nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRInterv
             nfd = -1;
         }
 
-        doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)rc, TLSTX, BUF);
+        doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)rc, TLSTX, BUF, NULL);
     }
 
     return rc;
@@ -2274,7 +2274,7 @@ nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime
             nfd = -1;
         }
 
-        doProtocol((uint64_t)fd, nfd, buf, (size_t)rc, TLSRX, BUF);
+        doProtocol((uint64_t)fd, nfd, buf, (size_t)rc, TLSRX, BUF, NULL);
     }
 
     return rc;
@@ -2310,7 +2310,7 @@ nss_read(PRFileDesc *fd, void *buf, PRInt32 amount)
             nfd = -1;
         }
 
-        doProtocol((uint64_t)fd, nfd, buf, (size_t)rc, TLSRX, BUF);
+        doProtocol((uint64_t)fd, nfd, buf, (size_t)rc, TLSRX, BUF, NULL);
     }
 
     return rc;
@@ -2346,7 +2346,7 @@ nss_write(PRFileDesc *fd, const void *buf, PRInt32 amount)
             nfd = -1;
         }
 
-        doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)rc, TLSRX, BUF);
+        doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)rc, TLSRX, BUF, NULL);
     }
 
     return rc;
@@ -2382,7 +2382,7 @@ nss_writev(PRFileDesc *fd, const PRIOVec *iov, PRInt32 iov_size, PRIntervalTime 
             nfd = -1;
         }
 
-        doProtocol((uint64_t)fd, nfd, (void *)iov, (size_t)iov_size, TLSRX, IOV);
+        doProtocol((uint64_t)fd, nfd, (void *)iov, (size_t)iov_size, TLSRX, IOV, NULL);
     }
 
     return rc;
@@ -2419,7 +2419,7 @@ nss_sendto(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags,
             nfd = -1;
         }
 
-        doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)amount, TLSRX, BUF);
+        doProtocol((uint64_t)fd, nfd, (void *)buf, (size_t)amount, TLSRX, BUF, NULL);
     }
 
     return rc;
@@ -2456,7 +2456,7 @@ nss_recvfrom(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags,
             nfd = -1;
         }
 
-        doProtocol((uint64_t)fd, nfd, buf, (size_t)amount, TLSRX, BUF);
+        doProtocol((uint64_t)fd, nfd, buf, (size_t)amount, TLSRX, BUF, NULL);
     }
 
     return rc;

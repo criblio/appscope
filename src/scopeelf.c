@@ -288,3 +288,14 @@ getSymbol(const char *buf, char *sname)
 
     return (void *)symaddr;
 }
+
+int
+checkEnv(char *env, char *val)
+{
+    char *estr;
+    if (((estr = getenv(env)) != NULL) &&
+       (strncmp(estr, val, strlen(estr)) == 0)) {
+        return TRUE;
+    }
+    return FALSE;
+}

@@ -868,17 +868,6 @@ hookCallback(struct dl_phdr_info *info, size_t size, void *data)
     return 0;
 }
 
-static int 
-checkEnv(char *env, char* val)
-{
-    char *estr;
-    if (((estr = getenv(env)) != NULL) &&
-       (strncmp(estr, val, strlen(estr)) == 0)) {
-        return TRUE;
-    }
-    return FALSE;
-}
-
 /*
  * There are 3x SSL_read functions to consider:
  * 1) the one in this file used to interpose SSL_read
@@ -903,16 +892,14 @@ initHook()
 {
     int rc;
     funchook_t *funchook;
-    char *full_path, *estr;
+    char *full_path;
     bool should_we_patch = FALSE;
     elf_buf_t *ebuf;
 
     // default to a native app
     // Are we a Go dynamic app
-    if (((estr = getenv("SCOPE_APP_TYPE")) != NULL) &&
-        (strncmp(estr, "go", strlen(estr)) == 0) &&
-        ((estr = getenv("SCOPE_EXEC_TYPE")) != NULL) &&
-        (strncmp(estr, "dynamic", strlen(estr)) == 0) &&
+    if (checkEnv("SCOPE_APP_TYPE", "go") &&
+        checkEnv("SCOPE_EXEC_TYPE", "dynamic") &&
         ((full_path = osGetExePath()) != NULL) &&
         ((ebuf = getElf(full_path)) != NULL)) {
         initGoHook(ebuf);
@@ -990,28 +977,6 @@ initHook()
 #endif // __LINUX__
 
 
-static
-void patchClone() 
-{
-    void *clone = dlsym(RTLD_DEFAULT, "__clone");
-    if (clone) {
-        size_t pageSize = getpagesize();
-        void *addr = (void *)((ptrdiff_t) clone & ~(pageSize - 1));
-        // unprotect the page
-        if (mprotect(addr, pageSize, PROT_WRITE | PROT_READ | PROT_EXEC)) {
-            printf("mprotect failed\n");
-        }
-
-        uint8_t ass[6] = { 
-            0xb8, 0x00, 0x00, 0x00, 0x00,      // mov $0x0,%eax
-            0xc3                               // retq
-        };
-        memcpy(clone, ass, sizeof(ass));
-
-        printf("CLONE PATCHED\n");
-    }
-}
-
 __attribute__((constructor)) void
 init(void)
 {
@@ -1050,10 +1015,9 @@ init(void)
 
     initHook();
     
-    if (checkEnv("SCOPE_APP_TYPE", "go") && 
+    if (checkEnv("SCOPE_APP_TYPE", "go") &&
         checkEnv("SCOPE_EXEC_TYPE", "static")) {
         threadNow(0);
-        patchClone();
     } else {
         threadInit();
     }

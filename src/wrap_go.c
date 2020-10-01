@@ -17,6 +17,10 @@
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
 #define ENABLE_CAS_IN_SYSEXEC 1
 
+#define SWITCH_ENV "SCOPE_SWITCH"
+#define SWITCH_USE_NO_THREAD "no_thread"
+#define SWITCH_USE_THREAD "thread"
+
 #ifdef ENABLE_CAS_IN_SYSEXEC
 #include "atomic.h"
 #else
@@ -57,10 +61,13 @@ tap_t g_go_tap[] = {
 
 uint64_t g_glibc_guard = 0LL;
 uint64_t g_go_static = 0LL;
+static list_t *g_threadlist;
+static void *g_stack;
+static bool g_switch_thread;
+
 void (*go_runtime_cgocall)(void);
 
-static list_t *g_threadlist;
-void *g_stack;
+extern void __ctype_init (void);
 
 #if NEEDEVNULL > 0
 static void
@@ -236,13 +243,42 @@ patch_return_addrs(funchook_t *funchook,
     patchprint("\n\n");
 }
 
+static void
+patchClone()
+{
+    void *clone = dlsym(RTLD_DEFAULT, "__clone");
+    if (clone) {
+        size_t pageSize = getpagesize();
+        void *addr = (void *)((ptrdiff_t) clone & ~(pageSize - 1));
+
+        // set write perms on the page
+        if (mprotect(addr, pageSize, PROT_WRITE | PROT_READ | PROT_EXEC)) {
+            scopeLog("ERROR: patchCLone: mprotect failed\n", -1, CFG_LOG_ERROR);
+            return;
+        }
+
+        uint8_t ass[6] = {
+            0xb8, 0x00, 0x00, 0x00, 0x00,      // mov $0x0,%eax
+            0xc3                               // retq
+        };
+        memcpy(clone, ass, sizeof(ass));
+
+        scopeLog("patchClone: CLONE PATCHED\n", -1, CFG_LOG_DEBUG);
+
+        // restore perms to the page
+        if (mprotect(addr, pageSize, PROT_READ | PROT_EXEC)) {
+            scopeLog("ERROR: patchCLone: mprotect restore failed\n", -1, CFG_LOG_ERROR);
+            return;
+        }
+    }
+}
+
 void
 initGoHook(elf_buf_t *ebuf)
 {
     int rc;
     funchook_t *funchook;
     gostring_t *go_ver; // There is an implicit len field at go_ver + 0x8
-    char *estr;
     char *go_runtime_version = NULL;
 
     g_stack = malloc(32 * 1024);
@@ -265,13 +301,27 @@ initGoHook(elf_buf_t *ebuf)
     }
 
     // default to a dynamic app?
-    if (((estr = getenv("SCOPE_EXEC_TYPE")) != NULL) &&
-        (strncmp(estr, "static", strlen(estr)) == 0)) {
+    if (checkEnv("SCOPE_EXEC_TYPE", "static")) {
         g_go_static = 1LL;
-        sysprint("This is a static app: %s\n", estr);
+        sysprint("This is a static app\n");
     } else {
         g_go_static = 0LL;
-        sysprint("This is a dynamic app: %s\n", estr);
+        sysprint("This is a dynamic app\n");
+    }
+
+    // which go_switch function are we using?
+    if (g_go_static == 1) {
+        if (checkEnv(SWITCH_ENV, SWITCH_USE_NO_THREAD)) {
+            g_switch_thread = FALSE;
+            patchClone();
+        } else if (checkEnv(SWITCH_ENV, SWITCH_USE_THREAD)) {
+            g_switch_thread = TRUE;
+        } else {
+            g_switch_thread = FALSE;
+            patchClone();
+        }
+    } else {
+        g_switch_thread = TRUE;
     }
 
     if (!(go_ver= getSymbol(ebuf->buf, "runtime.buildVersion")) ||
@@ -378,187 +428,32 @@ frame_size(assembly_fn fn)
     exit(-1);
 }
 
+static void *
+dumb_thread(void *arg)
+{
+    pthread_barrier_t *pbarrier = (pthread_barrier_t *)arg;
+    sigset_t mask;
+
+    sigfillset(&mask);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
+
+    void *dummy = calloc(1, 32);
+    if (dummy) free(dummy);
+    pthread_barrier_wait(pbarrier);
+    while (1) {
+        sleep(0xffffffff);
+    }
+    return NULL;
+}
+
 /*
- * There are 3 go_switch() functions that all accomplish the 
+ * There are 2 go_switch() functions that accomplish the
  * same thing. They take different approaches. We want to 
  * see what effect an approach has on performance and reliability.
  * We'll likley get to one instance as we gain experience. 
- */
-
-/*
- * Switch from the Go system stack to a single libc stack
- * Switch from the 'm' TCB to the libc TCB
- * Call the C handler
- * Switch 'g' and 'm' state back
- * Return to the calling 'g'
  *
- * This implementation of go_switch uses
- * a single libc stack for all 'g'.
- * As such it must create a critical section around the
- * stack switch in order serialize acess to the libc stack.
- *
- * The signal masking is not needed. It's left in place and
- * disabled so that it can be compiled in to test as needed.
- *
- * go_switch_one_stack
- */
-inline static void *
-go_switch_one_stack(char *stackptr, void *cfunc, void *gfunc)
-{
-    uint64_t rc;
-    unsigned long go_tls, *go_ptr;
-    char *gstack;
-    char *go_g = NULL, *go_m = NULL;
-
-// This disables the signal masking by default.
-#ifdef ENABLE_SIGNAL_MASKING_IN_SYSEXEC
-    sigset_t mask;
-    if ((sigfillset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("blocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-#endif
-
-    // Get the Go routine's struct g
-    __asm__ volatile (
-        "mov %%fs:0xfffffffffffffff8, %%r11 \n"
-        "mov %%r11, %1  \n"
-        : "=r"(rc)                        // output
-        : "m"(go_g)                       // inputs
-        :                                 // clobbered register
-        );
-
-    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-        scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    uint32_t frame_offset = frame_size(gfunc);
-    if (!frame_offset) goto out;
-    stackptr += frame_offset;
-
-    // Beginning of critical section.
-    while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) ;
-    __asm__ volatile (
-        "mov %%rsp, %2 \n"
-        "mov %1, %%rsp \n"
-        "mov %3, %%rdi  \n"
-        "callq *%4  \n"
-        : "=r"(rc)                         // output
-        : "m"(scope_stack), "m"(gstack),   // input
-          "r"(stackptr), "r"(cfunc)
-        :                                  // clobbered register
-        );
-
-    // Switch stack back to Go
-    __asm__ volatile (
-        "mov %1, %%rsp \n"
-        : "=r"(rc)                        // output
-        : "r"(gstack)                     // inputs
-        :                                 // clobbered register
-        );
-
-    // End of critical section.
-    atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-
-    // get struct m from g
-    go_ptr = (unsigned long *)(go_g + g_go.g_to_m);
-    go_tls = *go_ptr;
-    go_m = (char *)go_tls;
-    go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-
-    if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
-        scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-// This disables the signal masking by default.
-#ifdef ENABLE_SIGNAL_MASKING_IN_SYSEXEC
-    if ((sigemptyset(&mask) == -1) || (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)) {
-        scopeLog("unblocking signals", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-#endif
-
-out:
-    return return_addr(gfunc);
-}
-
-inline static void *
-go_switch_static(char *stackptr, void *cfunc, void *gfunc)
-{
-    uint64_t rc;
-    unsigned long go_tls, *go_ptr;
-    char *go_g = NULL, *go_m = NULL;
-
-    // Get the Go routine's struct g
-    __asm__ volatile (
-        "mov %%fs:0xfffffffffffffff8, %%r11 \n"
-        "mov %%r11, %1  \n"
-        : "=r"(rc)                        // output
-        : "m"(go_g)                       // inputs
-        :                                 // clobbered register
-        );
-
-    // Switch to the libc TCB
-    if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-        scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-    uint32_t frame_offset = frame_size(gfunc);
-    if (!frame_offset) goto out;
-    stackptr += frame_offset;
-
-    // call the C handler
-    __asm__ volatile (
-        "mov %1, %%rdi  \n"
-        "callq *%2  \n"
-        : "=r"(rc)                    // output
-        : "r"(stackptr), "r"(cfunc)   // inputs
-        :                             // clobbered register
-        );
-
-    // get struct m from g and pull out the TLS from 'm'
-    go_ptr = (unsigned long *)(go_g + g_go.g_to_m);
-    go_tls = *go_ptr;
-    go_m = (char *)go_tls;
-    go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-
-    // Switch back to the 'm' TLS
-    if (arch_prctl(ARCH_SET_FS, go_tls) == -1) {
-        scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
-        goto out;
-    }
-
-out:
-    return return_addr(gfunc);
-}
-
-inline static void *
-go_switch_dynamic(char *stackptr, void *cfunc, void *gfunc)
-{
-    uint64_t rc;
-    uint32_t frame_offset = frame_size(gfunc);
-
-    if (!frame_offset) goto out;
-    stackptr += frame_offset;
-
-    // call the C handler
-    __asm__ volatile (
-        "mov %1, %%rdi  \n"
-        "callq *%2  \n"
-        : "=r"(rc)                    // output
-        : "r"(stackptr), "r"(cfunc)   // inputs
-        :                             // clobbered register
-        );
-out:
-    return return_addr(gfunc);
-}
-
-/*
- * This go_switch() is meant to support static
- * and dynamic apps at the same time. It depends
+ * These go_switch() functions are meant to support
+ * static and dynamic apps at the same time. It depends
  * on an env var being set in the scope
  * executable. In initGoHook() we get the
  * env var and set the variable g_go_static.
@@ -567,30 +462,126 @@ out:
  * In the static case we swtich TLS/TCB.
  * In the dynamic case we do not switch TLS/TCB.
  */
-
-static void *
-dumb_thread(void *arg)
+/*
+* go_switch_thread() creates a thread in glibc
+* for each 'm'. It then syncs with that thread
+* after the newly created thread inits memory
+* allocation.
+*/
+inline static void *
+go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 {
-    // pthread_barrier_t *pbarrier = (pthread_barrier_t *)arg;
-    // sigset_t mask;
+    uint64_t rc;
+    unsigned long go_tls = 0;
+    unsigned long go_fs = 0;
+    unsigned long go_m = 0;
+    char *go_g = NULL;
 
-    // sigfillset(&mask);
-    // pthread_sigmask(SIG_BLOCK, &mask, NULL);
+    if (g_go_static) {
+        // Get the Go routine's struct g
+        __asm__ volatile (
+            "mov %%fs:-8, %0"
+            : "=r"(go_g)                      // output
+            :                                 // inputs
+            :                                 // clobbered register
+            );
 
-    // void *dummy = calloc(1, 32);
-    // if (dummy) free(dummy);
-    // pthread_barrier_wait(pbarrier);
-    // while (1) {
-    //     sleep(0xffffffff);
-    // }
-    return NULL;
+        if (go_g) {
+            // get struct m from g and pull out the TLS from 'm'
+            go_m = *((unsigned long *)(go_g + g_go.g_to_m));
+            go_tls = (unsigned long)(go_m + g_go.m_to_tls);
+            go_fs = go_tls + 8; //go compiler uses -8(FS)
+        } else {
+            // We've seen a case where on process exit static cgo
+            // apps do not have a go_g while they're exiting.
+            // In this case we need to pull the TLS from the kernel
+            scopeLog("go_switch:did not get a 'g'; using fs from the kernel", -1, CFG_LOG_DEBUG);
+            if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
+                scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+        }
+
+        void *thread_fs = NULL;
+        if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
+            // Switch to the main thread TCB
+            if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
+                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+            pthread_t thread;
+            pthread_barrier_t barrier;
+            if (pthread_barrier_init(&barrier, NULL, 2) != 0) {
+                scopeLog("pthread_barrier_init failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+
+            if (pthread_create(&thread, NULL, dumb_thread, &barrier) != 0) {
+                scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+
+            //wait until the thread starts
+            pthread_barrier_wait(&barrier);
+
+            thread_fs = (void *)thread;
+
+            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
+                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+
+            if (pthread_barrier_destroy(&barrier) != 0) {
+                scopeLog("pthread_barrier_destroy failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+
+            if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
+                scopeLog("lstInsert failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+
+            sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
+        } else {
+            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
+                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+        }
+    }
+
+    uint32_t frame_offset = frame_size(gfunc);
+    if (!frame_offset) goto out;
+    stackptr += frame_offset;
+
+    // call the C handler
+    __asm__ volatile (
+        "mov %1, %%rdi  \n"
+        "callq *%2  \n"
+        : "=r"(rc)                    // output
+        : "r"(stackptr), "r"(cfunc)   // inputs
+        :                             // clobbered register
+        );
+out:
+    if (g_go_static && go_fs) {
+        // Switch back to the 'm' TLS
+        if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
+            scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
+        }
+    }
+    return return_addr(gfunc);
 }
 
-
-extern void __ctype_init (void);
-
+/*
+* go_switch_no_thread() creates a glibc TCB for
+* each 'm' and initializes TLS and memory allocation
+* in the newly created TCB. It uses pthread_create()
+* to create a TCB. However, __clone() has previously
+* been disabled in initGoHook(). Therefore, no thread
+* is actually created.
+*/
 inline static void *
-go_switch(char *stackptr, void *cfunc, void *gfunc)
+go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
 {
     uint64_t rc;
     unsigned long go_tls = 0;
@@ -702,6 +693,20 @@ out:
         }
     }
     return return_addr(gfunc);
+}
+
+/*
+* We want to be able to determine which go_switch
+* function to use at run time.
+*/
+inline static void *
+go_switch(char *stackptr, void *cfunc, void *gfunc)
+{
+    if (g_switch_thread == FALSE) {
+        return go_switch_no_thread(stackptr, cfunc, gfunc);
+    } else {
+        return go_switch_thread(stackptr, cfunc, gfunc);
+    }
 }
 
 /*

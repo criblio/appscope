@@ -2618,6 +2618,12 @@ fcloseall(void)
 }
 
 #ifdef __MACOS__
+int
+checkEnv(char *env, char *val)
+{
+    return FALSE;
+}
+
 EXPORTON int
 close$NOCANCEL(int fd)
 {

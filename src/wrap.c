@@ -892,16 +892,14 @@ initHook()
 {
     int rc;
     funchook_t *funchook;
-    char *full_path, *estr;
+    char *full_path;
     bool should_we_patch = FALSE;
     elf_buf_t *ebuf;
 
     // default to a native app
     // Are we a Go dynamic app
-    if (((estr = getenv("SCOPE_APP_TYPE")) != NULL) &&
-        (strncmp(estr, "go", strlen(estr)) == 0) &&
-        ((estr = getenv("SCOPE_EXEC_TYPE")) != NULL) &&
-        (strncmp(estr, "dynamic", strlen(estr)) == 0) &&
+    if (checkEnv("SCOPE_APP_TYPE", "go") &&
+        checkEnv("SCOPE_EXEC_TYPE", "dynamic") &&
         ((full_path = osGetExePath()) != NULL) &&
         ((ebuf = getElf(full_path)) != NULL)) {
         initGoHook(ebuf);
@@ -978,6 +976,7 @@ initHook()
 
 #endif // __LINUX__
 
+
 __attribute__((constructor)) void
 init(void)
 {
@@ -1016,8 +1015,8 @@ init(void)
 
     initHook();
     
-    char *execType = getenv("SCOPE_APP_TYPE");
-    if (execType != NULL && strcmp(execType, "go") == 0) {
+    if (checkEnv("SCOPE_APP_TYPE", "go") &&
+        checkEnv("SCOPE_EXEC_TYPE", "static")) {
         threadNow(0);
     } else {
         threadInit();
@@ -2619,6 +2618,12 @@ fcloseall(void)
 }
 
 #ifdef __MACOS__
+int
+checkEnv(char *env, char *val)
+{
+    return FALSE;
+}
+
 EXPORTON int
 close$NOCANCEL(int fd)
 {

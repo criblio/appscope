@@ -181,9 +181,28 @@ reportHttp(http_state_t *httpstate, char *ipPort)
     proto->len = httpstate->hdrlen;
     proto->fd = httpstate->id.sockfd;
     proto->uid = httpstate->id.uid;
-    proto->data = (char *)post;
+
+    net_info *net;
+    if ((net = getNetEntry(proto->fd))) {
+        proto->sock_type = net->type;
+        if (net->addrSetLocal) {
+            memcpy(&proto->localConn, &net->localConn, sizeof(struct sockaddr_storage));
+        } else {
+            proto->localConn.ss_family = -1;
+        }
+        if (net->addrSetRemote) {
+            memcpy(&proto->remoteConn, &net->remoteConn, sizeof(struct sockaddr_storage));
+        } else {
+            proto->remoteConn.ss_family = -1;
+        }
+    } else {
+        proto->sock_type = -1;
+        proto->localConn.ss_family = -1;
+        proto->remoteConn.ss_family = -1;
+    }
 
     // Set post info
+    proto->data = (char *)post;
     post->ssl = httpstate->id.isSsl;
     post->start_duration = getTime();
     post->id = httpstate->id.uid;

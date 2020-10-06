@@ -31,11 +31,17 @@ freeMsg(struct protocol_info_t** msg_ptr)
     *msg_ptr = NULL;
 }
 
-// This has almost nothing to do with this test.
-// I'm defining it here to avoid more dependencies.
+// These have almost nothing to do with this test.
+// I'm defining them here to avoid more dependencies.
 int
 get_port_net(net_info *net, int type, control_type_t which) {
     return 0;
+}
+
+net_info *
+getNetEntry(int fd)
+{
+    return NULL;
 }
 
 // This on the other hand is an important part of this test.

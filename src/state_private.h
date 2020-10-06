@@ -95,15 +95,6 @@ typedef struct http_map_t {
     char *resp;
 } http_map;
 
-typedef struct protocol_info_t {
-    metric_t evtype;
-    metric_t ptype;
-    size_t len;
-    int fd;
-    uint64_t uid;
-    char *data;
-} protocol_info;
-
 typedef struct stat_err_info_t {
     metric_t evtype;
     metric_t data_type;
@@ -125,6 +116,18 @@ typedef struct
     int sockfd;
     int isSsl;
 } httpId_t;
+
+typedef struct protocol_info_t {
+    metric_t evtype;
+    metric_t ptype;
+    size_t len;
+    int fd;
+    uint64_t uid;
+    char *data;
+    int sock_type;
+    struct sockaddr_storage localConn;
+    struct sockaddr_storage remoteConn;
+} protocol_info;
 
 typedef struct {
     http_enum_t state;
@@ -183,8 +186,6 @@ typedef struct fs_info_t {
     char path[PATH_MAX];
     char funcop[FUNC_MAX];
 } fs_info;
-
-
 
 // Accessor functions defined in state.c, but used in report.c too.
 int get_port(int, int, control_type_t);

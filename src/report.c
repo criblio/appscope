@@ -49,7 +49,30 @@
 #define HRES_FIELD(val)         STRFIELD("resp",           (val),        8)
 #define DETECT_PROTO(val)       STRFIELD("protocol",       (val),        8)
 
+#define HTTP_VERBOSITY 5
+#define HTTP_MAX_FIELDS 15
+#define H_ATTRIB(field, att, val, verbosity) \
+    field.name = att; \
+    field.value_type = FMT_STR; \
+    field.value.str = val; \
+    field.cardinality = verbosity;
+
+#define H_VALUE(field, att, val, verbosity) \
+    field.name = att; \
+    field.value_type = FMT_NUM; \
+    field.value.num = val; \
+    field.cardinality = verbosity;
+
+#define HTTP_NEXT_FLD(n) if (n < HTTP_MAX_FIELDS) {n++;}else{return FALSE;};
 #define HTTP_STATUS "HTTP/1."
+
+typedef struct http_report_t {
+    char *header;
+    char rport[8];
+    char lport[8];
+    char raddr[INET6_ADDRSTRLEN];
+    char laddr[INET6_ADDRSTRLEN];
+} http_report;
 
 // TBD - Ideally, we'd remove this dependency on the configured interval
 // and replace it with a measured value.  It'd be one less dependency
@@ -109,6 +132,20 @@ sendProcessStartMetric()
     if (urlEncodedCmd) free(urlEncodedCmd);
 }
 
+static void
+destroyProto(protocol_info *proto)
+{
+    if (!proto) return;
+
+    /*
+     * for future reference;
+     * proto is freed as event in doEvent().
+     * post->data is the http header and is freed in destroyHttpMap()
+     * when the list entry is deleted.
+     */
+    if (proto->data) free (proto->data);
+}
+
 static int
 getProtocol(int type, char *proto, size_t len)
 {
@@ -158,8 +195,33 @@ doUnixEndpoint(int sd, net_info *net)
     return;
 }
 
+static bool
+getConn(struct sockaddr_storage *conn, char *addr, size_t alen, char *port, size_t plen)
+{
+    if (!conn || !addr || !port) return FALSE;
+
+    if (conn->ss_family == AF_INET) {
+        if (inet_ntop(AF_INET, &((struct sockaddr_in *)conn)->sin_addr,
+                      addr, alen) == NULL) {
+                return FALSE;
+        }
+
+        snprintf(port, plen, "%d", htons(((struct sockaddr_in *)conn)->sin_port));
+    } else if (conn->ss_family == AF_INET6) {
+        if (inet_ntop(AF_INET6, &((struct sockaddr_in6 *)conn)->sin6_addr,
+                      addr, alen) == NULL) {
+                return  FALSE;
+        }
+
+        snprintf(port, plen, "%d", htons(((struct sockaddr_in6 *)conn)->sin6_port));
+    } else {
+        return FALSE;
+    }
+    return TRUE;
+}
+
 static size_t
-getHttpStatus(char *header, size_t len)
+getHttpStatus(char *header, size_t len, char **stext)
 {
     size_t ix;
     size_t rc;
@@ -171,6 +233,8 @@ getHttpStatus(char *header, size_t len)
     if ((ix < 0) || (ix > len) || ((ix + strlen(HTTP_STATUS) + 1) > len)) return -1;
 
     val = &header[ix + strlen(HTTP_STATUS) + 1];
+    // note that the spec defines the status code to be exactly 3 chars/digits
+    *stext = &header[ix + strlen(HTTP_STATUS) + 6];
 
     errno = 0;
     rc = strtoull(val, NULL, 0);
@@ -180,18 +244,89 @@ getHttpStatus(char *header, size_t len)
     return rc;
 }
 
-static void
-destroyProto(protocol_info *proto)
+static bool
+httpFields(event_field_t *fields, http_report *hreport, int entry, protocol_info *proto)
 {
-    if (!proto) return;
+    if (!fields || !hreport || !proto) return FALSE;
 
-    /*
-     * for future reference;
-     * proto is freed as event in doEvent().
-     * post->data is the http header and is freed in destroyHttpMap()
-     * when the list entry is deleted.
-     */
-    if (proto->data) free (proto->data);
+    // Start with fields from the header
+    char *savea;
+    http_post *post = (http_post *)proto->data;
+
+    strncpy(hreport->header, post->hdr, proto->len);
+
+    char *reqh = strtok_r(hreport->header, "\r\n", &savea);
+    if (!reqh) {
+        scopeLog("WARN: httpFields: parse an http request header", proto->fd, CFG_LOG_WARN);
+        return FALSE;
+    }
+
+    while ((reqh = strtok_r(NULL, "\r\n", &savea)) != NULL) {
+        if (strstr(reqh, "Host:")) {
+            H_ATTRIB(fields[entry], "http.host", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(entry);
+        } else if (strstr(reqh, "User-Agent:")) {
+            H_ATTRIB(fields[entry], "http.user_agent", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(entry);
+        } else if(strstr(reqh, "X-Forwarded-For:")) {
+            H_ATTRIB(fields[entry], "http.client_ip", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(entry);
+        }
+    }
+
+    // Next, add net fields from internal state
+    H_ATTRIB(fields[entry], "net.host.name", g_proc.hostname, HTTP_VERBOSITY);
+    HTTP_NEXT_FLD(entry);
+
+    if (proto->sock_type != -1) {
+        if (addrIsNetDomain(&proto->localConn)) {
+            if (proto->sock_type == SOCK_STREAM) {
+                H_ATTRIB(fields[entry], "net.transport", "IP.TCP", HTTP_VERBOSITY);
+                HTTP_NEXT_FLD(entry);
+            } else if (proto->sock_type == SOCK_DGRAM) {
+                H_ATTRIB(fields[entry], "net.transport", "IP.UDP", HTTP_VERBOSITY);
+                HTTP_NEXT_FLD(entry);
+            } else {
+                H_ATTRIB(fields[entry], "net.transport", "IP", HTTP_VERBOSITY);
+                HTTP_NEXT_FLD(entry);
+            }
+        } else if (addrIsUnixDomain(&proto->localConn)) { // TODO: more than unix
+            if (proto->sock_type == SOCK_STREAM) {
+                H_ATTRIB(fields[entry], "net.transport", "Unix.TCP", HTTP_VERBOSITY);
+                HTTP_NEXT_FLD(entry);
+            } else if (proto->sock_type == SOCK_DGRAM) {
+                H_ATTRIB(fields[entry], "net.transport", "Unix.UDP", HTTP_VERBOSITY);
+                HTTP_NEXT_FLD(entry);
+            } else {
+                H_ATTRIB(fields[entry], "net.transport", "Unix", HTTP_VERBOSITY);
+                HTTP_NEXT_FLD(entry);
+            }
+        }
+
+        // Connection details, where we know the file descriptor
+        if (getConn(&proto->remoteConn, hreport->raddr, sizeof(hreport->raddr),
+                    hreport->rport, sizeof(hreport->rport)) == TRUE) {
+            H_ATTRIB(fields[entry], "net.peer.ip", hreport->raddr, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(entry);
+            H_ATTRIB(fields[entry], "net.peer.port", hreport->rport, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(entry);
+        }
+
+        if (getConn(&proto->localConn, hreport->laddr, sizeof(hreport->laddr),
+                    hreport->lport, sizeof(hreport->lport)) == TRUE) {
+            H_ATTRIB(fields[entry], "net.host.ip", hreport->laddr, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(entry);
+            H_ATTRIB(fields[entry], "net.host.port", hreport->lport, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(entry);
+        }
+    }
+
+    fields[entry].name = NULL;
+    fields[entry].value_type = FMT_END;
+    fields[entry].value.str = NULL;
+    fields[entry].cardinality = 0;
+
+    return TRUE;
 }
 
 static void
@@ -203,6 +338,8 @@ doHttpHeader(protocol_info *proto)
     }
 
     char ssl[8];
+    event_field_t fields[HTTP_MAX_FIELDS];
+    http_report hreport;
     http_post *post = (http_post *)proto->data;
     http_map *map;
 
@@ -226,25 +363,90 @@ doHttpHeader(protocol_info *proto)
     map->frequency++;
 
     if (post->ssl) {
-        strncpy(ssl, "ssl", sizeof(ssl));
+        strncpy(ssl, "HTTPS", sizeof(ssl));
     } else {
-        strncpy(ssl, "clear", sizeof(ssl));
+        strncpy(ssl, "HTTP", sizeof(ssl));
     }
 
+    if ((hreport.header = calloc(1, proto->len)) == NULL) {
+        scopeLog("ERROR: doHttpHeader: memory allocation failure", proto->fd, CFG_LOG_ERROR);
+        return;
+    }
+
+ /*
+     * RFC 2616 Section 5 Request
+     * The Request-Line begins with a method token, followed by the Request-URI
+     * and the protocol version, and ending with CRLF. The elements are separated
+     * by SP characters. No CR or LF is allowed except in the final CRLF sequence.
+     *
+     *  Request-Line   = Method SP Request-URI SP HTTP-Version CRLF
+     */
     if (proto->ptype == EVT_HREQ) {
+        int i = 0;
+
         map->start_time = post->start_duration;
         map->req = (char *)post->hdr;
 
-        event_field_t fields[] = {
-            HREQ_FIELD(map->req),
-            DATA_FIELD(ssl),
-            UNIT_FIELD("byte"),
-            FIELDEND
-        };
+        char *savea;
+        char header[proto->len];
+        strncpy(header, map->req, proto->len);
+
+        char *headertok = strtok_r(header, "\r\n", &savea);
+        if (!headertok) {
+            scopeLog("WARN: doHttpHeader: parse an http request header", proto->fd, CFG_LOG_WARN);
+            return;
+        }
+
+        // The request specific values from Request-Line
+        char *method_str = strtok_r(headertok, " ", &savea);
+        if (method_str) {
+            H_ATTRIB(fields[i], "http.method", method_str, HTTP_VERBOSITY);
+            i++;
+        } else {
+            scopeLog("WARN: doHttpHeader: no method in an http request header", proto->fd, CFG_LOG_WARN);
+        }
+
+        char *target_str = strtok_r(NULL, " ", &savea);
+        if (target_str) {
+            H_ATTRIB(fields[i], "http.target", target_str, HTTP_VERBOSITY);
+            i++;
+        } else {
+            scopeLog("WARN: doHttpHeader: no target in an http request header", proto->fd, CFG_LOG_WARN);
+        }
+
+        char *flavor_str = strtok_r(NULL, " ", &savea);
+        if (flavor_str &&
+            ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
+            ((flavor_str = strtok_r(NULL, "\r", &savea)))) {
+            H_ATTRIB(fields[i], "http.flavor", flavor_str, HTTP_VERBOSITY);
+            i++;
+        } else {
+            scopeLog("WARN: doHttpHeader: no http version in an http request header", proto->fd, CFG_LOG_WARN);
+        }
+
+        H_ATTRIB(fields[i], "http.scheme", ssl, HTTP_VERBOSITY);
+        i++;
+
+        // Fields common to request & response
+        httpFields(fields, &hreport, i, proto);
 
         event_t sendEvent = INT_EVENT("http-req", proto->len, SET, fields);
         cmdSendHttp(g_ctl, &sendEvent, map->id, &g_proc);
+    /*
+    * RFC 2616 Section 6 Response
+    * After receiving and interpreting a request message, a server responds with an HTTP response message.
+    * Response = Status-Line               ; Section 6.1
+    *            *(( general-header        ; Section 4.5
+    *            | response-header         ; Section 6.2
+    *            | entity-header ) CRLF)   ; Section 7.1
+    *            CRLF
+    *            [ message-body ]          ; Section 7.2
+    *
+    *
+    * Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
+    */
     } else if (proto->ptype == EVT_HRES) {
+        int i = 0;
         int rps = map->frequency;
         int sec = (map->first_time > 0) ? (int)time(NULL) - map->first_time : 1;
         if (sec > 0) {
@@ -261,21 +463,46 @@ doHttpHeader(protocol_info *proto)
             map->duration = map->duration / 1000000;
         }
 
-        size_t status = getHttpStatus((char *)map->resp, proto->len);
+        char *stext;
+        size_t status = getHttpStatus((char *)map->resp, proto->len, &stext);
 
-        event_field_t hfields[] = {
-            HREQ_FIELD(map->req),
-            HRES_FIELD(map->resp),
-            DATA_FIELD(ssl),
-            DURATION_FIELD(map->duration),
-            HTTPSTAT_FIELD(status),
-            UNIT_FIELD("byte"),
-            FIELDEND
-        };
+        // The response specific values from Status-Line
+        char *savea;
+        char header[proto->len];
+        strncpy(header, map->resp, proto->len);
 
-        event_t hevent = INT_EVENT("http-resp", proto->len, SET, hfields);
+        char *headertok = strtok_r(header, "\r\n", &savea);
+        char *flavor_str = strtok_r(headertok, " ", &savea);
+        if (flavor_str &&
+            ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
+            ((flavor_str = strtok_r(NULL, "", &savea)))) {
+            H_ATTRIB(fields[i], "http.flavor", flavor_str, HTTP_VERBOSITY);
+            i++;
+        } else {
+            scopeLog("WARN: doHttpHeader: no version string in an http request header", proto->fd, CFG_LOG_WARN);
+        }
+
+        H_VALUE(fields[i], "http.status_code", status, HTTP_VERBOSITY);
+        i++;
+
+        char *status_str = strtok_r(stext, "\r", &savea); // go past the status code
+        if (status_str) {
+            H_ATTRIB(fields[i], "http.status_text", status_str, HTTP_VERBOSITY);
+            i++;
+        } else {
+            scopeLog("WARN: doHttpHeader: no status string in an http request header", proto->fd, CFG_LOG_WARN);
+        }
+
+        H_VALUE(fields[i], "http.server.duration", map->duration, HTTP_VERBOSITY);
+        i++;
+
+        // Fields common to request & response
+        httpFields(fields, &hreport, i, proto);
+
+        event_t hevent = INT_EVENT("http-resp", proto->len, SET, fields);
         cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
 
+        // Are we doing a metric event?
         event_field_t mfields[] = {
             DURATION_FIELD(map->duration),
             RATE_FIELD(rps),
@@ -298,6 +525,8 @@ doHttpHeader(protocol_info *proto)
                 FD_FIELD(proto->fd),
                 HOST_FIELD(g_proc.hostname),
                 HTTPSTAT_FIELD(status),
+                DURATION_FIELD(map->duration),
+                RATE_FIELD(rps),
                 FIELDEND
                 };
 
@@ -308,6 +537,8 @@ doHttpHeader(protocol_info *proto)
         // Done; we remove the list entry; complete when reported
         if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
     }
+
+    if (hreport.header) free(hreport.header);
     destroyProto(proto);
 }
 

@@ -63,11 +63,13 @@
     field.value.num = val; \
     field.cardinality = verbosity;
 
-#define HTTP_NEXT_FLD(n) if (n < HTTP_MAX_FIELDS) {n++;}else{return FALSE;};
+#define HTTP_NEXT_FLD(n) if (n < HTTP_MAX_FIELDS) {n++;}else{DBG(NULL);}
 #define HTTP_STATUS "HTTP/1."
 
 typedef struct http_report_t {
     char *header;
+    int ix;
+    size_t clen;
     char rport[8];
     char lport[8];
     char raddr[INET6_ADDRSTRLEN];
@@ -244,15 +246,24 @@ getHttpStatus(char *header, size_t len, char **stext)
     return rc;
 }
 
+static void
+httpFieldEnd(event_field_t *fields, http_report *hreport)
+{
+    fields[hreport->ix].name = NULL;
+    fields[hreport->ix].value_type = FMT_END;
+    fields[hreport->ix].value.str = NULL;
+    fields[hreport->ix].cardinality = 0;
+}
+
 static bool
-httpFields(event_field_t *fields, http_report *hreport, int entry, protocol_info *proto)
+httpFields(event_field_t *fields, http_report *hreport, protocol_info *proto)
 {
     if (!fields || !hreport || !proto) return FALSE;
 
     // Start with fields from the header
     char *savea;
     http_post *post = (http_post *)proto->data;
-
+    hreport->clen = -1;
     strncpy(hreport->header, post->hdr, proto->len);
 
     char *reqh = strtok_r(hreport->header, "\r\n", &savea);
@@ -263,69 +274,68 @@ httpFields(event_field_t *fields, http_report *hreport, int entry, protocol_info
 
     while ((reqh = strtok_r(NULL, "\r\n", &savea)) != NULL) {
         if (strstr(reqh, "Host:")) {
-            H_ATTRIB(fields[entry], "http.host", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
-            HTTP_NEXT_FLD(entry);
+            H_ATTRIB(fields[hreport->ix], "http.host", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport->ix);
         } else if (strstr(reqh, "User-Agent:")) {
-            H_ATTRIB(fields[entry], "http.user_agent", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
-            HTTP_NEXT_FLD(entry);
+            H_ATTRIB(fields[hreport->ix], "http.user_agent", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport->ix);
         } else if(strstr(reqh, "X-Forwarded-For:")) {
-            H_ATTRIB(fields[entry], "http.client_ip", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
-            HTTP_NEXT_FLD(entry);
+            H_ATTRIB(fields[hreport->ix], "http.client_ip", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport->ix);
+        } else if(strstr(reqh, "Content-Length:")) {
+            errno = 0;
+            if (((hreport->clen = strtoull(strchr(reqh, ':') + 2, NULL, 0)) == 0) || (errno != 0)) {
+                hreport->clen = -1;
+            }
         }
     }
 
     // Next, add net fields from internal state
-    H_ATTRIB(fields[entry], "net.host.name", g_proc.hostname, HTTP_VERBOSITY);
-    HTTP_NEXT_FLD(entry);
+    H_ATTRIB(fields[hreport->ix], "net.host.name", g_proc.hostname, HTTP_VERBOSITY);
+    HTTP_NEXT_FLD(hreport->ix);
 
     if (proto->sock_type != -1) {
         if (addrIsNetDomain(&proto->localConn)) {
             if (proto->sock_type == SOCK_STREAM) {
-                H_ATTRIB(fields[entry], "net.transport", "IP.TCP", HTTP_VERBOSITY);
-                HTTP_NEXT_FLD(entry);
+                H_ATTRIB(fields[hreport->ix], "net.transport", "IP.TCP", HTTP_VERBOSITY);
+                HTTP_NEXT_FLD(hreport->ix);
             } else if (proto->sock_type == SOCK_DGRAM) {
-                H_ATTRIB(fields[entry], "net.transport", "IP.UDP", HTTP_VERBOSITY);
-                HTTP_NEXT_FLD(entry);
+                H_ATTRIB(fields[hreport->ix], "net.transport", "IP.UDP", HTTP_VERBOSITY);
+                HTTP_NEXT_FLD(hreport->ix);
             } else {
-                H_ATTRIB(fields[entry], "net.transport", "IP", HTTP_VERBOSITY);
-                HTTP_NEXT_FLD(entry);
+                H_ATTRIB(fields[hreport->ix], "net.transport", "IP", HTTP_VERBOSITY);
+                HTTP_NEXT_FLD(hreport->ix);
             }
         } else if (addrIsUnixDomain(&proto->localConn)) { // TODO: more than unix
             if (proto->sock_type == SOCK_STREAM) {
-                H_ATTRIB(fields[entry], "net.transport", "Unix.TCP", HTTP_VERBOSITY);
-                HTTP_NEXT_FLD(entry);
+                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix.TCP", HTTP_VERBOSITY);
+                HTTP_NEXT_FLD(hreport->ix);
             } else if (proto->sock_type == SOCK_DGRAM) {
-                H_ATTRIB(fields[entry], "net.transport", "Unix.UDP", HTTP_VERBOSITY);
-                HTTP_NEXT_FLD(entry);
+                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix.UDP", HTTP_VERBOSITY);
+                HTTP_NEXT_FLD(hreport->ix);
             } else {
-                H_ATTRIB(fields[entry], "net.transport", "Unix", HTTP_VERBOSITY);
-                HTTP_NEXT_FLD(entry);
+                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix", HTTP_VERBOSITY);
+                HTTP_NEXT_FLD(hreport->ix);
             }
         }
 
         // Connection details, where we know the file descriptor
         if (getConn(&proto->remoteConn, hreport->raddr, sizeof(hreport->raddr),
                     hreport->rport, sizeof(hreport->rport)) == TRUE) {
-            H_ATTRIB(fields[entry], "net.peer.ip", hreport->raddr, HTTP_VERBOSITY);
-            HTTP_NEXT_FLD(entry);
-            H_ATTRIB(fields[entry], "net.peer.port", hreport->rport, HTTP_VERBOSITY);
-            HTTP_NEXT_FLD(entry);
+            H_ATTRIB(fields[hreport->ix], "net.peer.ip", hreport->raddr, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport->ix);
+            H_ATTRIB(fields[hreport->ix], "net.peer.port", hreport->rport, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport->ix);
         }
 
         if (getConn(&proto->localConn, hreport->laddr, sizeof(hreport->laddr),
                     hreport->lport, sizeof(hreport->lport)) == TRUE) {
-            H_ATTRIB(fields[entry], "net.host.ip", hreport->laddr, HTTP_VERBOSITY);
-            HTTP_NEXT_FLD(entry);
-            H_ATTRIB(fields[entry], "net.host.port", hreport->lport, HTTP_VERBOSITY);
-            HTTP_NEXT_FLD(entry);
+            H_ATTRIB(fields[hreport->ix], "net.host.ip", hreport->laddr, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport->ix);
+            H_ATTRIB(fields[hreport->ix], "net.host.port", hreport->lport, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport->ix);
         }
     }
-
-    fields[entry].name = NULL;
-    fields[entry].value_type = FMT_END;
-    fields[entry].value.str = NULL;
-    fields[entry].cardinality = 0;
-
     return TRUE;
 }
 
@@ -373,6 +383,8 @@ doHttpHeader(protocol_info *proto)
         return;
     }
 
+    hreport.ix = 0;
+
  /*
      * RFC 2616 Section 5 Request
      * The Request-Line begins with a method token, followed by the Request-URI
@@ -382,8 +394,6 @@ doHttpHeader(protocol_info *proto)
      *  Request-Line   = Method SP Request-URI SP HTTP-Version CRLF
      */
     if (proto->ptype == EVT_HREQ) {
-        int i = 0;
-
         map->start_time = post->start_duration;
         map->req = (char *)post->hdr;
 
@@ -400,16 +410,16 @@ doHttpHeader(protocol_info *proto)
         // The request specific values from Request-Line
         char *method_str = strtok_r(headertok, " ", &savea);
         if (method_str) {
-            H_ATTRIB(fields[i], "http.method", method_str, HTTP_VERBOSITY);
-            i++;
+            H_ATTRIB(fields[hreport.ix], "http.method", method_str, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no method in an http request header", proto->fd, CFG_LOG_WARN);
         }
 
         char *target_str = strtok_r(NULL, " ", &savea);
         if (target_str) {
-            H_ATTRIB(fields[i], "http.target", target_str, HTTP_VERBOSITY);
-            i++;
+            H_ATTRIB(fields[hreport.ix], "http.target", target_str, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no target in an http request header", proto->fd, CFG_LOG_WARN);
         }
@@ -418,17 +428,24 @@ doHttpHeader(protocol_info *proto)
         if (flavor_str &&
             ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
             ((flavor_str = strtok_r(NULL, "\r", &savea)))) {
-            H_ATTRIB(fields[i], "http.flavor", flavor_str, HTTP_VERBOSITY);
-            i++;
+            H_ATTRIB(fields[hreport.ix], "http.flavor", flavor_str, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no http version in an http request header", proto->fd, CFG_LOG_WARN);
         }
 
-        H_ATTRIB(fields[i], "http.scheme", ssl, HTTP_VERBOSITY);
-        i++;
+        H_ATTRIB(fields[hreport.ix], "http.scheme", ssl, HTTP_VERBOSITY);
+        HTTP_NEXT_FLD(hreport.ix);
 
         // Fields common to request & response
-        httpFields(fields, &hreport, i, proto);
+        httpFields(fields, &hreport, proto);
+
+        if (hreport.clen != -1) {
+            H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport.ix);
+        }
+
+        httpFieldEnd(fields, &hreport);
 
         event_t sendEvent = INT_EVENT("http-req", proto->len, SET, fields);
         cmdSendHttp(g_ctl, &sendEvent, map->id, &g_proc);
@@ -446,7 +463,6 @@ doHttpHeader(protocol_info *proto)
     * Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
     */
     } else if (proto->ptype == EVT_HRES) {
-        int i = 0;
         int rps = map->frequency;
         int sec = (map->first_time > 0) ? (int)time(NULL) - map->first_time : 1;
         if (sec > 0) {
@@ -476,28 +492,35 @@ doHttpHeader(protocol_info *proto)
         if (flavor_str &&
             ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
             ((flavor_str = strtok_r(NULL, "", &savea)))) {
-            H_ATTRIB(fields[i], "http.flavor", flavor_str, HTTP_VERBOSITY);
-            i++;
+            H_ATTRIB(fields[hreport.ix], "http.flavor", flavor_str, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no version string in an http request header", proto->fd, CFG_LOG_WARN);
         }
 
-        H_VALUE(fields[i], "http.status_code", status, HTTP_VERBOSITY);
-        i++;
+        H_VALUE(fields[hreport.ix], "http.status_code", status, HTTP_VERBOSITY);
+        HTTP_NEXT_FLD(hreport.ix);
 
         char *status_str = strtok_r(stext, "\r", &savea); // go past the status code
         if (status_str) {
-            H_ATTRIB(fields[i], "http.status_text", status_str, HTTP_VERBOSITY);
-            i++;
+            H_ATTRIB(fields[hreport.ix], "http.status_text", status_str, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no status string in an http request header", proto->fd, CFG_LOG_WARN);
         }
 
-        H_VALUE(fields[i], "http.server.duration", map->duration, HTTP_VERBOSITY);
-        i++;
+        H_VALUE(fields[hreport.ix], "http.server.duration", map->duration, HTTP_VERBOSITY);
+        HTTP_NEXT_FLD(hreport.ix);
 
         // Fields common to request & response
-        httpFields(fields, &hreport, i, proto);
+        httpFields(fields, &hreport, proto);
+
+        if (hreport.clen != -1) {
+            H_VALUE(fields[hreport.ix], "http.response_content_length", hreport.clen, HTTP_VERBOSITY);
+            HTTP_NEXT_FLD(hreport.ix);
+        }
+
+        httpFieldEnd(fields, &hreport);
 
         event_t hevent = INT_EVENT("http-resp", proto->len, SET, fields);
         cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);

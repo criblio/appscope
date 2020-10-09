@@ -382,7 +382,7 @@ addJsonFields(event_field_t* fields, regex_t* fieldFilter, cJSON* json)
 }
 
 cJSON *
-fmtMetricJson(event_t *metric, regex_t* fieldFilter, watch_t src)
+fmtMetricJson(event_t *metric, regex_t *fieldFilter, watch_t src)
 {
     const char* metric_type = NULL;
 

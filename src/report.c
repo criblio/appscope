@@ -501,13 +501,12 @@ doHttpHeader(protocol_info *proto)
         H_VALUE(fields[hreport.ix], "http.status_code", status, HTTP_VERBOSITY);
         HTTP_NEXT_FLD(hreport.ix);
 
-        char *status_str = strtok_r(stext, "\r", &savea); // go past the status code
-        if (status_str) {
-            H_ATTRIB(fields[hreport.ix], "http.status_text", status_str, HTTP_VERBOSITY);
-            HTTP_NEXT_FLD(hreport.ix);
-        } else {
-            scopeLog("WARN: doHttpHeader: no status string in an http request header", proto->fd, CFG_LOG_WARN);
-        }
+        // point past the status code
+        char st[strlen(stext)];
+        strncpy(st, stext, strlen(stext));
+        char *status_str = strtok_r(st, "\r", &savea);
+        H_ATTRIB(fields[hreport.ix], "http.status_text", status_str, HTTP_VERBOSITY);
+        HTTP_NEXT_FLD(hreport.ix);
 
         H_VALUE(fields[hreport.ix], "http.server.duration", map->duration, HTTP_VERBOSITY);
         HTTP_NEXT_FLD(hreport.ix);

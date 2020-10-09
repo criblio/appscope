@@ -80,7 +80,7 @@ if [ "${OS}" = "linux" ]; then
     run_test test/${OS}/glibcvertest
     run_test test/${OS}/reporttest
     run_test test/${OS}/javabcitest
-#    run_test test/${OS}/httpheadertest
+    run_test test/${OS}/httpheadertest
 fi
 run_test test/${OS}/selfinterposetest
 

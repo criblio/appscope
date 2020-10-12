@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <arpa/inet.h>
 
 #include "dbg.h"
@@ -12,6 +14,8 @@
 #include "evtformat.h"
 #include "httpstate.h"
 #include "test.h"
+
+#define UNIX_SOCK_PATH "/tmp/headertestsock"
 
 extern void doProtocolMetric(protocol_info *);
 rtconfig g_cfg = {0};
@@ -66,6 +70,21 @@ int cmdPostEvent(ctl_t *ctl, char *event)
     //printf("%s: data at: %p\n", __FUNCTION__, event);
     doProtocolMetric((protocol_info *)event);
     return 0;
+}
+
+static net_info *
+getUnix(int fd)
+{
+    addSock(fd, SOCK_STREAM, AF_UNIX);
+
+    struct sockaddr_un sa;
+    bzero((char *)&sa, sizeof(sa));
+    sa.sun_family = AF_UNIX;
+    strncpy(sa.sun_path, UNIX_SOCK_PATH, sizeof(sa.sun_path)-1);
+
+    doSetConnection(fd, (struct sockaddr *)&sa, sizeof(struct sockaddr_in), LOCAL);
+
+    return getNetEntry(fd);
 }
 
 static net_info *
@@ -174,6 +193,29 @@ headerResponseIP(void **state)
     assert_string_equal(header_event, result);
 }
 
+static void
+headerRequestUnix(void **state)
+{
+    char *request = "GET /hello HTTP/1.1\r\nHost: localhost:4430\r\nUser-Agent: curl/7.68.0\r\nAccept: */*\r\nContent-Length: 12345\r\nX-Forwarded-For: 192.7.7.7\r\n\r\n";
+    char *result =
+"{\"http.method\":\"GET\","
+"\"http.target\":\"/hello\","
+"\"http.flavor\":\"1.1\","
+"\"http.scheme\":\"HTTPS\","
+"\"http.host\":\"localhost:4430\","
+"\"http.user_agent\":\"curl/7.68.0\","
+"\"http.client_ip\":\"192.7.7.7\","
+"\"net.host.name\":\"thisHostName\","
+"\"net.transport\":\"Unix.TCP\","
+"\"http.request_content_length\":12345}";
+
+    net_info *net = getUnix(3);
+    assert_non_null(net);
+    assert_true(doHttp(0x12345, 3, net, request, strlen(request), TLSRX, BUF));
+    //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
+    assert_string_equal(header_event, result);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -184,6 +226,7 @@ main(int argc, char *argv[])
         cmocka_unit_test(headerBasicResponse),
         cmocka_unit_test(headerRequestIP),
         cmocka_unit_test(headerResponseIP),
+        cmocka_unit_test(headerRequestUnix),
     };
     return cmocka_run_group_tests(tests, needleTestSetup, groupTeardown);
 }

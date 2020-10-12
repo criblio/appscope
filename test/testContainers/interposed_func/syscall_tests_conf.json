@@ -56,7 +56,8 @@
         "bind04 and bind05 were ipv6 dependent",
         "bind06 timed out after 10 min",
         "sendto02 requires the sctp protocol",
-        "connect02 is kernel specific, works on ubuntu 19 not on 18"],
+        "connect02 is kernel specific, works on ubuntu 19 not on 18",
+        "sendto03 is a check for vulnerability in thekernel function tpacket_rcv()"],
       "exclude_tests": [
         "connect02",
         "sendmsg03",
@@ -115,7 +116,8 @@
         "sendfile09",
         "creat07",
         "sendmsg02",
-        "sendto02"
+        "sendto02",
+        "sendto03"
       ]
     },
     {

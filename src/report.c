@@ -290,6 +290,16 @@ httpFields(event_field_t *fields, http_report *hreport, protocol_info *proto)
         }
     }
 
+    /*
+    Compression and getting to an attribute with compressed and uncompressed lenghts.
+    https://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html
+    https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.11
+    https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
+    https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.41
+    Content-Encoding: gzip, compress, deflate (identity is N/A)
+    Transfer-Encoding: chunked (N/A?), identity (N/A?), gzip, compress, and deflate
+    */
+
     // Next, add net fields from internal state
     H_ATTRIB(fields[hreport->ix], "net.host.name", g_proc.hostname, HTTP_VERBOSITY);
     HTTP_NEXT_FLD(hreport->ix);

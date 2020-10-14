@@ -63,7 +63,7 @@
     field.value.num = val; \
     field.cardinality = verbosity;
 
-#define HTTP_NEXT_FLD(n) if (n < HTTP_MAX_FIELDS) {n++;}else{DBG(NULL);}
+#define HTTP_NEXT_FLD(n) if (n < HTTP_MAX_FIELDS-1) {n++;}else{DBG(NULL);}
 #define HTTP_STATUS "HTTP/1."
 
 typedef struct http_report_t {

@@ -19,7 +19,7 @@
 
 extern void doProtocolMetric(protocol_info *);
 rtconfig g_cfg = {0};
-char *header_event;
+char *header_event = NULL;
  
 static int
 needleTestSetup(void** state)
@@ -27,8 +27,6 @@ needleTestSetup(void** state)
     initTime();
     initFn();
     initState();
-    initReporting();
-    initHttpState();
 
     strcpy(g_proc.hostname, "thisHostName");
     strcpy(g_proc.procname, "thisProcName");
@@ -53,6 +51,7 @@ int cmdSendHttp(ctl_t *ctl, event_t *event, uint64_t id, proc_id_t *proc)
 
     cJSON *json  = fmtMetricJson(event, NULL, CFG_SRC_HTTP);
     header_event = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
 
     //printf("HTTP Header event: %s\n", header_event);
 
@@ -69,6 +68,7 @@ int cmdPostEvent(ctl_t *ctl, char *event)
 {
     //printf("%s: data at: %p\n", __FUNCTION__, event);
     doProtocolMetric((protocol_info *)event);
+    free(event);
     return 0;
 }
 
@@ -120,6 +120,7 @@ headerBasicRequest(void **state)
     assert_true(doHttp(0x12345, 0, &net, request, buflen, TLSRX, BUF));
     //printf("%s: %s\n", __FUNCTION__, header_event);
     assert_string_equal(header_event, result);
+    free(header_event);
 }
 
 static void
@@ -140,6 +141,7 @@ headerBasicResponse(void **state)
     assert_true(doHttp(0x12345, 3, &net, response, strlen(response), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     assert_string_equal(header_event, result);
+    free(header_event);
 }
 
 static void
@@ -167,6 +169,7 @@ headerRequestIP(void **state)
     assert_true(doHttp(0x12345, 3, net, request, strlen(request), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     assert_string_equal(header_event, result);
+    free(header_event);
 }
 
 static void
@@ -191,6 +194,7 @@ headerResponseIP(void **state)
     assert_true(doHttp(0x12345, 3, net, response, strlen(response), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     assert_string_equal(header_event, result);
+    free(header_event);
 }
 
 static void
@@ -214,6 +218,7 @@ headerRequestUnix(void **state)
     assert_true(doHttp(0x12345, 3, net, request, strlen(request), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     assert_string_equal(header_event, result);
+    free(header_event);
 }
 
 int

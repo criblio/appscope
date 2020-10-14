@@ -14,13 +14,13 @@
 typedef enum {FMT_END, FMT_STR, FMT_NUM} field_value_t;
 
 typedef struct {
-    const char* const name;
-    const field_value_t value_type;
+    const char *name;
+    field_value_t value_type;
     union {
-        const char* str;
+        const char *str;
         long long num;
     } value;
-    const unsigned cardinality;   // verbosity uses this
+    unsigned cardinality;   // verbosity uses this
 } event_field_t;
 
 #define STRFIELD(n,v,c) {n,    FMT_STR, { .str = v }, c}

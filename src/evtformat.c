@@ -300,10 +300,10 @@ fmtEventJson(event_format_t *sev)
 
     if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto err;
     if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto err;
-    cJSON_AddItemToObjectCS(json, DATA, sev->data);
     if (!cJSON_AddStringToObjLN(json, HOST, sev->proc->hostname)) goto err;
     if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto err;
     if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto err;
+    cJSON_AddItemToObjectCS(json, DATA, sev->data);
 
     return json;
 err:
@@ -382,7 +382,7 @@ addJsonFields(event_field_t* fields, regex_t* fieldFilter, cJSON* json)
 }
 
 cJSON *
-fmtMetricJson(event_t *metric, regex_t* fieldFilter)
+fmtMetricJson(event_t *metric, regex_t *fieldFilter, watch_t src)
 {
     const char* metric_type = NULL;
 
@@ -391,18 +391,20 @@ fmtMetricJson(event_t *metric, regex_t* fieldFilter)
     cJSON *json = cJSON_CreateObject();
     if (!json) goto err;
 
-    if (!cJSON_AddStringToObjLN(json, "_metric", metric->name)) goto err;
-    metric_type = metricTypeStr(metric->type);
-    if (!cJSON_AddStringToObjLN(json, "_metric_type", metric_type)) goto err;
-    switch ( metric->value.type ) {
-        case FMT_INT:
-            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.integer)) goto err;
-            break;
-        case FMT_FLT:
-            if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.floating)) goto err;
-            break;
-        default:
-            DBG(NULL);
+    if (src != CFG_SRC_HTTP) {
+        if (!cJSON_AddStringToObjLN(json, "_metric", metric->name)) goto err;
+        metric_type = metricTypeStr(metric->type);
+        if (!cJSON_AddStringToObjLN(json, "_metric_type", metric_type)) goto err;
+        switch ( metric->value.type ) {
+            case FMT_INT:
+                if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.integer)) goto err;
+                break;
+            case FMT_FLT:
+                if (!cJSON_AddNumberToObjLN(json, "_value", metric->value.floating)) goto err;
+                break;
+            default:
+                DBG(NULL);
+        }
     }
 
     // Add fields
@@ -461,11 +463,11 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
     event.src = metric->name;
     event.proc = proc;
     event.uid = uid;
+    event.sourcetype = src;
 
     // Format the metric string using the configured metric format type
-    event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, src));
+    event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, src), src);
     if (!event.data) return NULL;
-    event.sourcetype = src;
 
     return fmtEventJson(&event);
 }

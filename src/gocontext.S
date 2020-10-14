@@ -12,8 +12,8 @@
     // The push decrements the stack pointer, $rsp, by 8
     // then stores the register, the stack frame then is
     // 0x18 + 0x08 = 0x20
-    sub $0x18, %rsp
     push %rax
+    sub $0x18, %rsp
 
     // Call the 'C' handler with the current stack pointer
     // as argument, e.g.:
@@ -41,8 +41,8 @@
     mov %rax, %r11
 
     # housekeeping
-    pop %rax
     add $0x18, %rsp
+    pop %rax
 
     // The value returned from our 'C' handler function is always
     // the address of the trampoline that gets us back to the
@@ -83,10 +83,12 @@
     3) comment the macro instance above
        #interpose go_hook_write, go_write
     4) build
-
-go_hook_write_1:
-    sub $0x18, %rsp
+*/
+/*
+.global go_hook_write
+go_hook_write:
     push %rax
+    sub $0x18, %rsp
 
     mov %rsp, %r11
     add $0x20, %r11
@@ -101,8 +103,8 @@ go_hook_write_1:
     call *%r11
     mov %rax, %r11
 
-    pop %rax
     add $0x18, %rsp
+    pop %rax
 
     jmp *%r11
 */

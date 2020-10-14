@@ -374,26 +374,6 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr ladd
 
     unmap_all(buf, argv);
 
-#if 0
-    rc = syscall(SYS_brk, heap);
-    printf("%s:%d rc 0x%lx heap %p\n", __FUNCTION__, __LINE__, rc, heap);
-    //if (brk(heap) == -1) scopeLog("set_go:brk", -1, CFG_LOG_ERROR);
-
-    if (prctl(PR_SET_MM, PR_SET_MM_START_STACK, (unsigned long)sp,
-              (unsigned long)0, (unsigned long)0) == -1) {
-        scopeLog("set_go:prctl:PR_SET_MM_START_STACK", -1, CFG_LOG_ERROR);
-    } else {
-        printf("%s:%d\n", __FUNCTION__, __LINE__);
-    }
-
-    if (prctl(PR_SET_MM, PR_SET_MM_BRK, (unsigned long)heap,
-              (unsigned long)0, (unsigned long)0) == -1) {
-        scopeLog("set_go:prctl:PR_SET_MM_BRK", -1, CFG_LOG_ERROR);
-    } else {
-        printf("%s:%d heap %p sbrk %p\n", __FUNCTION__, __LINE__, heap, sbrk(0));
-    }
-#endif    
-
     __asm__ volatile (
         "lea scope_stack(%%rip), %%r11 \n"
         "mov %%rsp, (%%r11)  \n"

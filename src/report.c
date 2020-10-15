@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -273,16 +274,17 @@ httpFields(event_field_t *fields, http_report *hreport, protocol_info *proto)
     }
 
     while ((reqh = strtok_r(NULL, "\r\n", &savea)) != NULL) {
-        if (strstr(reqh, "Host:")) {
+        // From RFC 2616 Section 4.2 "Field names are case-insensitive."
+        if (strcasestr(reqh, "Host:")) {
             H_ATTRIB(fields[hreport->ix], "http.host", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if (strstr(reqh, "User-Agent:")) {
+        } else if (strcasestr(reqh, "User-Agent:")) {
             H_ATTRIB(fields[hreport->ix], "http.user_agent", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if(strstr(reqh, "X-Forwarded-For:")) {
+        } else if(strcasestr(reqh, "X-Forwarded-For:")) {
             H_ATTRIB(fields[hreport->ix], "http.client_ip", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if(strstr(reqh, "Content-Length:")) {
+        } else if(strcasestr(reqh, "Content-Length:")) {
             errno = 0;
             if (((hreport->clen = strtoull(strchr(reqh, ':') + 2, NULL, 0)) == 0) || (errno != 0)) {
                 hreport->clen = -1;

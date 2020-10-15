@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include <dlfcn.h>
 
+#include "fn.h"
 #include "dbg.h"
 #include "os.h"
 #include "com.h"
@@ -66,7 +67,7 @@ get_file_size(const char *path)
     int fd;
     struct stat sbuf;
 
-    if ((fd = open(path, O_RDONLY)) == -1) {
+    if (g_fn.open && (fd = g_fn.open(path, O_RDONLY)) == -1) {
         scopeLog("ERROR: get_file_size:open", -1, CFG_LOG_ERROR);
         return -1;
     }
@@ -76,7 +77,7 @@ get_file_size(const char *path)
         return -1;
     }
 
-    if (close(fd) == -1) {
+    if (g_fn.close && g_fn.close(fd) == -1) {
         scopeLog("EROR: get_file_size:close", -1, CFG_LOG_ERROR);
         return -1;        
     }

@@ -56,7 +56,7 @@ evaltest
 grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep "Host: cribl.io" $EVT_FILE > /dev/null
+grep '"http.host":"cribl.io"' $EVT_FILE > /dev/null
 ERR+=$?
 
 grep http-resp $EVT_FILE > /dev/null
@@ -77,7 +77,7 @@ evaltest
 grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep "Host: cribl.io" $EVT_FILE > /dev/null
+grep '"http.host":"cribl.io"' $EVT_FILE > /dev/null
 ERR+=$?
 
 grep http-resp $EVT_FILE > /dev/null
@@ -98,7 +98,7 @@ evaltest
 grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep "Host: cribl.io" $EVT_FILE > /dev/null
+grep '"http.host":"cribl.io"' $EVT_FILE > /dev/null
 ERR+=$?
 
 grep http-resp $EVT_FILE > /dev/null
@@ -119,7 +119,7 @@ evaltest
 grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep "Host: cribl.io" $EVT_FILE > /dev/null
+grep '"http.host":"cribl.io"' $EVT_FILE > /dev/null
 ERR+=$?
 
 grep http-resp $EVT_FILE > /dev/null
@@ -179,7 +179,7 @@ evaltest
 grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep "host: cribl.io" $EVT_FILE > /dev/null
+grep '"http.host":"cribl.io"' $EVT_FILE > /dev/null
 ERR+=$?
 
 grep http-resp $EVT_FILE > /dev/null

@@ -24,7 +24,7 @@ cJSON *             evtFormatLog(evt_fmt_t *, const char *, const void *, size_t
                                  uint64_t, proc_id_t *);
 
 // Could be static; these are lower level funcs only exposed for testing
-cJSON *             fmtMetricJson(event_t*, regex_t*);
+cJSON *             fmtMetricJson(event_t *, regex_t *, watch_t);
 cJSON *             fmtEventJson(event_format_t *);
 
 // Setters (modifies evt_fmt_t, but does not persist modifications)

@@ -38,8 +38,6 @@
 
 uint64_t scope_stack;
 unsigned long scope_fs;
-uint64_t *g_currsheap = NULL;
-uint64_t *g_heapend = NULL;
 
 void
 sysprint(const char* fmt, ...)
@@ -62,7 +60,6 @@ sysprint(const char* fmt, ...)
     scopeLog(str, -1, CFG_LOG_DEBUG);
 }
 
-#if 0
 static int
 get_file_size(const char *path)
 {
@@ -86,7 +83,6 @@ get_file_size(const char *path)
 
     return sbuf.st_size;
 }
-#endif
 
 static int
 load_sections(char *buf, char *addr, size_t mlen)
@@ -175,70 +171,53 @@ static Elf64_Addr
 load_elf(char *buf)
 {
     int i;
+    int pgsz = sysconf(_SC_PAGESIZE);
     Elf64_Ehdr *elf = (Elf64_Ehdr *)buf;
     Elf64_Phdr *phead = (Elf64_Phdr *)&buf[elf->e_phoff];
     Elf64_Half pnum = elf->e_phnum;
-    Elf64_Addr endaddr = 0;
+    Elf64_Half phsize = elf->e_phentsize;
+    void *pheadaddr;
+
+    if ((pheadaddr = mmap(NULL, ROUND_UP((size_t)(pnum * phsize), pgsz),
+                          PROT_READ | PROT_WRITE,
+                          MAP_PRIVATE | MAP_ANONYMOUS,
+                          -1, (off_t)NULL)) == MAP_FAILED) {
+        scopeLog("ERROR: load_elf:mmap", -1, CFG_LOG_ERROR);
+        return (Elf64_Addr)NULL;
+    }
+
+    memmove(pheadaddr, phead, (size_t)(pnum * phsize));
 
     for (i = 0; i < pnum; i++) {
         if (phead[i].p_type == PT_LOAD) {
-            endaddr = map_segment(buf, &phead[i]);
+            map_segment(buf, &phead[i]);
         }
     }
 
-    return endaddr;
+    return (Elf64_Addr)pheadaddr;
 }
 
 static int
 unmap_all(char *buf, const char **argv)
 {
-#if 0
-    Elf64_Half phnum;
-    int flen, i;
-    int pgsz = sysconf(_SC_PAGESIZE);
-    Elf64_Phdr *phead;
-    
+
+    int flen;
     if ((flen = get_file_size(argv[1])) == -1) {
         scopeLog("ERROR:unmap_all: file size", -1, CFG_LOG_ERROR);
         return -1;
     }
 
-    if (munmap(buf, flen) == -1) {
-        scopeLog("ERROR: unmap_all: munmap(1)", -1, CFG_LOG_ERROR);
-        return -1;
-    }
-
-    if ((phead = (Elf64_Phdr *)getauxval(AT_PHDR)) == 0) {
-        scopeLog("ERROR: unmap_all: getauxval", -1, CFG_LOG_ERROR);
-        return -1;
-    }
-
-    if ((phnum = (Elf64_Half)getauxval(AT_PHNUM)) == 0) {
-        scopeLog("ERROR: unmap_all: getauxval", -1, CFG_LOG_ERROR);
-        return -1;
-    }
-
-    for (i = 0; i < phnum; i++) {
-        if (phead[i].p_type == PT_LOAD) {
-            if (munmap((void *)ROUND_DOWN(phead[i].p_vaddr, pgsz), phead[i].p_memsz) == -1) {
-                scopeLog("ERROR: unmap_all: munmap(2)", -1, CFG_LOG_ERROR);
-                return -1;
-            }
-        }
-
-    }
-#endif
+    freeElf(buf, flen);
     return 0;
 }
 
 static int
-copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **env)
+copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **env, Elf64_Addr phaddr)
 {
     int i;
     Elf64_auxv_t *auxv;
     char **astart;
     Elf64_Ehdr *elf;
-    Elf64_Phdr *phead;
     char **spp = (char **)sp;
     uint64_t cnt = (uint64_t)argc - 1;
     Elf64_Addr *elf_info;
@@ -246,7 +225,6 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     if (!buf || !spp || !argv || !*argv || !env || !*env) return -1;
 
     elf = (Elf64_Ehdr *)buf;
-    phead = (Elf64_Phdr *)&buf[elf->e_phoff];
     
     // do argc
     *spp++ = (char *)cnt;
@@ -303,7 +281,7 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     for (auxv = (Elf64_auxv_t *)astart; auxv->a_type != AT_NULL; auxv++) {
         switch ((unsigned long)auxv->a_type) {
         case AT_PHDR:
-            AUX_ENT(auxv->a_type, (Elf64_Addr)phead);
+            AUX_ENT(auxv->a_type, (Elf64_Addr)phaddr);
             break;
 
         case AT_PHNUM:
@@ -334,25 +312,13 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
    
 //The first six integer or pointer arguments are passed in registers RDI, RSI, RDX, RCX, R8, R9
 static int
-set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr laddr)
+set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phaddr)
 {
-    //int pgsz = sysconf(_SC_PAGESIZE);
     uint64_t res = 0;
     char *sp;
     Elf64_Addr start;
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
     char *rtld_fini = NULL;
-
-    // create a heap (void *)ROUND_UP(laddr + pgsz, pgsz)  | MAP_FIXED
-    if ((g_currsheap = mmap(NULL, HEAP_SIZE,
-                            PROT_READ | PROT_WRITE,
-                            MAP_PRIVATE | MAP_ANONYMOUS,
-                            -1, (off_t)NULL)) == MAP_FAILED) {
-        scopeLog("set_go:mmap", -1, CFG_LOG_ERROR);
-        return -1;
-    }
-
-    g_heapend = g_currsheap + HEAP_SIZE;
 
     // create a stack (void *)ROUND_UP(laddr + pgsz + HEAP_SIZE, pgsz)  | MAP_FIXED
     if ((sp = mmap(NULL, STACK_SIZE,
@@ -364,7 +330,7 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr ladd
     }
 
     // build the stack
-    copy_strings(buf, (uint64_t)sp, argc, argv, env);
+    copy_strings(buf, (uint64_t)sp, argc, argv, env, phaddr);
     start = ehdr->e_entry;
 
     if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
@@ -393,18 +359,18 @@ EXPORTON int
 sys_exec(elf_buf_t *ebuf, const char *path, int argc, const char **argv, const char **env)
 {
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
-    Elf64_Addr lastaddr;
+    Elf64_Addr phaddr;
 
     if (!ebuf || !path || !argv || (argc < 1)) return -1;
 
     scopeLog("sys_exec type:", ehdr->e_type, CFG_LOG_DEBUG);
 
-    lastaddr = load_elf((char *)ebuf->buf);
+    phaddr = load_elf((char *)ebuf->buf);
 
     // TODO: are we loading a Go app or a glibc app?
     initGoHook(ebuf);
 
-    set_go((char *)ebuf->buf, argc, argv, env, lastaddr);
+    set_go((char *)ebuf->buf, argc, argv, env, phaddr);
 
     return 0;
 }

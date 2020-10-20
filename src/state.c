@@ -887,7 +887,7 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
 }
 
 int
-doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype, char *ipPort)
+doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     net_info *net = getNetEntry(sockfd);
 
@@ -1368,7 +1368,7 @@ doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         doUpdateState(NETRX, sockfd, rc, NULL, NULL);
 
         if ((sockfd != -1) && buf) {
-            doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETRX, src, NULL);
+            doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETRX, src);
         }
     }
     return 0;
@@ -1394,7 +1394,7 @@ doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
 
 
         if ((sockfd != -1) && buf && (len > 0)) {
-            doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETTX, src, NULL);
+            doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETTX, src);
         }
     }
     return 0;

@@ -8,21 +8,30 @@
 typedef struct {
     jmethodID mid_Object_hashCode;
     jmethodID mid_SSLSocketImpl_getSession;
+    
     jmethodID mid_AppOutputStream___write;
     jmethodID mid_AppInputStream___read;
     jfieldID  fid_AppOutputStream_socket;
     jfieldID  fid_AppInputStream_socket;
+    
     jmethodID mid_ByteBuffer_array;
     jmethodID mid_ByteBuffer_position;
     jmethodID mid_ByteBuffer_limit;
+    
     jmethodID mid_SSLEngineImpl___wrap;
     jmethodID mid_SSLEngineImpl___unwrap;
     jmethodID mid_SSLEngineImpl_getSession;
+    
     jmethodID mid_Socket_getInetAddress;
     jmethodID mid_Socket_getPort;
+    jmethodID mid_Socket_getImp;
+
+    jmethodID mid_SocketImpl_getFileDescriptor;
+
+    jfieldID  fid_FileDescriptor_fd;
+
     jmethodID mid_InetAddress_getHostAddress;
-    jmethodID mid_InetSocketAddress_getHostString;
-    jmethodID mid_InetSocketAddress_getPort;
+    
     jmethodID mid_SocketChannelImpl___read;
     jmethodID mid_SocketChannelImpl___write;
     jmethodID mid_SocketChannelImpl_getRemoteAddress;
@@ -52,22 +61,15 @@ clearJniException(JNIEnv *jni)
 }
 
 static int 
-getHostAddress(JNIEnv *jni, char *buf, size_t bufSize, jobject host, jint port)
+getFdFromSocket(JNIEnv *jni, jobject socket)
 {
-    int res;
-    const char* tmpStr = (*jni)->GetStringUTFChars(jni, host, NULL);
-    res = snprintf(buf, bufSize, "%s:%d", tmpStr, port);
-    (*jni)->ReleaseStringUTFChars(jni, host, tmpStr);
-    return res;
-}
-
-static int 
-getHostAddressFromSocket(JNIEnv *jni, char *buf, size_t bufSize, jobject socket)
-{
-    jobject addr = (*jni)->CallObjectMethod(jni, socket, g_java.mid_Socket_getInetAddress);
-    jobject host = (*jni)->CallObjectMethod(jni, addr, g_java.mid_InetAddress_getHostAddress);
-    jint    port = (*jni)->CallIntMethod(jni, socket, g_java.mid_Socket_getPort);
-    return getHostAddress(jni, buf, bufSize, host, port);
+    int fd = -1;
+    jobject socketImpl = (*jni)->CallObjectMethod(jni, socket, g_java.mid_Socket_getImp);
+    jobject fdObj = (*jni)->CallObjectMethod(jni, socketImpl, g_java.mid_SocketImpl_getFileDescriptor);
+    if (fdObj) {
+        fd = (*jni)->GetIntField(jni, fdObj, g_java.fid_FileDescriptor_fd);
+    }
+    return fd;
 }
 
 static void 
@@ -85,17 +87,19 @@ initJniGlobals(JNIEnv *jni)
     }
     g_java.mid_SSLSocketImpl_getSession = (*jni)->GetMethodID(jni, sslSocketImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
 
-    jclass socketImplClass         = (*jni)->FindClass(jni, "java/net/Socket");
-    g_java.mid_Socket_getInetAddress = (*jni)->GetMethodID(jni, socketImplClass, "getInetAddress", "()Ljava/net/InetAddress;");
-    g_java.mid_Socket_getPort      = (*jni)->GetMethodID(jni, socketImplClass, "getPort", "()I");
+    jclass socketClass         = (*jni)->FindClass(jni, "java/net/Socket");
+    g_java.mid_Socket_getInetAddress = (*jni)->GetMethodID(jni, socketClass, "getInetAddress", "()Ljava/net/InetAddress;");
+    g_java.mid_Socket_getPort      = (*jni)->GetMethodID(jni, socketClass, "getPort", "()I");
+    g_java.mid_Socket_getImp       = (*jni)->GetMethodID(jni, socketClass, "getImpl", "()Ljava/net/SocketImpl;");
+
+    jclass socketImplClass         = (*jni)->FindClass(jni, "java/net/SocketImpl");
+    g_java.mid_SocketImpl_getFileDescriptor = (*jni)->GetMethodID(jni, socketImplClass, "getFileDescriptor", "()Ljava/io/FileDescriptor;");
+
+    jclass fdClass                 = (*jni)->FindClass(jni, "java/io/FileDescriptor");
+    g_java.fid_FileDescriptor_fd   = (*jni)->GetFieldID(jni, fdClass, "fd", "I");
 
     jclass inetAddressClass        = (*jni)->FindClass(jni, "java/net/InetAddress");
     g_java.mid_InetAddress_getHostAddress = (*jni)->GetMethodID(jni, inetAddressClass, "getHostAddress", "()Ljava/lang/String;");
-
-    jclass inetSocketAddressClass  = (*jni)->FindClass(jni, "java/net/InetSocketAddress");
-    g_java.mid_InetSocketAddress_getHostString = (*jni)->GetMethodID(jni, inetSocketAddressClass, "getHostString", "()Ljava/lang/String;");
-    g_java.mid_InetSocketAddress_getPort = (*jni)->GetMethodID(jni, inetSocketAddressClass, "getPort", "()I");
-
 
     jclass byteBufferClass         = (*jni)->FindClass(jni, "java/nio/ByteBuffer");
     jclass bufferClass             = (*jni)->FindClass(jni, "java/nio/Buffer");
@@ -202,8 +206,12 @@ initSSLEngineImplGlobals(JNIEnv *jni)
     g_java.mid_SocketChannelImpl___read  = (*jni)->GetMethodID(jni, socketChannelClass, "__read", "(Ljava/nio/ByteBuffer;)I");
     g_java.mid_SocketChannelImpl___write = (*jni)->GetMethodID(jni, socketChannelClass, "__write", "(Ljava/nio/ByteBuffer;)I");
     g_java.mid_SocketChannelImpl_getRemoteAddress  = (*jni)->GetMethodID(jni, socketChannelClass, "getRemoteAddress", "()Ljava/net/SocketAddress;");
+    if (g_java.mid_SocketChannelImpl_getRemoteAddress == NULL) {
+        // Open JDK 6
+        g_java.mid_SocketChannelImpl_getRemoteAddress  = (*jni)->GetMethodID(jni, socketChannelClass, "remoteAddress", "()Ljava/net/SocketAddress;");
+        clearJniException(jni);
+    }
     g_java.mid_SocketChannelImpl_getFDVal  = (*jni)->GetMethodID(jni, socketChannelClass, "getFDVal", "()I");
-
 
     jclass aiChannelClass = (*jni)->FindClass(jni, "java/nio/channels/spi/AbstractInterruptibleChannel");
     g_java.mid_SocketChannelImpl___close = (*jni)->GetMethodID(jni, aiChannelClass, "__close", "()V");
@@ -369,11 +377,11 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
 }
 
 static void 
-doJavaProtocol(JNIEnv *jni, jobject session, jbyteArray buf, jint offset, jint len, metric_t src, int fd, char *ipPort)
+doJavaProtocol(JNIEnv *jni, jobject session, jbyteArray buf, jint offset, jint len, metric_t src, int fd)
 {
     jint  hash      = (*jni)->CallIntMethod(jni, session, g_java.mid_Object_hashCode);
     jbyte *byteBuf  = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
-    doProtocol((uint64_t)hash, fd, &byteBuf[offset], (size_t)(len - offset), src, BUF, ipPort);
+    doProtocol((uint64_t)hash, fd, &byteBuf[offset], (size_t)(len - offset), src, BUF, NULL);
     (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
 }
 
@@ -451,7 +459,7 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
         jobject bufEl  = (*jni)->GetObjectArrayElement(jni, dsts, i);
         jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
         jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-        doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd, NULL);
+        doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd);
     }
     return res;
 }
@@ -484,7 +492,7 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
         jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
         jint limit     = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_limit);
         jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-        doJavaProtocol(jni, session, buf, pos, limit, TLSTX, fd, NULL);
+        doJavaProtocol(jni, session, buf, pos, limit, TLSTX, fd);
     }
     
     //call the original method
@@ -501,8 +509,7 @@ Java_com_sun_net_ssl_internal_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, j
 JNIEXPORT void JNICALL 
 Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
-    char str[30];
-    char *hostAddr = NULL;
+    int fd = -1;
 
     initJniGlobals(jni);
     initAppOutputStreamGlobals(jni);
@@ -511,14 +518,12 @@ Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray
     if (g_java.fid_AppOutputStream_socket != NULL) {
         jobject socket  = (*jni)->GetObjectField(jni, obj, g_java.fid_AppOutputStream_socket);
         session = (*jni)->CallObjectMethod(jni, socket, g_java.mid_SSLSocketImpl_getSession);
-        if (getHostAddressFromSocket(jni, str, sizeof(str), socket) > 0) {
-            hostAddr = str;
-        }
+        fd = getFdFromSocket(jni, socket);
     } else {
         session = obj;
     }
     
-    doJavaProtocol(jni, session, buf, offset, len, TLSTX, -1, hostAddr);
+    doJavaProtocol(jni, session, buf, offset, len, TLSTX, fd);
     
     //call the original method
     (*jni)->CallVoidMethod(jni, obj, g_java.mid_AppOutputStream___write, buf, offset, len);
@@ -540,28 +545,24 @@ Java_com_sun_net_ssl_internal_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj
 JNIEXPORT jint JNICALL 
 Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
-    char str[30];
-    char *hostAddr = NULL;
+    int fd = -1;
 
     initJniGlobals(jni);
     initAppInputStreamGlobals(jni);
 
-    //call the original method
-    jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_AppInputStream___read, buf, offset, len);
-
-    jobject session = NULL;
-
+    jobject session;
     if (g_java.fid_AppInputStream_socket != NULL) {
         jobject socket  = (*jni)->GetObjectField(jni, obj, g_java.fid_AppInputStream_socket);
         session = (*jni)->CallObjectMethod(jni, socket, g_java.mid_SSLSocketImpl_getSession);
-        if (getHostAddressFromSocket(jni, str, sizeof(str), socket) > 0) {
-            hostAddr = str;
-        }
+        fd = getFdFromSocket(jni, socket);
     } else {
         session = obj;
     }
-    
-    doJavaProtocol(jni, session, buf, offset, res, TLSRX, -1, hostAddr);
+
+    //call the original method
+    jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_AppInputStream___read, buf, offset, len);
+
+    doJavaProtocol(jni, session, buf, offset, res, TLSRX, fd);
 
     return res;
 }

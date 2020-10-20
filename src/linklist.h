@@ -38,4 +38,6 @@ void* lstFind (list_t *list, list_key_t search_key);
 // on every element, then freeing the list_t structure when it's complete.
 void lstDestroy(list_t **list);
 
+void lstDeleteByData(list_t *list, void* data);
+
 #endif // __LINKLIST_H__

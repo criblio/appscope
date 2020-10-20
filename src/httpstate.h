@@ -6,7 +6,7 @@
 #include "state_private.h"
 
 void initHttpState(void);
-bool doHttp(uint64_t, int, net_info*, char*, size_t, metric_t, src_data_t, char *);
+bool doHttp(uint64_t, int, net_info*, char*, size_t, metric_t, src_data_t);
 void resetHttp(http_state_t *httpstate);
 
 #endif // __HTTPSTATE_H__

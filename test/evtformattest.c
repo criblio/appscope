@@ -54,12 +54,12 @@ evtFormatMetricHappyPath(void** state)
     asprintf(&expected, "{\"sourcetype\":\"metric\","
                            "\"id\":\"host-evttest-cmd-4\","
                            "\"_time\":%ld,"
-                           "\"source\":\"A\",\"data\":"
-                           "{\"_metric\":\"A\","
-                              "\"_metric_type\":\"counter\","
-                              "\"_value\":1"
-                           "},\"host\":\"host\","
-                           "\"_channel\":\"12345\"}", (long)time->valuedouble);
+                           "\"source\":\"A\","
+                           "\"host\":\"host\","
+                           "\"_channel\":\"12345\","
+                           "\"data\":{\"_metric\":\"A\",\"_metric_type\":\"counter\",\"_value\":1}}", (long)time->valuedouble);
+
+
     assert_non_null(expected);
     char* actual = cJSON_PrintUnformatted(json);
     assert_non_null(actual);
@@ -419,9 +419,10 @@ fmtEventJsonValue(void** state)
                               "\"id\":\"earl-formattest-cmd\","
                               "\"_time\":1573058085.991,"
                               "\"source\":\"stdin\","
-                              "\"data\":\"поспехаў\","
                               "\"host\":\"earl\","
-                              "\"_channel\":\"14627333968688430831\"}");
+                              "\"_channel\":\"14627333968688430831\","
+                              "\"data\":\"поспехаў\"}");
+
     free(str);
     cJSON_Delete(json);
 }
@@ -456,9 +457,10 @@ fmtEventJsonWithEmbeddedNulls(void** state)
                               "\"id\":\"earl--\","
                               "\"_time\":1573058085.001,"
                               "\"source\":\"stdout\","
-                              "\"data\":\"Unë mund\\u0000të ha qelq dhe nuk\\u0000më gjen gjë\","
                               "\"host\":\"earl\","
-                              "\"_channel\":\"14627333968688430831\"}");
+                              "\"_channel\":\"14627333968688430831\","
+                              "\"data\":\"Unë mund\\u0000të ha qelq dhe nuk\\u0000më gjen gjë\"}");
+
     free(str);
     cJSON_Delete(json);
 
@@ -489,7 +491,7 @@ fmtMetricJsonNoFields(void** state)
     data_type_t type;
     for (type=DELTA; type<=SET+1; type++) {
         event_t e = INT_EVENT("A", 1, type, NULL);
-        cJSON* json = fmtMetricJson(&e, NULL);
+        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_MAX);
         cJSON* json_type = cJSON_GetObjectItem(json, "_metric_type");
         assert_string_equal(map[type], cJSON_GetStringValue(json_type));
         if (json) cJSON_Delete(json);
@@ -507,7 +509,7 @@ fmtMetricJsonWFields(void** state)
         FIELDEND
     };
     event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
-    cJSON* json = fmtMetricJson(&e, NULL);
+    cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_MAX);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
@@ -533,7 +535,7 @@ fmtMetricJsonWFilteredFields(void** state)
     event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
     regex_t re;
     assert_int_equal(regcomp(&re, "[AD]", REG_EXTENDED), 0);
-    cJSON* json = fmtMetricJson(&e, &re);
+    cJSON* json = fmtMetricJson(&e, &re, CFG_SRC_MAX);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
@@ -552,7 +554,7 @@ fmtMetricJsonEscapedValues(void** state)
 {
     {
         event_t e = INT_EVENT("Paç \"fat!", 3, SET, NULL);    // embedded double quote
-        cJSON* json = fmtMetricJson(&e, NULL);
+        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_MAX);
         assert_non_null(json);
         char* str = cJSON_PrintUnformatted(json);
         assert_non_null(str);
@@ -571,7 +573,7 @@ fmtMetricJsonEscapedValues(void** state)
             FIELDEND
         };
         event_t e = INT_EVENT("you", 4, DELTA, fields);
-        cJSON* json = fmtMetricJson(&e, NULL);
+        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_MAX);
         assert_non_null(json);
         char* str = cJSON_PrintUnformatted(json);
         assert_non_null(str);

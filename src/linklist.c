@@ -229,16 +229,3 @@ lstDestroy(list_t** list)
     free(*list);
     *list = NULL;
 }
-
-void 
-lstDeleteByData(list_t *list, void* data)
-{
-    if (!list || !list->head) return;
-    list_element_t *el = list->head;
-    do {
-        if (el->data == data) {
-            lstDelete(list, el->key);
-        }
-        el = get_unmarked_reference(el->next);
-    } while (el);
-}

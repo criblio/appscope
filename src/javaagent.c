@@ -17,6 +17,7 @@ typedef struct {
     jmethodID mid_ByteBuffer_array;
     jmethodID mid_ByteBuffer_position;
     jmethodID mid_ByteBuffer_limit;
+    jfieldID  fid_ByteBuffer___fd;
     
     jmethodID mid_SSLEngineImpl___wrap;
     jmethodID mid_SSLEngineImpl___unwrap;
@@ -40,8 +41,6 @@ typedef struct {
 } java_global_t;
 
 static java_global_t g_java = {0};
-
-static list_t *g_socketMap;
 
 static void 
 logJvmtiError(jvmtiEnv *jvmti, jvmtiError errnum, const char *str) 
@@ -100,12 +99,6 @@ initJniGlobals(JNIEnv *jni)
 
     jclass inetAddressClass        = (*jni)->FindClass(jni, "java/net/InetAddress");
     g_java.mid_InetAddress_getHostAddress = (*jni)->GetMethodID(jni, inetAddressClass, "getHostAddress", "()Ljava/lang/String;");
-
-    jclass byteBufferClass         = (*jni)->FindClass(jni, "java/nio/ByteBuffer");
-    jclass bufferClass             = (*jni)->FindClass(jni, "java/nio/Buffer");
-    g_java.mid_ByteBuffer_array    = (*jni)->GetMethodID(jni, byteBufferClass, "array", "()[B");
-    g_java.mid_ByteBuffer_position = (*jni)->GetMethodID(jni, bufferClass, "position", "()I");
-    g_java.mid_ByteBuffer_limit    = (*jni)->GetMethodID(jni, bufferClass, "limit", "()I");
 }
 
 static void 
@@ -213,9 +206,20 @@ initSSLEngineImplGlobals(JNIEnv *jni)
     }
     g_java.mid_SocketChannelImpl_getFDVal  = (*jni)->GetMethodID(jni, socketChannelClass, "getFDVal", "()I");
 
-    jclass aiChannelClass = (*jni)->FindClass(jni, "java/nio/channels/spi/AbstractInterruptibleChannel");
-    g_java.mid_SocketChannelImpl___close = (*jni)->GetMethodID(jni, aiChannelClass, "__close", "()V");
-    g_socketMap = lstCreate(NULL);
+    jclass byteBufferClass         = (*jni)->FindClass(jni, "java/nio/ByteBuffer");
+    jclass bufferClass             = (*jni)->FindClass(jni, "java/nio/Buffer");
+    g_java.mid_ByteBuffer_array    = (*jni)->GetMethodID(jni, byteBufferClass, "array", "()[B");
+    g_java.mid_ByteBuffer_position = (*jni)->GetMethodID(jni, bufferClass, "position", "()I");
+    g_java.mid_ByteBuffer_limit    = (*jni)->GetMethodID(jni, bufferClass, "limit", "()I");
+
+    jclass dbbClass                = (*jni)->FindClass(jni, "java/nio/DirectByteBuffer");
+    g_java.fid_ByteBuffer___fd     = (*jni)->GetFieldID(jni, dbbClass, "__fd", "I");
+    if (g_java.fid_ByteBuffer___fd == NULL) {
+        // Open JDK 9
+        dbbClass                   = (*jni)->FindClass(jni, "java/nio/DirectByteBufferR");
+        g_java.fid_ByteBuffer___fd = (*jni)->GetFieldID(jni, dbbClass, "__fd", "I");
+        clearJniException(jni);
+    }
 }
 
 void JNICALL 
@@ -231,7 +235,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     unsigned char** new_class_data) 
 {
     if (name == NULL) return;
-
+    
     if (strcmp(name, "sun/security/ssl/AppOutputStream") == 0 || 
         strcmp(name, "com/sun/net/ssl/internal/ssl/AppOutputStream") == 0 ||
         strcmp(name, "sun/security/ssl/SSLSocketImpl$AppOutputStream") == 0) {
@@ -321,7 +325,6 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     if (strcmp(name, "sun/nio/ch/SocketChannelImpl") == 0) {
 
         scopeLog("installing Java SSL hooks for SocketChannelImpl class...", -1, CFG_LOG_INFO);
-
         java_class_t *classInfo = javaReadClass(class_data);
 
         int methodIndex = javaFindMethodIndex(classInfo, "read", "(Ljava/nio/ByteBuffer;)I");
@@ -351,20 +354,14 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (strcmp(name, "java/nio/channels/spi/AbstractInterruptibleChannel") == 0) {
-        
-        scopeLog("installing Java SSL hooks for AbstractInterruptibleChannel class...", -1, CFG_LOG_INFO);
+    if (strcmp(name, "java/nio/DirectByteBuffer") == 0 ||
+        strcmp(name, "java/nio/DirectByteBufferR") == 0) {
 
+        scopeLog("installing Java SSL hooks for java.nio.DirectByteBuffer class...", -1, CFG_LOG_INFO);
         java_class_t *classInfo = javaReadClass(class_data);
 
-        int methodIndex = javaFindMethodIndex(classInfo, "close", "()V");
-        if (methodIndex == -1) {
-            javaDestroy(&classInfo);
-            scopeLog("ERROR: 'close' method not found in AbstractInterruptibleChannel class\n", -1, CFG_LOG_ERROR);
-            return;
-        }
-        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__close");
-        javaConvertMethodToNative(classInfo, methodIndex);
+        // add a private field which will hold the fd used to read/write data for that buffer
+        javaAddField(classInfo, "__fd", "I", ACC_PRIVATE);
 
         unsigned char *dest;
         (*jvmti_env)->Allocate(jvmti_env, classInfo->length, &dest);
@@ -388,27 +385,9 @@ doJavaProtocol(JNIEnv *jni, jobject session, jbyteArray buf, jint offset, jint l
 static void
 saveSocketChannel(JNIEnv *jni, jobject socketChannel, jobject buf)
 {
-    uint64_t bufAddr = *((uint64_t *)buf);
-    uint64_t socketChannelAddr = *((uint64_t *)socketChannel);
-
-    if (lstFind(g_socketMap, bufAddr) == NULL) {
-        if (lstInsert(g_socketMap, bufAddr, (void *)socketChannelAddr) == FALSE) {
-            scopeLog("lstInsert failed", -1, CFG_LOG_ERROR);
-        }
-    }
-}
-
-JNIEXPORT void JNICALL
-Java_java_nio_channels_spi_AbstractInterruptibleChannel_close(JNIEnv *jni, jobject obj)
-{
-    initJniGlobals(jni);
-    initSSLEngineImplGlobals(jni);
-
-    //remove all refs to this socket channel from g_socketMap
-    uint64_t socketChannelAddr = *((uint64_t *)obj);
-    lstDeleteByData(g_socketMap, (void *)socketChannelAddr);
-
-    (*jni)->CallVoidMethod(jni, obj, g_java.mid_SocketChannelImpl___close);
+    jint fd = (*jni)->CallIntMethod(jni, socketChannel, g_java.mid_SocketChannelImpl_getFDVal);
+    //store the file descriptor in the internal byte buffer's field
+    (*jni)->SetIntField(jni, buf, g_java.fid_ByteBuffer___fd, fd);
 }
 
 JNIEXPORT jint JNICALL
@@ -443,12 +422,9 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
 
-    uint64_t bufAddr = *((uint64_t *)src);
-
-    void *socketChannelAddr;
-    if ((socketChannelAddr = lstFind(g_socketMap, bufAddr))) {
-        jobject socketChannel = (jobject) (&socketChannelAddr);
-        fd = (*jni)->CallIntMethod(jni, socketChannel, g_java.mid_SocketChannelImpl_getFDVal);
+    jint fdVal = (uint64_t) (*jni)->GetIntField(jni, src, g_java.fid_ByteBuffer___fd);
+    if (fdVal) {
+        fd = fdVal;
     }
 
     //call the original method
@@ -478,14 +454,11 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
 
-    uint64_t bufAddr = *((uint64_t *)dst);
-
-    void *socketChannelAddr;
-    if ((socketChannelAddr = lstFind(g_socketMap, bufAddr))) {
-        jobject socketChannel = (jobject) (&socketChannelAddr);
-        fd = (*jni)->CallIntMethod(jni, socketChannel, g_java.mid_SocketChannelImpl_getFDVal);
+    jint fdVal = (uint64_t) (*jni)->GetIntField(jni, dst, g_java.fid_ByteBuffer___fd);
+    if (fdVal) {
+        fd = fdVal;
     }
-
+    
     jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
     for(int i=offset;i<len - offset;i++) {
         jobject bufEl  = (*jni)->GetObjectArrayElement(jni, srcs, i);

@@ -383,7 +383,7 @@ doHttpHeader(protocol_info *proto)
         map->id = post->id;
     }
 
-    ssl = (post->ssl) ? "HTTPS" : "HTTP";
+    ssl = (post->ssl) ? "https" : "http";
 
     if ((hreport.header = calloc(1, proto->len)) == NULL) {
         scopeLog("ERROR: doHttpHeader: memory allocation failure", proto->fd, CFG_LOG_ERROR);

@@ -150,6 +150,8 @@ setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src
     httpId->isSsl = ((src == TLSTX) || (src == TLSRX) ||
                     (localPort == 443) || (remotePort == 443));
 
+    httpId->src = src;
+
     httpId->sockfd = sockfd;
 
     return TRUE;
@@ -174,10 +176,13 @@ reportHttp(http_state_t *httpstate)
     // If the first 5 chars are HTTP/, it's a response header
     int isResponse =
       (searchExec(g_http_start, httpstate->hdr, searchLen(g_http_start)) != -1);
+    int isSend = (httpstate->id.src == NETTX) || (httpstate->id.src == TLSTX);
 
     // Set proto info
     proto->evtype = EVT_PROTO;
     proto->ptype = (isResponse) ? EVT_HRES : EVT_HREQ;
+    // We're a server if we 1) sent a response or 2) received a request
+    proto->isServer = (isSend && isResponse) || (!isSend && !isResponse);
     proto->len = httpstate->hdrlen;
     proto->fd = httpstate->id.sockfd;
     proto->uid = httpstate->id.uid;

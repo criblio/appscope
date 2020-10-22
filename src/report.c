@@ -551,7 +551,8 @@ doHttpHeader(protocol_info *proto)
 
             httpFieldEnd(fields, &hreport);
 
-            event_t http_dur = INT_EVENT("http.server.duration", map->duration, DELTA, fields);
+            char *mtx_name = (proto->isServer) ? "http.server.duration" : "http.client.duration";
+            event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA, fields);
             cmdSendMetric(g_mtc, &http_dur);
 
             if (map->clen != -1) {

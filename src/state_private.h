@@ -116,11 +116,13 @@ typedef struct
     uint64_t uid;
     int sockfd;
     int isSsl;
+    metric_t src;
 } httpId_t;
 
 typedef struct protocol_info_t {
     metric_t evtype;
     metric_t ptype;
+    int isServer;
     size_t len;
     int fd;
     uint64_t uid;

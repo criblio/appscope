@@ -381,7 +381,10 @@ doHttpHeader(protocol_info *proto)
         }
 
         map->id = post->id;
+        map->first_time = time(NULL);
     }
+
+    map->frequency++;
 
     ssl = (post->ssl) ? "https" : "http";
 
@@ -446,7 +449,7 @@ doHttpHeader(protocol_info *proto)
         H_ATTRIB(fields[hreport.ix], "http.scheme", ssl, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
-        // Adds fields common to request & response
+        // Fields common to request & response
         httpFields(fields, &hreport, proto);
 
         if (hreport.clen != -1) {
@@ -473,6 +476,11 @@ doHttpHeader(protocol_info *proto)
     * Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
     */
     } else if (proto->ptype == EVT_HRES) {
+        int rps = map->frequency;
+        int sec = (map->first_time > 0) ? (int)time(NULL) - map->first_time : 1;
+        if (sec > 0) {
+            rps = map->frequency / sec;
+        }
 
         map->resp = (char *)post->hdr;
 
@@ -529,6 +537,22 @@ doHttpHeader(protocol_info *proto)
         event_t hevent = INT_EVENT("http-resp", proto->len, SET, fields);
         cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
 
+        // Are we doing a metric event?
+        event_field_t mfields[] = {
+            DURATION_FIELD(map->duration),
+            RATE_FIELD(rps),
+            HTTPSTAT_FIELD(status),
+            PROC_FIELD(g_proc.procname),
+            FD_FIELD(proto->fd),
+            PID_FIELD(g_proc.pid),
+            UNIT_FIELD("byte"),
+            FIELDEND
+        };
+
+        event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
+        cmdSendHttp(g_ctl, &mevent, map->id, &g_proc);
+
+        // emit statsd metrics, if enabled.
         if (mtcEnabled(g_mtc)) {
 
             // metric output has some fields from the header that the

@@ -86,15 +86,14 @@ typedef struct http_post_t {
 } http_post;
 
 typedef struct http_map_t {
-    time_t first_time;
-    uint64_t frequency;
     uint64_t start_time;
     uint64_t duration;
     uint64_t id;
-    char *req;
-    char *method_str;
-    char *target_str;
-    char *resp;
+    char *req;          // The whole original request
+    char *method_str;   //   Method field from Request-Line
+    char *target_str;   //   Request-URI field from Request-Line
+    size_t clen;        //   Content-Length entity-header value from req
+    char *resp;         // The whole original response
 } http_map;
 
 typedef struct stat_err_info_t {

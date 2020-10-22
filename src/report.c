@@ -381,10 +381,7 @@ doHttpHeader(protocol_info *proto)
         }
 
         map->id = post->id;
-        map->first_time = time(NULL);
     }
-
-    map->frequency++;
 
     ssl = (post->ssl) ? "HTTPS" : "HTTP";
 
@@ -456,6 +453,7 @@ doHttpHeader(protocol_info *proto)
             H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
             HTTP_NEXT_FLD(hreport.ix);
         }
+        map->clen = hreport.clen;
 
         httpFieldEnd(fields, &hreport);
 
@@ -475,11 +473,6 @@ doHttpHeader(protocol_info *proto)
     * Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
     */
     } else if (proto->ptype == EVT_HRES) {
-        int rps = map->frequency;
-        int sec = (map->first_time > 0) ? (int)time(NULL) - map->first_time : 1;
-        if (sec > 0) {
-            rps = map->frequency / sec;
-        }
 
         map->resp = (char *)post->hdr;
 
@@ -560,6 +553,17 @@ doHttpHeader(protocol_info *proto)
 
             event_t http_dur = INT_EVENT("http.server.duration", map->duration, DELTA, fields);
             cmdSendMetric(g_mtc, &http_dur);
+
+            if (map->clen != -1) {
+                event_t http_req_len = INT_EVENT("http.request.content_length", map->clen, DELTA, fields);
+                cmdSendMetric(g_mtc, &http_req_len);
+            }
+
+            if (hreport.clen != -1) {
+                event_t http_rsp_len = INT_EVENT("http.response.content_length", hreport.clen, DELTA, fields);
+                cmdSendMetric(g_mtc, &http_rsp_len);
+            }
+
         }
 
         // Done; we remove the list entry; complete when reported

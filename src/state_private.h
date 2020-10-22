@@ -92,6 +92,8 @@ typedef struct http_map_t {
     uint64_t duration;
     uint64_t id;
     char *req;
+    char *method_str;
+    char *target_str;
     char *resp;
 } http_map;
 

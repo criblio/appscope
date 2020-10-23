@@ -338,11 +338,152 @@ ERR+=$?
 
 endtest
 
+#
+#  influxdb tests
+#
+dbfile="/go/influx/db/meta/meta.db"
+influx_verbose=0
+
+influx_start_server() {
+    rm -f /go/influx/db/*.event
+
+    if (( $influx_verbose )); then
+        SCOPE_EVENT_DEST=file:///go/influx/db/influxd.event scope $1 &
+    else
+        SCOPE_EVENT_DEST=file:///go/influx/db/influxd.event scope $1 2>/dev/null &
+    fi
+
+    until test -e "$dbfile" ; do
+	    sleep 1
+    done
+
+}
+
+influx_eval() {
+    pkill -f $2
+
+    pexist="influxd"
+    until test -z "$pexist" ; do
+	    sleep 1
+	    pexist=`ps -ef | grep influxd | grep config`
+    done
+
+    evaltest
+    cnt=`grep -c http-req /go/influx/db/influxd.event`
+    if (test "$cnt" -lt $1); then
+	    echo "ERROR: Server count is $cnt"
+	    ERR+=1
+    else
+	    echo "Server Success count is $cnt"
+    fi
+
+    if [ -e  "/go/influx/db/influxc.event" ]; then
+        cnt=`grep -c http-req /go/influx/db/influxc.event`
+        if (test "$cnt" -lt $1); then
+	        echo "ERROR: Client count is $cnt"
+	        ERR+=1
+        else
+	        echo "Client Success count is $cnt"
+        fi
+    fi
+
+    rm -r /go/influx/db/*
+    touch $EVT_FILE
+    endtest
+
+}
+
+#
+# influx static stress test
+#
+# we've seen that the stress test does not run repeatedly
+# in a container/EC2 environment. There is a standalone
+# script that will run stress, Commentend out here.
+#
+sleep 1
+starttest influx_static_stress
+
+influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
+
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/stress_test insert -n 1000000 -f
+ERR+=$?
+
+influx_eval 90 scope
+
+#
+# influx static TLS test
+#
+sleep 1
+starttest influx_static_tls
+
+influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb_ssl.conf"
+
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'CREATE DATABASE goats'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
+
+if (test $influx_verbose -eq 0); then
+    sleep 1
+fi
+
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/influx_stat -ssl -unsafeSsl -host localhost -import -path=/go/influx/data.txt -precision=s
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
+
+influx_eval 2 scope
+
+
+#
+# influx dynamic TLS test
+#
+sleep 1
+starttest influx_dynamic_tls
+
+influx_start_server "/go/influx/influxd_dyn --config /go/influx/influxdb_ssl.conf"
+
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/influx_dyn -ssl -unsafeSsl -host localhost -execute 'CREATE DATABASE goats'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/influx_dyn -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
+
+influx_eval 2 influxd
+
+#
+# influx static clear test
+#
+sleep 1
+starttest influx_static_clear
+
+influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
+
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/influx_stat -host localhost -execute 'CREATE DATABASE sheep'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/influx_stat -host localhost -execute 'SHOW DATABASES'
+
+influx_eval 2 scope
+
+
+#
+# influx dynamic clear test
+#
+sleep 1
+starttest influx_dynamic_clear
+
+influx_start_server "/go/influx/influxd_dyn --config /go/influx/influxdb.conf"
+
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/influx_dyn -host localhost -execute 'CREATE DATABASE sheep'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/influx_dyn -host localhost -execute 'SHOW DATABASES'
+
+if (test $influx_verbose -eq 0); then
+    sleep 1
+fi
+
+
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/influx_dyn -import -path=/go/influx/data.txt -precision=s
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/influx_dyn -host localhost -execute 'SHOW DATABASES'
+
+influx_eval 2 influxd
 
 
 
-
-
+#
+# Done: print results
+#
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""
     echo ""

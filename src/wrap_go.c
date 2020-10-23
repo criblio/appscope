@@ -407,8 +407,7 @@ initGoHook(elf_buf_t *ebuf)
         } else if (checkEnv(SWITCH_ENV, SWITCH_USE_THREAD)) {
             g_switch_thread = TRUE;
         } else {
-            g_switch_thread = FALSE;
-            patchClone();
+            g_switch_thread = TRUE;
         }
     } else {
         g_switch_thread = TRUE;
@@ -651,6 +650,15 @@ out:
 * to create a TCB. However, __clone() has previously
 * been disabled in initGoHook(). Therefore, no thread
 * is actually created.
+*
+* Note: we found that this version of go_switch()
+* results in a malloc error when running with the
+* influxdb stress test. Making the thread version
+* the default resolves the issue. Have not found
+* the root cause. Reproduce by running a static
+* influxd, then run the old stress client
+* influx_stress_stat and write event files from
+* the server and client to the file system.
 */
 inline static void *
 go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)

@@ -42,6 +42,11 @@ COPY ./go/cgo/myc.h /go/cgo
 COPY ./go/cgo/mygo.go /go/cgo
 RUN cd /go/cgo && make all
 
+RUN mkdir /go/influx
+COPY ./go/influx/* /go/influx/
+COPY ./go/influx/influxdb-selfsigned.key /etc/ssl/.
+COPY ./go/influx/influxdb-selfsigned.crt /etc/ssl/.
+
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=true

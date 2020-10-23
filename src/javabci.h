@@ -69,7 +69,7 @@ typedef struct {
 
 java_class_t*   javaReadClass(const unsigned char* classData);
 void            javaWriteClass(unsigned char *dest, java_class_t *info);
-void            javaDestroy(java_class_t **classInfo);
+void            javaDestroy(java_class_t **info);
 
 int             javaFindClassIndex(java_class_t *info, const char *className);
 int             javaFindMethodIndex(java_class_t *info, const char *method, const char *signature);
@@ -77,7 +77,8 @@ void            javaCopyMethod(java_class_t *info, unsigned char *method, const 
 void            javaAddMethod(java_class_t *info, const char* name, const char* descriptor, 
                               uint16_t accessFlags, uint16_t maxStack, uint16_t maxLocals, 
                               uint8_t *code, uint32_t codeLen);
-void            javaInjectCode(java_class_t *classInfo, unsigned char *method, uint8_t *code, size_t len);
+void            javaAddField(java_class_t *info, const char* name, const char* descriptor, uint16_t accessFlags);
+void            javaInjectCode(java_class_t *info, unsigned char *method, uint8_t *code, size_t len);
 
 uint16_t        javaAddStringTag(java_class_t *info, const char* str);
 uint16_t        javaAddNameAndTypeTag(java_class_t *info, const char *name, const char *desc);

@@ -157,7 +157,7 @@ javaGetMethodLength(unsigned char *addr)
     return getAttributesLength(addr + 6) + 6;
 }
 
-unsigned char *
+static unsigned char *
 getCodeAttributeAddress(java_class_t *info, unsigned char *method) 
 {
     uint16_t attributes_count = be16toh(*((uint16_t *)(method + 6)));
@@ -311,6 +311,25 @@ javaAddMethod(java_class_t *info, const char* name, const char* descriptor,
     info->length += bufsize;
 }
 
+void
+javaAddField(java_class_t *info, const char* name, const char* descriptor, uint16_t accessFlags)
+{
+    uint16_t nameIndex       = addUtf8Tag(info, name);
+    uint16_t descriptorIndex = addUtf8Tag(info, descriptor);
+    uint16_t attrCount = 0;
+
+    size_t bufsize = 4 * 2;
+    unsigned char *buf = malloc(bufsize);
+    info->fields_count++;
+    info->fields[info->fields_count - 1] = buf;
+    info->length += bufsize;
+
+    *((uint16_t *)buf) = htobe16(accessFlags);      buf += 2;
+    *((uint16_t *)buf) = htobe16(nameIndex);        buf += 2;
+    *((uint16_t *)buf) = htobe16(descriptorIndex);  buf += 2;
+    *((uint16_t *)buf) = htobe16(attrCount);        buf += 2;
+}
+
 void 
 javaInjectCode(java_class_t *classInfo, unsigned char *method, uint8_t *code, size_t len) 
 {
@@ -411,7 +430,8 @@ javaReadClass(const unsigned char* classData)
 
     //read fields
     classInfo->fields_count         = be16toh(*((uint16_t *)off)); off += 2;
-    classInfo->fields               = (unsigned char **) calloc(classInfo->fields_count, sizeof(unsigned char *));
+    //allocate memory for existing fields and make a room for up to 100 new fields
+    classInfo->fields               = (unsigned char **) calloc(100 + classInfo->fields_count, sizeof(unsigned char *));
     for (int i=0;i<classInfo->fields_count;i++) {
         classInfo->fields[i] = off;
         off += getAttributesLength(off + 6) + 6;

@@ -62,7 +62,7 @@ ERR+=$?
 grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep HTTP $EVT_FILE > /dev/null
+grep http-metric $EVT_FILE > /dev/null
 ERR+=$?
 
 grep '"net.peer.ip":"127.0.0.1"' $EVT_FILE > /dev/null
@@ -84,7 +84,7 @@ ERR+=$?
 grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep HTTP $EVT_FILE > /dev/null
+grep http-metric $EVT_FILE > /dev/null
 ERR+=$?
 
 grep '"net.peer.ip":"127.0.0.1"' $EVT_FILE > /dev/null

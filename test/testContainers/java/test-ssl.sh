@@ -64,6 +64,13 @@ ERR+=$?
 
 grep HTTP $EVT_FILE > /dev/null
 ERR+=$?
+
+grep '"net.peer.ip":"127.0.0.1"' $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -E '"net\.peer\.port":"[0-9]+"' $EVT_FILE > /dev/null
+ERR+=$?
+
 endtest
 
 
@@ -79,6 +86,13 @@ ERR+=$?
 
 grep HTTP $EVT_FILE > /dev/null
 ERR+=$?
+
+grep '"net.peer.ip":"127.0.0.1"' $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -E '"net\.peer\.port":"[0-9]+"' $EVT_FILE > /dev/null
+ERR+=$?
+
 endtest
 
 /opt/tomcat/bin/catalina.sh stop

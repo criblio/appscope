@@ -388,6 +388,7 @@ influx_eval() {
     fi
 
     rm -r /go/influx/db/*
+    touch /go/influx/db/data.txt
     touch $EVT_FILE
     endtest
 

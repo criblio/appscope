@@ -42,7 +42,7 @@ COPY ./go/cgo/myc.h /go/cgo
 COPY ./go/cgo/mygo.go /go/cgo
 RUN cd /go/cgo && make all
 
-RUN mkdir /go/influx
+RUN mkdir -p /go/influx/db
 COPY ./go/influx/* /go/influx/
 COPY ./go/influx/influxdb-selfsigned.key /etc/ssl/.
 COPY ./go/influx/influxdb-selfsigned.crt /etc/ssl/.

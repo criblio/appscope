@@ -134,21 +134,16 @@ setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src
      * If we have an fd, use the uid/channel value as it's unique
      * else we are likley using TLS, so default to the session ID
      */
-    in_port_t localPort, remotePort;
     if (net) {
         httpId->uid = net->uid;
-        localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
-        remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
     } else if (id != -1) {
         httpId->uid = id;
-        localPort = remotePort = 0;
     } else {
         DBG(NULL);
         return FALSE;
     }
 
-    httpId->isSsl = ((src == TLSTX) || (src == TLSRX) ||
-                    (localPort == 443) || (remotePort == 443));
+    httpId->isSsl = (src == TLSTX) || (src == TLSRX);
 
     httpId->src = src;
 

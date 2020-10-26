@@ -110,7 +110,14 @@ static void
 headerBasicRequest(void **state)
 {
     char *request = "GET /hello HTTP/1.1\r\nHost: localhost:4430\r\nUser-Agent: curl/7.68.0\r\nAccept: */*\r\n\r\n";
-    char *result = "{\"http.method\":\"GET\",\"http.target\":\"/hello\",\"http.flavor\":\"1.1\",\"http.scheme\":\"HTTPS\",\"http.host\":\"localhost:4430\",\"http.user_agent\":\"curl/7.68.0\",\"net.host.name\":\"thisHostName\"}";
+    char *result[] = { "\"http.method\":\"GET\"",
+                       "\"http.target\":\"/hello\"",
+                       "\"http.flavor\":\"1.1\"",
+                       "\"http.scheme\":\"https\"",
+                       "\"http.host\":\"localhost:4430\"",
+                       "\"http.user_agent\":\"curl/7.68.0\"",
+                       "\"net.host.name\":\"thisHostName\""
+                     };
     size_t buflen = strlen(request);
 
     net_info net = {0};
@@ -119,7 +126,11 @@ headerBasicRequest(void **state)
 
     assert_true(doHttp(0x12345, 0, &net, request, buflen, TLSRX, BUF));
     //printf("%s: %s\n", __FUNCTION__, header_event);
-    assert_string_equal(header_event, result);
+    int i;
+    for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
+        // printf("looking for %s\n", result[i]);
+        assert_non_null(strstr(header_event, result[i]));
+    }
     free(header_event);
 }
 
@@ -127,12 +138,13 @@ static void
 headerBasicResponse(void **state)
 {
     char *response = "HTTP/1.1 200 OK blah blah now is the time for a response\r\nContent-Type: text/plain\r\nDate: Tue, 29 Sep 2020 19:56:15 GMT\r\n\r\n";
-    char *result =
-"{\"http.flavor\":\"1.1\","
-"\"http.status_code\":200,"
-"\"http.status_text\":\"OK blah blah now is the time for a response\","
-"\"http.server.duration\":0,"
-"\"net.host.name\":\"thisHostName\"}";
+    char *result[] = {
+        "\"http.flavor\":\"1.1\"",
+        "\"http.status_code\":200",
+        "\"http.status_text\":\"OK blah blah now is the time for a response\"",
+        "\"http.server.duration\":0",
+        "\"net.host.name\":\"thisHostName\"",
+    };
 
     net_info net = {0};
     net.fd = 3;
@@ -140,7 +152,11 @@ headerBasicResponse(void **state)
 
     assert_true(doHttp(0x12345, 3, &net, response, strlen(response), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
-    assert_string_equal(header_event, result);
+    int i;
+    for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
+        // printf("looking for %s\n", result[i]);
+        assert_non_null(strstr(header_event, result[i]));
+    }
     free(header_event);
 }
 
@@ -148,27 +164,32 @@ static void
 headerRequestIP(void **state)
 {
     char *request = "GET /hello HTTP/1.1\r\nHost: localhost:4430\r\nUser-Agent: curl/7.68.0\r\nAccept: */*\r\nContent-Length: 12345\r\nX-Forwarded-For: 192.7.7.7\r\n\r\n";
-    char *result =
-"{\"http.method\":\"GET\","
-"\"http.target\":\"/hello\","
-"\"http.flavor\":\"1.1\","
-"\"http.scheme\":\"HTTPS\","
-"\"http.host\":\"localhost:4430\","
-"\"http.user_agent\":\"curl/7.68.0\","
-"\"http.client_ip\":\"192.7.7.7\","
-"\"net.host.name\":\"thisHostName\","
-"\"net.transport\":\"IP.TCP\","
-"\"net.peer.ip\":\"192.1.2.99\","
-"\"net.peer.port\":\"24862\","
-"\"net.host.ip\":\"192.1.2.3\","
-"\"net.host.port\":\"3879\","
-"\"http.request_content_length\":12345}";
+    char *result[] = {
+        "\"http.method\":\"GET\"",
+        "\"http.target\":\"/hello\"",
+        "\"http.flavor\":\"1.1\"",
+        "\"http.scheme\":\"https\"",
+        "\"http.host\":\"localhost:4430\"",
+        "\"http.user_agent\":\"curl/7.68.0\"",
+        "\"http.client_ip\":\"192.7.7.7\"",
+        "\"net.host.name\":\"thisHostName\"",
+        "\"net.transport\":\"IP.TCP\"",
+        "\"net.peer.ip\":\"192.1.2.99\"",
+        "\"net.peer.port\":\"24862\"",
+        "\"net.host.ip\":\"192.1.2.3\"",
+        "\"net.host.port\":\"3879\"",
+        "\"http.request_content_length\":12345"
+    };
 
     net_info *net = getNet(3);
     assert_non_null(net);
     assert_true(doHttp(0x12345, 3, net, request, strlen(request), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
-    assert_string_equal(header_event, result);
+    int i;
+    for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
+        // printf("looking for %s\n", result[i]);
+        assert_non_null(strstr(header_event, result[i]));
+    }
     free(header_event);
 }
 
@@ -176,24 +197,29 @@ static void
 headerResponseIP(void **state)
 {
     char *response = "HTTP/1.1 777 Not OK\r\nContent-Type: text/plain\r\nDate: Tue, 29 Sep 2020 19:56:15 GMT\r\nContent-Length: 27\r\n\r\n";
-    char *result =
-"{\"http.flavor\":\"1.1\","
-"\"http.status_code\":777,"
-"\"http.status_text\":\"Not OK\","
-"\"http.server.duration\":0,"
-"\"net.host.name\":\"thisHostName\","
-"\"net.transport\":\"IP.TCP\","
-"\"net.peer.ip\":\"192.1.2.99\","
-"\"net.peer.port\":\"24862\","
-"\"net.host.ip\":\"192.1.2.3\","
-"\"net.host.port\":\"3879\","
-"\"http.response_content_length\":27}";
+    char *result[] = {
+        "\"http.flavor\":\"1.1\"",
+        "\"http.status_code\":777",
+        "\"http.status_text\":\"Not OK\"",
+        "\"http.server.duration\":0",
+        "\"net.host.name\":\"thisHostName\"",
+        "\"net.transport\":\"IP.TCP\"",
+        "\"net.peer.ip\":\"192.1.2.99\"",
+        "\"net.peer.port\":\"24862\"",
+        "\"net.host.ip\":\"192.1.2.3\"",
+        "\"net.host.port\":\"3879\"",
+        "\"http.response_content_length\":27"
+    };
 
     net_info *net = getNet(3);
     assert_non_null(net);
     assert_true(doHttp(0x12345, 3, net, response, strlen(response), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
-    assert_string_equal(header_event, result);
+    int i;
+    for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
+        // printf("looking for %s\n", result[i]);
+        assert_non_null(strstr(header_event, result[i]));
+    }
     free(header_event);
 }
 
@@ -201,23 +227,28 @@ static void
 headerRequestUnix(void **state)
 {
     char *request = "GET /hello HTTP/1.1\r\nHost: localhost:4430\r\nUser-Agent: curl/7.68.0\r\nAccept: */*\r\nContent-Length: 12345\r\nX-Forwarded-For: 192.7.7.7\r\n\r\n";
-    char *result =
-"{\"http.method\":\"GET\","
-"\"http.target\":\"/hello\","
-"\"http.flavor\":\"1.1\","
-"\"http.scheme\":\"HTTPS\","
-"\"http.host\":\"localhost:4430\","
-"\"http.user_agent\":\"curl/7.68.0\","
-"\"http.client_ip\":\"192.7.7.7\","
-"\"net.host.name\":\"thisHostName\","
-"\"net.transport\":\"Unix.TCP\","
-"\"http.request_content_length\":12345}";
+    char *result[] = {
+        "\"http.method\":\"GET\"",
+        "\"http.target\":\"/hello\"",
+        "\"http.flavor\":\"1.1\"",
+        "\"http.scheme\":\"https\"",
+        "\"http.host\":\"localhost:4430\"",
+        "\"http.user_agent\":\"curl/7.68.0\"",
+        "\"http.client_ip\":\"192.7.7.7\"",
+        "\"net.host.name\":\"thisHostName\"",
+        "\"net.transport\":\"Unix.TCP\"",
+        "\"http.request_content_length\":12345"
+    };
 
     net_info *net = getUnix(3);
     assert_non_null(net);
     assert_true(doHttp(0x12345, 3, net, request, strlen(request), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
-    assert_string_equal(header_event, result);
+    int i;
+    for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
+        // printf("looking for %s\n", result[i]);
+        assert_non_null(strstr(header_event, result[i]));
+    }
     free(header_event);
 }
 

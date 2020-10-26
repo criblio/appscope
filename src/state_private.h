@@ -91,8 +91,11 @@ typedef struct http_map_t {
     uint64_t start_time;
     uint64_t duration;
     uint64_t id;
-    char *req;
-    char *resp;
+    char *req;          // The whole original request
+    char *method_str;   //   Method field from Request-Line
+    char *target_str;   //   Request-URI field from Request-Line
+    size_t clen;        //   Content-Length entity-header value from req
+    char *resp;         // The whole original response
 } http_map;
 
 typedef struct stat_err_info_t {
@@ -115,11 +118,13 @@ typedef struct
     uint64_t uid;
     int sockfd;
     int isSsl;
+    metric_t src;
 } httpId_t;
 
 typedef struct protocol_info_t {
     metric_t evtype;
     metric_t ptype;
+    int isServer;
     size_t len;
     int fd;
     uint64_t uid;

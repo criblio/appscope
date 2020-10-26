@@ -50,7 +50,7 @@
 #define HRES_FIELD(val)         STRFIELD("resp",           (val),        8)
 #define DETECT_PROTO(val)       STRFIELD("protocol",       (val),        8)
 
-#define HTTP_VERBOSITY 5
+#define EVENT_ONLY_ATTR (CFG_MAX_VERBOSITY+1)
 #define HTTP_MAX_FIELDS 15
 #define H_ATTRIB(field, att, val, verbosity) \
     field.name = att; \
@@ -92,6 +92,8 @@ destroyHttpMap(void *data)
 
     if (map->req) free(map->req);
     if (map->resp) free(map->resp);
+    if (map->method_str) free(map->method_str);
+    if (map->target_str) free(map->target_str);
     if (map) free(map);
 }
 
@@ -262,7 +264,7 @@ httpFields(event_field_t *fields, http_report *hreport, protocol_info *proto)
     if (!fields || !hreport || !proto) return FALSE;
 
     // Start with fields from the header
-    char *savea;
+    char *savea = NULL;
     http_post *post = (http_post *)proto->data;
     hreport->clen = -1;
     strncpy(hreport->header, post->hdr, proto->len);
@@ -276,13 +278,13 @@ httpFields(event_field_t *fields, http_report *hreport, protocol_info *proto)
     while ((reqh = strtok_r(NULL, "\r\n", &savea)) != NULL) {
         // From RFC 2616 Section 4.2 "Field names are case-insensitive."
         if (strcasestr(reqh, "Host:")) {
-            H_ATTRIB(fields[hreport->ix], "http.host", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
+            H_ATTRIB(fields[hreport->ix], "http.host", strchr(reqh, ':') + 2, 1);
             HTTP_NEXT_FLD(hreport->ix);
         } else if (strcasestr(reqh, "User-Agent:")) {
-            H_ATTRIB(fields[hreport->ix], "http.user_agent", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
+            H_ATTRIB(fields[hreport->ix], "http.user_agent", strchr(reqh, ':') + 2, 5);
             HTTP_NEXT_FLD(hreport->ix);
         } else if(strcasestr(reqh, "X-Forwarded-For:")) {
-            H_ATTRIB(fields[hreport->ix], "http.client_ip", strchr(reqh, ':') + 2, HTTP_VERBOSITY);
+            H_ATTRIB(fields[hreport->ix], "http.client_ip", strchr(reqh, ':') + 2, 5);
             HTTP_NEXT_FLD(hreport->ix);
         } else if(strcasestr(reqh, "Content-Length:")) {
             errno = 0;
@@ -303,30 +305,30 @@ httpFields(event_field_t *fields, http_report *hreport, protocol_info *proto)
     */
 
     // Next, add net fields from internal state
-    H_ATTRIB(fields[hreport->ix], "net.host.name", g_proc.hostname, HTTP_VERBOSITY);
+    H_ATTRIB(fields[hreport->ix], "net.host.name", g_proc.hostname, 1);
     HTTP_NEXT_FLD(hreport->ix);
 
     if (proto->sock_type != -1) {
         if (addrIsNetDomain(&proto->localConn)) {
             if (proto->sock_type == SOCK_STREAM) {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "IP.TCP", HTTP_VERBOSITY);
+                H_ATTRIB(fields[hreport->ix], "net.transport", "IP.TCP", 1);
                 HTTP_NEXT_FLD(hreport->ix);
             } else if (proto->sock_type == SOCK_DGRAM) {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "IP.UDP", HTTP_VERBOSITY);
+                H_ATTRIB(fields[hreport->ix], "net.transport", "IP.UDP", 1);
                 HTTP_NEXT_FLD(hreport->ix);
             } else {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "IP", HTTP_VERBOSITY);
+                H_ATTRIB(fields[hreport->ix], "net.transport", "IP", 1);
                 HTTP_NEXT_FLD(hreport->ix);
             }
         } else if (addrIsUnixDomain(&proto->localConn)) { // TODO: more than unix
             if (proto->sock_type == SOCK_STREAM) {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix.TCP", HTTP_VERBOSITY);
+                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix.TCP", 1);
                 HTTP_NEXT_FLD(hreport->ix);
             } else if (proto->sock_type == SOCK_DGRAM) {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix.UDP", HTTP_VERBOSITY);
+                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix.UDP", 1);
                 HTTP_NEXT_FLD(hreport->ix);
             } else {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix", HTTP_VERBOSITY);
+                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix", 1);
                 HTTP_NEXT_FLD(hreport->ix);
             }
         }
@@ -334,17 +336,17 @@ httpFields(event_field_t *fields, http_report *hreport, protocol_info *proto)
         // Connection details, where we know the file descriptor
         if (getConn(&proto->remoteConn, hreport->raddr, sizeof(hreport->raddr),
                     hreport->rport, sizeof(hreport->rport)) == TRUE) {
-            H_ATTRIB(fields[hreport->ix], "net.peer.ip", hreport->raddr, HTTP_VERBOSITY);
+            H_ATTRIB(fields[hreport->ix], "net.peer.ip", hreport->raddr, 5);
             HTTP_NEXT_FLD(hreport->ix);
-            H_ATTRIB(fields[hreport->ix], "net.peer.port", hreport->rport, HTTP_VERBOSITY);
+            H_ATTRIB(fields[hreport->ix], "net.peer.port", hreport->rport, 7);
             HTTP_NEXT_FLD(hreport->ix);
         }
 
         if (getConn(&proto->localConn, hreport->laddr, sizeof(hreport->laddr),
                     hreport->lport, sizeof(hreport->lport)) == TRUE) {
-            H_ATTRIB(fields[hreport->ix], "net.host.ip", hreport->laddr, HTTP_VERBOSITY);
+            H_ATTRIB(fields[hreport->ix], "net.host.ip", hreport->laddr, 1);
             HTTP_NEXT_FLD(hreport->ix);
-            H_ATTRIB(fields[hreport->ix], "net.host.port", hreport->lport, HTTP_VERBOSITY);
+            H_ATTRIB(fields[hreport->ix], "net.host.port", hreport->lport, 1);
             HTTP_NEXT_FLD(hreport->ix);
         }
     }
@@ -359,7 +361,7 @@ doHttpHeader(protocol_info *proto)
         return;
     }
 
-    char ssl[8];
+    char *ssl;
     event_field_t fields[HTTP_MAX_FIELDS];
     http_report hreport;
     http_post *post = (http_post *)proto->data;
@@ -384,11 +386,7 @@ doHttpHeader(protocol_info *proto)
 
     map->frequency++;
 
-    if (post->ssl) {
-        strncpy(ssl, "HTTPS", sizeof(ssl));
-    } else {
-        strncpy(ssl, "HTTP", sizeof(ssl));
-    }
+    ssl = (post->ssl) ? "https" : "http";
 
     if ((hreport.header = calloc(1, proto->len)) == NULL) {
         scopeLog("ERROR: doHttpHeader: memory allocation failure", proto->fd, CFG_LOG_ERROR);
@@ -409,7 +407,7 @@ doHttpHeader(protocol_info *proto)
         map->start_time = post->start_duration;
         map->req = (char *)post->hdr;
 
-        char *savea;
+        char *savea = NULL;
         char header[proto->len];
         strncpy(header, map->req, proto->len);
 
@@ -422,16 +420,18 @@ doHttpHeader(protocol_info *proto)
         // The request specific values from Request-Line
         char *method_str = strtok_r(headertok, " ", &savea);
         if (method_str) {
-            H_ATTRIB(fields[hreport.ix], "http.method", method_str, HTTP_VERBOSITY);
+            H_ATTRIB(fields[hreport.ix], "http.method", method_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
+            map->method_str = strdup(method_str);
         } else {
             scopeLog("WARN: doHttpHeader: no method in an http request header", proto->fd, CFG_LOG_WARN);
         }
 
         char *target_str = strtok_r(NULL, " ", &savea);
         if (target_str) {
-            H_ATTRIB(fields[hreport.ix], "http.target", target_str, HTTP_VERBOSITY);
+            H_ATTRIB(fields[hreport.ix], "http.target", target_str, 4);
             HTTP_NEXT_FLD(hreport.ix);
+            map->target_str = strdup(target_str);
         } else {
             scopeLog("WARN: doHttpHeader: no target in an http request header", proto->fd, CFG_LOG_WARN);
         }
@@ -440,22 +440,23 @@ doHttpHeader(protocol_info *proto)
         if (flavor_str &&
             ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
             ((flavor_str = strtok_r(NULL, "\r", &savea)))) {
-            H_ATTRIB(fields[hreport.ix], "http.flavor", flavor_str, HTTP_VERBOSITY);
+            H_ATTRIB(fields[hreport.ix], "http.flavor", flavor_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no http version in an http request header", proto->fd, CFG_LOG_WARN);
         }
 
-        H_ATTRIB(fields[hreport.ix], "http.scheme", ssl, HTTP_VERBOSITY);
+        H_ATTRIB(fields[hreport.ix], "http.scheme", ssl, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
         // Fields common to request & response
         httpFields(fields, &hreport, proto);
 
         if (hreport.clen != -1) {
-            H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, HTTP_VERBOSITY);
+            H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
             HTTP_NEXT_FLD(hreport.ix);
         }
+        map->clen = hreport.clen;
 
         httpFieldEnd(fields, &hreport);
 
@@ -504,30 +505,30 @@ doHttpHeader(protocol_info *proto)
         if (flavor_str &&
             ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
             ((flavor_str = strtok_r(NULL, "", &savea)))) {
-            H_ATTRIB(fields[hreport.ix], "http.flavor", flavor_str, HTTP_VERBOSITY);
+            H_ATTRIB(fields[hreport.ix], "http.flavor", flavor_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no version string in an http request header", proto->fd, CFG_LOG_WARN);
         }
 
-        H_VALUE(fields[hreport.ix], "http.status_code", status, HTTP_VERBOSITY);
+        H_VALUE(fields[hreport.ix], "http.status_code", status, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
         // point past the status code
         char st[strlen(stext)];
         strncpy(st, stext, strlen(stext));
         char *status_str = strtok_r(st, "\r", &savea);
-        H_ATTRIB(fields[hreport.ix], "http.status_text", status_str, HTTP_VERBOSITY);
+        H_ATTRIB(fields[hreport.ix], "http.status_text", status_str, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
-        H_VALUE(fields[hreport.ix], "http.server.duration", map->duration, HTTP_VERBOSITY);
+        H_VALUE(fields[hreport.ix], "http.server.duration", map->duration, EVENT_ONLY_ATTR);
         HTTP_NEXT_FLD(hreport.ix);
 
         // Fields common to request & response
         httpFields(fields, &hreport, proto);
 
         if (hreport.clen != -1) {
-            H_VALUE(fields[hreport.ix], "http.response_content_length", hreport.clen, HTTP_VERBOSITY);
+            H_VALUE(fields[hreport.ix], "http.response_content_length", hreport.clen, EVENT_ONLY_ATTR);
             HTTP_NEXT_FLD(hreport.ix);
         }
 
@@ -551,21 +552,43 @@ doHttpHeader(protocol_info *proto)
         event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
         cmdSendHttp(g_ctl, &mevent, map->id, &g_proc);
 
-        // emit a statsd metric, if enabled.
+        // emit statsd metrics, if enabled.
         if (mtcEnabled(g_mtc)) {
-            event_field_t efields[] = {
-                PROC_FIELD(g_proc.procname),
-                PID_FIELD(g_proc.pid),
-                FD_FIELD(proto->fd),
-                HOST_FIELD(g_proc.hostname),
-                HTTPSTAT_FIELD(status),
-                DURATION_FIELD(map->duration),
-                RATE_FIELD(rps),
-                FIELDEND
-                };
 
-            event_t httpStat = INT_EVENT("http.status", 1, DELTA, efields);
-            cmdSendMetric(g_mtc, &httpStat);
+            // metric output has some fields from the header that the
+            // response event does not.  Add them here.
+            // First, back up to overwrite the httpFieldEnd
+            hreport.ix--;
+
+            if (map->method_str) {
+                H_ATTRIB(fields[hreport.ix], "http.method", map->method_str, 1);
+                HTTP_NEXT_FLD(hreport.ix);
+            }
+
+            if (map->target_str) {
+                H_ATTRIB(fields[hreport.ix], "http.target", map->target_str, 4);
+                HTTP_NEXT_FLD(hreport.ix);
+            }
+
+            H_ATTRIB(fields[hreport.ix], "http.scheme", ssl, 1);
+            HTTP_NEXT_FLD(hreport.ix);
+
+            httpFieldEnd(fields, &hreport);
+
+            char *mtx_name = (proto->isServer) ? "http.server.duration" : "http.client.duration";
+            event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA, fields);
+            cmdSendMetric(g_mtc, &http_dur);
+
+            if (map->clen != -1) {
+                event_t http_req_len = INT_EVENT("http.request.content_length", map->clen, DELTA, fields);
+                cmdSendMetric(g_mtc, &http_req_len);
+            }
+
+            if (hreport.clen != -1) {
+                event_t http_rsp_len = INT_EVENT("http.response.content_length", hreport.clen, DELTA, fields);
+                cmdSendMetric(g_mtc, &http_rsp_len);
+            }
+
         }
 
         // Done; we remove the list entry; complete when reported

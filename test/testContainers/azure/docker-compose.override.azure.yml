@@ -123,6 +123,9 @@ services:
       - type: bind
         source: ./scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
   go_9:
     build:
       cache_from:
@@ -135,6 +138,9 @@ services:
       - type: bind
         source: ./scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
   go_10:
     build:
       cache_from:
@@ -147,6 +153,9 @@ services:
       - type: bind
         source: ./scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
   go_11:
     build:
       cache_from:
@@ -159,6 +168,9 @@ services:
       - type: bind
         source: ./scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
   go_12:
     build:
       cache_from:
@@ -171,6 +183,9 @@ services:
       - type: bind
         source: ./scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
   go_13:
     build:
       cache_from:
@@ -183,6 +198,9 @@ services:
       - type: bind
         source: ./scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
   go_14:
     build:
       cache_from:
@@ -195,6 +213,9 @@ services:
       - type: bind
         source: ./scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
   go_15:
     build:
       cache_from:
@@ -207,6 +228,9 @@ services:
       - type: bind
         source: ./scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
 
   java6:
     build:

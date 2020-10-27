@@ -43,7 +43,6 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 go_offsets_t g_go = {.g_to_m=48,                   // 0x30
                      .m_to_tls=136,                // 0x88
                      .connReader_to_conn=0,        // 0x00
-                     .conn_to_tlsState=48,         // 0x30
                      .persistConn_to_conn=80,      // 0x50
                      .persistConn_to_bufrd=104,    // 0x68
                      .iface_data=8,                // 0x08
@@ -74,6 +73,7 @@ uint64_t g_go_static = 0LL;
 static list_t *g_threadlist;
 static void *g_stack;
 static bool g_switch_thread;
+static uint64_t go_tls_conn;
 
 void (*go_runtime_cgocall)(void);
 
@@ -352,7 +352,6 @@ adjustGoStructOffsetsForVersion(const char* go_runtime_version)
         dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
         dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
         dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
-        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
         dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go.persistConn_to_conn);
         dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go.persistConn_to_bufrd);
         dprintf(fd, "runtime.iface|data=%d|\n", g_go.iface_data);
@@ -408,8 +407,7 @@ initGoHook(elf_buf_t *ebuf)
         } else if (checkEnv(SWITCH_ENV, SWITCH_USE_THREAD)) {
             g_switch_thread = TRUE;
         } else {
-            g_switch_thread = FALSE;
-            patchClone();
+            g_switch_thread = TRUE;
         }
     } else {
         g_switch_thread = TRUE;
@@ -463,6 +461,10 @@ initGoHook(elf_buf_t *ebuf)
         sysprint("ERROR: can't get the address for runtime.cgocall\n");
         exit(-1);
     }
+
+    // Get the interface type for a tls.Conn (set to 0 if not present)
+    go_tls_conn = (uint64_t)getSymbol(ebuf->buf, "go.itab.*crypto/tls.Conn,net.Conn");
+
 
     // hook a few Go funcs
     rc = funchook_install(funchook, 0);
@@ -648,6 +650,15 @@ out:
 * to create a TCB. However, __clone() has previously
 * been disabled in initGoHook(). Therefore, no thread
 * is actually created.
+*
+* Note: we found that this version of go_switch()
+* results in a malloc error when running with the
+* influxdb stress test. Making the thread version
+* the default resolves the issue. Have not found
+* the root cause. Reproduce by running a static
+* influxd, then run the old stress client
+* influx_stress_stat and write event files from
+* the server and client to the file system.
 */
 inline static void *
 go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
@@ -934,11 +945,22 @@ go_accept4(char *stackptr)
   cr.conn.rwc_if = cr.conn + 0x10
   cr.conn.rwc = cr.conn.rwc_if + 0x08
   netFD = cr.conn.rwc + 0x08
-  pfd = *netFD
+  pfd = *netFD  (/usr/local/go/src/net/fd_unix.go:20)
   fd = netFD + 0x10
+
+  reference: net/http/server.go
+  type connReader struct {
+        conn *conn
+
+  type conn struct {
+          server *Server
+          cancelCtx context.CancelFunc
+          rwc net.Conn
+          remoteAddr string
+          tlsState *tls.ConnectionState
  */
 static void
-c_tls_read(char *stackaddr)
+c_http_server_read(char *stackaddr)
 {
     int fd = -1;
     uint64_t connReader = *(uint64_t*)(stackaddr + 0x8);
@@ -949,43 +971,42 @@ c_tls_read(char *stackaddr)
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
     uint64_t cr_conn_rwc_if, cr_conn_rwc, netFD, pfd;
 
-//  type connReader struct {
-//        conn *conn
     uint64_t conn =  *(uint64_t*)(connReader + g_go.connReader_to_conn);
     if (!conn) return;         // protect from dereferencing null
-//  reference: net/http/server.go
-//  type conn struct {
-//          server *Server
-//          cancelCtx context.CancelFunc
-//          rwc net.Conn
-//          remoteAddr string
-//          tlsState *tls.ConnectionState
 
-    cr_conn_rwc_if = (conn + g_go.conn_to_rwc);
-    cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go.iface_data);
-    netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data);
-    if (!netFD) return;
-    if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-        pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-        if (!pfd) return;
-        fd = *(int *)(pfd + g_go.pd_to_fd);
-    } else {
-        fd = *(int *)(netFD + g_go.netfd_to_sysfd);
-    }
+    cr_conn_rwc_if = conn + g_go.conn_to_rwc;
+    /*
+     * Strict conn I/F checking. There are as many as 5 types of conn structs in Go.
+     * We only want to extract an fd from a tls.Conn. We can check to see if the I/F
+     * type matches the value of the symbol "go.itab.*crypto/tls.Conn,net.Conn".
+     * A match defines this conn as a tls.Conn.
+     */
+    if (cr_conn_rwc_if && go_tls_conn && (*(uint64_t *)cr_conn_rwc_if == go_tls_conn)) {
+        cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go.iface_data);
+        netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data);
+        if (netFD) {
+            if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+                pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+                if (pfd) {
+                    //funcprint("Scope: %s:%d cr %p cr.conn %p cr.conn.rwc_if %p cr.conn.rwc %p netFD %p pfd %p fd %p\n",
+                    //          __FUNCTION__, __LINE__, connReader, conn, cr_conn_rwc_if, cr_conn_rwc,
+                    //          netFD, pfd, pfd + g_go.pd_to_fd);
+                    fd = *(int *)(pfd + g_go.pd_to_fd);
+                }
+            } else {
+                fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+            }
 
-    uint64_t tlsState =   *(uint64_t*)(conn + g_go.conn_to_tlsState);
-
-    // if tlsState is non-zero, then this is a tls connection
-    if (tlsState != 0ULL) {
-        funcprint("Scope: go_tls_read of %ld\n", fd);
-        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
+            funcprint("Scope: go_http_server_read of %ld\n", fd);
+            doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
+        }
     }
 }
 
 EXPORTON void *
 go_tls_read(char *stackptr)
 {
-    return go_switch(stackptr, c_tls_read, go_hook_tls_read);
+    return go_switch(stackptr, c_http_server_read, go_hook_tls_read);
 }
 
 /*
@@ -1000,7 +1021,7 @@ go_tls_read(char *stackptr)
   fd = pfd + 0x10
  */
 static void
-c_tls_write(char *stackaddr)
+c_http_server_write(char *stackaddr)
 {
     int fd = -1;
     uint64_t conn = *(uint64_t*)(stackaddr + 0x8);
@@ -1012,30 +1033,30 @@ c_tls_write(char *stackaddr)
     uint64_t w_conn_rwc_if, w_conn_rwc, netFD, pfd;
 
     w_conn_rwc_if = (conn + g_go.conn_to_rwc);
-    w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go.iface_data);
-    netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data);
-    if (!netFD) return;
-    if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-        pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-        if (!pfd) return;
-        fd = *(int *)(pfd + g_go.pd_to_fd);
-    } else {
-        fd = *(int *)(netFD + g_go.netfd_to_sysfd);
-    }
+    // Strict conn I/F checking. Ref the comment on c_http_server_read.
+    if (w_conn_rwc_if && go_tls_conn && (*(uint64_t *)w_conn_rwc_if == go_tls_conn)) {
+        w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go.iface_data);
+        netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data);
+        if (netFD) {
+            if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+                pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+                if (pfd) {
+                    fd = *(int *)(pfd + g_go.pd_to_fd);
+                }
+            } else {
+                fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+            }
 
-    uint64_t tlsState = *(uint64_t*)(conn + g_go.conn_to_tlsState);
-
-    // if tlsState is non-zero, then this is a tls connection
-    if (tlsState != 0ULL) {
-        funcprint("Scope: go_tls_write of %ld\n", fd);
-        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF);
+            funcprint("Scope: c_http_server_write of %ld\n", fd);
+            doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF);
+        }
     }
 }
 
 EXPORTON void *
 go_tls_write(char *stackptr)
 {
-    return go_switch(stackptr, c_tls_write, go_hook_tls_write);
+    return go_switch(stackptr, c_http_server_write, go_hook_tls_write);
 }
 
 /*
@@ -1054,7 +1075,7 @@ go_tls_write(char *stackptr)
   fd = pfd + 0x10             (pfd.sysfd)
  */
 static void
-c_pc_write(char *stackaddr)
+c_http_client_write(char *stackaddr)
 {
     int fd = -1;
     uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
@@ -1065,25 +1086,28 @@ c_pc_write(char *stackaddr)
     if (rc < 1) return;
 
     pc_conn_if = (w_pc + g_go.persistConn_to_conn);
-    w_pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
-    netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data);
-    if (!netFD) return;
-    if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-        pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-        if (!pfd) return;
-        fd = *(int *)(pfd + g_go.pd_to_fd);
-    } else {
-        fd = *(int *)(netFD + g_go.netfd_to_sysfd);
-    }
+    // Strict conn I/F checking. Ref the comment on c_http_server_read.
+    if (pc_conn_if && go_tls_conn && (*(uint64_t *)pc_conn_if == go_tls_conn)) {
+        w_pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
+        netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data);
+        if (!netFD) return;
+        if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+            if (!pfd) return;
+            fd = *(int *)(pfd + g_go.pd_to_fd);
+        } else {
+            fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+        }
 
-    doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
-    funcprint("Scope: c_pc_write of %d\n", fd);
+        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
+        funcprint("Scope: c_http_client_write of %d\n", fd);
+    }
 }
 
 EXPORTON void *
 go_pc_write(char *stackptr)
 {
-    return go_switch(stackptr, c_pc_write, go_hook_pc_write);
+    return go_switch(stackptr, c_http_client_write, go_hook_pc_write);
 }
 
 /*
@@ -1104,40 +1128,43 @@ go_pc_write(char *stackptr)
   resp = http response     (char *)
  */
 static void
-c_readResponse(char *stackaddr)
+c_http_client_read(char *stackaddr)
 {
     int fd = -1;
     uint64_t pc  = *(uint64_t *)(stackaddr + 0x08);
     uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
 
     pc_conn_if = (pc + g_go.persistConn_to_conn);
-    pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
-    netFD = *(uint64_t *)(pc_conn + g_go.iface_data);
-    if (!netFD) return;
-    if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-        pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-        if (!pfd) return;
-        fd = *(int *)(pfd + g_go.pd_to_fd);
-    } else {
-        fd = *(int *)(netFD + g_go.netfd_to_sysfd);
-    }
+    // Strict conn I/F checking. Ref the comment on c_http_server_read.
+    if (pc_conn_if && go_tls_conn && (*(uint64_t *)pc_conn_if == go_tls_conn)) {
+        pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
+        netFD = *(uint64_t *)(pc_conn + g_go.iface_data);
+        if (!netFD) return;
+        if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
+            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+            if (!pfd) return;
+            fd = *(int *)(pfd + g_go.pd_to_fd);
+        } else {
+            fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+        }
 
-    if ((pc_br = *(uint64_t *)(pc + g_go.persistConn_to_bufrd)) != 0) {
-        buf = *(uint64_t *)(pc_br + g_go.bufrd_to_buf);
-        // len is part of the []byte struct; the func doesn't return a len
-        len = *(uint64_t *)(pc_br + 0x08);
-    }
+        if ((pc_br = *(uint64_t *)(pc + g_go.persistConn_to_bufrd)) != 0) {
+            buf = *(uint64_t *)(pc_br + g_go.bufrd_to_buf);
+            // len is part of the []byte struct; the func doesn't return a len
+            len = *(uint64_t *)(pc_br + 0x08);
+        }
 
-    if (buf && (len > 0)) {
-        doProtocol((uint64_t)0, fd, (void *)buf, len, TLSRX, BUF);
-        funcprint("Scope: c_readResponse of %d\n", fd);
+        if (buf && (len > 0)) {
+            doProtocol((uint64_t)0, fd, (void *)buf, len, TLSRX, BUF);
+            funcprint("Scope: c_http_client_read of %d\n", fd);
+        }
     }
 }
 
 EXPORTON void *
 go_readResponse(char *stackptr)
 {
-    return go_switch(stackptr, c_readResponse, go_hook_readResponse);
+    return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
 }
 
 extern void handleExit(void);

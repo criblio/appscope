@@ -90,6 +90,9 @@ services:
       - type: bind
         source: ../../bin/linux/scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
     privileged: true
   go_9:
     volumes:
@@ -99,6 +102,9 @@ services:
       - type: bind
         source: ../../bin/linux/scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
     privileged: true
   go_10:
     volumes:
@@ -108,6 +114,9 @@ services:
       - type: bind
         source: ../../bin/linux/scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
     privileged: true
   go_11:
     volumes:
@@ -117,6 +126,9 @@ services:
       - type: bind
         source: ../../bin/linux/scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
     privileged: true
   go_12:
     volumes:
@@ -126,6 +138,9 @@ services:
       - type: bind
         source: ../../bin/linux/scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
     privileged: true
   go_13:
     volumes:
@@ -135,6 +150,9 @@ services:
       - type: bind
         source: ../../bin/linux/scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
     privileged: true
   go_14:
     volumes:
@@ -144,6 +162,9 @@ services:
       - type: bind
         source: ../../bin/linux/scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
     privileged: true
   go_15:
     volumes:
@@ -153,6 +174,9 @@ services:
       - type: bind
         source: ../../bin/linux/scope
         target: /usr/bin/scope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
     privileged: true
 
   java6:

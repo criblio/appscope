@@ -49,9 +49,8 @@ static inline int _memfd_create(const char *name, unsigned int flags) {
 }
 
 static void
-usage(char *prog) {
-  fprintf(stderr,"usage: %s static-executable args-for-executable\n", prog);
-  exit(-1);
+print_usage(char *prog) {
+    fprintf(stderr,"usage: %s command [args]\n", prog);
 }
 
 static int
@@ -248,6 +247,79 @@ setGoHttpEnvVariable(void)
     }
 }
 
+// This tests to see if cmd can be resolved to an executable file.
+// If so it will return a malloc'd buffer containing an absolute path,
+// otherwise it will return NULL.
+static char *
+resolve_inferior_cmd(const char *cmd)
+{
+    char *path_env = NULL;
+    char *ret_val = NULL;
+    struct stat buf;
+
+    if (!cmd) goto out;
+
+    // an absolute path was specified for cmd.
+    if (cmd[0] == '/') {
+        //  If we can resolve it, use it.
+        if (!stat(cmd, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
+            ret_val = strdup(cmd);
+        }
+        goto out;
+    }
+
+    // a relative path was specified for cmd.
+    if (strchr(cmd, '/')) {
+        char *cur_dir = get_current_dir_name();
+        if (!cur_dir) goto out;
+
+        char *path = NULL;
+        if (asprintf(&path, "%s/%s", cur_dir, cmd) > 0) {
+            // If we can resolve it, use it
+            if (!stat(path, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
+                ret_val = path;
+            } else {
+                free(path);
+            }
+        }
+        free(cur_dir);
+        goto out;
+    }
+
+    // try to resolve the cmd from PATH env variable
+    char *path_env_ptr = getenv("PATH");
+    if (!path_env_ptr) goto out;
+    path_env = strdup(path_env_ptr); // create a copy for strtok below
+    if (!path_env) goto out;
+
+    char *saveptr = NULL;
+    char *strtok_path = strtok_r(path_env, ":", &saveptr);
+    if (!strtok_path) goto out;
+
+    do {
+        char *path = NULL;
+        if (asprintf(&path, "%s/%s", strtok_path, cmd) < 0) {
+            break;
+        }
+        if ((stat(path, &buf) == -1) ||    // path doesn't exist
+            (!S_ISREG(buf.st_mode)) ||     // path isn't a file
+            ((buf.st_mode & 0111) == 0)) { // path isn't executable
+
+            free(path);
+            continue;
+        }
+
+        // We found the cmd, and it's an executable file
+        ret_val = path;
+        break;
+
+    } while ((strtok_path = strtok_r(NULL, ":", &saveptr)));
+
+out:
+    if (path_env) free(path_env);
+    return ret_val;
+}
+
 int
 main(int argc, char **argv, char **env)
 {
@@ -262,17 +334,26 @@ main(int argc, char **argv, char **env)
     initFn();
 
     //check command line arguments 
+    char *scope_cmd = argv[0];
     if (argc < 2) {
-        usage(argv[0]);
-        exit(1);
+        fprintf(stderr,"%s is missing required command.  Exiting.\n", scope_cmd);
+        print_usage(scope_cmd);
+        exit(EXIT_FAILURE);
     }
+    char *inferior_command = resolve_inferior_cmd(argv[1]);
+    if (!inferior_command) {
+        fprintf(stderr,"%s could not find or execute command `%s`.  Exiting.\n", scope_cmd, argv[1]);
+        exit(EXIT_FAILURE);
+    }
+    argv[1] = inferior_command; // update args with resolved inferior_command
+
     info = setup_libscope();
     if (!info) {
         fprintf(stderr, "%s:%d ERROR: unable to set up libscope\n", __FUNCTION__, __LINE__);
         exit(EXIT_FAILURE);
     }
 
-    ebuf = getElf(argv[1]);
+    ebuf = getElf(inferior_command);
 
     if ((ebuf != NULL) && (app_type(ebuf->buf, SHT_NOTE, ".note.go.buildid") != 0)) {
         if (setenv("SCOPE_APP_TYPE", "go", 1) == -1) {
@@ -316,7 +397,7 @@ main(int argc, char **argv, char **env)
             release_libscope(&info);
             exit(status);
         } else {
-            execve(argv[1], &argv[1], environ);
+            execve(inferior_command, &argv[1], environ);
             perror("execve");
             goto err;
         }
@@ -340,7 +421,7 @@ main(int argc, char **argv, char **env)
     }
     release_libscope(&info);
 
-    sys_exec(ebuf, argv[1], argc, argv, env);
+    sys_exec(ebuf, inferior_command, argc, argv, env);
 
     return 0;
 err:

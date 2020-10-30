@@ -58,4 +58,7 @@ int cbufGet(cbuf_handle_t cbuf, uint64_t *data);
 // Returns max capacity of the cbuf
 size_t cbufCapacity(cbuf_handle_t cbuf);
 
+// True if the circbuf is empty, else False
+int cbufEmpty(cbuf_handle_t cbuf);
+
 #endif // __CIRCBUF_H__

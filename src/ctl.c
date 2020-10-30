@@ -796,3 +796,9 @@ ctlGetEvent(ctl_t *ctl)
         return (uint64_t)-1;
     }
 }
+
+bool
+ctlCbufEmpty(ctl_t *ctl)
+{
+    return cbufEmpty(ctl->evbuf);
+}

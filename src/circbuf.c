@@ -118,3 +118,10 @@ cbufCapacity(cbuf_handle_t cbuf)
     if (!cbuf) return -1;
     return cbuf->maxlen - 1;
 }
+
+int
+cbufEmpty(cbuf_handle_t cbuf)
+{
+    if (cbuf->tail == cbuf->head) return TRUE;
+    return FALSE;
+}

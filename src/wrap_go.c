@@ -12,6 +12,7 @@
 #include "gocontext.h"
 #include "../contrib/funchook/distorm/include/distorm.h"
 #include "linklist.h"
+#include "circbuf.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
@@ -1174,6 +1175,21 @@ c_exit(char *stackaddr)
     // don't use stackaddr; patch_first_instruction() does not provide
     // frame_size, so stackaddr isn't useable
     handleExit();
+    funcprint("c_exit");
+
+    int i;
+    struct timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 10000; // 10 ms
+
+    // ensure the circular buffer is empty
+    for (i = 0; i < 100; i++) {
+        if (cmdCbufEmpty(g_ctl)) break;
+        nanosleep(&ts, NULL);
+    }
+
+    // flush the data
+    nanosleep(&ts, NULL);
 }
 
 EXPORTON void *

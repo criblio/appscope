@@ -119,4 +119,6 @@ bool            ctlEvtSourceEnabled(ctl_t *, watch_t);
 // Retreive events
 uint64_t   ctlGetEvent(ctl_t *);
 
+bool ctlCbufEmpty(ctl_t *);
+
 #endif // _CTL_H__

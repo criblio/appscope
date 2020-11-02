@@ -12,7 +12,6 @@
 #include "gocontext.h"
 #include "../contrib/funchook/distorm/include/distorm.h"
 #include "linklist.h"
-#include "circbuf.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1

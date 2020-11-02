@@ -122,6 +122,6 @@ cbufCapacity(cbuf_handle_t cbuf)
 int
 cbufEmpty(cbuf_handle_t cbuf)
 {
-    if (cbuf->tail == cbuf->head) return TRUE;
+    if (!cbuf || (cbuf->tail == cbuf->head)) return TRUE;
     return FALSE;
 }

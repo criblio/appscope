@@ -261,3 +261,9 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
     if (pcre_stack) free(pcre_stack);
     return rc;
 }
+
+bool
+cmdCbufEmpty(ctl_t *ctl)
+{
+    return ctlCbufEmpty(ctl);
+}

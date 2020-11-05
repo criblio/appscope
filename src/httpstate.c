@@ -5,6 +5,7 @@
 #include "httpstate.h"
 #include "plattime.h"
 #include "search.h"
+#include "atomic.h"
 
 
 #define MIN_HDR_ALLOC (4  * 1024)
@@ -25,6 +26,7 @@ static bool setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, 
 static int reportHttp(http_state_t *httpstate);
 static bool scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId);
 
+extern uint64_t g_http_guard[];
 
 static void
 setHttpState(http_state_t *httpstate, http_enum_t toState)
@@ -340,6 +342,8 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
     httpId_t httpId = {0};
     if (!setHttpId(&httpId, net, sockfd, id, src)) return FALSE;
 
+    if (net) while (!atomicCasU64(&g_http_guard[sockfd], 0ULL, 1ULL));
+
     int http_header_found = FALSE;
 
     // We won't always have net (looking at you, gnutls).  If net exists,
@@ -404,6 +408,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
         setHttpState(httpstate, HTTP_NONE);
     }
 
+    if (net) while (!atomicCasU64(&g_http_guard[sockfd], 1ULL, 0ULL));
     return http_header_found;
 }
 

@@ -31,6 +31,7 @@ extern rtconfig g_cfg;
 
 int g_numNinfo = NET_ENTRIES;
 int g_numFSinfo = FS_ENTRIES;
+uint64_t g_http_guard[NET_ENTRIES];
 
 // These would all be declared static, but the some functions that need
 // this data have been moved into report.c.  This is managed with the
@@ -47,6 +48,7 @@ static unsigned int g_prot_sequence = 0;
 // interfaces
 mtc_t *g_mtc = NULL;
 ctl_t *g_ctl = NULL;
+
 
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
@@ -236,6 +238,10 @@ initState()
     g_fsinfo = fsinfoLocal;
 
     initHttpState();
+    // the http guard array is static while the net fs array is dynamically allocated
+    // will need to change if we want to re-size at runtime
+    memset(g_http_guard, 0, sizeof(g_http_guard));
+
     g_http_redirect = searchComp(REDIRECTURL);
 
     g_protlist = lstCreate(destroyProtEntry);
@@ -1666,7 +1672,13 @@ doClose(int fd, const char *func)
     struct net_info_t *ninfo;
     struct fs_info_t *fsinfo;
 
-    if ((ninfo = getNetEntry(fd)) != NULL) {
+    ninfo = getNetEntry(fd);
+
+    if (ninfo != NULL) {
+        while (!atomicCasU64(&g_http_guard[fd], 0ULL, 1ULL));
+    }
+
+    if (ninfo != NULL) {
         doUpdateState(OPEN_PORTS, fd, -1, func, NULL);
         doUpdateState(NET_CONNECTIONS, fd, -1, func, NULL);
         doUpdateState(CONNECTION_DURATION, fd, -1, func, NULL);
@@ -1685,6 +1697,9 @@ doClose(int fd, const char *func)
     if (ninfo) memset(ninfo, 0, sizeof(struct net_info_t));
     if (fsinfo) memset(fsinfo, 0, sizeof(struct fs_info_t));
 
+    if (ninfo != NULL) {
+        while (!atomicCasU64(&g_http_guard[fd], 1ULL, 0ULL));
+    }
 }
 
 void

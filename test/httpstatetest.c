@@ -12,6 +12,7 @@
 #include "test.h"
 
 
+uint64_t g_http_guard[1024];
 ctl_t *g_ctl = NULL;
 struct protocol_info_t* g_msg = NULL;
 
@@ -60,6 +61,7 @@ needleTestSetup(void** state)
     initTime();
     initFn();
     initHttpState();
+    memset(g_http_guard, 0, sizeof(g_http_guard));
 
     // Call the general groupSetup() too.
     return groupSetup(state);

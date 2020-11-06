@@ -86,6 +86,7 @@ getElf(char *path)
         goto out;
     }
 
+    ebuf->cmd = path;
     ebuf->buf = mmap_rv;
     ebuf->len = sbuf.st_size;
 

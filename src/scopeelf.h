@@ -13,6 +13,7 @@ typedef struct {
 } got_list_t;
 
 typedef struct {
+    char *cmd;
     char *buf;
     int len;
     unsigned char *text_addr;

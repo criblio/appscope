@@ -82,6 +82,60 @@ services:
         target: /usr/bin/scope
     privileged: true
 
+  go_2:
+    volumes:
+      - type: bind
+        source: ../../lib/linux/libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ../../bin/linux/scope
+        target: /usr/bin/scope
+    privileged: true
+  go_3:
+    volumes:
+      - type: bind
+        source: ../../lib/linux/libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ../../bin/linux/scope
+        target: /usr/bin/scope
+    privileged: true
+  go_4:
+    volumes:
+      - type: bind
+        source: ../../lib/linux/libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ../../bin/linux/scope
+        target: /usr/bin/scope
+    privileged: true
+  go_5:
+    volumes:
+      - type: bind
+        source: ../../lib/linux/libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ../../bin/linux/scope
+        target: /usr/bin/scope
+    privileged: true
+  go_6:
+    volumes:
+      - type: bind
+        source: ../../lib/linux/libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ../../bin/linux/scope
+        target: /usr/bin/scope
+    privileged: true
+  go_7:
+    volumes:
+      - type: bind
+        source: ../../lib/linux/libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ../../bin/linux/scope
+        target: /usr/bin/scope
+    privileged: true
   go_8:
     volumes:
       - type: bind

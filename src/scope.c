@@ -18,11 +18,13 @@
 #include <sys/wait.h>
 #include <dlfcn.h>
 #include <sys/utsname.h>
-#include "fn.h"
-#include "scopeelf.h"
-#include "scopetypes.h"
 #include <limits.h>
 #include <errno.h>
+
+#include "fn.h"
+#include "dbg.h"
+#include "scopeelf.h"
+#include "scopetypes.h"
 
 #define DEVMODE 0
 #define __NR_memfd_create   319
@@ -417,6 +419,8 @@ main(int argc, char **argv, char **env)
         unsetenv("LD_PRELOAD");
         execve(argv[0], argv, environ);
     }
+
+    program_invocation_short_name = basename(argv[1]);
 
     if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
         fprintf(stderr, "%s\n", dlerror());

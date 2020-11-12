@@ -346,12 +346,16 @@ main(int argc, char **argv, char **env)
         exit(EXIT_FAILURE);
     }
     argv[1] = inferior_command; // update args with resolved inferior_command
+    //program_invocation_short_name = inferior_command;
 
     info = setup_libscope();
     if (!info) {
         fprintf(stderr, "%s:%d ERROR: unable to set up libscope\n", __FUNCTION__, __LINE__);
         exit(EXIT_FAILURE);
     }
+
+    unsetenv("SCOPE_EXEC_TYPE");
+    unsetenv("SCOPE_APP_TYPE");
 
     ebuf = getElf(inferior_command);
 
@@ -373,7 +377,7 @@ main(int argc, char **argv, char **env)
     if ((ebuf == NULL) || (!is_static(ebuf->buf))) {
         // Dynamic executable path
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
-        
+
         if (setenv("LD_PRELOAD", info->path, 0) == -1) {
             perror("setenv");
             goto err;
@@ -409,6 +413,11 @@ main(int argc, char **argv, char **env)
     }
 
     // Static executable path
+    if (getenv("LD_PRELOAD") != NULL) {
+        unsetenv("LD_PRELOAD");
+        execve(argv[0], argv, environ);
+    }
+
     if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
         fprintf(stderr, "%s\n", dlerror());
         goto err;

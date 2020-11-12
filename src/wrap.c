@@ -1827,6 +1827,41 @@ prctl(int option, ...)
     return g_fn.prctl(option, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
 }
 
+EXPORTON int
+execve(const char *pathname, char *const argv[], char *const envp[])
+{
+    int i, nargs, saverr;
+    char **nargv;
+    char scopexec[] = "/usr/bin/scope";
+
+    WRAP_CHECK(execve, -1);
+
+    if (strstr(g_proc.procname, "scope") != NULL) {
+        return g_fn.execve(pathname, argv, environ);
+    }
+
+    nargs = 0;
+    while ((argv[nargs] != NULL)) nargs++;
+
+    size_t plen = sizeof(char *);
+    if ((nargs == 0) || (nargv = calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
+        return g_fn.execve(pathname, argv, envp);
+    }
+
+    nargv[0] = scopexec;
+    nargv[1] = (char *)pathname;
+
+    for (i = 2; i <= nargs; i++) {
+        nargv[i] = argv[i - 1];
+    }
+
+    g_fn.execve(nargv[0], nargv, environ);
+    saverr = errno;
+    if (nargv) free(nargv);
+    errno = saverr;
+    return -1;
+}
+
 /*
  * Note:
  * The syscall function in libc is called from the loader for

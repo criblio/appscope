@@ -90,6 +90,7 @@ initFn(void)
     g_fn.select = dlsym(RTLD_NEXT, "select");
     g_fn.sigsuspend = dlsym(RTLD_NEXT, "sigsuspend");
     g_fn.sigaction = dlsym(RTLD_NEXT, "sigaction");
+    g_fn.execve = dlsym(RTLD_NEXT, "execve");
 #ifdef __MACOS__
     g_fn.close$NOCANCEL = dlsym(RTLD_NEXT, "close$NOCANCEL");
     g_fn.close_nocancel = dlsym(RTLD_NEXT, "close_nocancel");

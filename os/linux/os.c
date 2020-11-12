@@ -478,7 +478,7 @@ osThreadInit(void(*handler)(int), unsigned interval)
 
     sigemptyset(&sact.sa_mask);
     sact.sa_handler = handler;
-    sact.sa_flags = 0;
+    sact.sa_flags = SA_RESTART;
 
     if (!g_fn.sigaction) return FALSE;
 

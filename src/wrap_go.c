@@ -1173,7 +1173,6 @@ c_exit(char *stackaddr)
 {
     // don't use stackaddr; patch_first_instruction() does not provide
     // frame_size, so stackaddr isn't useable
-    handleExit();
     funcprint("c_exit");
 
     int i;
@@ -1187,6 +1186,7 @@ c_exit(char *stackaddr)
         nanosleep(&ts, NULL);
     }
 
+    handleExit();
     // flush the data
     nanosleep(&ts, NULL);
 }

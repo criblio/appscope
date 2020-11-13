@@ -299,3 +299,19 @@ checkEnv(char *env, char *val)
     }
     return FALSE;
 }
+
+int
+is_static(char *buf)
+{
+    int i;
+    Elf64_Ehdr *elf = (Elf64_Ehdr *)buf;
+    Elf64_Phdr *phead = (Elf64_Phdr *)&buf[elf->e_phoff];
+
+    for (i = 0; i < elf->e_phnum; i++) {
+        if ((phead[i].p_type == PT_DYNAMIC) || (phead[i].p_type == PT_INTERP)) {
+            return 0;
+        }
+    }
+
+    return 1;
+}

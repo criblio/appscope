@@ -52,23 +52,16 @@ static inline int _memfd_create(const char *name, unsigned int flags) {
 
 static void
 print_usage(char *prog) {
-    fprintf(stderr,"usage: %s command [args]\n", prog);
-}
+    void (*__scope_main)(void);
 
-static int
-is_static(char *buf)
-{
-    int i;
-    Elf64_Ehdr *elf = (Elf64_Ehdr *)buf;
-    Elf64_Phdr *phead = (Elf64_Phdr *)&buf[elf->e_phoff];
-
-    for (i = 0; i < elf->e_phnum; i++) {
-        if ((phead[i].p_type == PT_DYNAMIC) || (phead[i].p_type == PT_INTERP)) {
-            return 0;
-        }
+    __scope_main = dlsym(RTLD_NEXT, "__scope_main");
+    if (!__scope_main) {
+        fprintf(stderr, "%s\n", dlerror());
+        exit(EXIT_FAILURE);
     }
 
-    return 1;
+    printf("usage: %s command [args]\n", prog);
+    __scope_main();
 }
 
 static int
@@ -338,7 +331,6 @@ main(int argc, char **argv, char **env)
     //check command line arguments 
     char *scope_cmd = argv[0];
     if (argc < 2) {
-        fprintf(stderr,"%s is missing required command.  Exiting.\n", scope_cmd);
         print_usage(scope_cmd);
         exit(EXIT_FAILURE);
     }
@@ -348,16 +340,12 @@ main(int argc, char **argv, char **env)
         exit(EXIT_FAILURE);
     }
     argv[1] = inferior_command; // update args with resolved inferior_command
-    //program_invocation_short_name = inferior_command;
 
     info = setup_libscope();
     if (!info) {
         fprintf(stderr, "%s:%d ERROR: unable to set up libscope\n", __FUNCTION__, __LINE__);
         exit(EXIT_FAILURE);
     }
-
-    unsetenv("SCOPE_EXEC_TYPE");
-    unsetenv("SCOPE_APP_TYPE");
 
     ebuf = getElf(inferior_command);
 
@@ -432,6 +420,7 @@ main(int argc, char **argv, char **env)
         fprintf(stderr, "%s\n", dlerror());
         goto err;
     }
+
     release_libscope(&info);
 
     sys_exec(ebuf, inferior_command, argc, argv, env);

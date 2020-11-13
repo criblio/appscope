@@ -1831,13 +1831,37 @@ EXPORTON int
 execve(const char *pathname, char *const argv[], char *const envp[])
 {
     int i, nargs, saverr;
+    bool isstat = FALSE;
     char **nargv;
-    char scopexec[] = "/usr/bin/scope";
+    elf_buf_t *ebuf;
+    struct stat sbuf;
+    char scopexec[PATH_MAX];
 
     WRAP_CHECK(execve, -1);
 
-    if (strstr(g_proc.procname, "scope") != NULL) {
-        return g_fn.execve(pathname, argv, environ);
+    if ((ebuf = getElf((char *)pathname))) {
+        isstat = is_static(ebuf->buf);
+    }
+
+    // not really necessary since we're gonna exec
+    if (ebuf) freeElf(ebuf->buf, ebuf->len);
+
+    if (strstr(g_proc.procname, "scope") ||
+        (getenv("LD_PRELOAD") && (isstat == FALSE))) {
+        return g_fn.execve(pathname, argv, envp);
+    }
+
+    if (!stat("/usr/bin/scope", &sbuf)) {
+        strncpy(scopexec, "/usr/bin/scope", PATH_MAX);
+    } else if (!stat("/bin/scope", &sbuf)) {
+        strncpy(scopexec, "/bin/scope", PATH_MAX);
+    } else if (!stat("./bin/scope", &sbuf)) {
+        strncpy(scopexec, "./bin/scope", PATH_MAX);
+    } else if (!stat("./scope", &sbuf)) {
+        strncpy(scopexec, "./scope", PATH_MAX);
+    } else {
+        // can't find the scope executable
+        return g_fn.execve(pathname, argv, envp);
     }
 
     nargs = 0;

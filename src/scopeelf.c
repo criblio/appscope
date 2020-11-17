@@ -102,10 +102,10 @@ getElf(char *path)
         goto out;
     }
 
-    if (elf->e_type != ET_EXEC) {
-        char emsg[64];
-        snprintf(emsg, sizeof(emsg), "%s:%d %s is not an executable\n",
-                 __FUNCTION__, __LINE__, path);
+    if ((elf->e_type != ET_EXEC) && (elf->e_type != ET_DYN)) {
+        char emsg[128];
+        snprintf(emsg, sizeof(emsg), "%s:%d %s with type %d is not an executable\n",
+                 __FUNCTION__, __LINE__, path, elf->e_type);
         scopeLog(emsg, fd, CFG_LOG_ERROR);
         goto out;
     }

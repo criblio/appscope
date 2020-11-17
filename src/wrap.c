@@ -1848,7 +1848,8 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
     if (strstr(g_proc.procname, "scope") ||
-        (getenv("LD_PRELOAD") && (isstat == FALSE))) {
+        (getenv("LD_PRELOAD") && (isstat == FALSE)) ||
+        checkEnv("SCOPE_EXECVE", "false")) {
         return g_fn.execve(pathname, argv, envp);
     }
 

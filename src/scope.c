@@ -51,16 +51,29 @@ static inline int _memfd_create(const char *name, unsigned int flags) {
 }
 
 static void
-print_usage(char *prog) {
+print_usage(char *prog, libscope_info_t *info, int argc, char **argv) {
     void (*__scope_main)(void);
+    void *handle = NULL;
 
     __scope_main = dlsym(RTLD_NEXT, "__scope_main");
     if (!__scope_main) {
-        fprintf(stderr, "%s\n", dlerror());
-        exit(EXIT_FAILURE);
+        if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
+            fprintf(stderr, "handle error: %s\n", dlerror());
+            exit(EXIT_FAILURE);
+        }
+
+        __scope_main = dlsym(handle, "__scope_main");
+        if (!__scope_main) {
+            fprintf(stderr, "symbol error: %s from %s\n", dlerror(), info->path);
+            exit(EXIT_FAILURE);
+        }
     }
 
     printf("usage: %s command [args]\n", prog);
+    if (argc == 2) {
+        strncpy(argv[1], "all", strlen(argv[1]));
+    }
+
     __scope_main();
 }
 
@@ -328,10 +341,16 @@ main(int argc, char **argv, char **env)
     // Use dlsym to get addresses for everything in g_fn
     initFn();
 
+    info = setup_libscope();
+    if (!info) {
+        fprintf(stderr, "%s:%d ERROR: unable to set up libscope\n", __FUNCTION__, __LINE__);
+        exit(EXIT_FAILURE);
+    }
+
     //check command line arguments 
     char *scope_cmd = argv[0];
-    if (argc < 2) {
-        print_usage(scope_cmd);
+    if ((argc < 2) || ((argc == 2) && (strncmp(argv[1], "--help", 6) == 0))) {
+        print_usage(scope_cmd, info, argc, argv);
         exit(EXIT_FAILURE);
     }
     char *inferior_command = resolve_inferior_cmd(argv[1]);
@@ -340,12 +359,6 @@ main(int argc, char **argv, char **env)
         exit(EXIT_FAILURE);
     }
     argv[1] = inferior_command; // update args with resolved inferior_command
-
-    info = setup_libscope();
-    if (!info) {
-        fprintf(stderr, "%s:%d ERROR: unable to set up libscope\n", __FUNCTION__, __LINE__);
-        exit(EXIT_FAILURE);
-    }
 
     ebuf = getElf(inferior_command);
 

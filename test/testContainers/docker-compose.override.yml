@@ -59,6 +59,9 @@ services:
       - type: bind
         source: ../../lib/linux/libscope.so
         target: /opt/test-runner/bin/libscope.so
+      - type: bind
+        source: ../../bin/linux/scope
+        target: /usr/bin/scope
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
     privileged: true

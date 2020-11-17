@@ -88,7 +88,8 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 
     // Don't bother looking inside libraries until after we've seen our library.
     if (!param->after_scope) {
-        param->after_scope = (strstr(info->dlpi_name, "libscope.so") != NULL);
+        param->after_scope = (strstr(info->dlpi_name, "libscope") != NULL) ||
+            (strstr(info->dlpi_name, "/proc/") != NULL);
         return 0;
     }
 

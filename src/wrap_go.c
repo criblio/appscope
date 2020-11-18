@@ -292,15 +292,13 @@ patchClone()
     }
 }
 
-static void
-adjustGoStructOffsetsForVersion(const char* go_runtime_version)
-{
-    if (!go_runtime_version) {
-        sysprint("ERROR: can't determine major go version\n");
-        return;
-    }
+#define UNKNOWN_GO_VER (-1)
+#define MIN_SUPPORTED_GO_VER (8)
 
-    sysprint("go_runtime_version = %s\n", go_runtime_version);
+static int
+go_major_version(const char *go_runtime_version)
+{
+    if (!go_runtime_version) return UNKNOWN_GO_VER;
 
     char buf[256] = {0};
     strncpy(buf, go_runtime_version, sizeof(buf)-1);
@@ -308,30 +306,39 @@ adjustGoStructOffsetsForVersion(const char* go_runtime_version)
     char *token = strtok(buf, ".");
     token = strtok(NULL, ".");
     if (!token) {
-        sysprint("ERROR: can't determine major go version\n");
-        return;
+        return UNKNOWN_GO_VER;
     }
 
     errno = 0;
     long val = strtol(token, NULL, 10);
-    if (errno || val <= 0) {
+    if (errno || val <= 0 || val > INT_MAX) {
+        return UNKNOWN_GO_VER;
+    }
+
+    return val;
+}
+
+static void
+adjustGoStructOffsetsForVersion(int go_ver)
+{
+    if (!go_ver) {
         sysprint("ERROR: can't determine major go version\n");
         return;
     }
 
     // go 1.8 has a different m_to_tls offset than other supported versions.
-    if (val == 8) {
+    if (go_ver == 8) {
         g_go.m_to_tls = 96; // 0x60
     }
 
     // go 1.8 is the only version that directly goes from netfd to sysfd.
-    if (val == 8) {
+    if (go_ver == 8) {
         g_go.netfd_to_sysfd = 16;
     }
 
     // before go 1.12, persistConn_to_conn and persistConn_to_bufrd
     // have different values than 12 and after
-    if (val < 12) {
+    if (go_ver < 12) {
         g_go.persistConn_to_conn = 72;  // 0x48
         g_go.persistConn_to_bufrd = 96; // 0x60
     }
@@ -422,13 +429,26 @@ initGoHook(elf_buf_t *ebuf)
         g_switch_thread = TRUE;
     }
 
-    if (!(go_ver= getSymbol(ebuf->buf, "runtime.buildVersion")) ||
-        !(go_runtime_version = c_str(go_ver))) {
-        sysprint("ERROR: can't get the address for runtime.buildVersion\n");
-        return;
+    int go_major_ver = UNKNOWN_GO_VER;
+    if ((go_ver=getSymbol(ebuf->buf, "runtime.buildVersion")) &&
+        (go_runtime_version = c_str(go_ver))) {
+
+        sysprint("go_runtime_version = %s\n", go_runtime_version);
+
+        go_major_ver = go_major_version(go_runtime_version);
     }
 
-    adjustGoStructOffsetsForVersion(go_runtime_version);
+    if (go_major_ver < MIN_SUPPORTED_GO_VER) {
+        if (go_runtime_version) {
+            fprintf(stderr, "%s was compiled with go version `%s`.\n",
+                    ebuf->cmd, go_runtime_version);
+        }
+        fprintf(stderr, "%s was compiled with a version of go older than go1.8."
+                "  This is not supported by scope.  Exiting.\n", ebuf->cmd);
+        exit(1);
+    }
+
+    adjustGoStructOffsetsForVersion(go_major_ver);
 
     tap_t* tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {

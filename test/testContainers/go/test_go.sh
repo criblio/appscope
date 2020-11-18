@@ -407,7 +407,6 @@ starttest influx_static_stress
 influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
 
 SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/stress_test insert -n 1000000 -f
-ERR+=$?
 
 influx_eval 50 scope
 

@@ -333,7 +333,6 @@ main(int argc, char **argv, char **env)
 {
     elf_buf_t *ebuf;
     int (*sys_exec)(elf_buf_t *, const char *, int, char **, char **);
-    int status;
     pid_t pid;
     void *handle = NULL;
     libscope_info_t *info;
@@ -362,7 +361,9 @@ main(int argc, char **argv, char **env)
 
     ebuf = getElf(inferior_command);
 
-    if ((ebuf != NULL) && (app_type(ebuf->buf, SHT_NOTE, ".note.go.buildid") != 0)) {
+    if (ebuf && (app_type(ebuf->buf, SHT_PROGBITS, ".gosymtab") ||
+                 app_type(ebuf->buf, SHT_PROGBITS, ".gopclntab") ||
+                 app_type(ebuf->buf, SHT_NOTE, ".note.go.buildid"))) {
         if (setenv("SCOPE_APP_TYPE", "go", 1) == -1) {
             perror("setenv");
             goto err;
@@ -396,13 +397,15 @@ main(int argc, char **argv, char **env)
             perror("fork");
             goto err;
         } else if (pid > 0) {
+            int status;
             int ret;
             do {
                 ret = waitpid(pid, &status, 0);
             } while (ret == -1 && errno == EINTR);
 
             release_libscope(&info);
-            exit(status);
+            if (WIFEXITED(status)) exit(WEXITSTATUS(status));
+            exit(EXIT_FAILURE);
         } else {
             execve(inferior_command, &argv[1], environ);
             perror("execve");

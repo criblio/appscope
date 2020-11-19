@@ -427,7 +427,7 @@ doHttpHeader(protocol_info *proto)
     char header[map->req_len];
     // we're either building a new req or we have a previous req
     if (map->req) {
-        if ((hreport.hreq = calloc(1, proto->len)) == NULL) {
+        if ((hreport.hreq = calloc(1, map->req_len)) == NULL) {
             scopeLog("ERROR: doHttpHeader: hreq memory allocation failure", proto->fd, CFG_LOG_ERROR);
             return;
         }

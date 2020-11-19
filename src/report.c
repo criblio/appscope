@@ -23,44 +23,46 @@
 #endif
 
 
-#define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
-#define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)
-#define CLASS_FIELD(val)        STRFIELD("class",          (val),        2)
-#define PROTO_FIELD(val)        STRFIELD("proto",          (val),        2)
-#define OP_FIELD(val)           STRFIELD("op",             (val),        3)
-#define PID_FIELD(val)          NUMFIELD("pid",            (val),        4)
-#define HOST_FIELD(val)         STRFIELD("host",           (val),        4)
-#define PROC_FIELD(val)         STRFIELD("proc",           (val),        4)
-#define HTTPSTAT_FIELD(val)     NUMFIELD("http_status",    (val),        4)
-#define DOMAIN_FIELD(val)       STRFIELD("domain",         (val),        5)
-#define FILE_FIELD(val)         STRFIELD("file",           (val),        5)
-#define LOCALIP_FIELD(val)      STRFIELD("localip",        (val),        6)
-#define REMOTEIP_FIELD(val)     STRFIELD("remoteip",       (val),        6)
-#define LOCALP_FIELD(val)       NUMFIELD("localp",         (val),        6)
-#define LOCALN_FIELD(val)       NUMFIELD("localn",         (val),        6)
-#define PORT_FIELD(val)         NUMFIELD("port",           (val),        6)
-#define REMOTEP_FIELD(val)      NUMFIELD("remotep",        (val),        6)
-#define REMOTEN_FIELD(val)      NUMFIELD("remoten",        (val),        6)
-#define FD_FIELD(val)           NUMFIELD("fd",             (val),        7)
-#define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
-#define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
-#define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
-#define RATE_FIELD(val)         NUMFIELD("req_per_sec",    (val),        8)
-#define HREQ_FIELD(val)         STRFIELD("req",            (val),        8)
-#define HRES_FIELD(val)         STRFIELD("resp",           (val),        8)
-#define DETECT_PROTO(val)       STRFIELD("protocol",       (val),        8)
+#define DATA_FIELD(val)         STRFIELD("data",           (val), 1, TRUE)
+#define UNIT_FIELD(val)         STRFIELD("unit",           (val), 1, TRUE)
+#define CLASS_FIELD(val)        STRFIELD("class",          (val), 2, TRUE)
+#define PROTO_FIELD(val)        STRFIELD("proto",          (val), 2, TRUE)
+#define OP_FIELD(val)           STRFIELD("op",             (val), 3, TRUE)
+#define PID_FIELD(val)          NUMFIELD("pid",            (val), 4, FALSE)
+#define HOST_FIELD(val)         STRFIELD("host",           (val), 4, FALSE)
+#define PROC_FIELD(val)         STRFIELD("proc",           (val), 4, FALSE)
+#define HTTPSTAT_FIELD(val)     NUMFIELD("http_status",    (val), 4, TRUE)
+#define DOMAIN_FIELD(val)       STRFIELD("domain",         (val), 5, TRUE)
+#define FILE_FIELD(val)         STRFIELD("file",           (val), 5, TRUE)
+#define LOCALIP_FIELD(val)      STRFIELD("localip",        (val), 6, TRUE)
+#define REMOTEIP_FIELD(val)     STRFIELD("remoteip",       (val), 6, TRUE)
+#define LOCALP_FIELD(val)       NUMFIELD("localp",         (val), 6, TRUE)
+#define LOCALN_FIELD(val)       NUMFIELD("localn",         (val), 6, TRUE)
+#define PORT_FIELD(val)         NUMFIELD("port",           (val), 6, TRUE)
+#define REMOTEP_FIELD(val)      NUMFIELD("remotep",        (val), 6, TRUE)
+#define REMOTEN_FIELD(val)      NUMFIELD("remoten",        (val), 6, TRUE)
+#define FD_FIELD(val)           NUMFIELD("fd",             (val), 7, TRUE)
+#define ARGS_FIELD(val)         STRFIELD("args",           (val), 7, TRUE)
+#define DURATION_FIELD(val)     NUMFIELD("duration",       (val), 8, TRUE)
+#define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val), 8, TRUE)
+#define RATE_FIELD(val)         NUMFIELD("req_per_sec",    (val), 8, TRUE)
+#define HREQ_FIELD(val)         STRFIELD("req",            (val), 8, TRUE)
+#define HRES_FIELD(val)         STRFIELD("resp",           (val), 8, TRUE)
+#define DETECT_PROTO(val)       STRFIELD("protocol",       (val), 8, TRUE)
 
 #define EVENT_ONLY_ATTR (CFG_MAX_VERBOSITY+1)
-#define HTTP_MAX_FIELDS 15
+#define HTTP_MAX_FIELDS 25
 #define H_ATTRIB(field, att, val, verbosity) \
     field.name = att; \
     field.value_type = FMT_STR; \
+    field.event_usage = TRUE; \
     field.value.str = val; \
     field.cardinality = verbosity;
 
 #define H_VALUE(field, att, val, verbosity) \
     field.name = att; \
     field.value_type = FMT_NUM; \
+    field.event_usage = TRUE;   \
     field.value.num = val; \
     field.cardinality = verbosity;
 
@@ -68,7 +70,9 @@
 #define HTTP_STATUS "HTTP/1."
 
 typedef struct http_report_t {
-    char *header;
+    char *hreq;
+    char *hres;
+    metric_t ptype;
     int ix;
     size_t clen;
     char rport[8];
@@ -259,17 +263,26 @@ httpFieldEnd(event_field_t *fields, http_report *hreport)
 }
 
 static bool
-httpFields(event_field_t *fields, http_report *hreport, protocol_info *proto)
+httpFields(event_field_t *fields, http_report *hreport, char *hdr, size_t hdr_len, protocol_info *proto, bool donet)
 {
-    if (!fields || !hreport || !proto) return FALSE;
+    if (!fields || !hreport || !proto || !hdr) return FALSE;
 
     // Start with fields from the header
-    char *savea = NULL;
-    http_post *post = (http_post *)proto->data;
+    char *savea = NULL, *header;
     hreport->clen = -1;
-    strncpy(hreport->header, post->hdr, proto->len);
 
-    char *reqh = strtok_r(hreport->header, "\r\n", &savea);
+    if ((hreport->ptype == EVT_HREQ) && (hreport->hreq)) {
+        strncpy(hreport->hreq, hdr, hdr_len);
+        header = hreport->hreq;
+    } else if ((hreport->ptype == EVT_HRES) && (hreport->hres)) {
+        strncpy(hreport->hres, hdr, hdr_len);
+        header = hreport->hres;
+    } else {
+        scopeLog("WARN: httpFields: proto ptype is not req or resp", proto->fd, CFG_LOG_WARN);
+        return FALSE;
+    }
+
+    char *reqh = strtok_r(header, "\r\n", &savea);
     if (!reqh) {
         scopeLog("WARN: httpFields: parse an http request header", proto->fd, CFG_LOG_WARN);
         return FALSE;
@@ -292,6 +305,11 @@ httpFields(event_field_t *fields, http_report *hreport, protocol_info *proto)
                 hreport->clen = -1;
             }
         }
+    }
+
+    // don't do net.* twice
+    if (donet == FALSE) {
+        return TRUE;
     }
 
     /*
@@ -382,18 +400,15 @@ doHttpHeader(protocol_info *proto)
 
         map->id = post->id;
         map->first_time = time(NULL);
+        map->req = NULL;
+        map->req_len = 0;
     }
 
     map->frequency++;
-
     ssl = (post->ssl) ? "https" : "http";
-
-    if ((hreport.header = calloc(1, proto->len)) == NULL) {
-        scopeLog("ERROR: doHttpHeader: memory allocation failure", proto->fd, CFG_LOG_ERROR);
-        return;
-    }
-
     hreport.ix = 0;
+    hreport.hreq = NULL;
+    hreport.hres = NULL;
 
  /*
      * RFC 2616 Section 5 Request
@@ -406,10 +421,19 @@ doHttpHeader(protocol_info *proto)
     if (proto->ptype == EVT_HREQ) {
         map->start_time = post->start_duration;
         map->req = (char *)post->hdr;
+        map->req_len = proto->len;
+    }
+
+    char header[map->req_len];
+    // we're either building a new req or we have a previous req
+    if (map->req) {
+        if ((hreport.hreq = calloc(1, proto->len)) == NULL) {
+            scopeLog("ERROR: doHttpHeader: hreq memory allocation failure", proto->fd, CFG_LOG_ERROR);
+            return;
+        }
 
         char *savea = NULL;
-        char header[proto->len];
-        strncpy(header, map->req, proto->len);
+        strncpy(header, map->req, map->req_len);
 
         char *headertok = strtok_r(header, "\r\n", &savea);
         if (!headertok) {
@@ -440,8 +464,10 @@ doHttpHeader(protocol_info *proto)
         if (flavor_str &&
             ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
             ((flavor_str = strtok_r(NULL, "\r", &savea)))) {
-            H_ATTRIB(fields[hreport.ix], "http.flavor", flavor_str, 1);
-            HTTP_NEXT_FLD(hreport.ix);
+            if (proto->ptype == EVT_HREQ) {
+                H_ATTRIB(fields[hreport.ix], "http.flavor", flavor_str, 1);
+                HTTP_NEXT_FLD(hreport.ix);
+            }
         } else {
             scopeLog("WARN: doHttpHeader: no http version in an http request header", proto->fd, CFG_LOG_WARN);
         }
@@ -449,19 +475,24 @@ doHttpHeader(protocol_info *proto)
         H_ATTRIB(fields[hreport.ix], "http.scheme", ssl, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
-        // Fields common to request & response
-        httpFields(fields, &hreport, proto);
+        if (proto->ptype == EVT_HREQ) {
+            hreport.ptype = EVT_HREQ;
+            // Fields common to request & response
+            httpFields(fields, &hreport, map->req, map->req_len, proto, TRUE);
 
-        if (hreport.clen != -1) {
-            H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
-            HTTP_NEXT_FLD(hreport.ix);
+            if (hreport.clen != -1) {
+                H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
+                HTTP_NEXT_FLD(hreport.ix);
+            }
+            map->clen = hreport.clen;
+
+            httpFieldEnd(fields, &hreport);
+
+            event_t sendEvent = INT_EVENT("http-req", proto->len, SET, fields);
+            cmdSendHttp(g_ctl, &sendEvent, map->id, &g_proc);
         }
-        map->clen = hreport.clen;
+    }
 
-        httpFieldEnd(fields, &hreport);
-
-        event_t sendEvent = INT_EVENT("http-req", proto->len, SET, fields);
-        cmdSendHttp(g_ctl, &sendEvent, map->id, &g_proc);
     /*
     * RFC 2616 Section 6 Response
     * After receiving and interpreting a request message, a server responds with an HTTP response message.
@@ -475,7 +506,12 @@ doHttpHeader(protocol_info *proto)
     *
     * Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
     */
-    } else if (proto->ptype == EVT_HRES) {
+    if (proto->ptype == EVT_HRES) {
+        if ((hreport.hres = calloc(1, proto->len)) == NULL) {
+            scopeLog("ERROR: doHttpHeader: hres memory allocation failure", proto->fd, CFG_LOG_ERROR);
+            return;
+        }
+
         int rps = map->frequency;
         int sec = (map->first_time > 0) ? (int)time(NULL) - map->first_time : 1;
         if (sec > 0) {
@@ -485,7 +521,6 @@ doHttpHeader(protocol_info *proto)
         map->resp = (char *)post->hdr;
 
         if (!map->req) {
-            map->req = strdup("None");
             map->duration = 0;
         } else {
             map->duration = getDurationNow(post->start_duration, map->start_time);
@@ -497,10 +532,10 @@ doHttpHeader(protocol_info *proto)
 
         // The response specific values from Status-Line
         char *savea;
-        char header[proto->len];
-        strncpy(header, map->resp, proto->len);
+        char reqheader[proto->len];
+        strncpy(reqheader, map->resp, proto->len);
 
-        char *headertok = strtok_r(header, "\r\n", &savea);
+        char *headertok = strtok_r(reqheader, "\r\n", &savea);
         char *flavor_str = strtok_r(headertok, " ", &savea);
         if (flavor_str &&
             ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
@@ -525,8 +560,18 @@ doHttpHeader(protocol_info *proto)
         HTTP_NEXT_FLD(hreport.ix);
 
         // Fields common to request & response
-        httpFields(fields, &hreport, proto);
+        if (map->req) {
+            hreport.ptype = EVT_HREQ;
+            httpFields(fields, &hreport, map->req, map->req_len, proto, FALSE);
+            if (hreport.clen != -1) {
+                H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
+                HTTP_NEXT_FLD(hreport.ix);
+            }
+            map->clen = hreport.clen;
+        }
 
+        hreport.ptype = EVT_HRES;
+        httpFields(fields, &hreport, map->resp, proto->len, proto, TRUE);
         if (hreport.clen != -1) {
             H_VALUE(fields[hreport.ix], "http.response_content_length", hreport.clen, EVENT_ONLY_ATTR);
             HTTP_NEXT_FLD(hreport.ix);
@@ -595,7 +640,8 @@ doHttpHeader(protocol_info *proto)
         if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
     }
 
-    if (hreport.header) free(hreport.header);
+    if (hreport.hreq) free(hreport.hreq);
+    if (hreport.hres) free(hreport.hres);
     destroyProto(proto);
 }
 
@@ -1040,13 +1086,13 @@ doStatMetric(const char *op, const char *pathname, void* ctr)
     metric_counters* ctrs = (ctr) ? (metric_counters*) ctr : &g_ctrs;
 
     event_field_t fields[] = {
-            PROC_FIELD(g_proc.procname),
-            PID_FIELD(g_proc.pid),
-            HOST_FIELD(g_proc.hostname),
-            OP_FIELD(op),
-            FILE_FIELD(pathname),
-            UNIT_FIELD("operation"),
-            FIELDEND
+        PROC_FIELD(g_proc.procname),
+        PID_FIELD(g_proc.pid),
+        HOST_FIELD(g_proc.hostname),
+        OP_FIELD(op),
+        FILE_FIELD(pathname),
+        UNIT_FIELD("operation"),
+        FIELDEND
     };
 
     if (ctrs->numStat.evt != 0) {

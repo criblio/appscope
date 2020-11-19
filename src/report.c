@@ -10,6 +10,7 @@
 #include "atomic.h"
 #include "com.h"
 #include "dbg.h"
+#include "httpagg.h"
 #include "mtcformat.h"
 #include "os.h"
 #include "plattime.h"
@@ -83,6 +84,7 @@ typedef struct http_report_t {
 int g_interval = DEFAULT_SUMMARY_PERIOD;
 static list_t *g_maplist;
 static search_t *g_http_status = NULL;
+static http_agg_t *g_http_agg;
 
 static void
 destroyHttpMap(void *data)
@@ -102,6 +104,7 @@ initReporting()
 {
     g_maplist = lstCreate(destroyHttpMap);
     g_http_status = searchComp(HTTP_STATUS);
+    g_http_agg = httpAggCreate();
 }
 
 void
@@ -578,6 +581,7 @@ doHttpHeader(protocol_info *proto)
             char *mtx_name = (proto->isServer) ? "http.server.duration" : "http.client.duration";
             event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA, fields);
             cmdSendMetric(g_mtc, &http_dur);
+            httpAggAddMetric(g_http_agg, &http_dur, map->clen, hreport.clen);
 
             if (map->clen != -1) {
                 event_t http_req_len = INT_EVENT("http.request.content_length", map->clen, DELTA, fields);
@@ -2001,5 +2005,7 @@ doEvent()
             free(event);
         }
     }
+    httpAggSendReport(g_http_agg, g_mtc);
+    httpAggReset(g_http_agg);
     ctlFlush(g_ctl);
 }

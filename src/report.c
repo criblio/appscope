@@ -580,9 +580,10 @@ doHttpHeader(protocol_info *proto)
 
             char *mtx_name = (proto->isServer) ? "http.server.duration" : "http.client.duration";
             event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA, fields);
-            cmdSendMetric(g_mtc, &http_dur);
+            // TBD AGG Only cmdSendMetric(g_mtc, &http_dur);
             httpAggAddMetric(g_http_agg, &http_dur, map->clen, hreport.clen);
 
+            /* TBD AGG Only
             if (map->clen != -1) {
                 event_t http_req_len = INT_EVENT("http.request.content_length", map->clen, DELTA, fields);
                 cmdSendMetric(g_mtc, &http_req_len);
@@ -592,6 +593,7 @@ doHttpHeader(protocol_info *proto)
                 event_t http_rsp_len = INT_EVENT("http.response.content_length", hreport.clen, DELTA, fields);
                 cmdSendMetric(g_mtc, &http_rsp_len);
             }
+            */
 
         }
 

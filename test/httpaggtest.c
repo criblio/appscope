@@ -48,8 +48,8 @@ httpAggAddMetricHappyPath(void **state)
     http_agg_t *http_agg = httpAggCreate();
 
     event_field_t fields[] = {
-        STRFIELD("http.target", "/", 4),
-        NUMFIELD("http.status_code", 200, 1),
+        STRFIELD("http.target", "/", 4, FALSE),
+        NUMFIELD("http.status_code", 200, 1, FALSE),
         FIELDEND
     };
     event_t event = INT_EVENT("http.server.duration", 2, DELTA, fields);
@@ -102,8 +102,8 @@ httpAggAddMetricWithQueryStringsAreAggregatedTogether(void **state)
     int i;
     for (i=0; i<(sizeof(target)/sizeof(target[0])); i++) {
         event_field_t fields[] = {
-            STRFIELD("http.target", target[i], 4),
-            NUMFIELD("http.status_code", 200, 1),
+            STRFIELD("http.target", target[i], 4, FALSE),
+            NUMFIELD("http.status_code", 200, 1, FALSE),
             FIELDEND
         };
         event_t event = INT_EVENT("http.client.duration", 42, DELTA, fields);
@@ -133,8 +133,8 @@ httpAggAddMetricWithManyStatusCodesDoesNotCrash(void **state)
     int i;
     for (i=1; i<=100; i++) {
         event_field_t fields[] = {
-            STRFIELD("http.target", "/", 4),
-            NUMFIELD("http.status_code", i, 1),
+            STRFIELD("http.target", "/", 4, FALSE),
+            NUMFIELD("http.status_code", i, 1, FALSE),
             FIELDEND
         };
         event_t event = INT_EVENT("http.client.duration", 2, DELTA, fields);
@@ -157,8 +157,8 @@ httpAggAddMetricWithManyHttpTargetsDoesNotCrash(void **state)
         char http_target[128];
         snprintf(http_target, sizeof(http_target), "/%d", i);
         event_field_t fields[] = {
-            STRFIELD("http.target", http_target, 4),
-            NUMFIELD("http.status_code", 200, 1),
+            STRFIELD("http.target", http_target, 4, FALSE),
+            NUMFIELD("http.status_code", 200, 1, FALSE),
             FIELDEND
         };
         event_t event = INT_EVENT("http.client.duration", 2, DELTA, fields);

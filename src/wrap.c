@@ -1835,10 +1835,14 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     bool isstat = FALSE;
     char **nargv;
     elf_buf_t *ebuf;
-    struct stat sbuf;
-    char scopexec[PATH_MAX];
+    char *scopexec = NULL;
 
     WRAP_CHECK(execve, -1);
+
+    if (strstr(g_proc.procname, "scope") ||
+        checkEnv("SCOPE_EXECVE", "false")) {
+        return g_fn.execve(pathname, argv, envp);
+    }
 
     if ((ebuf = getElf((char *)pathname))) {
         isstat = is_static(ebuf->buf);
@@ -1847,22 +1851,18 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     // not really necessary since we're gonna exec
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
-    if (strstr(g_proc.procname, "scope") ||
-        (getenv("LD_PRELOAD") && (isstat == FALSE)) ||
-        checkEnv("SCOPE_EXECVE", "false")) {
+    if (getenv("LD_PRELOAD") && (isstat == FALSE)) {
         return g_fn.execve(pathname, argv, envp);
     }
 
-    if (!stat("/usr/bin/scope", &sbuf)) {
-        strncpy(scopexec, "/usr/bin/scope", PATH_MAX);
-    } else if (!stat("/bin/scope", &sbuf)) {
-        strncpy(scopexec, "/bin/scope", PATH_MAX);
-    } else if (!stat("./bin/scope", &sbuf)) {
-        strncpy(scopexec, "./bin/scope", PATH_MAX);
-    } else if (!stat("./scope", &sbuf)) {
-        strncpy(scopexec, "./scope", PATH_MAX);
-    } else {
+    scopexec = getenv("SCOPE_EXEC_PATH");
+    if (((scopexec = getpath(scopexec)) == NULL) &&
+        ((scopexec = getpath("scope")) == NULL)) {
+        char msg[64];
+
         // can't find the scope executable
+        snprintf(msg, sizeof(msg), "execve: can't find a scope executable for %s", pathname);
+        scopeLog(msg, -1, CFG_LOG_WARN);
         return g_fn.execve(pathname, argv, envp);
     }
 
@@ -1884,6 +1884,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     g_fn.execve(nargv[0], nargv, environ);
     saverr = errno;
     if (nargv) free(nargv);
+    if (scopexec) free(scopexec);
     errno = saverr;
     return -1;
 }

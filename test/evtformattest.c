@@ -58,7 +58,7 @@ evtFormatMetricHappyPath(void** state)
                            "\"host\":\"host\","
                            "\"proc\":\"evttest\","
                            "\"cmd\":\"cmd-4\","
-                           "\"pid\":\"4848\","
+                           "\"pid\":4848,"
                            "\"_channel\":\"12345\","
                            "\"data\":{\"_metric\":\"A\",\"_metric_type\":\"counter\",\"_value\":1}}", (long)time->valuedouble);
 
@@ -423,7 +423,7 @@ fmtEventJsonValue(void** state)
                               "\"source\":\"stdin\","
                               "\"host\":\"earl\","
                               "\"proc\":\"formattest\","
-                              "\"cmd\":\"cmd\",\"pid\":\"1234\","
+                              "\"cmd\":\"cmd\",\"pid\":1234,"
                               "\"_channel\":\"14627333968688430831\","
                               "\"data\":\"поспехаў\"}");
 
@@ -464,7 +464,7 @@ fmtEventJsonWithEmbeddedNulls(void** state)
                               "\"host\":\"earl\","
                               "\"proc\":\"\","
                               "\"cmd\":\"\","
-                              "\"pid\":\"1234\","
+                              "\"pid\":1234,"
                               "\"_channel\":\"14627333968688430831\","
                               "\"data\":\"Unë mund\\u0000të ha qelq dhe nuk\\u0000më gjen gjë\"}");
 
@@ -484,7 +484,7 @@ fmtEventJsonWithEmbeddedNulls(void** state)
                               "\"host\":\"earl\","
                               "\"proc\":\"\","
                               "\"cmd\":\"\","
-                              "\"pid\":\"1234\","
+                              "\"pid\":1234,"
                               "\"_channel\":\"14627333968688430831\"}");
     free(str);
     cJSON_Delete(json);

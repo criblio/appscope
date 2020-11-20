@@ -19,6 +19,7 @@
 #define ID "id"
 #define PROCNAME "proc"
 #define CMDNAME "cmd"
+#define PID "pid"
 
 typedef struct {
     const char* str;
@@ -290,7 +291,6 @@ cJSON *
 fmtEventJson(event_format_t *sev)
 {
     char numbuf[32];
-    char spid[32];
 
     if (!sev || !sev->proc) return NULL;
 
@@ -306,8 +306,7 @@ fmtEventJson(event_format_t *sev)
     if (!cJSON_AddStringToObjLN(json, HOST, sev->proc->hostname)) goto err;
     if (!cJSON_AddStringToObjLN(json, PROCNAME, sev->proc->procname)) goto err;
     if (!cJSON_AddStringToObjLN(json, CMDNAME, sev->proc->cmd)) goto err;
-    if (snprintf(spid, sizeof(spid), "%d", sev->proc->pid) < 0) goto err;
-    if (!cJSON_AddStringToObjLN(json, "pid", spid)) goto err;
+    if (!cJSON_AddNumberToObjLN(json, PID, sev->proc->pid)) goto err;
     if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto err;
     if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto err;
     cJSON_AddItemToObjectCS(json, DATA, sev->data);

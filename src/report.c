@@ -98,8 +98,6 @@ destroyHttpMap(void *data)
 
     if (map->req) free(map->req);
     if (map->resp) free(map->resp);
-    if (map->method_str) free(map->method_str);
-    if (map->target_str) free(map->target_str);
     if (map) free(map);
 }
 
@@ -449,7 +447,6 @@ doHttpHeader(protocol_info *proto)
         if (method_str) {
             H_ATTRIB(fields[hreport.ix], "http.method", method_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
-            map->method_str = strdup(method_str);
         } else {
             scopeLog("WARN: doHttpHeader: no method in an http request header", proto->fd, CFG_LOG_WARN);
         }
@@ -458,7 +455,6 @@ doHttpHeader(protocol_info *proto)
         if (target_str) {
             H_ATTRIB(fields[hreport.ix], "http.target", target_str, 4);
             HTTP_NEXT_FLD(hreport.ix);
-            map->target_str = strdup(target_str);
         } else {
             scopeLog("WARN: doHttpHeader: no target in an http request header", proto->fd, CFG_LOG_WARN);
         }
@@ -602,26 +598,6 @@ doHttpHeader(protocol_info *proto)
 
         // emit statsd metrics, if enabled.
         if (mtcEnabled(g_mtc)) {
-
-            // metric output has some fields from the header that the
-            // response event does not.  Add them here.
-            // First, back up to overwrite the httpFieldEnd
-            hreport.ix--;
-
-            if (map->method_str) {
-                H_ATTRIB(fields[hreport.ix], "http.method", map->method_str, 1);
-                HTTP_NEXT_FLD(hreport.ix);
-            }
-
-            if (map->target_str) {
-                H_ATTRIB(fields[hreport.ix], "http.target", map->target_str, 4);
-                HTTP_NEXT_FLD(hreport.ix);
-            }
-
-            H_ATTRIB(fields[hreport.ix], "http.scheme", ssl, 1);
-            HTTP_NEXT_FLD(hreport.ix);
-
-            httpFieldEnd(fields, &hreport);
 
             char *mtx_name = (proto->isServer) ? "http.server.duration" : "http.client.duration";
             event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA, fields);

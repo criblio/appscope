@@ -16,6 +16,7 @@ typedef enum {FMT_END, FMT_STR, FMT_NUM} field_value_t;
 typedef struct {
     const char *name;
     field_value_t value_type;
+    bool event_usage;
     union {
         const char *str;
         long long num;
@@ -23,9 +24,9 @@ typedef struct {
     unsigned cardinality;   // verbosity uses this
 } event_field_t;
 
-#define STRFIELD(n,v,c) {n,    FMT_STR, { .str = v }, c}
-#define NUMFIELD(n,v,c) {n,    FMT_NUM, { .num = v }, c}
-#define FIELDEND        {NULL, FMT_END, { .num = 0 }, 0}
+#define STRFIELD(n,v,c,e) {n,    FMT_STR, e, { .str = v }, c}
+#define NUMFIELD(n,v,c,e) {n,    FMT_NUM, e, { .num = v }, c}
+#define FIELDEND        {NULL, FMT_END, FALSE, { .num = 0 }, 0}
 
 // statsd:  COUNTER,   GAUGE,    TIMER, HISTOGRAM, SET
 typedef enum {DELTA, CURRENT, DELTA_MS, HISTOGRAM, SET} data_type_t;

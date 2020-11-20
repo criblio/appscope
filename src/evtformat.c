@@ -17,6 +17,9 @@
 #define SOURCETYPE "sourcetype"
 #define EVENT "ev"
 #define ID "id"
+#define PROCNAME "proc"
+#define CMDNAME "cmd"
+#define PID "pid"
 
 typedef struct {
     const char* str;
@@ -301,6 +304,9 @@ fmtEventJson(event_format_t *sev)
     if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto err;
     if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto err;
     if (!cJSON_AddStringToObjLN(json, HOST, sev->proc->hostname)) goto err;
+    if (!cJSON_AddStringToObjLN(json, PROCNAME, sev->proc->procname)) goto err;
+    if (!cJSON_AddStringToObjLN(json, CMDNAME, sev->proc->cmd)) goto err;
+    if (!cJSON_AddNumberToObjLN(json, PID, sev->proc->pid)) goto err;
     if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto err;
     if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto err;
     cJSON_AddItemToObjectCS(json, DATA, sev->data);
@@ -368,6 +374,9 @@ addJsonFields(event_field_t* fields, regex_t* fieldFilter, cJSON* json)
 
         // skip outputting anything that doesn't match fieldFilter
         if (fieldFilter && regexec_wrapper(fieldFilter, fld->name, 0, NULL, 0)) continue;
+
+        // skip if this field is not used in events
+        if (fld->event_usage == FALSE) continue;
 
         if (fld->value_type == FMT_STR) {
             if (!cJSON_AddStringToObjLN(json, fld->name, fld->value.str)) return FALSE;

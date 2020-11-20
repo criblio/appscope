@@ -281,8 +281,8 @@ report_target(mtc_t *mtc, target_agg_t *target)
             if (target->status[i].code == 0) break;
 
             event_field_t fields[] = {
-                STRFIELD("http.target", target->uri, 4),
-                NUMFIELD("http.status_code", target->status[i].code, 1),
+                STRFIELD("http.target", target->uri, 4, FALSE),
+                NUMFIELD("http.status_code", target->status[i].code, 1, FALSE),
                 FIELDEND
             };
             event_t metric = INT_EVENT("http.status_code",
@@ -296,8 +296,8 @@ report_target(mtc_t *mtc, target_agg_t *target)
         for (i = SERVER_DURATION; i < FIELD_MAX; i++) {
             if (target->field[i].num_entries == 0) continue;
             event_field_t fields[] = {
-                STRFIELD("http.target", target->uri, 4),
-                NUMFIELD("numops", target->field[i].num_entries, 8),
+                STRFIELD("http.target", target->uri, 4, FALSE),
+                NUMFIELD("numops", target->field[i].num_entries, 8, FALSE),
                 FIELDEND
             };
             event_t metric = INT_EVENT(valToStr(fieldMap, i),

@@ -150,7 +150,7 @@ static void
 mtcFormatStatsDStringNullFmtDoesntCrash(void** state)
 {
     event_field_t fields[] = {
-        STRFIELD("proc",             "redis",            2),
+        STRFIELD("proc",  "redis", 2,  TRUE),
         FIELDEND
     };
     event_t e = INT_EVENT("useful.apps", 1, CURRENT, fields);
@@ -170,12 +170,12 @@ mtcFormatStatsDStringHappyPath(void** state)
     in_port_t localPort = 8125;
 
     event_field_t fields[] = {
-        STRFIELD("proc",             g_procname,            2),
-        NUMFIELD("pid",              pid,                   7),
-        NUMFIELD("fd",               fd,                    7),
-        STRFIELD("host",             g_hostname,            2),
-        STRFIELD("proto",            proto,                 1),
-        NUMFIELD("port",             localPort,             4),
+        STRFIELD("proc",    g_procname,   2,  TRUE),
+        NUMFIELD("pid",     pid,          7,  TRUE),
+        NUMFIELD("fd",      fd,           7,  TRUE),
+        STRFIELD("host",    g_hostname,   2,  TRUE),
+        STRFIELD("proto",   proto,        1,  TRUE),
+        NUMFIELD("port",    localPort,    4,  TRUE),
         FIELDEND
     };
     event_t e = INT_EVENT("net.port", g_openPorts, CURRENT, fields);
@@ -211,12 +211,12 @@ mtcFormatStatsDStringHappyPathFilteredFields(void** state)
     in_port_t localPort = 8125;
 
     event_field_t fields[] = {
-        STRFIELD("proc",             g_procname,            2),
-        NUMFIELD("pid",              pid,                   7),
-        NUMFIELD("fd",               fd,                    7),
-        STRFIELD("host",             g_hostname,            2),
-        STRFIELD("proto",            proto,                 1),
-        NUMFIELD("port",             localPort,             4),
+        STRFIELD("proc",     g_procname,   2,  TRUE),
+        NUMFIELD("pid",      pid,          7,  TRUE),
+        NUMFIELD("fd",       fd,           7,  TRUE),
+        STRFIELD("host",     g_hostname,   2,  TRUE),
+        STRFIELD("proto",    proto,        1,  TRUE),
+        NUMFIELD("port",     localPort,     4,  TRUE),
         FIELDEND
     };
     event_t e = INT_EVENT("net.port", g_openPorts, CURRENT, fields);
@@ -277,7 +277,7 @@ mtcFormatStatsDStringWithCustomAndStatsdFields(void** state)
     mtcFormatCustomTagsSet(fmt, tags);
 
     event_field_t fields[] = {
-        STRFIELD("proc",             "test",                2),
+        STRFIELD("proc",   "test",  2,  TRUE),
         FIELDEND
     };
     event_t e = INT_EVENT("fs.read", 3, CURRENT, fields);
@@ -379,16 +379,16 @@ static void
 mtcFormatStatsDStringOmitsFieldsIfSpaceIsInsufficient(void** state)
 {
     event_field_t fields[] = {
-        NUMFIELD("J",               222,                    9),
-        STRFIELD("I",               "V",                    8),
-        NUMFIELD("H",               111,                    7),
-        STRFIELD("G",               "W",                    6),
-        NUMFIELD("F",               321,                    5),
-        STRFIELD("E",               "X",                    4),
-        NUMFIELD("D",               654,                    3),
-        STRFIELD("C",               "Y",                    2),
-        NUMFIELD("B",               987,                    1),
-        STRFIELD("A",               "Z",                    0),
+        NUMFIELD("J",  222,   9,  TRUE),
+        STRFIELD("I",  "V",   8,  TRUE),
+        NUMFIELD("H",  111,   7,  TRUE),
+        STRFIELD("G",  "W",   6,  TRUE),
+        NUMFIELD("F",  321,   5,  TRUE),
+        STRFIELD("E",  "X",   4,  TRUE),
+        NUMFIELD("D",  654,   3,  TRUE),
+        STRFIELD("C",  "Y",   2,  TRUE),
+        NUMFIELD("B",  987,   1,  TRUE),
+        STRFIELD("A",  "Z",   0,  TRUE),
         FIELDEND
     };
     event_t e = INT_EVENT("metric", 1, DELTA, fields);
@@ -422,16 +422,16 @@ static void
 mtcFormatStatsDStringHonorsCardinality(void** state)
 {
     event_field_t fields[] = {
-        STRFIELD("A",               "Z",                    0),
-        NUMFIELD("B",               987,                    1),
-        STRFIELD("C",               "Y",                    2),
-        NUMFIELD("D",               654,                    3),
-        STRFIELD("E",               "X",                    4),
-        NUMFIELD("F",               321,                    5),
-        STRFIELD("G",               "W",                    6),
-        NUMFIELD("H",               111,                    7),
-        STRFIELD("I",               "V",                    8),
-        NUMFIELD("J",               222,                    9),
+        STRFIELD("A",   "Z",   0,  TRUE),
+        NUMFIELD("B",   987,   1,  TRUE),
+        STRFIELD("C",   "Y",   2,  TRUE),
+        NUMFIELD("D",   654,   3,  TRUE),
+        STRFIELD("E",   "X",   4,  TRUE),
+        NUMFIELD("F",   321,   5,  TRUE),
+        STRFIELD("G",   "W",   6,  TRUE),
+        NUMFIELD("H",   111,   7,  TRUE),
+        STRFIELD("I",   "V",   8,  TRUE),
+        NUMFIELD("J",   222,   9,  TRUE),
         FIELDEND
     };
     event_t e = INT_EVENT("metric", 1, DELTA, fields);

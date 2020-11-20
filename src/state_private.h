@@ -92,6 +92,7 @@ typedef struct http_map_t {
     uint64_t duration;
     uint64_t id;
     char *req;          // The whole original request
+    size_t req_len;
     char *method_str;   //   Method field from Request-Line
     char *target_str;   //   Request-URI field from Request-Line
     size_t clen;        //   Content-Length entity-header value from req

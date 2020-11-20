@@ -62,7 +62,7 @@ typedef struct {
 } agg_counter_t;
 
 typedef struct {
-    char * uri;
+    char * uri;           // the key that comes from http.target
     status_code_t status[MAX_CODE_ENTRIES];
     agg_counter_t field[FIELD_MAX];
 } target_agg_t;
@@ -234,8 +234,8 @@ add_status(target_agg_t *entry, long long value)
 
 void
 httpAggAddMetric(http_agg_t *http_agg,
-                      event_t *duration,
-                      size_t request_len, size_t response_len)
+                 event_t *duration,
+                 size_t request_len, size_t response_len)
 {
     if (!http_agg || !duration) return;
 
@@ -283,9 +283,12 @@ report_target(mtc_t *mtc, target_agg_t *target)
             event_field_t fields[] = {
                 STRFIELD("http.target", target->uri, 4, FALSE),
                 NUMFIELD("http.status_code", target->status[i].code, 1, FALSE),
+                STRFIELD("proc",        g_proc.procname, 4, FALSE),
+                NUMFIELD("pid",         g_proc.pid,      4, FALSE),
+                STRFIELD("host",        g_proc.hostname, 4, FALSE),
                 FIELDEND
             };
-            event_t metric = INT_EVENT("http.status_code",
+            event_t metric = INT_EVENT("http.requests",
                                        target->status[i].count, DELTA, fields);
             cmdSendMetric(mtc, &metric);
         }
@@ -296,8 +299,11 @@ report_target(mtc_t *mtc, target_agg_t *target)
         for (i = SERVER_DURATION; i < FIELD_MAX; i++) {
             if (target->field[i].num_entries == 0) continue;
             event_field_t fields[] = {
-                STRFIELD("http.target", target->uri, 4, FALSE),
-                NUMFIELD("numops", target->field[i].num_entries, 8, FALSE),
+                STRFIELD("http.target", target->uri,     4, FALSE),
+                NUMFIELD("numops",      target->field[i].num_entries, 8, FALSE),
+                STRFIELD("proc",        g_proc.procname, 4, FALSE),
+                NUMFIELD("pid",         g_proc.pid,      4, FALSE),
+                STRFIELD("host",        g_proc.hostname, 4, FALSE),
                 FIELDEND
             };
             event_t metric = INT_EVENT(valToStr(fieldMap, i),

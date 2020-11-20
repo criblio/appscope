@@ -56,9 +56,11 @@ evtFormatMetricHappyPath(void** state)
                            "\"_time\":%ld,"
                            "\"source\":\"A\","
                            "\"host\":\"host\","
+                           "\"proc\":\"evttest\","
+                           "\"cmd\":\"cmd-4\","
+                           "\"pid\":4848,"
                            "\"_channel\":\"12345\","
                            "\"data\":{\"_metric\":\"A\",\"_metric_type\":\"counter\",\"_value\":1}}", (long)time->valuedouble);
-
 
     assert_non_null(expected);
     char* actual = cJSON_PrintUnformatted(json);
@@ -147,8 +149,8 @@ evtFormatMetricWithAndWithoutMatchingFieldFilter(void** state)
     evtFormatSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
 
     event_field_t fields[] = {
-        STRFIELD("proc",             "ps",                  3),
-        NUMFIELD("pid",              2,                     3),
+        STRFIELD("proc",   "ps",  3, TRUE),
+        NUMFIELD("pid",     2,    3, TRUE),
         FIELDEND
     };
     event_t e = INT_EVENT("A", 1, DELTA, fields);
@@ -210,8 +212,8 @@ evtFormatMetricWithAndWithoutMatchingValueFilter(void** state)
 
     // Adding a field with value 2 should match.
     event_field_t fields[] = {
-        STRFIELD("proc",             "ps",                  3),
-        NUMFIELD("pid",              2,                     3),
+        STRFIELD("proc", "ps", 3, TRUE),
+        NUMFIELD("pid",  2,    3, TRUE),
         FIELDEND
     };
     e.fields = fields;
@@ -420,6 +422,8 @@ fmtEventJsonValue(void** state)
                               "\"_time\":1573058085.991,"
                               "\"source\":\"stdin\","
                               "\"host\":\"earl\","
+                              "\"proc\":\"formattest\","
+                              "\"cmd\":\"cmd\",\"pid\":1234,"
                               "\"_channel\":\"14627333968688430831\","
                               "\"data\":\"поспехаў\"}");
 
@@ -458,6 +462,9 @@ fmtEventJsonWithEmbeddedNulls(void** state)
                               "\"_time\":1573058085.001,"
                               "\"source\":\"stdout\","
                               "\"host\":\"earl\","
+                              "\"proc\":\"\","
+                              "\"cmd\":\"\","
+                              "\"pid\":1234,"
                               "\"_channel\":\"14627333968688430831\","
                               "\"data\":\"Unë mund\\u0000të ha qelq dhe nuk\\u0000më gjen gjë\"}");
 
@@ -475,6 +482,9 @@ fmtEventJsonWithEmbeddedNulls(void** state)
                               "\"_time\":1573058085.001,"
                               "\"source\":\"stdout\","
                               "\"host\":\"earl\","
+                              "\"proc\":\"\","
+                              "\"cmd\":\"\","
+                              "\"pid\":1234,"
                               "\"_channel\":\"14627333968688430831\"}");
     free(str);
     cJSON_Delete(json);
@@ -502,10 +512,10 @@ static void
 fmtMetricJsonWFields(void** state)
 {
     event_field_t fields[] = {
-        STRFIELD("A",               "Z",                    0),
-        NUMFIELD("B",               987,                    1),
-        STRFIELD("C",               "Y",                    2),
-        NUMFIELD("D",               654,                    3),
+        STRFIELD("A",     "Z",  0,  TRUE),
+        NUMFIELD("B",     987,  1,  TRUE),
+        STRFIELD("C",     "Y",  2,  TRUE),
+        NUMFIELD("D",     654,  3,  TRUE),
         FIELDEND
     };
     event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
@@ -526,10 +536,10 @@ static void
 fmtMetricJsonWFilteredFields(void** state)
 {
     event_field_t fields[] = {
-        STRFIELD("A",               "Z",                    0),
-        NUMFIELD("B",               987,                    1),
-        STRFIELD("C",               "Y",                    2),
-        NUMFIELD("D",               654,                    3),
+        STRFIELD("A",  "Z",  0,  TRUE),
+        NUMFIELD("B",  987,  1,  TRUE),
+        STRFIELD("C",  "Y",  2,  TRUE),
+        NUMFIELD("D",  654,  3,  TRUE),
         FIELDEND
     };
     event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
@@ -568,8 +578,8 @@ fmtMetricJsonEscapedValues(void** state)
 
     {
         event_field_t fields[] = {
-            STRFIELD("A",         "행운을	빕니다",    0),   // embedded tab
-            NUMFIELD("Viel\\ Glück",     123,      1),   // embedded backslash
+            STRFIELD("A",         "행운을	빕니다",    0,  TRUE),   // embedded tab
+            NUMFIELD("Viel\\ Glück",     123,      1,  TRUE),   // embedded backslash
             FIELDEND
         };
         event_t e = INT_EVENT("you", 4, DELTA, fields);

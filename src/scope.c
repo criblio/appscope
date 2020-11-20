@@ -18,11 +18,13 @@
 #include <sys/wait.h>
 #include <dlfcn.h>
 #include <sys/utsname.h>
-#include "fn.h"
-#include "scopeelf.h"
-#include "scopetypes.h"
 #include <limits.h>
 #include <errno.h>
+
+#include "fn.h"
+#include "dbg.h"
+#include "scopeelf.h"
+#include "scopetypes.h"
 
 #define DEVMODE 0
 #define __NR_memfd_create   319
@@ -49,24 +51,30 @@ static inline int _memfd_create(const char *name, unsigned int flags) {
 }
 
 static void
-print_usage(char *prog) {
-    fprintf(stderr,"usage: %s command [args]\n", prog);
-}
+print_usage(char *prog, libscope_info_t *info, int argc, char **argv) {
+    void (*__scope_main)(void);
+    void *handle = NULL;
 
-static int
-is_static(char *buf)
-{
-    int i;
-    Elf64_Ehdr *elf = (Elf64_Ehdr *)buf;
-    Elf64_Phdr *phead = (Elf64_Phdr *)&buf[elf->e_phoff];
+    __scope_main = dlsym(RTLD_NEXT, "__scope_main");
+    if (!__scope_main) {
+        if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
+            fprintf(stderr, "handle error: %s\n", dlerror());
+            exit(EXIT_FAILURE);
+        }
 
-    for (i = 0; i < elf->e_phnum; i++) {
-        if ((phead[i].p_type == PT_DYNAMIC) || (phead[i].p_type == PT_INTERP)) {
-            return 0;
+        __scope_main = dlsym(handle, "__scope_main");
+        if (!__scope_main) {
+            fprintf(stderr, "symbol error: %s from %s\n", dlerror(), info->path);
+            exit(EXIT_FAILURE);
         }
     }
 
-    return 1;
+    printf("usage: %s command [args]\n", prog);
+    if (argc == 2) {
+        strncpy(argv[1], "all", strlen(argv[1]));
+    }
+
+    __scope_main();
 }
 
 static int
@@ -247,79 +255,6 @@ setGoHttpEnvVariable(void)
     }
 }
 
-// This tests to see if cmd can be resolved to an executable file.
-// If so it will return a malloc'd buffer containing an absolute path,
-// otherwise it will return NULL.
-static char *
-resolve_inferior_cmd(const char *cmd)
-{
-    char *path_env = NULL;
-    char *ret_val = NULL;
-    struct stat buf;
-
-    if (!cmd) goto out;
-
-    // an absolute path was specified for cmd.
-    if (cmd[0] == '/') {
-        //  If we can resolve it, use it.
-        if (!stat(cmd, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
-            ret_val = strdup(cmd);
-        }
-        goto out;
-    }
-
-    // a relative path was specified for cmd.
-    if (strchr(cmd, '/')) {
-        char *cur_dir = get_current_dir_name();
-        if (!cur_dir) goto out;
-
-        char *path = NULL;
-        if (asprintf(&path, "%s/%s", cur_dir, cmd) > 0) {
-            // If we can resolve it, use it
-            if (!stat(path, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
-                ret_val = path;
-            } else {
-                free(path);
-            }
-        }
-        free(cur_dir);
-        goto out;
-    }
-
-    // try to resolve the cmd from PATH env variable
-    char *path_env_ptr = getenv("PATH");
-    if (!path_env_ptr) goto out;
-    path_env = strdup(path_env_ptr); // create a copy for strtok below
-    if (!path_env) goto out;
-
-    char *saveptr = NULL;
-    char *strtok_path = strtok_r(path_env, ":", &saveptr);
-    if (!strtok_path) goto out;
-
-    do {
-        char *path = NULL;
-        if (asprintf(&path, "%s/%s", strtok_path, cmd) < 0) {
-            break;
-        }
-        if ((stat(path, &buf) == -1) ||    // path doesn't exist
-            (!S_ISREG(buf.st_mode)) ||     // path isn't a file
-            ((buf.st_mode & 0111) == 0)) { // path isn't executable
-
-            free(path);
-            continue;
-        }
-
-        // We found the cmd, and it's an executable file
-        ret_val = path;
-        break;
-
-    } while ((strtok_path = strtok_r(NULL, ":", &saveptr)));
-
-out:
-    if (path_env) free(path_env);
-    return ret_val;
-}
-
 int
 main(int argc, char **argv, char **env)
 {
@@ -332,25 +267,24 @@ main(int argc, char **argv, char **env)
     // Use dlsym to get addresses for everything in g_fn
     initFn();
 
-    //check command line arguments 
-    char *scope_cmd = argv[0];
-    if (argc < 2) {
-        fprintf(stderr,"%s is missing required command.  Exiting.\n", scope_cmd);
-        print_usage(scope_cmd);
-        exit(EXIT_FAILURE);
-    }
-    char *inferior_command = resolve_inferior_cmd(argv[1]);
-    if (!inferior_command) {
-        fprintf(stderr,"%s could not find or execute command `%s`.  Exiting.\n", scope_cmd, argv[1]);
-        exit(EXIT_FAILURE);
-    }
-    argv[1] = inferior_command; // update args with resolved inferior_command
-
     info = setup_libscope();
     if (!info) {
         fprintf(stderr, "%s:%d ERROR: unable to set up libscope\n", __FUNCTION__, __LINE__);
         exit(EXIT_FAILURE);
     }
+
+    //check command line arguments 
+    char *scope_cmd = argv[0];
+    if ((argc < 2) || ((argc == 2) && (strncmp(argv[1], "--help", 6) == 0))) {
+        print_usage(scope_cmd, info, argc, argv);
+        exit(EXIT_FAILURE);
+    }
+    char *inferior_command = getpath(argv[1]);
+    if (!inferior_command) {
+        fprintf(stderr,"%s could not find or execute command `%s`.  Exiting.\n", scope_cmd, argv[1]);
+        exit(EXIT_FAILURE);
+    }
+    argv[1] = inferior_command; // update args with resolved inferior_command
 
     ebuf = getElf(inferior_command);
 
@@ -374,7 +308,7 @@ main(int argc, char **argv, char **env)
     if ((ebuf == NULL) || (!is_static(ebuf->buf))) {
         // Dynamic executable path
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
-        
+
         if (setenv("LD_PRELOAD", info->path, 0) == -1) {
             perror("setenv");
             goto err;
@@ -412,6 +346,13 @@ main(int argc, char **argv, char **env)
     }
 
     // Static executable path
+    if (getenv("LD_PRELOAD") != NULL) {
+        unsetenv("LD_PRELOAD");
+        execve(argv[0], argv, environ);
+    }
+
+    program_invocation_short_name = basename(argv[1]);
+
     if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
         fprintf(stderr, "%s\n", dlerror());
         goto err;
@@ -422,6 +363,7 @@ main(int argc, char **argv, char **env)
         fprintf(stderr, "%s\n", dlerror());
         goto err;
     }
+
     release_libscope(&info);
 
     sys_exec(ebuf, inferior_command, argc, argv, env);

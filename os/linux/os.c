@@ -478,7 +478,7 @@ osThreadInit(void(*handler)(int), unsigned interval)
 
     sigemptyset(&sact.sa_mask);
     sact.sa_handler = handler;
-    sact.sa_flags = 0;
+    sact.sa_flags = SA_RESTART;
 
     if (!g_fn.sigaction) return FALSE;
 
@@ -863,13 +863,16 @@ args_are_all_valid(int argc, char **argv)
 }
 
 static void
-print_version(char* path)
+print_version(char *path)
 {
     printf("Scope Version: " SCOPE_VER "\n");
     printf("\n");
-    printf("    Usage: LD_PRELOAD=%s <command name>\n", path);
-    printf("    For more info: %s help\n", path);
-    printf("\n");
+
+    if (strstr(path, "libscope")) {
+        printf("    Usage: LD_PRELOAD=%s <command name>\n", path);
+        printf("    For more info: %s help\n", path);
+        printf("\n");
+    }
 }
 
 static void
@@ -887,7 +890,7 @@ print_help(char* path)
 }
 
 
-void
+__attribute__((visibility("default"))) void
 __scope_main()
 {
     // This depends on _dl_argv being NULL terminated.

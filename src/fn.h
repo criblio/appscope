@@ -180,7 +180,7 @@ typedef struct {
     void *(*dlopen)(const char *, int);
     int (*PR_FileDesc2NativeHandle)(PRFileDesc *);
     void (*PR_SetError)(PRErrorCode, PRInt32);
-
+    int (*execve)(const char *, char * const *, char * const *);
 #ifdef __LINUX__
     // Couldn't easily get struct definitions for these on mac
     int (*statvfs64)(const char *, struct statvfs64 *);

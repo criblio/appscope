@@ -88,7 +88,8 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 
     // Don't bother looking inside libraries until after we've seen our library.
     if (!param->after_scope) {
-        param->after_scope = (strstr(info->dlpi_name, "libscope.so") != NULL);
+        param->after_scope = (strstr(info->dlpi_name, "libscope") != NULL) ||
+            (strstr(info->dlpi_name, "/proc/") != NULL);
         return 0;
     }
 
@@ -1825,6 +1826,67 @@ prctl(int option, ...)
     }
 
     return g_fn.prctl(option, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
+}
+
+EXPORTON int
+execve(const char *pathname, char *const argv[], char *const envp[])
+{
+    int i, nargs, saverr;
+    bool isstat = FALSE;
+    char **nargv;
+    elf_buf_t *ebuf;
+    char *scopexec = NULL;
+
+    WRAP_CHECK(execve, -1);
+
+    if (strstr(g_proc.procname, "scope") ||
+        checkEnv("SCOPE_EXECVE", "false")) {
+        return g_fn.execve(pathname, argv, envp);
+    }
+
+    if ((ebuf = getElf((char *)pathname))) {
+        isstat = is_static(ebuf->buf);
+    }
+
+    // not really necessary since we're gonna exec
+    if (ebuf) freeElf(ebuf->buf, ebuf->len);
+
+    if (getenv("LD_PRELOAD") && (isstat == FALSE)) {
+        return g_fn.execve(pathname, argv, envp);
+    }
+
+    scopexec = getenv("SCOPE_EXEC_PATH");
+    if (((scopexec = getpath(scopexec)) == NULL) &&
+        ((scopexec = getpath("scope")) == NULL)) {
+        char msg[64];
+
+        // can't find the scope executable
+        snprintf(msg, sizeof(msg), "execve: can't find a scope executable for %s", pathname);
+        scopeLog(msg, -1, CFG_LOG_WARN);
+        return g_fn.execve(pathname, argv, envp);
+    }
+
+    nargs = 0;
+    while ((argv[nargs] != NULL)) nargs++;
+
+    size_t plen = sizeof(char *);
+    if ((nargs == 0) || (nargv = calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
+        return g_fn.execve(pathname, argv, envp);
+    }
+
+    nargv[0] = scopexec;
+    nargv[1] = (char *)pathname;
+
+    for (i = 2; i <= nargs; i++) {
+        nargv[i] = argv[i - 1];
+    }
+
+    g_fn.execve(nargv[0], nargv, environ);
+    saverr = errno;
+    if (nargv) free(nargv);
+    if (scopexec) free(scopexec);
+    errno = saverr;
+    return -1;
 }
 
 /*

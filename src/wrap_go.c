@@ -21,6 +21,15 @@
 #define SWITCH_USE_NO_THREAD "no_thread"
 #define SWITCH_USE_THREAD "thread"
 
+#define NSLEEP(now, remain) \
+    while (nanosleep(now, remain) != 0) { \
+        if (errno == EINTR) {             \
+            nanosleep(remain, NULL);      \
+        } else {                          \
+            break;                        \
+        }                                 \
+    }                                     \
+
 #ifdef ENABLE_CAS_IN_SYSEXEC
 #include "atomic.h"
 #else
@@ -1193,22 +1202,24 @@ c_exit(char *stackaddr)
 {
     // don't use stackaddr; patch_first_instruction() does not provide
     // frame_size, so stackaddr isn't useable
-    handleExit();
     funcprint("c_exit");
 
     int i;
-    struct timespec ts;
+    struct timespec ts, rem;
     ts.tv_sec = 0;
     ts.tv_nsec = 10000; // 10 ms
 
     // ensure the circular buffer is empty
     for (i = 0; i < 100; i++) {
         if (cmdCbufEmpty(g_ctl)) break;
-        nanosleep(&ts, NULL);
+        NSLEEP(&ts, &rem);
     }
 
+    handleExit();
     // flush the data
-    nanosleep(&ts, NULL);
+    ts.tv_sec = 0;
+    ts.tv_nsec = 1000;
+    NSLEEP(&ts, &rem);
 }
 
 EXPORTON void *

@@ -52,7 +52,7 @@
 #define DETECT_PROTO(val)       STRFIELD("protocol",       (val), 8, TRUE)
 
 #define EVENT_ONLY_ATTR (CFG_MAX_VERBOSITY+1)
-#define HTTP_MAX_FIELDS 25
+#define HTTP_MAX_FIELDS 30
 #define H_ATTRIB(field, att, val, verbosity) \
     field.name = att; \
     field.value_type = FMT_STR; \
@@ -264,7 +264,7 @@ httpFieldEnd(event_field_t *fields, http_report *hreport)
 }
 
 static bool
-httpFields(event_field_t *fields, http_report *hreport, char *hdr, size_t hdr_len, protocol_info *proto, bool donet)
+httpFields(event_field_t *fields, http_report *hreport, char *hdr, size_t hdr_len, protocol_info *proto)
 {
     if (!fields || !hreport || !proto || !hdr) return FALSE;
 
@@ -307,12 +307,13 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr, size_t hdr_le
             }
         }
     }
+    return TRUE;
+}
 
-    // don't do net.* twice
-    if (donet == FALSE) {
-        return TRUE;
-    }
 
+static bool
+httpFieldsInternal(event_field_t *fields, http_report *hreport, protocol_info *proto)
+{
     /*
     Compression and getting to an attribute with compressed and uncompressed lenghts.
     https://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html
@@ -322,6 +323,16 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr, size_t hdr_le
     Content-Encoding: gzip, compress, deflate (identity is N/A)
     Transfer-Encoding: chunked (N/A?), identity (N/A?), gzip, compress, and deflate
     */
+
+    H_VALUE(fields[hreport->ix], "pid", g_proc.pid, 4);
+    fields[hreport->ix].event_usage = FALSE;            // for http metrics only
+    HTTP_NEXT_FLD(hreport->ix);
+    H_ATTRIB(fields[hreport->ix], "host", g_proc.hostname, 4);
+    fields[hreport->ix].event_usage = FALSE;            // for http metrics only
+    HTTP_NEXT_FLD(hreport->ix);
+    H_ATTRIB(fields[hreport->ix], "proc", g_proc.procname, 4);
+    fields[hreport->ix].event_usage = FALSE;            // for http metrics only
+    HTTP_NEXT_FLD(hreport->ix);
 
     // Next, add net fields from internal state
     H_ATTRIB(fields[hreport->ix], "net.host.name", g_proc.hostname, 1);
@@ -477,7 +488,8 @@ doHttpHeader(protocol_info *proto)
         if (proto->ptype == EVT_HREQ) {
             hreport.ptype = EVT_HREQ;
             // Fields common to request & response
-            httpFields(fields, &hreport, map->req, map->req_len, proto, TRUE);
+            httpFields(fields, &hreport, map->req, map->req_len, proto);
+            httpFieldsInternal(fields, &hreport, proto);
 
             if (hreport.clen != -1) {
                 H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
@@ -561,7 +573,7 @@ doHttpHeader(protocol_info *proto)
         // Fields common to request & response
         if (map->req) {
             hreport.ptype = EVT_HREQ;
-            httpFields(fields, &hreport, map->req, map->req_len, proto, FALSE);
+            httpFields(fields, &hreport, map->req, map->req_len, proto);
             if (hreport.clen != -1) {
                 H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
                 HTTP_NEXT_FLD(hreport.ix);
@@ -570,7 +582,8 @@ doHttpHeader(protocol_info *proto)
         }
 
         hreport.ptype = EVT_HRES;
-        httpFields(fields, &hreport, map->resp, proto->len, proto, TRUE);
+        httpFields(fields, &hreport, map->resp, proto->len, proto);
+        httpFieldsInternal(fields, &hreport, proto);
         if (hreport.clen != -1) {
             H_VALUE(fields[hreport.ix], "http.response_content_length", hreport.clen, EVENT_ONLY_ATTR);
             HTTP_NEXT_FLD(hreport.ix);

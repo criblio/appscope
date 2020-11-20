@@ -103,10 +103,10 @@ getElf(char *path)
         goto out;
     }
 
-    if (elf->e_type != ET_EXEC) {
-        char emsg[64];
-        snprintf(emsg, sizeof(emsg), "%s:%d %s is not an executable\n",
-                 __FUNCTION__, __LINE__, path);
+    if ((elf->e_type != ET_EXEC) && (elf->e_type != ET_DYN)) {
+        char emsg[128];
+        snprintf(emsg, sizeof(emsg), "%s:%d %s with type %d is not an executable\n",
+                 __FUNCTION__, __LINE__, path, elf->e_type);
         scopeLog(emsg, fd, CFG_LOG_ERROR);
         goto out;
     }
@@ -299,4 +299,93 @@ checkEnv(char *env, char *val)
         return TRUE;
     }
     return FALSE;
+}
+
+int
+is_static(char *buf)
+{
+    int i;
+    Elf64_Ehdr *elf = (Elf64_Ehdr *)buf;
+    Elf64_Phdr *phead = (Elf64_Phdr *)&buf[elf->e_phoff];
+
+    for (i = 0; i < elf->e_phnum; i++) {
+        if ((phead[i].p_type == PT_DYNAMIC) || (phead[i].p_type == PT_INTERP)) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+// This tests to see if cmd can be resolved to an executable file.
+// If so it will return a malloc'd buffer containing an absolute path,
+// otherwise it will return NULL.
+char *
+getpath(const char *cmd)
+{
+    char *path_env = NULL;
+    char *ret_val = NULL;
+    struct stat buf;
+
+    if (!cmd) goto out;
+
+    // an absolute path was specified for cmd.
+    if (cmd[0] == '/') {
+        //  If we can resolve it, use it.
+        if (!stat(cmd, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
+            ret_val = strdup(cmd);
+        }
+        goto out;
+    }
+
+    // a relative path was specified for cmd.
+    if (strchr(cmd, '/')) {
+        char *cur_dir = get_current_dir_name();
+        if (!cur_dir) goto out;
+
+        char *path = NULL;
+        if (asprintf(&path, "%s/%s", cur_dir, cmd) > 0) {
+            // If we can resolve it, use it
+            if (!stat(path, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
+                ret_val = path;
+            } else {
+                free(path);
+            }
+        }
+        free(cur_dir);
+        goto out;
+    }
+
+    // try to resolve the cmd from PATH env variable
+    char *path_env_ptr = getenv("PATH");
+    if (!path_env_ptr) goto out;
+    path_env = strdup(path_env_ptr); // create a copy for strtok below
+    if (!path_env) goto out;
+
+    char *saveptr = NULL;
+    char *strtok_path = strtok_r(path_env, ":", &saveptr);
+    if (!strtok_path) goto out;
+
+    do {
+        char *path = NULL;
+        if (asprintf(&path, "%s/%s", strtok_path, cmd) < 0) {
+            break;
+        }
+        if ((stat(path, &buf) == -1) ||    // path doesn't exist
+            (!S_ISREG(buf.st_mode)) ||     // path isn't a file
+            ((buf.st_mode & 0111) == 0)) { // path isn't executable
+
+            free(path);
+            continue;
+        }
+
+        // We found the cmd, and it's an executable file
+        ret_val = path;
+        break;
+
+    } while ((strtok_path = strtok_r(NULL, ":", &saveptr)));
+
+out:
+    if (path_env) free(path_env);
+    return ret_val;
 }

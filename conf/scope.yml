@@ -58,8 +58,8 @@ event:
     # Creates events from data written to stdout, stderr, or both.
     # May be most useful for capturing debug output from processes
     # running in containerized environments.
-#    - type: (stdout|stderr)
-#      name: stdout
+#    - type: console
+#      name: stdout                  # (stdout|stderr)
 #      value: .*
 
     # Creates events from libscope's metric (statsd) data.  May be
@@ -68,13 +68,13 @@ event:
     # high cardinality.
 #    - type: metric
 #      name: .*                      # (net.*)|(.*err.*)
-#      field: ^[^h]+                 # whitelist ex regex describing field names
+#      field: .*                     # whitelist regex describing field names
 #      value: .*
 
     # Enable extraction of HTTP headers
 #    - type: http
-#      name: .*                      # .*-res | .*-req | .*-metrics
-#      field: ^[^h]+                 # ^[^h]+ whitelist ex regex describing field names
+#      name: .*                      # (http-resp)|(http-metrics)
+#      field: .*                     # whitelist regex describing field names
 #      value: .*
 
 libscope:

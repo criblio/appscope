@@ -12,6 +12,7 @@
 #include "test.h"
 
 
+int g_http_guard_enabled = TRUE;
 uint64_t g_http_guard[1024];
 ctl_t *g_ctl = NULL;
 struct protocol_info_t* g_msg = NULL;

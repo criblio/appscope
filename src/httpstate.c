@@ -26,6 +26,7 @@ static bool setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, 
 static int reportHttp(http_state_t *httpstate);
 static bool scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId);
 
+extern int      g_http_guard_enabled;
 extern uint64_t g_http_guard[];
 
 static void
@@ -342,7 +343,8 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
     httpId_t httpId = {0};
     if (!setHttpId(&httpId, net, sockfd, id, src)) return FALSE;
 
-    if (net) while (!atomicCasU64(&g_http_guard[sockfd], 0ULL, 1ULL));
+    int guard_enabled = g_http_guard_enabled && net;
+    if (guard_enabled) while (!atomicCasU64(&g_http_guard[sockfd], 0ULL, 1ULL));
 
     int http_header_found = FALSE;
 
@@ -408,7 +410,8 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
         setHttpState(httpstate, HTTP_NONE);
     }
 
-    if (net) while (!atomicCasU64(&g_http_guard[sockfd], 1ULL, 0ULL));
+    if (guard_enabled) while (!atomicCasU64(&g_http_guard[sockfd], 1ULL, 0ULL));
+
     return http_header_found;
 }
 

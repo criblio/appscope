@@ -31,6 +31,7 @@ extern rtconfig g_cfg;
 
 int g_numNinfo = NET_ENTRIES;
 int g_numFSinfo = FS_ENTRIES;
+int g_http_guard_enabled = TRUE;
 uint64_t g_http_guard[NET_ENTRIES];
 
 // These would all be declared static, but the some functions that need
@@ -241,6 +242,12 @@ initState()
     // the http guard array is static while the net fs array is dynamically allocated
     // will need to change if we want to re-size at runtime
     memset(g_http_guard, 0, sizeof(g_http_guard));
+    {
+        // g_http_guard_enable is always false unless
+        // SCOPE_HTTP_SERIALIZE_ENABLE is defined and is "true"
+        char *spin_env = getenv("SCOPE_HTTP_SERIALIZE_ENABLE");
+        g_http_guard_enabled = (spin_env && !strcmp(spin_env, "true"));
+    }
 
     g_http_redirect = searchComp(REDIRECTURL);
 
@@ -1674,9 +1681,8 @@ doClose(int fd, const char *func)
 
     ninfo = getNetEntry(fd);
 
-    if (ninfo != NULL) {
-        while (!atomicCasU64(&g_http_guard[fd], 0ULL, 1ULL));
-    }
+    int guard_enabled = g_http_guard_enabled && ninfo;
+    if (guard_enabled) while (!atomicCasU64(&g_http_guard[fd], 0ULL, 1ULL));
 
     if (ninfo != NULL) {
         doUpdateState(OPEN_PORTS, fd, -1, func, NULL);
@@ -1697,9 +1703,7 @@ doClose(int fd, const char *func)
     if (ninfo) memset(ninfo, 0, sizeof(struct net_info_t));
     if (fsinfo) memset(fsinfo, 0, sizeof(struct fs_info_t));
 
-    if (ninfo != NULL) {
-        while (!atomicCasU64(&g_http_guard[fd], 1ULL, 0ULL));
-    }
+    if (guard_enabled) while (!atomicCasU64(&g_http_guard[fd], 1ULL, 0ULL));
 }
 
 void

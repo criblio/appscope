@@ -53,14 +53,14 @@ evtFormatMetricHappyPath(void** state)
     char* expected = NULL;
     asprintf(&expected, "{\"sourcetype\":\"metric\","
                            "\"id\":\"host-evttest-cmd-4\","
-                           "\"_time\":%ld,"
+                           "\"_time\":%1.17g,"
                            "\"source\":\"A\","
                            "\"host\":\"host\","
                            "\"proc\":\"evttest\","
                            "\"cmd\":\"cmd-4\","
                            "\"pid\":4848,"
                            "\"_channel\":\"12345\","
-                           "\"data\":{\"_metric\":\"A\",\"_metric_type\":\"counter\",\"_value\":1}}", (long)time->valuedouble);
+                           "\"data\":{\"_metric\":\"A\",\"_metric_type\":\"counter\",\"_value\":1}}", time->valuedouble);
 
     assert_non_null(expected);
     char* actual = cJSON_PrintUnformatted(json);

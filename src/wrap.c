@@ -420,9 +420,8 @@ doConfig(config_t *cfg)
     setVerbosity(cfgMtcVerbosity(cfg));
     g_cmddir = cfgCmdDir(cfg);
 
-    log_t* log = initLog(cfg);
+    g_log = initLog(cfg);
     g_mtc = initMtc(cfg);
-    g_log = log; // Set after initMtc to avoid infinite loop with socket
     ctlEvtSet(g_ctl, initEvtFormat(cfg));
 
     // Disconnect the old interfaces that were just replaced

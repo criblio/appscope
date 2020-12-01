@@ -270,11 +270,14 @@ checkPendingSocketStatus(transport_t *trans)
         socklen_t optlen = sizeof(opt);
         if ((getsockopt(i, SOL_SOCKET, SO_ERROR, (void*)(&opt), &optlen) < 0)
             || opt) {
-            scopeLog("ERROR:checkPendingSocketStatus:getsockopt", i, CFG_LOG_DEBUG);
+            scopeLog("connect failed", i, CFG_LOG_INFO);
+
             FD_CLR(i, &trans->net.pending_connect);
             trans->close(i);
             continue;
         }
+
+        scopeLog("connect successful", i, CFG_LOG_INFO);
 
         // Hey!  We found one that will work!
         // Move this descriptor up out of the way
@@ -293,6 +296,7 @@ checkPendingSocketStatus(transport_t *trans)
     if (trans->net.sock != -1) {
         for (i=0; i<FD_SETSIZE; i++) {
             if (FD_ISSET(i, &trans->net.pending_connect)) {
+                scopeLog("abandoning connect due to previous success", i, CFG_LOG_INFO);
                 trans->close(i);
                 FD_CLR(i, &trans->net.pending_connect);
             }
@@ -324,6 +328,14 @@ socketConnectionStart(transport_t *trans)
             return 1;
     }
 
+    char *logmsg = NULL;
+    char *type = (trans->type == CFG_UDP) ? "udp" : "tcp";
+    if (asprintf(&logmsg, "getting DNS info for %s %s:%s",
+             type, trans->net.host, trans->net.port) != -1) {
+        scopeLog(logmsg, -1, CFG_LOG_INFO);
+        if (logmsg) free(logmsg);
+    }
+
     if (trans->getaddrinfo(trans->net.host,
                            trans->net.port,
                            &hints, &addr_list)) return 0;
@@ -351,21 +363,58 @@ socketConnectionStart(transport_t *trans)
             continue;
         }
 
+        void *addrptr = NULL;
+        unsigned short *portptr = NULL;
+        if (addr->ai_family == AF_INET) {
+            struct sockaddr_in *addr4_ptr;
+            addr4_ptr = (struct sockaddr_in *)addr->ai_addr;
+            addrptr = &addr4_ptr->sin_addr;
+            portptr = &addr4_ptr->sin_port;
+        } else {
+            struct sockaddr_in6 *addr6_ptr;
+            addr6_ptr = (struct sockaddr_in6 *)addr->ai_addr;
+            addrptr = &addr6_ptr->sin6_addr;
+            portptr = &addr6_ptr->sin6_port;
+        }
+        char addrstr[INET6_ADDRSTRLEN];
+        inet_ntop(addr->ai_family, addrptr, addrstr, sizeof(addrstr));
+        unsigned short port = ntohs(*portptr);
+
         errno = 0;
         if (trans->connect(sock,
                            addr->ai_addr,
                            addr->ai_addrlen) == -1) {
 
             if (errno != EINPROGRESS) {
+                char *logmsg = NULL;
+                if (asprintf(&logmsg, "connect to %s:%d failed", addrstr, port) != -1) {
+                    scopeLog(logmsg, sock, CFG_LOG_INFO);
+                    if (logmsg) free(logmsg);
+                }
+
                 // We could create a sock, but not connect.  Clean up.
                 transportDisconnect(trans);
                 continue;
             }
+
+            char *logmsg = NULL;
+            if (asprintf(&logmsg, "connect to %s:%d is pending", addrstr, port) != -1) {
+                scopeLog(logmsg, sock, CFG_LOG_INFO);
+                if (logmsg) free(logmsg);
+            }
+
             FD_SET(sock, &trans->net.pending_connect);
             continue;
         }
 
+
         if (trans->type == CFG_UDP) {
+            char *logmsg = NULL;
+            if (asprintf(&logmsg, "connect to %s:%d was successful", addrstr, port) != -1) {
+                scopeLog(logmsg, sock, CFG_LOG_INFO);
+                if (logmsg) free(logmsg);
+            }
+
             // connect on udp sockets normally succeeds immediately.
             trans->net.sock = placeDescriptor(sock, trans);
             if (trans->net.sock != -1) break;

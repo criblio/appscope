@@ -546,6 +546,10 @@ threadNow(int sig)
 static void
 threadInit()
 {
+    // for debugging... if SCOPE_NO_SIGNAL is defined, then don't create
+    // a signal handler, nor a timer to send a signal.
+    if (getenv("SCOPE_NO_SIGNAL")) return;
+
     if (osThreadInit(threadNow, g_thread.interval) == FALSE) {
         scopeLog("ERROR: threadInit:osThreadInit", -1, CFG_LOG_ERROR);
     }

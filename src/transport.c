@@ -370,11 +370,15 @@ socketConnectionStart(transport_t *trans)
             addr4_ptr = (struct sockaddr_in *)addr->ai_addr;
             addrptr = &addr4_ptr->sin_addr;
             portptr = &addr4_ptr->sin_port;
-        } else {
+        } else if (addr->ai_family == AF_INET6) {
             struct sockaddr_in6 *addr6_ptr;
             addr6_ptr = (struct sockaddr_in6 *)addr->ai_addr;
             addrptr = &addr6_ptr->sin6_addr;
             portptr = &addr6_ptr->sin6_port;
+        } else {
+            DBG("%d %s %s %d", sock, trans->net.host, trans->net.port, addr->ai_family);
+            trans->close(sock);
+            continue;
         }
         char addrstr[INET6_ADDRSTRLEN];
         inet_ntop(addr->ai_family, addrptr, addrstr, sizeof(addrstr));

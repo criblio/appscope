@@ -1531,6 +1531,20 @@ doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t byte
                 doUpdateState(FS_DURATION, fd, duration, func, NULL);
                 doUpdateState(FS_WRITE, fd, bytes, func, NULL);
             }
+
+            if (src == IOV) {
+                int i;
+                struct iovec *iov = (struct iovec *)buf;
+
+                for (i = 0; i < cnt; i++) {
+                    if (iov[i].iov_base) {
+                        ctlSendLog(g_ctl, fs->path, iov[i].iov_base, iov[i].iov_len, fs->uid, &g_proc);
+                    }
+                }
+
+                return;
+            }
+
             ctlSendLog(g_ctl, fs->path, buf, bytes, fs->uid, &g_proc);
         }
     } else {

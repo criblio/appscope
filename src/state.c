@@ -1417,7 +1417,12 @@ void
 doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 {
     scopeLog(func, sd, CFG_LOG_DEBUG);
-    if (addr) addSock(sd, SOCK_STREAM, addr->sa_family);
+    if (addr) {
+        addSock(sd, SOCK_STREAM, addr->sa_family);
+    } else {
+        doAddNewSock(sd);
+    }
+
 
     if (getNetEntry(sd) != NULL) {
         if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);

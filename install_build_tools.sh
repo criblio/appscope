@@ -86,7 +86,8 @@ macOS_automake_exists() {
 macOS_automake_install() {
     echo "Installing automake."
     brew install automake
-    if [ $? = 0 ]; then
+    #    if [ $? = 0 ]; then
+    if automake --version &>/dev/null; then
         echo "Installation of automake successful."
     else
         echo "Installation of automake failed."

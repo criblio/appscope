@@ -2046,3 +2046,18 @@ doEvent()
     httpAggReset(g_http_agg);
     ctlFlush(g_ctl);
 }
+
+void
+doPayload()
+{
+    uint64_t data;
+    while ((data = msgPayloadGet(g_ctl)) != -1) {
+        if (data) {
+            payload_info *pinfo = (payload_info *)data;
+
+            cmdSendPayload(g_ctl, pinfo->data, pinfo->len);
+            if (pinfo->data) free(pinfo->data);
+            if (pinfo) free(pinfo);
+        }
+    }
+}

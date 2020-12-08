@@ -703,6 +703,8 @@ reportPeriodicStuff(void)
 
     // Process any events that have been posted
     doEvent();
+    doPayload();
+
     mtcFlush(g_mtc);
 
     if (!atomicCasU64(&reentrancy_guard, 1ULL, 0ULL)) {
@@ -2683,12 +2685,6 @@ fcloseall(void)
 }
 
 #ifdef __MACOS__
-int
-checkEnv(char *env, char *val)
-{
-    return FALSE;
-}
-
 EXPORTON int
 close$NOCANCEL(int fd)
 {

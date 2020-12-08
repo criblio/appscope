@@ -57,4 +57,9 @@ int regexec_wrapper(const regex_t *, const char *, size_t, regmatch_t *, int);
 
 bool cmdCbufEmpty(ctl_t *);
 
+// payloads
+int cmdSendPayload(ctl_t *, char *, size_t);
+int cmdPostPayload(ctl_t *, char *);
+uint64_t msgPayloadGet(ctl_t *);
+
 #endif // __COM_H__

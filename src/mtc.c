@@ -48,7 +48,7 @@ mtcSend(mtc_t *mtc, const char *msg)
 {
     if (!mtc || !msg) return -1;
 
-    return transportSend(mtc->transport, msg);
+    return transportSend(mtc->transport, msg, strlen(msg));
 }
 
 int

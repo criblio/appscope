@@ -37,6 +37,14 @@ cmdSendMetric(mtc_t *mtc, event_t *evt)
     return mtcSendMetric(mtc, evt);
 }
 
+int
+cmdSendPayload(ctl_t *ctl, char *data, size_t len)
+{
+    if (!ctl || !data ||
+        (checkEnv(PAYLOAD_ENV, PAYLOAD_VAL) == FALSE)) return 0;
+
+    return ctlSendBin(ctl, data, len);
+}
 
 int
 cmdPostEvtMsg(ctl_t *ctl, cJSON *json)
@@ -267,3 +275,17 @@ cmdCbufEmpty(ctl_t *ctl)
 {
     return ctlCbufEmpty(ctl);
 }
+
+int
+cmdPostPayload(ctl_t *ctl, char *pay)
+{
+    return ctlPostPayload(ctl, pay);
+}
+
+uint64_t
+msgPayloadGet(ctl_t *ctl)
+{
+    if (!ctl) return (uint64_t) -1;
+    return ctlGetPayload(ctl);
+}
+

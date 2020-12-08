@@ -14,7 +14,7 @@ transport_t*        transportCreateShm(void);
 void                transportDestroy(transport_t **);
 
 // Accessors
-int                 transportSend(transport_t *, const char *);
+int                 transportSend(transport_t *, const char *, size_t);
 int                 transportFlush(transport_t *);
 int                 transportNeedsConnection(transport_t *);
 int                 transportConnect(transport_t *);

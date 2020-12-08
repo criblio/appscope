@@ -144,6 +144,12 @@ typedef struct {
     httpId_t id;
 } http_state_t;
 
+typedef struct payload_info_t {
+    metric_t evtype;
+    size_t len;
+    char *data;
+} payload_info;
+
 typedef struct net_info_t {
     metric_t evtype;
     metric_t data_type;

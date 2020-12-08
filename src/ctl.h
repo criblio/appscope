@@ -121,4 +121,8 @@ uint64_t   ctlGetEvent(ctl_t *);
 
 bool ctlCbufEmpty(ctl_t *);
 
+// Payloads
+int ctlPostPayload(ctl_t *, char *);
+uint64_t ctlGetPayload(ctl_t *);
+
 #endif // _CTL_H__

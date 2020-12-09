@@ -469,26 +469,16 @@ out:
 }
 
 bool
-osThreadInit(void(*handler)(int), unsigned interval)
+osThreadInit(void(*handler)(union sigval sv), unsigned interval)
 {
-    struct sigaction sact;
     struct sigevent sevent = {0};
     timer_t timerid = 0;
-    struct itimerspec tspec;
+    struct itimerspec tspec = {0};
 
-    sigemptyset(&sact.sa_mask);
-    sact.sa_handler = handler;
-    sact.sa_flags = SA_RESTART;
+    sevent.sigev_notify = SIGEV_THREAD;
+    sevent.sigev_notify_function = handler;
+    sevent.sigev_value.sival_ptr = NULL;
 
-    if (!g_fn.sigaction) return FALSE;
-
-    if (g_fn.sigaction(SIGUSR2, &sact, NULL) == -1) {
-        DBG("errno %d", errno);
-        return FALSE;
-    }
-
-    sevent.sigev_notify = SIGEV_SIGNAL;
-    sevent.sigev_signo = SIGUSR2;
     if (timer_create(CLOCK_MONOTONIC, &sevent, &timerid) == -1) {
         DBG("errno %d", errno);
         return FALSE;

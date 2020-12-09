@@ -50,7 +50,7 @@ __thread int g_getdelim = 0;
 static void *periodic(void *);
 static void doConfig(config_t *);
 static void reportProcessStart(void);
-static void threadNow(int);
+static void threadNow(union sigval);
 
 #ifdef __LINUX__
 extern int arch_prctl(int, unsigned long);
@@ -468,12 +468,10 @@ dynConfig(void)
 }
 
 static void
-threadNow(int sig)
-{
+threadNow(union sigval sv) {
     static uint64_t serialize;
 
     if (!atomicCasU64(&serialize, 0ULL, 1ULL)) return;
-
     // Create one thread at most
     if (g_thread.once == TRUE) {
         if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
@@ -577,7 +575,7 @@ doThread()
      * Shouldn't hurt anything else.
      */
     if (time(NULL) >= g_thread.startTime) {
-        threadNow(0);
+        threadNow((union sigval)NULL);
     }
 }
 
@@ -907,8 +905,7 @@ initHook()
         ((full_path = osGetExePath()) != NULL) &&
         ((ebuf = getElf(full_path)) != NULL)) {
         initGoHook(ebuf);
-        threadNow(0);
-
+        threadNow((union sigval)NULL);
         if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
             scopeLog("initHook:arch_prctl", -1, CFG_LOG_ERROR);
         }
@@ -1021,7 +1018,7 @@ init(void)
     
     if (checkEnv("SCOPE_APP_TYPE", "go") &&
         checkEnv("SCOPE_EXEC_TYPE", "static")) {
-        threadNow(0);
+        threadNow((union sigval)NULL);
     } else {
         threadInit();
     }

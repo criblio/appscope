@@ -19,7 +19,7 @@ struct _transport_t
     cfg_transport_t type;
     ssize_t (*send)(int, const void *, size_t, int);
     int (*open)(const char *, int, ...);
-    int (*dup3)(int, int, int);
+    int (*dup2)(int, int);
     int (*close)(int);
     int (*fcntl)(int, int, ...);
     size_t (*fwrite)(const void *, size_t, size_t, FILE *);
@@ -69,7 +69,7 @@ newTransport()
 
     if ((t->send = dlsym(RTLD_NEXT, "send")) == NULL) goto out;
     if ((t->open = dlsym(RTLD_NEXT, "open")) == NULL) goto out;
-    if ((t->dup3 = dlsym(RTLD_NEXT, "dup3")) == NULL) goto out;
+    if ((t->dup2 = dlsym(RTLD_NEXT, "dup2")) == NULL) goto out;
     if ((t->close = dlsym(RTLD_NEXT, "close")) == NULL) goto out;
     if ((t->fcntl = dlsym(RTLD_NEXT, "fcntl")) == NULL) goto out;
     if ((t->fwrite = dlsym(RTLD_NEXT, "fwrite")) == NULL) goto out;
@@ -82,10 +82,10 @@ newTransport()
     return t;
 
   out:
-    DBG("send=%p open=%p dup3=%p close=%p "
+    DBG("send=%p open=%p dup2=%p close=%p "
         "fcntl=%p fwrite=%p socket=%p connect=%p "
         "getaddrinfo=%p fclose=%p fdopen=%p",
-        t->send, t->open, t->dup3, t->close,
+        t->send, t->open, t->dup2, t->close,
         t->fcntl, t->fwrite, t->socket, t->connect,
         t->getaddrinfo, t->fclose, t->fdopen);
     free(t);
@@ -117,9 +117,17 @@ placeDescriptor(int fd, transport_t *t)
 
     for (i = next_fd_to_try; i >= DEFAULT_MIN_FD; i--) {
         if ((t->fcntl(i, F_GETFD) == -1) && (errno == EBADF)) {
-            // This fd is available
-            if ((dupfd = t->dup3(fd, i, O_CLOEXEC)) == -1) continue;
+
+            // This fd is available, try to dup it
+            if ((dupfd = t->dup2(fd, i)) == -1) continue;
             t->close(fd);
+
+            // Set close on exec. (dup2 does not preserve FD_CLOEXEC)
+            int flags = t->fcntl(dupfd, F_GETFD, 0);
+            if (t->fcntl(dupfd, F_SETFD, flags | FD_CLOEXEC) == -1) {
+                DBG("%d", dupfd);
+            }
+
             next_fd_to_try = dupfd - 1;
             return dupfd;
         }
@@ -592,12 +600,6 @@ transportConnectFile(transport_t *t)
 
     // Needed because umask affects open permissions
     if (fchmod(fd, 0666) == -1) {
-        DBG("%d %s", fd, t->file.path);
-    }
-
-    // set close on exec
-    int flags = t->fcntl(fd, F_GETFD, 0);
-    if (t->fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1) {
         DBG("%d %s", fd, t->file.path);
     }
 

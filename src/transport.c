@@ -19,7 +19,7 @@ struct _transport_t
     cfg_transport_t type;
     ssize_t (*send)(int, const void *, size_t, int);
     int (*open)(const char *, int, ...);
-    int (*dup2)(int, int);
+    int (*dup3)(int, int, int);
     int (*close)(int);
     int (*fcntl)(int, int, ...);
     size_t (*fwrite)(const void *, size_t, size_t, FILE *);
@@ -28,6 +28,9 @@ struct _transport_t
     int (*getaddrinfo)(const char *, const char *,
                        const struct addrinfo *,
                        struct addrinfo **);
+    int (*origGetaddrinfo)(const char *, const char *,
+                           const struct addrinfo *,
+                           struct addrinfo **);
     int (*fclose)(FILE*);
     FILE *(*fdopen)(int, const char *);
     union {
@@ -36,6 +39,7 @@ struct _transport_t
             fd_set pending_connect;
             char *host;
             char *port;
+            struct sockaddr_storage gai_addr;
         } net;
         struct {
             char *path;
@@ -46,6 +50,11 @@ struct _transport_t
         } file;
     };
 };
+
+// This is *not* realtime safe; it's shared between all transports in a
+// process.  It's used by scopeGetaddrinfo() to avoid a bug seen in
+// node.js processes.  See transportReconnect() below for details.
+static struct addrinfo *g_cached_addr = NULL;
 
 static transport_t*
 newTransport()
@@ -60,22 +69,23 @@ newTransport()
 
     if ((t->send = dlsym(RTLD_NEXT, "send")) == NULL) goto out;
     if ((t->open = dlsym(RTLD_NEXT, "open")) == NULL) goto out;
-    if ((t->dup2 = dlsym(RTLD_NEXT, "dup2")) == NULL) goto out;
+    if ((t->dup3 = dlsym(RTLD_NEXT, "dup3")) == NULL) goto out;
     if ((t->close = dlsym(RTLD_NEXT, "close")) == NULL) goto out;
     if ((t->fcntl = dlsym(RTLD_NEXT, "fcntl")) == NULL) goto out;
     if ((t->fwrite = dlsym(RTLD_NEXT, "fwrite")) == NULL) goto out;
     if ((t->socket = dlsym(RTLD_NEXT, "socket")) == NULL) goto out;
     if ((t->connect = dlsym(RTLD_NEXT, "connect")) == NULL) goto out;
     if ((t->getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo")) == NULL) goto out;
+    t->origGetaddrinfo = t->getaddrinfo;  // store a copy
     if ((t->fclose = dlsym(RTLD_NEXT, "fclose")) == NULL) goto out;
     if ((t->fdopen = dlsym(RTLD_NEXT, "fdopen")) == NULL) goto out;
     return t;
 
   out:
-    DBG("send=%p open=%p dup2=%p close=%p "
+    DBG("send=%p open=%p dup3=%p close=%p "
         "fcntl=%p fwrite=%p socket=%p connect=%p "
         "getaddrinfo=%p fclose=%p fdopen=%p",
-        t->send, t->open, t->dup2, t->close,
+        t->send, t->open, t->dup3, t->close,
         t->fcntl, t->fwrite, t->socket, t->connect,
         t->getaddrinfo, t->fclose, t->fdopen);
     free(t);
@@ -108,7 +118,7 @@ placeDescriptor(int fd, transport_t *t)
     for (i = next_fd_to_try; i >= DEFAULT_MIN_FD; i--) {
         if ((t->fcntl(i, F_GETFD) == -1) && (errno == EBADF)) {
             // This fd is available
-            if ((dupfd = t->dup2(fd, i)) == -1) continue;
+            if ((dupfd = t->dup3(fd, i, O_CLOEXEC)) == -1) continue;
             t->close(fd);
             next_fd_to_try = dupfd - 1;
             return dupfd;
@@ -211,6 +221,128 @@ transportDisconnect(transport_t *trans)
     }
     return 0;
 }
+
+
+// We've observed that node.js processes can hang from spinlocks
+// in glibc's getaddrinfo:
+//
+//      #0  __lll_lock_wait_private ()
+//                 at ../sysdeps/unix/sysv/linux/x86_64/lowlevellock.S:95
+//      #1  in get_locked_global () at resolv_conf.c:90
+//      #2  resolv_conf_get_1 () at resolv_conf.c:200
+//      #3  __resolv_conf_get () at resolv_conf.c:359
+//      #4  in context_alloc () at resolv_context.c:137
+//      #5  context_get (preinit=false) at resolv_context.c:181
+//      #6  __GI___resolv_context_get () at resolv_context.c:195
+//      #7  in gaih_inet () at ../sysdeps/posix/getaddrinfo.c:767
+//      #8  in __GI_getaddrinfo () at ../sysdeps/posix/getaddrinfo.c:2300
+//      #9  in socketConnectionStart () at src/transport.c:339
+//      #10 in transportConnect () at src/transport.c:514
+//      #11 in transportCreateTCP () at src/transport.c:549
+//      #12 in initTransport (cfg=0x5446bb0, t=CFG_CTL) at src/cfgutils.c:1516
+//      #13 in initCtl (cfg=0x5446bb0) at src/cfgutils.c:1609
+//      #14 in doReset () at src/wrap.c:637
+//      #15 in fork () at src/wrap.c:3361
+//      #16 in uv_spawn () at ../deps/uv/src/unix/process.c:489
+//
+// Here's our own version that returns an address from a previously
+// successful connection.  Look ma, no spinlocks!  See transportReconnect()
+// below for more info.
+static int
+scopeGetaddrinfo(const char *node, const char *service,
+                  const struct addrinfo *hints,
+                  struct addrinfo **res)
+{
+    if (!res) return 1;
+    *res = g_cached_addr;
+    return (g_cached_addr) ? 0 : 1; // 0 is successful
+}
+
+static struct addrinfo *
+getExistingConnectionAddr(transport_t *trans)
+{
+    struct addrinfo *ai = NULL;
+
+    if (transportNeedsConnection(trans) || trans->type != CFG_TCP) goto err;
+
+    // Allocate what we need to be compatible with freeaddrinfo()
+    ai = calloc(1, sizeof(struct addrinfo));
+    if (!ai) {
+        DBG(NULL);
+        goto err;
+    }
+
+    // Clear the address value
+    socklen_t addrsize = sizeof(trans->net.gai_addr);
+    struct sockaddr *addr = (struct sockaddr*)&trans->net.gai_addr;
+    memset(addr, 0, addrsize);
+
+    // lookup the address
+    if (getpeername(trans->net.sock, addr, &addrsize)) {
+        DBG(NULL);
+        goto err;
+    }
+
+    // Set all the fields
+    ai->ai_flags = 0;                  // Unused by us
+    ai->ai_family = addr->sa_family;
+    ai->ai_socktype = SOCK_STREAM;
+    ai->ai_protocol = IPPROTO_TCP;
+    ai->ai_addrlen = addrsize;
+    ai->ai_addr = addr;
+    ai->ai_canonname = NULL;           // Unused by us
+    ai->ai_next = NULL;
+
+    return ai;
+
+err:
+    if (ai) free(ai);
+    return NULL;
+}
+
+
+// This is expected to be called by child processses that
+// may have inherited connected transports from their parent
+// processes.  i.e. fork()->doReset() path
+// As a caution, because of its use of g_cached_addr, it's
+// *not* reentrant.
+int
+transportReconnect(transport_t *trans)
+{
+    if (!trans) return 0;
+
+    switch (trans->type) {
+        case CFG_TCP:
+            // Since TCP is connection-oriented, we want to disconnect
+            // and reconnect so child processes can have distinct
+            // connections from their parents.  However, we can't use
+            // glibc's getaddrinfo lest we introduce hangs in node.js
+            // processes.  So, if a transport has an existing connection,
+            // grab the address from that connection and substitute in our
+            // own getaddrinfo for this situation.
+
+            g_cached_addr = getExistingConnectionAddr(trans);
+            transportDisconnect(trans);          // Never keep the parents connection.
+            if (g_cached_addr) {
+                trans->getaddrinfo = scopeGetaddrinfo;
+                transportConnect(trans);         // Will use g_cached_addr
+                trans->getaddrinfo = trans->origGetaddrinfo;
+            }
+
+            break;
+        case CFG_UDP:
+        case CFG_FILE:
+        case CFG_SYSLOG:
+        case CFG_SHM:
+            // Everything else is a no-op.  These can all share
+            // the parent's transport.
+            break;
+        default:
+            DBG(NULL);
+    }
+    return 0;
+}
+
 
 static int
 setSocketBlocking(transport_t *trans, int sock, bool block)

@@ -744,6 +744,13 @@ ctlClose(ctl_t *ctl)
     return transportDisconnect(ctl->transport);
 }
 
+int
+ctlReconnect(ctl_t *ctl)
+{
+    if (!ctl) return 0;
+    return transportReconnect(ctl->transport);
+}
+
 void
 ctlTransportSet(ctl_t *ctl, transport_t *transport)
 {

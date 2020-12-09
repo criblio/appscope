@@ -77,6 +77,13 @@ logDisconnect(log_t* log)
     return transportDisconnect(log->transport);
 }
 
+int
+logReconnect(log_t* log)
+{
+    if (!log) return 0;
+    return transportReconnect(log->transport);
+}
+
 void
 logTransportSet(log_t* log, transport_t* transport)
 {

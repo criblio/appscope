@@ -23,6 +23,15 @@ void                 dbgAddLine(const char* key, const char* fmt, ...);
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
+#define NSLEEP(now, remain) \
+    while (nanosleep(now, remain) != 0) { \
+        if (errno == EINTR) {             \
+            nanosleep(remain, NULL);      \
+        } else {                          \
+            break;                        \
+        }                                 \
+    }                                     \
+
 #define DBG_FILE_AND_LINE __FILE__ ":" TOSTRING(__LINE__)
 
 //

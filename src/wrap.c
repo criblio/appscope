@@ -40,6 +40,7 @@ static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 static list_t *g_nsslist;
+static uint64_t reentrancy_guard = 0ULL;
 
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
@@ -50,7 +51,7 @@ __thread int g_getdelim = 0;
 static void *periodic(void *);
 static void doConfig(config_t *);
 static void reportProcessStart(void);
-static void threadNow(union sigval);
+static void threadNow(int);
 
 #ifdef __LINUX__
 extern int arch_prctl(int, unsigned long);
@@ -468,7 +469,7 @@ dynConfig(void)
 }
 
 static void
-threadNow(union sigval sv) {
+threadNow(int sig) {
     static uint64_t serialize;
 
     if (!atomicCasU64(&serialize, 0ULL, 1ULL)) return;
@@ -575,7 +576,7 @@ doThread()
      * Shouldn't hurt anything else.
      */
     if (time(NULL) >= g_thread.startTime) {
-        threadNow((union sigval)NULL);
+        threadNow(0);
     }
 }
 
@@ -595,7 +596,7 @@ doGetProcCPU() {
 }
 
 static void
-setProcId(proc_id_t* proc)
+setProcId(proc_id_t *proc)
 {
     if (!proc) return;
 
@@ -628,13 +629,15 @@ doReset()
 
     g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
-    threadInit();
 
     resetState();
     ctlDestroy(&g_ctl);
     g_ctl = initCtl(g_staticfg);
 
+    atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
+
     reportProcessStart();
+    threadInit();
 }
 
 static void
@@ -644,12 +647,6 @@ reportPeriodicStuff(void)
     int nthread, nfds, children;
     long long cpu = 0;
     static long long cpuState = 0;
-
-    // This is called by periodic, and due to atexit().
-    // If it's actively running for one reason, then skip the second.
-    static uint64_t reentrancy_guard = 0ULL;
-    if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) return;
-
 
     // We report CPU time for this period.
     cpu = doGetProcCPU();
@@ -702,16 +699,25 @@ reportPeriodicStuff(void)
     // Process any events that have been posted
     doEvent();
     mtcFlush(g_mtc);
-
-    if (!atomicCasU64(&reentrancy_guard, 1ULL, 0ULL)) {
-         DBG(NULL);
-    }
 }
 
 void
 handleExit(void)
 {
-    reportPeriodicStuff();
+    if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+        struct timespec ts, rem;
+        ts.tv_sec = 0;
+        ts.tv_nsec = 10000; // 10 ms
+
+        // let the periodic thread finish
+        while (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+            NSLEEP(&ts, &rem);
+        }
+        doEvent();
+    } else {
+        reportPeriodicStuff();
+    }
+
     mtcFlush(g_mtc);
     logFlush(g_log);
     ctlFlush(g_ctl);
@@ -755,7 +761,10 @@ periodic(void *arg)
             cmdSendInfoMsg(g_ctl, json);
         }
 
-        reportPeriodicStuff();
+        if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+            reportPeriodicStuff();
+            atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
+        }
 
         remoteConfig();
     }
@@ -905,7 +914,7 @@ initHook()
         ((full_path = osGetExePath()) != NULL) &&
         ((ebuf = getElf(full_path)) != NULL)) {
         initGoHook(ebuf);
-        threadNow((union sigval)NULL);
+        threadNow(0);
         if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
             scopeLog("initHook:arch_prctl", -1, CFG_LOG_ERROR);
         }
@@ -1018,7 +1027,7 @@ init(void)
     
     if (checkEnv("SCOPE_APP_TYPE", "go") &&
         checkEnv("SCOPE_EXEC_TYPE", "static")) {
-        threadNow((union sigval)NULL);
+        threadNow(0);
     } else {
         threadInit();
     }

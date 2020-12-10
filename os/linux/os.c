@@ -6,6 +6,9 @@
 #include "../../src/fn.h"
 #include "../../src/scopetypes.h"
 
+// want to put this list in an obvious place
+static char thread_delay_list[] = "chrome:nacl_helper";
+
 static int
 sendNL(int sd, ino_t node)
 {
@@ -471,14 +474,38 @@ out:
 bool
 osThreadInit(void(*handler)(int), unsigned interval)
 {
+    bool delay = FALSE;
     struct sigaction sact;
     struct sigevent sevent = {0};
     timer_t timerid = 0;
     struct itimerspec tspec;
     char *cmd;
 
-    if (osGetCmdline(getpid(), &cmd) && cmd &&
-        (!strstr(cmd, "chrome"))) {
+    if (osGetCmdline(getpid(), &cmd) && cmd) {
+        char *save = NULL, *this = NULL;
+        for (this = strtok_r(thread_delay_list, ":", &save);
+             this != NULL;
+             this = strtok_r(NULL, ":", &save)) {
+            if (this && strstr(cmd, this)) {
+                delay = TRUE;
+                break;
+            }
+        }
+
+        char *envlist = getenv(THREAD_DELAY_LIST);
+        if (envlist) {
+            for (this = strtok_r(envlist, ":", &save);
+                 this != NULL;
+                 this = strtok_r(NULL, ":", &save)) {
+                if (this && strstr(cmd, this)) {
+                    delay = TRUE;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (delay == FALSE) {
         handler(0);
         return TRUE;
     }

@@ -41,6 +41,14 @@ typedef struct
     char id[MAX_ID];
 } proc_id_t;
 
+#define NSLEEP(now, remain) \
+    while (nanosleep(now, remain) != 0) { \
+        if (errno == EINTR) {             \
+            nanosleep(remain, NULL);      \
+        } else {                          \
+            break;                        \
+        }                                 \
+    }                                     \
 
 #define TRUE 1
 #define FALSE 0
@@ -103,6 +111,9 @@ typedef unsigned int bool;
  */
 #define DEFAULT_CBUF_SIZE (MAXEVENTSPERSEC * DEFAULT_SUMMARY_PERIOD)
 #define DEFAULT_CONFIG_SIZE 30 * 1024
+
+// we should start moving env var constants to one place
+#define THREAD_DELAY_LIST "SCOPE_THREAD_DELAY"
 
 #endif // __SCOPETYPES_H__
 

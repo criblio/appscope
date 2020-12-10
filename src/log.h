@@ -18,6 +18,7 @@ void                logFlush(log_t*);
 int                 logNeedsConnection(log_t*);
 int                 logConnect(log_t*);
 int                 logDisconnect(log_t*);
+int                 logReconnect(log_t*);
 void                logTransportSet(log_t*, transport_t*);
 void                logLevelSet(log_t*, cfg_log_level_t);
 

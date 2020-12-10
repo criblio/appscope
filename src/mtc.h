@@ -20,6 +20,7 @@ void                mtcFlush(mtc_t*);
 int                 mtcNeedsConnection(mtc_t *);
 int                 mtcConnect(mtc_t *);
 int                 mtcDisconnect(mtc_t *);
+int                 mtcReconnect(mtc_t *);
 void                mtcEnabledSet(mtc_t*, unsigned);
 void                mtcTransportSet(mtc_t*, transport_t*);
 void                mtcFormatSet(mtc_t*, mtc_fmt_t*);

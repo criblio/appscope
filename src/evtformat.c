@@ -8,6 +8,19 @@
 #include "evtformat.h"
 #include "com.h"
 
+
+// This is ugly, but...
+// In glibc 2.27 (ubuntu 18.04) and earlier clock_gettime
+// resolved to 'clock_gettime@@GLIBC_2.2.5'.
+// In glibc 2.31 (ubuntu 20.04), it's now 'clock_gettime@@GLIBC_2.17'.
+// This voodoo avoids creating binaries which would require a glibc
+// that's 2.31 or newer, even if built on new ubuntu 20.04.
+// This is tested by test/glibcvertest.c.
+#ifdef __LINUX__
+__asm__(".symver clock_gettime,clock_gettime@GLIBC_2.2.5");
+#endif
+
+
 // key names for event JSON
 #define HOST "host"
 #define TIME "_time"

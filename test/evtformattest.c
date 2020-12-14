@@ -49,18 +49,19 @@ evtFormatMetricHappyPath(void** state)
     // grab the time value from json to use in our expected output.
     // the specific value isn't of interest.
     cJSON* time = cJSON_GetObjectItem(json, "_time");
+    char *timestr = cJSON_Print(time);
 
     char* expected = NULL;
     asprintf(&expected, "{\"sourcetype\":\"metric\","
                            "\"id\":\"host-evttest-cmd-4\","
-                           "\"_time\":%1.17g,"
+                           "\"_time\":%s,"
                            "\"source\":\"A\","
                            "\"host\":\"host\","
                            "\"proc\":\"evttest\","
                            "\"cmd\":\"cmd-4\","
                            "\"pid\":4848,"
                            "\"_channel\":\"12345\","
-                           "\"data\":{\"_metric\":\"A\",\"_metric_type\":\"counter\",\"_value\":1}}", time->valuedouble);
+                           "\"data\":{\"_metric\":\"A\",\"_metric_type\":\"counter\",\"_value\":1}}", timestr);
 
     assert_non_null(expected);
     char* actual = cJSON_PrintUnformatted(json);
@@ -69,6 +70,7 @@ evtFormatMetricHappyPath(void** state)
     cJSON_Delete(json);
     free(actual);
     free(expected);
+    free(timestr);
 
     evtFormatDestroy(&evt);
 }
@@ -270,8 +272,13 @@ evtFormatMetricRateLimitReturnsNotice(void** state)
             // This test depends on running all iterations in the same second.
             // If we find this isn't true, start the loop over.
             initial = current;
-            i=0;
+            i=-1;
             cJSON_Delete(json);
+
+            // reset evt state
+            evtFormatDestroy(&evt);
+            evt = evtFormatCreate();
+            evtFormatSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
             continue;
         }
 

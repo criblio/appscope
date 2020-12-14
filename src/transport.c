@@ -28,6 +28,9 @@ struct _transport_t
     int (*getaddrinfo)(const char *, const char *,
                        const struct addrinfo *,
                        struct addrinfo **);
+    int (*origGetaddrinfo)(const char *, const char *,
+                           const struct addrinfo *,
+                           struct addrinfo **);
     int (*fclose)(FILE*);
     FILE *(*fdopen)(int, const char *);
     union {
@@ -36,6 +39,7 @@ struct _transport_t
             fd_set pending_connect;
             char *host;
             char *port;
+            struct sockaddr_storage gai_addr;
         } net;
         struct {
             char *path;
@@ -46,6 +50,11 @@ struct _transport_t
         } file;
     };
 };
+
+// This is *not* realtime safe; it's shared between all transports in a
+// process.  It's used by scopeGetaddrinfo() to avoid a bug seen in
+// node.js processes.  See transportReconnect() below for details.
+static struct addrinfo *g_cached_addr = NULL;
 
 static transport_t*
 newTransport()
@@ -67,6 +76,7 @@ newTransport()
     if ((t->socket = dlsym(RTLD_NEXT, "socket")) == NULL) goto out;
     if ((t->connect = dlsym(RTLD_NEXT, "connect")) == NULL) goto out;
     if ((t->getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo")) == NULL) goto out;
+    t->origGetaddrinfo = t->getaddrinfo;  // store a copy
     if ((t->fclose = dlsym(RTLD_NEXT, "fclose")) == NULL) goto out;
     if ((t->fdopen = dlsym(RTLD_NEXT, "fdopen")) == NULL) goto out;
     return t;
@@ -107,9 +117,17 @@ placeDescriptor(int fd, transport_t *t)
 
     for (i = next_fd_to_try; i >= DEFAULT_MIN_FD; i--) {
         if ((t->fcntl(i, F_GETFD) == -1) && (errno == EBADF)) {
-            // This fd is available
+
+            // This fd is available, try to dup it
             if ((dupfd = t->dup2(fd, i)) == -1) continue;
             t->close(fd);
+
+            // Set close on exec. (dup2 does not preserve FD_CLOEXEC)
+            int flags = t->fcntl(dupfd, F_GETFD, 0);
+            if (t->fcntl(dupfd, F_SETFD, flags | FD_CLOEXEC) == -1) {
+                DBG("%d", dupfd);
+            }
+
             next_fd_to_try = dupfd - 1;
             return dupfd;
         }
@@ -212,6 +230,128 @@ transportDisconnect(transport_t *trans)
     return 0;
 }
 
+
+// We've observed that node.js processes can hang from spinlocks
+// in glibc's getaddrinfo:
+//
+//      #0  __lll_lock_wait_private ()
+//                 at ../sysdeps/unix/sysv/linux/x86_64/lowlevellock.S:95
+//      #1  in get_locked_global () at resolv_conf.c:90
+//      #2  resolv_conf_get_1 () at resolv_conf.c:200
+//      #3  __resolv_conf_get () at resolv_conf.c:359
+//      #4  in context_alloc () at resolv_context.c:137
+//      #5  context_get (preinit=false) at resolv_context.c:181
+//      #6  __GI___resolv_context_get () at resolv_context.c:195
+//      #7  in gaih_inet () at ../sysdeps/posix/getaddrinfo.c:767
+//      #8  in __GI_getaddrinfo () at ../sysdeps/posix/getaddrinfo.c:2300
+//      #9  in socketConnectionStart () at src/transport.c:339
+//      #10 in transportConnect () at src/transport.c:514
+//      #11 in transportCreateTCP () at src/transport.c:549
+//      #12 in initTransport (cfg=0x5446bb0, t=CFG_CTL) at src/cfgutils.c:1516
+//      #13 in initCtl (cfg=0x5446bb0) at src/cfgutils.c:1609
+//      #14 in doReset () at src/wrap.c:637
+//      #15 in fork () at src/wrap.c:3361
+//      #16 in uv_spawn () at ../deps/uv/src/unix/process.c:489
+//
+// Here's our own version that returns an address from a previously
+// successful connection.  Look ma, no spinlocks!  See transportReconnect()
+// below for more info.
+static int
+scopeGetaddrinfo(const char *node, const char *service,
+                  const struct addrinfo *hints,
+                  struct addrinfo **res)
+{
+    if (!res) return 1;
+    *res = g_cached_addr;
+    return (g_cached_addr) ? 0 : 1; // 0 is successful
+}
+
+static struct addrinfo *
+getExistingConnectionAddr(transport_t *trans)
+{
+    struct addrinfo *ai = NULL;
+
+    if (transportNeedsConnection(trans) || trans->type != CFG_TCP) goto err;
+
+    // Allocate what we need to be compatible with freeaddrinfo()
+    ai = calloc(1, sizeof(struct addrinfo));
+    if (!ai) {
+        DBG(NULL);
+        goto err;
+    }
+
+    // Clear the address value
+    socklen_t addrsize = sizeof(trans->net.gai_addr);
+    struct sockaddr *addr = (struct sockaddr*)&trans->net.gai_addr;
+    memset(addr, 0, addrsize);
+
+    // lookup the address
+    if (getpeername(trans->net.sock, addr, &addrsize)) {
+        DBG(NULL);
+        goto err;
+    }
+
+    // Set all the fields
+    ai->ai_flags = 0;                  // Unused by us
+    ai->ai_family = addr->sa_family;
+    ai->ai_socktype = SOCK_STREAM;
+    ai->ai_protocol = IPPROTO_TCP;
+    ai->ai_addrlen = addrsize;
+    ai->ai_addr = addr;
+    ai->ai_canonname = NULL;           // Unused by us
+    ai->ai_next = NULL;
+
+    return ai;
+
+err:
+    if (ai) free(ai);
+    return NULL;
+}
+
+
+// This is expected to be called by child processses that
+// may have inherited connected transports from their parent
+// processes.  i.e. fork()->doReset() path
+// As a caution, because of its use of g_cached_addr, it's
+// *not* reentrant.
+int
+transportReconnect(transport_t *trans)
+{
+    if (!trans) return 0;
+
+    switch (trans->type) {
+        case CFG_TCP:
+            // Since TCP is connection-oriented, we want to disconnect
+            // and reconnect so child processes can have distinct
+            // connections from their parents.  However, we can't use
+            // glibc's getaddrinfo lest we introduce hangs in node.js
+            // processes.  So, if a transport has an existing connection,
+            // grab the address from that connection and substitute in our
+            // own getaddrinfo for this situation.
+
+            g_cached_addr = getExistingConnectionAddr(trans);
+            transportDisconnect(trans);          // Never keep the parents connection.
+            if (g_cached_addr) {
+                trans->getaddrinfo = scopeGetaddrinfo;
+                transportConnect(trans);         // Will use g_cached_addr
+                trans->getaddrinfo = trans->origGetaddrinfo;
+            }
+
+            break;
+        case CFG_UDP:
+        case CFG_FILE:
+        case CFG_SYSLOG:
+        case CFG_SHM:
+            // Everything else is a no-op.  These can all share
+            // the parent's transport.
+            break;
+        default:
+            DBG(NULL);
+    }
+    return 0;
+}
+
+
 static int
 setSocketBlocking(transport_t *trans, int sock, bool block)
 {
@@ -270,11 +410,14 @@ checkPendingSocketStatus(transport_t *trans)
         socklen_t optlen = sizeof(opt);
         if ((getsockopt(i, SOL_SOCKET, SO_ERROR, (void*)(&opt), &optlen) < 0)
             || opt) {
-            scopeLog("ERROR:checkPendingSocketStatus:getsockopt", i, CFG_LOG_DEBUG);
+            scopeLog("connect failed", i, CFG_LOG_INFO);
+
             FD_CLR(i, &trans->net.pending_connect);
             trans->close(i);
             continue;
         }
+
+        scopeLog("connect successful", i, CFG_LOG_INFO);
 
         // Hey!  We found one that will work!
         // Move this descriptor up out of the way
@@ -293,6 +436,7 @@ checkPendingSocketStatus(transport_t *trans)
     if (trans->net.sock != -1) {
         for (i=0; i<FD_SETSIZE; i++) {
             if (FD_ISSET(i, &trans->net.pending_connect)) {
+                scopeLog("abandoning connect due to previous success", i, CFG_LOG_INFO);
                 trans->close(i);
                 FD_CLR(i, &trans->net.pending_connect);
             }
@@ -324,6 +468,14 @@ socketConnectionStart(transport_t *trans)
             return 1;
     }
 
+    char *logmsg = NULL;
+    char *type = (trans->type == CFG_UDP) ? "udp" : "tcp";
+    if (asprintf(&logmsg, "getting DNS info for %s %s:%s",
+             type, trans->net.host, trans->net.port) != -1) {
+        scopeLog(logmsg, -1, CFG_LOG_INFO);
+        if (logmsg) free(logmsg);
+    }
+
     if (trans->getaddrinfo(trans->net.host,
                            trans->net.port,
                            &hints, &addr_list)) return 0;
@@ -351,21 +503,62 @@ socketConnectionStart(transport_t *trans)
             continue;
         }
 
+        void *addrptr = NULL;
+        unsigned short *portptr = NULL;
+        if (addr->ai_family == AF_INET) {
+            struct sockaddr_in *addr4_ptr;
+            addr4_ptr = (struct sockaddr_in *)addr->ai_addr;
+            addrptr = &addr4_ptr->sin_addr;
+            portptr = &addr4_ptr->sin_port;
+        } else if (addr->ai_family == AF_INET6) {
+            struct sockaddr_in6 *addr6_ptr;
+            addr6_ptr = (struct sockaddr_in6 *)addr->ai_addr;
+            addrptr = &addr6_ptr->sin6_addr;
+            portptr = &addr6_ptr->sin6_port;
+        } else {
+            DBG("%d %s %s %d", sock, trans->net.host, trans->net.port, addr->ai_family);
+            trans->close(sock);
+            continue;
+        }
+        char addrstr[INET6_ADDRSTRLEN];
+        inet_ntop(addr->ai_family, addrptr, addrstr, sizeof(addrstr));
+        unsigned short port = ntohs(*portptr);
+
         errno = 0;
         if (trans->connect(sock,
                            addr->ai_addr,
                            addr->ai_addrlen) == -1) {
 
             if (errno != EINPROGRESS) {
+                char *logmsg = NULL;
+                if (asprintf(&logmsg, "connect to %s:%d failed", addrstr, port) != -1) {
+                    scopeLog(logmsg, sock, CFG_LOG_INFO);
+                    if (logmsg) free(logmsg);
+                }
+
                 // We could create a sock, but not connect.  Clean up.
                 transportDisconnect(trans);
                 continue;
             }
+
+            char *logmsg = NULL;
+            if (asprintf(&logmsg, "connect to %s:%d is pending", addrstr, port) != -1) {
+                scopeLog(logmsg, sock, CFG_LOG_INFO);
+                if (logmsg) free(logmsg);
+            }
+
             FD_SET(sock, &trans->net.pending_connect);
             continue;
         }
 
+
         if (trans->type == CFG_UDP) {
+            char *logmsg = NULL;
+            if (asprintf(&logmsg, "connect to %s:%d was successful", addrstr, port) != -1) {
+                scopeLog(logmsg, sock, CFG_LOG_INFO);
+                if (logmsg) free(logmsg);
+            }
+
             // connect on udp sockets normally succeeds immediately.
             trans->net.sock = placeDescriptor(sock, trans);
             if (trans->net.sock != -1) break;
@@ -407,12 +600,6 @@ transportConnectFile(transport_t *t)
 
     // Needed because umask affects open permissions
     if (fchmod(fd, 0666) == -1) {
-        DBG("%d %s", fd, t->file.path);
-    }
-
-    // set close on exec
-    int flags = t->fcntl(fd, F_GETFD, 0);
-    if (t->fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1) {
         DBG("%d %s", fd, t->file.path);
     }
 

@@ -1417,7 +1417,12 @@ void
 doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 {
     scopeLog(func, sd, CFG_LOG_DEBUG);
-    if (addr) addSock(sd, SOCK_STREAM, addr->sa_family);
+    if (addr) {
+        addSock(sd, SOCK_STREAM, addr->sa_family);
+    } else {
+        doAddNewSock(sd);
+    }
+
 
     if (getNetEntry(sd) != NULL) {
         if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);
@@ -1531,6 +1536,20 @@ doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t byte
                 doUpdateState(FS_DURATION, fd, duration, func, NULL);
                 doUpdateState(FS_WRITE, fd, bytes, func, NULL);
             }
+
+            if (src == IOV) {
+                int i;
+                struct iovec *iov = (struct iovec *)buf;
+
+                for (i = 0; i < cnt; i++) {
+                    if (iov[i].iov_base) {
+                        ctlSendLog(g_ctl, fs->path, iov[i].iov_base, iov[i].iov_len, fs->uid, &g_proc);
+                    }
+                }
+
+                return;
+            }
+
             ctlSendLog(g_ctl, fs->path, buf, bytes, fs->uid, &g_proc);
         }
     } else {

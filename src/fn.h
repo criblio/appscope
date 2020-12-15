@@ -8,6 +8,7 @@
 #include <netdb.h>
 #ifdef __LINUX__
 #include <sys/epoll.h>
+#include <poll.h>
 #include <sys/vfs.h>
 #endif // __LINUX__
 #include <signal.h>
@@ -186,6 +187,7 @@ typedef struct {
     int (*statvfs64)(const char *, struct statvfs64 *);
     int (*fstatvfs64)(int, struct statvfs64 *);
     int (*epoll_wait)(int, struct epoll_event *, int, int);
+    int (*poll)(struct pollfd *, nfds_t, int);
 #endif // __LINUX__
 
 #if defined(__LINUX__) && defined(__STATX__)

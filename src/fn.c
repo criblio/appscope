@@ -102,6 +102,7 @@ initFn(void)
 
 #ifdef __LINUX__
     g_fn.epoll_wait = dlsym(RTLD_NEXT, "epoll_wait");
+    g_fn.poll = dlsym(RTLD_NEXT, "poll");
     g_fn.open64 = dlsym(RTLD_NEXT, "open64");
     g_fn.openat64 = dlsym(RTLD_NEXT, "openat64");
     g_fn.__open_2 = dlsym(RTLD_NEXT, "__open_2");

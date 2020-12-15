@@ -473,11 +473,14 @@ threadNow(int sig) {
     static uint64_t serialize;
 
     if (!atomicCasU64(&serialize, 0ULL, 1ULL)) return;
+
     // Create one thread at most
     if (g_thread.once == TRUE) {
         if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
         return;
     }
+
+    osTimerStop();
 
     if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
         scopeLog("ERROR: threadNow:pthread_create", -1, CFG_LOG_ERROR);
@@ -580,6 +583,15 @@ doThread()
     }
 }
 
+static void
+stopTimer(void)
+{
+    // if we are in the constructor, do nothing
+    if (!g_ctl) return;
+
+    osTimerStop();
+    threadNow(0);
+}
 
 // Return process specific CPU usage in microseconds
 static long long
@@ -1042,9 +1054,10 @@ nanosleep(const struct timespec *req, struct timespec *rem)
     return g_fn.nanosleep(req, rem);
 }
 
-EXPORTOFF int
+EXPORTON int
 select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
 {
+    stopTimer();
     WRAP_CHECK(select, -1);
     return g_fn.select(nfds, readfds, writefds, exceptfds, timeout);
 }
@@ -1163,11 +1176,20 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
 }
 
 #ifdef __LINUX__
-EXPORTOFF int
+EXPORTON int
 epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 {
+    stopTimer();
     WRAP_CHECK(epoll_wait, -1);
     return g_fn.epoll_wait(epfd, events, maxevents, timeout);
+}
+
+EXPORTON int
+poll(struct pollfd *fds, nfds_t nfds, int timeout)
+{
+    stopTimer();
+    WRAP_CHECK(epoll_wait, -1);
+    return g_fn.poll(fds, nfds, timeout);
 }
 
 EXPORTON int

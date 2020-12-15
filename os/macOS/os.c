@@ -146,3 +146,9 @@ osGetPageProt(uint64_t addr)
 {
     return -1;
 }
+
+bool
+osTimerStop(void)
+{
+    return TRUE;
+}

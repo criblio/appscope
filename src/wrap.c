@@ -644,8 +644,10 @@ doReset()
     g_thread.startTime = time(NULL) + g_thread.interval;
 
     resetState();
-    ctlDestroy(&g_ctl);
-    g_ctl = initCtl(g_staticfg);
+
+    logReconnect(g_log);
+    mtcReconnect(g_mtc);
+    ctlReconnect(g_ctl);
 
     atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
 

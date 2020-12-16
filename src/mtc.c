@@ -91,6 +91,13 @@ mtcDisconnect(mtc_t *mtc)
     return transportDisconnect(mtc->transport);
 }
 
+int
+mtcReconnect(mtc_t *mtc)
+{
+    if (!mtc) return 0;
+    return transportReconnect(mtc->transport);
+}
+
 void
 mtcEnabledSet(mtc_t *mtc, unsigned val)
 {

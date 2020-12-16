@@ -109,6 +109,7 @@ int              ctlNeedsConnection(ctl_t *);
 int              ctlConnection(ctl_t *);
 int              ctlConnect(ctl_t *);
 int              ctlClose(ctl_t *);
+int              ctlReconnect(ctl_t *);
 void             ctlTransportSet(ctl_t *, transport_t *);
 void             ctlEvtSet(ctl_t *, evt_fmt_t *);
 cfg_transport_t  ctlTransportType(ctl_t *);

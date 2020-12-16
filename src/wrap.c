@@ -633,8 +633,10 @@ doReset()
     threadInit();
 
     resetState();
-    ctlDestroy(&g_ctl);
-    g_ctl = initCtl(g_staticfg);
+
+    logReconnect(g_log);
+    mtcReconnect(g_mtc);
+    ctlReconnect(g_ctl);
 
     reportProcessStart();
 }

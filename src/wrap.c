@@ -251,7 +251,7 @@ remoteConfig()
 
     fds.fd = ctlConnection(g_ctl);
 
-    rc = poll(&fds, 1, timeout);
+    rc = g_fn.poll(&fds, 1, timeout);
 
     /*
      * Error from poll;
@@ -469,7 +469,8 @@ dynConfig(void)
 }
 
 static void
-threadNow(int sig) {
+threadNow(int sig)
+{
     static uint64_t serialize;
 
     if (!atomicCasU64(&serialize, 0ULL, 1ULL)) return;
@@ -1047,28 +1048,6 @@ init(void)
     osInitJavaAgent();
 }
 
-EXPORTOFF int
-nanosleep(const struct timespec *req, struct timespec *rem)
-{
-    WRAP_CHECK(nanosleep, -1);
-    return g_fn.nanosleep(req, rem);
-}
-
-EXPORTON int
-select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
-{
-    stopTimer();
-    WRAP_CHECK(select, -1);
-    return g_fn.select(nfds, readfds, writefds, exceptfds, timeout);
-}
-
-EXPORTOFF int
-sigsuspend(const sigset_t *mask)
-{
-    WRAP_CHECK(sigsuspend, -1);
-    return g_fn.sigsuspend(mask);
-}
-
 EXPORTON int
 sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 {
@@ -1177,6 +1156,30 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
 
 #ifdef __LINUX__
 EXPORTON int
+nanosleep(const struct timespec *req, struct timespec *rem)
+{
+    stopTimer();
+    WRAP_CHECK(nanosleep, -1);
+    return g_fn.nanosleep(req, rem);
+}
+
+EXPORTON int
+select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
+{
+    stopTimer();
+    WRAP_CHECK(select, -1);
+    return g_fn.select(nfds, readfds, writefds, exceptfds, timeout);
+}
+
+EXPORTON int
+sigsuspend(const sigset_t *mask)
+{
+    stopTimer();
+    WRAP_CHECK(sigsuspend, -1);
+    return g_fn.sigsuspend(mask);
+}
+
+EXPORTON int
 epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 {
     stopTimer();
@@ -1190,6 +1193,120 @@ poll(struct pollfd *fds, nfds_t nfds, int timeout)
     stopTimer();
     WRAP_CHECK(epoll_wait, -1);
     return g_fn.poll(fds, nfds, timeout);
+}
+
+EXPORTON int
+pause(void)
+{
+    stopTimer();
+    WRAP_CHECK(pause, -1);
+    return g_fn.pause();
+}
+
+EXPORTON int
+sigwaitinfo(const sigset_t *set, siginfo_t *info)
+{
+    stopTimer();
+    WRAP_CHECK(sigwaitinfo, -1);
+    return g_fn.sigwaitinfo(set, info);
+}
+
+EXPORTON int
+sigtimedwait(const sigset_t *set, siginfo_t *info,
+             const struct timespec *timeout)
+{
+    stopTimer();
+    WRAP_CHECK(sigtimedwait, -1);
+    return g_fn.sigtimedwait(set, info, timeout);
+}
+
+EXPORTON int
+epoll_pwait(int epfd, struct epoll_event *events,
+            int maxevents, int timeout,
+            const sigset_t *sigmask)
+{
+    stopTimer();
+    WRAP_CHECK(epoll_pwait, -1);
+    return g_fn.epoll_pwait(epfd, events, maxevents, timeout, sigmask);
+}
+
+EXPORTON int
+ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
+      const sigset_t *sigmask)
+{
+    stopTimer();
+    WRAP_CHECK(ppoll, -1);
+    return g_fn.ppoll(fds, nfds, tmo_p, sigmask);
+}
+
+EXPORTON int
+pselect(int nfds, fd_set *readfds, fd_set *writefds,
+        fd_set *exceptfds, const struct timespec *timeout,
+        const sigset_t *sigmask)
+{
+    stopTimer();
+    WRAP_CHECK(pselect, -1);
+    return g_fn.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask);
+}
+
+EXPORTON int
+msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg)
+{
+    stopTimer();
+    WRAP_CHECK(msgsnd, -1);
+    return g_fn.msgsnd(msqid, msgp, msgsz, msgflg);
+}
+
+EXPORTON ssize_t
+msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg)
+{
+    stopTimer();
+    WRAP_CHECK(msgrcv, -1);
+    return g_fn.msgrcv(msqid, msgp, msgsz, msgtyp, msgflg);
+}
+
+EXPORTON int
+semop(int semid, struct sembuf *sops, size_t nsops)
+{
+    stopTimer();
+    WRAP_CHECK(semop, -1);
+    return g_fn.semop(semid, sops, nsops);
+}
+
+EXPORTON int
+semtimedop(int semid, struct sembuf *sops, size_t nsops,
+           const struct timespec *timeout)
+{
+    stopTimer();
+    WRAP_CHECK(semtimedop, -1);
+    return g_fn.semtimedop(semid, sops, nsops, timeout);
+}
+
+EXPORTON int
+clock_nanosleep(clockid_t clockid, int flags,
+                const struct timespec *request,
+                struct timespec *remain)
+{
+    stopTimer();
+    WRAP_CHECK(clock_nanosleep, -1);
+    return g_fn.clock_nanosleep(clockid, flags, request, remain);
+}
+
+EXPORTON int
+usleep(useconds_t usec)
+{
+    stopTimer();
+    WRAP_CHECK(usleep, -1);
+    return g_fn.usleep(usec);
+}
+
+EXPORTON int
+io_getevents(io_context_t ctx_id, long min_nr, long nr,
+             struct io_event *events, struct timespec *timeout)
+{
+    stopTimer();
+    WRAP_CHECK(io_getevents, -1);
+    return g_fn.io_getevents(ctx_id, min_nr, nr, events, timeout);
 }
 
 EXPORTON int

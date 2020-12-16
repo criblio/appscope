@@ -58,6 +58,5 @@ extern void osInitJavaAgent(void);
 extern int osGetPageProt(unsigned long);
 extern char *osGetExePath();
 extern bool osTimerStop(void);
-extern bool osTimerRunning(void);
 
 #endif  //__OS_H__

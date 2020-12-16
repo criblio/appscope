@@ -473,32 +473,12 @@ out:
 }
 
 bool
-osTimerRunning(void)
-{
-    return g_timerid == 0 ? FALSE : TRUE;
-}
-
-bool
 osTimerStop(void)
 {
 
     if (g_timerid) {
-        struct sigaction sact;
-
         timer_delete(g_timerid);
         g_timerid = 0;
-
-        sigemptyset(&sact.sa_mask);
-        sact.sa_handler = SIG_DFL;
-        sact.sa_flags = SA_RESTART;
-
-        if (!g_fn.sigaction) return FALSE;
-
-        if (g_fn.sigaction(SIGUSR2, &sact, NULL) == -1) {
-            DBG("errno %d", errno);
-            return FALSE;
-        }
-
         return TRUE;
     }
 
@@ -510,41 +490,7 @@ osThreadInit(void(*handler)(int), unsigned interval)
 {
     struct sigaction sact;
     struct sigevent sevent = {0};
-    //timer_t timerid = 0;
     struct itimerspec tspec;
-#if 0
-    bool delay = FALSE;
-    char *cmd;
-
-    if (osGetCmdline(getpid(), &cmd) && cmd) {
-        char *save = NULL, *this = NULL;
-        for (this = strtok_r(thread_delay_list, ":", &save);
-             this != NULL;
-             this = strtok_r(NULL, ":", &save)) {
-            if (this && strstr(cmd, this)) {
-                delay = TRUE;
-                break;
-            }
-        }
-
-        char *envlist = getenv(THREAD_DELAY_LIST);
-        if (envlist) {
-            for (this = strtok_r(envlist, ":", &save);
-                 this != NULL;
-                 this = strtok_r(NULL, ":", &save)) {
-                if (this && strstr(cmd, this)) {
-                    delay = TRUE;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (delay == FALSE) {
-        handler(0);
-        return TRUE;
-    }
-#endif
     sigemptyset(&sact.sa_mask);
     sact.sa_handler = handler;
     sact.sa_flags = SA_RESTART;
@@ -558,6 +504,7 @@ osThreadInit(void(*handler)(int), unsigned interval)
 
     sevent.sigev_notify = SIGEV_SIGNAL;
     sevent.sigev_signo = SIGUSR2;
+
     if (timer_create(CLOCK_MONOTONIC, &sevent, &g_timerid) == -1) {
         DBG("errno %d", errno);
         return FALSE;

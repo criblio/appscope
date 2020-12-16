@@ -2054,8 +2054,94 @@ doPayload()
     while ((data = msgPayloadGet(g_ctl)) != -1) {
         if (data) {
             payload_info *pinfo = (payload_info *)data;
+            net_info *net = &pinfo->net;
 
-            cmdSendPayload(g_ctl, pinfo->data, pinfo->len);
+            //{"procid":"host-proc-cmd","pid":1234,"ppid":1233,"fd":20,"src":"rx/tx","sid":1234,"len":1234,'lip':'192.168.1.102','lport':65536,'rip':'192.168.1.103','rport':80}\n
+
+            size_t hlen = strlen("{'procid':'','pid':,'ppid':,'fd':,'src':'rx/tx','sid':,'len':'lip':'','lport':,'rip':'','rport':}\n") +
+                strlen(g_proc.id) + (sizeof(uint64_t) * 5) + (32 * 2) + (8 * 2) + 2;
+            //                                                IP addrs   ports
+
+            char *pay = calloc(1, hlen + pinfo->len);
+            if (!pay) return;
+
+            char *srcstr = NULL, rx[]="rx", tx[]="tx", none[]="none";
+
+            switch (pinfo->src) {
+            case NETTX:
+            case TLSTX:
+                srcstr = tx;
+                break;
+
+            case NETRX:
+            case TLSRX:
+                srcstr = rx;
+                break;
+
+            default:
+                srcstr = none;
+                break;
+            }
+
+            // TODO: turn this into a reusable function
+            in_port_t lport, rport;
+            char lip[INET6_ADDRSTRLEN];
+            char rip[INET6_ADDRSTRLEN];
+
+            if (net) {
+                lport = get_port_net(net, net->localConn.ss_family, LOCAL);
+                rport = get_port_net(net, net->remoteConn.ss_family, REMOTE);
+
+                if (net->localConn.ss_family == AF_INET) {
+                    if (inet_ntop(AF_INET,
+                                  &((struct sockaddr_in *)&net->localConn)->sin_addr,
+                                  lip, sizeof(lip)) == NULL) {
+                        strncpy(lip, "af_inte err", sizeof(lip));
+                    }
+                } else if (net->localConn.ss_family == AF_INET6) {
+                    if (inet_ntop(AF_INET6,
+                                  &((struct sockaddr_in6 *)&net->localConn)->sin6_addr,
+                                  lip, sizeof(lip)) == NULL) {
+                        strncpy(lip, "af_inte6 err", sizeof(lip));
+                    }
+                } else {
+                    strncpy(lip, "not net", sizeof(lip));
+                }
+
+                if (net->remoteConn.ss_family == AF_INET) {
+                    if (inet_ntop(AF_INET,
+                                  &((struct sockaddr_in *)&net->remoteConn)->sin_addr,
+                                  rip, sizeof(rip)) == NULL) {
+                        strncpy(rip, "af_inet err", sizeof(rip));
+                    }
+                } else if (net->remoteConn.ss_family == AF_INET6) {
+                    if (inet_ntop(AF_INET6,
+                                  &((struct sockaddr_in6 *)&net->remoteConn)->sin6_addr,
+                                  rip, sizeof(rip)) == NULL) {
+                        strncpy(rip, "af_inet6 err", sizeof(rip));
+                    }
+                } else {
+                    strncpy(rip, "not net", sizeof(rip));
+                }
+            } else {
+                strncpy(lip, "na", sizeof(rip));
+                strncpy(rip, "na", sizeof(rip));
+                lport = rport = 0;
+            }
+
+            uint64_t netid = (net != NULL) ? net->uid : 0;
+            snprintf(pay, hlen,
+                     "{\"procid\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"sid\":%ld,\"len\":%ld,\"lip\":\"%s\",\"lport\":%d,\"rip\":\"%s\",\"rport\":%d}\n",
+                     g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport);
+
+            if (strlen(pay) <= hlen) {
+                hlen = strlen(pay) + 1;
+            }
+
+            memmove(&pay[hlen], pinfo->data, pinfo->len);
+
+            cmdSendPayload(g_ctl, pay, pinfo->len + hlen);
+            if (pay) free(pay);
             if (pinfo->data) free(pinfo->data);
             if (pinfo) free(pinfo);
         }

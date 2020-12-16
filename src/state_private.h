@@ -144,12 +144,6 @@ typedef struct {
     httpId_t id;
 } http_state_t;
 
-typedef struct payload_info_t {
-    metric_t evtype;
-    size_t len;
-    char *data;
-} payload_info;
-
 typedef struct net_info_t {
     metric_t evtype;
     metric_t data_type;
@@ -198,6 +192,15 @@ typedef struct fs_info_t {
     char path[PATH_MAX];
     char funcop[FUNC_MAX];
 } fs_info;
+
+typedef struct payload_info_t {
+    metric_t evtype;
+    metric_t src;
+    int sockfd;
+    net_info net;
+    size_t len;
+    char *data;
+} payload_info;
 
 // Accessor functions defined in state.c, but used in report.c too.
 int get_port(int, int, control_type_t);

@@ -848,53 +848,26 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
 static int
 extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
-    //{"procid":"host-proc-cmd","pid":1234,"ppid":1233,"fd":20,"src":"rx/tx","sid":1234,"len":1234}
-
     if (!buf || (len <= 0) || (checkEnv(PAYLOAD_ENV, PAYLOAD_VAL) == FALSE)) return -1;
-
-    size_t hlen = strlen("{'procid':'','pid':,'ppid':,'fd':,'src':'rx/tx','sid':,'len':}") +
-                  strlen(g_proc.id) + (sizeof(uint64_t) * 5) + 2;
-    char *pay = calloc(1, hlen + len);
-    if (!pay) return -1;
 
     payload_info *pinfo = calloc(1, sizeof(struct payload_info_t));
     if (!pinfo) {
-        free(pay);
         return -1;
     }
 
-    char *srcstr = NULL, rx[]="rx", tx[]="tx", none[]="none";
-
-    switch (src) {
-    case NETTX:
-    case TLSTX:
-        srcstr = tx;
-        break;
-
-    case NETRX:
-    case TLSRX:
-        srcstr = rx;
-        break;
-
-    default:
-        srcstr = none;
-        break;
+    pinfo->data = calloc(1, len);
+    if (!pinfo->data) {
+        free(pinfo);
+        return -1;
     }
 
-    uint64_t netid = (net != NULL) ? net->uid : 0;
-    snprintf(pay, hlen,
-             "{\"procid\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"sid\":%ld,\"len\":%ld}",
-             g_proc.id, g_proc.pid, g_proc.ppid, sockfd, srcstr, netid, len);
-
-    if (strlen(pay) <= hlen) {
-        hlen = strlen(pay) + 1;
-    }
-
-    memmove(&pay[hlen], buf, len);
+    memmove(pinfo->data, buf, len);
+    memmove(&pinfo->net, net, sizeof(net_info));
 
     pinfo->evtype = EVT_PAYLOAD;
-    pinfo->len = hlen + len;
-    pinfo->data = pay;
+    pinfo->src = src;
+    pinfo->sockfd = sockfd;
+    pinfo->len = len;
 
     cmdPostPayload(g_ctl, (char *)pinfo);
     return 0;

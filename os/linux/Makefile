@@ -16,7 +16,7 @@ PCRE2_AR=contrib/pcre2/build/libpcre2-posix.a contrib/pcre2/build/libpcre2-8.a
 TEST_AR=$(YAML_AR) $(JSON_AR) $(PCRE2_AR)
 TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
-TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
+TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl -lrt
 
 .PHONY: all clean test
 all: libscope.so scope

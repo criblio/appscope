@@ -8,6 +8,19 @@
 #include "evtformat.h"
 #include "com.h"
 
+
+// This is ugly, but...
+// In glibc 2.27 (ubuntu 18.04) and earlier clock_gettime
+// resolved to 'clock_gettime@@GLIBC_2.2.5'.
+// In glibc 2.31 (ubuntu 20.04), it's now 'clock_gettime@@GLIBC_2.17'.
+// This voodoo avoids creating binaries which would require a glibc
+// that's 2.31 or newer, even if built on new ubuntu 20.04.
+// This is tested by test/glibcvertest.c.
+#ifdef __LINUX__
+__asm__(".symver clock_gettime,clock_gettime@GLIBC_2.2.5");
+#endif
+
+
 // key names for event JSON
 #define HOST "host"
 #define TIME "_time"
@@ -325,9 +338,9 @@ rateLimitMessage(proc_id_t *proc, watch_t src)
 {
     event_format_t event;
 
-    struct timeb tb;
-    ftime(&tb);
-    event.timestamp = tb.time + tb.millitm/1000;
+    struct timespec tb;
+    clock_gettime(CLOCK_REALTIME, &tb);
+    event.timestamp = tb.tv_sec + (double)tb.tv_nsec/1000000000;
     event.src = "notice";
     event.proc = proc;
     event.uid = 0ULL;
@@ -432,7 +445,7 @@ static cJSON *
 evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, watch_t src)
 {
     event_format_t event;
-    struct timeb tb;
+    struct timespec tb;
     time_t now;
     
     regex_t *filter;
@@ -467,8 +480,8 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
         return NULL;
     }
 
-    ftime(&tb);
-    event.timestamp = tb.time + tb.millitm/1000;
+    clock_gettime(CLOCK_REALTIME, &tb);
+    event.timestamp = tb.tv_sec + (double)tb.tv_nsec/1000000000;
     event.src = metric->name;
     event.proc = proc;
     event.uid = uid;
@@ -498,7 +511,7 @@ evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
        uint64_t uid, proc_id_t* proc)
 {
     event_format_t event;
-    struct timeb tb;
+    struct timespec tb;
     watch_t logType;
 
     if (!evt || !path || !buf || !proc) return NULL;
@@ -516,8 +529,8 @@ evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
         return NULL;
     }
 
-    ftime(&tb);
-    event.timestamp = tb.time + tb.millitm/1000;
+    clock_gettime(CLOCK_REALTIME, &tb);
+    event.timestamp = tb.tv_sec + (double)tb.tv_nsec/1000000000;
     event.src = path;
     event.proc = proc;
     event.uid = uid;

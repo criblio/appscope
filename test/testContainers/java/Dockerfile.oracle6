@@ -1,4 +1,4 @@
-FROM centos:6
+FROM centos:7
 
 ADD https://cdn.cribl.io/dl/lb/java/jre/jre-6u45-linux-x64-rpm.bin /tmp/jre-rpm.bin
 WORKDIR /tmp
@@ -50,5 +50,3 @@ ENV CURL_PARAMS="--ciphers rsa_aes_128_sha"
 
 CMD /opt/test-runner/bin/test-ssl.sh
 #CMD tail -f /dev/null
-    
-    

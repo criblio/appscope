@@ -2140,7 +2140,7 @@ doPayload()
                 hlen = strlen(pay) + 1;
             }
 
-            char *bdata;
+            char *bdata = NULL;
             size_t len;
 
             if (lsbin == TRUE) {
@@ -2162,14 +2162,8 @@ doPayload()
                 cJSON *jdata = cJSON_CreateStringFromBuffer(pinfo->data, pinfo->len);
                 cJSON_AddItemToObjectCS(json, "data", jdata);
                 char *sdata = cJSON_PrintUnformatted(json);
-                bdata = calloc(1, hlen + strlen(sdata) + 2);
-                if (bdata){
-                    memmove(bdata, pay, hlen);
-                    strncat(bdata, (const char *)sdata, strlen(sdata));
-                    strncat(bdata, "\n", hlen);
-
-                    len = hlen + strlen(sdata);
-
+                if (sdata) {
+                    len = strlen(sdata);
                     ///tmp/<splunk-pid>/<src_host:src_port:dst_port>.in
                     switch (pinfo->src) {
                     case NETTX:
@@ -2188,7 +2182,7 @@ doPayload()
                     }
 
                     if ((fd = g_fn.open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)) != -1) {
-                        g_fn.write(fd, bdata, len);
+                        g_fn.write(fd, sdata, len);
                         g_fn.close(fd);
                     }
                 }

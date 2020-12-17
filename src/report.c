@@ -10,6 +10,7 @@
 #include "atomic.h"
 #include "com.h"
 #include "dbg.h"
+#include "fn.h"
 #include "httpagg.h"
 #include "mtcformat.h"
 #include "os.h"
@@ -2050,6 +2051,8 @@ doEvent()
 void
 doPayload()
 {
+    bool lsbin = TRUE;
+    bool filebin = TRUE;
     uint64_t data;
     while ((data = msgPayloadGet(g_ctl)) != -1) {
         if (data) {
@@ -2062,9 +2065,7 @@ doPayload()
                 strlen(g_proc.id) + (sizeof(uint64_t) * 5) + (32 * 2) + (8 * 2) + 2;
             //                                                IP addrs   ports
 
-            char *pay = calloc(1, hlen + pinfo->len);
-            if (!pay) return;
-
+            char pay[hlen];
             char *srcstr = NULL, rx[]="rx", tx[]="tx", none[]="none";
 
             switch (pinfo->src) {
@@ -2105,7 +2106,7 @@ doPayload()
                         strncpy(lip, "af_inte6 err", sizeof(lip));
                     }
                 } else {
-                    strncpy(lip, "not net", sizeof(lip));
+                    strncpy(lip, "not_net", sizeof(lip));
                 }
 
                 if (net->remoteConn.ss_family == AF_INET) {
@@ -2121,7 +2122,7 @@ doPayload()
                         strncpy(rip, "af_inet6 err", sizeof(rip));
                     }
                 } else {
-                    strncpy(rip, "not net", sizeof(rip));
+                    strncpy(rip, "not_net", sizeof(rip));
                 }
             } else {
                 strncpy(lip, "na", sizeof(rip));
@@ -2131,17 +2132,69 @@ doPayload()
 
             uint64_t netid = (net != NULL) ? net->uid : 0;
             snprintf(pay, hlen,
-                     "{\"procid\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"sid\":%ld,\"len\":%ld,\"lip\":\"%s\",\"lport\":%d,\"rip\":\"%s\",\"rport\":%d}\n",
+                     "{\"procid\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"sid\":%ld,\"len\":%ld,\"lip\":\"%s\",\"lport\":%d,\"rip\":\"%s\",\"rport\":%d}",
                      g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport);
 
             if (strlen(pay) <= hlen) {
                 hlen = strlen(pay) + 1;
             }
 
-            memmove(&pay[hlen], pinfo->data, pinfo->len);
+            char *bdata;
+            size_t len;
 
-            cmdSendPayload(g_ctl, pay, pinfo->len + hlen);
-            if (pay) free(pay);
+            if (lsbin == TRUE) {
+                bdata = calloc(1, hlen + pinfo->len);
+                if (bdata) {
+                    memmove(bdata, pay, hlen);
+                    strncat(bdata, "\n", hlen);
+                    memmove(&bdata[hlen], pinfo->data, pinfo->len);
+                    len = hlen + pinfo->len;
+                    cmdSendPayload(g_ctl, bdata, len);
+                }
+            }
+
+            if (filebin == TRUE) {
+                int fd;
+                char path[PATH_MAX];
+
+                cJSON *json = cJSON_CreateObject();
+                cJSON *jdata = cJSON_CreateStringFromBuffer(pinfo->data, pinfo->len);
+                cJSON_AddItemToObjectCS(json, "data", jdata);
+                char *sdata = cJSON_PrintUnformatted(json);
+                bdata = calloc(1, hlen + strlen(sdata) + 2);
+                if (bdata){
+                    memmove(bdata, pay, hlen);
+                    strncat(bdata, (const char *)sdata, strlen(sdata));
+                    strncat(bdata, "\n", hlen);
+
+                    len = hlen + strlen(sdata);
+
+                    ///tmp/<splunk-pid>/<src_host:src_port:dst_port>.in
+                    switch (pinfo->src) {
+                    case NETTX:
+                    case TLSTX:
+                        snprintf(path, PATH_MAX, "/tmp/%d_%s:%d:%d.out", g_proc.pid, rip, lport, rport);
+                        break;
+
+                    case NETRX:
+                    case TLSRX:
+                        snprintf(path, PATH_MAX, "/tmp/%d_%s:%d:%d.in", g_proc.pid, rip, rport, lport);
+                        break;
+
+                    default:
+                        snprintf(path, PATH_MAX, "/tmp/%d.na", g_proc.pid);
+                        break;
+                    }
+
+                    if ((fd = g_fn.open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)) != -1) {
+                        g_fn.write(fd, bdata, len);
+                        g_fn.close(fd);
+                    }
+                }
+                if (json) free(json);
+            }
+
+            if (bdata) free(bdata);
             if (pinfo->data) free(pinfo->data);
             if (pinfo) free(pinfo);
         }

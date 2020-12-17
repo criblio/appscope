@@ -2060,9 +2060,9 @@ doPayload()
             payload_info *pinfo = (payload_info *)data;
             net_info *net = &pinfo->net;
 
-            //{"procid":"host-proc-cmd","pid":1234,"ppid":1233,"fd":20,"src":"rx/tx","sid":1234,"len":1234,'lip':'192.168.1.102','lport':65536,'rip':'192.168.1.103','rport':80}\n
+            //{"id":"host-proc-cmd","pid":1234,"ppid":1233,"fd":20,"src":"rx/tx","_channel":1234,"len":1234,'localip':'192.168.1.102','localp':65536,'remoteip':'192.168.1.103','remotep':80}\n
 
-            size_t hlen = strlen("{'procid':'','pid':,'ppid':,'fd':,'src':'rx/tx','sid':,'len':'lip':'','lport':,'rip':'','rport':}\n") +
+            size_t hlen = strlen("{'id':'','pid':,'ppid':,'fd':,'src':'rx/tx','_channel':,'len':'localip':'','localp':,'remoteip':'','remotep':}\n") +
                 strlen(g_proc.id) + (sizeof(uint64_t) * 5) + (32 * 2) + (8 * 2) + 2;
             //                                                IP addrs   ports
 
@@ -2133,7 +2133,7 @@ doPayload()
 
             uint64_t netid = (net != NULL) ? net->uid : 0;
             snprintf(pay, hlen,
-                     "{\"procid\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"sid\":%ld,\"len\":%ld,\"lip\":\"%s\",\"lport\":%d,\"rip\":\"%s\",\"rport\":%d}",
+                     "{\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%d,\"remoteip\":\"%s\",\"remotep\":%d}",
                      g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport);
 
             if (strlen(pay) <= hlen) {

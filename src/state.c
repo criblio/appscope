@@ -1157,7 +1157,8 @@ doSetAddrs(int sockfd)
     // Only do this if output is enabled
     int need_to_track_addrs =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
-        (mtcEnabled(g_mtc) && g_mtc_addr_output);
+        (mtcEnabled(g_mtc) && g_mtc_addr_output) ||
+        checkEnv(PAYLOAD_ENV, PAYLOAD_VAL);
     if (!need_to_track_addrs) return 0;
 
     /*

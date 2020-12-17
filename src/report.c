@@ -2158,35 +2158,27 @@ doPayload()
                 int fd;
                 char path[PATH_MAX];
 
-                cJSON *json = cJSON_CreateObject();
-                cJSON *jdata = cJSON_CreateStringFromBuffer(pinfo->data, pinfo->len);
-                cJSON_AddItemToObjectCS(json, "data", jdata);
-                char *sdata = cJSON_PrintUnformatted(json);
-                if (sdata) {
-                    len = strlen(sdata);
-                    ///tmp/<splunk-pid>/<src_host:src_port:dst_port>.in
-                    switch (pinfo->src) {
-                    case NETTX:
-                    case TLSTX:
-                        snprintf(path, PATH_MAX, "/tmp/%d_%s:%d:%d.out", g_proc.pid, rip, lport, rport);
-                        break;
+                ///tmp/<splunk-pid>/<src_host:src_port:dst_port>.in
+                switch (pinfo->src) {
+                case NETTX:
+                case TLSTX:
+                    snprintf(path, PATH_MAX, "/tmp/%d_%s:%d:%d.out", g_proc.pid, rip, lport, rport);
+                    break;
 
-                    case NETRX:
-                    case TLSRX:
-                        snprintf(path, PATH_MAX, "/tmp/%d_%s:%d:%d.in", g_proc.pid, rip, rport, lport);
-                        break;
+                case NETRX:
+                case TLSRX:
+                    snprintf(path, PATH_MAX, "/tmp/%d_%s:%d:%d.in", g_proc.pid, rip, rport, lport);
+                    break;
 
-                    default:
-                        snprintf(path, PATH_MAX, "/tmp/%d.na", g_proc.pid);
-                        break;
-                    }
-
-                    if ((fd = g_fn.open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)) != -1) {
-                        g_fn.write(fd, sdata, len);
-                        g_fn.close(fd);
-                    }
+                default:
+                    snprintf(path, PATH_MAX, "/tmp/%d.na", g_proc.pid);
+                    break;
                 }
-                if (json) free(json);
+
+                if ((fd = g_fn.open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)) != -1) {
+                    g_fn.write(fd, pinfo->data, pinfo->len);
+                    g_fn.close(fd);
+                }
             }
 
             if (bdata) free(bdata);

@@ -1,4 +1,4 @@
-FROM centos:6
+FROM centos:7
 
 RUN yum -y update
 RUN yum -y install centos-release-scl
@@ -43,3 +43,4 @@ COPY ./test_runner /opt/test-runner/
 COPY ./interposed_func/syscall_tests_conf.json /opt/test-runner/syscall_tests_conf.json
 
 ENTRYPOINT ["/opt/test-runner/bin/python", "/opt/test-runner/app.py", "--target", "syscalls","-l","/opt/test-runner/logs/", "--syscalls_tests_config", "/opt/test-runner/syscall_tests_conf.json"]
+#ENTRYPOINT ["tail", "-f", "/dev/null"]

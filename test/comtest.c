@@ -123,8 +123,8 @@ msgStartHasExpectedSubNodes(void** state)
                       .procname = "comtest",
                       .cmd = "cmd",
                       .id = "host-comtest-cmd"};
-    config_t* cfg = cfgCreateDefault();
-    cJSON* json;
+    config_t *cfg = cfgCreateDefault();
+    cJSON *json;
 
     json = msgStart(NULL, NULL);
     assert_null(json);
@@ -135,14 +135,24 @@ msgStartHasExpectedSubNodes(void** state)
     json = msgStart(&proc, cfg);
     assert_non_null(json);
 
-    assert_non_null(cJSON_GetObjectItem(json, "process"));
-    assert_non_null(cJSON_GetObjectItem(json, "configuration"));
-    assert_non_null(cJSON_GetObjectItem(json, "environment"));
+    // Make sure there is a "format" field, with value "ndjson"
+    cJSON *format = cJSON_GetObjectItem(json, "format");
+    assert_non_null(format);
+    assert_string_equal("ndjson", cJSON_GetStringValue(format));
+
+    // Make sure there is an "info" field
+    cJSON *info = cJSON_GetObjectItem(json, "info");
+    assert_non_null(info);
+
+    // Make sure the contents of "info" contain the basics
+    assert_non_null(cJSON_GetObjectItem(info, "process"));
+    assert_non_null(cJSON_GetObjectItem(info, "configuration"));
+    assert_non_null(cJSON_GetObjectItem(info, "environment"));
 
     /*
     char* str = cJSON_Print(json);
     assert_non_null(str);
-    printf(str);
+    printf("%s\n", str);
     free(str);
     */
 

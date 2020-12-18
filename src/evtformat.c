@@ -8,6 +8,19 @@
 #include "evtformat.h"
 #include "com.h"
 
+
+// This is ugly, but...
+// In glibc 2.27 (ubuntu 18.04) and earlier clock_gettime
+// resolved to 'clock_gettime@@GLIBC_2.2.5'.
+// In glibc 2.31 (ubuntu 20.04), it's now 'clock_gettime@@GLIBC_2.17'.
+// This voodoo avoids creating binaries which would require a glibc
+// that's 2.31 or newer, even if built on new ubuntu 20.04.
+// This is tested by test/glibcvertest.c.
+//#ifdef __LINUX__
+//__asm__(".symver clock_gettime,clock_gettime@GLIBC_2.2.5");
+//#endif
+
+
 // key names for event JSON
 #define HOST "host"
 #define TIME "_time"
@@ -327,7 +340,7 @@ rateLimitMessage(proc_id_t *proc, watch_t src)
 
     struct timeb tb;
     ftime(&tb);
-    event.timestamp = tb.time + tb.millitm/1000;
+    event.timestamp = tb.time + (double)tb.millitm/1000;
     event.src = "notice";
     event.proc = proc;
     event.uid = 0ULL;
@@ -468,7 +481,7 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
     }
 
     ftime(&tb);
-    event.timestamp = tb.time + tb.millitm/1000;
+    event.timestamp = tb.time + (double)tb.millitm/1000;
     event.src = metric->name;
     event.proc = proc;
     event.uid = uid;
@@ -517,7 +530,7 @@ evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
     }
 
     ftime(&tb);
-    event.timestamp = tb.time + tb.millitm/1000;
+    event.timestamp = tb.time + (double)tb.millitm/1000;
     event.src = path;
     event.proc = proc;
     event.uid = uid;

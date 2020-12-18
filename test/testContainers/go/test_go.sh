@@ -402,6 +402,12 @@ influx_eval() {
 # script that will run stress, Commentend out here.
 #
 sleep 1
+
+# This test has race conditions where it closes sockets
+# while other threads are reading/writing data on them.
+# SCOPE_HTTP_SERIALIZE_ENABLE ensures that a close and
+# read/write can't happen at the same time.
+export SCOPE_HTTP_SERIALIZE_ENABLE=true
 starttest influx_static_stress
 
 influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
@@ -409,6 +415,8 @@ influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
 SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope /go/influx/stress_test insert -n 1000000 -f
 
 influx_eval 50 scope
+
+unset SCOPE_HTTP_SERIALIZE_ENABLE
 
 #
 # influx static TLS test

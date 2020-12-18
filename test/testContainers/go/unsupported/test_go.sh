@@ -7,6 +7,8 @@ FAILED_TEST_COUNT=0
 
 EVT_FILE="/go/events.log"
 touch $EVT_FILE
+STDERR_FILE="/go/stdout.txt"
+touch $STDERR_FILE
 
 starttest(){
     CURRENT_TEST=$1
@@ -40,6 +42,7 @@ endtest(){
     fi
 
     rm $EVT_FILE
+    rm $STDERR_FILE
 }
 
 
@@ -49,15 +52,24 @@ endtest(){
 starttest plainServerDynamic
 cd /go/net
 PORT=80
-scope ./plainServerDynamic ${PORT}
-SCOPE_RET=$?
+scope ./plainServerDynamic ${PORT} 2>${STDERR_FILE} &
+
+# this sleep gives the server a chance to bind to the port
+# before we try to hit it with curl
+sleep 0.5
+curl http://localhost:${PORT}/hello
+ERR+=$?
+
+# This stops plainServerDynamic
+pkill -f plainServerDynamic
+
+# this sleep gives plainServerDynamic a chance to report its events on exit
+sleep 0.5
 
 evaltest
 
-# we expect a non-zero return code.
-if [ $SCOPE_RET -eq 0 ]; then
-    ERR+=1
-fi
+grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+ERR+=$?
 
 endtest
 
@@ -68,15 +80,24 @@ endtest
 starttest plainServerStatic
 cd /go/net
 PORT=81
-scope ./plainServerStatic ${PORT}
-SCOPE_RET=$?
+scope ./plainServerStatic ${PORT} 2>${STDERR_FILE} &
+
+# this sleep gives the server a chance to bind to the port
+# before we try to hit it with curl
+sleep 0.5
+curl http://localhost:${PORT}/hello
+ERR+=$?
+
+# This stops plainServerStatic
+pkill -f plainServerStatic
+
+# this sleep gives plainServerStatic a chance to report its events on exit
+sleep 0.5
 
 evaltest
 
-# we expect a non-zero return code.
-if [ $SCOPE_RET -eq 0 ]; then
-    ERR+=1
-fi
+grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+ERR+=$?
 
 endtest
 
@@ -87,15 +108,24 @@ endtest
 starttest tlsServerDynamic
 cd /go/net
 PORT=4430
-scope ./tlsServerDynamic ${PORT}
-SCOPE_RET=$?
+scope ./tlsServerDynamic ${PORT} 2>${STDERR_FILE} &
+
+# this sleep gives the server a chance to bind to the port
+# before we try to hit it with curl
+sleep 0.5
+curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
+ERR+=$?
+
+# This stops tlsServerDynamic
+pkill -f tlsServerDynamic
+
+# this sleep gives tlsServerDynamic a chance to report its events on exit
+sleep 0.5
 
 evaltest
 
-# we expect a non-zero return code.
-if [ $SCOPE_RET -eq 0 ]; then
-    ERR+=1
-fi
+grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+ERR+=$?
 
 endtest
 
@@ -106,15 +136,24 @@ endtest
 starttest tlsServerStatic
 cd /go/net
 PORT=4431
-scope ./tlsServerStatic ${PORT}
-SCOPE_RET=$?
+scope ./tlsServerStatic ${PORT} 2>${STDERR_FILE} &
+
+# this sleep gives the server a chance to bind to the port
+# before we try to hit it with curl
+sleep 0.5
+curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
+ERR+=$?
+
+# This stops tlsServerStatic
+pkill -f tlsServerStatic
+
+# this sleep gives tlsServerStatic a chance to report its events on exit
+sleep 0.5
 
 evaltest
 
-# we expect a non-zero return code.
-if [ $SCOPE_RET -eq 0 ]; then
-    ERR+=1
-fi
+grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+ERR+=$?
 
 endtest
 
@@ -124,15 +163,16 @@ endtest
 #
 starttest plainClientDynamic
 cd /go/net
-scope ./plainClientDynamic
-SCOPE_RET=$?
+scope ./plainClientDynamic 2>${STDERR_FILE}
+ERR+=$?
+
+# this sleep gives plainClientDynamic a chance to report its events on exit
+sleep 0.5
 
 evaltest
 
-# we expect a non-zero return code.
-if [ $SCOPE_RET -eq 0 ]; then
-    ERR+=1
-fi
+grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+ERR+=$?
 
 endtest
 
@@ -142,15 +182,16 @@ endtest
 #
 starttest plainClientStatic
 cd /go/net
-scope ./plainClientStatic
-SCOPE_RET=$?
+scope ./plainClientStatic 2>${STDERR_FILE}
+ERR+=$?
+
+# this sleep gives plainClientStatic a chance to report its events on exit
+sleep 0.5
 
 evaltest
 
-# we expect a non-zero return code.
-if [ $SCOPE_RET -eq 0 ]; then
-    ERR+=1
-fi
+grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+ERR+=$?
 
 endtest
 
@@ -160,15 +201,16 @@ endtest
 #
 starttest tlsClientDynamic
 cd /go/net
-scope ./tlsClientDynamic
-SCOPE_RET=$?
+scope ./tlsClientDynamic 2>${STDERR_FILE}
+ERR+=$?
+
+# this sleep gives tlsClientDynamic a chance to report its events on exit
+sleep 0.5
 
 evaltest
 
-# we expect a non-zero return code.
-if [ $SCOPE_RET -eq 0 ]; then
-    ERR+=1
-fi
+grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+ERR+=$?
 
 endtest
 
@@ -178,15 +220,16 @@ endtest
 #
 starttest tlsClientStatic
 cd /go/net
-scope ./tlsClientStatic
-SCOPE_RET=$?
+scope ./tlsClientStatic 2>${STDERR_FILE}
+ERR+=$?
+
+# this sleep gives tlsClientStatic a chance to report its events on exit
+sleep 0.5
 
 evaltest
 
-# we expect a non-zero return code.
-if [ $SCOPE_RET -eq 0 ]; then
-    ERR+=1
-fi
+grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+ERR+=$?
 
 endtest
 
@@ -196,15 +239,12 @@ endtest
 #
 starttest fileThread
 cd /go/thread
-scope ./fileThread
-SCOPE_RET=$?
-
+scope ./fileThread 2>${STDERR_FILE}
+ERR+=$?
 evaltest
 
-# we expect a non-zero return code.
-if [ $SCOPE_RET -eq 0 ]; then
-    ERR+=1
-fi
+grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+ERR+=$?
 
 endtest
 
@@ -214,15 +254,12 @@ endtest
 #
 starttest cgoDynamic
 cd /go/cgo
-LD_LIBRARY_PATH=. scope ./cgoDynamic
-SCOPE_RET=$?
-
+LD_LIBRARY_PATH=. scope ./cgoDynamic 2>${STDERR_FILE}
+ERR+=$?
 evaltest
 
-# we expect a non-zero return code.
-if [ $SCOPE_RET -eq 0 ]; then
-    ERR+=1
-fi
+grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+ERR+=$?
 
 endtest
 
@@ -232,15 +269,13 @@ endtest
 #
 starttest cgoStatic
 cd /go/cgo
-scope ./cgoStatic
-SCOPE_RET=$?
+scope ./cgoStatic 2>${STDERR_FILE}
+ERR+=$?
 
 evaltest
 
-# we expect a non-zero return code.
-if [ $SCOPE_RET -eq 0 ]; then
-    ERR+=1
-fi
+grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+ERR+=$?
 
 endtest
 

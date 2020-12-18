@@ -435,9 +435,25 @@ initGoHook(elf_buf_t *ebuf)
                     ebuf->cmd, go_runtime_version);
         }
         fprintf(stderr, "%s was compiled with a version of go older than go1.8."
-                "  This is not supported by scope.  Exiting.\n", ebuf->cmd);
-        exit(1);
+                "  This is not supported by scope.  Continuing without scope.\n", ebuf->cmd);
+       return; // don't install our hooks
     }
+
+    /*
+     * Note: calling runtime.cgocall results in the Go error
+     *       "fatal error: cgocall unavailable"
+     * Calling runtime.asmcgocall does work. Possibly becasue we
+     * are entering the Go func past the runtime stack check?
+     * Need to investigate later.
+     */
+    if ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
+        sysprint("ERROR: can't get the address for runtime.cgocall\n");
+        return; // don't install our hooks
+    }
+
+    // Get the interface type for a tls.Conn (set to 0 if not present)
+    go_tls_conn = (uint64_t)getSymbol(ebuf->buf, "go.itab.*crypto/tls.Conn,net.Conn");
+
 
     adjustGoStructOffsetsForVersion(go_major_ver);
 
@@ -469,21 +485,6 @@ initGoHook(elf_buf_t *ebuf)
 
         patch_return_addrs(funchook, asm_inst, asm_count, tap);
     }
-
-    /*
-     * Note: calling runtime.cgocall results in the Go error
-     *       "fatal error: cgocall unavailable"
-     * Calling runtime.asmcgocall does work. Possibly becasue we
-     * are entering the Go func past the runtime stack check?
-     * Need to investigate later.
-     */
-    if ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
-        sysprint("ERROR: can't get the address for runtime.cgocall\n");
-        exit(-1);
-    }
-
-    // Get the interface type for a tls.Conn (set to 0 if not present)
-    go_tls_conn = (uint64_t)getSymbol(ebuf->buf, "go.itab.*crypto/tls.Conn,net.Conn");
 
 
     // hook a few Go funcs

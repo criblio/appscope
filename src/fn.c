@@ -86,11 +86,10 @@ initFn(void)
     g_fn.gethostbyname = dlsym(RTLD_NEXT, "gethostbyname");
     g_fn.gethostbyname2 = dlsym(RTLD_NEXT, "gethostbyname2");
     g_fn.getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo");
-    g_fn.nanosleep = dlsym(RTLD_NEXT, "nanosleep");
-    g_fn.select = dlsym(RTLD_NEXT, "select");
-    g_fn.sigsuspend = dlsym(RTLD_NEXT, "sigsuspend");
     g_fn.sigaction = dlsym(RTLD_NEXT, "sigaction");
     g_fn.execve = dlsym(RTLD_NEXT, "execve");
+    g_fn.poll = dlsym(RTLD_NEXT, "poll");
+    g_fn.select = dlsym(RTLD_NEXT, "select");
 #ifdef __MACOS__
     g_fn.close$NOCANCEL = dlsym(RTLD_NEXT, "close$NOCANCEL");
     g_fn.close_nocancel = dlsym(RTLD_NEXT, "close_nocancel");
@@ -101,7 +100,6 @@ initFn(void)
 #endif // __MACOS__
 
 #ifdef __LINUX__
-    g_fn.epoll_wait = dlsym(RTLD_NEXT, "epoll_wait");
     g_fn.open64 = dlsym(RTLD_NEXT, "open64");
     g_fn.openat64 = dlsym(RTLD_NEXT, "openat64");
     g_fn.__open_2 = dlsym(RTLD_NEXT, "__open_2");
@@ -164,5 +162,25 @@ initFn(void)
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__
+
+    // functions that can't be restarted, needed for stopTimer()
+    // plus poll & select which are used for linux & macos
+    g_fn.epoll_wait = dlsym(RTLD_NEXT, "epoll_wait");
+    g_fn.nanosleep = dlsym(RTLD_NEXT, "nanosleep");
+    g_fn.sigsuspend = dlsym(RTLD_NEXT, "sigsuspend");
+    g_fn.pause = dlsym(RTLD_NEXT, "pause");
+    g_fn.sigwaitinfo = dlsym(RTLD_NEXT, "sigwaitinfo");
+    g_fn.sigtimedwait = dlsym(RTLD_NEXT, "sigtimedwait");
+    g_fn.epoll_pwait = dlsym(RTLD_NEXT, "epoll_pwait");
+    g_fn.ppoll = dlsym(RTLD_NEXT, "ppoll");
+    g_fn.pselect = dlsym(RTLD_NEXT, "pselect");
+    g_fn.msgsnd = dlsym(RTLD_NEXT, "msgsnd");
+    g_fn.msgrcv = dlsym(RTLD_NEXT, "msgrcv");
+    g_fn.semop = dlsym(RTLD_NEXT, "semop");
+    g_fn.semtimedop = dlsym(RTLD_NEXT, "semtimedop");
+    g_fn.clock_nanosleep = dlsym(RTLD_NEXT, "clock_nanosleep");
+    g_fn.usleep = dlsym(RTLD_NEXT, "usleep");
+    g_fn.io_getevents = dlsym(RTLD_NEXT, "io_getevents");
+
 #endif // __LINUX__
 }

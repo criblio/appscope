@@ -21,15 +21,6 @@
 #define SWITCH_USE_NO_THREAD "no_thread"
 #define SWITCH_USE_THREAD "thread"
 
-#define NSLEEP(now, remain) \
-    while (nanosleep(now, remain) != 0) { \
-        if (errno == EINTR) {             \
-            nanosleep(remain, NULL);      \
-        } else {                          \
-            break;                        \
-        }                                 \
-    }                                     \
-
 #ifdef ENABLE_CAS_IN_SYSEXEC
 #include "atomic.h"
 #else

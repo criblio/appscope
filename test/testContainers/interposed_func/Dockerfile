@@ -32,7 +32,7 @@ ENV SCOPE_EVENT_CONSOLE=true
 ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
 #ENV SCOPE_EVENT_DEST=tcp://172.16.198.132:9109
-
+ENV SCOPE_THREAD_DELAY="dup205"
 COPY ./interposed_func/altp /opt/test/altp
 RUN cd /opt/test/altp && make -j
 

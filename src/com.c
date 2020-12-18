@@ -174,6 +174,8 @@ msgStart(proc_id_t *proc, config_t *cfg)
     if (!(json_env = jsonEnvironmentObject())) goto err;
     cJSON_AddItemToObjectCS(json_root, "environment", json_env);
 
+    // keep this??
+    scopeLog(cJSON_PrintUnformatted(json_cfg), -1, CFG_LOG_INFO);
     return json_root;
 err:
     if (json_root) cJSON_Delete(json_root);

@@ -153,18 +153,23 @@ cJSON *
 msgStart(proc_id_t *proc, config_t *cfg)
 {
     cJSON *json_root = NULL;
+    cJSON *json_info;
     cJSON *json_proc, *json_cfg, *json_env;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
+    if (!cJSON_AddStringToObjLN(json_root, "format", "ndjson")) goto err;
+
+    if (!(json_info = cJSON_AddObjectToObjLN(json_root, "info"))) goto err;
+
     if (!(json_proc = jsonProcessObject(proc))) goto err;
-    cJSON_AddItemToObjectCS(json_root, "process", json_proc);
+    cJSON_AddItemToObjectCS(json_info, "process", json_proc);
 
     if (!(json_cfg = jsonConfigurationObject(cfg))) goto err;
-    cJSON_AddItemToObjectCS(json_root, "configuration", json_cfg);
+    cJSON_AddItemToObjectCS(json_info, "configuration", json_cfg);
 
     if (!(json_env = jsonEnvironmentObject())) goto err;
-    cJSON_AddItemToObjectCS(json_root, "environment", json_env);
+    cJSON_AddItemToObjectCS(json_info, "environment", json_env);
 
     return json_root;
 err:

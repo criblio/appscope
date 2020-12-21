@@ -43,6 +43,8 @@ initFn(void)
     g_fn.writev = dlsym(RTLD_NEXT, "writev");
     g_fn.fwrite = dlsym(RTLD_NEXT, "fwrite");
     g_fn.sendfile = dlsym(RTLD_NEXT, "sendfile");
+    g_fn.putchar = dlsym(RTLD_NEXT, "putchar");
+    g_fn.puts = dlsym(RTLD_NEXT, "puts");
     g_fn.fputs = dlsym(RTLD_NEXT, "fputs");
     g_fn.fputs_unlocked = dlsym(RTLD_NEXT, "fputs_unlocked");
     g_fn.fputws = dlsym(RTLD_NEXT, "fputws");
@@ -161,6 +163,7 @@ initFn(void)
     g_fn.dlopen = dlsym(RTLD_NEXT, "dlopen");
     g_fn.PR_FileDesc2NativeHandle = dlsym(RTLD_NEXT, "PR_FileDesc2NativeHandle");
     g_fn.PR_SetError = dlsym(RTLD_NEXT, "PR_SetError");
+    g_fn.__overflow = dlsym(RTLD_NEXT, "__overflow");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__

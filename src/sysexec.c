@@ -131,6 +131,7 @@ map_segment(char *buf, Elf64_Phdr *phead)
     int pgsz = sysconf(_SC_PAGESIZE);
     void *addr;
     char *laddr;
+    unsigned long lsize;
 
     if ((phead->p_vaddr == 0) || (phead->p_memsz <= 0) || (phead->p_flags == 0)) return -1;
 
@@ -140,11 +141,13 @@ map_segment(char *buf, Elf64_Phdr *phead)
     prot |= (phead->p_flags & PF_X) ? PROT_EXEC : 0;
 
     laddr = (char *)ROUND_DOWN(phead->p_vaddr, pgsz);
+    lsize = phead->p_memsz + ((char*)phead->p_vaddr - laddr);
+
 
     sysprint("%s:%d vaddr 0x%lx size 0x%lx\n",
              __FUNCTION__, __LINE__, phead->p_vaddr, (size_t)phead->p_memsz);
 
-    if ((addr = mmap(laddr, ROUND_UP((size_t)phead->p_memsz, phead->p_align),
+    if ((addr = mmap(laddr, ROUND_UP((size_t)lsize, phead->p_align),
                      prot | PROT_WRITE,
                      MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED,
                      -1, (off_t)NULL)) == MAP_FAILED) {
@@ -157,14 +160,14 @@ map_segment(char *buf, Elf64_Phdr *phead)
         return -1;
     }
 
-    load_sections(buf, (char *)phead->p_vaddr, (size_t)phead->p_memsz);
+    load_sections(buf, (char *)phead->p_vaddr, (size_t)lsize);
 
-    if (((prot & PROT_WRITE) == 0) && (mprotect(laddr, phead->p_memsz, prot) == -1)) {
+    if (((prot & PROT_WRITE) == 0) && (mprotect(laddr, lsize, prot) == -1)) {
         scopeLog("ERROR: load_segment:mprotect", -1, CFG_LOG_ERROR);
         return -1;
     }
 
-    laddr = addr + phead->p_memsz;
+    laddr = addr + lsize;
     return (Elf64_Addr)ROUND_UP((Elf64_Addr)laddr, pgsz);
 }
 

@@ -33,6 +33,7 @@ struct _transport_t
                            struct addrinfo **);
     int (*fclose)(FILE*);
     FILE *(*fdopen)(int, const char *);
+    int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
     union {
         struct {
             int sock;
@@ -79,15 +80,16 @@ newTransport()
     t->origGetaddrinfo = t->getaddrinfo;  // store a copy
     if ((t->fclose = dlsym(RTLD_NEXT, "fclose")) == NULL) goto out;
     if ((t->fdopen = dlsym(RTLD_NEXT, "fdopen")) == NULL) goto out;
+    if ((t->select = dlsym(RTLD_NEXT, "select")) == NULL) goto out;
     return t;
 
   out:
     DBG("send=%p open=%p dup2=%p close=%p "
         "fcntl=%p fwrite=%p socket=%p connect=%p "
-        "getaddrinfo=%p fclose=%p fdopen=%p",
+        "getaddrinfo=%p fclose=%p fdopen=%p select=%p",
         t->send, t->open, t->dup2, t->close,
         t->fcntl, t->fwrite, t->socket, t->connect,
-        t->getaddrinfo, t->fclose, t->fdopen);
+        t->getaddrinfo, t->fclose, t->fdopen, t->select);
     free(t);
     return NULL;
 }
@@ -387,10 +389,11 @@ socketConnectIsPending(transport_t *trans)
 static int
 checkPendingSocketStatus(transport_t *trans)
 {
+    if (!trans) return 0;
     int rc;
     struct timeval tv = {0};
     fd_set pending_results = trans->net.pending_connect;
-    rc = select(FD_SETSIZE, NULL, &pending_results, NULL, &tv);
+    rc = trans->select(FD_SETSIZE, NULL, &pending_results, NULL, &tv);
     if (rc < 0) {
         DBG(NULL);
         transportDisconnect(trans);

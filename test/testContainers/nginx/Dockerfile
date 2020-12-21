@@ -1,6 +1,12 @@
 FROM centos:6
 
+RUN curl https://www.getpagespeed.com/files/centos6-eol.repo --output /etc/yum.repos.d/CentOS-Base.repo
+RUN curl https://www.getpagespeed.com/files/centos6-epel-eol.repo --output /etc/yum.repos.d/epel.repo
+
 RUN yum -y update
+
+RUN curl https://www.getpagespeed.com/files/centos6-scl-eol.repo --output /etc/yum.repos.d/CentOS-SCLo-scl.repo
+RUN curl https://www.getpagespeed.com/files/centos6-scl-rh-eol.repo --output /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo
 RUN yum -y install centos-release-scl
 RUN yum -y install rh-python36
 RUN yum -y install epel-release
@@ -22,7 +28,6 @@ ENV SCOPE_EVENT_LOGFILE=true
 ENV SCOPE_EVENT_CONSOLE=true
 ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
-#ENV SCOPE_EVENT_DEST=tcp://172.16.198.132:9109
 
 COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./nginx/post.json /opt/test-runner/post.json

@@ -1,4 +1,4 @@
-FROM centos:6
+FROM centos:7
 
 RUN yum -y update
 RUN yum -y install centos-release-scl
@@ -32,7 +32,7 @@ ENV SCOPE_EVENT_CONSOLE=true
 ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
 #ENV SCOPE_EVENT_DEST=tcp://172.16.198.132:9109
-
+ENV SCOPE_THREAD_DELAY="dup205"
 COPY ./interposed_func/altp /opt/test/altp
 RUN cd /opt/test/altp && make -j
 
@@ -43,3 +43,4 @@ COPY ./test_runner /opt/test-runner/
 COPY ./interposed_func/syscall_tests_conf.json /opt/test-runner/syscall_tests_conf.json
 
 ENTRYPOINT ["/opt/test-runner/bin/python", "/opt/test-runner/app.py", "--target", "syscalls","-l","/opt/test-runner/logs/", "--syscalls_tests_config", "/opt/test-runner/syscall_tests_conf.json"]
+#ENTRYPOINT ["tail", "-f", "/dev/null"]

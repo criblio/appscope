@@ -94,6 +94,7 @@ void    ctlDestroy(ctl_t **);
 
 // Raw Send (without messaging protocol)
 void    ctlSendMsg(ctl_t *, char *);
+void    ctlSendJson(ctl_t *, cJSON *);
 
 // Messaging protocol send
 int     ctlPostMsg(ctl_t *, cJSON *, upload_type_t, request_t *, bool);

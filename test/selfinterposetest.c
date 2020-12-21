@@ -188,6 +188,9 @@ checkObjectFile(fn_list_t* interpose_list, const char* file, test_state_t* s)
             int i = sprintf(&s->failMsgs[s->failMsgPos],
                             "  %s contains %s\n", file, interpose->name);
             if (i > 0) s->failMsgPos += i;
+            if ((strcmp(interpose->name, "puts")) || (strcmp(interpose->name, "putchar"))) {
+                fputs("FYI: a self interposed test failure due to puts or putchar can be due to using printf\nwith a constant string, resulting in puts being referenced, or printf using a single character,\nresulting in putc being referenced. You may need to change how printf is being used.\n", stderr);
+            }
         }
     }
     deleteList(&used_list);

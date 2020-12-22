@@ -8,7 +8,11 @@
 #include <netdb.h>
 #ifdef __LINUX__
 #include <sys/epoll.h>
+#include <poll.h>
 #include <sys/vfs.h>
+#include <linux/aio_abi.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 #endif // __LINUX__
 #include <signal.h>
 #include "../contrib/tls/tls.h"
@@ -16,6 +20,12 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#ifdef __LINUX__
+#ifndef io_context_t
+#define io_context_t unsigned long
+#endif
+#endif
 
 #ifdef __MACOS__
 #include <sys/mount.h>
@@ -161,9 +171,6 @@ typedef struct {
     int (*fcntl64)(int, int, ...);
     long (*syscall)(long, ...);
     int (*prctl)(int, unsigned long, unsigned long, unsigned long, unsigned long);
-    int (*nanosleep)(const struct timespec *, struct timespec *);
-    int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
-    int (*sigsuspend)(const sigset_t *);
     int (*sigaction)(int, const struct sigaction *, struct sigaction *);
     void (*_exit)(int);
     int (*SSL_read)(SSL *, void *, int);
@@ -183,12 +190,29 @@ typedef struct {
     int (*PR_FileDesc2NativeHandle)(PRFileDesc *);
     void (*PR_SetError)(PRErrorCode, PRInt32);
     int (*execve)(const char *, char * const *, char * const *);
+    int (*poll)(struct pollfd *, nfds_t, int);
+    int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 #ifdef __LINUX__
     // Couldn't easily get struct definitions for these on mac
     int (*statvfs64)(const char *, struct statvfs64 *);
     int (*fstatvfs64)(int, struct statvfs64 *);
     int (*epoll_wait)(int, struct epoll_event *, int, int);
     int (*__overflow)(FILE *, int);
+    int (*epoll_pwait)(int, struct epoll_event *, int, int, const sigset_t *);
+    int (*ppoll)(struct pollfd *, nfds_t, const struct timespec *, const sigset_t *);
+    int (*pause)(void);
+    int (*nanosleep)(const struct timespec *, struct timespec *);
+    int (*sigsuspend)(const sigset_t *);
+    int (*sigwaitinfo)(const sigset_t *, siginfo_t *);
+    int (*sigtimedwait)(const sigset_t *, siginfo_t *, const struct timespec *);
+    int (*pselect)(int, fd_set *, fd_set *, fd_set *, const struct timespec *, const sigset_t *);
+    int (*msgsnd)(int, const void *, size_t, int);
+    ssize_t (*msgrcv)(int, void *, size_t, long, int);
+    int (*semop)(int, struct sembuf *, size_t);
+    int (*semtimedop)(int, struct sembuf *, size_t, const struct timespec *);
+    int (*clock_nanosleep)(clockid_t, int, const struct timespec *, struct timespec *);
+    int (*usleep)(useconds_t);
+    int (*io_getevents)(io_context_t, long, long, struct io_event *, struct timespec *);
 #endif // __LINUX__
 
 #if defined(__LINUX__) && defined(__STATX__)

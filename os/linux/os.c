@@ -6,6 +6,10 @@
 #include "../../src/fn.h"
 #include "../../src/scopetypes.h"
 
+// want to put this list in an obvious place
+//static char thread_delay_list[] = "chrome:nacl_helper";
+static timer_t g_timerid = 0;
+
 static int
 sendNL(int sd, ino_t node)
 {
@@ -469,13 +473,24 @@ out:
 }
 
 bool
+osTimerStop(void)
+{
+
+    if (g_timerid) {
+        timer_delete(g_timerid);
+        g_timerid = 0;
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+bool
 osThreadInit(void(*handler)(int), unsigned interval)
 {
     struct sigaction sact;
     struct sigevent sevent = {0};
-    timer_t timerid = 0;
     struct itimerspec tspec;
-
     sigemptyset(&sact.sa_mask);
     sact.sa_handler = handler;
     sact.sa_flags = SA_RESTART;
@@ -489,7 +504,8 @@ osThreadInit(void(*handler)(int), unsigned interval)
 
     sevent.sigev_notify = SIGEV_SIGNAL;
     sevent.sigev_signo = SIGUSR2;
-    if (timer_create(CLOCK_MONOTONIC, &sevent, &timerid) == -1) {
+
+    if (timer_create(CLOCK_MONOTONIC, &sevent, &g_timerid) == -1) {
         DBG("errno %d", errno);
         return FALSE;
     }
@@ -498,7 +514,7 @@ osThreadInit(void(*handler)(int), unsigned interval)
     tspec.it_interval.tv_nsec = 0;
     tspec.it_value.tv_sec = interval;
     tspec.it_value.tv_nsec = 0;
-    if (timer_settime(timerid, 0, &tspec, NULL) == -1) {
+    if (timer_settime(g_timerid, 0, &tspec, NULL) == -1) {
         DBG("errno %d", errno);
         return FALSE;
     }

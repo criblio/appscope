@@ -40,6 +40,7 @@ static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 static list_t *g_nsslist;
+static uint64_t reentrancy_guard = 0ULL;
 
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
@@ -250,7 +251,7 @@ remoteConfig()
 
     fds.fd = ctlConnection(g_ctl);
 
-    rc = poll(&fds, 1, timeout);
+    rc = g_fn.poll(&fds, 1, timeout);
 
     /*
      * Error from poll;
@@ -480,6 +481,8 @@ threadNow(int sig)
         return;
     }
 
+    osTimerStop();
+
     if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
         scopeLog("ERROR: threadNow:pthread_create", -1, CFG_LOG_ERROR);
         if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
@@ -581,6 +584,15 @@ doThread()
     }
 }
 
+static void
+stopTimer(void)
+{
+    // if we are in the constructor, do nothing
+    if (!g_ctl) return;
+
+    osTimerStop();
+    threadNow(0);
+}
 
 // Return process specific CPU usage in microseconds
 static long long
@@ -597,7 +609,7 @@ doGetProcCPU() {
 }
 
 static void
-setProcId(proc_id_t* proc)
+setProcId(proc_id_t *proc)
 {
     if (!proc) return;
 
@@ -630,7 +642,6 @@ doReset()
 
     g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
-    threadInit();
 
     resetState();
 
@@ -638,7 +649,10 @@ doReset()
     mtcReconnect(g_mtc);
     ctlReconnect(g_ctl);
 
+    atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
+
     reportProcessStart();
+    threadInit();
 }
 
 static void
@@ -648,12 +662,6 @@ reportPeriodicStuff(void)
     int nthread, nfds, children;
     long long cpu = 0;
     static long long cpuState = 0;
-
-    // This is called by periodic, and due to atexit().
-    // If it's actively running for one reason, then skip the second.
-    static uint64_t reentrancy_guard = 0ULL;
-    if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) return;
-
 
     // We report CPU time for this period.
     cpu = doGetProcCPU();
@@ -706,16 +714,25 @@ reportPeriodicStuff(void)
     // Process any events that have been posted
     doEvent();
     mtcFlush(g_mtc);
-
-    if (!atomicCasU64(&reentrancy_guard, 1ULL, 0ULL)) {
-         DBG(NULL);
-    }
 }
 
 void
 handleExit(void)
 {
-    reportPeriodicStuff();
+    if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+        struct timespec ts, rem;
+        ts.tv_sec = 0;
+        ts.tv_nsec = 10000; // 10 ms
+
+        // let the periodic thread finish
+        while (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+            NSLEEP(&ts, &rem);
+        }
+        doEvent();
+    } else {
+        reportPeriodicStuff();
+    }
+
     mtcFlush(g_mtc);
     logFlush(g_log);
     ctlFlush(g_ctl);
@@ -756,10 +773,14 @@ periodic(void *arg)
             // Hey we have a new connection!  Identify ourselves
             // like reportProcessStart, but only on the event interface...
             cJSON *json = msgStart(&g_proc, g_staticfg);
-            cmdSendInfoMsg(g_ctl, json);
+            ctlSendJson(g_ctl, json);
+            ctlFlush(g_ctl);
         }
 
-        reportPeriodicStuff();
+        if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+            reportPeriodicStuff();
+            atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
+        }
 
         remoteConfig();
     }
@@ -781,9 +802,10 @@ reportProcessStart(void)
     // 2) Send a metric
     sendProcessStartMetric();
 
-    // 3) Send an event at startup, provided metric events are enabled
+    // 3) Send a startup msg
     cJSON *json = msgStart(&g_proc, g_staticfg);
-    cmdSendInfoMsg(g_ctl, json);
+    ctlSendJson(g_ctl, json);
+    ctlFlush(g_ctl);
 }
 
 // TODO; should this move to os/linux/os.c?
@@ -910,7 +932,6 @@ initHook()
         ((ebuf = getElf(full_path)) != NULL)) {
         initGoHook(ebuf);
         threadNow(0);
-
         if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
             scopeLog("initHook:arch_prctl", -1, CFG_LOG_ERROR);
         }
@@ -1031,27 +1052,6 @@ init(void)
     osInitJavaAgent();
 }
 
-EXPORTOFF int
-nanosleep(const struct timespec *req, struct timespec *rem)
-{
-    WRAP_CHECK(nanosleep, -1);
-    return g_fn.nanosleep(req, rem);
-}
-
-EXPORTOFF int
-select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
-{
-    WRAP_CHECK(select, -1);
-    return g_fn.select(nfds, readfds, writefds, exceptfds, timeout);
-}
-
-EXPORTOFF int
-sigsuspend(const sigset_t *mask)
-{
-    WRAP_CHECK(sigsuspend, -1);
-    return g_fn.sigsuspend(mask);
-}
-
 EXPORTON int
 sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 {
@@ -1159,11 +1159,158 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
 }
 
 #ifdef __LINUX__
-EXPORTOFF int
+EXPORTON int
+nanosleep(const struct timespec *req, struct timespec *rem)
+{
+    stopTimer();
+    WRAP_CHECK(nanosleep, -1);
+    return g_fn.nanosleep(req, rem);
+}
+
+EXPORTON int
+select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
+{
+    stopTimer();
+    WRAP_CHECK(select, -1);
+    return g_fn.select(nfds, readfds, writefds, exceptfds, timeout);
+}
+
+EXPORTON int
+sigsuspend(const sigset_t *mask)
+{
+    stopTimer();
+    WRAP_CHECK(sigsuspend, -1);
+    return g_fn.sigsuspend(mask);
+}
+
+EXPORTON int
 epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 {
+    stopTimer();
     WRAP_CHECK(epoll_wait, -1);
     return g_fn.epoll_wait(epfd, events, maxevents, timeout);
+}
+
+EXPORTON int
+poll(struct pollfd *fds, nfds_t nfds, int timeout)
+{
+    stopTimer();
+    WRAP_CHECK(epoll_wait, -1);
+    return g_fn.poll(fds, nfds, timeout);
+}
+
+EXPORTON int
+pause(void)
+{
+    stopTimer();
+    WRAP_CHECK(pause, -1);
+    return g_fn.pause();
+}
+
+EXPORTON int
+sigwaitinfo(const sigset_t *set, siginfo_t *info)
+{
+    stopTimer();
+    WRAP_CHECK(sigwaitinfo, -1);
+    return g_fn.sigwaitinfo(set, info);
+}
+
+EXPORTON int
+sigtimedwait(const sigset_t *set, siginfo_t *info,
+             const struct timespec *timeout)
+{
+    stopTimer();
+    WRAP_CHECK(sigtimedwait, -1);
+    return g_fn.sigtimedwait(set, info, timeout);
+}
+
+EXPORTON int
+epoll_pwait(int epfd, struct epoll_event *events,
+            int maxevents, int timeout,
+            const sigset_t *sigmask)
+{
+    stopTimer();
+    WRAP_CHECK(epoll_pwait, -1);
+    return g_fn.epoll_pwait(epfd, events, maxevents, timeout, sigmask);
+}
+
+EXPORTON int
+ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
+      const sigset_t *sigmask)
+{
+    stopTimer();
+    WRAP_CHECK(ppoll, -1);
+    return g_fn.ppoll(fds, nfds, tmo_p, sigmask);
+}
+
+EXPORTON int
+pselect(int nfds, fd_set *readfds, fd_set *writefds,
+        fd_set *exceptfds, const struct timespec *timeout,
+        const sigset_t *sigmask)
+{
+    stopTimer();
+    WRAP_CHECK(pselect, -1);
+    return g_fn.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask);
+}
+
+EXPORTON int
+msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg)
+{
+    stopTimer();
+    WRAP_CHECK(msgsnd, -1);
+    return g_fn.msgsnd(msqid, msgp, msgsz, msgflg);
+}
+
+EXPORTON ssize_t
+msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg)
+{
+    stopTimer();
+    WRAP_CHECK(msgrcv, -1);
+    return g_fn.msgrcv(msqid, msgp, msgsz, msgtyp, msgflg);
+}
+
+EXPORTON int
+semop(int semid, struct sembuf *sops, size_t nsops)
+{
+    stopTimer();
+    WRAP_CHECK(semop, -1);
+    return g_fn.semop(semid, sops, nsops);
+}
+
+EXPORTON int
+semtimedop(int semid, struct sembuf *sops, size_t nsops,
+           const struct timespec *timeout)
+{
+    stopTimer();
+    WRAP_CHECK(semtimedop, -1);
+    return g_fn.semtimedop(semid, sops, nsops, timeout);
+}
+
+EXPORTON int
+clock_nanosleep(clockid_t clockid, int flags,
+                const struct timespec *request,
+                struct timespec *remain)
+{
+    stopTimer();
+    WRAP_CHECK(clock_nanosleep, -1);
+    return g_fn.clock_nanosleep(clockid, flags, request, remain);
+}
+
+EXPORTON int
+usleep(useconds_t usec)
+{
+    stopTimer();
+    WRAP_CHECK(usleep, -1);
+    return g_fn.usleep(usec);
+}
+
+EXPORTON int
+io_getevents(io_context_t ctx_id, long min_nr, long nr,
+             struct io_event *events, struct timespec *timeout)
+{
+    stopTimer();
+    WRAP_CHECK(io_getevents, -1);
+    return g_fn.io_getevents(ctx_id, min_nr, nr, events, timeout);
 }
 
 EXPORTON int

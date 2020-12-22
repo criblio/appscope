@@ -37,13 +37,6 @@ cmdSendMetric(mtc_t *mtc, event_t *evt)
     return mtcSendMetric(mtc, evt);
 }
 
-
-int
-cmdPostEvtMsg(ctl_t *ctl, cJSON *json)
-{
-    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
-}
-
 int
 cmdSendInfoStr(ctl_t *ctl, const char *str)
 {
@@ -66,27 +59,9 @@ cmdPostEvent(ctl_t *ctl, char *event)
 }
 
 int
-cmdSendEvtMsg(ctl_t *ctl, cJSON *json)
-{
-    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, TRUE);
-}
-
-int
-cmdSendInfoMsg(ctl_t *ctl, cJSON *json)
-{
-    return ctlPostMsg(ctl, json, UPLD_INFO, NULL, TRUE);
-}
-
-int
 cmdSendResponse(ctl_t *ctl, request_t *req, cJSON *body)
 {
     return ctlPostMsg(ctl, body, UPLD_RESP, req, TRUE);
-}
-
-int
-cmdSendBin(ctl_t *ctl, char *buf, size_t len)
-{
-    return ctlSendBin(ctl, buf, len);
 }
 
 request_t *

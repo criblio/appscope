@@ -40,3 +40,4 @@ extern bool osThreadInit(void(*handler)(int), unsigned);
 extern int osUnixSockPeer(ino_t);
 extern void osInitJavaAgent(void);
 extern int osGetPageProt(uint64_t);
+extern bool osTimerStop(void);

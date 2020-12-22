@@ -57,5 +57,6 @@ extern int osUnixSockPeer(ino_t);
 extern void osInitJavaAgent(void);
 extern int osGetPageProt(unsigned long);
 extern char *osGetExePath();
+extern bool osTimerStop(void);
 
 #endif  //__OS_H__

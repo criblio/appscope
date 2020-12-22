@@ -773,7 +773,8 @@ periodic(void *arg)
             // Hey we have a new connection!  Identify ourselves
             // like reportProcessStart, but only on the event interface...
             cJSON *json = msgStart(&g_proc, g_staticfg);
-            cmdSendInfoMsg(g_ctl, json);
+            ctlSendJson(g_ctl, json);
+            ctlFlush(g_ctl);
         }
 
         if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
@@ -801,9 +802,10 @@ reportProcessStart(void)
     // 2) Send a metric
     sendProcessStartMetric();
 
-    // 3) Send an event at startup, provided metric events are enabled
+    // 3) Send a startup msg
     cJSON *json = msgStart(&g_proc, g_staticfg);
-    cmdSendInfoMsg(g_ctl, json);
+    ctlSendJson(g_ctl, json);
+    ctlFlush(g_ctl);
 }
 
 // TODO; should this move to os/linux/os.c?

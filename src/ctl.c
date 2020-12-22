@@ -568,6 +568,25 @@ ctlSendMsg(ctl_t *ctl, char *msg)
     }
 }
 
+void
+ctlSendJson(ctl_t *ctl, cJSON *json)
+{
+    // This sends raw json (no envelope/messaging protocol)
+
+    if (!json) return;
+    if (!ctl) {
+        cJSON_Delete(json);
+        return;
+    }
+
+    char *streamMsg = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+    if (streamMsg) {
+        // put it on the ring buffer and send it
+        ctlSendMsg(ctl, streamMsg);
+    }
+}
+
 int
 ctlPostMsg(ctl_t *ctl, cJSON *body, upload_type_t type, request_t *req, bool now)
 {
@@ -712,14 +731,6 @@ sendBufferedMessages(ctl_t *ctl)
             free(msg);
         }
     }
-}
-
-int
-ctlSendBin(ctl_t *ctl, char *buf, size_t len)
-{
-    if (!ctl || !buf) return -1;
-
-    return transportSend(ctl->transport, buf, len);
 }
 
 void

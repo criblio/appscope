@@ -881,13 +881,11 @@ args_are_all_valid(int argc, char **argv)
 static void
 print_version(char *path)
 {
-    printf("Scope Version: " SCOPE_VER "\n");
-    printf("\n");
+    printf("Scope Version: %s\n\n", SCOPE_VER);
 
     if (strstr(path, "libscope")) {
         printf("    Usage: LD_PRELOAD=%s <command name>\n", path);
-        printf("    For more info: %s help\n", path);
-        printf("\n");
+        printf("    For more info: %s help\n\n", path);
     }
 }
 
@@ -902,7 +900,8 @@ print_help(char* path)
     for (i=0; help_list[i].cmd; i++) {
         printf("        %s %s\n", path, help_list[i].cmd);
     }
-    printf("\n");
+
+    if (g_fn.putchar) g_fn.putchar('\n');
 }
 
 

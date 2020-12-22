@@ -56,6 +56,8 @@ typedef struct {
     size_t (*fread)(void *, size_t, size_t, FILE *);
     char *(*fgets)(char *, int, FILE *);
     int (*fscanf)(FILE *, const char *, ...);
+    int (*putchar)(int);
+    int (*puts)(const char *);
     int (*fputs)(const char *, FILE *);
     int (*fputs_unlocked)(const char *, FILE *);
     int (*fputws)(const wchar_t *, FILE *);
@@ -195,6 +197,7 @@ typedef struct {
     int (*statvfs64)(const char *, struct statvfs64 *);
     int (*fstatvfs64)(int, struct statvfs64 *);
     int (*epoll_wait)(int, struct epoll_event *, int, int);
+    int (*__overflow)(FILE *, int);
     int (*epoll_pwait)(int, struct epoll_event *, int, int, const sigset_t *);
     int (*ppoll)(struct pollfd *, nfds_t, const struct timespec *, const sigset_t *);
     int (*pause)(void);

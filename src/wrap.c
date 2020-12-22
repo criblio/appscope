@@ -2041,6 +2041,19 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     return -1;
 }
 
+EXPORTON int
+__overflow(FILE *stream, int ch)
+{
+    WRAP_CHECK(__overflow, EOF);
+    uint64_t initialTime = getTime();
+
+    int rc = g_fn.__overflow(stream, ch);
+
+    doWrite(fileno(stream), initialTime, (rc != EOF), &ch, 1, "__overflow", BUF, 0);
+
+    return rc;
+}
+
 /*
  * Note:
  * The syscall function in libc is called from the loader for
@@ -2135,7 +2148,6 @@ fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 
     return rc;
 }
-
 
 /*
  * Note: in_fd must be a file
@@ -3099,6 +3111,32 @@ fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 }
 
 EXPORTON int
+puts(const char *s)
+{
+    WRAP_CHECK(puts, EOF);
+    uint64_t initialTime = getTime();
+
+    int rc = g_fn.puts(s);
+
+    doWrite(fileno(stdout), initialTime, (rc != EOF), s, strlen(s), "puts", BUF, 0);
+
+    return rc;
+}
+
+EXPORTON int
+putchar(int c)
+{
+    WRAP_CHECK(putchar, EOF);
+    uint64_t initialTime = getTime();
+
+    int rc = g_fn.putchar(c);
+
+    doWrite(fileno(stdout), initialTime, (rc != EOF), &c, 1, "putchar", BUF, 0);
+
+    return rc;
+}
+
+EXPORTON int
 fputs(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs, EOF);
@@ -3120,19 +3158,6 @@ fputs_unlocked(const char *s, FILE *stream)
     int rc = g_fn.fputs_unlocked(s, stream);
 
     doWrite(fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs_unlocked", BUF, 0);
-
-    return rc;
-}
-
-EXPORTON int
-fputws(const wchar_t *ws, FILE *stream)
-{
-    WRAP_CHECK(fputws, EOF);
-    uint64_t initialTime = getTime();
-
-    int rc = g_fn.fputws(ws, stream);
-
-    doWrite(fileno(stream), initialTime, (rc != EOF), ws, wcslen(ws) * sizeof(wchar_t), "fputws", BUF, 0);
 
     return rc;
 }
@@ -3317,7 +3342,7 @@ fputc(int c, FILE *stream)
 
     int rc = g_fn.fputc(c, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), NULL, 1, "fputc", NONE, 0);
+    doWrite(fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc", NONE, 0);
 
     return rc;
 }
@@ -3330,7 +3355,7 @@ fputc_unlocked(int c, FILE *stream)
 
     int rc = g_fn.fputc_unlocked(c, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), NULL, 1, "fputc_unlocked", NONE, 0);
+    doWrite(fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc_unlocked", NONE, 0);
 
     return rc;
 }
@@ -3343,7 +3368,7 @@ putwc(wchar_t wc, FILE *stream)
 
     wint_t rc = g_fn.putwc(wc, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "putwc", NONE, 0);
+    doWrite(fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "putwc", NONE, 0);
 
     return rc;
 }
@@ -3356,7 +3381,7 @@ fputwc(wchar_t wc, FILE *stream)
 
     wint_t rc = g_fn.fputwc(wc, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "fputwc", NONE, 0);
+    doWrite(fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "fputwc", NONE, 0);
 
     return rc;
 }

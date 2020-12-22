@@ -9,20 +9,6 @@
 rtconfig g_cfg = {0};
 
 static void
-cmdPostEvtMsgDoesNotCrash(void** state)
-{
-    ctl_t* ctl = ctlCreate();
-    assert_non_null(ctl);
-
-    assert_int_equal(-1, cmdPostEvtMsg(NULL, NULL));
-    assert_int_equal(-1, cmdPostEvtMsg(NULL, cJSON_CreateString("hey")));
-    assert_int_equal(-1, cmdPostEvtMsg(ctl, NULL));
-    assert_int_equal(0, cmdPostEvtMsg(ctl, cJSON_CreateString("hey")));
-
-    ctlDestroy(&ctl);
-}
-
-static void
 cmdPostInfoMsgDoesNotCrash(void** state)
 {
     ctl_t* ctl = ctlCreate();
@@ -37,20 +23,6 @@ cmdPostInfoMsgDoesNotCrash(void** state)
 }
 
 static void
-cmdSendEvtMsgDoesNotCrash(void** state)
-{
-    ctl_t* ctl = ctlCreate();
-    assert_non_null(ctl);
-
-    assert_int_equal(-1, cmdSendEvtMsg(NULL, NULL));
-    assert_int_equal(-1, cmdSendEvtMsg(NULL, cJSON_CreateString("hey")));
-    assert_int_equal(-1, cmdSendEvtMsg(ctl, NULL));
-    assert_int_equal(0, cmdSendEvtMsg(ctl, cJSON_CreateString("hey")));
-
-    ctlDestroy(&ctl);
-}
-
-static void
 cmdSendInfoStrDoesNotCrash(void** state)
 {
     ctl_t* ctl = ctlCreate();
@@ -60,20 +32,6 @@ cmdSendInfoStrDoesNotCrash(void** state)
     assert_int_equal(-1, cmdSendInfoStr(NULL, "hey"));
     assert_int_equal(-1, cmdSendInfoStr(ctl, NULL));
     assert_int_equal(0, cmdSendInfoStr(ctl, "hey"));
-
-    ctlDestroy(&ctl);
-}
-
-static void
-cmdSendInfoMsgDoesNotCrash(void** state)
-{
-    ctl_t* ctl = ctlCreate();
-    assert_non_null(ctl);
-
-    assert_int_equal(-1, cmdSendInfoMsg(NULL, NULL));
-    assert_int_equal(-1, cmdSendInfoMsg(NULL, cJSON_CreateString("hey")));
-    assert_int_equal(-1, cmdSendInfoMsg(ctl, NULL));
-    assert_int_equal(0, cmdSendInfoMsg(ctl, cJSON_CreateString("hey")));
 
     ctlDestroy(&ctl);
 }
@@ -166,11 +124,8 @@ main(int argc, char* argv[])
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(cmdPostEvtMsgDoesNotCrash),
         cmocka_unit_test(cmdPostInfoMsgDoesNotCrash),
-        cmocka_unit_test(cmdSendEvtMsgDoesNotCrash),
         cmocka_unit_test(cmdSendInfoStrDoesNotCrash),
-        cmocka_unit_test(cmdSendInfoMsgDoesNotCrash),
         cmocka_unit_test(cmdSendResponseDoesNotCrash),
         cmocka_unit_test(cmdParseDoesNotCrash),
         cmocka_unit_test(msgStartHasExpectedSubNodes),

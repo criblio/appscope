@@ -125,5 +125,6 @@ bool ctlCbufEmpty(ctl_t *);
 // Payloads
 int ctlPostPayload(ctl_t *, char *);
 uint64_t ctlGetPayload(ctl_t *);
+int ctlSendBin(ctl_t *, char *, size_t);
 
 #endif // _CTL_H__

@@ -848,7 +848,7 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
 static int
 extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
-    if (!buf || (len <= 0) || (checkEnv(PAYLOAD_ENV, PAYLOAD_VAL) == FALSE)) return -1;
+    if (!buf || (len <= 0)) return -1;
 
     payload_info *pinfo = calloc(1, sizeof(struct payload_info_t));
     if (!pinfo) {
@@ -869,7 +869,12 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     pinfo->sockfd = sockfd;
     pinfo->len = len;
 
-    cmdPostPayload(g_ctl, (char *)pinfo);
+    if (cmdPostPayload(g_ctl, (char *)pinfo) == -1) {
+        if (pinfo->data) free(pinfo->data);
+        if (pinfo) free(pinfo);
+        return -1;
+    }
+
     return 0;
 }
 

@@ -846,17 +846,12 @@ ctlCbufEmpty(ctl_t *ctl)
 int
 ctlPostPayload(ctl_t *ctl, char *pay)
 {
-    if (!pay) return -1;
-    if (!ctl) {
-        free(pay);
-        return -1;
-    }
+    if (!pay || !ctl) return -1;
 
     if ((ctl->payloads) &&
         (cbufPut(ctl->payloads, (uint64_t)pay) == -1)) {
         // Full; drop and ignore
         DBG(NULL);
-        free(pay);
         return -1;
     }
     return 0;

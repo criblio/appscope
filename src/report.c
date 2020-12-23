@@ -2055,17 +2055,12 @@ doPayload()
     bool lsbin = TRUE;
     bool filebin = TRUE;
     uint64_t data;
+
     while ((data = msgPayloadGet(g_ctl)) != -1) {
         if (data) {
             payload_info *pinfo = (payload_info *)data;
             net_info *net = &pinfo->net;
-
-            //{"id":"host-proc-cmd","pid":1234,"ppid":1233,"fd":20,"src":"rx/tx","_channel":1234,"len":1234,'localip':'192.168.1.102','localp':65536,'remoteip':'192.168.1.103','remotep':80}\n
-
-            size_t hlen = strlen("{'id':'','pid':,'ppid':,'fd':,'src':'rx/tx','_channel':,'len':'localip':'','localp':,'remoteip':'','remotep':}\n") +
-                strlen(g_proc.id) + (sizeof(uint64_t) * 5) + (32 * 2) + (8 * 2) + 2;
-            //                                                IP addrs   ports
-
+            size_t hlen = 1024;
             char pay[hlen];
             char *srcstr = NULL, rx[]="rx", tx[]="tx", none[]="none";
 
@@ -2085,63 +2080,42 @@ doPayload()
                 break;
             }
 
-            // TODO: turn this into a reusable function
-            in_port_t lport, rport;
+            char lport[8], rport[8];
             char lip[INET6_ADDRSTRLEN];
             char rip[INET6_ADDRSTRLEN];
 
             if (net) {
-                lport = get_port_net(net, net->localConn.ss_family, LOCAL);
-                rport = get_port_net(net, net->remoteConn.ss_family, REMOTE);
-
-                if (net->localConn.ss_family == AF_INET) {
-                    if (inet_ntop(AF_INET,
-                                  &((struct sockaddr_in *)&net->localConn)->sin_addr,
-                                  lip, sizeof(lip)) == NULL) {
-                        strncpy(lip, "af_inte err", sizeof(lip));
-                    }
-                } else if (net->localConn.ss_family == AF_INET6) {
-                    if (inet_ntop(AF_INET6,
-                                  &((struct sockaddr_in6 *)&net->localConn)->sin6_addr,
-                                  lip, sizeof(lip)) == NULL) {
-                        strncpy(lip, "af_inte6 err", sizeof(lip));
-                    }
-                } else {
-                    strncpy(lip, "not_net", sizeof(lip));
+                if (getConn(&net->localConn, lip, sizeof(lip), lport, sizeof(lport)) == FALSE) {
+                    strncpy(lip, "af_int_err", sizeof(lip));
+                    strncpy(lport, "0", sizeof(lport));
                 }
 
-                if (net->remoteConn.ss_family == AF_INET) {
-                    if (inet_ntop(AF_INET,
-                                  &((struct sockaddr_in *)&net->remoteConn)->sin_addr,
-                                  rip, sizeof(rip)) == NULL) {
-                        strncpy(rip, "af_inet err", sizeof(rip));
-                    }
-                } else if (net->remoteConn.ss_family == AF_INET6) {
-                    if (inet_ntop(AF_INET6,
-                                  &((struct sockaddr_in6 *)&net->remoteConn)->sin6_addr,
-                                  rip, sizeof(rip)) == NULL) {
-                        strncpy(rip, "af_inet6 err", sizeof(rip));
-                    }
-                } else {
-                    strncpy(rip, "not_net", sizeof(rip));
+                if (getConn(&net->remoteConn, rip, sizeof(rip), rport, sizeof(rport)) == FALSE) {
+                    strncpy(rip, "af_int_err", sizeof(rip));
+                    strncpy(rport, "0", sizeof(rport));
                 }
-            } else {
-                strncpy(lip, "na", sizeof(rip));
-                strncpy(rip, "na", sizeof(rip));
-                lport = rport = 0;
             }
 
             uint64_t netid = (net != NULL) ? net->uid : 0;
-            snprintf(pay, hlen,
-                     "{\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%d,\"remoteip\":\"%s\",\"remotep\":%d}",
-                     g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport);
+            int rc = snprintf(pay, hlen,
+                              "{\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s}",
+                              g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport);
+            if (rc < 0) {
+                // unlikley
+                if (pinfo->data) free(pinfo->data);
+                if (pinfo) free(pinfo);
+                DBG(NULL);
+                return;
+            }
 
-            if (strlen(pay) <= hlen) {
-                hlen = strlen(pay) + 1;
+            if (rc < hlen) {
+                hlen = rc + 1;
+            } else {
+                hlen--;
+                scopeLog("WARN: payload header was truncated", pinfo->sockfd, CFG_LOG_WARN);
             }
 
             char *bdata = NULL;
-            size_t len;
 
             if (lsbin == TRUE) {
                 bdata = calloc(1, hlen + pinfo->len);
@@ -2149,8 +2123,7 @@ doPayload()
                     memmove(bdata, pay, hlen);
                     strncat(bdata, "\n", hlen);
                     memmove(&bdata[hlen], pinfo->data, pinfo->len);
-                    len = hlen + pinfo->len;
-                    cmdSendPayload(g_ctl, bdata, len);
+                    cmdSendPayload(g_ctl, bdata, hlen + pinfo->len);
                 }
             }
 
@@ -2162,12 +2135,12 @@ doPayload()
                 switch (pinfo->src) {
                 case NETTX:
                 case TLSTX:
-                    snprintf(path, PATH_MAX, "/tmp/%d_%s:%d:%d.out", g_proc.pid, rip, lport, rport);
+                    snprintf(path, PATH_MAX, "/tmp/%d_%s:%s:%s.out", g_proc.pid, rip, lport, rport);
                     break;
 
                 case NETRX:
                 case TLSRX:
-                    snprintf(path, PATH_MAX, "/tmp/%d_%s:%d:%d.in", g_proc.pid, rip, rport, lport);
+                    snprintf(path, PATH_MAX, "/tmp/%d_%s:%s:%s.in", g_proc.pid, rip, rport, lport);
                     break;
 
                 default:

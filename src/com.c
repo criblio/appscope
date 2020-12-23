@@ -38,6 +38,15 @@ cmdSendMetric(mtc_t *mtc, event_t *evt)
 }
 
 int
+cmdSendPayload(ctl_t *ctl, char *data, size_t len)
+{
+    if (!ctl || !data ||
+        (checkEnv(PAYLOAD_ENV, PAYLOAD_VAL) == FALSE)) return 0;
+
+    return ctlSendBin(ctl, data, len);
+}
+
+int
 cmdSendInfoStr(ctl_t *ctl, const char *str)
 {
     cJSON* json;
@@ -146,6 +155,11 @@ msgStart(proc_id_t *proc, config_t *cfg)
     if (!(json_env = jsonEnvironmentObject())) goto err;
     cJSON_AddItemToObjectCS(json_info, "environment", json_env);
 
+    char *cfg_text = cJSON_PrintUnformatted(json_cfg);
+    if (cfg_text) {
+        scopeLog(cfg_text, -1, CFG_LOG_INFO);
+        free(cfg_text);
+    }
     return json_root;
 err:
     if (json_root) cJSON_Delete(json_root);
@@ -247,3 +261,17 @@ cmdCbufEmpty(ctl_t *ctl)
 {
     return ctlCbufEmpty(ctl);
 }
+
+int
+cmdPostPayload(ctl_t *ctl, char *pay)
+{
+    return ctlPostPayload(ctl, pay);
+}
+
+uint64_t
+msgPayloadGet(ctl_t *ctl)
+{
+    if (!ctl) return (uint64_t) -1;
+    return ctlGetPayload(ctl);
+}
+

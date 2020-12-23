@@ -230,7 +230,7 @@ static void
 transportSendForNullTransportDoesNothing(void** state)
 {
     const char* msg = "Hey, this is cool!\n";
-    assert_int_equal(transportSend(NULL, msg), -1);
+    assert_int_equal(transportSend(NULL, msg, strlen(msg)), -1);
 }
 
 static void
@@ -239,7 +239,7 @@ transportSendForNullMessageDoesNothing(void** state)
     const char* path = "/tmp/path";
     transport_t* t = transportCreateFile(path, CFG_BUFFER_LINE);
     assert_non_null(t);
-    assert_int_equal(transportSend(t, NULL), -1);
+    assert_int_equal(transportSend(t, NULL, 0), -1);
     transportDestroy(&t);
     if (unlink(path))
         fail_msg("Couldn't delete test file %s", path);
@@ -250,15 +250,15 @@ transportSendForUnimplementedTransportTypesIsHarmless(void** state)
 {
     transport_t* t;
     t = transportCreateUnix("/my/favorite/path");
-    transportSend(t, "blah");
+    transportSend(t, "blah", strlen("blah"));
     transportDestroy(&t);
 
     t = transportCreateSyslog();
-    transportSend(t, "blah");
+    transportSend(t, "blah", strlen("blah"));
     transportDestroy(&t);
 
     t = transportCreateShm();
-    transportSend(t, "blah");
+    transportSend(t, "blah", strlen("blah"));
     transportDestroy(&t);
 }
 
@@ -288,7 +288,7 @@ transportSendForUdpTransmitsMsg(void** state)
     assert_non_null(t);
     const char msg[] = "This is the payload message to transfer.\n";
     char buf[sizeof(msg)] = {0};  // Has room for a null at the end
-    assert_int_equal(transportSend(t, msg), 0);
+    assert_int_equal(transportSend(t, msg, strlen(msg)), 0);
 
     struct sockaddr_storage from = {0};
     socklen_t len = sizeof(from);
@@ -313,7 +313,7 @@ transportSendForFileWritesToFileAfterFlushWhenFullyBuffered(void** state)
 
     long file_pos_before = fileEndPosition(path);
     const char msg[] = "This is the payload message to transfer.\n";
-    assert_int_equal(transportSend(t, msg), 0);
+    assert_int_equal(transportSend(t, msg, strlen(msg)), 0);
     long file_pos_after = fileEndPosition(path);
 
     // With CFG_BUFFER_FULLY, this output only happens with the flush
@@ -370,7 +370,7 @@ transportSendForFileWritesToFileImmediatelyWhenLineBuffered(void** state)
     clearerr(f);
 
     const char msg[] = "This is the payload message to transfer.\n";
-    assert_int_equal(transportSend(t, msg), 0);
+    assert_int_equal(transportSend(t, msg, strlen(msg)), 0);
 
     // Test that after the transportSend, that the msg got there.
     bytesRead = fread(buf, 1, maxReadSize, f);

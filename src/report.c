@@ -6,10 +6,12 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <fcntl.h>
 
 #include "atomic.h"
 #include "com.h"
 #include "dbg.h"
+#include "fn.h"
 #include "httpagg.h"
 #include "mtcformat.h"
 #include "os.h"
@@ -2045,4 +2047,116 @@ doEvent()
     httpAggSendReport(g_http_agg, g_mtc);
     httpAggReset(g_http_agg);
     ctlFlush(g_ctl);
+}
+
+void
+doPayload()
+{
+    bool lsbin = TRUE;
+    bool filebin = TRUE;
+    uint64_t data;
+
+    while ((data = msgPayloadGet(g_ctl)) != -1) {
+        if (data) {
+            payload_info *pinfo = (payload_info *)data;
+            net_info *net = &pinfo->net;
+            size_t hlen = 1024;
+            char pay[hlen];
+            char *srcstr = NULL, rx[]="rx", tx[]="tx", none[]="none";
+
+            switch (pinfo->src) {
+            case NETTX:
+            case TLSTX:
+                srcstr = tx;
+                break;
+
+            case NETRX:
+            case TLSRX:
+                srcstr = rx;
+                break;
+
+            default:
+                srcstr = none;
+                break;
+            }
+
+            char lport[8], rport[8];
+            char lip[INET6_ADDRSTRLEN];
+            char rip[INET6_ADDRSTRLEN];
+
+            if (net) {
+                if (getConn(&net->localConn, lip, sizeof(lip), lport, sizeof(lport)) == FALSE) {
+                    strncpy(lip, "af_int_err", sizeof(lip));
+                    strncpy(lport, "0", sizeof(lport));
+                }
+
+                if (getConn(&net->remoteConn, rip, sizeof(rip), rport, sizeof(rport)) == FALSE) {
+                    strncpy(rip, "af_int_err", sizeof(rip));
+                    strncpy(rport, "0", sizeof(rport));
+                }
+            }
+
+            uint64_t netid = (net != NULL) ? net->uid : 0;
+            int rc = snprintf(pay, hlen,
+                              "{\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s}",
+                              g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport);
+            if (rc < 0) {
+                // unlikley
+                if (pinfo->data) free(pinfo->data);
+                if (pinfo) free(pinfo);
+                DBG(NULL);
+                return;
+            }
+
+            if (rc < hlen) {
+                hlen = rc + 1;
+            } else {
+                hlen--;
+                scopeLog("WARN: payload header was truncated", pinfo->sockfd, CFG_LOG_WARN);
+            }
+
+            char *bdata = NULL;
+
+            if (lsbin == TRUE) {
+                bdata = calloc(1, hlen + pinfo->len);
+                if (bdata) {
+                    memmove(bdata, pay, hlen);
+                    strncat(bdata, "\n", hlen);
+                    memmove(&bdata[hlen], pinfo->data, pinfo->len);
+                    cmdSendPayload(g_ctl, bdata, hlen + pinfo->len);
+                }
+            }
+
+            if (filebin == TRUE) {
+                int fd;
+                char path[PATH_MAX];
+
+                ///tmp/<splunk-pid>/<src_host:src_port:dst_port>.in
+                switch (pinfo->src) {
+                case NETTX:
+                case TLSTX:
+                    snprintf(path, PATH_MAX, "/tmp/%d_%s:%s:%s.out", g_proc.pid, rip, lport, rport);
+                    break;
+
+                case NETRX:
+                case TLSRX:
+                    snprintf(path, PATH_MAX, "/tmp/%d_%s:%s:%s.in", g_proc.pid, rip, rport, lport);
+                    break;
+
+                default:
+                    snprintf(path, PATH_MAX, "/tmp/%d.na", g_proc.pid);
+                    break;
+                }
+
+                if ((fd = g_fn.open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)) != -1) {
+                    g_fn.write(fd, pinfo->data, pinfo->len);
+                    g_fn.close(fd);
+                }
+            }
+
+            if (bdata) free(bdata);
+            if (pinfo->data) free(pinfo->data);
+            if (pinfo) free(pinfo);
+        }
+    }
 }

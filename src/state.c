@@ -845,6 +845,39 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     return TRUE;
 }
 
+static int
+extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
+{
+    if (!buf || (len <= 0)) return -1;
+
+    payload_info *pinfo = calloc(1, sizeof(struct payload_info_t));
+    if (!pinfo) {
+        return -1;
+    }
+
+    pinfo->data = calloc(1, len);
+    if (!pinfo->data) {
+        free(pinfo);
+        return -1;
+    }
+
+    memmove(pinfo->data, buf, len);
+    if (net) memmove(&pinfo->net, net, sizeof(net_info));
+
+    pinfo->evtype = EVT_PAYLOAD;
+    pinfo->src = src;
+    pinfo->sockfd = sockfd;
+    pinfo->len = len;
+
+    if (cmdPostPayload(g_ctl, (char *)pinfo) == -1) {
+        if (pinfo->data) free(pinfo->data);
+        if (pinfo) free(pinfo);
+        return -1;
+    }
+
+    return 0;
+}
+
 static void
 detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
@@ -903,6 +936,12 @@ int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     net_info *net = getNetEntry(sockfd);
+
+    if ((checkEnv(PAYLOAD_ENV, PAYLOAD_VAL) == TRUE)) {
+        // instead of or in addition to http &/or detect?
+        extractPayload(sockfd, net, buf, len, src, dtype);
+        return 0;
+    }
 
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
         if (doHttp(id, sockfd, net, buf, len, src, dtype)) {
@@ -1123,7 +1162,8 @@ doSetAddrs(int sockfd)
     // Only do this if output is enabled
     int need_to_track_addrs =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
-        (mtcEnabled(g_mtc) && g_mtc_addr_output);
+        (mtcEnabled(g_mtc) && g_mtc_addr_output) ||
+        checkEnv(PAYLOAD_ENV, PAYLOAD_VAL);
     if (!need_to_track_addrs) return 0;
 
     /*

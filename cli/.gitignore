@@ -1,0 +1,4 @@
+run/cscope.go
+build/*
+!build/.gitkeep
+coverage.out

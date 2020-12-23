@@ -1,11 +1,11 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "circbuf.h"
 #include "cfgutils.h"
 #include "ctl.h"
 #include "dbg.h"
-
 
 struct _ctl_t
 {
@@ -13,6 +13,7 @@ struct _ctl_t
     evt_fmt_t *evt;
     cbuf_handle_t evbuf;
     cbuf_handle_t events;
+    cbuf_handle_t payloads;
 };
 
 typedef struct {
@@ -520,6 +521,17 @@ ctlCreate()
         return NULL;
     }
 
+
+    if (checkEnv(PAYLOAD_ENV, PAYLOAD_VAL) == TRUE) {
+        ctl->payloads = cbufInit(DEFAULT_CBUF_SIZE);
+        if (!ctl->payloads) {
+            DBG(NULL);
+            return NULL;
+        }
+    } else {
+        ctl->payloads = NULL;
+    }
+
     return ctl;
 }
 
@@ -531,6 +543,7 @@ ctlDestroy(ctl_t **ctl)
     ctlFlush(*ctl);
     cbufFree((*ctl)->evbuf);
     cbufFree((*ctl)->events);
+    cbufFree((*ctl)->payloads);
 
     transportDestroy(&(*ctl)->transport);
     evtFormatDestroy(&(*ctl)->evt);
@@ -629,7 +642,7 @@ ctlSendHttp(ctl_t *ctl, event_t *evt, uint64_t uid, proc_id_t *proc)
     upld.req = NULL;
     streamMsg = prepMessage(&upld);
 
-    rc = transportSend(ctl->transport, streamMsg);
+    rc = transportSend(ctl->transport, streamMsg, strlen(streamMsg));
     if (streamMsg) free(streamMsg);
     return rc;
 }
@@ -653,7 +666,7 @@ ctlSendEvent(ctl_t *ctl, event_t *evt, uint64_t uid, proc_id_t *proc)
     upld.req = NULL;
     streamMsg = prepMessage(&upld);
 
-    rc = transportSend(ctl->transport, streamMsg);
+    rc = transportSend(ctl->transport, streamMsg, strlen(streamMsg));
     if (streamMsg) free(streamMsg);
     return rc;
 
@@ -684,6 +697,7 @@ ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t
 
     // get a cJSON object for the given log msg
     cJSON *json = evtFormatLog(ctl->evt, path, buf, count, uid, proc);
+    if (!json) return 0;
 
     // send it
     return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
@@ -713,10 +727,18 @@ sendBufferedMessages(ctl_t *ctl)
                 msg[strsize] = '\n';
                 msg[strsize+1] = '\0';
             }
-            transportSend(ctl->transport, msg);
+            transportSend(ctl->transport, msg, strlen(msg));
             free(msg);
         }
     }
+}
+
+int
+ctlSendBin(ctl_t *ctl, char *buf, size_t len)
+{
+    if (!ctl || !buf) return -1;
+
+    return transportSend(ctl->transport, buf, len);
 }
 
 void
@@ -820,3 +842,31 @@ ctlCbufEmpty(ctl_t *ctl)
 {
     return cbufEmpty(ctl->evbuf);
 }
+
+int
+ctlPostPayload(ctl_t *ctl, char *pay)
+{
+    if (!pay || !ctl) return -1;
+
+    if ((ctl->payloads) &&
+        (cbufPut(ctl->payloads, (uint64_t)pay) == -1)) {
+        // Full; drop and ignore
+        DBG(NULL);
+        return -1;
+    }
+    return 0;
+}
+
+uint64_t
+ctlGetPayload(ctl_t *ctl)
+{
+    uint64_t data;
+
+    if ((ctl->payloads) &&
+        (cbufGet(ctl->payloads, &data) == 0)) {
+        return data;
+    } else {
+        return (uint64_t)-1;
+    }
+}
+

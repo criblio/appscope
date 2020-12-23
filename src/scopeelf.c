@@ -356,6 +356,16 @@ getpath(const char *cmd)
         goto out;
     }
 
+    // try the current dir
+    char *path = NULL;
+    if (asprintf(&path, "./%s", cmd) > 0) {
+        if (!stat(path, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
+            return path;
+        } else {
+            free(path);
+        }
+    }
+
     // try to resolve the cmd from PATH env variable
     char *path_env_ptr = getenv("PATH");
     if (!path_env_ptr) goto out;

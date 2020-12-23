@@ -10,6 +10,7 @@
 #endif
 #include <sys/syscall.h>
 #include <sys/stat.h>
+#include <libgen.h>
 
 #include "atomic.h"
 #include "cfg.h"
@@ -1985,7 +1986,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 {
     int i, nargs, saverr;
     bool isstat = FALSE;
-    char **nargv;
+    char **nargv, *ldp;
     elf_buf_t *ebuf;
     char *scopexec = NULL;
 
@@ -2003,14 +2004,16 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     // not really necessary since we're gonna exec
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
-    if (getenv("LD_PRELOAD") && (isstat == FALSE)) {
+    ldp = getenv("LD_PRELOAD");
+    if (ldp && (isstat == FALSE)) {
         return g_fn.execve(pathname, argv, envp);
     }
 
     scopexec = getenv("SCOPE_EXEC_PATH");
     if (((scopexec = getpath(scopexec)) == NULL) &&
-        ((scopexec = getpath("scope")) == NULL)) {
-        char msg[64];
+        ((scopexec = getpath("scope")) == NULL) &&
+        ldp && ((scopexec = getpath(dirname(ldp))) == NULL)) {
+        char msg[128];
 
         // can't find the scope executable
         snprintf(msg, sizeof(msg), "execve: can't find a scope executable for %s", pathname);

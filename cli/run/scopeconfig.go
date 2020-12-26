@@ -24,13 +24,16 @@ type ScopeMetricConfig struct {
 
 // ScopeEventConfig represents how to output events
 type ScopeEventConfig struct {
-	Enable bool              `mapstructure:"enable" json:"enable" yaml:"enable"`
-	Format ScopeOutputFormat `mapstructure:"format" json:"format" yaml:"format"`
-	Watch  []struct {
-		WatchType string `mapstructure:"type" json:"type" yaml:"type"`
-		Name      string `mapstructure:"name" json:"name" yaml:"name"`
-		Value     string `mapstructure:"value" json:"value" yaml:"value"`
-	} `mapstructure:"watch" json:"watch" yaml:"watch"`
+	Enable bool               `mapstructure:"enable" json:"enable" yaml:"enable"`
+	Format ScopeOutputFormat  `mapstructure:"format" json:"format" yaml:"format"`
+	Watch  []ScopeWatchConfig `mapstructure:"watch" json:"watch" yaml:"watch"`
+}
+
+// ScopeWatchConfig represents a watch configuration
+type ScopeWatchConfig struct {
+	WatchType string `mapstructure:"type" json:"type" yaml:"type"`
+	Name      string `mapstructure:"name" json:"name" yaml:"name"`
+	Value     string `mapstructure:"value" json:"value" yaml:"value"`
 }
 
 // ScopeLibscopeConfig represents how to configure libscope
@@ -42,6 +45,7 @@ type ScopeLibscopeConfig struct {
 	Log           ScopeLogConfig `mapstructure:"log" json:"log" yaml:"log"`
 }
 
+// ScopeLogConfig represents how to configure libscope logs
 type ScopeLogConfig struct {
 	Level     string         `mapstructure:"level" json:"level" yaml:"level"`
 	Transport ScopeTransport `mapstructure:"transport" json:"transport" yaml:"transport"`
@@ -70,18 +74,35 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 		Metric: ScopeMetricConfig{
 			Enable: true,
 			Format: ScopeOutputFormat{
-				FormatType: "ndjson",
+				FormatType: "metricjson",
 				Verbosity:  4,
 			},
 			Transport: ScopeTransport{
 				TransportType: "file",
-				Path:          filepath.Join(workDir, "metrics.json"),
+				Path:          filepath.Join(workDir, "metrics.dogstatsd"),
 			},
 		},
 		Event: ScopeEventConfig{
 			Enable: true,
 			Format: ScopeOutputFormat{
 				FormatType: "ndjson",
+			},
+			Watch: []ScopeWatchConfig{
+				{
+					WatchType: "file",
+					Name:      ".*log.*",
+					Value:     ".*",
+				},
+				{
+					WatchType: "console",
+					Name:      "(stdout|stderr)",
+					Value:     ".*",
+				},
+				{
+					WatchType: "http",
+					Name:      ".*",
+					Value:     ".*",
+				},
 			},
 		},
 		Libscope: ScopeLibscopeConfig{

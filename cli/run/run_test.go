@@ -20,6 +20,7 @@ import (
 func TestCreateCScope(t *testing.T) {
 	tmpCScope := filepath.Join(".foo", "cscope")
 	os.Setenv("SCOPE_HOME", ".foo")
+	internal.InitConfig("")
 	err := CreateCScope()
 	os.Unsetenv("SCOPE_HOME")
 	assert.NoError(t, err)
@@ -109,7 +110,11 @@ func TestCreateWorkDir(t *testing.T) {
 	// Test CreateWorkDir, successfully
 	cmd = exec.Command(os.Args[0])
 	cmd.Env = append(os.Environ(), "TEST_MAIN=createWorkDir", "SCOPE_HOME=.test", "SCOPE_TEST=true")
+	var outb, errb bytes.Buffer
+	cmd.Stdout = &outb
+	cmd.Stderr = &errb
 	err = cmd.Run()
+	assert.NoError(t, err, errb.String())
 	wd := fmt.Sprintf("%s_%d_%d", ".test/history/foo", cmd.Process.Pid, 0)
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
@@ -117,10 +122,11 @@ func TestCreateWorkDir(t *testing.T) {
 }
 
 func testDefaultScopeConfigYaml(wd string) string {
+	wd, _ = filepath.Abs(wd)
 	expectedYaml := `metric:
   enable: true
   format:
-    type: ndjson
+    type: metricjson
     verbosity: 4
   transport:
     type: file
@@ -129,7 +135,16 @@ event:
   enable: true
   format:
     type: ndjson
-  watch: []
+  watch:
+  - type: file
+    name: .*log.*
+    value: .*
+  - type: console
+    name: (stdout|stderr)
+    value: .*
+  - type: http
+    name: .*
+    value: .*
 libscope:
   level: ""
   transport:
@@ -144,7 +159,7 @@ libscope:
       path: CSCOPELOGPATH
       buffering: line
 `
-	expectedYaml = strings.Replace(expectedYaml, "METRICSPATH", filepath.Join(wd, "metrics.json"), 1)
+	expectedYaml = strings.Replace(expectedYaml, "METRICSPATH", filepath.Join(wd, "metrics.dogstatsd"), 1)
 	expectedYaml = strings.Replace(expectedYaml, "EVENTSPATH", filepath.Join(wd, "events.json"), 1)
 	expectedYaml = strings.Replace(expectedYaml, "CMDDIR", filepath.Join(wd, "cmd"), 1)
 	expectedYaml = strings.Replace(expectedYaml, "CSCOPELOGPATH", filepath.Join(wd, "cscope.log"), 1)
@@ -198,5 +213,5 @@ func TestRun(t *testing.T) {
 
 	cmdDirExists := util.CheckFileExists(filepath.Join(wd, "cmd"))
 	assert.True(t, cmdDirExists)
-	// os.RemoveAll(".test")
+	os.RemoveAll(".test")
 }

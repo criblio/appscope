@@ -11,8 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/criblio/scope/logger"
+	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
@@ -34,12 +35,15 @@ func Run(args []string) {
 	// Normal operational, not passthrough, create directory for this run
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
-	if !viper.GetBool("passthrough") {
+	passthrough := viper.GetBool("passthrough")
+	if !passthrough {
 		env = environNoScope()
 		SetupWorkDir(args)
+		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(workDir, "scope.yml"))
 	} else {
 		env = os.Environ()
 	}
+	log.Info().Bool("passthrough", passthrough).Strs("args", args).Msg("calling syscall.Exec")
 	syscall.Exec(cscopePath(), append([]string{"cscope"}, args...), env)
 }
 
@@ -70,6 +74,7 @@ func CreateCScope() error {
 	if err != nil {
 		return err
 	}
+	log.Info().Str("cscope", cscope).Msg("created cscope")
 	return nil
 }
 
@@ -102,9 +107,10 @@ func CreateWorkDir(cmd string) {
 	cmdDir := filepath.Join(workDir, "cmd")
 	err := os.MkdirAll(cmdDir, 0755)
 	if err != nil {
-		util.ErrAndExit("error creating runDir: %v", err)
+		util.ErrAndExit("error creating work dir: %v", err)
 	}
-	log.WithFields(log.Fields{"workDir": workDir}).Infof("creating working directory")
+	internal.SetLogFile(filepath.Join(workDir, "scope.log"))
+	log.Info().Str("workDir", workDir).Msg("created working directory")
 }
 
 // HistoryDir returns the history directory

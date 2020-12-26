@@ -3,8 +3,10 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -21,7 +23,12 @@ var RootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	RootCmd.SilenceErrors = true
 	if err := RootCmd.Execute(); err != nil {
+		if strings.HasPrefix(err.Error(), "unknown command") {
+			internal.InitConfig(util.GetConfigPath())
+			run.Run(os.Args[1:])
+		}
 		fmt.Println(err)
 		os.Exit(1)
 	}

@@ -37,6 +37,9 @@ func ScopeHome() string {
 	}
 	base, match := os.LookupEnv("SCOPE_HOME")
 	if match {
+		if absPath, err := filepath.Abs(base); err == nil {
+			base = absPath
+		}
 		scopeHome = base
 		return scopeHome
 	}

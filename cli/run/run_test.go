@@ -115,7 +115,7 @@ func TestCreateWorkDir(t *testing.T) {
 	cmd.Stderr = &errb
 	err = cmd.Run()
 	assert.NoError(t, err, errb.String())
-	wd := fmt.Sprintf("%s_%d_%d", ".test/history/foo", cmd.Process.Pid, 0)
+	wd := fmt.Sprintf("%s_%d_%d_%d", ".test/history/foo", 1, cmd.Process.Pid, 0)
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 	os.RemoveAll(".test")
@@ -172,7 +172,7 @@ func TestSetupWorkDir(t *testing.T) {
 	cmd.Env = append(os.Environ(), "TEST_MAIN=setupWorkDir", "SCOPE_HOME=.test", "SCOPE_TEST=true")
 	err := cmd.Run()
 	assert.NoError(t, err)
-	wd := fmt.Sprintf("%s_%d_%d", ".test/history/foo", cmd.Process.Pid, 0)
+	wd := fmt.Sprintf("%s_%d_%d_%d", ".test/history/foo", 1, cmd.Process.Pid, 0)
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 
@@ -197,7 +197,7 @@ func TestRun(t *testing.T) {
 	cmd.Env = append(os.Environ(), "TEST_MAIN=run", "SCOPE_HOME=.test", "SCOPE_TEST=true")
 	err := cmd.Run()
 	assert.NoError(t, err)
-	wd := fmt.Sprintf("%s_%d_%d", ".test/history/echo", cmd.Process.Pid, 0)
+	wd := fmt.Sprintf("%s_%d_%d_%d", ".test/history/echo", 1, cmd.Process.Pid, 0)
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 

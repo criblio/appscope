@@ -3,6 +3,7 @@ package util
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -37,4 +38,17 @@ func TestScopeHome(t *testing.T) {
 	os.Setenv("HOME", homeBak)
 	os.Setenv("SCOPE_HOME", scopeHomeBak)
 	os.Setenv("TMPDIR", tmpDirBak)
+}
+
+func TestGetAgo(t *testing.T) {
+	ago := GetAgo(time.Now().Add(-1 * time.Second))
+	assert.Equal(t, "1s", ago)
+	ago = GetAgo(time.Now().Add((-1 * time.Minute) + (-1 * time.Second)))
+	assert.Equal(t, "1m1s", ago)
+	ago = GetAgo(time.Now().Add((-1 * time.Hour) + (-1 * time.Minute)))
+	assert.Equal(t, "1h1m", ago)
+	ago = GetAgo(time.Now().Add((-24 * time.Hour) + (-1 * time.Hour)))
+	assert.Equal(t, "1d1h", ago)
+	ago = GetAgo(time.Now().Add((-24 * 7 * time.Hour) + (-1 * time.Hour)))
+	assert.Equal(t, "7d", ago)
 }

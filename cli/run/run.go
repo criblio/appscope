@@ -101,16 +101,43 @@ func CreateWorkDir(cmd string) {
 	}
 	ts := strconv.FormatInt(now().UTC().UnixNano(), 10)
 	pid := strconv.Itoa(os.Getpid())
-	// Directories named CMD_PID_TIMESTAMP
-	tmpDirName := path.Base(cmd) + "_" + pid + "_" + ts
-	workDir = filepath.Join(HistoryDir(), tmpDirName)
-	cmdDir := filepath.Join(workDir, "cmd")
-	err := os.MkdirAll(cmdDir, 0755)
+	histDir := HistoryDir()
+	err := os.MkdirAll(histDir, 0755)
 	if err != nil {
-		util.ErrAndExit("error creating work dir: %v", err)
+		util.ErrAndExit("error creating history dir: %v", err)
+	}
+	sessionID := getSessionID()
+	// Directories named CMD_SESSIONID_PID_TIMESTAMP
+	tmpDirName := path.Base(cmd) + "_" + sessionID + "_" + pid + "_" + ts
+	workDir = filepath.Join(HistoryDir(), tmpDirName)
+	err = os.Mkdir(workDir, 0755)
+	if err != nil {
+		util.ErrAndExit("error creating workdir dir: %v", err)
+	}
+	cmdDir := filepath.Join(workDir, "cmd")
+	err = os.Mkdir(cmdDir, 0755)
+	if err != nil {
+		util.ErrAndExit("error creating cmd dir: %v", err)
 	}
 	internal.SetLogFile(filepath.Join(workDir, "scope.log"))
 	log.Info().Str("workDir", workDir).Msg("created working directory")
+}
+
+// Open to race conditions, but having a duplicate ID is only a UX bug rather than breaking
+// so keeping it simple and avoiding locking etc
+func getSessionID() string {
+	countFile := filepath.Join(util.ScopeHome(), "count")
+	lastSessionID := 0
+	lastSessionBytes, err := ioutil.ReadFile(countFile)
+	if err == nil {
+		lastSessionID, err = strconv.Atoi(string(lastSessionBytes))
+		if err != nil {
+			lastSessionID = 0
+		}
+	}
+	sessionID := strconv.Itoa(lastSessionID + 1)
+	_ = ioutil.WriteFile(countFile, []byte(sessionID), 0644)
+	return sessionID
 }
 
 // HistoryDir returns the history directory

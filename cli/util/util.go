@@ -2,10 +2,16 @@ package util
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/fatih/structs"
 )
 
 func init() {
@@ -75,4 +81,56 @@ func CheckFileExists(filePath string) bool {
 		return true
 	}
 	return false
+}
+
+// GetValue returns a reflect.Value to either the object itself or indirects its pointer first
+func GetValue(obj interface{}) reflect.Value {
+	v := reflect.ValueOf(obj)
+	if v.Kind() == reflect.Ptr {
+		return reflect.Indirect(v)
+	}
+	return v
+}
+
+// GetJSONField returns a given struct field given a JSON tag value
+func GetJSONField(obj interface{}, field string) *structs.Field {
+	fields := structs.Fields(obj)
+	for _, f := range fields {
+		if strings.Contains(f.Tag("json"), field) {
+			return f
+		}
+	}
+	return nil
+}
+
+// GetAgo returns a human readable duration from now
+func GetAgo(t time.Time) string {
+	since := time.Now().Sub(t)
+	if since.Hours() > 24*7 {
+		days := math.Floor(since.Hours() / 24)
+		return fmt.Sprintf("%.fd", days)
+	} else if since.Hours() > 24 {
+		days := math.Floor(since.Hours() / 24)
+		hours := int(math.Floor(since.Hours())) % 24
+		return fmt.Sprintf("%.fd%dh", days, hours)
+	} else if since.Hours() >= 1 {
+		hours := math.Floor(since.Hours())
+		mins := int(math.Floor(since.Minutes())) % 60
+		return fmt.Sprintf("%.fh%dm", hours, mins)
+	} else if since.Minutes() >= 1 {
+		mins := math.Floor(since.Minutes())
+		secs := int(math.Floor(since.Seconds())) % 60
+		return fmt.Sprintf("%.fm%ds", mins, secs)
+	} else {
+		secs := math.Floor(since.Seconds())
+		return fmt.Sprintf("%.fs", secs)
+	}
+}
+
+// TruncWithElipsis truncates a string to a specified length including the elipsis
+func TruncWithElipsis(s string, l int) string {
+	if len(s) > l {
+		return fmt.Sprintf("%."+strconv.Itoa(l-1)+"s…", s)
+	}
+	return s
 }

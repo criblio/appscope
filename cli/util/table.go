@@ -81,6 +81,7 @@ func printSlice(fields []ObjField, obj interface{}) error {
 	}
 	table.SetHeader(header)
 	table.SetAutoFormatHeaders(false)
+	table.SetAutoWrapText(false)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.SetCenterSeparator("")

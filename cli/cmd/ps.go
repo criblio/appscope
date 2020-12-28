@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// psCmd represents the run command
+// psCmd represents the ps command
 var psCmd = &cobra.Command{
 	Use:     "ps [flags]",
 	Short:   "List scope sessions",

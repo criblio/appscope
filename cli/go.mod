@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/fatih/color v1.7.0
 	github.com/fatih/structs v1.1.0
+	github.com/guptarohit/asciigraph v0.5.1
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/rs/zerolog v1.20.0

@@ -21,6 +21,11 @@ type Session struct {
 	Timestamp int64    `json:"timestamp"`
 	WorkDir   string   `json:"workDir"`
 	Args      []string `json:"args"`
+
+	ArgsPath    string `json:"-"`
+	MetricsPath string `json:"-"`
+	EventsPath  string `json:"-"`
+	CmdDirPath  string `json:"-"`
 }
 
 // SessionList represents a list of sessions
@@ -40,12 +45,18 @@ func GetSessions() (ret SessionList) {
 		pid, _ := strconv.Atoi(vals[3])
 		ts, _ := strconv.ParseInt(vals[4], 10, 64)
 
+		workDir := filepath.Join(histDir, f.Name())
+
 		ret = append(ret, Session{
-			ID:        id,
-			Cmd:       vals[1],
-			Pid:       pid,
-			Timestamp: ts,
-			WorkDir:   filepath.Join(histDir, f.Name()),
+			ID:          id,
+			Cmd:         vals[1],
+			Pid:         pid,
+			Timestamp:   ts,
+			WorkDir:     workDir,
+			ArgsPath:    filepath.Join(workDir, "args.json"),
+			CmdDirPath:  filepath.Join(workDir, "cmd"),
+			EventsPath:  filepath.Join(workDir, "even ts.json"),
+			MetricsPath: filepath.Join(workDir, "metrics.dogstatsd"),
 		})
 	}
 	return ret
@@ -82,6 +93,16 @@ func (sessions SessionList) Args() (ret SessionList) {
 			json.Unmarshal(rawBytes, &s.Args)
 		}
 		ret = append(ret, s)
+	}
+	return ret
+}
+
+// ID returns only matching session ID (expected one)
+func (sessions SessionList) ID(id int) (ret SessionList) {
+	for _, s := range sessions {
+		if s.ID == id {
+			ret = append(ret, s)
+		}
 	}
 	return ret
 }

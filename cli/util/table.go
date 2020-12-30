@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/fatih/color"
@@ -116,6 +117,7 @@ func printObj(fields []ObjField, obj interface{}) error {
 	table.SetBorders(tablewriter.Border{Left: false, Top: false, Right: false, Bottom: false})
 	table.SetColumnSeparator("  ")
 	table.SetCenterSeparator("  ")
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	// Iterate over fields
 	for _, field := range fields {
 		// Lookup field pointed to by Field
@@ -170,7 +172,13 @@ func printObj(fields []ObjField, obj interface{}) error {
 
 func indentedSubtable(obj map[string]interface{}, indent string) [][]string {
 	ret := [][]string{}
-	for k, v := range obj {
+	keys := make([]string, 0, len(obj))
+	for k := range obj {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := obj[k]
 		switch v.(type) {
 		case map[string]interface{}:
 			ret = append(ret, []string{fmt.Sprintf("%s%s", indent, k), ""})

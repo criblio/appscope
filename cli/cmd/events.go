@@ -1,14 +1,18 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/criblio/scope/events"
+	"github.com/criblio/scope/util"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
@@ -60,28 +64,36 @@ var co colorOpts
 
 // eventsCmd represents the events command
 var eventsCmd = &cobra.Command{
-	Use:     "events [flags]",
+	Use:     "events [flags] ([id])",
 	Short:   "Outputs events for a session",
 	Long:    `Outputs events for a session`,
 	Example: `scope events`,
-	Args:    cobra.NoArgs,
+	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		id, _ := cmd.Flags().GetInt("id")
 		sources, _ := cmd.Flags().GetStringSlice("source")
 		sourcetypes, _ := cmd.Flags().GetStringSlice("sourcetype")
-		noFields, _ := cmd.Flags().GetBool("nofields")
+		allFields, _ := cmd.Flags().GetBool("allfields")
 		lastN, _ := cmd.Flags().GetInt("last")
+		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		sessions := sessionByID(id)
 
 		// width, _, err := term.GetSize(0)
 		// util.CheckErrSprintf(err, "cannot get terminal width: %v", err)
 
+		count := events.Count(sessions[0].EventsPath)
 		skipEvents := 0
-		if lastN > -1 {
-			count := events.Count(sessions[0].EventsPath)
+		eventID := 0
+		if len(args) > 0 {
+			var err error
+			eventID, err = strconv.Atoi(args[0])
+			util.CheckErrSprintf(err, "could not parse %s as event ID (integer): %v", args[0], err)
+			skipEvents = eventID
+		} else if lastN > -1 {
 			skipEvents = count - lastN + 1
 		}
+		idChars := len(fmt.Sprintf("%d", count))
 
 		in := make(chan map[string]interface{})
 		idx := 0
@@ -110,13 +122,43 @@ var eventsCmd = &cobra.Command{
 			}
 			return events.MatchAll(all...)(line)
 		}, in)
+
+		enc := json.NewEncoder(os.Stdout)
+		if eventID > 0 {
+			e := <-in
+			if jsonOut {
+				enc.Encode(e)
+			} else {
+				// printe := map[string]interface{}{}
+				fields := []util.ObjField{
+					{Name: "ID", Field: "id"},
+					{Name: "Proc", Field: "proc"},
+					{Name: "Pid", Field: "pid"},
+					{Name: "Time", Field: "_time", Transform: func(obj interface{}) string { return formatTimestamp(obj.(float64)) }},
+					{Name: "Command", Field: "cmd"},
+					{Name: "Source", Field: "source"},
+					{Name: "Sourcetype", Field: "sourcetype"},
+					{Name: "Host", Field: "host"},
+					{Name: "Channel", Field: "_channel"},
+					{Name: "Data", Field: "data"},
+				}
+				util.PrintObj(fields, e)
+			}
+			os.Exit(0)
+		}
+
 		for e := range in {
+			if jsonOut {
+				enc.Encode(e)
+				continue
+			}
+			out := color.BlueString("[%"+strconv.Itoa(idChars)+"d] ", e["id"])
 			if _, timeExists := e["_time"]; timeExists {
 				timeFp := e["_time"].(float64)
-				e["_time"] = time.Unix(int64(math.Floor(timeFp)), int64(math.Mod(timeFp, 1)*1000000)).Format(time.Stamp)
+				e["_time"] = formatTimestamp(timeFp)
 			}
 			noop := func(orig interface{}) interface{} { return orig }
-			out := colorToken(e, "_time", noop)
+			out += colorToken(e, "_time", noop)
 			out += colorToken(e, "proc", noop)
 			out += sourcetypeColorToken(e)
 			out += colorToken(e, "source", noop)
@@ -136,8 +178,8 @@ var eventsCmd = &cobra.Command{
 			delete(e, "_channel")
 			delete(e, "sourcetype")
 
-			if !noFields {
-				out += colorMap(e, []string{})
+			if allFields {
+				out += fmt.Sprintf("[[%s]]", colorMap(e, []string{}))
 			}
 			fmt.Printf("%s\n", out)
 		}
@@ -171,9 +213,12 @@ func colorMap(e map[string]interface{}, onlyFields []string) string {
 
 	}
 	sort.Strings(keys)
-	for _, k := range keys {
+	for idx, k := range keys {
+		if idx > 0 {
+			kv += " "
+		}
 		kv += co.color("key").Sprintf("%s", k)
-		kv += co.color("val").Sprintf(":%s ", interfaceToString(e[k]))
+		kv += co.color("val").Sprintf(":%s", interfaceToString(e[k]))
 	}
 	return kv
 }
@@ -204,12 +249,17 @@ func ansiStrip(str string) string {
 	return ansire.ReplaceAllString(str, "")
 }
 
+func formatTimestamp(timeFp float64) string {
+	return time.Unix(int64(math.Floor(timeFp)), int64(math.Mod(timeFp, 1)*1000000)).Format(time.Stamp)
+}
+
 func init() {
 	eventsCmd.Flags().Int("id", -1, "Display events from session ID")
 	eventsCmd.Flags().StringSliceP("source", "s", []string{}, "Display events matching supplied sources")
 	eventsCmd.Flags().StringSliceP("sourcetype", "t", []string{}, "Display events matching supplied sourcetypes")
-	eventsCmd.Flags().Bool("nofields", false, "Disable displaying extra fields")
+	eventsCmd.Flags().Bool("allfields", false, "Displaying hidden fields")
 	eventsCmd.Flags().IntP("last", "n", -1, "Show n last events")
+	eventsCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	RootCmd.AddCommand(eventsCmd)
 
 	if co == nil {

@@ -21,7 +21,9 @@ func Reader(path string, match func(string) bool, out chan map[string]interface{
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+	idx := 0
 	for scanner.Scan() {
+		idx++
 		event := map[string]interface{}{}
 		if !match(scanner.Text()) {
 			continue
@@ -29,7 +31,9 @@ func Reader(path string, match func(string) bool, out chan map[string]interface{
 		err := json.Unmarshal(scanner.Bytes(), &event)
 		util.CheckErrSprintf(err, "error decoding JSON %s\nerr: %v", scanner.Text(), err)
 		if eventType, typeExists := event["type"]; typeExists && eventType.(string) == "evt" {
-			out <- event["body"].(map[string]interface{})
+			body := event["body"].(map[string]interface{})
+			body["id"] = idx
+			out <- body
 		}
 	}
 

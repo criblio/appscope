@@ -166,23 +166,23 @@ func TestPrintObjSliceMap(t *testing.T) {
 	rows := strings.Split(string(buf.Bytes()), "\n")
 
 	// First row contains headers
-	assert.True(t, strings.Contains(rows[0], "Field 1"))
-	assert.True(t, strings.Contains(rows[0], "field2"))
-	assert.True(t, strings.Contains(rows[0], "field4"))
-	assert.False(t, strings.Contains(rows[0], "field3"))
+	assert.True(t, strings.Contains(rows[0], "FIELD 1"))
+	assert.True(t, strings.Contains(rows[0], "FIELD2"))
+	assert.True(t, strings.Contains(rows[0], "FIELD4"))
+	assert.False(t, strings.Contains(rows[0], "FIELD3"))
 
 	// Second row contains row divider
-	assert.True(t, strings.Contains(rows[1], "--"))
+	// assert.True(t, strings.Contains(rows[1], "--"))
 
 	// Third row is the first row of the table
-	assert.True(t, strings.Contains(rows[2], "value1"))
-	assert.True(t, strings.Contains(rows[2], "VALUE2"))
-	assert.True(t, strings.Contains(rows[2], "4"))
-	assert.False(t, strings.Contains(rows[2], "value3"))
+	assert.True(t, strings.Contains(rows[1], "value1"))
+	assert.True(t, strings.Contains(rows[1], "VALUE2"))
+	assert.True(t, strings.Contains(rows[1], "4"))
+	assert.False(t, strings.Contains(rows[1], "value3"))
 
 	// Fourth row is the second row of the table
-	assert.True(t, strings.Contains(rows[3], "2value1"))
-	assert.True(t, strings.Contains(rows[3], "2VALUE2"))
-	assert.True(t, strings.Contains(rows[3], "24"))
-	assert.False(t, strings.Contains(rows[3], "2value3"))
+	assert.True(t, strings.Contains(rows[2], "2value1"))
+	assert.True(t, strings.Contains(rows[2], "2VALUE2"))
+	assert.True(t, strings.Contains(rows[2], "24"))
+	assert.False(t, strings.Contains(rows[2], "2value3"))
 }

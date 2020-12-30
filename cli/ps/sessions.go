@@ -35,9 +35,7 @@ type SessionList []Session
 func GetSessions() (ret SessionList) {
 	histDir := run.HistoryDir()
 	files, err := ioutil.ReadDir(histDir)
-	if err != nil {
-		util.ErrAndExit("error listing %s: %v", histDir, err)
-	}
+	util.CheckErrSprintf(err, "error listing %s: %v", histDir, err)
 	re := regexp.MustCompile(`([^_]+)_(\d+)_(\d+)_(\d+)`)
 	for _, f := range files {
 		vals := re.FindStringSubmatch(f.Name())
@@ -55,7 +53,7 @@ func GetSessions() (ret SessionList) {
 			WorkDir:     workDir,
 			ArgsPath:    filepath.Join(workDir, "args.json"),
 			CmdDirPath:  filepath.Join(workDir, "cmd"),
-			EventsPath:  filepath.Join(workDir, "even ts.json"),
+			EventsPath:  filepath.Join(workDir, "events.json"),
 			MetricsPath: filepath.Join(workDir, "metrics.dogstatsd"),
 		})
 	}

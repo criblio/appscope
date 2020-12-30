@@ -65,6 +65,13 @@ func GetConfigPath() string {
 	return filepath.Join(ScopeHome(), "config.yml")
 }
 
+// CheckErrSprintf writes a format string to stderr and then exits with a status code of 1 if there is an error
+func CheckErrSprintf(err error, format string, a ...interface{}) {
+	if err != nil {
+		ErrAndExit(format, a...)
+	}
+}
+
 // ErrAndExit writes a format string to stderr and then exits with a status code of 1
 func ErrAndExit(format string, a ...interface{}) {
 	out := fmt.Sprintf(format, a...)

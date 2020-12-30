@@ -12,6 +12,9 @@ import (
 
 // InitConfig reads in config file and ENV variables if set.
 func InitConfig(cfgFile string) {
+	if viper.GetBool("passthrough") {
+		return
+	}
 	viper.SetConfigFile(cfgFile)
 	viper.SetEnvPrefix("scope")
 	viper.AutomaticEnv() // read in environment variables that match
@@ -43,12 +46,8 @@ func InitConfig(cfgFile string) {
 // SetLogFile sets log output to a particular file path
 func SetLogFile(path string) {
 	err := os.MkdirAll(filepath.Dir(path), 0755)
-	if err != nil {
-		util.ErrAndExit("could not create path to log file %s: %v", path, err)
-	}
+	util.CheckErrSprintf(err, "could not create path to log file %s: %v", path, err)
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		util.ErrAndExit("could not open log file %s: %v", path, err)
-	}
+	util.CheckErrSprintf(err, "could not open log file %s: %v", path, err)
 	log.Logger = zerolog.New(f).With().Timestamp().Caller().Logger()
 }

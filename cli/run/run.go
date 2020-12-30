@@ -40,10 +40,10 @@ func Run(args []string) {
 		env = environNoScope()
 		SetupWorkDir(args)
 		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(workDir, "scope.yml"))
+		log.Info().Bool("passthrough", passthrough).Strs("args", args).Msg("calling syscall.Exec")
 	} else {
 		env = os.Environ()
 	}
-	log.Info().Bool("passthrough", passthrough).Strs("args", args).Msg("calling syscall.Exec")
 	syscall.Exec(cscopePath(), append([]string{"cscope"}, args...), env)
 }
 
@@ -103,22 +103,16 @@ func CreateWorkDir(cmd string) {
 	pid := strconv.Itoa(os.Getpid())
 	histDir := HistoryDir()
 	err := os.MkdirAll(histDir, 0755)
-	if err != nil {
-		util.ErrAndExit("error creating history dir: %v", err)
-	}
+	util.CheckErrSprintf(err, "error creating history dir: %v", err)
 	sessionID := getSessionID()
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP
 	tmpDirName := path.Base(cmd) + "_" + sessionID + "_" + pid + "_" + ts
 	workDir = filepath.Join(HistoryDir(), tmpDirName)
 	err = os.Mkdir(workDir, 0755)
-	if err != nil {
-		util.ErrAndExit("error creating workdir dir: %v", err)
-	}
+	util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
 	cmdDir := filepath.Join(workDir, "cmd")
 	err = os.Mkdir(cmdDir, 0755)
-	if err != nil {
-		util.ErrAndExit("error creating cmd dir: %v", err)
-	}
+	util.CheckErrSprintf(err, "error creating cmd dir: %v", err)
 	internal.SetLogFile(filepath.Join(workDir, "scope.log"))
 	log.Info().Str("workDir", workDir).Msg("created working directory")
 }
@@ -154,13 +148,9 @@ func SetupWorkDir(args []string) {
 
 	scYamlPath := filepath.Join(workDir, "scope.yml")
 	err := WriteScopeConfig(sc, scYamlPath)
-	if err != nil {
-		util.ErrAndExit("%v", err)
-	}
+	util.CheckErrSprintf(err, "%v", err)
 	argsJSONPath := filepath.Join(workDir, "args.json")
 	argsBytes, err := json.Marshal(args)
-	if err != nil {
-		util.ErrAndExit("error marshaling JSON: %v", err)
-	}
+	util.CheckErrSprintf(err, "error marshaling JSON: %v", err)
 	err = ioutil.WriteFile(argsJSONPath, argsBytes, 0644)
 }

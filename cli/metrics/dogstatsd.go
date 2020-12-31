@@ -12,7 +12,7 @@ import (
 // ReadMetricsFromFile reads dogstatsd metrics from a file
 func ReadMetricsFromFile(path string) (ret []Metric) {
 	file, err := os.Open(path)
-	util.CheckErrSprintf(err, "error reading metrics from file, cannot open %s: %v", path, err)
+	util.CheckErrSprintf(err, "Invalid session. Command likely exited without capturing metric data.\nerror reading metrics from file: %v", err)
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)

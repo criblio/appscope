@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"os"
@@ -140,4 +141,51 @@ func TruncWithElipsis(s string, l int) string {
 		return fmt.Sprintf("%."+strconv.Itoa(l-1)+"s…", s)
 	}
 	return s
+}
+
+// CountingReader counts the bytes read from an io.Reader
+type CountingReader struct {
+	io.Reader
+	BytesRead int
+}
+
+func (r *CountingReader) Read(p []byte) (n int, err error) {
+	n, err = r.Reader.Read(p)
+	r.BytesRead += n
+	return n, err
+}
+
+// TailReader implements a simple polling based file tailer
+type TailReader struct {
+	io.ReadCloser
+}
+
+func (t TailReader) Read(b []byte) (int, error) {
+	for {
+		n, err := t.ReadCloser.Read(b)
+		if n > 0 {
+			return n, nil
+		} else if err != io.EOF {
+			return n, err
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// NewTailReader creates a new tailing reader for fileName
+func NewTailReader(fileName string, offset int) (TailReader, error) {
+	f, err := os.Open(fileName)
+	if err != nil {
+		return TailReader{}, err
+	}
+
+	if _, err := f.Seek(int64(offset), os.SEEK_SET); err != nil {
+		return TailReader{}, err
+	}
+	return TailReader{f}, nil
+}
+
+// FormatTimestamp prints a human readable timestamp from scope's secs.millisecs format.
+func FormatTimestamp(timeFp float64) string {
+	return time.Unix(int64(math.Floor(timeFp)), int64(math.Mod(timeFp, 1)*1000000)).Format(time.Stamp)
 }

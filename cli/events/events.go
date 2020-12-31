@@ -13,15 +13,13 @@ import (
 	"github.com/criblio/scope/util"
 )
 
-// Reader reads a newline delimited JSON document and sends parsed documents
+// Reader reads a newline delimited JSON documents and sends parsed documents
 // to the passed out channel. It exits the process on error.
-func Reader(path string, match func(string) bool, out chan map[string]interface{}) {
-	file, err := os.Open(path)
-	util.CheckErrSprintf(err, "error opening events file %s: %v", path, err)
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
+func Reader(r io.Reader, match func(string) bool, out chan map[string]interface{}) (int, error) {
+	cr := &util.CountingReader{Reader: r}
+	scanner := bufio.NewScanner(cr)
 	idx := 0
+	// Discard first line, which is scope setup event
 	for scanner.Scan() {
 		idx++
 		event := map[string]interface{}{}
@@ -29,7 +27,9 @@ func Reader(path string, match func(string) bool, out chan map[string]interface{
 			continue
 		}
 		err := json.Unmarshal(scanner.Bytes(), &event)
-		util.CheckErrSprintf(err, "error decoding JSON %s\nerr: %v", scanner.Text(), err)
+		if err != nil {
+			return cr.BytesRead, err
+		}
 		if eventType, typeExists := event["type"]; typeExists && eventType.(string) == "evt" {
 			body := event["body"].(map[string]interface{})
 			body["id"] = idx
@@ -38,9 +38,10 @@ func Reader(path string, match func(string) bool, out chan map[string]interface{
 	}
 
 	if err := scanner.Err(); err != nil {
-		util.ErrAndExit("error scanning events file %s: %v", path, err)
+		return cr.BytesRead, err
 	}
 	close(out)
+	return cr.BytesRead, nil
 }
 
 // MatchFunc will return true or false if a given event matches
@@ -111,9 +112,11 @@ func MatchAll(match ...MatchFunc) MatchFunc {
 }
 
 // Count returns the number of events in a given file
-func Count(path string) int {
+func Count(path string) (int, error) {
 	file, err := os.Open(path)
-	util.CheckErrSprintf(err, "error opening events file %s: %v", path, err)
+	if err != nil {
+		return 0, err
+	}
 	defer file.Close()
 
 	buf := make([]byte, 32*1024)
@@ -126,10 +129,10 @@ func Count(path string) int {
 
 		switch {
 		case err == io.EOF:
-			return count
+			return count, nil
 
 		case err != nil:
-			util.ErrAndExit("unexpected error counting events: %v", err)
+			return count, err
 		}
 	}
 }

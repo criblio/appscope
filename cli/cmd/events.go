@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/criblio/scope/events"
 	"github.com/criblio/scope/util"
@@ -73,16 +72,14 @@ var eventsCmd = &cobra.Command{
 		id, _ := cmd.Flags().GetInt("id")
 		sources, _ := cmd.Flags().GetStringSlice("source")
 		sourcetypes, _ := cmd.Flags().GetStringSlice("sourcetype")
-		allFields, _ := cmd.Flags().GetBool("allfields")
 		lastN, _ := cmd.Flags().GetInt("last")
-		jsonOut, _ := cmd.Flags().GetBool("json")
+		follow, _ := cmd.Flags().GetBool("follow")
 
 		sessions := sessionByID(id)
 
-		// width, _, err := term.GetSize(0)
-		// util.CheckErrSprintf(err, "cannot get terminal width: %v", err)
-
-		count := events.Count(sessions[0].EventsPath)
+		// Count events to figure out our starting place if we want the last N events or a specific event
+		count, err := events.Count(sessions[0].EventsPath)
+		util.CheckErrSprintf(err, "Invalid session. Command likely exited without capturing event data.\nerror opening events file: %v", err)
 		skipEvents := 0
 		eventID := 0
 		if len(args) > 0 {
@@ -91,99 +88,121 @@ var eventsCmd = &cobra.Command{
 			util.CheckErrSprintf(err, "could not parse %s as event ID (integer): %v", args[0], err)
 			skipEvents = eventID
 		} else if lastN > -1 {
-			skipEvents = count - lastN + 1
+			skipEvents = count - lastN - 1
 		}
+		// How many events do we have? Determines width of the id field
 		idChars := len(fmt.Sprintf("%d", count))
 
-		in := make(chan map[string]interface{})
-		idx := 0
-		go events.Reader(sessions[0].EventsPath, func(line string) bool {
-			idx++
-			if skipEvents > 0 && idx < skipEvents {
-				return false
-			}
-			all := []events.MatchFunc{}
-			if len(sources) > 0 {
-				matchsources := []events.MatchFunc{}
-				for _, s := range sources {
-					matchsources = append(matchsources, events.MatchField("source", s))
-				}
-				all = append(all, events.MatchAny(matchsources...))
-			}
-			if len(sourcetypes) > 0 {
-				matchsourcetypes := []events.MatchFunc{}
-				for _, t := range sourcetypes {
-					matchsourcetypes = append(matchsourcetypes, events.MatchField("sourcetype", t))
-				}
-				all = append(all, events.MatchAny(matchsourcetypes...))
-			}
-			if len(all) == 0 {
-				all = append(all, events.MatchAlways)
-			}
-			return events.MatchAll(all...)(line)
-		}, in)
+		// EventMatch contains parameters to match again, used in the filter function
+		// sent to events.Reader
+		em := eventMatch{
+			sources:     sources,
+			sourcetypes: sourcetypes,
+			skipEvents:  skipEvents,
+		}
 
-		enc := json.NewEncoder(os.Stdout)
+		// Open events.json file
+		file, err := os.Open(sessions[0].EventsPath)
+		util.CheckErrSprintf(err, "error opening events file: %v", err)
+		// Read Events
+		in := make(chan map[string]interface{})
+		offsetChan := make(chan int)
+		go func() {
+			offset, err := events.Reader(file, em.filter(), in)
+			util.CheckErrSprintf(err, "error opening reading events from file: %v", err)
+			offsetChan <- offset
+		}()
+
+		// If we were passed an EventID, read that one event, print and exit
 		if eventID > 0 {
-			e := <-in
-			if jsonOut {
-				enc.Encode(e)
-			} else {
-				// printe := map[string]interface{}{}
-				fields := []util.ObjField{
-					{Name: "ID", Field: "id"},
-					{Name: "Proc", Field: "proc"},
-					{Name: "Pid", Field: "pid"},
-					{Name: "Time", Field: "_time", Transform: func(obj interface{}) string { return formatTimestamp(obj.(float64)) }},
-					{Name: "Command", Field: "cmd"},
-					{Name: "Source", Field: "source"},
-					{Name: "Sourcetype", Field: "sourcetype"},
-					{Name: "Host", Field: "host"},
-					{Name: "Channel", Field: "_channel"},
-					{Name: "Data", Field: "data"},
-				}
-				util.PrintObj(fields, e)
-			}
+			printEvent(cmd, in)
 			os.Exit(0)
 		}
 
-		for e := range in {
-			if jsonOut {
-				enc.Encode(e)
-				continue
-			}
-			out := color.BlueString("[%"+strconv.Itoa(idChars)+"d] ", e["id"])
-			if _, timeExists := e["_time"]; timeExists {
-				timeFp := e["_time"].(float64)
-				e["_time"] = formatTimestamp(timeFp)
-			}
-			noop := func(orig interface{}) interface{} { return orig }
-			out += colorToken(e, "_time", noop)
-			out += colorToken(e, "proc", noop)
-			out += sourcetypeColorToken(e)
-			out += colorToken(e, "source", noop)
-			out += colorToken(e, "data", func(orig interface{}) interface{} {
-				ret := ""
-				switch orig.(type) {
-				case string:
-					ret = ansiStrip(strings.TrimSpace(fmt.Sprintf("%s", orig)))
-				case map[string]interface{}:
-					ret = colorMap(orig.(map[string]interface{}), sourcetypeFields[e["sourcetype"].(string)])
-				}
-				return ret
-			})
+		// Print events from events.json
+		printEvents(cmd, idChars, in)
+		file.Close()
 
-			// Delete uninteresting fields
-			delete(e, "id")
-			delete(e, "_channel")
-			delete(e, "sourcetype")
-
-			if allFields {
-				out += fmt.Sprintf("[[%s]]", colorMap(e, []string{}))
-			}
-			fmt.Printf("%s\n", out)
+		if follow {
+			offset := <-offsetChan
+			tailFile, err := util.NewTailReader(sessions[0].EventsPath, offset)
+			util.CheckErrSprintf(err, "error opening events file for tailing: %v", err)
+			in = make(chan map[string]interface{})
+			go events.Reader(tailFile, em.filter(), in)
+			printEvents(cmd, idChars, in)
 		}
 	},
+}
+
+func printEvent(cmd *cobra.Command, in chan map[string]interface{}) {
+	jsonOut, _ := cmd.Flags().GetBool("json")
+	enc := json.NewEncoder(os.Stdout)
+	e := <-in
+	if jsonOut {
+		enc.Encode(e)
+	} else {
+		// printe := map[string]interface{}{}
+		fields := []util.ObjField{
+			{Name: "ID", Field: "id"},
+			{Name: "Proc", Field: "proc"},
+			{Name: "Pid", Field: "pid"},
+			{Name: "Time", Field: "_time", Transform: func(obj interface{}) string { return util.FormatTimestamp(obj.(float64)) }},
+			{Name: "Command", Field: "cmd"},
+			{Name: "Source", Field: "source"},
+			{Name: "Sourcetype", Field: "sourcetype"},
+			{Name: "Host", Field: "host"},
+			{Name: "Channel", Field: "_channel"},
+			{Name: "Data", Field: "data"},
+		}
+		util.PrintObj(fields, e)
+	}
+}
+
+var lastID = 0 // HACK until we can get some real IDs
+
+func printEvents(cmd *cobra.Command, idChars int, in chan map[string]interface{}) {
+	jsonOut, _ := cmd.Flags().GetBool("json")
+	allFields, _ := cmd.Flags().GetBool("allfields")
+	enc := json.NewEncoder(os.Stdout)
+	llastID := 0
+	for e := range in {
+		if jsonOut {
+			enc.Encode(e)
+			continue
+		}
+		out := color.BlueString("[%"+strconv.Itoa(idChars)+"d] ", e["id"].(int)+lastID)
+		if _, timeExists := e["_time"]; timeExists {
+			timeFp := e["_time"].(float64)
+			e["_time"] = util.FormatTimestamp(timeFp)
+		}
+		noop := func(orig interface{}) interface{} { return orig }
+		out += colorToken(e, "_time", noop)
+		out += colorToken(e, "proc", noop)
+		out += sourcetypeColorToken(e)
+		out += colorToken(e, "source", noop)
+		out += colorToken(e, "data", func(orig interface{}) interface{} {
+			ret := ""
+			switch orig.(type) {
+			case string:
+				ret = ansiStrip(strings.TrimSpace(fmt.Sprintf("%s", orig)))
+			case map[string]interface{}:
+				ret = colorMap(orig.(map[string]interface{}), sourcetypeFields[e["sourcetype"].(string)])
+			}
+			return ret
+		})
+
+		// Delete uninteresting fields
+		llastID = e["id"].(int)
+		delete(e, "id")
+		delete(e, "_channel")
+		delete(e, "sourcetype")
+
+		if allFields {
+			out += fmt.Sprintf("[[%s]]", colorMap(e, []string{}))
+		}
+		fmt.Printf("%s\n", out)
+	}
+	lastID = llastID
 }
 
 func colorToken(e map[string]interface{}, field string, transform func(interface{}) interface{}) string {
@@ -249,8 +268,39 @@ func ansiStrip(str string) string {
 	return ansire.ReplaceAllString(str, "")
 }
 
-func formatTimestamp(timeFp float64) string {
-	return time.Unix(int64(math.Floor(timeFp)), int64(math.Mod(timeFp, 1)*1000000)).Format(time.Stamp)
+type eventMatch struct {
+	sources     []string
+	sourcetypes []string
+	skipEvents  int
+}
+
+func (em eventMatch) filter() func(string) bool {
+	idx := 0
+	return func(line string) bool {
+		idx++
+		if em.skipEvents > 0 && idx < em.skipEvents {
+			return false
+		}
+		all := []events.MatchFunc{}
+		if len(em.sources) > 0 {
+			matchsources := []events.MatchFunc{}
+			for _, s := range em.sources {
+				matchsources = append(matchsources, events.MatchField("source", s))
+			}
+			all = append(all, events.MatchAny(matchsources...))
+		}
+		if len(em.sourcetypes) > 0 {
+			matchsourcetypes := []events.MatchFunc{}
+			for _, t := range em.sourcetypes {
+				matchsourcetypes = append(matchsourcetypes, events.MatchField("sourcetype", t))
+			}
+			all = append(all, events.MatchAny(matchsourcetypes...))
+		}
+		if len(all) == 0 {
+			all = append(all, events.MatchAlways)
+		}
+		return events.MatchAll(all...)(line)
+	}
 }
 
 func init() {
@@ -260,6 +310,7 @@ func init() {
 	eventsCmd.Flags().Bool("allfields", false, "Displaying hidden fields")
 	eventsCmd.Flags().IntP("last", "n", -1, "Show n last events")
 	eventsCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
+	eventsCmd.Flags().BoolP("follow", "f", false, "Follow a file, like tail -f")
 	RootCmd.AddCommand(eventsCmd)
 
 	if co == nil {

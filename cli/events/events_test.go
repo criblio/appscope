@@ -14,8 +14,9 @@ func TestReader(t *testing.T) {
 	ioutil.WriteFile("event.json", []byte(rawEvent), 0644)
 
 	in := make(chan map[string]interface{})
-
-	go Reader("event.json", MatchAlways, in)
+	file, err := os.Open("event.json")
+	assert.NoError(t, err)
+	go Reader(file, MatchAlways, in)
 
 	event := <-in
 
@@ -35,23 +36,31 @@ func TestReaderWithFilter(t *testing.T) {
 	ioutil.WriteFile("event.json", []byte(rawEvent), 0644)
 
 	in := make(chan map[string]interface{})
-	go Reader("event.json", MatchString("foo"), in)
+	file, err := os.Open("event.json")
+	assert.NoError(t, err)
+	go Reader(file, MatchString("foo"), in)
 	events := []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
 	}
 	assert.Len(t, events, 1)
+	file.Close()
 
 	in = make(chan map[string]interface{})
-	go Reader("event.json", MatchField("source", "foo"), in)
+	file, err = os.Open("event.json")
+	assert.NoError(t, err)
+	go Reader(file, MatchField("source", "foo"), in)
 	events = []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
 	}
 	assert.Len(t, events, 1)
+	file.Close()
 
 	in = make(chan map[string]interface{})
-	go Reader("event.json", MatchField("pid", 10118), in)
+	file, err = os.Open("event.json")
+	assert.NoError(t, err)
+	go Reader(file, MatchField("pid", 10118), in)
 	events = []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
@@ -59,36 +68,48 @@ func TestReaderWithFilter(t *testing.T) {
 	assert.Len(t, events, 2)
 
 	in = make(chan map[string]interface{})
-	go Reader("event.json", MatchField("_time", 1609191683.986), in)
+	file, err = os.Open("event.json")
+	assert.NoError(t, err)
+	go Reader(file, MatchField("_time", 1609191683.986), in)
 	events = []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
 	}
 	assert.Len(t, events, 1)
+	file.Close()
 
 	in = make(chan map[string]interface{})
-	go Reader("event.json", MatchAny([]MatchFunc{MatchField("pid", 10118), MatchString("foo")}...), in)
+	file, err = os.Open("event.json")
+	assert.NoError(t, err)
+	go Reader(file, MatchAny([]MatchFunc{MatchField("pid", 10118), MatchString("foo")}...), in)
 	events = []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
 	}
 	assert.Len(t, events, 3)
+	file.Close()
 
 	in = make(chan map[string]interface{})
-	go Reader("event.json", MatchAll([]MatchFunc{MatchField("pid", 10118), MatchString("foo")}...), in)
+	file, err = os.Open("event.json")
+	assert.NoError(t, err)
+	go Reader(file, MatchAll([]MatchFunc{MatchField("pid", 10118), MatchString("foo")}...), in)
 	events = []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
 	}
 	assert.Len(t, events, 0)
+	file.Close()
 
 	in = make(chan map[string]interface{})
-	go Reader("event.json", MatchAll([]MatchFunc{MatchField("pid", 10117), MatchString("foo")}...), in)
+	file, err = os.Open("event.json")
+	assert.NoError(t, err)
+	go Reader(file, MatchAll([]MatchFunc{MatchField("pid", 10117), MatchString("foo")}...), in)
 	events = []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
 	}
 	assert.Len(t, events, 1)
+	file.Close()
 }
 
 func TestCount(t *testing.T) {
@@ -100,7 +121,8 @@ func TestCount(t *testing.T) {
 
 	ioutil.WriteFile("event.json", []byte(rawEvent), 0644)
 
-	count := Count("event.json")
+	count, err := Count("event.json")
+	assert.NoError(t, err)
 	assert.Equal(t, 4, count)
 	os.Remove("event.json")
 }

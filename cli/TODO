@@ -1,0 +1,4 @@
+* Change unit tests to only use process executino for the specific run test and mock the file output in other tests
+* Tail for Metrics
+* Option for run to output metric and/or event data on stderr
+* Back out any ID related stuff in favor of a scope generated ID

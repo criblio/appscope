@@ -22,10 +22,10 @@ type Session struct {
 	WorkDir   string   `json:"workDir"`
 	Args      []string `json:"args"`
 
-	ArgsPath    string `json:"-"`
-	MetricsPath string `json:"-"`
-	EventsPath  string `json:"-"`
-	CmdDirPath  string `json:"-"`
+	ArgsPath    string `json:"argspath"`
+	MetricsPath string `json:"metricspath"`
+	EventsPath  string `json:"eventspath"`
+	CmdDirPath  string `json:"cmddirpath"`
 }
 
 // SessionList represents a list of sessions

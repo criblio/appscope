@@ -128,6 +128,7 @@ var eventsCmd = &cobra.Command{
 			tailFile, err := util.NewTailReader(sessions[0].EventsPath, offset)
 			util.CheckErrSprintf(err, "error opening events file for tailing: %v", err)
 			in = make(chan map[string]interface{})
+			em.skipEvents = 0
 			go events.Reader(tailFile, em.filter(), in)
 			printEvents(cmd, idChars, in)
 		}

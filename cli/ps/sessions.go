@@ -35,7 +35,7 @@ type SessionList []Session
 func GetSessions() (ret SessionList) {
 	histDir := run.HistoryDir()
 	files, err := ioutil.ReadDir(histDir)
-	util.CheckErrSprintf(err, "error listing %s: %v", histDir, err)
+	util.CheckErrSprintf(err, "No prior sessions found. Have you tried `scope run`?\nerror listing: %v", err)
 	re := regexp.MustCompile(`([^_]+)_(\d+)_(\d+)_(\d+)`)
 	for _, f := range files {
 		vals := re.FindStringSubmatch(f.Name())

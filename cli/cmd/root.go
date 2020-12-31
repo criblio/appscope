@@ -26,6 +26,15 @@ func Execute() {
 	RootCmd.SilenceErrors = true
 	if err := RootCmd.Execute(); err != nil {
 		if strings.HasPrefix(err.Error(), "unknown command") {
+			for _, cmd := range RootCmd.Commands() {
+				if os.Args[1] == cmd.Name() {
+					cmd.PrintErrln("Error:", err.Error())
+					cmd.PrintErrf("Run '%v --help' for usage.\n", cmd.CommandPath())
+					os.Exit(1)
+				}
+			}
+
+			// If we're not a known command, exec cscope
 			internal.InitConfig(util.GetConfigPath())
 			run.Run(os.Args[1:])
 		}

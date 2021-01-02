@@ -8,5 +8,8 @@
 * Pull out Viper if we don't find a use for it
 * Add CLI to CI/CD
 * Port cscope run implementation to golang
-* Pagination for `ps` and `events` and the like
 * Signal to running process, turn up instrumentation
+* Metrics and Events summary view from what came out
+* Summary view across runs
+* `clean` or `prune` command
+* Show command duration in `hist`, show number of events, number of metric events

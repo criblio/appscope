@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/criblio/scope/metrics"
-	"github.com/criblio/scope/ps"
 	"github.com/criblio/scope/util"
 	"github.com/guptarohit/asciigraph"
 	"github.com/spf13/cobra"
@@ -20,57 +19,65 @@ var metricsCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		id, _ := cmd.Flags().GetInt("id")
-		name, _ := cmd.Flags().GetString("name")
-		graph, _ := cmd.Flags().GetString("graph")
-		cols, _ := cmd.Flags().GetStringSlice("cols")
+		names, _ := cmd.Flags().GetStringSlice("metric")
+		graph, _ := cmd.Flags().GetBool("graph")
+		cols, _ := cmd.Flags().GetBool("cols")
 
-		var sessions ps.SessionList
-		if id == -1 {
-			sessions = ps.GetSessions().Last(1)
-		} else {
-			sessions = ps.GetSessions().ID(id)
-		}
-		sessionCount := len(sessions)
-		if sessionCount != 1 {
-			util.ErrAndExit("error expected a single session, saw: %d", sessionCount)
-		}
-		allm := metrics.ReadMetricsFromFile(sessions[0].MetricsPath)
+		sessions := sessionByID(id)
 
-		// Filter metrics to match metrics
-		mm := []metrics.Metric{}
-		values := []float64{}
-		metricCols := []map[string]interface{}{}
-		if name != "" || graph != "" || len(cols) > 0 {
-			for _, m := range allm {
-				if m.Name == "proc.cpu" {
-					metricCols = append(metricCols, map[string]interface{}{})
-				}
-				if name != "" && m.Name == name {
-					mm = append(mm, m)
-				}
-				if graph != "" && m.Name == graph {
-					values = append(values, m.Value)
-				}
-				for _, col := range cols {
-					// fmt.Printf("col: %s\n", col)
-					if m.Name == col {
-						metricCols[len(metricCols)-1][m.Name] = m.Value
-					}
-				}
-
+		file, err := os.Open(sessions[0].MetricsPath)
+		util.CheckErrSprintf(err, "Invalid session. Command likely exited without capturing metric data.\nerror opening metrics file: %v", err)
+		in := make(chan metrics.Metric)
+		offsetChan := make(chan int)
+		filters := []util.MatchFunc{}
+		if len(names) > 0 {
+			for _, n := range names {
+				filters = append(filters, util.MatchString(n))
 			}
 		} else {
-			mm = allm
+			filters = []util.MatchFunc{util.MatchAlways}
+		}
+		go func() {
+			offset, err := metrics.Reader(file, util.MatchAny(filters...), in)
+			util.CheckErrSprintf(err, "error reading metrics: %v", err)
+			offsetChan <- offset
+		}()
+		util.CheckErrSprintf(err, "error reading metrics from file: %v", err)
+
+		// Filter metrics to match metrics
+		values := []float64{}
+		metricCols := []map[string]interface{}{}
+		mm := []metrics.Metric{}
+
+		for m := range in {
+			if cols && m.Name == "proc.cpu" { // use proc.cpu as a breaker for batches of metrics
+				metricCols = append(metricCols, map[string]interface{}{})
+			}
+			if len(names) > 0 {
+				for _, name := range names {
+					if m.Name == name {
+						if graph {
+							values = append(values, m.Value)
+						} else if cols {
+							metricCols[len(metricCols)-1][m.Name] = m.Value
+						} else {
+							mm = append(mm, m)
+						}
+					}
+				}
+			} else {
+				mm = append(mm, m)
+			}
 		}
 
-		if graph != "" {
+		if graph {
 			fmt.Println(asciigraph.Plot(values, asciigraph.Height(20)))
 			os.Exit(0)
 		}
 
-		if len(cols) > 0 {
+		if cols {
 			ofCols := []util.ObjField{}
-			for _, col := range cols {
+			for _, col := range names {
 				ofCols = append(ofCols, util.ObjField{Name: col, Field: col})
 			}
 			util.PrintObj(ofCols, metricCols)
@@ -97,9 +104,9 @@ var metricsCmd = &cobra.Command{
 }
 
 func init() {
-	metricsCmd.Flags().Int("id", -1, "Display metrics from session ID")
-	metricsCmd.Flags().StringP("name", "n", "", "Returns matching metrics")
-	metricsCmd.Flags().String("graph", "", "Graph this metric")
-	metricsCmd.Flags().StringSlice("cols", []string{}, "Display supplied metrics as columns")
+	metricsCmd.Flags().IntP("id", "i", -1, "Display info from specific from session ID")
+	metricsCmd.Flags().StringSliceP("metric", "m", []string{}, "Display only supplied metrics")
+	metricsCmd.Flags().BoolP("graph", "g", false, "Graph this metric")
+	metricsCmd.Flags().BoolP("cols", "c", false, "Display metrics as columns")
 	RootCmd.AddCommand(metricsCmd)
 }

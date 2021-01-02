@@ -1,6 +1,7 @@
 package util
 
 import (
+	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -51,4 +52,19 @@ func TestGetAgo(t *testing.T) {
 	assert.Equal(t, "1d1h", ago)
 	ago = GetAgo(time.Now().Add((-24 * 7 * time.Hour) + (-1 * time.Hour)))
 	assert.Equal(t, "7d", ago)
+}
+
+func TestCountLines(t *testing.T) {
+	rawEvent := `{"type":"evt","body":{"sourcetype":"console","id":"d55805e5c25e-echo-/bin/echo true","_time":1609191683.985,"source":"stdout","host":"d55805e5c25e","proc":"echo","cmd":"/bin/echo true","pid":10117,"_channel":"641503557208802","data":"true"}}
+{"type":"evt","body":{"sourcetype":"console","id":"d55805e5c25e-echo-/bin/echo true","_time":1609191683.985,"source":"stdout","host":"d55805e5c25e","proc":"echo","cmd":"/bin/echo true","pid":10117,"_channel":"641503557208802","data":"true"}}
+{"type":"evt","body":{"sourcetype":"console","id":"d55805e5c25e-echo-/bin/echo true","_time":1609191683.985,"source":"stdout","host":"d55805e5c25e","proc":"echo","cmd":"/bin/echo true","pid":10117,"_channel":"641503557208802","data":"true"}}
+{"type":"evt","body":{"sourcetype":"console","id":"d55805e5c25e-echo-/bin/echo true","_time":1609191683.985,"source":"stdout","host":"d55805e5c25e","proc":"echo","cmd":"/bin/echo true","pid":10117,"_channel":"641503557208802","data":"true"}}
+`
+
+	ioutil.WriteFile("event.json", []byte(rawEvent), 0644)
+
+	count, err := CountLines("event.json")
+	assert.NoError(t, err)
+	assert.Equal(t, 4, count)
+	os.Remove("event.json")
 }

@@ -27,7 +27,7 @@ func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		if strings.HasPrefix(err.Error(), "unknown command") {
 			for _, cmd := range RootCmd.Commands() {
-				if os.Args[1] == cmd.Name() {
+				if os.Args[1] == cmd.Name() || cmd.HasAlias(os.Args[1]) {
 					cmd.PrintErrln("Error:", err.Error())
 					cmd.PrintErrf("Run '%v --help' for usage.\n", cmd.CommandPath())
 					os.Exit(1)

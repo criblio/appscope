@@ -74,11 +74,16 @@ var eventsCmd = &cobra.Command{
 		sourcetypes, _ := cmd.Flags().GetStringSlice("sourcetype")
 		lastN, _ := cmd.Flags().GetInt("last")
 		follow, _ := cmd.Flags().GetBool("follow")
+		forceColor, _ := cmd.Flags().GetBool("color")
+
+		if forceColor {
+			color.NoColor = false
+		}
 
 		sessions := sessionByID(id)
 
 		// Count events to figure out our starting place if we want the last N events or a specific event
-		count, err := events.Count(sessions[0].EventsPath)
+		count, err := util.CountLines(sessions[0].EventsPath)
 		util.CheckErrSprintf(err, "Invalid session. Command likely exited without capturing event data.\nerror opening events file: %v", err)
 		skipEvents := 0
 		eventID := 0
@@ -109,7 +114,7 @@ var eventsCmd = &cobra.Command{
 		offsetChan := make(chan int)
 		go func() {
 			offset, err := events.Reader(file, em.filter(), in)
-			util.CheckErrSprintf(err, "error opening reading events from file: %v", err)
+			util.CheckErrSprintf(err, "error reading events: %v", err)
 			offsetChan <- offset
 		}()
 
@@ -142,7 +147,6 @@ func printEvent(cmd *cobra.Command, in chan map[string]interface{}) {
 	if jsonOut {
 		enc.Encode(e)
 	} else {
-		// printe := map[string]interface{}{}
 		fields := []util.ObjField{
 			{Name: "ID", Field: "id"},
 			{Name: "Proc", Field: "proc"},
@@ -282,36 +286,37 @@ func (em eventMatch) filter() func(string) bool {
 		if em.skipEvents > 0 && idx < em.skipEvents {
 			return false
 		}
-		all := []events.MatchFunc{}
+		all := []util.MatchFunc{}
 		if len(em.sources) > 0 {
-			matchsources := []events.MatchFunc{}
+			matchsources := []util.MatchFunc{}
 			for _, s := range em.sources {
-				matchsources = append(matchsources, events.MatchField("source", s))
+				matchsources = append(matchsources, util.MatchField("source", s))
 			}
-			all = append(all, events.MatchAny(matchsources...))
+			all = append(all, util.MatchAny(matchsources...))
 		}
 		if len(em.sourcetypes) > 0 {
-			matchsourcetypes := []events.MatchFunc{}
+			matchsourcetypes := []util.MatchFunc{}
 			for _, t := range em.sourcetypes {
-				matchsourcetypes = append(matchsourcetypes, events.MatchField("sourcetype", t))
+				matchsourcetypes = append(matchsourcetypes, util.MatchField("sourcetype", t))
 			}
-			all = append(all, events.MatchAny(matchsourcetypes...))
+			all = append(all, util.MatchAny(matchsourcetypes...))
 		}
 		if len(all) == 0 {
-			all = append(all, events.MatchAlways)
+			all = append(all, util.MatchAlways)
 		}
-		return events.MatchAll(all...)(line)
+		return util.MatchAll(all...)(line)
 	}
 }
 
 func init() {
-	eventsCmd.Flags().Int("id", -1, "Display events from session ID")
+	eventsCmd.Flags().IntP("id", "i", -1, "Display info from specific from session ID")
 	eventsCmd.Flags().StringSliceP("source", "s", []string{}, "Display events matching supplied sources")
 	eventsCmd.Flags().StringSliceP("sourcetype", "t", []string{}, "Display events matching supplied sourcetypes")
 	eventsCmd.Flags().Bool("allfields", false, "Displaying hidden fields")
-	eventsCmd.Flags().IntP("last", "n", -1, "Show n last events")
+	eventsCmd.Flags().IntP("last", "n", 20, "Show last <n> events")
 	eventsCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	eventsCmd.Flags().BoolP("follow", "f", false, "Follow a file, like tail -f")
+	eventsCmd.Flags().Bool("color", false, "Force color on (if tty detection fails or pipeing)")
 	RootCmd.AddCommand(eventsCmd)
 
 	if co == nil {

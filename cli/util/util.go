@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"math"
@@ -188,4 +189,30 @@ func NewTailReader(fileName string, offset int) (TailReader, error) {
 // FormatTimestamp prints a human readable timestamp from scope's secs.millisecs format.
 func FormatTimestamp(timeFp float64) string {
 	return time.Unix(int64(math.Floor(timeFp)), int64(math.Mod(timeFp, 1)*1000000)).Format(time.Stamp)
+}
+
+// CountLines returns the number of lines in a given file
+func CountLines(path string) (int, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	buf := make([]byte, 32*1024)
+	count := 0
+	lineSep := []byte{'\n'}
+
+	for {
+		c, err := file.Read(buf)
+		count += bytes.Count(buf[:c], lineSep)
+
+		switch {
+		case err == io.EOF:
+			return count, nil
+
+		case err != nil:
+			return count, err
+		}
+	}
 }

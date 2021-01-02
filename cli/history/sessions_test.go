@@ -1,4 +1,4 @@
-package ps
+package history
 
 import (
 	"fmt"

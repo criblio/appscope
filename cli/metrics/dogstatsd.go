@@ -1,31 +1,9 @@
 package metrics
 
 import (
-	"bufio"
-	"os"
 	"strconv"
 	"strings"
-
-	"github.com/criblio/scope/util"
 )
-
-// ReadMetricsFromFile reads dogstatsd metrics from a file
-func ReadMetricsFromFile(path string) (ret []Metric) {
-	file, err := os.Open(path)
-	util.CheckErrSprintf(err, "Invalid session. Command likely exited without capturing metric data.\nerror reading metrics from file: %v", err)
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		m := parseDogStatsd((scanner.Text()))
-		ret = append(ret, m)
-	}
-
-	if err := scanner.Err(); err != nil {
-		util.ErrAndExit("error scanning metrics file %s: %v", path, err)
-	}
-	return ret
-}
 
 // parseDogStatsd parses Scope's dogstatsd output
 // Not general purpose. Ignores sampling which is allowed in the format.

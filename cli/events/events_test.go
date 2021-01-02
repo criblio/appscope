@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/criblio/scope/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +17,7 @@ func TestReader(t *testing.T) {
 	in := make(chan map[string]interface{})
 	file, err := os.Open("event.json")
 	assert.NoError(t, err)
-	go Reader(file, MatchAlways, in)
+	go Reader(file, util.MatchAlways, in)
 
 	event := <-in
 
@@ -38,7 +39,7 @@ func TestReaderWithFilter(t *testing.T) {
 	in := make(chan map[string]interface{})
 	file, err := os.Open("event.json")
 	assert.NoError(t, err)
-	go Reader(file, MatchString("foo"), in)
+	go Reader(file, util.MatchString("foo"), in)
 	events := []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
@@ -49,7 +50,7 @@ func TestReaderWithFilter(t *testing.T) {
 	in = make(chan map[string]interface{})
 	file, err = os.Open("event.json")
 	assert.NoError(t, err)
-	go Reader(file, MatchField("source", "foo"), in)
+	go Reader(file, util.MatchField("source", "foo"), in)
 	events = []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
@@ -60,7 +61,7 @@ func TestReaderWithFilter(t *testing.T) {
 	in = make(chan map[string]interface{})
 	file, err = os.Open("event.json")
 	assert.NoError(t, err)
-	go Reader(file, MatchField("pid", 10118), in)
+	go Reader(file, util.MatchField("pid", 10118), in)
 	events = []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
@@ -70,7 +71,7 @@ func TestReaderWithFilter(t *testing.T) {
 	in = make(chan map[string]interface{})
 	file, err = os.Open("event.json")
 	assert.NoError(t, err)
-	go Reader(file, MatchField("_time", 1609191683.986), in)
+	go Reader(file, util.MatchField("_time", 1609191683.986), in)
 	events = []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
@@ -81,7 +82,7 @@ func TestReaderWithFilter(t *testing.T) {
 	in = make(chan map[string]interface{})
 	file, err = os.Open("event.json")
 	assert.NoError(t, err)
-	go Reader(file, MatchAny([]MatchFunc{MatchField("pid", 10118), MatchString("foo")}...), in)
+	go Reader(file, util.MatchAny([]util.MatchFunc{util.MatchField("pid", 10118), util.MatchString("foo")}...), in)
 	events = []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
@@ -92,7 +93,7 @@ func TestReaderWithFilter(t *testing.T) {
 	in = make(chan map[string]interface{})
 	file, err = os.Open("event.json")
 	assert.NoError(t, err)
-	go Reader(file, MatchAll([]MatchFunc{MatchField("pid", 10118), MatchString("foo")}...), in)
+	go Reader(file, util.MatchAll([]util.MatchFunc{util.MatchField("pid", 10118), util.MatchString("foo")}...), in)
 	events = []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
@@ -103,26 +104,13 @@ func TestReaderWithFilter(t *testing.T) {
 	in = make(chan map[string]interface{})
 	file, err = os.Open("event.json")
 	assert.NoError(t, err)
-	go Reader(file, MatchAll([]MatchFunc{MatchField("pid", 10117), MatchString("foo")}...), in)
+	go Reader(file, util.MatchAll([]util.MatchFunc{util.MatchField("pid", 10117), util.MatchString("foo")}...), in)
 	events = []map[string]interface{}{}
 	for e := range in {
 		events = append(events, e)
 	}
 	assert.Len(t, events, 1)
 	file.Close()
-}
 
-func TestCount(t *testing.T) {
-	rawEvent := `{"type":"evt","body":{"sourcetype":"console","id":"d55805e5c25e-echo-/bin/echo true","_time":1609191683.985,"source":"stdout","host":"d55805e5c25e","proc":"echo","cmd":"/bin/echo true","pid":10117,"_channel":"641503557208802","data":"true"}}
-{"type":"evt","body":{"sourcetype":"console","id":"d55805e5c25e-echo-/bin/echo true","_time":1609191683.985,"source":"stdout","host":"d55805e5c25e","proc":"echo","cmd":"/bin/echo true","pid":10117,"_channel":"641503557208802","data":"true"}}
-{"type":"evt","body":{"sourcetype":"console","id":"d55805e5c25e-echo-/bin/echo true","_time":1609191683.985,"source":"stdout","host":"d55805e5c25e","proc":"echo","cmd":"/bin/echo true","pid":10117,"_channel":"641503557208802","data":"true"}}
-{"type":"evt","body":{"sourcetype":"console","id":"d55805e5c25e-echo-/bin/echo true","_time":1609191683.985,"source":"stdout","host":"d55805e5c25e","proc":"echo","cmd":"/bin/echo true","pid":10117,"_channel":"641503557208802","data":"true"}}
-`
-
-	ioutil.WriteFile("event.json", []byte(rawEvent), 0644)
-
-	count, err := Count("event.json")
-	assert.NoError(t, err)
-	assert.Equal(t, 4, count)
 	os.Remove("event.json")
 }

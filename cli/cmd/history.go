@@ -5,26 +5,37 @@ import (
 	"os"
 	"time"
 
-	"github.com/criblio/scope/ps"
+	"github.com/criblio/scope/history"
 	"github.com/criblio/scope/util"
 	"github.com/kballard/go-shellquote"
 	"github.com/spf13/cobra"
 )
 
-// psCmd represents the ps command
-var psCmd = &cobra.Command{
-	Use:     "ps [flags]",
-	Short:   "List scope sessions",
-	Long:    `List scope sessions`,
-	Example: `scope ps`,
+// historyCmd represents the history command
+var historyCmd = &cobra.Command{
+	Use:     "history [flags]",
+	Short:   "List scope session history",
+	Long:    `List scope session history`,
+	Example: `scope history`,
+	Aliases: []string{"hist"},
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		all, _ := cmd.Flags().GetBool("all")
 		last, _ := cmd.Flags().GetInt("last")
+		running, _ := cmd.Flags().GetBool("running")
 		id, _ := cmd.Flags().GetInt("id")
 		onlydir, _ := cmd.Flags().GetBool("dir")
-		sessions := ps.GetSessions().Last(last)
-		if !all {
+		sessions := history.GetSessions()
+		if all {
+			fmt.Println("Displaying all sessions")
+		} else {
+			if !onlydir && !running {
+				fmt.Printf("Displaying last %d sessions\n", last)
+			}
+			sessions = sessions.Last(last)
+		}
+		if running {
+			fmt.Print("Displaying running sessions\n")
 			sessions = sessions.Running()
 		}
 		sessions = sessions.Args()
@@ -63,9 +74,10 @@ var psCmd = &cobra.Command{
 }
 
 func init() {
-	psCmd.Flags().BoolP("all", "a", false, "List all sessions, including non-running sessions")
-	psCmd.Flags().IntP("last", "n", -1, "Show n last sessions")
-	psCmd.Flags().Int("id", -1, "Display info from specific from session ID")
-	psCmd.Flags().BoolP("dir", "d", false, "Output just directory (with --id)")
-	RootCmd.AddCommand(psCmd)
+	historyCmd.Flags().BoolP("all", "a", false, "List all sessions")
+	historyCmd.Flags().BoolP("running", "r", false, "List running sessions")
+	historyCmd.Flags().IntP("last", "n", 20, "Show last <n> sessions")
+	historyCmd.Flags().IntP("id", "i", -1, "Display info from specific from session ID")
+	historyCmd.Flags().BoolP("dir", "d", false, "Output just directory (with -i)")
+	RootCmd.AddCommand(historyCmd)
 }

@@ -1,4 +1,4 @@
-package ps
+package history
 
 import (
 	"encoding/json"
@@ -57,6 +57,7 @@ func GetSessions() (ret SessionList) {
 			MetricsPath: filepath.Join(workDir, "metrics.dogstatsd"),
 		})
 	}
+	sort.Slice(ret, func(i, j int) bool { return ret[i].ID < ret[j].ID })
 	return ret
 }
 
@@ -70,6 +71,7 @@ func (sessions SessionList) Last(n int) (ret SessionList) {
 	} else {
 		ret = append(ret, sessions...)
 	}
+	sort.Slice(ret, func(i, j int) bool { return ret[i].ID < ret[j].ID })
 	return ret
 }
 

@@ -4,23 +4,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
+	"time"
 
+	"github.com/criblio/scope/events"
 	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 )
 
 // Session represents a scoped run
 type Session struct {
-	ID        int      `json:"id"`
-	Cmd       string   `json:"cmd"`
-	Pid       int      `json:"pid"`
-	Timestamp int64    `json:"timestamp"`
-	WorkDir   string   `json:"workDir"`
-	Args      []string `json:"args"`
+	ID           int           `json:"id"`
+	Cmd          string        `json:"cmd"`
+	Pid          int           `json:"pid"`
+	Timestamp    int64         `json:"timestamp"`
+	EndTimestamp int64         `json:"endtimestamp"`
+	WorkDir      string        `json:"workDir"`
+	Args         []string      `json:"args"`
+	EventCount   int           `json:"eventCount"`
+	Duration     time.Duration `json:"duration"`
 
 	ArgsPath    string `json:"argspath"`
 	MetricsPath string `json:"metricspath"`
@@ -88,7 +94,7 @@ func (sessions SessionList) Running() (ret SessionList) {
 // Args gets command arguments
 func (sessions SessionList) Args() (ret SessionList) {
 	for _, s := range sessions {
-		rawBytes, err := ioutil.ReadFile(filepath.Join(s.WorkDir, "args.json"))
+		rawBytes, err := ioutil.ReadFile(s.ArgsPath)
 		if err == nil {
 			json.Unmarshal(rawBytes, &s.Args)
 		}
@@ -103,6 +109,30 @@ func (sessions SessionList) ID(id int) (ret SessionList) {
 		if s.ID == id {
 			ret = append(ret, s)
 		}
+	}
+	return ret
+}
+
+// CountAndDuration adds event counts & durations by parsing event files in every session
+func (sessions SessionList) CountAndDuration() (ret SessionList) {
+	for _, s := range sessions {
+		var err error
+		s.EventCount, err = util.CountLines(s.EventsPath)
+		if err == nil {
+			file, err := os.Open(s.EventsPath)
+			if err == nil {
+				in := make(chan map[string]interface{})
+				// There may be lines which aren't actually events, so iterate over the last 5 and hope we catch a timestamp
+				go events.Reader(file, util.MatchSkipN(s.EventCount-5), in)
+				for e := range in {
+					startTime := time.Unix(0, s.Timestamp)
+					endTime := util.ParseEventTime(e["_time"].(float64))
+					s.Duration = endTime.Sub(startTime)
+					s.EndTimestamp = endTime.UnixNano()
+				}
+			}
+		}
+		ret = append(ret, s)
 	}
 	return ret
 }

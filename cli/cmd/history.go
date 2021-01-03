@@ -28,23 +28,25 @@ var historyCmd = &cobra.Command{
 		sessions := history.GetSessions()
 		if all {
 			fmt.Println("Displaying all sessions")
-		} else {
+		} else if id == -1 {
 			if !onlydir && !running {
 				fmt.Printf("Displaying last %d sessions\n", last)
 			}
 			sessions = sessions.Last(last)
+		} else {
+			sessions = sessions.ID(id)
 		}
 		if running {
 			fmt.Print("Displaying running sessions\n")
 			sessions = sessions.Running()
 		}
 		sessions = sessions.Args()
+		sessions = sessions.CountAndDuration()
 		if id > -1 {
-			s := sessions.ID(id)
-			if len(s) == 0 {
+			if len(sessions) == 0 {
 				util.ErrAndExit("session id %d not found", id)
 			}
-			session := s[0]
+			session := sessions[0]
 			if onlydir {
 				fmt.Printf("%s\n", session.WorkDir)
 				os.Exit(0)
@@ -55,6 +57,9 @@ var historyCmd = &cobra.Command{
 				{Name: "Cmdline", Field: "args", Transform: func(obj interface{}) string { return util.TruncWithElipsis(shellquote.Join(obj.([]string)...), 25) }},
 				{Name: "PID", Field: "pid"},
 				{Name: "Timestamp", Field: "timestamp", Transform: func(obj interface{}) string { return time.Unix(int64(0), obj.(int64)).Format(time.Stamp) }},
+				{Name: "End Timestamp", Field: "endtimestamp", Transform: func(obj interface{}) string { return time.Unix(int64(0), obj.(int64)).Format(time.Stamp) }},
+				{Name: "Duration", Field: "duration", Transform: func(obj interface{}) string { return util.GetHumanDuration(obj.(time.Duration)) }},
+				{Name: "Total Events", Field: "eventCount"},
 				{Name: "WorkDir", Field: "workDir"},
 				{Name: "ArgsPath", Field: "argspath"},
 				{Name: "CmdDirPath", Field: "cmddirpath"},
@@ -67,7 +72,9 @@ var historyCmd = &cobra.Command{
 				{Name: "Command", Field: "cmd"},
 				{Name: "Cmdline", Field: "args", Transform: func(obj interface{}) string { return util.TruncWithElipsis(shellquote.Join(obj.([]string)...), 25) }},
 				{Name: "PID", Field: "pid"},
-				{Name: "Age", Field: "timestamp", Transform: func(obj interface{}) string { return util.GetAgo(time.Unix(0, obj.(int64))) }},
+				{Name: "Age", Field: "timestamp", Transform: func(obj interface{}) string { return util.GetHumanDuration(time.Now().Sub(time.Unix(0, obj.(int64)))) }},
+				{Name: "Duration", Field: "duration", Transform: func(obj interface{}) string { return util.GetHumanDuration(obj.(time.Duration)) }},
+				{Name: "Total Events", Field: "eventCount"},
 			}, sessions)
 		}
 	},

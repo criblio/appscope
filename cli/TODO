@@ -12,4 +12,3 @@
 * Metrics and Events summary view from what came out
 * Summary view across runs
 * `clean` or `prune` command
-* Show command duration in `hist`, show number of events, number of metric events

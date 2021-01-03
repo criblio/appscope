@@ -112,9 +112,8 @@ func GetJSONField(obj interface{}, field string) *structs.Field {
 	return nil
 }
 
-// GetAgo returns a human readable duration from now
-func GetAgo(t time.Time) string {
-	since := time.Now().Sub(t)
+// GetHumanDuration returns a human readable duration
+func GetHumanDuration(since time.Duration) string {
 	if since.Hours() > 24*7 {
 		days := math.Floor(since.Hours() / 24)
 		return fmt.Sprintf("%.fd", days)
@@ -130,9 +129,11 @@ func GetAgo(t time.Time) string {
 		mins := math.Floor(since.Minutes())
 		secs := int(math.Floor(since.Seconds())) % 60
 		return fmt.Sprintf("%.fm%ds", mins, secs)
-	} else {
+	} else if since.Seconds() >= 1 {
 		secs := math.Floor(since.Seconds())
 		return fmt.Sprintf("%.fs", secs)
+	} else {
+		return fmt.Sprintf("%dms", since.Milliseconds())
 	}
 }
 
@@ -188,7 +189,14 @@ func NewTailReader(fileName string, offset int) (TailReader, error) {
 
 // FormatTimestamp prints a human readable timestamp from scope's secs.millisecs format.
 func FormatTimestamp(timeFp float64) string {
-	return time.Unix(int64(math.Floor(timeFp)), int64(math.Mod(timeFp, 1)*1000000)).Format(time.Stamp)
+	return ParseEventTime(timeFp).Format(time.Stamp)
+}
+
+// ParseEventTime parses an event time in secs.msecs format
+func ParseEventTime(timeFp float64) time.Time {
+	secs := int64(math.Floor(timeFp))
+	nSecs := int64(math.Mod(timeFp, 1) * 1000000000)
+	return time.Unix(secs, nSecs)
 }
 
 // CountLines returns the number of lines in a given file

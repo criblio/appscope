@@ -76,7 +76,7 @@ func TestGetSessionLast(t *testing.T) {
 	assert.Equal(t, pid, l1[0].Pid)
 
 	l2 := sessions.Last(2)
-	assert.Greater(t, l2[0].Timestamp, l2[1].Timestamp)
+	assert.Greater(t, l2[1].Timestamp, l2[0].Timestamp)
 
 	// assert.True(t, util.CheckFileExists(".test"))
 	os.RemoveAll(".test")

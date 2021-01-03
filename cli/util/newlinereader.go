@@ -96,3 +96,15 @@ func MatchAll(match ...MatchFunc) MatchFunc {
 		return true
 	}
 }
+
+// MatchSkipN will return true after N events have passed
+func MatchSkipN(skip int) MatchFunc {
+	idx := 0
+	return func(in string) bool {
+		idx++
+		if skip > 0 && idx < skip {
+			return false
+		}
+		return true
+	}
+}

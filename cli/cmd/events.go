@@ -280,30 +280,27 @@ type eventMatch struct {
 }
 
 func (em eventMatch) filter() func(string) bool {
-	idx := 0
+	all := []util.MatchFunc{
+		util.MatchSkipN(em.skipEvents),
+	}
+	if len(em.sources) > 0 {
+		matchsources := []util.MatchFunc{}
+		for _, s := range em.sources {
+			matchsources = append(matchsources, util.MatchField("source", s))
+		}
+		all = append(all, util.MatchAny(matchsources...))
+	}
+	if len(em.sourcetypes) > 0 {
+		matchsourcetypes := []util.MatchFunc{}
+		for _, t := range em.sourcetypes {
+			matchsourcetypes = append(matchsourcetypes, util.MatchField("sourcetype", t))
+		}
+		all = append(all, util.MatchAny(matchsourcetypes...))
+	}
+	if len(all) == 0 {
+		all = append(all, util.MatchAlways)
+	}
 	return func(line string) bool {
-		idx++
-		if em.skipEvents > 0 && idx < em.skipEvents {
-			return false
-		}
-		all := []util.MatchFunc{}
-		if len(em.sources) > 0 {
-			matchsources := []util.MatchFunc{}
-			for _, s := range em.sources {
-				matchsources = append(matchsources, util.MatchField("source", s))
-			}
-			all = append(all, util.MatchAny(matchsources...))
-		}
-		if len(em.sourcetypes) > 0 {
-			matchsourcetypes := []util.MatchFunc{}
-			for _, t := range em.sourcetypes {
-				matchsourcetypes = append(matchsourcetypes, util.MatchField("sourcetype", t))
-			}
-			all = append(all, util.MatchAny(matchsourcetypes...))
-		}
-		if len(all) == 0 {
-			all = append(all, util.MatchAlways)
-		}
 		return util.MatchAll(all...)(line)
 	}
 }

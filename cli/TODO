@@ -11,4 +11,3 @@
 * Signal to running process, turn up instrumentation
 * Metrics and Events summary view from what came out
 * Summary view across runs
-* `clean` or `prune` command

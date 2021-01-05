@@ -6,6 +6,7 @@ import (
 	"github.com/criblio/scope/util"
 )
 
+// Metric represents a metric sample
 type Metric struct {
 	Name  string     `json:"name"`
 	Value float64    `json:"value"`
@@ -15,11 +16,13 @@ type Metric struct {
 	Tags []MetricTag `json:"tags"`
 }
 
+// MetricTag is a key/value pair which describes an attribute of a metric
 type MetricTag struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
 
+// MetricType represents the type of a metric
 type MetricType int
 
 const (

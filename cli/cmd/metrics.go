@@ -25,6 +25,10 @@ var metricsCmd = &cobra.Command{
 
 		sessions := sessionByID(id)
 
+		if graph && len(names) == 0 {
+			util.ErrAndExit("must specify a metric to graph")
+		}
+
 		file, err := os.Open(sessions[0].MetricsPath)
 		util.CheckErrSprintf(err, "Invalid session. Command likely exited without capturing metric data.\nerror opening metrics file: %v", err)
 		in := make(chan metrics.Metric)

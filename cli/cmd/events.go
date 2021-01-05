@@ -10,10 +10,14 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/crypto/ssh/terminal"
+
 	"github.com/criblio/scope/events"
 	"github.com/criblio/scope/util"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+
+	"github.com/dop251/goja"
 )
 
 var nc = color.New
@@ -72,9 +76,11 @@ var eventsCmd = &cobra.Command{
 		id, _ := cmd.Flags().GetInt("id")
 		sources, _ := cmd.Flags().GetStringSlice("source")
 		sourcetypes, _ := cmd.Flags().GetStringSlice("sourcetype")
+		match, _ := cmd.Flags().GetString("match")
 		lastN, _ := cmd.Flags().GetInt("last")
 		follow, _ := cmd.Flags().GetBool("follow")
 		forceColor, _ := cmd.Flags().GetBool("color")
+		allEvents, _ := cmd.Flags().GetBool("all")
 
 		if forceColor {
 			color.NoColor = false
@@ -92,8 +98,9 @@ var eventsCmd = &cobra.Command{
 			eventID, err = strconv.Atoi(args[0])
 			util.CheckErrSprintf(err, "could not parse %s as event ID (integer): %v", args[0], err)
 			skipEvents = eventID
+			allEvents = false
 		} else if lastN > -1 {
-			skipEvents = count - lastN - 1
+			skipEvents = count - lastN + 1
 		}
 		// How many events do we have? Determines width of the id field
 		idChars := len(fmt.Sprintf("%d", count))
@@ -104,6 +111,8 @@ var eventsCmd = &cobra.Command{
 			sources:     sources,
 			sourcetypes: sourcetypes,
 			skipEvents:  skipEvents,
+			allEvents:   allEvents,
+			match:       match,
 		}
 
 		// Open events.json file
@@ -168,9 +177,36 @@ var lastID = 0 // HACK until we can get some real IDs
 func printEvents(cmd *cobra.Command, idChars int, in chan map[string]interface{}) {
 	jsonOut, _ := cmd.Flags().GetBool("json")
 	allFields, _ := cmd.Flags().GetBool("allfields")
+	eval, _ := cmd.Flags().GetString("eval")
 	enc := json.NewEncoder(os.Stdout)
 	llastID := 0
+	termWidth, _, err := terminal.GetSize(0)
+	util.CheckErrSprintf(err, "error getting terminal width: %v", err)
+
+	var vm *goja.Runtime
+	var prog *goja.Program
+	if eval != "" {
+		vm = goja.New()
+		prog, err = goja.Compile("expr", eval, false)
+		util.CheckErrSprintf(err, "error compiling JavaScript expression: %v", err)
+	}
 	for e := range in {
+		if eval != "" {
+			for k, v := range e {
+				vm.Set(k, v)
+			}
+			v, err := vm.RunProgram(prog)
+			util.CheckErrSprintf(err, "error evaluating JavaScript expression: %v", err)
+			res := v.Export()
+			switch res.(type) {
+			case bool:
+				if !res.(bool) {
+					continue
+				}
+			default:
+				util.ErrAndExit("error: JavaScript return value is not boolean")
+			}
+		}
 		if jsonOut {
 			enc.Encode(e)
 			continue
@@ -185,11 +221,13 @@ func printEvents(cmd *cobra.Command, idChars int, in chan map[string]interface{}
 		out += colorToken(e, "proc", noop)
 		out += sourcetypeColorToken(e)
 		out += colorToken(e, "source", noop)
+		truncLen := termWidth - len(ansiStrip(out)) - 1
 		out += colorToken(e, "data", func(orig interface{}) interface{} {
 			ret := ""
 			switch orig.(type) {
 			case string:
 				ret = ansiStrip(strings.TrimSpace(fmt.Sprintf("%s", orig)))
+				ret = util.TruncWithElipsis(ret, truncLen)
 			case map[string]interface{}:
 				ret = colorMap(orig.(map[string]interface{}), sourcetypeFields[e["sourcetype"].(string)])
 			}
@@ -276,12 +314,18 @@ func ansiStrip(str string) string {
 type eventMatch struct {
 	sources     []string
 	sourcetypes []string
+	match       string
 	skipEvents  int
+	allEvents   bool
 }
 
 func (em eventMatch) filter() func(string) bool {
-	all := []util.MatchFunc{
-		util.MatchSkipN(em.skipEvents),
+	all := []util.MatchFunc{}
+	if !em.allEvents && em.skipEvents > 0 {
+		all = append(all, util.MatchSkipN(em.skipEvents))
+	}
+	if em.match != "" {
+		all = append(all, util.MatchString(em.match))
 	}
 	if len(em.sources) > 0 {
 		matchsources := []util.MatchFunc{}
@@ -309,11 +353,14 @@ func init() {
 	eventsCmd.Flags().IntP("id", "i", -1, "Display info from specific from session ID")
 	eventsCmd.Flags().StringSliceP("source", "s", []string{}, "Display events matching supplied sources")
 	eventsCmd.Flags().StringSliceP("sourcetype", "t", []string{}, "Display events matching supplied sourcetypes")
+	eventsCmd.Flags().StringP("match", "m", "", "Display events containing supplied string")
 	eventsCmd.Flags().Bool("allfields", false, "Displaying hidden fields")
 	eventsCmd.Flags().IntP("last", "n", 20, "Show last <n> events")
 	eventsCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	eventsCmd.Flags().BoolP("follow", "f", false, "Follow a file, like tail -f")
 	eventsCmd.Flags().Bool("color", false, "Force color on (if tty detection fails or pipeing)")
+	eventsCmd.Flags().BoolP("all", "a", false, "Show all events")
+	eventsCmd.Flags().StringP("eval", "e", "", "Evaluate JavaScript expression against event. Must return truthy to print event.")
 	RootCmd.AddCommand(eventsCmd)
 
 	if co == nil {

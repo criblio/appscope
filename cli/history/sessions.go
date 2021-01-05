@@ -70,7 +70,10 @@ func GetSessions() (ret SessionList) {
 // Last returns the last n sessions by time
 func (sessions SessionList) Last(n int) (ret SessionList) {
 	sort.Slice(sessions, func(i, j int) bool { return sessions[i].Timestamp > sessions[j].Timestamp })
-	if n > 0 && len(sessions) > 0 {
+	if n > len(sessions) {
+		n = len(sessions)
+	}
+	if n > 0 {
 		for i := 0; i < n; i++ {
 			ret = append(ret, sessions[i])
 		}

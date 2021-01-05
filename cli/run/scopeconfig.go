@@ -103,6 +103,11 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 					Name:      ".*",
 					Value:     ".*",
 				},
+				// {
+				// 	WatchType: "metric",
+				// 	Name:      ".*",
+				// 	Value:     ".*",
+				// },
 			},
 		},
 		Libscope: ScopeLibscopeConfig{

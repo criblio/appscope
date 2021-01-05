@@ -56,7 +56,7 @@ mtcSendMetric(mtc_t *mtc, event_t *evt)
 {
     if (!mtc || !evt) return -1;
 
-    char *msg = mtcFormatStatsDString(mtc->format, evt, NULL);
+    char *msg = mtcFormatEventForOutput(mtc->format, evt, NULL);
     int rv = mtcSend(mtc, msg);
     if (msg) free(msg);
     return rv;

@@ -3875,6 +3875,7 @@ gethostbyname(const char *name)
     elapsed_t time = {0};
     
     WRAP_CHECK(gethostbyname, NULL);
+    doUpdateState(DNS, -1, 0, NULL, name);
     time.initial = getTime();
     rc = g_fn.gethostbyname(name);
     time.duration = getDuration(time.initial);
@@ -3898,6 +3899,7 @@ gethostbyname2(const char *name, int af)
     elapsed_t time = {0};
     
     WRAP_CHECK(gethostbyname2, NULL);
+    doUpdateState(DNS, -1, 0, NULL, name);
     time.initial = getTime();
     rc = g_fn.gethostbyname2(name, af);
     time.duration = getDuration(time.initial);
@@ -3923,6 +3925,7 @@ getaddrinfo(const char *node, const char *service,
     elapsed_t time = {0};
     
     WRAP_CHECK(getaddrinfo, -1);
+    doUpdateState(DNS, -1, 0, NULL, node);
     time.initial = getTime();
     rc = g_fn.getaddrinfo(node, service, hints, res);
     time.duration = getDuration(time.initial);
@@ -3932,7 +3935,7 @@ getaddrinfo(const char *node, const char *service,
         doUpdateState(DNS, -1, time.duration, NULL, node);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, node);
     } else {
-        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname", node);
+        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "getaddrinfo", node);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, node);
     }
 

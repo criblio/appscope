@@ -159,7 +159,7 @@ mtcFormatEventForOutputNullFmtDoesntCrash(void** state)
 }
 
 static void
-mtcFormatEventForOutputHappyPath(void** state)
+mtcFormatEventForOutputHappyPathStatsd(void** state)
 {
     char* g_hostname = "myhost";
     char* g_procname = "testapp";
@@ -193,6 +193,62 @@ mtcFormatEventForOutputHappyPath(void** state)
          g_openPorts, g_procname, pid, fd, g_hostname, proto, localPort);
     assert_true(rv > 0 && rv < 1024);
     assert_string_equal(expected, msg);
+    free(msg);
+
+    mtcFormatDestroy(&fmt);
+    assert_null(fmt);
+}
+
+static void
+mtcFormatEventForOutputHappyPathJson(void** state)
+{
+    char* g_hostname = "myhost";
+    char* g_procname = "testapp";
+    int g_openPorts = 2;
+    pid_t pid = 666;
+    int fd = 3;
+    char* proto = "TCP";
+    in_port_t localPort = 8125;
+
+    event_field_t fields[] = {
+        STRFIELD("proc",    g_procname,   2,  TRUE),
+        NUMFIELD("pid",     pid,          7,  TRUE),
+        NUMFIELD("fd",      fd,           7,  TRUE),
+        STRFIELD("host",    g_hostname,   2,  TRUE),
+        STRFIELD("proto",   proto,        1,  TRUE),
+        NUMFIELD("port",    localPort,    4,  TRUE),
+        FIELDEND
+    };
+    event_t e = INT_EVENT("net.port", g_openPorts, CURRENT, fields);
+
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_JSON);
+    assert_non_null(fmt);
+    mtcFormatVerbositySet(fmt, CFG_MAX_VERBOSITY);
+
+    char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
+    assert_non_null(msg);
+
+    // For usability, the json string needs to be newline terminated
+    assert_int_equal(msg[strlen(msg)-1], '\n');
+
+    cJSON *json = cJSON_Parse(msg);
+    assert_non_null(json);
+
+    // Fields expected for all json metrics
+    assert_true(cJSON_HasObjectItem(json, "_metric"));
+    assert_true(cJSON_HasObjectItem(json, "_metric_type"));
+    assert_true(cJSON_HasObjectItem(json, "_value"));
+    // Fields expected for our specific metric
+    assert_true(cJSON_HasObjectItem(json, "proc"));
+    assert_true(cJSON_HasObjectItem(json, "pid"));
+    assert_true(cJSON_HasObjectItem(json, "fd"));
+    assert_true(cJSON_HasObjectItem(json, "host"));
+    assert_true(cJSON_HasObjectItem(json, "proto"));
+    assert_true(cJSON_HasObjectItem(json, "port"));
+    // And... _time field is required too
+    assert_true(cJSON_HasObjectItem(json, "_time"));
+
+    cJSON_Delete(json);
     free(msg);
 
     mtcFormatDestroy(&fmt);
@@ -572,7 +628,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(mtcFormatEventForOutputNullEventDoesntCrash),
         cmocka_unit_test(mtcFormatEventForOutputNullEventFieldsDoesntCrash),
         cmocka_unit_test(mtcFormatEventForOutputNullFmtDoesntCrash),
-        cmocka_unit_test(mtcFormatEventForOutputHappyPath),
+        cmocka_unit_test(mtcFormatEventForOutputHappyPathStatsd),
+        cmocka_unit_test(mtcFormatEventForOutputHappyPathJson),
         cmocka_unit_test(mtcFormatEventForOutputHappyPathFilteredFields),
         cmocka_unit_test(mtcFormatEventForOutputWithCustomFields),
         cmocka_unit_test(mtcFormatEventForOutputWithCustomAndStatsdFields),

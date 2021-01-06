@@ -413,7 +413,7 @@ postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char
     net_info *netp = calloc(1, len);
     if (!netp) return FALSE;
 
-    memmove(netp, net, len);
+    if (net) memmove(netp, net, len);
     netp->fd = fd;
     netp->evtype = EVT_DNS;
     netp->data_type = type;
@@ -583,24 +583,38 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case DNS:
     {
-        if (!checkNetEntry(fd)) break;
+        int rc;
+
         addToInterfaceCounts(&g_ctrs.numDNS, 1);
-        if (postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname)) {
-            atomicSubU64(&g_ctrs.numDNS.mtc, 1);
+        if (checkNetEntry(fd)) {
+            rc = postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname);
+        } else {
+            rc = postDNSState(fd, type, NULL, (uint64_t)size, pathname);
         }
+
+        if (rc) atomicSubU64(&g_ctrs.numDNS.mtc, 1);
         atomicSubU64(&g_ctrs.numDNS.evt, 1);
         break;
     }
 
     case DNS_DURATION:
     {
-        if (!checkNetEntry(fd)) break;
+        int rc;
+
         addToInterfaceCounts(&g_ctrs.dnsDurationNum, 1);
         addToInterfaceCounts(&g_ctrs.dnsDurationTotal, 0);
-        if (postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname)) {
+
+        if (checkNetEntry(fd)) {
+            rc = postDNSState(fd, type, &g_netinfo[fd], size, pathname);
+        } else {
+            rc = postDNSState(fd, type, NULL, size, pathname);
+        }
+
+        if (rc) {
             atomicSwapU64(&g_ctrs.dnsDurationNum.mtc, 0);
             atomicSwapU64(&g_ctrs.dnsDurationTotal.mtc, 0);
         }
+
         atomicSwapU64(&g_ctrs.dnsDurationNum.evt, 0);
         atomicSwapU64(&g_ctrs.dnsDurationTotal.evt, 0);
         break;
@@ -1420,6 +1434,10 @@ doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         doSetAddrs(sockfd);
         doUpdateState(NETRX, sockfd, rc, NULL, NULL);
 
+        if (remotePortIsDNS(sockfd) && (g_netinfo[sockfd].dnsName[0])) {
+            doUpdateState(DNS, sockfd, (ssize_t)1, NULL, g_netinfo[sockfd].dnsName);
+        }
+
         if ((sockfd != -1) && buf) {
             doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETRX, src);
         }
@@ -1439,7 +1457,6 @@ doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         doUpdateState(NETTX, sockfd, rc, NULL, NULL);
 
         if (get_port(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
-            // tbd - consider calling doDNSMetricName instead...
             if (g_netinfo[sockfd].dnsName[0]) {
                 doUpdateState(DNS, sockfd, (ssize_t)0, NULL, NULL);
             }

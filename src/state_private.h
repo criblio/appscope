@@ -137,7 +137,7 @@ typedef struct protocol_info_t {
 
 typedef struct {
     http_enum_t state;
-    char* hdr;          // Used if state == HDR
+    char *hdr;          // Used if state == HDR
     size_t hdrlen;
     size_t hdralloc;
     size_t clen;        // Used if state==HTTP_DATA
@@ -209,17 +209,17 @@ bool checkNetEntry(int);
 bool checkFSEntry(int);
 net_info *getNetEntry(int);
 fs_info *getFSEntry(int);
-bool addrIsNetDomain(struct sockaddr_storage*);
-bool addrIsUnixDomain(struct sockaddr_storage*);
-sock_summary_bucket_t getNetRxTxBucket(net_info*);
+bool addrIsNetDomain(struct sockaddr_storage *);
+bool addrIsUnixDomain(struct sockaddr_storage *);
+sock_summary_bucket_t getNetRxTxBucket(net_info *);
 
 // The hiding of objects forces these to be defined here
 void doFSMetric(metric_t, struct fs_info_t *, control_type_t, const char *, ssize_t, const char *);
 void doNetMetric(metric_t, struct net_info_t *, control_type_t, ssize_t);
 void doUnixEndpoint(int, net_info *);
-void resetInterfaceCounts(counters_element_t*);
-void addToInterfaceCounts(counters_element_t*, uint64_t);
-void subFromInterfaceCounts(counters_element_t*, uint64_t);
+void resetInterfaceCounts(counters_element_t *);
+void addToInterfaceCounts(counters_element_t *, uint64_t);
+void subFromInterfaceCounts(counters_element_t *, uint64_t);
 
 // Data that lives in state.c, but is used in report.c too.
 extern summary_t g_summary;

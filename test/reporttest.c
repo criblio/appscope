@@ -1122,12 +1122,12 @@ doDNSSendNoDNSSummarization(void** state)
     // Zeros should not be reported on any interface
     doSend(16, 0, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.dns"), 0);
-    assert_int_equal(eventCalls("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns.req"), 0);
 
     // Totals should not be reported if zero either
     doTotal(TOT_DNS);
     assert_int_equal(metricCalls("net.dns"), 0);
-    assert_int_equal(eventCalls("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns.req"), 0);
 
 
     // Without DNS summarization, every net.dns is output
@@ -1152,8 +1152,8 @@ doDNSSendNoDNSSummarization(void** state)
     assert_int_equal(eventValues("net.tx"), 2*13);
     assert_int_equal(metricCalls("net.dns"), 2);
     assert_int_equal(metricValues("net.dns"), 2);
-    assert_int_equal(eventCalls("net.dns"), 2);
-    assert_int_equal(eventValues("net.dns"), 2);
+    assert_int_equal(eventCalls("net.dns.req"), 2);
+    assert_int_equal(eventValues("net.dns.req"), 2);
 
 
     // Without open/close summarization, every doClose is output
@@ -1162,7 +1162,7 @@ doDNSSendNoDNSSummarization(void** state)
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 0);
     assert_int_equal(metricCalls("net.dns"), 0);
-    assert_int_equal(eventCalls("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns.req"), 0);
     assert_int_equal(metricCalls("net.tcp"), 0);
     assert_int_equal(metricCalls("net.port"), 0);
     assert_int_equal(eventCalls("net.tcp"), 1);
@@ -1204,12 +1204,12 @@ doDNSSendDNSSummarization(void** state)
     // Zeros should not be reported on any interface
     doSend(16, 0, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.dns"), 0);
-    assert_int_equal(eventCalls("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns.req"), 0);
 
     // Totals should not be reported if zero either
     doTotal(TOT_DNS);
     assert_int_equal(metricCalls("net.dns"), 0);
-    assert_int_equal(eventCalls("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns.req"), 0);
 
 
     // With DNS summarization, net.dns is not output
@@ -1234,8 +1234,8 @@ doDNSSendDNSSummarization(void** state)
     assert_int_equal(eventValues("net.tx"), 2*13);
     assert_int_equal(metricCalls("net.dns"), 0);
     assert_int_equal(metricValues("net.dns"), 0);
-    assert_int_equal(eventCalls("net.dns"), 2);
-    assert_int_equal(eventValues("net.dns"), 2);
+    assert_int_equal(eventCalls("net.dns.req"), 2);
+    assert_int_equal(eventValues("net.dns.req"), 2);
 
 
     // Without open/close summarization, every doClose is output
@@ -1244,7 +1244,7 @@ doDNSSendDNSSummarization(void** state)
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 0);
     assert_int_equal(metricCalls("net.dns"), 0);
-    assert_int_equal(eventCalls("net.dns"), 0);
+    assert_int_equal(eventCalls("net.dns.req"), 0);
     assert_int_equal(metricCalls("net.tcp"), 0);
     assert_int_equal(metricCalls("net.port"), 0);
     assert_int_equal(eventCalls("net.tcp"), 1);

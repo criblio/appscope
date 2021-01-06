@@ -856,7 +856,7 @@ doErrorMetric(metric_t type, control_type_t source,
 }
 
 void
-doDNSMetricName(metric_t type, const char *domain, counters_element_t* duration, void* ctr)
+doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration, void *ctr)
 {
     if (!domain || !domain[0]) return;
 
@@ -867,17 +867,29 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t* duration,
     {
         // Don't report zeros.
         if (ctrs->numDNS.evt != 0) {
-            event_field_t fields[] = {
-                PROC_FIELD(g_proc.procname),
-                PID_FIELD(g_proc.pid),
-                HOST_FIELD(g_proc.hostname),
-                DOMAIN_FIELD(domain),
-                DURATION_FIELD(duration->evt / 1000000), // convert ns to ms.
-                UNIT_FIELD("request"),
-                FIELDEND
-            };
-            event_t dnsMetric = INT_EVENT("net.dns", ctrs->numDNS.evt, DELTA, fields);
-            cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
+            if (duration && (duration->evt > 0)) {
+                event_field_t resp[] = {
+                    PROC_FIELD(g_proc.procname),
+                    PID_FIELD(g_proc.pid),
+                    HOST_FIELD(g_proc.hostname),
+                    DOMAIN_FIELD(domain),
+                    UNIT_FIELD("response"),
+                    FIELDEND
+                };
+                event_t dnsMetric = INT_EVENT("net.dns.resp", ctrs->numDNS.evt, DELTA, resp);
+                cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
+            } else {
+                event_field_t req[] = {
+                    PROC_FIELD(g_proc.procname),
+                    PID_FIELD(g_proc.pid),
+                    HOST_FIELD(g_proc.hostname),
+                    DOMAIN_FIELD(domain),
+                    UNIT_FIELD("request"),
+                    FIELDEND
+                };
+                event_t dnsMetric = INT_EVENT("net.dns.req", ctrs->numDNS.evt, DELTA, req);
+                cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
+            }
         }
 
         // Only report if enabled
@@ -915,6 +927,8 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t* duration,
         if (cachedDurationNum >= 1) {
             // factor of 1000000 converts ns to ms.
             dur = ctrs->dnsDurationTotal.evt / ( 1000000 * cachedDurationNum);
+            // default to at least 1ms as opposed to reporting nothing
+            if (dur == 0) dur = 1;
         }
 
         // Don't report zeros.
@@ -945,6 +959,8 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t* duration,
         if (cachedDurationNum >= 1) {
             // factor of 1000000 converts ns to ms.
             dur = ctrs->dnsDurationTotal.mtc / ( 1000000 * cachedDurationNum);
+            // default to at least 1ms as opposed to reporting nothing
+            if (dur == 0) dur = 1;
         }
 
         // Don't report zeros
@@ -1994,8 +2010,6 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // For next time
         net->dnsSend = FALSE;
 
-        // TBD - this is only called by doSend.  Consider calling this directly
-        // from there?
         doDNSMetricName(DNS, net->dnsName, 0, NULL);
 
         break;

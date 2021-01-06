@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/timeb.h>
 #include <inttypes.h>
 #include "cJSON.h"
 #include "dbg.h"
@@ -183,7 +184,7 @@ addCustomFields(mtc_fmt_t* fmt, custom_tag_t** tags, char** end, int* bytes, int
     }
 }
 
-char*
+static char*
 mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
 {
     if (!fmt || !e) return NULL;
@@ -244,6 +245,45 @@ mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
     bytes += 1;
 
     return end_start;
+}
+
+char *
+mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
+{
+    if (!fmt || !evt ) return NULL;
+
+    char *msg = NULL;
+
+    if (fmt->format == CFG_METRIC_STATSD) {
+        msg = mtcFormatStatsDString(fmt, evt, fieldFilter);
+    } else if (fmt->format == CFG_METRIC_JSON) {
+        cJSON *json = fmtMetricJson(evt, NULL, CFG_SRC_METRIC);
+        if (!json) return NULL;
+
+        // Request is for this json, plus a _time field
+        struct timeb tb;
+        ftime(&tb);
+        double timestamp = tb.time + (double)tb.millitm/1000;
+        cJSON_AddNumberToObjLN(json, "_time", timestamp);
+
+        if ((msg = cJSON_PrintUnformatted(json))) {
+            int strsize = strlen(msg);
+            char *temp = realloc(msg, strsize+2); // room for "\n\0"
+            if (!temp) {
+                DBG(NULL);
+                scopeLog("mtcFormat realloc error", -1, CFG_LOG_INFO);
+                free(msg);
+                msg = NULL;
+            } else {
+                msg = temp;
+                msg[strsize] = '\n';
+                msg[strsize+1] = '\0';
+            }
+        }
+        cJSON_Delete(json);
+    }
+
+    return msg;
 }
 
 const char*

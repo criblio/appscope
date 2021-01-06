@@ -674,7 +674,7 @@ static const char scope_help_configuration[] =
 "            udp://server:123         (server is servername or address;\n"
 "                                      123 is port number or service name)\n"
 "    SCOPE_METRIC_FORMAT\n"
-"        metricstatsd\n"
+"        metricstatsd, metricjson\n"
 "        Default is metricstatsd\n"
 "    SCOPE_STATSD_PREFIX\n"
 "        Specify a string to be prepended to every scope metric.\n"

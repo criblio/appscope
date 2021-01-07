@@ -8,8 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
@@ -20,7 +22,7 @@ import (
 func TestCreateCScope(t *testing.T) {
 	tmpCScope := filepath.Join(".foo", "cscope")
 	os.Setenv("SCOPE_HOME", ".foo")
-	internal.InitConfig("")
+	internal.InitConfig()
 	err := CreateCScope()
 	os.Unsetenv("SCOPE_HOME")
 	assert.NoError(t, err)
@@ -64,17 +66,17 @@ func TestMain(m *testing.M) {
 	// Borrowed from http://cs-guy.com/blog/2015/01/test-main/
 	switch os.Getenv("TEST_MAIN") {
 	case "runpassthrough":
-		internal.InitConfig("")
-		Run([]string{"/bin/echo", "true"})
+		internal.InitConfig()
+		rc := Config{Passthrough: true}
+		rc.Run([]string{"/bin/echo", "true"})
 	case "createWorkDir":
-		internal.InitConfig("")
-		CreateWorkDir("foo")
-	case "setupWorkDir":
-		internal.InitConfig("")
-		SetupWorkDir([]string{"/bin/foo"})
+		internal.InitConfig()
+		rc := Config{}
+		rc.CreateWorkDir("foo")
 	case "run":
-		internal.InitConfig("")
-		Run([]string{"/bin/echo", "true"})
+		internal.InitConfig()
+		rc := Config{}
+		rc.Run([]string{"/bin/echo", "true"})
 	default:
 		os.Exit(m.Run())
 	}
@@ -86,7 +88,7 @@ func TestMain(m *testing.M) {
 func TestRunPassthrough(t *testing.T) {
 	// Test Passthrough, read from Stderr
 	cmd := exec.Command(os.Args[0])
-	cmd.Env = append(os.Environ(), "TEST_MAIN=runpassthrough", "SCOPE_PASSTHROUGH=true", "SCOPE_METRIC_DEST=file://stderr")
+	cmd.Env = append(os.Environ(), "TEST_MAIN=runpassthrough", "SCOPE_METRIC_DEST=file://stderr")
 	var outb, errb bytes.Buffer
 	cmd.Stdout = &outb
 	cmd.Stderr = &errb
@@ -115,19 +117,30 @@ func TestCreateWorkDir(t *testing.T) {
 	cmd.Stderr = &errb
 	err = cmd.Run()
 	assert.NoError(t, err, errb.String())
-	wd := fmt.Sprintf("%s_%d_%d_%d", ".test/history/foo", 1, cmd.Process.Pid, 0)
+	files, err := ioutil.ReadDir(".test/history")
+	matched := false
+	wdbase := fmt.Sprintf("%s_%d_%d", "foo", 1, cmd.Process.Pid)
+	var wd string
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), wdbase) {
+			matched = true
+			wd = fmt.Sprintf("%s%s", ".test/history/", f.Name())
+			break
+		}
+	}
+	assert.True(t, matched)
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 	os.RemoveAll(".test")
 }
 
-func testDefaultScopeConfigYaml(wd string) string {
+func testDefaultScopeConfigYaml(wd string, verbosity int) string {
 	wd, _ = filepath.Abs(wd)
 	expectedYaml := `metric:
   enable: true
   format:
     type: metricjson
-    verbosity: 4
+    verbosity: VERBOSITY
   transport:
     type: file
     path: METRICSPATH
@@ -159,6 +172,8 @@ libscope:
       path: CSCOPELOGPATH
       buffering: line
 `
+
+	expectedYaml = strings.Replace(expectedYaml, "VERBOSITY", strconv.Itoa(verbosity), 1)
 	expectedYaml = strings.Replace(expectedYaml, "METRICSPATH", filepath.Join(wd, "metrics.dogstatsd"), 1)
 	expectedYaml = strings.Replace(expectedYaml, "EVENTSPATH", filepath.Join(wd, "events.json"), 1)
 	expectedYaml = strings.Replace(expectedYaml, "CMDDIR", filepath.Join(wd, "cmd"), 1)
@@ -167,12 +182,11 @@ libscope:
 }
 
 func TestSetupWorkDir(t *testing.T) {
-	// Test SetupWorkDir, successfully
-	cmd := exec.Command(os.Args[0])
-	cmd.Env = append(os.Environ(), "TEST_MAIN=setupWorkDir", "SCOPE_HOME=.test", "SCOPE_TEST=true")
-	err := cmd.Run()
-	assert.NoError(t, err)
-	wd := fmt.Sprintf("%s_%d_%d_%d", ".test/history/foo", 1, cmd.Process.Pid, 0)
+	os.Setenv("SCOPE_TEST", "true")
+	rc := Config{}
+	rc.now = func() time.Time { return time.Unix(0, 0) }
+	rc.SetupWorkDir([]string{"/bin/foo"})
+	wd := fmt.Sprintf("%s_%d_%d_%d", ".foo/history/foo", 1, os.Getpid(), 0)
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 
@@ -180,7 +194,7 @@ func TestSetupWorkDir(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, `["/bin/foo"]`, string(argsJSONBytes))
 
-	expectedYaml := testDefaultScopeConfigYaml(wd)
+	expectedYaml := testDefaultScopeConfigYaml(wd, 4)
 
 	scopeYAMLBytes, err := ioutil.ReadFile(filepath.Join(wd, "scope.yml"))
 	assert.NoError(t, err)
@@ -188,7 +202,36 @@ func TestSetupWorkDir(t *testing.T) {
 
 	cmdDirExists := util.CheckFileExists(filepath.Join(wd, "cmd"))
 	assert.True(t, cmdDirExists)
-	os.RemoveAll(".test")
+	os.RemoveAll(".foo")
+	os.Unsetenv("SCOPE_TEST")
+}
+
+func TestSetupScopeYaml(t *testing.T) {
+	fullpath, _ := filepath.Abs(".foo")
+	rc := Config{workDir: fullpath}
+	os.Mkdir(".foo", 0755)
+	rc.SetupScopeYaml()
+
+	expectedYaml := testDefaultScopeConfigYaml(".foo", 4)
+
+	yamlOnDisk, err := ioutil.ReadFile(".foo/scope.yml")
+	assert.NoError(t, err)
+	assert.Equal(t, expectedYaml, string(yamlOnDisk))
+
+	os.RemoveAll(".foo")
+	os.Mkdir(".foo", 0755)
+
+	rc.Verbosity = 5
+	rc.SetupScopeYaml()
+
+	expectedYaml = testDefaultScopeConfigYaml(".foo", 5)
+
+	yamlOnDisk, err = ioutil.ReadFile(".foo/scope.yml")
+	assert.NoError(t, err)
+	assert.Equal(t, expectedYaml, string(yamlOnDisk))
+
+	os.RemoveAll(".foo")
+
 }
 
 func TestRun(t *testing.T) {
@@ -197,7 +240,19 @@ func TestRun(t *testing.T) {
 	cmd.Env = append(os.Environ(), "TEST_MAIN=run", "SCOPE_HOME=.test", "SCOPE_TEST=true")
 	err := cmd.Run()
 	assert.NoError(t, err)
-	wd := fmt.Sprintf("%s_%d_%d_%d", ".test/history/echo", 1, cmd.Process.Pid, 0)
+	files, err := ioutil.ReadDir(".test/history")
+	matched := false
+	wdbase := fmt.Sprintf("%s_%d_%d", "echo", 1, cmd.Process.Pid)
+	var wd string
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), wdbase) {
+			matched = true
+			wd = fmt.Sprintf("%s%s", ".test/history/", f.Name())
+			break
+		}
+	}
+	assert.True(t, matched)
+
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 
@@ -205,7 +260,7 @@ func TestRun(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, `["/bin/echo","true"]`, string(argsJSONBytes))
 
-	expectedYaml := testDefaultScopeConfigYaml(wd)
+	expectedYaml := testDefaultScopeConfigYaml(wd, 4)
 
 	scopeYAMLBytes, err := ioutil.ReadFile(filepath.Join(wd, "scope.yml"))
 	assert.NoError(t, err)

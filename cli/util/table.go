@@ -1,7 +1,6 @@
 package util
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
-	"github.com/spf13/viper"
 )
 
 var out io.Writer
@@ -50,14 +48,6 @@ type ObjField struct {
 // key   value
 //
 func PrintObj(fields []ObjField, obj interface{}) error {
-	if viper.GetBool("json") {
-		outJSON, err := json.Marshal(obj)
-		if err != nil {
-			return fmt.Errorf("error marshaling json: %v", err)
-		}
-		printf("%s\n", string(outJSON))
-		return nil
-	}
 	v := GetValue(obj)
 	switch v.Kind() {
 	case reflect.Slice:

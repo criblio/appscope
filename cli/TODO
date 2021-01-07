@@ -4,9 +4,6 @@
 * Back out any ID related stuff in favor of a scope generated ID
 * Payload support
 * TermDash UI
-* Support setting verbosity on metrics
-* Pull out Viper if we don't find a use for it
-* Add CLI to CI/CD
 * Port cscope run implementation to golang
 * Signal to running process, turn up instrumentation
 * Metrics and Events summary view from what came out
@@ -14,3 +11,4 @@
 * Show scope config
 * Colorize metrics
 * scope metrics -u output unique metric names
+* Port azure full integ tests to Github

@@ -5,9 +5,7 @@ import (
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/run"
-	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // runCmd represents the run command
@@ -18,18 +16,24 @@ var runCmd = &cobra.Command{
 	Example: `scope run /bin/echo "foo"`,
 	Args:    cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		run.Run(args)
+		passthrough, _ := cmd.Flags().GetBool("passthrough")
+		verbosity, _ := cmd.Flags().GetInt("verbosity")
+		rc := run.Config{
+			Passthrough: passthrough,
+			Verbosity:   verbosity,
+		}
+		rc.Run(args)
 	},
 }
 
 func init() {
 	runCmd.Flags().BoolP("passthrough", "p", false, "Runs cscope with current environment & no config.")
+	runCmd.Flags().IntP("verbosity", "v", 4, "Set scope metric verbosity")
 	// This may be a bad assumption, if we have any args preceding this it might fail
 	runCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		internal.InitConfig(util.GetConfigPath())
-		run.Run(os.Args[2:])
+		internal.InitConfig()
+		runCmd.Run(cmd, os.Args[2:])
 		return nil
 	})
-	viper.BindPFlag("passthrough", runCmd.Flags().Lookup("passthrough"))
 	RootCmd.AddCommand(runCmd)
 }

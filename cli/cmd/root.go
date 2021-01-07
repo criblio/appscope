@@ -7,9 +7,7 @@ import (
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/run"
-	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var cfgFile string
@@ -35,28 +33,25 @@ func Execute() {
 			}
 
 			// If we're not a known command, exec cscope
-			internal.InitConfig(util.GetConfigPath())
-			run.Run(os.Args[1:])
+			internal.InitConfig()
+			rc := run.Config{}
+			rc.Run(os.Args[1:])
 		}
 		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
-func viperPersistentStringFlag(name string, viperName string, shorthand string, value string, usage string) {
-	RootCmd.PersistentFlags().StringP(name, shorthand, value, usage)
-	viper.BindPFlag(viperName, RootCmd.PersistentFlags().Lookup(name))
-}
-
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	RootCmd.PersistentFlags().CountP("verbose", "v", "set verbosity level")
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", util.GetConfigPath(), "config file")
+	RootCmd.Flags().CountP("verbose", "v", "set verbosity level")
 }
 
 func initConfig() {
-
-	viper.BindPFlag("verbose", RootCmd.Flags().Lookup("verbose"))
-	internal.InitConfig(cfgFile)
+	internal.InitConfig()
+	verbose, _ := RootCmd.Flags().GetBool("verbose")
+	if verbose {
+		internal.SetDebug()
+	}
 }

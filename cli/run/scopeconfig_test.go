@@ -42,7 +42,7 @@ import (
 func TestGetDefaultScopeConfig(t *testing.T) {
 	sc := GetDefaultScopeConfig("/foo")
 
-	testYaml := testDefaultScopeConfigYaml("/foo")
+	testYaml := testDefaultScopeConfigYaml("/foo", 4)
 
 	configYaml, err := yaml.Marshal(sc)
 	assert.NoError(t, err)
@@ -59,7 +59,7 @@ func TestWriteScopeConfig(t *testing.T) {
 	// assert.Error(t, err, "operational not permitted")
 	// os.Remove(".cantwrite")
 
-	testYaml := testDefaultScopeConfigYaml("/foo")
+	testYaml := testDefaultScopeConfigYaml("/foo", 4)
 	err = WriteScopeConfig(sc, ".scope.yml")
 	assert.NoError(t, err)
 	yamlBytes, err := ioutil.ReadFile(".scope.yml")

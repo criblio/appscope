@@ -14,20 +14,19 @@ import (
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 )
 
-var now func() time.Time
+// Config represents options to change how we run scope
+type Config struct {
+	Passthrough bool
+	Verbosity   int
 
-func init() {
-	now = time.Now
-	if os.Getenv("SCOPE_TEST") != "" {
-		now = func() time.Time { return time.Unix(0, 0) }
-	}
+	workDir string
+	now     func() time.Time
 }
 
 // Run executes a scoped command
-func Run(args []string) {
+func (rc *Config) Run(args []string) {
 	if err := CreateCScope(); err != nil {
 		util.ErrAndExit("error creating cscope: %v", err)
 	}
@@ -35,12 +34,11 @@ func Run(args []string) {
 	// Normal operational, not passthrough, create directory for this run
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
-	passthrough := viper.GetBool("passthrough")
-	if !passthrough {
+	if !rc.Passthrough {
 		env = environNoScope()
-		SetupWorkDir(args)
-		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(workDir, "scope.yml"))
-		log.Info().Bool("passthrough", passthrough).Strs("args", args).Msg("calling syscall.Exec")
+		rc.SetupWorkDir(args)
+		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.workDir, "scope.yml"))
+		log.Info().Bool("passthrough", rc.Passthrough).Strs("args", args).Msg("calling syscall.Exec")
 	} else {
 		env = os.Environ()
 	}
@@ -88,18 +86,18 @@ func environNoScope() []string {
 	return env
 }
 
-// workDir represents our working directory
-var workDir string
-
 // CreateWorkDir creates a working directory
-func CreateWorkDir(cmd string) {
-	if workDir != "" {
-		if util.CheckFileExists(workDir) {
+func (rc *Config) CreateWorkDir(cmd string) {
+	if rc.workDir != "" {
+		if util.CheckFileExists(rc.workDir) {
 			// Directory exists, exit
 			return
 		}
 	}
-	ts := strconv.FormatInt(now().UTC().UnixNano(), 10)
+	if rc.now == nil {
+		rc.now = time.Now
+	}
+	ts := strconv.FormatInt(rc.now().UTC().UnixNano(), 10)
 	pid := strconv.Itoa(os.Getpid())
 	histDir := HistoryDir()
 	err := os.MkdirAll(histDir, 0755)
@@ -107,14 +105,14 @@ func CreateWorkDir(cmd string) {
 	sessionID := getSessionID()
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP
 	tmpDirName := path.Base(cmd) + "_" + sessionID + "_" + pid + "_" + ts
-	workDir = filepath.Join(HistoryDir(), tmpDirName)
-	err = os.Mkdir(workDir, 0755)
+	rc.workDir = filepath.Join(HistoryDir(), tmpDirName)
+	err = os.Mkdir(rc.workDir, 0755)
 	util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
-	cmdDir := filepath.Join(workDir, "cmd")
+	cmdDir := filepath.Join(rc.workDir, "cmd")
 	err = os.Mkdir(cmdDir, 0755)
 	util.CheckErrSprintf(err, "error creating cmd dir: %v", err)
-	internal.SetLogFile(filepath.Join(workDir, "scope.log"))
-	log.Info().Str("workDir", workDir).Msg("created working directory")
+	internal.SetLogFile(filepath.Join(rc.workDir, "scope.log"))
+	log.Info().Str("workDir", rc.workDir).Msg("created working directory")
 }
 
 // Open to race conditions, but having a duplicate ID is only a UX bug rather than breaking
@@ -140,17 +138,27 @@ func HistoryDir() string {
 }
 
 // SetupWorkDir sets up a working directory for a given set of args
-func SetupWorkDir(args []string) {
+func (rc *Config) SetupWorkDir(args []string) {
 	cmd := path.Base(args[0])
-	CreateWorkDir(cmd)
+	rc.CreateWorkDir(cmd)
 
-	sc := GetDefaultScopeConfig(workDir)
+	rc.SetupScopeYaml()
 
-	scYamlPath := filepath.Join(workDir, "scope.yml")
-	err := WriteScopeConfig(sc, scYamlPath)
-	util.CheckErrSprintf(err, "%v", err)
-	argsJSONPath := filepath.Join(workDir, "args.json")
+	argsJSONPath := filepath.Join(rc.workDir, "args.json")
 	argsBytes, err := json.Marshal(args)
 	util.CheckErrSprintf(err, "error marshaling JSON: %v", err)
 	err = ioutil.WriteFile(argsJSONPath, argsBytes, 0644)
+}
+
+// SetupScopeYaml writes the scope configuration to the workdir
+func (rc *Config) SetupScopeYaml() {
+	sc := GetDefaultScopeConfig(rc.workDir)
+
+	if rc.Verbosity != 0 {
+		sc.Metric.Format.Verbosity = rc.Verbosity
+	}
+
+	scYamlPath := filepath.Join(rc.workDir, "scope.yml")
+	err := WriteScopeConfig(sc, scYamlPath)
+	util.CheckErrSprintf(err, "%v", err)
 }

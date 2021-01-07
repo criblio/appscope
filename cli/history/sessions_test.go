@@ -17,11 +17,13 @@ func TestMain(m *testing.M) {
 	// Borrowed from http://cs-guy.com/blog/2015/01/test-main/
 	switch os.Getenv("TEST_MAIN") {
 	case "run":
-		internal.InitConfig("")
-		run.Run([]string{"/bin/echo", "true"})
+		internal.InitConfig()
+		rc := run.Config{}
+		rc.Run([]string{"/bin/echo", "true"})
 	case "slow":
-		internal.InitConfig("")
-		run.Run([]string{"/bin/sleep", "10"})
+		internal.InitConfig()
+		rc := run.Config{}
+		rc.Run([]string{"/bin/sleep", "10"})
 	default:
 		os.Exit(m.Run())
 	}

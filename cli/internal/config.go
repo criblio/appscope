@@ -7,34 +7,13 @@ import (
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 )
 
 // InitConfig reads in config file and ENV variables if set.
-func InitConfig(cfgFile string) {
-	if viper.GetBool("passthrough") {
-		return
-	}
-	viper.SetConfigFile(cfgFile)
-	viper.SetEnvPrefix("scope")
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	viper.ReadInConfig()
-	// viper.WatchConfig() // Watch config for changes
-	// viper.OnConfigChange(func(e fsnotify.Event) {
-	// 	log.Debugf("Config file changed: %s", e.Name)
-	// })
-
+func InitConfig() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	if viper.GetInt("verbose") > 0 {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	}
 	SetLogFile(filepath.Join(util.ScopeHome(), "scope.log"))
-
-	c := viper.AllSettings()
-	log.Debug().Interface("config", c).Msg("config")
 }
 
 // GetConfigMap returns configuration as a map
@@ -50,4 +29,9 @@ func SetLogFile(path string) {
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
 	util.CheckErrSprintf(err, "could not open log file %s: %v", path, err)
 	log.Logger = zerolog.New(f).With().Timestamp().Caller().Logger()
+}
+
+// SetDebug sets logging to debug
+func SetDebug() {
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 }

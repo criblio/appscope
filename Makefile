@@ -4,6 +4,7 @@ PLATFORM=$(shell "$(CWD)"/scope_env.sh platform)
 
 ifeq ($(PLATFORM),Linux)
 	include os/linux/Makefile
+	include cli/Makefile
 else
 	ifeq ($(PLATFORM),macOS)
 		include os/macOS/Makefile

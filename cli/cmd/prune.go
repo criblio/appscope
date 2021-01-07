@@ -44,12 +44,12 @@ scope prune -a`,
 		sessions := history.GetSessions()
 		countD := 0
 		for idx, s := range sessions {
+			if idx > len(sessions)-keep-1 {
+				break
+			}
 			err := os.RemoveAll(s.WorkDir)
 			util.CheckErrSprintf(err, "error removing work directory: %v", err)
 			countD = idx + 1
-			if idx > len(sessions)-keep {
-				break
-			}
 		}
 		fmt.Printf("Removed %d sessions.\n", countD)
 		os.Exit(0)
@@ -58,7 +58,7 @@ scope prune -a`,
 
 func init() {
 	RootCmd.AddCommand(pruneCmd)
-	pruneCmd.Flags().IntP("keep", "k", -1, "Delete last <keep> sessions")
+	pruneCmd.Flags().IntP("keep", "k", -1, "Keep last <keep> sessions")
 	pruneCmd.Flags().BoolP("all", "a", false, "Delete all sessions")
 	pruneCmd.Flags().BoolP("force", "f", false, "Do not prompt for confirmation")
 }

@@ -19,7 +19,7 @@ TEST_INCLUDES=-I./src -I./contrib/cmocka/include
 TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
 
 .PHONY: all clean test
-all: libscope.so scope
+all: libscope.so cscope scope
 
 $(PCRE2_AR):
 	@echo "Building pcre2"
@@ -41,9 +41,9 @@ libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c s
 	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
 	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/ && rm ./test/selfinterpose/wrap_go.o
 
-scope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c libscope.so
+cscope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c libscope.so
 	objcopy -I binary -O elf64-x86-64 -B i386 ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
-	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c -ldl -lrt -o ./bin/$(OS)/scope ./lib/$(OS)/libscope.o -I./os/$(OS)
+	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c -ldl -lrt -o ./bin/$(OS)/cscope ./lib/$(OS)/libscope.o -I./os/$(OS)
 	rm -f ./lib/$(OS)/libscope.o
 
 clean:

@@ -449,7 +449,7 @@ apt_make_exists() {
 
 apt_make_install() {
     echo "Installing make."
-    sudo apt-get install make
+    sudo apt-get install -y make
     if [ $? = 0 ]; then
         echo "Installation of make successful."
     else
@@ -469,7 +469,7 @@ apt_autoconf_exists() {
 
 apt_autoconf_install() {
     echo "Installing autoconf."
-    sudo apt-get install autoconf
+    sudo apt-get install -y autoconf
     if [ $? = 0 ]; then
         echo "Installation of autoconf successful."
     else
@@ -489,7 +489,7 @@ apt_libtool_exists() {
 
 apt_libtool_install() {
     echo "Installing libtool."
-    sudo apt-get install libtool-bin
+    sudo apt-get install -y libtool-bin
     if [ $? = 0 ]; then
         echo "Installation of libtool successful."
     else
@@ -509,7 +509,7 @@ apt_cmake_exists() {
 
 apt_cmake_install() {
     echo "Installing cmake."
-    sudo apt-get install cmake
+    sudo apt-get install -y cmake
     if [ $? = 0 ]; then
         echo "Installation of cmake successful."
     else
@@ -529,7 +529,7 @@ apt_lcov_exists() {
 
 apt_lcov_install() {
     echo "Installing lcov."
-    sudo apt-get install lcov
+    sudo apt-get install -y lcov
     if [ $? = 0 ]; then
         echo "Installation of lcov successful."
     else

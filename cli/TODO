@@ -13,3 +13,4 @@
 * Summary view across runs
 * Show scope config
 * Colorize metrics
+* scope metrics -u output unique metric names

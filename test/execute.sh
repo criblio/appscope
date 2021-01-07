@@ -21,7 +21,7 @@ accumulate_coverage() {
 report_final_coverage() {
 
     genhtml -o coverage $INFOLIST
-    rm *\.gcno *\.o
+    rm *\.gcno *\.o *\.gcda
 }
 
 run_test() {

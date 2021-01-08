@@ -633,8 +633,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             atomicSwapU64(&g_fsinfo[fd].numDuration.mtc, 0);
             atomicSwapU64(&g_fsinfo[fd].totalDuration.mtc, 0);
         }
-        atomicSwapU64(&g_fsinfo[fd].numDuration.evt, 0);
-        atomicSwapU64(&g_fsinfo[fd].totalDuration.evt, 0);
+        //atomicSwapU64(&g_fsinfo[fd].numDuration.evt, 0);
+        //atomicSwapU64(&g_fsinfo[fd].totalDuration.evt, 0);
         break;
     }
 
@@ -649,8 +649,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             atomicSwapU64(&g_fsinfo[fd].readBytes.mtc, 0);
             //subFromInterfaceCounts(&g_ctrs.readBytes, size);
         }
-        atomicSwapU64(&g_fsinfo[fd].numRead.evt, 0);
-        atomicSwapU64(&g_fsinfo[fd].readBytes.evt, 0);
+        //atomicSwapU64(&g_fsinfo[fd].numRead.evt, 0);
+        //atomicSwapU64(&g_fsinfo[fd].readBytes.evt, 0);
         break;
     }
 
@@ -665,8 +665,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             atomicSwapU64(&g_fsinfo[fd].writeBytes.mtc, 0);
             //subFromInterfaceCounts(&g_ctrs.writeBytes, size);
         }
-        atomicSwapU64(&g_fsinfo[fd].numWrite.evt, 0);
-        atomicSwapU64(&g_fsinfo[fd].writeBytes.evt, 0);
+        //atomicSwapU64(&g_fsinfo[fd].numWrite.evt, 0);
+        //atomicSwapU64(&g_fsinfo[fd].writeBytes.evt, 0);
         break;
     }
 

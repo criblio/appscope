@@ -78,6 +78,22 @@ metricCalls(const char* str)
     return returnVal;
 }
 
+// we no longer clear counters on rd/wr, only on close
+// the last entry is the total
+int
+eventRdWrValues(const char *str)
+{
+    doEvent();
+    int i, returnVal = 0;
+    for (i=0; i < evtBufNext; i++) {
+        returnVal = 0;
+        if (!str || !strcmp(evtBuf[i].name, str)) {
+            returnVal += evtBuf[i].value.integer;
+        }
+    }
+    return returnVal;
+}
+
 int
 eventValues(const char* str)
 {
@@ -244,7 +260,7 @@ doReadFileNoSummarization(void** state)
     assert_int_equal(metricCalls("fs.read"), 2);
     assert_int_equal(metricValues("fs.read"), 2*13);
     assert_int_equal(eventCalls("fs.read"), 2);
-    assert_int_equal(eventValues("fs.read"), 2*13);
+    assert_int_equal(eventRdWrValues("fs.read"), 2*13);
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -288,7 +304,7 @@ doReadFileSummarizedOpenCloseNotSummarized(void** state)
     doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 2);
-    assert_int_equal(eventValues("fs.read"), 2*13);
+    assert_int_equal(eventRdWrValues("fs.read"), 2*13);
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -334,7 +350,7 @@ doReadFileFullSummarization(void** state)
     doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 2);
-    assert_int_equal(eventValues("fs.read"), 2*13);
+    assert_int_equal(eventRdWrValues("fs.read"), 2*13);
 
     // With open/close summarization, doClose does not output either
     clearTestData();
@@ -386,7 +402,7 @@ doWriteFileNoSummarization(void** state)
     assert_int_equal(metricCalls("fs.write"), 2);
     assert_int_equal(metricValues("fs.write"), 2*sizeof(buf));
     assert_int_equal(eventCalls("fs.write"), 2);
-    assert_int_equal(eventValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(eventRdWrValues("fs.write"), 2*sizeof(buf));
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -432,7 +448,7 @@ doWriteFileSummarizedOpenCloseNotSummarized(void** state)
     doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 0);
     assert_int_equal(eventCalls("fs.write"), 2);
-    assert_int_equal(eventValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(eventRdWrValues("fs.write"), 2*sizeof(buf));
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -480,7 +496,7 @@ doWriteFileFullSummarization(void** state)
     doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 0);
     assert_int_equal(eventCalls("fs.write"), 2);
-    assert_int_equal(eventValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(eventRdWrValues("fs.write"), 2*sizeof(buf));
 
     // With open/close summarization, doClose does not output either
     clearTestData();

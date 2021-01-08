@@ -39,11 +39,18 @@
 #define PROC_FIELD(val)         STRFIELD("proc",           (val), 4, FALSE)
 #define HTTPSTAT_FIELD(val)     NUMFIELD("http_status",    (val), 4, TRUE)
 #define DOMAIN_FIELD(val)       STRFIELD("domain",         (val), 5, TRUE)
-#define FILE_FIELD(val)         STRFIELD("file",           (val), 5, TRUE)
-#define FILE_EV_NAME(val)       STRFIELD("file.name",      (val), 5, TRUE)
-#define FILE_EV_MODE(val)       STRFIELD("file.perms",     (val), 5, TRUE)
-#define FILE_OWNER(val)         NUMFIELD("file.owner",     (val), 5, TRUE)
-#define FILE_GROUP(val)         NUMFIELD("file.group",     (val), 5, TRUE)
+
+#define FILE_FIELD(val)      STRFIELD("file",              (val), 5, TRUE)
+#define FILE_EV_NAME(val)    STRFIELD("file.name",         (val), 5, TRUE)
+#define FILE_EV_MODE(val)    STRFIELD("file.perms",        (val), 5, TRUE)
+#define FILE_OWNER(val)      NUMFIELD("file.owner",        (val), 5, TRUE)
+#define FILE_GROUP(val)      NUMFIELD("file.group",        (val), 5, TRUE)
+#define FILE_RD_BYTES(val)   NUMFIELD("file.read_bytes",   (val), 5, TRUE)
+#define FILE_RD_OPS(val)     NUMFIELD("file.read_ops",     (val), 5, TRUE)
+#define FILE_WR_BYTES(val)   NUMFIELD("file.write_bytes",  (val), 5, TRUE)
+#define FILE_WR_OPS(val)     NUMFIELD("file.write_ops",    (val), 5, TRUE)
+#define FILE_ERRS(val)       NUMFIELD("file.errors",       (val), 5, TRUE)
+
 #define LOCALIP_FIELD(val)      STRFIELD("localip",        (val), 6, TRUE)
 #define REMOTEIP_FIELD(val)     STRFIELD("remoteip",       (val), 6, TRUE)
 #define LOCALP_FIELD(val)       NUMFIELD("localp",         (val), 6, TRUE)
@@ -1134,6 +1141,126 @@ doStatMetric(const char *op, const char *pathname, void* ctr)
     }
 }
 
+static uint64_t
+getFSDuration(fs_info *fs)
+{
+    uint64_t dur = 0ULL;
+    int cachedDurationNum = fs->numDuration.evt; // avoid div by zero
+    if (cachedDurationNum >= 1) {
+        // factor of 1000 converts ns to us.
+        dur = fs->totalDuration.evt / ( 1000 * cachedDurationNum);
+    }
+    return dur;
+}
+
+/* Example FS Events
+   {
+   "sourcetype": "fs",
+   "source": "fs.open",
+   "cmd": "foo",
+   "pid": 10831,
+   "host": "hostname",
+   "_time": timestamp,
+   "data": {
+   "file.name": "/usr/lib/ssl/openssl.cnf",
+   "file.perms": 0755,
+   "file.owner": 0,
+   "file.group": 0,
+   "proc.uid": 1000,
+   "proc.gid": 1000,
+   "proc.cgroup": "foo"
+   }
+   }
+
+   {
+   "sourcetype": "fs",
+   "source": "fs.close",
+   "cmd": "foo",
+   "pid": 10831,
+   "host": "hostname",
+   "_time": timestamp,
+   "data": {
+   "file.name": "/usr/lib/ssl/openssl.cnf",
+   "file.perms": 0755,
+   "file.owner": 0,
+   "file.group": 0,
+   "file.read_bytes": 18343,
+   "file.read_ops": 5,
+   "file.write_bytes": 1823,
+   "file.write_ops": 9,
+   "file.errors": 1,
+   "proc.uid": 1000,
+   "proc.gid": 1000,
+   "proc.cgroup": "foo",
+   "duration": 1833
+   }
+   }
+*/
+static void
+doFSOpenEvent(fs_info *fs, const char *op)
+{
+    const char *metric = "fs.open";
+    counters_element_t *numops = &fs->numOpen;
+
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FILE_EVENTS) &&
+        (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
+        char *mode = osGetFileMode(fs->mode);
+
+        event_field_t fevent[] = {
+            FILE_EV_NAME(fs->path),
+            PROC_UID(g_proc.uid),
+            PROC_GID(g_proc.gid),
+            PROC_CGROUP(g_proc.cgroup),
+            FILE_EV_MODE((mode == NULL) ? "---" : mode),
+            FILE_OWNER(fs->fuid),
+            FILE_GROUP(fs->fgid),
+            OP_FIELD(op),
+            FIELDEND
+        };
+
+        event_t evt = INT_EVENT(metric, numops->evt, DELTA, fevent);
+        evt.src = CFG_SRC_FILE_EVENTS;
+        cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
+
+        if (mode) free(mode);
+    }
+}
+
+static void
+doFSCloseEvent(fs_info *fs, const char *op)
+{
+    const char *metric = "fs.close";
+
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FILE_EVENTS) &&
+        (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
+        char *mode = osGetFileMode(fs->mode);
+
+        event_field_t fevent[] = {
+            FILE_EV_NAME(fs->path),
+            PROC_UID(g_proc.uid),
+            PROC_GID(g_proc.gid),
+            PROC_CGROUP(g_proc.cgroup),
+            FILE_EV_MODE((mode == NULL) ? "---" : mode),
+            FILE_OWNER(fs->fuid),
+            FILE_GROUP(fs->fgid),
+            FILE_RD_BYTES(fs->readBytes.evt),
+            FILE_RD_OPS(fs->numRead.evt),
+            FILE_WR_BYTES(fs->writeBytes.evt),
+            FILE_WR_OPS(fs->numWrite.evt),
+            //FILE_ERRS(g_ctrs.fsRdWrErrors.evt), we don't track errs per fd
+            DURATION_FIELD(getFSDuration(fs)),
+            OP_FIELD(op),
+            FIELDEND
+        };
+
+        event_t evt = INT_EVENT(metric, fs->numClose.evt, DELTA, fevent);
+        evt.src = CFG_SRC_FILE_EVENTS;
+        cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
+
+        if (mode) free(mode);
+    }
+}
+
 void
 doFSMetric(metric_t type, fs_info *fs, control_type_t source,
            const char *op, ssize_t size, const char *pathname)
@@ -1167,10 +1294,10 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
 
             event_t evt = INT_EVENT("fs.duration", dur, HISTOGRAM, fields);
             cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
-            atomicSwapU64(&fs->numDuration.evt, 0);
-            atomicSwapU64(&fs->totalDuration.evt, 0);
-            //atomicSwapU64(&g_ctrs.fsDurationNum.evt, 0);
-            //atomicSwapU64(&g_ctrs.fsDurationTotal.evt, 0);
+            //atomicSwapU64(&fs->numDuration.evt, 0);
+            //atomicSwapU64(&fs->totalDuration.evt, 0);
+            ////atomicSwapU64(&g_ctrs.fsDurationNum.evt, 0);
+            ////atomicSwapU64(&g_ctrs.fsDurationTotal.evt, 0);
         }
 
         dur = 0ULL;
@@ -1256,9 +1383,9 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
 
             event_t rwMetric = INT_EVENT(metric, sizebytes->evt, HISTOGRAM, fields);
             cmdSendEvent(g_ctl, &rwMetric, fs->uid, &g_proc);
-            atomicSwapU64(&numops->evt, 0);
-            atomicSwapU64(&sizebytes->evt, 0);
-            //atomicSwapU64(global_counter->evt, 0);
+            //atomicSwapU64(&numops->evt, 0);
+            //atomicSwapU64(&sizebytes->evt, 0);
+            ////atomicSwapU64(global_counter->evt, 0);
         }
 
         // Only report if enabled
@@ -1347,53 +1474,20 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
             reported = TRUE;
         }
 
-        /* Example FS Event
-          {
-          "sourcetype": "fs",
-          "source": "fs.open",
-          "cmd": "foo",
-          "pid": 10831,
-          "host": "hostname",
-          "_time": timestamp,
-          "data": {
-          "file.name": "/usr/lib/ssl/openssl.cnf",
-          "file.perms": 0755,
-          "file.owner": 0,
-          "file.group": 0,
-          "proc.uid": 1000,
-          "proc.gid": 1000,
-          "proc.cgroup": "foo"
-          }
-          }
-        */
+        if ((type == FS_OPEN) && (numops->evt != 0ULL)) {
+            doFSOpenEvent(fs, op);
+            reported = TRUE;
+        }
 
-        if ((type == FS_OPEN) && ctlEvtSourceEnabled(g_ctl, CFG_SRC_FILE_EVENTS) &&
-            (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
-            char *mode = osGetFileMode(fs->mode);
-
-            event_field_t fevent[] = {
-                FILE_EV_NAME(fs->path),
-                PROC_UID(g_proc.uid),
-                PROC_GID(g_proc.gid),
-                PROC_CGROUP(g_proc.cgroup),
-                FILE_EV_MODE((mode == NULL) ? "---" : mode),
-                FILE_OWNER(fs->fuid),
-                FILE_GROUP(fs->fgid),
-                OP_FIELD(op),
-                FIELDEND
-            };
-            metric = "fs.open";
-
-            // Don't report zeros.
-            if (numops->evt != 0ULL) {
-                event_t evt = INT_EVENT(metric, numops->evt, DELTA, fevent);
-                evt.src = CFG_SRC_FILE_EVENTS;
-                cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
-                reported = TRUE;
-            }
-
-            metric = "fs.op.open";
-            if (mode) free(mode);
+        if ((type == FS_CLOSE) && (numops->evt != 0ULL)) {
+            doFSCloseEvent(fs, op);
+            reported = TRUE;
+            atomicSwapU64(&fs->numWrite.evt, 0);
+            atomicSwapU64(&fs->writeBytes.evt, 0);
+            atomicSwapU64(&fs->numRead.evt, 0);
+            atomicSwapU64(&fs->readBytes.evt, 0);
+            atomicSwapU64(&fs->numDuration.evt, 0);
+            atomicSwapU64(&fs->totalDuration.evt, 0);
         }
 
         if (reported == TRUE) atomicSwapU64(&numops->evt, 0);

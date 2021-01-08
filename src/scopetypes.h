@@ -21,6 +21,9 @@ typedef enum {CFG_SRC_FILE,
               CFG_SRC_SYSLOG,
               CFG_SRC_METRIC,
               CFG_SRC_HTTP,
+              CFG_SRC_FILE_EVENTS,
+              CFG_SRC_NET_EVENTS,
+              CFG_SRC_DNS_EVENTS,
               CFG_SRC_MAX} watch_t;
 
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
@@ -30,15 +33,20 @@ typedef enum {CFG_SRC_FILE,
 #define MAX_PROCNAME 128
 #define DEFAULT_CMD_SIZE 32
 #define MAX_ID 512
+#define MAX_CGROUP 512
+#define MODE_STR 16
 
 typedef struct
 {
     pid_t pid;
     pid_t ppid;
+    uid_t uid;
+    gid_t gid;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];
     char *cmd;
     char id[MAX_ID];
+    char cgroup[MAX_CGROUP];
 } proc_id_t;
 
 #define NSLEEP(now, remain) \
@@ -79,22 +87,34 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_SYSLOG_VALUE ".*"
 #define DEFAULT_SRC_METRIC_VALUE ".*"
 #define DEFAULT_SRC_HTTP_VALUE ".*"
+#define DEFAULT_SRC_FILE_EVENTS_VALUE ".*"
+#define DEFAULT_SRC_NET_EVENTS_VALUE ".*"
+#define DEFAULT_SRC_DNS_EVENTS_VALUE ".*"
 #define DEFAULT_SRC_FILE_FIELD ".*"
 #define DEFAULT_SRC_CONSOLE_FIELD ".*"
 #define DEFAULT_SRC_SYSLOG_FIELD ".*"
 #define DEFAULT_SRC_METRIC_FIELD "^[^h]+"
 #define DEFAULT_SRC_HTTP_FIELD ".*"
+#define DEFAULT_SRC_FILE_EVENTS_FIELD ".*"
+#define DEFAULT_SRC_NET_EVENTS_FIELD ".*"
+#define DEFAULT_SRC_DNS_EVENTS_FIELD ".*"
 #define DEFAULT_SRC_FILE_NAME ".*log.*"
 #define DEFAULT_SRC_CONSOLE_NAME "(stdout)|(stderr)"
 #define DEFAULT_SRC_SYSLOG_NAME ".*"
 #define DEFAULT_SRC_METRIC_NAME ".*"
 #define DEFAULT_SRC_HTTP_NAME ".*"
+#define DEFAULT_SRC_FILE_EVENTS_NAME ".*"
+#define DEFAULT_SRC_NET_EVENTS_NAME ".*"
+#define DEFAULT_SRC_DNS_EVENTS_NAME ".*"
 #define DEFAULT_MTC_IPPORT_VERBOSITY 1
 #define DEFAULT_SRC_FILE FALSE
 #define DEFAULT_SRC_CONSOLE FALSE
 #define DEFAULT_SRC_SYSLOG FALSE
 #define DEFAULT_SRC_METRIC FALSE
 #define DEFAULT_SRC_HTTP FALSE
+#define DEFAULT_SRC_FILE_EVENTS TRUE
+#define DEFAULT_SRC_NET_EVENTS TRUE
+#define DEFAULT_SRC_DNS_EVENTS TRUE
 #define DEFAULT_MTC_PORT "8125"
 #define DEFAULT_CTL_PORT "9109"
 #define MAXEVENTSPERSEC 10000

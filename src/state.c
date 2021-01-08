@@ -21,6 +21,7 @@
 #include "state.h"
 #include "state_private.h"
 #include "pcre2.h"
+#include "fn.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
@@ -374,6 +375,7 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
     int mtc_needs_reporting = summarize && !*summarize;
     int need_to_post =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_FILE_EVENTS) ||
         (mtcEnabled(g_mtc) && mtc_needs_reporting);
     if (!need_to_post) return FALSE;
 
@@ -1824,6 +1826,15 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
         g_fsinfo[fd].type = type;
         g_fsinfo[fd].uid = getTime();
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
+
+        if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FILE_EVENTS)) {
+            struct stat sbuf;
+            if ((g_fn.__xstat) && (g_fn.__xstat(1, g_fsinfo[fd].path, &sbuf) == 0)) {
+                g_fsinfo[fd].fuid = sbuf.st_uid;
+                g_fsinfo[fd].fgid = sbuf.st_gid;
+                g_fsinfo[fd].mode = sbuf.st_mode;
+            }
+        }
 
         doUpdateState(FS_OPEN, fd, 0, func, path);
         scopeLog(func, fd, CFG_LOG_TRACE);

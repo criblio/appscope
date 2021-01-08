@@ -189,6 +189,9 @@ typedef struct fs_info_t {
     counters_element_t numDuration;
     counters_element_t totalDuration;
     uint64_t uid;
+    uid_t fuid;
+    gid_t fgid;
+    mode_t mode;
     char path[PATH_MAX];
     char funcop[FUNC_MAX];
 } fs_info;

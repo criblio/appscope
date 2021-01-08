@@ -33,7 +33,7 @@ typedef enum {DELTA, CURRENT, DELTA_MS, HISTOGRAM, SET} data_type_t;
 
 typedef enum {FMT_INT, FMT_FLT} value_t;
 typedef struct {
-    const char* const name;
+    const char *const name;
     struct {
         const value_t type;
         union {
@@ -42,11 +42,12 @@ typedef struct {
         };
     } value;
     const data_type_t type;
-    event_field_t* fields;
+    event_field_t *fields;
+    watch_t src;
 } event_t;
 
-#define INT_EVENT(n, v, t, f) {n, { FMT_INT, .integer=v}, t, f}
-#define FLT_EVENT(n, v, t, f) {n, { FMT_FLT, .floating=v}, t, f}
+#define INT_EVENT(n, v, t, f) {n, { FMT_INT, .integer=v}, t, f, CFG_SRC_METRIC}
+#define FLT_EVENT(n, v, t, f) {n, { FMT_FLT, .floating=v}, t, f, CFG_SRC_METRIC}
 
 typedef struct event_format {
     double timestamp;

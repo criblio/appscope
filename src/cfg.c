@@ -103,6 +103,9 @@ static unsigned srcEnabledDefault[] = {
     DEFAULT_SRC_SYSLOG,
     DEFAULT_SRC_METRIC,
     DEFAULT_SRC_HTTP,
+    DEFAULT_SRC_FILE_EVENTS,
+    DEFAULT_SRC_NET_EVENTS,
+    DEFAULT_SRC_DNS_EVENTS,
 };
 
 static cfg_transport_t typeDefault[] = {

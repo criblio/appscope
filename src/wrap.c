@@ -633,6 +633,12 @@ setProcId(proc_id_t *proc)
     } else {
         snprintf(proc->id, sizeof(proc->id), "badid");
     }
+
+    proc->uid = getuid();
+    proc->gid = getgid();
+    if (osGetCgroup(proc->pid, proc->cgroup, MAX_CGROUP) == FALSE) {
+        proc->cgroup[0] = '\0';
+    }
 }
 
 static void

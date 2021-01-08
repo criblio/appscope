@@ -31,12 +31,19 @@
 #define CLASS_FIELD(val)        STRFIELD("class",          (val), 2, TRUE)
 #define PROTO_FIELD(val)        STRFIELD("proto",          (val), 2, TRUE)
 #define OP_FIELD(val)           STRFIELD("op",             (val), 3, TRUE)
-#define PID_FIELD(val)          NUMFIELD("pid",            (val), 4, FALSE)
+#define PID_FIELD(val)          NUMFIELD("pid",            (val), 4, TRUE)
+#define PROC_UID(val)           NUMFIELD("proc.uid",       (val), 4, TRUE)
+#define PROC_GID(val)           NUMFIELD("proc.gid",       (val), 4, TRUE)
+#define PROC_CGROUP(val)        STRFIELD("proc.cgroup",    (val), 4, TRUE)
 #define HOST_FIELD(val)         STRFIELD("host",           (val), 4, FALSE)
 #define PROC_FIELD(val)         STRFIELD("proc",           (val), 4, FALSE)
 #define HTTPSTAT_FIELD(val)     NUMFIELD("http_status",    (val), 4, TRUE)
 #define DOMAIN_FIELD(val)       STRFIELD("domain",         (val), 5, TRUE)
 #define FILE_FIELD(val)         STRFIELD("file",           (val), 5, TRUE)
+#define FILE_EV_NAME(val)       STRFIELD("file.name",      (val), 5, TRUE)
+#define FILE_EV_MODE(val)       STRFIELD("file.perms",     (val), 5, TRUE)
+#define FILE_OWNER(val)         NUMFIELD("file.owner",     (val), 5, TRUE)
+#define FILE_GROUP(val)         NUMFIELD("file.group",     (val), 5, TRUE)
 #define LOCALIP_FIELD(val)      STRFIELD("localip",        (val), 6, TRUE)
 #define REMOTEIP_FIELD(val)     STRFIELD("remoteip",       (val), 6, TRUE)
 #define LOCALP_FIELD(val)       NUMFIELD("localp",         (val), 6, TRUE)
@@ -1289,6 +1296,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
     case FS_CLOSE:
     case FS_SEEK:
     {
+        bool reported = FALSE;
         const char* metric = "UNKNOWN";
         counters_element_t* numops = NULL;
         counters_element_t* global_counter = NULL;
@@ -1333,11 +1341,61 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         };
 
         // Don't report zeros.
-        if (numops->evt != 0ULL) {
+        if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) && (numops->evt != 0ULL)) {
             event_t evt = INT_EVENT(metric, numops->evt, DELTA, fields);
             cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
-            atomicSwapU64(&numops->evt, 0);
+            reported = TRUE;
         }
+
+        /* Example FS Event
+          {
+          "sourcetype": "fs",
+          "source": "fs.open",
+          "cmd": "foo",
+          "pid": 10831,
+          "host": "hostname",
+          "_time": timestamp,
+          "data": {
+          "file.name": "/usr/lib/ssl/openssl.cnf",
+          "file.perms": 0755,
+          "file.owner": 0,
+          "file.group": 0,
+          "proc.uid": 1000,
+          "proc.gid": 1000,
+          "proc.cgroup": "foo"
+          }
+          }
+        */
+
+        if ((type == FS_OPEN) && ctlEvtSourceEnabled(g_ctl, CFG_SRC_FILE_EVENTS) &&
+            (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
+            char *mode = osGetFileMode(fs->mode);
+
+            event_field_t fevent[] = {
+                FILE_EV_NAME(fs->path),
+                PROC_UID(g_proc.uid),
+                PROC_GID(g_proc.gid),
+                PROC_CGROUP(g_proc.cgroup),
+                FILE_EV_MODE((mode == NULL) ? "---" : mode),
+                FILE_OWNER(fs->fuid),
+                FILE_GROUP(fs->fgid),
+                OP_FIELD(op),
+                FIELDEND
+            };
+            metric = "fs.open";
+
+            // Don't report zeros.
+            if (numops->evt != 0ULL) {
+                event_t evt = INT_EVENT(metric, numops->evt, DELTA, fevent);
+                evt.src = CFG_SRC_FILE_EVENTS;
+                cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
+                reported = TRUE;
+            }
+
+            if (mode) free(mode);
+        }
+
+        if (reported == TRUE) atomicSwapU64(&numops->evt, 0);
 
         // Only report if enabled
         if (*summarize && (source == EVENT_BASED)) {

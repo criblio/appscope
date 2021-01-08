@@ -34,17 +34,29 @@
 #define CMDNAME "cmd"
 #define PID "pid"
 
+#define FMTERR(e, j)                                             \
+    {                                                            \
+    DBG("time=%s src=%s data=%p json=%p",                        \
+        e.timestamp, e.src, e.data, json);                       \
+    if (e.data) cJSON_Delete(e.data);                            \
+    if (j) cJSON_Delete(j);                                      \
+    return NULL;                                                 \
+    }
+
 typedef struct {
     const char* str;
     unsigned val;
 } enum_map_t;
 
 static enum_map_t watchTypeMap[] = {
-    {"file",                  CFG_SRC_FILE},
-    {"console",               CFG_SRC_CONSOLE},
-    {"syslog",                CFG_SRC_SYSLOG},
-    {"metric",                CFG_SRC_METRIC},
-    {"http",                  CFG_SRC_HTTP},
+    {"file",         CFG_SRC_FILE},
+    {"console",      CFG_SRC_CONSOLE},
+    {"syslog",       CFG_SRC_SYSLOG},
+    {"metric",       CFG_SRC_METRIC},
+    {"http",         CFG_SRC_HTTP},
+    {"fs",           CFG_SRC_FILE_EVENTS},
+    {"net-events",   CFG_SRC_NET_EVENTS},
+    {"dns-events",   CFG_SRC_DNS_EVENTS},
     {NULL,                    -1}
 };
 
@@ -83,6 +95,9 @@ static const char* valueFilterDefault[] = {
     DEFAULT_SRC_SYSLOG_VALUE,
     DEFAULT_SRC_METRIC_VALUE,
     DEFAULT_SRC_HTTP_VALUE,
+    DEFAULT_SRC_FILE_EVENTS_VALUE,
+    DEFAULT_SRC_NET_EVENTS_VALUE,
+    DEFAULT_SRC_DNS_EVENTS_VALUE,
 };
 
 static const char* fieldFilterDefault[] = {
@@ -91,6 +106,9 @@ static const char* fieldFilterDefault[] = {
     DEFAULT_SRC_SYSLOG_FIELD,
     DEFAULT_SRC_METRIC_FIELD,
     DEFAULT_SRC_HTTP_FIELD,
+    DEFAULT_SRC_FILE_EVENTS_FIELD,
+    DEFAULT_SRC_NET_EVENTS_FIELD,
+    DEFAULT_SRC_DNS_EVENTS_FIELD,
 };
 
 static const char* nameFilterDefault[] = {
@@ -99,6 +117,9 @@ static const char* nameFilterDefault[] = {
     DEFAULT_SRC_SYSLOG_NAME,
     DEFAULT_SRC_METRIC_NAME,
     DEFAULT_SRC_HTTP_NAME,
+    DEFAULT_SRC_FILE_EVENTS_NAME,
+    DEFAULT_SRC_NET_EVENTS_NAME,
+    DEFAULT_SRC_DNS_EVENTS_NAME,
 };
 
 static unsigned srcEnabledDefault[] = {
@@ -107,6 +128,9 @@ static unsigned srcEnabledDefault[] = {
     DEFAULT_SRC_SYSLOG,
     DEFAULT_SRC_METRIC,
     DEFAULT_SRC_HTTP,
+    DEFAULT_SRC_FILE_EVENTS,
+    DEFAULT_SRC_NET_EVENTS,
+    DEFAULT_SRC_DNS_EVENTS,
 };
 
 
@@ -218,6 +242,11 @@ unsigned
 evtFormatSourceEnabled(evt_fmt_t *evt, watch_t src)
 {
     if (src < CFG_SRC_MAX) {
+        // TEMP
+        if (src == CFG_SRC_FILE_EVENTS) {
+            return DEFAULT_SRC_FILE_EVENTS;
+        }
+
         if (evt) return evt->enabled[src];
         return srcEnabledDefault[src];
     }
@@ -413,7 +442,7 @@ fmtMetricJson(event_t *metric, regex_t *fieldFilter, watch_t src)
     cJSON *json = cJSON_CreateObject();
     if (!json) goto err;
 
-    if (src != CFG_SRC_HTTP) {
+    if (src == CFG_SRC_METRIC) {
         if (!cJSON_AddStringToObjLN(json, "_metric", metric->name)) goto err;
         metric_type = metricTypeStr(metric->type);
         if (!cJSON_AddStringToObjLN(json, "_metric_type", metric_type)) goto err;
@@ -439,6 +468,54 @@ err:
     if (json) cJSON_Delete(json);
 
     return NULL;
+}
+
+static cJSON *
+evtFSEvent(evt_fmt_t *evt, event_t *metric, proc_id_t *proc)
+{
+    event_format_t event;
+    struct timeb tb;
+    regex_t *filter;
+
+    if (!evt || !metric || !proc) return NULL;
+
+    // Test for a name field match.  No match, no metric output
+    if (!evtFormatSourceEnabled(evt, metric->src) ||
+        !(filter = evtFormatNameFilter(evt, metric->src)) ||
+        (regexec_wrapper(filter, metric->name, 0, NULL, 0))) {
+        return NULL;
+    }
+
+    /*
+     * Loop through all metric fields for at least one matching field value
+     * No match, no metric output
+     */
+    if (!anyValueFieldMatches(evtFormatValueFilter(evt, metric->src), metric)) {
+        return NULL;
+    }
+
+    ftime(&tb);
+    event.timestamp = tb.time + (double)tb.millitm/1000;
+    event.src = metric->name;
+    event.sourcetype = metric->src;
+
+    // Format the metric string using the configured metric format type
+    event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, metric->src), metric->src);
+    if (!event.data) return NULL;
+
+    cJSON *json = cJSON_CreateObject();
+    if (!json) FMTERR(event, json);
+
+    if (!cJSON_AddStringToObjLN(json, SOURCETYPE,
+                                valToStr(watchTypeMap, event.sourcetype))) FMTERR(event, json);
+    if (!cJSON_AddStringToObjLN(json, SOURCE, event.src)) FMTERR(event, json);
+    if (!cJSON_AddStringToObjLN(json, CMDNAME, proc->cmd)) FMTERR(event, json);
+    if (!cJSON_AddNumberToObjLN(json, PID, proc->pid)) FMTERR(event, json);
+    if (!cJSON_AddStringToObjLN(json, HOST, proc->hostname)) FMTERR(event, json);
+    if (!cJSON_AddNumberToObjLN(json, TIME, event.timestamp)) FMTERR(event, json);;
+    cJSON_AddItemToObjectCS(json, DATA, event.data);
+
+    return json;
 }
 
 static cJSON *
@@ -497,7 +574,13 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
 cJSON *
 evtFormatMetric(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc)
 {
-    return evtFormatHelper(evt, metric, uid, proc, CFG_SRC_METRIC);
+    switch (metric->src) {
+        case CFG_SRC_FILE_EVENTS:
+            return evtFSEvent(evt, metric, proc);
+            break;
+        default:
+            return evtFormatHelper(evt, metric, uid, proc, metric->src);
+    }
 }
 
 cJSON *

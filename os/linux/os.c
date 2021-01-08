@@ -605,6 +605,77 @@ osGetPageProt(uint64_t addr)
     return prot;
 }
 
+/*
+ * Example from /proc/<pid>/cgroup:
+   2:freezer:/
+   11:pids:/user.slice/user-1000.slice/user@1000.service
+   10:memory:/user.slice/user-1000.slice/user@1000.service
+   9:cpuset:/
+   8:devices:/user.slice
+   7:net_cls,net_prio:/
+   6:blkio:/user.slice
+   5:perf_event:/
+   4:hugetlb:/
+   3:cpu,cpuacct:/user.slice
+   2:rdma:/
+   1:name=systemd:/user.slice/user-1000.slice/user@1000.service/gnome-launched-emacs.desktop-21457.scope
+   0::/user.slice/user-1000.slice/user@1000.service/gnome-launched-emacs.desktop-21457.scope
+ */
+bool
+osGetCgroup(pid_t pid, char *cgroup, size_t cglen)
+{
+    size_t len = 0;
+    char *buf = NULL;
+    char path[PATH_MAX];
+
+    if (!g_fn.fopen || !g_fn.getline || !g_fn.fclose || (cglen <= 0)) {
+        return FALSE;
+    }
+
+    if (snprintf(path, sizeof(path), "/proc/%d/cgroup", pid) < 0) return FALSE;
+
+    FILE *fstream = g_fn.fopen(path, "r");
+    if (fstream == NULL) return FALSE;
+
+    while (g_fn.getline(&buf, &len, fstream) != -1) {
+        if (buf && strstr(buf, "0::")) {
+            strncpy(cgroup, buf, cglen);
+            char *nonl = strchr(cgroup, '\n');
+            if (nonl) *nonl = '\0';
+
+            free(buf);
+            g_fn.fclose(fstream);
+            return TRUE;
+        }
+
+        if (buf) free(buf);
+        buf = NULL;
+        len = 0;
+    }
+
+    g_fn.fclose(fstream);
+    return FALSE;
+}
+
+char *
+osGetFileMode(mode_t perm)
+{
+    char *mode = malloc(MODE_STR);
+    if (!mode) return NULL;
+
+    mode[0] = (perm & S_IRUSR) ? 'r' : '-';
+    mode[1] = (perm & S_IWUSR) ? 'w' : '-';
+    mode[2] = (perm & S_IXUSR) ? 'x' : '-';
+    mode[3] = (perm & S_IRGRP) ? 'r' : '-';
+    mode[4] = (perm & S_IWGRP) ? 'w' : '-';
+    mode[5] = (perm & S_IXGRP) ? 'x' : '-';
+    mode[6] = (perm & S_IROTH) ? 'r' : '-';
+    mode[7] = (perm & S_IWOTH) ? 'w' : '-';
+    mode[8] = (perm & S_IXOTH) ? 'x' : '-';
+    mode[9] = '\0';
+    return mode;
+}
+
 static const char scope_help_overview[] =
 "OVERVIEW:\n"
 "    The Scope library supports extraction of data from within applications.\n"

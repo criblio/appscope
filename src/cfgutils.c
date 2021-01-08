@@ -113,6 +113,9 @@ enum_map_t watchTypeMap[] = {
     {"syslog",                CFG_SRC_SYSLOG},
     {"metric",                CFG_SRC_METRIC},
     {"http",                  CFG_SRC_HTTP},
+    {"file_events",           CFG_SRC_FILE_EVENTS},
+    {"net_events",            CFG_SRC_NET_EVENTS},
+    {"dns_events",            CFG_SRC_DNS_EVENTS},
     {NULL,                    -1}
 };
 
@@ -1592,6 +1595,8 @@ initEvtFormat(config_t *cfg)
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
     }
 
+    // TEMPORARY; until we process and set defaults
+    evtFormatSourceEnabledSet(evt, CFG_SRC_FILE_EVENTS, 1);
     return evt;
 }
 

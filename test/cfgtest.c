@@ -278,7 +278,12 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
              dbgInit(); // reset dbg for the rest of the tests
         } else {
              assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 0);
-             assert_int_equal(cfgEvtFormatSourceEnabled(config, i), 0);
+             // these default to enabled
+             if (i == CFG_SRC_FILE_EVENTS) {
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), 1);
+             } else {
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), 0);
+             }
         }
     }
 
@@ -324,6 +329,15 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
                 break;
             case CFG_SRC_METRIC:
                 expected = DEFAULT_SRC_METRIC;
+                break;
+            case CFG_SRC_FILE_EVENTS:
+                expected = DEFAULT_SRC_FILE_EVENTS;
+                break;
+            case CFG_SRC_NET_EVENTS:
+                expected = DEFAULT_SRC_NET_EVENTS;
+                break;
+            case CFG_SRC_DNS_EVENTS:
+                expected = DEFAULT_SRC_DNS_EVENTS;
                 break;
         }
         assert_int_equal(cfgEvtFormatSourceEnabled(config, i), expected);

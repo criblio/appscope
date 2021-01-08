@@ -242,10 +242,10 @@ unsigned
 evtFormatSourceEnabled(evt_fmt_t *evt, watch_t src)
 {
     if (src < CFG_SRC_MAX) {
-        // TEMP
-        if (src == CFG_SRC_FILE_EVENTS) {
-            return DEFAULT_SRC_FILE_EVENTS;
-        }
+        // TEMPORARY
+        //if (src == CFG_SRC_FILE_EVENTS) {
+        //    return DEFAULT_SRC_FILE_EVENTS;
+        //}
 
         if (evt) return evt->enabled[src];
         return srcEnabledDefault[src];

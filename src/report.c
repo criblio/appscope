@@ -1392,6 +1392,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
                 reported = TRUE;
             }
 
+            metric = "fs.op.open";
             if (mode) free(mode);
         }
 

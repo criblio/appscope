@@ -508,7 +508,7 @@ fmtMetricJsonNoFields(void** state)
     data_type_t type;
     for (type=DELTA; type<=SET+1; type++) {
         event_t e = INT_EVENT("A", 1, type, NULL);
-        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_MAX);
+        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC);
         cJSON* json_type = cJSON_GetObjectItem(json, "_metric_type");
         assert_string_equal(map[type], cJSON_GetStringValue(json_type));
         if (json) cJSON_Delete(json);
@@ -526,7 +526,7 @@ fmtMetricJsonWFields(void** state)
         FIELDEND
     };
     event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
-    cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_MAX);
+    cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
@@ -552,7 +552,7 @@ fmtMetricJsonWFilteredFields(void** state)
     event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
     regex_t re;
     assert_int_equal(regcomp(&re, "[AD]", REG_EXTENDED), 0);
-    cJSON* json = fmtMetricJson(&e, &re, CFG_SRC_MAX);
+    cJSON* json = fmtMetricJson(&e, &re, CFG_SRC_METRIC);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
@@ -571,7 +571,7 @@ fmtMetricJsonEscapedValues(void** state)
 {
     {
         event_t e = INT_EVENT("Paç \"fat!", 3, SET, NULL);    // embedded double quote
-        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_MAX);
+        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC);
         assert_non_null(json);
         char* str = cJSON_PrintUnformatted(json);
         assert_non_null(str);
@@ -590,7 +590,7 @@ fmtMetricJsonEscapedValues(void** state)
             FIELDEND
         };
         event_t e = INT_EVENT("you", 4, DELTA, fields);
-        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_MAX);
+        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC);
         assert_non_null(json);
         char* str = cJSON_PrintUnformatted(json);
         assert_non_null(str);
@@ -776,6 +776,15 @@ evtFormatSourceEnabledSetAndGet(void** state)
                 break;
             case CFG_SRC_METRIC:
                 expected = DEFAULT_SRC_METRIC;
+                break;
+            case CFG_SRC_FILE_EVENTS:
+                expected = DEFAULT_SRC_FILE_EVENTS;
+                break;
+            case CFG_SRC_NET_EVENTS:
+                expected = DEFAULT_SRC_NET_EVENTS;
+                break;
+            case CFG_SRC_DNS_EVENTS:
+                expected = DEFAULT_SRC_DNS_EVENTS;
                 break;
         }
 

@@ -21,9 +21,9 @@ typedef enum {CFG_SRC_FILE,
               CFG_SRC_SYSLOG,
               CFG_SRC_METRIC,
               CFG_SRC_HTTP,
-              CFG_SRC_FILE_EVENTS,
-              CFG_SRC_NET_EVENTS,
-              CFG_SRC_DNS_EVENTS,
+              CFG_SRC_NET,
+              CFG_SRC_FS,
+              CFG_SRC_DNS,
               CFG_SRC_MAX} watch_t;
 
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
@@ -87,34 +87,34 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_SYSLOG_VALUE ".*"
 #define DEFAULT_SRC_METRIC_VALUE ".*"
 #define DEFAULT_SRC_HTTP_VALUE ".*"
-#define DEFAULT_SRC_FILE_EVENTS_VALUE ".*"
-#define DEFAULT_SRC_NET_EVENTS_VALUE ".*"
-#define DEFAULT_SRC_DNS_EVENTS_VALUE ".*"
+#define DEFAULT_SRC_NET_VALUE ".*"
+#define DEFAULT_SRC_FS_VALUE ".*"
+#define DEFAULT_SRC_DNS_VALUE ".*"
 #define DEFAULT_SRC_FILE_FIELD ".*"
 #define DEFAULT_SRC_CONSOLE_FIELD ".*"
 #define DEFAULT_SRC_SYSLOG_FIELD ".*"
 #define DEFAULT_SRC_METRIC_FIELD "^[^h]+"
 #define DEFAULT_SRC_HTTP_FIELD ".*"
-#define DEFAULT_SRC_FILE_EVENTS_FIELD ".*"
-#define DEFAULT_SRC_NET_EVENTS_FIELD ".*"
-#define DEFAULT_SRC_DNS_EVENTS_FIELD ".*"
+#define DEFAULT_SRC_NET_FIELD ".*"
+#define DEFAULT_SRC_FS_FIELD ".*"
+#define DEFAULT_SRC_DNS_FIELD ".*"
 #define DEFAULT_SRC_FILE_NAME ".*log.*"
 #define DEFAULT_SRC_CONSOLE_NAME "(stdout)|(stderr)"
 #define DEFAULT_SRC_SYSLOG_NAME ".*"
 #define DEFAULT_SRC_METRIC_NAME ".*"
 #define DEFAULT_SRC_HTTP_NAME ".*"
-#define DEFAULT_SRC_FILE_EVENTS_NAME ".*"
-#define DEFAULT_SRC_NET_EVENTS_NAME ".*"
-#define DEFAULT_SRC_DNS_EVENTS_NAME ".*"
+#define DEFAULT_SRC_NET_NAME ".*"
+#define DEFAULT_SRC_FS_NAME ".*"
+#define DEFAULT_SRC_DNS_NAME ".*"
 #define DEFAULT_MTC_IPPORT_VERBOSITY 1
 #define DEFAULT_SRC_FILE FALSE
 #define DEFAULT_SRC_CONSOLE FALSE
 #define DEFAULT_SRC_SYSLOG FALSE
 #define DEFAULT_SRC_METRIC FALSE
 #define DEFAULT_SRC_HTTP FALSE
-#define DEFAULT_SRC_FILE_EVENTS TRUE
-#define DEFAULT_SRC_NET_EVENTS FALSE
-#define DEFAULT_SRC_DNS_EVENTS FALSE
+#define DEFAULT_SRC_NET FALSE
+#define DEFAULT_SRC_FS FALSE
+#define DEFAULT_SRC_DNS FALSE
 #define DEFAULT_MTC_PORT "8125"
 #define DEFAULT_CTL_PORT "9109"
 #define MAXEVENTSPERSEC 10000

@@ -777,14 +777,17 @@ evtFormatSourceEnabledSetAndGet(void** state)
             case CFG_SRC_METRIC:
                 expected = DEFAULT_SRC_METRIC;
                 break;
-            case CFG_SRC_FILE_EVENTS:
-                expected = DEFAULT_SRC_FILE_EVENTS;
+            case CFG_SRC_HTTP:
+                expected = DEFAULT_SRC_HTTP;
                 break;
-            case CFG_SRC_NET_EVENTS:
-                expected = DEFAULT_SRC_NET_EVENTS;
+            case CFG_SRC_NET:
+                expected = DEFAULT_SRC_NET;
                 break;
-            case CFG_SRC_DNS_EVENTS:
-                expected = DEFAULT_SRC_DNS_EVENTS;
+            case CFG_SRC_FS:
+                expected = DEFAULT_SRC_FS;
+                break;
+            case CFG_SRC_DNS:
+                expected = DEFAULT_SRC_DNS;
                 break;
         }
 

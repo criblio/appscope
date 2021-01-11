@@ -695,18 +695,34 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_EVENT_CONSOLE=false\n"
         "SCOPE_EVENT_SYSLOG=true\n"
         "SCOPE_EVENT_METRIC=false\n"
+        "SCOPE_EVENT_HTTP=false\n"
+        "SCOPE_EVENT_NET=true\n"
+        "SCOPE_EVENT_FS=false\n"
+        "SCOPE_EVENT_DNS=true\n"
         "SCOPE_EVENT_LOGFILE_NAME=a\n"
         "SCOPE_EVENT_CONSOLE_NAME=b\n"
         "SCOPE_EVENT_SYSLOG_NAME=c\n"
         "SCOPE_EVENT_METRIC_NAME=d\n"
-        "SCOPE_EVENT_LOGFILE_FIELD=e\n"
-        "SCOPE_EVENT_CONSOLE_FIELD=f\n"
-        "SCOPE_EVENT_SYSLOG_FIELD=g\n"
-        "SCOPE_EVENT_METRIC_FIELD=h\n"
-        "SCOPE_EVENT_LOGFILE_VALUE=i\n"
-        "SCOPE_EVENT_CONSOLE_VALUE=j\n"
-        "SCOPE_EVENT_SYSLOG_VALUE=k\n"
-        "SCOPE_EVENT_METRIC_VALUE=l\n"
+        "SCOPE_EVENT_HTTP_NAME=e\n"
+        "SCOPE_EVENT_NET_NAME=f\n"
+        "SCOPE_EVENT_FS_NAME=g\n"
+        "SCOPE_EVENT_DNS_NAME=h\n"
+        "SCOPE_EVENT_LOGFILE_FIELD=i\n"
+        "SCOPE_EVENT_CONSOLE_FIELD=j\n"
+        "SCOPE_EVENT_SYSLOG_FIELD=k\n"
+        "SCOPE_EVENT_METRIC_FIELD=l\n"
+        "SCOPE_EVENT_HTTP_FIELD=m\n"
+        "SCOPE_EVENT_NET_FIELD=n\n"
+        "SCOPE_EVENT_FS_FIELD=o\n"
+        "SCOPE_EVENT_DNS_FIELD=p\n"
+        "SCOPE_EVENT_LOGFILE_VALUE=q\n"
+        "SCOPE_EVENT_CONSOLE_VALUE=r\n"
+        "SCOPE_EVENT_SYSLOG_VALUE=s\n"
+        "SCOPE_EVENT_METRIC_VALUE=t\n"
+        "SCOPE_EVENT_HTTP_VALUE=u\n"
+        "SCOPE_EVENT_NET_VALUE=v\n"
+        "SCOPE_EVENT_FS_VALUE=w\n"
+        "SCOPE_EVENT_DNS_VALUE=x\n"
     );
 
     openFileAndExecuteCfgProcessCommands(path, cfg);
@@ -730,18 +746,34 @@ cfgProcessCommandsFromFile(void** state)
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_METRIC), 0);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_HTTP), 0);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_NET), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_FS), 0);
+    assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_DNS), 1);
     assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_FILE), "a");
     assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_CONSOLE), "b");
     assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_SYSLOG), "c");
     assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_METRIC), "d");
-    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_FILE), "e");
-    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_CONSOLE), "f");
-    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_SYSLOG), "g");
-    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_METRIC), "h");
-    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_FILE), "i");
-    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_CONSOLE), "j");
-    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_SYSLOG), "k");
-    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_METRIC), "l");
+    assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_HTTP), "e");
+    assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_NET), "f");
+    assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_FS), "g");
+    assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_DNS), "h");
+    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_FILE), "i");
+    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_CONSOLE), "j");
+    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_SYSLOG), "k");
+    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_METRIC), "l");
+    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_HTTP), "m");
+    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_NET), "n");
+    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_FS), "o");
+    assert_string_equal(cfgEvtFormatFieldFilter(cfg, CFG_SRC_DNS), "p");
+    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_FILE), "q");
+    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_CONSOLE), "r");
+    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_SYSLOG), "s");
+    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_METRIC), "t");
+    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_HTTP), "u");
+    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_NET), "v");
+    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_FS), "w");
+    assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_DNS), "x");
 
     deleteFile(path);
     cfgDestroy(&cfg);
@@ -827,6 +859,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     unsetenv("MAXLEN");
     unsetenv("DEST");
     unsetenv("PERIOD");
+    unsetenv("MYHOME");
     unsetenv("VERBOSITY");
     unsetenv("LOGLEVEL");
     unsetenv("FILTER");
@@ -849,18 +882,34 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_VALUE);
     assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_FIELD);
     assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_FIELD);
     assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_FIELD);
     assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_FIELD);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_NAME);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_NAME);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_NAME);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_NAME);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), DEFAULT_SRC_NET);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), DEFAULT_SRC_FS);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), DEFAULT_SRC_DNS);
     assert_int_equal       (cfgTransportType(config, CFG_MTC), CFG_UDP);
     assert_string_equal    (cfgTransportHost(config, CFG_MTC), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_MTC), "8125");
@@ -914,6 +963,10 @@ cfgReadGoodYaml(void** state)
         "    - type: console                 # create events from stdout and stderr\n"
         "    - type: syslog                  # create events from syslog and vsyslog\n"
         "    - type: metric\n"
+        "    - type: http\n"
+        "    - type: net\n"
+        "    - type: fs\n"
+        "    - type: dns\n"
         "libscope:\n"
         "  transport:\n"
         "    type: tcp                       # udp, unix, file, syslog\n"
@@ -948,6 +1001,10 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), 1);
     assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_FILE);
     assert_string_equal(cfgTransportHost(config, CFG_MTC), "127.0.0.1");
     assert_string_equal(cfgTransportPort(config, CFG_MTC), "8125");
@@ -1093,7 +1150,11 @@ const char* jsonText =
     "      {'type':'file', 'name':'.*[.]log$'},\n"
     "      {'type':'console'},\n"
     "      {'type':'syslog'},\n"
-    "      {'type':'metric'}\n"
+    "      {'type':'metric'},\n"
+    "      {'type':'http'},\n"
+    "      {'type':'net'},\n"
+    "      {'type':'fs'},\n"
+    "      {'type':'dns'}\n"
     "    ]\n"
     "  },\n"
     "  'libscope': {\n"
@@ -1131,6 +1192,10 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), 1);
     assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_FILE);
     assert_string_equal(cfgTransportHost(config, CFG_MTC), "127.0.0.1");
     assert_string_equal(cfgTransportPort(config, CFG_MTC), "8125");
@@ -1238,7 +1303,12 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "      field: .*host.*\n"
         "      value: '[0-9]+'\n"
         "    - type: file\n"
+        "    - type: syslog\n"
         "    - type: metric\n"
+        "    - type: http\n"
+        "    - type: net\n"
+        "    - type: fs\n"
+        "    - type: dns\n"
         "  format:\n"
         "    type : metricjson\n"
         "  enable : false\n"
@@ -1284,6 +1354,10 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), 0);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), 1);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), 1);
     assert_int_equal(cfgTransportType(config, CFG_CTL), CFG_SYSLOG);
     assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UNIX);
     assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/run/scope.sock");
@@ -1581,6 +1655,10 @@ main(int argc, char* argv[])
     source_state_t con = {"SCOPE_EVENT_CONSOLE", CFG_SRC_CONSOLE, DEFAULT_SRC_CONSOLE};
     source_state_t sys = {"SCOPE_EVENT_SYSLOG" , CFG_SRC_SYSLOG , DEFAULT_SRC_SYSLOG};
     source_state_t met = {"SCOPE_EVENT_METRIC", CFG_SRC_METRIC , DEFAULT_SRC_METRIC};
+    source_state_t htt = {"SCOPE_EVENT_HTTP", CFG_SRC_HTTP , DEFAULT_SRC_HTTP};
+    source_state_t net = {"SCOPE_EVENT_NET", CFG_SRC_NET , DEFAULT_SRC_NET};
+    source_state_t fs =  {"SCOPE_EVENT_FS", CFG_SRC_FS , DEFAULT_SRC_FS};
+    source_state_t dns = {"SCOPE_EVENT_DNS", CFG_SRC_DNS , DEFAULT_SRC_DNS};
 
     dest_state_t dest_mtc = {"SCOPE_METRIC_DEST", CFG_MTC};
     dest_state_t dest_evt = {"SCOPE_EVENT_DEST", CFG_CTL};
@@ -1601,6 +1679,10 @@ main(int argc, char* argv[])
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &con),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &sys),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &met),
+        cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &htt),
+        cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &net),
+        cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &fs),
+        cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &dns),
         cmocka_unit_test(cfgProcessEnvironmentMtcVerbosity),
         cmocka_unit_test(cfgProcessEnvironmentLogLevel),
         cmocka_unit_test_prestate(cfgProcessEnvironmentTransport, &dest_mtc),

@@ -24,18 +24,34 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_VALUE);
     assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_FIELD);
     assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_FIELD);
     assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_FIELD);
     assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_FIELD);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_NAME);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_NAME);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_NAME);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_NAME);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), DEFAULT_SRC_NET);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), DEFAULT_SRC_FS);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), DEFAULT_SRC_DNS);
     assert_int_equal       (cfgTransportType(config, CFG_MTC), CFG_UDP);
     assert_string_equal    (cfgTransportHost(config, CFG_MTC), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_MTC), DEFAULT_MTC_PORT);
@@ -278,12 +294,7 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
              dbgInit(); // reset dbg for the rest of the tests
         } else {
              assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 0);
-             // these default to enabled
-             if (i == CFG_SRC_FILE_EVENTS) {
-                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), 1);
-             } else {
-                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), 0);
-             }
+             assert_int_equal(cfgEvtFormatSourceEnabled(config, i), 0);
         }
     }
 
@@ -330,14 +341,17 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
             case CFG_SRC_METRIC:
                 expected = DEFAULT_SRC_METRIC;
                 break;
-            case CFG_SRC_FILE_EVENTS:
-                expected = DEFAULT_SRC_FILE_EVENTS;
+            case CFG_SRC_HTTP:
+                expected = DEFAULT_SRC_HTTP;
                 break;
-            case CFG_SRC_NET_EVENTS:
-                expected = DEFAULT_SRC_NET_EVENTS;
+            case CFG_SRC_NET:
+                expected = DEFAULT_SRC_NET;
                 break;
-            case CFG_SRC_DNS_EVENTS:
-                expected = DEFAULT_SRC_DNS_EVENTS;
+            case CFG_SRC_FS:
+                expected = DEFAULT_SRC_FS;
+                break;
+            case CFG_SRC_DNS:
+                expected = DEFAULT_SRC_DNS;
                 break;
         }
         assert_int_equal(cfgEvtFormatSourceEnabled(config, i), expected);
@@ -501,6 +515,10 @@ main(int argc, char* argv[])
     source_state_t con = {CFG_SRC_CONSOLE, DEFAULT_SRC_CONSOLE_VALUE, DEFAULT_SRC_CONSOLE_FIELD, DEFAULT_SRC_CONSOLE_NAME};
     source_state_t sys = {CFG_SRC_SYSLOG, DEFAULT_SRC_SYSLOG_VALUE, DEFAULT_SRC_SYSLOG_FIELD, DEFAULT_SRC_SYSLOG_NAME};
     source_state_t met = {CFG_SRC_METRIC, DEFAULT_SRC_METRIC_VALUE, DEFAULT_SRC_METRIC_FIELD, DEFAULT_SRC_METRIC_NAME};
+    source_state_t htt = {CFG_SRC_HTTP, DEFAULT_SRC_HTTP_VALUE, DEFAULT_SRC_HTTP_FIELD, DEFAULT_SRC_HTTP_NAME};
+    source_state_t net = {CFG_SRC_NET, DEFAULT_SRC_NET_VALUE, DEFAULT_SRC_NET_FIELD, DEFAULT_SRC_NET_NAME};
+    source_state_t fs =  {CFG_SRC_FS, DEFAULT_SRC_FS_VALUE, DEFAULT_SRC_FS_FIELD, DEFAULT_SRC_FS_NAME};
+    source_state_t dns = {CFG_SRC_DNS, DEFAULT_SRC_DNS_VALUE, DEFAULT_SRC_DNS_FIELD, DEFAULT_SRC_DNS_NAME};
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(cfgCreateDefaultReturnsValidPtr),
@@ -520,16 +538,28 @@ main(int argc, char* argv[])
         cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &con),
         cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &sys),
         cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &met),
+        cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &htt),
+        cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &net),
+        cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &fs),
+        cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &dns),
 
         cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &log),
         cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &con),
         cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &sys),
         cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &met),
+        cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &htt),
+        cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &net),
+        cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &fs),
+        cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &dns),
 
         cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &log),
         cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &con),
         cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &sys),
         cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &met),
+        cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &htt),
+        cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &net),
+        cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &fs),
+        cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &dns),
 
         cmocka_unit_test(cfgEvtFormatSourceEnabledSetAndGet),
 

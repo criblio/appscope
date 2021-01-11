@@ -75,9 +75,8 @@ const char* valToStr(enum_map_t map[], unsigned val)
 }
 
 enum_map_t formatMap[] = {
-    {"metricstatsd",          CFG_METRIC_STATSD},
-    {"metricjson",            CFG_METRIC_JSON},
-    {"ndjson",                CFG_EVENT_ND_JSON},
+    {"statsd",                CFG_FMT_STATSD},
+    {"ndjson",                CFG_FMT_NDJSON},
     {NULL,                    -1}
 };
 
@@ -601,7 +600,9 @@ void
 cfgEventFormatSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    cfgEventFormatSet(cfg, strToVal(formatMap, value));
+    // only ndjson is valid
+    cfgEventFormatSet(cfg, CFG_FMT_NDJSON);
+    //cfgEventFormatSet(cfg, strToVal(formatMap, value));
 }
 
 void

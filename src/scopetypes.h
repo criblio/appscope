@@ -3,9 +3,8 @@
 
 #include <unistd.h>
 
-typedef enum {CFG_METRIC_STATSD,
-              CFG_METRIC_JSON,
-              CFG_EVENT_ND_JSON,
+typedef enum {CFG_FMT_STATSD,
+              CFG_FMT_NDJSON,
               CFG_FORMAT_MAX} cfg_mtc_format_t;
 typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_SYSLOG, CFG_SHM, CFG_TCP} cfg_transport_t;
 typedef enum {CFG_MTC, CFG_CTL, CFG_LOG, CFG_WHICH_MAX} which_transport_t;
@@ -70,7 +69,7 @@ typedef unsigned int bool;
 #define PROTOCOL_FILE_NAME "scope_protocol.yml"
 
 #define DEFAULT_MTC_ENABLE TRUE
-#define DEFAULT_MTC_FORMAT CFG_METRIC_STATSD
+#define DEFAULT_MTC_FORMAT CFG_FMT_STATSD
 #define DEFAULT_STATSD_MAX_LEN 512
 #define DEFAULT_STATSD_PREFIX ""
 #define DEFAULT_CUSTOM_TAGS NULL
@@ -81,7 +80,7 @@ typedef unsigned int bool;
 #define DEFAULT_FD 999
 #define DEFAULT_MIN_FD 200
 #define DEFAULT_EVT_ENABLE TRUE
-#define DEFAULT_CTL_FORMAT CFG_EVENT_ND_JSON
+#define DEFAULT_CTL_FORMAT CFG_FMT_NDJSON
 #define DEFAULT_SRC_FILE_VALUE ".*"
 #define DEFAULT_SRC_CONSOLE_VALUE ".*"
 #define DEFAULT_SRC_SYSLOG_VALUE ".*"

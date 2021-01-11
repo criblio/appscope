@@ -123,12 +123,12 @@ static void
 cfgMtcFormatSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
-    cfgMtcFormatSet(config, CFG_METRIC_JSON);
-    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_JSON);
-    cfgMtcFormatSet(config, CFG_METRIC_STATSD);
-    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_STATSD);
-    cfgMtcFormatSet(config, CFG_EVENT_ND_JSON);
-    assert_int_equal(cfgMtcFormat(config), CFG_EVENT_ND_JSON);
+    cfgMtcFormatSet(config, CFG_FMT_NDJSON);
+    assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
+    cfgMtcFormatSet(config, CFG_FMT_STATSD);
+    assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
+    cfgMtcFormatSet(config, CFG_FMT_NDJSON);
+    assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
     cfgDestroy(&config);
 }
 
@@ -217,12 +217,12 @@ static void
 cfgEventFormatSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
-    cfgEventFormatSet(config, CFG_METRIC_STATSD);
-    assert_int_equal(cfgEventFormat(config), CFG_METRIC_STATSD);
-    cfgEventFormatSet(config, CFG_METRIC_JSON);
-    assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
-    cfgEventFormatSet(config, CFG_EVENT_ND_JSON);
-    assert_int_equal(cfgEventFormat(config), CFG_EVENT_ND_JSON);
+    cfgEventFormatSet(config, CFG_FMT_STATSD);
+    assert_int_equal(cfgEventFormat(config), CFG_FMT_STATSD);
+    cfgEventFormatSet(config, CFG_FMT_NDJSON);
+    assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
+    cfgEventFormatSet(config, CFG_FMT_NDJSON);
+    assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
     cfgDestroy(&config);
 }
 

@@ -181,31 +181,27 @@ static void
 cfgProcessEnvironmentMtcFormat(void** state)
 {
     config_t* cfg = cfgCreateDefault();
-    cfgMtcFormatSet(cfg, CFG_METRIC_JSON);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_JSON);
+    cfgMtcFormatSet(cfg, CFG_FMT_NDJSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
 
     // should override current cfg
-    assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "metricstatsd", 1), 0);
+    assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "statsd", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_STATSD);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_STATSD);
 
     assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "ndjson", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_EVENT_ND_JSON);
-
-    assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "metricjson", 1), 0);
-    cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv("SCOPE_METRIC_FORMAT"), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
 
     // unrecognised value should not affect cfg
     assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "bson", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -371,27 +367,27 @@ static void
 cfgProcessEnvironmentEventFormat(void** state)
 {
     config_t* cfg = cfgCreateDefault();
-    cfgEventFormatSet(cfg, CFG_METRIC_JSON);
-    assert_int_equal(cfgEventFormat(cfg), CFG_METRIC_JSON);
+    cfgEventFormatSet(cfg, CFG_FMT_NDJSON);
+    assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
 
     // should override current cfg
     assert_int_equal(setenv("SCOPE_EVENT_FORMAT", "ndjson", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventFormat(cfg), CFG_EVENT_ND_JSON);
+    assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
 
-    assert_int_equal(setenv("SCOPE_EVENT_FORMAT", "metricjson", 1), 0);
+    assert_int_equal(setenv("SCOPE_EVENT_FORMAT", "statsd", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv("SCOPE_EVENT_FORMAT"), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
 
     // unrecognised value should not affect cfg
     assert_int_equal(setenv("SCOPE_EVENT_FORMAT", "bson", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -651,23 +647,23 @@ cfgProcessCommandsFromFile(void** state)
 
 
     // test the basics
-    writeFile(path, "SCOPE_METRIC_FORMAT=metricjson");
+    writeFile(path, "SCOPE_METRIC_FORMAT=ndjson");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
 
-    writeFile(path, "\nSCOPE_METRIC_FORMAT=metricstatsd\r\nblah");
+    writeFile(path, "\nSCOPE_METRIC_FORMAT=statsd\r\nblah");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_STATSD);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_STATSD);
 
-    writeFile(path, "blah\nSCOPE_METRIC_FORMAT=metricjson");
+    writeFile(path, "blah\nSCOPE_METRIC_FORMAT=ndjson");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
 
     // just demonstrating that the "last one wins"
-    writeFile(path, "SCOPE_METRIC_FORMAT=metricjson\n"
-                    "SCOPE_METRIC_FORMAT=metricstatsd");
+    writeFile(path, "SCOPE_METRIC_FORMAT=ndjson\n"
+                    "SCOPE_METRIC_FORMAT=statsd");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_METRIC_STATSD);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_STATSD);
 
 
     // test everything else once
@@ -741,7 +737,7 @@ cfgProcessCommandsFromFile(void** state)
     assert_string_equal(cfgTransportHost(cfg, CFG_CTL), "host");
     assert_string_equal(cfgTransportPort(cfg, CFG_CTL), "1234");
     assert_int_equal(cfgEvtEnable(cfg), FALSE);
-    assert_int_equal(cfgEventFormat(cfg), CFG_EVENT_ND_JSON);
+    assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_CONSOLE), 0);
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
@@ -940,7 +936,7 @@ cfgReadGoodYaml(void** state)
         "metric:\n"
         "  enable: false\n"
         "  format:\n"
-        "    type: metricjson                # metricstatsd, metricjson\n"
+        "    type: ndjson                    # statsd, ndjson\n"
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
         "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
         "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
@@ -954,7 +950,7 @@ cfgReadGoodYaml(void** state)
         "event:\n"
         "  enable: true\n"
         "  format:\n"
-        "    type : metricjson               # ndjson\n"
+        "    type : ndjson                   # ndjson\n"
         "  watch:\n"
         "    - type: file                    # create events from file\n"
         "      name: .*[.]log$\n"
@@ -986,14 +982,14 @@ cfgReadGoodYaml(void** state)
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), FALSE);
-    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 1024);
     assert_int_equal(cfgMtcVerbosity(config), 3);
     assert_int_equal(cfgMtcPeriod(config), 11);
     assert_string_equal(cfgCmdDir(config), "/tmp");
     assert_int_equal(cfgEvtEnable(config), TRUE);
-    assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
+    assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
     assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
     assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_FILE), ".*host.*");
     assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_FILE), "[0-9]+");
@@ -1126,7 +1122,7 @@ const char* jsonText =
     "  'metric': {\n"
     "    'enable': 'true',\n"
     "    'format': {\n"
-    "      'type': 'metricjson',\n"
+    "      'type': 'ndjson',\n"
     "      'statsdprefix': 'cribl.scope',\n"
     "      'statsdmaxlen': '42',\n"
     "      'verbosity': '0',\n"
@@ -1180,13 +1176,13 @@ cfgReadGoodJson(void** state)
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), TRUE);
-    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_JSON);
+    assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 42);
     assert_int_equal(cfgMtcVerbosity(config), 0);
     assert_int_equal(cfgMtcPeriod(config), 13);
     assert_int_equal(cfgEvtEnable(config), FALSE);
-    assert_int_equal(cfgEventFormat(config), CFG_EVENT_ND_JSON);
+    assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
     assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), 1);
@@ -1231,7 +1227,7 @@ cfgReadBadYamlReturnsDefaults(void** state)
     const char* yamlText =
         "---\n"
         "metric:\n"
-        "  format: metricjson\n"
+        "  format: ndjson\n"
         "  statsdprefix : 'cribl.scope'\n"
         "  transport:\n"
         "    type: file\n"
@@ -1261,7 +1257,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "  [apples,sugar,flour,dirt]        # dirt mom?  Really?\n"
         "metric:\n"
         "  format:\n"
-        "    type: metricstatsd\n"
+        "    type: statsd\n"
         "    hey: yeahyou\n"
         "    tags:\n"
         "      brainfarts: 135\n"
@@ -1279,7 +1275,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
 
     config_t* config = cfgRead(path);
     assert_non_null(config);
-    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_STATSD);
+    assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
     assert_string_equal(cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
     assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UNIX);
     assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/run/scope.sock");
@@ -1310,7 +1306,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    - type: fs\n"
         "    - type: dns\n"
         "  format:\n"
-        "    type : metricjson\n"
+        "    type : ndjson\n"
         "  enable : false\n"
         "libscope:\n"
         "  log:\n"
@@ -1331,7 +1327,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    verbosity: 4294967295\n"
         "    statsdmaxlen: 4294967295\n"
         "    statsdprefix: 'cribl.scope'\n"
-        "    type:  metricstatsd\n"
+        "    type:  statsd\n"
         "  enable : false\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
@@ -1340,13 +1336,13 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), FALSE);
-    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_STATSD);
+    assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 4294967295);
     assert_int_equal(cfgMtcVerbosity(config), CFG_MAX_VERBOSITY);
     assert_int_equal(cfgMtcPeriod(config), 42);
     assert_int_equal(cfgEvtEnable(config), FALSE);
-    assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
+    assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
     assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_SYSLOG), ".*[.]log$");
     assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_SYSLOG), ".*host.*");
     assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), "[0-9]+");
@@ -1383,7 +1379,7 @@ cfgReadEnvSubstitution(void** state)
     assert_int_equal(setenv("MYHOME", "home/mydir", 1), 0);
     assert_int_equal(setenv("VERBOSITY", "1", 1), 0);
     assert_int_equal(setenv("LOGLEVEL", "trace", 1), 0);
-    assert_int_equal(setenv("FORMAT", "metricstatsd", 1), 0);
+    assert_int_equal(setenv("FORMAT", "ndjson", 1), 0);
     assert_int_equal(setenv("FILTER", ".*[.]log$", 1), 0);
     assert_int_equal(setenv("SOURCE", "syslog", 1), 0);
 
@@ -1392,7 +1388,7 @@ cfgReadEnvSubstitution(void** state)
         "metric:\n"
         "  enable: $MASTER_ENABLE\n"
         "  format:\n"
-        "    type: metricjson\n"
+        "    type: ndjson\n"
         "    statsdprefix : $VAR1.$MY_ENV_VAR\n"
         "    statsdmaxlen : $MAXLEN\n"
         "    verbosity: $VERBOSITY\n"
@@ -1449,7 +1445,7 @@ cfgReadEnvSubstitution(void** state)
     assert_string_equal(cfgCustomTagValue(cfg, "undefined"), "$UNDEFINEDENV");
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_TRACE);
     // test event fields...
-    assert_int_equal(cfgEventFormat(cfg), CFG_METRIC_STATSD);
+    assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
     assert_string_equal(cfgEvtFormatNameFilter(cfg, CFG_SRC_FILE), ".*[.]log$");
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, CFG_SRC_SYSLOG), 1);
     // misc

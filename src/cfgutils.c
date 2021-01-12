@@ -75,9 +75,8 @@ const char* valToStr(enum_map_t map[], unsigned val)
 }
 
 enum_map_t formatMap[] = {
-    {"metricstatsd",          CFG_METRIC_STATSD},
-    {"metricjson",            CFG_METRIC_JSON},
-    {"ndjson",                CFG_EVENT_ND_JSON},
+    {"statsd",                CFG_FMT_STATSD},
+    {"ndjson",                CFG_FMT_NDJSON},
     {NULL,                    -1}
 };
 
@@ -113,9 +112,9 @@ enum_map_t watchTypeMap[] = {
     {"syslog",                CFG_SRC_SYSLOG},
     {"metric",                CFG_SRC_METRIC},
     {"http",                  CFG_SRC_HTTP},
-    {"file_events",           CFG_SRC_FILE_EVENTS},
-    {"net_events",            CFG_SRC_NET_EVENTS},
-    {"dns_events",            CFG_SRC_DNS_EVENTS},
+    {"net",                   CFG_SRC_NET},
+    {"fs",                    CFG_SRC_FS},
+    {"dns",                   CFG_SRC_DNS},
     {NULL,                    -1}
 };
 
@@ -434,6 +433,12 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_NET_NAME")) {
+        cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_NET, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_FS_NAME")) {
+        cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FS, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_DNS_NAME")) {
+        cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_DNS, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_FIELD")) {
@@ -444,6 +449,12 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_NET_FIELD")) {
+        cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_NET, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_FS_FIELD")) {
+        cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_FS, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_DNS_FIELD")) {
+        cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_DNS, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_VALUE")) {
@@ -454,6 +465,12 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_NET_VALUE")) {
+        cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_NET, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_FS_VALUE")) {
+        cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_FS, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_DNS_VALUE")) {
+        cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_DNS, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE")) {
@@ -464,6 +481,12 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_HTTP")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_HTTP, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_NET")) {
+        cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_NET, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_FS")) {
+        cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FS, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_DNS")) {
+        cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_DNS, value);
     }
 
     free(value);
@@ -577,7 +600,9 @@ void
 cfgEventFormatSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    cfgEventFormatSet(cfg, strToVal(formatMap, value));
+    // only ndjson is valid
+    cfgEventFormatSet(cfg, CFG_FMT_NDJSON);
+    //cfgEventFormatSet(cfg, strToVal(formatMap, value));
 }
 
 void
@@ -1595,8 +1620,6 @@ initEvtFormat(config_t *cfg)
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
     }
 
-    // TEMPORARY; until we process and set defaults
-    evtFormatSourceEnabledSet(evt, CFG_SRC_FILE_EVENTS, 1);
     return evt;
 }
 

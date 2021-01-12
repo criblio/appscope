@@ -79,6 +79,9 @@ static const char* valueFilterDefault[] = {
     DEFAULT_SRC_SYSLOG_VALUE,
     DEFAULT_SRC_METRIC_VALUE,
     DEFAULT_SRC_HTTP_VALUE,
+    DEFAULT_SRC_NET_VALUE,
+    DEFAULT_SRC_FS_VALUE,
+    DEFAULT_SRC_DNS_VALUE,
 };
 
 static const char* fieldFilterDefault[] = {
@@ -87,6 +90,9 @@ static const char* fieldFilterDefault[] = {
     DEFAULT_SRC_SYSLOG_FIELD,
     DEFAULT_SRC_METRIC_FIELD,
     DEFAULT_SRC_HTTP_FIELD,
+    DEFAULT_SRC_NET_FIELD,
+    DEFAULT_SRC_FS_FIELD,
+    DEFAULT_SRC_DNS_FIELD,
 };
 
 static const char* nameFilterDefault[] = {
@@ -95,6 +101,9 @@ static const char* nameFilterDefault[] = {
     DEFAULT_SRC_SYSLOG_NAME,
     DEFAULT_SRC_METRIC_NAME,
     DEFAULT_SRC_HTTP_NAME,
+    DEFAULT_SRC_NET_NAME,
+    DEFAULT_SRC_FS_NAME,
+    DEFAULT_SRC_DNS_NAME,
 };
 
 static unsigned srcEnabledDefault[] = {
@@ -103,9 +112,9 @@ static unsigned srcEnabledDefault[] = {
     DEFAULT_SRC_SYSLOG,
     DEFAULT_SRC_METRIC,
     DEFAULT_SRC_HTTP,
-    DEFAULT_SRC_FILE_EVENTS,
-    DEFAULT_SRC_NET_EVENTS,
-    DEFAULT_SRC_DNS_EVENTS,
+    DEFAULT_SRC_NET,
+    DEFAULT_SRC_FS,
+    DEFAULT_SRC_DNS,
 };
 
 static cfg_transport_t typeDefault[] = {

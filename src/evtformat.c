@@ -54,9 +54,9 @@ static enum_map_t watchTypeMap[] = {
     {"syslog",       CFG_SRC_SYSLOG},
     {"metric",       CFG_SRC_METRIC},
     {"http",         CFG_SRC_HTTP},
-    {"fs",           CFG_SRC_FILE_EVENTS},
-    {"net-events",   CFG_SRC_NET_EVENTS},
-    {"dns-events",   CFG_SRC_DNS_EVENTS},
+    {"net",          CFG_SRC_NET},
+    {"fs",           CFG_SRC_FS},
+    {"dns",          CFG_SRC_DNS},
     {NULL,                    -1}
 };
 
@@ -95,9 +95,9 @@ static const char* valueFilterDefault[] = {
     DEFAULT_SRC_SYSLOG_VALUE,
     DEFAULT_SRC_METRIC_VALUE,
     DEFAULT_SRC_HTTP_VALUE,
-    DEFAULT_SRC_FILE_EVENTS_VALUE,
-    DEFAULT_SRC_NET_EVENTS_VALUE,
-    DEFAULT_SRC_DNS_EVENTS_VALUE,
+    DEFAULT_SRC_NET_VALUE,
+    DEFAULT_SRC_FS_VALUE,
+    DEFAULT_SRC_DNS_VALUE,
 };
 
 static const char* fieldFilterDefault[] = {
@@ -106,9 +106,9 @@ static const char* fieldFilterDefault[] = {
     DEFAULT_SRC_SYSLOG_FIELD,
     DEFAULT_SRC_METRIC_FIELD,
     DEFAULT_SRC_HTTP_FIELD,
-    DEFAULT_SRC_FILE_EVENTS_FIELD,
-    DEFAULT_SRC_NET_EVENTS_FIELD,
-    DEFAULT_SRC_DNS_EVENTS_FIELD,
+    DEFAULT_SRC_NET_FIELD,
+    DEFAULT_SRC_FS_FIELD,
+    DEFAULT_SRC_DNS_FIELD,
 };
 
 static const char* nameFilterDefault[] = {
@@ -117,9 +117,9 @@ static const char* nameFilterDefault[] = {
     DEFAULT_SRC_SYSLOG_NAME,
     DEFAULT_SRC_METRIC_NAME,
     DEFAULT_SRC_HTTP_NAME,
-    DEFAULT_SRC_FILE_EVENTS_NAME,
-    DEFAULT_SRC_NET_EVENTS_NAME,
-    DEFAULT_SRC_DNS_EVENTS_NAME,
+    DEFAULT_SRC_NET_NAME,
+    DEFAULT_SRC_FS_NAME,
+    DEFAULT_SRC_DNS_NAME,
 };
 
 static unsigned srcEnabledDefault[] = {
@@ -128,9 +128,9 @@ static unsigned srcEnabledDefault[] = {
     DEFAULT_SRC_SYSLOG,
     DEFAULT_SRC_METRIC,
     DEFAULT_SRC_HTTP,
-    DEFAULT_SRC_FILE_EVENTS,
-    DEFAULT_SRC_NET_EVENTS,
-    DEFAULT_SRC_DNS_EVENTS,
+    DEFAULT_SRC_NET,
+    DEFAULT_SRC_FS,
+    DEFAULT_SRC_DNS,
 };
 
 
@@ -242,10 +242,6 @@ unsigned
 evtFormatSourceEnabled(evt_fmt_t *evt, watch_t src)
 {
     if (src < CFG_SRC_MAX) {
-        // TEMPORARY
-        //if (src == CFG_SRC_FILE_EVENTS) {
-        //    return DEFAULT_SRC_FILE_EVENTS;
-        //}
 
         if (evt) return evt->enabled[src];
         return srcEnabledDefault[src];
@@ -575,7 +571,7 @@ cJSON *
 evtFormatMetric(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc)
 {
     switch (metric->src) {
-        case CFG_SRC_FILE_EVENTS:
+        case CFG_SRC_FS:
             return evtFSEvent(evt, metric, proc);
             break;
         default:

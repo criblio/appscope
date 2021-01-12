@@ -1343,7 +1343,7 @@ doFSOpenEvent(fs_info *fs, const char *op)
     const char *metric = "fs.open";
     counters_element_t *numops = &fs->numOpen;
 
-    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FILE_EVENTS) &&
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) &&
         (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
         char *mode = osGetFileMode(fs->mode);
 
@@ -1360,7 +1360,7 @@ doFSOpenEvent(fs_info *fs, const char *op)
         };
 
         event_t evt = INT_EVENT(metric, numops->evt, DELTA, fevent);
-        evt.src = CFG_SRC_FILE_EVENTS;
+        evt.src = CFG_SRC_FS;
         cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
 
         if (mode) free(mode);
@@ -1372,7 +1372,7 @@ doFSCloseEvent(fs_info *fs, const char *op)
 {
     const char *metric = "fs.close";
 
-    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FILE_EVENTS) &&
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) &&
         (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
         char *mode = osGetFileMode(fs->mode);
 
@@ -1395,7 +1395,7 @@ doFSCloseEvent(fs_info *fs, const char *op)
         };
 
         event_t evt = INT_EVENT(metric, fs->numClose.evt, DELTA, fevent);
-        evt.src = CFG_SRC_FILE_EVENTS;
+        evt.src = CFG_SRC_FS;
         cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
 
         if (mode) free(mode);

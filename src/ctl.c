@@ -48,6 +48,10 @@ static bool srcEnabledDefault[] = {
     DEFAULT_SRC_CONSOLE,
     DEFAULT_SRC_SYSLOG,
     DEFAULT_SRC_METRIC,
+    DEFAULT_SRC_HTTP,
+    DEFAULT_SRC_NET,
+    DEFAULT_SRC_FS,
+    DEFAULT_SRC_DNS,
 };
 
 static void

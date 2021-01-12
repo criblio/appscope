@@ -77,6 +77,23 @@ event:
 #      field: .*                     # whitelist regex describing field names
 #      value: .*
 
+#    - type: net
+#      name: .*                      #
+#      field: .*                     # whitelist regex describing field names
+#      value: .*
+
+#    - type: fs
+#      name: .*                      #
+#      field: .*                     # whitelist regex describing field names
+#      value: .*
+
+#    - type: dns
+#      name: .*                      #
+#      field: .*                     # whitelist regex describing field names
+#      value: .*
+
+
+
 libscope:
   transport:
     type: tcp                       # udp, tcp, unix, file, syslog

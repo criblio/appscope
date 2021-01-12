@@ -1290,7 +1290,7 @@ doNetOpenEvent(net_info *net)
     nevent[nix].cardinality = 0;
 
     event_t evt = INT_EVENT(metric, g_ctrs.openPorts.evt, CURRENT, nevent);
-    evt.src = CFG_SRC_NET_EVENTS;
+    evt.src = CFG_SRC_NET;
     cmdSendEvent(g_ctl, &evt, net->uid, &g_proc);
 }
 

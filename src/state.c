@@ -457,6 +457,7 @@ postNetState(int fd, metric_t type, net_info *net)
     int mtc_needs_reporting = summarize && !*summarize;
     int need_to_post =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET_EVENTS) ||
         (mtcEnabled(g_mtc) && mtc_needs_reporting);
     if (!need_to_post) return FALSE;
 
@@ -546,6 +547,16 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
         }
         atomicSwapU64(&g_netinfo[fd].numDuration.evt, 0);
         atomicSwapU64(&g_netinfo[fd].totalDuration.evt, 0);
+        break;
+    }
+
+    case CONNECTION_OPEN:
+    {
+        if (checkNetEntry(fd) && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET_EVENTS) &&
+            (((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)) ||
+             (get_port(fd, g_netinfo[fd].remoteConn.ss_family, REMOTE) == DNS_PORT))) { 
+            postNetState(fd, type, &g_netinfo[fd]);
+        }
         break;
     }
 
@@ -1165,6 +1176,8 @@ doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, control_type
             memmove(&g_netinfo[sd].remoteConn, addr, len);
             if (net->type == SOCK_STREAM) net->addrSetRemote = TRUE;
         }
+
+        doUpdateState(CONNECTION_OPEN, sd, 1, NULL, NULL);
     }
 }
 
@@ -1178,6 +1191,7 @@ doSetAddrs(int sockfd)
     // Only do this if output is enabled
     int need_to_track_addrs =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET_EVENTS) ||
         (mtcEnabled(g_mtc) && g_mtc_addr_output) ||
         checkEnv(PAYLOAD_ENV, PAYLOAD_VAL);
     if (!need_to_track_addrs) return 0;

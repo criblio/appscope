@@ -55,8 +55,8 @@ static enum_map_t watchTypeMap[] = {
     {"metric",       CFG_SRC_METRIC},
     {"http",         CFG_SRC_HTTP},
     {"fs",           CFG_SRC_FILE_EVENTS},
-    {"net-events",   CFG_SRC_NET_EVENTS},
-    {"dns-events",   CFG_SRC_DNS_EVENTS},
+    {"net",          CFG_SRC_NET_EVENTS},
+    {"dns",          CFG_SRC_DNS_EVENTS},
     {NULL,                    -1}
 };
 
@@ -481,8 +481,8 @@ evtFSEvent(evt_fmt_t *evt, event_t *metric, proc_id_t *proc)
 
     // Test for a name field match.  No match, no metric output
     if (!evtFormatSourceEnabled(evt, metric->src) ||
-        !(filter = evtFormatNameFilter(evt, metric->src)) ||
-        (regexec_wrapper(filter, metric->name, 0, NULL, 0))) {
+        !(filter = evtFormatNameFilter(evt, metric->src))) { //||
+        //(regexec_wrapper(filter, metric->name, 0, NULL, 0))) {
         return NULL;
     }
 
@@ -576,6 +576,7 @@ evtFormatMetric(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc)
 {
     switch (metric->src) {
         case CFG_SRC_FILE_EVENTS:
+        case CFG_SRC_NET_EVENTS:
             return evtFSEvent(evt, metric, proc);
             break;
         default:

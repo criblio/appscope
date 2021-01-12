@@ -20,6 +20,7 @@
 #include "search.h"
 #include "state_private.h"
 #include "linklist.h"
+#include "dns.h"
 
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
@@ -69,6 +70,7 @@
 
 #define EVENT_ONLY_ATTR (CFG_MAX_VERBOSITY+1)
 #define HTTP_MAX_FIELDS 30
+#define NET_MAX_FIELDS 16
 #define H_ATTRIB(field, att, val, verbosity) \
     field.name = att; \
     field.value_type = FMT_STR; \
@@ -84,6 +86,8 @@
     field.cardinality = verbosity;
 
 #define HTTP_NEXT_FLD(n) if (n < HTTP_MAX_FIELDS-1) {n++;}else{DBG(NULL);}
+#define NEXT_FLD(n, max) if (n < max-1) {n+=1;}else{DBG(NULL);}
+
 #define HTTP_STATUS "HTTP/1."
 
 typedef struct http_report_t {
@@ -246,6 +250,84 @@ getConn(struct sockaddr_storage *conn, char *addr, size_t alen, char *port, size
     return TRUE;
 }
 
+// yeah, a lot of params. but, it's generic.
+static bool
+getNetInternals(int type, struct sockaddr_storage *lconn, struct sockaddr_storage *rconn,
+                char *laddr, char *raddr, size_t alen, char *lport, char *rport, size_t plen,
+                event_field_t *fields, int *ix, int maxfld)
+{
+    if (!lconn || !rconn || !laddr || !raddr || !fields || !ix) return FALSE;
+
+    if (addrIsNetDomain(lconn)) {
+        switch (type) {
+        case SOCK_STREAM:
+            H_ATTRIB(fields[*ix], "net.transport", "IP.TCP", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_DGRAM:
+            H_ATTRIB(fields[*ix], "net.transport", "IP.UDP", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_RAW:
+            H_ATTRIB(fields[*ix], "net.transport", "IP.RAW", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_RDM:
+            H_ATTRIB(fields[*ix], "net.transport", "IP.RDM", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_SEQPACKET:
+            H_ATTRIB(fields[*ix], "net.transport", "IP.SEQPACKET", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        default:
+            break;
+        }
+    } else if (addrIsUnixDomain(lconn)) {
+        switch (type) {
+        case SOCK_STREAM:
+            H_ATTRIB(fields[*ix], "net.transport", "UNIX.TCP", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_DGRAM:
+            H_ATTRIB(fields[*ix], "net.transport", "UNIX.UDP", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_RAW:
+            H_ATTRIB(fields[*ix], "net.transport", "UNIX.RAW", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_RDM:
+            H_ATTRIB(fields[*ix], "net.transport", "UNIX.RDM", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_SEQPACKET:
+            H_ATTRIB(fields[*ix], "net.transport", "UNIX.SEQPACKET", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        default:
+            break;
+        }
+    }
+
+    // Connection details, where we know the file descriptor
+    if (getConn(rconn, raddr, alen, rport, plen) == TRUE) {
+        H_ATTRIB(fields[*ix], "net.peer.ip", raddr, 5);
+        NEXT_FLD(*ix, maxfld);
+        H_ATTRIB(fields[*ix], "net.peer.port", rport, 5);
+        NEXT_FLD(*ix, maxfld);
+    }
+
+    if (getConn(lconn, laddr, alen, lport, plen) == TRUE) {
+        H_ATTRIB(fields[*ix], "net.host.ip", laddr, 1);
+        NEXT_FLD(*ix, maxfld);
+        H_ATTRIB(fields[*ix], "net.host.port", lport, 1);
+        NEXT_FLD(*ix, maxfld);
+    }
+
+    return TRUE;
+}
+
 static size_t
 getHttpStatus(char *header, size_t len, char **stext)
 {
@@ -326,7 +408,6 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr, size_t hdr_le
     return TRUE;
 }
 
-
 static bool
 httpFieldsInternal(event_field_t *fields, http_report *hreport, protocol_info *proto)
 {
@@ -355,6 +436,12 @@ httpFieldsInternal(event_field_t *fields, http_report *hreport, protocol_info *p
     HTTP_NEXT_FLD(hreport->ix);
 
     if (proto->sock_type != -1) {
+#if 0
+        getNetInternals(proto->sock_type, &proto->localConn, &proto->remoteConn,
+                        hreport->laddr, hreport->raddr, sizeof(hreport->raddr),
+                        hreport->lport, hreport->rport, sizeof(hreport->rport),
+                        fields, &hreport->ix, HTTP_MAX_FIELDS);
+#else
         if (addrIsNetDomain(&proto->localConn)) {
             if (proto->sock_type == SOCK_STREAM) {
                 H_ATTRIB(fields[hreport->ix], "net.transport", "IP.TCP", 1);
@@ -395,7 +482,9 @@ httpFieldsInternal(event_field_t *fields, http_report *hreport, protocol_info *p
             H_ATTRIB(fields[hreport->ix], "net.host.port", hreport->lport, 1);
             HTTP_NEXT_FLD(hreport->ix);
         }
+#endif
     }
+
     return TRUE;
 }
 
@@ -1153,6 +1242,58 @@ getFSDuration(fs_info *fs)
     return dur;
 }
 
+/*
+{
+  "sourcetype": "net",
+  "source": "net.conn.open",
+  "cmd": "foo",
+  "pid": 10831,
+  "host": "hostname",
+  "data" {
+    "net.transport": "IP.TCP",
+    "net.peer.ip": "5.9.243.187",
+    "net.peer.port": 443,
+    "net.peer.name": wttr.in,
+    "net.host.ip": "172.17.0.2",
+    "net.host.port": 49202,
+    "net.host.name": "scope-vm",
+    "net.protocol": "http",
+  },
+  "_time": timestamp
+}
+ */
+static void
+doNetOpenEvent(net_info *net)
+{
+    int nix = 0;
+    const char *metric = "net.conn.open";
+    char rport[8];
+    char lport[8];
+    char raddr[INET6_ADDRSTRLEN];
+    char laddr[INET6_ADDRSTRLEN];
+
+    event_field_t nevent[NET_MAX_FIELDS];
+
+    getNetInternals(net->type, &net->localConn, &net->remoteConn,
+                    laddr, raddr, sizeof(raddr),
+                    lport, rport, sizeof(rport),
+                    nevent, &nix, NET_MAX_FIELDS);
+
+    if (net->dnsName[0] != 0) {
+        H_ATTRIB(nevent[nix], "net.host.name", net->dnsName, 1);
+        NEXT_FLD(nix, NET_MAX_FIELDS);
+    }
+
+    nevent[nix].name = NULL;
+    nevent[nix].value_type = FMT_END;
+    nevent[nix].value.str = NULL;
+    nevent[nix].cardinality = 0;
+
+    event_t evt = INT_EVENT(metric, g_ctrs.openPorts.evt, CURRENT, nevent);
+    evt.src = CFG_SRC_NET_EVENTS;
+    cmdSendEvent(g_ctl, &evt, net->uid, &g_proc);
+}
+
 /* Example FS Events
    {
    "sourcetype": "fs",
@@ -1482,12 +1623,12 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         if ((type == FS_CLOSE) && (numops->evt != 0ULL)) {
             doFSCloseEvent(fs, op);
             reported = TRUE;
-            atomicSwapU64(&fs->numWrite.evt, 0);
-            atomicSwapU64(&fs->writeBytes.evt, 0);
-            atomicSwapU64(&fs->numRead.evt, 0);
-            atomicSwapU64(&fs->readBytes.evt, 0);
-            atomicSwapU64(&fs->numDuration.evt, 0);
-            atomicSwapU64(&fs->totalDuration.evt, 0);
+            //atomicSwapU64(&fs->numWrite.evt, 0);
+            //atomicSwapU64(&fs->writeBytes.evt, 0);
+            //atomicSwapU64(&fs->numRead.evt, 0);
+            //atomicSwapU64(&fs->readBytes.evt, 0);
+            //atomicSwapU64(&fs->numDuration.evt, 0);
+            //atomicSwapU64(&fs->totalDuration.evt, 0);
         }
 
         if (reported == TRUE) atomicSwapU64(&numops->evt, 0);
@@ -1828,6 +1969,11 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // atomicSwapU64(value, 0);
 
         break;
+    }
+
+    case CONNECTION_OPEN:
+    {
+        doNetOpenEvent(net);
     }
 
     case CONNECTION_DURATION:

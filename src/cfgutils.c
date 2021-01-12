@@ -1597,6 +1597,7 @@ initEvtFormat(config_t *cfg)
 
     // TEMPORARY; until we process and set defaults
     evtFormatSourceEnabledSet(evt, CFG_SRC_FILE_EVENTS, 1);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_NET_EVENTS, 1);
     return evt;
 }
 

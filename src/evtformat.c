@@ -83,9 +83,12 @@ struct _evt_fmt_t
     unsigned enabled[CFG_SRC_MAX];
 
     struct {
+        // runtime params
         time_t time;
         unsigned long evtCount;
         int notified;
+        // configured param
+        unsigned long maxEvtPerSec;
     } ratelimit;
 };
 
@@ -172,6 +175,7 @@ evtFormatCreate()
         filterSet(&evt->name_re[src], NULL, nameFilterDefault[src]);
         evt->enabled[src] = srcEnabledDefault[src];
     }
+    evt->ratelimit.maxEvtPerSec = DEFAULT_MAXEVENTSPERSEC;
 
     return evt;
 }
@@ -251,6 +255,12 @@ evtFormatSourceEnabled(evt_fmt_t *evt, watch_t src)
     return srcEnabledDefault[CFG_SRC_FILE];
 }
 
+unsigned
+evtFormatRateLimit(evt_fmt_t *evt)
+{
+    return (evt) ? evt->ratelimit.maxEvtPerSec : DEFAULT_MAXEVENTSPERSEC;
+}
+
 void
 evtFormatValueFilterSet(evt_fmt_t *evt, watch_t src, const char *str)
 {
@@ -277,6 +287,13 @@ evtFormatSourceEnabledSet(evt_fmt_t* evt, watch_t src, unsigned val)
 {
     if (!evt || src >= CFG_SRC_MAX || val > 1) return;
     evt->enabled[src] = val;
+}
+
+void
+evtFormatRateLimitSet(evt_fmt_t *evt, unsigned val)
+{
+    if (!evt) return;
+    evt->ratelimit.maxEvtPerSec = val;
 }
 
 #define MATCH_FOUND 1
@@ -359,7 +376,7 @@ err:
 }
 
 cJSON *
-rateLimitMessage(proc_id_t *proc, watch_t src)
+rateLimitMessage(proc_id_t *proc, watch_t src, unsigned maxEvtPerSec)
 {
     event_format_t event;
 
@@ -371,7 +388,7 @@ rateLimitMessage(proc_id_t *proc, watch_t src)
     event.uid = 0ULL;
 
     char string[128];
-    if (snprintf(string, sizeof(string), "Truncated metrics. Your rate exceeded %d metrics per second", MAXEVENTSPERSEC) == -1) {
+    if (snprintf(string, sizeof(string), "Truncated metrics. Your rate exceeded %u metrics per second", maxEvtPerSec) == -1) {
         return NULL;
     }
     event.data = cJSON_CreateString(string);
@@ -532,14 +549,16 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
         return NULL;
     }
 
-    // rate limited to MAXEVENTSPERSEC
-    if (time(&now) != evt->ratelimit.time) {
+    // rate limited to maxEvtPerSec
+    if (evt->ratelimit.maxEvtPerSec == 0) {
+        ; // no rate limiting.
+    } else if (time(&now) != evt->ratelimit.time) {
         evt->ratelimit.time = now;
         evt->ratelimit.evtCount = evt->ratelimit.notified = 0;
-    } else if (++evt->ratelimit.evtCount >= MAXEVENTSPERSEC) {
+    } else if (++evt->ratelimit.evtCount >= evt->ratelimit.maxEvtPerSec) {
         // one notice per truncate
         if (evt->ratelimit.notified == 0) {
-            cJSON* notice = rateLimitMessage(proc, src);
+            cJSON* notice = rateLimitMessage(proc, src, evt->ratelimit.maxEvtPerSec);
             evt->ratelimit.notified = (notice)?1:0;
             return notice;
         }

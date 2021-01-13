@@ -47,6 +47,8 @@ event:
   enable: true                      # true, false
   format:
     type : ndjson                   # ndjson
+    maxeventpersec: 10000           # max events per second.  zero is "no limit"
+    enhancefs: true                 # true, false
   watch:
     # Creates events from data written to files.
     # Designed for monitoring log files, but capable of capturing

@@ -20,6 +20,8 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
     assert_int_equal       (cfgEvtEnable(config), DEFAULT_EVT_ENABLE);
     assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
+    assert_int_equal       (cfgEvtRateLimit(config), DEFAULT_MAXEVENTSPERSEC);
+    assert_int_equal       (cfgEnhanceFs(config), DEFAULT_ENHANCE_FS);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
@@ -223,6 +225,30 @@ cfgEventFormatSetAndGet(void** state)
     assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
     cfgEventFormatSet(config, CFG_FMT_NDJSON);
     assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
+    cfgDestroy(&config);
+}
+
+static void
+cfgEvtRateLimitSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgEvtRateLimitSet(config, 0);
+    assert_int_equal(cfgEvtRateLimit(config), 0);
+    cfgEvtRateLimitSet(config, 1);
+    assert_int_equal(cfgEvtRateLimit(config), 1);
+    cfgEvtRateLimitSet(config, UINT_MAX);
+    assert_int_equal(cfgEvtRateLimit(config), UINT_MAX);
+    cfgDestroy(&config);
+}
+
+static void
+cfgEnhanceFsSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgEnhanceFsSet(config, 0);
+    assert_int_equal(cfgEnhanceFs(config), 0);
+    cfgEnhanceFsSet(config, 1);
+    assert_int_equal(cfgEnhanceFs(config), 1);
     cfgDestroy(&config);
 }
 
@@ -533,6 +559,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgCmdDirSetAndGet),
         cmocka_unit_test(cfgEvtEnableSetAndGet),
         cmocka_unit_test(cfgEventFormatSetAndGet),
+        cmocka_unit_test(cfgEvtRateLimitSetAndGet),
+        cmocka_unit_test(cfgEnhanceFsSetAndGet),
 
         cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &log),
         cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &con),

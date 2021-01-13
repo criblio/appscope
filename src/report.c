@@ -43,7 +43,7 @@
 
 #define FILE_FIELD(val)      STRFIELD("file",              (val), 5, TRUE)
 #define FILE_EV_NAME(val)    STRFIELD("file.name",         (val), 5, TRUE)
-#define FILE_EV_MODE(val)    STRFIELD("file.perms",        (val), 5, TRUE)
+#define FILE_EV_MODE(val)    NUMFIELD("file.perms",        (val), 5, TRUE)
 #define FILE_OWNER(val)      NUMFIELD("file.owner",        (val), 5, TRUE)
 #define FILE_GROUP(val)      NUMFIELD("file.group",        (val), 5, TRUE)
 #define FILE_RD_BYTES(val)   NUMFIELD("file.read_bytes",   (val), 5, TRUE)
@@ -252,7 +252,8 @@ getConn(struct sockaddr_storage *conn, char *addr, size_t alen, char *port, size
 
 // yeah, a lot of params. but, it's generic.
 static bool
-getNetInternals(int type, struct sockaddr_storage *lconn, struct sockaddr_storage *rconn,
+getNetInternals(net_info *net, int type,
+                struct sockaddr_storage *lconn, struct sockaddr_storage *rconn,
                 char *laddr, char *raddr, size_t alen, char *lport, char *rport, size_t plen,
                 event_field_t *fields, int *ix, int maxfld)
 {
@@ -283,46 +284,52 @@ getNetInternals(int type, struct sockaddr_storage *lconn, struct sockaddr_storag
         default:
             break;
         }
+
+        if (getConn(rconn, raddr, alen, rport, plen) == TRUE) {
+            H_ATTRIB(fields[*ix], "net.peer.ip", raddr, 1);
+            NEXT_FLD(*ix, maxfld);
+            H_ATTRIB(fields[*ix], "net.peer.port", rport, 1);
+            NEXT_FLD(*ix, maxfld);
+        }
+
+        if (getConn(lconn, laddr, alen, lport, plen) == TRUE) {
+            H_ATTRIB(fields[*ix], "net.host.ip", laddr, 1);
+            NEXT_FLD(*ix, maxfld);
+            H_ATTRIB(fields[*ix], "net.host.port", lport, 1);
+            NEXT_FLD(*ix, maxfld);
+        }
     } else if (addrIsUnixDomain(lconn)) {
         switch (type) {
         case SOCK_STREAM:
-            H_ATTRIB(fields[*ix], "net.transport", "UNIX.TCP", 1);
+            H_ATTRIB(fields[*ix], "net.transport", "Unix.TCP", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_DGRAM:
-            H_ATTRIB(fields[*ix], "net.transport", "UNIX.UDP", 1);
+            H_ATTRIB(fields[*ix], "net.transport", "Unix.UDP", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_RAW:
-            H_ATTRIB(fields[*ix], "net.transport", "UNIX.RAW", 1);
+            H_ATTRIB(fields[*ix], "net.transport", "Unix.RAW", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_RDM:
-            H_ATTRIB(fields[*ix], "net.transport", "UNIX.RDM", 1);
+            H_ATTRIB(fields[*ix], "net.transport", "Unix.RDM", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_SEQPACKET:
-            H_ATTRIB(fields[*ix], "net.transport", "UNIX.SEQPACKET", 1);
+            H_ATTRIB(fields[*ix], "net.transport", "Unix.SEQPACKET", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         default:
             break;
         }
-    }
 
-    // Connection details, where we know the file descriptor
-    if (getConn(rconn, raddr, alen, rport, plen) == TRUE) {
-        H_ATTRIB(fields[*ix], "net.peer.ip", raddr, 5);
-        NEXT_FLD(*ix, maxfld);
-        H_ATTRIB(fields[*ix], "net.peer.port", rport, 5);
-        NEXT_FLD(*ix, maxfld);
-    }
-
-    if (getConn(lconn, laddr, alen, lport, plen) == TRUE) {
-        H_ATTRIB(fields[*ix], "net.host.ip", laddr, 1);
-        NEXT_FLD(*ix, maxfld);
-        H_ATTRIB(fields[*ix], "net.host.port", lport, 1);
-        NEXT_FLD(*ix, maxfld);
+        if (net) {
+            H_VALUE(fields[*ix], "unix.peer", net->rnode, 1);
+            NEXT_FLD(*ix, maxfld);
+            H_VALUE(fields[*ix], "unix.host", net->lnode, 1);
+            NEXT_FLD(*ix, maxfld);
+        }
     }
 
     return TRUE;
@@ -436,53 +443,11 @@ httpFieldsInternal(event_field_t *fields, http_report *hreport, protocol_info *p
     HTTP_NEXT_FLD(hreport->ix);
 
     if (proto->sock_type != -1) {
-#if 0
-        getNetInternals(proto->sock_type, &proto->localConn, &proto->remoteConn,
+        getNetInternals(NULL, proto->sock_type,
+                        &proto->localConn, &proto->remoteConn,
                         hreport->laddr, hreport->raddr, sizeof(hreport->raddr),
                         hreport->lport, hreport->rport, sizeof(hreport->rport),
                         fields, &hreport->ix, HTTP_MAX_FIELDS);
-#else
-        if (addrIsNetDomain(&proto->localConn)) {
-            if (proto->sock_type == SOCK_STREAM) {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "IP.TCP", 1);
-                HTTP_NEXT_FLD(hreport->ix);
-            } else if (proto->sock_type == SOCK_DGRAM) {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "IP.UDP", 1);
-                HTTP_NEXT_FLD(hreport->ix);
-            } else {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "IP", 1);
-                HTTP_NEXT_FLD(hreport->ix);
-            }
-        } else if (addrIsUnixDomain(&proto->localConn)) { // TODO: more than unix
-            if (proto->sock_type == SOCK_STREAM) {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix.TCP", 1);
-                HTTP_NEXT_FLD(hreport->ix);
-            } else if (proto->sock_type == SOCK_DGRAM) {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix.UDP", 1);
-                HTTP_NEXT_FLD(hreport->ix);
-            } else {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix", 1);
-                HTTP_NEXT_FLD(hreport->ix);
-            }
-        }
-
-        // Connection details, where we know the file descriptor
-        if (getConn(&proto->remoteConn, hreport->raddr, sizeof(hreport->raddr),
-                    hreport->rport, sizeof(hreport->rport)) == TRUE) {
-            H_ATTRIB(fields[hreport->ix], "net.peer.ip", hreport->raddr, 5);
-            HTTP_NEXT_FLD(hreport->ix);
-            H_ATTRIB(fields[hreport->ix], "net.peer.port", hreport->rport, 7);
-            HTTP_NEXT_FLD(hreport->ix);
-        }
-
-        if (getConn(&proto->localConn, hreport->laddr, sizeof(hreport->laddr),
-                    hreport->lport, sizeof(hreport->lport)) == TRUE) {
-            H_ATTRIB(fields[hreport->ix], "net.host.ip", hreport->laddr, 1);
-            HTTP_NEXT_FLD(hreport->ix);
-            H_ATTRIB(fields[hreport->ix], "net.host.port", hreport->lport, 1);
-            HTTP_NEXT_FLD(hreport->ix);
-        }
-#endif
     }
 
     return TRUE;
@@ -1242,6 +1207,39 @@ getFSDuration(fs_info *fs)
     return dur;
 }
 
+static int
+decimalToOctal(int dec)
+{
+    int oct = 0, i = 1;
+
+    while (dec != 0) {
+        oct += (dec % 8) * i;
+        dec /= 8;
+        i *= 10;
+    }
+
+    return oct;
+}
+
+// The assumption being we will add more protocols
+static void
+getNetPtotocol(net_info *net, event_field_t *nevent, int *ix)
+{
+    if (!net || !nevent) return;
+    in_port_t localPort, remotePort;
+
+    localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
+    remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
+
+    if ((localPort == 80) || (localPort == 443) ||
+        (remotePort == 80) || (remotePort == 443)) {
+        H_ATTRIB(nevent[*ix], "net.protocol", "http", 1);
+        NEXT_FLD(*ix, NET_MAX_FIELDS);
+    }
+
+    return;
+}
+
 /*
 {
   "sourcetype": "net",
@@ -1274,13 +1272,98 @@ doNetOpenEvent(net_info *net)
 
     event_field_t nevent[NET_MAX_FIELDS];
 
-    getNetInternals(net->type, &net->localConn, &net->remoteConn,
+    getNetInternals(net, net->type,
+                    &net->localConn, &net->remoteConn,
                     laddr, raddr, sizeof(raddr),
                     lport, rport, sizeof(rport),
                     nevent, &nix, NET_MAX_FIELDS);
 
     if (net->dnsName[0] != 0) {
         H_ATTRIB(nevent[nix], "net.host.name", net->dnsName, 1);
+        NEXT_FLD(nix, NET_MAX_FIELDS);
+    }
+
+    getNetPtotocol(net, nevent, &nix);
+
+    nevent[nix].name = NULL;
+    nevent[nix].value_type = FMT_END;
+    nevent[nix].value.str = NULL;
+    nevent[nix].cardinality = 0;
+
+    event_t evt = INT_EVENT(metric, g_ctrs.openPorts.evt, CURRENT, nevent);
+    evt.src = CFG_SRC_NET;
+    cmdSendEvent(g_ctl, &evt, net->uid, &g_proc);
+}
+
+/*
+{
+  "sourcetype": "net",
+  "source": "net.conn.close",
+  "cmd": "foo",
+  "pid": 10831,
+  "host": "hostname",
+  "data" {
+    "net.transport": "IP.TCP",
+    "net.peer.ip": "5.9.243.187",
+    "net.peer.port": 443,
+    "net.peer.name": wttr.in,
+    "net.host.ip": "172.17.0.2",
+    "net.host.port": 49202,
+    "net.host.name": "scope-vm",
+    "net.protocol": "http",
+    "duration": 243,
+    "net.close.reason": "normal",
+    "net.close.origin": "peer",
+    "net.bytes_sent": 4134,
+    "net.bytes_recv": 123
+  },
+  "_time": timestamp
+}
+ */
+static void
+doNetCloseEvent(net_info *net, uint64_t dur)
+{
+    int nix = 0;
+    const char *metric = "net.conn.close";
+    char rport[8];
+    char lport[8];
+    char raddr[INET6_ADDRSTRLEN];
+    char laddr[INET6_ADDRSTRLEN];
+
+    event_field_t nevent[NET_MAX_FIELDS];
+
+    getNetInternals(net, net->type,
+                    &net->localConn, &net->remoteConn,
+                    laddr, raddr, sizeof(raddr),
+                    lport, rport, sizeof(rport),
+                    nevent, &nix, NET_MAX_FIELDS);
+
+    if (net->dnsName[0] != 0) {
+        H_ATTRIB(nevent[nix], "net.host.name", net->dnsName, 1);
+        NEXT_FLD(nix, NET_MAX_FIELDS);
+    }
+
+    if (net->http.state != HTTP_NONE) {
+        H_ATTRIB(nevent[nix], "net.protocol", "http", 1);
+        NEXT_FLD(nix, NET_MAX_FIELDS);
+    }
+
+    getNetPtotocol(net, nevent, &nix);
+
+    H_VALUE(nevent[nix], "duration", dur, 1);
+    NEXT_FLD(nix, NET_MAX_FIELDS);
+
+    H_VALUE(nevent[nix], "net.bytes_sent", net->txBytes.evt, 1);
+    NEXT_FLD(nix, NET_MAX_FIELDS);
+
+    H_VALUE(nevent[nix], "net.bytes_recv", net->rxBytes.evt, 1);
+    NEXT_FLD(nix, NET_MAX_FIELDS);
+
+    if (net->remoteClose == TRUE) {
+        H_ATTRIB(nevent[nix], "net.close.reason", "remote", 1);
+        NEXT_FLD(nix, NET_MAX_FIELDS);
+    } else {
+        H_ATTRIB(nevent[nix], "net.close.reason", "local", 1);
         NEXT_FLD(nix, NET_MAX_FIELDS);
     }
 
@@ -1336,6 +1419,8 @@ doNetOpenEvent(net_info *net)
    "duration": 1833
    }
    }
+   Note: if we ever want mode values in rwx string format as opposed to octal
+   This will function will return the rwx string: char *mode = osGetFileMode(fs->mode);
 */
 static void
 doFSOpenEvent(fs_info *fs, const char *op)
@@ -1345,14 +1430,13 @@ doFSOpenEvent(fs_info *fs, const char *op)
 
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) &&
         (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
-        char *mode = osGetFileMode(fs->mode);
 
         event_field_t fevent[] = {
             FILE_EV_NAME(fs->path),
             PROC_UID(g_proc.uid),
             PROC_GID(g_proc.gid),
             PROC_CGROUP(g_proc.cgroup),
-            FILE_EV_MODE((mode == NULL) ? "---" : mode),
+            FILE_EV_MODE(decimalToOctal(fs->mode & (S_IRWXU | S_IRWXG | S_IRWXO))),
             FILE_OWNER(fs->fuid),
             FILE_GROUP(fs->fgid),
             OP_FIELD(op),
@@ -1362,8 +1446,6 @@ doFSOpenEvent(fs_info *fs, const char *op)
         event_t evt = INT_EVENT(metric, numops->evt, DELTA, fevent);
         evt.src = CFG_SRC_FS;
         cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
-
-        if (mode) free(mode);
     }
 }
 
@@ -1374,14 +1456,13 @@ doFSCloseEvent(fs_info *fs, const char *op)
 
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) &&
         (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
-        char *mode = osGetFileMode(fs->mode);
 
         event_field_t fevent[] = {
             FILE_EV_NAME(fs->path),
             PROC_UID(g_proc.uid),
             PROC_GID(g_proc.gid),
             PROC_CGROUP(g_proc.cgroup),
-            FILE_EV_MODE((mode == NULL) ? "---" : mode),
+            FILE_EV_MODE(decimalToOctal(fs->mode & (S_IRWXU | S_IRWXG | S_IRWXO))),
             FILE_OWNER(fs->fuid),
             FILE_GROUP(fs->fgid),
             FILE_RD_BYTES(fs->readBytes.evt),
@@ -1397,8 +1478,6 @@ doFSCloseEvent(fs_info *fs, const char *op)
         event_t evt = INT_EVENT(metric, fs->numClose.evt, DELTA, fevent);
         evt.src = CFG_SRC_FS;
         cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
-
-        if (mode) free(mode);
     }
 }
 
@@ -1974,6 +2053,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
     case CONNECTION_OPEN:
     {
         doNetOpenEvent(net);
+        break;
     }
 
     case CONNECTION_DURATION:
@@ -2003,6 +2083,10 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             atomicSwapU64(&net->numDuration.evt, 0);
             atomicSwapU64(&net->totalDuration.evt, 0);
          }
+
+        if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
+            doNetCloseEvent(net, dur);
+        }
 
         // Only report if enabled
         if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
@@ -2274,8 +2358,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         if (net->txBytes.evt != 0ULL) {
 
             cmdSendEvent(g_ctl, &txMetric, net->uid, &g_proc);
-            atomicSwapU64(&net->numTX.evt, 0);
-            atomicSwapU64(&net->txBytes.evt, 0);
+            //atomicSwapU64(&net->numTX.evt, 0);
+            //atomicSwapU64(&net->txBytes.evt, 0);
         }
 
         // Don't report zeros.

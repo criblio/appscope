@@ -155,6 +155,7 @@ typedef struct net_info_t {
     bool addrSetLocal;
     bool addrSetRemote;
     bool addrSetUnix;
+    bool remoteClose;
     counters_element_t numTX;
     counters_element_t numRX;
     counters_element_t txBytes;

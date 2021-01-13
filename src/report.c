@@ -935,6 +935,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
     {
         // Don't report zeros.
         if (ctrs->numDNS.evt != 0) {
+            // This creates a DNS raw event
             if (duration && (duration->evt > 0)) {
                 event_field_t resp[] = {
                     PROC_FIELD(g_proc.procname),
@@ -946,7 +947,18 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
                 };
                 event_t dnsMetric = INT_EVENT("net.dns.resp", ctrs->numDNS.evt, DELTA, resp);
                 cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
+
+                // This creates a DNS event
+                event_field_t evfield[] = {
+                    DOMAIN_FIELD(domain),
+                    DURATION_FIELD(duration->evt / 1000000), // convert ns to ms.
+                    FIELDEND
+                };
+                event_t dnsEvent = INT_EVENT("net.dns.resp", ctrs->numDNS.evt, DELTA, evfield);
+                dnsEvent.src = CFG_SRC_DNS;
+                cmdSendEvent(g_ctl, &dnsEvent, getTime(), &g_proc);
             } else {
+                // This create a DNS raw event
                 event_field_t req[] = {
                     PROC_FIELD(g_proc.procname),
                     PID_FIELD(g_proc.pid),
@@ -957,6 +969,15 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
                 };
                 event_t dnsMetric = INT_EVENT("net.dns.req", ctrs->numDNS.evt, DELTA, req);
                 cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
+
+                // This creates a DNS event
+                event_field_t evfield[] = {
+                    DOMAIN_FIELD(domain),
+                    FIELDEND
+                };
+                event_t dnsEvent = INT_EVENT("net.dns.req", ctrs->numDNS.evt, DELTA, evfield);
+                dnsEvent.src = CFG_SRC_DNS;
+                cmdSendEvent(g_ctl, &dnsEvent, getTime(), &g_proc);
             }
         }
 
@@ -1329,8 +1350,10 @@ doNetCloseEvent(net_info *net, uint64_t dur)
     char lport[8];
     char raddr[INET6_ADDRSTRLEN];
     char laddr[INET6_ADDRSTRLEN];
-
     event_field_t nevent[NET_MAX_FIELDS];
+
+
+    if (net->type != SOCK_STREAM) return;
 
     getNetInternals(net, net->type,
                     &net->localConn, &net->remoteConn,

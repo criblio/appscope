@@ -3868,8 +3868,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
             }
         }
 
-        // implies not getting http headers from here. is that correct?
-        doRecv(sockfd, rc, msg, 0, MSG);
+        doRecv(sockfd, rc, msg, rc, MSG);
         doAccessRights(msg);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmsg", "nopath");

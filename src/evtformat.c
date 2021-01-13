@@ -573,6 +573,7 @@ evtFormatMetric(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc)
     switch (metric->src) {
         case CFG_SRC_FS:
         case CFG_SRC_NET:
+        case CFG_SRC_DNS:
             return evtFSEvent(evt, metric, proc);
             break;
         default:

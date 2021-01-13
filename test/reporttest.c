@@ -1169,8 +1169,10 @@ doDNSSendNoDNSSummarization(void** state)
     assert_int_equal(eventRdWrValues("net.tx"), 2*13);
     assert_int_equal(metricCalls("net.dns"), 2);
     assert_int_equal(metricValues("net.dns"), 2);
-    assert_int_equal(eventCalls("net.dns.req"), 2);
-    assert_int_equal(eventValues("net.dns.req"), 2);
+    // the way this is done, there is now a raw event and a DNS event
+    // for each doEvent()
+    assert_int_equal(eventCalls("net.dns.req"), 4);
+    assert_int_equal(eventValues("net.dns.req"), 4);
 
 
     // Without open/close summarization, every doClose is output
@@ -1251,8 +1253,8 @@ doDNSSendDNSSummarization(void** state)
     assert_int_equal(eventRdWrValues("net.tx"), 2*13);
     assert_int_equal(metricCalls("net.dns"), 0);
     assert_int_equal(metricValues("net.dns"), 0);
-    assert_int_equal(eventCalls("net.dns.req"), 2);
-    assert_int_equal(eventValues("net.dns.req"), 2);
+    assert_int_equal(eventCalls("net.dns.req"), 4);
+    assert_int_equal(eventValues("net.dns.req"), 4);
 
 
     // Without open/close summarization, every doClose is output

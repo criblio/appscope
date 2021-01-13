@@ -408,6 +408,7 @@ postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char
     int mtc_needs_reporting = !g_summary.net.dns;
     int need_to_post =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_DNS) ||
         (mtcEnabled(g_mtc) && mtc_needs_reporting);
     if (!need_to_post) return FALSE;
 

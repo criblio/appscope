@@ -72,7 +72,7 @@ custom_tag_t**      mtcFormatCustomTags(mtc_fmt_t*);
 
 // This function returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
-char*               mtcFormatStatsDString(mtc_fmt_t*, event_t*, regex_t*);
+char*               mtcFormatEventForOutput(mtc_fmt_t*, event_t*, regex_t*);
 
 // Setters
 void                mtcFormatStatsDPrefixSet(mtc_fmt_t*, const char*);

@@ -456,6 +456,7 @@ prepMessage(upload_t *upld)
     if (!upld) return NULL;
 
     streamMsg = ctlCreateTxMsg(upld);
+    if (!streamMsg) return NULL;
 
     // Add the newline delimiter to the msg.
     int strsize = strlen(streamMsg);
@@ -463,6 +464,7 @@ prepMessage(upload_t *upld)
     if (!temp) {
         DBG(NULL);
         scopeLog("CTL realloc error", -1, CFG_LOG_INFO);
+        free(streamMsg);
         return NULL;
     }
 

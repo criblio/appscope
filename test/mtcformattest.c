@@ -130,7 +130,7 @@ static void
 mtcFormatEventForOutputNullEventDoesntCrash(void** state)
 {
     mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
-    assert_null(mtcFormatStatsDString(fmt, NULL, NULL));
+    assert_null(mtcFormatEventForOutput(fmt, NULL, NULL));
     mtcFormatDestroy(&fmt);
 }
 
@@ -140,7 +140,7 @@ mtcFormatEventForOutputNullEventFieldsDoesntCrash(void** state)
     event_t e = INT_EVENT("useful.apps", 1, CURRENT, NULL);
 
     mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
-    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
+    char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_string_equal(msg, "useful.apps:1|g\n");
     if (msg) free(msg);
     mtcFormatDestroy(&fmt);
@@ -221,7 +221,7 @@ mtcFormatEventForOutputHappyPathJson(void** state)
     };
     event_t e = INT_EVENT("net.port", g_openPorts, CURRENT, fields);
 
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_JSON);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_NDJSON);
     assert_non_null(fmt);
     mtcFormatVerbositySet(fmt, CFG_MAX_VERBOSITY);
 

@@ -408,6 +408,7 @@ postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char
     int mtc_needs_reporting = !g_summary.net.dns;
     int need_to_post =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_DNS) ||
         (mtcEnabled(g_mtc) && mtc_needs_reporting);
     if (!need_to_post) return FALSE;
 
@@ -539,7 +540,10 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             addToInterfaceCounts(&g_ctrs.connDurationNum, 1);
             addToInterfaceCounts(&g_ctrs.connDurationTotal, new_duration);
         }
-        if (postNetState(fd, type, &g_netinfo[fd])) {
+
+        if ((g_netinfo[fd].rxBytes.evt > 0) || (g_netinfo[fd].txBytes.evt > 0) ||
+            (g_netinfo[fd].rxBytes.mtc > 0) || (g_netinfo[fd].txBytes.mtc > 0)) {
+            postNetState(fd, type, &g_netinfo[fd]);
             atomicSwapU64(&g_netinfo[fd].numDuration.mtc, 0);
             atomicSwapU64(&g_netinfo[fd].totalDuration.mtc, 0);
             //subFromInterfaceCounts(&g_ctrs.connDurationNum, 1);
@@ -554,8 +558,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     {
         if (checkNetEntry(fd) && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) &&
             (((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)) ||
-             (get_port(fd, g_netinfo[fd].remoteConn.ss_family, REMOTE) == DNS_PORT))) { 
-            postNetState(fd, type, &g_netinfo[fd]);
+             (funcop && !strncmp(funcop, "dup", 3)))) {
+                postNetState(fd, type, &g_netinfo[fd]);
         }
         break;
     }
@@ -572,8 +576,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             atomicSwapU64(&g_netinfo[fd].rxBytes.mtc, 0);
             //subFromInterfaceCounts(&g_ctrs.netrxBytes, size);
         }
-        atomicSwapU64(&g_netinfo[fd].numRX.evt, 0);
-        atomicSwapU64(&g_netinfo[fd].rxBytes.evt, 0);
+        //atomicSwapU64(&g_netinfo[fd].numRX.evt, 0);
+        //atomicSwapU64(&g_netinfo[fd].rxBytes.evt, 0);
         break;
     }
 
@@ -589,8 +593,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             atomicSwapU64(&g_netinfo[fd].txBytes.mtc, 0);
             //subFromInterfaceCounts(&g_ctrs.nettxBytes, size);
         }
-        atomicSwapU64(&g_netinfo[fd].numTX.evt, 0);
-        atomicSwapU64(&g_netinfo[fd].txBytes.evt, 0);
+        //atomicSwapU64(&g_netinfo[fd].numTX.evt, 0);
+        //atomicSwapU64(&g_netinfo[fd].txBytes.evt, 0);
         break;
     }
 
@@ -1072,6 +1076,16 @@ getFSEntry(int fd)
 }
 
 void
+setRemoteClose(int sd, int err)
+{
+    net_info *net;
+
+    if ((err == EPIPE) && ((net = getNetEntry(sd)))) {
+        net->remoteClose = TRUE;
+    }
+}
+
+void
 addSock(int fd, int type, int family)
 {
     if (checkNetEntry(fd) == TRUE) {
@@ -1177,7 +1191,9 @@ doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, control_type
             if (net->type == SOCK_STREAM) net->addrSetRemote = TRUE;
         }
 
-        doUpdateState(CONNECTION_OPEN, sd, 1, NULL, NULL);
+        if (addrIsNetDomain(&g_netinfo[sd].localConn)) {
+            doUpdateState(CONNECTION_OPEN, sd, 1, NULL, NULL);
+        }
     }
 }
 
@@ -1204,12 +1220,12 @@ doSetAddrs(int sockfd)
      */
     if ((net = getNetEntry(sockfd)) == NULL) return 0;
 
-    // TODO: dont think LOCAL is correct?
     if (addrIsUnixDomain(&net->remoteConn) ||
         addrIsUnixDomain(&net->localConn)) {
         if (net->addrSetUnix == TRUE) return 0;
         doUnixEndpoint(sockfd, net);
         net->addrSetUnix = TRUE;
+        doUpdateState(CONNECTION_OPEN, sockfd, 1, NULL, NULL);
         return 0;
     }
 
@@ -1448,6 +1464,18 @@ doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         }
 
         doSetAddrs(sockfd);
+
+        /*
+         * If a netrx operation returns a len of 0
+         * it means that the remote end has disconnected.
+         * This is the the traditional "end-of-file"
+         */
+        if (len == 0) {
+            g_netinfo[sockfd].remoteClose = TRUE;
+            // Seems that returning here makes sense with a len of 0
+            return 0;
+        }
+
         doUpdateState(NETRX, sockfd, rc, NULL, NULL);
 
         if (remotePortIsDNS(sockfd) && (g_netinfo[sockfd].dnsName[0])) {
@@ -1708,6 +1736,7 @@ doDupSock(int oldfd, int newfd)
     g_netinfo[newfd].totalDuration = (counters_element_t){.mtc=0, .evt=0};
     g_netinfo[newfd].numDuration = (counters_element_t){.mtc=0, .evt=0};
 
+    doUpdateState(CONNECTION_OPEN, newfd, 1, "dup", NULL);
     return 0;
 }
 

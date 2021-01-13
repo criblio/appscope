@@ -2927,6 +2927,7 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
 
         doSend(sockfd, rc, buf, len, BUF);
     } else {
+        setRemoteClose(sockfd, errno);
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "__sendto_nocancel", "nopath");
     }
 
@@ -3706,6 +3707,7 @@ send(int sockfd, const void *buf, size_t len, int flags)
 
         doSend(sockfd, rc, buf, rc, BUF);
     } else {
+        setRemoteClose(sockfd, errno);
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "send", "nopath");
     }
 
@@ -3729,6 +3731,7 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
 
         doSend(sockfd, rc, buf, rc, BUF);
     } else {
+        setRemoteClose(sockfd, errno);
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendto", "nopath");
     }
 
@@ -3762,6 +3765,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
 
         doSend(sockfd, rc, msg, rc, MSG);
     } else {
+        setRemoteClose(sockfd, errno);
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendmsg", "nopath");
     }
 
@@ -3864,8 +3868,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
             }
         }
 
-        // implies not getting http headers from here. is that correct?
-        doRecv(sockfd, rc, msg, 0, MSG);
+        doRecv(sockfd, rc, msg, rc, MSG);
         doAccessRights(msg);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmsg", "nopath");

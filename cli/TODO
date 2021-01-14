@@ -1,11 +1,9 @@
-* Change unit tests to only use process execution for the specific run test and mock the file output in other tests
 * Tail for Metrics
 * Option for run to output metric and/or event data on stderr
-* Back out any ID related stuff in favor of a scope generated ID
 * Payload support
 * TermDash UI
 * Port cscope run implementation to golang
-* Signal to running process, turn up instrumentation
+* Signal to running process, turn up instrumentation (CRIBL-4127)
 * Metrics and Events summary view from what came out
 * Summary view across runs
 * Show scope config

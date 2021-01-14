@@ -30,7 +30,7 @@ run/cscope.go:
 scope: run/cscope.go
 	# GOOS=linux CGO_ENABLED=0 $(GO) build -a -tags netgo -ldflags="-s -w" -o build/scope
 	cd $(DIR) && GOOS=linux $(GO) build -o $(DIR)build/scope 
-	# upx -9 build/scope
+	upx -9 build/scope
 
 install: 
 	cp $(DIR)build/scope /usr/local/bin/scope

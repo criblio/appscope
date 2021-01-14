@@ -14,7 +14,7 @@ var runCmd = &cobra.Command{
 	Short:   "execute a scoped command",
 	Long:    `Executes a scoped command`,
 	Example: `scope run /bin/echo "foo"`,
-	Args:    cobra.ArbitraryArgs,
+	Args:    cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		passthrough, _ := cmd.Flags().GetBool("passthrough")
 		verbosity, _ := cmd.Flags().GetInt("verbosity")

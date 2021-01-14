@@ -254,9 +254,9 @@ mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
 
     char *msg = NULL;
 
-    if (fmt->format == CFG_METRIC_STATSD) {
+    if (fmt->format == CFG_FMT_STATSD) {
         msg = mtcFormatStatsDString(fmt, evt, fieldFilter);
-    } else if (fmt->format == CFG_METRIC_JSON) {
+    } else if (fmt->format == CFG_FMT_NDJSON) {
         cJSON *json = fmtMetricJson(evt, NULL, CFG_SRC_METRIC);
         if (!json) return NULL;
 

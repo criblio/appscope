@@ -78,6 +78,23 @@ metricCalls(const char* str)
     return returnVal;
 }
 
+// we no longer clear counters on rd/wr, only on close
+// the last entry is the total
+int
+eventRdWrValues(const char *str)
+{
+    doEvent();
+    int i, returnVal = 0;
+    for (i=0; i < evtBufNext; i++) {
+        if (!str || !strcmp(evtBuf[i].name, str)) {
+            if (evtBuf[i].value.integer > 0) {
+                returnVal = evtBuf[i].value.integer;
+            }
+        }
+    }
+    return returnVal;
+}
+
 int
 eventValues(const char* str)
 {
@@ -244,7 +261,7 @@ doReadFileNoSummarization(void** state)
     assert_int_equal(metricCalls("fs.read"), 2);
     assert_int_equal(metricValues("fs.read"), 2*13);
     assert_int_equal(eventCalls("fs.read"), 2);
-    assert_int_equal(eventValues("fs.read"), 2*13);
+    assert_int_equal(eventRdWrValues("fs.read"), 2*13);
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -288,7 +305,7 @@ doReadFileSummarizedOpenCloseNotSummarized(void** state)
     doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 2);
-    assert_int_equal(eventValues("fs.read"), 2*13);
+    assert_int_equal(eventRdWrValues("fs.read"), 2*13);
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -334,7 +351,7 @@ doReadFileFullSummarization(void** state)
     doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 2);
-    assert_int_equal(eventValues("fs.read"), 2*13);
+    assert_int_equal(eventRdWrValues("fs.read"), 2*13);
 
     // With open/close summarization, doClose does not output either
     clearTestData();
@@ -386,7 +403,7 @@ doWriteFileNoSummarization(void** state)
     assert_int_equal(metricCalls("fs.write"), 2);
     assert_int_equal(metricValues("fs.write"), 2*sizeof(buf));
     assert_int_equal(eventCalls("fs.write"), 2);
-    assert_int_equal(eventValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(eventRdWrValues("fs.write"), 2*sizeof(buf));
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -432,7 +449,7 @@ doWriteFileSummarizedOpenCloseNotSummarized(void** state)
     doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 0);
     assert_int_equal(eventCalls("fs.write"), 2);
-    assert_int_equal(eventValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(eventRdWrValues("fs.write"), 2*sizeof(buf));
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -480,7 +497,7 @@ doWriteFileFullSummarization(void** state)
     doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 0);
     assert_int_equal(eventCalls("fs.write"), 2);
-    assert_int_equal(eventValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(eventRdWrValues("fs.write"), 2*sizeof(buf));
 
     // With open/close summarization, doClose does not output either
     clearTestData();
@@ -537,12 +554,12 @@ doRecvNoSummarization(void** state)
 
     // Without rx/tx summarization, every doRecv is output
     clearTestData();
-    doRecv(16, 13, NULL, 0, BUF);
-    doRecv(16, 13, NULL, 0, BUF);
+    doRecv(16, 13, NULL, 13, BUF);
+    doRecv(16, 13, NULL, 13, BUF);
     assert_int_equal(metricCalls("net.rx"), 2);
     assert_int_equal(metricValues("net.rx"), 2*13);
     assert_int_equal(eventCalls("net.rx"), 2);
-    assert_int_equal(eventValues("net.rx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.rx"), 2*13);
 
     // Without open/close summarization, every doClose it output
     clearTestData();
@@ -598,11 +615,11 @@ doRecvSummarizedOpenCloseNotSummarized(void** state)
 
     // With rx/tx summarization, no doRecv is output at the time
     clearTestData();
-    doRecv(16, 13, NULL, 0, BUF);
-    doRecv(16, 13, NULL, 0, BUF);
+    doRecv(16, 13, NULL, 13, BUF);
+    doRecv(16, 13, NULL, 13, BUF);
     assert_int_equal(metricCalls("net.rx"), 0);
     assert_int_equal(eventCalls("net.rx"), 2);
-    assert_int_equal(eventValues("net.rx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.rx"), 2*13);
 
     // Without open/close summarization, every doClose it output
     clearTestData();
@@ -661,11 +678,11 @@ doRecvFullSummarization(void** state)
 
     // With rx/tx summarization, no doRecv is output at the time
     clearTestData();
-    doRecv(16, 13, NULL, 0, BUF);
-    doRecv(16, 13, NULL, 0, BUF);
+    doRecv(16, 13, NULL, 13, BUF);
+    doRecv(16, 13, NULL, 13, BUF);
     assert_int_equal(metricCalls("net.rx"), 0);
     assert_int_equal(eventCalls("net.rx"), 2);
-    assert_int_equal(eventValues("net.rx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.rx"), 2*13);
 
     // With open/close summarization, doClose does not output either
     clearTestData();
@@ -729,7 +746,7 @@ doSendNoSummarization(void** state)
     assert_int_equal(metricCalls("net.tx"), 2);
     assert_int_equal(metricValues("net.tx"), 2*13);
     assert_int_equal(eventCalls("net.tx"), 2);
-    assert_int_equal(eventValues("net.tx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.tx"), 2*13);
 
     // Without open/close summarization, every doClose it output
     clearTestData();
@@ -789,7 +806,7 @@ doSendSummarizedOpenCloseNotSummarized(void** state)
     doSend(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
-    assert_int_equal(eventValues("net.tx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.tx"), 2*13);
 
     // Without open/close summarization, every doClose it output
     clearTestData();
@@ -852,7 +869,7 @@ doSendFullSummarization(void** state)
     doSend(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
-    assert_int_equal(eventValues("net.tx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.tx"), 2*13);
 
     // With open/close summarization, doClose does not output either
     clearTestData();
@@ -1141,19 +1158,21 @@ doDNSSendNoDNSSummarization(void** state)
 	0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01
     };
     getDNSName(16, pkt, sizeof(pkt));
-    doSend(16, 13, NULL, 0, BUF);
+    doSend(16, 13, NULL, 13, BUF);
     // Switch from www.google.com to www.reddit.com.
     // This is because we only report dns domain *changes*.
     memcpy(&pkt[17], "reddit", 6);
     getDNSName(16, pkt, sizeof(pkt));
-    doSend(16, 13, NULL, 0, BUF);
+    doSend(16, 13, NULL, 13, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
-    assert_int_equal(eventValues("net.tx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.tx"), 2*13);
     assert_int_equal(metricCalls("net.dns"), 2);
     assert_int_equal(metricValues("net.dns"), 2);
-    assert_int_equal(eventCalls("net.dns.req"), 2);
-    assert_int_equal(eventValues("net.dns.req"), 2);
+    // the way this is done, there is now a raw event and a DNS event
+    // for each doEvent()
+    assert_int_equal(eventCalls("net.dns.req"), 4);
+    assert_int_equal(eventValues("net.dns.req"), 4);
 
 
     // Without open/close summarization, every doClose is output
@@ -1231,11 +1250,11 @@ doDNSSendDNSSummarization(void** state)
     doSend(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
-    assert_int_equal(eventValues("net.tx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.tx"), 2*13);
     assert_int_equal(metricCalls("net.dns"), 0);
     assert_int_equal(metricValues("net.dns"), 0);
-    assert_int_equal(eventCalls("net.dns.req"), 2);
-    assert_int_equal(eventValues("net.dns.req"), 2);
+    assert_int_equal(eventCalls("net.dns.req"), 4);
+    assert_int_equal(eventValues("net.dns.req"), 4);
 
 
     // Without open/close summarization, every doClose is output

@@ -155,6 +155,7 @@ typedef struct net_info_t {
     bool addrSetLocal;
     bool addrSetRemote;
     bool addrSetUnix;
+    bool remoteClose;
     counters_element_t numTX;
     counters_element_t numRX;
     counters_element_t txBytes;
@@ -189,6 +190,9 @@ typedef struct fs_info_t {
     counters_element_t numDuration;
     counters_element_t totalDuration;
     uint64_t uid;
+    uid_t fuid;
+    gid_t fgid;
+    mode_t mode;
     char path[PATH_MAX];
     char funcop[FUNC_MAX];
 } fs_info;

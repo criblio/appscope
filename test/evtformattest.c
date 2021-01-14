@@ -246,9 +246,12 @@ evtFormatMetricWithAndWithoutMatchingValueFilter(void** state)
 static void
 evtFormatMetricRateLimitReturnsNotice(void** state)
 {
+    const unsigned ratelimit = 5; // 5 events per second for test
+
     evt_fmt_t* evt = evtFormatCreate();
     assert_non_null(evt);
     evtFormatSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+    evtFormatRateLimitSet(evt, ratelimit);
 
     event_t e = INT_EVENT("Hey", 1, DELTA, NULL);
     proc_id_t proc = {.pid = 4848,
@@ -263,7 +266,7 @@ evtFormatMetricRateLimitReturnsNotice(void** state)
     time(&initial);
 
     int i;
-    for (i=0; i<=MAXEVENTSPERSEC; i++) {
+    for (i=0; i<=ratelimit; i++) {
         json = evtFormatMetric(evt, &e, 12345, &proc);
         assert_non_null(json);
 
@@ -286,7 +289,7 @@ evtFormatMetricRateLimitReturnsNotice(void** state)
         data = cJSON_GetObjectItem(json, "data");
         assert_non_null(data);
 
-        if (i<MAXEVENTSPERSEC) {
+        if (i<ratelimit) {
             // Verify that data contains _metric, and not "Truncated"
             assert_true(cJSON_HasObjectItem(data, "_metric"));
             assert_false(cJSON_IsString(data));
@@ -296,6 +299,43 @@ evtFormatMetricRateLimitReturnsNotice(void** state)
             assert_non_null(strstr(data->valuestring, "Truncated"));
             assert_false(cJSON_HasObjectItem(data, "_metric"));
         }
+        cJSON_Delete(json);
+    }
+
+    evtFormatDestroy(&evt);
+}
+
+static void
+evtFormatMetricRateLimitCanBeTurnedOff(void** state)
+{
+    const unsigned ratelimit = 0; // 0 means "no limit"
+
+    evt_fmt_t* evt = evtFormatCreate();
+    assert_non_null(evt);
+    evtFormatSourceEnabledSet(evt, CFG_SRC_METRIC, 1);
+    evtFormatRateLimitSet(evt, ratelimit);
+
+    event_t e = INT_EVENT("Hey", 1, DELTA, NULL);
+    proc_id_t proc = {.pid = 4848,
+                      .ppid = 4847,
+                      .hostname = "host",
+                      .procname = "evttest",
+                      .cmd = "cmd-4",
+                      .id = "host-evttest-cmd-4"};
+    cJSON* json, *data;
+
+    int i;
+    for (i=0; i<=500000; i++) {  // 1/2 million is arbitrary
+        json = evtFormatMetric(evt, &e, 12345, &proc);
+        assert_non_null(json);
+
+        //printf("i=%d %s\n", i, msg);
+        data = cJSON_GetObjectItem(json, "data");
+        assert_non_null(data);
+
+        // Verify that data contains _metric, and not "Truncated"
+        assert_true(cJSON_HasObjectItem(data, "_metric"));
+        assert_false(cJSON_IsString(data));
         cJSON_Delete(json);
     }
 
@@ -508,7 +548,7 @@ fmtMetricJsonNoFields(void** state)
     data_type_t type;
     for (type=DELTA; type<=SET+1; type++) {
         event_t e = INT_EVENT("A", 1, type, NULL);
-        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_MAX);
+        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC);
         cJSON* json_type = cJSON_GetObjectItem(json, "_metric_type");
         assert_string_equal(map[type], cJSON_GetStringValue(json_type));
         if (json) cJSON_Delete(json);
@@ -526,7 +566,7 @@ fmtMetricJsonWFields(void** state)
         FIELDEND
     };
     event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
-    cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_MAX);
+    cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
@@ -552,7 +592,7 @@ fmtMetricJsonWFilteredFields(void** state)
     event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
     regex_t re;
     assert_int_equal(regcomp(&re, "[AD]", REG_EXTENDED), 0);
-    cJSON* json = fmtMetricJson(&e, &re, CFG_SRC_MAX);
+    cJSON* json = fmtMetricJson(&e, &re, CFG_SRC_METRIC);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
@@ -571,7 +611,7 @@ fmtMetricJsonEscapedValues(void** state)
 {
     {
         event_t e = INT_EVENT("Paç \"fat!", 3, SET, NULL);    // embedded double quote
-        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_MAX);
+        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC);
         assert_non_null(json);
         char* str = cJSON_PrintUnformatted(json);
         assert_non_null(str);
@@ -590,7 +630,7 @@ fmtMetricJsonEscapedValues(void** state)
             FIELDEND
         };
         event_t e = INT_EVENT("you", 4, DELTA, fields);
-        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_MAX);
+        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC);
         assert_non_null(json);
         char* str = cJSON_PrintUnformatted(json);
         assert_non_null(str);
@@ -777,6 +817,18 @@ evtFormatSourceEnabledSetAndGet(void** state)
             case CFG_SRC_METRIC:
                 expected = DEFAULT_SRC_METRIC;
                 break;
+            case CFG_SRC_HTTP:
+                expected = DEFAULT_SRC_HTTP;
+                break;
+            case CFG_SRC_NET:
+                expected = DEFAULT_SRC_NET;
+                break;
+            case CFG_SRC_FS:
+                expected = DEFAULT_SRC_FS;
+                break;
+            case CFG_SRC_DNS:
+                expected = DEFAULT_SRC_DNS;
+                break;
         }
 
         assert_int_equal(evtFormatSourceEnabled(evt, i), expected);
@@ -797,6 +849,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(evtFormatMetricWithAndWithoutMatchingFieldFilter),
         cmocka_unit_test(evtFormatMetricWithAndWithoutMatchingValueFilter),
         cmocka_unit_test(evtFormatMetricRateLimitReturnsNotice),
+        cmocka_unit_test(evtFormatMetricRateLimitCanBeTurnedOff),
         cmocka_unit_test(evtFormatLogWithSourceDisabledReturnsNull),
         cmocka_unit_test(evtFormatLogWithAndWithoutMatchingNameFilter),
         cmocka_unit_test(evtFormatLogWithAndWithoutMatchingValueFilter),

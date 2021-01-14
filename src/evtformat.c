@@ -484,54 +484,6 @@ err:
 }
 
 static cJSON *
-evtFSEvent(evt_fmt_t *evt, event_t *metric, proc_id_t *proc)
-{
-    event_format_t event;
-    struct timeb tb;
-    regex_t *filter;
-
-    if (!evt || !metric || !proc) return NULL;
-
-    // Test for a name field match.  No match, no metric output
-    if (!evtFormatSourceEnabled(evt, metric->src) ||
-        !(filter = evtFormatNameFilter(evt, metric->src))) { //||
-        //(regexec_wrapper(filter, metric->name, 0, NULL, 0))) {
-        return NULL;
-    }
-
-    /*
-     * Loop through all metric fields for at least one matching field value
-     * No match, no metric output
-     */
-    if (!anyValueFieldMatches(evtFormatValueFilter(evt, metric->src), metric)) {
-        return NULL;
-    }
-
-    ftime(&tb);
-    event.timestamp = tb.time + (double)tb.millitm/1000;
-    event.src = metric->name;
-    event.sourcetype = metric->src;
-
-    // Format the metric string using the configured metric format type
-    event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, metric->src), metric->src);
-    if (!event.data) return NULL;
-
-    cJSON *json = cJSON_CreateObject();
-    if (!json) FMTERR(event, json);
-
-    if (!cJSON_AddStringToObjLN(json, SOURCETYPE,
-                                valToStr(watchTypeMap, event.sourcetype))) FMTERR(event, json);
-    if (!cJSON_AddStringToObjLN(json, SOURCE, event.src)) FMTERR(event, json);
-    if (!cJSON_AddStringToObjLN(json, CMDNAME, proc->cmd)) FMTERR(event, json);
-    if (!cJSON_AddNumberToObjLN(json, PID, proc->pid)) FMTERR(event, json);
-    if (!cJSON_AddStringToObjLN(json, HOST, proc->hostname)) FMTERR(event, json);
-    if (!cJSON_AddNumberToObjLN(json, TIME, event.timestamp)) FMTERR(event, json);;
-    cJSON_AddItemToObjectCS(json, DATA, event.data);
-
-    return json;
-}
-
-static cJSON *
 evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, watch_t src)
 {
     event_format_t event;
@@ -589,15 +541,7 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
 cJSON *
 evtFormatMetric(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc)
 {
-    switch (metric->src) {
-        case CFG_SRC_FS:
-        case CFG_SRC_NET:
-        case CFG_SRC_DNS:
-            return evtFSEvent(evt, metric, proc);
-            break;
-        default:
-            return evtFormatHelper(evt, metric, uid, proc, metric->src);
-    }
+    return evtFormatHelper(evt, metric, uid, proc, metric->src);
 }
 
 cJSON *

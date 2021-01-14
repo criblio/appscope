@@ -22,6 +22,7 @@
 #include "state_private.h"
 #include "pcre2.h"
 #include "fn.h"
+#include "os.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
@@ -292,6 +293,31 @@ dumpAddrs(int sd)
     }
 }
 #endif
+
+void
+doUnixEndpoint(int sd, net_info *net)
+{
+    ino_t rnode;
+    struct stat sbuf;
+
+    if (!net) return;
+
+    if ((fstat(sd, &sbuf) == -1) ||
+        ((sbuf.st_mode & S_IFMT) != S_IFSOCK)) {
+        net->lnode = 0;
+        net->rnode = 0;
+        return;
+    }
+
+    if ((rnode = osUnixSockPeer(sbuf.st_ino)) != -1) {
+        net->lnode = sbuf.st_ino;
+        net->rnode = rnode;
+    } else {
+        net->lnode = 0;
+        net->rnode = 0;
+    }
+    return;
+}
 
 static int
 postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const char *pathname)
@@ -967,6 +993,8 @@ int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     net_info *net = getNetEntry(sockfd);
+
+    if (!net) return -1;
 
     if ((checkEnv(PAYLOAD_ENV, PAYLOAD_VAL) == TRUE)) {
         // instead of or in addition to http &/or detect?

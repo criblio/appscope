@@ -2,7 +2,7 @@
 metric:
   enable: true                      # true, false
   format:
-    type : metricstatsd             # metricstatsd, metricjson
+    type : statsd                   # statsd, ndjson
     #statsdprefix : 'cribl.scope'    # prepends each statsd metric
     statsdmaxlen : 512              # max size of a formatted statsd string
     verbosity : 4                   # 0-9 (0 is least verbose, 9 is most)
@@ -47,6 +47,8 @@ event:
   enable: true                      # true, false
   format:
     type : ndjson                   # ndjson
+    maxeventpersec: 10000           # max events per second.  zero is "no limit"
+    enhancefs: true                 # true, false
   watch:
     # Creates events from data written to files.
     # Designed for monitoring log files, but capable of capturing
@@ -77,16 +79,19 @@ event:
 #      field: .*                     # whitelist regex describing field names
 #      value: .*
 
+    # Creates events describing network connectivity
 #    - type: net
 #      name: .*                      #
 #      field: .*                     # whitelist regex describing field names
 #      value: .*
 
+    # Creates events describing file connectivity
 #    - type: fs
 #      name: .*                      #
 #      field: .*                     # whitelist regex describing field names
 #      value: .*
 
+    # Creates events describing dns activity
 #    - type: dns
 #      name: .*                      #
 #      field: .*                     # whitelist regex describing field names

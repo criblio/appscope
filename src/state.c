@@ -1870,7 +1870,7 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
         g_fsinfo[fd].uid = getTime();
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
 
-        if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS)) {
+        if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) && ctlEnhanceFs(g_ctl)) {
             struct stat sbuf;
             if ((g_fn.__xstat) && (g_fn.__xstat(1, g_fsinfo[fd].path, &sbuf) == 0)) {
                 g_fsinfo[fd].fuid = sbuf.st_uid;

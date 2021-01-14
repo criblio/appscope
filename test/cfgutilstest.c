@@ -394,6 +394,67 @@ cfgProcessEnvironmentEventFormat(void** state)
     cfgProcessEnvironment(cfg);
 }
 
+static void
+cfgProcessEnvironmentMaxEps(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    cfgEvtRateLimitSet(cfg, 0);
+    assert_int_equal(cfgEvtRateLimit(cfg), 0);
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_EVENT_MAXEPS", "13", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEvtRateLimit(cfg), 13);
+
+    assert_int_equal(setenv("SCOPE_EVENT_MAXEPS", "31", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEvtRateLimit(cfg), 31);
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_EVENT_MAXEPS"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEvtRateLimit(cfg), 31);
+
+    // unrecognised value should not affect cfg
+    assert_int_equal(setenv("SCOPE_EVENT_MAXEPS", "cribl_rulz", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEvtRateLimit(cfg), 31);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
+static void
+cfgProcessEnvironmentEnhanceFs(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    cfgEnhanceFsSet(cfg, FALSE);
+    assert_int_equal(cfgEnhanceFs(cfg), FALSE);
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_ENHANCE_FS", "true", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEnhanceFs(cfg), TRUE);
+
+    assert_int_equal(setenv("SCOPE_ENHANCE_FS", "false", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEnhanceFs(cfg), FALSE);
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_ENHANCE_FS"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEnhanceFs(cfg), FALSE);
+
+    // unrecognised value should not affect cfg
+    assert_int_equal(setenv("SCOPE_ENHANCE_FS", "cribl_rulz", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEnhanceFs(cfg), FALSE);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
 
 typedef struct
 {
@@ -719,6 +780,8 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_EVENT_NET_VALUE=v\n"
         "SCOPE_EVENT_FS_VALUE=w\n"
         "SCOPE_EVENT_DNS_VALUE=x\n"
+        "SCOPE_EVENT_MAXEPS=123456789\n"
+        "SCOPE_ENHANCE_FS=false\n"
     );
 
     openFileAndExecuteCfgProcessCommands(path, cfg);
@@ -770,6 +833,8 @@ cfgProcessCommandsFromFile(void** state)
     assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_NET), "v");
     assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_FS), "w");
     assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_DNS), "x");
+    assert_int_equal(cfgEvtRateLimit(cfg), 123456789);
+    assert_int_equal(cfgEnhanceFs(cfg), FALSE);
 
     deleteFile(path);
     cfgDestroy(&cfg);
@@ -804,6 +869,8 @@ cfgProcessCommandsEnvSubstitution(void** state)
         "SCOPE_EVENT_SYSLOG=$TRUTH\n"
         "SCOPE_EVENT_METRIC=false\n"
         "SCOPE_EVENT_LOGFILE_NAME=$FILTER\n"
+        "SCOPE_EVENT_MAXEPS=$EPS\n"
+        "SCOPE_ENHANCE_FS=$TRUTH\n"
     );
 
 
@@ -818,6 +885,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_int_equal(setenv("VERBOSITY", "1", 1), 0);
     assert_int_equal(setenv("LOGLEVEL", "trace", 1), 0);
     assert_int_equal(setenv("FILTER", ".*[.]log$", 1), 0);
+    assert_int_equal(setenv("EPS", "987654321", 1), 0);
     assert_int_equal(setenv("TRUTH", "true", 1), 0);
 
     openFileAndExecuteCfgProcessCommands(path, cfg);
@@ -845,6 +913,8 @@ cfgProcessCommandsEnvSubstitution(void** state)
     // misc
     assert_int_equal(cfgMtcEnable(cfg), FALSE);
     assert_int_equal(cfgEvtEnable(cfg), FALSE);
+    assert_int_equal(cfgEvtRateLimit(cfg), 987654321);
+    assert_int_equal(cfgEnhanceFs(cfg), TRUE);
 
     deleteFile(path);
     cfgDestroy(&cfg);
@@ -859,6 +929,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     unsetenv("VERBOSITY");
     unsetenv("LOGLEVEL");
     unsetenv("FILTER");
+    unsetenv("EPS");
     unsetenv("TRUTH");
 }
 
@@ -874,6 +945,8 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
     assert_int_equal       (cfgEvtEnable(config), DEFAULT_EVT_ENABLE);
     assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
+    assert_int_equal       (cfgEvtRateLimit(config), DEFAULT_MAXEVENTSPERSEC);
+    assert_int_equal       (cfgEnhanceFs(config), DEFAULT_ENHANCE_FS);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
@@ -951,6 +1024,8 @@ cfgReadGoodYaml(void** state)
         "  enable: true\n"
         "  format:\n"
         "    type : ndjson                   # ndjson\n"
+        "    maxeventpersec : 989898         # max events per second.\n"
+        "    enhancefs : false               # true, false\n"
         "  watch:\n"
         "    - type: file                    # create events from file\n"
         "      name: .*[.]log$\n"
@@ -990,6 +1065,8 @@ cfgReadGoodYaml(void** state)
     assert_string_equal(cfgCmdDir(config), "/tmp");
     assert_int_equal(cfgEvtEnable(config), TRUE);
     assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
+    assert_int_equal(cfgEvtRateLimit(config), 989898);
+    assert_int_equal(cfgEnhanceFs(config), FALSE);
     assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
     assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_FILE), ".*host.*");
     assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_FILE), "[0-9]+");
@@ -1140,7 +1217,9 @@ const char* jsonText =
     "  'event': {\n"
     "    'enable': 'false',\n"
     "    'format': {\n"
-    "      'type': 'ndjson'\n"
+    "      'type': 'ndjson',\n"
+    "      'maxeventpersec': '42',\n"
+    "      'enhancefs': 'false'\n"
     "    },\n"
     "    'watch' : [\n"
     "      {'type':'file', 'name':'.*[.]log$'},\n"
@@ -1183,6 +1262,8 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgMtcPeriod(config), 13);
     assert_int_equal(cfgEvtEnable(config), FALSE);
     assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
+    assert_int_equal(cfgEvtRateLimit(config), 42);
+    assert_int_equal(cfgEnhanceFs(config), FALSE);
     assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_FILE), ".*[.]log$");
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), 1);
@@ -1306,6 +1387,8 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    - type: fs\n"
         "    - type: dns\n"
         "  format:\n"
+        "    enhancefs : true\n"
+        "    maxeventpersec : 13579\n"
         "    type : ndjson\n"
         "  enable : false\n"
         "libscope:\n"
@@ -1343,6 +1426,8 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_int_equal(cfgMtcPeriod(config), 42);
     assert_int_equal(cfgEvtEnable(config), FALSE);
     assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
+    assert_int_equal(cfgEvtRateLimit(config), 13579);
+    assert_int_equal(cfgEnhanceFs(config), TRUE);
     assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_SYSLOG), ".*[.]log$");
     assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_SYSLOG), ".*host.*");
     assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), "[0-9]+");
@@ -1382,6 +1467,7 @@ cfgReadEnvSubstitution(void** state)
     assert_int_equal(setenv("FORMAT", "ndjson", 1), 0);
     assert_int_equal(setenv("FILTER", ".*[.]log$", 1), 0);
     assert_int_equal(setenv("SOURCE", "syslog", 1), 0);
+    assert_int_equal(setenv("EPS", "987654321", 1), 0);
 
     const char* yamlText =
         "---\n"
@@ -1404,6 +1490,8 @@ cfgReadEnvSubstitution(void** state)
         "  enable: $MASTER_ENABLE\n"
         "  format:\n"
         "    type : $FORMAT\n"
+        "    maxeventpersec : $EPS\n"
+        "    enhancefs : $MASTER_ENABLE\n"
         "  watch:\n"
         "    - type: file                    # create events from files\n"
         "      name: $FILTER\n"
@@ -1451,6 +1539,8 @@ cfgReadEnvSubstitution(void** state)
     // misc
     assert_int_equal(cfgMtcEnable(cfg), TRUE);
     assert_int_equal(cfgEvtEnable(cfg), TRUE);
+    assert_int_equal(cfgEvtRateLimit(cfg), 987654321);
+    assert_int_equal(cfgEnhanceFs(cfg), TRUE);
 
     cfgDestroy(&cfg);
 
@@ -1465,6 +1555,7 @@ cfgReadEnvSubstitution(void** state)
     unsetenv("FORMAT");
     unsetenv("FILTER");
     unsetenv("SOURCE");
+    unsetenv("EPS");
 
     deleteFile(path);
 }
@@ -1671,6 +1762,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgProcessEnvironmentCommandDir),
         cmocka_unit_test(cfgProcessEnvironmentEvtEnable),
         cmocka_unit_test(cfgProcessEnvironmentEventFormat),
+        cmocka_unit_test(cfgProcessEnvironmentMaxEps),
+        cmocka_unit_test(cfgProcessEnvironmentEnhanceFs),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &log),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &con),
         cmocka_unit_test_prestate(cfgProcessEnvironmentEventSource, &sys),

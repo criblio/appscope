@@ -16,6 +16,7 @@ regex_t *           evtFormatValueFilter(evt_fmt_t *, watch_t);
 regex_t *           evtFormatFieldFilter(evt_fmt_t *, watch_t);
 regex_t *           evtFormatNameFilter(evt_fmt_t *, watch_t);
 unsigned            evtFormatSourceEnabled(evt_fmt_t *, watch_t);
+unsigned            evtFormatRateLimit(evt_fmt_t *);
 
 // These are the exposed functions that are expected to be used externally
 cJSON *             evtFormatMetric(evt_fmt_t *, event_t *, uint64_t, proc_id_t *);
@@ -32,6 +33,7 @@ void                evtFormatValueFilterSet(evt_fmt_t *, watch_t, const char *);
 void                evtFormatFieldFilterSet(evt_fmt_t *, watch_t, const char *);
 void                evtFormatNameFilterSet(evt_fmt_t *, watch_t, const char *);
 void                evtFormatSourceEnabledSet(evt_fmt_t *, watch_t, unsigned);
+void                evtFormatRateLimitSet(evt_fmt_t *, unsigned);
 
 #endif // __EVT_FORMAT_H__
 

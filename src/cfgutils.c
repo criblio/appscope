@@ -45,6 +45,8 @@
 #define EVENT_NODE           "event"
 #define FORMAT_NODE              "format"
 #define TYPE_NODE                    "type"
+#define MAXEPS_NODE                  "maxeventpersec"
+#define ENHANCEFS_NODE               "enhancefs"
 #define WATCH_NODE               "watch"
 #define TYPE_NODE                    "type"
 #define NAME_NODE                    "name"
@@ -133,6 +135,8 @@ void cfgMtcPeriodSetFromStr(config_t*, const char*);
 void cfgCmdDirSetFromStr(config_t*, const char*);
 void cfgEvtEnableSetFromStr(config_t*, const char*);
 void cfgEventFormatSetFromStr(config_t*, const char*);
+void cfgEvtRateLimitSetFromStr(config_t*, const char*);
+void cfgEnhanceFsSetFromStr(config_t*, const char*);
 void cfgEvtFormatValueFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatFieldFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatNameFilterSetFromStr(config_t*, watch_t, const char*);
@@ -423,6 +427,10 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtEnableSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
         cfgEventFormatSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_MAXEPS")) {
+        cfgEvtRateLimitSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_ENHANCE_FS")) {
+        cfgEnhanceFsSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_NAME")) {
@@ -603,6 +611,25 @@ cfgEventFormatSetFromStr(config_t* cfg, const char* value)
     // only ndjson is valid
     cfgEventFormatSet(cfg, CFG_FMT_NDJSON);
     //cfgEventFormatSet(cfg, strToVal(formatMap, value));
+}
+
+void
+cfgEvtRateLimitSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    errno = 0;
+    char* endptr = NULL;
+    unsigned long x = strtoul(value, &endptr, 10);
+    if (errno || *endptr) return;
+
+    cfgEvtRateLimitSet(cfg, x);
+}
+
+void
+cfgEnhanceFsSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgEnhanceFsSet(cfg, strToVal(boolMap, value));
 }
 
 void
@@ -903,6 +930,22 @@ processFormatTypeEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node
 }
 
 static void
+processFormatMaxEps(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char* value = stringVal(node);
+    cfgEvtRateLimitSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
+processEnhanceFs(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char* value = stringVal(node);
+    cfgEnhanceFsSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
 processStatsDPrefix(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
@@ -1003,6 +1046,8 @@ processEvtFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,    TYPE_NODE,            processFormatTypeEvent},
+        {YAML_SCALAR_NODE,    MAXEPS_NODE,          processFormatMaxEps},
+        {YAML_SCALAR_NODE,    ENHANCEFS_NODE,       processEnhanceFs},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1619,6 +1664,7 @@ initEvtFormat(config_t *cfg)
         evtFormatFieldFilterSet(evt, src, cfgEvtFormatFieldFilter(cfg, src));
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
     }
+    evtFormatRateLimitSet(evt, cfgEvtRateLimit(cfg));
 
     return evt;
 }
@@ -1647,6 +1693,8 @@ initCtl(config_t *cfg)
         return ctl;
     }
     ctlEvtSet(ctl, evt);
+
+    ctlEnhanceFsSet(ctl, cfgEnhanceFs(cfg));
 
     return ctl;
 }

@@ -14,6 +14,7 @@ struct _ctl_t
     cbuf_handle_t evbuf;
     cbuf_handle_t events;
     cbuf_handle_t payloads;
+    unsigned enhancefs;
 };
 
 typedef struct {
@@ -538,6 +539,8 @@ ctlCreate()
         ctl->payloads = NULL;
     }
 
+    ctl->enhancefs = DEFAULT_ENHANCE_FS;
+
     return ctl;
 }
 
@@ -829,6 +832,19 @@ ctlEvtSourceEnabled(ctl_t *ctl, watch_t src)
 
     DBG("%d", src);
     return srcEnabledDefault[CFG_SRC_FILE];
+}
+
+unsigned
+ctlEnhanceFs(ctl_t *ctl)
+{
+    return (ctl) ? ctl->enhancefs : DEFAULT_ENHANCE_FS;
+}
+
+void
+ctlEnhanceFsSet(ctl_t *ctl, unsigned val)
+{
+    if (!ctl) return;
+    ctl->enhancefs = val;
 }
 
 uint64_t

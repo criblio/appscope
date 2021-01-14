@@ -116,7 +116,8 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_DNS FALSE
 #define DEFAULT_MTC_PORT "8125"
 #define DEFAULT_CTL_PORT "9109"
-#define MAXEVENTSPERSEC 10000
+#define DEFAULT_MAXEVENTSPERSEC 10000
+#define DEFAULT_ENHANCE_FS TRUE
 #define DEFAULT_PORTBLOCK 0
 #define DEFAULT_METRIC_CBUF_SIZE 50 * 1024
 #define DEFAULT_LOG_PATH "/tmp/scope.log"
@@ -128,7 +129,7 @@ typedef unsigned int bool;
  * results in a value large enough to support what we are aware
  * of as requirements. SO, we'll extend this over time.
  */
-#define DEFAULT_CBUF_SIZE (MAXEVENTSPERSEC * DEFAULT_SUMMARY_PERIOD)
+#define DEFAULT_CBUF_SIZE (DEFAULT_MAXEVENTSPERSEC * DEFAULT_SUMMARY_PERIOD)
 #define DEFAULT_CONFIG_SIZE 30 * 1024
 
 // we should start moving env var constants to one place

@@ -35,7 +35,6 @@
 #define BUFFERING_NODE               "buffering"
 
 #define LIBSCOPE_NODE        "libscope"
-#define TRANSPORT_NODE           "transport"
 #define LOG_NODE                 "log"
 #define LEVEL_NODE                   "level"
 #define TRANSPORT_NODE               "transport"
@@ -43,6 +42,7 @@
 #define COMMANDDIR_NODE          "commanddir"
 
 #define EVENT_NODE           "event"
+#define TRANSPORT_NODE           "transport"
 #define FORMAT_NODE              "format"
 #define TYPE_NODE                    "type"
 #define MAXEPS_NODE                  "maxeventpersec"
@@ -1162,6 +1162,7 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,    ENABLE_NODE,          processEvtEnable},
+        {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportCtl},
         {YAML_MAPPING_NODE,   FORMAT_NODE,          processEvtFormat},
         {YAML_SEQUENCE_NODE,  WATCH_NODE,           processWatch},
         {YAML_NO_NODE,        NULL,                 NULL}
@@ -1179,7 +1180,6 @@ processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportCtl},
         {YAML_MAPPING_NODE,   LOG_NODE,             processLogging},
         {YAML_SCALAR_NODE,    SUMMARYPERIOD_NODE,   processSummaryPeriod},
         {YAML_SCALAR_NODE,    COMMANDDIR_NODE,      processCommandDir},
@@ -1477,6 +1477,10 @@ createEventFormatJson(config_t* cfg)
     if (!(root = cJSON_CreateObject())) goto err;
     if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
                       valToStr(formatMap, cfgEventFormat(cfg)))) goto err;
+    if (!cJSON_AddNumberToObjLN(root, MAXEPS_NODE,
+                      cfgEvtRateLimit(cfg))) goto err;
+    if (!cJSON_AddStringToObjLN(root, ENHANCEFS_NODE,
+                      valToStr(boolMap, cfgEnhanceFs(cfg)))) goto err;
 
     return root;
 err:
@@ -1488,12 +1492,15 @@ static cJSON*
 createEventJson(config_t* cfg)
 {
     cJSON* root = NULL;
-    cJSON* format, *watch;
+    cJSON* format, *watch, *transport;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
     if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
                           valToStr(boolMap, cfgEvtEnable(cfg)))) goto err;
+
+    if (!(transport = createTransportJson(cfg, CFG_CTL))) goto err;
+    cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
 
     if (!(format = createEventFormatJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, FORMAT_NODE, format);
@@ -1511,12 +1518,9 @@ static cJSON*
 createLibscopeJson(config_t* cfg)
 {
     cJSON* root = NULL;
-    cJSON* transport, *log;
+    cJSON *log;
 
     if (!(root = cJSON_CreateObject())) goto err;
-
-    if (!(transport = createTransportJson(cfg, CFG_CTL))) goto err;
-    cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
 
     if (!(log = createLogJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, LOG_NODE, log);

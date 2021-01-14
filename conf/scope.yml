@@ -45,6 +45,10 @@ metric:
 
 event:
   enable: true                      # true, false
+  transport:
+    type: tcp                       # udp, tcp, unix, file, syslog
+    host: 127.0.0.1
+    port: 9109
   format:
     type : ndjson                   # ndjson
     maxeventpersec: 10000           # max events per second.  zero is "no limit"
@@ -100,10 +104,6 @@ event:
 
 
 libscope:
-  transport:
-    type: tcp                       # udp, tcp, unix, file, syslog
-    host: 127.0.0.1
-    port: 9109
   summaryperiod : 10                # in seconds
   commanddir : '/tmp'
   #  commanddir supports changes to configuration settings of running

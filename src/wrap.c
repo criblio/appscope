@@ -39,6 +39,7 @@ static log_t *g_prevlog = NULL;
 static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
+static unsigned g_sendprocessstart;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
 
@@ -420,6 +421,7 @@ doConfig(config_t *cfg)
 
     setVerbosity(cfgMtcVerbosity(cfg));
     g_cmddir = cfgCmdDir(cfg);
+    g_sendprocessstart = cfgSendProcessStartMsg(cfg);
 
     g_log = initLog(cfg);
     g_mtc = initMtc(cfg);
@@ -777,7 +779,8 @@ periodic(void *arg)
         if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
         if (logNeedsConnection(g_log)) logConnect(g_log);
 
-        if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl)) {
+        if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl) &&
+            g_sendprocessstart) {
             // Hey we have a new connection!  Identify ourselves
             // like reportProcessStart, but only on the event interface...
             cJSON *json = msgStart(&g_proc, g_staticfg);
@@ -811,9 +814,11 @@ reportProcessStart(void)
     sendProcessStartMetric();
 
     // 3) Send a startup msg
-    cJSON *json = msgStart(&g_proc, g_staticfg);
-    ctlSendJson(g_ctl, json);
-    ctlFlush(g_ctl);
+    if (g_sendprocessstart) {
+        cJSON *json = msgStart(&g_proc, g_staticfg);
+        ctlSendJson(g_ctl, json);
+        ctlFlush(g_ctl);
+    }
 }
 
 // TODO; should this move to os/linux/os.c?

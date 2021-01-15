@@ -18,6 +18,7 @@ typedef enum {
 typedef enum {
     OPEN_PORTS,
     NET_CONNECTIONS,
+    CONNECTION_OPEN,
     CONNECTION_DURATION,
     PROC_CPU,
     PROC_MEM,

@@ -152,3 +152,15 @@ osTimerStop(void)
 {
     return TRUE;
 }
+
+char *
+osGetFileMode(mode_t perm)
+{
+    return NULL;
+}
+
+bool
+osGetCgroup(pid_t pid, char *cgroup, size_t cglen)
+{
+    return FALSE;
+}

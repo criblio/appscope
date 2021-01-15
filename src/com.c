@@ -18,7 +18,6 @@ bool g_need_stack_expand = FALSE;
 int
 cmdSendEvent(ctl_t *ctl, event_t *event, uint64_t time, proc_id_t *proc)
 {
-    if (!ctlEvtSourceEnabled(ctl, CFG_SRC_METRIC)) return 0;
     return ctlSendEvent(ctl, event, time, proc);
 }
 

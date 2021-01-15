@@ -14,6 +14,7 @@ struct _ctl_t
     cbuf_handle_t evbuf;
     cbuf_handle_t events;
     cbuf_handle_t payloads;
+    unsigned enhancefs;
 };
 
 typedef struct {
@@ -48,6 +49,10 @@ static bool srcEnabledDefault[] = {
     DEFAULT_SRC_CONSOLE,
     DEFAULT_SRC_SYSLOG,
     DEFAULT_SRC_METRIC,
+    DEFAULT_SRC_HTTP,
+    DEFAULT_SRC_NET,
+    DEFAULT_SRC_FS,
+    DEFAULT_SRC_DNS,
 };
 
 static void
@@ -452,6 +457,7 @@ prepMessage(upload_t *upld)
     if (!upld) return NULL;
 
     streamMsg = ctlCreateTxMsg(upld);
+    if (!streamMsg) return NULL;
 
     // Add the newline delimiter to the msg.
     int strsize = strlen(streamMsg);
@@ -459,6 +465,7 @@ prepMessage(upload_t *upld)
     if (!temp) {
         DBG(NULL);
         scopeLog("CTL realloc error", -1, CFG_LOG_INFO);
+        free(streamMsg);
         return NULL;
     }
 
@@ -531,6 +538,8 @@ ctlCreate()
     } else {
         ctl->payloads = NULL;
     }
+
+    ctl->enhancefs = DEFAULT_ENHANCE_FS;
 
     return ctl;
 }
@@ -823,6 +832,19 @@ ctlEvtSourceEnabled(ctl_t *ctl, watch_t src)
 
     DBG("%d", src);
     return srcEnabledDefault[CFG_SRC_FILE];
+}
+
+unsigned
+ctlEnhanceFs(ctl_t *ctl)
+{
+    return (ctl) ? ctl->enhancefs : DEFAULT_ENHANCE_FS;
+}
+
+void
+ctlEnhanceFsSet(ctl_t *ctl, unsigned val)
+{
+    if (!ctl) return;
+    ctl->enhancefs = val;
 }
 
 uint64_t

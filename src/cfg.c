@@ -35,6 +35,7 @@ struct _config_t
     struct {
         unsigned enable;
         cfg_mtc_format_t format;
+        unsigned ratelimit;
         char* valuefilter[CFG_SRC_MAX];
         char* fieldfilter[CFG_SRC_MAX];
         char* namefilter[CFG_SRC_MAX];
@@ -50,6 +51,8 @@ struct _config_t
 
     custom_tag_t** tags;
     unsigned max_tags;
+
+    unsigned enhancefs;
 };
 
 #define DEFAULT_SUMMARY_PERIOD 10
@@ -79,6 +82,9 @@ static const char* valueFilterDefault[] = {
     DEFAULT_SRC_SYSLOG_VALUE,
     DEFAULT_SRC_METRIC_VALUE,
     DEFAULT_SRC_HTTP_VALUE,
+    DEFAULT_SRC_NET_VALUE,
+    DEFAULT_SRC_FS_VALUE,
+    DEFAULT_SRC_DNS_VALUE,
 };
 
 static const char* fieldFilterDefault[] = {
@@ -87,6 +93,9 @@ static const char* fieldFilterDefault[] = {
     DEFAULT_SRC_SYSLOG_FIELD,
     DEFAULT_SRC_METRIC_FIELD,
     DEFAULT_SRC_HTTP_FIELD,
+    DEFAULT_SRC_NET_FIELD,
+    DEFAULT_SRC_FS_FIELD,
+    DEFAULT_SRC_DNS_FIELD,
 };
 
 static const char* nameFilterDefault[] = {
@@ -95,6 +104,9 @@ static const char* nameFilterDefault[] = {
     DEFAULT_SRC_SYSLOG_NAME,
     DEFAULT_SRC_METRIC_NAME,
     DEFAULT_SRC_HTTP_NAME,
+    DEFAULT_SRC_NET_NAME,
+    DEFAULT_SRC_FS_NAME,
+    DEFAULT_SRC_DNS_NAME,
 };
 
 static unsigned srcEnabledDefault[] = {
@@ -103,6 +115,9 @@ static unsigned srcEnabledDefault[] = {
     DEFAULT_SRC_SYSLOG,
     DEFAULT_SRC_METRIC,
     DEFAULT_SRC_HTTP,
+    DEFAULT_SRC_NET,
+    DEFAULT_SRC_FS,
+    DEFAULT_SRC_DNS,
 };
 
 static cfg_transport_t typeDefault[] = {
@@ -156,6 +171,7 @@ cfgCreateDefault()
     c->mtc.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
     c->evt.enable = DEFAULT_EVT_ENABLE;
     c->evt.format = DEFAULT_CTL_FORMAT;
+    c->evt.ratelimit = DEFAULT_MAXEVENTSPERSEC;
 
     watch_t src;
     for (src=CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
@@ -183,6 +199,7 @@ cfgCreateDefault()
     c->tags = DEFAULT_TAGS;
     c->max_tags = DEFAULT_NUM_TAGS;
     c->log.level = DEFAULT_LOG_LEVEL;
+    c->enhancefs = DEFAULT_ENHANCE_FS;
 
     return c;
 }
@@ -272,6 +289,18 @@ cfg_mtc_format_t
 cfgEventFormat(config_t* cfg)
 {
     return (cfg) ? cfg->evt.format : DEFAULT_CTL_FORMAT;
+}
+
+unsigned
+cfgEvtRateLimit(config_t* cfg)
+{
+    return (cfg) ? cfg->evt.ratelimit : DEFAULT_MAXEVENTSPERSEC;
+}
+
+unsigned
+cfgEnhanceFs(config_t* cfg)
+{
+    return (cfg) ? cfg->enhancefs : DEFAULT_ENHANCE_FS;
 }
 
 const char*
@@ -517,6 +546,20 @@ cfgEventFormatSet(config_t* cfg, cfg_mtc_format_t fmt)
 {
     if (!cfg || fmt < 0 || fmt >= CFG_FORMAT_MAX) return;
     cfg->evt.format = fmt;
+}
+
+void
+cfgEvtRateLimitSet(config_t* cfg, unsigned val)
+{
+    if (!cfg) return;
+    cfg->evt.ratelimit = val;
+}
+
+void
+cfgEnhanceFsSet(config_t* cfg, unsigned val)
+{
+    if (!cfg || val > 1) return;
+    cfg->enhancefs = val;
 }
 
 void

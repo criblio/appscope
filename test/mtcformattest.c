@@ -15,12 +15,12 @@
 static void
 mtcFormatCreateReturnsValidPtrForGoodFormat(void** state)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     assert_non_null(fmt);
     mtcFormatDestroy(&fmt);
     assert_null(fmt);
 
-    fmt = mtcFormatCreate(CFG_METRIC_JSON);
+    fmt = mtcFormatCreate(CFG_FMT_NDJSON);
     assert_non_null(fmt);
     mtcFormatDestroy(&fmt);
     assert_null(fmt);
@@ -45,7 +45,7 @@ verifyDefaults(mtc_fmt_t* fmt)
 static void
 mtcFormatCreateHasExpectedDefaults(void** state)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     verifyDefaults(fmt);
     mtcFormatDestroy(&fmt);
 
@@ -65,7 +65,7 @@ mtcFormatDestroyNullDoesntCrash(void** state)
 static void
 mtcFormatStatsDPrefixSetAndGet(void** state)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     mtcFormatStatsDPrefixSet(fmt, "cribl.io");
     assert_string_equal(mtcFormatStatsDPrefix(fmt), "cribl.io");
     mtcFormatStatsDPrefixSet(fmt, "");
@@ -80,7 +80,7 @@ mtcFormatStatsDPrefixSetAndGet(void** state)
 static void
 mtcFormatStatsDMaxLenSetAndGet(void** state)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     mtcFormatStatsDMaxLenSet(fmt, 0);
     assert_int_equal(mtcFormatStatsDMaxLen(fmt), 0);
     mtcFormatStatsDMaxLenSet(fmt, UINT_MAX);
@@ -91,7 +91,7 @@ mtcFormatStatsDMaxLenSetAndGet(void** state)
 static void
 mtcFormatVerbositySetAndGet(void** state)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_JSON);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_NDJSON);
     mtcFormatVerbositySet(fmt, 0);
     assert_int_equal(mtcFormatVerbosity(fmt), 0);
     mtcFormatVerbositySet(fmt, UINT_MAX);
@@ -102,7 +102,7 @@ mtcFormatVerbositySetAndGet(void** state)
 static void
 mtcFormatCustomTagsSetAndGet(void ** state)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     {
         custom_tag_t t1 = {"name1", "value1"};
         custom_tag_t t2 = {"name2", "value2"};
@@ -127,27 +127,27 @@ mtcFormatCustomTagsSetAndGet(void ** state)
 }
 
 static void
-mtcFormatStatsDStringNullEventDoesntCrash(void** state)
+mtcFormatEventForOutputNullEventDoesntCrash(void** state)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
-    assert_null(mtcFormatStatsDString(fmt, NULL, NULL));
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
+    assert_null(mtcFormatEventForOutput(fmt, NULL, NULL));
     mtcFormatDestroy(&fmt);
 }
 
 static void
-mtcFormatStatsDStringNullEventFieldsDoesntCrash(void** state)
+mtcFormatEventForOutputNullEventFieldsDoesntCrash(void** state)
 {
     event_t e = INT_EVENT("useful.apps", 1, CURRENT, NULL);
 
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
-    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
+    char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_string_equal(msg, "useful.apps:1|g\n");
     if (msg) free(msg);
     mtcFormatDestroy(&fmt);
 }
 
 static void
-mtcFormatStatsDStringNullFmtDoesntCrash(void** state)
+mtcFormatEventForOutputNullFmtDoesntCrash(void** state)
 {
     event_field_t fields[] = {
         STRFIELD("proc",  "redis", 2,  TRUE),
@@ -155,11 +155,11 @@ mtcFormatStatsDStringNullFmtDoesntCrash(void** state)
     };
     event_t e = INT_EVENT("useful.apps", 1, CURRENT, fields);
 
-    assert_null(mtcFormatStatsDString(NULL, &e, NULL));
+    assert_null(mtcFormatEventForOutput(NULL, &e, NULL));
 }
 
 static void
-mtcFormatStatsDStringHappyPath(void** state)
+mtcFormatEventForOutputHappyPathStatsd(void** state)
 {
     char* g_hostname = "myhost";
     char* g_procname = "testapp";
@@ -180,11 +180,11 @@ mtcFormatStatsDStringHappyPath(void** state)
     };
     event_t e = INT_EVENT("net.port", g_openPorts, CURRENT, fields);
 
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     assert_non_null(fmt);
     mtcFormatVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
-    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
+    char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_non_null(msg);
 
     char expected[1024];
@@ -200,7 +200,63 @@ mtcFormatStatsDStringHappyPath(void** state)
 }
 
 static void
-mtcFormatStatsDStringHappyPathFilteredFields(void** state)
+mtcFormatEventForOutputHappyPathJson(void** state)
+{
+    char* g_hostname = "myhost";
+    char* g_procname = "testapp";
+    int g_openPorts = 2;
+    pid_t pid = 666;
+    int fd = 3;
+    char* proto = "TCP";
+    in_port_t localPort = 8125;
+
+    event_field_t fields[] = {
+        STRFIELD("proc",    g_procname,   2,  TRUE),
+        NUMFIELD("pid",     pid,          7,  TRUE),
+        NUMFIELD("fd",      fd,           7,  TRUE),
+        STRFIELD("host",    g_hostname,   2,  TRUE),
+        STRFIELD("proto",   proto,        1,  TRUE),
+        NUMFIELD("port",    localPort,    4,  TRUE),
+        FIELDEND
+    };
+    event_t e = INT_EVENT("net.port", g_openPorts, CURRENT, fields);
+
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_NDJSON);
+    assert_non_null(fmt);
+    mtcFormatVerbositySet(fmt, CFG_MAX_VERBOSITY);
+
+    char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
+    assert_non_null(msg);
+
+    // For usability, the json string needs to be newline terminated
+    assert_int_equal(msg[strlen(msg)-1], '\n');
+
+    cJSON *json = cJSON_Parse(msg);
+    assert_non_null(json);
+
+    // Fields expected for all json metrics
+    assert_true(cJSON_HasObjectItem(json, "_metric"));
+    assert_true(cJSON_HasObjectItem(json, "_metric_type"));
+    assert_true(cJSON_HasObjectItem(json, "_value"));
+    // Fields expected for our specific metric
+    assert_true(cJSON_HasObjectItem(json, "proc"));
+    assert_true(cJSON_HasObjectItem(json, "pid"));
+    assert_true(cJSON_HasObjectItem(json, "fd"));
+    assert_true(cJSON_HasObjectItem(json, "host"));
+    assert_true(cJSON_HasObjectItem(json, "proto"));
+    assert_true(cJSON_HasObjectItem(json, "port"));
+    // And... _time field is required too
+    assert_true(cJSON_HasObjectItem(json, "_time"));
+
+    cJSON_Delete(json);
+    free(msg);
+
+    mtcFormatDestroy(&fmt);
+    assert_null(fmt);
+}
+
+static void
+mtcFormatEventForOutputHappyPathFilteredFields(void** state)
 {
     char* g_hostname = "myhost";
     char* g_procname = "testapp";
@@ -216,19 +272,19 @@ mtcFormatStatsDStringHappyPathFilteredFields(void** state)
         NUMFIELD("fd",       fd,           7,  TRUE),
         STRFIELD("host",     g_hostname,   2,  TRUE),
         STRFIELD("proto",    proto,        1,  TRUE),
-        NUMFIELD("port",     localPort,     4,  TRUE),
+        NUMFIELD("port",     localPort,    4,  TRUE),
         FIELDEND
     };
     event_t e = INT_EVENT("net.port", g_openPorts, CURRENT, fields);
 
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     assert_non_null(fmt);
     mtcFormatVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
     regex_t re;
     assert_int_equal(regcomp(&re, "^[p]", REG_EXTENDED), 0);
 
-    char* msg = mtcFormatStatsDString(fmt, &e, &re);
+    char* msg = mtcFormatEventForOutput(fmt, &e, &re);
     assert_non_null(msg);
 
 
@@ -246,9 +302,9 @@ mtcFormatStatsDStringHappyPathFilteredFields(void** state)
 }
 
 static void
-mtcFormatStatsDStringWithCustomFields(void** state)
+mtcFormatEventForOutputWithCustomFields(void** state)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     assert_non_null(fmt);
 
     custom_tag_t t1 = {"name1", "value1"};
@@ -258,7 +314,7 @@ mtcFormatStatsDStringWithCustomFields(void** state)
 
     event_t e = INT_EVENT("statsd.metric", 3, CURRENT, NULL);
 
-    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
+    char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_non_null(msg);
 
     assert_string_equal("statsd.metric:3|g|#name1:value1,name2:value2\n", msg);
@@ -267,9 +323,9 @@ mtcFormatStatsDStringWithCustomFields(void** state)
 }
 
 static void
-mtcFormatStatsDStringWithCustomAndStatsdFields(void** state)
+mtcFormatEventForOutputWithCustomAndStatsdFields(void** state)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     assert_non_null(fmt);
 
     custom_tag_t t1 = {"tag", "value"};
@@ -282,7 +338,7 @@ mtcFormatStatsDStringWithCustomAndStatsdFields(void** state)
     };
     event_t e = INT_EVENT("fs.read", 3, CURRENT, fields);
 
-    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
+    char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_non_null(msg);
 
     assert_string_equal("fs.read:3|g|#tag:value,proc:test\n", msg);
@@ -291,15 +347,15 @@ mtcFormatStatsDStringWithCustomAndStatsdFields(void** state)
 }
 
 static void
-mtcFormatStatsDStringReturnsNullIfSpaceIsInsufficient(void** state)
+mtcFormatEventForOutputReturnsNullIfSpaceIsInsufficient(void** state)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     mtcFormatStatsDMaxLenSet(fmt, 28);
     mtcFormatStatsDPrefixSet(fmt, "98");
 
     // Test one that just fits
     event_t e1 = INT_EVENT("A", -1234567890123456789, DELTA_MS, NULL);
-    char* msg = mtcFormatStatsDString(fmt, &e1, NULL);
+    char* msg = mtcFormatEventForOutput(fmt, &e1, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "98A:-1234567890123456789|ms\n");
     assert_true(strlen(msg) == 28);
@@ -307,21 +363,21 @@ mtcFormatStatsDStringReturnsNullIfSpaceIsInsufficient(void** state)
 
     // One character too much (longer name)
     event_t e2 = INT_EVENT("AB", e1.value.integer, e1.type, e1.fields);
-    msg = mtcFormatStatsDString(fmt, &e2, NULL);
+    msg = mtcFormatEventForOutput(fmt, &e2, NULL);
     assert_null(msg);
     mtcFormatDestroy(&fmt);
 }
 
 static void
-mtcFormatStatsDStringReturnsNullIfSpaceIsInsufficientMax(void** state)
+mtcFormatEventForOutputReturnsNullIfSpaceIsInsufficientMax(void** state)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     mtcFormatStatsDMaxLenSet(fmt, 2+1+315+3);
     mtcFormatStatsDPrefixSet(fmt, "98");
 
     // Test one that just fits
     event_t e1 = FLT_EVENT("A", -DBL_MAX, DELTA_MS, NULL);
-    char* msg = mtcFormatStatsDString(fmt, &e1, NULL);
+    char* msg = mtcFormatEventForOutput(fmt, &e1, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "98A:-179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.00|ms\n");
     assert_true(strlen(msg) == 2+1+315+3);
@@ -329,20 +385,20 @@ mtcFormatStatsDStringReturnsNullIfSpaceIsInsufficientMax(void** state)
 
     // One character too much (longer name)
     event_t e2 = FLT_EVENT("AB", e1.value.floating, e1.type, e1.fields);
-    msg = mtcFormatStatsDString(fmt, &e2, NULL);
+    msg = mtcFormatEventForOutput(fmt, &e2, NULL);
     assert_null(msg);
     mtcFormatDestroy(&fmt);
 }
 
 static void
-mtcFormatStatsDStringVerifyEachStatsDType(void** state)
+mtcFormatEventForOutputVerifyEachStatsDType(void** state)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
 
     data_type_t t;
     for (t=DELTA; t<=SET; t++) {
         event_t e = INT_EVENT("A", 1, t, NULL);
-        char* msg = mtcFormatStatsDString(fmt, &e, NULL);
+        char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
         switch (t) {
             case DELTA:
                 assert_string_equal(msg, "A:1|c\n");
@@ -367,7 +423,7 @@ mtcFormatStatsDStringVerifyEachStatsDType(void** state)
 
     // In undefined case, just don't crash...
     event_t e = INT_EVENT("A", 1, SET+1, NULL);
-    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
+    char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
     if (msg) free(msg);
 
     assert_int_equal(dbgCountMatchingLines("src/mtcformat.c"), 1);
@@ -376,7 +432,7 @@ mtcFormatStatsDStringVerifyEachStatsDType(void** state)
 }
 
 static void
-mtcFormatStatsDStringOmitsFieldsIfSpaceIsInsufficient(void** state)
+mtcFormatEventForOutputOmitsFieldsIfSpaceIsInsufficient(void** state)
 {
     event_field_t fields[] = {
         NUMFIELD("J",  222,   9,  TRUE),
@@ -392,7 +448,7 @@ mtcFormatStatsDStringOmitsFieldsIfSpaceIsInsufficient(void** state)
         FIELDEND
     };
     event_t e = INT_EVENT("metric", 1, DELTA, fields);
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     mtcFormatVerbositySet(fmt, CFG_MAX_VERBOSITY);
 
     // Note that this test documents that we don't prioritize
@@ -401,7 +457,7 @@ mtcFormatStatsDStringOmitsFieldsIfSpaceIsInsufficient(void** state)
     // mtcFormatStatsDMaxLen.
 
     mtcFormatStatsDMaxLenSet(fmt, 31);
-    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
+    char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_non_null(msg);
     //                                 1111111111222222222233
     //                        1234567890123456789012345678901
@@ -410,7 +466,7 @@ mtcFormatStatsDStringOmitsFieldsIfSpaceIsInsufficient(void** state)
     free(msg);
 
     mtcFormatStatsDMaxLenSet(fmt, 32);
-    msg = mtcFormatStatsDString(fmt, &e, NULL);
+    msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#J:222,I:V,H:111,G:W\n");
     free(msg);
@@ -419,7 +475,7 @@ mtcFormatStatsDStringOmitsFieldsIfSpaceIsInsufficient(void** state)
 }
 
 static void
-mtcFormatStatsDStringHonorsCardinality(void** state)
+mtcFormatEventForOutputHonorsCardinality(void** state)
 {
     event_field_t fields[] = {
         STRFIELD("A",   "Z",   0,  TRUE),
@@ -435,22 +491,22 @@ mtcFormatStatsDStringHonorsCardinality(void** state)
         FIELDEND
     };
     event_t e = INT_EVENT("metric", 1, DELTA, fields);
-    mtc_fmt_t* fmt = mtcFormatCreate(CFG_METRIC_STATSD);
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
 
     mtcFormatVerbositySet(fmt, 0);
-    char* msg = mtcFormatStatsDString(fmt, &e, NULL);
+    char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#A:Z\n");
     free(msg);
 
     mtcFormatVerbositySet(fmt, 5);
-    msg = mtcFormatStatsDString(fmt, &e, NULL);
+    msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#A:Z,B:987,C:Y,D:654,E:X,F:321\n");
     free(msg);
 
     mtcFormatVerbositySet(fmt, 9);
-    msg = mtcFormatStatsDString(fmt, &e, NULL);
+    msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_non_null(msg);
     // Verify every name is there, 10 in total
     int count =0;
@@ -569,18 +625,19 @@ main(int argc, char* argv[])
         cmocka_unit_test(mtcFormatStatsDMaxLenSetAndGet),
         cmocka_unit_test(mtcFormatVerbositySetAndGet),
         cmocka_unit_test(mtcFormatCustomTagsSetAndGet),
-        cmocka_unit_test(mtcFormatStatsDStringNullEventDoesntCrash),
-        cmocka_unit_test(mtcFormatStatsDStringNullEventFieldsDoesntCrash),
-        cmocka_unit_test(mtcFormatStatsDStringNullFmtDoesntCrash),
-        cmocka_unit_test(mtcFormatStatsDStringHappyPath),
-        cmocka_unit_test(mtcFormatStatsDStringHappyPathFilteredFields),
-        cmocka_unit_test(mtcFormatStatsDStringWithCustomFields),
-        cmocka_unit_test(mtcFormatStatsDStringWithCustomAndStatsdFields),
-        cmocka_unit_test(mtcFormatStatsDStringReturnsNullIfSpaceIsInsufficient),
-        cmocka_unit_test(mtcFormatStatsDStringReturnsNullIfSpaceIsInsufficientMax),
-        cmocka_unit_test(mtcFormatStatsDStringVerifyEachStatsDType),
-        cmocka_unit_test(mtcFormatStatsDStringOmitsFieldsIfSpaceIsInsufficient),
-        cmocka_unit_test(mtcFormatStatsDStringHonorsCardinality),
+        cmocka_unit_test(mtcFormatEventForOutputNullEventDoesntCrash),
+        cmocka_unit_test(mtcFormatEventForOutputNullEventFieldsDoesntCrash),
+        cmocka_unit_test(mtcFormatEventForOutputNullFmtDoesntCrash),
+        cmocka_unit_test(mtcFormatEventForOutputHappyPathStatsd),
+        cmocka_unit_test(mtcFormatEventForOutputHappyPathJson),
+        cmocka_unit_test(mtcFormatEventForOutputHappyPathFilteredFields),
+        cmocka_unit_test(mtcFormatEventForOutputWithCustomFields),
+        cmocka_unit_test(mtcFormatEventForOutputWithCustomAndStatsdFields),
+        cmocka_unit_test(mtcFormatEventForOutputReturnsNullIfSpaceIsInsufficient),
+        cmocka_unit_test(mtcFormatEventForOutputReturnsNullIfSpaceIsInsufficientMax),
+        cmocka_unit_test(mtcFormatEventForOutputVerifyEachStatsDType),
+        cmocka_unit_test(mtcFormatEventForOutputOmitsFieldsIfSpaceIsInsufficient),
+        cmocka_unit_test(mtcFormatEventForOutputHonorsCardinality),
         cmocka_unit_test(fmtUrlEncodeDecodeRoundTrip),
         cmocka_unit_test(fmtUrlDecodeToleratesBadData),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),

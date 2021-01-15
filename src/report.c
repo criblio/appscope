@@ -20,6 +20,7 @@
 #include "search.h"
 #include "state_private.h"
 #include "linklist.h"
+#include "dns.h"
 
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
@@ -31,12 +32,26 @@
 #define CLASS_FIELD(val)        STRFIELD("class",          (val), 2, TRUE)
 #define PROTO_FIELD(val)        STRFIELD("proto",          (val), 2, TRUE)
 #define OP_FIELD(val)           STRFIELD("op",             (val), 3, TRUE)
-#define PID_FIELD(val)          NUMFIELD("pid",            (val), 4, FALSE)
+#define PID_FIELD(val)          NUMFIELD("pid",            (val), 4, TRUE)
+#define PROC_UID(val)           NUMFIELD("proc.uid",       (val), 4, TRUE)
+#define PROC_GID(val)           NUMFIELD("proc.gid",       (val), 4, TRUE)
+#define PROC_CGROUP(val)        STRFIELD("proc.cgroup",    (val), 4, TRUE)
 #define HOST_FIELD(val)         STRFIELD("host",           (val), 4, FALSE)
 #define PROC_FIELD(val)         STRFIELD("proc",           (val), 4, FALSE)
 #define HTTPSTAT_FIELD(val)     NUMFIELD("http_status",    (val), 4, TRUE)
 #define DOMAIN_FIELD(val)       STRFIELD("domain",         (val), 5, TRUE)
-#define FILE_FIELD(val)         STRFIELD("file",           (val), 5, TRUE)
+
+#define FILE_FIELD(val)      STRFIELD("file",              (val), 5, TRUE)
+#define FILE_EV_NAME(val)    STRFIELD("file.name",         (val), 5, TRUE)
+#define FILE_EV_MODE(val)    NUMFIELD("file.perms",        (val), 5, TRUE)
+#define FILE_OWNER(val)      NUMFIELD("file.owner",        (val), 5, TRUE)
+#define FILE_GROUP(val)      NUMFIELD("file.group",        (val), 5, TRUE)
+#define FILE_RD_BYTES(val)   NUMFIELD("file.read_bytes",   (val), 5, TRUE)
+#define FILE_RD_OPS(val)     NUMFIELD("file.read_ops",     (val), 5, TRUE)
+#define FILE_WR_BYTES(val)   NUMFIELD("file.write_bytes",  (val), 5, TRUE)
+#define FILE_WR_OPS(val)     NUMFIELD("file.write_ops",    (val), 5, TRUE)
+#define FILE_ERRS(val)       NUMFIELD("file.errors",       (val), 5, TRUE)
+
 #define LOCALIP_FIELD(val)      STRFIELD("localip",        (val), 6, TRUE)
 #define REMOTEIP_FIELD(val)     STRFIELD("remoteip",       (val), 6, TRUE)
 #define LOCALP_FIELD(val)       NUMFIELD("localp",         (val), 6, TRUE)
@@ -55,6 +70,7 @@
 
 #define EVENT_ONLY_ATTR (CFG_MAX_VERBOSITY+1)
 #define HTTP_MAX_FIELDS 30
+#define NET_MAX_FIELDS 16
 #define H_ATTRIB(field, att, val, verbosity) \
     field.name = att; \
     field.value_type = FMT_STR; \
@@ -70,6 +86,8 @@
     field.cardinality = verbosity;
 
 #define HTTP_NEXT_FLD(n) if (n < HTTP_MAX_FIELDS-1) {n++;}else{DBG(NULL);}
+#define NEXT_FLD(n, max) if (n < max-1) {n+=1;}else{DBG(NULL);}
+
 #define HTTP_STATUS "HTTP/1."
 
 typedef struct http_report_t {
@@ -232,6 +250,91 @@ getConn(struct sockaddr_storage *conn, char *addr, size_t alen, char *port, size
     return TRUE;
 }
 
+// yeah, a lot of params. but, it's generic.
+static bool
+getNetInternals(net_info *net, int type,
+                struct sockaddr_storage *lconn, struct sockaddr_storage *rconn,
+                char *laddr, char *raddr, size_t alen, char *lport, char *rport, size_t plen,
+                event_field_t *fields, int *ix, int maxfld)
+{
+    if (!lconn || !rconn || !laddr || !raddr || !fields || !ix) return FALSE;
+
+    if (addrIsNetDomain(lconn)) {
+        switch (type) {
+        case SOCK_STREAM:
+            H_ATTRIB(fields[*ix], "net.transport", "IP.TCP", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_DGRAM:
+            H_ATTRIB(fields[*ix], "net.transport", "IP.UDP", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_RAW:
+            H_ATTRIB(fields[*ix], "net.transport", "IP.RAW", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_RDM:
+            H_ATTRIB(fields[*ix], "net.transport", "IP.RDM", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_SEQPACKET:
+            H_ATTRIB(fields[*ix], "net.transport", "IP.SEQPACKET", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        default:
+            break;
+        }
+
+        if (getConn(rconn, raddr, alen, rport, plen) == TRUE) {
+            H_ATTRIB(fields[*ix], "net.peer.ip", raddr, 1);
+            NEXT_FLD(*ix, maxfld);
+            H_ATTRIB(fields[*ix], "net.peer.port", rport, 1);
+            NEXT_FLD(*ix, maxfld);
+        }
+
+        if (getConn(lconn, laddr, alen, lport, plen) == TRUE) {
+            H_ATTRIB(fields[*ix], "net.host.ip", laddr, 1);
+            NEXT_FLD(*ix, maxfld);
+            H_ATTRIB(fields[*ix], "net.host.port", lport, 1);
+            NEXT_FLD(*ix, maxfld);
+        }
+    } else if (addrIsUnixDomain(lconn)) {
+        switch (type) {
+        case SOCK_STREAM:
+            H_ATTRIB(fields[*ix], "net.transport", "Unix.TCP", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_DGRAM:
+            H_ATTRIB(fields[*ix], "net.transport", "Unix.UDP", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_RAW:
+            H_ATTRIB(fields[*ix], "net.transport", "Unix.RAW", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_RDM:
+            H_ATTRIB(fields[*ix], "net.transport", "Unix.RDM", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        case SOCK_SEQPACKET:
+            H_ATTRIB(fields[*ix], "net.transport", "Unix.SEQPACKET", 1);
+            NEXT_FLD(*ix, maxfld);
+            break;
+        default:
+            break;
+        }
+
+        if (net) {
+            H_VALUE(fields[*ix], "unix.peer", net->rnode, 1);
+            NEXT_FLD(*ix, maxfld);
+            H_VALUE(fields[*ix], "unix.host", net->lnode, 1);
+            NEXT_FLD(*ix, maxfld);
+        }
+    }
+
+    return TRUE;
+}
+
 static size_t
 getHttpStatus(char *header, size_t len, char **stext)
 {
@@ -312,7 +415,6 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr, size_t hdr_le
     return TRUE;
 }
 
-
 static bool
 httpFieldsInternal(event_field_t *fields, http_report *hreport, protocol_info *proto)
 {
@@ -341,47 +443,13 @@ httpFieldsInternal(event_field_t *fields, http_report *hreport, protocol_info *p
     HTTP_NEXT_FLD(hreport->ix);
 
     if (proto->sock_type != -1) {
-        if (addrIsNetDomain(&proto->localConn)) {
-            if (proto->sock_type == SOCK_STREAM) {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "IP.TCP", 1);
-                HTTP_NEXT_FLD(hreport->ix);
-            } else if (proto->sock_type == SOCK_DGRAM) {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "IP.UDP", 1);
-                HTTP_NEXT_FLD(hreport->ix);
-            } else {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "IP", 1);
-                HTTP_NEXT_FLD(hreport->ix);
-            }
-        } else if (addrIsUnixDomain(&proto->localConn)) { // TODO: more than unix
-            if (proto->sock_type == SOCK_STREAM) {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix.TCP", 1);
-                HTTP_NEXT_FLD(hreport->ix);
-            } else if (proto->sock_type == SOCK_DGRAM) {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix.UDP", 1);
-                HTTP_NEXT_FLD(hreport->ix);
-            } else {
-                H_ATTRIB(fields[hreport->ix], "net.transport", "Unix", 1);
-                HTTP_NEXT_FLD(hreport->ix);
-            }
-        }
-
-        // Connection details, where we know the file descriptor
-        if (getConn(&proto->remoteConn, hreport->raddr, sizeof(hreport->raddr),
-                    hreport->rport, sizeof(hreport->rport)) == TRUE) {
-            H_ATTRIB(fields[hreport->ix], "net.peer.ip", hreport->raddr, 5);
-            HTTP_NEXT_FLD(hreport->ix);
-            H_ATTRIB(fields[hreport->ix], "net.peer.port", hreport->rport, 7);
-            HTTP_NEXT_FLD(hreport->ix);
-        }
-
-        if (getConn(&proto->localConn, hreport->laddr, sizeof(hreport->laddr),
-                    hreport->lport, sizeof(hreport->lport)) == TRUE) {
-            H_ATTRIB(fields[hreport->ix], "net.host.ip", hreport->laddr, 1);
-            HTTP_NEXT_FLD(hreport->ix);
-            H_ATTRIB(fields[hreport->ix], "net.host.port", hreport->lport, 1);
-            HTTP_NEXT_FLD(hreport->ix);
-        }
+        getNetInternals(NULL, proto->sock_type,
+                        &proto->localConn, &proto->remoteConn,
+                        hreport->laddr, hreport->raddr, sizeof(hreport->raddr),
+                        hreport->lport, hreport->rport, sizeof(hreport->rport),
+                        fields, &hreport->ix, HTTP_MAX_FIELDS);
     }
+
     return TRUE;
 }
 
@@ -856,7 +924,7 @@ doErrorMetric(metric_t type, control_type_t source,
 }
 
 void
-doDNSMetricName(metric_t type, const char *domain, counters_element_t* duration, void* ctr)
+doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration, void *ctr)
 {
     if (!domain || !domain[0]) return;
 
@@ -867,17 +935,50 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t* duration,
     {
         // Don't report zeros.
         if (ctrs->numDNS.evt != 0) {
-            event_field_t fields[] = {
-                PROC_FIELD(g_proc.procname),
-                PID_FIELD(g_proc.pid),
-                HOST_FIELD(g_proc.hostname),
-                DOMAIN_FIELD(domain),
-                DURATION_FIELD(duration->evt / 1000000), // convert ns to ms.
-                UNIT_FIELD("request"),
-                FIELDEND
-            };
-            event_t dnsMetric = INT_EVENT("net.dns", ctrs->numDNS.evt, DELTA, fields);
-            cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
+            // This creates a DNS raw event
+            if (duration && (duration->evt > 0)) {
+                event_field_t resp[] = {
+                    PROC_FIELD(g_proc.procname),
+                    PID_FIELD(g_proc.pid),
+                    HOST_FIELD(g_proc.hostname),
+                    DOMAIN_FIELD(domain),
+                    UNIT_FIELD("response"),
+                    FIELDEND
+                };
+                event_t dnsMetric = INT_EVENT("net.dns.resp", ctrs->numDNS.evt, DELTA, resp);
+                cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
+
+                // This creates a DNS event
+                event_field_t evfield[] = {
+                    DOMAIN_FIELD(domain),
+                    DURATION_FIELD(duration->evt / 1000000), // convert ns to ms.
+                    FIELDEND
+                };
+                event_t dnsEvent = INT_EVENT("net.dns.resp", ctrs->numDNS.evt, DELTA, evfield);
+                dnsEvent.src = CFG_SRC_DNS;
+                cmdSendEvent(g_ctl, &dnsEvent, getTime(), &g_proc);
+            } else {
+                // This create a DNS raw event
+                event_field_t req[] = {
+                    PROC_FIELD(g_proc.procname),
+                    PID_FIELD(g_proc.pid),
+                    HOST_FIELD(g_proc.hostname),
+                    DOMAIN_FIELD(domain),
+                    UNIT_FIELD("request"),
+                    FIELDEND
+                };
+                event_t dnsMetric = INT_EVENT("net.dns.req", ctrs->numDNS.evt, DELTA, req);
+                cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
+
+                // This creates a DNS event
+                event_field_t evfield[] = {
+                    DOMAIN_FIELD(domain),
+                    FIELDEND
+                };
+                event_t dnsEvent = INT_EVENT("net.dns.req", ctrs->numDNS.evt, DELTA, evfield);
+                dnsEvent.src = CFG_SRC_DNS;
+                cmdSendEvent(g_ctl, &dnsEvent, getTime(), &g_proc);
+            }
         }
 
         // Only report if enabled
@@ -915,6 +1016,8 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t* duration,
         if (cachedDurationNum >= 1) {
             // factor of 1000000 converts ns to ms.
             dur = ctrs->dnsDurationTotal.evt / ( 1000000 * cachedDurationNum);
+            // default to at least 1ms as opposed to reporting nothing
+            if (dur == 0) dur = 1;
         }
 
         // Don't report zeros.
@@ -945,6 +1048,8 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t* duration,
         if (cachedDurationNum >= 1) {
             // factor of 1000000 converts ns to ms.
             dur = ctrs->dnsDurationTotal.mtc / ( 1000000 * cachedDurationNum);
+            // default to at least 1ms as opposed to reporting nothing
+            if (dur == 0) dur = 1;
         }
 
         // Don't report zeros
@@ -1111,6 +1216,294 @@ doStatMetric(const char *op, const char *pathname, void* ctr)
     }
 }
 
+static uint64_t
+getFSDuration(fs_info *fs)
+{
+    uint64_t dur = 0ULL;
+    int cachedDurationNum = fs->numDuration.evt; // avoid div by zero
+    if (cachedDurationNum >= 1) {
+        // factor of 1000 converts ns to us.
+        dur = fs->totalDuration.evt / ( 1000 * cachedDurationNum);
+    }
+    return dur;
+}
+
+static int
+decimalToOctal(int dec)
+{
+    int oct = 0, i = 1;
+
+    while (dec != 0) {
+        oct += (dec % 8) * i;
+        dec /= 8;
+        i *= 10;
+    }
+
+    return oct;
+}
+
+// The assumption being we will add more protocols
+static void
+getNetPtotocol(net_info *net, event_field_t *nevent, int *ix)
+{
+    if (!net || !nevent) return;
+    in_port_t localPort, remotePort;
+
+    localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
+    remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
+
+    if ((localPort == 80) || (localPort == 443) ||
+        (remotePort == 80) || (remotePort == 443)) {
+        H_ATTRIB(nevent[*ix], "net.protocol", "http", 1);
+        NEXT_FLD(*ix, NET_MAX_FIELDS);
+    }
+
+    return;
+}
+
+/*
+{
+  "sourcetype": "net",
+  "source": "net.conn.open",
+  "cmd": "foo",
+  "pid": 10831,
+  "host": "hostname",
+  "data" {
+    "net.transport": "IP.TCP",
+    "net.peer.ip": "5.9.243.187",
+    "net.peer.port": 443,
+    "net.peer.name": wttr.in,
+    "net.host.ip": "172.17.0.2",
+    "net.host.port": 49202,
+    "net.host.name": "scope-vm",
+    "net.protocol": "http",
+  },
+  "_time": timestamp
+}
+ */
+static void
+doNetOpenEvent(net_info *net)
+{
+    int nix = 0;
+    const char *metric = "net.conn.open";
+    char rport[8];
+    char lport[8];
+    char raddr[INET6_ADDRSTRLEN];
+    char laddr[INET6_ADDRSTRLEN];
+
+    event_field_t nevent[NET_MAX_FIELDS];
+
+    getNetInternals(net, net->type,
+                    &net->localConn, &net->remoteConn,
+                    laddr, raddr, sizeof(raddr),
+                    lport, rport, sizeof(rport),
+                    nevent, &nix, NET_MAX_FIELDS);
+
+    if (net->dnsName[0] != 0) {
+        H_ATTRIB(nevent[nix], "net.host.name", net->dnsName, 1);
+        NEXT_FLD(nix, NET_MAX_FIELDS);
+    }
+
+    getNetPtotocol(net, nevent, &nix);
+
+    nevent[nix].name = NULL;
+    nevent[nix].value_type = FMT_END;
+    nevent[nix].value.str = NULL;
+    nevent[nix].cardinality = 0;
+
+    event_t evt = INT_EVENT(metric, g_ctrs.openPorts.evt, CURRENT, nevent);
+    evt.src = CFG_SRC_NET;
+    cmdSendEvent(g_ctl, &evt, net->uid, &g_proc);
+}
+
+/*
+{
+  "sourcetype": "net",
+  "source": "net.conn.close",
+  "cmd": "foo",
+  "pid": 10831,
+  "host": "hostname",
+  "data" {
+    "net.transport": "IP.TCP",
+    "net.peer.ip": "5.9.243.187",
+    "net.peer.port": 443,
+    "net.peer.name": wttr.in,
+    "net.host.ip": "172.17.0.2",
+    "net.host.port": 49202,
+    "net.host.name": "scope-vm",
+    "net.protocol": "http",
+    "duration": 243,
+    "net.close.reason": "normal",
+    "net.close.origin": "peer",
+    "net.bytes_sent": 4134,
+    "net.bytes_recv": 123
+  },
+  "_time": timestamp
+}
+ */
+static void
+doNetCloseEvent(net_info *net, uint64_t dur)
+{
+    int nix = 0;
+    const char *metric = "net.conn.close";
+    char rport[8];
+    char lport[8];
+    char raddr[INET6_ADDRSTRLEN];
+    char laddr[INET6_ADDRSTRLEN];
+    event_field_t nevent[NET_MAX_FIELDS];
+
+
+    if (net->type != SOCK_STREAM) return;
+
+    getNetInternals(net, net->type,
+                    &net->localConn, &net->remoteConn,
+                    laddr, raddr, sizeof(raddr),
+                    lport, rport, sizeof(rport),
+                    nevent, &nix, NET_MAX_FIELDS);
+
+    if (net->dnsName[0] != 0) {
+        H_ATTRIB(nevent[nix], "net.host.name", net->dnsName, 1);
+        NEXT_FLD(nix, NET_MAX_FIELDS);
+    }
+
+    if (net->http.state != HTTP_NONE) {
+        H_ATTRIB(nevent[nix], "net.protocol", "http", 1);
+        NEXT_FLD(nix, NET_MAX_FIELDS);
+    }
+
+    getNetPtotocol(net, nevent, &nix);
+
+    H_VALUE(nevent[nix], "duration", dur, 1);
+    NEXT_FLD(nix, NET_MAX_FIELDS);
+
+    H_VALUE(nevent[nix], "net.bytes_sent", net->txBytes.evt, 1);
+    NEXT_FLD(nix, NET_MAX_FIELDS);
+
+    H_VALUE(nevent[nix], "net.bytes_recv", net->rxBytes.evt, 1);
+    NEXT_FLD(nix, NET_MAX_FIELDS);
+
+    if (net->remoteClose == TRUE) {
+        H_ATTRIB(nevent[nix], "net.close.reason", "remote", 1);
+        NEXT_FLD(nix, NET_MAX_FIELDS);
+    } else {
+        H_ATTRIB(nevent[nix], "net.close.reason", "local", 1);
+        NEXT_FLD(nix, NET_MAX_FIELDS);
+    }
+
+    nevent[nix].name = NULL;
+    nevent[nix].value_type = FMT_END;
+    nevent[nix].value.str = NULL;
+    nevent[nix].cardinality = 0;
+
+    event_t evt = INT_EVENT(metric, g_ctrs.openPorts.evt, CURRENT, nevent);
+    evt.src = CFG_SRC_NET;
+    cmdSendEvent(g_ctl, &evt, net->uid, &g_proc);
+}
+
+/* Example FS Events
+   {
+   "sourcetype": "fs",
+   "source": "fs.open",
+   "cmd": "foo",
+   "pid": 10831,
+   "host": "hostname",
+   "_time": timestamp,
+   "data": {
+   "file.name": "/usr/lib/ssl/openssl.cnf",
+   "file.perms": 0755,
+   "file.owner": 0,
+   "file.group": 0,
+   "proc.uid": 1000,
+   "proc.gid": 1000,
+   "proc.cgroup": "foo"
+   }
+   }
+
+   {
+   "sourcetype": "fs",
+   "source": "fs.close",
+   "cmd": "foo",
+   "pid": 10831,
+   "host": "hostname",
+   "_time": timestamp,
+   "data": {
+   "file.name": "/usr/lib/ssl/openssl.cnf",
+   "file.perms": 0755,
+   "file.owner": 0,
+   "file.group": 0,
+   "file.read_bytes": 18343,
+   "file.read_ops": 5,
+   "file.write_bytes": 1823,
+   "file.write_ops": 9,
+   "file.errors": 1,
+   "proc.uid": 1000,
+   "proc.gid": 1000,
+   "proc.cgroup": "foo",
+   "duration": 1833
+   }
+   }
+   Note: if we ever want mode values in rwx string format as opposed to octal
+   This will function will return the rwx string: char *mode = osGetFileMode(fs->mode);
+*/
+static void
+doFSOpenEvent(fs_info *fs, const char *op)
+{
+    const char *metric = "fs.open";
+    counters_element_t *numops = &fs->numOpen;
+
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) &&
+        (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
+
+        event_field_t fevent[] = {
+            FILE_EV_NAME(fs->path),
+            PROC_UID(g_proc.uid),
+            PROC_GID(g_proc.gid),
+            PROC_CGROUP(g_proc.cgroup),
+            FILE_EV_MODE(decimalToOctal(fs->mode & (S_IRWXU | S_IRWXG | S_IRWXO))),
+            FILE_OWNER(fs->fuid),
+            FILE_GROUP(fs->fgid),
+            OP_FIELD(op),
+            FIELDEND
+        };
+
+        event_t evt = INT_EVENT(metric, numops->evt, DELTA, fevent);
+        evt.src = CFG_SRC_FS;
+        cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
+    }
+}
+
+static void
+doFSCloseEvent(fs_info *fs, const char *op)
+{
+    const char *metric = "fs.close";
+
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) &&
+        (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
+
+        event_field_t fevent[] = {
+            FILE_EV_NAME(fs->path),
+            PROC_UID(g_proc.uid),
+            PROC_GID(g_proc.gid),
+            PROC_CGROUP(g_proc.cgroup),
+            FILE_EV_MODE(decimalToOctal(fs->mode & (S_IRWXU | S_IRWXG | S_IRWXO))),
+            FILE_OWNER(fs->fuid),
+            FILE_GROUP(fs->fgid),
+            FILE_RD_BYTES(fs->readBytes.evt),
+            FILE_RD_OPS(fs->numRead.evt),
+            FILE_WR_BYTES(fs->writeBytes.evt),
+            FILE_WR_OPS(fs->numWrite.evt),
+            //FILE_ERRS(g_ctrs.fsRdWrErrors.evt), we don't track errs per fd
+            DURATION_FIELD(getFSDuration(fs)),
+            OP_FIELD(op),
+            FIELDEND
+        };
+
+        event_t evt = INT_EVENT(metric, fs->numClose.evt, DELTA, fevent);
+        evt.src = CFG_SRC_FS;
+        cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
+    }
+}
+
 void
 doFSMetric(metric_t type, fs_info *fs, control_type_t source,
            const char *op, ssize_t size, const char *pathname)
@@ -1144,10 +1537,10 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
 
             event_t evt = INT_EVENT("fs.duration", dur, HISTOGRAM, fields);
             cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
-            atomicSwapU64(&fs->numDuration.evt, 0);
-            atomicSwapU64(&fs->totalDuration.evt, 0);
-            //atomicSwapU64(&g_ctrs.fsDurationNum.evt, 0);
-            //atomicSwapU64(&g_ctrs.fsDurationTotal.evt, 0);
+            //atomicSwapU64(&fs->numDuration.evt, 0);
+            //atomicSwapU64(&fs->totalDuration.evt, 0);
+            ////atomicSwapU64(&g_ctrs.fsDurationNum.evt, 0);
+            ////atomicSwapU64(&g_ctrs.fsDurationTotal.evt, 0);
         }
 
         dur = 0ULL;
@@ -1233,9 +1626,9 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
 
             event_t rwMetric = INT_EVENT(metric, sizebytes->evt, HISTOGRAM, fields);
             cmdSendEvent(g_ctl, &rwMetric, fs->uid, &g_proc);
-            atomicSwapU64(&numops->evt, 0);
-            atomicSwapU64(&sizebytes->evt, 0);
-            //atomicSwapU64(global_counter->evt, 0);
+            //atomicSwapU64(&numops->evt, 0);
+            //atomicSwapU64(&sizebytes->evt, 0);
+            ////atomicSwapU64(global_counter->evt, 0);
         }
 
         // Only report if enabled
@@ -1273,6 +1666,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
     case FS_CLOSE:
     case FS_SEEK:
     {
+        bool reported = FALSE;
         const char* metric = "UNKNOWN";
         counters_element_t* numops = NULL;
         counters_element_t* global_counter = NULL;
@@ -1317,11 +1711,29 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         };
 
         // Don't report zeros.
-        if (numops->evt != 0ULL) {
+        if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) && (numops->evt != 0ULL)) {
             event_t evt = INT_EVENT(metric, numops->evt, DELTA, fields);
             cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
-            atomicSwapU64(&numops->evt, 0);
+            reported = TRUE;
         }
+
+        if ((type == FS_OPEN) && (numops->evt != 0ULL)) {
+            doFSOpenEvent(fs, op);
+            reported = TRUE;
+        }
+
+        if ((type == FS_CLOSE) && (numops->evt != 0ULL)) {
+            doFSCloseEvent(fs, op);
+            reported = TRUE;
+            //atomicSwapU64(&fs->numWrite.evt, 0);
+            //atomicSwapU64(&fs->writeBytes.evt, 0);
+            //atomicSwapU64(&fs->numRead.evt, 0);
+            //atomicSwapU64(&fs->readBytes.evt, 0);
+            //atomicSwapU64(&fs->numDuration.evt, 0);
+            //atomicSwapU64(&fs->totalDuration.evt, 0);
+        }
+
+        if (reported == TRUE) atomicSwapU64(&numops->evt, 0);
 
         // Only report if enabled
         if (*summarize && (source == EVENT_BASED)) {
@@ -1661,6 +2073,12 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         break;
     }
 
+    case CONNECTION_OPEN:
+    {
+        doNetOpenEvent(net);
+        break;
+    }
+
     case CONNECTION_DURATION:
     {
         uint64_t dur = 0ULL;
@@ -1688,6 +2106,10 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             atomicSwapU64(&net->numDuration.evt, 0);
             atomicSwapU64(&net->totalDuration.evt, 0);
          }
+
+        if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
+            doNetCloseEvent(net, dur);
+        }
 
         // Only report if enabled
         if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
@@ -1959,8 +2381,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         if (net->txBytes.evt != 0ULL) {
 
             cmdSendEvent(g_ctl, &txMetric, net->uid, &g_proc);
-            atomicSwapU64(&net->numTX.evt, 0);
-            atomicSwapU64(&net->txBytes.evt, 0);
+            //atomicSwapU64(&net->numTX.evt, 0);
+            //atomicSwapU64(&net->txBytes.evt, 0);
         }
 
         // Don't report zeros.
@@ -1994,8 +2416,6 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // For next time
         net->dnsSend = FALSE;
 
-        // TBD - this is only called by doSend.  Consider calling this directly
-        // from there?
         doDNSMetricName(DNS, net->dnsName, 0, NULL);
 
         break;

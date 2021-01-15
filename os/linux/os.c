@@ -605,6 +605,77 @@ osGetPageProt(uint64_t addr)
     return prot;
 }
 
+/*
+ * Example from /proc/<pid>/cgroup:
+   2:freezer:/
+   11:pids:/user.slice/user-1000.slice/user@1000.service
+   10:memory:/user.slice/user-1000.slice/user@1000.service
+   9:cpuset:/
+   8:devices:/user.slice
+   7:net_cls,net_prio:/
+   6:blkio:/user.slice
+   5:perf_event:/
+   4:hugetlb:/
+   3:cpu,cpuacct:/user.slice
+   2:rdma:/
+   1:name=systemd:/user.slice/user-1000.slice/user@1000.service/gnome-launched-emacs.desktop-21457.scope
+   0::/user.slice/user-1000.slice/user@1000.service/gnome-launched-emacs.desktop-21457.scope
+ */
+bool
+osGetCgroup(pid_t pid, char *cgroup, size_t cglen)
+{
+    size_t len = 0;
+    char *buf = NULL;
+    char path[PATH_MAX];
+
+    if (!g_fn.fopen || !g_fn.getline || !g_fn.fclose || (cglen <= 0)) {
+        return FALSE;
+    }
+
+    if (snprintf(path, sizeof(path), "/proc/%d/cgroup", pid) < 0) return FALSE;
+
+    FILE *fstream = g_fn.fopen(path, "r");
+    if (fstream == NULL) return FALSE;
+
+    while (g_fn.getline(&buf, &len, fstream) != -1) {
+        if (buf && strstr(buf, "0::")) {
+            strncpy(cgroup, buf, cglen);
+            char *nonl = strchr(cgroup, '\n');
+            if (nonl) *nonl = '\0';
+
+            free(buf);
+            g_fn.fclose(fstream);
+            return TRUE;
+        }
+
+        if (buf) free(buf);
+        buf = NULL;
+        len = 0;
+    }
+
+    g_fn.fclose(fstream);
+    return FALSE;
+}
+
+char *
+osGetFileMode(mode_t perm)
+{
+    char *mode = malloc(MODE_STR);
+    if (!mode) return NULL;
+
+    mode[0] = (perm & S_IRUSR) ? 'r' : '-';
+    mode[1] = (perm & S_IWUSR) ? 'w' : '-';
+    mode[2] = (perm & S_IXUSR) ? 'x' : '-';
+    mode[3] = (perm & S_IRGRP) ? 'r' : '-';
+    mode[4] = (perm & S_IWGRP) ? 'w' : '-';
+    mode[5] = (perm & S_IXGRP) ? 'x' : '-';
+    mode[6] = (perm & S_IROTH) ? 'r' : '-';
+    mode[7] = (perm & S_IWOTH) ? 'w' : '-';
+    mode[8] = (perm & S_IXOTH) ? 'x' : '-';
+    mode[9] = '\0';
+    return mode;
+}
+
 static const char scope_help_overview[] =
 "OVERVIEW:\n"
 "    The Scope library supports extraction of data from within applications.\n"
@@ -674,8 +745,8 @@ static const char scope_help_configuration[] =
 "            udp://server:123         (server is servername or address;\n"
 "                                      123 is port number or service name)\n"
 "    SCOPE_METRIC_FORMAT\n"
-"        metricstatsd\n"
-"        Default is metricstatsd\n"
+"        statsd, ndjson\n"
+"        Default is statsd\n"
 "    SCOPE_STATSD_PREFIX\n"
 "        Specify a string to be prepended to every scope metric.\n"
 "    SCOPE_STATSD_MAXLEN\n"
@@ -692,47 +763,89 @@ static const char scope_help_configuration[] =
 "        ndjson\n"
 "        Default is ndjson\n"
 "    SCOPE_EVENT_LOGFILE\n"
-"        Create events from logs that match SCOPE_EVENT_LOGFILE_NAME.\n"
+"        Create events from writes to log files.\n"
 "        true,false  Default is false.\n"
 "    SCOPE_EVENT_LOGFILE_NAME\n"
-"        An extended regular expression that describes log file names.\n"
+"        An extended regex to filter log file events by file name.\n"
 "        Only used if SCOPE_EVENT_LOGFILE is true. Default is .*log.*\n"
 "    SCOPE_EVENT_LOGFILE_VALUE\n"
-"        An extended regular expression that describes field values.\n"
+"        An extended regex to filter log file events by field value.\n"
 "        Only used if SCOPE_EVENT_LOGFILE is true. Default is .*\n"
 "    SCOPE_EVENT_CONSOLE\n"
-"        Create events from stdout, stderr.\n"
+"        Create events from writes to stdout, stderr.\n"
 "        true,false  Default is false.\n"
 "    SCOPE_EVENT_CONSOLE_NAME\n"
-"        An extended regular expression that includes stdout, stderr.\n"
+"        An extended regex to filter console events by event name.\n"
 "        Only used if SCOPE_EVENT_CONSOLE is true. Default is .*\n"
 "    SCOPE_EVENT_CONSOLE_VALUE\n"
-"        An extended regular expression that describes field values.\n"
+"        An extended regex to filter console events by field value.\n"
 "        Only used if SCOPE_EVENT_CONSOLE is true. Default is .*\n"
 "    SCOPE_EVENT_METRIC\n"
 "        Create events from metrics.\n"
 "        true,false  Default is false.\n"
 "    SCOPE_EVENT_METRIC_NAME\n"
-"        An extended regular expression that describes metric names.\n"
+"        An extended regex to filter metric events by event name.\n"
 "        Only used if SCOPE_EVENT_METRIC is true. Default is .*\n"
 "    SCOPE_EVENT_METRIC_FIELD\n"
-"        An extended regular expression that describes field names.\n"
+"        An extended regex to filter metric events by field name.\n"
 "        Only used if SCOPE_EVENT_METRIC is true. Default is .*\n"
 "    SCOPE_EVENT_METRIC_VALUE\n"
-"        An extended regular expression that describes field values.\n"
+"        An extended regex to filter metric events by field value.\n"
 "        Only used if SCOPE_EVENT_METRIC is true. Default is .*\n"
 "    SCOPE_EVENT_HTTP\n"
 "        Create events from HTTP headers.\n"
 "        true,false  Default is false.\n"
 "    SCOPE_EVENT_HTTP_NAME\n"
-"        An extended regular expression that describes http names.\n"
+"        An extended regex to filter http events by event name.\n"
 "        Only used if SCOPE_EVENT_HTTP is true. Default is .*\n"
 "    SCOPE_EVENT_HTTP_FIELD\n"
-"        An extended regular expression that describes field names.\n"
+"        An extended regex to filter http events by field name.\n"
 "        Only used if SCOPE_EVENT_HTTP is true. Default is .*\n"
 "    SCOPE_EVENT_HTTP_VALUE\n"
-"        An extended regular expression that describes field values.\n"
+"        An extended regex to filter http events by field value.\n"
 "        Only used if SCOPE_EVENT_HTTP is true. Default is .*\n"
+"    SCOPE_EVENT_NET\n"
+"        Create events describing network connectivity.\n"
+"        true,false  Default is false.\n"
+"    SCOPE_EVENT_NET_NAME\n"
+"        An extended regex to filter network events by event name.\n"
+"        Only used if SCOPE_EVENT_NET is true. Default is .*\n"
+"    SCOPE_EVENT_NET_FIELD\n"
+"        An extended regex to filter network events by field name.\n"
+"        Only used if SCOPE_EVENT_NET is true. Default is .*\n"
+"    SCOPE_EVENT_NET_VALUE\n"
+"        An extended regex to filter network events by field value.\n"
+"        Only used if SCOPE_EVENT_NET is true. Default is .*\n"
+"    SCOPE_EVENT_FS\n"
+"        Create events describing file connectivity.\n"
+"        true,false  Default is false.\n"
+"    SCOPE_EVENT_FS_NAME\n"
+"        An extended regex to filter file events by event name.\n"
+"        Only used if SCOPE_EVENT_FS is true. Default is .*\n"
+"    SCOPE_EVENT_FS_FIELD\n"
+"        An extended regex to filter file events by field name.\n"
+"        Only used if SCOPE_EVENT_FS is true. Default is .*\n"
+"    SCOPE_EVENT_FS_VALUE\n"
+"        An extended regex to filter file events by field value.\n"
+"        Only used if SCOPE_EVENT_FS is true. Default is .*\n"
+"    SCOPE_EVENT_DNS\n"
+"        Create events describing dns activity.\n"
+"        true,false  Default is false.\n"
+"    SCOPE_EVENT_DNS_NAME\n"
+"        An extended regex to filter dns events by event name.\n"
+"        Only used if SCOPE_EVENT_DNS is true. Default is .*\n"
+"    SCOPE_EVENT_DNS_FIELD\n"
+"        An extended regex to filter dns events by field name.\n"
+"        Only used if SCOPE_EVENT_DNS is true. Default is .*\n"
+"    SCOPE_EVENT_DNS_VALUE\n"
+"        An extended regex to filter dns events by field value.\n"
+"        Only used if SCOPE_EVENT_DNS is true. Default is .*\n"
+"    SCOPE_EVENT_MAXEPS\n"
+"        Limits number of events that can be sent in a single second.\n"
+"        0 is \"no limit\", 10000 is the default\n"
+"    SCOPE_ENHANCE_FS\n"
+"        Controls whether uid, gid, and mode are captured for each open.\n"
+"        Only used if SCOPE_EVENT_FS is true. true,false Default is true.\n"
 "    SCOPE_LOG_LEVEL\n"
 "        debug, info, warning, error, none. Default is error.\n"
 "    SCOPE_LOG_DEST\n"

@@ -146,17 +146,23 @@ checkMetric(char *domain)
     int rc = -1, loopcnt = 0;
     char *line = NULL;
     size_t len = 0;
+    struct stat sbuf = {0};
 
     FILE *fp = fopen("/tmp/dnstest.log", "r");
     if (fp == NULL) {
         printf("%s:%d can't open metric file\n", __FUNCTION__, __LINE__);
         return -1;
     }
-    
+
+    while (sbuf.st_size == 0) {
+        sleep(1);
+        fstat(fileno(fp), &sbuf);
+    }
+
     while ((getline(&line, &len, fp) != -1) && (loopcnt < MAXLINES)) {
         if (strstr(line, "net.dns") != NULL) {
             char *key, *value, *end;
-            if ((key = strstr(line, "domain:")) != NULL) {
+                if ((key = strstr(line, "domain:")) != NULL) {
                 if ((value = index(key, ':')) == NULL) break;
                 value += 1;
                 if ((end = index(value, ',')) == NULL) break;
@@ -174,6 +180,8 @@ checkMetric(char *domain)
          * error.
          */
         loopcnt++;
+        if (line) free(line);
+        line = NULL;
     }
 
     if (line) free(line);

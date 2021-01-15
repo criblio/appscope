@@ -30,17 +30,14 @@ func (rc *Config) Run(args []string) {
 	if err := CreateScopec(); err != nil {
 		util.ErrAndExit("error creating scopec: %v", err)
 	}
-	var env []string
 	// Normal operational, not passthrough, create directory for this run
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
+	env := os.Environ()
 	if !rc.Passthrough {
-		env = environNoScope()
 		rc.SetupWorkDir(args)
 		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.workDir, "scope.yml"))
 		log.Info().Bool("passthrough", rc.Passthrough).Strs("args", args).Msg("calling syscall.Exec")
-	} else {
-		env = os.Environ()
 	}
 	syscall.Exec(scopecPath(), append([]string{"scopec"}, args...), env)
 }

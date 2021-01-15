@@ -333,6 +333,38 @@ cfgProcessEnvironmentCommandDir(void** state)
 }
 
 static void
+cfgProcessEnvironmentConfigEvent(void** state)
+{
+    config_t* cfg = cfgCreateDefault();
+    cfgSendProcessStartMsgSet(cfg, FALSE);
+    assert_int_equal(cfgSendProcessStartMsg(cfg), FALSE);
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_CONFIG_EVENT", "true", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgSendProcessStartMsg(cfg), TRUE);
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_CONFIG_EVENT", "false", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgSendProcessStartMsg(cfg), FALSE);
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_CONFIG_EVENT"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgSendProcessStartMsg(cfg), FALSE);
+
+    // unrecognised value should not affect cfg
+    assert_int_equal(setenv("SCOPE_CONFIG_EVENT", "hi!", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgSendProcessStartMsg(cfg), FALSE);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
+static void
 cfgProcessEnvironmentEvtEnable(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -734,6 +766,7 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_STATSD_MAXLEN=1024\n"
         "SCOPE_SUMMARY_PERIOD=11\n"
         "SCOPE_CMD_DIR=/the/path/\n"
+        "SCOPE_CONFIG_EVENT=false\n"
         "SCOPE_METRIC_VERBOSITY=1\n"
         "SCOPE_METRIC_VERBOSITY:prefix\n"     // ignored (no '=')
         "SCOPE_METRIC_VERBOSITY=blah\n"       // processed, but 'blah' isn't int)
@@ -790,6 +823,7 @@ cfgProcessCommandsFromFile(void** state)
     assert_int_equal(cfgMtcStatsDMaxLen(cfg), 1024);
     assert_int_equal(cfgMtcPeriod(cfg), 11);
     assert_string_equal(cfgCmdDir(cfg), "/the/path/");
+    assert_int_equal(cfgSendProcessStartMsg(cfg), FALSE);
     assert_int_equal(cfgMtcVerbosity(cfg), 1);
     assert_string_equal(cfgTransportPath(cfg, CFG_MTC), "/tmp/file.tmp");
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/file.tmp2");
@@ -855,6 +889,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
         "SCOPE_STATSD_MAXLEN=$MAXLEN\n"
         "SCOPE_SUMMARY_PERIOD=$PERIOD\n"
         "SCOPE_CMD_DIR=/$MYHOME/scope/\n"
+        "SCOPE_CONFIG_EVENT=$MASTER_ENABLE\n"
         "SCOPE_METRIC_VERBOSITY=$VERBOSITY\n"
         "SCOPE_LOG_LEVEL=$LOGLEVEL\n"
         "SCOPE_METRIC_DEST=file:///\\$VAR1/$MY_ENV_VAR/\n"
@@ -894,6 +929,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_int_equal(cfgMtcStatsDMaxLen(cfg), 1024);
     assert_int_equal(cfgMtcPeriod(cfg), 11);
     assert_string_equal(cfgCmdDir(cfg), "/home/mydir/scope/");
+    assert_int_equal(cfgSendProcessStartMsg(cfg), FALSE);
     assert_int_equal(cfgMtcVerbosity(cfg), 1);
     // test escaped substitution  (a match preceeded by '\')
     assert_string_equal(cfgTransportPath(cfg, CFG_MTC), "/$VAR1/shorter/");
@@ -943,6 +979,7 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
     assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
+    assert_int_equal       (cfgSendProcessStartMsg(config), DEFAULT_PROCESS_START_MSG);
     assert_int_equal       (cfgEvtEnable(config), DEFAULT_EVT_ENABLE);
     assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
     assert_int_equal       (cfgEvtRateLimit(config), DEFAULT_MAXEVENTSPERSEC);
@@ -1022,6 +1059,11 @@ cfgReadGoodYaml(void** state)
         "    buffering: line\n"
         "event:\n"
         "  enable: true\n"
+        "  transport:\n"
+        "    type: tcp                       # udp, unix, file, syslog\n"
+        "    host: 127.0.0.2\n"
+        "    port: 9009\n"
+        "    buffering: line\n"
         "  format:\n"
         "    type : ndjson                   # ndjson\n"
         "    maxeventpersec : 989898         # max events per second.\n"
@@ -1039,11 +1081,7 @@ cfgReadGoodYaml(void** state)
         "    - type: fs\n"
         "    - type: dns\n"
         "libscope:\n"
-        "  transport:\n"
-        "    type: tcp                       # udp, unix, file, syslog\n"
-        "    host: 127.0.0.2\n"
-        "    port: 9009\n"
-        "    buffering: line\n"
+        "  configevent: true\n"
         "  summaryperiod: 11                 # in seconds\n"
         "  commanddir: /tmp\n"
         "  log:\n"
@@ -1063,6 +1101,7 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgMtcVerbosity(config), 3);
     assert_int_equal(cfgMtcPeriod(config), 11);
     assert_string_equal(cfgCmdDir(config), "/tmp");
+    assert_int_equal(cfgSendProcessStartMsg(config), TRUE);
     assert_int_equal(cfgEvtEnable(config), TRUE);
     assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
     assert_int_equal(cfgEvtRateLimit(config), 989898);
@@ -1216,6 +1255,10 @@ const char* jsonText =
     "  },\n"
     "  'event': {\n"
     "    'enable': 'false',\n"
+    "    'transport': {\n"
+    "      'type': 'file',\n"
+    "      'path': '/var/log/event.log'\n"
+    "    },\n"
     "    'format': {\n"
     "      'type': 'ndjson',\n"
     "      'maxeventpersec': '42',\n"
@@ -1233,10 +1276,7 @@ const char* jsonText =
     "    ]\n"
     "  },\n"
     "  'libscope': {\n"
-    "    'transport': {\n"
-    "      'type': 'file',\n"
-    "      'path': '/var/log/event.log'\n"
-    "    },\n"
+    "    'configevent': 'true',\n"
     "    'summaryperiod': '13',\n"
     "    'log': {\n"
     "      'level': 'debug',\n"
@@ -1260,6 +1300,7 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgMtcStatsDMaxLen(config), 42);
     assert_int_equal(cfgMtcVerbosity(config), 0);
     assert_int_equal(cfgMtcPeriod(config), 13);
+    assert_int_equal(cfgSendProcessStartMsg(config), TRUE);
     assert_int_equal(cfgEvtEnable(config), FALSE);
     assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
     assert_int_equal(cfgEvtRateLimit(config), 42);
@@ -1391,15 +1432,16 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    maxeventpersec : 13579\n"
         "    type : ndjson\n"
         "  enable : false\n"
-        "libscope:\n"
-        "  log:\n"
-        "    level: info\n"
-        "  summaryperiod: 42\n"
         "  transport:\n"
         "    type: syslog                    # udp, unix, file, syslog\n"
         "    host: 127.0.0.2\n"
         "    port: 9009\n"
         "    buffering: line\n"
+        "libscope:\n"
+        "  log:\n"
+        "    level: info\n"
+        "  summaryperiod: 42\n"
+        "  configevent: false\n"
         "metric:\n"
         "  transport:\n"
         "    path: '/var/run/scope.sock'\n"
@@ -1424,6 +1466,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_int_equal(cfgMtcStatsDMaxLen(config), 4294967295);
     assert_int_equal(cfgMtcVerbosity(config), CFG_MAX_VERBOSITY);
     assert_int_equal(cfgMtcPeriod(config), 42);
+    assert_int_equal(cfgSendProcessStartMsg(config), FALSE);
     assert_int_equal(cfgEvtEnable(config), FALSE);
     assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
     assert_int_equal(cfgEvtRateLimit(config), 13579);
@@ -1505,6 +1548,7 @@ cfgReadEnvSubstitution(void** state)
         "    port: 9009\n"
         "    buffering: line\n"
         "  summaryperiod: $PERIOD\n"
+        "  configevent: $MASTER_ENABLE\n"
         "  commanddir: /$MYHOME/scope/\n"
         "  log:\n"
         "    level: $LOGLEVEL\n"
@@ -1523,6 +1567,7 @@ cfgReadEnvSubstitution(void** state)
     assert_int_equal(cfgMtcStatsDMaxLen(cfg), 1024);
     assert_int_equal(cfgMtcPeriod(cfg), 11);
     assert_string_equal(cfgCmdDir(cfg), "/home/mydir/scope/");
+    assert_int_equal(cfgSendProcessStartMsg(cfg), TRUE);
     assert_int_equal(cfgMtcVerbosity(cfg), 1);
     // test escaped substitution  (a match preceeded by '\')
     assert_string_equal(cfgTransportPath(cfg, CFG_MTC), "/$VAR1/shorter/");
@@ -1760,6 +1805,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgProcessEnvironmentStatsDMaxLen),
         cmocka_unit_test(cfgProcessEnvironmentMtcPeriod),
         cmocka_unit_test(cfgProcessEnvironmentCommandDir),
+        cmocka_unit_test(cfgProcessEnvironmentConfigEvent),
         cmocka_unit_test(cfgProcessEnvironmentEvtEnable),
         cmocka_unit_test(cfgProcessEnvironmentEventFormat),
         cmocka_unit_test(cfgProcessEnvironmentMaxEps),

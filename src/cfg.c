@@ -29,7 +29,6 @@ struct _config_t
         } statsd;
         unsigned period;
         unsigned verbosity;
-        char* commanddir;
     } mtc;
 
     struct {
@@ -52,6 +51,8 @@ struct _config_t
     custom_tag_t** tags;
     unsigned max_tags;
 
+    char* commanddir;
+    unsigned processstartmsg;
     unsigned enhancefs;
 };
 
@@ -168,7 +169,6 @@ cfgCreateDefault()
     c->mtc.statsd.maxlen = DEFAULT_STATSD_MAX_LEN;
     c->mtc.period = DEFAULT_SUMMARY_PERIOD;
     c->mtc.verbosity = DEFAULT_MTC_VERBOSITY;
-    c->mtc.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
     c->evt.enable = DEFAULT_EVT_ENABLE;
     c->evt.format = DEFAULT_CTL_FORMAT;
     c->evt.ratelimit = DEFAULT_MAXEVENTSPERSEC;
@@ -199,6 +199,9 @@ cfgCreateDefault()
     c->tags = DEFAULT_TAGS;
     c->max_tags = DEFAULT_NUM_TAGS;
     c->log.level = DEFAULT_LOG_LEVEL;
+
+    c->commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
+    c->processstartmsg = DEFAULT_PROCESS_START_MSG;
     c->enhancefs = DEFAULT_ENHANCE_FS;
 
     return c;
@@ -210,7 +213,7 @@ cfgDestroy(config_t** cfg)
     if (!cfg || !*cfg) return;
     config_t* c = *cfg;
     if (c->mtc.statsd.prefix) free(c->mtc.statsd.prefix);
-    if (c->mtc.commanddir) free(c->mtc.commanddir);
+    if (c->commanddir) free(c->commanddir);
 
     watch_t src;
     for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
@@ -276,7 +279,13 @@ cfgMtcPeriod(config_t* cfg)
 const char *
 cfgCmdDir(config_t* cfg)
 {
-    return (cfg) ? cfg->mtc.commanddir : DEFAULT_COMMAND_DIR;
+    return (cfg) ? cfg->commanddir : DEFAULT_COMMAND_DIR;
+}
+
+unsigned
+cfgSendProcessStartMsg(config_t* cfg)
+{
+    return (cfg) ? cfg->processstartmsg : DEFAULT_PROCESS_START_MSG;
 }
 
 unsigned
@@ -517,13 +526,20 @@ void
 cfgCmdDirSet(config_t* cfg, const char* path)
 {
     if (!cfg) return;
-    if (cfg->mtc.commanddir) free(cfg->mtc.commanddir);
+    if (cfg->commanddir) free(cfg->commanddir);
     if (!path || (path[0] == '\0')) {
-        cfg->mtc.commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
+        cfg->commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
         return;
     }
 
-    cfg->mtc.commanddir = strdup(path);
+    cfg->commanddir = strdup(path);
+}
+
+void
+cfgSendProcessStartMsgSet(config_t* cfg, unsigned val)
+{
+    if (!cfg || val > 1) return;
+    cfg->processstartmsg = val;
 }
 
 void

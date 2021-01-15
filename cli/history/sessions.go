@@ -60,7 +60,7 @@ func GetSessions() (ret SessionList) {
 			ArgsPath:    filepath.Join(workDir, "args.json"),
 			CmdDirPath:  filepath.Join(workDir, "cmd"),
 			EventsPath:  filepath.Join(workDir, "events.json"),
-			MetricsPath: filepath.Join(workDir, "metrics.dogstatsd"),
+			MetricsPath: filepath.Join(workDir, "metrics.json"),
 		})
 	}
 	sort.Slice(ret, func(i, j int) bool { return ret[i].ID < ret[j].ID })

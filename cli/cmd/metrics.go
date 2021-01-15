@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/criblio/scope/metrics"
 	"github.com/criblio/scope/util"
@@ -93,9 +94,12 @@ var metricsCmd = &cobra.Command{
 			{Name: "Value", Field: "value"},
 			{Name: "Type", Field: "type"},
 			{Name: "Unit", Field: "unit"},
+			{Name: "PID", Field: "pid"},
 			{Name: "Tags", Field: "tags", Transform: func(obj interface{}) string {
 				ret := ""
-				for _, t := range obj.([]metrics.MetricTag) {
+				tags := obj.([]metrics.MetricTag)
+				sort.Slice(tags, func(i, j int) bool { return tags[i].Name < tags[j].Name })
+				for _, t := range tags {
 					ret += fmt.Sprintf("%s: %s,", t.Name, t.Value)
 				}
 				if len(ret) > 0 {

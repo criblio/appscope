@@ -24,9 +24,10 @@ type ScopeMetricConfig struct {
 
 // ScopeEventConfig represents how to output events
 type ScopeEventConfig struct {
-	Enable bool               `mapstructure:"enable" json:"enable" yaml:"enable"`
-	Format ScopeOutputFormat  `mapstructure:"format" json:"format" yaml:"format"`
-	Watch  []ScopeWatchConfig `mapstructure:"watch" json:"watch" yaml:"watch"`
+	Enable    bool               `mapstructure:"enable" json:"enable" yaml:"enable"`
+	Format    ScopeOutputFormat  `mapstructure:"format" json:"format" yaml:"format"`
+	Transport ScopeTransport     `mapstructure:"transport" json:"transport" yaml:"transport"`
+	Watch     []ScopeWatchConfig `mapstructure:"watch" json:"watch" yaml:"watch"`
 }
 
 // ScopeWatchConfig represents a watch configuration
@@ -40,7 +41,7 @@ type ScopeWatchConfig struct {
 // ScopeLibscopeConfig represents how to configure libscope
 type ScopeLibscopeConfig struct {
 	Level         string         `mapstructure:"level" json:"level" yaml:"level"`
-	Transport     ScopeTransport `mapstructure:"transport" json:"transport" yaml:"transport"`
+	ConfigEvent   bool           `mapstructure:"configevent" json:"configevent" yaml:"configevent"`
 	SummaryPeriod int            `mapstructure:"summaryperiod" jaon:"summaryperiod" yaml:"summaryperiod"`
 	CommandDir    string         `mapstructure:"commanddir" json:"commanddir" yaml:"commanddir"`
 	Log           ScopeLogConfig `mapstructure:"log" json:"log" yaml:"log"`
@@ -88,6 +89,10 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 			Format: ScopeOutputFormat{
 				FormatType: "ndjson",
 			},
+			Transport: ScopeTransport{
+				TransportType: "file",
+				Path:          filepath.Join(workDir, "events.json"),
+			},
 			Watch: []ScopeWatchConfig{
 				{
 					WatchType: "file",
@@ -131,12 +136,9 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 			},
 		},
 		Libscope: ScopeLibscopeConfig{
-			Transport: ScopeTransport{
-				TransportType: "file",
-				Path:          filepath.Join(workDir, "events.json"),
-			},
 			SummaryPeriod: 10,
 			CommandDir:    filepath.Join(workDir, "cmd"),
+			ConfigEvent:   false,
 			Log: ScopeLogConfig{
 				Level: "error",
 				Transport: ScopeTransport{

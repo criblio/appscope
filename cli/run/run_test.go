@@ -157,6 +157,9 @@ event:
   enable: true
   format:
     type: ndjson
+  transport:
+    type: file
+    path: EVENTSPATH
   watch:
   - type: file
     name: .*log.*
@@ -182,9 +185,7 @@ event:
     value: .*
 libscope:
   level: ""
-  transport:
-    type: file
-    path: EVENTSPATH
+  configevent: false
   summaryperiod: 10
   commanddir: CMDDIR
   log:

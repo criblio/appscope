@@ -115,8 +115,7 @@ headerBasicRequest(void **state)
                        "\"http.flavor\":\"1.1\"",
                        "\"http.scheme\":\"https\"",
                        "\"http.host\":\"localhost:4430\"",
-                       "\"http.user_agent\":\"curl/7.68.0\"",
-                       "\"net.host.name\":\"thisHostName\""
+                       "\"http.user_agent\":\"curl/7.68.0\""
                      };
     size_t buflen = strlen(request);
 
@@ -125,10 +124,10 @@ headerBasicRequest(void **state)
     net.type = SOCK_STREAM;
 
     assert_true(doHttp(0x12345, 0, &net, request, buflen, TLSRX, BUF));
-    //printf("%s: %s\n", __FUNCTION__, header_event);
+    printf("%s: %s\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
-        // printf("looking for %s\n", result[i]);
+         printf("looking for %s\n", result[i]);
         assert_non_null(strstr(header_event, result[i]));
     }
     free(header_event);
@@ -143,7 +142,6 @@ headerBasicResponse(void **state)
         "\"http.status_code\":200",
         "\"http.status_text\":\"OK blah blah now is the time for a response\"",
         "\"http.server.duration\":0",
-        "\"net.host.name\":\"thisHostName\"",
     };
 
     net_info net = {0};
@@ -172,7 +170,6 @@ headerRequestIP(void **state)
         "\"http.host\":\"localhost:4430\"",
         "\"http.user_agent\":\"curl/7.68.0\"",
         "\"http.client_ip\":\"192.7.7.7\"",
-        "\"net.host.name\":\"thisHostName\"",
         "\"net.transport\":\"IP.TCP\"",
         "\"net.peer.ip\":\"192.1.2.99\"",
         "\"net.peer.port\":\"24862\"",
@@ -202,7 +199,6 @@ headerResponseIP(void **state)
         "\"http.status_code\":777",
         "\"http.status_text\":\"Not OK\"",
         "\"http.server.duration\":0",
-        "\"net.host.name\":\"thisHostName\"",
         "\"net.transport\":\"IP.TCP\"",
         "\"net.peer.ip\":\"192.1.2.99\"",
         "\"net.peer.port\":\"24862\"",
@@ -235,7 +231,6 @@ headerRequestUnix(void **state)
         "\"http.host\":\"localhost:4430\"",
         "\"http.user_agent\":\"curl/7.68.0\"",
         "\"http.client_ip\":\"192.7.7.7\"",
-        "\"net.host.name\":\"thisHostName\"",
         "\"net.transport\":\"Unix.TCP\"",
         "\"http.request_content_length\":12345"
     };

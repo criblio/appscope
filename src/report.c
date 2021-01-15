@@ -200,31 +200,6 @@ getProtocol(int type, char *proto, size_t len)
     return 0;
 }
 
-void
-doUnixEndpoint(int sd, net_info *net)
-{
-    ino_t rnode;
-    struct stat sbuf;
-
-    if (!net) return;
-
-    if ((fstat(sd, &sbuf) == -1) ||
-        ((sbuf.st_mode & S_IFMT) != S_IFSOCK)) {
-        net->lnode = 0;
-        net->rnode = 0;
-        return;
-    }
-
-    if ((rnode = osUnixSockPeer(sbuf.st_ino)) != -1) {
-        net->lnode = sbuf.st_ino;
-        net->rnode = rnode;
-    } else {
-        net->lnode = 0;
-        net->rnode = 0;
-    }
-    return;
-}
-
 static bool
 getConn(struct sockaddr_storage *conn, char *addr, size_t alen, char *port, size_t plen)
 {
@@ -325,11 +300,16 @@ getNetInternals(net_info *net, int type,
         }
 
         if (net) {
-            H_VALUE(fields[*ix], "unix.peer", net->rnode, 1);
+            H_VALUE(fields[*ix], "unix.peer.inode", net->rnode, 1);
             NEXT_FLD(*ix, maxfld);
-            H_VALUE(fields[*ix], "unix.host", net->lnode, 1);
+            H_VALUE(fields[*ix], "unix.local.inode", net->lnode, 1);
             NEXT_FLD(*ix, maxfld);
         }
+    }
+
+    if (net && net->dnsName[0]) {
+        H_ATTRIB(fields[*ix], "net.peer.name", net->dnsName, 1);
+        NEXT_FLD(*ix, maxfld);
     }
 
     return TRUE;
@@ -439,9 +419,6 @@ httpFieldsInternal(event_field_t *fields, http_report *hreport, protocol_info *p
     HTTP_NEXT_FLD(hreport->ix);
 
     // Next, add net fields from internal state
-    H_ATTRIB(fields[hreport->ix], "net.host.name", g_proc.hostname, 1);
-    HTTP_NEXT_FLD(hreport->ix);
-
     if (proto->sock_type != -1) {
         getNetInternals(NULL, proto->sock_type,
                         &proto->localConn, &proto->remoteConn,
@@ -1275,7 +1252,7 @@ getNetPtotocol(net_info *net, event_field_t *nevent, int *ix)
     "net.peer.name": wttr.in,
     "net.host.ip": "172.17.0.2",
     "net.host.port": 49202,
-    "net.host.name": "scope-vm",
+    "net.host.name": "scope-vm", (removed as redunant with host)
     "net.protocol": "http",
   },
   "_time": timestamp
@@ -1290,19 +1267,15 @@ doNetOpenEvent(net_info *net)
     char lport[8];
     char raddr[INET6_ADDRSTRLEN];
     char laddr[INET6_ADDRSTRLEN];
-
     event_field_t nevent[NET_MAX_FIELDS];
+
+    if (net->type != SOCK_STREAM) return;
 
     getNetInternals(net, net->type,
                     &net->localConn, &net->remoteConn,
                     laddr, raddr, sizeof(raddr),
                     lport, rport, sizeof(rport),
                     nevent, &nix, NET_MAX_FIELDS);
-
-    if (net->dnsName[0] != 0) {
-        H_ATTRIB(nevent[nix], "net.host.name", net->dnsName, 1);
-        NEXT_FLD(nix, NET_MAX_FIELDS);
-    }
 
     getNetPtotocol(net, nevent, &nix);
 
@@ -1330,7 +1303,7 @@ doNetOpenEvent(net_info *net)
     "net.peer.name": wttr.in,
     "net.host.ip": "172.17.0.2",
     "net.host.port": 49202,
-    "net.host.name": "scope-vm",
+    "net.host.name": "scope-vm", (removed as redunant with host)
     "net.protocol": "http",
     "duration": 243,
     "net.close.reason": "normal",
@@ -1360,11 +1333,6 @@ doNetCloseEvent(net_info *net, uint64_t dur)
                     laddr, raddr, sizeof(raddr),
                     lport, rport, sizeof(rport),
                     nevent, &nix, NET_MAX_FIELDS);
-
-    if (net->dnsName[0] != 0) {
-        H_ATTRIB(nevent[nix], "net.host.name", net->dnsName, 1);
-        NEXT_FLD(nix, NET_MAX_FIELDS);
-    }
 
     if (net->http.state != HTTP_NONE) {
         H_ATTRIB(nevent[nix], "net.protocol", "http", 1);
@@ -1435,7 +1403,7 @@ doNetCloseEvent(net_info *net, uint64_t dur)
    "file.read_ops": 5,
    "file.write_bytes": 1823,
    "file.write_ops": 9,
-   "file.errors": 1,
+   "file.errors": 1, (removed until we support errs per fd)
    "proc.uid": 1000,
    "proc.gid": 1000,
    "proc.cgroup": "foo",

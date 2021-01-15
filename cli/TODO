@@ -2,7 +2,7 @@
 * Option for run to output metric and/or event data on stderr
 * Payload support
 * TermDash UI
-* Port cscope run implementation to golang
+* Port scopec run implementation to golang
 * Signal to running process, turn up instrumentation (CRIBL-4127)
 * Metrics and Events summary view from what came out
 * Summary view across runs

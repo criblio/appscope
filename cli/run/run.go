@@ -27,8 +27,8 @@ type Config struct {
 
 // Run executes a scoped command
 func (rc *Config) Run(args []string) {
-	if err := CreateCScope(); err != nil {
-		util.ErrAndExit("error creating cscope: %v", err)
+	if err := CreateScopec(); err != nil {
+		util.ErrAndExit("error creating scopec: %v", err)
 	}
 	var env []string
 	// Normal operational, not passthrough, create directory for this run
@@ -42,23 +42,26 @@ func (rc *Config) Run(args []string) {
 	} else {
 		env = os.Environ()
 	}
-	syscall.Exec(cscopePath(), append([]string{"cscope"}, args...), env)
+	syscall.Exec(scopecPath(), append([]string{"scopec"}, args...), env)
 }
 
-func cscopePath() string {
-	return filepath.Join(util.ScopeHome(), "cscope")
+func scopecPath() string {
+	return filepath.Join(util.ScopeHome(), "scopec")
 }
 
-// CreateCScope creates libwrap.so in BOLTON_TMPDIR
-func CreateCScope() error {
-	cscope := cscopePath()
+// CreateScopec creates libwrap.so in BOLTON_TMPDIR
+func CreateScopec() error {
+	scopec := scopecPath()
+	scopecInfo, _ := buildScopec()
 
 	// If it exists, don't create
-	if _, err := os.Stat(cscope); err == nil {
-		return nil
+	if stat, err := os.Stat(scopec); err == nil {
+		if stat.ModTime() == scopecInfo.info.ModTime() {
+			return nil
+		}
 	}
 
-	b, err := buildCscopeBytes()
+	b, err := buildScopecBytes()
 	if err != nil {
 		return err
 	}
@@ -68,11 +71,15 @@ func CreateCScope() error {
 		return err
 	}
 
-	err = ioutil.WriteFile(cscope, b, 0755)
+	err = ioutil.WriteFile(scopec, b, 0755)
 	if err != nil {
 		return err
 	}
-	log.Info().Str("cscope", cscope).Msg("created cscope")
+	err = os.Chtimes(scopec, scopecInfo.info.ModTime(), scopecInfo.info.ModTime())
+	if err != nil {
+		return err
+	}
+	log.Info().Str("scopec", scopec).Msg("created scopec")
 	return nil
 }
 

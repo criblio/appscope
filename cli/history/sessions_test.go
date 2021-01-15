@@ -2,8 +2,12 @@ package history
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,7 +38,23 @@ func TestGetSessions(t *testing.T) {
 	cmd.Env = append(os.Environ(), "TEST_MAIN=run", "SCOPE_HOME=.test", "SCOPE_TEST=true")
 	err := cmd.Run()
 	assert.NoError(t, err)
-	wd := fmt.Sprintf("%s_%d_%d_%d", ".test/history/echo", 1, cmd.Process.Pid, 0)
+	files, err := ioutil.ReadDir(".test/history")
+	matched := false
+	wdbase := fmt.Sprintf("%s_%d_%d", "echo", 1, cmd.Process.Pid)
+	var wd string
+	var ts int
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), wdbase) {
+			matched = true
+			pattern := fmt.Sprintf("%s_(\\d+)", wdbase)
+			r := regexp.MustCompile(pattern)
+			matchTS := r.FindStringSubmatch(f.Name())
+			ts, _ = strconv.Atoi(matchTS[1])
+			wd = fmt.Sprintf("%s%s", ".test/history/", f.Name())
+			break
+		}
+	}
+	assert.True(t, matched)
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 
@@ -48,7 +68,7 @@ func TestGetSessions(t *testing.T) {
 	assert.Equal(t, "echo", sessions[0].Cmd)
 	assert.Equal(t, 1, sessions[0].ID)
 	assert.Equal(t, cmd.Process.Pid, sessions[0].Pid)
-	assert.Equal(t, int64(0), sessions[0].Timestamp)
+	assert.Equal(t, int64(ts), sessions[0].Timestamp)
 
 	// assert.True(t, util.CheckFileExists(".test"))
 	os.RemoveAll(".test")

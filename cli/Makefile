@@ -23,14 +23,14 @@ rebuild: clean all
 local:
 	cd $(DIR) && $(GO) build -o /usr/local/bin/scope
 
-run/cscope.go:
-	cp $(DIR)../bin/linux/cscope $(DIR)build/
-	cd $(DIR) && go-bindata -o run/cscope.go -pkg run build/cscope
+run/scopec.go:
+	cp $(DIR)../bin/linux/scopec $(DIR)build/
+	cd $(DIR) && go-bindata -o run/scopec.go -pkg run build/scopec
 
-scope: run/cscope.go
+scope: run/scopec.go
 	# GOOS=linux CGO_ENABLED=0 $(GO) build -a -tags netgo -ldflags="-s -w" -o build/scope
 	cd $(DIR) && GOOS=linux $(GO) build -o $(DIR)build/scope 
-	upx -9 build/scope
+	upx -9 $(DIR)build/scope
 
 install: 
 	cp $(DIR)build/scope /usr/local/bin/scope

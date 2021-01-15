@@ -32,7 +32,7 @@ func Execute() {
 				}
 			}
 
-			// If we're not a known command, exec cscope
+			// If we're not a known command, exec scopec
 			internal.InitConfig()
 			rc := run.Config{}
 			rc.Run(os.Args[1:])

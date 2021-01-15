@@ -27,7 +27,7 @@ var runCmd = &cobra.Command{
 }
 
 func init() {
-	runCmd.Flags().BoolP("passthrough", "p", false, "Runs cscope with current environment & no config.")
+	runCmd.Flags().BoolP("passthrough", "p", false, "Runs scopec with current environment & no config.")
 	runCmd.Flags().IntP("verbosity", "v", 4, "Set scope metric verbosity")
 	// This may be a bad assumption, if we have any args preceding this it might fail
 	runCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {

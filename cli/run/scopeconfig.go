@@ -33,6 +33,7 @@ type ScopeEventConfig struct {
 type ScopeWatchConfig struct {
 	WatchType string `mapstructure:"type" json:"type" yaml:"type"`
 	Name      string `mapstructure:"name" json:"name" yaml:"name"`
+	Field     string `mapstructure:"field,omitempty" json:"field,omitempty" yaml:"field,omitempty"`
 	Value     string `mapstructure:"value" json:"value" yaml:"value"`
 }
 
@@ -74,12 +75,12 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 		Metric: ScopeMetricConfig{
 			Enable: true,
 			Format: ScopeOutputFormat{
-				FormatType: "metricjson",
+				FormatType: "ndjson",
 				Verbosity:  4,
 			},
 			Transport: ScopeTransport{
 				TransportType: "file",
-				Path:          filepath.Join(workDir, "metrics.dogstatsd"),
+				Path:          filepath.Join(workDir, "metrics.json"),
 			},
 		},
 		Event: ScopeEventConfig{
@@ -101,6 +102,25 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 				{
 					WatchType: "http",
 					Name:      ".*",
+					Field:     ".*",
+					Value:     ".*",
+				},
+				{
+					WatchType: "net",
+					Name:      ".*",
+					Field:     ".*",
+					Value:     ".*",
+				},
+				{
+					WatchType: "fs",
+					Name:      ".*",
+					Field:     ".*",
+					Value:     ".*",
+				},
+				{
+					WatchType: "dns",
+					Name:      ".*",
+					Field:     ".*",
 					Value:     ".*",
 				},
 				// {
@@ -121,7 +141,7 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 				Level: "error",
 				Transport: ScopeTransport{
 					TransportType: "file",
-					Path:          filepath.Join(workDir, "cscope.log"),
+					Path:          filepath.Join(workDir, "scopec.log"),
 					Buffering:     "line",
 				},
 			},

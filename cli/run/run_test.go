@@ -19,27 +19,36 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateCScope(t *testing.T) {
-	tmpCScope := filepath.Join(".foo", "cscope")
+func TestCreateScopec(t *testing.T) {
+	tmpScopec := filepath.Join(".foo", "scopec")
 	os.Setenv("SCOPE_HOME", ".foo")
 	internal.InitConfig()
-	err := CreateCScope()
+	err := CreateScopec()
 	os.Unsetenv("SCOPE_HOME")
 	assert.NoError(t, err)
 
-	wb, _ := buildCscopeBytes()
+	wb, _ := buildScopecBytes()
 	hash1 := md5.Sum(wb)
-	fb, _ := ioutil.ReadFile(tmpCScope)
+	fb, _ := ioutil.ReadFile(tmpScopec)
 	hash2 := md5.Sum(fb)
 	assert.Equal(t, hash1, hash2)
 
-	fb, _ = ioutil.ReadFile("../build/cscope")
+	fb, _ = ioutil.ReadFile("../build/scopec")
 	hash3 := md5.Sum(fb)
 	assert.Equal(t, hash2, hash3)
 
 	// Call again, should use cached copy
-	err = CreateCScope()
+	err = CreateScopec()
 	assert.NoError(t, err)
+
+	os.Chtimes(tmpScopec, time.Now(), time.Now())
+	scopecInfo, _ := buildScopec()
+	stat, _ := os.Stat(tmpScopec)
+	assert.NotEqual(t, scopecInfo.info.ModTime(), stat.ModTime())
+	err = CreateScopec()
+	assert.NoError(t, err)
+	stat, _ = os.Stat(tmpScopec)
+	assert.Equal(t, scopecInfo.info.ModTime(), stat.ModTime())
 
 	os.RemoveAll(".foo")
 
@@ -139,7 +148,7 @@ func testDefaultScopeConfigYaml(wd string, verbosity int) string {
 	expectedYaml := `metric:
   enable: true
   format:
-    type: metricjson
+    type: ndjson
     verbosity: VERBOSITY
   transport:
     type: file
@@ -157,6 +166,19 @@ event:
     value: .*
   - type: http
     name: .*
+    field: .*
+    value: .*
+  - type: net
+    name: .*
+    field: .*
+    value: .*
+  - type: fs
+    name: .*
+    field: .*
+    value: .*
+  - type: dns
+    name: .*
+    field: .*
     value: .*
 libscope:
   level: ""
@@ -169,15 +191,15 @@ libscope:
     level: error
     transport:
       type: file
-      path: CSCOPELOGPATH
+      path: SCOPECLOGPATH
       buffering: line
 `
 
 	expectedYaml = strings.Replace(expectedYaml, "VERBOSITY", strconv.Itoa(verbosity), 1)
-	expectedYaml = strings.Replace(expectedYaml, "METRICSPATH", filepath.Join(wd, "metrics.dogstatsd"), 1)
+	expectedYaml = strings.Replace(expectedYaml, "METRICSPATH", filepath.Join(wd, "metrics.json"), 1)
 	expectedYaml = strings.Replace(expectedYaml, "EVENTSPATH", filepath.Join(wd, "events.json"), 1)
 	expectedYaml = strings.Replace(expectedYaml, "CMDDIR", filepath.Join(wd, "cmd"), 1)
-	expectedYaml = strings.Replace(expectedYaml, "CSCOPELOGPATH", filepath.Join(wd, "cscope.log"), 1)
+	expectedYaml = strings.Replace(expectedYaml, "SCOPECLOGPATH", filepath.Join(wd, "scopec.log"), 1)
 	return expectedYaml
 }
 

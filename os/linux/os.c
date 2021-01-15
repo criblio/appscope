@@ -859,7 +859,7 @@ static const char scope_help_configuration[] =
 "        See Dynamic Configuration below.\n"
 "        Default is /tmp\n"
 "    SCOPE_CONFIG_EVENT\n"
-"        Sends s single process-identifying event when a transport\n"
+"        Sends a single process-identifying event when a transport\n"
 "        connection is established.  true,false  Default is true\n"
 "\n"
 "    Dynamic Configuration:\n"

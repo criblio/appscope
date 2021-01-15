@@ -40,6 +40,7 @@
 #define TRANSPORT_NODE               "transport"
 #define SUMMARYPERIOD_NODE       "summaryperiod"
 #define COMMANDDIR_NODE          "commanddir"
+#define CFGEVENT_NODE            "configevent"
 
 #define EVENT_NODE           "event"
 #define TRANSPORT_NODE           "transport"
@@ -133,6 +134,7 @@ void cfgMtcStatsDPrefixSetFromStr(config_t*, const char*);
 void cfgMtcStatsDMaxLenSetFromStr(config_t*, const char*);
 void cfgMtcPeriodSetFromStr(config_t*, const char*);
 void cfgCmdDirSetFromStr(config_t*, const char*);
+void cfgConfigEventSetFromStr(config_t*, const char*);
 void cfgEvtEnableSetFromStr(config_t*, const char*);
 void cfgEventFormatSetFromStr(config_t*, const char*);
 void cfgEvtRateLimitSetFromStr(config_t*, const char*);
@@ -409,6 +411,8 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgMtcPeriodSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_CMD_DIR")) {
         cfgCmdDirSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_CONFIG_EVENT")) {
+        cfgConfigEventSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_METRIC_VERBOSITY")) {
         cfgMtcVerbositySetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_LOG_LEVEL")) {
@@ -595,6 +599,13 @@ cfgCmdDirSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     cfgCmdDirSet(cfg, value);
+}
+
+void
+cfgConfigEventSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgSendProcessStartMsgSet(cfg, strToVal(boolMap, value));
 }
 
 void
@@ -1014,6 +1025,14 @@ processCommandDir(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
+processConfigEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char* value = stringVal(node);
+    cfgConfigEventSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
 processMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_MAPPING_NODE) return;
@@ -1183,6 +1202,7 @@ processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_MAPPING_NODE,   LOG_NODE,             processLogging},
         {YAML_SCALAR_NODE,    SUMMARYPERIOD_NODE,   processSummaryPeriod},
         {YAML_SCALAR_NODE,    COMMANDDIR_NODE,      processCommandDir},
+        {YAML_SCALAR_NODE,    CFGEVENT_NODE,        processConfigEvent},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1524,6 +1544,9 @@ createLibscopeJson(config_t* cfg)
 
     if (!(log = createLogJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, LOG_NODE, log);
+
+    if (!cJSON_AddStringToObjLN(root, CFGEVENT_NODE,
+                 valToStr(boolMap, cfgSendProcessStartMsg(cfg)))) goto err;
 
     if (!cJSON_AddNumberToObjLN(root, SUMMARYPERIOD_NODE,
                                       cfgMtcPeriod(cfg))) goto err;

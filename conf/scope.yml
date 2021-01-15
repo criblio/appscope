@@ -104,6 +104,7 @@ event:
 
 
 libscope:
+  configevent: true                 # true, false
   summaryperiod : 10                # in seconds
   commanddir : '/tmp'
   #  commanddir supports changes to configuration settings of running

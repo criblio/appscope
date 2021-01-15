@@ -121,6 +121,7 @@ typedef unsigned int bool;
 #define DEFAULT_PORTBLOCK 0
 #define DEFAULT_METRIC_CBUF_SIZE 50 * 1024
 #define DEFAULT_LOG_PATH "/tmp/scope.log"
+#define DEFAULT_PROCESS_START_MSG TRUE
 
 /*
  * This calculation is not what we need in the long run.

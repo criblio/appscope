@@ -9,19 +9,20 @@ import (
 )
 
 // NewlineReader reads from an io.Reader, matches against a given callback, and calls a callback with the line number and bytes
-func NewlineReader(r io.Reader, match func(string) bool, callback func(line int, b []byte) error) (int, error) {
+func NewlineReader(r io.Reader, match func(string) bool, callback func(line int, offset int, b []byte) error) (int, error) {
 	cr := &CountingReader{Reader: r}
 	scanner := bufio.NewScanner(cr)
 	idx := 0
+	offset := 0
 	for scanner.Scan() {
 		idx++
-		if !match(scanner.Text()) {
-			continue
+		if match(scanner.Text()) {
+			err := callback(idx, offset, scanner.Bytes())
+			if err != nil {
+				return cr.BytesRead, err
+			}
 		}
-		err := callback(idx, scanner.Bytes())
-		if err != nil {
-			return cr.BytesRead, err
-		}
+		offset += len(scanner.Bytes()) + 1 // bad assumption here with newline length 1 but lazy right now
 	}
 
 	if err := scanner.Err(); err != nil {

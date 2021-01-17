@@ -15,7 +15,7 @@ func TestReader(t *testing.T) {
 	in := make(chan map[string]interface{})
 
 	r := bytes.NewBuffer([]byte(rawEvent))
-	go Reader(r, util.MatchAlways, in)
+	go Reader(r, 0, util.MatchAlways, in)
 
 	event := <-in
 
@@ -45,7 +45,7 @@ func TestReaderWithFilter(t *testing.T) {
 	testFilter := func(filter func(string) bool, len int) {
 		in := make(chan map[string]interface{})
 		r := bytes.NewBuffer([]byte(rawEvent))
-		go Reader(r, filter, in)
+		go Reader(r, 0, filter, in)
 		events := []map[string]interface{}{}
 		for e := range in {
 			events = append(events, e)

@@ -2,13 +2,16 @@ package cmd
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"sort"
 
+	linq "github.com/ahmetb/go-linq/v3"
 	"github.com/criblio/scope/metrics"
 	"github.com/criblio/scope/util"
 	"github.com/guptarohit/asciigraph"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 // metricsCmd represents the metrics command
@@ -54,8 +57,12 @@ var metricsCmd = &cobra.Command{
 		metricCols := []map[string]interface{}{}
 		mm := []metrics.Metric{}
 
+		firstMetric := ""
 		for m := range in {
-			if cols && m.Name == "proc.cpu" { // use proc.cpu as a breaker for batches of metrics
+			if firstMetric == "" {
+				firstMetric = m.Name
+			}
+			if cols && m.Name == firstMetric { // use first metric as a breaker for batches of metrics
 				metricCols = append(metricCols, map[string]interface{}{})
 			}
 			if len(names) > 0 {
@@ -76,7 +83,22 @@ var metricsCmd = &cobra.Command{
 		}
 
 		if graph {
-			fmt.Println(asciigraph.Plot(values, asciigraph.Height(20)))
+			termWidth, _, err := terminal.GetSize(0)
+			util.CheckErrSprintf(err, "error getting terminal width: %v", err)
+
+			q := linq.From(values)
+			max := q.Max().(float64)
+			legendSize := len(fmt.Sprintf("%.0f", max)) + 4
+			maxValues := termWidth - legendSize
+			sampleRate := int(math.Round(float64(len(values)) / float64(maxValues)))
+
+			var newValues []float64
+			q.WhereIndexed(
+				func(idx int, _ interface{}) bool {
+					return idx%sampleRate == 0
+				},
+			).ToSlice(&newValues)
+			fmt.Println(asciigraph.Plot(newValues[:maxValues], asciigraph.Height(20)))
 			os.Exit(0)
 		}
 

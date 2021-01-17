@@ -126,7 +126,7 @@ func (sessions SessionList) CountAndDuration() (ret SessionList) {
 			if err == nil {
 				in := make(chan map[string]interface{})
 				// There may be lines which aren't actually events, so iterate over the last 5 and hope we catch a timestamp
-				go events.Reader(file, util.MatchSkipN(s.EventCount-5), in)
+				go events.Reader(file, 0, util.MatchSkipN(s.EventCount-1), in)
 				for e := range in {
 					startTime := time.Unix(0, s.Timestamp)
 					endTime := util.ParseEventTime(e["_time"].(float64))

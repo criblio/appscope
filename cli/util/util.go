@@ -16,6 +16,11 @@ import (
 	"github.com/fatih/structs"
 )
 
+type ReadSeekCloser interface {
+	io.ReadSeeker
+	io.Closer
+}
+
 func init() {
 	if os.Getenv("SCOPE_NOTRAND") != "" {
 		rand.Seed(0)
@@ -159,12 +164,12 @@ func (r *CountingReader) Read(p []byte) (n int, err error) {
 
 // TailReader implements a simple polling based file tailer
 type TailReader struct {
-	io.ReadCloser
+	ReadSeekCloser
 }
 
 func (t TailReader) Read(b []byte) (int, error) {
 	for {
-		n, err := t.ReadCloser.Read(b)
+		n, err := t.ReadSeekCloser.Read(b)
 		if n > 0 {
 			return n, nil
 		} else if err != io.EOF {
@@ -174,14 +179,20 @@ func (t TailReader) Read(b []byte) (int, error) {
 	}
 }
 
+// Seek moves the file cursor to the given offset
+func (t TailReader) Seek(offset int64, whence int) (int64, error) {
+	return t.ReadSeekCloser.Seek(offset, whence)
+}
+
+// Close closes the file
+func (t TailReader) Close() error {
+	return t.ReadSeekCloser.Close()
+}
+
 // NewTailReader creates a new tailing reader for fileName
-func NewTailReader(fileName string, offset int) (TailReader, error) {
+func NewTailReader(fileName string) (TailReader, error) {
 	f, err := os.Open(fileName)
 	if err != nil {
-		return TailReader{}, err
-	}
-
-	if _, err := f.Seek(int64(offset), os.SEEK_SET); err != nil {
 		return TailReader{}, err
 	}
 	return TailReader{f}, nil
@@ -223,4 +234,35 @@ func CountLines(path string) (int, error) {
 			return count, err
 		}
 	}
+}
+
+// Copy pasta from https://codereview.stackexchange.com/questions/71272/convert-int64-to-custom-base64-number-string
+var codes = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ%^"
+
+func EncodeOffset(offset int64) string {
+	str := make([]byte, 0, 12)
+	if offset == 0 {
+		return "0"
+	}
+	for offset > 0 {
+		ch := codes[offset%64]
+		str = append(str, byte(ch))
+		offset /= 64
+	}
+	return string(str)
+}
+
+func DecodeOffset(encoded string) (int64, error) {
+	res := int64(0)
+
+	for i := len(encoded); i > 0; i-- {
+		ch := encoded[i-1]
+		res *= 64
+		mod := strings.IndexRune(codes, rune(ch))
+		if mod == -1 {
+			return -1, fmt.Errorf("Invalid encoded character: '%c'", ch)
+		}
+		res += int64(mod)
+	}
+	return res, nil
 }

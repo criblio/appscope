@@ -50,7 +50,7 @@ var metricTypesToCodes map[string]MetricType = map[string]MetricType{
 
 // Reader reads dogstatsd metrics from a file
 func Reader(r io.Reader, match func(string) bool, out chan Metric) (int, error) {
-	br, err := util.NewlineReader(r, match, func(idx int, b []byte) error {
+	br, err := util.NewlineReader(r, match, func(idx int, offset int, b []byte) error {
 		m, err := parseJSONMetric(b)
 		if err != nil {
 			return err

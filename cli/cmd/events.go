@@ -7,7 +7,6 @@ import (
 	"os"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/ssh/terminal"
@@ -47,11 +46,43 @@ var lightColorOpts = colorOpts{
 var sourcetypeColors = colorOpts{
 	"console": nc(color.FgHiGreen),
 	"http":    nc(color.FgHiBlue),
+	"fs":      nc(color.FgHiCyan),
+	"net":     nc(color.FgHiRed),
 	"default": nc(color.FgYellow),
 }
 
-var sourcetypeFields = map[string][]string{
-	"http": {"http.host", "http.method", "http.request_content_length", "http.scheme", "http.target", "http.response_content_length", "http.status", "duration", "req_per_sec"},
+var sourceFields = map[string][]string{
+	"http-req": {"http.host",
+		"http.method",
+		"http.request_content_length",
+		"http.scheme",
+		"http.target"},
+	"http-resp": {"http.host",
+		"http.method",
+		"http.scheme",
+		"http.target",
+		"http.response_content_length",
+		"http.status"},
+	"http-metrics": {"duration",
+		"req_per_sec"},
+	"fs.open": {"file.name"},
+	"fs.close": {"file.name",
+		"file.read_bytes",
+		"file.read_ops",
+		"file.write_bytes",
+		"file.write_ops"},
+	"net.conn.open": {"net.peer.ip",
+		"net.peer.port",
+		"net.host.ip",
+		"net.host.port",
+		"net.protocol",
+		"net.transport"},
+	"net.conn.close": {"net.peer.ip",
+		"net.peer.port",
+		"net.bytes_recv",
+		"net.bytes_sent",
+		"net.close.reason",
+		"net.protocol"},
 }
 
 // color returns the matching color or the default
@@ -92,12 +123,11 @@ var eventsCmd = &cobra.Command{
 		count, err := util.CountLines(sessions[0].EventsPath)
 		util.CheckErrSprintf(err, "Invalid session. Command likely exited without capturing event data.\nerror opening events file: %v", err)
 		skipEvents := 0
-		eventID := 0
+		offset := 0
 		if len(args) > 0 {
-			var err error
-			eventID, err = strconv.Atoi(args[0])
-			util.CheckErrSprintf(err, "could not parse %s as event ID (integer): %v", args[0], err)
-			skipEvents = eventID
+			offset64, err := util.DecodeOffset(args[0])
+			util.CheckErrSprintf(err, "Could not decode encoded offset: %v", err)
+			offset = int(offset64)
 			allEvents = false
 		} else if lastN > -1 {
 			skipEvents = count - lastN + 1
@@ -116,19 +146,25 @@ var eventsCmd = &cobra.Command{
 		}
 
 		// Open events.json file
-		file, err := os.Open(sessions[0].EventsPath)
+		var file util.ReadSeekCloser
+		if follow {
+			file, err = util.NewTailReader(sessions[0].EventsPath)
+		} else {
+			file, err = os.Open(sessions[0].EventsPath)
+		}
 		util.CheckErrSprintf(err, "error opening events file: %v", err)
+		_, err = file.Seek(int64(offset), os.SEEK_SET)
+		util.CheckErrSprintf(err, "error seeking events file: %v", err)
+
 		// Read Events
 		in := make(chan map[string]interface{})
-		offsetChan := make(chan int)
 		go func() {
-			offset, err := events.Reader(file, em.filter(), in)
+			_, err := events.Reader(file, offset, em.filter(), in)
 			util.CheckErrSprintf(err, "error reading events: %v", err)
-			offsetChan <- offset
 		}()
 
 		// If we were passed an EventID, read that one event, print and exit
-		if eventID > 0 {
+		if len(args) > 0 {
 			printEvent(cmd, in)
 			os.Exit(0)
 		}
@@ -136,16 +172,6 @@ var eventsCmd = &cobra.Command{
 		// Print events from events.json
 		printEvents(cmd, idChars, in)
 		file.Close()
-
-		if follow {
-			offset := <-offsetChan
-			tailFile, err := util.NewTailReader(sessions[0].EventsPath, offset)
-			util.CheckErrSprintf(err, "error opening events file for tailing: %v", err)
-			in = make(chan map[string]interface{})
-			em.skipEvents = 0
-			go events.Reader(tailFile, em.filter(), in)
-			printEvents(cmd, idChars, in)
-		}
 	},
 }
 
@@ -172,14 +198,11 @@ func printEvent(cmd *cobra.Command, in chan map[string]interface{}) {
 	}
 }
 
-var lastID = 0 // HACK until we can get some real IDs
-
 func printEvents(cmd *cobra.Command, idChars int, in chan map[string]interface{}) {
 	jsonOut, _ := cmd.Flags().GetBool("json")
 	allFields, _ := cmd.Flags().GetBool("allfields")
 	eval, _ := cmd.Flags().GetString("eval")
 	enc := json.NewEncoder(os.Stdout)
-	llastID := 0
 	termWidth, _, err := terminal.GetSize(0)
 	util.CheckErrSprintf(err, "error getting terminal width: %v", err)
 
@@ -211,11 +234,12 @@ func printEvents(cmd *cobra.Command, idChars int, in chan map[string]interface{}
 			enc.Encode(e)
 			continue
 		}
-		out := color.BlueString("[%"+strconv.Itoa(idChars)+"d] ", e["id"].(int)+lastID)
+		out := color.BlueString("[%s] ", e["id"].(string))
 		if _, timeExists := e["_time"]; timeExists {
 			timeFp := e["_time"].(float64)
 			e["_time"] = util.FormatTimestamp(timeFp)
 		}
+		source := e["source"]
 		noop := func(orig interface{}) interface{} { return orig }
 		out += colorToken(e, "_time", noop)
 		out += colorToken(e, "proc", noop)
@@ -229,13 +253,12 @@ func printEvents(cmd *cobra.Command, idChars int, in chan map[string]interface{}
 				ret = ansiStrip(strings.TrimSpace(fmt.Sprintf("%s", orig)))
 				ret = util.TruncWithElipsis(ret, truncLen)
 			case map[string]interface{}:
-				ret = colorMap(orig.(map[string]interface{}), sourcetypeFields[e["sourcetype"].(string)])
+				ret = colorMap(orig.(map[string]interface{}), sourceFields[source.(string)])
 			}
 			return ret
 		})
 
 		// Delete uninteresting fields
-		llastID = e["id"].(int)
 		delete(e, "id")
 		delete(e, "_channel")
 		delete(e, "sourcetype")
@@ -245,7 +268,6 @@ func printEvents(cmd *cobra.Command, idChars int, in chan map[string]interface{}
 		}
 		fmt.Printf("%s\n", out)
 	}
-	lastID = llastID
 }
 
 func colorToken(e map[string]interface{}, field string, transform func(interface{}) interface{}) string {
@@ -262,25 +284,22 @@ func sourcetypeColorToken(e map[string]interface{}) string {
 func colorMap(e map[string]interface{}, onlyFields []string) string {
 	kv := ""
 	keys := make([]string, 0, len(e))
-	for k := range e {
-		if len(onlyFields) > 0 {
-			for _, field := range onlyFields {
-				if k == field {
-					keys = append(keys, k)
-				}
-			}
-		} else {
+	if len(onlyFields) > 0 {
+		keys = onlyFields
+	} else {
+		for k := range e {
 			keys = append(keys, k)
 		}
-
+		sort.Strings(keys)
 	}
-	sort.Strings(keys)
 	for idx, k := range keys {
-		if idx > 0 {
-			kv += " "
+		if _, ok := e[k]; ok {
+			if idx > 0 {
+				kv += " "
+			}
+			kv += co.color("key").Sprintf("%s", k)
+			kv += co.color("val").Sprintf(":%s", interfaceToString(e[k]))
 		}
-		kv += co.color("key").Sprintf("%s", k)
-		kv += co.color("val").Sprintf(":%s", interfaceToString(e[k]))
 	}
 	return kv
 }

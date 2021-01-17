@@ -33,6 +33,10 @@ var historyCmd = &cobra.Command{
 				fmt.Printf("Displaying last %d sessions\n", last)
 			}
 			sessions = sessions.Last(last)
+			if onlydir {
+				fmt.Printf("%s\n", sessions[len(sessions)-1].WorkDir)
+				os.Exit(0)
+			}
 		} else {
 			sessions = sessions.ID(id)
 		}

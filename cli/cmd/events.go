@@ -98,11 +98,17 @@ var co colorOpts
 
 // eventsCmd represents the events command
 var eventsCmd = &cobra.Command{
-	Use:     "events [flags] ([id])",
-	Short:   "Outputs events for a session",
-	Long:    `Outputs events for a session`,
-	Example: `scope events`,
-	Args:    cobra.MaximumNArgs(1),
+	Use:   "events [flags] ([eventId])",
+	Short: "Outputs events for a session",
+	Long: `Outputs events for a session. Detailed information about each event can be obtained by inputting the Event ID (by default, in blue 
+in []'s at the left) as a positional parameter. Filters can be provided to narrow down by source (e.g. http, net, fs, console) 
+or source (e.g. fs.open, stdout, net.conn.open). JavaScript expressions can be used to further refine the query and express logic.`,
+	Example: `scope events
+scope events -t http
+scope events -s stderr
+scope events -e 'sourcetype!="net"'
+scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") == -1 && (data["file.name"] || "").indexOf("/proc") == -1'`,
+	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		id, _ := cmd.Flags().GetInt("id")
 		sources, _ := cmd.Flags().GetStringSlice("source")
@@ -234,40 +240,45 @@ func printEvents(cmd *cobra.Command, idChars int, in chan map[string]interface{}
 			enc.Encode(e)
 			continue
 		}
-		out := color.BlueString("[%s] ", e["id"].(string))
-		if _, timeExists := e["_time"]; timeExists {
-			timeFp := e["_time"].(float64)
-			e["_time"] = util.FormatTimestamp(timeFp)
-		}
-		source := e["source"]
-		noop := func(orig interface{}) interface{} { return orig }
-		out += colorToken(e, "_time", noop)
-		out += colorToken(e, "proc", noop)
-		out += sourcetypeColorToken(e)
-		out += colorToken(e, "source", noop)
-		truncLen := termWidth - len(ansiStrip(out)) - 1
-		out += colorToken(e, "data", func(orig interface{}) interface{} {
-			ret := ""
-			switch orig.(type) {
-			case string:
-				ret = ansiStrip(strings.TrimSpace(fmt.Sprintf("%s", orig)))
-				ret = util.TruncWithElipsis(ret, truncLen)
-			case map[string]interface{}:
-				ret = colorMap(orig.(map[string]interface{}), sourceFields[source.(string)])
-			}
-			return ret
-		})
-
-		// Delete uninteresting fields
-		delete(e, "id")
-		delete(e, "_channel")
-		delete(e, "sourcetype")
-
-		if allFields {
-			out += fmt.Sprintf("[[%s]]", colorMap(e, []string{}))
-		}
+		out := getEventText(e, termWidth, allFields)
 		fmt.Printf("%s\n", out)
 	}
+}
+
+func getEventText(e map[string]interface{}, width int, allFields bool) string {
+	out := color.BlueString("[%s] ", e["id"].(string))
+	if _, timeExists := e["_time"]; timeExists {
+		timeFp := e["_time"].(float64)
+		e["_time"] = util.FormatTimestamp(timeFp)
+	}
+	source := e["source"]
+	noop := func(orig interface{}) interface{} { return orig }
+	out += colorToken(e, "_time", noop)
+	out += colorToken(e, "proc", noop)
+	out += sourcetypeColorToken(e)
+	out += colorToken(e, "source", noop)
+	truncLen := width - len(ansiStrip(out)) - 1
+	out += colorToken(e, "data", func(orig interface{}) interface{} {
+		ret := ""
+		switch orig.(type) {
+		case string:
+			ret = ansiStrip(strings.TrimSpace(fmt.Sprintf("%s", orig)))
+			ret = util.TruncWithElipsis(ret, truncLen)
+		case map[string]interface{}:
+			ret = colorMap(orig.(map[string]interface{}), sourceFields[source.(string)])
+		}
+		return ret
+	})
+
+	// Delete uninteresting fields
+	delete(e, "id")
+	delete(e, "_channel")
+	delete(e, "sourcetype")
+
+	if allFields {
+		out += fmt.Sprintf("[[%s]]", colorMap(e, []string{}))
+	}
+	return out
 }
 
 func colorToken(e map[string]interface{}, field string, transform func(interface{}) interface{}) string {

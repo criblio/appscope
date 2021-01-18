@@ -26,6 +26,7 @@ var metricsCmd = &cobra.Command{
 		names, _ := cmd.Flags().GetStringSlice("metric")
 		graph, _ := cmd.Flags().GetBool("graph")
 		cols, _ := cmd.Flags().GetBool("cols")
+		uniq, _ := cmd.Flags().GetBool("uniq")
 
 		sessions := sessionByID(id)
 
@@ -91,6 +92,9 @@ var metricsCmd = &cobra.Command{
 			legendSize := len(fmt.Sprintf("%.0f", max)) + 4
 			maxValues := termWidth - legendSize
 			sampleRate := int(math.Round(float64(len(values)) / float64(maxValues)))
+			if sampleRate == 0 {
+				sampleRate = 1
+			}
 
 			var newValues []float64
 			q.WhereIndexed(
@@ -98,6 +102,9 @@ var metricsCmd = &cobra.Command{
 					return idx%sampleRate == 0
 				},
 			).ToSlice(&newValues)
+			if maxValues > len(newValues) {
+				maxValues = len(newValues)
+			}
 			fmt.Println(asciigraph.Plot(newValues[:maxValues], asciigraph.Height(20)))
 			os.Exit(0)
 		}
@@ -109,6 +116,12 @@ var metricsCmd = &cobra.Command{
 			}
 			util.PrintObj(ofCols, metricCols)
 			os.Exit(0)
+		}
+
+		if uniq {
+			linq.From(mm).DistinctBy(func(item interface{}) interface{} {
+				return item.(metrics.Metric).Name
+			}).ToSlice(&mm)
 		}
 
 		util.PrintObj([]util.ObjField{
@@ -138,5 +151,6 @@ func init() {
 	metricsCmd.Flags().StringSliceP("metric", "m", []string{}, "Display only supplied metrics")
 	metricsCmd.Flags().BoolP("graph", "g", false, "Graph this metric")
 	metricsCmd.Flags().BoolP("cols", "c", false, "Display metrics as columns")
+	metricsCmd.Flags().BoolP("uniq", "u", false, "Display first instance of each unique metric")
 	RootCmd.AddCommand(metricsCmd)
 }

@@ -684,6 +684,68 @@ cfgProcessEnvironmentStatsdTags(void** state)
 }
 
 static void
+cfgProcessEnvironmentPayEnable(void **state)
+{
+    config_t* cfg = cfgCreateDefault();
+    cfgPayEnableSet(cfg, FALSE);
+    assert_int_equal(cfgPayEnable(cfg), FALSE);
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_PAYLOAD_ENABLE", "true", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgPayEnable(cfg), TRUE);
+
+    assert_int_equal(setenv("SCOPE_PAYLOAD_ENABLE", "false", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgPayEnable(cfg), FALSE);
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_PAYLOAD_ENABLE"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgPayEnable(cfg), FALSE);
+
+    // unrecognised value should not affect cfg
+    assert_int_equal(setenv("SCOPE_PAYLOAD_ENABLE", "blah", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgPayEnable(cfg), FALSE);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
+static void
+cfgProcessEnvironmentPayDir(void **state)
+{
+    config_t* cfg = cfgCreateDefault();
+    cfgPayDirSet(cfg, "/my/favorite/directory");
+    assert_string_equal(cfgPayDir(cfg), "/my/favorite/directory");
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_PAYLOAD_DIR", "/my/other/dir", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgPayDir(cfg), "/my/other/dir");
+
+    assert_int_equal(setenv("SCOPE_PAYLOAD_DIR", "/my/dir", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgPayDir(cfg), "/my/dir");
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_PAYLOAD_DIR"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgPayDir(cfg), "/my/dir");
+
+    // empty string
+    assert_int_equal(setenv("SCOPE_PAYLOAD_DIR", "", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_string_equal(cfgPayDir(cfg), DEFAULT_PAYLOAD_DIR);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
+static void
 cfgProcessEnvironmentCmdDebugIsIgnored(void** state)
 {
     const char* path = "/tmp/dbgoutfile.txt";
@@ -815,6 +877,8 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_EVENT_DNS_VALUE=x\n"
         "SCOPE_EVENT_MAXEPS=123456789\n"
         "SCOPE_ENHANCE_FS=false\n"
+        "SCOPE_PAYLOAD_ENABLE=false\n"
+        "SCOPE_PAYLOAD_DIR=/the/path\n"
     );
 
     openFileAndExecuteCfgProcessCommands(path, cfg);
@@ -869,6 +933,8 @@ cfgProcessCommandsFromFile(void** state)
     assert_string_equal(cfgEvtFormatValueFilter(cfg, CFG_SRC_DNS), "x");
     assert_int_equal(cfgEvtRateLimit(cfg), 123456789);
     assert_int_equal(cfgEnhanceFs(cfg), FALSE);
+    assert_int_equal(cfgPayEnable(cfg), FALSE);
+    assert_string_equal(cfgPayDir(cfg), "/the/path");
 
     deleteFile(path);
     cfgDestroy(&cfg);
@@ -906,6 +972,8 @@ cfgProcessCommandsEnvSubstitution(void** state)
         "SCOPE_EVENT_LOGFILE_NAME=$FILTER\n"
         "SCOPE_EVENT_MAXEPS=$EPS\n"
         "SCOPE_ENHANCE_FS=$TRUTH\n"
+        "SCOPE_PAYLOAD_ENABLE=$TRUTH\n"
+        "SCOPE_PAYLOAD_DIR=$MYHOME\n"
     );
 
 
@@ -951,6 +1019,8 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_int_equal(cfgEvtEnable(cfg), FALSE);
     assert_int_equal(cfgEvtRateLimit(cfg), 987654321);
     assert_int_equal(cfgEnhanceFs(cfg), TRUE);
+    assert_int_equal(cfgPayEnable(cfg), TRUE);
+    assert_string_equal(cfgPayDir(cfg), "home/mydir");
 
     deleteFile(path);
     cfgDestroy(&cfg);
@@ -1034,6 +1104,8 @@ verifyDefaults(config_t* config)
     assert_null            (cfgCustomTags(config));
     assert_null            (cfgCustomTagValue(config, "tagname"));
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
+    assert_int_equal       (cfgPayEnable(config), DEFAULT_PAYLOAD_ENABLE);
+    assert_string_equal    (cfgPayDir(config), DEFAULT_PAYLOAD_DIR);
 }
 
 
@@ -1080,6 +1152,9 @@ cfgReadGoodYaml(void** state)
         "    - type: net\n"
         "    - type: fs\n"
         "    - type: dns\n"
+        "payload:\n"
+        "  enable: false\n"
+        "  dir: '/my/dir'\n"
         "libscope:\n"
         "  configevent: true\n"
         "  summaryperiod: 11                 # in seconds\n"
@@ -1136,6 +1211,8 @@ cfgReadGoodYaml(void** state)
     assert_string_equal(cfgCustomTagValue(config, "name1"), "value1");
     assert_string_equal(cfgCustomTagValue(config, "name2"), "value2");
     assert_int_equal(cfgLogLevel(config), CFG_LOG_DEBUG);
+    assert_int_equal(cfgPayEnable(config), FALSE);
+    assert_string_equal(cfgPayDir(config), "/my/dir");
     cfgDestroy(&config);
     deleteFile(path);
 }
@@ -1275,6 +1352,10 @@ const char* jsonText =
     "      {'type':'dns'}\n"
     "    ]\n"
     "  },\n"
+    "  'payload': {\n"
+    "    'enable': 'true',\n"
+    "    'dir': '/the/dir'\n"
+    "  },\n"
     "  'libscope': {\n"
     "    'configevent': 'true',\n"
     "    'summaryperiod': '13',\n"
@@ -1331,6 +1412,8 @@ cfgReadGoodJson(void** state)
     assert_string_equal(cfgCustomTagValue(config, "tagB"), "val2");
     assert_string_equal(cfgCustomTagValue(config, "tagC"), "val3");
     assert_int_equal(cfgLogLevel(config), CFG_LOG_DEBUG);
+    assert_int_equal(cfgPayEnable(config), TRUE);
+    assert_string_equal(cfgPayDir(config), "/the/dir");
     cfgDestroy(&config);
     deleteFile(path);
 }
@@ -1414,6 +1497,9 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
 {
     const char* yamlText =
         "---\n"
+        "payload:\n"
+        "  dir: /favorite\n"
+        "  enable: false\n"
         "event:\n"
         "  watch:\n"
         "    - name: .*[.]log$\n"
@@ -1488,6 +1574,8 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_non_null(cfgCustomTags(config));
     assert_string_equal(cfgCustomTagValue(config, "135"), "kittens");
     assert_int_equal(cfgLogLevel(config), CFG_LOG_INFO);
+    assert_int_equal(cfgPayEnable(config), FALSE);
+    assert_string_equal(cfgPayDir(config), "/favorite");
 
     cfgDestroy(&config);
     deleteFile(path);
@@ -1541,6 +1629,9 @@ cfgReadEnvSubstitution(void** state)
         "    - type: console                 # create events from stdout and stderr\n"
         "    - type: $SOURCE                 # create events from syslog and vsyslog\n"
         "    - type: metric\n"
+        "payload:\n"
+        "  enable: $MASTER_ENABLE\n"
+        "  dir: $MYHOME\n"
         "libscope:\n"
         "  transport:\n"
         "    type: syslog                    # udp, unix, file, syslog\n"
@@ -1586,6 +1677,8 @@ cfgReadEnvSubstitution(void** state)
     assert_int_equal(cfgEvtEnable(cfg), TRUE);
     assert_int_equal(cfgEvtRateLimit(cfg), 987654321);
     assert_int_equal(cfgEnhanceFs(cfg), TRUE);
+    assert_int_equal(cfgPayEnable(cfg), TRUE);
+    assert_string_equal(cfgPayDir(cfg), "home/mydir");
 
     cfgDestroy(&cfg);
 
@@ -1824,6 +1917,8 @@ main(int argc, char* argv[])
         cmocka_unit_test_prestate(cfgProcessEnvironmentTransport, &dest_evt),
         cmocka_unit_test_prestate(cfgProcessEnvironmentTransport, &dest_log),
         cmocka_unit_test(cfgProcessEnvironmentStatsdTags),
+        cmocka_unit_test(cfgProcessEnvironmentPayEnable),
+        cmocka_unit_test(cfgProcessEnvironmentPayDir),
         cmocka_unit_test(cfgProcessEnvironmentCmdDebugIsIgnored),
         cmocka_unit_test(cfgProcessCommandsCmdDebugIsProcessed),
         cmocka_unit_test(cfgProcessCommandsFromFile),

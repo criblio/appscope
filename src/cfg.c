@@ -45,6 +45,11 @@ struct _config_t
         cfg_log_level_t level;
     } log;
 
+    struct {
+        unsigned int enable;
+        char *dir;
+    } pay;
+
     // CFG_MTC, CFG_CTL, or CFG_LOG
     transport_struct_t transport[CFG_WHICH_MAX]; 
 
@@ -196,9 +201,13 @@ cfgCreateDefault()
         c->transport[tp].file.buf_policy = bufDefault[tp];
     }
 
+    c->log.level = DEFAULT_LOG_LEVEL;
+
+    c->pay.enable = DEFAULT_PAYLOAD_ENABLE;
+    c->pay.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
+
     c->tags = DEFAULT_TAGS;
     c->max_tags = DEFAULT_NUM_TAGS;
-    c->log.level = DEFAULT_LOG_LEVEL;
 
     c->commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
     c->processstartmsg = DEFAULT_PROCESS_START_MSG;
@@ -228,6 +237,8 @@ cfgDestroy(config_t** cfg)
         if (c->transport[t].net.port) free(c->transport[t].net.port);
         if (c->transport[t].file.path) free(c->transport[t].file.path);
     }
+
+    if (c->pay.dir) free(c->pay.dir);
 
     if (c->tags) {
         int i = 0;
@@ -462,6 +473,18 @@ cfg_log_level_t
 cfgLogLevel(config_t* cfg)
 {
     return (cfg) ? cfg->log.level : DEFAULT_LOG_LEVEL;
+}
+
+unsigned int
+cfgPayEnable(config_t *cfg)
+{
+    return (cfg) ? cfg->pay.enable : DEFAULT_PAYLOAD_ENABLE;
+}
+
+const char *
+cfgPayDir(config_t *cfg)
+{
+    return (cfg) ? cfg->pay.dir : DEFAULT_PAYLOAD_DIR;
 }
 
 ///////////////////////////////////
@@ -734,3 +757,24 @@ cfgLogLevelSet(config_t* cfg, cfg_log_level_t level)
     if (!cfg || level < 0 || level > CFG_LOG_NONE) return;
     cfg->log.level = level;
 }
+
+void
+cfgPayEnableSet(config_t *cfg, unsigned int val)
+{
+    if (!cfg || val > 1) return;
+    cfg->pay.enable = val;
+}
+
+void
+cfgPayDirSet(config_t *cfg, const char *dir)
+{
+    if (!cfg) return;
+    if (cfg->pay.dir) free(cfg->pay.dir);
+    if (!dir || (dir[0] == '\0')) {
+        cfg->pay.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
+        return;
+    }
+
+    cfg->pay.dir = strdup(dir);
+}
+

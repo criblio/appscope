@@ -38,6 +38,8 @@ cfg_buffer_t        cfgTransportBuf(config_t*, which_transport_t);
 custom_tag_t**      cfgCustomTags(config_t*);
 const char*         cfgCustomTagValue(config_t*, const char*);
 cfg_log_level_t     cfgLogLevel(config_t*);
+unsigned int        cfgPayEnable(config_t*);
+const char *        cfgPayDir(config_t*);
 
 // Setters (modifies config_t, but does not persist modifications)
 void                cfgMtcEnableSet(config_t*, unsigned);
@@ -63,4 +65,6 @@ void                cfgTransportPathSet(config_t*, which_transport_t, const char
 void                cfgTransportBufSet(config_t*, which_transport_t, cfg_buffer_t);
 void                cfgCustomTagAdd(config_t*, const char*, const char*);
 void                cfgLogLevelSet(config_t*, cfg_log_level_t);
+void                cfgPayEnableSet(config_t*, unsigned int);
+void                cfgPayDirSet(config_t*, const char *);
 #endif // __CFG_H__

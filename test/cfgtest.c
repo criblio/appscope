@@ -73,6 +73,8 @@ verifyDefaults(config_t* config)
     assert_null            (cfgCustomTags(config));
     assert_null            (cfgCustomTagValue(config, "tagname"));
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
+    assert_int_equal       (cfgPayEnable(config), DEFAULT_PAYLOAD_ENABLE);
+    assert_string_equal    (cfgPayDir(config), DEFAULT_PAYLOAD_DIR);
 }
 
 static void
@@ -546,6 +548,33 @@ cfgLogLevelSetAndGet(void** state)
     cfgDestroy(&config);
 }
 
+static void
+cfgPayEnableSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgPayEnableSet(config, TRUE);
+    assert_int_equal(cfgPayEnable(config), TRUE);
+    cfgPayEnableSet(config, FALSE);
+    assert_int_equal(cfgPayEnable(config), FALSE);
+
+    // 2 is outside of allowed range; should be ignored.
+    cfgPayEnableSet(config, 2);
+    assert_int_equal(cfgPayEnable(config), FALSE);
+
+    cfgDestroy(&config);
+}
+
+static void
+cfgPayDirSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgPayDirSet(config, "/some/path");
+    assert_string_equal(cfgPayDir(config), "/some/path");
+    cfgPayDirSet(config, NULL);
+    assert_string_equal(cfgPayDir(config), DEFAULT_COMMAND_DIR);
+    cfgDestroy(&config);
+}
+
 
 int
 main(int argc, char* argv[])
@@ -631,6 +660,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgCustomTagsSetAndGet),
         cmocka_unit_test(cfgLoggingSetAndGet),
         cmocka_unit_test(cfgLogLevelSetAndGet),
+        cmocka_unit_test(cfgPayEnableSetAndGet),
+        cmocka_unit_test(cfgPayDirSetAndGet),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

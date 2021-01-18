@@ -133,6 +133,7 @@ typedef unsigned int bool;
  * of as requirements. SO, we'll extend this over time.
  */
 #define DEFAULT_CBUF_SIZE (DEFAULT_MAXEVENTSPERSEC * DEFAULT_SUMMARY_PERIOD)
+#define DEFAULT_PAYLOAD_RING_SIZE 10000
 #define DEFAULT_CONFIG_SIZE 30 * 1024
 
 // we should start moving env var constants to one place

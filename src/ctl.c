@@ -537,7 +537,7 @@ ctlCreate()
 
     ctl->payload.enable = DEFAULT_PAYLOAD_ENABLE;
     ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
-    ctl->payload.ringbuf = cbufInit(DEFAULT_CBUF_SIZE);
+    ctl->payload.ringbuf = cbufInit(DEFAULT_PAYLOAD_RING_SIZE);
     if (!ctl->payload.ringbuf) {
         DBG(NULL);
         return NULL;

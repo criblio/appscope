@@ -2515,7 +2515,7 @@ doPayload()
                 }
             }
 
-            if (filebin == TRUE) {
+            if (filebin == TRUE && ctlPayDir(g_ctl)) {
                 int fd;
                 char path[PATH_MAX];
 
@@ -2523,16 +2523,19 @@ doPayload()
                 switch (pinfo->src) {
                 case NETTX:
                 case TLSTX:
-                    snprintf(path, PATH_MAX, "/tmp/%d_%s:%s:%s.out", g_proc.pid, rip, lport, rport);
+                    snprintf(path, PATH_MAX, "%s/%d_%s:%s:%s.out",
+                             ctlPayDir(g_ctl), g_proc.pid, rip, lport, rport);
                     break;
 
                 case NETRX:
                 case TLSRX:
-                    snprintf(path, PATH_MAX, "/tmp/%d_%s:%s:%s.in", g_proc.pid, rip, rport, lport);
+                    snprintf(path, PATH_MAX, "%s/%d_%s:%s:%s.in",
+                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lport);
                     break;
 
                 default:
-                    snprintf(path, PATH_MAX, "/tmp/%d.na", g_proc.pid);
+                    snprintf(path, PATH_MAX, "%s/%d.na",
+                             ctlPayDir(g_ctl), g_proc.pid);
                     break;
                 }
 

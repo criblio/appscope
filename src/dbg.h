@@ -64,9 +64,6 @@ extern proc_id_t g_proc;
 
 void scopeLog(const char *, int, cfg_log_level_t);
 
-#define PAYLOAD_ENV "SCOPE_PAYLOAD_ENABLE"
-#define PAYLOAD_VAL "true"
-
 int checkEnv(char *, char *);
 
 #endif // __DBG_H__

@@ -14,7 +14,6 @@
 #include "fn.h"
 #include "httpagg.h"
 #include "mtcformat.h"
-#include "os.h"
 #include "plattime.h"
 #include "report.h"
 #include "search.h"
@@ -36,8 +35,8 @@
 #define PROC_UID(val)           NUMFIELD("proc.uid",       (val), 4, TRUE)
 #define PROC_GID(val)           NUMFIELD("proc.gid",       (val), 4, TRUE)
 #define PROC_CGROUP(val)        STRFIELD("proc.cgroup",    (val), 4, TRUE)
-#define HOST_FIELD(val)         STRFIELD("host",           (val), 4, FALSE)
-#define PROC_FIELD(val)         STRFIELD("proc",           (val), 4, FALSE)
+#define HOST_FIELD(val)         STRFIELD("host",           (val), 4, TRUE)
+#define PROC_FIELD(val)         STRFIELD("proc",           (val), 4, TRUE)
 #define HTTPSTAT_FIELD(val)     NUMFIELD("http_status",    (val), 4, TRUE)
 #define DOMAIN_FIELD(val)       STRFIELD("domain",         (val), 5, TRUE)
 
@@ -2515,7 +2514,7 @@ doPayload()
                 }
             }
 
-            if (filebin == TRUE) {
+            if (filebin == TRUE && ctlPayDir(g_ctl)) {
                 int fd;
                 char path[PATH_MAX];
 
@@ -2523,16 +2522,19 @@ doPayload()
                 switch (pinfo->src) {
                 case NETTX:
                 case TLSTX:
-                    snprintf(path, PATH_MAX, "/tmp/%d_%s:%s:%s.out", g_proc.pid, rip, lport, rport);
+                    snprintf(path, PATH_MAX, "%s/%d_%s:%s:%s.out",
+                             ctlPayDir(g_ctl), g_proc.pid, rip, lport, rport);
                     break;
 
                 case NETRX:
                 case TLSRX:
-                    snprintf(path, PATH_MAX, "/tmp/%d_%s:%s:%s.in", g_proc.pid, rip, rport, lport);
+                    snprintf(path, PATH_MAX, "%s/%d_%s:%s:%s.in",
+                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lport);
                     break;
 
                 default:
-                    snprintf(path, PATH_MAX, "/tmp/%d.na", g_proc.pid);
+                    snprintf(path, PATH_MAX, "%s/%d.na",
+                             ctlPayDir(g_ctl), g_proc.pid);
                     break;
                 }
 

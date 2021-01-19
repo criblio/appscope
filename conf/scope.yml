@@ -101,7 +101,9 @@ event:
 #      field: .*                     # whitelist regex describing field names
 #      value: .*
 
-
+payload:
+  enable: false                     # true, false
+  dir: '/tmp'
 
 libscope:
   configevent: true                 # true, false

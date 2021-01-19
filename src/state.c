@@ -1002,7 +1002,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
 
     if (!net) return -1;
 
-    if ((checkEnv(PAYLOAD_ENV, PAYLOAD_VAL) == TRUE)) {
+    if (ctlPayEnable(g_ctl)) {
         // instead of or in addition to http &/or detect?
         extractPayload(sockfd, net, buf, len, src, dtype);
         return 0;
@@ -1243,7 +1243,7 @@ doSetAddrs(int sockfd)
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
         (mtcEnabled(g_mtc) && g_mtc_addr_output) ||
-        checkEnv(PAYLOAD_ENV, PAYLOAD_VAL);
+        ctlPayEnable(g_ctl);
     if (!need_to_track_addrs) return 0;
 
     /*

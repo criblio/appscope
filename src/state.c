@@ -1000,8 +1000,6 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
 {
     net_info *net = getNetEntry(sockfd);
 
-    if (!net) return -1;
-
     if (ctlPayEnable(g_ctl)) {
         // instead of or in addition to http &/or detect?
         extractPayload(sockfd, net, buf, len, src, dtype);

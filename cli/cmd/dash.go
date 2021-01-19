@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/criblio/scope/events"
@@ -169,10 +170,99 @@ func readEvents(workDir string, w *widgets) {
 
 	for e := range in {
 		eventText := getEventText(e, termWidth-4, false)
-		err = w.events.Write(fmt.Sprintf("%s\n", ansiStrip(eventText)))
-		// log.Info().Msg(ansiStrip(strings.TrimSpace(eventText)))
-		util.CheckErrSprintf(err, "%v", err)
+		results := ansiToTermDashColors(eventText)
+		for _, r := range results {
+			err = w.events.Write(r.text, r.options)
+			util.CheckErrSprintf(err, "%v", err)
+		}
 	}
+}
+
+var colorTokenRegex = regexp.MustCompile(`([\x1b|\033]\[[0-9;]*[0-9]+m)([^\x1b|\033]+)[\x1b|\033]\[0m`)
+
+type textWithWriteOption struct {
+	text    string
+	options text.WriteOption
+}
+
+func ansiToTermDashColors(input string) []textWithWriteOption {
+	matchIndexes := colorTokenRegex.FindAllStringSubmatchIndex(input, -1)
+	results := []textWithWriteOption{}
+
+	for _, match := range matchIndexes {
+		colorCode := input[match[2]:match[3]]
+		matchText := input[match[4]:match[5]]
+
+		var options text.WriteOption
+		switch colorCode {
+		case "\x1b[30m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorBlack))
+		case "\x1b[31m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorRed))
+		case "\x1b[32m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorGreen))
+		case "\x1b[33m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorYellow))
+		case "\x1b[34m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorBlue))
+		case "\x1b[35m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorMagenta))
+		case "\x1b[36m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorCyan))
+		case "\x1b[40m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorBlack))
+		case "\x1b[41m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorRed))
+		case "\x1b[42m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorGreen))
+		case "\x1b[43m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorYellow))
+		case "\x1b[44m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorBlue))
+		case "\x1b[45m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorMagenta))
+		case "\x1b[47m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorWhite))
+		case "\x1b[90m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorRGB24(85, 85, 85)))
+		case "\x1b[91m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorRGB24(255, 85, 85)))
+		case "\x1b[92m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorRGB24(85, 255, 85)))
+		case "\x1b[93m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorRGB24(255, 255, 85)))
+		case "\x1b[94m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorRGB24(85, 85, 255)))
+		case "\x1b[95m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorRGB24(255, 85, 255)))
+		case "\x1b[96m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorRGB24(85, 255, 255)))
+		case "\x1b[97m":
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorRGB24(255, 255, 255)))
+		case "\x1b[100m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorRGB24(85, 85, 85)))
+		case "\x1b[101m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorRGB24(255, 85, 85)))
+		case "\x1b[102m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorRGB24(85, 255, 85)))
+		case "\x1b[103m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorRGB24(255, 255, 85)))
+		case "\x1b[104m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorRGB24(85, 85, 255)))
+		case "\x1b[105m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorRGB24(255, 85, 255)))
+		case "\x1b[106m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorRGB24(85, 255, 255)))
+		case "\x1b[107m":
+			options = text.WriteCellOpts(cell.BgColor(cell.ColorWhite))
+		default:
+			options = text.WriteCellOpts(cell.FgColor(cell.ColorWhite))
+		}
+
+		results = append(results, textWithWriteOption{text: matchText, options: options})
+	}
+	results = append(results, textWithWriteOption{text: "\n", options: text.WriteCellOpts()})
+	return results
 }
 
 func runDashboard(ctx context.Context, cancel context.CancelFunc, w *widgets) {

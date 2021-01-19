@@ -306,7 +306,7 @@ func colorMap(e map[string]interface{}, onlyFields []string) string {
 	for idx, k := range keys {
 		if _, ok := e[k]; ok {
 			if idx > 0 {
-				kv += " "
+				kv += co.color("key").Sprint(" ")
 			}
 			kv += co.color("key").Sprintf("%s", k)
 			kv += co.color("val").Sprintf(":%s", interfaceToString(e[k]))

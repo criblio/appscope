@@ -5,7 +5,7 @@ AppScope is an open source instrumentation utility for any application, regardle
 
 AppScope extracts detailed information from applications as they execute, including all file operations, all network operations, clear text data from encrypted flows, all payloads can be extracted in their entirety, any console I/O is captured, updates to any log file is captured, CPU and memory resource usage are presented in process detail.
 
-AppScope consists of a shared library and an executable. In simple terms, the library is loaded by either preload features supported by the dynamic loader or by a custom loader for static executables,  into the address space of a process, With the library loaded, and ddetails are extracted from applications as they execute. The executable provides a command line interface (CLI) which can optionally be used to control which processes are interposed, what data is extracted, and how to view and interact with the results.
+AppScope consists of a shared library and an executable. In simple terms, the library is loaded by either preload features supported by the dynamic loader or by a custom loader for static executables,  into the address space of a process, With the library loaded, and details are extracted from applications as they execute. The executable provides a command line interface (CLI) which can optionally be used to control which processes are interposed, what data is extracted, and how to view and interact with the results.
 
 Information is extracted by the library as it interposes functions. When an application calls a function, it actually calls a function of the same name in the AppScope library. Details are extracted from the function, and the original function is called. The interposition of function calls in this manner does not require any change to an application, it works with unmodified binaries, while the CPU and memory overhead are minimal.
 
@@ -41,7 +41,7 @@ Check out the code, install build tools, build, and run tests.
     make all
     make test
 
-To clean out files that were manually added, or were added bythe result of running build commands:
+To clean out files that were manually added, or were added by the result of running build commands:
 
     git clean -f -d
 
@@ -63,7 +63,7 @@ Using `scope` in this manner causes your_command to be loaded as well as loading
 This will cause the bash shell to be executed with the AppScope library. All subsequent command executed from the shell will emit detailed data describing the behavior of the application.
 
 ## Dynamic Loader
-The dynamic loader is run by the kernel when an executable is started. The loader determines which executable to load, resolves dependencies, allocates memory, loads code, performs all required link operations and starts the application. When resolving dependencies the loader can be configured to load a specific library in addition to the library dependcencies associated with the executable. Loading of an additional library is configured by setting the environment variable LD_PRELOAD. 
+The dynamic loader is run by the kernel when an executable is started. The loader determines which executable to load, resolves dependencies, allocates memory, loads code, performs all required link operations and starts the application. When resolving dependencies the loader can be configured to load a specific library in addition to the library dependencies associated with the executable. Loading of an additional library is configured by setting the environment variable LD_PRELOAD.
 
 Examples:
 ```bash
@@ -98,5 +98,4 @@ There are several distinct modes supported by `scope`:
 # Developer notes
 - The top-level Makefile checks to see what platform you are on and then includes the specific Makefile for the platform from the OS specific directory.
 - The run script will determine which platform you are using and will set environment variables accordingly. 
-
 

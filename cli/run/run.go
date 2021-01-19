@@ -20,6 +20,7 @@ import (
 type Config struct {
 	Passthrough bool
 	Verbosity   int
+	Payloads    bool
 
 	workDir string
 	now     func() time.Time
@@ -115,6 +116,9 @@ func (rc *Config) CreateWorkDir(cmd string) {
 	cmdDir := filepath.Join(rc.workDir, "cmd")
 	err = os.Mkdir(cmdDir, 0755)
 	util.CheckErrSprintf(err, "error creating cmd dir: %v", err)
+	payloadsDir := filepath.Join(rc.workDir, "payloads")
+	err = os.MkdirAll(payloadsDir, 0755)
+	util.CheckErrSprintf(err, "error creating payloads dir: %v", err)
 	internal.SetLogFile(filepath.Join(rc.workDir, "scope.log"))
 	log.Info().Str("workDir", rc.workDir).Msg("created working directory")
 }
@@ -160,6 +164,13 @@ func (rc *Config) SetupScopeYaml() {
 
 	if rc.Verbosity != 0 {
 		sc.Metric.Format.Verbosity = rc.Verbosity
+	}
+
+	if rc.Payloads {
+		sc.Payload = ScopePayloadConfig{
+			Enable: true,
+			Dir:    filepath.Join(rc.workDir, "payloads"),
+		}
 	}
 
 	scYamlPath := filepath.Join(rc.workDir, "scope.yml")

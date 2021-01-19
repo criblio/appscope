@@ -12,6 +12,7 @@ import (
 type ScopeConfig struct {
 	Metric   ScopeMetricConfig   `mapstructure:"metric" json:"metric" yaml:"metric"`
 	Event    ScopeEventConfig    `mapstructure:"event" json:"event" yaml:"event"`
+	Payload  ScopePayloadConfig  `mapstructure:"payload,omitempty" json:"payload,omitempty" yaml:"payload,omitempty"`
 	Libscope ScopeLibscopeConfig `mapstructure:"libscope" json:"libscope" yaml:"libscope"`
 }
 
@@ -28,6 +29,12 @@ type ScopeEventConfig struct {
 	Format    ScopeOutputFormat  `mapstructure:"format" json:"format" yaml:"format"`
 	Transport ScopeTransport     `mapstructure:"transport" json:"transport" yaml:"transport"`
 	Watch     []ScopeWatchConfig `mapstructure:"watch" json:"watch" yaml:"watch"`
+}
+
+// ScopePayloadConfig represents how to capture payloads
+type ScopePayloadConfig struct {
+	Enable bool   `mapstructure:"enable" json:"enable" yaml:"enable"`
+	Dir    string `mapstructure:"dir" json:"dir" yaml:"dir"`
 }
 
 // ScopeWatchConfig represents a watch configuration

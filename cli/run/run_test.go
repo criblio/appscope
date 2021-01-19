@@ -225,6 +225,9 @@ func TestSetupWorkDir(t *testing.T) {
 
 	cmdDirExists := util.CheckFileExists(filepath.Join(wd, "cmd"))
 	assert.True(t, cmdDirExists)
+
+	payloadsDirExists := util.CheckFileExists(filepath.Join(wd, "payloads"))
+	assert.True(t, payloadsDirExists)
 	os.RemoveAll(".foo")
 	os.Unsetenv("SCOPE_TEST")
 }

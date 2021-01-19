@@ -281,11 +281,12 @@ report_target(mtc_t *mtc, target_agg_t *target)
             if (target->status[i].code == 0) break;
 
             event_field_t fields[] = {
-                STRFIELD("http.target", target->uri, 4, FALSE),
-                NUMFIELD("http.status_code", target->status[i].code, 1, FALSE),
-                STRFIELD("proc",        g_proc.procname, 4, FALSE),
-                NUMFIELD("pid",         g_proc.pid,      4, FALSE),
-                STRFIELD("host",        g_proc.hostname, 4, FALSE),
+                STRFIELD("http.target", target->uri, 4, TRUE),
+                NUMFIELD("http.status_code", target->status[i].code, 1, TRUE),
+                STRFIELD("proc",        g_proc.procname, 4, TRUE),
+                NUMFIELD("pid",         g_proc.pid,      4, TRUE),
+                STRFIELD("host",        g_proc.hostname, 4, TRUE),
+                STRFIELD("unit",        "request", 4, TRUE),
                 FIELDEND
             };
             event_t metric = INT_EVENT("http.requests",
@@ -298,12 +299,21 @@ report_target(mtc_t *mtc, target_agg_t *target)
         counter_field_enum i;
         for (i = SERVER_DURATION; i < FIELD_MAX; i++) {
             if (target->field[i].num_entries == 0) continue;
+            char *unit;
+
+            if ((i == SERVER_DURATION) || (i == CLIENT_DURATION)) {
+                unit = "millisecond";
+            } else {
+                unit = "byte";
+            }
+
             event_field_t fields[] = {
-                STRFIELD("http.target", target->uri,     4, FALSE),
-                NUMFIELD("numops",      target->field[i].num_entries, 8, FALSE),
-                STRFIELD("proc",        g_proc.procname, 4, FALSE),
-                NUMFIELD("pid",         g_proc.pid,      4, FALSE),
-                STRFIELD("host",        g_proc.hostname, 4, FALSE),
+                STRFIELD("http.target", target->uri,     4, TRUE),
+                NUMFIELD("numops",      target->field[i].num_entries, 8, TRUE),
+                STRFIELD("proc",        g_proc.procname, 4, TRUE),
+                NUMFIELD("pid",         g_proc.pid,      4, TRUE),
+                STRFIELD("host",        g_proc.hostname, 4, TRUE),
+                STRFIELD("unit",        unit, 4, TRUE),
                 FIELDEND
             };
             event_t metric = INT_EVENT(valToStr(fieldMap, i),

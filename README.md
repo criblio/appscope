@@ -1,13 +1,13 @@
 **Cribl Scope**
 
 # Introduction
-Scope is part of the Deep Collect project.  Scope can be used to extract details from within a running process.  Information is extracted by loading a shared library into the address space of a process as the process is started. The library is loaded by the dynamic linker as part of the normal process of loading libraries in response to an exec system call in Linux/Unix/macOS, CreateProcess in Windows.  The mechanism to configure the loader to load our library varies with each OS. In Linux we start with LD_PRELOAD. In macOS we start with DYLD_INSERT_LIBRARIES and DYLD_FORCE_FLAT_NAMESPACE. In Windows we start with AppInitDLL.
+Scope can be used to extract details from within a running process.  Scope uses two mechanisms to accomplish this.  For dynamically linked executables, information is extracted by having the dynamic linker load a shared library into the address space of a process as the process is started.  In Linux this is done with the LD_PRELOAD environment variable.  For supported static executables, scope can act as a loader and use the elf file of the executable to set up the runtime environment that allows scope to extract details.  For users, these internal mechanisms are not important; refer to the Run section below for details.
 
 # Requirements
-In order to develop code for Scope you will need either a Linux, macOS, or Windows environment, and access to the scope.git repository.
+In order to develop code for Scope you will need either a Linux environment, and access to the scope.git repository.
 
 # Install and Build
-## macOS, Linux
+## Linux
 (Only linux distros with yum or apt-get package managers are supported)
 
 Run these commands to do everything: checkout the scope codebase, install necessary build tools, build, and run tests.
@@ -26,14 +26,10 @@ And finally, to clean out files that were manually added or the result of runnin
 
     git clean -f -d
 
-
-## Windows
-TBD
-
 # Run
-In order to run any given process in a mode where detailed information about the process can be extracted, without changes to code or the executable, you simply need to run the process with one or more environment variables set. You can set the environment variables defined below as needed.  Or, just start the executable with the Scope wrapper. Here's how: From the top level Scope directory execute the command:
+In order to run any given process in a mode where detailed information about the process can be extracted, without changes to code or the executable, you simply need to run the process with one or more environment variables set. You can set the environment variables defined below as needed.  Or, just start the executable with the scope wrapper. Here's how: From the top level Scope directory execute the command:
 
-    ./scope_env.sh run your_command params
+    ./scope run your_command params
 Where "your_command" is any executable and "params" are any parameters needed for the executable.  
  
 # Developer notes
@@ -41,11 +37,6 @@ Where "your_command" is any executable and "params" are any parameters needed fo
 - The run script will determine which platform you are using and will set environment variables accordingly. 
 
 # Environment variables 
-## macOS dynamic loader
-DYLD_INSERT_LIBRARIES
-DYLD_FORCE_FLAT_NAMESPACE
-These are the variables that are needed in order for the Scope library to be loaded and enable functions in new processes to be interposed on macOS.
-
 ## Linux dynamic loader
 LD_PRELOAD
 This is the variable that is needed in order for the Scope library to be loaded and enable functions in new processes to be interposed on Linux.

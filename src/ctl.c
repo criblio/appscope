@@ -13,8 +13,13 @@ struct _ctl_t
     evt_fmt_t *evt;
     cbuf_handle_t evbuf;
     cbuf_handle_t events;
-    cbuf_handle_t payloads;
     unsigned enhancefs;
+
+    struct {
+        unsigned int enable;
+        char * dir;
+        cbuf_handle_t ringbuf;
+    } payload;
 };
 
 typedef struct {
@@ -528,18 +533,15 @@ ctlCreate()
         return NULL;
     }
 
-
-    if (checkEnv(PAYLOAD_ENV, PAYLOAD_VAL) == TRUE) {
-        ctl->payloads = cbufInit(DEFAULT_CBUF_SIZE);
-        if (!ctl->payloads) {
-            DBG(NULL);
-            return NULL;
-        }
-    } else {
-        ctl->payloads = NULL;
-    }
-
     ctl->enhancefs = DEFAULT_ENHANCE_FS;
+
+    ctl->payload.enable = DEFAULT_PAYLOAD_ENABLE;
+    ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
+    ctl->payload.ringbuf = cbufInit(DEFAULT_PAYLOAD_RING_SIZE);
+    if (!ctl->payload.ringbuf) {
+        DBG(NULL);
+        return NULL;
+    }
 
     return ctl;
 }
@@ -552,7 +554,9 @@ ctlDestroy(ctl_t **ctl)
     ctlFlush(*ctl);
     cbufFree((*ctl)->evbuf);
     cbufFree((*ctl)->events);
-    cbufFree((*ctl)->payloads);
+
+    if ((*ctl)->payload.dir) free((*ctl)->payload.dir);
+    cbufFree((*ctl)->payload.ringbuf);
 
     transportDestroy(&(*ctl)->transport);
     evtFormatDestroy(&(*ctl)->evt);
@@ -847,6 +851,39 @@ ctlEnhanceFsSet(ctl_t *ctl, unsigned val)
     ctl->enhancefs = val;
 }
 
+unsigned int
+ctlPayEnable(ctl_t *ctl)
+{
+    return (ctl) ? ctl->payload.enable : DEFAULT_PAYLOAD_ENABLE;
+}
+
+void
+ctlPayEnableSet(ctl_t *ctl, unsigned int val)
+{
+    if (!ctl) return;
+    ctl->payload.enable = val;
+}
+
+const char *
+ctlPayDir(ctl_t *ctl)
+{
+    return (ctl) ? ctl->payload.dir : DEFAULT_PAYLOAD_DIR;
+}
+
+void
+ctlPayDirSet(ctl_t *ctl, const char *dir)
+{
+    if (!ctl) return;
+    if (ctl->payload.dir) free(ctl->payload.dir);
+    if (!dir || (dir[0] == '\0')) {
+        ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
+        return;
+    }
+
+    ctl->payload.dir = strdup(dir);
+}
+
+
 uint64_t
 ctlGetEvent(ctl_t *ctl)
 {
@@ -870,8 +907,8 @@ ctlPostPayload(ctl_t *ctl, char *pay)
 {
     if (!pay || !ctl) return -1;
 
-    if ((ctl->payloads) &&
-        (cbufPut(ctl->payloads, (uint64_t)pay) == -1)) {
+    if ((ctl->payload.ringbuf) &&
+        (cbufPut(ctl->payload.ringbuf, (uint64_t)pay) == -1)) {
         // Full; drop and ignore
         DBG(NULL);
         return -1;
@@ -884,8 +921,8 @@ ctlGetPayload(ctl_t *ctl)
 {
     uint64_t data;
 
-    if ((ctl->payloads) &&
-        (cbufGet(ctl->payloads, &data) == 0)) {
+    if ((ctl->payload.ringbuf) &&
+        (cbufGet(ctl->payload.ringbuf, &data) == 0)) {
         return data;
     } else {
         return (uint64_t)-1;

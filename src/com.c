@@ -39,9 +39,7 @@ cmdSendMetric(mtc_t *mtc, event_t *evt)
 int
 cmdSendPayload(ctl_t *ctl, char *data, size_t len)
 {
-    if (!ctl || !data ||
-        (checkEnv(PAYLOAD_ENV, PAYLOAD_VAL) == FALSE)) return 0;
-
+    if (!ctl || !data) return 0;
     return ctlSendBin(ctl, data, len);
 }
 

@@ -122,6 +122,8 @@ typedef unsigned int bool;
 #define DEFAULT_METRIC_CBUF_SIZE 50 * 1024
 #define DEFAULT_LOG_PATH "/tmp/scope.log"
 #define DEFAULT_PROCESS_START_MSG TRUE
+#define DEFAULT_PAYLOAD_ENABLE FALSE
+#define DEFAULT_PAYLOAD_DIR "/tmp"
 
 /*
  * This calculation is not what we need in the long run.
@@ -131,6 +133,7 @@ typedef unsigned int bool;
  * of as requirements. SO, we'll extend this over time.
  */
 #define DEFAULT_CBUF_SIZE (DEFAULT_MAXEVENTSPERSEC * DEFAULT_SUMMARY_PERIOD)
+#define DEFAULT_PAYLOAD_RING_SIZE 10000
 #define DEFAULT_CONFIG_SIZE 30 * 1024
 
 // we should start moving env var constants to one place

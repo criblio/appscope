@@ -54,6 +54,10 @@
 #define FIELD_NODE                   "field"
 #define VALUE_NODE                   "value"
 
+#define PAYLOAD_NODE          "payload"
+#define ENABLE_NODE              "enable"
+#define DIR_NODE                 "dir"
+
 typedef struct {
     const char* str;
     unsigned val;
@@ -147,6 +151,8 @@ void cfgMtcVerbositySetFromStr(config_t*, const char*);
 void cfgTransportSetFromStr(config_t*, which_transport_t, const char*);
 void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
+void cfgPayEnableSetFromStr(config_t*, const char*);
+void cfgPayDirSetFromStr(config_t*, const char*);
 
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
@@ -423,6 +429,10 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgTransportSetFromStr(cfg, CFG_LOG, value);
     } else if (startsWith(env_line, "SCOPE_TAG_")) {
         processCustomTag(cfg, env_line, value);
+    } else if (startsWith(env_line, "SCOPE_PAYLOAD_ENABLE")) {
+        cfgPayEnableSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_PAYLOAD_DIR")) {
+        cfgPayDirSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_CMD_DBG_PATH")) {
         processCmdDebug(value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DEST")) {
@@ -747,6 +757,20 @@ cfgLogLevelSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     cfgLogLevelSet(cfg, strToVal(logLevelMap, value));
+}
+
+void
+cfgPayEnableSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgPayEnableSet(cfg, strToVal(boolMap, value));
+}
+
+void
+cfgPayDirSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgPayDirSet(cfg, value);
 }
 
 #ifndef NO_YAML
@@ -1213,6 +1237,39 @@ processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
+processPayloadEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    cfgPayEnableSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
+processPayloadDir(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    cfgPayDirSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
+processPayload(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE,    ENABLE_NODE,          processPayloadEnable},
+        {YAML_SCALAR_NODE,    DIR_NODE,             processPayloadDir},
+        {YAML_NO_NODE,        NULL,                 NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
+static void
 setConfigFromDoc(config_t* config, yaml_document_t* doc)
 {
     yaml_node_t* node = yaml_document_get_root_node(doc);
@@ -1221,6 +1278,7 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
     parse_table_t t[] = {
         {YAML_MAPPING_NODE,   METRIC_NODE,          processMetric},
         {YAML_MAPPING_NODE,   LIBSCOPE_NODE,        processLibscope},
+        {YAML_MAPPING_NODE,   PAYLOAD_NODE,         processPayload},
         {YAML_MAPPING_NODE,   EVENT_NODE,           processEvent},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
@@ -1535,6 +1593,24 @@ err:
 }
 
 static cJSON*
+createPayloadJson(config_t *cfg)
+{
+    cJSON *root = NULL;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
+                         valToStr(boolMap, cfgPayEnable(cfg)))) goto err;
+    if (!cJSON_AddStringToObjLN(root, DIR_NODE,
+                         cfgPayDir(cfg))) goto err;
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
 createLibscopeJson(config_t* cfg)
 {
     cJSON* root = NULL;
@@ -1564,7 +1640,7 @@ cJSON*
 jsonObjectFromCfg(config_t* cfg)
 {
     cJSON* json_root = NULL;
-    cJSON* metric, *libscope, *event;
+    cJSON* metric, *libscope, *event, *payload;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
@@ -1574,8 +1650,11 @@ jsonObjectFromCfg(config_t* cfg)
     if (!(libscope = createLibscopeJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(json_root, LIBSCOPE_NODE, libscope);
 
-     if (!(event = createEventJson(cfg))) goto err;
+    if (!(event = createEventJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(json_root, EVENT_NODE, event);
+
+    if (!(payload = createPayloadJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, PAYLOAD_NODE, payload);
 
     return json_root;
 err:
@@ -1722,6 +1801,8 @@ initCtl(config_t *cfg)
     ctlEvtSet(ctl, evt);
 
     ctlEnhanceFsSet(ctl, cfgEnhanceFs(cfg));
+    ctlPayEnableSet(ctl, cfgPayEnable(cfg));
+    ctlPayDirSet(ctl,    cfgPayDir(cfg));
 
     return ctl;
 }

@@ -119,6 +119,10 @@ bool            ctlEvtSourceEnabled(ctl_t *, watch_t);
 
 unsigned        ctlEnhanceFs(ctl_t *);
 void            ctlEnhanceFsSet(ctl_t *, unsigned);
+unsigned int    ctlPayEnable(ctl_t *);
+void            ctlPayEnableSet(ctl_t *, unsigned int);
+const char *    ctlPayDir(ctl_t *);
+void            ctlPayDirSet(ctl_t *, const char *);
 
 // Retreive events
 uint64_t   ctlGetEvent(ctl_t *);

@@ -337,7 +337,7 @@ dnsNoName(void** state)
 static void
 dnsGethostbyname(void** state)
 {
-    gethostbyname(DOMAIN);
+    assert_non_null(gethostbyname(DOMAIN));
     assert_int_equal(0, checkMetric(DOMAIN));
     truncFile();
 }
@@ -346,7 +346,7 @@ dnsGethostbyname(void** state)
 static void
 dnsGethostbyname2(void** state)
 {
-    gethostbyname2(DOMAIN, AF_INET);
+    assert_non_null(gethostbyname2(DOMAIN, AF_INET));
     assert_int_equal(0, checkMetric(DOMAIN));
     truncFile();
 }

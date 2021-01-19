@@ -14,7 +14,6 @@
 #include "fn.h"
 #include "httpagg.h"
 #include "mtcformat.h"
-#include "os.h"
 #include "plattime.h"
 #include "report.h"
 #include "search.h"
@@ -36,8 +35,8 @@
 #define PROC_UID(val)           NUMFIELD("proc.uid",       (val), 4, TRUE)
 #define PROC_GID(val)           NUMFIELD("proc.gid",       (val), 4, TRUE)
 #define PROC_CGROUP(val)        STRFIELD("proc.cgroup",    (val), 4, TRUE)
-#define HOST_FIELD(val)         STRFIELD("host",           (val), 4, FALSE)
-#define PROC_FIELD(val)         STRFIELD("proc",           (val), 4, FALSE)
+#define HOST_FIELD(val)         STRFIELD("host",           (val), 4, TRUE)
+#define PROC_FIELD(val)         STRFIELD("proc",           (val), 4, TRUE)
 #define HTTPSTAT_FIELD(val)     NUMFIELD("http_status",    (val), 4, TRUE)
 #define DOMAIN_FIELD(val)       STRFIELD("domain",         (val), 5, TRUE)
 

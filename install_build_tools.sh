@@ -88,7 +88,6 @@ macOS_automake_install() {
     brew install automake
     # We had a new failure with macOS 10.14 on azure on 8-dec-2020.
     # Work around it by ignoring the return code
-    #    if [ $? = 0 ]; then
     if automake --version &>/dev/null; then
         echo "Installation of automake successful."
     else

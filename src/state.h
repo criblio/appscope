@@ -59,5 +59,6 @@ int doProtocol(uint64_t, int, void *, size_t, metric_t, src_data_t);
 int doSSL(uint64_t, int, void *, size_t, metric_t, src_data_t, char *);
 bool addProtocol(request_t *);
 bool delProtocol(request_t *);
+void setRemoteClose(int, int);
 
 #endif // __STATE_H__

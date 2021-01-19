@@ -1,5 +1,7 @@
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include "dbg.h"
 #include "log.h"
 
@@ -40,7 +42,7 @@ logSend(log_t* log, const char* msg, cfg_log_level_t mlevel)
 
     if ((log->level == CFG_LOG_NONE) || (log->level > mlevel)) return 0;
     
-    return transportSend(log->transport, msg);
+    return transportSend(log->transport, msg, strlen(msg));
 }
 
 cfg_log_level_t

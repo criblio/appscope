@@ -35,21 +35,28 @@
 #define BUFFERING_NODE               "buffering"
 
 #define LIBSCOPE_NODE        "libscope"
-#define TRANSPORT_NODE           "transport"
 #define LOG_NODE                 "log"
 #define LEVEL_NODE                   "level"
 #define TRANSPORT_NODE               "transport"
 #define SUMMARYPERIOD_NODE       "summaryperiod"
 #define COMMANDDIR_NODE          "commanddir"
+#define CFGEVENT_NODE            "configevent"
 
 #define EVENT_NODE           "event"
+#define TRANSPORT_NODE           "transport"
 #define FORMAT_NODE              "format"
 #define TYPE_NODE                    "type"
+#define MAXEPS_NODE                  "maxeventpersec"
+#define ENHANCEFS_NODE               "enhancefs"
 #define WATCH_NODE               "watch"
 #define TYPE_NODE                    "type"
 #define NAME_NODE                    "name"
 #define FIELD_NODE                   "field"
 #define VALUE_NODE                   "value"
+
+#define PAYLOAD_NODE          "payload"
+#define ENABLE_NODE              "enable"
+#define DIR_NODE                 "dir"
 
 typedef struct {
     const char* str;
@@ -75,9 +82,8 @@ const char* valToStr(enum_map_t map[], unsigned val)
 }
 
 enum_map_t formatMap[] = {
-    {"metricstatsd",          CFG_METRIC_STATSD},
-    {"metricjson",            CFG_METRIC_JSON},
-    {"ndjson",                CFG_EVENT_ND_JSON},
+    {"statsd",                CFG_FMT_STATSD},
+    {"ndjson",                CFG_FMT_NDJSON},
     {NULL,                    -1}
 };
 
@@ -113,6 +119,9 @@ enum_map_t watchTypeMap[] = {
     {"syslog",                CFG_SRC_SYSLOG},
     {"metric",                CFG_SRC_METRIC},
     {"http",                  CFG_SRC_HTTP},
+    {"net",                   CFG_SRC_NET},
+    {"fs",                    CFG_SRC_FS},
+    {"dns",                   CFG_SRC_DNS},
     {NULL,                    -1}
 };
 
@@ -129,8 +138,11 @@ void cfgMtcStatsDPrefixSetFromStr(config_t*, const char*);
 void cfgMtcStatsDMaxLenSetFromStr(config_t*, const char*);
 void cfgMtcPeriodSetFromStr(config_t*, const char*);
 void cfgCmdDirSetFromStr(config_t*, const char*);
+void cfgConfigEventSetFromStr(config_t*, const char*);
 void cfgEvtEnableSetFromStr(config_t*, const char*);
 void cfgEventFormatSetFromStr(config_t*, const char*);
+void cfgEvtRateLimitSetFromStr(config_t*, const char*);
+void cfgEnhanceFsSetFromStr(config_t*, const char*);
 void cfgEvtFormatValueFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatFieldFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatNameFilterSetFromStr(config_t*, watch_t, const char*);
@@ -139,6 +151,8 @@ void cfgMtcVerbositySetFromStr(config_t*, const char*);
 void cfgTransportSetFromStr(config_t*, which_transport_t, const char*);
 void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
+void cfgPayEnableSetFromStr(config_t*, const char*);
+void cfgPayDirSetFromStr(config_t*, const char*);
 
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
@@ -403,6 +417,8 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgMtcPeriodSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_CMD_DIR")) {
         cfgCmdDirSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_CONFIG_EVENT")) {
+        cfgConfigEventSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_METRIC_VERBOSITY")) {
         cfgMtcVerbositySetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_LOG_LEVEL")) {
@@ -413,6 +429,10 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgTransportSetFromStr(cfg, CFG_LOG, value);
     } else if (startsWith(env_line, "SCOPE_TAG_")) {
         processCustomTag(cfg, env_line, value);
+    } else if (startsWith(env_line, "SCOPE_PAYLOAD_ENABLE")) {
+        cfgPayEnableSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_PAYLOAD_DIR")) {
+        cfgPayDirSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_CMD_DBG_PATH")) {
         processCmdDebug(value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DEST")) {
@@ -421,6 +441,10 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtEnableSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
         cfgEventFormatSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_MAXEPS")) {
+        cfgEvtRateLimitSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_ENHANCE_FS")) {
+        cfgEnhanceFsSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_NAME")) {
@@ -431,6 +455,12 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_NET_NAME")) {
+        cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_NET, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_FS_NAME")) {
+        cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FS, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_DNS_NAME")) {
+        cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_DNS, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_FIELD")) {
@@ -441,6 +471,12 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_NET_FIELD")) {
+        cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_NET, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_FS_FIELD")) {
+        cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_FS, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_DNS_FIELD")) {
+        cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_DNS, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_VALUE")) {
@@ -451,6 +487,12 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_NET_VALUE")) {
+        cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_NET, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_FS_VALUE")) {
+        cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_FS, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_DNS_VALUE")) {
+        cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_DNS, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE")) {
@@ -461,6 +503,12 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_HTTP")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_HTTP, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_NET")) {
+        cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_NET, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_FS")) {
+        cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FS, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_DNS")) {
+        cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_DNS, value);
     }
 
     free(value);
@@ -564,6 +612,13 @@ cfgCmdDirSetFromStr(config_t* cfg, const char* value)
 }
 
 void
+cfgConfigEventSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgSendProcessStartMsgSet(cfg, strToVal(boolMap, value));
+}
+
+void
 cfgEvtEnableSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
@@ -574,7 +629,28 @@ void
 cfgEventFormatSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    cfgEventFormatSet(cfg, strToVal(formatMap, value));
+    // only ndjson is valid
+    cfgEventFormatSet(cfg, CFG_FMT_NDJSON);
+    //cfgEventFormatSet(cfg, strToVal(formatMap, value));
+}
+
+void
+cfgEvtRateLimitSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    errno = 0;
+    char* endptr = NULL;
+    unsigned long x = strtoul(value, &endptr, 10);
+    if (errno || *endptr) return;
+
+    cfgEvtRateLimitSet(cfg, x);
+}
+
+void
+cfgEnhanceFsSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgEnhanceFsSet(cfg, strToVal(boolMap, value));
 }
 
 void
@@ -681,6 +757,20 @@ cfgLogLevelSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     cfgLogLevelSet(cfg, strToVal(logLevelMap, value));
+}
+
+void
+cfgPayEnableSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgPayEnableSet(cfg, strToVal(boolMap, value));
+}
+
+void
+cfgPayDirSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgPayDirSet(cfg, value);
 }
 
 #ifndef NO_YAML
@@ -875,6 +965,22 @@ processFormatTypeEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node
 }
 
 static void
+processFormatMaxEps(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char* value = stringVal(node);
+    cfgEvtRateLimitSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
+processEnhanceFs(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char* value = stringVal(node);
+    cfgEnhanceFsSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
 processStatsDPrefix(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
@@ -943,6 +1049,14 @@ processCommandDir(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
+processConfigEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char* value = stringVal(node);
+    cfgConfigEventSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
 processMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_MAPPING_NODE) return;
@@ -975,6 +1089,8 @@ processEvtFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,    TYPE_NODE,            processFormatTypeEvent},
+        {YAML_SCALAR_NODE,    MAXEPS_NODE,          processFormatMaxEps},
+        {YAML_SCALAR_NODE,    ENHANCEFS_NODE,       processEnhanceFs},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1089,6 +1205,7 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,    ENABLE_NODE,          processEvtEnable},
+        {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportCtl},
         {YAML_MAPPING_NODE,   FORMAT_NODE,          processEvtFormat},
         {YAML_SEQUENCE_NODE,  WATCH_NODE,           processWatch},
         {YAML_NO_NODE,        NULL,                 NULL}
@@ -1106,10 +1223,43 @@ processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportCtl},
         {YAML_MAPPING_NODE,   LOG_NODE,             processLogging},
         {YAML_SCALAR_NODE,    SUMMARYPERIOD_NODE,   processSummaryPeriod},
         {YAML_SCALAR_NODE,    COMMANDDIR_NODE,      processCommandDir},
+        {YAML_SCALAR_NODE,    CFGEVENT_NODE,        processConfigEvent},
+        {YAML_NO_NODE,        NULL,                 NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
+static void
+processPayloadEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    cfgPayEnableSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
+processPayloadDir(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    cfgPayDirSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
+processPayload(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE,    ENABLE_NODE,          processPayloadEnable},
+        {YAML_SCALAR_NODE,    DIR_NODE,             processPayloadDir},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1128,6 +1278,7 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
     parse_table_t t[] = {
         {YAML_MAPPING_NODE,   METRIC_NODE,          processMetric},
         {YAML_MAPPING_NODE,   LIBSCOPE_NODE,        processLibscope},
+        {YAML_MAPPING_NODE,   PAYLOAD_NODE,         processPayload},
         {YAML_MAPPING_NODE,   EVENT_NODE,           processEvent},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
@@ -1404,6 +1555,10 @@ createEventFormatJson(config_t* cfg)
     if (!(root = cJSON_CreateObject())) goto err;
     if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
                       valToStr(formatMap, cfgEventFormat(cfg)))) goto err;
+    if (!cJSON_AddNumberToObjLN(root, MAXEPS_NODE,
+                      cfgEvtRateLimit(cfg))) goto err;
+    if (!cJSON_AddStringToObjLN(root, ENHANCEFS_NODE,
+                      valToStr(boolMap, cfgEnhanceFs(cfg)))) goto err;
 
     return root;
 err:
@@ -1415,12 +1570,15 @@ static cJSON*
 createEventJson(config_t* cfg)
 {
     cJSON* root = NULL;
-    cJSON* format, *watch;
+    cJSON* format, *watch, *transport;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
     if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
                           valToStr(boolMap, cfgEvtEnable(cfg)))) goto err;
+
+    if (!(transport = createTransportJson(cfg, CFG_CTL))) goto err;
+    cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
 
     if (!(format = createEventFormatJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, FORMAT_NODE, format);
@@ -1435,18 +1593,36 @@ err:
 }
 
 static cJSON*
-createLibscopeJson(config_t* cfg)
+createPayloadJson(config_t *cfg)
 {
-    cJSON* root = NULL;
-    cJSON* transport, *log;
+    cJSON *root = NULL;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
-    if (!(transport = createTransportJson(cfg, CFG_CTL))) goto err;
-    cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
+    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
+                         valToStr(boolMap, cfgPayEnable(cfg)))) goto err;
+    if (!cJSON_AddStringToObjLN(root, DIR_NODE,
+                         cfgPayDir(cfg))) goto err;
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createLibscopeJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+    cJSON *log;
+
+    if (!(root = cJSON_CreateObject())) goto err;
 
     if (!(log = createLogJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, LOG_NODE, log);
+
+    if (!cJSON_AddStringToObjLN(root, CFGEVENT_NODE,
+                 valToStr(boolMap, cfgSendProcessStartMsg(cfg)))) goto err;
 
     if (!cJSON_AddNumberToObjLN(root, SUMMARYPERIOD_NODE,
                                       cfgMtcPeriod(cfg))) goto err;
@@ -1464,7 +1640,7 @@ cJSON*
 jsonObjectFromCfg(config_t* cfg)
 {
     cJSON* json_root = NULL;
-    cJSON* metric, *libscope, *event;
+    cJSON* metric, *libscope, *event, *payload;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
@@ -1474,8 +1650,11 @@ jsonObjectFromCfg(config_t* cfg)
     if (!(libscope = createLibscopeJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(json_root, LIBSCOPE_NODE, libscope);
 
-     if (!(event = createEventJson(cfg))) goto err;
+    if (!(event = createEventJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(json_root, EVENT_NODE, event);
+
+    if (!(payload = createPayloadJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, PAYLOAD_NODE, payload);
 
     return json_root;
 err:
@@ -1591,6 +1770,7 @@ initEvtFormat(config_t *cfg)
         evtFormatFieldFilterSet(evt, src, cfgEvtFormatFieldFilter(cfg, src));
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
     }
+    evtFormatRateLimitSet(evt, cfgEvtRateLimit(cfg));
 
     return evt;
 }
@@ -1619,6 +1799,10 @@ initCtl(config_t *cfg)
         return ctl;
     }
     ctlEvtSet(ctl, evt);
+
+    ctlEnhanceFsSet(ctl, cfgEnhanceFs(cfg));
+    ctlPayEnableSet(ctl, cfgPayEnable(cfg));
+    ctlPayDirSet(ctl,    cfgPayDir(cfg));
 
     return ctl;
 }

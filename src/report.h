@@ -18,6 +18,7 @@ typedef enum {
 typedef enum {
     OPEN_PORTS,
     NET_CONNECTIONS,
+    CONNECTION_OPEN,
     CONNECTION_DURATION,
     PROC_CPU,
     PROC_MEM,
@@ -66,6 +67,7 @@ typedef enum {
     EVT_HREQ,
     EVT_HRES,
     EVT_DETECT,
+    EVT_PAYLOAD,
     TLSRX,
     TLSTX
 } metric_t;
@@ -90,5 +92,6 @@ void doStatMetric(const char *, const char *, void *);
 void doTotal(metric_t);
 void doTotalDuration(metric_t);
 void doEvent(void);
+void doPayload(void);
 
 #endif // __REPORT_H__

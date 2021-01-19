@@ -59,10 +59,11 @@ void                 dbgAddLine(const char* key, const char* fmt, ...);
 // logging utilities
 //
 
-extern log_t* g_log;
+extern log_t *g_log;
 extern proc_id_t g_proc;
 
-void scopeLog(const char* msg, int fd, cfg_log_level_t level);
+void scopeLog(const char *, int, cfg_log_level_t);
 
+int checkEnv(char *, char *);
 
 #endif // __DBG_H__

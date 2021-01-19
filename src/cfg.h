@@ -20,9 +20,12 @@ const char*         cfgMtcStatsDPrefix(config_t*);
 unsigned            cfgMtcStatsDMaxLen(config_t*);
 unsigned            cfgMtcPeriod(config_t*);
 const char*         cfgCmdDir(config_t*);
+unsigned            cfgSendProcessStartMsg(config_t*);
 unsigned            cfgMtcVerbosity(config_t*);
 unsigned            cfgEvtEnable(config_t*);
 cfg_mtc_format_t    cfgEventFormat(config_t*);
+unsigned            cfgEvtRateLimit(config_t*);
+unsigned            cfgEnhanceFs(config_t*);
 const char*         cfgEvtFormatValueFilter(config_t*, watch_t);
 const char*         cfgEvtFormatFieldFilter(config_t*, watch_t);
 const char*         cfgEvtFormatNameFilter(config_t*, watch_t);
@@ -35,6 +38,8 @@ cfg_buffer_t        cfgTransportBuf(config_t*, which_transport_t);
 custom_tag_t**      cfgCustomTags(config_t*);
 const char*         cfgCustomTagValue(config_t*, const char*);
 cfg_log_level_t     cfgLogLevel(config_t*);
+unsigned int        cfgPayEnable(config_t*);
+const char *        cfgPayDir(config_t*);
 
 // Setters (modifies config_t, but does not persist modifications)
 void                cfgMtcEnableSet(config_t*, unsigned);
@@ -43,9 +48,12 @@ void                cfgMtcStatsDPrefixSet(config_t*, const char*);
 void                cfgMtcStatsDMaxLenSet(config_t*, unsigned);
 void                cfgMtcPeriodSet(config_t*, unsigned);
 void                cfgCmdDirSet(config_t*, const char*);
+void                cfgSendProcessStartMsgSet(config_t*, unsigned);
 void                cfgMtcVerbositySet(config_t*, unsigned);
 void                cfgEvtEnableSet(config_t*, unsigned);
 void                cfgEventFormatSet(config_t*, cfg_mtc_format_t);
+void                cfgEvtRateLimitSet(config_t*, unsigned);
+void                cfgEnhanceFsSet(config_t*, unsigned);
 void                cfgEvtFormatValueFilterSet(config_t*, watch_t, const char*);
 void                cfgEvtFormatFieldFilterSet(config_t*, watch_t, const char*);
 void                cfgEvtFormatNameFilterSet(config_t*, watch_t, const char*);
@@ -57,4 +65,6 @@ void                cfgTransportPathSet(config_t*, which_transport_t, const char
 void                cfgTransportBufSet(config_t*, which_transport_t, cfg_buffer_t);
 void                cfgCustomTagAdd(config_t*, const char*, const char*);
 void                cfgLogLevelSet(config_t*, cfg_log_level_t);
+void                cfgPayEnableSet(config_t*, unsigned int);
+void                cfgPayDirSet(config_t*, const char *);
 #endif // __CFG_H__

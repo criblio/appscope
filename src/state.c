@@ -21,6 +21,8 @@
 #include "state.h"
 #include "state_private.h"
 #include "pcre2.h"
+#include "fn.h"
+#include "os.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
@@ -292,6 +294,31 @@ dumpAddrs(int sd)
 }
 #endif
 
+void
+doUnixEndpoint(int sd, net_info *net)
+{
+    ino_t rnode;
+    struct stat sbuf;
+
+    if (!net) return;
+
+    if ((fstat(sd, &sbuf) == -1) ||
+        ((sbuf.st_mode & S_IFMT) != S_IFSOCK)) {
+        net->lnode = 0;
+        net->rnode = 0;
+        return;
+    }
+
+    if ((rnode = osUnixSockPeer(sbuf.st_ino)) != -1) {
+        net->lnode = sbuf.st_ino;
+        net->rnode = rnode;
+    } else {
+        net->lnode = 0;
+        net->rnode = 0;
+    }
+    return;
+}
+
 static int
 postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const char *pathname)
 {
@@ -374,6 +401,7 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
     int mtc_needs_reporting = summarize && !*summarize;
     int need_to_post =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) ||
         (mtcEnabled(g_mtc) && mtc_needs_reporting);
     if (!need_to_post) return FALSE;
 
@@ -406,6 +434,7 @@ postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char
     int mtc_needs_reporting = !g_summary.net.dns;
     int need_to_post =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_DNS) ||
         (mtcEnabled(g_mtc) && mtc_needs_reporting);
     if (!need_to_post) return FALSE;
 
@@ -413,7 +442,7 @@ postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char
     net_info *netp = calloc(1, len);
     if (!netp) return FALSE;
 
-    memmove(netp, net, len);
+    if (net) memmove(netp, net, len);
     netp->fd = fd;
     netp->evtype = EVT_DNS;
     netp->data_type = type;
@@ -455,6 +484,7 @@ postNetState(int fd, metric_t type, net_info *net)
     int mtc_needs_reporting = summarize && !*summarize;
     int need_to_post =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
         (mtcEnabled(g_mtc) && mtc_needs_reporting);
     if (!need_to_post) return FALSE;
 
@@ -536,7 +566,10 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             addToInterfaceCounts(&g_ctrs.connDurationNum, 1);
             addToInterfaceCounts(&g_ctrs.connDurationTotal, new_duration);
         }
-        if (postNetState(fd, type, &g_netinfo[fd])) {
+
+        if ((g_netinfo[fd].rxBytes.evt > 0) || (g_netinfo[fd].txBytes.evt > 0) ||
+            (g_netinfo[fd].rxBytes.mtc > 0) || (g_netinfo[fd].txBytes.mtc > 0)) {
+            postNetState(fd, type, &g_netinfo[fd]);
             atomicSwapU64(&g_netinfo[fd].numDuration.mtc, 0);
             atomicSwapU64(&g_netinfo[fd].totalDuration.mtc, 0);
             //subFromInterfaceCounts(&g_ctrs.connDurationNum, 1);
@@ -544,6 +577,16 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
         }
         atomicSwapU64(&g_netinfo[fd].numDuration.evt, 0);
         atomicSwapU64(&g_netinfo[fd].totalDuration.evt, 0);
+        break;
+    }
+
+    case CONNECTION_OPEN:
+    {
+        if (checkNetEntry(fd) && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) &&
+            (((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)) ||
+             (funcop && !strncmp(funcop, "dup", 3)))) {
+                postNetState(fd, type, &g_netinfo[fd]);
+        }
         break;
     }
 
@@ -559,8 +602,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             atomicSwapU64(&g_netinfo[fd].rxBytes.mtc, 0);
             //subFromInterfaceCounts(&g_ctrs.netrxBytes, size);
         }
-        atomicSwapU64(&g_netinfo[fd].numRX.evt, 0);
-        atomicSwapU64(&g_netinfo[fd].rxBytes.evt, 0);
+        //atomicSwapU64(&g_netinfo[fd].numRX.evt, 0);
+        //atomicSwapU64(&g_netinfo[fd].rxBytes.evt, 0);
         break;
     }
 
@@ -576,31 +619,51 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             atomicSwapU64(&g_netinfo[fd].txBytes.mtc, 0);
             //subFromInterfaceCounts(&g_ctrs.nettxBytes, size);
         }
-        atomicSwapU64(&g_netinfo[fd].numTX.evt, 0);
-        atomicSwapU64(&g_netinfo[fd].txBytes.evt, 0);
+        //atomicSwapU64(&g_netinfo[fd].numTX.evt, 0);
+        //atomicSwapU64(&g_netinfo[fd].txBytes.evt, 0);
         break;
     }
 
     case DNS:
     {
-        if (!checkNetEntry(fd)) break;
-        addToInterfaceCounts(&g_ctrs.numDNS, 1);
-        if (postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname)) {
-            atomicSubU64(&g_ctrs.numDNS.mtc, 1);
+        int rc;
+
+        // on DNS resp only inc events
+        if (size > 0) {
+            atomicAddU64(&g_ctrs.numDNS.evt, 1);
+        } else {
+            addToInterfaceCounts(&g_ctrs.numDNS, 1);
         }
+
+        if (checkNetEntry(fd)) {
+            rc = postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname);
+        } else {
+            rc = postDNSState(fd, type, NULL, (uint64_t)size, pathname);
+        }
+
+        if (rc && (size == 0)) atomicSubU64(&g_ctrs.numDNS.mtc, 1);
         atomicSubU64(&g_ctrs.numDNS.evt, 1);
         break;
     }
 
     case DNS_DURATION:
     {
-        if (!checkNetEntry(fd)) break;
+        int rc;
+
         addToInterfaceCounts(&g_ctrs.dnsDurationNum, 1);
         addToInterfaceCounts(&g_ctrs.dnsDurationTotal, 0);
-        if (postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname)) {
+
+        if (checkNetEntry(fd)) {
+            rc = postDNSState(fd, type, &g_netinfo[fd], size, pathname);
+        } else {
+            rc = postDNSState(fd, type, NULL, size, pathname);
+        }
+
+        if (rc) {
             atomicSwapU64(&g_ctrs.dnsDurationNum.mtc, 0);
             atomicSwapU64(&g_ctrs.dnsDurationTotal.mtc, 0);
         }
+
         atomicSwapU64(&g_ctrs.dnsDurationNum.evt, 0);
         atomicSwapU64(&g_ctrs.dnsDurationTotal.evt, 0);
         break;
@@ -617,8 +680,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             atomicSwapU64(&g_fsinfo[fd].numDuration.mtc, 0);
             atomicSwapU64(&g_fsinfo[fd].totalDuration.mtc, 0);
         }
-        atomicSwapU64(&g_fsinfo[fd].numDuration.evt, 0);
-        atomicSwapU64(&g_fsinfo[fd].totalDuration.evt, 0);
+        //atomicSwapU64(&g_fsinfo[fd].numDuration.evt, 0);
+        //atomicSwapU64(&g_fsinfo[fd].totalDuration.evt, 0);
         break;
     }
 
@@ -633,8 +696,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             atomicSwapU64(&g_fsinfo[fd].readBytes.mtc, 0);
             //subFromInterfaceCounts(&g_ctrs.readBytes, size);
         }
-        atomicSwapU64(&g_fsinfo[fd].numRead.evt, 0);
-        atomicSwapU64(&g_fsinfo[fd].readBytes.evt, 0);
+        //atomicSwapU64(&g_fsinfo[fd].numRead.evt, 0);
+        //atomicSwapU64(&g_fsinfo[fd].readBytes.evt, 0);
         break;
     }
 
@@ -649,8 +712,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             atomicSwapU64(&g_fsinfo[fd].writeBytes.mtc, 0);
             //subFromInterfaceCounts(&g_ctrs.writeBytes, size);
         }
-        atomicSwapU64(&g_fsinfo[fd].numWrite.evt, 0);
-        atomicSwapU64(&g_fsinfo[fd].writeBytes.evt, 0);
+        //atomicSwapU64(&g_fsinfo[fd].numWrite.evt, 0);
+        //atomicSwapU64(&g_fsinfo[fd].writeBytes.evt, 0);
         break;
     }
 
@@ -845,6 +908,39 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     return TRUE;
 }
 
+static int
+extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
+{
+    if (!buf || (len <= 0)) return -1;
+
+    payload_info *pinfo = calloc(1, sizeof(struct payload_info_t));
+    if (!pinfo) {
+        return -1;
+    }
+
+    pinfo->data = calloc(1, len);
+    if (!pinfo->data) {
+        free(pinfo);
+        return -1;
+    }
+
+    memmove(pinfo->data, buf, len);
+    if (net) memmove(&pinfo->net, net, sizeof(net_info));
+
+    pinfo->evtype = EVT_PAYLOAD;
+    pinfo->src = src;
+    pinfo->sockfd = sockfd;
+    pinfo->len = len;
+
+    if (cmdPostPayload(g_ctl, (char *)pinfo) == -1) {
+        if (pinfo->data) free(pinfo->data);
+        if (pinfo) free(pinfo);
+        return -1;
+    }
+
+    return 0;
+}
+
 static void
 detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
@@ -903,6 +999,12 @@ int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     net_info *net = getNetEntry(sockfd);
+
+    if (ctlPayEnable(g_ctl)) {
+        // instead of or in addition to http &/or detect?
+        extractPayload(sockfd, net, buf, len, src, dtype);
+        return 0;
+    }
 
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
         if (doHttp(id, sockfd, net, buf, len, src, dtype)) {
@@ -1003,6 +1105,16 @@ getFSEntry(int fd)
     }
 
     return NULL;
+}
+
+void
+setRemoteClose(int sd, int err)
+{
+    net_info *net;
+
+    if ((err == EPIPE) && ((net = getNetEntry(sd)))) {
+        net->remoteClose = TRUE;
+    }
 }
 
 void
@@ -1110,6 +1222,10 @@ doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, control_type
             memmove(&g_netinfo[sd].remoteConn, addr, len);
             if (net->type == SOCK_STREAM) net->addrSetRemote = TRUE;
         }
+
+        if (addrIsNetDomain(&g_netinfo[sd].localConn)) {
+            doUpdateState(CONNECTION_OPEN, sd, 1, NULL, NULL);
+        }
     }
 }
 
@@ -1123,7 +1239,9 @@ doSetAddrs(int sockfd)
     // Only do this if output is enabled
     int need_to_track_addrs =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
-        (mtcEnabled(g_mtc) && g_mtc_addr_output);
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
+        (mtcEnabled(g_mtc) && g_mtc_addr_output) ||
+        ctlPayEnable(g_ctl);
     if (!need_to_track_addrs) return 0;
 
     /*
@@ -1134,12 +1252,12 @@ doSetAddrs(int sockfd)
      */
     if ((net = getNetEntry(sockfd)) == NULL) return 0;
 
-    // TODO: dont think LOCAL is correct?
     if (addrIsUnixDomain(&net->remoteConn) ||
         addrIsUnixDomain(&net->localConn)) {
         if (net->addrSetUnix == TRUE) return 0;
         doUnixEndpoint(sockfd, net);
         net->addrSetUnix = TRUE;
+        doUpdateState(CONNECTION_OPEN, sockfd, 1, NULL, NULL);
         return 0;
     }
 
@@ -1378,7 +1496,23 @@ doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         }
 
         doSetAddrs(sockfd);
+
+        /*
+         * If a netrx operation returns a len of 0
+         * it means that the remote end has disconnected.
+         * This is the the traditional "end-of-file"
+         */
+        if (len == 0) {
+            g_netinfo[sockfd].remoteClose = TRUE;
+            // Seems that returning here makes sense with a len of 0
+            return 0;
+        }
+
         doUpdateState(NETRX, sockfd, rc, NULL, NULL);
+
+        if (remotePortIsDNS(sockfd) && (g_netinfo[sockfd].dnsName[0])) {
+            doUpdateState(DNS, sockfd, (ssize_t)1, NULL, g_netinfo[sockfd].dnsName);
+        }
 
         if ((sockfd != -1) && buf) {
             doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETRX, src);
@@ -1399,7 +1533,6 @@ doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         doUpdateState(NETTX, sockfd, rc, NULL, NULL);
 
         if (get_port(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
-            // tbd - consider calling doDNSMetricName instead...
             if (g_netinfo[sockfd].dnsName[0]) {
                 doUpdateState(DNS, sockfd, (ssize_t)0, NULL, NULL);
             }
@@ -1635,6 +1768,7 @@ doDupSock(int oldfd, int newfd)
     g_netinfo[newfd].totalDuration = (counters_element_t){.mtc=0, .evt=0};
     g_netinfo[newfd].numDuration = (counters_element_t){.mtc=0, .evt=0};
 
+    doUpdateState(CONNECTION_OPEN, newfd, 1, "dup", NULL);
     return 0;
 }
 
@@ -1767,6 +1901,15 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
         g_fsinfo[fd].type = type;
         g_fsinfo[fd].uid = getTime();
         strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
+
+        if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) && ctlEnhanceFs(g_ctl)) {
+            struct stat sbuf;
+            if ((g_fn.__xstat) && (g_fn.__xstat(1, g_fsinfo[fd].path, &sbuf) == 0)) {
+                g_fsinfo[fd].fuid = sbuf.st_uid;
+                g_fsinfo[fd].fgid = sbuf.st_gid;
+                g_fsinfo[fd].mode = sbuf.st_mode;
+            }
+        }
 
         doUpdateState(FS_OPEN, fd, 0, func, path);
         scopeLog(func, fd, CFG_LOG_TRACE);

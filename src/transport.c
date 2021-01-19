@@ -819,7 +819,7 @@ transportDestroy(transport_t** transport)
 }
 
 int
-transportSend(transport_t *trans, const char *msg)
+transportSend(transport_t *trans, const char *msg, size_t len)
 {
     if (!trans || !msg) return -1;
 
@@ -830,7 +830,7 @@ transportSend(transport_t *trans, const char *msg)
                     DBG(NULL);
                     break;
                 }
-                int rc = trans->send(trans->net.sock, msg, strlen(msg), 0);
+                int rc = trans->send(trans->net.sock, msg, len, 0);
 
                 if (rc < 0) {
                     switch (errno) {
@@ -859,7 +859,7 @@ transportSend(transport_t *trans, const char *msg)
                 flags |= MSG_NOSIGNAL;
 #endif
 
-                size_t bytes_to_send = strlen(msg);
+                size_t bytes_to_send = len;
                 size_t bytes_sent = 0;
                 int rc;
 
@@ -891,7 +891,7 @@ transportSend(transport_t *trans, const char *msg)
             break;
         case CFG_FILE:
             if (trans->file.stream) {
-                size_t msg_size = strlen(msg);
+                size_t msg_size = len;
                 int bytes = trans->fwrite(msg, 1, msg_size, trans->file.stream);
                 if (bytes != msg_size) {
                     if (errno == EBADF) {

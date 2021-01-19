@@ -1,11 +1,11 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "circbuf.h"
 #include "cfgutils.h"
 #include "ctl.h"
 #include "dbg.h"
-
 
 struct _ctl_t
 {
@@ -13,6 +13,13 @@ struct _ctl_t
     evt_fmt_t *evt;
     cbuf_handle_t evbuf;
     cbuf_handle_t events;
+    unsigned enhancefs;
+
+    struct {
+        unsigned int enable;
+        char * dir;
+        cbuf_handle_t ringbuf;
+    } payload;
 };
 
 typedef struct {
@@ -47,6 +54,10 @@ static bool srcEnabledDefault[] = {
     DEFAULT_SRC_CONSOLE,
     DEFAULT_SRC_SYSLOG,
     DEFAULT_SRC_METRIC,
+    DEFAULT_SRC_HTTP,
+    DEFAULT_SRC_NET,
+    DEFAULT_SRC_FS,
+    DEFAULT_SRC_DNS,
 };
 
 static void
@@ -451,6 +462,7 @@ prepMessage(upload_t *upld)
     if (!upld) return NULL;
 
     streamMsg = ctlCreateTxMsg(upld);
+    if (!streamMsg) return NULL;
 
     // Add the newline delimiter to the msg.
     int strsize = strlen(streamMsg);
@@ -458,6 +470,7 @@ prepMessage(upload_t *upld)
     if (!temp) {
         DBG(NULL);
         scopeLog("CTL realloc error", -1, CFG_LOG_INFO);
+        free(streamMsg);
         return NULL;
     }
 
@@ -520,6 +533,16 @@ ctlCreate()
         return NULL;
     }
 
+    ctl->enhancefs = DEFAULT_ENHANCE_FS;
+
+    ctl->payload.enable = DEFAULT_PAYLOAD_ENABLE;
+    ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
+    ctl->payload.ringbuf = cbufInit(DEFAULT_PAYLOAD_RING_SIZE);
+    if (!ctl->payload.ringbuf) {
+        DBG(NULL);
+        return NULL;
+    }
+
     return ctl;
 }
 
@@ -531,6 +554,9 @@ ctlDestroy(ctl_t **ctl)
     ctlFlush(*ctl);
     cbufFree((*ctl)->evbuf);
     cbufFree((*ctl)->events);
+
+    if ((*ctl)->payload.dir) free((*ctl)->payload.dir);
+    cbufFree((*ctl)->payload.ringbuf);
 
     transportDestroy(&(*ctl)->transport);
     evtFormatDestroy(&(*ctl)->evt);
@@ -629,7 +655,7 @@ ctlSendHttp(ctl_t *ctl, event_t *evt, uint64_t uid, proc_id_t *proc)
     upld.req = NULL;
     streamMsg = prepMessage(&upld);
 
-    rc = transportSend(ctl->transport, streamMsg);
+    rc = transportSend(ctl->transport, streamMsg, strlen(streamMsg));
     if (streamMsg) free(streamMsg);
     return rc;
 }
@@ -653,7 +679,7 @@ ctlSendEvent(ctl_t *ctl, event_t *evt, uint64_t uid, proc_id_t *proc)
     upld.req = NULL;
     streamMsg = prepMessage(&upld);
 
-    rc = transportSend(ctl->transport, streamMsg);
+    rc = transportSend(ctl->transport, streamMsg, strlen(streamMsg));
     if (streamMsg) free(streamMsg);
     return rc;
 
@@ -684,6 +710,7 @@ ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t
 
     // get a cJSON object for the given log msg
     cJSON *json = evtFormatLog(ctl->evt, path, buf, count, uid, proc);
+    if (!json) return 0;
 
     // send it
     return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
@@ -713,10 +740,18 @@ sendBufferedMessages(ctl_t *ctl)
                 msg[strsize] = '\n';
                 msg[strsize+1] = '\0';
             }
-            transportSend(ctl->transport, msg);
+            transportSend(ctl->transport, msg, strlen(msg));
             free(msg);
         }
     }
+}
+
+int
+ctlSendBin(ctl_t *ctl, char *buf, size_t len)
+{
+    if (!ctl || !buf) return -1;
+
+    return transportSend(ctl->transport, buf, len);
 }
 
 void
@@ -803,6 +838,52 @@ ctlEvtSourceEnabled(ctl_t *ctl, watch_t src)
     return srcEnabledDefault[CFG_SRC_FILE];
 }
 
+unsigned
+ctlEnhanceFs(ctl_t *ctl)
+{
+    return (ctl) ? ctl->enhancefs : DEFAULT_ENHANCE_FS;
+}
+
+void
+ctlEnhanceFsSet(ctl_t *ctl, unsigned val)
+{
+    if (!ctl) return;
+    ctl->enhancefs = val;
+}
+
+unsigned int
+ctlPayEnable(ctl_t *ctl)
+{
+    return (ctl) ? ctl->payload.enable : DEFAULT_PAYLOAD_ENABLE;
+}
+
+void
+ctlPayEnableSet(ctl_t *ctl, unsigned int val)
+{
+    if (!ctl) return;
+    ctl->payload.enable = val;
+}
+
+const char *
+ctlPayDir(ctl_t *ctl)
+{
+    return (ctl) ? ctl->payload.dir : DEFAULT_PAYLOAD_DIR;
+}
+
+void
+ctlPayDirSet(ctl_t *ctl, const char *dir)
+{
+    if (!ctl) return;
+    if (ctl->payload.dir) free(ctl->payload.dir);
+    if (!dir || (dir[0] == '\0')) {
+        ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
+        return;
+    }
+
+    ctl->payload.dir = strdup(dir);
+}
+
+
 uint64_t
 ctlGetEvent(ctl_t *ctl)
 {
@@ -820,3 +901,31 @@ ctlCbufEmpty(ctl_t *ctl)
 {
     return cbufEmpty(ctl->evbuf);
 }
+
+int
+ctlPostPayload(ctl_t *ctl, char *pay)
+{
+    if (!pay || !ctl) return -1;
+
+    if ((ctl->payload.ringbuf) &&
+        (cbufPut(ctl->payload.ringbuf, (uint64_t)pay) == -1)) {
+        // Full; drop and ignore
+        DBG(NULL);
+        return -1;
+    }
+    return 0;
+}
+
+uint64_t
+ctlGetPayload(ctl_t *ctl)
+{
+    uint64_t data;
+
+    if ((ctl->payload.ringbuf) &&
+        (cbufGet(ctl->payload.ringbuf, &data) == 0)) {
+        return data;
+    } else {
+        return (uint64_t)-1;
+    }
+}
+

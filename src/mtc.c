@@ -48,7 +48,7 @@ mtcSend(mtc_t *mtc, const char *msg)
 {
     if (!mtc || !msg) return -1;
 
-    return transportSend(mtc->transport, msg);
+    return transportSend(mtc->transport, msg, strlen(msg));
 }
 
 int
@@ -56,7 +56,7 @@ mtcSendMetric(mtc_t *mtc, event_t *evt)
 {
     if (!mtc || !evt) return -1;
 
-    char *msg = mtcFormatStatsDString(mtc->format, evt, NULL);
+    char *msg = mtcFormatEventForOutput(mtc->format, evt, NULL);
     int rv = mtcSend(mtc, msg);
     if (msg) free(msg);
     return rv;

@@ -40,6 +40,7 @@ static log_t *g_prevlog = NULL;
 static mtc_t *g_prevmtc = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
+static unsigned g_sendprocessstart;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
 
@@ -421,6 +422,7 @@ doConfig(config_t *cfg)
 
     setVerbosity(cfgMtcVerbosity(cfg));
     g_cmddir = cfgCmdDir(cfg);
+    g_sendprocessstart = cfgSendProcessStartMsg(cfg);
 
     g_log = initLog(cfg);
     g_mtc = initMtc(cfg);
@@ -634,6 +636,12 @@ setProcId(proc_id_t *proc)
     } else {
         snprintf(proc->id, sizeof(proc->id), "badid");
     }
+
+    proc->uid = getuid();
+    proc->gid = getgid();
+    if (osGetCgroup(proc->pid, proc->cgroup, MAX_CGROUP) == FALSE) {
+        proc->cgroup[0] = '\0';
+    }
 }
 
 static void
@@ -714,6 +722,8 @@ reportPeriodicStuff(void)
 
     // Process any events that have been posted
     doEvent();
+    doPayload();
+
     mtcFlush(g_mtc);
 }
 
@@ -770,7 +780,8 @@ periodic(void *arg)
         if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
         if (logNeedsConnection(g_log)) logConnect(g_log);
 
-        if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl)) {
+        if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl) &&
+            g_sendprocessstart) {
             // Hey we have a new connection!  Identify ourselves
             // like reportProcessStart, but only on the event interface...
             cJSON *json = msgStart(&g_proc, g_staticfg);
@@ -804,9 +815,11 @@ reportProcessStart(void)
     sendProcessStartMetric();
 
     // 3) Send a startup msg
-    cJSON *json = msgStart(&g_proc, g_staticfg);
-    ctlSendJson(g_ctl, json);
-    ctlFlush(g_ctl);
+    if (g_sendprocessstart) {
+        cJSON *json = msgStart(&g_proc, g_staticfg);
+        ctlSendJson(g_ctl, json);
+        ctlFlush(g_ctl);
+    }
 }
 
 // TODO; should this move to os/linux/os.c?
@@ -2847,12 +2860,6 @@ fcloseall(void)
 }
 
 #ifdef __MACOS__
-int
-checkEnv(char *env, char *val)
-{
-    return FALSE;
-}
-
 EXPORTON int
 close$NOCANCEL(int fd)
 {
@@ -2928,6 +2935,7 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
 
         doSend(sockfd, rc, buf, len, BUF);
     } else {
+        setRemoteClose(sockfd, errno);
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "__sendto_nocancel", "nopath");
     }
 
@@ -3707,6 +3715,7 @@ send(int sockfd, const void *buf, size_t len, int flags)
 
         doSend(sockfd, rc, buf, rc, BUF);
     } else {
+        setRemoteClose(sockfd, errno);
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "send", "nopath");
     }
 
@@ -3730,6 +3739,7 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
 
         doSend(sockfd, rc, buf, rc, BUF);
     } else {
+        setRemoteClose(sockfd, errno);
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendto", "nopath");
     }
 
@@ -3763,6 +3773,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
 
         doSend(sockfd, rc, msg, rc, MSG);
     } else {
+        setRemoteClose(sockfd, errno);
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendmsg", "nopath");
     }
 
@@ -3865,8 +3876,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
             }
         }
 
-        // implies not getting http headers from here. is that correct?
-        doRecv(sockfd, rc, msg, 0, MSG);
+        doRecv(sockfd, rc, msg, rc, MSG);
         doAccessRights(msg);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmsg", "nopath");
@@ -3882,6 +3892,7 @@ gethostbyname(const char *name)
     elapsed_t time = {0};
     
     WRAP_CHECK(gethostbyname, NULL);
+    doUpdateState(DNS, -1, 0, NULL, name);
     time.initial = getTime();
     rc = g_fn.gethostbyname(name);
     time.duration = getDuration(time.initial);
@@ -3905,6 +3916,7 @@ gethostbyname2(const char *name, int af)
     elapsed_t time = {0};
     
     WRAP_CHECK(gethostbyname2, NULL);
+    doUpdateState(DNS, -1, 0, NULL, name);
     time.initial = getTime();
     rc = g_fn.gethostbyname2(name, af);
     time.duration = getDuration(time.initial);
@@ -3930,6 +3942,7 @@ getaddrinfo(const char *node, const char *service,
     elapsed_t time = {0};
     
     WRAP_CHECK(getaddrinfo, -1);
+    doUpdateState(DNS, -1, 0, NULL, node);
     time.initial = getTime();
     rc = g_fn.getaddrinfo(node, service, hints, res);
     time.duration = getDuration(time.initial);
@@ -3939,7 +3952,7 @@ getaddrinfo(const char *node, const char *service,
         doUpdateState(DNS, -1, time.duration, NULL, node);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, node);
     } else {
-        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname", node);
+        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "getaddrinfo", node);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, node);
     }
 

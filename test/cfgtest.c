@@ -18,24 +18,43 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
     assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
+    assert_int_equal       (cfgSendProcessStartMsg(config), DEFAULT_PROCESS_START_MSG);
     assert_int_equal       (cfgEvtEnable(config), DEFAULT_EVT_ENABLE);
     assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
+    assert_int_equal       (cfgEvtRateLimit(config), DEFAULT_MAXEVENTSPERSEC);
+    assert_int_equal       (cfgEnhanceFs(config), DEFAULT_ENHANCE_FS);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_VALUE);
+    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_VALUE);
     assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_FIELD);
     assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_FIELD);
     assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_FIELD);
     assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_FIELD);
+    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_FIELD);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_NAME);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_NAME);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_NAME);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_NAME);
+    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_NAME);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), DEFAULT_SRC_NET);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), DEFAULT_SRC_FS);
+    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), DEFAULT_SRC_DNS);
     assert_int_equal       (cfgTransportType(config, CFG_MTC), CFG_UDP);
     assert_string_equal    (cfgTransportHost(config, CFG_MTC), "127.0.0.1");
     assert_string_equal    (cfgTransportPort(config, CFG_MTC), DEFAULT_MTC_PORT);
@@ -54,6 +73,8 @@ verifyDefaults(config_t* config)
     assert_null            (cfgCustomTags(config));
     assert_null            (cfgCustomTagValue(config, "tagname"));
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
+    assert_int_equal       (cfgPayEnable(config), DEFAULT_PAYLOAD_ENABLE);
+    assert_string_equal    (cfgPayDir(config), DEFAULT_PAYLOAD_DIR);
 }
 
 static void
@@ -107,12 +128,12 @@ static void
 cfgMtcFormatSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
-    cfgMtcFormatSet(config, CFG_METRIC_JSON);
-    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_JSON);
-    cfgMtcFormatSet(config, CFG_METRIC_STATSD);
-    assert_int_equal(cfgMtcFormat(config), CFG_METRIC_STATSD);
-    cfgMtcFormatSet(config, CFG_EVENT_ND_JSON);
-    assert_int_equal(cfgMtcFormat(config), CFG_EVENT_ND_JSON);
+    cfgMtcFormatSet(config, CFG_FMT_NDJSON);
+    assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
+    cfgMtcFormatSet(config, CFG_FMT_STATSD);
+    assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
+    cfgMtcFormatSet(config, CFG_FMT_NDJSON);
+    assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
     cfgDestroy(&config);
 }
 
@@ -182,6 +203,23 @@ cfgCmdDirSetAndGet(void** state)
 }
 
 static void
+cfgSendProcessStartMsgSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgSendProcessStartMsgSet(config, TRUE);
+    assert_int_equal(cfgSendProcessStartMsg(config), TRUE);
+
+    cfgSendProcessStartMsgSet(config, FALSE);
+    assert_int_equal(cfgSendProcessStartMsg(config), FALSE);
+
+    // 2 is outside of allowed range; should be ignored.
+    cfgSendProcessStartMsgSet(config, 2);
+    assert_int_equal(cfgSendProcessStartMsg(config), FALSE);
+
+    cfgDestroy(&config);
+}
+
+static void
 cfgEvtEnableSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
@@ -201,12 +239,36 @@ static void
 cfgEventFormatSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
-    cfgEventFormatSet(config, CFG_METRIC_STATSD);
-    assert_int_equal(cfgEventFormat(config), CFG_METRIC_STATSD);
-    cfgEventFormatSet(config, CFG_METRIC_JSON);
-    assert_int_equal(cfgEventFormat(config), CFG_METRIC_JSON);
-    cfgEventFormatSet(config, CFG_EVENT_ND_JSON);
-    assert_int_equal(cfgEventFormat(config), CFG_EVENT_ND_JSON);
+    cfgEventFormatSet(config, CFG_FMT_STATSD);
+    assert_int_equal(cfgEventFormat(config), CFG_FMT_STATSD);
+    cfgEventFormatSet(config, CFG_FMT_NDJSON);
+    assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
+    cfgEventFormatSet(config, CFG_FMT_NDJSON);
+    assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
+    cfgDestroy(&config);
+}
+
+static void
+cfgEvtRateLimitSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgEvtRateLimitSet(config, 0);
+    assert_int_equal(cfgEvtRateLimit(config), 0);
+    cfgEvtRateLimitSet(config, 1);
+    assert_int_equal(cfgEvtRateLimit(config), 1);
+    cfgEvtRateLimitSet(config, UINT_MAX);
+    assert_int_equal(cfgEvtRateLimit(config), UINT_MAX);
+    cfgDestroy(&config);
+}
+
+static void
+cfgEnhanceFsSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgEnhanceFsSet(config, 0);
+    assert_int_equal(cfgEnhanceFs(config), 0);
+    cfgEnhanceFsSet(config, 1);
+    assert_int_equal(cfgEnhanceFs(config), 1);
     cfgDestroy(&config);
 }
 
@@ -324,6 +386,18 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
                 break;
             case CFG_SRC_METRIC:
                 expected = DEFAULT_SRC_METRIC;
+                break;
+            case CFG_SRC_HTTP:
+                expected = DEFAULT_SRC_HTTP;
+                break;
+            case CFG_SRC_NET:
+                expected = DEFAULT_SRC_NET;
+                break;
+            case CFG_SRC_FS:
+                expected = DEFAULT_SRC_FS;
+                break;
+            case CFG_SRC_DNS:
+                expected = DEFAULT_SRC_DNS;
                 break;
         }
         assert_int_equal(cfgEvtFormatSourceEnabled(config, i), expected);
@@ -474,6 +548,33 @@ cfgLogLevelSetAndGet(void** state)
     cfgDestroy(&config);
 }
 
+static void
+cfgPayEnableSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgPayEnableSet(config, TRUE);
+    assert_int_equal(cfgPayEnable(config), TRUE);
+    cfgPayEnableSet(config, FALSE);
+    assert_int_equal(cfgPayEnable(config), FALSE);
+
+    // 2 is outside of allowed range; should be ignored.
+    cfgPayEnableSet(config, 2);
+    assert_int_equal(cfgPayEnable(config), FALSE);
+
+    cfgDestroy(&config);
+}
+
+static void
+cfgPayDirSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgPayDirSet(config, "/some/path");
+    assert_string_equal(cfgPayDir(config), "/some/path");
+    cfgPayDirSet(config, NULL);
+    assert_string_equal(cfgPayDir(config), DEFAULT_COMMAND_DIR);
+    cfgDestroy(&config);
+}
+
 
 int
 main(int argc, char* argv[])
@@ -487,6 +588,10 @@ main(int argc, char* argv[])
     source_state_t con = {CFG_SRC_CONSOLE, DEFAULT_SRC_CONSOLE_VALUE, DEFAULT_SRC_CONSOLE_FIELD, DEFAULT_SRC_CONSOLE_NAME};
     source_state_t sys = {CFG_SRC_SYSLOG, DEFAULT_SRC_SYSLOG_VALUE, DEFAULT_SRC_SYSLOG_FIELD, DEFAULT_SRC_SYSLOG_NAME};
     source_state_t met = {CFG_SRC_METRIC, DEFAULT_SRC_METRIC_VALUE, DEFAULT_SRC_METRIC_FIELD, DEFAULT_SRC_METRIC_NAME};
+    source_state_t htt = {CFG_SRC_HTTP, DEFAULT_SRC_HTTP_VALUE, DEFAULT_SRC_HTTP_FIELD, DEFAULT_SRC_HTTP_NAME};
+    source_state_t net = {CFG_SRC_NET, DEFAULT_SRC_NET_VALUE, DEFAULT_SRC_NET_FIELD, DEFAULT_SRC_NET_NAME};
+    source_state_t fs =  {CFG_SRC_FS, DEFAULT_SRC_FS_VALUE, DEFAULT_SRC_FS_FIELD, DEFAULT_SRC_FS_NAME};
+    source_state_t dns = {CFG_SRC_DNS, DEFAULT_SRC_DNS_VALUE, DEFAULT_SRC_DNS_FIELD, DEFAULT_SRC_DNS_NAME};
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(cfgCreateDefaultReturnsValidPtr),
@@ -499,23 +604,38 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgMtcVerbositySetAndGet),
         cmocka_unit_test(cfgMtcPeriodSetAndGet),
         cmocka_unit_test(cfgCmdDirSetAndGet),
+        cmocka_unit_test(cfgSendProcessStartMsgSetAndGet),
         cmocka_unit_test(cfgEvtEnableSetAndGet),
         cmocka_unit_test(cfgEventFormatSetAndGet),
+        cmocka_unit_test(cfgEvtRateLimitSetAndGet),
+        cmocka_unit_test(cfgEnhanceFsSetAndGet),
 
         cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &log),
         cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &con),
         cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &sys),
         cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &met),
+        cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &htt),
+        cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &net),
+        cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &fs),
+        cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &dns),
 
         cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &log),
         cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &con),
         cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &sys),
         cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &met),
+        cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &htt),
+        cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &net),
+        cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &fs),
+        cmocka_unit_test_prestate(cfgEvtFormatFieldFilterSetAndGet, &dns),
 
         cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &log),
         cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &con),
         cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &sys),
         cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &met),
+        cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &htt),
+        cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &net),
+        cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &fs),
+        cmocka_unit_test_prestate(cfgEvtFormatNameFilterSetAndGet, &dns),
 
         cmocka_unit_test(cfgEvtFormatSourceEnabledSetAndGet),
 
@@ -540,6 +660,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgCustomTagsSetAndGet),
         cmocka_unit_test(cfgLoggingSetAndGet),
         cmocka_unit_test(cfgLogLevelSetAndGet),
+        cmocka_unit_test(cfgPayEnableSetAndGet),
+        cmocka_unit_test(cfgPayDirSetAndGet),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

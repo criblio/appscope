@@ -628,14 +628,20 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     {
         int rc;
 
-        addToInterfaceCounts(&g_ctrs.numDNS, 1);
+        // on DNS resp only inc events
+        if (size > 0) {
+            atomicAddU64(&g_ctrs.numDNS.evt, 1);
+        } else {
+            addToInterfaceCounts(&g_ctrs.numDNS, 1);
+        }
+
         if (checkNetEntry(fd)) {
             rc = postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname);
         } else {
             rc = postDNSState(fd, type, NULL, (uint64_t)size, pathname);
         }
 
-        if (rc) atomicSubU64(&g_ctrs.numDNS.mtc, 1);
+        if (rc && (size == 0)) atomicSubU64(&g_ctrs.numDNS.mtc, 1);
         atomicSubU64(&g_ctrs.numDNS.evt, 1);
         break;
     }
@@ -993,8 +999,6 @@ int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     net_info *net = getNetEntry(sockfd);
-
-    if (!net) return -1;
 
     if (ctlPayEnable(g_ctl)) {
         // instead of or in addition to http &/or detect?

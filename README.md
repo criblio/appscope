@@ -119,7 +119,7 @@ export LD_PRELOAD=./libscope.so
 
 This will set the `LD_PRELOAD` environment variable for all commands that execute in the current shell. The result is that all commands executed from the shell will cause `libscope.so` to be loaded and details of those applications emitted. 
 
-# The `scope` Executable
+# The scope Executable
 
 `scope` provides a rich set of features for exploring data from applications that have been "scoped". `scope` supports several distinct modes:
 

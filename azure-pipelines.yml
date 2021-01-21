@@ -23,6 +23,8 @@ stages:
             displayName: Install dependencies
             inputs:
               scriptPath: ./install_build_tools.sh
+          - script: make deps
+            displayName: Run make deps
           - script: make all
             displayName: Build all
           - script: make test

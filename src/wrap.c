@@ -2007,7 +2007,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     WRAP_CHECK(execve, -1);
 
-    if (strstr(g_proc.procname, "scopec") ||
+    if (strstr(g_proc.procname, "ldscope") ||
         checkEnv("SCOPE_EXECVE", "false")) {
         return g_fn.execve(pathname, argv, envp);
     }
@@ -2025,7 +2025,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     scopexec = getenv("SCOPE_EXEC_PATH");
     if (((scopexec = getpath(scopexec)) == NULL) &&
-        ((scopexec = getpath("scopec")) == NULL)) {
+        ((scopexec = getpath("ldscope")) == NULL)) {
         char msg[64];
 
         // can't find the scope executable

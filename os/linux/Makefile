@@ -18,7 +18,7 @@ TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
 TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
 
-.PHONY: all clean test
+.PHONY: all coreclean coretest
 all: libscope.so ldscope
 
 $(PCRE2_AR):
@@ -43,11 +43,11 @@ libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c s
 
 ldscope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c libscope.so
 	objcopy -I binary -O elf64-x86-64 -B i386 ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
-	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c -ldl -lrt -o ./bin/$(OS)/ldscope ./lib/$(OS)/libscope.o -I./os/$(OS)
-	rm -f ./lib/$(OS)/libscope.o
+	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c -ldl -lrt -o ./bin/$(OS)/scopec ./lib/$(OS)/libscope.o -I./os/$(OS)
+	rm -f ./lib/$(OS)/libscope.o && rm -f ../../cli/run/scopec.go
 	cp ./bin/$(OS)/ldscope ./bin/$(OS)/scopec
 
-clean:
+coreclean:
 	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a bin/$(OS)/ldscope bin/$(OS)/scopec
 
 SRC_C_FILES:=$(wildcard src/*.c)
@@ -58,7 +58,7 @@ TEST_C_FILES:=$(filter-out test/wraptest.c, $(TEST_C_FILES))
 C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c
 O_FILES:=$(C_FILES:.c=.o)
 
-test: $(C_FILES)
+coretest: $(C_FILES)
 	@echo "Building Tests"
 	$(CC) -c $(TEST_CFLAGS) $^ $(INCLUDES) $(TEST_INCLUDES)
 	make $(YAML_AR)

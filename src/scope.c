@@ -25,6 +25,7 @@
 #include "dbg.h"
 #include "scopeelf.h"
 #include "scopetypes.h"
+#include "os.h"
 
 #define DEVMODE 0
 #define __NR_memfd_create   319
@@ -75,28 +76,6 @@ print_usage(char *prog, libscope_info_t *info, int argc, char **argv) {
     }
 
     __scope_main();
-}
-
-static int
-app_type(char *buf, const uint32_t sh_type, const char *sh_name)
-{
-    int i = 0;
-    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
-    Elf64_Shdr *sections;
-    const char *section_strtab = NULL;
-    const char *sec_name = NULL;
-
-    sections = (Elf64_Shdr *)(buf + ehdr->e_shoff);
-    section_strtab = buf + sections[ehdr->e_shstrndx].sh_offset;
-
-    for (i = 0; i < ehdr->e_shnum; i++) {
-        sec_name = section_strtab + sections[i].sh_name;
-        //printf("section %s type = %d \n", sec_name, sections[i].sh_type);
-        if (sections[i].sh_type == sh_type && strcmp(sec_name, sh_name) == 0) {
-            return 1;
-        }
-    }
-    return 0;
 }
 
 /**
@@ -286,11 +265,17 @@ main(int argc, char **argv, char **env)
     }
     argv[1] = inferior_command; // update args with resolved inferior_command
 
+    // before processing, try to set SCOPE_EXEC_PATH for execve
+    char *sep;
+    if (osGetExePath(&sep) == 0) {
+        // doesn't overwrite an existing env var if already set
+        setenv("SCOPE_EXEC_PATH", sep, 0);
+        free(sep);
+    }
+
     ebuf = getElf(inferior_command);
 
-    if (ebuf && (app_type(ebuf->buf, SHT_PROGBITS, ".gosymtab") ||
-                 app_type(ebuf->buf, SHT_PROGBITS, ".gopclntab") ||
-                 app_type(ebuf->buf, SHT_NOTE, ".note.go.buildid"))) {
+    if (ebuf && (is_go(ebuf->buf) == TRUE)) {
         if (setenv("SCOPE_APP_TYPE", "go", 1) == -1) {
             perror("setenv");
             goto err;

@@ -45,6 +45,28 @@ setTextSizeAndLenFromElf(elf_buf_t *ebuf)
     }
 }
 
+static bool
+app_type(char *buf, const uint32_t sh_type, const char *sh_name)
+{
+    int i = 0;
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
+    Elf64_Shdr *sections;
+    const char *section_strtab = NULL;
+    const char *sec_name = NULL;
+
+    sections = (Elf64_Shdr *)(buf + ehdr->e_shoff);
+    section_strtab = buf + sections[ehdr->e_shstrndx].sh_offset;
+
+    for (i = 0; i < ehdr->e_shnum; i++) {
+        sec_name = section_strtab + sections[i].sh_name;
+        //printf("section %s type = %d \n", sec_name, sections[i].sh_type);
+        if (sections[i].sh_type == sh_type && strcmp(sec_name, sh_name) == 0) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 elf_buf_t *
 getElf(char *path)
 {
@@ -290,7 +312,7 @@ getSymbol(const char *buf, char *sname)
     return (void *)symaddr;
 }
 
-int
+bool
 is_static(char *buf)
 {
     int i;
@@ -299,11 +321,23 @@ is_static(char *buf)
 
     for (i = 0; i < elf->e_phnum; i++) {
         if ((phead[i].p_type == PT_DYNAMIC) || (phead[i].p_type == PT_INTERP)) {
-            return 0;
+            return FALSE;
         }
     }
 
-    return 1;
+    return TRUE;
+}
+
+bool
+is_go(char *buf)
+{
+    if (buf && (app_type(buf, SHT_PROGBITS, ".gosymtab") ||
+                app_type(buf, SHT_PROGBITS, ".gopclntab") ||
+                app_type(buf, SHT_NOTE, ".note.go.buildid"))) {
+        return TRUE;
+    }
+
+    return FALSE;
 }
 
 // This tests to see if cmd can be resolved to an executable file.
@@ -343,6 +377,17 @@ getpath(const char *cmd)
         }
         free(cur_dir);
         goto out;
+    }
+
+    // try the current dir
+    char *path = NULL;
+    if (asprintf(&path, "./%s", cmd) > 0) {
+        if (!stat(path, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
+            ret_val = path;
+            goto out;
+        } else {
+            free(path);
+        }
     }
 
     // try to resolve the cmd from PATH env variable

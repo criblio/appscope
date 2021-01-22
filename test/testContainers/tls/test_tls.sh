@@ -50,7 +50,7 @@ endtest(){
 #
 starttest OpenSSL
 cd /opt/test
-scope ./curlssl/src/curl --head https://cribl.io
+ldscope ./curlssl/src/curl --head https://cribl.io
 evaltest
 
 grep http-req $EVT_FILE > /dev/null
@@ -69,7 +69,7 @@ endtest
 #
 starttest gnutls
 unset LD_PRELOAD
-scope ./curltls/src/curl --head https://cribl.io
+ldscope ./curltls/src/curl --head https://cribl.io
 evaltest
 
 grep http-req $EVT_FILE > /dev/null
@@ -88,7 +88,7 @@ endtest
 #
 starttest nss
 unset LD_PRELOAD
-scope curl --head https://cribl.io
+ldscope curl --head https://cribl.io
 evaltest
 
 grep http-req $EVT_FILE > /dev/null
@@ -107,7 +107,7 @@ endtest
 #
 starttest "node.js"
 unset LD_PRELOAD
-scope node /opt/test-runner/bin/nodehttp.ts > /dev/null
+ldscope node /opt/test-runner/bin/nodehttp.ts > /dev/null
 evaltest
 
 grep http-req $EVT_FILE > /dev/null
@@ -147,10 +147,10 @@ endtest
 /opt/rh/rh-python36/root/usr/bin/pip3.6 install pyopenssl
 starttest Python
 unset LD_PRELOAD
-scope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py create_certs
-scope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py start_server&
+ldscope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py create_certs
+ldscope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py start_server&
 sleep 1
-scope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py run_client
+ldscope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py run_client
 sleep 1
 evaltest
 
@@ -165,7 +165,7 @@ endtest
 # Rust
 #
 starttest Rust
-scope /opt/test-runner/bin/http_test > /dev/null
+ldscope /opt/test-runner/bin/http_test > /dev/null
 evaltest
 
 grep http-req $EVT_FILE > /dev/null
@@ -185,7 +185,7 @@ endtest
 starttest php
 unset LD_PRELOAD
 PHP_HTTP_START=$(grep http- $EVT_FILE | grep -c sslclient.php)
-scope php /opt/test-runner/php/sslclient.php > /dev/null
+ldscope php /opt/test-runner/php/sslclient.php > /dev/null
 evaltest
 
 PHP_HTTP_END=$(grep http- $EVT_FILE | grep -c sslclient.php)
@@ -202,9 +202,9 @@ endtest
 starttest apache
 unset LD_PRELOAD
 APACHE_HTTP_START=$(grep http- $EVT_FILE | grep -c httpd)
-scope httpd -k start
-scope curl -k https://localhost:443/ > /dev/null
-scope httpd -k stop
+ldscope httpd -k start
+ldscope curl -k https://localhost:443/ > /dev/null
+ldscope httpd -k stop
 evaltest
 APACHE_HTTP_END=$(grep http- $EVT_FILE | grep -c httpd)
 

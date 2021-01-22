@@ -10,6 +10,7 @@
 #endif
 #include <sys/syscall.h>
 #include <sys/stat.h>
+#include <libgen.h>
 
 #include "atomic.h"
 #include "cfg.h"
@@ -937,12 +938,11 @@ initHook()
     bool should_we_patch = FALSE;
     elf_buf_t *ebuf;
 
-    // default to a native app
-    // Are we a Go dynamic app
-    if (checkEnv("SCOPE_APP_TYPE", "go") &&
-        checkEnv("SCOPE_EXEC_TYPE", "dynamic") &&
-        ((full_path = osGetExePath()) != NULL) &&
-        ((ebuf = getElf(full_path)) != NULL)) {
+    // env vars are not always set as needed, be explicit here
+    // this is duplicated if we were started from the scope exec
+    if ((osGetExePath(&full_path) != -1) &&
+        ((ebuf = getElf(full_path))) &&
+        (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
         initGoHook(ebuf);
         threadNow(0);
         if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
@@ -961,6 +961,9 @@ initHook()
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
         return;
     }
+
+    if (full_path) free(full_path);
+    if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
     if (dl_iterate_phdr(hookCallback, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
@@ -2004,7 +2007,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     WRAP_CHECK(execve, -1);
 
-    if (strstr(g_proc.procname, "scope") ||
+    if (strstr(g_proc.procname, "ldscope") ||
         checkEnv("SCOPE_EXECVE", "false")) {
         return g_fn.execve(pathname, argv, envp);
     }
@@ -2022,7 +2025,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     scopexec = getenv("SCOPE_EXEC_PATH");
     if (((scopexec = getpath(scopexec)) == NULL) &&
-        ((scopexec = getpath("scope")) == NULL)) {
+        ((scopexec = getpath("ldscope")) == NULL)) {
         char msg[64];
 
         // can't find the scope executable

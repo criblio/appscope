@@ -14,6 +14,9 @@ endif
 endif
 
 ifeq ($(PLATFORM),Linux)
+
+.PHONY: clean test
+
 clean:
 	$(MAKE) -f os/linux/Makefile core$@
 	$(MAKE) -f cli/Makefile cli$@

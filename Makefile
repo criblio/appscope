@@ -15,13 +15,17 @@ endif
 
 ifeq ($(PLATFORM),Linux)
 
-.PHONY: clean test
+.PHONY: clean test all
 
 clean:
 	$(MAKE) -f os/linux/Makefile core$@
 	$(MAKE) -f cli/Makefile cli$@
 
 test:
+	$(MAKE) -f os/linux/Makefile core$@
+	$(MAKE) -f cli/Makefile cli$@
+
+all:
 	$(MAKE) -f os/linux/Makefile core$@
 	$(MAKE) -f cli/Makefile cli$@
 endif

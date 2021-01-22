@@ -18,8 +18,8 @@ TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
 TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
 
-.PHONY: all coreclean coretest
-all: libscope.so ldscope
+.PHONY: coreall coreclean coretest
+coreall: libscope.so ldscope
 
 $(PCRE2_AR):
 	@echo "Building pcre2"

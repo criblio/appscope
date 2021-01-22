@@ -58,7 +58,7 @@ RX_FILE="/gogen/receive.log"
 tcpserver 12345 > $RX_FILE &
 
 # Run gogen
-scope ./gogen -c coccyx/weblog -ot json -o tcp --url localhost:12345 -g 10 --os 10 -v gen -c 10 -ei 10000 -i 60
+ldscope ./gogen -c coccyx/weblog -ot json -o tcp --url localhost:12345 -g 10 --os 10 -v gen -c 10 -ei 10000 -i 60
 ERR+=$?
 evaltest
 

@@ -8,9 +8,9 @@ GO=GOPATH=$(GOPATH) $(GOPATH)/bin/$(DESIRED_GO_VER)
 
 GO_VER_FLAGS=$(shell $(GOPATH)/bin/govvv -flags)
 
-.PHONY: all
+.PHONY: cliall
 
-all: deps scope
+cliall: deps scope
 
 cliclean:
 	rm -rf $(DIR)build/*

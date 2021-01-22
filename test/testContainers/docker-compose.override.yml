@@ -92,7 +92,7 @@ services:
         target: /usr/lib/libscope.so
       - type: bind
         source: ../../bin/linux/ldscope
-        target: /usr/bin/scope
+        target: /usr/bin/ldscope
     privileged: true
   go_3:
     volumes:

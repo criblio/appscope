@@ -353,6 +353,50 @@ yum_lcov_install() {
     fi
 }
 
+yum_go_exists() {
+    if go version &>/dev/null; then
+        echo "go is already installed; doing nothing for go."
+    else
+        echo "go is not already installed."
+        return 1
+    fi
+}
+
+yum_go_install() {
+    echo "Installing go."
+    sudo yum -y install epel-release
+    sudo yum -y install golang
+    if [ $? = 0 ]; then
+        echo "Installation of go successful."
+    else
+        echo "Installation of go failed."
+        FAILED=1
+    fi
+}
+
+yum_upx_exists() {
+    if upx --version &>/dev/null; then
+        echo "upx is already installed; doing nothing for upx."
+    else
+        echo "upx is not already installed."
+        return 1
+    fi
+}
+
+yum_upx_install() {
+    echo "Installing upx."
+    sudo yum -y install epel-release
+    sudo yum -y install upx
+    if [ $? = 0 ]; then
+        echo "Installation of upx successful."
+    else
+        echo "Installation of upx failed."
+        FAILED=1
+    fi
+}
+
+
+
 
 yum_dump_versions() {
     # The crazy sed stuff at the end of each just provides indention.
@@ -370,6 +414,8 @@ yum_dump_versions() {
     libtool --version | head -n1 | sed 's/^/      /'
     cmake --version | head -n1 | sed 's/^/      /'
     lcov --version | head -n1 | sed 's/^/      /'
+    go version | head -n1 | sed 's/^/      /'
+    upx --version | head -n1 | sed 's/^/      /'
 }
 
 yum_install() {
@@ -393,6 +439,13 @@ yum_install() {
     if ! yum_lcov_exists; then
         yum_lcov_install
     fi
+    if ! yum_go_exists; then
+        yum_go_install
+    fi
+    if ! yum_upx_exists; then
+        yum_upx_install
+    fi
+
 
     if (( FAILED )); then
         echo "Installation failure detected."
@@ -449,7 +502,7 @@ apt_make_exists() {
 
 apt_make_install() {
     echo "Installing make."
-    sudo apt-get install make
+    sudo apt-get install -y make
     if [ $? = 0 ]; then
         echo "Installation of make successful."
     else
@@ -469,7 +522,7 @@ apt_autoconf_exists() {
 
 apt_autoconf_install() {
     echo "Installing autoconf."
-    sudo apt-get install autoconf
+    sudo apt-get install -y autoconf
     if [ $? = 0 ]; then
         echo "Installation of autoconf successful."
     else
@@ -489,7 +542,7 @@ apt_libtool_exists() {
 
 apt_libtool_install() {
     echo "Installing libtool."
-    sudo apt-get install libtool-bin
+    sudo apt-get install -y libtool-bin
     if [ $? = 0 ]; then
         echo "Installation of libtool successful."
     else
@@ -509,7 +562,7 @@ apt_cmake_exists() {
 
 apt_cmake_install() {
     echo "Installing cmake."
-    sudo apt-get install cmake
+    sudo apt-get install -y cmake
     if [ $? = 0 ]; then
         echo "Installation of cmake successful."
     else
@@ -529,11 +582,51 @@ apt_lcov_exists() {
 
 apt_lcov_install() {
     echo "Installing lcov."
-    sudo apt-get install lcov
+    sudo apt-get install -y lcov
     if [ $? = 0 ]; then
         echo "Installation of lcov successful."
     else
         echo "Installation of lcov failed."
+        FAILED=1
+    fi
+}
+
+apt_go_exists() {
+    if go version &>/dev/null; then
+        echo "go is already installed; doing nothing for go."
+    else
+        echo "go is not already installed."
+        return 1
+    fi
+}
+
+apt_go_install() {
+    echo "Installing go."
+    sudo apt-get install -y golang-go
+    if [ $? = 0 ]; then
+        echo "Installation of go successful."
+    else
+        echo "Installation of go failed."
+        FAILED=1
+    fi
+}
+
+apt_upx_exists() {
+    if upx --version &>/dev/null; then
+        echo "upx is already installed; doing nothing for upx."
+    else
+        echo "upx is not already installed."
+        return 1
+    fi
+}
+
+apt_upx_install() {
+    echo "Installing upx."
+    sudo apt-get install -y upx
+    if [ $? = 0 ]; then
+        echo "Installation of upx successful."
+    else
+        echo "Installation of upx failed."
         FAILED=1
     fi
 }
@@ -552,6 +645,8 @@ apt_dump_versions() {
     libtool --version | head -n1 | sed 's/^/      /'
     cmake --version | head -n1 | sed 's/^/      /'
     lcov --version | head -n1 | sed 's/^/      /'
+    go version | head -n1 | sed 's/^/      /'
+    upx --version | head -n1 | sed 's/^/      /'
 }
 
 apt_install() {
@@ -575,6 +670,13 @@ apt_install() {
     if ! apt_lcov_exists; then
         apt_lcov_install
     fi
+    if ! apt_go_exists; then
+        apt_go_install
+    fi
+    if ! apt_upx_exists; then
+        apt_upx_install
+    fi
+
 
     if (( FAILED )); then
         echo "Installation failure detected."

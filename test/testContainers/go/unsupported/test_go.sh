@@ -52,7 +52,7 @@ endtest(){
 starttest plainServerDynamic
 cd /go/net
 PORT=80
-scope ./plainServerDynamic ${PORT} 2>${STDERR_FILE} &
+ldscope ./plainServerDynamic ${PORT} 2>${STDERR_FILE} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -80,7 +80,7 @@ endtest
 starttest plainServerStatic
 cd /go/net
 PORT=81
-scope ./plainServerStatic ${PORT} 2>${STDERR_FILE} &
+ldscope ./plainServerStatic ${PORT} 2>${STDERR_FILE} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -108,7 +108,7 @@ endtest
 starttest tlsServerDynamic
 cd /go/net
 PORT=4430
-scope ./tlsServerDynamic ${PORT} 2>${STDERR_FILE} &
+ldscope ./tlsServerDynamic ${PORT} 2>${STDERR_FILE} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -136,7 +136,7 @@ endtest
 starttest tlsServerStatic
 cd /go/net
 PORT=4431
-scope ./tlsServerStatic ${PORT} 2>${STDERR_FILE} &
+ldscope ./tlsServerStatic ${PORT} 2>${STDERR_FILE} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -163,7 +163,7 @@ endtest
 #
 starttest plainClientDynamic
 cd /go/net
-scope ./plainClientDynamic 2>${STDERR_FILE}
+ldscope ./plainClientDynamic 2>${STDERR_FILE}
 ERR+=$?
 
 # this sleep gives plainClientDynamic a chance to report its events on exit
@@ -182,7 +182,7 @@ endtest
 #
 starttest plainClientStatic
 cd /go/net
-scope ./plainClientStatic 2>${STDERR_FILE}
+ldscope ./plainClientStatic 2>${STDERR_FILE}
 ERR+=$?
 
 # this sleep gives plainClientStatic a chance to report its events on exit
@@ -201,7 +201,7 @@ endtest
 #
 starttest tlsClientDynamic
 cd /go/net
-scope ./tlsClientDynamic 2>${STDERR_FILE}
+ldscope ./tlsClientDynamic 2>${STDERR_FILE}
 ERR+=$?
 
 # this sleep gives tlsClientDynamic a chance to report its events on exit
@@ -220,7 +220,7 @@ endtest
 #
 starttest tlsClientStatic
 cd /go/net
-scope ./tlsClientStatic 2>${STDERR_FILE}
+ldscope ./tlsClientStatic 2>${STDERR_FILE}
 ERR+=$?
 
 # this sleep gives tlsClientStatic a chance to report its events on exit
@@ -239,7 +239,7 @@ endtest
 #
 starttest fileThread
 cd /go/thread
-scope ./fileThread 2>${STDERR_FILE}
+ldscope ./fileThread 2>${STDERR_FILE}
 ERR+=$?
 evaltest
 
@@ -254,7 +254,7 @@ endtest
 #
 starttest cgoDynamic
 cd /go/cgo
-LD_LIBRARY_PATH=. scope ./cgoDynamic 2>${STDERR_FILE}
+LD_LIBRARY_PATH=. ldscope ./cgoDynamic 2>${STDERR_FILE}
 ERR+=$?
 evaltest
 
@@ -269,7 +269,7 @@ endtest
 #
 starttest cgoStatic
 cd /go/cgo
-scope ./cgoStatic 2>${STDERR_FILE}
+ldscope ./cgoStatic 2>${STDERR_FILE}
 ERR+=$?
 
 evaltest

@@ -83,8 +83,8 @@ services:
         source: ./libscope.so
         target: /opt/test-runner/bin/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
 
@@ -111,8 +111,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
 
   go_2:
     build:
@@ -124,8 +124,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
   go_3:
     build:
       cache_from:
@@ -136,8 +136,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
   go_4:
     build:
       cache_from:
@@ -148,8 +148,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
   go_5:
     build:
       cache_from:
@@ -160,8 +160,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
   go_6:
     build:
       cache_from:
@@ -172,8 +172,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
   go_7:
     build:
       cache_from:
@@ -184,8 +184,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
   go_8:
     build:
       cache_from:
@@ -196,8 +196,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -211,8 +211,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -226,8 +226,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -241,8 +241,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -256,8 +256,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -271,8 +271,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -286,8 +286,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -301,8 +301,8 @@ services:
         source: ./libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ./scope
-        target: /usr/bin/scope
+        source: ./ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db

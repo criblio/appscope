@@ -60,8 +60,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /opt/test-runner/bin/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
     privileged: true
@@ -81,8 +81,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
     privileged: true
 
   go_2:
@@ -91,7 +91,7 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
+        source: ../../bin/linux/ldscope
         target: /usr/bin/scope
     privileged: true
   go_3:
@@ -100,8 +100,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
     privileged: true
   go_4:
     volumes:
@@ -109,8 +109,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
     privileged: true
   go_5:
     volumes:
@@ -118,8 +118,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
     privileged: true
   go_6:
     volumes:
@@ -127,8 +127,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
     privileged: true
   go_7:
     volumes:
@@ -136,8 +136,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
     privileged: true
   go_8:
     volumes:
@@ -145,8 +145,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -157,8 +157,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -169,8 +169,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -181,8 +181,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -193,8 +193,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -205,8 +205,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -217,8 +217,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db
@@ -229,8 +229,8 @@ services:
         source: ../../lib/linux/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/scope
-        target: /usr/bin/scope
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
         target: /go/influx/db

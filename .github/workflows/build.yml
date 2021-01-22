@@ -1,0 +1,15 @@
+name: build
+on: [push]
+jobs:
+  build-scope:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: 1.15
+      # - run: apt-get update && apt-get install -y git
+      - run: ./install_build_tools.sh
+      - run: make deps
+      - run: make
+      - run: make test

@@ -1,0 +1,4 @@
+run/scopec.go
+build/*
+!build/.gitkeep
+coverage.out

@@ -225,13 +225,6 @@ install_build_tools() {
 }
 
 run_make() {
-    echo "Running make deps."
-    if make deps; then
-        echo "make deps was successful."
-    else
-        echo "make deps failed.  Exiting."
-        exit 1
-    fi
     echo "Running make all."
     if make all; then
         echo "make all was successful."

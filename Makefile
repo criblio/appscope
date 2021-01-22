@@ -13,4 +13,12 @@ $(info ERROR not a valid platform: "$(PLATFORM)")
 endif
 endif
 
+ifeq ($(PLATFORM),Linux)
+clean:
+	$(MAKE) -f os/linux/Makefile core$@
+	$(MAKE) -f cli/Makefile cli$@
 
+test:
+	$(MAKE) -f os/linux/Makefile core$@
+	$(MAKE) -f cli/Makefile cli$@
+endif

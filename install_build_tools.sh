@@ -353,6 +353,50 @@ yum_lcov_install() {
     fi
 }
 
+yum_go_exists() {
+    if go version &>/dev/null; then
+        echo "go is already installed; doing nothing for go."
+    else
+        echo "go is not already installed."
+        return 1
+    fi
+}
+
+yum_go_install() {
+    echo "Installing go."
+    sudo yum -y install epel-release
+    sudo yum -y install golang
+    if [ $? = 0 ]; then
+        echo "Installation of go successful."
+    else
+        echo "Installation of go failed."
+        FAILED=1
+    fi
+}
+
+yum_upx_exists() {
+    if upx --version &>/dev/null; then
+        echo "upx is already installed; doing nothing for upx."
+    else
+        echo "upx is not already installed."
+        return 1
+    fi
+}
+
+yum_upx_install() {
+    echo "Installing upx."
+    sudo yum -y install epel-release
+    sudo yum -y install upx
+    if [ $? = 0 ]; then
+        echo "Installation of upx successful."
+    else
+        echo "Installation of upx failed."
+        FAILED=1
+    fi
+}
+
+
+
 
 yum_dump_versions() {
     # The crazy sed stuff at the end of each just provides indention.
@@ -370,6 +414,8 @@ yum_dump_versions() {
     libtool --version | head -n1 | sed 's/^/      /'
     cmake --version | head -n1 | sed 's/^/      /'
     lcov --version | head -n1 | sed 's/^/      /'
+    go version | head -n1 | sed 's/^/      /'
+    upx --version | head -n1 | sed 's/^/      /'
 }
 
 yum_install() {
@@ -393,6 +439,13 @@ yum_install() {
     if ! yum_lcov_exists; then
         yum_lcov_install
     fi
+    if ! yum_go_exists; then
+        yum_go_install
+    fi
+    if ! yum_upx_exists; then
+        yum_upx_install
+    fi
+
 
     if (( FAILED )); then
         echo "Installation failure detected."

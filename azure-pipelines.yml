@@ -23,8 +23,6 @@ stages:
             displayName: Install dependencies
             inputs:
               scriptPath: ./install_build_tools.sh
-          - script: make deps
-            displayName: Run make deps
           - script: make all
             displayName: Build all
           - script: make test
@@ -43,7 +41,7 @@ stages:
           #  steps:
           #  - script: ./scope.sh build
           #    displayName: scope.sh build
-          - publish: ./bin/linux/scope
+          - publish: ./bin/linux/scopec
             displayName: publish linux application
             condition: and(succeeded(), eq(variables['Agent.OS'], 'Linux'))
             artifact: linux_app
@@ -251,7 +249,7 @@ stages:
               regionName: 'us-west-2'
               bucketName: 'io.cribl.cdn'
               sourceFolder: '$(Build.BinariesDirectory)/bin/'
-              globExpressions: '**/scope'
+              globExpressions: '**/scopec'
               ${{ if eq(variables['Build.SourceBranchName'], 'master') }}:
                 targetFolder: 'dl/scope/latest/'
               ${{ if ne(variables['Build.SourceBranchName'], 'master') }}:

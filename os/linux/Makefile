@@ -18,8 +18,8 @@ TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
 TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
 
-.PHONY: all clean test
-all: libscope.so scopec scope
+.PHONY: all coreclean coretest
+all: libscope.so scopec
 
 $(PCRE2_AR):
 	@echo "Building pcre2"
@@ -46,8 +46,8 @@ scopec: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c libscope.so
 	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c -ldl -lrt -o ./bin/$(OS)/scopec ./lib/$(OS)/libscope.o -I./os/$(OS)
 	rm -f ./lib/$(OS)/libscope.o && rm -f ../../cli/run/scopec.go
 
-clean:
-	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a bin/$(OS)/scope
+coreclean:
+	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a bin/$(OS)/scopec
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))
@@ -57,7 +57,7 @@ TEST_C_FILES:=$(filter-out test/wraptest.c, $(TEST_C_FILES))
 C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c
 O_FILES:=$(C_FILES:.c=.o)
 
-test: $(C_FILES)
+coretest: $(C_FILES)
 	@echo "Building Tests"
 	$(CC) -c $(TEST_CFLAGS) $^ $(INCLUDES) $(TEST_INCLUDES)
 	make $(YAML_AR)

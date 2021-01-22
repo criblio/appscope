@@ -10,9 +10,9 @@ GO_VER_FLAGS=$(shell $(GOPATH)/bin/govvv -flags)
 
 .PHONY: all
 
-all: scope
+all: deps scope
 
-clean:
+cliclean:
 	rm -rf $(DIR)build/*
 
 deps:
@@ -24,7 +24,7 @@ deps:
 	$(GO) get github.com/go-bindata/go-bindata/...
 	$(GO) get github.com/ahmetb/govvv
 
-rebuild: clean all
+rebuild: cliclean all
 
 local:
 	cd $(DIR) && $(GO) build -o /usr/local/bin/scope
@@ -41,7 +41,7 @@ scope: run/scopec.go
 install: 
 	cp $(DIR)build/scope /usr/local/bin/scope
 
-test:
+clitest:
 	cd $(DIR) && $(GO) test -v -coverprofile coverage.out ./...
 
 cover:

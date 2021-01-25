@@ -1,10 +1,9 @@
 
 DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-BOOTSTRAP_GO_VER:=$(shell go version | cut -d' ' -f3)
-DESIRED_GO_VER:=go1.15.7
-GOPATH:=$(DIR)../go
-GO=GOPATH=$(GOPATH) $(GOPATH)/bin/$(DESIRED_GO_VER)
+GO_VER:=$(shell go version | cut -d' ' -f3)
+GOPATH:=$(shell go env | grep GOPATH | cut -d\" -f2)
+GO:=go
 
 GO_VER_FLAGS=$(shell $(GOPATH)/bin/govvv -flags)
 
@@ -17,10 +16,8 @@ cliclean:
 
 deps:
 	@echo DIR=$(DIR)
-	@echo BOOTSTRAP_GO_VER=$(BOOTSTRAP_GO_VER)
-	@echo DESIRED_GO_VER=$(DESIRED_GO_VER)
-	GOPATH=$(GOPATH) go get golang.org/dl/$(DESIRED_GO_VER)
-	$(GO) download
+	@echo GO_VER=$(GO_VER)
+	@echo GOPATH=$(GOPATH)
 	$(GO) get github.com/go-bindata/go-bindata/...
 	$(GO) get github.com/ahmetb/govvv
 

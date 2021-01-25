@@ -205,10 +205,13 @@ fi
 #      yum 3.4.3
 #      Sudo version 1.8.23
 #      autoconf (GNU Autoconf) 2.69
+#      GNU Make 3.82
 #      automake (GNU automake) 1.13.4
 #      libtool (GNU libtool) 2.4.2
 #      cmake version 3.13.5
 #      lcov: LCOV version 1.13
+#      go1.15.5
+#      upx 3.96
 #
 
 PKG_MGR="unknown"
@@ -255,11 +258,31 @@ yum_autoconf_exists() {
 
 yum_autoconf_install() {
     echo "Installing autoconf."
-    sudo yum install autoconf
+    sudo yum -y install autoconf
     if [ $? = 0 ]; then
         echo "Installation of autoconf successful."
     else
         echo "Installation of autoconf failed."
+        FAILED=1
+    fi
+}
+
+yum_make_exists() {
+    if make --version &>/dev/null; then
+        echo "make is already installed; doing nothing for make."
+    else
+        echo "make is not already installed."
+        return 1
+    fi
+}
+
+yum_make_install() {
+    echo "Installing make."
+    sudo yum -y install make
+    if [ $? = 0 ]; then
+        echo "Installation of make successful."
+    else
+        echo "Installation of make failed."
         FAILED=1
     fi
 }
@@ -275,7 +298,7 @@ yum_automake_exists() {
 
 yum_automake_install() {
     echo "Installing automake."
-    sudo yum install automake
+    sudo yum -y install automake
     if [ $? = 0 ]; then
         echo "Installation of automake successful."
     else
@@ -295,7 +318,7 @@ yum_libtool_exists() {
 
 yum_libtool_install() {
     echo "Installing libtool."
-    sudo yum install libtool
+    sudo yum -y install libtool
     if [ $? = 0 ]; then
         echo "Installation of libtool successful."
     else
@@ -315,9 +338,8 @@ yum_cmake_exists() {
 
 yum_cmake_install() {
     echo "Installing cmake."
-    # As a note, cmake3 is provided by epel-release, so if this doesn't
-    # work, we probably just need to add sudo yum install epel-release first.
-    sudo yum install cmake3
+    sudo yum -y install epel-release
+    sudo yum -y install cmake3
     if [ $? = 0 ]; then
         sudo alternatives --install /usr/local/bin/cmake cmake /usr/bin/cmake3 10 \
              --slave /usr/local/bin/ctest ctest /usr/bin/ctest3 \
@@ -344,7 +366,8 @@ yum_lcov_exists() {
 
 yum_lcov_install() {
     echo "Installing lcov."
-    sudo yum install lcov
+    sudo yum -y install epel-release
+    sudo yum -y install lcov
     if [ $? = 0 ]; then
         echo "Installation of lcov successful."
     else
@@ -410,6 +433,7 @@ yum_dump_versions() {
     yum --version | head -n1 | sed 's/^/      yum /'
     sudo --version | head -n1 | sed 's/^/      /'
     autoconf --version | head -n1 | sed 's/^/      /'
+    make --version | head -n1 | sed 's/^/      /'
     automake --version | head -n1 | sed 's/^/      /'
     libtool --version | head -n1 | sed 's/^/      /'
     cmake --version | head -n1 | sed 's/^/      /'
@@ -426,6 +450,9 @@ yum_install() {
     fi
     if ! yum_autoconf_exists; then
         yum_autoconf_install
+    fi
+    if ! yum_make_exists; then
+        yum_make_install
     fi
     if ! yum_automake_exists; then
         yum_automake_install
@@ -602,6 +629,8 @@ apt_go_exists() {
 
 apt_go_install() {
     echo "Installing go."
+    sudo add-apt-repository ppa:longsleep/golang-backports
+    sudo apt update
     sudo apt-get install -y golang-go
     if [ $? = 0 ]; then
         echo "Installation of go successful."

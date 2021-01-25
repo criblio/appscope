@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"strings"
 
 	linq "github.com/ahmetb/go-linq/v3"
 	"github.com/criblio/scope/metrics"
@@ -31,11 +32,15 @@ var metricsCmd = &cobra.Command{
 		sessions := sessionByID(id)
 
 		if graph && len(names) == 0 {
-			util.ErrAndExit("must specify a metric to graph")
+			helpErrAndExit(cmd, "Must specify a metric names with --graph")
+		} else if cols && len(names) == 0 {
+			helpErrAndExit(cmd, "Must specify metric names with --cols")
 		}
 
 		file, err := os.Open(sessions[0].MetricsPath)
-		util.CheckErrSprintf(err, "Invalid session. Command likely exited without capturing metric data.\nerror opening metrics file: %v", err)
+		if err != nil && strings.Contains(err.Error(), "metrics.json: no such file or directory") {
+			promptClean(sessions[0:1])
+		}
 		in := make(chan metrics.Metric)
 		offsetChan := make(chan int)
 		filters := []util.MatchFunc{}

@@ -67,9 +67,23 @@ func GetSessions() (ret SessionList) {
 	return ret
 }
 
-// Last returns the last n sessions by time
+// Last returns the last n sessions by ID
 func (sessions SessionList) Last(n int) (ret SessionList) {
-	sort.Slice(sessions, func(i, j int) bool { return sessions[i].Timestamp > sessions[j].Timestamp })
+	sort.Slice(sessions, func(i, j int) bool { return sessions[i].ID > sessions[j].ID })
+	ret = sessions.getN(n)
+	sort.Slice(ret, func(i, j int) bool { return ret[i].ID < ret[j].ID })
+	return ret
+}
+
+// First returns the first n sessions by ID
+func (sessions SessionList) First(n int) (ret SessionList) {
+	sort.Slice(sessions, func(i, j int) bool { return sessions[i].ID < sessions[j].ID })
+	ret = sessions.getN(n)
+	sort.Slice(ret, func(i, j int) bool { return ret[i].ID < ret[j].ID })
+	return ret
+}
+
+func (sessions SessionList) getN(n int) (ret SessionList) {
 	if n > len(sessions) {
 		n = len(sessions)
 	}
@@ -80,7 +94,6 @@ func (sessions SessionList) Last(n int) (ret SessionList) {
 	} else {
 		ret = append(ret, sessions...)
 	}
-	sort.Slice(ret, func(i, j int) bool { return ret[i].ID < ret[j].ID })
 	return ret
 }
 
@@ -138,4 +151,13 @@ func (sessions SessionList) CountAndDuration() (ret SessionList) {
 		ret = append(ret, s)
 	}
 	return ret
+}
+
+// Remove removes all sessions in a given session list
+func (sessions SessionList) Remove() (ret SessionList) {
+	for _, s := range sessions {
+		err := os.RemoveAll(s.WorkDir)
+		util.CheckErrSprintf(err, "error removing work directory: %v", err)
+	}
+	return []Session{}
 }

@@ -103,7 +103,7 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 			Watch: []ScopeWatchConfig{
 				{
 					WatchType: "file",
-					Name:      ".*log.*",
+					Name:      ScopeLogRegex(),
 					Value:     ".*",
 				},
 				{
@@ -169,4 +169,8 @@ func WriteScopeConfig(sc *ScopeConfig, path string) error {
 		return fmt.Errorf("error writing ScopeConfig to file %s: %v", path, err)
 	}
 	return nil
+}
+
+func ScopeLogRegex() string {
+	return `[\s\/\\\.]log[s]?[\/\\\.]?`
 }

@@ -431,7 +431,8 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
     jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___unwrap, src, dsts, offset, len);
 
     jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
-    for(int i=offset;i<len - offset;i++) {
+    int i;
+    for(i=offset;i<len - offset;i++) {
         jobject bufEl  = (*jni)->GetObjectArrayElement(jni, dsts, i);
         jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
         jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
@@ -460,7 +461,8 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
     }
     
     jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
-    for(int i=offset;i<len - offset;i++) {
+    int i;
+    for(i=offset;i<len - offset;i++) {
         jobject bufEl  = (*jni)->GetObjectArrayElement(jni, srcs, i);
         jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
         jint limit     = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_limit);

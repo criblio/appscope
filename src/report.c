@@ -1105,7 +1105,7 @@ doProcMetric(metric_t type, long long measurement)
             UNIT_FIELD("kibibyte"),
             FIELDEND
         };
-        event_t event = INT_EVENT("proc.mem", measurement, DELTA, fields);
+        event_t event = INT_EVENT("proc.mem", measurement, CURRENT, fields);
         sendEvent(g_mtc, &event);
         break;
     }

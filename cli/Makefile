@@ -44,7 +44,7 @@ scope: run/scopec.go
 install: 
 	cp $(DIR)build/scope /usr/local/bin/scope
 
-test:
+clitest:
 	cd $(DIR) && go test -v -coverprofile coverage.out ./...
 
 cover:

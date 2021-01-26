@@ -7,7 +7,13 @@ endif
 
 DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-.PHONY: all
+GO_VER:=$(shell go version | cut -d' ' -f3)
+GOPATH:=$(shell go env | grep GOPATH | cut -d\" -f2)
+GO:=go
+
+GO_VER_FLAGS=$(shell $(GOPATH)/bin/govvv -flags)
+
+.PHONY: cliall
 
 cliall: deps scope
 
@@ -15,8 +21,11 @@ cliclean:
 	rm -rf $(DIR)build/*
 
 deps:
-	go get github.com/go-bindata/go-bindata/...
-	go get github.com/ahmetb/govvv
+	@echo DIR=$(DIR)
+	@echo GO_VER=$(GO_VER)
+	@echo GOPATH=$(GOPATH)
+	$(GO) get github.com/go-bindata/go-bindata/...
+	$(GO) get github.com/ahmetb/govvv
 
 rebuild: cliclean all
 

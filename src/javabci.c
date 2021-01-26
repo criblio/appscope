@@ -144,7 +144,8 @@ getAttributesLength(unsigned char *addr)
 {
     uint16_t attr_count = be16toh(*((uint16_t *)addr));
     unsigned char *off = addr + 2;
-    for (int j=0;j<attr_count;j++) {
+    int j;
+    for (j=0;j<attr_count;j++) {
         uint32_t attr_length = be32toh(*((uint32_t *)(off + 2)));
         off += attr_length + 6;
     }
@@ -164,7 +165,8 @@ getCodeAttributeAddress(java_class_t *info, unsigned char *method)
     
     unsigned char *code = NULL;
     unsigned char *off = method + 8;
-    for (int j=0;j<attributes_count && code == NULL;j++) {
+    int j;
+    for (j=0;j<attributes_count && code == NULL;j++) {
         uint16_t attr_name_index = be16toh(*((uint16_t *)off));
         uint32_t attr_length     = be32toh(*((uint32_t *)(off + 2)));
         char *attr_name          = javaGetUtf8String(info, attr_name_index);
@@ -182,7 +184,8 @@ int
 javaFindClassIndex(java_class_t *info, const char *className) 
 {
     int idx = -1;
-    for(int i=1;i<info->constant_pool_count;i++) {
+    int i;
+    for(i=1;i<info->constant_pool_count;i++) {
         unsigned char *cp_info = info->constant_pool[i - 1];
         uint8_t tag = *((uint8_t *)cp_info);
         if(tag == CONSTANT_Class) {
@@ -202,7 +205,8 @@ int
 javaFindMethodIndex(java_class_t *info, const char *method, const char *signature) 
 {
     int idx = -1;
-    for (int i=0;i<info->methods_count;i++) {
+    int i;
+    for (i=0;i<info->methods_count;i++) {
         unsigned char *addr = info->methods[i];
         uint16_t name_index       = be16toh(*((uint16_t *)(addr + 2)));
         uint16_t descriptor_index = be16toh(*((uint16_t *)(addr + 4)));
@@ -347,7 +351,8 @@ javaWriteClass(unsigned char *dest, java_class_t *info)
     *((uint16_t *)addr) = htobe16(info->minor_version);         addr += 2;
     *((uint16_t *)addr) = htobe16(info->major_version);         addr += 2;
     *((uint16_t *)addr) = htobe16(info->constant_pool_count);   addr += 2;
-    for(int i=0;i<info->constant_pool_count - 1;i++) {
+    int i;
+    for(i=0;i<info->constant_pool_count - 1;i++) {
         unsigned char *cp = info->constant_pool[i];
         unsigned char tag = *((unsigned char *)cp);
         uint16_t size = javaGetTagLength(cp);
@@ -368,7 +373,7 @@ javaWriteClass(unsigned char *dest, java_class_t *info)
     memcpy(addr, info->interfaces, info->interfaces_count * 2); addr += info->interfaces_count * 2;
     //write fields
     *((uint16_t *)addr) = htobe16(info->fields_count); addr += 2;
-    for (int i=0;i<info->fields_count;i++) {
+    for (i=0;i<info->fields_count;i++) {
         unsigned char *field = info->fields[i];
         uint32_t size = getAttributesLength(field + 6) + 6;
         memcpy(addr, info->fields[i], size);
@@ -376,7 +381,7 @@ javaWriteClass(unsigned char *dest, java_class_t *info)
     }
     *((uint16_t *)addr) = htobe16(info->methods_count); addr += 2;
     //write methods
-    for (int i=0;i<info->methods_count;i++) {
+    for (i=0;i<info->methods_count;i++) {
         unsigned char *method = info->methods[i];
         uint32_t size = javaGetMethodLength(method);
         memcpy(addr, info->methods[i], size);
@@ -384,7 +389,7 @@ javaWriteClass(unsigned char *dest, java_class_t *info)
     }
     //write attributes
     *((uint16_t *)addr) = htobe16(info->attributes_count); addr += 2;
-    for (int i=0;i<info->attributes_count;i++) {
+    for (i=0;i<info->attributes_count;i++) {
         unsigned char *attr = info->attributes[i];
         uint32_t attribute_length = be32toh(*((uint32_t *)(attr + 2)));
         size_t size = attribute_length + 6;
@@ -408,7 +413,8 @@ javaReadClass(const unsigned char* classData)
     classInfo->_constant_pool_count = classInfo->constant_pool_count;
     //allocate memory for existing constant pool enties and make a room for up to 100 new entries
     classInfo->constant_pool        = (unsigned char **) calloc(100 + (classInfo->constant_pool_count - 1), sizeof(unsigned char *));
-    for(int i=1;i<classInfo->constant_pool_count;i++) {
+    int i;
+    for(i=1;i<classInfo->constant_pool_count;i++) {
         classInfo->constant_pool[i - 1] = (unsigned char *)off;
         unsigned char tag = *((unsigned char *)off);
         if (tag == CONSTANT_Double || tag == CONSTANT_Long) {
@@ -432,7 +438,7 @@ javaReadClass(const unsigned char* classData)
     classInfo->fields_count         = be16toh(*((uint16_t *)off)); off += 2;
     //allocate memory for existing fields and make a room for up to 100 new fields
     classInfo->fields               = (unsigned char **) calloc(100 + classInfo->fields_count, sizeof(unsigned char *));
-    for (int i=0;i<classInfo->fields_count;i++) {
+    for (i=0;i<classInfo->fields_count;i++) {
         classInfo->fields[i] = off;
         off += getAttributesLength(off + 6) + 6;
     }
@@ -442,7 +448,7 @@ javaReadClass(const unsigned char* classData)
     classInfo->_methods_count       = classInfo->methods_count;
     //allocate memory for existing methods and make a room for up to 100 new methods
     classInfo->methods              = (unsigned char **) calloc(100 + classInfo->methods_count, sizeof(unsigned char *));
-    for (int i=0;i<classInfo->methods_count;i++) {
+    for (i=0;i<classInfo->methods_count;i++) {
         classInfo->methods[i] = off;
         off += javaGetMethodLength(off);
     }
@@ -450,7 +456,7 @@ javaReadClass(const unsigned char* classData)
     //read attributes
     classInfo->attributes_count     = be16toh(*((uint16_t *)off)); off += 2;
     classInfo->attributes           = (unsigned char **) calloc(classInfo->attributes_count, sizeof(unsigned char *));
-    for (int i=0;i<classInfo->attributes_count;i++) {
+    for (i=0;i<classInfo->attributes_count;i++) {
         classInfo->attributes[i] = off;
         uint32_t attribute_length = be32toh(*((uint32_t *)(off + 2)));
         off += attribute_length + 6;

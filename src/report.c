@@ -2439,7 +2439,7 @@ doEvent()
 void
 doPayload()
 {
-    bool lsbin = TRUE;
+    bool lsbin = FALSE;
     bool filebin = TRUE;
     uint64_t data;
 

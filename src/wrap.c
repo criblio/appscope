@@ -674,19 +674,24 @@ reportPeriodicStuff(void)
 
     // We report CPU time for this period.
     cpu = doGetProcCPU();
-    doProcMetric(PROC_CPU, cpu - cpuState);
-    cpuState = cpu;
+    if (cpu != -1) {
+        doProcMetric(PROC_CPU, cpu - cpuState);
+        cpuState = cpu;
+    }
 
     mem = osGetProcMemory(g_proc.pid);
-    doProcMetric(PROC_MEM, mem);
+    if (mem != -1) doProcMetric(PROC_MEM, mem);
 
     nthread = osGetNumThreads(g_proc.pid);
-    doProcMetric(PROC_THREAD, nthread);
+    if (nthread != -1) doProcMetric(PROC_THREAD, nthread);
 
     nfds = osGetNumFds(g_proc.pid);
-    doProcMetric(PROC_FD, nfds);
+    if (nfds != -1) doProcMetric(PROC_FD, nfds);
 
     children = osGetNumChildProcs(g_proc.pid);
+    if (children < 0) {
+        children = 0;
+    }
     doProcMetric(PROC_CHILD, children);
 
     // report totals (not by file descriptor/socket descriptor)

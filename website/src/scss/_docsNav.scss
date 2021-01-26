@@ -1,0 +1,61 @@
+@import "_vars";
+
+.docsNav {
+  border-right: 1px solid $orange;
+  input {
+    padding: 5px 10px;
+    border: 1px solid #ccc;
+    width: 300px;
+    outline: none;
+    margin-bottom: 20px;
+    font-size: 0.6rem;
+  }
+  h4 {
+    margin-bottom: 20px;
+    display: flex;
+    cursor: pointer;
+    align-items: center;
+    font-size: 0.75rem;
+    span {
+      font-size: 14px;
+      font-weight: 300;
+      margin-left: 10px;
+    }
+  }
+  ul {
+    list-style-type: none;
+    padding: 0;
+    font-size: 16px;
+    li {
+      margin: 10px 0;
+      ul {
+        border-left: 1px solid $blue;
+        margin-left: 25px;
+        padding-left: 10px;
+        li {
+          font-size: 14px;
+        }
+      }
+    }
+  }
+}
+.TOC {
+  font-size: 16px;
+  text-transform: capitalize;
+  display: flex;
+  justify-content: flex-end;
+  text-align: right;
+  margin-top: 150px;
+  ul {
+    list-style-type: none;
+    li {
+      margin: 10px 0;
+      &:first-of-type {
+        text-decoration: underline;
+        text-decoration-color: $blue;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 5px;
+      }
+    }
+  }
+}

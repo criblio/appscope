@@ -1,0 +1,24 @@
+# You can find a list of all icons available at https://fontawesome.com/icons?d=gallery&s=solid
+
+- title: AppScope Highlights Can Go Here
+  description: Use Iconography & Description for High Level Features. 
+  items: 
+    - title: Highlight Item
+      icon: tachometer-alt
+      shortDescription: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+    - title: Highlight Item
+      icon: tachometer-alt
+      shortDescription: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+    - title: Highlight Item
+      icon: tachometer-alt
+      shortDescription: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+    - title: Highlight Item
+      icon: tachometer-alt
+      shortDescription: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+    - title: Highlight Item
+      icon: tachometer-alt
+      shortDescription: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+    - title: Highlight Item
+      icon: tachometer-alt
+      shortDescription: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+    

@@ -1,0 +1,13 @@
+@import "_vars";
+
+.alert {
+  background: $orange;
+  color: #fff;
+  margin: 0;
+  text-align: center;
+  border-radius: 0;
+  p {
+    margin: 0;
+    font-size: 0.75rem;
+  }
+}

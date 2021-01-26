@@ -3,6 +3,7 @@ package run
 import (
 	"io/ioutil"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -65,4 +66,22 @@ func TestWriteScopeConfig(t *testing.T) {
 	yamlBytes, err := ioutil.ReadFile(".scope.yml")
 	assert.Equal(t, testYaml, string(yamlBytes))
 	os.Remove(".scope.yml")
+}
+
+func TestScopeLogRegex(t *testing.T) {
+	tests := []struct {
+		Test    string
+		Matches bool
+	}{
+		{"/var/log/messages", true},
+		{"/opt/cribl/log/cribl.log", true},
+		{"/some/container/path.log", true},
+		{"/opt/cribl/blog/foo.txt", false},
+		{"/opt/cribl/log/foo.txt", true},
+	}
+
+	re := regexp.MustCompile(ScopeLogRegex())
+	for _, test := range tests {
+		assert.Equal(t, test.Matches, re.MatchString(test.Test))
+	}
 }

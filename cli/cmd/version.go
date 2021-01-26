@@ -13,8 +13,8 @@ var versionDate bool
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{
 	Use:   "version [flags]",
-	Short: "display scope version",
-	Long:  `Outputs version info`,
+	Short: "Display scope version",
+	Long:  `Output version info.`,
 	Example: `scope version
 scope version --date
 scope version --summary`,

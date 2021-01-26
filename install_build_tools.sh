@@ -618,49 +618,6 @@ apt_lcov_install() {
     fi
 }
 
-apt_go_exists() {
-    if go version &>/dev/null; then
-        echo "go is already installed; doing nothing for go."
-    else
-        echo "go is not already installed."
-        return 1
-    fi
-}
-
-apt_go_install() {
-    echo "Installing go."
-    sudo apt-get install -y software-properties-common
-    sudo add-apt-repository -y ppa:longsleep/golang-backports
-    sudo apt update
-    sudo apt-get install -y golang-go
-    if [ $? = 0 ]; then
-        echo "Installation of go successful."
-    else
-        echo "Installation of go failed."
-        FAILED=1
-    fi
-}
-
-apt_upx_exists() {
-    if upx --version &>/dev/null; then
-        echo "upx is already installed; doing nothing for upx."
-    else
-        echo "upx is not already installed."
-        return 1
-    fi
-}
-
-apt_upx_install() {
-    echo "Installing upx."
-    sudo apt-get install -y upx
-    if [ $? = 0 ]; then
-        echo "Installation of upx successful."
-    else
-        echo "Installation of upx failed."
-        FAILED=1
-    fi
-}
-
 apt_dump_versions() {
     # The crazy sed stuff at the end of each just provides indention.
     if lsb_release -d &>/dev/null; then
@@ -675,8 +632,6 @@ apt_dump_versions() {
     libtool --version | head -n1 | sed 's/^/      /'
     cmake --version | head -n1 | sed 's/^/      /'
     lcov --version | head -n1 | sed 's/^/      /'
-    go version | head -n1 | sed 's/^/      /'
-    upx --version | head -n1 | sed 's/^/      /'
 }
 
 apt_install() {
@@ -700,13 +655,6 @@ apt_install() {
     if ! apt_lcov_exists; then
         apt_lcov_install
     fi
-    if ! apt_go_exists; then
-        apt_go_install
-    fi
-    if ! apt_upx_exists; then
-        apt_upx_install
-    fi
-
 
     if (( FAILED )); then
         echo "Installation failure detected."

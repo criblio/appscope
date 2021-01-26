@@ -13,10 +13,18 @@ import (
 
 // historyCmd represents the history command
 var historyCmd = &cobra.Command{
-	Use:     "history [flags]",
-	Short:   "List scope session history",
-	Long:    `List scope session history`,
-	Example: `scope history`,
+	Use:   "history [flags]",
+	Short: "List scope session history",
+	Long: `Each scope execution maintains a directory full of information collected by scope. History lists sessions and 
+prints information on individual sessions. History displays information on what was executed, when they were 
+started, how many events they output, etc.`,
+	Example: `scope history                    # Displays session history
+scope hist                       # Shortcut for scope history
+scope hist -r                    # Displays running sessions
+scope hist --id 2                # Displays detailed information for session 2
+scope hist -n 50                 # Displays last 50 sessions
+scope hist -d                    # Displays directory for the last session
+cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope history directory for the current session`,
 	Aliases: []string{"hist"},
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {

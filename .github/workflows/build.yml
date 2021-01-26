@@ -11,5 +11,6 @@ jobs:
       # - run: apt-get update && apt-get install -y git
       - run: ./install_build_tools.sh
       - run: make deps
-      - run: make
+      - run: make all
       - run: make test
+      - run: cd test/testContainers && docker-compose up

@@ -12,8 +12,8 @@ import (
 // pruneCmd represents the prune command
 var pruneCmd = &cobra.Command{
 	Use:   "prune [flags]",
-	Short: "Prune deletes scope history",
-	Long:  `Prune deletes scope history`,
+	Short: "Prune deletes session history",
+	Long:  `Scope stores captured data in a directory per session. Prune allows you to delete prior sessions. `,
 	Example: `scope prune -k 20
 scope prune -a`,
 	Args: cobra.NoArgs,
@@ -25,13 +25,13 @@ scope prune -a`,
 
 		count := ""
 		if keep == -1 && del == -1 && all == false {
-			util.ErrAndExit("Must specify keep, delete, or all")
+			helpErrAndExit(cmd, "Must specify keep, delete, or all")
 		} else if all != false && keep > -1 {
-			util.ErrAndExit("Cannot specify keep and all")
+			helpErrAndExit(cmd, "Cannot specify keep and all")
 		} else if all != false && del > -1 {
-			util.ErrAndExit("Cannot specify delete and all")
+			helpErrAndExit(cmd, "Cannot specify delete and all")
 		} else if keep > -1 && del > -1 {
-			util.ErrAndExit("Cannot specify delete and keep")
+			helpErrAndExit(cmd, "Cannot specify delete and keep")
 		} else if keep > -1 {
 			count = fmt.Sprintf("all but %d", keep)
 		} else if del > -1 {
@@ -50,22 +50,18 @@ scope prune -a`,
 		}
 		sessions := history.GetSessions()
 		countD := 0
-		if keep > -1 || all {
-			for idx, s := range sessions {
-				if idx > len(sessions)-keep-1 {
-					break
-				}
-				err := os.RemoveAll(s.WorkDir)
-				util.CheckErrSprintf(err, "error removing work directory: %v", err)
-				countD = idx + 1
-			}
+		if all {
+			countD = len(sessions)
+			sessions.Remove()
+		} else if keep > -1 {
+			toRemove := len(sessions) - keep
+			removeS := sessions.First(toRemove)
+			countD = len(removeS)
+			removeS.Remove()
 		} else if del > -1 {
-			sessions = sessions.Last(del)
-			for idx, s := range sessions {
-				err := os.RemoveAll(s.WorkDir)
-				util.CheckErrSprintf(err, "error removing work directory: %v", err)
-				countD = idx + 1
-			}
+			removeS := sessions.Last(del)
+			countD = len(removeS)
+			removeS.Remove()
 		}
 		fmt.Printf("Removed %d sessions.\n", countD)
 		os.Exit(0)

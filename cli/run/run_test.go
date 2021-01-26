@@ -162,7 +162,7 @@ event:
     path: EVENTSPATH
   watch:
   - type: file
-    name: .*log.*
+    name: '[\s\/\\\.]log[s]?[\/\\\.]?'
     value: .*
   - type: console
     name: (stdout|stderr)

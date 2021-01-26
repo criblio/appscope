@@ -618,52 +618,6 @@ apt_lcov_install() {
     fi
 }
 
-<<<<<<< HEAD
-=======
-apt_go_exists() {
-    if go version &>/dev/null; then
-        echo "go is already installed; doing nothing for go."
-    else
-        echo "go is not already installed."
-        return 1
-    fi
-}
-
-apt_go_install() {
-    echo "Installing go."
-    sudo apt-get install -y software-properties-common
-    sudo add-apt-repository -y ppa:longsleep/golang-backports
-    sudo apt update
-    sudo apt-get install -y golang-go
-    if [ $? = 0 ]; then
-        echo "Installation of go successful."
-    else
-        echo "Installation of go failed."
-        FAILED=1
-    fi
-}
-
-apt_upx_exists() {
-    if upx --version &>/dev/null; then
-        echo "upx is already installed; doing nothing for upx."
-    else
-        echo "upx is not already installed."
-        return 1
-    fi
-}
-
-apt_upx_install() {
-    echo "Installing upx."
-    sudo apt-get install -y upx
-    if [ $? = 0 ]; then
-        echo "Installation of upx successful."
-    else
-        echo "Installation of upx failed."
-        FAILED=1
-    fi
-}
-
->>>>>>> 4554f4e6717ba2b7c96d162184f9b89a7cad2b1d
 apt_dump_versions() {
     # The crazy sed stuff at the end of each just provides indention.
     if lsb_release -d &>/dev/null; then

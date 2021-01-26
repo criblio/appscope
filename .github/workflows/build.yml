@@ -13,4 +13,4 @@ jobs:
       - run: make deps
       - run: make all
       - run: make test
-      - run: cd scope/test/testContainers && docker-compose up
+      - run: cd test/testContainers && docker-compose up

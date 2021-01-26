@@ -629,8 +629,8 @@ apt_go_exists() {
 
 apt_go_install() {
     echo "Installing go."
-    sudo apt-get install software-properties-common
-    sudo add-apt-repository ppa:longsleep/golang-backports
+    sudo apt-get install -y software-properties-common
+    sudo add-apt-repository -y ppa:longsleep/golang-backports
     sudo apt update
     sudo apt-get install -y golang-go
     if [ $? = 0 ]; then

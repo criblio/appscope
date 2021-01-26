@@ -9,3 +9,10 @@ contrib/funchook/build/
 contrib/pcre2/build
 
 test/testContainers/logs
+
+#website
+website/.env
+website/public/
+website/node_modules/
+website/.cache/
+

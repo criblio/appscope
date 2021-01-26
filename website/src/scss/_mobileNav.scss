@@ -1,0 +1,76 @@
+@import "_vars";
+.display-xs {
+  .nav {
+    background: #fff;
+
+    #uncontrolled-tab-example-tab-AppScope {
+      img {
+        filter: brightness(0) invert(1);
+      }
+    }
+    #uncontrolled-tab-example-tab-AppScope,
+    #uncontrolled-tab-example-tab-Cribl {
+      background-color: #565656;
+      border: none;
+      border-radius: 0;
+      height: 60px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 42%;
+    }
+    #uncontrolled-tab-example-tab-AppScope.active,
+    #uncontrolled-tab-example-tab-Cribl.active {
+      background-color: $black;
+
+      img {
+        color: #fff;
+      }
+    }
+  }
+  .tab-pane {
+    position: relative;
+    top: -400px;
+    background: $black;
+    transition: top 0.5s, z-index 0s ease-out;
+    .tab-content .navbar-nav {
+      background: $black;
+    }
+    .navbar-light .navbar-nav .nav-link {
+      color: #fff;
+      font-size: 0.8rem;
+    }
+    .dropdown {
+      background-color: $black;
+      .dropdown-menu {
+        background-color: $black;
+        border: none;
+        .dropdown-item {
+          color: #fff;
+          font-size: 0.8rem;
+
+          &:hover {
+            background-color: $black;
+            text-decoration: underline;
+          }
+        }
+      }
+    }
+  }
+  .tab-pane.menuActive {
+    top: 0;
+    z-index: 7;
+    transition: top 0.5s ease-out, z-index 1.2s;
+  }
+  .tab-content {
+    height: 0;
+    z-index: 0;
+  }
+  .nav-tabs {
+    display: flex;
+    align-items: center;
+    border-top: 3px solid $blue;
+    z-index: 10;
+    position: relative;
+  }
+}

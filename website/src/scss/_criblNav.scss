@@ -1,0 +1,121 @@
+@import "_vars";
+
+.criblNav-wrapper {
+  background: #000;
+  height: 55px;
+  padding: 0;
+  .criblNav {
+    color: #fff;
+    display: flex;
+    padding: 2px 0;
+    align-items: center;
+    height: 55px;
+    max-width: 1470px;
+
+    .col {
+      padding: 0;
+    }
+    .col-md-6 {
+      padding: 0;
+    }
+    .cribl-logo {
+      margin-right: 18px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      height: 55px;
+      margin-right: 32px;
+      &:last-of-type {
+        margin-right: 0;
+      }
+      a.nav-link {
+        color: #fff;
+        text-transform: uppercase;
+        font-size: 12px;
+        padding-right: 0;
+        &:first-of-type {
+          padding-left: 0;
+        }
+      }
+      a.dropdown-toggle {
+        display: flex;
+        align-items: center;
+        &::after {
+          content: "\203A";
+          color: $blue;
+          border: none;
+          font-size: 20px;
+          transform: rotate(90deg);
+          margin-left: 10px;
+        }
+      }
+
+      .dropdown-menu {
+        border-width: 0 0 3px 0;
+        border-color: $orange;
+        border-radius: 0;
+        width: 300px;
+        margin-top: 3px !important;
+
+        a {
+          color: $blue;
+          text-transform: capitalize;
+          font-size: 14px;
+
+          &::after {
+            content: "";
+          }
+
+          &:hover {
+            color: $hover;
+          }
+        }
+      }
+    }
+    .cribl-brand {
+      padding-right: 16px;
+    }
+    .sandbox-btn {
+      padding: 0 0 0 40px;
+    }
+    .nav-link {
+      display: flex;
+      align-self: center;
+    }
+
+    button {
+      background: $orange;
+      border: none;
+      width: 193px;
+      font-size: 0.4rem;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: center;
+      font-weight: bold;
+      margin: 0;
+      border-radius: 0;
+      align-items: center;
+      height: 36px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    background: $black;
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    z-index: 10000;
+    .criblNav {
+      color: #fff;
+      display: flex;
+      padding: 2px 0;
+      align-items: flex-start;
+      height: 100%;
+      .nav-item {
+        width: 100%;
+      }
+    }
+  }
+}

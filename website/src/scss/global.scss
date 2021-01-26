@@ -1,0 +1,115 @@
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;700&display=swap");
+@import "_vars.scss";
+
+html {
+  overflow-x: hidden;
+  font-size: 18px;
+  @media (min-width: 768px) {
+    font-size: 36px;
+  }
+}
+
+body {
+  font-family: "Open Sans", sans-serif;
+  // background: $black !important;
+  // color: #fff;
+  // nav {
+  //   background: #fff;
+  // }
+  overflow: hidden;
+}
+.container {
+  max-width: 1470px;
+}
+.container,
+.container-fluid {
+  padding: 50px 0;
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin-bottom: 30px;
+    font-weight: bold;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+  }
+
+  h3 {
+    font-size: 1.15rem;
+  }
+  h4 {
+    font-size: 1rem;
+  }
+
+  p,
+  ul,
+  li,
+  .alert p {
+    font-size: 0.75rem;
+    font-weight: 300;
+    margin: 15px 0;
+    @media (min-width: 768px) {
+      font-size: 0.5rem;
+    }
+  }
+  ul {
+    padding-left: 20px;
+  }
+  .row {
+    align-items: center;
+  }
+
+  p {
+    @media (max-width: 767px) {
+      padding: 0 20px;
+    }
+  }
+  button {
+    background: $orange;
+    border: none;
+    border-radius: 2px;
+    width: 185px;
+    height: 50px;
+    font-weight: bold;
+    text-transform: uppercase;
+    @media (min-width: 768px) {
+      font-size: 0.45rem;
+    }
+  }
+  @media (min-width: 768px) {
+    padding: 100px 0;
+  }
+}
+.alert {
+  height: 55px;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  z-index: 10;
+}
+
+.display-xs {
+  display: none;
+
+  @media (max-width: 767px) {
+    display: block;
+  }
+}
+
+.display-md {
+  display: none;
+  @media (min-width: 768px) {
+    display: block;
+  }
+}

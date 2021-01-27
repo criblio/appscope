@@ -9,11 +9,11 @@ import (
 )
 
 // NewlineReader reads from an io.Reader, matches against a given callback, and calls a callback with the line number and bytes
-func NewlineReader(r io.Reader, match func(string) bool, callback func(line int, offset int, b []byte) error) (int, error) {
+func NewlineReader(r io.Reader, match func(string) bool, callback func(line int, offset int64, b []byte) error) (int, error) {
 	cr := &CountingReader{Reader: r}
 	scanner := bufio.NewScanner(cr)
 	idx := 0
-	offset := 0
+	offset := int64(0)
 	for scanner.Scan() {
 		idx++
 		if match(scanner.Text()) {
@@ -22,13 +22,68 @@ func NewlineReader(r io.Reader, match func(string) bool, callback func(line int,
 				return cr.BytesRead, err
 			}
 		}
-		offset += len(scanner.Bytes()) + 1 // bad assumption here with newline length 1 but lazy right now
+		offset += int64(len(scanner.Bytes()) + 1) // bad assumption here with newline length 1 but lazy right now
 	}
 
 	if err := scanner.Err(); err != nil {
 		return cr.BytesRead, err
 	}
 	return cr.BytesRead, nil
+}
+
+// FindReverseLineMatchOffset finds the passed number of lines from the end of the passed reader
+func FindReverseLineMatchOffset(lines int, r io.ReadSeeker, match func(string) bool) (offset int64, err error) {
+	found := 0
+
+	// Move to the end of the file
+	offset, err = r.Seek(0, io.SeekEnd)
+	if err != nil {
+		return
+	}
+
+	// Read 102400 byte buffers, backwards from the end of the file, counting lines which match a given match function
+	buf := make([]byte, 102400)
+	for { // Each iteration reads 102400 bytes (or as much as it can) and returns if we've found the number of matches or if we're at the beginning of the file
+		offset -= int64(cap(buf))
+		if offset < 0 {
+			offset = 0
+		}
+		_, err = r.Seek(offset, io.SeekStart)
+		if err != nil {
+			offset = -1
+			return
+		}
+		var rBytes int
+		rBytes, err = r.Read(buf)
+		if err != nil {
+			offset = -1
+			return
+		}
+
+		lastMatch := rBytes - 1               // Only search as much as we've read, -1 for offset 0
+		for i := lastMatch - 2; i >= 0; i-- { // Start 2 characters in, skip last newline or if single char not newline won't match either
+			if buf[i] == '\n' {
+				line := string(buf[i+1 : lastMatch])
+				lastMatch = i
+				// fmt.Fprintf(os.Stderr, "%d line: %s\n", i, line)
+				if match(line) {
+					// fmt.Fprintf(os.Stderr, "found!\n")
+					found++
+					if found == lines {
+						offset += int64(i) + int64(1) // Return character after the last match plus what we haven't yet read in the file
+						return
+					}
+				}
+			}
+		}
+
+		if rBytes != cap(buf) { // we couldn't read a full buffer, so we're at the beginning. Exit indicating offset -1 which means we didn't find.
+			offset = -1
+			return
+		}
+
+		offset += int64(lastMatch) // Set offset to last matched newline and start from there to avoid matching against broken lines
+	}
 }
 
 // MatchFunc will return true or false if a given event matches

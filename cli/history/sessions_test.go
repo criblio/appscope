@@ -74,15 +74,20 @@ func TestGetSessions(t *testing.T) {
 	os.RemoveAll(".test")
 }
 
-func TestGetSessionLast(t *testing.T) {
-	pid := 0
+func runThree(t *testing.T) []int {
+	pids := []int{}
 	for i := 0; i < 3; i++ {
 		cmd := exec.Command(os.Args[0])
 		cmd.Env = append(os.Environ(), "TEST_MAIN=run", "SCOPE_HOME=.test")
 		err := cmd.Run()
 		assert.NoError(t, err)
-		pid = cmd.Process.Pid
+		pids = append(pids, cmd.Process.Pid)
 	}
+	return pids
+}
+
+func TestGetSessionLast(t *testing.T) {
+	pids := runThree(t)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -95,10 +100,56 @@ func TestGetSessionLast(t *testing.T) {
 	l1 := sessions.Last(1)
 	assert.Equal(t, "echo", l1[0].Cmd)
 	assert.Equal(t, 3, l1[0].ID)
-	assert.Equal(t, pid, l1[0].Pid)
+	assert.Equal(t, pids[2], l1[0].Pid)
 
 	l2 := sessions.Last(2)
 	assert.Greater(t, l2[1].Timestamp, l2[0].Timestamp)
+
+	// assert.True(t, util.CheckFileExists(".test"))
+	os.RemoveAll(".test")
+}
+
+func TestGetSessionFirst(t *testing.T) {
+	pids := runThree(t)
+
+	time.Sleep(100 * time.Millisecond)
+
+	lastHome := os.Getenv("SCOPE_HOME")
+	os.Setenv("SCOPE_HOME", ".test")
+	sessions := GetSessions()
+	os.Setenv("SCOPE_HOME", lastHome)
+	assert.Len(t, sessions, 3)
+
+	l1 := sessions.First(1)
+	assert.Equal(t, "echo", l1[0].Cmd)
+	assert.Equal(t, 1, l1[0].ID)
+	assert.Equal(t, pids[0], l1[0].Pid)
+
+	l2 := sessions.First(2)
+	assert.Greater(t, l2[1].Timestamp, l2[0].Timestamp)
+
+	// assert.True(t, util.CheckFileExists(".test"))
+	os.RemoveAll(".test")
+}
+
+func TestSessionRemove(t *testing.T) {
+	_ = runThree(t)
+	time.Sleep(100 * time.Millisecond)
+
+	lastHome := os.Getenv("SCOPE_HOME")
+	os.Setenv("SCOPE_HOME", ".test")
+	sessions := GetSessions()
+	os.Setenv("SCOPE_HOME", lastHome)
+	assert.Len(t, sessions, 3)
+
+	sessionsBak := append(SessionList{}, sessions...)
+	for _, s := range sessions {
+		assert.True(t, util.CheckFileExists(s.WorkDir))
+	}
+	sessions.Remove()
+	for _, s := range sessionsBak {
+		assert.False(t, util.CheckFileExists(s.WorkDir))
+	}
 
 	// assert.True(t, util.CheckFileExists(".test"))
 	os.RemoveAll(".test")

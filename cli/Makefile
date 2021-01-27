@@ -1,3 +1,9 @@
+GOVVV = $(shell command -v govvv 2>/dev/null)
+ifndef GOVVV
+    GO=go
+else 
+    GO=govvv
+endif
 
 DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
@@ -28,18 +34,18 @@ local:
 
 run/scopec.go:
 	cp $(DIR)../bin/linux/scopec $(DIR)build/
-	cd $(DIR) && $(GOPATH)/bin/go-bindata -o run/scopec.go -pkg run build/scopec
+	cd $(DIR) && go-bindata -o run/scopec.go -pkg run build/scopec
 
 scope: run/scopec.go
 	# GOOS=linux CGO_ENABLED=0 $(GO) build -a -tags netgo -ldflags="-s -w" -o build/scope
-	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)build/scope
+	cd $(DIR) && GOOS=linux $(GO) build -o $(DIR)build/scope 
 	upx -9 $(DIR)build/scope
 
 install: 
 	cp $(DIR)build/scope /usr/local/bin/scope
 
 clitest:
-	cd $(DIR) && $(GO) test -v -coverprofile coverage.out ./...
+	cd $(DIR) && go test -v -coverprofile coverage.out ./...
 
 cover:
-	cd $(DIR) && $(GO) tool cover -html=coverage.out -o coverage.html
+	cd $(DIR) && go tool cover -html=coverage.out -o coverage.html

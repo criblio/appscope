@@ -10,8 +10,8 @@ import (
 
 // Reader reads a newline delimited JSON documents and sends parsed documents
 // to the passed out channel. It exits the process on error.
-func Reader(r io.Reader, initOffset int, match func(string) bool, out chan map[string]interface{}) (int, error) {
-	br, err := util.NewlineReader(r, match, func(idx int, offset int, b []byte) error {
+func Reader(r io.Reader, initOffset int64, match func(string) bool, out chan map[string]interface{}) (int, error) {
+	br, err := util.NewlineReader(r, match, func(idx int, offset int64, b []byte) error {
 		event, err := ParseEvent(b)
 		if err != nil {
 			if err.Error() == "config event" {
@@ -19,7 +19,7 @@ func Reader(r io.Reader, initOffset int, match func(string) bool, out chan map[s
 			}
 			return err
 		}
-		event["id"] = util.EncodeOffset(int64(initOffset + offset))
+		event["id"] = util.EncodeOffset(initOffset + offset)
 		out <- event
 		return nil
 	})

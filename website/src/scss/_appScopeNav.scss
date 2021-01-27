@@ -1,0 +1,53 @@
+@import "_vars.scss";
+
+.nav-container {
+  justify-content: center;
+  font-size: 12px;
+  height: 55px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  text-transform: uppercase;
+  padding: 0;
+  max-width: 1470px;
+  background: #fff !important;
+
+  .col {
+    padding: 0;
+  }
+  .nav {
+    height: 55px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    .nav-item {
+      a.nav-link {
+        color: $black;
+        padding: 8px 0;
+        margin: 0 32px;
+        &:first-of-type {
+          margin-left: 0;
+        }
+
+        svg {
+          font-size: 10px;
+          color: $blue;
+          margin-left: 5px;
+        }
+      }
+    }
+    .branding {
+      margin-right: 30px;
+    }
+  }
+  .appscope-nav-widgets {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .sticky {
+    position: fixed;
+    top: 0;
+    width: 100%;
+  }
+}

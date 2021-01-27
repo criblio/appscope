@@ -1,0 +1,19 @@
+@import "_vars";
+
+.documentation {
+  .code-container {
+    padding: 10px;
+    p {
+      margin-bottom: 0;
+      padding: 0 0 10px 0;
+    }
+  }
+  .gatsby-highlight {
+    font-size: 0.5rem;
+  }
+}
+.TOC {
+  @media (max-width: 767px) {
+    display: none;
+  }
+}

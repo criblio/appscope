@@ -22,12 +22,9 @@ The executable `scope` is provided with AppScope. The `scope` executable provide
 
 ## Operating System Support
 
-- RedHat Linux 6 and later
-- CentOs 6 and later
+- RedHat Enterprise Linux or CentOS 6.4 and later
 - Ubuntu 16 and later
-- Amazon Linux
-- Debian
-- Alpine
+- Amazon Linux 1 and 2
 
 ## Resources
 

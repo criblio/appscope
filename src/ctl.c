@@ -22,6 +22,7 @@ struct _ctl_t
     transport_t *transport;
     evt_fmt_t *evt;
     cbuf_handle_t events;
+    cbuf_handle_t evbuf;
     unsigned enhancefs;
 
     struct {
@@ -560,6 +561,12 @@ ctlCreate()
     }
 
 
+    ctl->evbuf = cbufInit(DEFAULT_CBUF_SIZE);
+    if (!ctl->evbuf) {
+        DBG(NULL);
+        return NULL;
+    }
+
     ctl->events = cbufInit(DEFAULT_CBUF_SIZE);
     if (!ctl->events) {
         DBG(NULL);
@@ -585,6 +592,7 @@ ctlDestroy(ctl_t **ctl)
     if (!ctl || !*ctl) return;
 
     ctlFlush(*ctl);
+    cbufFree((*ctl)->evbuf);
     cbufFree((*ctl)->events);
 
     if (g_fn.close && ((*ctl)->logserver != -1)) g_fn.close((*ctl)->logserver);
@@ -603,16 +611,16 @@ ctlDestroy(ctl_t **ctl)
 void
 ctlSendMsg(ctl_t *ctl, char *msg)
 {
-    if (!msg || !g_fn.sendto) return;
-    if (!ctl || (ctl->logserver == -1)) {
+if (!msg) return;
+    if (!ctl) {
         free(msg);
         return;
     }
 
-    if (g_fn.sendto(ctl->logserver, msg, strlen(msg), 0,
-                    (struct sockaddr *)&ctl->logsvaddr,
-                    sizeof(struct sockaddr_un)) < 0) {
-        scopeLog("error sending log/console event", -1, CFG_LOG_DEBUG);
+    if (cbufPut(ctl->evbuf, (uint64_t)msg) == -1) {
+        // Full; drop and ignore
+        DBG(NULL);
+        free(msg);
     }
 }
 
@@ -741,18 +749,63 @@ ctlPostEvent(ctl_t *ctl, char *event)
 int
 ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t uid, proc_id_t *proc)
 {
-    if (!ctl || !path || !buf || !proc) return -1;
+    if (!ctl || !path || !buf || !proc || !g_fn.sendto || (ctl->logserver == -1)) return -1;
+
+    int rc = -1;
+    upload_t upld;
 
     // get a cJSON object for the given log msg
     cJSON *json = evtFormatLog(ctl->evt, path, buf, count, uid, proc);
-    if (!json) return 0;
+    if (!json) return -1;
 
-    // send it
-    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
+    upld.type = UPLD_EVT;
+    upld.body = json;
+    upld.req = NULL;
+    char *msg = ctlCreateTxMsg(&upld);
+    if (!msg) return -1;
+
+    rc = g_fn.sendto(ctl->logserver, msg, strlen(msg), 0,
+                     (struct sockaddr *)&ctl->logsvaddr,
+                     sizeof(struct sockaddr_un));
+
+    if (rc == -1) scopeLog("error sending log/console event", -1, CFG_LOG_DEBUG);
+
+    if (msg) free(msg);
+    return rc;
 }
 
 static void
 sendBufferedMessages(ctl_t *ctl)
+{
+    if (!ctl) return;
+
+    uint64_t data;
+    while (cbufGet(ctl->evbuf, &data) == 0) {
+        if (data) {
+            char *msg = (char*) data;
+
+            // Add the newline delimiter to the msg.
+            {
+                int strsize = strlen(msg);
+                char* temp = realloc(msg, strsize+2); // room for "\n\0"
+                if (!temp) {
+                    DBG(NULL);
+                    free(msg);
+                    msg = NULL;
+                    continue;
+                }
+                msg = temp;
+                msg[strsize] = '\n';
+                msg[strsize+1] = '\0';
+            }
+            transportSend(ctl->transport, msg, strlen(msg));
+            free(msg);
+        }
+    }
+}
+
+static void
+sendLogMessages(ctl_t *ctl)
 {
     if (!ctl || !g_fn.recvfrom || (ctl->logclient == -1)) return;
 
@@ -798,6 +851,8 @@ void
 ctlFlush(ctl_t *ctl)
 {
     if (!ctl) return;
+
+    sendLogMessages(ctl);
     sendBufferedMessages(ctl);
     transportFlush(ctl->transport);
 }
@@ -944,7 +999,7 @@ ctlGetEvent(ctl_t *ctl)
 bool
 ctlCbufEmpty(ctl_t *ctl)
 {
-    return FALSE;
+    return cbufEmpty(ctl->evbuf);
 }
 
 int

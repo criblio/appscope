@@ -22,5 +22,6 @@ int                 transportConnection(transport_t *);
 int                 transportDisconnect(transport_t *);
 int                 transportReconnect(transport_t *);
 cfg_transport_t     transportType(transport_t *);
+int                 transportSetFD(int, transport_t *);
 
 #endif // __TRANSPORT_H__

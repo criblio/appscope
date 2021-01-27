@@ -1,17 +1,26 @@
+#define _GNU_SOURCE
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "circbuf.h"
 #include "cfgutils.h"
 #include "ctl.h"
 #include "dbg.h"
+#include "fn.h"
 
 struct _ctl_t
 {
+    int logclient;
+    int logserver;
+    struct sockaddr_un logcladdr;
+    struct sockaddr_un logsvaddr;
     transport_t *transport;
     evt_fmt_t *evt;
-    cbuf_handle_t evbuf;
     cbuf_handle_t events;
     unsigned enhancefs;
 
@@ -521,11 +530,35 @@ ctlCreate()
         return NULL;
     }
 
-    ctl->evbuf = cbufInit(DEFAULT_CBUF_SIZE);
-    if (!ctl->evbuf) {
-        DBG(NULL);
-        return NULL;
+    ctl->logserver = (g_fn.socket) ? g_fn.socket(AF_UNIX, SOCK_DGRAM, 0) : -1;
+    ctl->logclient = (g_fn.socket) ? g_fn.socket(AF_UNIX, SOCK_DGRAM, 0) : -1;
+
+    bzero((char *)&ctl->logsvaddr, sizeof(ctl->logsvaddr));
+    ctl->logsvaddr.sun_family = AF_UNIX;
+    strncpy(ctl->logsvaddr.sun_path, LOG_EVENT_SERVER_SOCK, sizeof(ctl->logsvaddr.sun_path)-1);
+
+    bzero((char *)&ctl->logcladdr, sizeof(ctl->logcladdr));
+    ctl->logcladdr.sun_family = AF_UNIX;
+    strncpy(ctl->logcladdr.sun_path, LOG_EVENT_CLIENT_SOCK, sizeof(ctl->logcladdr.sun_path)-1);
+
+    unlink(LOG_EVENT_CLIENT_SOCK);
+    unlink(LOG_EVENT_SERVER_SOCK);
+
+    if ((ctl->logserver != -1) && (ctl->logclient != -1) &&
+        g_fn.fcntl && g_fn.bind) {
+        int flags = g_fn.fcntl(ctl->logclient, F_GETFL, NULL);
+        flags |= O_NONBLOCK;
+        g_fn.fcntl(ctl->logclient, F_SETFL, flags);
+
+        if (g_fn.bind(ctl->logserver, (struct sockaddr *)&ctl->logcladdr, sizeof(struct sockaddr_un))) {
+            scopeLog("error binding to log server datagram socket", -1, CFG_LOG_DEBUG);
+        }
+
+        if (g_fn.bind(ctl->logclient, (struct sockaddr *)&ctl->logsvaddr, sizeof(struct sockaddr_un))) {
+            scopeLog("error binding to log client datagram socket", -1, CFG_LOG_DEBUG);
+        }
     }
+
 
     ctl->events = cbufInit(DEFAULT_CBUF_SIZE);
     if (!ctl->events) {
@@ -552,8 +585,10 @@ ctlDestroy(ctl_t **ctl)
     if (!ctl || !*ctl) return;
 
     ctlFlush(*ctl);
-    cbufFree((*ctl)->evbuf);
     cbufFree((*ctl)->events);
+
+    if (g_fn.close && ((*ctl)->logserver != -1)) g_fn.close((*ctl)->logserver);
+    if (g_fn.close && ((*ctl)->logclient != -1)) g_fn.close((*ctl)->logclient);
 
     if ((*ctl)->payload.dir) free((*ctl)->payload.dir);
     cbufFree((*ctl)->payload.ringbuf);
@@ -568,16 +603,16 @@ ctlDestroy(ctl_t **ctl)
 void
 ctlSendMsg(ctl_t *ctl, char *msg)
 {
-    if (!msg) return;
-    if (!ctl) {
+    if (!msg || !g_fn.sendto) return;
+    if (!ctl || (ctl->logserver == -1)) {
         free(msg);
         return;
     }
 
-    if (cbufPut(ctl->evbuf, (uint64_t)msg) == -1) {
-        // Full; drop and ignore
-        DBG(NULL);
-        free(msg);
+    if (g_fn.sendto(ctl->logserver, msg, strlen(msg), 0,
+                    (struct sockaddr *)&ctl->logsvaddr,
+                    sizeof(struct sockaddr_un)) < 0) {
+        scopeLog("error sending log/console event", -1, CFG_LOG_DEBUG);
     }
 }
 
@@ -719,30 +754,35 @@ ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t
 static void
 sendBufferedMessages(ctl_t *ctl)
 {
-    if (!ctl) return;
+    if (!ctl || !g_fn.recvfrom || (ctl->logclient == -1)) return;
 
-    uint64_t data;
-    while (cbufGet(ctl->evbuf, &data) == 0) {
-        if (data) {
-            char *msg = (char*) data;
+    while (1) {
+        int rlen;
+        size_t buflen = LOG_EVENT_BUF_SIZE - 2;
+        socklen_t addr_len = sizeof(struct sockaddr_un);
+        char *data;
 
-            // Add the newline delimiter to the msg.
-            {
-                int strsize = strlen(msg);
-                char* temp = realloc(msg, strsize+2); // room for "\n\0"
-                if (!temp) {
-                    DBG(NULL);
-                    free(msg);
-                    msg = NULL;
-                    continue;
-                }
-                msg = temp;
-                msg[strsize] = '\n';
-                msg[strsize+1] = '\0';
-            }
-            transportSend(ctl->transport, msg, strlen(msg));
-            free(msg);
+        if ((data = malloc(LOG_EVENT_BUF_SIZE)) == NULL) return;
+
+        rlen = g_fn.recvfrom(ctl->logclient, data, buflen, 0,
+                             (struct sockaddr *)&ctl->logcladdr,
+                             &addr_len);
+        if (rlen == -1) {
+            free(data);
+            return;
         }
+
+        if (rlen > buflen) {
+            // should not happen
+            free(data);
+            DBG(NULL);
+            continue;
+        }
+
+        data[rlen] = '\n';
+        data[rlen+1] = '\0';
+        transportSend(ctl->transport, data, strlen(data));
+        free(data);
     }
 }
 
@@ -805,6 +845,11 @@ ctlTransportSet(ctl_t *ctl, transport_t *transport)
     // Don't leak if ctlTransportSet is called repeatedly
     transportDestroy(&ctl->transport);
     ctl->transport = transport;
+
+    if ((ctl->logserver != -1) && (ctl->logclient != -1)) {
+        ctl->logserver = transportSetFD(ctl->logserver, ctl->transport);
+        ctl->logclient = transportSetFD(ctl->logclient, ctl->transport);
+    }
 }
 
 cfg_transport_t
@@ -899,7 +944,7 @@ ctlGetEvent(ctl_t *ctl)
 bool
 ctlCbufEmpty(ctl_t *ctl)
 {
-    return cbufEmpty(ctl->evbuf);
+    return FALSE;
 }
 
 int

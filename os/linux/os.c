@@ -679,18 +679,19 @@ osGetFileMode(mode_t perm)
 }
 
 static const char scope_help_overview[] =
-" OVERVIEW:\n"
+"    OVERVIEW:\n"
 "    The Scope library supports extraction of data from within applications.\n"
 "    As a general rule, applications consist of one or more processes.\n"
 "    The Scope library can be loaded into any process as the\n"
 "    process starts.\n"
 "    The primary way to define which processes include the Scope library\n"
-"    is by exporting the environment variable LD_PRELOAD, which is set to point to the path name of the Scope library. E.g.: \n"
+"    is by exporting the environment variable LD_PRELOAD, which is set to point\n"
+"    to the path name of the Scope library. E.g.: \n"
 "    export LD_PRELOAD=./libscope.so\n"
 "\n"
 "    Scope emits data as metrics and/or events.\n"
-"    Scope is fully configurable by means of a configuration file (scope.yml) and/or \n"
-"    environment variables.\n"
+"    Scope is fully configurable by means of a configuration file (scope.yml)\n"
+"    and/or environment variables.\n"
 "\n"
 "    Metrics are emitted in StatsD format, over a configurable link. By default,\n"
 "    metrics are sent over a UDP socket using localhost and port 8125.\n"
@@ -704,16 +705,17 @@ static const char scope_help_overview[] =
 "\n";
 
 static const char scope_help_configuration[] =
-" CONFIGURATION:\n"
+"    CONFIGURATION:\n"
 "    Configuration File:\n"
-"       A YAML config file (named scope.yml) enables control of all available settings.\n"
-"       The config file is optional. Environment variables take precedence\n"
-"       over settings in a config file.\n"
+"       A YAML config file (named scope.yml) enables control of all available\n"
+"       settings. The config file is optional. Environment variables take\n"
+"       precedence over settings in a config file.\n"
 "\n"
 "    Config File Resolution\n"
 "        If the SCOPE_CONF_PATH env variable is defined, and points to a\n"
-"        file that can be opened, it will use this as the config file. Otherwise, AppScope searches for the config file in this priority order, using\n"
-"        the first one it finds:\n"
+"        file that can be opened, it will use this as the config file.\n"
+"        Otherwise, AppScope searches for the config file in this priority\n"
+"        order, using the first one it finds:\n"
 "\n"
 "            $SCOPE_HOME/conf/scope.yml\n"
 "            $SCOPE_HOME/scope.yml\n"
@@ -880,7 +882,7 @@ static const char scope_help_configuration[] =
 "\n";
 
 static const char scope_help_metrics[] =
-"METRICS:\n"
+"    METRICS:\n"
 "    Metrics can be enabled or disabled with a single config element\n"
 "    (metric: enable: true|false). Specific types of metrics, and specific \n"
 "    field content, are managed with a Metric Verbosity setting.\n"
@@ -914,7 +916,7 @@ static const char scope_help_metrics[] =
 "\n";
 
 static const char scope_help_events[] =
-"EVENTS:\n"
+"    EVENTS:\n"
 "    All events can be enabled or disabled with a single config element\n"
 "    (event: enable: true|false). Unlike metrics, event content is not \n"
 "    managed with verbosity settings. Instead, you use regex filters that \n"
@@ -926,10 +928,11 @@ static const char scope_help_events[] =
 "     2) Console Output. Select stdin and/or stdout, and all data written to\n"
 "        these endpoints will be formatted in JSON and emitted over the event\n"
 "        channel.\n"
-"     3) Metrics. Event metrics provide the greatest level of detail from libscope.\n"
-"        Events are created for every read, write, send, receive, open, close, and connect.\n"
-"        These raw events are configured with regex filters to manage which event, which specific\n"
-"        fields within an event, and which value patterns within a field to include.\n"
+"     3) Metrics. Event metrics provide the greatest level of detail from\n"
+"        libscope. Events are created for every read, write, send, receive,\n"
+"        open, close, and connect. These raw events are configured with regex\n"
+"        filters to manage which event, which specific fields within an event,\n"
+"        and which value patterns within a field to include.\n"
 "\n"
 "     4) HTTP Headers. HTTP headers are extracted, formatted in JSON, and\n"
 "        emitted over the event channel. Three types of events are created\n"
@@ -938,22 +941,25 @@ static const char scope_help_events[] =
 "        sequence. A response event includes the corresponding request,\n"
 "        status and duration fields. An HTTP metric event provides fields\n"
 "        describing bytes received, requests per second, duration, and status.\n"
-"     5) File System. Events are formatted in JSON for each file system open, including\n"
-"        file name, permissions, and cgroup. Events for file system close add a summary of\n"
-"        the number of bytes read and written, the total number of read and write operations,\n"
-"        and the total duration of read and write operations. The specific function performing\n"
-"        open and close is reported as well.\n"
-"     6) Network. Events are formatted in JSON for network connections and corresponding disconnects,\n"
-"        including type of protocol used, and local and peer IP:port. Events for network disconnect\n"
-"        add a summary of the number of bytes sent and received, and the duration of the sends and\n"
-"        receives while the connection was active. The reason (source) for disconnect is provided as\n"
-"        local or remote. \n"
-"     7) DNS. Events are formatted in JSON for DNS requests and responses. The event provides the domain\n"
-"        name being resolved. On DNS response, the event provides the duration of the DNS operation.\n"
+"     5) File System. Events are formatted in JSON for each file system open,\n"
+"        including file name, permissions, and cgroup. Events for file system\n"
+"        close add a summary of the number of bytes read and written, the\n"
+"        total number of read and write operations, and the total duration\n"
+"        of read and write operations. The specific function performing open\n"
+"        and close is reported as well.\n"
+"     6) Network. Events are formatted in JSON for network connections and \n"
+"        corresponding disconnects, including type of protocol used, and \n"
+"        local and peer IP:port. Events for network disconnect add a summary\n"
+"        of the number of bytes sent and received, and the duration of the\n"
+"        sends and receives while the connection was active. The reason\n"
+"        (source) for disconnect is provided as local or remote. \n"
+"     7) DNS. Events are formatted in JSON for DNS requests and responses.\n"
+"        The event provides the domain name being resolved. On DNS response,\n"
+"        the event provides the duration of the DNS operation.\n"
 "\n";
 
 static const char scope_help_protocol[] =
-" PROTOCOL DETECTION:\n"
+"     PROTOCOL DETECTION:\n"
 "     Scope can detect any defined network protocol. You provide protocol\n"
 "     definitions in a separate YAML config file (which should be named \n"
 "     scope_protocol.yml). You describe protocol specifics in one or more regex \n"
@@ -963,20 +969,21 @@ static const char scope_help_protocol[] =
 "\n"
 "     Scope detects binary and string protocols. Detection events, \n"
 "     formatted in JSON, are emitted over the event channel. Enable the \n"
-"      event metric watch type to allow protocol detection.\n"
+"     event metric watch type to allow protocol detection.\n"
 "\n"
 "     The protocol detection config file should be named scope_protocol.yml.\n"
 "     Place the protocol definitions config file (scope_protocol.yml) in the \n"
 "     directory defined by the SCOPE_HOME environment variable. If Scope \n"
-"     does not find the protocol definitions file in that directory, it will search for it, \n"
-"     in the same search order as described for config files.\n"
+"     does not find the protocol definitions file in that directory, it will\n"
+"     search for it, in the same search order as described for config files.\n"
 "\n"
 "\n"
-"PAYLOAD EXTRACTION:\n"
+"     PAYLOAD EXTRACTION:\n"
 "     When enabled, libscope extracts payload data from network operations.\n"
 "     Payloads are emitted in binary. No formatting is applied to the data.\n"
 "     Payloads are emitted to either a local file or the LogStream channel.\n"
-"     Configuration elements for libscope support defining a path for payload data.\n"
+"     Configuration elements for libscope support defining a path for payload\n"
+"     data.\n"
 "\n";
 
 typedef struct {
@@ -1072,7 +1079,7 @@ __scope_main()
         // print all help sections
         if (!strcmp(_dl_argv[1], "all")) {
             for (i=0; help_list[i].text; i++) {
-                printf("    %s\n", help_list[i].text);
+                printf("%s", help_list[i].text);
             }
         }
         // print matching help sections

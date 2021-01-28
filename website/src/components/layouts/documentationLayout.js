@@ -20,10 +20,15 @@ export default function Layout({ children }) {
         data-offset-top="197"
       >
         <Row className=" align-items-start">
-          <Col md={3} xs={12}>
+          <Col md={3} xs={12} className="position-fixed">
             <DocsNav />
           </Col>
-          <Col md={9} xs={12} className="documentation" id="docContainer">
+          <Col
+            md={{ span: 9, offset: 3 }}
+            xs={12}
+            className="documentation"
+            id="docContainer"
+          >
             {children}
           </Col>
           {/* <Col md={3} className="TOC">

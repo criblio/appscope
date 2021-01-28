@@ -1,4 +1,4 @@
-name: build
+name: website
 on:
   push:
     branches:
@@ -19,4 +19,3 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: ./website/deploy.sh
-        

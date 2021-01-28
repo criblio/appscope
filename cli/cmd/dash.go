@@ -4,14 +4,17 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"os"
 	"path/filepath"
 	"regexp"
 	"time"
 
 	"github.com/criblio/scope/events"
+	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/metrics"
 	"github.com/criblio/scope/util"
 	"github.com/mum4k/termdash"
+	"github.com/mum4k/termdash/align"
 	"github.com/mum4k/termdash/cell"
 	"github.com/mum4k/termdash/container"
 	"github.com/mum4k/termdash/container/grid"
@@ -22,6 +25,7 @@ import (
 	"github.com/mum4k/termdash/widgets/segmentdisplay"
 	"github.com/mum4k/termdash/widgets/sparkline"
 	"github.com/mum4k/termdash/widgets/text"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -29,12 +33,14 @@ import (
 // dashCmd represents the dash command
 var dashCmd = &cobra.Command{
 	Use:     "dash [flags]",
-	Short:   "display scope dashboard",
+	Short:   "Display scope dashboard",
 	Long:    `Displays an interactive dashboard with an overview of whats happening with the selected session.`,
 	Example: `scope dash`,
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		id, _ := cmd.Flags().GetInt("id")
+
+		internal.InitConfig()
 
 		sessions := sessionByID(id)
 
@@ -55,8 +61,9 @@ func init() {
 
 func readMetrics(workDir string, w *widgets) {
 	metricsPath := filepath.Join(workDir, "metrics.json")
-	tr, err := util.NewTailReader(metricsPath)
+	file, err := os.Open(metricsPath)
 	util.CheckErrSprintf(err, "%v", err)
+	tr := util.NewTailReader(file)
 	in := make(chan metrics.Metric)
 	go metrics.Reader(tr, util.MatchAlways, in)
 
@@ -96,31 +103,31 @@ func readMetrics(workDir string, w *widgets) {
 				}
 				switch mname {
 				case "proc.cpu_perc":
-					writeSingleValue(w.cpuPerc, val)
+					writeGaugeText(w.cpuPerc, "CPU Perc", fmt.Sprintf("%.2f", val))
 				case "proc.mem":
-					writeSingleValue(w.mem, util.ByteCountSI(int64(val*1024)))
+					writeGaugeText(w.mem, "Mem", util.ByteCountSI(int64(val*1024)))
 				case "proc.fd":
-					writeSingleValue(w.fds, val)
+					writeGaugeText(w.fds, "FDs", fmt.Sprintf("%.0f", val))
 				case "proc.thread":
-					writeSingleValue(w.threads, val)
+					writeGaugeText(w.threads, "Threads", fmt.Sprintf("%.0f", val))
 				case "proc.child":
-					writeSingleValue(w.children, val)
+					writeGaugeText(w.children, "Children", fmt.Sprintf("%.0f", val))
 				case "fs.open":
 					writeSparklineFloat64(w.fsOpen, val)
 				case "fs.close":
 					writeSparklineFloat64(w.fsClose, val)
 				case "fs.read":
-					writeSparklineFloat64(w.fsRead, val)
+					writeSparklineFloat64(w.fsRead, val, sparkline.Label(fmt.Sprintf("Rcvd: %s/sec", util.ByteCountSI(int64(val/10))))) // Hard coded assumption we receive data every 10 secs
 				case "fs.write":
-					writeSparklineFloat64(w.fsWrite, val)
+					writeSparklineFloat64(w.fsWrite, val, sparkline.Label(fmt.Sprintf("Tsmt: %s/sec", util.ByteCountSI(int64(val/10))))) // Hard coded assumption we receive data every 10 secs
 				case "fs.error":
 					writeSparklineFloat64(w.fsError, val)
 				case "fs.duration":
 					writeSparklineFloat64(w.fsDuration, val)
 				case "net.rx":
-					writeSparklineFloat64(w.netRx, val)
+					writeSparklineFloat64(w.netRx, val, sparkline.Label(fmt.Sprintf("Rcvd: %s/sec", util.ByteCountSI(int64(val/10))))) // Hard coded assumption we receive data every 10 secs
 				case "net.tx":
-					writeSparklineFloat64(w.netTx, val)
+					writeSparklineFloat64(w.netTx, val, sparkline.Label(fmt.Sprintf("Tsmt: %s/sec", util.ByteCountSI(int64(val/10))))) // Hard coded assumption we receive data every 10 secs
 				case "net.tcp":
 					writeSparklineFloat64(w.netTCP, val)
 				case "net.udp":
@@ -130,11 +137,11 @@ func readMetrics(workDir string, w *widgets) {
 				case "net.conn_duration":
 					writeSparklineFloat64(w.netDuration, val)
 				case "http.requests":
-					writeSparklineFloat64(w.httpReq, val)
+					writeSparklineFloat64(w.httpReq, val, sparkline.Label(fmt.Sprintf("Requests: %.0f/sec", math.Round(val/10))))
 				case "http.server.duration":
-					writeSparklineFloat64(w.httpDuration, val)
+					writeSparklineFloat64(w.httpDuration, val, sparkline.Label(fmt.Sprintf("Avg Duration: %.0f ms", val)))
 				case "http.response.content_length":
-					writeSparklineFloat64(w.httpBytes, val)
+					writeSparklineFloat64(w.httpBytes, val, sparkline.Label(fmt.Sprintf("Avg Content Length: %.0f bytes", val)))
 				case "net.dns":
 					writeSparklineFloat64(w.dnsReq, val)
 				}
@@ -156,11 +163,12 @@ func readMetrics(workDir string, w *widgets) {
 }
 
 func readEvents(workDir string, w *widgets) {
-	metricsPath := filepath.Join(workDir, "events.json")
-	tr, err := util.NewTailReader(metricsPath)
+	eventsPath := filepath.Join(workDir, "events.json")
+	file, err := os.Open(eventsPath)
 	util.CheckErrSprintf(err, "%v", err)
+	tr := util.NewTailReader(file)
 	in := make(chan map[string]interface{})
-	eventCount, _ := util.CountLines(metricsPath)
+	eventCount, _ := util.CountLines(eventsPath)
 	termWidth, _, err := terminal.GetSize(0)
 	skipEvents := eventCount - 20
 	if skipEvents < 0 {
@@ -173,7 +181,10 @@ func readEvents(workDir string, w *widgets) {
 		results := ansiToTermDashColors(eventText)
 		for _, r := range results {
 			err = w.events.Write(r.text, r.options)
-			util.CheckErrSprintf(err, "%v", err)
+			if err != nil {
+				log.Error().Msgf("error writing to console: %v", err)
+				w.events.Write(ansiStrip(r.text), text.WriteCellOpts())
+			}
 		}
 	}
 }
@@ -291,7 +302,7 @@ func runDashboard(ctx context.Context, cancel context.CancelFunc, w *widgets) {
 	}
 
 	quitter := func(k *terminalapi.Keyboard) {
-		if k.Key == keyboard.KeyEsc || k.Key == keyboard.KeyCtrlC {
+		if k.Key == keyboard.KeyEsc || k.Key == keyboard.KeyCtrlC || k.Key == 'q' || k.Key == 'Q' {
 			cancel()
 		}
 	}
@@ -301,11 +312,11 @@ func runDashboard(ctx context.Context, cancel context.CancelFunc, w *widgets) {
 }
 
 type widgets struct {
-	cpuPerc      *segmentdisplay.SegmentDisplay
-	mem          *segmentdisplay.SegmentDisplay
-	threads      *segmentdisplay.SegmentDisplay
-	children     *segmentdisplay.SegmentDisplay
-	fds          *segmentdisplay.SegmentDisplay
+	cpuPerc      *text.Text
+	mem          *text.Text
+	threads      *text.Text
+	children     *text.Text
+	fds          *text.Text
 	fsOpen       *sparkline.SparkLine
 	fsClose      *sparkline.SparkLine
 	fsRead       *sparkline.SparkLine
@@ -327,11 +338,11 @@ type widgets struct {
 
 func newWidgets(ctx context.Context) *widgets {
 	w := widgets{}
-	w.cpuPerc = newSegment()
-	w.mem = newSegment()
-	w.threads = newSegment()
-	w.fds = newSegment()
-	w.children = newSegment()
+	w.cpuPerc, _ = text.New(text.DisableScrolling())
+	w.mem, _ = text.New(text.DisableScrolling())
+	w.threads, _ = text.New(text.DisableScrolling())
+	w.fds, _ = text.New(text.DisableScrolling())
+	w.children, _ = text.New(text.DisableScrolling())
 
 	w.fsOpen = newSparkline(sparkline.Color(cell.ColorCyan))
 	w.fsClose = newSparkline(sparkline.Color(cell.ColorCyan))
@@ -360,65 +371,82 @@ func newWidgets(ctx context.Context) *widgets {
 func (w widgets) newGrid(ctx context.Context) ([]container.Option, error) {
 	builder := grid.New()
 	builder.Add(
-		grid.RowHeightPerc(20,
-			grid.ColWidthPerc(20,
-				grid.Widget(w.cpuPerc,
-					container.Border(linestyle.Light),
-					container.BorderTitle("CPU Perc"),
+		grid.RowHeightPerc(70,
+			grid.ColWidthPerc(66,
+				grid.RowHeightPercWithOpts(15,
+					[]container.Option{container.Border(linestyle.Light), container.BorderTitle("Proc Info")},
+					grid.ColWidthPerc(20,
+						grid.Widget(w.cpuPerc,
+							container.AlignHorizontal(align.HorizontalCenter),
+							container.AlignVertical(align.VerticalMiddle),
+						),
+					),
+					grid.ColWidthPerc(20,
+						grid.Widget(w.mem,
+							container.AlignHorizontal(align.HorizontalCenter),
+							container.AlignVertical(align.VerticalMiddle),
+						),
+					),
+					grid.ColWidthPerc(20,
+						grid.Widget(w.fds,
+							container.AlignHorizontal(align.HorizontalCenter),
+							container.AlignVertical(align.VerticalMiddle),
+						),
+					),
+					grid.ColWidthPerc(20,
+						grid.Widget(w.threads,
+							container.AlignHorizontal(align.HorizontalCenter),
+							container.AlignVertical(align.VerticalMiddle),
+						),
+					),
+					grid.ColWidthPerc(20,
+						grid.Widget(w.children,
+							container.AlignHorizontal(align.HorizontalCenter),
+							container.AlignVertical(align.VerticalMiddle),
+						),
+					),
+				),
+				grid.RowHeightPerc(85,
+					grid.ColWidthPercWithOpts(50,
+						[]container.Option{container.Border(linestyle.Light), container.BorderTitle("Network")},
+						grid.RowHeightPercWithOpts(60,
+							[]container.Option{container.Border(linestyle.Light), container.BorderTitle("IO")},
+							grid.RowHeightPerc(50, grid.Widget(w.netRx)),
+							grid.RowHeightPerc(50, grid.Widget(w.netTx)),
+						),
+						grid.RowHeightPerc(20,
+							grid.ColWidthPerc(66, grid.Widget(w.netTCP, container.Border(linestyle.Light), container.BorderTitle("TCP Conn"))),
+							grid.ColWidthPerc(33, grid.Widget(w.netUDP, container.Border(linestyle.Light), container.BorderTitle("UDP Conn"))),
+						),
+						grid.RowHeightPerc(20,
+							grid.ColWidthPerc(50, grid.Widget(w.netError, container.Border(linestyle.Light), container.BorderTitle("Error"))),
+							grid.ColWidthPerc(50, grid.Widget(w.netDuration, container.Border(linestyle.Light), container.BorderTitle("Duration"))),
+						),
+					),
+					grid.ColWidthPerc(50,
+						grid.RowHeightPercWithOpts(80,
+							[]container.Option{container.Border(linestyle.Light), container.BorderTitle("HTTP")},
+							grid.RowHeightPerc(40, grid.Widget(w.httpReq)),
+							grid.RowHeightPerc(40, grid.Widget(w.httpDuration)),
+							grid.RowHeightPerc(20, grid.Widget(w.httpBytes)),
+						),
+						grid.RowHeightPerc(20, grid.Widget(w.dnsReq, container.Border(linestyle.Light), container.BorderTitle("DNS Requests"))),
+					),
 				),
 			),
-			grid.ColWidthPerc(20,
-				grid.Widget(w.mem,
-					container.Border(linestyle.Light),
-					container.BorderTitle("Memory"),
-				),
-			),
-			grid.ColWidthPerc(20,
-				grid.Widget(w.fds,
-					container.Border(linestyle.Light),
-					container.BorderTitle("FDs"),
-				),
-			),
-			grid.ColWidthPerc(20,
-				grid.Widget(w.threads,
-					container.Border(linestyle.Light),
-					container.BorderTitle("Threads"),
-				),
-			),
-			grid.ColWidthPerc(20,
-				grid.Widget(w.children,
-					container.Border(linestyle.Light),
-					container.BorderTitle("Children"),
-				),
-			),
-		),
-		grid.RowHeightPerc(50,
-			grid.ColWidthPercWithOpts(33,
+			grid.ColWidthPercWithOpts(34,
 				[]container.Option{container.Border(linestyle.Light), container.BorderTitle("Filesystem")},
-				grid.RowHeightPerc(15, grid.Widget(w.fsOpen, container.Border(linestyle.Light), container.BorderTitle("Open"))),
-				grid.RowHeightPerc(15, grid.Widget(w.fsClose, container.Border(linestyle.Light), container.BorderTitle("Close"))),
-				grid.RowHeightPerc(20, grid.Widget(w.fsRead, container.Border(linestyle.Light), container.BorderTitle("Read"))),
-				grid.RowHeightPerc(20, grid.Widget(w.fsWrite, container.Border(linestyle.Light), container.BorderTitle("Write"))),
-				grid.RowHeightPerc(15, grid.Widget(w.fsError, container.Border(linestyle.Light), container.BorderTitle("Error"))),
-				grid.RowHeightPerc(15, grid.Widget(w.fsDuration, container.Border(linestyle.Light), container.BorderTitle("Duration"))),
-			),
-			grid.ColWidthPercWithOpts(33,
-				[]container.Option{container.Border(linestyle.Light), container.BorderTitle("Network")},
-				grid.RowHeightPerc(20, grid.Widget(w.netRx, container.Border(linestyle.Light), container.BorderTitle("Receive"))),
-				grid.RowHeightPerc(20, grid.Widget(w.netTx, container.Border(linestyle.Light), container.BorderTitle("Transmit"))),
-				grid.RowHeightPerc(15, grid.Widget(w.netTCP, container.Border(linestyle.Light), container.BorderTitle("TCP Conn"))),
-				grid.RowHeightPerc(15, grid.Widget(w.netUDP, container.Border(linestyle.Light), container.BorderTitle("UDP Conn"))),
-				grid.RowHeightPerc(15, grid.Widget(w.netError, container.Border(linestyle.Light), container.BorderTitle("Error"))),
-				grid.RowHeightPerc(15, grid.Widget(w.netDuration, container.Border(linestyle.Light), container.BorderTitle("Duration"))),
-			),
-			grid.ColWidthPerc(33,
-				grid.RowHeightPercWithOpts(66,
-					[]container.Option{container.Border(linestyle.Light), container.BorderTitle("HTTP")},
-					grid.RowHeightPerc(40, grid.Widget(w.httpReq, container.Border(linestyle.Light), container.BorderTitle("Requests"))),
-					grid.RowHeightPerc(40, grid.Widget(w.httpDuration, container.Border(linestyle.Light), container.BorderTitle("Duration"))),
-					grid.RowHeightPerc(20, grid.Widget(w.httpBytes, container.Border(linestyle.Light), container.BorderTitle("Response Bytes"))),
+				grid.RowHeightPercWithOpts(60,
+					[]container.Option{container.Border(linestyle.Light), container.BorderTitle("IO")},
+					grid.RowHeightPerc(50, grid.Widget(w.fsRead)),
+					grid.RowHeightPerc(50, grid.Widget(w.fsWrite)),
 				),
-				grid.RowHeightPerc(33, grid.Widget(w.dnsReq, container.Border(linestyle.Light), container.BorderTitle("DNS Requests"))),
+				grid.RowHeightPerc(13, grid.Widget(w.fsOpen, container.Border(linestyle.Light), container.BorderTitle("Open"))),
+				grid.RowHeightPerc(13, grid.Widget(w.fsClose, container.Border(linestyle.Light), container.BorderTitle("Close"))),
+				grid.RowHeightPerc(14,
+					grid.ColWidthPerc(50, grid.Widget(w.fsError, container.Border(linestyle.Light), container.BorderTitle("Error"))),
+					grid.ColWidthPerc(50, grid.Widget(w.fsDuration, container.Border(linestyle.Light), container.BorderTitle("Duration"))),
+				),
 			),
 		),
 		grid.RowHeightPerc(30,
@@ -444,8 +472,12 @@ func writeSingleValue(s *segmentdisplay.SegmentDisplay, val interface{}) {
 	}
 }
 
-func writeSparklineFloat64(w *sparkline.SparkLine, val float64) {
-	w.Add([]int{int(math.Round(val))})
+func writeSparklineFloat64(w *sparkline.SparkLine, val float64, opts ...sparkline.Option) {
+	w.Add([]int{int(math.Round(val))}, opts...)
+}
+
+func writeGaugeText(w *text.Text, title string, val string) {
+	w.Write(fmt.Sprintf("%s\n%s\n", title, val), text.WriteCellOpts(), text.WriteReplace())
 }
 
 func newSegment() *segmentdisplay.SegmentDisplay {

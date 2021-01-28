@@ -190,12 +190,8 @@ func (t TailReader) Close() error {
 }
 
 // NewTailReader creates a new tailing reader for fileName
-func NewTailReader(fileName string) (TailReader, error) {
-	f, err := os.Open(fileName)
-	if err != nil {
-		return TailReader{}, err
-	}
-	return TailReader{f}, nil
+func NewTailReader(f ReadSeekCloser) TailReader {
+	return TailReader{f}
 }
 
 // FormatTimestamp prints a human readable timestamp from scope's secs.millisecs format.

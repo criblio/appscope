@@ -2,7 +2,12 @@
 DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
 GO_VER:=$(shell go version | cut -d' ' -f3)
+
+# Allow GOPATH to be set, but don't require it.
+ifndef GOPATH
 GOPATH:=$(shell go env | grep GOPATH | cut -d\" -f2)
+endif
+
 GO:=go
 
 GO_VER_FLAGS=$(shell $(GOPATH)/bin/govvv -flags)

@@ -125,38 +125,39 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 
 		sessions := sessionByID(id)
 
-		// Count events to figure out our starting place if we want the last N events or a specific event
-		count, err := util.CountLines(sessions[0].EventsPath)
-		util.CheckErrSprintf(err, "Invalid session. Command likely exited without capturing event data.\nerror opening events file: %v", err)
-		skipEvents := 0
-		offset := 0
-		if len(args) > 0 {
-			offset64, err := util.DecodeOffset(args[0])
-			util.CheckErrSprintf(err, "Could not decode encoded offset: %v", err)
-			offset = int(offset64)
-			allEvents = false
-		} else if lastN > -1 {
-			skipEvents = count - lastN + 1
+		// Open events.json file
+		var file util.ReadSeekCloser
+		var err error
+		file, err = os.Open(sessions[0].EventsPath)
+		if follow {
+			file = util.NewTailReader(file)
 		}
-		// How many events do we have? Determines width of the id field
-		idChars := len(fmt.Sprintf("%d", count))
-
+		if err != nil && strings.Contains(err.Error(), "events.json: no such file or directory") {
+			promptClean(sessions[0:1])
+		} else {
+			util.CheckErrSprintf(err, "error opening events file: %v", err)
+		}
+		offset := int64(0)
 		// EventMatch contains parameters to match again, used in the filter function
 		// sent to events.Reader
 		em := eventMatch{
 			sources:     sources,
 			sourcetypes: sourcetypes,
-			skipEvents:  skipEvents,
+			skipEvents:  0,
 			allEvents:   allEvents,
 			match:       match,
 		}
 
-		// Open events.json file
-		var file util.ReadSeekCloser
-		if follow {
-			file, err = util.NewTailReader(sessions[0].EventsPath)
-		} else {
-			file, err = os.Open(sessions[0].EventsPath)
+		if len(args) > 0 {
+			offset, err = util.DecodeOffset(args[0])
+			util.CheckErrSprintf(err, "Could not decode encoded offset: %v", err)
+			allEvents = false
+		} else if !allEvents {
+			offset, err = util.FindReverseLineMatchOffset(lastN, file, em.filter())
+			util.CheckErrSprintf(err, "Error searching for offset: %v", err)
+			if offset < 0 {
+				offset = int64(0)
+			}
 		}
 		util.CheckErrSprintf(err, "error opening events file: %v", err)
 		_, err = file.Seek(int64(offset), os.SEEK_SET)
@@ -176,7 +177,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		}
 
 		// Print events from events.json
-		printEvents(cmd, idChars, in)
+		printEvents(cmd, in)
 		file.Close()
 	},
 }
@@ -204,7 +205,7 @@ func printEvent(cmd *cobra.Command, in chan map[string]interface{}) {
 	}
 }
 
-func printEvents(cmd *cobra.Command, idChars int, in chan map[string]interface{}) {
+func printEvents(cmd *cobra.Command, in chan map[string]interface{}) {
 	jsonOut, _ := cmd.Flags().GetBool("json")
 	allFields, _ := cmd.Flags().GetBool("allfields")
 	eval, _ := cmd.Flags().GetString("eval")
@@ -390,7 +391,7 @@ func init() {
 	eventsCmd.Flags().BoolP("follow", "f", false, "Follow a file, like tail -f")
 	eventsCmd.Flags().Bool("color", false, "Force color on (if tty detection fails or pipeing)")
 	eventsCmd.Flags().BoolP("all", "a", false, "Show all events")
-	eventsCmd.Flags().StringP("eval", "e", "", "Evaluate JavaScript expression against event. Must return truthy to print event.")
+	eventsCmd.Flags().StringP("eval", "e", "", "Evaluate JavaScript expression against event. Must return truthy to print event.\nNote: Post-processes after matching, not guarantted to return last <n> events.")
 	RootCmd.AddCommand(eventsCmd)
 
 	if co == nil {

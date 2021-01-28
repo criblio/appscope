@@ -3,7 +3,6 @@ You have 16 H1 headings. You may want to use the "H1 -> H2" option to demote all
 
 ----->
 
-
 <p style="color: red; font-weight: bold">>>>>>  gd2md-html alert:  ERRORs: 0; WARNINGs: 1; ALERTS: 3.</p>
 <ul style="color: red; font-weight: bold"><li>See top comment block for details on ERRORs and WARNINGs. <li>In the converted Markdown or HTML, search for inline alerts that start with >>>>>  gd2md-html alert:  for specific instances that need correction.</ul>
 
@@ -13,68 +12,50 @@ You have 16 H1 headings. You may want to use the "H1 -> H2" option to demote all
 
 <p style="color: red; font-weight: bold">>>>>> PLEASE check and correct alert issues and delete this message and the inline alerts.<hr></p>
 
-
 _Successor to: [https://docs.google.com/document/d/1tzdvtxuKsKGYb4ceShdujB2ThQygIKYn89N15VMZBrI/edit#](https://docs.google.com/document/d/1tzdvtxuKsKGYb4ceShdujB2ThQygIKYn89N15VMZBrI/edit#)_
 
 _The sidebar in docs should follow this sidebar only up to H1 titles. H2 titles and their content are sections within each page._
 
-
 # § About AppScope
 
-
 # Overview
-
 
 ## What Is AppScope
 
 AppScope is an open source instrumentation utility for any application, regardless of programming language, with no code modification required.
 
-
-
 <p id="gdcalert1" ><span style="color: red; font-weight: bold">>>>>>  gd2md-html alert: inline image link here (to images/image1.png). Store image on your image server and adjust path/filename/extension if necessary. </span><br>(<a href="#">Back to top</a>)(<a href="#gdcalert2">Next alert</a>)<br><span style="color: red; font-weight: bold">>>>>> </span></p>
-
 
 ![alt_text](images/image1.png "image_tooltip")
 
-
-![AppScope in-terminal monitoring](./images/AppScope-GUI-screenshot.png)
-
+![AppScope in-terminal monitoring](../images/AppScope-GUI-screenshot.png)
 
 ## Features
 
 AppScope helps users explore, understand, and gain visibility into applications' behavior. Features include:
 
- 
-
-
-
-*   Capture application metrics 
-    *   File, Network, Memory, CPU
-*   Capture and log application events
-    *   Application console content `stdin/out`
-    *   Application logs 
-    *   Errors 
-*   Summarize metrics 
-*   Protocol detection 
-*   Capture any and all payloads
-    *   DNS, HTTP, and HTTPS
-*   Emit metrics and events to remote systems
-*   Normalize data
-*   Monitor static executables
-*   All runtimes (runtime-agnostic)
-*   No dependencies
-*   No code development required
-
-
+- Capture application metrics
+  - File, Network, Memory, CPU
+- Capture and log application events
+  - Application console content `stdin/out`
+  - Application logs
+  - Errors
+- Summarize metrics
+- Protocol detection
+- Capture any and all payloads
+  - DNS, HTTP, and HTTPS
+- Emit metrics and events to remote systems
+- Normalize data
+- Monitor static executables
+- All runtimes (runtime-agnostic)
+- No dependencies
+- No code development required
 
 <p id="gdcalert2" ><span style="color: red; font-weight: bold">>>>>>  gd2md-html alert: inline image link here (to images/image2.png). Store image on your image server and adjust path/filename/extension if necessary. </span><br>(<a href="#">Back to top</a>)(<a href="#gdcalert3">Next alert</a>)<br><span style="color: red; font-weight: bold">>>>>> </span></p>
 
-
 ![alt_text](images/image2.png "image_tooltip")
 
-
-![AppScope emitting metrics/events to remote systems](./images/AppScope_iso.png)
-
+![AppScope emitting metrics/events to remote systems](../images/AppScope_iso.png)
 
 # Cool, but What Can I Do with It?
 
@@ -82,124 +63,100 @@ AppScope offers APM-like, black-box instrumentation of any unmodified Linux exec
 
 Data collection options include:
 
-
-
-*   Metrics about performance. 
-*   Logs emitted from an application, collected with zero configuration, and delivered to log files or to the console. 
-*   Network flow logs and metrics. 
-*   DNS Requests. 
-*   Files opened and closed, with I/O consumption per file. 
-*   HTTP requests to and from an application, including URI endpoint, HTTP header, and full payload visibility.
+- Metrics about performance.
+- Logs emitted from an application, collected with zero configuration, and delivered to log files or to the console.
+- Network flow logs and metrics.
+- DNS Requests.
+- Files opened and closed, with I/O consumption per file.
+- HTTP requests to and from an application, including URI endpoint, HTTP header, and full payload visibility.
 
 AppScope works with static or dynamic binaries, to instrument anything running in Linux. The CLI makes it easy to inspect any application without needing a man-in-the-middle proxy. You can use the AppScope library independently of the CLI, applying fine-grained configuration options.
 
-AppScope collects StatsD-style metrics about applications. With HTTP-level visibility, any web server or application can be instantly observable. You get the observability of a proxy/service mesh, without the latency of a sidecar. And you can use general-purpose tools instead of specialized APM tools and agents. 
+AppScope collects StatsD-style metrics about applications. With HTTP-level visibility, any web server or application can be instantly observable. You get the observability of a proxy/service mesh, without the latency of a sidecar. And you can use general-purpose tools instead of specialized APM tools and agents.
 
 Some example use cases:
 
-
-
-*   Send HTTP events from Slack to a specified Splunk server.
-*   Send metrics from nginx to a specified Datadog server.
-*   Send metrics from a Go static application to A specified Datadog server.
-*   Run Firefox from the AppScope CLI, and view results on a terminal-based dashboard.
-
+- Send HTTP events from Slack to a specified Splunk server.
+- Send metrics from nginx to a specified Datadog server.
+- Send metrics from a Go static application to A specified Datadog server.
+- Run Firefox from the AppScope CLI, and view results on a terminal-based dashboard.
 
 # How AppScope Works
 
 AppScope consists of a shared library and an executable. In simple terms, you load the library into the address space of a process. With the library loaded, details are extracted from applications as they execute. The executable provides a command line interface (CLI), which can optionally be used to control which processes are interposed, what data is extracted, and how to view and interact with the results.
 
-The library extracts information as it interposes functions. When an application calls a function, it actually calls a function of the same name in the AppScope library. AppScope extracts details from the function, and the original function call proceeds. This interposition of function calls requires no change to an application: it works with unmodified binaries, and its CPU and memory overhead are minimal. 
+The library extracts information as it interposes functions. When an application calls a function, it actually calls a function of the same name in the AppScope library. AppScope extracts details from the function, and the original function call proceeds. This interposition of function calls requires no change to an application: it works with unmodified binaries, and its CPU and memory overhead are minimal.
 
 The library is loaded using a number of mechanisms, depending on the type of executable. A dynamic loader can preload the library (where supported) and AppScope is used to load static executables.
 
 Child processes are created with the library present, if the library was present in the parent. In this manner, a single executable is able to start, daemonize, and create any number of children, all of which include interposed functions.
 
-
-
 <p id="gdcalert3" ><span style="color: red; font-weight: bold">>>>>>  gd2md-html alert: inline image link here (to images/image3.png). Store image on your image server and adjust path/filename/extension if necessary. </span><br>(<a href="#">Back to top</a>)(<a href="#gdcalert4">Next alert</a>)<br><span style="color: red; font-weight: bold">>>>>> </span></p>
-
 
 ![alt_text](images/image3.png "image_tooltip")
 
-
-![AppScope system-level design](./images/AppScope-system-level-design.png)
-
+![AppScope system-level design](../images/AppScope-system-level-design.png)
 
 # AppScope Components
 
 AppScope consists of three components:
 
-
-
 1. Command Line Interface \
-The AppScope CLI (`scope`) provides a quick and easy way to explore capabilities and to obtain insight into application behavior. Here, no installation or configuration is required to get started exploring application behavior.
+   The AppScope CLI (`scope`) provides a quick and easy way to explore capabilities and to obtain insight into application behavior. Here, no installation or configuration is required to get started exploring application behavior.
 2. Loader \
-Linux, like other operating systems, provides a loader capable of loading and linking dynamic and static executables as needed. AppScope provides a very simple component (`ldscope`) that supports loading static executables. This allows AppScope to interpos functions, and to thereby expose the same data that is exposed from dynamic executables. (While the AppScope loader is optional for use with dynamic executables, it is required in order when used to extract details from a static executable.) \
+   Linux, like other operating systems, provides a loader capable of loading and linking dynamic and static executables as needed. AppScope provides a very simple component (`ldscope`) that supports loading static executables. This allows AppScope to interpos functions, and to thereby expose the same data that is exposed from dynamic executables. (While the AppScope loader is optional for use with dynamic executables, it is required in order when used to extract details from a static executable.) \
 
 3. Library \
-The AppScope library (`libscope`) is the core component that resides in application processes, extracting data as an application executes. You can closely configure the library's behavior using environment variables or a configuration file.
-
+   The AppScope library (`libscope`) is the core component that resides in application processes, extracting data as an application executes. You can closely configure the library's behavior using environment variables or a configuration file.
 
 # Use Cases by Component
 
-
 ## Get Started with the CLI
 
-The easiest way to get started with AppScope is to use the CLI. This provides a rich set of capabilities intended to capture data from single applications. Data is captured in the local file system and is managed through the CLI. 
-
+The easiest way to get started with AppScope is to use the CLI. This provides a rich set of capabilities intended to capture data from single applications. Data is captured in the local file system and is managed through the CLI.
 
 ## Use the Loader Interface (Production Environments)
 
-As you get more interested in obtaining details from production applications, explore using the AppScope library apart from the CLI. This allows for full configurability via the `scope.yml` configuration file (default `scope.yml` [here]([https://github.com/criblio/appscope/blob/master/conf/scope.yml](https://github.com/criblio/appscope/blob/master/conf/scope.yml)l)). You can send details over UDP, TCP, and local or remote connections, and you can define specific events and metrics for export. You can use the AppScope loader to start applications that include the library. 
-
+As you get more interested in obtaining details from production applications, explore using the AppScope library apart from the CLI. This allows for full configurability via the `scope.yml` configuration file (default `scope.yml` [here](<[https://github.com/criblio/appscope/blob/master/conf/scope.yml](https://github.com/criblio/appscope/blob/master/conf/scope.yml)l>)). You can send details over UDP, TCP, and local or remote connections, and you can define specific events and metrics for export. You can use the AppScope loader to start applications that include the library.
 
 ## Use the Library Independently (Production Environments)
 
 You can also load the AppScope library independently, configured by means of a configuration file and/or environment variables. The config file (default: [`scope.yml`](https://github.com/criblio/appscope/blob/master/conf/scope.yml)) can be located where needed – just reference its location using the `LD_PRELOAD` environment variable. Environment variables take precedence over the default configuration, as well as over details in any configuration file.
 
-You use an environment variable to load the library independent of any executable. Whether you use this option or the AppScope loader, you get full control of the data source, formats, and transports. 
-
+You use an environment variable to load the library independent of any executable. Whether you use this option or the AppScope loader, you get full control of the data source, formats, and transports.
 
 # § Installing AppScope
 
-
 # Requirements
 
-Requirements for AppScope are as follows: 
-
+Requirements for AppScope are as follows:
 
 ## Operating Systems (Linux only)
 
 Supported:
 
+- RedHat Enterprise Linux or CentOS 6.4 and later
+- Ubuntu 16 and later
+- Amazon Linux 1 and 2
+- Debian
 
+CPU: x84-64 architecture
 
-*   RedHat Enterprise Linux or CentOS 6.4 and later
-*   Ubuntu 16 and later
-*   Amazon Linux 1 and 2
-*   Debian
+Memory: 1GB
 
-CPU:  		x84-64 architecture 
+Disk: 20MB (library + CLI)
 
-Memory: 	1GB
-
-Disk: 		20MB (library + CLI)
-
-
-## Known Limitations 
+## Known Limitations
 
 These runtimes are not supported Open JVM &lt; v.6, Oracle JVM &lt; v.6, Go &lt; v.1.8.
 
-
 # Quick Start Guide
 
-First, see &lt;link>[Requirements](#bookmark=id.2gpv5bl9l16m)&lt;/link> to ensure that you’re completing these steps on a supported system. Getting started is easy. 
-
+First, see &lt;link>[Requirements](#bookmark=id.2gpv5bl9l16m)&lt;/link> to ensure that you’re completing these steps on a supported system. Getting started is easy.
 
 ## Get AppScope
 
-Directly download the CLI binary from [https://cdn.cribl.io/dl/scope/cli/linux/scope](https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linux/scope). Use this curl command: 
+Directly download the CLI binary from [https://cdn.cribl.io/dl/scope/cli/linux/scope](https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linux/scope). Use this curl command:
 
 ```
 
@@ -207,15 +164,13 @@ curl -Lo scope https://cdn.cribl.io/dl/scope/cli/linux/scope && chmod 755 ./scop
 
 ```
 
-
 ## Explore the CLI
 
 Run `scope --help` or `scope -h` to view CLI options. Also see the complete &lt;link>[CLI Reference](#bookmark=id.q6rt37xg7u0g)&lt;/link>.
 
-
 ## Scope Some Commands
 
-Test-run one or more well-known Linux commands, and view the results. E.g.: 
+Test-run one or more well-known Linux commands, and view the results. E.g.:
 
 ```
 
@@ -225,8 +180,7 @@ scope ps -ef
 
 ```
 
-
-## Explore the Data 
+## Explore the Data
 
 To see the monitoring and visualization features AppScope offers, exercise some of its options. E.g.:
 
@@ -240,23 +194,21 @@ Plot a chart of the `proc.cpu` metric:
 
 Display captured events:
 
-`scope events` 
+`scope events`
 
 Filter out events, for just http:
 
 `scope events -t http`
 
-List this AppScope session's history: 
+List this AppScope session's history:
 
 `scope history`
-
 
 ## Next Steps
 
 For guidance on taking AppScope to the next level, [j[oin](https://cribl.io/community/)](https://cribl.io/community/) our [[community on Slack](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100)](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100).
 
-
-# Updating 
+# Updating
 
 You can update AppScope in place. First, download a fresh version of the binary:
 
@@ -270,18 +222,15 @@ curl -Lo scope https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linu
 
 Next, confirm the overwrite.
 
-After updating, verify AppScope's version and build date: 
+After updating, verify AppScope's version and build date:
 
-`scope version` 
+`scope version`
 
+# Uninstalling
 
-# Uninstalling 
+You can uninstall AppScope by simply deleting the code:
 
-You can uninstall AppScope by simply deleting the code:  
-
-		
-
-`rm -rf appscope` 
+`rm -rf appscope`
 
 … and the associated history directory:
 
@@ -309,7 +258,7 @@ Generate a large data set:
 
 Scope every subsequent shell command:
 
-`scope bash` 
+`scope bash`
 
 If you have [Cribl LogStream](https://cribl.io/download/) installed, try:
 
@@ -334,7 +283,7 @@ To execute CLI commands, the basic syntax is:
 
 ## ## Commands Available
 
-To see a list of available commands, enter `./scope` alone, or `./scope -h`, or  `./scope --help`.  This displays the basic help listing below. 
+To see a list of available commands, enter `./scope` alone, or `./scope -h`, or  `./scope --help`.  This displays the basic help listing below.
 
 ```
 
@@ -342,31 +291,31 @@ Command line interface for working with Cribl AppScope
 
 Usage:
 
-  scope [command]
+scope [command]
 
 Available Commands:
 
-  dash        Display scope dashboard
+dash Display scope dashboard
 
-  events      Output events for a session
+events Output events for a session
 
-  help        Help about any command
+help Help about any command
 
-  history     List scope session history
+history List scope session history
 
-  metrics     Output metrics for a session
+metrics Output metrics for a session
 
-  prune       Delete scope history
+prune Delete scope history
 
-  run         Execute a scoped command
+run Execute a scoped command
 
-  version     Display scope version
+version Display scope version
 
 Flags:
 
-  -h, --help            Help for scope
+-h, --help Help for scope
 
-  -v, --verbose count   Set verbosity level
+-v, --verbose count Set verbosity level
 
 Use "scope [command] --help" for more information about a command.
 
@@ -394,9 +343,9 @@ Displays an interactive dashboard with an overview of what's happening with the 
 
 ```
 
-  -h, --help     help for dash
+-h, --help help for dash
 
-  -i, --id int   Display info from specific from session ID (default -1)
+-i, --id int Display info from specific from session ID (default -1)
 
 ```
 
@@ -432,29 +381,29 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 
 ```
 
-  -a, --all                  Show all events
+-a, --all Show all events
 
       --allfields            Displaying hidden fields
 
       --color                Force color on (if tty detection fails or pipeing)
 
-  -e, --eval string          Evaluate JavaScript expression against event. Must return truthy to print event.
+-e, --eval string Evaluate JavaScript expression against event. Must return truthy to print event.
 
-  -f, --follow               Follow a file, like tail -f
+-f, --follow Follow a file, like tail -f
 
-  -h, --help                 help for events
+-h, --help help for events
 
-  -i, --id int               Display info from specific from session ID (default -1)
+-i, --id int Display info from specific from session ID (default -1)
 
-  -j, --json                 Output as newline delimited JSON
+-j, --json Output as newline delimited JSON
 
-  -n, --last int             Show last &lt;n> events (default 20)
+-n, --last int Show last &lt;n> events (default 20)
 
-  -m, --match string         Display events containing supplied string
+-m, --match string Display events containing supplied string
 
-  -s, --source strings       Display events matching supplied sources
+-s, --source strings Display events matching supplied sources
 
-  -t, --sourcetype strings   Display events matching supplied sourcetypes
+-t, --sourcetype strings Display events matching supplied sourcetypes
 
 ```
 
@@ -483,17 +432,17 @@ Lists scope session history.
 
 ```
 
-  -a, --all        List all sessions
+-a, --all List all sessions
 
-  -d, --dir        Output just directory (with -i)
+-d, --dir Output just directory (with -i)
 
-  -h, --help       help for history
+-h, --help help for history
 
-  -i, --id int     Display info from specific from session ID (default -1)
+-i, --id int Display info from specific from session ID (default -1)
 
-  -n, --last int   Show last &lt;n> sessions (default 20)
+-n, --last int Show last &lt;n> sessions (default 20)
 
-  -r, --running    List running sessions
+-r, --running List running sessions
 
 ```
 
@@ -517,17 +466,17 @@ Outputs metrics for a session.
 
 ```
 
-  -c, --cols             Display metrics as columns
+-c, --cols Display metrics as columns
 
-  -g, --graph            Graph this metric
+-g, --graph Graph this metric
 
-  -h, --help             help for metrics
+-h, --help help for metrics
 
-  -i, --id int           Display info from specific from session ID (default -1)
+-i, --id int Display info from specific from session ID (default -1)
 
-  -m, --metric strings   Display only supplied metrics
+-m, --metric strings Display only supplied metrics
 
-  -u, --uniq             Display first instance of each unique metric
+-u, --uniq Display first instance of each unique metric
 
 ```
 
@@ -557,15 +506,15 @@ scope prune -a
 
 ```
 
-  -a, --all          Delete all sessions
+-a, --all Delete all sessions
 
-  -d, --delete int   Delete last &lt;delete> sessions (default -1)
+-d, --delete int Delete last &lt;delete> sessions (default -1)
 
-  -f, --force        Do not prompt for confirmation
+-f, --force Do not prompt for confirmation
 
-  -h, --help         help for prune
+-h, --help help for prune
 
-  -k, --keep int     Keep last &lt;keep> sessions (default -1)
+-k, --keep int Keep last &lt;keep> sessions (default -1)
 
 ```
 
@@ -589,13 +538,13 @@ Executes a scoped command (or application.
 
 ```
 
-  -h, --help            help for run
+-h, --help help for run
 
       --passthrough     Runs scopec with current environment & no config.
 
-  -p, --payloads        Capture payloads of network transactions
+-p, --payloads Capture payloads of network transactions
 
-  -v, --verbosity int   Set scope metric verbosity (default 4)
+-v, --verbosity int Set scope metric verbosity (default 4)
 
 ```
 
@@ -629,7 +578,7 @@ scope version --summary
 
       --date      output just the date
 
-  -h, --help      help for version
+-h, --help help for version
 
       --summary   output just the summary
 
@@ -670,11 +619,11 @@ To use the AppScope library independently of the CLI or loader, you rely on the 
 
 ## LD_PRELOAD Environment Variable with a Single Command
 
-Start with this basic example: 
+Start with this basic example:
 
 `LD_PRELOAD=./libscope.so ps -ef`
 
-This executes the command `ps -ef`. But first, the OS' loader loads the AppScope library as part of loading and linking the ps executable. 
+This executes the command `ps -ef`. But first, the OS' loader loads the AppScope library as part of loading and linking the ps executable.
 
 Details of the ps application's execution are emitted to the configured transport, in the configured format. For configuration details, see [Configuring the Library](#configuring).
 
@@ -729,7 +678,7 @@ scope dash
 
 ```
 
-SCOPE_METRIC_DEST=udp://ddoghost:5000 ldscope nginx 
+SCOPE_METRIC_DEST=udp://ddoghost:5000 ldscope nginx
 
 ```
 
@@ -749,11 +698,11 @@ Configuration file example:
 
 event:
 
-  enable: true
+enable: true
 
-  transport:
+transport:
 
-    type: tcp 
+    type: tcp
 
     host: mydata
 
@@ -763,7 +712,7 @@ event:
 
 
 
-4. Send HTTP events from Slack to a Splunk server at `shost`: 
+4. Send HTTP events from Slack to a Splunk server at `shost`:
 
 ```
 
@@ -777,9 +726,9 @@ Configuration file example, located at `/etc/scope` or `~/scope.yml`:
 
 event:
 
-  enable: true
+enable: true
 
-  transport:
+transport:
 
     type: tcp
 
@@ -787,7 +736,7 @@ event:
 
     port: 8088
 
------
+---
 
     - type: http
 
@@ -815,7 +764,7 @@ SCOPE_EVENT_DNS=true LD_PRELOAD=./libscope.so curl [https://cribl.io](https://cr
 
 ```
 
-ldscope ./hello 
+ldscope ./hello
 
 ```
 
@@ -825,13 +774,13 @@ Configuration file example:
 
 metric:
 
-  enable: true
+enable: true
 
-  format:
+format:
 
     type : statsd
 
------
+---
 
 transport:
 
@@ -849,7 +798,7 @@ transport:
 
 # Join Our Slack
 
-To connect with other AppScope users and developers, [[join](https://cribl.io/community/)](https://cribl.io/community/) our [[Community Slack](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100)](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100). 
+To connect with other AppScope users and developers, [[join](https://cribl.io/community/)](https://cribl.io/community/) our [[Community Slack](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100)](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100).
 
 
 # How to Contribute
@@ -857,7 +806,7 @@ To connect with other AppScope users and developers, [[join](https://cribl.io/co
 Fork our [[repo on GitHub](https://github.com/criblio/appscope.git)](https://github.com/criblio/appscope.git).
 
 
-# § Appendix: Default Configuration 
+# § Appendix: Default Configuration
 
 Below are the contents of the default AppScope library configuration file. (You can access this default file's most-recent version [on GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).)
 
@@ -1119,13 +1068,13 @@ Related: [AppSoope README.md remix](https://docs.google.com/document/d/1e5OkQ_bE
 
     The primary way to define which processes include the Scope library
 
-    is by exporting the environment variable LD_PRELOAD, which is set to point to the path name of the Scope library. E.g.: 
+    is by exporting the environment variable LD_PRELOAD, which is set to point to the path name of the Scope library. E.g.:
 
     export LD_PRELOAD=./libscope.so
 
     Scope emits data as metrics and/or events.
 
-    Scope is fully configurable by means of a configuration file (scope.yml) and/or 
+    Scope is fully configurable by means of a configuration file (scope.yml) and/or
 
     environment variables.
 
@@ -1175,7 +1124,7 @@ Related: [AppSoope README.md remix](https://docs.google.com/document/d/1e5OkQ_bE
 
             ./scope.yml
 
-        
+
 
     Environment Variables:
 
@@ -1485,13 +1434,13 @@ Related: [AppSoope README.md remix](https://docs.google.com/document/d/1e5OkQ_bE
 
     Metrics can be enabled or disabled with a single config element
 
-    (metric: enable: true|false). Specific types of metrics, and specific 
+    (metric: enable: true|false). Specific types of metrics, and specific
 
     field content, are managed with a Metric Verbosity setting.
 
     Metric Verbosity
 
-        Controls two different aspects of metric output – 
+        Controls two different aspects of metric output –
 
         Tag Cardinality and Summarization.
 
@@ -1538,13 +1487,13 @@ Related: [AppSoope README.md remix](https://docs.google.com/document/d/1e5OkQ_bE
     EVENTS:
 
     All events can be enabled or disabled with a single config element \
-    (event: enable: true|false). Unlike metrics, event content is not 
+    (event: enable: true|false). Unlike metrics, event content is not
 
-    managed with verbosity settings. Instead, you use regex filters that 
+    managed with verbosity settings. Instead, you use regex filters that
 
     manage which field types and field values to include.
 
-     Events are organized as 7 watch types: 
+     Events are organized as 7 watch types:
 
      1) File Content. Provide a pathname, and all data written to the file
 
@@ -1574,7 +1523,7 @@ Related: [AppSoope README.md remix](https://docs.google.com/document/d/1e5OkQ_bE
 
      5) File System. Events are formatted in JSON for each file system open, including file name, permissions, and cgroup. Events for file system close add a summary of the number of bytes read and written, the total number of read and write operations, and the total duration of read and write operations. The specific function performing open and close is reported as well.
 
-     6) Network. Events are formatted in JSON for network connections and corresponding disconnects, including type of protocol used, and local and peer IP:port. Events for network disconnect add a summary of the number of bytes sent and received, and the duration of the sends and receives while the connection was active. The reason (source) for disconnect is provided as local or remote. 
+     6) Network. Events are formatted in JSON for network connections and corresponding disconnects, including type of protocol used, and local and peer IP:port. Events for network disconnect add a summary of the number of bytes sent and received, and the duration of the sends and receives while the connection was active. The reason (source) for disconnect is provided as local or remote.
 
      7) DNS.   Events are formatted in JSON for DNS requests and responses. The event provides the domain name being resolved. On DNS response, the event provides the duration of the DNS operation.
 
@@ -1588,20 +1537,21 @@ Related: [AppSoope README.md remix](https://docs.google.com/document/d/1e5OkQ_bE
 
      expressions are supported. You can find a sample config file at https://github.com/criblio/appscope/blob/master/conf/scope_protocol.yml.
 
-     Scope detects binary and string protocols. Detection events, 
+     Scope detects binary and string protocols. Detection events,
 
-     formatted in JSON, are emitted over the event channel. Enable the 
+     formatted in JSON, are emitted over the event channel. Enable the
 
       event metric watch type to allow protocol detection.
 
      The protocol detection config file should be named scope_protocol.yml.
 
-     Place the protocol definitions config file (scope_protocol.yml) in the directory defined by the SCOPE_HOME 
+     Place the protocol definitions config file (scope_protocol.yml) in the directory defined by the SCOPE_HOME
 
-     environment variable. If Scope does not find the protocol definitions 
+     environment variable. If Scope does not find the protocol definitions
 
      file in that directory, it will search for it, in the same search order as described for config files.
 
 PAYLOAD EXTRACTION:
 
-When enabled, libscope extracts payload data from network operations. Payloads are emitted in binary. No formatting is applied to the data. Payloads are emitted to either a local file or the LogStream channel. Configuration elements for libscope support defining a path for payload data. 
+When enabled, libscope extracts payload data from network operations. Payloads are emitted in binary. No formatting is applied to the data. Payloads are emitted to either a local file or the LogStream channel. Configuration elements for libscope support defining a path for payload data.
+```

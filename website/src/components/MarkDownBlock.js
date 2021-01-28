@@ -1,22 +1,24 @@
 import React from "react";
-import { useStaticQuery, graphql } from "gatsby";
+import { graphql } from "gatsby";
+import Layout from "./layouts/documentationLayout";
+import "prismjs/themes/prism.css";
 
-export default function MarkDownBlock() {
-  const data = useStaticQuery(graphql`
-    query codeQuery {
-      markdownRemark(frontmatter: { title: { eq: "Intro" } }) {
-        id
-        html
-      }
-    }
-  `);
-  console.log(data);
+export default function MarkDownBlock({ data }) {
+  const post = data.markdownRemark;
   return (
-    <div
-      className="code-container"
-      dangerouslySetInnerHTML={{
-        __html: data.markdownRemark.html,
-      }}
-    ></div>
+    <Layout>
+      <div
+        className="code-container"
+        dangerouslySetInnerHTML={{ __html: post.html }}
+      />
+    </Layout>
   );
 }
+
+export const query = graphql`
+  query($slug: String!) {
+    markdownRemark(fields: { slug: { eq: $slug } }) {
+      html
+    }
+  }
+`;

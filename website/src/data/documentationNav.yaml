@@ -1,34 +1,50 @@
-- name: Introduction
-  path: ./src/documentation/introduction.md
-  
-- name: Quick Start
-  path: ./src/documentation/tutorials/index.md
+- name: Overview
+  path: /documentation/overview
   child: 
-    - name: Level 1
-      path: ./src/documentation/tutorials/level1.md
-  TOC: 
-    - title: TOC title
-      childItem: TOC Child Item 
-      link: Child/Item/Link.md
+    - name: Cool, but What Can I Do with It?
+      path: /documentation/what-do-with-scope
 
-- name: Tutorials
-  path: ./src/documentation/tutorials/index.md
-  child: 
-    - name: Level 1
-      path: ./src/documentation/tutorials/level1.md 
-    - name: Level 1
-      path: ./src/documentation/tutorials/level1.md
-    - name: Level 1
-      path: ./src/documentation/tutorials/level1.md 
-    - name: Level 1
-      path: ./src/documentation/tutorials/level1.md
-    - name: Another Tutorial
-      path: ./src/documentation/tutorials/level1.md
+    - name: How AppScope Works
+      path: /documentation/how-works
 
-- name: Item
-  path: ./src/documentation/tutorials/index.md
+    - name: AppScope Components
+      path: /documentation/appscope-components
+ 
+    - name: Use Cases by Component
+      path: /documentation/use-cases
+
+- name: Installing AppScope
+  path: /documentation/requirements
   child: 
-    - name: Level 1
-      path: ./src/documentation/tutorials/level1.md
+    - name: Quick Start Guide
+      path: /documentation/quick-start-guide
+
+    - name: Updating
+      path: /documentation/updating
+
+    - name: Uninstalling
+      path: /documentation/uninstalling
+
+- name: Using AppScope
+  path: /documentation/cli-using
+  child: 
+    - name: CLI Reference
+      path: /documentation/cli-reference
+
+    - name: Using the Library
+      path: /documentation/library-use
+
+    - name: Configuring the Library
+      path: /documentation/library-configuring
+
+    - name: Examples and Use Cases
+      path: /documentation/examples-use-cases
+
+- name: Community
+  path: /documentation/community
+
+- name: "Appendix: Default Configuration"
+  path: /documentation/default-configuration
+
       
 

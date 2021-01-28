@@ -18,14 +18,14 @@ module.exports = {
     "gatsby-plugin-mdx",
     "gatsby-transformer-sharp",
     "gatsby-plugin-styled-components",
-    {
-      resolve: "gatsby-plugin-algolia",
-      options: {
-        appId: process.env.GATSBY_ALGOLIA_APP_ID,
-        apiKey: process.env.ALGOLIA_ADMIN_KEY,
-        queries: require("./src/utils/algolia-queries"),
-      },
-    },
+    // {
+    //   resolve: "gatsby-plugin-algolia",
+    //   options: {
+    //     appId: process.env.GATSBY_ALGOLIA_APP_ID,
+    //     apiKey: process.env.ALGOLIA_ADMIN_KEY,
+    //     queries: require("./src/utils/algolia-queries"),
+    //   },
+    // },
     {
       resolve: "gatsby-plugin-manifest",
       options: {
@@ -46,6 +46,19 @@ module.exports = {
           {
             resolve: "gatsby-remark-prismjs",
             options: {},
+          },
+        ],
+      },
+    },
+    {
+      resolve: "gatsby-transformer-remark",
+      options: {
+        plugins: [
+          {
+            resolve: "gatsby-remark-images",
+            options: {
+              maxWidth: 800,
+            },
           },
         ],
       },

@@ -13,7 +13,7 @@ RUN mkdir /opt/test-runner/logs/
 RUN source scl_source enable rh-python36 && virtualenv /opt/test-runner/
 
 # Originally used 2.1.1 and 2.11, but they're too old now.
-ENV KAFKA_VERSION=2.5.0 KAFKA_SCALA_VERSION=2.13
+ENV KAFKA_VERSION=2.7.0 KAFKA_SCALA_VERSION=2.13
 ENV KAFKA_RELEASE_ARCHIVE kafka_${KAFKA_SCALA_VERSION}-${KAFKA_VERSION}.tgz
 
 RUN mkdir /kafka /data /logs

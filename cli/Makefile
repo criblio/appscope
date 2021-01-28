@@ -26,6 +26,10 @@ deps:
 	$(GO) get github.com/go-bindata/go-bindata/...
 	$(GO) get github.com/ahmetb/govvv
 
+demo:
+	go build -o $(DIR)demo/demo-scripts/goHttps demo/demo-scripts/https.go
+	docker build -t criblio/appscope-demo -f $(DIR)demo/Dockerfile .
+
 rebuild: cliclean all
 
 local:

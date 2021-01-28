@@ -1,12 +1,14 @@
 FROM docker.elastic.co/elasticsearch/elasticsearch:7.4.2
 ENV discovery.type=single-node
 
-RUN yum -y update
-RUN yum -y install centos-release-scl
-RUN yum -y install rh-python36
+RUN yum -y update && \
+    yum -y install centos-release-scl rh-python36 && \
+    mkdir -p /opt/test-runner/logs
+# RUN yum -y install centos-release-scl
+# RUN yum -y install rh-python36
 
-RUN mkdir /opt/test-runner/
-RUN mkdir /opt/test-runner/logs/
+# RUN mkdir /opt/test-runner/
+# RUN mkdir /opt/test-runner/logs/
 
 RUN source scl_source enable rh-python36 && virtualenv /opt/test-runner/
 

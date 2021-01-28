@@ -1,18 +1,24 @@
 FROM centos:latest
 
-RUN yum -y update
-RUN yum -y install epel-release
-RUN yum -y install redis
-RUN yum -y install wget
-RUN yum -y install gdb
-RUN yum -y install openssl
-
 COPY mongodb.repo /etc/yum.repos.d/.
-RUN yum -y install mongodb-org
+RUN yum -y update && \
+    yum -y install epel-release redis wget gdb openssl mongodb-org && \
+    mkdir -p /opt/test-runner/logs && mkdir /opt/test-runner/bin
 
-RUN mkdir /opt/test-runner/
-RUN mkdir /opt/test-runner/logs/
-RUN mkdir /opt/test-runner/bin
+
+# RUN yum -y update
+# RUN yum -y install epel-release
+# RUN yum -y install redis
+# RUN yum -y install wget
+# RUN yum -y install gdb
+# RUN yum -y install openssl
+
+# COPY mongodb.repo /etc/yum.repos.d/.
+# RUN yum -y install mongodb-org
+
+# RUN mkdir /opt/test-runner/
+# RUN mkdir /opt/test-runner/logs/
+# RUN mkdir /opt/test-runner/bin
 
 COPY mongod.conf /etc/.
 COPY scope_protocol.yml /opt/test-runner/bin/.

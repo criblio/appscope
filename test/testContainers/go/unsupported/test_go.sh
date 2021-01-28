@@ -252,32 +252,32 @@ endtest
 #
 # cgoDynamic
 #
-starttest cgoDynamic
-cd /go/cgo
-LD_LIBRARY_PATH=. ldscope ./cgoDynamic 2>${STDERR_FILE}
-ERR+=$?
-evaltest
+# starttest cgoDynamic
+# cd /go/cgo
+# LD_LIBRARY_PATH=. ldscope ./cgoDynamic 2>${STDERR_FILE}
+# ERR+=$?
+# evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
-ERR+=$?
+# grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+# ERR+=$?
 
-endtest
+# endtest
 
 
 #
 # cgoStatic
 #
-starttest cgoStatic
-cd /go/cgo
-ldscope ./cgoStatic 2>${STDERR_FILE}
-ERR+=$?
+# starttest cgoStatic
+# cd /go/cgo
+# ldscope ./cgoStatic 2>${STDERR_FILE}
+# ERR+=$?
 
-evaltest
+# evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
-ERR+=$?
+# grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+# ERR+=$?
 
-endtest
+# endtest
 
 
 

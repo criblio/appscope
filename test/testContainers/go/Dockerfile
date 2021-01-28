@@ -1,7 +1,12 @@
 ARG GO_IMAGE_VER=golang:1.14
 FROM $GO_IMAGE_VER
 
-RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y vim curl file
+RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y vim curl file bison
+
+COPY ./go /go
+COPY ./go/influx/influxdb-selfsigned.key /etc/ssl/.
+COPY ./go/influx/influxdb-selfsigned.crt /etc/ssl/.
+RUN curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer | bash -x
 
 #ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 #COPY ./libscope.so /usr/lib/libscope.so
@@ -10,42 +15,59 @@ RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y vim
 #COPY ./scope /usr/bin/scope
 #RUN chmod 755 /usr/bin/scope
 
-COPY ./go/test_go.sh /go
-COPY ./go/test_go_struct.sh /go
+# COPY ./go/test_go.sh /go
+# COPY ./go/test_go_struct.sh /go
 
-RUN mkdir /go/thread
-COPY ./go/thread/fileThread.go /go/thread
-RUN cd /go/thread && CGO_ENABLED=0 go build fileThread.go
+# RUN mkdir /go/thread
+# COPY ./go/thread/fileThread.go /go/thread
+ENV GO_UNSUPPORTED_VERSIONS 1.4 1.5 1.6 1.7 
+ENV GO_SUPPORTED_VERSIONS 1.8 1.9 1.10 1.11 1.12 1.13 1.14 1.15
+# RUN cd /go/thread && CGO_ENABLED=0 go build fileThread.go && \
+#     cd /go/net && go build -o plainServerDynamic plainServer.go && \
+#     cd /go/net && CGO_ENABLED=0 go build -o plainServerStatic plainServer.go && \
+#     cd /go/net && go build -o tlsServerDynamic tlsServer.go && \
+#     cd /go/net && CGO_ENABLED=0 go build -o tlsServerStatic tlsServer.go && \
+#     cd /go/net && openssl genrsa -out server.key 2048 && \
+#                   openssl ecparam -genkey -name secp384r1 -out server.key && \
+#                   openssl req -new -x509 -sha256 -key server.key -out server.crt \
+#        -days 3650 -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost" && \
+#     cd /go/net && go build -o plainClientDynamic plainClient.go && \
+#     cd /go/net && go build -o tlsClientDynamic tlsClient.go && \
+#     cd /go/net && CGO_ENABLED=0 go build -o tlsClientStatic tlsClient.go && \
+#     cd /go/cgo && make all
 
-RUN mkdir /go/net
-COPY ./go/net/plainServer.go /go/net
-RUN cd /go/net && go build -o plainServerDynamic plainServer.go
-RUN cd /go/net && CGO_ENABLED=0 go build -o plainServerStatic plainServer.go
-COPY ./go/net/tlsServer.go /go/net
-RUN cd /go/net && go build -o tlsServerDynamic tlsServer.go
-RUN cd /go/net && CGO_ENABLED=0 go build -o tlsServerStatic tlsServer.go
-RUN cd /go/net && openssl genrsa -out server.key 2048 && \
-                  openssl ecparam -genkey -name secp384r1 -out server.key && \
-                  openssl req -new -x509 -sha256 -key server.key -out server.crt \
-       -days 3650 -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost"
-COPY ./go/net/plainClient.go /go/net
-RUN cd /go/net && go build -o plainClientDynamic plainClient.go
-RUN cd /go/net && CGO_ENABLED=0 go build -o plainClientStatic plainClient.go
-COPY ./go/net/tlsClient.go /go/net
-RUN cd /go/net && go build -o tlsClientDynamic tlsClient.go
-RUN cd /go/net && CGO_ENABLED=0 go build -o tlsClientStatic tlsClient.go
 
-RUN mkdir /go/cgo
-COPY ./go/cgo/Makefile /go/cgo
-COPY ./go/cgo/myc.c /go/cgo
-COPY ./go/cgo/myc.h /go/cgo
-COPY ./go/cgo/mygo.go /go/cgo
-RUN cd /go/cgo && make all
 
-RUN mkdir -p /go/influx
-COPY ./go/influx/* /go/influx/
-COPY ./go/influx/influxdb-selfsigned.key /etc/ssl/.
-COPY ./go/influx/influxdb-selfsigned.crt /etc/ssl/.
+
+# RUN mkdir /go/net
+# COPY ./go/net/plainServer.go /go/net
+# RUN cd /go/net && go build -o plainServerDynamic plainServer.go
+# RUN cd /go/net && CGO_ENABLED=0 go build -o plainServerStatic plainServer.go
+# COPY ./go/net/tlsServer.go /go/net
+# RUN cd /go/net && go build -o tlsServerDynamic tlsServer.go
+# RUN cd /go/net && CGO_ENABLED=0 go build -o tlsServerStatic tlsServer.go
+# RUN cd /go/net && openssl genrsa -out server.key 2048 && \
+                #   openssl ecparam -genkey -name secp384r1 -out server.key && \
+                #   openssl req -new -x509 -sha256 -key server.key -out server.crt \
+    #    -days 3650 -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost"
+# COPY ./go/net/plainClient.go /go/net
+# RUN cd /go/net && go build -o plainClientDynamic plainClient.go
+# RUN cd /go/net && CGO_ENABLED=0 go build -o plainClientStatic plainClient.go
+# COPY ./go/net/tlsClient.go /go/net
+# RUN cd /go/net && go build -o tlsClientDynamic tlsClient.go
+# RUN cd /go/net && CGO_ENABLED=0 go build -o tlsClientStatic tlsClient.go
+
+# RUN mkdir /go/cgo
+# COPY ./go/cgo/Makefile /go/cgo
+# COPY ./go/cgo/myc.c /go/cgo
+# COPY ./go/cgo/myc.h /go/cgo
+# COPY ./go/cgo/mygo.go /go/cgo
+# RUN cd /go/cgo && make all
+
+# RUN mkdir -p /go/influx
+# COPY ./go/influx/* /go/influx/
+# COPY ./go/influx/influxdb-selfsigned.key /etc/ssl/.
+# COPY ./go/influx/influxdb-selfsigned.crt /etc/ssl/.
 
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4
@@ -59,5 +81,5 @@ ENV SCOPE_EVENT_DEST=file:///go/events.log
 #ENV LD_PRELOAD=/usr/lib/libscope.so
 
 #ENTRYPOINT ["tail", "-f", "/dev/null"]
-ENTRYPOINT ["/go/test_go.sh"]
+# ENTRYPOINT ["/go/test.sh"]
 

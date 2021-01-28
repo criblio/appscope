@@ -2,7 +2,7 @@
   path: /
   
 - name: Docs
-  path: /documentation
+  path: /documentation/overview
 
 - name: Resources
   path: /resources

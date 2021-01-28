@@ -1,31 +1,33 @@
 @import "_vars";
 
 .starCount-container {
+  display: flex;
+  flex-direction: row;
+  border: 1px solid;
+  height: 32px;
+  font-size: 14px;
+  width: 120px;
+  color: $black;
+  cursor: pointer;
+  .gitLogo,
+  .starCount {
     display: flex;
-    flex-direction: row;
-    border: 1px solid ;
-    height: 32px;
-    font-size: 14px;
-    width: 120px;
-    .gitLogo,
-    .starCount {
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    align-items: center;
+    justify-content: center;
+  }
 
-    }
+  .gitLogo {
+    color: $black;
+    border-right: 1px solid;
+    font-size: 28px;
+    width: 32px;
+  }
 
-    .gitLogo {
-        border-right: 1px solid;
-        font-size: 28px;
-        width: 32px;
+  .starCount {
+    width: 82px;
+    span {
+      margin-left: 5px;
+      font-weight: 600;
     }
-
-    .starCount {
-        width: 82px;
-        span {
-            margin-left: 5px;
-            font-weight: 600;
-        }
-    }
+  }
 }

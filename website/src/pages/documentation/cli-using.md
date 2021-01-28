@@ -14,6 +14,6 @@ Scope every subsequent shell command:
 
 If you have [Cribl LogStream](https://cribl.io/download/) installed, try:
 
-`scope /<cribl_home>/bin/cribl server`
+`scope $CRIBL_HOME/bin/cribl server`
 
 To release a process, like `scope bash`, `exit` the process in the shell. If you do this with the bash shell itself, you won't be able to `scope bash` again in the same terminal session.

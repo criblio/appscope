@@ -8,7 +8,7 @@ AppScope consists of three components:
   
 2. Loader
 
-  Linux, like other operating systems, provides a loader capable of loading and linking dynamic and static executables as needed. AppScope provides a very simple component (`ldscope`) that supports loading static executables. This allows AppScope to interpos functions, and to thereby expose the same data that is exposed from dynamic executables. (While the AppScope loader is optional for use with dynamic executables, it is required in order when used to extract details from a static executable.)
+  Linux, like other operating systems, provides a loader capable of loading and linking dynamic and static executables as needed. AppScope provides a very simple component (`ldscope`) that supports loading static executables. This allows AppScope to interpose functions, and to thereby expose the same data that is exposed from dynamic executables. (While the AppScope loader is optional for use with dynamic executables, it is required in order when used to extract details from a static executable.)
 
 3. Library
 

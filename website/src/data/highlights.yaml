@@ -1,24 +1,15 @@
 # You can find a list of all icons available at https://fontawesome.com/icons?d=gallery&s=solid
 
-- title: AppScope Highlights Can Go Here
+- title: Instrument Any Application
   description: Use Iconography & Description for High Level Features. 
   items: 
-    - title: Highlight Item
+    - title: Instrument
       icon: tachometer-alt
-      shortDescription: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-    - title: Highlight Item
-      icon: tachometer-alt
-      shortDescription: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-    - title: Highlight Item
-      icon: tachometer-alt
-      shortDescription: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-    - title: Highlight Item
-      icon: tachometer-alt
-      shortDescription: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-    - title: Highlight Item
-      icon: tachometer-alt
-      shortDescription: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-    - title: Highlight Item
-      icon: tachometer-alt
-      shortDescription: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-    
+      shortDescription: Use the simple command line to easily instrument and inspect any application or Linux command, regardless of runtime, including Go binaries. There’s no need for a man in the middle proxy. It’s like strace meets tcpdump, but with readily consumable output. 
+    - title: Collect
+      icon: digital-tachograph
+      shortDescription: AppScope collects StatsD-style metrics about applications, including events like file access, DNS, and network activity. AppScope even looks inside encrypted payloads for WAF-like visibility into applications without proxying traffic. 
+    - title: Observe
+      icon: microscope
+      shortDescription: Send application information, wire and log data, and performance metrics to existing log analytics and metrics tooling. 
+  

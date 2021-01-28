@@ -1,0 +1,10 @@
+@import "_vars";
+.footer-container {
+  display: flex;
+
+  align-items: center;
+  height: 200px;
+  background: $black;
+  .footer {
+  }
+}

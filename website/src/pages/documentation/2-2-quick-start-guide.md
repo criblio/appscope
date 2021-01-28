@@ -4,12 +4,11 @@ First, see <link>[Requirements](#bookmark=id.2gpv5bl9l16m)</link> to ensure that
 
 ## Get AppScope
 
-Directly download the CLI binary from [https://cdn.cribl.io/dl/scope/cli/linux/scope](https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linux/scope). Use this command to both download and make it executable:
+Directly download the CLI binary from [https://cdn.cribl.io/dl/scope/cli/linux/scope](https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linux/scope). Use this curl command: 
 
 ```
 curl -Lo scope https://cdn.cribl.io/dl/scope/cli/linux/scope && chmod 755 ./scope
 ```
-
 
 ## Explore the CLI
 
@@ -40,7 +39,7 @@ Display captured events:
 
 `scope events` 
 
-Filter out events, for just `http`:
+Filter out events, for just http:
 
 `scope events -t http`
 

@@ -34,14 +34,6 @@ export default function MobileHeader() {
         edges {
           node {
             navigationLeft {
-              url
-              parent
-              child {
-                link
-                url
-              }
-            }
-            navigationRight {
               parent
               child {
                 link
@@ -102,23 +94,6 @@ export default function MobileHeader() {
           <Navbar expand="lg">
             <Nav className="mr-auto">
               {data.allCorpSiteNavYaml.edges[0].node.navigationLeft.map(
-                (item, i) => {
-                  return item.child === null ? (
-                    <Nav.Link href={item.url}>{item.parent}</Nav.Link>
-                  ) : (
-                    <NavDropdown title={item.parent} id="basic-nav-dropdown">
-                      {item.child.map((childItem, j) => {
-                        return (
-                          <NavDropdown.Item href={childItem.url}>
-                            {childItem.link}
-                          </NavDropdown.Item>
-                        );
-                      })}
-                    </NavDropdown>
-                  );
-                }
-              )}
-              {data.allCorpSiteNavYaml.edges[1].node.navigationRight.map(
                 (item, i) => {
                   return item.child === null ? (
                     <Nav.Link href={item.url}>{item.parent}</Nav.Link>

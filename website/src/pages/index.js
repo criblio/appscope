@@ -5,7 +5,7 @@ import Highlights from "../components/Highlights";
 import TwoCol from "../components/TwoCol";
 import Alert from "../components/Alert";
 import MobileHeader from "../components/MobileHeader";
-
+import Footer from "../components/Footer";
 const IndexPage = () => {
   return (
     <main>
@@ -20,6 +20,7 @@ const IndexPage = () => {
       <Hero />
       <Highlights />
       <TwoCol />
+      <Footer />
     </main>
   );
 };

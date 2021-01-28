@@ -84,6 +84,10 @@ body {
     @media (min-width: 768px) {
       font-size: 0.45rem;
     }
+    &:hover {
+      background: $orange;
+      opacity: 0.8;
+    }
   }
   @media (min-width: 768px) {
     padding: 100px 0;
@@ -127,4 +131,11 @@ pre {
   display: flex;
   color: #fff;
   font-size: 0.5rem;
+}
+nav {
+  position: fixed;
+  width: 100%;
+  z-index: 1000;
+  background: #fff;
+  border-bottom: 1px solid $blue;
 }

@@ -3,10 +3,6 @@
 .documentation {
   .code-container {
     padding: 10px;
-    p {
-      margin-bottom: 0;
-      padding: 0 0 10px 0;
-    }
   }
   .gatsby-highlight {
     font-size: 0.5rem;
@@ -20,16 +16,57 @@
   h3 {
     font-size: 0.75rem;
   }
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin-top: 30px;
+    margin-bottom: 10px;
+  }
   p,
   ol,
   li,
   pre,
   code {
     font-size: 16px;
+    margin: 15px 0;
+  }
+  li {
+    margin: 5px 0;
+  }
+  li p {
+    padding: 0;
+    margin: 0;
+  }
+  li ul {
+    margin: 0;
+    li {
+      list-style-type: none;
+      &::before {
+        content: " \203a  ";
+        font-size: 18px;
+        color: $orange;
+      }
+      code {
+        color: #fff;
+        background: $black;
+        border-radius: 3px;
+        padding: 0 5px;
+      }
+    }
   }
 }
 .TOC {
   @media (max-width: 767px) {
     display: none;
+  }
+}
+.darkMode {
+  background: $black;
+  color: #fff;
+  .docsNav {
+    a {
+      color: #fff;
+    }
   }
 }

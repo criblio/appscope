@@ -27,7 +27,7 @@ export default function Highlights() {
   return (
     <Container className="highlights">
       <h2>{data.allHighlightsYaml.edges[0].node.title}</h2>
-      <p>{data.allHighlightsYaml.edges[0].node.description}</p>
+      {/*<p>{data.allHighlightsYaml.edges[0].node.description}</p> */}
       <Row>
         {data.allHighlightsYaml.edges[0].node.items.map((item, i) => {
           return (

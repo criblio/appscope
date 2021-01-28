@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { navigate } from "gatsby";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import "../../scss/_starCount.scss";
 import "../../utils/font-awesome";
@@ -15,7 +16,10 @@ export default function StarCount() {
   }, []);
 
   return (
-    <div className="starCount-container">
+    <div
+      className="starCount-container"
+      onClick={() => navigate("https://github.com/criblio/appscope")}
+    >
       <div className="gitLogo">
         <FontAwesomeIcon icon={["fab", "github-square"]} />
       </div>

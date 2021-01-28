@@ -12,7 +12,7 @@ curl -Lo scope https://cdn.cribl.io/dl/scope/cli/linux/scope && chmod 755 ./scop
 
 ## Explore the CLI
 
-Run `scope --help` or `scope -h` to view CLI options. Also see the complete <link>[CLI Reference](#bookmark=id.q6rt37xg7u0g)</link>.
+Run `scope --help` or `scope -h` to view CLI options. Also see the complete <link>[CLI Reference](/documentation/cli-reference)</link>.
 
 ## Scope Some Commands
 

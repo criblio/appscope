@@ -11,6 +11,22 @@
   .gatsby-highlight {
     font-size: 0.5rem;
   }
+  h1 {
+    font-size: 1.25rem;
+  }
+  h2 {
+    font-size: 1rem;
+  }
+  h3 {
+    font-size: 0.75rem;
+  }
+  p,
+  ol,
+  li,
+  pre,
+  code {
+    font-size: 16px;
+  }
 }
 .TOC {
   @media (max-width: 767px) {

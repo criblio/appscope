@@ -1,5 +1,5 @@
 import React from "react";
-import { useStaticQuery, graphql } from "gatsby";
+import { useStaticQuery, graphql, Link } from "gatsby";
 import "../scss/_docsNav.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
@@ -29,19 +29,28 @@ export default function DocsNav() {
         {navItems.map((item, i) => {
           return item.child !== null ? (
             <li key={i}>
-              {item.name}
+              <Link to={item.path}> {item.name}</Link>
               <ul>
                 {item.child.map((secondItem, j) => {
                   return secondItem.child !== null ? (
-                    <li key={j}>{secondItem.name}</li>
+                    <li key={j}>
+                      <Link
+                        to={secondItem.path}
+                        activeStyle={{ color: "#FD6600", fontWeight: 700 }}
+                      >
+                        {secondItem.name}
+                      </Link>
+                    </li>
                   ) : (
-                    <li>{secondItem.name}</li>
+                    ""
                   );
                 })}
               </ul>
             </li>
           ) : (
-            <li key={i}>{item.name}</li>
+            <li key={i}>
+              <Link to={item.path}>{item.name}</Link>
+            </li>
           );
         })}
       </ul>

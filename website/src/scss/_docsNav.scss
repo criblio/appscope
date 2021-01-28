@@ -25,15 +25,29 @@
   ul {
     list-style-type: none;
     padding: 0;
-    font-size: 16px;
+    font-size: 14px;
     li {
-      margin: 10px 0;
+      margin: 7px 0;
+      text-transform: uppercase;
+      font-weight: 700;
+      font-size: 14px;
+      a {
+        color: $black;
+        &:hover {
+          text-decoration: underline;
+          text-decoration-color: $blue;
+          text-underline-offset: 5px;
+          text-decoration-thickness: 3px;
+        }
+      }
       ul {
         border-left: 1px solid $blue;
-        margin-left: 25px;
+        margin-left: 10px;
         padding-left: 10px;
         li {
           font-size: 14px;
+          text-transform: none;
+          font-weight: 300;
         }
       }
     }

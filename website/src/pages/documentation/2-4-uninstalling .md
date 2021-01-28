@@ -1,9 +1,9 @@
 # Uninstalling 
 
-You can uninstall AppScope by simply deleting the code:  
+You can uninstall AppScope by simply deleting the binary:  
 
 ```
-rm -rf appscope
+rm -rf scope
 ```
 
 … and the associated history directory:

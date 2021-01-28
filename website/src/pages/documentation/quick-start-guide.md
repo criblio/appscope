@@ -1,29 +1,30 @@
 # Quick-Start Guide
 
-First, see <link>[Requirements](#bookmark=id.2gpv5bl9l16m)</link> to ensure that you’re completing these steps on a supported system. Getting started is easy.
+First, see <link>[Requirements](#bookmark=id.2gpv5bl9l16m)</link> to ensure that you’re completing these steps on a supported system. Getting started is easy. 
 
 ## Get AppScope
 
-Directly download the CLI binary from [https://cdn.cribl.io/dl/scope/cli/linux/scope](https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linux/scope). Use this curl command:
+Directly download the CLI binary from [https://cdn.cribl.io/dl/scope/cli/linux/scope](https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linux/scope). Use this command to both download and make it executable:
 
 ```
 curl -Lo scope https://cdn.cribl.io/dl/scope/cli/linux/scope && chmod 755 ./scope
 ```
 
+
 ## Explore the CLI
 
-Run `scope --help` or `scope -h` to view CLI options. Also see the complete <link>[CLI Reference](/documentation/cli-reference)</link>.
+Run `scope --help` or `scope -h` to view CLI options. Also see the complete <link>[CLI Reference](#bookmark=id.q6rt37xg7u0g)</link>.
 
 ## Scope Some Commands
 
-Test-run one or more well-known Linux commands, and view the results. E.g.:
+Test-run one or more well-known Linux commands, and view the results. E.g.: 
 
 ```
 scope curl https://google.com
 scope ps -ef
 ```
 
-## Explore the Data
+## Explore the Data 
 
 To see the monitoring and visualization features AppScope offers, exercise some of its options. E.g.:
 
@@ -37,13 +38,13 @@ Plot a chart of the `proc.cpu` metric:
 
 Display captured events:
 
-`scope events`
+`scope events` 
 
-Filter out events, for just http:
+Filter out events, for just `http`:
 
 `scope events -t http`
 
-List this AppScope session's history:
+List this AppScope session's history: 
 
 `scope history`
 

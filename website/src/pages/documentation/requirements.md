@@ -1,5 +1,3 @@
-# § Installing AppScope
-
 # Requirements
 
 Requirements for AppScope are as follows: 

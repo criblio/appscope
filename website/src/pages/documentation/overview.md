@@ -1,5 +1,3 @@
-# § About AppScope
-
 # Overview
 
 ## What Is AppScope

@@ -14,7 +14,7 @@ The executable `scope` is provided with AppScope. The `scope` executable provide
 
 # Requirements
 
-AppScope supports Linux distros `yum` or `apt-get` package managers, and supports any runtime environment supported by Linux.
+AppScope supports Linux distros that have `yum` or `apt-get` package managers, and supports any runtime environment supported by Linux.
 
 # Install and Build
 

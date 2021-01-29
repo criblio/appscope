@@ -33,4 +33,4 @@ This again executes the `ps` command using the AppScope library. But here, we al
 
 # <span id="configuring"> Configuring the Library </span>
 
-For details on configuring the library, see AppScope online help's CONFIGURATION section. For the default settings in the sample `scope.yml` configuration file, see the <link>Appendix</link>, or see the most-recent file on [GitHub]([https://github.com/criblio/appscope/blob/master/conf/scope.yml](https://github.com/criblio/appscope/blob/master/conf/scope.yml)).
+For details on configuring the library, see AppScope online help's CONFIGURATION section. For the default settings in the sample `scope.yml` configuration file, see the [Appendix](/documentation/default-configuration), or see the most-recent file on [GitHub]([https://github.com/criblio/appscope/blob/master/conf/scope.yml](https://github.com/criblio/appscope/blob/master/conf/scope.yml)).

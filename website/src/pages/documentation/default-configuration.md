@@ -1,4 +1,4 @@
-# § Appendix: Default Configuration 
+# Appendix: Default Configuration 
 
 Below are the contents of the default AppScope library configuration file. (You can access this default file's most-recent version [on GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).)
 

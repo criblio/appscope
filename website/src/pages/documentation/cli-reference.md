@@ -214,7 +214,7 @@ scope version --summary
 
 ### `--verbose`
 
-This flag sets the verbosity level. `0` is least verbose, `4` is the default, and `9` is most default. For descriptions of individual levels, see  <link>[Appendix: Default Configuration](https://docs.google.com/document/d/1tzdvtxuKsKGYb4ceShdujB2ThQygIKYn89N15VMZBrI/edit#bookmark=id.xnkgdpnlvncq)</link>.
+This flag sets the verbosity level. `0` is least verbose, `4` is the default, and `9` is most default. For descriptions of individual levels, see  [Appendix: Default Configuration](/documentation/default-configuration).
 
 #### Usage
 

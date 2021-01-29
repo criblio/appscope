@@ -1,6 +1,6 @@
-# Quick-Start Guide
+# Quick Start Guide
 
-First, see <link>[Requirements](#bookmark=id.2gpv5bl9l16m)</link> to ensure that you’re completing these steps on a supported system. Getting started is easy. 
+First, see [Requirements](/documentation/requirements) to ensure that you’re completing these steps on a supported system. Getting started is easy. 
 
 ## Get AppScope
 
@@ -13,7 +13,7 @@ curl -Lo scope https://cdn.cribl.io/dl/scope/cli/linux/scope && chmod 755 ./scop
 
 ## Explore the CLI
 
-Run `scope --help` or `scope -h` to view CLI options. Also see the complete <link>[CLI Reference](#bookmark=id.q6rt37xg7u0g)</link>.
+Run `scope --help` or `scope -h` to view CLI options. Also see the complete [CLI Reference](/documentation/cli-reference).
 
 ## Scope Some Commands
 

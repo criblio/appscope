@@ -1,5 +1,3 @@
-# § Using AppScope
-
 # Using the CLI
 
 You can use the AppScope CLI to monitor applications and other processes, as shown in these examples:

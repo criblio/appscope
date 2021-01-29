@@ -6,7 +6,6 @@ import "../scss/_docsNav.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 export default function DocsNav() {
-  const dm = document.querySelector("body").classList.contains("darkMode");
   const [darkMode, toggleDarkMode] = useState(false);
   const data = useStaticQuery(graphql`
     query DocumentationNav {

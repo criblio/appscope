@@ -54,7 +54,7 @@ Where "your_command" is any executable and "params" are any parameters needed fo
 - The top-level Makefile checks to see what platform you are on and then includes the specific Makefile for the platform from the OS specific directory.
 - The run script will determine which platform you are using and will set environment variables accordingly.
 
-# Environment variables
+# Environment Variables
 
 ## Linux Dynamic Loader
 

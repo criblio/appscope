@@ -8,10 +8,10 @@
       path: /documentation/how-works
 
     - name: AppScope Components
-      path: /documentation/appscope-components
+      path: /documentation/components
  
     - name: Use Cases by Component
-      path: /documentation/use-cases
+      path: /documentation/examples-use-cases
 
 - name: Installing AppScope
   path: /documentation/requirements
@@ -32,7 +32,7 @@
       path: /documentation/cli-reference
 
     - name: Using the Library
-      path: /documentation/library-use
+      path: /documentation/library-using
 
     - name: Configuring the Library
       path: /documentation/library-configuring

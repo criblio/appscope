@@ -17,8 +17,6 @@ struct _ctl_t
 {
     int logclient;
     int logserver;
-    struct sockaddr_un logcladdr;
-    struct sockaddr_un logsvaddr;
     transport_t *transport;
     evt_fmt_t *evt;
     cbuf_handle_t events;
@@ -525,41 +523,23 @@ out:
 ctl_t *
 ctlCreate()
 {
+    int socks[2];
+
     ctl_t *ctl = calloc(1, sizeof(ctl_t));
     if (!ctl) {
         DBG(NULL);
         return NULL;
     }
 
-    ctl->logserver = (g_fn.socket) ? g_fn.socket(AF_UNIX, SOCK_DGRAM, 0) : -1;
-    ctl->logclient = (g_fn.socket) ? g_fn.socket(AF_UNIX, SOCK_DGRAM, 0) : -1;
+    socketpair(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0, socks);
+    ctl->logserver = socks[0];
+    ctl->logclient = socks[1];
 
-    bzero((char *)&ctl->logsvaddr, sizeof(ctl->logsvaddr));
-    ctl->logsvaddr.sun_family = AF_UNIX;
-    strncpy(ctl->logsvaddr.sun_path, LOG_EVENT_SERVER_SOCK, sizeof(ctl->logsvaddr.sun_path)-1);
-
-    bzero((char *)&ctl->logcladdr, sizeof(ctl->logcladdr));
-    ctl->logcladdr.sun_family = AF_UNIX;
-    strncpy(ctl->logcladdr.sun_path, LOG_EVENT_CLIENT_SOCK, sizeof(ctl->logcladdr.sun_path)-1);
-
-    unlink(LOG_EVENT_CLIENT_SOCK);
-    unlink(LOG_EVENT_SERVER_SOCK);
-
-    if ((ctl->logserver != -1) && (ctl->logclient != -1) &&
-        g_fn.fcntl && g_fn.bind) {
+    if ((ctl->logserver != -1) && (ctl->logclient != -1) && g_fn.fcntl) {
         int flags = g_fn.fcntl(ctl->logclient, F_GETFL, NULL);
         flags |= O_NONBLOCK;
         g_fn.fcntl(ctl->logclient, F_SETFL, flags);
-
-        if (g_fn.bind(ctl->logserver, (struct sockaddr *)&ctl->logcladdr, sizeof(struct sockaddr_un))) {
-            scopeLog("error binding to log server datagram socket", -1, CFG_LOG_DEBUG);
-        }
-
-        if (g_fn.bind(ctl->logclient, (struct sockaddr *)&ctl->logsvaddr, sizeof(struct sockaddr_un))) {
-            scopeLog("error binding to log client datagram socket", -1, CFG_LOG_DEBUG);
-        }
     }
-
 
     ctl->evbuf = cbufInit(DEFAULT_CBUF_SIZE);
     if (!ctl->evbuf) {
@@ -746,10 +726,23 @@ ctlPostEvent(ctl_t *ctl, char *event)
     return 0;
 }
 
+/*
+ * Note: In order to ensure that we don't drop log messages
+ * and console because of log data, we write to a blocking
+ * socket and read from a non-blocking socket. The chance
+ * that the app will block due to this is very slim. 
+ *
+ * Trading off the variable size of RSS vs doing 2x
+ * additional copies. We send the address of the msg
+ * and not the message which aleviates the need to copy
+ * the log data into kernel buffers. It has the effect
+ * of increasing user memory, RSS, until the buffers
+ * are read back. Should be a max of 1ms.
+ */
 int
 ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t uid, proc_id_t *proc)
 {
-    if (!ctl || !path || !buf || !proc || !g_fn.sendto || (ctl->logserver == -1)) return -1;
+    if (!ctl || !path || !buf || !proc || !g_fn.write || (ctl->logserver == -1)) return -1;
 
     int rc = -1;
     upload_t upld;
@@ -764,13 +757,12 @@ ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t
     char *msg = ctlCreateTxMsg(&upld);
     if (!msg) return -1;
 
-    rc = g_fn.sendto(ctl->logserver, msg, strlen(msg), 0,
-                     (struct sockaddr *)&ctl->logsvaddr,
-                     sizeof(struct sockaddr_un));
+    rc = g_fn.write(ctl->logserver, (char *)&msg, sizeof(char *));
+    if (rc == -1) {
+        scopeLog("error sending log/console event", -1, CFG_LOG_DEBUG);
+        DBG("error sending log/console event");
+    }
 
-    if (rc == -1) scopeLog("error sending log/console event", -1, CFG_LOG_DEBUG);
-
-    if (msg) free(msg);
     return rc;
 }
 
@@ -807,35 +799,35 @@ sendBufferedMessages(ctl_t *ctl)
 static void
 sendLogMessages(ctl_t *ctl)
 {
-    if (!ctl || !g_fn.recvfrom || (ctl->logclient == -1)) return;
+    if (!ctl || !g_fn.read || (ctl->logclient == -1)) return;
 
     while (1) {
         int rlen;
-        size_t buflen = LOG_EVENT_BUF_SIZE - 2;
-        socklen_t addr_len = sizeof(struct sockaddr_un);
-        char *data;
+        uint64_t dp;
+        char *data = NULL;
 
-        if ((data = malloc(LOG_EVENT_BUF_SIZE)) == NULL) return;
-
-        rlen = g_fn.recvfrom(ctl->logclient, data, buflen, 0,
-                             (struct sockaddr *)&ctl->logcladdr,
-                             &addr_len);
-        if (rlen == -1) {
-            free(data);
+        rlen = g_fn.read(ctl->logclient, &dp, sizeof(uint64_t));
+        if (rlen <= 0 ) {
+            // 0 means we lost a connection
             return;
         }
 
-        if (rlen > buflen) {
-            // should not happen
-            free(data);
+        data = (char *)dp;
+        int strsize = strlen(data);
+        char* temp = realloc(data, strsize+2); // room for "\n\0"
+        if (!temp) {
             DBG(NULL);
+            if (data) free(data);
+            data = NULL;
             continue;
         }
 
-        data[rlen] = '\n';
-        data[rlen+1] = '\0';
+        data = temp;
+        data[strsize] = '\n';
+        data[strsize+1] = '\0';
+
         transportSend(ctl->transport, data, strlen(data));
-        free(data);
+        if (data) free(data);
     }
 }
 

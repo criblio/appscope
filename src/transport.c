@@ -107,7 +107,7 @@ newTransport()
 static int
 placeDescriptor(int fd, transport_t *t)
 {
-    if (!t) return -1;
+    if (!t || !t->fcntl || !t->dup2 || !t->close) return -1;
 
     // next_fd_to_try avoids reusing file descriptors.
     // Without this, we've had problems where the buffered stream for

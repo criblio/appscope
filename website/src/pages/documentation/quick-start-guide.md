@@ -1,4 +1,4 @@
-# Quick-Start Guide
+# Quick Start Guide
 
 First, see [Requirements](/documentation/requirements) to ensure that you’re completing these steps on a supported system. Getting started is easy. 
 

@@ -4,7 +4,8 @@ import Helmet from "react-helmet";
 import { useStaticQuery, graphql, Link } from "gatsby";
 import "../scss/_docsNav.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-
+import Search from "./search";
+const searchIndices = [{ name: `Pages`, title: `Pages` }];
 export default function DocsNav() {
   const [darkMode, toggleDarkMode] = useState(false);
   const data = useStaticQuery(graphql`
@@ -30,7 +31,7 @@ export default function DocsNav() {
         }}
       />
       <div className="docsNav">
-        <input type="search" placeholder="Search..." />
+        <Search indices={searchIndices} />
         <h4>
           <FontAwesomeIcon
             icon={darkMode ? ["fas", "toggle-on"] : ["fas", "toggle-off"]}

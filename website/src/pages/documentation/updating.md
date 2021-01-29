@@ -1,4 +1,8 @@
-# Updating 
+---
+title: Updating
+---
+
+# Updating
 
 You can update AppScope in place. First, download a fresh version of the binary:
 
@@ -9,8 +13,8 @@ curl -Lo scope https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linu
 
 Next, confirm the overwrite.
 
-After updating, verify AppScope's version and build date: 
+After updating, verify AppScope's version and build date:
 
 ```
 scope version
-``` 
+```

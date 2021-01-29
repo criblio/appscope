@@ -3,6 +3,7 @@ import { Container, Row, Col } from "react-bootstrap";
 import DocsNav from "../DocsNav";
 import Header from "../Header";
 import MobileHeader from "../MobileHeader";
+
 import "../../scss/_documentation.scss";
 export default function Layout({ children }) {
   return (
@@ -16,7 +17,12 @@ export default function Layout({ children }) {
       </div>
       <Container style={{ paddingTop: 50 }} id="docsContainer">
         <Row className=" align-items-start" style={{ marginTop: 110 }}>
-          <Col md={3} xs={12} className="position-fixed">
+          <Col
+            md={3}
+            xs={12}
+            className="position-fixed"
+            style={{ zIndex: 1000 }}
+          >
             <DocsNav />
           </Col>
           <Col

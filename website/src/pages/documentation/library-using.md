@@ -1,18 +1,20 @@
+---
+title: Using the Library
+---
+
 # Using the Library
 
 To use the AppScope library independently of the CLI or loader, you rely on the `LD_PRELOAD` environment variable. This section provides several examples – all calling the system-level `ps` command – simply to show how the syntax works.
 
-
 ## LD_PRELOAD Environment Variable with a Single Command
 
-Start with this basic example: 
+Start with this basic example:
 
 `LD_PRELOAD=./libscope.so ps -ef`
 
-This executes the command `ps -ef`. But first, the OS' loader loads the AppScope library as part of loading and linking the ps executable. 
+This executes the command `ps -ef`. But first, the OS' loader loads the AppScope library as part of loading and linking the ps executable.
 
 Details of the ps application's execution are emitted to the configured transport, in the configured format. For configuration details, see [Configuring the Library](#configuring).
-
 
 ## LD_PRELOAD Environment Variable Extended Examples
 

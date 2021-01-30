@@ -2,12 +2,12 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-if [[ $GITHUB_REF == "refs/tags/v*" ]]; then
+if [[ $GITHUB_REF == refs/tags/v* ]]; then
     VERSION=$(echo ${GITHUB_REF} | sed -e "s*^refs/tags/v**")
     LATEST=$VERSION
 else if [ $GITHUB_REF == "refs/heads/master" ]; then
     VERSION=next
-else if [[ $GITHUB_REF == "refs/heads/*" ]]; then
+else if [[ $GITHUB_REF == refs/heads/* ]]; then
     VERSION="branch/$(echo ${GITHUB_REF} | sed -e 's*^refs/heads/v**')"
 else
     VERSION=whoops

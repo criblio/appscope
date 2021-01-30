@@ -11,7 +11,7 @@ else if [[ $GITHUB_REF == "refs/heads/*" ]]; then
     VERSION="branch/$(echo ${GITHUB_REF} | sed -e 's*^refs/heads/v**')"
 else
     VERSION=whoops
-fi fi fi fi
+fi fi fi
 
 TMPDIR=$(mktemp -d)
 mkdir -p ${TMPDIR}/scope

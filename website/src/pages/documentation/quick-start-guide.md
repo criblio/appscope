@@ -53,4 +53,4 @@ List this AppScope session's history:
 
 ## Next Steps
 
-For guidance on taking AppScope to the next level, [j[oin](https://cribl.io/community/)](https://cribl.io/community/) our [[community on Slack](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100)](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100).
+For guidance on taking AppScope to the next level, [join](https://cribl.io/community/) our [Community Slack](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100).

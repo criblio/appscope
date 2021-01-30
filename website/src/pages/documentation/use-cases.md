@@ -10,7 +10,7 @@ The easiest way to get started with AppScope is to use the CLI. This provides a 
 
 ## Use the Loader Interface (Production Environments)
 
-As you get more interested in obtaining details from production applications, explore using the AppScope library apart from the CLI. This allows for full configurability via the `scope.yml` configuration file (default `scope.yml` [here](<[https://github.com/criblio/appscope/blob/master/conf/scope.yml](https://github.com/criblio/appscope/blob/master/conf/scope.yml)l>)). You can send details over UDP, TCP, and local or remote connections, and you can define specific events and metrics for export. You can use the AppScope loader to start applications that include the library.
+As you get more interested in obtaining details from production applications, explore using the AppScope library apart from the CLI. This allows for full configurability via the `scope.yml` configuration file (default `scope.yml` available [here](https://github.com/criblio/appscope/blob/master/conf/scope.yml). You can send details over UDP, TCP, and local or remote connections, and you can define specific events and metrics for export. You can use the AppScope loader to start applications that include the library.
 
 ## Use the Library Independently (Production Environments)
 

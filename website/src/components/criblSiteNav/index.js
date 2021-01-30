@@ -30,7 +30,7 @@ export default function CriblSiteNav() {
         <Col xs={12} md={6}>
           <Nav>
             <Nav.Item className="cribl-brand">
-              <Nav.Link>
+              <Nav.Link href="https://cribl.io">
                 <img src={logo} alt="Cribl" width="96" className="cribl-logo" />
               </Nav.Link>
             </Nav.Item>

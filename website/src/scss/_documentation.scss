@@ -3,6 +3,8 @@
 .documentation {
   .code-container {
     padding: 10px;
+    position: relative;
+    z-index: 1;
   }
   .gatsby-highlight {
     font-size: 0.5rem;

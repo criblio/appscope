@@ -1,3 +1,7 @@
+---
+title: CLI Reference
+---
+
 # CLI Reference
 
 ## Command Syntax
@@ -10,7 +14,7 @@ To execute CLI commands, the basic syntax is:
 
 ## Commands Available
 
-To see a list of available commands, enter `./scope` alone, or `./scope -h`, or  `./scope --help`.  This displays the basic help listing below. 
+To see a list of available commands, enter `./scope` alone, or `./scope -h`, or `./scope --help`. This displays the basic help listing below.
 
 ```
 Command line interface for working with Cribl AppScope
@@ -156,7 +160,6 @@ scope prune -k 20
 scope prune -a
 ```
 
-
 #### Flags
 
 ```
@@ -214,7 +217,7 @@ scope version --summary
 
 ### `--verbose`
 
-This flag sets the verbosity level. `0` is least verbose, `4` is the default, and `9` is most default. For descriptions of individual levels, see  [Appendix: Default Configuration](/documentation/default-configuration).
+This flag sets the verbosity level. `0` is least verbose, `4` is the default, and `9` is most default. For descriptions of individual levels, see [Appendix: Default Configuration](/documentation/default-configuration).
 
 #### Usage
 

@@ -2,6 +2,7 @@
 
 .docsNav {
   //border-right: 1px solid $orange;
+  z-index: 10000000;
   input {
     padding: 5px 10px;
     border: 1px solid #ccc;

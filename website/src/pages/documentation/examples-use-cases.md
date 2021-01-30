@@ -1,3 +1,7 @@
+---
+title: Examples and Use Cases
+---
+
 # Examples and Use Cases
 
 Here are some examples of using AppScope to monitor specific applications, and to send the resulting data to specific destinations.
@@ -12,7 +16,7 @@ scope dash
 2. Send metrics from nginx to Datadog at `ddoghost`, using an environment variable and all other defaults:
 
 ```
-SCOPE_METRIC_DEST=udp://ddoghost:5000 scope nginx 
+SCOPE_METRIC_DEST=udp://ddoghost:5000 scope nginx
 ```
 
 3. Send configured events from curl to the server `myHost.example.com` on port 9000, using the config file at `/opt/scope/scope.yml`:
@@ -27,12 +31,12 @@ Configuration file example:
 event:
   enable: true
   transport:
-    type: tcp 
+    type: tcp
     host: myHost.example.com
     port: 9000
 ```
 
-4. Send HTTP events from Slack to a Splunk server at `myHost.example.com`: 
+4. Send HTTP events from Slack to a Splunk server at `myHost.example.com`:
 
 ```
 scope slack
@@ -59,13 +63,13 @@ event:
 ```
 SCOPE_EVENT_DNS=true LD_PRELOAD=./libscope.so curl https://cribl.io
 ```
-or 
 
+or
 
 6. Send default metrics from the Go static application `hello` to the Datadog server at `ddog`:
 
 ```
-scope ./hello 
+scope ./hello
 ```
 
 Configuration file example:

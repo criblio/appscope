@@ -1,3 +1,7 @@
+---
+title: Using the CLI
+---
+
 # Using the CLI
 
 You can use the AppScope CLI to monitor applications and other processes, as shown in these examples:
@@ -8,7 +12,7 @@ Generate a large data set:
 
 Scope every subsequent shell command:
 
-`scope bash` 
+`scope bash`
 
 If you have [Cribl LogStream](https://cribl.io/download/) installed, try:
 

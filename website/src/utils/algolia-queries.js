@@ -15,17 +15,18 @@ const pageQuery = `{
         frontmatter {
           title
         }
-        
+         fields {
+          slug
+        }     
         excerpt(pruneLength: 5000)
       }
     }
   }
 }`;
 
-function pageToAlgoliaRecord({ node: { id, frontmatter, fields, ...rest } }) {
+function pageToAlgoliaRecord({ node: { id, fields, ...rest } }) {
   return {
     objectID: id,
-    ...frontmatter,
     ...fields,
     ...rest,
   };

@@ -1,6 +1,10 @@
+---
+title: Quick Start Guide
+---
+
 # Quick Start Guide
 
-First, see [Requirements](/documentation/requirements) to ensure that you’re completing these steps on a supported system. Getting started is easy. 
+First, see [Requirements](/documentation/requirements) to ensure that you’re completing these steps on a supported system. Getting started is easy.
 
 ## Get AppScope
 
@@ -10,21 +14,20 @@ Directly download the CLI binary from [https://cdn.cribl.io/dl/scope/cli/linux/s
 curl -Lo scope https://cdn.cribl.io/dl/scope/cli/linux/scope && chmod 755 ./scope
 ```
 
-
 ## Explore the CLI
 
 Run `scope --help` or `scope -h` to view CLI options. Also see the complete [CLI Reference](/documentation/cli-reference).
 
 ## Scope Some Commands
 
-Test-run one or more well-known Linux commands, and view the results. E.g.: 
+Test-run one or more well-known Linux commands, and view the results. E.g.:
 
 ```
 scope curl https://google.com
 scope ps -ef
 ```
 
-## Explore the Data 
+## Explore the Data
 
 To see the monitoring and visualization features AppScope offers, exercise some of its options. E.g.:
 
@@ -38,16 +41,16 @@ Plot a chart of the `proc.cpu` metric:
 
 Display captured events:
 
-`scope events` 
+`scope events`
 
 Filter out events, for just `http`:
 
 `scope events -t http`
 
-List this AppScope session's history: 
+List this AppScope session's history:
 
 `scope history`
 
 ## Next Steps
 
-For guidance on taking AppScope to the next level, [j[oin](https://cribl.io/community/)](https://cribl.io/community/) our [[community on Slack](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100)](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100).
+For guidance on taking AppScope to the next level, [join](https://cribl.io/community/) our [Community Slack](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100).

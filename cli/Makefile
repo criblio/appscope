@@ -31,11 +31,14 @@ rebuild: cliclean all
 local:
 	cd $(DIR) && $(GO) build -o /usr/local/bin/scope
 
-run/scopec.go:
-	cp $(DIR)../bin/linux/scopec $(DIR)build/
-	cd $(DIR) && $(GOPATH)/bin/go-bindata -o run/scopec.go -pkg run build/scopec
+run/bundle.go:
+	rm -rf $(DIR)/build/*
+	cp $(DIR)../bin/linux/ldscope $(DIR)build/
+	cp $(DIR)../lib/linux/libscope.so $(DIR)build/
+	cp $(DIR)../conf/*.yml $(DIR)build/
+	cd $(DIR) && $(GOPATH)/bin/go-bindata -o run/bundle.go -pkg run build
 
-scope: run/scopec.go
+scope: run/bundle.go
 	# GOOS=linux CGO_ENABLED=0 $(GO) build -a -tags netgo -ldflags="-s -w" -o build/scope
 	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)build/scope
 	upx -9 $(DIR)build/scope

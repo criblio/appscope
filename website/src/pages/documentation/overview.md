@@ -2,33 +2,27 @@
 title: Overview
 ---
 
-# Overview
-
 ## What Is AppScope
+---
 
-AppScope is an open source instrumentation utility for any application, regardless of programming language, with no code modification required.
+AppScope is an open source instrumentation utility for any Linux command or application, regardless of programming language. It helps users explore, understand, and gain visibility with **NO code modification**. 
+
+It provides fin-grained observability of a proxy/service mesh, without the latency of a sidecar and emits APM-like metric and event data, in open formats, to existing log and metric tools.
+
+It’s like [strace](https://strace.io/) meets [tcpdump](https://www.tcpdump.org/), but with consumable output for events like file access, DNS, and network activity and StatsD-style metrics for applications. It can also look inside encrypted payloads for WAF-like visibility without proxying traffic. 
+</br>
+</br>
+
 
 ![AppScope in-terminal monitoring](./images/AppScope-GUI-screenshot.png)
 
-## Features
 
-AppScope helps users explore, understand, and gain visibility into applications' behavior. Features include:
+## Features: Instrument, Collect and Observe
+---
 
-- Capture application metrics
-  - File, Network, Memory, CPU
-- Capture and log application events
-  - Application console content `stdin/out`
-  - Application logs
-  - Errors
-- Summarize metrics
-- Protocol detection
-- Capture any and all payloads
-  - DNS, HTTP, and HTTPS
-- Emit metrics and events to remote systems
-- Normalize data
-- Monitor static executables
-- All runtimes (runtime-agnostic)
-- No dependencies
-- No code development required
-
-![AppScope emitting metrics/events to remote systems](./images/AppScope_iso.png)
+- Runtime-agnostic, no dependencies, no code development required, including static executables
+- Capture application metrics: **File, Network, Memory, CPU**
+- Capture application events: console content, stdin/out, logs, errors
+- Capture any and all payloads: DNS, HTTP, and HTTPS
+- Summarize metrics & detect protocols
+- Normalize and forward metrics and events, in real-time to remote systems.

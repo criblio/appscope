@@ -2,9 +2,10 @@
 title: CLI Reference
 ---
 
-# CLI Reference
+## CLI Reference
+---
 
-## Command Syntax
+### Command Syntax
 
 To execute CLI commands, the basic syntax is:
 
@@ -12,7 +13,7 @@ To execute CLI commands, the basic syntax is:
 ./scope <command> [flags] [options]
 ```
 
-## Commands Available
+### Commands Available
 
 To see a list of available commands, enter `./scope` alone, or `./scope -h`, or `./scope --help`. This displays the basic help listing below.
 
@@ -25,6 +26,7 @@ Usage:
 Available Commands:
   dash        Display scope dashboard
   events      Output events for a session
+  extract     Output instrumentary library files to <dir>
   help        Help about any command
   history     List scope session history
   metrics     Output metrics for a session
@@ -41,7 +43,8 @@ Use "scope [command] --help" for more information about a command.
 
 As noted just above, to see a specific command's help or its required parameters, enter `./scope <command> -h` or `./scope help <command> [flags]`.
 
-### `dash`
+### dash
+---
 
 Displays an interactive dashboard with an overview of what's happening with the selected session.
 
@@ -60,8 +63,8 @@ Displays an interactive dashboard with an overview of what's happening with the 
   -i, --id int   Display info from specific from session ID (default -1)
 ```
 
-### `events`
-
+### events
+---
 Outputs events for a session. You can obtain detailed information about each event by inputting the Event ID as a positional parameter. (By default, the Event ID appears in blue in []'s at the left.) You can provide filters to narrow down by name (e.g., `http`, `net`, `fs`, or `console`) or by field (e.g., `fs.open`, `stdout`, or `net.conn.open`). You can use JavaScript expressions to further refine the query and express logic.
 
 #### Usage
@@ -95,8 +98,35 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
   -t, --sourcetype strings   Display events matching supplied sourcetypes
 ```
 
-### `history`
 
+### extract
+---
+Extract outputs ldscope, libscope.so, scope.yml and scope_protocol.yml to the provided directory. These files can configured
+to instrument any application and output the data to any existing tool using simple TCP protocols. Libscope can easily be used
+with any dynamic or static application, regardless of the runtime.
+
+#### Usage
+  `scope extract (<dir>) [flags]`
+
+#### Aliases:
+  `extract, excrete, expunge, extricate, exorcise`
+
+#### Examples:
+
+```
+scope exctract
+scope exctract /opt/libscope
+```
+
+#### Flags:
+ 
+```
+  -h, --help   help for extract
+```
+
+
+### history
+---
 Lists scope session history.
 
 #### Usage
@@ -122,7 +152,8 @@ Lists scope session history.
   -r, --running    List running sessions
 ```
 
-### `metrics`
+### metrics
+---
 
 Outputs metrics for a session.
 
@@ -145,7 +176,8 @@ Outputs metrics for a session.
   -u, --uniq             Display first instance of each unique metric
 ```
 
-### `prune`
+### prune
+----
 
 Deletes scope history for this session.
 
@@ -170,7 +202,8 @@ scope prune -a
   -k, --keep int     Keep last <keep> sessions (default -1)
 ```
 
-### `run`
+### run
+----
 
 Executes a scoped command (or application.
 
@@ -191,7 +224,8 @@ Executes a scoped command (or application.
   -v, --verbosity int   Set scope metric verbosity (default 4)
 ```
 
-### `version`
+### version
+----
 
 Outputs version info.
 
@@ -215,9 +249,10 @@ scope version --summary
       --summary   output just the summary
 ```
 
-### `--verbose`
+### --verbose
+----
 
-This flag sets the verbosity level. `0` is least verbose, `4` is the default, and `9` is most default. For descriptions of individual levels, see [Appendix: Default Configuration](/documentation/default-configuration).
+This flag sets the verbosity level. `0` is least verbose, `4` is the default, and `9` is most default. For descriptions of individual levels, see [Appendix: Default Configuration](/documentation/config-files).
 
 #### Usage
 

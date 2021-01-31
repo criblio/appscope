@@ -10,10 +10,10 @@ import (
 
 // excreteCmd represents the excrete command
 var excreteCmd = &cobra.Command{
-	Use:     "excrete (<dir>)",
-	Aliases: []string{"birth", "expunge", "extricate"},
+	Use:     "extract (<dir>)",
+	Aliases: []string{"excrete", "expunge", "extricate", "exorcise"},
 	Short:   "Output instrumentary library files to <dir>",
-	Long: `Excrete outputs ldscope, libscope.so, scope.yml and scope_protocol.yml to the provided directory. These files can configured
+	Long: `Extract outputs ldscope, libscope.so, scope.yml and scope_protocol.yml to the provided directory. These files can configured
 to instrument any application and output the data to any existing tool using simple TCP protocols. Libscope can easily be used
 with any dynamic or static application, regardless of the runtime.`,
 	Example: `scope extrete
@@ -30,7 +30,7 @@ scope excrete /opt/libscope`,
 
 		err := run.CreateAll(outPath)
 		util.CheckErrSprintf(err, "error excreting files: %v", err)
-		fmt.Printf("Successfully excreted to %s.\n", outPath)
+		fmt.Printf("Successfully extracted to %s.\n", outPath)
 	},
 }
 

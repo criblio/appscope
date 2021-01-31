@@ -18,16 +18,11 @@ export default function Layout({ children }) {
       </div>
       <Container style={{ paddingTop: 50 }} id="docsContainer">
         <Row className=" align-items-start" style={{ marginTop: 110 }}>
-          <Col
-            md={3}
-            xs={12}
-            className="position-fixed"
-            style={{ zIndex: 1000 }}
-          >
+          <Col md={3} xs={12} className="" style={{ zIndex: 1000 }}>
             <DocsNav />
           </Col>
           <Col
-            md={{ span: 9, offset: 3 }}
+            md={{ span: 9 }}
             xs={12}
             className="documentation"
             id="docContainer"

@@ -1,8 +1,6 @@
 import React from "react";
 import { Container, Col, Nav, Navbar } from "react-bootstrap";
-import { useStaticQuery, graphql, navigate } from "gatsby";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronDown } from "@fortawesome/free-solid-svg-icons";
+import { useStaticQuery, graphql } from "gatsby";
 import StarCount from "./widgets/StarCount";
 import Download from "./widgets/Download";
 import CriblSiteNav from "./criblSiteNav";

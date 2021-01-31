@@ -1,10 +1,22 @@
 @import "_vars";
 .footer-container {
   display: flex;
-
+  border-top: 1px solid $blue;
   align-items: center;
   height: 200px;
   background: $black;
-  .footer {
+  color: #fff;
+
+  .footer-right {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    p {
+      padding-right: 40px;
+    }
+    a {
+      color: $blue;
+      margin: 0 8px;
+    }
   }
 }

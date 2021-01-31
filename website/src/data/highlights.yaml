@@ -6,10 +6,12 @@
     - title: Instrument
       icon: tachometer-alt
       shortDescription: Use the simple command line to easily instrument and inspect any application or Linux command, regardless of runtime, including Go binaries. There’s no need for a man in the middle proxy. It’s like strace meets tcpdump, but with readily consumable output. 
+      order: 1
     - title: Collect
       icon: digital-tachograph
       shortDescription: AppScope collects StatsD-style metrics about applications, including events like file access, DNS, and network activity. AppScope even looks inside encrypted payloads for WAF-like visibility into applications without proxying traffic. 
+      order: 2
     - title: Observe
       icon: microscope
       shortDescription: Send application information, wire and log data, and performance metrics to existing log analytics and metrics tooling. 
-  
+      order: 1

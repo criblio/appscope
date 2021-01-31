@@ -1,0 +1,35 @@
+@import "_vars";
+
+.community-layout {
+  min-height: 100vh;
+  padding-top: 160px;
+  text-align: center;
+  .community-cards {
+    padding: 50px 0;
+  }
+}
+.communityCard {
+  height: 200px;
+  border: 1px solid $orange;
+
+  display: flex;
+  align-items: center;
+  padding: 0 25px;
+  svg {
+    font-size: 70px;
+  }
+  &:hover {
+    background: #efefef;
+  }
+}
+.communityLink {
+  text-align: left;
+  a {
+    color: $black !important;
+
+    &:hover {
+      text-decoration: none;
+      background: #efefef;
+    }
+  }
+}

@@ -14,7 +14,7 @@ export default function Hero() {
           subText
         }
       }
-      file(relativePath: { eq: "hero-image.png" }) {
+      file(relativePath: { eq: "isoarchitecture.png" }) {
         childImageSharp {
           fluid {
             sizes

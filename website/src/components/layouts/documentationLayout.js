@@ -5,6 +5,7 @@ import Header from "../Header";
 import MobileHeader from "../MobileHeader";
 
 import "../../scss/_documentation.scss";
+import Footer from "../Footer";
 export default function Layout({ children }) {
   return (
     <>
@@ -35,6 +36,7 @@ export default function Layout({ children }) {
           </Col>
         </Row>
       </Container>
+      <Footer />
     </>
   );
 }

@@ -1,5 +1,6 @@
 import React from "react";
 import { useStaticQuery, graphql } from "gatsby";
+import Img from "gatsby-image";
 import { Container, Row, Col } from "react-bootstrap";
 import "../scss/_highlights.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -17,7 +18,19 @@ export default function Highlights() {
               title
               shortDescription
               icon
+              order
             }
+          }
+        }
+      }
+      file(relativePath: { eq: "hero-image.png" }) {
+        childImageSharp {
+          fluid {
+            sizes
+            src
+            srcSet
+            base64
+            aspectRatio
           }
         }
       }
@@ -28,19 +41,29 @@ export default function Highlights() {
     <Container className="highlights">
       <h2>{data.allHighlightsYaml.edges[0].node.title}</h2>
       {/*<p>{data.allHighlightsYaml.edges[0].node.description}</p> */}
-      <Row>
+      <Container>
         {data.allHighlightsYaml.edges[0].node.items.map((item, i) => {
           return (
-            <Col xs={12} md={6} className="highlight-col" key={i}>
-              <h3>
-                <FontAwesomeIcon icon={item.icon} />
-              </h3>
-              <h4>{item.title}</h4>
-              <p>{item.shortDescription}</p>
-            </Col>
+            <Row>
+              <Col xs={12} md={{ span: 6, order: item.order === 1 ? 2 : 1 }}>
+                <Img
+                  fluid={data.file.childImageSharp.fluid}
+                  alt="AppScope Machine"
+                  style={{ maxWidth: 90 + "%", margin: "10px auto" }}
+                />
+              </Col>
+              <Col
+                xs={12}
+                md={{ span: 6, order: item.order === 1 ? 1 : 2 }}
+                className="text-left"
+              >
+                <h4>{item.title}</h4>
+                <p>{item.shortDescription}</p>
+              </Col>
+            </Row>
           );
         })}
-      </Row>
+      </Container>
     </Container>
   );
 }

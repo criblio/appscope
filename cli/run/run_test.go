@@ -58,10 +58,14 @@ func TestCreateAll(t *testing.T) {
 	os.MkdirAll(".foo", 0755)
 	CreateAll(".foo")
 	files := []string{"ldscope", "libscope.so", "scope.yml", "scope_protocol.yml"}
-	for _, f := range files {
+	perms := []os.FileMode{0755, 0755, 0644, 0644}
+	for i, f := range files {
+		path := fmt.Sprintf(".foo/%s", f)
+		stat, _ := os.Stat(path)
+		assert.Equal(t, stat.Mode(), perms[i])
 		wb, _ := Asset(fmt.Sprintf("build/%s", f))
 		hash1 := md5.Sum(wb)
-		fb, _ := ioutil.ReadFile(fmt.Sprintf(".foo/%s", f))
+		fb, _ := ioutil.ReadFile(path)
 		hash2 := md5.Sum(fb)
 		assert.Equal(t, hash1, hash2)
 

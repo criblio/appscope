@@ -95,12 +95,13 @@ func environNoScope() []string {
 // CreateAll outputs all bundled files to a given path
 func CreateAll(path string) error {
 	files := []string{"ldscope", "libscope.so", "scope.yml", "scope_protocol.yml"}
-	for _, f := range files {
+	perms := []os.FileMode{0755, 0755, 0644, 0644}
+	for i, f := range files {
 		b, err := Asset(fmt.Sprintf("build/%s", f))
 		if err != nil {
 			return err
 		}
-		err = ioutil.WriteFile(filepath.Join(path, f), b, 0755)
+		err = ioutil.WriteFile(filepath.Join(path, f), b, perms[i])
 		if err != nil {
 			return err
 		}
@@ -111,7 +112,7 @@ func CreateAll(path string) error {
 // CreateWorkDir creates a working directory
 func (rc *Config) CreateWorkDir(cmd string) {
 	if rc.workDir != "" {
-		if util.CheckFileExists(rc.workDir) {
+		if util.CheckDirExists(rc.workDir) {
 			// Directory exists, exit
 			return
 		}

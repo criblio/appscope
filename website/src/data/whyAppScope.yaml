@@ -1,12 +1,12 @@
 - title: Why AppScope?
   items:
-    - item: Existing APMs require language-specific agents; limited to in-house built applications; agents deliver inconsistent experience based on language 
+    - item: AppScope is language agnostic and completely userland; works with any application; scales from the CLI to production
       icon: project-diagram
-      title: APM Complexity
-    - item: Vendor agents only work with their product; performance data is locked in vendor data silos; holistic correlations across data sources is impossible
+      title: Simple
+    - item: Send AppScope data to any existing monitoring tool, timeseries database, or log tool
       icon: database
-      title: Data Silos
-    - item: APM is expensive, limiting its usefulness to only the most important applications 
+      title: No New Tools
+    - item: Extends APM reach into every application, affordably
       icon: money-bill-wave
       title: Cost
     #ctaText: Quick Start Guide

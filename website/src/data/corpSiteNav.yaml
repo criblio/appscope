@@ -9,3 +9,5 @@
         url: https://cribl.io/cribl-logstream-pricing/
       - link: Download Logstream
         url: https://cribl.io/download/
+  - parent: About Cribl
+    link: https://cribl.io/about-us

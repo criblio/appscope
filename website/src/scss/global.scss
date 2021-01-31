@@ -135,7 +135,13 @@ pre {
 nav {
   position: fixed;
   width: 100%;
-  z-index: 1000;
+  z-index: 10000000000;
   background: #fff;
   border-bottom: 1px solid $blue;
+}
+code {
+  background: #000;
+  border-radius: 3px;
+  padding: 3px 6px;
+  color: #fff;
 }

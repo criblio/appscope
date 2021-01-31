@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Container, Col, Nav, NavDropdown } from "react-bootstrap";
-import { useStaticQuery, graphql, navigate } from "gatsby";
+import { useStaticQuery, graphql } from "gatsby";
 import logo from "../../images/logo-cribl-new.svg";
 import "../../scss/_criblNav.scss";
 
@@ -14,6 +14,7 @@ export default function CriblSiteNav() {
           node {
             navigationLeft {
               parent
+              link
               child {
                 link
                 url
@@ -38,7 +39,7 @@ export default function CriblSiteNav() {
               (item, i) => {
                 return item.child === null ? (
                   <Nav.Item>
-                    <Nav.Link key={i} href={item.url}>
+                    <Nav.Link key={i} href={item.link}>
                       {item.parent}
                     </Nav.Link>
                   </Nav.Item>

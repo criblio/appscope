@@ -12,7 +12,9 @@ export default function Footer() {
       <Container>
         <Row>
           <Col xs={12} md={6} className="text-left">
-            <img src={logo} alt="Cribl" width={125} />
+            <Link to="https://cribl.io">
+              <img src={logo} alt="Cribl" width={125} />
+            </Link>
           </Col>
           <Col xs={12} md={6} className="text-right footer-right">
             <p>Cribl, &copy; 2021</p>

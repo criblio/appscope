@@ -27,6 +27,7 @@ function SEO({ description, lang, meta, title }) {
       }}
       title={title}
       titleTemplate={`%s | ${site.siteMetadata.title}`}
+      bodyAttributes={{ class: "d-flex flex-column min-vh-100" }}
       meta={[
         {
           name: `description`,

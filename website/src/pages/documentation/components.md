@@ -1,5 +1,5 @@
 ---
-AppScope Components
+title: AppScope Components
 ---
 
 # AppScope Components

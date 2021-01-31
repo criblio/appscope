@@ -1,5 +1,13 @@
-- title: Why AppScope
+- title: Why AppScope?
   items:
-    - item: APM Complexity - existing APMs require language-specific agents; limited to in-house built applications; agents deliver inconsistent experience based on language 
-    - item: Data silos - vendor agents only work with their product; performance data is locked in vendor data silos; holistic correlations across data sources is impossible
-    - item: Cost - APM is expensive, limiting its usefulness to only the most important applications 
+    - item: Existing APMs require language-specific agents; limited to in-house built applications; agents deliver inconsistent experience based on language 
+      icon: project-diagram
+      title: APM Complexity
+    - item: Vendor agents only work with their product; performance data is locked in vendor data silos; holistic correlations across data sources is impossible
+      icon: database
+      title: Data Silos
+    - item: APM is expensive, limiting its usefulness to only the most important applications 
+      icon: money-bill-wave
+      title: Cost
+    #ctaText: Quick Start Guide
+    #ctaLink: /documentation/quick-start-guide

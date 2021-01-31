@@ -8,7 +8,7 @@ if [[ $GITHUB_REF == refs/tags/v* ]]; then
 else if [ $GITHUB_REF == "refs/heads/master" ]; then
     VERSION=next
 else if [[ $GITHUB_REF == refs/heads/* ]]; then
-    VERSION="branch/$(echo ${GITHUB_REF} | sed -e 's*^refs/heads/v**')"
+    VERSION="branch/$(echo ${GITHUB_REF} | sed -e 's*^refs/heads/**')"
 else
     VERSION=whoops
 fi fi fi

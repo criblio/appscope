@@ -4,8 +4,10 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include "circbuf.h"
 #include "cfgutils.h"
@@ -448,7 +450,7 @@ err:
 static cJSON *
 create_evt_json(upload_t *upld)
 {
-    cJSON* json_root = NULL;
+    cJSON *json_root = NULL;
     if (!upld || !upld->body) goto err;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
@@ -727,17 +729,10 @@ ctlPostEvent(ctl_t *ctl, char *event)
 }
 
 /*
- * Note: In order to ensure that we don't drop log messages
+ * In order to ensure that we don't drop log messages
  * and console because of log data, we write to a blocking
  * socket and read from a non-blocking socket. The chance
  * that the app will block due to this is very slim. 
- *
- * Trading off the variable size of RSS vs doing 2x
- * additional copies. We send the address of the msg
- * and not the message which aleviates the need to copy
- * the log data into kernel buffers. It has the effect
- * of increasing user memory, RSS, until the buffers
- * are read back. Should be a max of 1ms.
  */
 int
 ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t uid, proc_id_t *proc)
@@ -746,6 +741,7 @@ ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t
 
     int rc = -1;
     upload_t upld;
+    size_t len;
 
     // get a cJSON object for the given log msg
     cJSON *json = evtFormatLog(ctl->evt, path, buf, count, uid, proc);
@@ -757,13 +753,66 @@ ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t
     char *msg = ctlCreateTxMsg(&upld);
     if (!msg) return -1;
 
-    rc = g_fn.write(ctl->logserver, (char *)&msg, sizeof(char *));
-    if (rc == -1) {
-        scopeLog("error sending log/console event", -1, CFG_LOG_DEBUG);
-        DBG("error sending log/console event");
+    len = strlen(msg);
+    char *temp = realloc(msg, len + 2); // room for "\n\0"
+    if (!temp) {
+        DBG(NULL);
+        if (msg) free(msg);
+        return -1;
     }
 
+    msg = temp;
+    msg[len] = '\n';
+    msg[len + 1] = '\0';
+
+    size_t bytes_sent = 0;
+    size_t bytes_to_send = len + 2;
+
+    while (bytes_to_send > 0) {
+        rc = g_fn.write(ctl->logserver, &msg[bytes_sent], bytes_to_send);
+        if (rc <= 0) {
+            DBG(NULL);
+            break;
+        }
+ 
+        bytes_sent += rc;
+        bytes_to_send -= rc;
+    }
+
+    if (msg) free(msg);
     return rc;
+}
+
+void
+ctlFlushLog(ctl_t *ctl)
+{
+    if (!ctl || !g_fn.read || (ctl->logclient == -1)) return;
+
+    while (1) {
+        int rlen;
+        char *data = NULL;
+
+        // ask the os how much data is pending
+	    int buflen = 0;
+	    if (ioctl(ctl->logclient, FIONREAD, &buflen)) {
+                DBG(NULL);
+                return;
+        }
+	    if (!buflen) return;
+
+        if ((data = malloc(buflen)) == NULL) return;
+
+        rlen = g_fn.read(ctl->logclient, data, buflen);
+        if (rlen != buflen) {
+            // if we got interrupted, we'll just check next interval
+            DBG("rlen = %d, buflen = %d", rlen, buflen);
+            free(data);
+            return;
+        }
+
+        transportSend(ctl->transport, data, buflen);
+        if (data) free(data);
+    }
 }
 
 static void
@@ -796,41 +845,6 @@ sendBufferedMessages(ctl_t *ctl)
     }
 }
 
-static void
-sendLogMessages(ctl_t *ctl)
-{
-    if (!ctl || !g_fn.read || (ctl->logclient == -1)) return;
-
-    while (1) {
-        int rlen;
-        uint64_t dp;
-        char *data = NULL;
-
-        rlen = g_fn.read(ctl->logclient, &dp, sizeof(uint64_t));
-        if (rlen <= 0 ) {
-            // 0 means we lost a connection
-            return;
-        }
-
-        data = (char *)dp;
-        int strsize = strlen(data);
-        char* temp = realloc(data, strsize+2); // room for "\n\0"
-        if (!temp) {
-            DBG(NULL);
-            if (data) free(data);
-            data = NULL;
-            continue;
-        }
-
-        data = temp;
-        data[strsize] = '\n';
-        data[strsize+1] = '\0';
-
-        transportSend(ctl->transport, data, strlen(data));
-        if (data) free(data);
-    }
-}
-
 int
 ctlSendBin(ctl_t *ctl, char *buf, size_t len)
 {
@@ -844,7 +858,6 @@ ctlFlush(ctl_t *ctl)
 {
     if (!ctl) return;
 
-    sendLogMessages(ctl);
     sendBufferedMessages(ctl);
     transportFlush(ctl->transport);
 }

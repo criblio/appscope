@@ -18,8 +18,8 @@ func init() {
 	out = os.Stdout
 }
 
-// setOut is used by unit tests to change where we're writing
-func setOut(newOut io.Writer) {
+// SetOut is used by unit tests to change where we're writing
+func SetOut(newOut io.Writer) {
 	out = newOut
 }
 

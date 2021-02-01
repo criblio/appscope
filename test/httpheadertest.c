@@ -124,10 +124,10 @@ headerBasicRequest(void **state)
     net.type = SOCK_STREAM;
 
     assert_true(doHttp(0x12345, 0, &net, request, buflen, TLSRX, BUF));
-    printf("%s: %s\n", __FUNCTION__, header_event);
+    //printf("%s: %s\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
-         printf("looking for %s\n", result[i]);
+        //printf("looking for %s\n", result[i]);
         assert_non_null(strstr(header_event, result[i]));
     }
     free(header_event);

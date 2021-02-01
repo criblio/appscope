@@ -241,8 +241,8 @@ remoteConfig()
     char buf[1024];
     char path[PATH_MAX];
     
-    // MS
-    timeout = (g_thread.interval * 1000);
+    // to be clear; a 1ms timeout
+    timeout = 1;
     memset(&fds, 0x0, sizeof(fds));
 
     if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
@@ -672,66 +672,84 @@ reportPeriodicStuff(void)
     long mem;
     int nthread, nfds, children;
     long long cpu = 0;
+    bool perf;
     static long long cpuState = 0;
+    static time_t summaryTime = 0;
 
-    // We report CPU time for this period.
-    cpu = doGetProcCPU();
-    if (cpu != -1) {
-        doProcMetric(PROC_CPU, cpu - cpuState);
-        cpuState = cpu;
+    if (summaryTime == 0) {
+        summaryTime = time(NULL) + g_thread.interval;
     }
 
-    mem = osGetProcMemory(g_proc.pid);
-    if (mem != -1) doProcMetric(PROC_MEM, mem);
-
-    nthread = osGetNumThreads(g_proc.pid);
-    if (nthread != -1) doProcMetric(PROC_THREAD, nthread);
-
-    nfds = osGetNumFds(g_proc.pid);
-    if (nfds != -1) doProcMetric(PROC_FD, nfds);
-
-    children = osGetNumChildProcs(g_proc.pid);
-    if (children < 0) {
-        children = 0;
-    }
-    doProcMetric(PROC_CHILD, children);
-
-    // report totals (not by file descriptor/socket descriptor)
-    doTotal(TOT_READ);
-    doTotal(TOT_WRITE);
-    doTotal(TOT_RX);
-    doTotal(TOT_TX);
-    doTotal(TOT_SEEK);
-    doTotal(TOT_STAT);
-    doTotal(TOT_OPEN);
-    doTotal(TOT_CLOSE);
-    doTotal(TOT_DNS);
-
-    doTotal(TOT_PORTS);
-    doTotal(TOT_TCP_CONN);
-    doTotal(TOT_UDP_CONN);
-    doTotal(TOT_OTHER_CONN);
-
-    doTotalDuration(TOT_FS_DURATION);
-    doTotalDuration(TOT_NET_DURATION);
-    doTotalDuration(TOT_DNS_DURATION);
-
-    // Report errors
-    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
-    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
-    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
-    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
-    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
-    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
-
-    // report net and file by descriptor
-    reportAllFds(PERIODIC);
+    perf = checkEnv(PRESERVE_PERF_REPORTING, "true");
 
     // Process any events that have been posted
-    doEvent();
-    doPayload();
+    if (perf == FALSE) {
+        doEvent();
+        doPayload();
+    }
 
-    mtcFlush(g_mtc);
+    if (time(NULL) >= summaryTime) {
+        // We report CPU time for this period.
+        cpu = doGetProcCPU();
+        if (cpu != -1) {
+            doProcMetric(PROC_CPU, cpu - cpuState);
+            cpuState = cpu;
+        }
+
+        mem = osGetProcMemory(g_proc.pid);
+        if (mem != -1) doProcMetric(PROC_MEM, mem);
+
+        nthread = osGetNumThreads(g_proc.pid);
+        if (nthread != -1) doProcMetric(PROC_THREAD, nthread);
+
+        nfds = osGetNumFds(g_proc.pid);
+        if (nfds != -1) doProcMetric(PROC_FD, nfds);
+
+        children = osGetNumChildProcs(g_proc.pid);
+        if (children < 0) {
+            children = 0;
+        }
+        doProcMetric(PROC_CHILD, children);
+
+        // report totals (not by file descriptor/socket descriptor)
+        doTotal(TOT_READ);
+        doTotal(TOT_WRITE);
+        doTotal(TOT_RX);
+        doTotal(TOT_TX);
+        doTotal(TOT_SEEK);
+        doTotal(TOT_STAT);
+        doTotal(TOT_OPEN);
+        doTotal(TOT_CLOSE);
+        doTotal(TOT_DNS);
+
+        doTotal(TOT_PORTS);
+        doTotal(TOT_TCP_CONN);
+        doTotal(TOT_UDP_CONN);
+        doTotal(TOT_OTHER_CONN);
+
+        doTotalDuration(TOT_FS_DURATION);
+        doTotalDuration(TOT_NET_DURATION);
+        doTotalDuration(TOT_DNS_DURATION);
+
+        // Report errors
+        doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
+        doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
+        doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
+        doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
+        doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
+        doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
+
+        // report net and file by descriptor
+        reportAllFds(PERIODIC);
+        mtcFlush(g_mtc);
+
+        if (perf == TRUE) {
+            doEvent();
+            doPayload();
+        }
+
+        summaryTime = time(NULL) + g_thread.interval;
+    }
 }
 
 void

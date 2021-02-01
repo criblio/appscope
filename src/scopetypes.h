@@ -130,6 +130,7 @@ typedef unsigned int bool;
 // we should start moving env var constants to one place
 #define THREAD_DELAY_LIST "SCOPE_THREAD_DELAY"
 #define SCOPE_PID_ENV "SCOPE_PID"
+#define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
 
 #endif // __SCOPETYPES_H__
 

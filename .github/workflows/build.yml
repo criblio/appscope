@@ -20,3 +20,6 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
         run: ./deploy.sh
+      - env:
+          SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
+        run: ./cli/docker-demo.sh

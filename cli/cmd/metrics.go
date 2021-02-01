@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"sort"
@@ -129,6 +131,23 @@ var metricsCmd = &cobra.Command{
 			}).ToSlice(&mm)
 		}
 
+		r, w := io.Pipe()
+		util.SetOut(w)
+		scanner := bufio.NewScanner(r)
+		termWidth, _, _ := terminal.GetSize(0)
+		go func() {
+			first := true
+			for scanner.Scan() {
+				line := strings.ReplaceAll(scanner.Text(), "\t", "    ")
+				if first {
+					line = util.Trunc(line, termWidth)
+				} else {
+					line = util.TruncWithElipsis(line, termWidth)
+				}
+				fmt.Printf("%s\n", line)
+				first = false
+			}
+		}()
 		util.PrintObj([]util.ObjField{
 			{Name: "Name", Field: "name"},
 			{Name: "Value", Field: "value"},

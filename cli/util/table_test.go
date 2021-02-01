@@ -11,7 +11,7 @@ import (
 
 func TestPrintObjWithMap(t *testing.T) {
 	buf := &bytes.Buffer{}
-	setOut(buf)
+	SetOut(buf)
 	obj := map[string]interface{}{
 		"field1": "value1",
 		"field2": "value2",
@@ -68,7 +68,7 @@ func TestPrintObjWithMap(t *testing.T) {
 
 func TestPrintObjWithStruct(t *testing.T) {
 	buf := &bytes.Buffer{}
-	setOut(buf)
+	SetOut(buf)
 	type printObj struct {
 		Field1 string                 `json:"field1,omitempty"`
 		Field2 string                 `json:"field2"`
@@ -139,7 +139,7 @@ func TestPrintObjWithStruct(t *testing.T) {
 
 func TestPrintObjSliceMap(t *testing.T) {
 	buf := &bytes.Buffer{}
-	setOut(buf)
+	SetOut(buf)
 	obj := []map[string]interface{}{
 		{
 			"field1": "value1",

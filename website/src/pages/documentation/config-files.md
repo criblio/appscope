@@ -2,10 +2,12 @@
 title: "Config Files"
 ---
 
-## Config File: scope.yml
+## Config Files
 ---
 
-Below are the default contentof `scope.yml` library configuration file: 
+### scope.yml Config File
+
+Below are the default contents of the `scope.yml` library configuration file: 
 
 ```
 ---
@@ -120,7 +122,7 @@ libscope:
   summaryperiod : 10                # in seconds
   commanddir : '/tmp'
   #  commanddir supports changes to configuration settings of running
-  #  processees.  At every summary period the library looks in commanddir
+  #  processes.  At every summary period the library looks in commanddir
   #  to see if a file named scope.<pid> exists.  (where pid is the process ID
   #  of the process running with scope.)  If it exists, it processes every
   #  line for environment variable-style commands:
@@ -137,11 +139,9 @@ libscope:
 ...
 ```
 
-
-
-## Config File: scope_protocol.yml
+### scope_protocol.yml Config File
 ---
-Below are the default content of `scope_protocol.yml` library configuration file: 
+Below are the default contents of the `scope_protocol.yml` library configuration file: 
 
 ```
 ---

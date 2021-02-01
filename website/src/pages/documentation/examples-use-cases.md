@@ -70,7 +70,6 @@ Send DNS events from curl to the default host. This example uses the library in 
 SCOPE_EVENT_DNS=true LD_PRELOAD=./libscope.so curl https://cribl.io
 ```
 
-
 #### Example 6: 
 Send default metrics from the Go static application `hello` to the Datadog server at `ddog`:
 

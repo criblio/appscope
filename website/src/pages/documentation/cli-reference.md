@@ -26,7 +26,7 @@ Usage:
 Available Commands:
   dash        Display scope dashboard
   events      Output events for a session
-  extract     Output instrumentary library files to <dir>
+  extract     Output instrumenting library files to <dir>
   help        Help about any command
   history     List scope session history
   metrics     Output metrics for a session
@@ -101,21 +101,19 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 
 ### extract
 ---
-Extract outputs ldscope, libscope.so, scope.yml and scope_protocol.yml to the provided directory. These files can configured
-to instrument any application and output the data to any existing tool using simple TCP protocols. Libscope can easily be used
-with any dynamic or static application, regardless of the runtime.
+Outputs `ldscope`, `libscope.so`, `scope.yml`, and `scope_protocol.yml` to the provided directory. These files can configured to instrument any application, and to output the data to any existing tool using simple TCP protocols. Libscope can easily be used with any dynamic or static application, regardless of the runtime.
 
 #### Usage
   `scope extract (<dir>) [flags]`
 
 #### Aliases:
-  `extract, excrete, expunge, extricate, exorcise`
+  `extract`, `excrete`, `expunge`, `extricate`, `exorcise`
 
 #### Examples:
 
 ```
-scope exctract
-scope exctract /opt/libscope
+scope extract
+scope extract /opt/libscope
 ```
 
 #### Flags:
@@ -252,7 +250,7 @@ scope version --summary
 ### --verbose
 ----
 
-This flag sets the verbosity level. `0` is least verbose, `4` is the default, and `9` is most default. For descriptions of individual levels, see [Appendix: Default Configuration](/documentation/config-files).
+This flag sets the verbosity level. `0` is least verbose, `4` is the default, and `9` is most verbose. For descriptions of individual levels, see [Appendix: Default Configuration](/documentation/config-files).
 
 #### Usage
 

@@ -23,19 +23,30 @@ export default function Highlights() {
           }
         }
       }
-      file(relativePath: { eq: "hero-image.png" }) {
-        childImageSharp {
-          fluid {
-            sizes
-            src
-            srcSet
-            base64
-            aspectRatio
-          }
-        }
+      metricsAndEvents: file(relativePath: { eq: "scope-metrics-and-events.gif" }) {
+        publicURL
+      }
+      http: file(relativePath: { eq: "scope-http.gif" }) {
+        publicURL
+      }
+      dash: file(relativePath: { eq: "scope-dash.gif" }) {
+        publicURL
       }
     }
   `);
+
+  // I am certain there is a better way of doing this but this will work.
+  const images = [
+    data.metricsAndEvents.publicURL,
+    data.http.publicURL,
+    data.dash.publicURL,
+  ];
+
+  const alt = [
+    'Scope Metrics & Events',
+    'Scope HTTP',
+    'Scope Dashboard',
+  ];
 
   return (
     <Container className="highlights">
@@ -46,9 +57,9 @@ export default function Highlights() {
           return (
             <Row>
               <Col xs={12} md={{ span: 6, order: item.order === 1 ? 2 : 1 }}>
-                <Img
-                  fluid={data.file.childImageSharp.fluid}
-                  alt="AppScope Machine"
+                <img
+                  src={images[i]}
+                  alt={alt[i]}
                   style={{ maxWidth: 90 + "%", margin: "10px auto" }}
                 />
               </Col>

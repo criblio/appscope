@@ -122,6 +122,9 @@ body {
 
 .display-md {
   display: none;
+  nav {
+    background: #fff;
+  }
   @media (min-width: 900px) {
     display: block;
   }

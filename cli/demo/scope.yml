@@ -1,0 +1,47 @@
+metric:
+  format:
+    type : metricstatsd             # metricstatsd, metricjson
+    statsdmaxlen : 512              # max size of a formatted statsd string
+    verbosity : 4                   # 0-9 (0 is least verbose, 9 is most)
+  transport:
+    type: file
+    path: '/tmp/metrics.log'
+    buffer: line
+
+event:
+  enable: true
+  format:
+    type : ndjson                   # ndjson
+  transport:
+    type: file
+    path: '/tmp/events.log'
+    buffer: line
+  watch:
+    - type: file
+      name: .*log.*                 # whitelist ex regex describing log file names
+      value: .*                     # whitelist ex regex describing field values
+    - type: console
+      name: (stdout)|(stderr)
+      value: .*
+    # - type: metric
+    #   name: .*                      # (net.*)|(.*err.*)
+    #   field: ^[^h]+                 # whitelist ex regex describing field names
+    #   value: .*
+    - type: http
+      name: .*                      # .*-res | .*-req | .*-metrics
+      field: ^[^h]+                 # ^[^h]+ whitelist ex regex describing field names
+      value: .*
+
+  
+
+libscope:
+  summaryperiod : 10                # in seconds
+  commanddir : '/tmp'
+
+  log:
+    level: error                    # debug, info, warning, error, none
+    transport:
+      type: file
+      path: '/tmp/scope.log'
+      buffering: line               # line, full
+

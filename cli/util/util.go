@@ -162,6 +162,14 @@ func TruncWithElipsis(s string, l int) string {
 	return s
 }
 
+// Trunc truncates a string to a specified length
+func Trunc(s string, l int) string {
+	if len(s) > l {
+		return fmt.Sprintf("%."+strconv.Itoa(l)+"s", s)
+	}
+	return s
+}
+
 // CountingReader counts the bytes read from an io.Reader
 type CountingReader struct {
 	io.Reader

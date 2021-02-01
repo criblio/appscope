@@ -31,8 +31,7 @@
   p,
   ol,
   li,
-  code
-   {
+  code {
     font-size: 16px;
     margin: 5px 0;
   }
@@ -69,14 +68,12 @@
   }
 }
 
-
 p code {
   color: #2d9b0d;
   background: none;
   padding: 0;
   border-radius: 0%;
 }
-
 
 .TOC {
   @media (max-width: 767px) {
@@ -90,5 +87,8 @@ p code {
     a {
       color: #fff;
     }
+  }
+  img {
+    box-shadow: none !important;
   }
 }

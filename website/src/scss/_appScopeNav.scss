@@ -11,7 +11,9 @@
   padding: 0;
   max-width: 1470px;
   background: #fff !important;
-
+  @media (max-width: 1440px) {
+    padding: 2px 15px;
+  }
   .col {
     padding: 0;
   }

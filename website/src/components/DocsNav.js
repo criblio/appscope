@@ -5,9 +5,12 @@ import { useStaticQuery, graphql, Link } from "gatsby";
 import "../scss/_docsNav.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Search from "./search";
+import "../utils/font-awesome";
 const searchIndices = [{ name: `Pages`, title: `Pages` }];
+
 export default function DocsNav() {
   const [darkMode, toggleDarkMode] = useState(false);
+  const [mobileNav, openMobileNav] = useState(false);
   const data = useStaticQuery(graphql`
     query DocumentationNav {
       allDocumentationNavYaml {
@@ -30,8 +33,15 @@ export default function DocsNav() {
           class: darkMode ? "darkMode" : "",
         }}
       />
-      <div className="docsNav">
-        <Search indices={searchIndices} />
+      <div className={mobileNav ? "docsNav mobileNavOpen" : "docsNav"}>
+        <h2 className="mobileMenuHeader">Menu</h2>
+        <Search indices={searchIndices} onChange={() => openMobileNav(true)} />
+
+        <FontAwesomeIcon
+          className="mobileDocsNav"
+          icon={["fas", mobileNav ? "times" : "chevron-down"]}
+          onClick={() => openMobileNav(mobileNav ? false : true)}
+        />
         <h4>
           <FontAwesomeIcon
             icon={darkMode ? ["fas", "toggle-on"] : ["fas", "toggle-off"]}

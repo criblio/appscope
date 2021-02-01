@@ -33,10 +33,15 @@ body {
   h6 {
     margin-bottom: 30px;
     font-weight: bold;
+
+    @media (max-width: 767px) {
+      padding: 0 20px;
+    }
   }
 
   h1 {
     font-size: 2rem;
+    padding: 0;
   }
 
   h2 {
@@ -84,6 +89,10 @@ body {
     @media (min-width: 768px) {
       font-size: 0.45rem;
     }
+    @media (max-width: 768px) {
+      margin-left: 20px;
+      margin-bottom: 20px;
+    }
     &:hover {
       background: $orange;
       opacity: 0.8;
@@ -106,14 +115,14 @@ body {
 .display-xs {
   display: none;
 
-  @media (max-width: 767px) {
+  @media (max-width: 899px) {
     display: block;
   }
 }
 
 .display-md {
   display: none;
-  @media (min-width: 768px) {
+  @media (min-width: 900px) {
     display: block;
   }
 }
@@ -136,11 +145,10 @@ nav {
   position: fixed;
   width: 100%;
   z-index: 10000000000;
-  background: #fff;
+  //background: #fff;
   border-bottom: 1px solid $blue;
 }
 
 code {
   color: #2d9b0d;
 }
-

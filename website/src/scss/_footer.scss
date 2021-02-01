@@ -19,4 +19,15 @@
       margin: 0 8px;
     }
   }
+  @media (max-width: 767px) {
+    .footer-left,
+    .footer-right {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .footer-left {
+      padding-bottom: 30px;
+    }
+  }
 }

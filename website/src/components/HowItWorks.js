@@ -34,7 +34,7 @@ export default function HowItWorks() {
   `);
 
   return (
-    <Container className="howItWorks">
+    <Container className="howItWorks" style={{ padding: "50px 25px" }}>
       <Row>
         <Col xs={12} md={6} className="text-left">
           <h2>{data.allHowItWorksYaml.edges[0].node.title}</h2>

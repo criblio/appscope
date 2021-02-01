@@ -6,8 +6,7 @@
   background-position-y: 60%;
   border-top: 1px solid $blue;
   border-bottom: 1px solid $blue;
-  height: calc(80vh);
-  padding: 210px 25px 50px 25px;
+  padding: 210px 25px 100px 25px;
   display: flex;
   align-items: center;
   .col-12 {
@@ -16,7 +15,7 @@
   p {
     padding: 0;
   }
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     padding: 15px;
     border-top: none;
   }

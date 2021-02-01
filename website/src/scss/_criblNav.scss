@@ -11,7 +11,9 @@
     align-items: center;
     height: 55px;
     max-width: 1470px;
-
+    @media (max-width: 1440px) {
+      padding: 2px 15px;
+    }
     .col {
       padding: 0;
     }

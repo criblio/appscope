@@ -2,9 +2,9 @@
 
 .documentation {
   .code-container {
-    padding: 5px;
     position: relative;
     z-index: 1;
+    padding: 0 10px;
   }
   .gatsby-highlight {
     font-size: 0.5rem;
@@ -21,10 +21,18 @@
   h4 {
     font-size: 0.5rem;
   }
+  h5 {
+    font-size: 0.4rem;
+  }
+  h6 {
+    font-size: 0.3rem;
+  }
   h1,
   h2,
   h3,
-  h4 {
+  h4,
+  h5,
+  h6 {
     margin-top: 30px;
     margin-bottom: 10px;
   }
@@ -90,5 +98,13 @@ p code {
   }
   img {
     box-shadow: none !important;
+  }
+}
+@media (max-width: 767px) {
+  #docsContainer {
+    padding-top: 0 !important;
+    .align-items-start {
+      margin-top: 50px !important;
+    }
   }
 }

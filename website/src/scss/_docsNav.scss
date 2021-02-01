@@ -3,6 +3,9 @@
 .docsNav {
   //border-right: 1px solid $orange;
   z-index: 10000000;
+  .mobileDocsNav {
+    display: none;
+  }
   input {
     padding: 5px 10px;
     border: 1px solid #ccc;
@@ -11,12 +14,16 @@
     margin-bottom: 20px;
     font-size: 0.6rem;
   }
+  .mobileMenuHeader {
+    display: none;
+  }
   h4 {
     margin-bottom: 20px;
     display: flex;
     cursor: pointer;
     align-items: center;
     font-size: 0.75rem;
+    padding: 0;
     span {
       font-size: 14px;
       font-weight: 300;
@@ -72,5 +79,47 @@
         text-underline-offset: 5px;
       }
     }
+  }
+}
+@media (max-width: 767px) {
+  .docsNav {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    max-width: 90%;
+    padding: 15px 20px;
+    height: 60px;
+    overflow: hidden;
+    position: relative;
+    transition: height 0.4s ease-in-out;
+    background: $black;
+    margin: 0 auto;
+    color: #fff;
+    border-radius: 3px;
+    ul li a {
+      color: #fff;
+    }
+    .mobileMenuHeader {
+      display: block;
+      padding: 0;
+    }
+    .mobileDocsNav {
+      position: absolute;
+      right: 20px;
+      top: 20px;
+      display: block;
+    }
+    .ais-Hits-item {
+      span {
+        color: #000;
+      }
+    }
+    .SearchInput {
+      background: #fff !important;
+    }
+  }
+  .mobileNavOpen {
+    height: 800px;
+    transition: height 0.4s ease-in-out;
   }
 }

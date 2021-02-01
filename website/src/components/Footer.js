@@ -11,7 +11,7 @@ export default function Footer() {
     <Container fluid className="footer-container ">
       <Container>
         <Row>
-          <Col xs={12} md={6} className="text-left">
+          <Col xs={12} md={6} className="text-left footer-left">
             <Link to="https://cribl.io">
               <img src={logo} alt="Cribl" width={125} />
             </Link>

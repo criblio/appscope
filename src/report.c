@@ -2433,6 +2433,7 @@ doEvent()
     }
     httpAggSendReport(g_http_agg, g_mtc);
     httpAggReset(g_http_agg);
+    ctlFlushLog(g_ctl);
     ctlFlush(g_ctl);
 }
 

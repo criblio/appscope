@@ -2,7 +2,8 @@
 title: Updating
 ---
 
-# Updating
+## Updating
+---
 
 You can update AppScope in place. First, download a fresh version of the binary:
 

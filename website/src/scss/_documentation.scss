@@ -2,7 +2,7 @@
 
 .documentation {
   .code-container {
-    padding: 10px;
+    padding: 5px;
     position: relative;
     z-index: 1;
   }
@@ -10,13 +10,16 @@
     font-size: 0.5rem;
   }
   h1 {
-    font-size: 1.25rem;
-  }
-  h2 {
     font-size: 1rem;
   }
+  h2 {
+    font-size: 0.8rem;
+  }
   h3 {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
+  }
+  h4 {
+    font-size: 0.5rem;
   }
   h1,
   h2,
@@ -28,10 +31,14 @@
   p,
   ol,
   li,
-  pre,
-  code {
+  code
+   {
     font-size: 16px;
-    margin: 15px 0;
+    margin: 5px 0;
+  }
+  pre {
+    font-size: 16px;
+    margin: 10px 0;
   }
   ol {
     padding: 0;
@@ -53,14 +60,24 @@
         color: $orange;
       }
       code {
-        color: #fff;
-        background: $black;
-        border-radius: 3px;
-        padding: 0 5px;
+        color: #2d9b0d;
+        background: none;
+        padding: 0;
+        border-radius: 0%;
       }
     }
   }
 }
+
+
+p code {
+  color: #2d9b0d;
+  background: none;
+  padding: 0;
+  border-radius: 0%;
+}
+
+
 .TOC {
   @media (max-width: 767px) {
     display: none;

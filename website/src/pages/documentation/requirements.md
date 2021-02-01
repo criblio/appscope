@@ -2,11 +2,12 @@
 title: Requirements
 ---
 
-# Requirements
+## Requirements
+---
 
 Requirements for AppScope are as follows:
 
-## Operating Systems (Linux only)
+### Operating Systems (Linux only)
 
 Supported:
 
@@ -15,14 +16,12 @@ Supported:
 - Amazon Linux 1 and 2
 - Debian
 
-CPU: x84-64 architecture
+### System
 
-Memory: 1GB
+- CPU: x84-64 architecture
+- Memory: 1GB
+- Disk: 20MB (library + CLI)
 
-Disk: 20MB (library + CLI)
+### Known Limitations
 
-## Known Limitations
-
-These runtimes are **not** supported:
-
-- Open JVM < v.6, Oracle JVM < v.6, Go < v.1.8.
+These runtimes are **not** supported: Open JVM < v.6, Oracle JVM < v.6, Go < v.1.8.

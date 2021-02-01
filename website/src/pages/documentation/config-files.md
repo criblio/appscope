@@ -1,10 +1,11 @@
 ---
-title: "Appendix: Default Configuration"
+title: "Config Files"
 ---
 
-# Appendix: Default Configuration
+## Config File: scope.yml
+---
 
-Below are the contents of the default AppScope library configuration file. (You can access this default file's most-recent version [on GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).)
+Below are the default contentof `scope.yml` library configuration file: 
 
 ```
 ---
@@ -134,4 +135,24 @@ libscope:
       path: '/tmp/scope.log'
       buffering: line               # line, full
 ...
+```
+
+
+
+## Config File: scope_protocol.yml
+---
+Below are the default content of `scope_protocol.yml` library configuration file: 
+
+```
+---
+protocol:
+  - name: Redis
+    binary: false
+    regex: "^[*]\\d+|^[+]\\w+|^[$]\\d+"
+
+  - name: Mongo
+    binary: true
+    regex: "^240100000000000000000000d407"
+    len: 32
+---
 ```

@@ -125,12 +125,12 @@ p code {
   padding: 2px 5px;
 }
 pre {
-  background: $black;
-  padding: 16px 20px;
+  background: $darkgray3;
+  padding: 5px 20px;
   border-radius: 6px;
   display: flex;
   color: #fff;
-  font-size: 0.5rem;
+  font-size: 0.4rem;
 }
 nav {
   position: fixed;
@@ -139,9 +139,8 @@ nav {
   background: #fff;
   border-bottom: 1px solid $blue;
 }
+
 code {
-  background: #000;
-  border-radius: 3px;
-  padding: 3px 6px;
-  color: #fff;
+  color: #2d9b0d;
 }
+

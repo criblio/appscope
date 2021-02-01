@@ -1,23 +1,22 @@
-- name: Overview
-  path: /documentation/overview
+- name: About AppScope
   child: 
-    - name: Cool, but What Can I Do with It?
-      path: /documentation/what-do-with-scope
+    - name: Overview
+      path: /documentation/overview
 
     - name: How AppScope Works
       path: /documentation/how-works
-
-    - name: AppScope Components
-      path: /documentation/components
- 
-    - name: Use Cases by Component
-      path: /documentation/examples-use-cases
+      
+    - name: Cool, but What Can I Do with It?
+      path: /documentation/what-do-with-scope
 
 - name: Installing AppScope
-  path: /documentation/requirements
   child: 
-    - name: Quick Start Guide
-      path: /documentation/quick-start-guide
+
+    - name: Requirements 
+      path: /documentation/requirements
+
+    - name: Installing
+      path: /documentation/installing
 
     - name: Updating
       path: /documentation/updating
@@ -28,23 +27,26 @@
 - name: Using AppScope
   path: /documentation/cli-using
   child: 
-    - name: CLI Reference
-      path: /documentation/cli-reference
+    - name: Using the CLI
+      path: /documentation/quick-start-guide
+
+    - name: Loader and Library
+      path: /documentation/loader-library
 
     - name: Using the Library
       path: /documentation/library-using
 
-    - name: Configuring the Library
-      path: /documentation/library-configuring
-
     - name: Examples and Use Cases
       path: /documentation/examples-use-cases
 
+- name: Reference
+  child: 
+  - name: CLI Reference
+    path: /documentation/cli-reference
+
+  - name: Config Files
+    path: /documentation/config-files
+
 - name: Community
-  path: /documentation/community
-
-- name: "Appendix: Default Configuration"
-  path: /documentation/default-configuration
-
-      
+  path: /documentation/community      
 

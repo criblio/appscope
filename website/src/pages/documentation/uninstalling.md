@@ -2,7 +2,8 @@
 title: Uninstalling
 ---
 
-# Uninstalling
+## Uninstalling
+----
 
 You can uninstall AppScope by simply deleting the binary:
 
@@ -16,5 +17,6 @@ rm -rf scope
 cd ~
 rm -rf ./scope
 ```
+</br>
 
-Applications currently scope’d will continue to run. To remove the AppScope library from a running process, you will need to restart that process.
+Currently scope’d applications will continue to run. To remove the AppScope library from a running process, you will need to restart that process.

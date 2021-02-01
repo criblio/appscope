@@ -23,7 +23,9 @@ export default function Highlights() {
           }
         }
       }
-      metricsAndEvents: file(relativePath: { eq: "scope-metrics-and-events.gif" }) {
+      metricsAndEvents: file(
+        relativePath: { eq: "scope-metrics-and-events.gif" }
+      ) {
         publicURL
       }
       http: file(relativePath: { eq: "scope-http.gif" }) {
@@ -42,11 +44,7 @@ export default function Highlights() {
     data.dash.publicURL,
   ];
 
-  const alt = [
-    'Scope Metrics & Events',
-    'Scope HTTP',
-    'Scope Dashboard',
-  ];
+  const alt = ["Scope Metrics & Events", "Scope HTTP", "Scope Dashboard"];
 
   return (
     <Container className="highlights">
@@ -56,7 +54,10 @@ export default function Highlights() {
         {data.allHighlightsYaml.edges[0].node.items.map((item, i) => {
           return (
             <Row>
-              <Col xs={12} md={{ span: 6, order: item.order === 1 ? 2 : 1 }}>
+              <Col
+                xs={{ span: 12, order: 2 }}
+                md={{ span: 6, order: item.order === 1 ? 2 : 1 }}
+              >
                 <img
                   src={images[i]}
                   alt={alt[i]}
@@ -64,7 +65,7 @@ export default function Highlights() {
                 />
               </Col>
               <Col
-                xs={12}
+                xs={{ span: 12, order: 1 }}
                 md={{ span: 6, order: item.order === 1 ? 1 : 2 }}
                 className="text-left"
               >

@@ -13,5 +13,5 @@
       order: 2
     - title: Observe
       icon: microscope
-      shortDescription: Send application information, wire and log data, and performance metrics to existing log analytics and metrics tooling. 
+      shortDescription: Send application information, wire and log data, and performance metrics to existing log analytics and metrics tooling. For quick results, visualize with our terminal dashboard.
       order: 1

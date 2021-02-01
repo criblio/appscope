@@ -5,7 +5,7 @@ title: "Config Files"
 ## Config File: scope.yml
 ---
 
-Below are the default contentof `scope.yml` library configuration file: 
+Below are the default contents of the `scope.yml` library configuration file: 
 
 ```
 ---
@@ -141,7 +141,7 @@ libscope:
 
 ## Config File: scope_protocol.yml
 ---
-Below are the default content of `scope_protocol.yml` library configuration file: 
+Below are the default contents of the `scope_protocol.yml` library configuration file: 
 
 ```
 ---

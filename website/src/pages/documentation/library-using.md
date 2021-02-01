@@ -19,7 +19,7 @@ This executes the command `ps -ef`. But first, the OS' loader loads the AppScope
 
 Details of the ps application's execution are emitted to the configured transport, in the configured format. For configuration details, see the **Configuring the Library** section below.
 
-### LD_PRELOAD Environment Variable Extended Examples
+### LD_PRELOAD Environment Variable – Extended Examples
 
 These examples demonstrate using `LD_PRELOAD` with additional variables.
 

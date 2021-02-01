@@ -11,7 +11,6 @@
 
 - name: Installing AppScope
   child: 
-
     - name: Requirements 
       path: /documentation/requirements
 
@@ -25,7 +24,6 @@
       path: /documentation/uninstalling
 
 - name: Using AppScope
-  path: /documentation/cli-using
   child: 
     - name: Using the CLI
       path: /documentation/quick-start-guide
@@ -41,12 +39,14 @@
 
 - name: Reference
   child: 
-  - name: CLI Reference
-    path: /documentation/cli-reference
+    - name: CLI Reference
+      path: /documentation/cli-reference
 
-  - name: Config Files
-    path: /documentation/config-files
+    - name: Config Files
+      path: /documentation/config-files
 
 - name: Community
-  path: /documentation/community      
+  child: 
+    - name: Community
+      path: /documentation/community      
 

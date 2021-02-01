@@ -2,7 +2,7 @@
 title: How AppScope Works
 ---
 
-## AppScope Components
+## How AppScope Works: Components
 ---
 
 AppScope is a single binary download that consists of three components:

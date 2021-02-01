@@ -97,6 +97,18 @@ func CheckFileExists(filePath string) bool {
 	return false
 }
 
+// CheckDirExists checks if a directory exists on the filesystem
+func CheckDirExists(filePath string) bool {
+	stat, err := os.Stat(os.ExpandEnv(filePath))
+	if err != nil {
+		return false
+	}
+	if !stat.IsDir() {
+		return false
+	}
+	return true
+}
+
 // GetValue returns a reflect.Value to either the object itself or indirects its pointer first
 func GetValue(obj interface{}) reflect.Value {
 	v := reflect.ValueOf(obj)

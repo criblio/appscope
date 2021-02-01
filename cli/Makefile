@@ -1,14 +1,13 @@
-GOVVV = $(shell command -v govvv 2>/dev/null)
-ifndef GOVVV
-    GO=go
-else 
-    GO=govvv
-endif
 
 DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
 GO_VER:=$(shell go version | cut -d' ' -f3)
+
+# Allow GOPATH to be set, but don't require it.
+ifndef GOPATH
 GOPATH:=$(shell go env | grep GOPATH | cut -d\" -f2)
+endif
+
 GO:=go
 
 GO_VER_FLAGS=$(shell $(GOPATH)/bin/govvv -flags)
@@ -32,20 +31,23 @@ rebuild: cliclean all
 local:
 	cd $(DIR) && $(GO) build -o /usr/local/bin/scope
 
-run/scopec.go:
-	cp $(DIR)../bin/linux/scopec $(DIR)build/
-	cd $(DIR) && go-bindata -o run/scopec.go -pkg run build/scopec
+run/bundle.go:
+	rm -rf $(DIR)/build/*
+	cp $(DIR)../bin/linux/ldscope $(DIR)build/
+	cp $(DIR)../lib/linux/libscope.so $(DIR)build/
+	cp $(DIR)../conf/*.yml $(DIR)build/
+	cd $(DIR) && $(GOPATH)/bin/go-bindata -o run/bundle.go -pkg run build
 
-scope: run/scopec.go
+scope: run/bundle.go
 	# GOOS=linux CGO_ENABLED=0 $(GO) build -a -tags netgo -ldflags="-s -w" -o build/scope
-	cd $(DIR) && GOOS=linux $(GO) build -o $(DIR)build/scope 
+	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)build/scope
 	upx -9 $(DIR)build/scope
 
 install: 
 	cp $(DIR)build/scope /usr/local/bin/scope
 
 clitest:
-	cd $(DIR) && go test -v -coverprofile coverage.out ./...
+	cd $(DIR) && $(GO) test -v -coverprofile coverage.out ./...
 
 cover:
-	cd $(DIR) && go tool cover -html=coverage.out -o coverage.html
+	cd $(DIR) && $(GO) tool cover -html=coverage.out -o coverage.html

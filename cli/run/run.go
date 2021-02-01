@@ -2,6 +2,7 @@ package run
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -28,8 +29,8 @@ type Config struct {
 
 // Run executes a scoped command
 func (rc *Config) Run(args []string) {
-	if err := CreateScopec(); err != nil {
-		util.ErrAndExit("error creating scopec: %v", err)
+	if err := CreateLdscope(); err != nil {
+		util.ErrAndExit("error creating ldscope: %v", err)
 	}
 	// Normal operational, not passthrough, create directory for this run
 	// Directory contains scope.yml which is configured to output to that
@@ -40,26 +41,26 @@ func (rc *Config) Run(args []string) {
 		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.workDir, "scope.yml"))
 		log.Info().Bool("passthrough", rc.Passthrough).Strs("args", args).Msg("calling syscall.Exec")
 	}
-	syscall.Exec(scopecPath(), append([]string{"scopec"}, args...), env)
+	syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)
 }
 
-func scopecPath() string {
-	return filepath.Join(util.ScopeHome(), "scopec")
+func ldscopePath() string {
+	return filepath.Join(util.ScopeHome(), "ldscope")
 }
 
-// CreateScopec creates libwrap.so in BOLTON_TMPDIR
-func CreateScopec() error {
-	scopec := scopecPath()
-	scopecInfo, _ := buildScopec()
+// CreateLdscope creates ldscope in $SCOPE_HOME
+func CreateLdscope() error {
+	ldscope := ldscopePath()
+	ldscopeInfo, _ := AssetInfo("build/ldscope")
 
 	// If it exists, don't create
-	if stat, err := os.Stat(scopec); err == nil {
-		if stat.ModTime() == scopecInfo.info.ModTime() {
+	if stat, err := os.Stat(ldscope); err == nil {
+		if stat.ModTime() == ldscopeInfo.ModTime() {
 			return nil
 		}
 	}
 
-	b, err := buildScopecBytes()
+	b, err := Asset("build/ldscope")
 	if err != nil {
 		return err
 	}
@@ -69,15 +70,15 @@ func CreateScopec() error {
 		return err
 	}
 
-	err = ioutil.WriteFile(scopec, b, 0755)
+	err = ioutil.WriteFile(ldscope, b, 0755)
 	if err != nil {
 		return err
 	}
-	err = os.Chtimes(scopec, scopecInfo.info.ModTime(), scopecInfo.info.ModTime())
+	err = os.Chtimes(ldscope, ldscopeInfo.ModTime(), ldscopeInfo.ModTime())
 	if err != nil {
 		return err
 	}
-	log.Info().Str("scopec", scopec).Msg("created scopec")
+	log.Info().Str("ldscope", ldscope).Msg("created ldscope")
 	return nil
 }
 
@@ -91,10 +92,27 @@ func environNoScope() []string {
 	return env
 }
 
+// CreateAll outputs all bundled files to a given path
+func CreateAll(path string) error {
+	files := []string{"ldscope", "libscope.so", "scope.yml", "scope_protocol.yml"}
+	perms := []os.FileMode{0755, 0755, 0644, 0644}
+	for i, f := range files {
+		b, err := Asset(fmt.Sprintf("build/%s", f))
+		if err != nil {
+			return err
+		}
+		err = ioutil.WriteFile(filepath.Join(path, f), b, perms[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // CreateWorkDir creates a working directory
 func (rc *Config) CreateWorkDir(cmd string) {
 	if rc.workDir != "" {
-		if util.CheckFileExists(rc.workDir) {
+		if util.CheckDirExists(rc.workDir) {
 			// Directory exists, exit
 			return
 		}

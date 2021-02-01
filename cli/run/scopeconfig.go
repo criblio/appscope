@@ -150,7 +150,7 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 				Level: "error",
 				Transport: ScopeTransport{
 					TransportType: "file",
-					Path:          filepath.Join(workDir, "scopec.log"),
+					Path:          filepath.Join(workDir, "ldscope.log"),
 					Buffering:     "line",
 				},
 			},

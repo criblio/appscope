@@ -766,7 +766,7 @@ ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t
     msg[len + 1] = '\0';
 
     size_t bytes_sent = 0;
-    size_t bytes_to_send = len + 2;
+    size_t bytes_to_send = len + 1;
 
     while (bytes_to_send > 0) {
         rc = g_fn.write(ctl->logserver, &msg[bytes_sent], bytes_to_send);

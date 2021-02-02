@@ -1,52 +1,52 @@
 - name: About AppScope
   child: 
     - name: Overview
-      path: /documentation/overview
+      path: /docs/overview
 
     - name: How AppScope Works
-      path: /documentation/how-works
+      path: /docs/how-works
       
     - name: Cool, but What Can I Do with It?
-      path: /documentation/what-do-with-scope
+      path: /docs/what-do-with-scope
 
 - name: Installing AppScope
   child: 
     - name: Requirements 
-      path: /documentation/requirements
+      path: /docs/requirements
 
     - name: Installing
-      path: /documentation/installing
+      path: /docs/installing
 
     - name: Updating
-      path: /documentation/updating
+      path: /docs/updating
 
     - name: Uninstalling
-      path: /documentation/uninstalling
+      path: /docs/uninstalling
 
 - name: Using AppScope
   child: 
     - name: Using the CLI
-      path: /documentation/quick-start-guide
+      path: /docs/quick-start-guide
 
     - name: Loader and Library
-      path: /documentation/loader-library
+      path: /docs/loader-library
 
     - name: Using the Library
-      path: /documentation/library-using
+      path: /docs/library-using
 
     - name: Examples and Use Cases
-      path: /documentation/examples-use-cases
+      path: /docs/examples-use-cases
 
 - name: Reference
   child: 
     - name: CLI Reference
-      path: /documentation/cli-reference
+      path: /docs/cli-reference
 
     - name: Config Files
-      path: /documentation/config-files
+      path: /docs/config-files
 
 - name: Community
   child: 
     - name: Community
-      path: /documentation/community      
+      path: /docs/community      
 

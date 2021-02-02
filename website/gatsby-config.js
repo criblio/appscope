@@ -6,7 +6,7 @@ module.exports = {
     author: "Cribl",
     description:
       "AppScope is an open source instrumentation utility for any application, regardless of programming language, with no code modification required. Collect only the data you need for full observability of your applications, systems and infrastructure.",
-    siteUrl: "https://appscope.dev,
+    siteUrl: "https://appscope.dev",
   },
   plugins: [
     "gatsby-plugin-sass",
@@ -36,7 +36,7 @@ module.exports = {
       resolve: "gatsby-source-filesystem",
       options: {
         name: "code",
-        path: "./src/pages/documentation",
+        path: "./src/pages/docs",
       },
     },
     {
@@ -82,8 +82,8 @@ module.exports = {
     {
       resolve: "gatsby-source-filesystem",
       options: {
-        name: "documentation",
-        path: "./src/pages/documentation",
+        name: "docs",
+        path: "./src/pages/docs",
       },
       __key: "markdown",
     },
@@ -93,5 +93,6 @@ module.exports = {
         path: "./src/data/",
       },
     },
+    "gatsby-plugin-meta-redirect", // Should be last, per docs
   ],
 };

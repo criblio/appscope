@@ -16,7 +16,6 @@ export default function DocsNav() {
       allDocumentationNavYaml {
         nodes {
           name
-          path
           child {
             name
             path

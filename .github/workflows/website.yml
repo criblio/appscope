@@ -4,10 +4,6 @@ on:
     branches:
       - master
       - staging
-  pull_request:
-    branches:
-      - master
-      - staging
 jobs:
   website:
     runs-on: ubuntu-latest

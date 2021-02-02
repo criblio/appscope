@@ -138,6 +138,10 @@ typedef unsigned int bool;
 
 // we should start moving env var constants to one place
 #define THREAD_DELAY_LIST "SCOPE_THREAD_DELAY"
+#define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
+#define LOG_EVENT_CLIENT_SOCK "/tmp/scopecllog"
+#define LOG_EVENT_SERVER_SOCK "/tmp/scopesvlog"
+#define LOG_EVENT_BUF_SIZE 4096
 
 #endif // __SCOPETYPES_H__
 

@@ -102,12 +102,12 @@ newTransport()
  *
  * We look for an available fd starting at a relatively high
  * range and work our way down until we find one we can get.
- * Then, we force the use of the availabale fd. 
+ * Then, we force the use of the available fd. 
  */
 static int
 placeDescriptor(int fd, transport_t *t)
 {
-    if (!t) return -1;
+    if (!t || !t->fcntl || !t->dup2 || !t->close) return -1;
 
     // next_fd_to_try avoids reusing file descriptors.
     // Without this, we've had problems where the buffered stream for
@@ -137,6 +137,14 @@ placeDescriptor(int fd, transport_t *t)
     DBG("%d", t->type);
     t->close(fd);
     return -1;
+}
+
+int
+transportSetFD(int fd, transport_t *trans)
+{
+    if (!trans) return -1;
+
+    return placeDescriptor(fd, trans);
 }
 
 cfg_transport_t

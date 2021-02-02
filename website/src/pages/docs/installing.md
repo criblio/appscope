@@ -13,7 +13,7 @@ Directly download the CLI binary from [https://cdn.cribl.io/dl/scope/cli/linux/s
 
 
 ```
-curl -Lo scope https://cdn.cribl.io/dl/scope/cli/linux/scope && chmod 755 ./scope
+curl -Lo scope https://cdn.cribl.io/dl/scope/$(curl -L https://cdn.cribl.io/dl/scope/latest)/linux/scope && chmod 755 ./scope
 ```
 
 That's it!

@@ -21,7 +21,7 @@ cd scope && md5sum scope > scope.md5 && cd -
 md5sum scope.tgz > scope.tgz.md5
 if [ -n "${LATEST}" ]; then
     echo $LATEST > ${TMPDIR}/latest
-    aws cp ${TMPDIR}/latest s3://io.cribl.cdn/dl/scope/
+    aws s3 cp ${TMPDIR}/latest s3://io.cribl.cdn/dl/scope/
 fi
 aws s3 cp scope/scope s3://io.cribl.cdn/dl/scope/$VERSION/
 aws s3 cp scope.tgz s3://io.cribl.cdn/dl/scope/$VERSION/

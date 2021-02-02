@@ -24,14 +24,14 @@ export default function Highlights() {
         }
       }
       metricsAndEvents: file(
-        relativePath: { eq: "scope-metrics-and-events.gif" }
+        relativePath: { eq: "scope-metrics-and-events.mp4" }
       ) {
         publicURL
       }
-      http: file(relativePath: { eq: "scope-http.gif" }) {
+      http: file(relativePath: { eq: "scope-http.mp4" }) {
         publicURL
       }
-      dash: file(relativePath: { eq: "scope-dash.gif" }) {
+      dash: file(relativePath: { eq: "scope-dash.mp4" }) {
         publicURL
       }
     }
@@ -58,11 +58,16 @@ export default function Highlights() {
                 xs={{ span: 12, order: 2 }}
                 md={{ span: 6, order: item.order === 1 ? 2 : 1 }}
               >
-                <img
-                  src={images[i]}
-                  alt={alt[i]}
+                <video
+                  autoPlay={true}
+                  loop={true}
+                  muted={true}
+                  playsInline={true}
                   style={{ maxWidth: 90 + "%", margin: "10px auto" }}
-                />
+                >
+                  <source src={images[i]} type='video/mp4'>
+                  </source>
+                </video>
               </Col>
               <Col
                 xs={{ span: 12, order: 1 }}

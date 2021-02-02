@@ -7,7 +7,7 @@ exports.onCreateNode = ({ node, getNode, actions }) => {
     const slug = createFilePath({
       node,
       getNode,
-      basePath: `pages/documentation`,
+      basePath: `pages/docs`,
     });
     createNodeField({
       node,
@@ -36,9 +36,16 @@ exports.createPages = async function ({ actions, graphql }) {
     const slug = edge.node.fields.slug;
     const id = edge.node.id;
     actions.createPage({
-      path: `documentation` + slug,
+      path: `docs` + slug,
       component: require.resolve(`./src/components/MarkDownBlock.js`),
       context: { slug: slug, id: id },
     });
+  });
+
+  actions.createRedirect({
+    fromPath: '/docs',
+    toPath: '/docs/overview',
+    // redirectInBrowser: true,
+    isPermanent: true,
   });
 };

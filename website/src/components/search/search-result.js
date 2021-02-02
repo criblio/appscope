@@ -21,7 +21,7 @@ const HitCount = connectStateResults(({ searchResults }) => {
 
 const PageHit = ({ hit }) => (
   <div>
-    <Link to={"/documentation" + hit.slug}>
+    <Link to={"/docs" + hit.slug}>
       <h4>
         <Highlight attribute="frontmatter.title" hit={hit} tagName="mark" />
       </h4>

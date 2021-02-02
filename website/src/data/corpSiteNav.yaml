@@ -9,47 +9,5 @@
         url: https://cribl.io/cribl-logstream-pricing/
       - link: Download Logstream
         url: https://cribl.io/download/
-
-  - parent: Solutions
-    url: https://cribl.io/solutions/
-  
-  - parent: Company
-    child: 
-      - link: About Us
-        url: https://cribl.io/about-us/
-      - link: Leadership
-        url: https://cribl.io/leadership/
-      - link: Careers
-        url: https://cribl.io/jobs/
-      - link: News
-        url: https://cribl.io/news/
-      - link: Partners
-        url: https://cribl.io/partners/
-
-- navigationRight:
-  - parent: Learn
-    child: 
-      - link: Resources Library
-        url: https://cribl.io/resources/
-      - link: Pricing Plans
-        url: https://cribl.io/cribl-logstream-pricing/
-      - link: Blog
-        url: https://cribl.io/blog/
-      - link: Docs
-        url: https://docs.cribl.io/docs/about
-      - link: Events
-        url: https://cribl.io/events/
-      - link: Community
-        url: https://cribl.io/community/
-      - link: Cribl Podcast
-        url: https://cribl.libsyn.com/website
-  
-  - parent: Support / Services
-    child: 
-      - link: Support Overview
-        url: https://cribl.io/support/
-      - link: Download
-        url: https://cribl.io/download/
-      - link: Community
-        url: https://cribl.io/community/
-     
+  - parent: About Cribl
+    link: https://cribl.io/about-us

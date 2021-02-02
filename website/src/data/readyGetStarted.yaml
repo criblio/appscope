@@ -1,0 +1,10 @@
+- title: Want to Contribute?
+  description: We’re proud to make AppScope available as open source under the Apache Software License v2.0. You can join the AppScope development by contributing code and documentation on Github, and by joining our Slack community.
+  items:
+    - icon: github
+      url: https://github.com/criblio/appscope
+      buttonText: Fork On Github
+    - icon: 
+      url: https://cribl.io/community
+      buttonText: Join Our Community
+   

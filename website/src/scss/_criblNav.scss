@@ -10,8 +10,10 @@
     padding: 2px 0;
     align-items: center;
     height: 55px;
-    max-width: 1470px;
-
+    max-width: 1400px;
+    @media (max-width: 1440px) {
+      padding: 2px 15px;
+    }
     .col {
       padding: 0;
     }

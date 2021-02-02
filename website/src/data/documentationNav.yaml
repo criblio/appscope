@@ -1,34 +1,52 @@
-- name: Introduction
-  path: ./src/documentation/introduction.md
-  
-- name: Quick Start
-  path: ./src/documentation/tutorials/index.md
+- name: About AppScope
   child: 
-    - name: Level 1
-      path: ./src/documentation/tutorials/level1.md
-  TOC: 
-    - title: TOC title
-      childItem: TOC Child Item 
-      link: Child/Item/Link.md
+    - name: Overview
+      path: /docs/overview
 
-- name: Tutorials
-  path: ./src/documentation/tutorials/index.md
-  child: 
-    - name: Level 1
-      path: ./src/documentation/tutorials/level1.md 
-    - name: Level 1
-      path: ./src/documentation/tutorials/level1.md
-    - name: Level 1
-      path: ./src/documentation/tutorials/level1.md 
-    - name: Level 1
-      path: ./src/documentation/tutorials/level1.md
-    - name: Another Tutorial
-      path: ./src/documentation/tutorials/level1.md
-
-- name: Item
-  path: ./src/documentation/tutorials/index.md
-  child: 
-    - name: Level 1
-      path: ./src/documentation/tutorials/level1.md
+    - name: How AppScope Works
+      path: /docs/how-works
       
+    - name: Cool, but What Can I Do with It?
+      path: /docs/what-do-with-scope
+
+- name: Installing AppScope
+  child: 
+    - name: Requirements 
+      path: /docs/requirements
+
+    - name: Installing
+      path: /docs/installing
+
+    - name: Updating
+      path: /docs/updating
+
+    - name: Uninstalling
+      path: /docs/uninstalling
+
+- name: Using AppScope
+  child: 
+    - name: Using the CLI
+      path: /docs/quick-start-guide
+
+    - name: Loader and Library
+      path: /docs/loader-library
+
+    - name: Using the Library
+      path: /docs/library-using
+
+    - name: Examples and Use Cases
+      path: /docs/examples-use-cases
+
+- name: Reference
+  child: 
+    - name: CLI Reference
+      path: /docs/cli-reference
+
+    - name: Config Files
+      path: /docs/config-files
+
+- name: Community
+  child: 
+    - name: Community
+      path: /docs/community      
 

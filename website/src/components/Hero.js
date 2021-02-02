@@ -14,7 +14,7 @@ export default function Hero() {
           subText
         }
       }
-      file(relativePath: { eq: "hero-image.png" }) {
+      file(relativePath: { eq: "isoarchitecture.png" }) {
         childImageSharp {
           fluid {
             sizes
@@ -37,7 +37,7 @@ export default function Hero() {
             <p>{data.heroYaml.hero.subText}</p>
             <Button
               onClick={() => {
-                navigate("/documentation");
+                navigate("/docs/installing");
               }}
             >
               {data.heroYaml.hero.ctaText}

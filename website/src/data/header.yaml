@@ -2,10 +2,10 @@
   path: /
   
 - name: Docs
-  path: /documentation
+  path: /docs/overview
 
-- name: Resources
-  path: /resources
+# - name: Resources
+#   path: /resources
   # child: 
   #   - name: Level 1
   #     path: /resources/level1
@@ -13,7 +13,7 @@
   #     path: /resources/level2
 
 - name: Community
-  path: /community
+  path: https://cribl.io/community
 
       
           

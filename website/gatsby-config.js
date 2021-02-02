@@ -6,7 +6,7 @@ module.exports = {
     author: "Cribl",
     description:
       "AppScope is an open source instrumentation utility for any application, regardless of programming language, with no code modification required. Collect only the data you need for full observability of your applications, systems and infrastructure.",
-    siteUrl: "https://needstobetheproductionurl.com",
+    siteUrl: "https://appscope.dev",
   },
   plugins: [
     "gatsby-plugin-sass",
@@ -18,25 +18,25 @@ module.exports = {
     "gatsby-plugin-mdx",
     "gatsby-transformer-sharp",
     "gatsby-plugin-styled-components",
-    // {
-    //   resolve: "gatsby-plugin-algolia",
-    //   options: {
-    //     appId: process.env.GATSBY_ALGOLIA_APP_ID,
-    //     apiKey: process.env.ALGOLIA_ADMIN_KEY,
-    //     queries: require("./src/utils/algolia-queries"),
-    //   },
-    // },
+    {
+      resolve: "gatsby-plugin-algolia",
+      options: {
+        appId: process.env.GATSBY_ALGOLIA_APP_ID,
+        apiKey: process.env.ALGOLIA_ADMIN_KEY,
+        queries: require("./src/utils/algolia-queries"),
+      },
+    },
     {
       resolve: "gatsby-plugin-manifest",
       options: {
-        icon: "src/images/icon.png",
+        icon: "src/images/apple-touch-icon.png",
       },
     },
     {
       resolve: "gatsby-source-filesystem",
       options: {
         name: "code",
-        path: "./src/pages/documentation",
+        path: "./src/pages/docs",
       },
     },
     {
@@ -46,6 +46,19 @@ module.exports = {
           {
             resolve: "gatsby-remark-prismjs",
             options: {},
+          },
+        ],
+      },
+    },
+    {
+      resolve: "gatsby-transformer-remark",
+      options: {
+        plugins: [
+          {
+            resolve: "gatsby-remark-images",
+            options: {
+              maxWidth: 800,
+            },
           },
         ],
       },
@@ -69,8 +82,8 @@ module.exports = {
     {
       resolve: "gatsby-source-filesystem",
       options: {
-        name: "documentation",
-        path: "./src/pages/documentation",
+        name: "docs",
+        path: "./src/pages/docs",
       },
       __key: "markdown",
     },
@@ -80,5 +93,6 @@ module.exports = {
         path: "./src/data/",
       },
     },
+    "gatsby-plugin-meta-redirect", // Should be last, per docs
   ],
 };

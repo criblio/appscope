@@ -1,0 +1,13 @@
+- title: Why AppScope?
+  items:
+    - item: AppScope is language agnostic and completely userland; works with any application; scales from the CLI to production
+      icon: project-diagram
+      title: Simple
+    - item: Send AppScope data to any existing monitoring tool, timeseries database, or log tool
+      icon: database
+      title: No New Tools
+    - item: Extends APM reach into every application, affordably
+      icon: money-bill-wave
+      title: Cost
+    #ctaText: Quick Start Guide
+    #ctaLink: /docs/quick-start-guide

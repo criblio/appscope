@@ -23,9 +23,9 @@ if [ -n "${LATEST}" ]; then
     echo $LATEST > ${TMPDIR}/latest
     aws s3 cp ${TMPDIR}/latest s3://io.cribl.cdn/dl/scope/
 fi
-aws s3 cp scope/scope s3://io.cribl.cdn/dl/scope/$VERSION/
-aws s3 cp scope.tgz s3://io.cribl.cdn/dl/scope/$VERSION/
-aws s3 cp scope/scope.md5 s3://io.cribl.cdn/dl/scope/$VERSION/
-aws s3 cp scope.tgz.md5 s3://io.cribl.cdn/dl/scope/$VERSION/
+aws s3 cp scope/scope s3://io.cribl.cdn/dl/scope/$VERSION/linux/
+aws s3 cp scope.tgz s3://io.cribl.cdn/dl/scope/$VERSION/linux/
+aws s3 cp scope/scope.md5 s3://io.cribl.cdn/dl/scope/$VERSION/linux/
+aws s3 cp scope.tgz.md5 s3://io.cribl.cdn/dl/scope/$VERSION/linux/
 
 aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*'

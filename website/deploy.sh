@@ -15,5 +15,6 @@ if [ $GITHUB_REF == "refs/heads/master" ]; then
     DISTRIBUTION_ID=E3CI6UPKUT68NJ
 fi
 
+aws s3 rm s3://${BUCKET} --recursive
 aws s3 cp ${DIR}/public s3://${BUCKET} --recursive
 aws cloudfront create-invalidation --distribution-id=${DISTRIBUTION_ID} --paths '/*'

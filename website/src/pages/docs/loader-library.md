@@ -4,7 +4,7 @@ title: Extracting the Library
 
 ## The Loader, Library and .yml Files
 ---
-As mentioned in [How AppScope Works](/docs/how-works), the single binary contains a **Loader** and a **Library** component that can be used independently of the CLI. In order to use them, they must first be extracted using the `extract` sub-command. This will output `ldscope`, `libscope.so`, `scope.yml` and `scope_protocol.yml` in a directory of choice. These files can be later configured to instrument any application and output the data to any existing tool using simple TCP protocols. 
+As covered in [How AppScope Works](/docs/how-works), the single binary contains **Loader** and **Library** components that can be used independently of the CLI. In order to use these components, you must first extract them using the `extract` sub-command. This will output the `ldscope`, `libscope.so`, `scope.yml`, and `scope_protocol.yml` into a directory that you specify. You can later configure these files to instrument any application, and to output the data to any existing tool via simple TCP protocols. 
 
 
 
@@ -30,4 +30,4 @@ drwxr-xr-x 1 root root    4096 Jan 31 22:32 ../
 
 ### Next Steps
 
-Let's go to [Using the Library](/docs/library-using).
+Let's go on to [Using the Library](/docs/library-using).

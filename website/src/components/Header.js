@@ -1,5 +1,5 @@
 import React from "react";
-import { Container, Col, Nav, Navbar } from "react-bootstrap";
+import { Container, Col, Nav } from "react-bootstrap";
 import { useStaticQuery, graphql } from "gatsby";
 import StarCount from "./widgets/StarCount";
 import Download from "./widgets/Download";
@@ -47,7 +47,7 @@ export default function Header() {
                 <Nav.Item key={i}>
                   <Nav.Link
                     href={item.node.path}
-                    activeStyle={{ color: "#FD6600", fontWeight: 700 }}
+                    activestyle={{ color: "#FD6600", fontWeight: 700 }}
                   >
                     {item.node.name}{" "}
                   </Nav.Link>

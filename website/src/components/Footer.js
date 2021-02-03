@@ -1,5 +1,4 @@
 import React from "react";
-import { Link } from "gatsby";
 import { Container, Row, Col } from "react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import logo from "../images/logo-cribl-new.svg";
@@ -12,21 +11,21 @@ export default function Footer() {
       <Container>
         <Row>
           <Col xs={12} md={6} className="text-left footer-left">
-            <Link to="https://cribl.io">
+            <a href="https://cribl.io">
               <img src={logo} alt="Cribl" width={125} />
-            </Link>
+            </a>
           </Col>
           <Col xs={12} md={6} className="text-right footer-right">
             <p>Cribl, &copy; 2021</p>
-            <Link to="https://www.facebook.com/Cribl-258234158133458/">
+            <a href="https://www.facebook.com/Cribl-258234158133458/">
               <FontAwesomeIcon icon={["fab", "facebook"]} />
-            </Link>
-            <Link to="https://twitter.com/cribl_io">
+            </a>
+            <a href="https://twitter.com/cribl_io">
               <FontAwesomeIcon icon={["fab", "twitter"]} />
-            </Link>
-            <Link to="https://www.linkedin.com/company/18777798">
+            </a>
+            <a href="https://www.linkedin.com/company/18777798">
               <FontAwesomeIcon icon={["fab", "linkedin"]} />
-            </Link>
+            </a>
           </Col>
         </Row>
       </Container>

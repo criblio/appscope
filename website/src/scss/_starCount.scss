@@ -30,4 +30,8 @@
       font-weight: 600;
     }
   }
+  &:hover {
+    color: $black;
+    text-decoration: none;
+  }
 }

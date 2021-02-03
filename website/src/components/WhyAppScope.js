@@ -32,7 +32,7 @@ export default function WhyAppScope() {
           <Row>
             {data.allWhyAppScopeYaml.edges[0].node.items.map((bullet, i) => {
               return (
-                <Col xs={12} md={4} className="highlight-col">
+                <Col xs={12} md={4} className="highlight-col" key={i}>
                   <h3>
                     <FontAwesomeIcon icon={bullet.icon} />
                   </h3>

@@ -2,7 +2,7 @@ import * as React from "react";
 import Header from "../components/Header";
 import NotFound from "../components/NotFound";
 
-import Alert from "../components/Alert";
+//import Alert from "../components/Alert";
 import MobileHeader from "../components/MobileHeader";
 
 const NotFoundPage = () => {

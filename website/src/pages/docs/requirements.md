@@ -7,7 +7,7 @@ title: Requirements
 
 Requirements for AppScope are as follows:
 
-### Operating Systems (Linux only)
+### Operating Systems (Linux Only)
 
 Supported:
 

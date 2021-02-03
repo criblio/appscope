@@ -10,4 +10,4 @@ To connect with other AppScope users and developers, [join](https://cribl.io/com
 
 ## How to Contribute
 
-Fork our [repo on GitHub](https://github.com/criblio/appscope.git)(https://github.com/criblio/appscope.git).
+Fork our [repo on GitHub](https://github.com/criblio/appscope.git).

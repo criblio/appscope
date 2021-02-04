@@ -175,6 +175,7 @@ func testDefaultScopeConfigYaml(wd string, verbosity int) string {
   transport:
     type: file
     path: METRICSPATH
+    buffering: line
 event:
   enable: true
   format:
@@ -182,6 +183,7 @@ event:
   transport:
     type: file
     path: EVENTSPATH
+    buffering: line
   watch:
   - type: file
     name: '[\s\/\\\.]log[s]?[\/\\\.]?'

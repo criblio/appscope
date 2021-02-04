@@ -21,6 +21,16 @@ module.exports = {
     "gatsby-transformer-sharp",
     "gatsby-plugin-styled-components",
     {
+      resolve: "gatsby-plugin-google-tagmanager",
+      options: {
+        id: "G-PZXELDJWEZ",
+        includeInDevelopment: false,
+        defaultDataLayer: { platform: "gatsby" },
+        routeChangeEventName: "gatsby-route-change",
+      },
+    },
+
+    {
       resolve: "gatsby-plugin-algolia",
       options: {
         appId: process.env.GATSBY_ALGOLIA_APP_ID,

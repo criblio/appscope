@@ -5,13 +5,14 @@
 #include <signal.h>
 #include <pthread.h>
 
-#include "dbg.h"
-#include "os.h"
 #include "com.h"
-#include "state.h"
+#include "dbg.h"
 #include "gocontext.h"
-#include "../contrib/funchook/distorm/include/distorm.h"
 #include "linklist.h"
+#include "os.h"
+#include "state.h"
+#include "utils.h"
+#include "../contrib/funchook/distorm/include/distorm.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
@@ -1197,21 +1198,17 @@ c_exit(char *stackaddr)
     funcprint("c_exit");
 
     int i;
-    struct timespec ts, rem;
-    ts.tv_sec = 0;
-    ts.tv_nsec = 10000; // 10 ms
+    struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
 
     // ensure the circular buffer is empty
     for (i = 0; i < 100; i++) {
         if (cmdCbufEmpty(g_ctl)) break;
-        NSLEEP(&ts, &rem);
+        sigSafeNanosleep(&ts);
     }
 
     handleExit();
     // flush the data
-    ts.tv_sec = 0;
-    ts.tv_nsec = 1000;
-    NSLEEP(&ts, &rem);
+    sigSafeNanosleep(&ts);
 }
 
 EXPORTON void *

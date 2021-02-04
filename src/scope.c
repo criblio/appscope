@@ -26,6 +26,7 @@
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include "os.h"
+#include "utils.h"
 
 #define DEVMODE 0
 #define __NR_memfd_create   319
@@ -245,6 +246,7 @@ main(int argc, char **argv, char **env)
 
     // Use dlsym to get addresses for everything in g_fn
     initFn();
+    setPidEnv(getpid());
 
     info = setup_libscope();
     if (!info) {

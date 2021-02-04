@@ -14,6 +14,7 @@
 #include "mtcformat.h"
 #include "scopetypes.h"
 #include "com.h"
+#include "utils.h"
 
 #ifndef NO_YAML
 #include "yaml.h"
@@ -58,28 +59,6 @@
 #define ENABLE_NODE              "enable"
 #define DIR_NODE                 "dir"
 
-typedef struct {
-    const char* str;
-    unsigned val;
-} enum_map_t;
-
-unsigned strToVal(enum_map_t map[], const char* str)
-{
-    enum_map_t* m;
-    for (m=map; m->str; m++) {
-        if (!strcmp(str, m->str)) return m->val;
-    }
-    return -1;
-}
-
-const char* valToStr(enum_map_t map[], unsigned val)
-{
-    enum_map_t* m;
-    for (m=map; m->str; m++) {
-        if (val == m->val) return m->str;
-    }
-    return NULL;
-}
 
 enum_map_t formatMap[] = {
     {"statsd",                CFG_FMT_STATSD},

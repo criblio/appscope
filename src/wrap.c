@@ -670,84 +670,66 @@ reportPeriodicStuff(void)
     long mem;
     int nthread, nfds, children;
     long long cpu = 0;
-    bool perf;
     static long long cpuState = 0;
-    static time_t summaryTime = 0;
 
-    if (summaryTime == 0) {
-        summaryTime = time(NULL) + g_thread.interval;
+    // We report CPU time for this period.
+    cpu = doGetProcCPU();
+    if (cpu != -1) {
+        doProcMetric(PROC_CPU, cpu - cpuState);
+        cpuState = cpu;
     }
 
-    perf = checkEnv(PRESERVE_PERF_REPORTING, "true");
+    mem = osGetProcMemory(g_proc.pid);
+    if (mem != -1) doProcMetric(PROC_MEM, mem);
 
-    // Process any events that have been posted
-    if (perf == FALSE) {
-        doEvent();
-        doPayload();
+    nthread = osGetNumThreads(g_proc.pid);
+    if (nthread != -1) doProcMetric(PROC_THREAD, nthread);
+
+    nfds = osGetNumFds(g_proc.pid);
+    if (nfds != -1) doProcMetric(PROC_FD, nfds);
+
+    children = osGetNumChildProcs(g_proc.pid);
+    if (children < 0) {
+        children = 0;
     }
+    doProcMetric(PROC_CHILD, children);
 
-    if (time(NULL) >= summaryTime) {
-        // We report CPU time for this period.
-        cpu = doGetProcCPU();
-        if (cpu != -1) {
-            doProcMetric(PROC_CPU, cpu - cpuState);
-            cpuState = cpu;
-        }
+    // report totals (not by file descriptor/socket descriptor)
+    doTotal(TOT_READ);
+    doTotal(TOT_WRITE);
+    doTotal(TOT_RX);
+    doTotal(TOT_TX);
+    doTotal(TOT_SEEK);
+    doTotal(TOT_STAT);
+    doTotal(TOT_OPEN);
+    doTotal(TOT_CLOSE);
+    doTotal(TOT_DNS);
 
-        mem = osGetProcMemory(g_proc.pid);
-        if (mem != -1) doProcMetric(PROC_MEM, mem);
+    doTotal(TOT_PORTS);
+    doTotal(TOT_TCP_CONN);
+    doTotal(TOT_UDP_CONN);
+    doTotal(TOT_OTHER_CONN);
 
-        nthread = osGetNumThreads(g_proc.pid);
-        if (nthread != -1) doProcMetric(PROC_THREAD, nthread);
+    doTotalDuration(TOT_FS_DURATION);
+    doTotalDuration(TOT_NET_DURATION);
+    doTotalDuration(TOT_DNS_DURATION);
 
-        nfds = osGetNumFds(g_proc.pid);
-        if (nfds != -1) doProcMetric(PROC_FD, nfds);
+    // Report errors
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
 
-        children = osGetNumChildProcs(g_proc.pid);
-        if (children < 0) {
-            children = 0;
-        }
-        doProcMetric(PROC_CHILD, children);
+    // report net and file by descriptor
+    reportAllFds(PERIODIC);
 
-        // report totals (not by file descriptor/socket descriptor)
-        doTotal(TOT_READ);
-        doTotal(TOT_WRITE);
-        doTotal(TOT_RX);
-        doTotal(TOT_TX);
-        doTotal(TOT_SEEK);
-        doTotal(TOT_STAT);
-        doTotal(TOT_OPEN);
-        doTotal(TOT_CLOSE);
-        doTotal(TOT_DNS);
+    // empty the event queues
+    doEvent();
+    doPayload();
 
-        doTotal(TOT_PORTS);
-        doTotal(TOT_TCP_CONN);
-        doTotal(TOT_UDP_CONN);
-        doTotal(TOT_OTHER_CONN);
-
-        doTotalDuration(TOT_FS_DURATION);
-        doTotalDuration(TOT_NET_DURATION);
-        doTotalDuration(TOT_DNS_DURATION);
-
-        // Report errors
-        doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
-        doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
-        doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
-        doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
-        doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
-        doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
-
-        // report net and file by descriptor
-        reportAllFds(PERIODIC);
-        mtcFlush(g_mtc);
-
-        if (perf == TRUE) {
-            doEvent();
-            doPayload();
-        }
-
-        summaryTime = time(NULL) + g_thread.interval;
-    }
+    mtcFlush(g_mtc);
 }
 
 void
@@ -785,38 +767,52 @@ periodic(void *arg)
     sigset_t mask;
     sigfillset(&mask);
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
+    bool perf;
+    static time_t summaryTime;
+
+    summaryTime = time(NULL) + g_thread.interval;
+
+    perf = checkEnv(PRESERVE_PERF_REPORTING, "true");
 
     while (1) {
+        if (time(NULL) >= summaryTime) {
+            // Process dynamic config changes, if any
+            dynConfig();
 
-        // Process dynamic config changes, if any
-        dynConfig();
+            // TODO: need to ensure that the previous object is no longer in use
+            // Clean up previous objects if they exist.
+            //if (g_prevmtc) mtcDestroy(&g_prevmtc);
+            //if (g_prevlog) logDestroy(&g_prevlog);
 
-        // TODO: need to ensure that the previous object is no longer in use
-        // Clean up previous objects if they exist.
-        //if (g_prevmtc) mtcDestroy(&g_prevmtc);
-        //if (g_prevlog) logDestroy(&g_prevlog);
+            // Q: What does it mean to connect transports we expect to be
+            // "connectionless"?  A: We've observed some processes close all
+            // file/socket descriptors during their initialization.
+            // If this happens, this the way we manage re-init.
+            if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
+            if (logNeedsConnection(g_log)) logConnect(g_log);
 
-        // Q: What does it mean to connect transports we expect to be
-        // "connectionless"?  A: We've observed some processes close all
-        // file/socket descriptors during their initialization.
-        // If this happens, this the way we manage re-init.
-        if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
-        if (logNeedsConnection(g_log)) logConnect(g_log);
+            if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl) &&
+                g_sendprocessstart) {
+                // Hey we have a new connection!  Identify ourselves
+                // like reportProcessStart, but only on the event interface...
+                cJSON *json = msgStart(&g_proc, g_staticfg);
+                ctlSendJson(g_ctl, json);
+                ctlFlush(g_ctl);
+            }
 
-        if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl) &&
-            g_sendprocessstart) {
-            // Hey we have a new connection!  Identify ourselves
-            // like reportProcessStart, but only on the event interface...
-            cJSON *json = msgStart(&g_proc, g_staticfg);
-            ctlSendJson(g_ctl, json);
-            ctlFlush(g_ctl);
+            if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+                reportPeriodicStuff();
+                atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
+            }
+
+            summaryTime = time(NULL) + g_thread.interval;
+        } else if (perf == FALSE) {
+            if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+                doEvent();
+                doPayload();
+                atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
+            }
         }
-
-        if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
-            reportPeriodicStuff();
-            atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
-        }
-
         remoteConfig();
     }
 

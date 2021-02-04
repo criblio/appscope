@@ -99,6 +99,7 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 			Transport: ScopeTransport{
 				TransportType: "file",
 				Path:          filepath.Join(workDir, "events.json"),
+				Buffering:     "line",
 			},
 			Watch: []ScopeWatchConfig{
 				{

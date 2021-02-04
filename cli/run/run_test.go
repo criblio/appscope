@@ -182,6 +182,7 @@ event:
   transport:
     type: file
     path: EVENTSPATH
+    buffering: line
   watch:
   - type: file
     name: '[\s\/\\\.]log[s]?[\/\\\.]?'

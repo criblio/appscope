@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useStaticQuery, navigate } from "gatsby";
+import { Link, useStaticQuery } from "gatsby";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Container, Row, Col } from "react-bootstrap";
 import "../../utils/font-awesome";

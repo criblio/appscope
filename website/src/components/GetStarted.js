@@ -1,6 +1,5 @@
 import React from "react";
-import { useStaticQuery, graphql, Link } from "gatsby";
-import Img from "gatsby-image";
+import { useStaticQuery, graphql } from "gatsby";
 import { Container, Row, Col, Button } from "react-bootstrap";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import community from "../images/community.svg";
@@ -44,12 +43,16 @@ export default function GetStarted() {
                 {data.allReadyGetStartedYaml.edges[0].node.items.map(
                   (bullet, i) => {
                     return (
-                      <Link to={bullet.url}>
+                      <a href={bullet.url} key={i}>
                         <Button style={{ width: 250, marginRight: 30 }}>
-                          <FontAwesomeIcon icon={["fab", bullet.icon]} />
+                          {bullet.icon !== null ? (
+                            <FontAwesomeIcon icon={["fab", bullet.icon]} />
+                          ) : (
+                            ""
+                          )}
                           {" " + bullet.buttonText}
                         </Button>
-                      </Link>
+                      </a>
                     );
                   }
                 )}

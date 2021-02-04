@@ -707,8 +707,9 @@ main(int argc, char **argv) {
           }
           break;
       case 4:
+          sleep(1);
           verify[0] = "net.tx";
-          if (check_event(verify, 1) != -1) {
+          if (check_event(verify, 1) == -1) {
               fprintf(stderr, "Parent:ERROR:should not have an event for sending TTL\n");
               exit(-1);
           }

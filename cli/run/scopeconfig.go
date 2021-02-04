@@ -89,6 +89,7 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 			Transport: ScopeTransport{
 				TransportType: "file",
 				Path:          filepath.Join(workDir, "metrics.json"),
+				Buffering:     "line",
 			},
 		},
 		Event: ScopeEventConfig{

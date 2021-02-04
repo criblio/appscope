@@ -2,18 +2,11 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
 
 #include "circbuf.h"
 #include "cfgutils.h"
 #include "ctl.h"
 #include "dbg.h"
-#include "fn.h"
 
 struct _ctl_t
 {

@@ -41,7 +41,11 @@ Flags:
 Use "scope [command] --help" for more information about a command.
 ```
 
-As noted just above, to see a specific command's help or its required parameters, enter `./scope <command> -h` or `./scope help <command> [flags]`.
+As noted just above, to see a specific command's help or its required parameters, enter: 
+`./scope <command> -h` 
+
+…or: 
+`./scope help <command> [flags]`.
 
 ### dash
 ---
@@ -65,7 +69,7 @@ Displays an interactive dashboard with an overview of what's happening with the 
 
 ### events
 ---
-Outputs events for a session. You can obtain detailed information about each event by inputting the Event ID as a positional parameter. (By default, the Event ID appears in blue in []'s at the left.) You can provide filters to narrow down by name (e.g., `http`, `net`, `fs`, or `console`) or by field (e.g., `fs.open`, `stdout`, or `net.conn.open`). You can use JavaScript expressions to further refine the query and express logic.
+Outputs events for a session. You can obtain detailed information about each event by inputting the Event ID as a positional parameter. (By default, the Event ID appears in blue, in `[]`'s at the left.) You can provide filters to narrow down by name (e.g., `http`, `net`, `fs`, or `console`), or by field (e.g., `fs.open`, `stdout`, or `net.conn.open`). You can use JavaScript expressions to further refine the query, and to express logic.
 
 #### Usage
 
@@ -101,7 +105,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 
 ### extract
 ---
-Outputs `ldscope`, `libscope.so`, `scope.yml`, and `scope_protocol.yml` to the provided directory. These files can configured to instrument any application, and to output the data to any existing tool using simple TCP protocols. Libscope can easily be used with any dynamic or static application, regardless of the runtime.
+Outputs `ldscope`, `libscope.so`, `scope.yml`, and `scope_protocol.yml` to the provided directory. You can configure these files to instrument any application, and to output the data to any existing tool via simple TCP protocols. The `libscope` component can easily be used with any dynamic or static application, regardless of the runtime.
 
 #### Usage
   `scope extract (<dir>) [flags]`
@@ -250,7 +254,7 @@ scope version --summary
 ### --verbose
 ----
 
-This flag sets the verbosity level. `0` is least verbose, `4` is the default, and `9` is most verbose. For descriptions of individual levels, see [Appendix: Default Configuration](/docs/config-files).
+This flag sets the verbosity level. `0` is least verbose, `4` is the default, and `9` is most verbose. For descriptions of individual levels, see [Config Files](/docs/config-files).
 
 #### Usage
 

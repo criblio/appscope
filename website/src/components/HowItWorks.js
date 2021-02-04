@@ -39,7 +39,7 @@ export default function HowItWorks() {
         <Col xs={12} md={6} className="text-left">
           <h2>{data.allHowItWorksYaml.edges[0].node.title}</h2>
           {data.allHowItWorksYaml.edges[0].node.items.map((bullet, i) => {
-            return <p>{bullet.item}</p>;
+            return <p key={i}>{bullet.item}</p>;
           })}
           <Button
             style={{ width: 230 }}

@@ -48,15 +48,6 @@ typedef struct
     char cgroup[MAX_CGROUP];
 } proc_id_t;
 
-#define NSLEEP(now, remain) \
-    while (nanosleep(now, remain) != 0) { \
-        if (errno == EINTR) {             \
-            nanosleep(remain, NULL);      \
-        } else {                          \
-            break;                        \
-        }                                 \
-    }                                     \
-
 #define TRUE 1
 #define FALSE 0
 
@@ -116,7 +107,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_DNS FALSE
 #define DEFAULT_MTC_PORT "8125"
 #define DEFAULT_CTL_PORT "9109"
-#define DEFAULT_MAXEVENTSPERSEC 10000
+#define DEFAULT_MAXEVENTSPERSEC 100000
 #define DEFAULT_ENHANCE_FS TRUE
 #define DEFAULT_PORTBLOCK 0
 #define DEFAULT_METRIC_CBUF_SIZE 50 * 1024
@@ -138,10 +129,8 @@ typedef unsigned int bool;
 
 // we should start moving env var constants to one place
 #define THREAD_DELAY_LIST "SCOPE_THREAD_DELAY"
+#define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
-#define LOG_EVENT_CLIENT_SOCK "/tmp/scopecllog"
-#define LOG_EVENT_SERVER_SOCK "/tmp/scopesvlog"
-#define LOG_EVENT_BUF_SIZE 4096
 
 #endif // __SCOPETYPES_H__
 

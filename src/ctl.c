@@ -2,23 +2,14 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
 
 #include "circbuf.h"
 #include "cfgutils.h"
 #include "ctl.h"
 #include "dbg.h"
-#include "fn.h"
 
 struct _ctl_t
 {
-    int logclient;
-    int logserver;
     transport_t *transport;
     evt_fmt_t *evt;
     cbuf_handle_t events;
@@ -525,22 +516,10 @@ out:
 ctl_t *
 ctlCreate()
 {
-    int socks[2];
-
     ctl_t *ctl = calloc(1, sizeof(ctl_t));
     if (!ctl) {
         DBG(NULL);
         return NULL;
-    }
-
-    socketpair(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0, socks);
-    ctl->logserver = socks[0];
-    ctl->logclient = socks[1];
-
-    if ((ctl->logserver != -1) && (ctl->logclient != -1) && g_fn.fcntl) {
-        int flags = g_fn.fcntl(ctl->logclient, F_GETFL, NULL);
-        flags |= O_NONBLOCK;
-        g_fn.fcntl(ctl->logclient, F_SETFL, flags);
     }
 
     ctl->evbuf = cbufInit(DEFAULT_CBUF_SIZE);
@@ -576,9 +555,6 @@ ctlDestroy(ctl_t **ctl)
     ctlFlush(*ctl);
     cbufFree((*ctl)->evbuf);
     cbufFree((*ctl)->events);
-
-    if (g_fn.close && ((*ctl)->logserver != -1)) g_fn.close((*ctl)->logserver);
-    if (g_fn.close && ((*ctl)->logclient != -1)) g_fn.close((*ctl)->logclient);
 
     if ((*ctl)->payload.dir) free((*ctl)->payload.dir);
     cbufFree((*ctl)->payload.ringbuf);
@@ -728,20 +704,12 @@ ctlPostEvent(ctl_t *ctl, char *event)
     return 0;
 }
 
-/*
- * In order to ensure that we don't drop log messages
- * and console because of log data, we write to a blocking
- * socket and read from a non-blocking socket. The chance
- * that the app will block due to this is very slim. 
- */
 int
 ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t uid, proc_id_t *proc)
 {
-    if (!ctl || !path || !buf || !proc || !g_fn.write || (ctl->logserver == -1)) return -1;
+    if (!ctl || !path || !buf || !proc) return -1;
 
-    int rc = -1;
     upload_t upld;
-    size_t len;
 
     // get a cJSON object for the given log msg
     cJSON *json = evtFormatLog(ctl->evt, path, buf, count, uid, proc);
@@ -753,66 +721,14 @@ ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t
     char *msg = ctlCreateTxMsg(&upld);
     if (!msg) return -1;
 
-    len = strlen(msg);
-    char *temp = realloc(msg, len + 2); // room for "\n\0"
-    if (!temp) {
+    if (cbufPut(ctl->evbuf, (uint64_t)msg) == -1) {
+        // Full; drop and ignore
         DBG(NULL);
         if (msg) free(msg);
         return -1;
     }
 
-    msg = temp;
-    msg[len] = '\n';
-    msg[len + 1] = '\0';
-
-    size_t bytes_sent = 0;
-    size_t bytes_to_send = len + 1;
-
-    while (bytes_to_send > 0) {
-        rc = g_fn.write(ctl->logserver, &msg[bytes_sent], bytes_to_send);
-        if (rc <= 0) {
-            DBG(NULL);
-            break;
-        }
- 
-        bytes_sent += rc;
-        bytes_to_send -= rc;
-    }
-
-    if (msg) free(msg);
-    return rc;
-}
-
-void
-ctlFlushLog(ctl_t *ctl)
-{
-    if (!ctl || !g_fn.read || (ctl->logclient == -1)) return;
-
-    while (1) {
-        int rlen;
-        char *data = NULL;
-
-        // ask the os how much data is pending
-	    int buflen = 0;
-	    if (ioctl(ctl->logclient, FIONREAD, &buflen)) {
-                DBG(NULL);
-                return;
-        }
-	    if (!buflen) return;
-
-        if ((data = malloc(buflen)) == NULL) return;
-
-        rlen = g_fn.read(ctl->logclient, data, buflen);
-        if (rlen != buflen) {
-            // if we got interrupted, we'll just check next interval
-            DBG("rlen = %d, buflen = %d", rlen, buflen);
-            free(data);
-            return;
-        }
-
-        transportSend(ctl->transport, data, buflen);
-        if (data) free(data);
-    }
+    return 0;
 }
 
 static void
@@ -843,6 +759,12 @@ sendBufferedMessages(ctl_t *ctl)
             free(msg);
         }
     }
+}
+
+void
+ctlFlushLog(ctl_t *ctl)
+{
+    return sendBufferedMessages(ctl);
 }
 
 int
@@ -905,11 +827,6 @@ ctlTransportSet(ctl_t *ctl, transport_t *transport)
     // Don't leak if ctlTransportSet is called repeatedly
     transportDestroy(&ctl->transport);
     ctl->transport = transport;
-
-    if ((ctl->logserver != -1) && (ctl->logclient != -1)) {
-        ctl->logserver = transportSetFD(ctl->logserver, ctl->transport);
-        ctl->logclient = transportSetFD(ctl->logclient, ctl->transport);
-    }
 }
 
 cfg_transport_t

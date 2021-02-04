@@ -64,6 +64,4 @@ extern proc_id_t g_proc;
 
 void scopeLog(const char *, int, cfg_log_level_t);
 
-int checkEnv(char *, char *);
-
 #endif // __DBG_H__

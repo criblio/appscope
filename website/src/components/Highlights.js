@@ -1,9 +1,7 @@
 import React from "react";
 import { useStaticQuery, graphql } from "gatsby";
-import Img from "gatsby-image";
 import { Container, Row, Col } from "react-bootstrap";
 import "../scss/_highlights.scss";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import "../utils/font-awesome";
 
 export default function Highlights() {
@@ -44,7 +42,7 @@ export default function Highlights() {
     data.dash.publicURL,
   ];
 
-  const alt = ["Scope Metrics & Events", "Scope HTTP", "Scope Dashboard"];
+  //const alt = ["Scope Metrics & Events", "Scope HTTP", "Scope Dashboard"];
 
   return (
     <Container className="highlights">
@@ -53,7 +51,7 @@ export default function Highlights() {
       <Container>
         {data.allHighlightsYaml.edges[0].node.items.map((item, i) => {
           return (
-            <Row>
+            <Row key={i}>
               <Col
                 xs={{ span: 12, order: 2 }}
                 md={{ span: 6, order: item.order === 1 ? 2 : 1 }}
@@ -65,8 +63,7 @@ export default function Highlights() {
                   playsInline={true}
                   style={{ maxWidth: 90 + "%", margin: "10px auto" }}
                 >
-                  <source src={images[i]} type='video/mp4'>
-                  </source>
+                  <source src={images[i]} type="video/mp4"></source>
                 </video>
               </Col>
               <Col

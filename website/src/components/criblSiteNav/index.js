@@ -38,13 +38,13 @@ export default function CriblSiteNav() {
             {data.allCorpSiteNavYaml.edges[0].node.navigationLeft.map(
               (item, i) => {
                 return item.child === null ? (
-                  <Nav.Item>
+                  <Nav.Item key={i}>
                     <Nav.Link key={i} href={item.link}>
                       {item.parent}
                     </Nav.Link>
                   </Nav.Item>
                 ) : (
-                  <Nav.Item>
+                  <Nav.Item key={i}>
                     <NavDropdown
                       title={item.parent}
                       className="dropdown"

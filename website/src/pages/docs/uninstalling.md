@@ -11,7 +11,7 @@ You can uninstall AppScope by simply deleting the binary:
 rm -rf scope
 ```
 
-… and the associated history directory:
+…and the associated history directory:
 
 ```
 cd ~

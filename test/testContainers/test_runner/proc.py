@@ -8,7 +8,7 @@ from common import AppController
 
 class SubprocessAppController(AppController):
 
-    def __init__(self, start_command, name, scope_path, logs_path, start_wait=5, stop_wait=3):
+    def __init__(self, start_command, name, scope_path, logs_path, start_wait=5, stop_wait=11):
         super().__init__(name)
         self.logs_path = logs_path
         self.scope_path = scope_path

@@ -7,7 +7,7 @@ module.exports = {
     description:
       "AppScope is an open source instrumentation utility for any application, regardless of its runtime, with no code modification required. Collect only the data you need for full observability of your applications, systems and infrastructure.",
     url: "https://appscope.dev",
-    siteUrl: 'https://appscope.dev/',
+    siteUrl: "https://appscope.dev/",
     image: "/images/isoarchitecture.png",
     twitterUsername: "@cribl",
   },
@@ -24,7 +24,7 @@ module.exports = {
     {
       resolve: "gatsby-plugin-google-tagmanager",
       options: {
-        id: "G-PZXELDJWEZ",
+        id: "GTM-NNCJGH7",
         includeInDevelopment: false,
         defaultDataLayer: { platform: "gatsby" },
         routeChangeEventName: "gatsby-route-change",

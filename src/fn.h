@@ -25,6 +25,7 @@
 #ifndef io_context_t
 #define io_context_t unsigned long
 #endif
+typedef _G_fpos64_t fpos64_t;
 #endif
 
 #ifdef __MACOS__
@@ -229,6 +230,12 @@ typedef struct {
     int32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
                                       uint16_t, uint16_t, void *, void *);
 #endif // __MACOS__
+
+    // These functions are not interposed.  They're here because
+    // we've seen applications override the weak glibc implementation,
+    // where our library needs to use the glibc instance.
+    // setenv was overriden in bash.
+    int (*setenv)(const char *name, const char *value, int overwrite);
 } interposed_funcs_t;
 
 extern interposed_funcs_t g_fn;

@@ -48,15 +48,6 @@ typedef struct
     char cgroup[MAX_CGROUP];
 } proc_id_t;
 
-#define NSLEEP(now, remain) \
-    while (nanosleep(now, remain) != 0) { \
-        if (errno == EINTR) {             \
-            nanosleep(remain, NULL);      \
-        } else {                          \
-            break;                        \
-        }                                 \
-    }                                     \
-
 #define TRUE 1
 #define FALSE 0
 
@@ -138,10 +129,8 @@ typedef unsigned int bool;
 
 // we should start moving env var constants to one place
 #define THREAD_DELAY_LIST "SCOPE_THREAD_DELAY"
+#define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
-#define LOG_EVENT_CLIENT_SOCK "/tmp/scopecllog"
-#define LOG_EVENT_SERVER_SOCK "/tmp/scopesvlog"
-#define LOG_EVENT_BUF_SIZE 4096
 
 #endif // __SCOPETYPES_H__
 

@@ -25,6 +25,7 @@
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include "state.h"
+#include "utils.h"
 #include "wrap.h"
 #include "runtimecfg.h"
 #include "javaagent.h"
@@ -648,6 +649,7 @@ static void
 doReset()
 {
     setProcId(&g_proc);
+    setPidEnv(g_proc.pid);
 
     g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
@@ -754,13 +756,11 @@ void
 handleExit(void)
 {
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
-        struct timespec ts, rem;
-        ts.tv_sec = 0;
-        ts.tv_nsec = 10000; // 10 ms
+        struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
 
         // let the periodic thread finish
         while (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
-            NSLEEP(&ts, &rem);
+            sigSafeNanosleep(&ts);
         }
         doEvent();
     } else {
@@ -1050,6 +1050,7 @@ init(void)
     initFn();
 
     setProcId(&g_proc);
+    setPidEnv(g_proc.pid);
 
     initState();
 

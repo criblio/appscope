@@ -80,12 +80,12 @@ test: tests
 	./$(CJSON_TEST)
 
 .c.o:
-	$(CC) -c $(R_CFLAGS) $<
+	$(CC) -c -DENABLE_LOCALES $(R_CFLAGS) $<
 
 #tests
 #cJSON
 $(CJSON_TEST): $(CJSON_TEST_SRC) cJSON.h
-	$(CC) $(R_CFLAGS) $(CJSON_TEST_SRC)  -o $@ $(LDLIBS) -I.
+	$(CC) -DENABLE_LOCALES $(R_CFLAGS) $(CJSON_TEST_SRC)  -o $@ $(LDLIBS) -I.
 
 #static libraries
 #cJSON

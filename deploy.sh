@@ -19,7 +19,7 @@ cp ${DIR}/cli/build/{scope,ldscope,libscope.so,scope.yml,scope_protocol.yml} ${T
 cd ${TMPDIR} && tar cfz scope.tgz scope
 cd scope && md5sum scope > scope.md5 && cd -
 md5sum scope.tgz > scope.tgz.md5
-if [ -n "${LATEST}" ]; then
+if [[ -n "${LATEST}" && $LATEST != *-rc* ]]; then
     echo $LATEST > ${TMPDIR}/latest
     aws s3 cp ${TMPDIR}/latest s3://io.cribl.cdn/dl/scope/
 fi

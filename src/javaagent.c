@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "dbg.h"
 #include "fn.h"
 #include "os.h"

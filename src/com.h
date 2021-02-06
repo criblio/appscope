@@ -1,7 +1,6 @@
 #ifndef __COM_H__
 #define __COM_H__
 
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>

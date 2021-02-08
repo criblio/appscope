@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var rc *run.Config = &run.Config{}
+
 // runCmd represents the run command
 var runCmd = &cobra.Command{
 	Use:   "run [flags]",
@@ -22,22 +24,17 @@ scope run --payloads -- nc -lp 10001
 scope run -- curl https://wttr.in/94105`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		passthrough, _ := cmd.Flags().GetBool("passthrough")
-		verbosity, _ := cmd.Flags().GetInt("verbosity")
-		payloads, _ := cmd.Flags().GetBool("payloads")
-		rc := run.Config{
-			Passthrough: passthrough,
-			Verbosity:   verbosity,
-			Payloads:    payloads,
-		}
 		rc.Run(args)
 	},
 }
 
 func init() {
-	runCmd.Flags().Bool("passthrough", false, "Runs scopec with current environment & no config.")
-	runCmd.Flags().IntP("verbosity", "v", 4, "Set scope metric verbosity")
-	runCmd.Flags().BoolP("payloads", "p", false, "Capture payloads of network transactions")
+	runCmd.Flags().BoolVar(&rc.Passthrough, "passthrough", false, "Runs scopec with current environment & no config.")
+	runCmd.Flags().IntVarP(&rc.Verbosity, "verbosity", "v", 4, "Set scope metric verbosity")
+	runCmd.Flags().BoolVarP(&rc.Payloads, "payloads", "p", false, "Capture payloads of network transactions")
+	runCmd.Flags().StringVar(&rc.MetricsFormat, "metricformat", "ndjson", "Set format of metrics output (statsd|ndjson)")
+	runCmd.Flags().StringVarP(&rc.MetricsDest, "metricdest", "m", "", "Set destination for metrics (tcp://host:port, udp://host:port, or file:///path/file.json)")
+	runCmd.Flags().StringVarP(&rc.EventsDest, "eventdest", "e", "", "Set destination for events (tcp://host:port, udp://host:port, or file:///path/file.json)")
 	// This may be a bad assumption, if we have any args preceding this it might fail
 	runCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		internal.InitConfig()

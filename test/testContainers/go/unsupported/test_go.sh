@@ -1,14 +1,12 @@
 #! /bin/bash
 
-DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
+DEBUG=0  # set this to 1 to capture the LOG_FILE for each test
 
 FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
-EVT_FILE="/go/events.log"
-touch $EVT_FILE
-STDERR_FILE="/go/stdout.txt"
-touch $STDERR_FILE
+LOG_FILE="/go/logs.txt"
+touch $LOG_FILE
 
 starttest(){
     CURRENT_TEST=$1
@@ -36,13 +34,12 @@ endtest(){
     echo ""
     echo ""
 
-    # copy the EVT_FILE to help with debugging
+    # copy the LOG_FILE to help with debugging
     if (( $DEBUG )) || [ $RESULT == "FAILED" ]; then
-        cp $EVT_FILE $EVT_FILE.$CURRENT_TEST
+        cp $LOG_FILE $LOG_FILE.$CURRENT_TEST
     fi
 
-    rm $EVT_FILE
-    rm $STDERR_FILE
+    rm $LOG_FILE
 }
 
 
@@ -52,7 +49,7 @@ endtest(){
 starttest plainServerDynamic
 cd /go/net
 PORT=80
-ldscope ./plainServerDynamic ${PORT} 2>${STDERR_FILE} &
+ldscope ./plainServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -68,7 +65,7 @@ sleep 0.5
 
 evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+grep "Continuing without AppScope." ${LOG_FILE}
 ERR+=$?
 
 endtest
@@ -80,7 +77,7 @@ endtest
 starttest plainServerStatic
 cd /go/net
 PORT=81
-ldscope ./plainServerStatic ${PORT} 2>${STDERR_FILE} &
+ldscope ./plainServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -96,7 +93,7 @@ sleep 0.5
 
 evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+grep "Continuing without AppScope." ${LOG_FILE}
 ERR+=$?
 
 endtest
@@ -108,7 +105,7 @@ endtest
 starttest tlsServerDynamic
 cd /go/net
 PORT=4430
-ldscope ./tlsServerDynamic ${PORT} 2>${STDERR_FILE} &
+ldscope ./tlsServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -124,7 +121,7 @@ sleep 0.5
 
 evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+grep "Continuing without AppScope." ${LOG_FILE}
 ERR+=$?
 
 endtest
@@ -136,7 +133,7 @@ endtest
 starttest tlsServerStatic
 cd /go/net
 PORT=4431
-ldscope ./tlsServerStatic ${PORT} 2>${STDERR_FILE} &
+ldscope ./tlsServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -152,7 +149,7 @@ sleep 0.5
 
 evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+grep "Continuing without AppScope." ${LOG_FILE}
 ERR+=$?
 
 endtest
@@ -163,7 +160,7 @@ endtest
 #
 starttest plainClientDynamic
 cd /go/net
-ldscope ./plainClientDynamic 2>${STDERR_FILE}
+ldscope ./plainClientDynamic
 ERR+=$?
 
 # this sleep gives plainClientDynamic a chance to report its events on exit
@@ -171,7 +168,7 @@ sleep 0.5
 
 evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+grep "Continuing without AppScope." ${LOG_FILE}
 ERR+=$?
 
 endtest
@@ -182,7 +179,7 @@ endtest
 #
 starttest plainClientStatic
 cd /go/net
-ldscope ./plainClientStatic 2>${STDERR_FILE}
+ldscope ./plainClientStatic
 ERR+=$?
 
 # this sleep gives plainClientStatic a chance to report its events on exit
@@ -190,7 +187,7 @@ sleep 0.5
 
 evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+grep "Continuing without AppScope." ${LOG_FILE}
 ERR+=$?
 
 endtest
@@ -201,7 +198,7 @@ endtest
 #
 starttest tlsClientDynamic
 cd /go/net
-ldscope ./tlsClientDynamic 2>${STDERR_FILE}
+ldscope ./tlsClientDynamic
 ERR+=$?
 
 # this sleep gives tlsClientDynamic a chance to report its events on exit
@@ -209,7 +206,7 @@ sleep 0.5
 
 evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+grep "Continuing without AppScope." ${LOG_FILE}
 ERR+=$?
 
 endtest
@@ -220,7 +217,7 @@ endtest
 #
 starttest tlsClientStatic
 cd /go/net
-ldscope ./tlsClientStatic 2>${STDERR_FILE}
+ldscope ./tlsClientStatic
 ERR+=$?
 
 # this sleep gives tlsClientStatic a chance to report its events on exit
@@ -228,7 +225,7 @@ sleep 0.5
 
 evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+grep "Continuing without AppScope." ${LOG_FILE}
 ERR+=$?
 
 endtest
@@ -239,11 +236,11 @@ endtest
 #
 starttest fileThread
 cd /go/thread
-ldscope ./fileThread 2>${STDERR_FILE}
+ldscope ./fileThread
 ERR+=$?
 evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+grep "Continuing without AppScope." ${LOG_FILE}
 ERR+=$?
 
 endtest
@@ -254,11 +251,11 @@ endtest
 #
 starttest cgoDynamic
 cd /go/cgo
-LD_LIBRARY_PATH=. ldscope ./cgoDynamic 2>${STDERR_FILE}
+LD_LIBRARY_PATH=. ldscope ./cgoDynamic
 ERR+=$?
 evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+grep "Continuing without AppScope." ${LOG_FILE}
 ERR+=$?
 
 endtest
@@ -269,12 +266,12 @@ endtest
 #
 starttest cgoStatic
 cd /go/cgo
-ldscope ./cgoStatic 2>${STDERR_FILE}
+ldscope ./cgoStatic
 ERR+=$?
 
 evaltest
 
-grep "was compiled with a version of go older than go1.8" ${STDERR_FILE}
+grep "Continuing without AppScope." ${LOG_FILE}
 ERR+=$?
 
 endtest
@@ -294,7 +291,7 @@ else
     echo "Failed tests: $FAILED_TEST_LIST"
     echo "Refer to these files for more info:"
     for FAILED_TEST in $FAILED_TEST_LIST; do
-        echo "  $EVT_FILE.$FAILED_TEST"
+        echo "  $LOG_FILE.$FAILED_TEST"
     done
 fi
 

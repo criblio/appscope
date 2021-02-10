@@ -4,7 +4,6 @@
     - icon: github
       url: https://github.com/criblio/appscope
       buttonText: Fork On Github
-    - icon: 
-      url: https://cribl.io/community
+    - icon:
+      url: https://cribl.io/community?utm_source=appscope&utm_medium=footer&utm_campaign=appscope
       buttonText: Join Our Community
-   

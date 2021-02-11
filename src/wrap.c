@@ -999,34 +999,38 @@ initHook()
         dlclose(handle);
     }
 
-    funchook = funchook_create();
+    if (should_we_patch || g_fn.sendmmsg) {
+        funchook = funchook_create();
 
-    if (logLevel(g_log) <= CFG_LOG_DEBUG) {
-        // TODO: add some mechanism to get the config'd log file path
-        funchook_set_debug_file(DEFAULT_LOG_PATH);
-    }
+        if (logLevel(g_log) <= CFG_LOG_DEBUG) {
+            // TODO: add some mechanism to get the config'd log file path
+            funchook_set_debug_file(DEFAULT_LOG_PATH);
+        }
 
-    if (should_we_patch) {
-        g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
+        if (should_we_patch) {
+            g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
     
-        rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
+            rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
 
-        g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
+            g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
 
-        rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
-    }
+            rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
+        }
 
-    // sendmmsg for internal libc use in DNS queries
-    rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, sendmmsg);
+        // sendmmsg for internal libc use in DNS queries
+        if (g_fn.sendmmsg) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, sendmmsg);
+        }
 
-    // hook 'em
-    rc = funchook_install(funchook, 0);
-    if (rc != 0) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "ERROR: failed to install SSL_read hook. (%s)\n",
-                funchook_error_message(funchook));
-        scopeLog(buf, -1, CFG_LOG_ERROR);
-        return;
+        // hook 'em
+        rc = funchook_install(funchook, 0);
+        if (rc != 0) {
+            char buf[128];
+            snprintf(buf, sizeof(buf), "ERROR: failed to install SSL_read hook. (%s)\n",
+                     funchook_error_message(funchook));
+            scopeLog(buf, -1, CFG_LOG_ERROR);
+            return;
+        }
     }
 }
 #else

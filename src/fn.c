@@ -82,11 +82,9 @@ initFn(void)
     g_fn.send = dlsym(RTLD_NEXT, "send");
     g_fn.sendto = dlsym(RTLD_NEXT, "sendto");
     g_fn.sendmsg = dlsym(RTLD_NEXT, "sendmsg");
-    g_fn.sendmmsg = dlsym(RTLD_NEXT, "sendmmsg");
     g_fn.recv = dlsym(RTLD_NEXT, "recv");
     g_fn.recvfrom = dlsym(RTLD_NEXT, "recvfrom");
     g_fn.recvmsg = dlsym(RTLD_NEXT, "recvmsg");
-    g_fn.recvmmsg = dlsym(RTLD_NEXT, "recvmmsg");
     g_fn.gethostbyname = dlsym(RTLD_NEXT, "gethostbyname");
     g_fn.gethostbyname2 = dlsym(RTLD_NEXT, "gethostbyname2");
     g_fn.getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo");
@@ -164,6 +162,8 @@ initFn(void)
     g_fn.PR_FileDesc2NativeHandle = dlsym(RTLD_NEXT, "PR_FileDesc2NativeHandle");
     g_fn.PR_SetError = dlsym(RTLD_NEXT, "PR_SetError");
     g_fn.__overflow = dlsym(RTLD_NEXT, "__overflow");
+    g_fn.sendmmsg = dlsym(RTLD_NEXT, "sendmmsg");
+    g_fn.recvmmsg = dlsym(RTLD_NEXT, "recvmmsg");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__

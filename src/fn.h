@@ -1,8 +1,6 @@
 #ifndef __FN_H__
 #define __FN_H__
 
-#define _GNU_SOURCE
-#define __USE_LARGEFILE64 1
 #include <wchar.h>
 #include <sys/statvfs.h>
 #include <netdb.h>
@@ -25,7 +23,6 @@
 #ifndef io_context_t
 #define io_context_t unsigned long
 #endif
-typedef _G_fpos64_t fpos64_t;
 #endif
 
 #ifdef __MACOS__

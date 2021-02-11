@@ -27,7 +27,6 @@ int getElfEntries(struct link_map *, Elf64_Rela **, Elf64_Sym **, char **, int *
 void * getSymbol(const char *, char *);
 bool is_static(char *);
 bool is_go(char *);
-char *getpath(const char *);
 
 #endif // __LINUX__
 

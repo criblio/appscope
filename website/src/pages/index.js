@@ -1,14 +1,18 @@
 import * as React from "react";
+import Helmet from "react-helmet";
 import Header from "../components/Header";
 import Hero from "../components/Hero";
 import Highlights from "../components/Highlights";
-import TwoCol from "../components/TwoCol";
-import Alert from "../components/Alert";
 import MobileHeader from "../components/MobileHeader";
-
+import Footer from "../components/Footer";
+import WhyAppScope from "../components/WhyAppScope";
+import HowItWorks from "../components/HowItWorks";
+import GetStarted from "../components/GetStarted";
+import SEO from "../components/SEO";
 const IndexPage = () => {
   return (
     <main>
+      <SEO />
       {/* <Alert /> */}
       <div className="display-xs">
         <MobileHeader />
@@ -19,7 +23,10 @@ const IndexPage = () => {
       </div>
       <Hero />
       <Highlights />
-      <TwoCol />
+      <WhyAppScope />
+      <HowItWorks />
+      <GetStarted />
+      <Footer />
     </main>
   );
 };

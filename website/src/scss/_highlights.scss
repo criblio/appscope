@@ -5,19 +5,30 @@
   display: flex;
   justify-content: center;
   flex-direction: column;
-
+  align-items: center;
+  padding-left: 25px;
+  padding-right: 25px;
   .row {
     display: flex;
     justify-content: center;
-
+    align-items: center;
+    padding: 10px 0;
+    &:first-of-type {
+      padding: 0 0 50px 0;
+    }
     h3 {
       color: $orange;
       font-size: 90px;
     }
 
     .highlight-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
       max-width: 360px;
       margin: 0 35px;
+      padding-top: 50px;
     }
   }
 }

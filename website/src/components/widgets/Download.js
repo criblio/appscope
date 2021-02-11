@@ -5,7 +5,7 @@ import "../../scss/_download.scss";
 import "../../utils/font-awesome";
 export default function Download(props) {
   return (
-    <Link to="/" className="download">
+    <Link to="/docs/installing" className="download">
       <FontAwesomeIcon icon={"download"} />
       <span> {props.btnText}</span>
     </Link>

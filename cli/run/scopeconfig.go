@@ -89,6 +89,7 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 			Transport: ScopeTransport{
 				TransportType: "file",
 				Path:          filepath.Join(workDir, "metrics.json"),
+				Buffering:     "line",
 			},
 		},
 		Event: ScopeEventConfig{
@@ -99,6 +100,7 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 			Transport: ScopeTransport{
 				TransportType: "file",
 				Path:          filepath.Join(workDir, "events.json"),
+				Buffering:     "line",
 			},
 			Watch: []ScopeWatchConfig{
 				{
@@ -150,7 +152,7 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 				Level: "error",
 				Transport: ScopeTransport{
 					TransportType: "file",
-					Path:          filepath.Join(workDir, "scopec.log"),
+					Path:          filepath.Join(workDir, "ldscope.log"),
 					Buffering:     "line",
 				},
 			},

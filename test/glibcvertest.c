@@ -5,11 +5,11 @@
 
 #include "test.h"
 
-// memcpy is using GLIBC_2.14, which is way newer than anything else we
+// memcpy is using GLIBC_2.14, which is newer than anything else we
 // depend on.  This dependency on a relatively new GLIBC can be avoided
 // by using memmove instead which only needs GLIBC_2.2.5
 //
-// At the moment, GLIBC_2.4 is the newest thing we need.  This test was
+// At the moment, GLIBC_2.12 is the newest thing we need.  This test was
 // written to be the canary in the coal mine if this changes...  We'd
 // expect it to fail if someone writes code that uses memcpy instead of
 // memmove, or adds some other new dependency on a new version of glibc.
@@ -36,6 +36,10 @@ static const char* ok_private_funcs[] = {
     "_dl_sym",
     "_dl_argv",
     "__ctype_init"
+};
+
+static const char* funcs_to_avoid[] = {
+    "setenv",
 };
 
 static const char*
@@ -179,6 +183,52 @@ testEachLineInStreamWithActualLibraryData(void** state)
     //fclose(f_out);
 }
 
+// This test was created after we found that setenv was overridden in bash.
+// When our library called setenv within a bash process, it did not
+// work as expected, because the glibc version was not getting called.
+// (in this case not even indirectly through bash!)
+//
+// We can work around this by ensuring we call glibc functions directly.
+// See g_fn.setenv for an example of how to do this.
+//
+// Rather than let this kind of problem happen again silently, let's
+// detect at build-time if we're using any (glibc) functions we've had
+// troubles with.  Most of glibc's exported symbols are WEAK, and therefore
+// could theoretically be in this category, but it seems particularly
+// strange that bash didn't ever call glibc's setenv.  Until it becomes
+// necessary to stop using glibc funcs altogether, this can be the list
+// of those we want to avoid for now.
+static void
+testLibraryUsesFunctionsWeShouldNot(void **state)
+{
+    FILE* f_in = popen("nm ./lib/linux/libscope.so", "r");
+    unsigned int lines_failed = 0;
+
+    char line[1024];
+    while (getNextLine(f_in, line, sizeof(line))) {
+        removeNewline(line);
+
+        int i, found = 0;
+        for (i=0; i<sizeof(funcs_to_avoid)/sizeof(funcs_to_avoid[0]); i++) {
+            char pattern[1024];
+            snprintf(pattern, sizeof(pattern), " U %s@", funcs_to_avoid[i]);
+            if (strstr(line, pattern)) {
+                found = 1;
+                break;
+            }
+        }
+        if (found) {
+            fprintf(stdout, "glibc symbol: '%s' is a function that we don't want to use\n", line);
+            lines_failed++;
+        }
+    }
+
+    if (lines_failed) {
+        fail_msg("test failed with %u glibc functions we don't want to use.\n", lines_failed);
+    }
+
+    pclose(f_in);
+}
 
 int
 main(int argc, char* argv[])
@@ -187,6 +237,7 @@ main(int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(testEachLineInStreamWorksWithCannedData),
         cmocka_unit_test(testEachLineInStreamWithActualLibraryData),
+        cmocka_unit_test(testLibraryUsesFunctionsWeShouldNot),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

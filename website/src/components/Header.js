@@ -1,8 +1,6 @@
 import React from "react";
 import { Container, Col, Nav } from "react-bootstrap";
 import { useStaticQuery, graphql } from "gatsby";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronDown } from "@fortawesome/free-solid-svg-icons";
 import StarCount from "./widgets/StarCount";
 import Download from "./widgets/Download";
 import CriblSiteNav from "./criblSiteNav";
@@ -47,7 +45,12 @@ export default function Header() {
             {data.allHeaderYaml.edges.map((item, i) => {
               return (
                 <Nav.Item key={i}>
-                  <Nav.Link href={item.node.path}>{item.node.name} </Nav.Link>
+                  <Nav.Link
+                    href={item.node.path}
+                    activestyle={{ color: "#FD6600", fontWeight: 700 }}
+                  >
+                    {item.node.name}{" "}
+                  </Nav.Link>
                 </Nav.Item>
               );
             })}

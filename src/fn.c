@@ -186,5 +186,11 @@ initFn(void)
     g_fn.usleep = dlsym(RTLD_NEXT, "usleep");
     g_fn.io_getevents = dlsym(RTLD_NEXT, "io_getevents");
 
+    // These functions are not interposed.  They're here because
+    // we've seen applications override the weak glibc implementation,
+    // where our library needs to use the glibc instance.
+    // setenv was overriden in bash.
+    g_fn.setenv = dlsym(RTLD_NEXT, "setenv");
+
 #endif // __LINUX__
 }

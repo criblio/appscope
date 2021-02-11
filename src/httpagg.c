@@ -1,39 +1,15 @@
+#define _GNU_SOURCE
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
 #include "com.h"
 #include "dbg.h"
 #include "httpagg.h"
+#include "utils.h"
 
 
 #define DEFAULT_TARGET_LEN ( 128 )
 #define MAX_CODE_ENTRIES ( 64 )
-
-typedef struct {
-    const char* str;
-    unsigned val;
-} enum_map_t;
-
-static unsigned
-strToVal(enum_map_t map[], const char* str)
-{
-    enum_map_t* m;
-    for (m=map; m->str; m++) {
-        if (!strcmp(str, m->str)) return m->val;
-    }
-    return -1;
-}
-
-static const char*
-valToStr(enum_map_t map[], unsigned val)
-{
-    enum_map_t* m;
-    for (m=map; m->str; m++) {
-        if (val == m->val) return m->str;
-    }
-    return NULL;
-}
-
 
 typedef enum {
     SERVER_DURATION,

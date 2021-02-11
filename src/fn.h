@@ -1,8 +1,6 @@
 #ifndef __FN_H__
 #define __FN_H__
 
-#define _GNU_SOURCE
-#define __USE_LARGEFILE64 1
 #include <wchar.h>
 #include <sys/statvfs.h>
 #include <netdb.h>
@@ -230,6 +228,12 @@ typedef struct {
     int32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
                                       uint16_t, uint16_t, void *, void *);
 #endif // __MACOS__
+
+    // These functions are not interposed.  They're here because
+    // we've seen applications override the weak glibc implementation,
+    // where our library needs to use the glibc instance.
+    // setenv was overriden in bash.
+    int (*setenv)(const char *name, const char *value, int overwrite);
 } interposed_funcs_t;
 
 extern interposed_funcs_t g_fn;

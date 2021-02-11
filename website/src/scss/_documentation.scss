@@ -1,19 +1,112 @@
 @import "_vars";
-
+#docsContainer {
+  padding: 50px 20px;
+}
 .documentation {
   .code-container {
-    padding: 10px;
-    p {
-      margin-bottom: 0;
-      padding: 0 0 10px 0;
-    }
+    position: relative;
+    z-index: 1;
+    padding: 0 10px;
   }
   .gatsby-highlight {
     font-size: 0.5rem;
   }
+  h1 {
+    font-size: 1rem;
+  }
+  h2 {
+    font-size: 0.8rem;
+  }
+  h3 {
+    font-size: 0.65rem;
+  }
+  h4 {
+    font-size: 0.5rem;
+  }
+  h5 {
+    font-size: 0.4rem;
+  }
+  h6 {
+    font-size: 0.3rem;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin-top: 30px;
+    margin-bottom: 10px;
+  }
+  p,
+  ol,
+  li,
+  code {
+    font-size: 16px;
+    margin: 15px 0;
+  }
+  pre {
+    font-size: 16px;
+    margin: 10px 0;
+  }
+  ol {
+    padding: 0;
+  }
+  li {
+    margin: 5px 0;
+  }
+  li p {
+    padding: 0;
+    margin: 0;
+  }
+  li ul {
+    margin: 0;
+    li {
+      list-style-type: none;
+      &::before {
+        content: " \203a  ";
+        font-size: 18px;
+        color: $orange;
+      }
+      code {
+        color: #2d9b0d;
+        background: none;
+        padding: 0;
+        border-radius: 0%;
+      }
+    }
+  }
 }
+
+p code {
+  color: #2d9b0d;
+  background: none;
+  padding: 0;
+  border-radius: 0%;
+}
+
 .TOC {
   @media (max-width: 767px) {
     display: none;
+  }
+}
+.darkMode {
+  background: $black;
+  color: #fff;
+  .docsNav {
+    a {
+      color: #fff;
+    }
+  }
+  img {
+    box-shadow: none !important;
+  }
+}
+@media (max-width: 767px) {
+  #docsContainer {
+    padding-top: 0 !important;
+    .align-items-start {
+      margin-top: 50px !important;
+    }
   }
 }

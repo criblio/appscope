@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,8 +12,8 @@ struct _ctl_t
 {
     transport_t *transport;
     evt_fmt_t *evt;
-    cbuf_handle_t evbuf;
     cbuf_handle_t events;
+    cbuf_handle_t evbuf;
     unsigned enhancefs;
 
     struct {
@@ -440,7 +441,7 @@ err:
 static cJSON *
 create_evt_json(upload_t *upld)
 {
-    cJSON* json_root = NULL;
+    cJSON *json_root = NULL;
     if (!upld || !upld->body) goto err;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
@@ -568,7 +569,7 @@ ctlDestroy(ctl_t **ctl)
 void
 ctlSendMsg(ctl_t *ctl, char *msg)
 {
-    if (!msg) return;
+if (!msg) return;
     if (!ctl) {
         free(msg);
         return;
@@ -708,12 +709,26 @@ ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t
 {
     if (!ctl || !path || !buf || !proc) return -1;
 
+    upload_t upld;
+
     // get a cJSON object for the given log msg
     cJSON *json = evtFormatLog(ctl->evt, path, buf, count, uid, proc);
-    if (!json) return 0;
+    if (!json) return -1;
 
-    // send it
-    return ctlPostMsg(ctl, json, UPLD_EVT, NULL, FALSE);
+    upld.type = UPLD_EVT;
+    upld.body = json;
+    upld.req = NULL;
+    char *msg = ctlCreateTxMsg(&upld);
+    if (!msg) return -1;
+
+    if (cbufPut(ctl->evbuf, (uint64_t)msg) == -1) {
+        // Full; drop and ignore
+        DBG(NULL);
+        if (msg) free(msg);
+        return -1;
+    }
+
+    return 0;
 }
 
 static void
@@ -746,6 +761,12 @@ sendBufferedMessages(ctl_t *ctl)
     }
 }
 
+void
+ctlFlushLog(ctl_t *ctl)
+{
+    return sendBufferedMessages(ctl);
+}
+
 int
 ctlSendBin(ctl_t *ctl, char *buf, size_t len)
 {
@@ -758,6 +779,7 @@ void
 ctlFlush(ctl_t *ctl)
 {
     if (!ctl) return;
+
     sendBufferedMessages(ctl);
     transportFlush(ctl->transport);
 }

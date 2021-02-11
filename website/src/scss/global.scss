@@ -19,7 +19,7 @@ body {
   overflow: hidden;
 }
 .container {
-  max-width: 1470px;
+  max-width: 1400px;
 }
 .container,
 .container-fluid {
@@ -33,10 +33,15 @@ body {
   h6 {
     margin-bottom: 30px;
     font-weight: bold;
+
+    @media (max-width: 767px) {
+      padding: 0 20px;
+    }
   }
 
   h1 {
     font-size: 2rem;
+    padding: 0;
   }
 
   h2 {
@@ -74,7 +79,7 @@ body {
     }
   }
   button {
-    background: $orange;
+    background: $blue;
     border: none;
     border-radius: 2px;
     width: 185px;
@@ -84,9 +89,17 @@ body {
     @media (min-width: 768px) {
       font-size: 0.45rem;
     }
+    @media (max-width: 768px) {
+      margin-left: 20px;
+      margin-bottom: 20px;
+    }
+    &:hover {
+      background: $blue;
+      opacity: 0.8;
+    }
   }
   @media (min-width: 768px) {
-    padding: 100px 0;
+    padding: 50px 0;
   }
 }
 .alert {
@@ -102,14 +115,43 @@ body {
 .display-xs {
   display: none;
 
-  @media (max-width: 767px) {
+  @media (max-width: 899px) {
     display: block;
   }
 }
 
 .display-md {
   display: none;
-  @media (min-width: 768px) {
+  nav {
+    background: #fff;
+  }
+  @media (min-width: 900px) {
     display: block;
   }
+}
+p code {
+  background: $black;
+  color: #fff;
+  font-size: 0.5rem;
+  border-radius: 3px;
+  padding: 2px 5px;
+}
+pre {
+  background: $darkgray3;
+  padding: 5px 20px;
+  border-radius: 6px;
+  display: flex;
+  color: #fff;
+  font-size: 0.4rem;
+}
+nav {
+  position: fixed;
+  width: 100%;
+  z-index: 10000000000;
+  //background: #fff;
+  border-bottom: 1px solid $blue;
+}
+
+code {
+  color: #2d9b0d;
 }

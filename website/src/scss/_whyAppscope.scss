@@ -1,0 +1,107 @@
+@import "_vars";
+
+.whyAppScope {
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  .container {
+    padding: 0;
+  }
+
+  .row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 0;
+    &:first-of-type {
+      padding: 0 0 50px 0;
+    }
+    h3 {
+      color: $blue;
+      font-size: 90px;
+    }
+
+    .highlight-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      max-width: 360px;
+      margin: 0 35px;
+      padding-top: 50px;
+      min-height: 440px;
+    }
+  }
+}
+
+.highlights-fluid {
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  padding: 35px;
+  h2 {
+    padding-bottom: 0;
+    margin-bottom: 0;
+
+    font-weight: 700;
+    @media (min-width: 768px) {
+      padding-bottom: 30px;
+    }
+  }
+  p {
+    margin-bottom: 50px;
+  }
+  .row {
+    display: flex;
+    justify-content: center;
+
+    h3 {
+      color: $orange;
+      font-size: 90px;
+    }
+
+    .highlight-col {
+      max-width: 360px;
+      margin: 0 35px;
+    }
+  }
+  @media (min-width: 768px) {
+    padding: 75px;
+  }
+}
+
+.highlights-cards {
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  color: $black;
+  padding: 50px 10px;
+  .card {
+    margin: 15px 0;
+  }
+  h2 {
+    text-transform: capitalize;
+    font-weight: 700;
+  }
+  p {
+    margin-bottom: 50px;
+  }
+  .row {
+    display: flex;
+    justify-content: center;
+
+    h3 {
+      color: $orange;
+      font-size: 90px;
+    }
+
+    .highlight-col {
+      max-width: 360px;
+      margin: 0 35px;
+    }
+  }
+}

@@ -15,7 +15,10 @@ export default function StarCount() {
   }, []);
 
   return (
-    <div className="starCount-container">
+    <a
+      className="starCount-container"
+      href="https://github.com/criblio/appscope"
+    >
       <div className="gitLogo">
         <FontAwesomeIcon icon={["fab", "github-square"]} />
       </div>
@@ -25,6 +28,6 @@ export default function StarCount() {
           {starsCount > 999 ? (starsCount / 1000).toFixed(1) + "K" : starsCount}
         </span>
       </div>
-    </div>
+    </a>
   );
 }

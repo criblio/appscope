@@ -1,19 +1,7 @@
 import React, { useState } from "react";
-import {
-  Tabs,
-  Tab,
-  Navbar,
-  Nav,
-  NavDropdown,
-  Form,
-  FormControl,
-  Button,
-} from "react-bootstrap";
+import { Tabs, Tab, Navbar, Nav, NavDropdown } from "react-bootstrap";
 import { useStaticQuery, graphql } from "gatsby";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronDown } from "@fortawesome/free-solid-svg-icons";
-// import StarCount from "./widgets/StarCount";
-// import CriblSiteNav from "./criblSiteNav";
 import logo from "../images/logo-appscope.svg";
 import criblLogo from "../images/logo-cribl-new.svg";
 
@@ -34,14 +22,6 @@ export default function MobileHeader() {
         edges {
           node {
             navigationLeft {
-              url
-              parent
-              child {
-                link
-                url
-              }
-            }
-            navigationRight {
               parent
               child {
                 link
@@ -104,29 +84,18 @@ export default function MobileHeader() {
               {data.allCorpSiteNavYaml.edges[0].node.navigationLeft.map(
                 (item, i) => {
                   return item.child === null ? (
-                    <Nav.Link href={item.url}>{item.parent}</Nav.Link>
+                    <Nav.Link href={item.url} key={i}>
+                      {item.parent}
+                    </Nav.Link>
                   ) : (
-                    <NavDropdown title={item.parent} id="basic-nav-dropdown">
+                    <NavDropdown
+                      title={item.parent}
+                      id="basic-nav-dropdown"
+                      key={i}
+                    >
                       {item.child.map((childItem, j) => {
                         return (
-                          <NavDropdown.Item href={childItem.url}>
-                            {childItem.link}
-                          </NavDropdown.Item>
-                        );
-                      })}
-                    </NavDropdown>
-                  );
-                }
-              )}
-              {data.allCorpSiteNavYaml.edges[1].node.navigationRight.map(
-                (item, i) => {
-                  return item.child === null ? (
-                    <Nav.Link href={item.url}>{item.parent}</Nav.Link>
-                  ) : (
-                    <NavDropdown title={item.parent} id="basic-nav-dropdown">
-                      {item.child.map((childItem, j) => {
-                        return (
-                          <NavDropdown.Item href={childItem.url}>
+                          <NavDropdown.Item href={childItem.url} key={j}>
                             {childItem.link}
                           </NavDropdown.Item>
                         );

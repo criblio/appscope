@@ -1,7 +1,6 @@
 #ifndef __LINKLIST_H__
 #define __LINKLIST_H__
 
-#define _GNU_SOURCE
 #include <stdint.h>
 
 typedef uint64_t list_key_t;

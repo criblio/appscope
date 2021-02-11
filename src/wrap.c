@@ -25,6 +25,7 @@
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include "state.h"
+#include "utils.h"
 #include "wrap.h"
 #include "runtimecfg.h"
 #include "javaagent.h"
@@ -240,8 +241,8 @@ remoteConfig()
     char buf[1024];
     char path[PATH_MAX];
     
-    // MS
-    timeout = (g_thread.interval * 1000);
+    // to be clear; a 1ms timeout
+    timeout = 1;
     memset(&fds, 0x0, sizeof(fds));
 
     if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
@@ -648,6 +649,7 @@ static void
 doReset()
 {
     setProcId(&g_proc);
+    setPidEnv(g_proc.pid);
 
     g_thread.once = 0;
     g_thread.startTime = time(NULL) + g_thread.interval;
@@ -725,7 +727,7 @@ reportPeriodicStuff(void)
     // report net and file by descriptor
     reportAllFds(PERIODIC);
 
-    // Process any events that have been posted
+    // empty the event queues
     doEvent();
     doPayload();
 
@@ -736,13 +738,11 @@ void
 handleExit(void)
 {
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
-        struct timespec ts, rem;
-        ts.tv_sec = 0;
-        ts.tv_nsec = 10000; // 10 ms
+        struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
 
         // let the periodic thread finish
         while (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
-            NSLEEP(&ts, &rem);
+            sigSafeNanosleep(&ts);
         }
         doEvent();
     } else {
@@ -767,38 +767,52 @@ periodic(void *arg)
     sigset_t mask;
     sigfillset(&mask);
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
+    bool perf;
+    static time_t summaryTime;
+
+    summaryTime = time(NULL) + g_thread.interval;
+
+    perf = checkEnv(PRESERVE_PERF_REPORTING, "true");
 
     while (1) {
+        if (time(NULL) >= summaryTime) {
+            // Process dynamic config changes, if any
+            dynConfig();
 
-        // Process dynamic config changes, if any
-        dynConfig();
+            // TODO: need to ensure that the previous object is no longer in use
+            // Clean up previous objects if they exist.
+            //if (g_prevmtc) mtcDestroy(&g_prevmtc);
+            //if (g_prevlog) logDestroy(&g_prevlog);
 
-        // TODO: need to ensure that the previous object is no longer in use
-        // Clean up previous objects if they exist.
-        //if (g_prevmtc) mtcDestroy(&g_prevmtc);
-        //if (g_prevlog) logDestroy(&g_prevlog);
+            // Q: What does it mean to connect transports we expect to be
+            // "connectionless"?  A: We've observed some processes close all
+            // file/socket descriptors during their initialization.
+            // If this happens, this the way we manage re-init.
+            if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
+            if (logNeedsConnection(g_log)) logConnect(g_log);
 
-        // Q: What does it mean to connect transports we expect to be
-        // "connectionless"?  A: We've observed some processes close all
-        // file/socket descriptors during their initialization.
-        // If this happens, this the way we manage re-init.
-        if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
-        if (logNeedsConnection(g_log)) logConnect(g_log);
+            if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl) &&
+                g_sendprocessstart) {
+                // Hey we have a new connection!  Identify ourselves
+                // like reportProcessStart, but only on the event interface...
+                cJSON *json = msgStart(&g_proc, g_staticfg);
+                ctlSendJson(g_ctl, json);
+                ctlFlush(g_ctl);
+            }
 
-        if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl) &&
-            g_sendprocessstart) {
-            // Hey we have a new connection!  Identify ourselves
-            // like reportProcessStart, but only on the event interface...
-            cJSON *json = msgStart(&g_proc, g_staticfg);
-            ctlSendJson(g_ctl, json);
-            ctlFlush(g_ctl);
+            if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+                reportPeriodicStuff();
+                atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
+            }
+
+            summaryTime = time(NULL) + g_thread.interval;
+        } else if (perf == FALSE) {
+            if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+                doEvent();
+                doPayload();
+                atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
+            }
         }
-
-        if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
-            reportPeriodicStuff();
-            atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
-        }
-
         remoteConfig();
     }
 
@@ -1032,6 +1046,7 @@ init(void)
     initFn();
 
     setProcId(&g_proc);
+    setPidEnv(g_proc.pid);
 
     initState();
 

@@ -972,7 +972,7 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
                 }
 
                 pinfo->data = temp;
-                memmove(&pinfo->data[blen], &iov[i].iov_base, iov[i].iov_len);
+                memmove(&pinfo->data[blen], iov[i].iov_base, iov[i].iov_len);
                 blen += iov[i].iov_len;
             }
         }
@@ -981,7 +981,9 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     }
 
     default:
-        break;
+        // no data, no need to continue
+        free(pinfo);
+        return -1;
     }
 
     if (net) memmove(&pinfo->net, net, sizeof(net_info));
@@ -1533,7 +1535,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
 
     // error in the received response?
     if (ns_msg_getflag(handle, ns_f_rcode) != ns_r_noerror) {
-        scopeLog("WARN: received a DNS response that had an error", -1, CFG_LOG_WARN);
+        scopeLog("received a DNS response that had an error", -1, CFG_LOG_INFO);
     }
 
     if (nmsg > 0) {
@@ -1554,6 +1556,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
             //ns_sprintrr(&handle, &rr, NULL, NULL, dispbuf, sizeof (dispbuf));
             //scopeLog(dispbuf, -1, CFG_LOG_DEBUG);
 
+            // type A is IPv4, AAA is IPv6
             if (ns_rr_type(rr) == ns_t_a) {
                 if (!inet_ntop(AF_INET, (struct sockaddr_in *)rr.rdata,
                                ipaddr, sizeof(ipaddr))) {
@@ -1585,14 +1588,13 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
 bool
 getDNSAnswer(int sockfd, char *buf, size_t len, src_data_t dtype)
 {
-
     bool result;
     struct net_info_t *net = getNetEntry(sockfd);
 
-    if (!buf || !net || (len <= 0)) return -1;
+    if (!buf || !net || (len <= 0)) return FALSE;
 
     cJSON *json = cJSON_CreateObject();
-    if (!json) return -1;
+    if (!json) return FALSE;
 
     cJSON *addrs = cJSON_CreateArray();
     if (!addrs) DNSDONE(json, addrs);
@@ -1626,6 +1628,7 @@ getDNSAnswer(int sockfd, char *buf, size_t len, src_data_t dtype)
                 if (parseDNSAnswer((char *)iov->iov_base, len, json, addrs, i) == TRUE) {
                     result = TRUE;
                 } else {
+                    // should we stop if an iov doesn't parse? probably.
                     break;
                 }
             }
@@ -1640,7 +1643,7 @@ getDNSAnswer(int sockfd, char *buf, size_t len, src_data_t dtype)
 
         for (i = 0; i < len; i++) {
             if (iov[i].iov_base && (iov[i].iov_len > 0)) {
-                if (parseDNSAnswer((char *)&iov[i].iov_base, len, json, addrs, i)  == TRUE) {
+                if (parseDNSAnswer((char *)iov[i].iov_base, len, json, addrs, i)  == TRUE) {
                     result = TRUE;
                 } else {
                     break;

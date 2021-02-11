@@ -3956,6 +3956,43 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     return rc;
 }
 
+#ifdef __LINUX__
+EXPORTON int
+recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
+         int flags, struct timespec *timeout)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(recvmmsg, -1);
+    rc = g_fn.recvmmsg(sockfd, msgvec, vlen, flags, timeout);
+    if (rc != -1) {
+        scopeLog("recvmmsg", sockfd, CFG_LOG_TRACE);
+
+        // For UDP connections the msg is a remote addr
+        if (msgvec) {
+            if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                sizeof(struct sockaddr_in6), REMOTE);
+            } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                sizeof(struct sockaddr_in), REMOTE);
+            }
+        }
+
+        if (remotePortIsDNS(sockfd)) {
+            getDNSAnswer(sockfd, (char *)&msgvec->msg_hdr, rc, MSG);
+        }
+
+        doRecv(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
+        doAccessRights(&msgvec->msg_hdr);
+    } else {
+        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmmsg", "nopath");
+    }
+
+    return rc;
+}
+#endif //__LINUX__
+
 EXPORTOFF struct hostent *
 gethostbyname(const char *name)
 {

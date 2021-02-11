@@ -86,6 +86,7 @@ initFn(void)
     g_fn.recv = dlsym(RTLD_NEXT, "recv");
     g_fn.recvfrom = dlsym(RTLD_NEXT, "recvfrom");
     g_fn.recvmsg = dlsym(RTLD_NEXT, "recvmsg");
+    g_fn.recvmmsg = dlsym(RTLD_NEXT, "recvmmsg");
     g_fn.gethostbyname = dlsym(RTLD_NEXT, "gethostbyname");
     g_fn.gethostbyname2 = dlsym(RTLD_NEXT, "gethostbyname2");
     g_fn.getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo");

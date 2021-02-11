@@ -105,7 +105,6 @@ typedef struct {
     ssize_t (*sendto)(int, const void *, size_t, int,
                               const struct sockaddr *, socklen_t);
     ssize_t (*sendmsg)(int, const struct msghdr *, int);
-    int (*sendmmsg)(int, struct mmsghdr *, unsigned int, int);
     ssize_t (*recv)(int, void *, size_t, int);
     ssize_t (*recvfrom)(int sockfd, void *buf, size_t len, int flags,
                                 struct sockaddr *src_addr, socklen_t *addrlen);
@@ -212,6 +211,8 @@ typedef struct {
     int (*clock_nanosleep)(clockid_t, int, const struct timespec *, struct timespec *);
     int (*usleep)(useconds_t);
     int (*io_getevents)(io_context_t, long, long, struct io_event *, struct timespec *);
+    int (*sendmmsg)(int, struct mmsghdr *, unsigned int, int);
+    int (*recvmmsg)(int, struct mmsghdr *, unsigned int, int, struct timespec *);
 #endif // __LINUX__
 
 #if defined(__LINUX__) && defined(__STATX__)

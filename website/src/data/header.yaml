@@ -1,21 +1,16 @@
 - name: Overview
   path: /
-  
+
 - name: Docs
   path: /docs/overview
 
 # - name: Resources
 #   path: /resources
-  # child: 
+  # child:
   #   - name: Level 1
   #     path: /resources/level1
   #   - name: Level 2
   #     path: /resources/level2
 
 - name: Community
-  path: https://cribl.io/community
-
-      
-          
-
-   
+  path: https://cribl.io/community?utm_source=appscope&utm_medium=footer&utm_campaign=appscope

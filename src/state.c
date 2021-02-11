@@ -1548,7 +1548,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
             // do this once, after we get the rr
             if (first == 0) {
                 if (!cJSON_AddStringToObjLN(json, "domain", ns_rr_name(rr))) {
-                    DNSDONE(json, addrs);
+                    continue;
                 }
                 first = 1;
             }
@@ -1560,23 +1560,23 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
             if (ns_rr_type(rr) == ns_t_a) {
                 if (!inet_ntop(AF_INET, (struct sockaddr_in *)rr.rdata,
                                ipaddr, sizeof(ipaddr))) {
-                    DNSDONE(json, addrs);
+                    continue;
                 }
             } else if (ns_rr_type(rr) == ns_t_aaaa) {
                 if (!inet_ntop(AF_INET6, (struct sockaddr_in6 *)rr.rdata,
                                ipaddr, sizeof(ipaddr))) {
-                    DNSDONE(json, addrs);
+                    continue;
                 }
             } else {
                 DBG("DNS response received without an IP address");
-                DNSDONE(json, addrs);
+                continue;
             }
 
             //snprintf(dispbuf, sizeof(dispbuf), "resolved addr is %s\n", ipaddr);
             //scopeLog(dispbuf, -1, CFG_LOG_DEBUG);
 
             if (!cJSON_AddStringToObjLN(addrs, "addr", ipaddr)) {
-                DNSDONE(json, addrs);
+                continue;
             }
         }
         return TRUE;

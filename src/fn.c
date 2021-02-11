@@ -82,6 +82,7 @@ initFn(void)
     g_fn.send = dlsym(RTLD_NEXT, "send");
     g_fn.sendto = dlsym(RTLD_NEXT, "sendto");
     g_fn.sendmsg = dlsym(RTLD_NEXT, "sendmsg");
+    g_fn.sendmmsg = dlsym(RTLD_NEXT, "sendmmsg");
     g_fn.recv = dlsym(RTLD_NEXT, "recv");
     g_fn.recvfrom = dlsym(RTLD_NEXT, "recvfrom");
     g_fn.recvmsg = dlsym(RTLD_NEXT, "recvmsg");

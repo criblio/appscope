@@ -107,6 +107,7 @@ typedef struct {
     ssize_t (*sendto)(int, const void *, size_t, int,
                               const struct sockaddr *, socklen_t);
     ssize_t (*sendmsg)(int, const struct msghdr *, int);
+    int (*sendmmsg)(int, struct mmsghdr *, unsigned int, int);
     ssize_t (*recv)(int, void *, size_t, int);
     ssize_t (*recvfrom)(int sockfd, void *buf, size_t len, int flags,
                                 struct sockaddr *src_addr, socklen_t *addrlen);

@@ -1412,10 +1412,13 @@ getDNSName(int sd, void *pkt, int pktlen)
     char *dname;
     char dnsName[MAX_HOSTNAME+1];
     int dnsNameBytesUsed = 0;
+    struct net_info_t *net = getNetEntry(sd);
 
-    if (getNetEntry(sd) == NULL) {
+    if (net == NULL) {
         return -1;
     }
+
+    net->startTime = getTime();
 
     query = (struct dns_query_t *)pkt;
     header = &query->qhead;

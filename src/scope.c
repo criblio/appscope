@@ -340,6 +340,14 @@ main(int argc, char **argv, char **env)
 
     program_invocation_short_name = basename(argv[1]);
 
+    if (!is_go(ebuf->buf)) {
+        // We're getting here with upx-encoded binaries
+        // and any other static native apps...
+        // Start here when we support more static binaries
+        // than go.
+        execve(argv[1], &argv[1], environ);
+    }
+
     if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
         fprintf(stderr, "%s\n", dlerror());
         goto err;

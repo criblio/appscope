@@ -999,34 +999,38 @@ initHook()
         dlclose(handle);
     }
 
-    if (!should_we_patch) {
-      scopeLog("not installing SSL_read and SSL_write hooks...", -1, CFG_LOG_DEBUG);
-      return;
-    }
+    if (should_we_patch || g_fn.sendmmsg) {
+        funchook = funchook_create();
 
-    funchook = funchook_create();
+        if (logLevel(g_log) <= CFG_LOG_DEBUG) {
+            // TODO: add some mechanism to get the config'd log file path
+            funchook_set_debug_file(DEFAULT_LOG_PATH);
+        }
 
-    if (logLevel(g_log) <= CFG_LOG_DEBUG) {
-        // TODO: add some mechanism to get the config'd log file path
-        funchook_set_debug_file(DEFAULT_LOG_PATH);
-    }
-
-    g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
+        if (should_we_patch) {
+            g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
     
-    rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
+            rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
 
-    g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
+            g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
 
-    rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
+            rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
+        }
 
-    /* hook SSL_read and SSL_write*/
-    rc = funchook_install(funchook, 0);
-    if (rc != 0) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "ERROR: failed to install SSL_read hook. (%s)\n",
-                funchook_error_message(funchook));
-        scopeLog(buf, -1, CFG_LOG_ERROR);
-        return;
+        // sendmmsg for internal libc use in DNS queries
+        if (g_fn.sendmmsg) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, sendmmsg);
+        }
+
+        // hook 'em
+        rc = funchook_install(funchook, 0);
+        if (rc != 0) {
+            char buf[128];
+            snprintf(buf, sizeof(buf), "ERROR: failed to install SSL_read hook. (%s)\n",
+                     funchook_error_message(funchook));
+            scopeLog(buf, -1, CFG_LOG_ERROR);
+            return;
+        }
     }
 }
 #else
@@ -1902,7 +1906,7 @@ faccessat(int dirfd, const char *pathname, int mode, int flags)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
                 struct hostent **result, int *h_errnop)
 {
@@ -1926,7 +1930,7 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 gethostbyname2_r(const char *name, int af, struct hostent *ret, char *buf,
                  size_t buflen, struct hostent **result, int *h_errnop)
 {
@@ -2962,7 +2966,7 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
     return rc;
 }
 
-EXPORTON int32_t
+EXPORTOFF int32_t
 DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
                       const char *fullname, uint16_t rrtype, uint16_t rrclass,
                       void *callback, void *context)
@@ -3800,6 +3804,43 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
     return rc;
 }
 
+#ifdef __LINUX__
+EXPORTON int
+sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(sendmmsg, -1);
+    rc = g_fn.sendmmsg(sockfd, msgvec, vlen, flags);
+    if (rc != -1) {
+        scopeLog("sendmmsg", sockfd, CFG_LOG_TRACE);
+
+        // For UDP connections the msg is a remote addr
+        if (!sockIsTCP(sockfd)) {
+            if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                sizeof(struct sockaddr_in6), REMOTE);
+            } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                sizeof(struct sockaddr_in), REMOTE);
+            }
+        }
+
+        if (remotePortIsDNS(sockfd)) {
+            getDNSName(sockfd, msgvec->msg_hdr.msg_iov->iov_base, msgvec->msg_hdr.msg_iov->iov_len);
+        }
+
+        doSend(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
+
+    } else {
+        setRemoteClose(sockfd, errno);
+        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendmmsg", "nopath");
+    }
+
+    return rc;
+}
+#endif // __LINUX__
+
 EXPORTON ssize_t
 recv(int sockfd, void *buf, size_t len, int flags)
 {
@@ -3812,6 +3853,11 @@ recv(int sockfd, void *buf, size_t len, int flags)
     }
 
     if (rc != -1) {
+        // it's possible to get DNS over TCP
+        if (remotePortIsDNS(sockfd)) {
+            getDNSAnswer(sockfd, buf, rc, BUF);
+        }
+
         doRecv(sockfd, rc, buf, rc, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recv", "nopath");
@@ -3830,6 +3876,11 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
         scopeLog("recvfrom", sockfd, CFG_LOG_TRACE);
+
+        if (remotePortIsDNS(sockfd)) {
+            getDNSAnswer(sockfd, buf, rc, BUF);
+        }
+
         doRecv(sockfd, rc, buf, rc, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvfrom", "nopath");
@@ -3896,6 +3947,10 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
             }
         }
 
+        if (remotePortIsDNS(sockfd)) {
+            getDNSAnswer(sockfd, (char *)msg, rc, MSG);
+        }
+
         doRecv(sockfd, rc, msg, rc, MSG);
         doAccessRights(msg);
     } else {
@@ -3905,7 +3960,44 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     return rc;
 }
 
-EXPORTON struct hostent *
+#ifdef __LINUX__
+EXPORTON int
+recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
+         int flags, struct timespec *timeout)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(recvmmsg, -1);
+    rc = g_fn.recvmmsg(sockfd, msgvec, vlen, flags, timeout);
+    if (rc != -1) {
+        scopeLog("recvmmsg", sockfd, CFG_LOG_TRACE);
+
+        // For UDP connections the msg is a remote addr
+        if (msgvec) {
+            if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                sizeof(struct sockaddr_in6), REMOTE);
+            } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                sizeof(struct sockaddr_in), REMOTE);
+            }
+        }
+
+        if (remotePortIsDNS(sockfd)) {
+            getDNSAnswer(sockfd, (char *)&msgvec->msg_hdr, rc, MSG);
+        }
+
+        doRecv(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
+        doAccessRights(&msgvec->msg_hdr);
+    } else {
+        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmmsg", "nopath");
+    }
+
+    return rc;
+}
+#endif //__LINUX__
+
+EXPORTOFF struct hostent *
 gethostbyname(const char *name)
 {
     struct hostent *rc;
@@ -3929,7 +4021,7 @@ gethostbyname(const char *name)
     return rc;
 }
 
-EXPORTON struct hostent *
+EXPORTOFF struct hostent *
 gethostbyname2(const char *name, int af)
 {
     struct hostent *rc;
@@ -3953,7 +4045,12 @@ gethostbyname2(const char *name, int af)
     return rc;
 }
 
-EXPORTON int
+/*
+ * we use this to get the DNS request if sendmmsg
+ * is not funchooked or if the lib uses a different
+ * internal function to send the dns request.
+ */
+EXPORTOFF int
 getaddrinfo(const char *node, const char *service,
             const struct addrinfo *hints,
             struct addrinfo **res)
@@ -3962,6 +4059,7 @@ getaddrinfo(const char *node, const char *service,
     elapsed_t time = {0};
     
     WRAP_CHECK(getaddrinfo, -1);
+
     doUpdateState(DNS, -1, 0, NULL, node);
     time.initial = getTime();
     rc = g_fn.getaddrinfo(node, service, hints, res);

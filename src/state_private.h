@@ -161,6 +161,7 @@ typedef struct net_info_t {
     counters_element_t txBytes;
     counters_element_t rxBytes;
     bool dnsSend;
+    bool dnsRecv;
     uint64_t startTime;
     counters_element_t numDuration;
     counters_element_t totalDuration;
@@ -168,6 +169,7 @@ typedef struct net_info_t {
     uint64_t lnode;
     uint64_t rnode;
     char dnsName[MAX_HOSTNAME];
+    cJSON *dnsAnswer;
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;
     metric_counters counters;

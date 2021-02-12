@@ -5,7 +5,7 @@ CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -D__LINUX__ -D__
 SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -D__LINUX__
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
-LD_FLAGS=$(PCRE2_AR) -ldl -lpthread -lrt -Lcontrib/funchook/build -lfunchook -ldistorm -e __scope_main
+LD_FLAGS=$(PCRE2_AR) -ldl -lpthread -lrt -lresolv -Lcontrib/funchook/build -lfunchook -ldistorm -e __scope_main
 INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build -I./contrib/jni -I./contrib/jni/linux/
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 CJSON_DEFINES=-DENABLE_LOCALES
@@ -17,7 +17,7 @@ PCRE2_AR=contrib/pcre2/build/libpcre2-posix.a contrib/pcre2/build/libpcre2-8.a
 TEST_AR=$(YAML_AR) $(JSON_AR) $(PCRE2_AR)
 TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
-TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
+TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl -lresolv
 
 .PHONY: coreall coreclean coretest
 coreall: libscope.so ldscope

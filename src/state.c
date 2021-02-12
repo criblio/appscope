@@ -1518,7 +1518,7 @@ getDNSName(int sd, void *pkt, int pktlen)
     return 0;
 }
 
-#define DNSDONE(var1, var2) {if (var1) free(var1); if (var2) free(var2); return FALSE;}
+#define DNSDONE(var1, var2) {if (var1) cJSON_Delete(var1); if (var2) cJSON_Delete(var2); return FALSE;}
 
 static bool
 parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
@@ -1662,8 +1662,8 @@ getDNSAnswer(int sockfd, char *buf, size_t len, src_data_t dtype)
         net->dnsAnswer = json;
     } else {
         net->dnsAnswer = NULL;
-        if (json) free (json);
-        if (addrs) free(addrs);
+        if (json) cJSON_Delete(json);
+        if (addrs) cJSON_Delete(addrs);
     }
 
     return TRUE;

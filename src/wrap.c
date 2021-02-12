@@ -1906,7 +1906,7 @@ faccessat(int dirfd, const char *pathname, int mode, int flags)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
                 struct hostent **result, int *h_errnop)
 {
@@ -1930,7 +1930,7 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 gethostbyname2_r(const char *name, int af, struct hostent *ret, char *buf,
                  size_t buflen, struct hostent **result, int *h_errnop)
 {
@@ -2966,7 +2966,7 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
     return rc;
 }
 
-EXPORTON int32_t
+EXPORTOFF int32_t
 DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
                       const char *fullname, uint16_t rrtype, uint16_t rrclass,
                       void *callback, void *context)

@@ -29,7 +29,7 @@ deps:
 rebuild: cliclean all
 
 local:
-	cd $(DIR) && $(GO) build -o /usr/local/bin/scope
+	cd $(DIR) && $(GO) build -ldflags="$(GO_VER_FLAGS)" -o /usr/local/bin/scope
 
 run/bundle.go:
 	rm -rf $(DIR)/build/*

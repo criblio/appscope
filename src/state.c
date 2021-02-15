@@ -23,6 +23,7 @@
 #include "pcre2.h"
 #include "fn.h"
 #include "os.h"
+#include "utils.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
@@ -47,6 +48,7 @@ int g_mtc_addr_output = TRUE;
 static search_t* g_http_redirect = NULL;
 static list_t *g_protlist;
 static unsigned int g_prot_sequence = 0;
+static protocol_def_t *g_payload_pre = NULL;
 
 // interfaces
 mtc_t *g_mtc = NULL;
@@ -183,6 +185,33 @@ addProtocol(request_t *req)
 }
 
 static void
+initPayloadExtract()
+{
+    int errornumber = 0;
+    PCRE2_SIZE erroroffset = 0;
+
+    if ((g_payload_pre = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+
+    g_payload_pre->binary = TRUE;
+    g_payload_pre->len = 2;
+    g_payload_pre->type = 0;
+    g_payload_pre->protname = NULL;
+    g_payload_pre->regex = PAYLOADREGEX;
+
+    g_payload_pre->re = pcre2_compile((PCRE2_SPTR)g_payload_pre->regex,
+                                      PCRE2_ZERO_TERMINATED, 0,
+                                      &errornumber, &erroroffset, NULL);
+
+    if (g_payload_pre->re == NULL) {
+        destroyProtEntry(g_payload_pre);
+        g_payload_pre = NULL;
+        return;
+    }
+
+    g_payload_pre->match_data = pcre2_match_data_create_from_pattern(g_payload_pre->re, NULL);
+}
+
+static void
 initProtocolDetection()
 {
     int i;
@@ -255,6 +284,7 @@ initState()
 
     g_protlist = lstCreate(destroyProtEntry);
     initProtocolDetection();
+    initPayloadExtract();
 
     initReporting();
 }
@@ -913,6 +943,63 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
 {
     if (!buf || (len <= 0)) return -1;
 
+    if (net && g_payload_pre && (checkEnv(LOGSTREAM, "true") == FALSE)) {
+        int rc;
+        char *data = buf;
+        in_port_t localPort, remotePort;
+
+        localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
+        remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
+
+        /*
+         * If we are a client receiving or a server sending, drop
+         * everything on the wire. There is no TLS happening.
+         * The SSL/TLS interposed functions will provide
+         * unencrypted data.
+         */
+        if ((localPort == 443) && (src == NETTX)) return 0;
+        if ((remotePort == 443) && (src == NETRX)) return 0;
+
+        /*
+         * If we are a client sending or a server receiving, then
+         * a TLS handshake is taking place. So, filter and drop
+         * TLS traffic.
+         */
+        if (((remotePort == 443) && (src == NETTX)) ||
+            ((localPort == 443) && (src == NETRX))) {
+
+            // TLS data is binary, convert to chars
+            int i;
+            size_t alen = (g_payload_pre->len * 2) + 1;
+            char sstr[4], cpdata[alen];
+
+            memset(cpdata, 0, alen);
+
+            for (i = 0; i < g_payload_pre->len; i++) {
+                snprintf(sstr, sizeof(sstr), "%02x", data[i]);
+                strncat(cpdata, sstr, alen);
+            }
+
+            if ((rc = pcre2_match_wrapper(g_payload_pre->re, (PCRE2_SPTR)cpdata,
+                                          (PCRE2_SIZE)alen, 0, 0,
+                                          g_payload_pre->match_data, NULL)) > 0) {
+                //DEBUG
+                //scopeLog("Payload remove: SUCCESS", sockfd, CFG_LOG_ERROR);
+                return 0;
+            } else {
+                switch(rc)
+                {
+                case PCRE2_ERROR_NOMATCH:
+                    scopeLog("extractPayload: No match", sockfd, CFG_LOG_DEBUG);
+                    break;
+                default:
+                    scopeLog("extractPayload: Matching error", sockfd, CFG_LOG_DEBUG);
+                    break;
+                }
+            }
+        }
+    }
+
     payload_info *pinfo = calloc(1, sizeof(struct payload_info_t));
     if (!pinfo) {
         return -1;
@@ -1003,7 +1090,6 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     if (ctlPayEnable(g_ctl)) {
         // instead of or in addition to http &/or detect?
         extractPayload(sockfd, net, buf, len, src, dtype);
-        return 0;
     }
 
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {

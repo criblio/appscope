@@ -7,18 +7,20 @@
 #include "fn.h"
 #include "dbg.h"
 
-unsigned int strToVal(enum_map_t map[], const char* str)
+unsigned int
+strToVal(enum_map_t map[], const char *str)
 {
-    enum_map_t* m;
+    enum_map_t *m;
     for (m=map; m->str; m++) {
         if (!strcmp(str, m->str)) return m->val;
     }
     return -1;
 }
 
-const char* valToStr(enum_map_t map[], unsigned int val)
+const char *
+valToStr(enum_map_t map[], unsigned int val)
 {
-    enum_map_t* m;
+    enum_map_t *m;
     for (m=map; m->str; m++) {
         if (val == m->val) return m->str;
     }
@@ -51,6 +53,15 @@ setPidEnv(int pid)
              g_fn.setenv, SCOPE_PID_ENV, val);
     }
 }
+
+#ifdef __MACOS__
+char *
+getpath(const char *cmd)
+{
+    return NULL;
+}
+
+#else
 
 // This tests to see if cmd can be resolved to an executable file.
 // If so it will return a malloc'd buffer containing an absolute path,
@@ -135,6 +146,7 @@ out:
     if (path_env) free(path_env);
     return ret_val;
 }
+#endif //__MACOS__
 
 int
 sigSafeNanosleep(const struct timespec *req)

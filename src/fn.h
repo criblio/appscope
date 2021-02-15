@@ -35,6 +35,9 @@ typedef uint64_t off64_t;
 typedef uint64_t fpos64_t;
 #endif
 
+#ifndef nfds_t
+typedef unsigned int nfds_t;
+#endif
 #endif // __MACOS__
 
 
@@ -190,6 +193,7 @@ typedef struct {
     int (*execve)(const char *, char * const *, char * const *);
     int (*poll)(struct pollfd *, nfds_t, int);
     int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
+    int (*nanosleep)(const struct timespec *, struct timespec *);
 #ifdef __LINUX__
     // Couldn't easily get struct definitions for these on mac
     int (*statvfs64)(const char *, struct statvfs64 *);
@@ -199,7 +203,6 @@ typedef struct {
     int (*epoll_pwait)(int, struct epoll_event *, int, int, const sigset_t *);
     int (*ppoll)(struct pollfd *, nfds_t, const struct timespec *, const sigset_t *);
     int (*pause)(void);
-    int (*nanosleep)(const struct timespec *, struct timespec *);
     int (*sigsuspend)(const sigset_t *);
     int (*sigwaitinfo)(const sigset_t *, siginfo_t *);
     int (*sigtimedwait)(const sigset_t *, siginfo_t *, const struct timespec *);
@@ -211,6 +214,8 @@ typedef struct {
     int (*clock_nanosleep)(clockid_t, int, const struct timespec *, struct timespec *);
     int (*usleep)(useconds_t);
     int (*io_getevents)(io_context_t, long, long, struct io_event *, struct timespec *);
+    int (*sendmmsg)(int, struct mmsghdr *, unsigned int, int);
+    int (*recvmmsg)(int, struct mmsghdr *, unsigned int, int, struct timespec *);
 #endif // __LINUX__
 
 #if defined(__LINUX__) && defined(__STATX__)

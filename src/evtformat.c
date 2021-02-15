@@ -45,7 +45,7 @@
     }
 
 typedef struct {
-    const char* str;
+    const char *str;
     unsigned val;
 } enum_map_t;
 
@@ -61,10 +61,10 @@ static enum_map_t watchTypeMap[] = {
     {NULL,                    -1}
 };
 
-static const char*
+static const char *
 valToStr(enum_map_t map[], unsigned val)
 {
-    enum_map_t* m;
+    enum_map_t *m;
     for (m=map; m->str; m++) {
         if (val == m->val) return m->str;
     }
@@ -93,7 +93,7 @@ struct _evt_fmt_t
     } ratelimit;
 };
 
-static const char* valueFilterDefault[] = {
+static const char *valueFilterDefault[] = {
     DEFAULT_SRC_FILE_VALUE,
     DEFAULT_SRC_CONSOLE_VALUE,
     DEFAULT_SRC_SYSLOG_VALUE,
@@ -104,7 +104,7 @@ static const char* valueFilterDefault[] = {
     DEFAULT_SRC_DNS_VALUE,
 };
 
-static const char* fieldFilterDefault[] = {
+static const char *fieldFilterDefault[] = {
     DEFAULT_SRC_FILE_FIELD,
     DEFAULT_SRC_CONSOLE_FIELD,
     DEFAULT_SRC_SYSLOG_FIELD,
@@ -115,7 +115,7 @@ static const char* fieldFilterDefault[] = {
     DEFAULT_SRC_DNS_FIELD,
 };
 
-static const char* nameFilterDefault[] = {
+static const char *nameFilterDefault[] = {
     DEFAULT_SRC_FILE_NAME,
     DEFAULT_SRC_CONSOLE_NAME,
     DEFAULT_SRC_SYSLOG_NAME,
@@ -139,7 +139,7 @@ static unsigned srcEnabledDefault[] = {
 
 
 static void
-filterSet(local_re_t* re, const char *str, const char* default_val)
+filterSet(local_re_t *re, const char *str, const char *default_val)
 {
     if (!re || !default_val) return;
 
@@ -160,10 +160,10 @@ filterSet(local_re_t* re, const char *str, const char* default_val)
     }
 }
 
-evt_fmt_t*
+evt_fmt_t *
 evtFormatCreate()
 {
-    evt_fmt_t* evt = calloc(1, sizeof(evt_fmt_t));
+    evt_fmt_t *evt = calloc(1, sizeof(evt_fmt_t));
     if (!evt) {
         DBG(NULL);
         return NULL;
@@ -182,7 +182,7 @@ evtFormatCreate()
 }
 
 void
-evtFormatDestroy(evt_fmt_t** evt)
+evtFormatDestroy(evt_fmt_t **evt)
 {
     if (!evt || !*evt) return;
     evt_fmt_t *edestroy  = *evt;
@@ -284,7 +284,7 @@ evtFormatNameFilterSet(evt_fmt_t *evt, watch_t src, const char *str)
 }
 
 void
-evtFormatSourceEnabledSet(evt_fmt_t* evt, watch_t src, unsigned val)
+evtFormatSourceEnabledSet(evt_fmt_t *evt, watch_t src, unsigned val)
 {
     if (!evt || src >= CFG_SRC_MAX || val > 1) return;
     evt->enabled[src] = val;
@@ -301,7 +301,7 @@ evtFormatRateLimitSet(evt_fmt_t *evt, unsigned val)
 #define NO_MATCH_FOUND 0
 
 static int
-anyValueFieldMatches(regex_t* filter, event_t* metric)
+anyValueFieldMatches(regex_t *filter, event_t *metric)
 {
     if (!filter || !metric) return MATCH_FOUND;
 
@@ -350,7 +350,7 @@ fmtEventJson(event_format_t *sev)
 
     if (!sev || !sev->proc) return NULL;
 
-    cJSON* json = cJSON_CreateObject();
+    cJSON *json = cJSON_CreateObject();
     if (!json) goto err;
 
     if (!cJSON_AddStringToObjLN(json, SOURCETYPE, valToStr(watchTypeMap, sev->sourcetype))) goto err;
@@ -395,11 +395,11 @@ rateLimitMessage(proc_id_t *proc, watch_t src, unsigned maxEvtPerSec)
     event.data = cJSON_CreateString(string);
     event.sourcetype = src;
 
-    cJSON* json = fmtEventJson(&event);
+    cJSON *json = fmtEventJson(&event);
     return json;
 }
 
-static const char*
+static const char *
 metricTypeStr(data_type_t type)
 {
     switch (type) {
@@ -419,7 +419,7 @@ metricTypeStr(data_type_t type)
 }
 
 static int
-addJsonFields(event_field_t* fields, regex_t* fieldFilter, cJSON* json)
+addJsonFields(event_field_t *fields, regex_t *fieldFilter, cJSON *json)
 {
     if (!fields) return TRUE;
 
@@ -449,7 +449,7 @@ addJsonFields(event_field_t* fields, regex_t* fieldFilter, cJSON* json)
 cJSON *
 fmtMetricJson(event_t *metric, regex_t *fieldFilter, watch_t src)
 {
-    const char* metric_type = NULL;
+    const char *metric_type = NULL;
 
     if (!metric) return NULL;
 
@@ -511,7 +511,7 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
     } else if (++evt->ratelimit.evtCount >= evt->ratelimit.maxEvtPerSec) {
         // one notice per truncate
         if (evt->ratelimit.notified == 0) {
-            cJSON* notice = rateLimitMessage(proc, src, evt->ratelimit.maxEvtPerSec);
+            cJSON *notice = rateLimitMessage(proc, src, evt->ratelimit.maxEvtPerSec);
             evt->ratelimit.notified = (notice)?1:0;
             return notice;
         }
@@ -533,7 +533,12 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
     event.sourcetype = src;
 
     // Format the metric string using the configured metric format type
-    event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, src), src);
+    if (!metric->data) {
+        event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, src), src);
+    } else {
+        event.data = metric->data;
+    }
+
     if (!event.data) return NULL;
 
     return fmtEventJson(&event);
@@ -553,7 +558,7 @@ evtFormatHttp(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc)
 
 cJSON *
 evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
-       uint64_t uid, proc_id_t* proc)
+       uint64_t uid, proc_id_t *proc)
 {
     event_format_t event;
     struct timeb tb;
@@ -561,7 +566,7 @@ evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
 
     if (!evt || !path || !buf || !proc) return NULL;
 
-    regex_t* filter;
+    regex_t *filter;
     if (evtFormatSourceEnabled(evt, CFG_SRC_CONSOLE) &&
        (filter = evtFormatNameFilter(evt, CFG_SRC_CONSOLE)) &&
        (!regexec_wrapper(filter, path, 0, NULL, 0))) {
@@ -583,11 +588,11 @@ evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
     if (!event.data) return NULL;
     event.sourcetype = logType;
 
-    cJSON * json = fmtEventJson(&event);
+    cJSON *json = fmtEventJson(&event);
     if (!json) return NULL;
 
 
-    cJSON* dataField = cJSON_GetObjectItem(json, "data");
+    cJSON *dataField = cJSON_GetObjectItem(json, "data");
     if (dataField && dataField->valuestring) {
         filter = evtFormatValueFilter(evt, logType);
         if (filter && regexec_wrapper(filter, dataField->valuestring, 0, NULL, 0)) {

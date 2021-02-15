@@ -1005,15 +1005,75 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         return -1;
     }
 
-    pinfo->data = calloc(1, len);
-    if (!pinfo->data) {
+    switch (dtype) {
+    case BUF:
+        pinfo->data = calloc(1, len);
+        if (!pinfo->data) {
+            free(pinfo);
+            return -1;
+        }
+
+        memmove(pinfo->data, buf, len);
+        break;
+
+    case MSG:
+    {
+        int i;
+        size_t blen = 0;
+        struct msghdr *msg = (struct msghdr *)buf;
+        struct iovec *iov;
+
+        for (i = 0; i < msg->msg_iovlen; i++) {
+            iov = &msg->msg_iov[i];
+            if (iov && iov->iov_base && (iov->iov_len > 0)) {
+                char *temp = realloc(pinfo->data, blen + iov->iov_len);
+                if (!temp) {
+                    if (pinfo->data) free(pinfo->data);
+                    free(pinfo);
+                    return -1;
+                }
+
+                pinfo->data = temp;
+                memmove(&pinfo->data[blen], iov->iov_base, iov->iov_len);
+                blen += iov->iov_len;
+            }
+        }
+        len = blen;
+        break;
+    }
+
+    case IOV:
+    {
+        int i;
+        size_t blen = 0;
+        struct iovec *iov = (struct iovec *)buf;
+
+        // len is expected to be an iovcnt for an IOV data type
+        for (i = 0; i < len; i++) {
+            if (iov[i].iov_base && (iov[i].iov_len > 0)) {
+                char *temp = realloc(pinfo->data, blen + iov[i].iov_len);
+                if (!temp) {
+                    if (pinfo->data) free(pinfo->data);
+                    free(pinfo);
+                    return -1;
+                }
+
+                pinfo->data = temp;
+                memmove(&pinfo->data[blen], iov[i].iov_base, iov[i].iov_len);
+                blen += iov[i].iov_len;
+            }
+        }
+        len = blen;
+        break;
+    }
+
+    default:
+        // no data, no need to continue
         free(pinfo);
         return -1;
     }
 
-    memmove(pinfo->data, buf, len);
     if (net) memmove(&pinfo->net, net, sizeof(net_info));
-
     pinfo->evtype = EVT_PAYLOAD;
     pinfo->src = src;
     pinfo->sockfd = sockfd;
@@ -1440,10 +1500,13 @@ getDNSName(int sd, void *pkt, int pktlen)
     char *dname;
     char dnsName[MAX_HOSTNAME+1];
     int dnsNameBytesUsed = 0;
+    struct net_info_t *net = getNetEntry(sd);
 
-    if (getNetEntry(sd) == NULL) {
+    if (net == NULL) {
         return -1;
     }
+
+    net->startTime = getTime();
 
     query = (struct dns_query_t *)pkt;
     header = &query->qhead;
@@ -1532,13 +1595,164 @@ getDNSName(int sd, void *pkt, int pktlen)
 
     if (strncmp(dnsName, g_netinfo[sd].dnsName, dnsNameBytesUsed) == 0) {
         // Already sent this from an interposed function
-        g_netinfo[sd].dnsSend = FALSE;
+        g_netinfo[sd].dnsSend = TRUE;
     } else {
         strncpy(g_netinfo[sd].dnsName, dnsName, dnsNameBytesUsed);
-        g_netinfo[sd].dnsSend = TRUE;
+        g_netinfo[sd].dnsSend = FALSE;
     }
 
     return 0;
+}
+
+#define DNSDONE(var1, var2) {if (var1) cJSON_Delete(var1); if (var2) cJSON_Delete(var2); return FALSE;}
+
+static bool
+parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
+{
+    int i, nmsg;
+    ns_rr rr;
+    ns_msg handle;
+    struct answer *ans = (struct answer *)buf;
+
+    // init ns lib
+    ns_initparse((const unsigned char *)ans, len, &handle);
+
+    nmsg = ns_msg_count(handle, ns_s_an);
+
+    // error in the received response?
+    if (ns_msg_getflag(handle, ns_f_rcode) != ns_r_noerror) {
+        scopeLog("received a DNS response that had an error", -1, CFG_LOG_INFO);
+    }
+
+    if (nmsg > 0) {
+        for (i = 0; i < nmsg; i++) {
+            char ipaddr[128];
+            //char dispbuf[4096];
+
+            ns_parserr(&handle, ns_s_an, i, &rr);
+
+            // do this once, after we get the rr
+            if (first == 0) {
+                if (!cJSON_AddStringToObjLN(json, "domain", ns_rr_name(rr))) {
+                    continue;
+                }
+                first = 1;
+            }
+
+            //ns_sprintrr(&handle, &rr, NULL, NULL, dispbuf, sizeof (dispbuf));
+            //scopeLog(dispbuf, -1, CFG_LOG_DEBUG);
+
+            // type A is IPv4, AAA is IPv6
+            if (ns_rr_type(rr) == ns_t_a) {
+                if (!inet_ntop(AF_INET, (struct sockaddr_in *)rr.rdata,
+                               ipaddr, sizeof(ipaddr))) {
+                    continue;
+                }
+            } else if (ns_rr_type(rr) == ns_t_aaaa) {
+                if (!inet_ntop(AF_INET6, (struct sockaddr_in6 *)rr.rdata,
+                               ipaddr, sizeof(ipaddr))) {
+                    continue;
+                }
+            } else {
+                DBG("DNS response received without an IP address");
+                continue;
+            }
+
+            //snprintf(dispbuf, sizeof(dispbuf), "resolved addr is %s\n", ipaddr);
+            //scopeLog(dispbuf, -1, CFG_LOG_DEBUG);
+
+            if (!cJSON_AddStringToObjLN(addrs, "addr", ipaddr)) {
+                continue;
+            }
+        }
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+bool
+getDNSAnswer(int sockfd, char *buf, size_t len, src_data_t dtype)
+{
+    bool result;
+    struct net_info_t *net = getNetEntry(sockfd);
+
+    if (!buf || !net || (len <= 0)) return FALSE;
+
+    cJSON *json = cJSON_CreateObject();
+    if (!json) return FALSE;
+
+    cJSON *addrs = cJSON_CreateArray();
+    if (!addrs) DNSDONE(json, addrs);
+
+    if (net->startTime == 0) {
+        if (!cJSON_AddNumberToObjLN(json, "duration", 0)) {
+            DNSDONE(json, addrs);
+        }
+    } else {
+        if (!cJSON_AddNumberToObjLN(json, "duration",
+                                    getDuration(net->startTime) / 1000000)) {
+            DNSDONE(json, addrs);
+        }
+    }
+
+    switch (dtype) {
+    case BUF:
+        result = parseDNSAnswer(buf, len, json, addrs, 0);
+        break;
+
+    case MSG:
+    {
+        int i;
+        struct msghdr *msg = (struct msghdr *)buf;
+        struct iovec *iov;
+
+        for (i = 0; i < msg->msg_iovlen; i++) {
+            iov = &msg->msg_iov[i];
+            if (iov && iov->iov_base && (iov->iov_len > 0)) {
+                // do we have at least one good pass?
+                if (parseDNSAnswer((char *)iov->iov_base, len, json, addrs, i) == TRUE) {
+                    result = TRUE;
+                } else {
+                    // should we stop if an iov doesn't parse? probably.
+                    break;
+                }
+            }
+        }
+        break;
+    }
+
+    case IOV:
+    {
+        int i;
+        struct iovec *iov = (struct iovec *)buf;
+
+        for (i = 0; i < len; i++) {
+            if (iov[i].iov_base && (iov[i].iov_len > 0)) {
+                if (parseDNSAnswer((char *)iov[i].iov_base, len, json, addrs, i)  == TRUE) {
+                    result = TRUE;
+                } else {
+                    break;
+                }
+            }
+        }
+        break;
+    }
+
+    default:
+        DNSDONE(json, addrs);
+    }
+
+    if (result == TRUE) {
+        cJSON_AddItemToObject(json, "addrs", addrs);
+        net->dnsAnswer = json;
+    } else {
+        net->dnsAnswer = NULL;
+        if (json) cJSON_Delete(json);
+        if (addrs) cJSON_Delete(addrs);
+    }
+
+    return TRUE;
 }
 
 int
@@ -1596,7 +1810,10 @@ doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
 
         doUpdateState(NETRX, sockfd, rc, NULL, NULL);
 
-        if (remotePortIsDNS(sockfd) && (g_netinfo[sockfd].dnsName[0])) {
+        if ((g_netinfo[sockfd].dnsRecv == FALSE) &&
+            remotePortIsDNS(sockfd) &&
+            (g_netinfo[sockfd].dnsName[0])) {
+            g_netinfo[sockfd].dnsRecv = TRUE;
             doUpdateState(DNS, sockfd, (ssize_t)1, NULL, g_netinfo[sockfd].dnsName);
         }
 
@@ -1618,12 +1835,12 @@ doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         doSetAddrs(sockfd);
         doUpdateState(NETTX, sockfd, rc, NULL, NULL);
 
-        if (get_port(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
-            if (g_netinfo[sockfd].dnsName[0]) {
-                doUpdateState(DNS, sockfd, (ssize_t)0, NULL, NULL);
-            }
+        if ((g_netinfo[sockfd].dnsSend == FALSE) &&
+            remotePortIsDNS(sockfd) &&
+            (g_netinfo[sockfd].dnsName[0])) {
+            doUpdateState(DNS, sockfd, (ssize_t)0, NULL, NULL);
+            g_netinfo[sockfd].dnsSend = TRUE;
         }
-
 
         if ((sockfd != -1) && buf && (len > 0)) {
             doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETTX, src);
@@ -2080,7 +2297,7 @@ sockIsTCP(int sockfd)
 }
 
 bool
-addrIsNetDomain(struct sockaddr_storage* sock)
+addrIsNetDomain(struct sockaddr_storage *sock)
 {
     if (!sock) return FALSE;
 
@@ -2089,7 +2306,7 @@ addrIsNetDomain(struct sockaddr_storage* sock)
 }
 
 bool
-addrIsUnixDomain(struct sockaddr_storage* sock)
+addrIsUnixDomain(struct sockaddr_storage *sock)
 {
     if (!sock) return FALSE;
 
@@ -2098,7 +2315,7 @@ addrIsUnixDomain(struct sockaddr_storage* sock)
 }
 
 sock_summary_bucket_t
-getNetRxTxBucket(net_info* net)
+getNetRxTxBucket(net_info *net)
 {
     if (!net) return SOCK_OTHER;
 

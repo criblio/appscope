@@ -162,6 +162,8 @@ initFn(void)
     g_fn.PR_FileDesc2NativeHandle = dlsym(RTLD_NEXT, "PR_FileDesc2NativeHandle");
     g_fn.PR_SetError = dlsym(RTLD_NEXT, "PR_SetError");
     g_fn.__overflow = dlsym(RTLD_NEXT, "__overflow");
+    g_fn.sendmmsg = dlsym(RTLD_NEXT, "sendmmsg");
+    g_fn.recvmmsg = dlsym(RTLD_NEXT, "recvmmsg");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__

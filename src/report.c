@@ -901,11 +901,12 @@ doErrorMetric(metric_t type, control_type_t source,
 }
 
 void
-doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration, void *ctr)
+doDNSMetricName(metric_t type, net_info *net)
 {
-    if (!domain || !domain[0]) return;
+    if (!net || !net->dnsName || !net->dnsName[0]) return;
 
-    metric_counters* ctrs = (ctr) ? (metric_counters*) ctr : &g_ctrs;
+    metric_counters *ctrs = &net->counters;
+    counters_element_t *duration = &net->totalDuration;
 
     switch (type) {
     case DNS:
@@ -918,7 +919,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
                     PROC_FIELD(g_proc.procname),
                     PID_FIELD(g_proc.pid),
                     HOST_FIELD(g_proc.hostname),
-                    DOMAIN_FIELD(domain),
+                    DOMAIN_FIELD(net->dnsName),
                     UNIT_FIELD("response"),
                     FIELDEND
                 };
@@ -927,12 +928,13 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
 
                 // This creates a DNS event
                 event_field_t evfield[] = {
-                    DOMAIN_FIELD(domain),
+                    DOMAIN_FIELD(net->dnsName),
                     DURATION_FIELD(duration->evt / 1000000), // convert ns to ms.
                     FIELDEND
                 };
                 event_t dnsEvent = INT_EVENT("net.dns.resp", ctrs->numDNS.evt, DELTA, evfield);
                 dnsEvent.src = CFG_SRC_DNS;
+                dnsEvent.data = net->dnsAnswer;
                 cmdSendEvent(g_ctl, &dnsEvent, getTime(), &g_proc);
             } else {
                 // This create a DNS raw event
@@ -940,7 +942,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
                     PROC_FIELD(g_proc.procname),
                     PID_FIELD(g_proc.pid),
                     HOST_FIELD(g_proc.hostname),
-                    DOMAIN_FIELD(domain),
+                    DOMAIN_FIELD(net->dnsName),
                     UNIT_FIELD("request"),
                     FIELDEND
                 };
@@ -949,7 +951,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
 
                 // This creates a DNS event
                 event_field_t evfield[] = {
-                    DOMAIN_FIELD(domain),
+                    DOMAIN_FIELD(net->dnsName),
                     FIELDEND
                 };
                 event_t dnsEvent = INT_EVENT("net.dns.req", ctrs->numDNS.evt, DELTA, evfield);
@@ -970,7 +972,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
             HOST_FIELD(g_proc.hostname),
-            DOMAIN_FIELD(domain),
+            DOMAIN_FIELD(net->dnsName),
             DURATION_FIELD(duration->mtc / 1000000), // convert ns to ms.
             UNIT_FIELD("request"),
             FIELDEND
@@ -1003,7 +1005,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
                 PROC_FIELD(g_proc.procname),
                 PID_FIELD(g_proc.pid),
                 HOST_FIELD(g_proc.hostname),
-                DOMAIN_FIELD(domain),
+                DOMAIN_FIELD(net->dnsName),
                 NUMOPS_FIELD(cachedDurationNum),
                 UNIT_FIELD("millisecond"),
                 FIELDEND
@@ -1036,7 +1038,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
             HOST_FIELD(g_proc.hostname),
-            DOMAIN_FIELD(domain),
+            DOMAIN_FIELD(net->dnsName),
             NUMOPS_FIELD(cachedDurationNum),
             UNIT_FIELD("millisecond"),
             FIELDEND
@@ -1053,7 +1055,6 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
     default:
         scopeLog("ERROR: doDNSMetric:metric type", -1, CFG_LOG_ERROR);
     }
-
 }
 
 void
@@ -2384,7 +2385,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // For next time
         net->dnsSend = FALSE;
 
-        doDNSMetricName(DNS, net->dnsName, 0, NULL);
+        doDNSMetricName(DNS, net);
 
         break;
     }
@@ -2420,7 +2421,7 @@ doEvent()
                 doStatMetric(staterr->funcop, staterr->name, &staterr->counters);
             } else if (event->evtype == EVT_DNS) {
                 net = (net_info *)data;
-                doDNSMetricName(net->data_type, net->dnsName, &net->totalDuration, &net->counters);
+                doDNSMetricName(net->data_type, net);
             } else if (event->evtype == EVT_PROTO) {
                 proto = (protocol_info *)data;
                 doProtocolMetric(proto);

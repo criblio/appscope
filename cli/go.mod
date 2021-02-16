@@ -10,6 +10,7 @@ require (
 	github.com/fatih/color v1.7.0
 	github.com/fatih/structs v1.1.0
 	github.com/go-bindata/go-bindata v3.1.2+incompatible // indirect
+	github.com/go-chi/chi v1.5.2
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/guptarohit/asciigraph v0.5.1
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
@@ -18,7 +19,9 @@ require (
 	github.com/rs/zerolog v1.20.0
 	github.com/spf13/cobra v1.1.1
 	github.com/stretchr/testify v1.6.1
-	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/sys v0.0.0-20201223074533-0d417f636930 // indirect
 	gopkg.in/yaml.v2 v2.4.0
+	k8s.io/api v0.20.2
+	k8s.io/apimachinery v0.20.2
 )

@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path"
 
 	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
@@ -30,10 +32,18 @@ scope excrete /opt/libscope`,
 
 		err := run.CreateAll(outPath)
 		util.CheckErrSprintf(err, "error excreting files: %v", err)
+		if rc.MetricsDest != "" || rc.EventsDest != "" {
+			err = os.Rename(path.Join(outPath, "scope.yml"), path.Join(outPath, "scope_example.yml"))
+			util.CheckErrSprintf(err, "error renaming scope.yml: %v", err)
+			rc.WorkDir = outPath
+			err = rc.WriteScopeConfig(path.Join(outPath, "scope.yml"))
+			util.CheckErrSprintf(err, "error writing scope.yml: %v", err)
+		}
 		fmt.Printf("Successfully extracted to %s.\n", outPath)
 	},
 }
 
 func init() {
+	metricAndEventDestFlags(excreteCmd, rc)
 	RootCmd.AddCommand(excreteCmd)
 }

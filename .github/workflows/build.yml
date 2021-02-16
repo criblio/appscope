@@ -23,4 +23,4 @@ jobs:
       - if: github.ref=='refs/tags/v*' && github.ref!='*-rc*'
         env:
           SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
-        run: ./cli/docker-demo.sh
+        run: ./docker/build.sh

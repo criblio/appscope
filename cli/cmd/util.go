@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/criblio/scope/history"
+	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
@@ -39,4 +40,10 @@ func helpErrAndExit(cmd *cobra.Command, errText string) {
 	cmd.Help()
 	fmt.Printf("\nerror: %s\n", errText)
 	os.Exit(1)
+}
+
+func metricAndEventDestFlags(cmd *cobra.Command, rc *run.Config) {
+	cmd.Flags().StringVar(&rc.MetricsFormat, "metricformat", "ndjson", "Set format of metrics output (statsd|ndjson)")
+	cmd.Flags().StringVarP(&rc.MetricsDest, "metricdest", "m", "file:///tmp/metrics.json", "Set destination for metrics (tcp://host:port, udp://host:port, or file:///path/file.json)")
+	cmd.Flags().StringVarP(&rc.EventsDest, "eventdest", "e", "file:///tmp/events.json", "Set destination for events (tcp://host:port, udp://host:port, or file:///path/file.json)")
 }

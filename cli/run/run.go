@@ -141,7 +141,7 @@ func (rc *Config) createWorkDir(cmd string) {
 	payloadsDir := filepath.Join(rc.WorkDir, "payloads")
 	err = os.MkdirAll(payloadsDir, 0755)
 	util.CheckErrSprintf(err, "error creating payloads dir: %v", err)
-	internal.SetLogFile(filepath.Join(rc.WorkDir, "scope.log"))
+	internal.CreateLogFile(filepath.Join(rc.WorkDir, "scope.log"))
 	if rc.MetricsDest != "" {
 		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_dest"), []byte(rc.MetricsDest), 0644)
 		util.CheckErrSprintf(err, "error writing metric_dest: %v", err)

@@ -4,7 +4,7 @@ var webhook string = `---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: {{ .App }}
+  name: {{ .App }}.{{ .Namespace }}.appscope.io
   labels:
     app: {{ .App }}
 webhooks:
@@ -24,7 +24,7 @@ webhooks:
         apiVersions: ["v1"]
         resources: ["pods"]
         scope: "*"
-    NamespaceSelector:
+    namespaceSelector:
       matchLabels:
         scope: enabled
 `
@@ -41,7 +41,7 @@ spec:
       containers:
       - name: webhook-cert-setup
         # This is a minimal kubectl image based on Alpine Linux that signs certificates using the k8s extension api server
-        image: quay.io/didil/k8s-webhook-cert-manager:0.13.19-1-a
+        image: newrelic/k8s-webhook-cert-manager:latest
         command: ["./generate_certificate.sh"]
         args:
           - "--service"
@@ -75,6 +75,10 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get"]
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["signers"]
+    resourceNames: ["kubernetes.io/legacy-unknown"]
+    verbs: ["approve"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -116,14 +120,18 @@ spec:
     spec:
       containers:
         - name: {{ .App }}
-          image: criblio/scope:{{ .Version }}
+          image: cribl/scope:{{ .Version }}
+          command: ["/bin/bash"]
+          args:
+          - "-c"
+          - "/usr/local/bin/scope k8s --server --debug --metricdest {{ .MetricDest }} --metricformat {{ .MetricFormat }} --eventdest {{ .EventDest }} || sleep 1000"
           imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: certs
               mountPath: /etc/certs
               readOnly: true
           ports:
-            - containerPort: 4443
+            - containerPort: {{ .Port }}
               protocol: TCP
       volumes:
         - name: certs
@@ -137,10 +145,19 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - name: 4443-tcp
+    - name: {{ .Port }}-tcp
       protocol: TCP
       port: 443
-      targetPort: 4443
+      targetPort: {{ .Port }}
   selector:
     app: {{ .App }} 
 `
+
+// - "k8s"
+// - "--server"
+// - "--metricdest"
+// - "{{ .MetricDest }}"
+// - "--metricformat"
+// - "{{ .MetricFormat }}"
+// - "--eventdest"
+// - "{{ .EventDest }}"

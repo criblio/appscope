@@ -32,9 +32,7 @@ func init() {
 	runCmd.Flags().BoolVar(&rc.Passthrough, "passthrough", false, "Runs scopec with current environment & no config.")
 	runCmd.Flags().IntVarP(&rc.Verbosity, "verbosity", "v", 4, "Set scope metric verbosity")
 	runCmd.Flags().BoolVarP(&rc.Payloads, "payloads", "p", false, "Capture payloads of network transactions")
-	runCmd.Flags().StringVar(&rc.MetricsFormat, "metricformat", "ndjson", "Set format of metrics output (statsd|ndjson)")
-	runCmd.Flags().StringVarP(&rc.MetricsDest, "metricdest", "m", "", "Set destination for metrics (tcp://host:port, udp://host:port, or file:///path/file.json)")
-	runCmd.Flags().StringVarP(&rc.EventsDest, "eventdest", "e", "", "Set destination for events (tcp://host:port, udp://host:port, or file:///path/file.json)")
+	metricAndEventDestFlags(runCmd, rc)
 	// This may be a bad assumption, if we have any args preceding this it might fail
 	runCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		internal.InitConfig()

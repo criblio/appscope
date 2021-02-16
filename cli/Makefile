@@ -10,7 +10,7 @@ endif
 
 GO:=go
 
-GO_VER_FLAGS=$(shell $(GOPATH)/bin/govvv -flags)
+GO_VER_FLAGS=$(shell cd $(DIR) && $(GOPATH)/bin/govvv -flags)
 
 .PHONY: cliall
 

@@ -45,6 +45,9 @@
     - name: Config Files
       path: /docs/config-files
 
+    - name: Changelog
+      path: /docs/changelog
+
 - name: Community
   child: 
     - name: Community

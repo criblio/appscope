@@ -431,13 +431,17 @@ initGoHook(elf_buf_t *ebuf)
     }
 
     if (go_major_ver < MIN_SUPPORTED_GO_VER) {
-        if (go_runtime_version) {
-            fprintf(stderr, "%s was compiled with go version `%s`.\n",
-                    ebuf->cmd, go_runtime_version);
+        char buf[1024];
+        if (!is_go(ebuf->buf)) {
+            // Don't expect to get here, but try to be clear if we do.
+            snprintf(buf, sizeof(buf), "%s is not a go application.  Continuing without AppScope.", ebuf->cmd);
+        } else if (go_runtime_version) {
+            snprintf(buf, sizeof(buf), "%s was compiled with go version `%s`.  AppScope can only instrument go1.8 or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version);
+        } else {
+            snprintf(buf, sizeof(buf), "%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope requires symbols and can only instrument go1.8 or newer.  Continuing without AppScope.", ebuf->cmd);
         }
-        fprintf(stderr, "%s was compiled with a version of go older than go1.8."
-                "  This is not supported by scope.  Continuing without scope.\n", ebuf->cmd);
-       return; // don't install our hooks
+        scopeLog(buf, -1, CFG_LOG_WARN);
+        return; // don't install our hooks
     }
 
     /*

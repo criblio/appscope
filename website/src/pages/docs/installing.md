@@ -9,8 +9,7 @@ First, see [Requirements](/docs/requirements) to ensure that you’re completing
 
 ### Get AppScope
 
-Directly download the CLI binary from [https://cdn.cribl.io/dl/scope/cli/linux/scope](https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linux/scope). Use this command to both download it and make it executable:
-
+Use this command to download the CLI binary and make it executable:
 
 ```
 curl -Lo scope https://cdn.cribl.io/dl/scope/\

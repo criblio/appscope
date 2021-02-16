@@ -44,6 +44,7 @@ typedef struct {
     const data_type_t type;
     event_field_t *fields;
     watch_t src;
+    cJSON *data;
 } event_t;
 
 #define INT_EVENT(n, v, t, f) {n, { FMT_INT, .integer=v}, t, f, CFG_SRC_METRIC}

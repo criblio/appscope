@@ -61,26 +61,6 @@ struct _config_t
     unsigned enhancefs;
 };
 
-#define DEFAULT_SUMMARY_PERIOD 10
-#define DEFAULT_MTC_TYPE CFG_UDP
-#define DEFAULT_MTC_HOST "127.0.0.1"
-//#define DEFAULT_MTC_PORT DEFAULT_MTC_PORT (defined in scopetypes.h)
-#define DEFAULT_MTC_PATH NULL
-//#define DEFAULT_MTC_BUF CFG_BUFFER_FULLY
-#define DEFAULT_MTC_BUF CFG_BUFFER_LINE
-#define DEFAULT_CTL_TYPE CFG_TCP
-#define DEFAULT_CTL_HOST "127.0.0.1"
-//#define DEFAULT_CTL_PORT DEFAULT_CTL_PORT (defined in scopetypes.h)
-#define DEFAULT_CTL_PATH NULL
-#define DEFAULT_CTL_BUF CFG_BUFFER_FULLY
-#define DEFAULT_LOG_TYPE CFG_FILE
-#define DEFAULT_LOG_HOST NULL
-#define DEFAULT_LOG_PORT NULL
-#define DEFAULT_LOG_BUF CFG_BUFFER_FULLY
-#define DEFAULT_TAGS NULL
-#define DEFAULT_NUM_TAGS 8
-#define DEFAULT_COMMAND_DIR "/tmp"
-
 
 static const char* valueFilterDefault[] = {
     DEFAULT_SRC_FILE_VALUE,
@@ -206,7 +186,7 @@ cfgCreateDefault()
     c->pay.enable = DEFAULT_PAYLOAD_ENABLE;
     c->pay.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
 
-    c->tags = DEFAULT_TAGS;
+    c->tags = DEFAULT_CUSTOM_TAGS;
     c->max_tags = DEFAULT_NUM_TAGS;
 
     c->commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
@@ -440,7 +420,7 @@ cfgTransportBuf(config_t* cfg, which_transport_t t)
 custom_tag_t**
 cfgCustomTags(config_t* cfg)
 {
-    return (cfg) ? cfg->tags : DEFAULT_TAGS;
+    return (cfg) ? cfg->tags : DEFAULT_CUSTOM_TAGS;
 }
 
 static custom_tag_t*

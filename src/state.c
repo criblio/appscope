@@ -209,6 +209,12 @@ initPayloadExtract()
     }
 
     g_payload_pre->match_data = pcre2_match_data_create_from_pattern(g_payload_pre->re, NULL);
+
+    if (g_payload_pre->match_data == NULL) {
+        destroyProtEntry(g_payload_pre);
+        g_payload_pre = NULL;
+        return;
+    }
 }
 
 static void

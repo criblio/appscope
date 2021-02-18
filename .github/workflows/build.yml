@@ -20,7 +20,7 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
         run: ./deploy.sh
-      - if: github.ref=='refs/tags/v*' && github.ref!='*-rc*'
+      - if: startsWith(github.ref, 'refs/tags/v')
         env:
           SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
         run: ./docker/build.sh

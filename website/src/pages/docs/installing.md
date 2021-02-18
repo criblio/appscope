@@ -9,6 +9,10 @@ First, see [Requirements](/docs/requirements) to ensure that you’re completing
 
 ### Get AppScope
 
+You can download as a binary to run on your Linux OS, or as a container.
+
+#### Download as Binary
+
 Use this command to download the CLI binary and make it executable:
 
 ```
@@ -19,6 +23,13 @@ chmod 755 ./scope
 
 That's it!
 
+#### Download as Container
+
+Visit the AppScope repo on Docker Hub to download and run the most recently tagged container:
+
+https://hub.docker.com/r/cribl/scope
+
+The container provides the AppScope binary on Ubuntu 20.04.
 
 ### Explore the CLI
 

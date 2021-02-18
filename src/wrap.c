@@ -1068,7 +1068,6 @@ init(void)
     config_t* cfg = cfgRead(path);
     cfgProcessEnvironment(cfg);
     doConfig(cfg);
-    g_ctl = initCtl(cfg);
     g_staticfg = cfg;
     if (path) free(path);
     if (!g_dbg) dbgInit();

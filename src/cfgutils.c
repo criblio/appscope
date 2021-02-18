@@ -1191,7 +1191,11 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 static void
 processWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SEQUENCE_NODE) return;
+    // Type can be scalar or sequence.
+    // It will be scalar there are zero entries, in which case we
+    // clear all values and return.
+    if ((node->type != YAML_SEQUENCE_NODE) &&
+       (node->type != YAML_SCALAR_NODE)) return;
 
     // absence of one of these values means to clear it.
     // clear them all, then set values for whatever we find.
@@ -1200,6 +1204,7 @@ processWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         cfgEvtFormatSourceEnabledSet(config, x, 0);
     }
 
+    if (node->type != YAML_SEQUENCE_NODE) return;
     yaml_node_item_t* item;
     foreach(item, node->data.sequence.items) {
         yaml_node_t* i = yaml_document_get_node(doc, *item);
@@ -1217,6 +1222,7 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportCtl},
         {YAML_MAPPING_NODE,   FORMAT_NODE,          processEvtFormat},
         {YAML_SEQUENCE_NODE,  WATCH_NODE,           processWatch},
+        {YAML_SCALAR_NODE,    WATCH_NODE,           processWatch},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 

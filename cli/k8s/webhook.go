@@ -36,7 +36,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 
 	shouldModify := true
 
-	if _, ok := pod.ObjectMeta.Annotations["io.appscope/disable"]; ok {
+	if _, ok := pod.ObjectMeta.Annotations["appscope.dev/disable"]; ok {
 		shouldModify = false
 	}
 
@@ -114,7 +114,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		pod.ObjectMeta.Labels["io.appscope/scoped"] = "true"
+		pod.ObjectMeta.Labels["appscope.dev/scope"] = "true"
 
 		initContainersBytes, err := json.Marshal(&pod.Spec.InitContainers)
 		if err != nil {

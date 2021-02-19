@@ -16,6 +16,14 @@
 
 typedef enum
 {
+    PROT_NOTCHECKED,
+    PROT_CHECKED,
+    PROT_TLS,
+    PROT_MAX
+} protocol_type_t;
+
+typedef enum
+{
     INET_TCP,
     INET_UDP,
     UNIX_TCP,
@@ -173,7 +181,7 @@ typedef struct net_info_t {
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;
     metric_counters counters;
-    unsigned int protocol;
+    protocol_type_t protocol;
 } net_info;
 
 typedef struct fs_info_t {

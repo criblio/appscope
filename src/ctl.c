@@ -806,7 +806,7 @@ ctlConnect(ctl_t *ctl)
 }
 
 int
-ctlClose(ctl_t *ctl)
+ctlDisconnect(ctl_t *ctl)
 {
     if (!ctl) return 0;
     return transportDisconnect(ctl->transport);
@@ -843,8 +843,7 @@ ctlEvtSet(ctl_t *ctl, evt_fmt_t *evt)
     if (!ctl) return;
 
     // Don't leak if ctlEvtSet is called repeatedly
-    // TODO: need to ensure that previous object is no longer in use
-    // evtFormatDestroy(&ctl->evt);
+    evtFormatDestroy(&ctl->evt);
     ctl->evt = evt;
 }
 

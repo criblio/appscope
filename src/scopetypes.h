@@ -25,6 +25,10 @@ typedef enum {CFG_SRC_FILE,
               CFG_SRC_DNS,
               CFG_SRC_MAX} watch_t;
 
+typedef enum {CFG_HTTP_EX_HEADER,
+              CFG_HTTP_EX_PAYLOAD,
+              CFG_HTTP_EX_MAX} http_ex_t;
+
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
@@ -103,6 +107,11 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_SYSLOG FALSE
 #define DEFAULT_SRC_METRIC FALSE
 #define DEFAULT_SRC_HTTP FALSE
+#define DEFAULT_HTTP_EXTRACTIONS 0
+#define DEFAULT_HTTP_FROM CFG_HTTP_EX_HEADER
+#define DEFAULT_HTTP_MATCH_NAME NULL
+#define DEFAULT_HTTP_FIELD_NAME "appscope_"
+
 #define DEFAULT_SRC_NET FALSE
 #define DEFAULT_SRC_FS FALSE
 #define DEFAULT_SRC_DNS FALSE

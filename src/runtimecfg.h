@@ -9,4 +9,6 @@ typedef struct rtconfig_t {
     config_t *staticfg;
 } rtconfig;
 
+extern rtconfig g_cfg;
+
 #endif // __RUNTIMECFG_H__

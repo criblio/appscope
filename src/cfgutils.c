@@ -54,6 +54,10 @@
 #define NAME_NODE                    "name"
 #define FIELD_NODE                   "field"
 #define VALUE_NODE                   "value"
+#define EXTRACT_NODE                 "extractions"
+#define FROM_NODE                       "from"
+#define MATCH_NODE                      "matchName"
+#define EXEVENT_NODE                    "eventFieldName"
 
 #define PAYLOAD_NODE          "payload"
 #define ENABLE_NODE              "enable"
@@ -104,6 +108,12 @@ enum_map_t watchTypeMap[] = {
     {NULL,                    -1}
 };
 
+enum_map_t watchFromMap[] = {
+    {"header",     CFG_HTTP_EX_HEADER},
+    {"payload",    CFG_HTTP_EX_PAYLOAD},
+    {NULL,         -1}
+};
+
 enum_map_t boolMap[] = {
     {"true",                  TRUE},
     {"false",                 FALSE},
@@ -132,11 +142,16 @@ void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
 void cfgPayEnableSetFromStr(config_t*, const char*);
 void cfgPayDirSetFromStr(config_t*, const char*);
+void cfgEvtHttpExtractSetFromStr(config_t *, const char *);
+void cfgEvtHttpExFromSetFromStr(config_t *, const char *);
+void cfgEvtHttpExMatchSetFromStr(config_t *, http_ex_t, const char *);
+void cfgEvtHttpExEventSetFromStr(config_t *, http_ex_t, const char *);
 
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
 static which_transport_t transport_context;
 static watch_t watch_context;
+static http_ex_t g_http_ex;
 
 static regex_t* g_regex = NULL;
 
@@ -375,7 +390,7 @@ startsWith(const char* string, const char* substring)
 //    SCOPE_CONF_PATH (only used on startup to specify cfg file)
 //    SCOPE_HOME      (only used on startup for searching for cfg file)
 static void
-processEnvStyleInput(config_t* cfg, const char* env_line)
+processEnvStyleInput(config_t *cfg, const char *env_line)
 {
 
     if (!cfg || !env_line) return;
@@ -466,6 +481,18 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_EXTRACT")) {
+        cfgEvtHttpExtractSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_EXTRACT_FROM")) {
+        cfgEvtHttpExFromSetFromStr(cfg, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_EXTRACT_MATCH_HEADER")) {
+        cfgEvtHttpExMatchSetFromStr(cfg, CFG_HTTP_EX_HEADER, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_EXTRACT_MATCH_PAYLOAD")) {
+        cfgEvtHttpExMatchSetFromStr(cfg, CFG_HTTP_EX_PAYLOAD, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_EXTRACT_FIELD_HEADER")) {
+        cfgEvtHttpExEventSetFromStr(cfg, CFG_HTTP_EX_HEADER, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_EXTRACT_FIELD_PAYLOAD")) {
+        cfgEvtHttpExEventSetFromStr(cfg, CFG_HTTP_EX_PAYLOAD, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_NET_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_NET, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_FS_VALUE")) {
@@ -630,6 +657,34 @@ cfgEnhanceFsSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     cfgEnhanceFsSet(cfg, strToVal(boolMap, value));
+}
+
+void
+cfgEvtHttpExtractSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgEvtHttpExtractSet(cfg, strToVal(boolMap, value));
+}
+
+void
+cfgEvtHttpExFromSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgEvtHttpExFromSet(cfg, strToVal(watchFromMap, value));
+}
+
+void
+cfgEvtHttpExMatchSetFromStr(config_t *cfg, http_ex_t src, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgEvtHttpExMatchSet(cfg, src, value);
+}
+
+void
+cfgEvtHttpExEventSetFromStr(config_t *cfg, http_ex_t src, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgEvtHttpExEventSet(cfg, src, value);
 }
 
 void
@@ -1120,6 +1175,58 @@ processWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (value) free(value);
 }
 
+static void
+processWatchExFrom(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    char *value = stringVal(node);
+    g_http_ex = strToVal(watchFromMap, value);
+    cfgEvtHttpExFromSet(config, g_http_ex);
+    if (value) free(value);
+}
+
+static void
+processWatchExMatch(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    char *value = stringVal(node);
+    cfgEvtHttpExMatchSet(config, g_http_ex, value);
+    if (value) free(value);
+
+    // if we are given something to match, then extraction is enabled
+    cfgEvtHttpExtractSet(config, 1);
+}
+
+static void
+processWatchExEvent(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    char *value = stringVal(node);
+    cfgEvtHttpExEventSet(config, g_http_ex, value);
+    if (value) free(value);
+}
+
+static void
+processWatchExtraction(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE,    FROM_NODE,            processWatchExFrom},
+        {YAML_SCALAR_NODE,    MATCH_NODE,           processWatchExMatch},
+        {YAML_SCALAR_NODE,    EXEVENT_NODE,         processWatchExEvent},
+        {YAML_NO_NODE,        NULL,                 NULL}
+    };
+
+    yaml_node_pair_t *pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
 static int
 isWatchType(yaml_document_t* doc, yaml_node_pair_t* pair)
 {
@@ -1138,6 +1245,7 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    NAME_NODE,            processWatchName},
         {YAML_SCALAR_NODE,    FIELD_NODE,           processWatchField},
         {YAML_SCALAR_NODE,    VALUE_NODE,           processWatchValue},
+        {YAML_MAPPING_NODE,   EXTRACT_NODE,         processWatchExtraction},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 

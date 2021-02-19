@@ -146,6 +146,7 @@ void cfgEvtHttpExtractSetFromStr(config_t *, const char *);
 void cfgEvtHttpExFromSetFromStr(config_t *, const char *);
 void cfgEvtHttpExMatchSetFromStr(config_t *, http_ex_t, const char *);
 void cfgEvtHttpExEventSetFromStr(config_t *, http_ex_t, const char *);
+static void cfgSetFromFile(config_t *config, const char *path);
 
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
@@ -376,6 +377,19 @@ processCmdDebug(const char* path)
     ni_fclose(f);
 }
 
+static void
+processReloadConfig(config_t *cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    unsigned int enable = strToVal(boolMap, value);
+    if (enable != TRUE) return;
+
+    char *path = cfgPath();
+    cfgSetFromFile(cfg, path);
+    if (path) free(path);
+
+    cfgProcessEnvironment(cfg);
+}
 
 static int
 startsWith(const char* string, const char* substring)
@@ -389,6 +403,19 @@ startsWith(const char* string, const char* substring)
 // For completeness, scope env vars that are not processed here:
 //    SCOPE_CONF_PATH (only used on startup to specify cfg file)
 //    SCOPE_HOME      (only used on startup for searching for cfg file)
+//
+// Unpublished scope env vars that are not processed here:
+//    SCOPE_APP_TYPE                 internal use only
+//    SCOPE_EXEC_TYPE                internal use only
+//    SCOPE_EXECVE                   "false" disables scope of child procs
+//    SCOPE_EXEC_PATH                specifies path to ldscope executable
+//    SCOPE_GO_STRUCT_PATH           for internal testing
+//    SCOPE_HTTP_SERIALIZE_ENABLE    "true" adds guard for race condition
+//    SCOPE_NO_SIGNAL                if defined, timer for USR2 is not set
+//    SCOPE_PERF_PRESERVE            "true" processes at 10s instead of 1ms
+//    SCOPE_SWITCH                   for internal go debugging
+//    SCOPE_PID                      provided by library
+//
 static void
 processEnvStyleInput(config_t *cfg, const char *env_line)
 {
@@ -429,6 +456,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgPayDirSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_CMD_DBG_PATH")) {
         processCmdDebug(value);
+    } else if (startsWith(env_line, "SCOPE_CONF_RELOAD")) {
+        processReloadConfig(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_CTL, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_ENABLE")) {
@@ -537,6 +566,7 @@ cfgProcessEnvironment(config_t* cfg)
         // Some things should only be processed as commands, not as
         // environment variables.  Skip them here.
         if (startsWith(e, "SCOPE_CMD_DBG_PATH")) continue;
+        if (startsWith(e, "SCOPE_CONF_RELOAD")) continue;
 
         // Process everything else.
         processEnvStyleInput(cfg, e);
@@ -1269,7 +1299,11 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 static void
 processWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    if (node->type != YAML_SEQUENCE_NODE) return;
+    // Type can be scalar or sequence.
+    // It will be scalar there are zero entries, in which case we
+    // clear all values and return.
+    if ((node->type != YAML_SEQUENCE_NODE) &&
+       (node->type != YAML_SCALAR_NODE)) return;
 
     // absence of one of these values means to clear it.
     // clear them all, then set values for whatever we find.
@@ -1278,6 +1312,7 @@ processWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         cfgEvtFormatSourceEnabledSet(config, x, 0);
     }
 
+    if (node->type != YAML_SEQUENCE_NODE) return;
     yaml_node_item_t* item;
     foreach(item, node->data.sequence.items) {
         yaml_node_t* i = yaml_document_get_node(doc, *item);
@@ -1295,6 +1330,7 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportCtl},
         {YAML_MAPPING_NODE,   FORMAT_NODE,          processEvtFormat},
         {YAML_SEQUENCE_NODE,  WATCH_NODE,           processWatch},
+        {YAML_SCALAR_NODE,    WATCH_NODE,           processWatch},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1376,11 +1412,10 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
     }
 }
 
-config_t*
-cfgRead(const char* path)
+static void
+cfgSetFromFile(config_t *config, const char* path)
 {
     FILE* f = NULL;
-    config_t* config = NULL;
     int parser_successful = 0;
     int doc_successful = 0;
     yaml_parser_t parser;
@@ -1391,9 +1426,7 @@ cfgRead(const char* path)
 
     if (!ni_fopen || !ni_fclose) goto cleanup;
 
-    config = cfgCreateDefault();
     if (!config) goto cleanup;
-
     if (!path) goto cleanup;
     f = ni_fopen(path, "rb");
     if (!f) goto cleanup;
@@ -1413,7 +1446,6 @@ cleanup:
     if (doc_successful) yaml_document_delete(&doc);
     if (parser_successful) yaml_parser_delete(&parser);
     if (f) ni_fclose(f);
-    return config;
 }
 
 config_t*
@@ -1444,6 +1476,14 @@ cfgFromString(const char* string)
 cleanup:
     if (doc_successful) yaml_document_delete(&doc);
     if (parser_successful) yaml_parser_delete(&parser);
+    return config;
+}
+
+config_t*
+cfgRead(const char *path)
+{
+    config_t *config = cfgCreateDefault();
+    cfgSetFromFile(config, path);
     return config;
 }
 

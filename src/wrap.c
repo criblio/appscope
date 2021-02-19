@@ -39,6 +39,7 @@ static thread_timing g_thread = {0};
 static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static mtc_t *g_prevmtc = NULL;
+static ctl_t *g_prevctl = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 static unsigned g_sendprocessstart;
@@ -285,7 +286,7 @@ remoteConfig()
         rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
         if (rc <= 0) {
             // Something has happened to our connection
-            ctlClose(g_ctl);
+            ctlDisconnect(g_ctl);
             break;
         }
 
@@ -414,6 +415,7 @@ doConfig(config_t *cfg)
     // Save the current objects to get cleaned up on the periodic thread
     g_prevmtc = g_mtc;
     g_prevlog = g_log;
+    g_prevctl = g_ctl;
 
     g_thread.interval = cfgMtcPeriod(cfg);
     setReportingInterval(cfgMtcPeriod(cfg));
@@ -427,11 +429,12 @@ doConfig(config_t *cfg)
 
     g_log = initLog(cfg);
     g_mtc = initMtc(cfg);
-    ctlEvtSet(g_ctl, initEvtFormat(cfg));
+    g_ctl = initCtl(cfg);
 
     // Disconnect the old interfaces that were just replaced
     mtcDisconnect(g_prevmtc);
     logDisconnect(g_prevlog);
+    ctlDisconnect(g_prevctl);
 }
 
 // Process dynamic config change if they are available
@@ -1065,7 +1068,6 @@ init(void)
     config_t* cfg = cfgRead(path);
     cfgProcessEnvironment(cfg);
     doConfig(cfg);
-    g_ctl = initCtl(cfg);
     g_staticfg = cfg;
     if (path) free(path);
     if (!g_dbg) dbgInit();

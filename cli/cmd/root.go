@@ -32,7 +32,7 @@ func Execute() {
 				}
 			}
 
-			// If we're not a known command, exec scopec
+			// If we're not a known command, exec ldscope
 			internal.InitConfig()
 			rc := run.Config{}
 			rc.Run(os.Args[1:])
@@ -44,14 +44,8 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-
-	RootCmd.Flags().CountP("verbose", "v", "set verbosity level")
 }
 
 func initConfig() {
 	internal.InitConfig()
-	verbose, _ := RootCmd.Flags().GetBool("verbose")
-	if verbose {
-		internal.SetDebug()
-	}
 }

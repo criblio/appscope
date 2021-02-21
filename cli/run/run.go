@@ -147,11 +147,11 @@ func (rc *Config) createWorkDir(cmd string) {
 		util.CheckErrSprintf(err, "error writing metric_dest: %v", err)
 	}
 	if rc.MetricsFormat != "" {
-		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_format"), []byte(rc.MetricsDest), 0644)
+		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_format"), []byte(rc.MetricsFormat), 0644)
 		util.CheckErrSprintf(err, "error writing metric_format: %v", err)
 	}
 	if rc.EventsDest != "" {
-		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "event_dest"), []byte(rc.MetricsDest), 0644)
+		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "event_dest"), []byte(rc.EventsDest), 0644)
 		util.CheckErrSprintf(err, "error writing event_dest: %v", err)
 	}
 	log.Info().Str("workDir", rc.WorkDir).Msg("created working directory")
@@ -186,6 +186,28 @@ func (rc *Config) setupWorkDir(args []string) {
 
 	err := rc.configFromRunOpts()
 	util.CheckErrSprintf(err, "%v", err)
+
+	if rc.sc.Metric.Transport.TransportType == "file" {
+		newPath, err := filepath.Abs(rc.sc.Metric.Transport.Path)
+		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Metric.Transport.Path, err)
+		rc.sc.Metric.Transport.Path = newPath
+		f, err := os.OpenFile(rc.sc.Metric.Transport.Path, os.O_CREATE, 0644)
+		if err != nil && !os.IsExist(err) {
+			util.ErrAndExit("cannot create metric file %s: %v", rc.sc.Metric.Transport.Path, err)
+		}
+		f.Close()
+	}
+
+	if rc.sc.Event.Transport.TransportType == "file" {
+		newPath, err := filepath.Abs(rc.sc.Event.Transport.Path)
+		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Event.Transport.Path, err)
+		rc.sc.Event.Transport.Path = newPath
+		f, err := os.OpenFile(rc.sc.Event.Transport.Path, os.O_CREATE, 0644)
+		if err != nil && !os.IsExist(err) {
+			util.ErrAndExit("cannot create metric file %s: %v", rc.sc.Event.Transport.Path, err)
+		}
+		f.Close()
+	}
 
 	scYamlPath := filepath.Join(rc.WorkDir, "scope.yml")
 	err = rc.WriteScopeConfig(scYamlPath)

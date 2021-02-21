@@ -208,7 +208,6 @@ event:
     field: .*
     value: .*
 libscope:
-  level: ""
   configevent: false
   summaryperiod: 10
   commanddir: CMDDIR

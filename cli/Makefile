@@ -12,9 +12,9 @@ GO:=go
 
 GO_VER_FLAGS=$(shell cd $(DIR) && $(GOPATH)/bin/govvv -flags)
 
-.PHONY: cliall
+.PHONY: cliall compressscope
 
-cliall: deps scope
+cliall: deps scope compressscope
 
 cliclean:
 	rm -rf $(DIR)build/*
@@ -28,8 +28,8 @@ deps:
 
 rebuild: cliclean all
 
-local:
-	cd $(DIR) && $(GO) build -ldflags="$(GO_VER_FLAGS)" -o /usr/local/bin/scope
+local: scope
+	sudo cp $(DIR)build/scope /usr/local/bin/scope
 
 run/bundle.go:
 	rm -rf $(DIR)/build/*
@@ -41,6 +41,8 @@ run/bundle.go:
 scope: run/bundle.go
 	# GOOS=linux CGO_ENABLED=0 $(GO) build -a -tags netgo -ldflags="-s -w" -o build/scope
 	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)build/scope
+
+compressscope:
 	upx -9 $(DIR)build/scope
 
 install: 

@@ -49,7 +49,6 @@ type ScopeWatchConfig struct {
 
 // ScopeLibscopeConfig represents how to configure libscope
 type ScopeLibscopeConfig struct {
-	Level         string         `mapstructure:"level" json:"level" yaml:"level"`
 	ConfigEvent   bool           `mapstructure:"configevent" json:"configevent" yaml:"configevent"`
 	SummaryPeriod int            `mapstructure:"summaryperiod" jaon:"summaryperiod" yaml:"summaryperiod"`
 	CommandDir    string         `mapstructure:"commanddir" json:"commanddir" yaml:"commanddir"`

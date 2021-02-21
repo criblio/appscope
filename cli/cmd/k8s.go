@@ -13,12 +13,14 @@ var opt k8s.Options
 
 // k8sCmd represents the k8s command
 var k8sCmd = &cobra.Command{
-	Use:     "k8s",
-	Short:   "Prints k8s configurations to install scope to automatically instrument pods",
-	Long:    `Prints k8s configurations to install scope to automatically instrument pods`,
-	Example: `scope k8s`,
-	Args:    cobra.NoArgs,
-	Hidden:  true,
+	Use:   "k8s",
+	Short: "Install scope in kubernetes",
+	Long: `The k8s command prints configurations to be passed to kubectl which will automatically instrument newly launched containers. This installs
+a mutating admission webhook which adds an initContainer to each pod along with some environment variables which installs scope for all
+all processes in that container.`,
+	Example: `scope k8s --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 | kubectl apply -f -
+kubectl label namespace default scope=enabled`,
+	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		if opt.Version == "" {
 			opt.Version = internal.GetVersion()

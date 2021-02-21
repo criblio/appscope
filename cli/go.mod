@@ -4,13 +4,10 @@ go 1.15
 
 require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
-	github.com/ahmetb/govvv v0.3.0 // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
 	github.com/dop251/goja v0.0.0-20201221183957-6b6d5e2b5d80
 	github.com/fatih/color v1.7.0
 	github.com/fatih/structs v1.1.0
-	github.com/go-bindata/go-bindata v3.1.2+incompatible // indirect
-	github.com/go-chi/chi v1.5.2
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/guptarohit/asciigraph v0.5.1
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51

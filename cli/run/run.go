@@ -19,17 +19,21 @@ import (
 
 // Config represents options to change how we run scope
 type Config struct {
-	Passthrough bool
-	Verbosity   int
-	Payloads    bool
+	WorkDir       string
+	Passthrough   bool
+	Verbosity     int
+	Payloads      bool
+	MetricsDest   string
+	EventsDest    string
+	MetricsFormat string
 
-	workDir string
-	now     func() time.Time
+	now func() time.Time
+	sc  *ScopeConfig
 }
 
 // Run executes a scoped command
 func (rc *Config) Run(args []string) {
-	if err := CreateLdscope(); err != nil {
+	if err := createLdscope(); err != nil {
 		util.ErrAndExit("error creating ldscope: %v", err)
 	}
 	// Normal operational, not passthrough, create directory for this run
@@ -37,8 +41,8 @@ func (rc *Config) Run(args []string) {
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
 	if !rc.Passthrough {
-		rc.SetupWorkDir(args)
-		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.workDir, "scope.yml"))
+		rc.setupWorkDir(args)
+		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
 		log.Info().Bool("passthrough", rc.Passthrough).Strs("args", args).Msg("calling syscall.Exec")
 	}
 	syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)
@@ -48,8 +52,8 @@ func ldscopePath() string {
 	return filepath.Join(util.ScopeHome(), "ldscope")
 }
 
-// CreateLdscope creates ldscope in $SCOPE_HOME
-func CreateLdscope() error {
+// createLdscope creates ldscope in $SCOPE_HOME
+func createLdscope() error {
 	ldscope := ldscopePath()
 	ldscopeInfo, _ := AssetInfo("build/ldscope")
 
@@ -109,10 +113,10 @@ func CreateAll(path string) error {
 	return nil
 }
 
-// CreateWorkDir creates a working directory
-func (rc *Config) CreateWorkDir(cmd string) {
-	if rc.workDir != "" {
-		if util.CheckDirExists(rc.workDir) {
+// createWorkDir creates a working directory
+func (rc *Config) createWorkDir(cmd string) {
+	if rc.WorkDir != "" {
+		if util.CheckDirExists(rc.WorkDir) {
 			// Directory exists, exit
 			return
 		}
@@ -128,17 +132,29 @@ func (rc *Config) CreateWorkDir(cmd string) {
 	sessionID := getSessionID()
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP
 	tmpDirName := path.Base(cmd) + "_" + sessionID + "_" + pid + "_" + ts
-	rc.workDir = filepath.Join(HistoryDir(), tmpDirName)
-	err = os.Mkdir(rc.workDir, 0755)
+	rc.WorkDir = filepath.Join(HistoryDir(), tmpDirName)
+	err = os.Mkdir(rc.WorkDir, 0755)
 	util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
-	cmdDir := filepath.Join(rc.workDir, "cmd")
+	cmdDir := filepath.Join(rc.WorkDir, "cmd")
 	err = os.Mkdir(cmdDir, 0755)
 	util.CheckErrSprintf(err, "error creating cmd dir: %v", err)
-	payloadsDir := filepath.Join(rc.workDir, "payloads")
+	payloadsDir := filepath.Join(rc.WorkDir, "payloads")
 	err = os.MkdirAll(payloadsDir, 0755)
 	util.CheckErrSprintf(err, "error creating payloads dir: %v", err)
-	internal.SetLogFile(filepath.Join(rc.workDir, "scope.log"))
-	log.Info().Str("workDir", rc.workDir).Msg("created working directory")
+	internal.CreateLogFile(filepath.Join(rc.WorkDir, "scope.log"))
+	if rc.MetricsDest != "" {
+		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_dest"), []byte(rc.MetricsDest), 0644)
+		util.CheckErrSprintf(err, "error writing metric_dest: %v", err)
+	}
+	if rc.MetricsFormat != "" {
+		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_format"), []byte(rc.MetricsFormat), 0644)
+		util.CheckErrSprintf(err, "error writing metric_format: %v", err)
+	}
+	if rc.EventsDest != "" {
+		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "event_dest"), []byte(rc.EventsDest), 0644)
+		util.CheckErrSprintf(err, "error writing event_dest: %v", err)
+	}
+	log.Info().Str("workDir", rc.WorkDir).Msg("created working directory")
 }
 
 // Open to race conditions, but having a duplicate ID is only a UX bug rather than breaking
@@ -163,35 +179,42 @@ func HistoryDir() string {
 	return filepath.Join(util.ScopeHome(), "history")
 }
 
-// SetupWorkDir sets up a working directory for a given set of args
-func (rc *Config) SetupWorkDir(args []string) {
+// setupWorkDir sets up a working directory for a given set of args
+func (rc *Config) setupWorkDir(args []string) {
 	cmd := path.Base(args[0])
-	rc.CreateWorkDir(cmd)
+	rc.createWorkDir(cmd)
 
-	rc.SetupScopeYaml()
+	err := rc.configFromRunOpts()
+	util.CheckErrSprintf(err, "%v", err)
 
-	argsJSONPath := filepath.Join(rc.workDir, "args.json")
+	if rc.sc.Metric.Transport.TransportType == "file" {
+		newPath, err := filepath.Abs(rc.sc.Metric.Transport.Path)
+		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Metric.Transport.Path, err)
+		rc.sc.Metric.Transport.Path = newPath
+		f, err := os.OpenFile(rc.sc.Metric.Transport.Path, os.O_CREATE, 0644)
+		if err != nil && !os.IsExist(err) {
+			util.ErrAndExit("cannot create metric file %s: %v", rc.sc.Metric.Transport.Path, err)
+		}
+		f.Close()
+	}
+
+	if rc.sc.Event.Transport.TransportType == "file" {
+		newPath, err := filepath.Abs(rc.sc.Event.Transport.Path)
+		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Event.Transport.Path, err)
+		rc.sc.Event.Transport.Path = newPath
+		f, err := os.OpenFile(rc.sc.Event.Transport.Path, os.O_CREATE, 0644)
+		if err != nil && !os.IsExist(err) {
+			util.ErrAndExit("cannot create metric file %s: %v", rc.sc.Event.Transport.Path, err)
+		}
+		f.Close()
+	}
+
+	scYamlPath := filepath.Join(rc.WorkDir, "scope.yml")
+	err = rc.WriteScopeConfig(scYamlPath)
+	util.CheckErrSprintf(err, "%v", err)
+
+	argsJSONPath := filepath.Join(rc.WorkDir, "args.json")
 	argsBytes, err := json.Marshal(args)
 	util.CheckErrSprintf(err, "error marshaling JSON: %v", err)
 	err = ioutil.WriteFile(argsJSONPath, argsBytes, 0644)
-}
-
-// SetupScopeYaml writes the scope configuration to the workdir
-func (rc *Config) SetupScopeYaml() {
-	sc := GetDefaultScopeConfig(rc.workDir)
-
-	if rc.Verbosity != 0 {
-		sc.Metric.Format.Verbosity = rc.Verbosity
-	}
-
-	if rc.Payloads {
-		sc.Payload = ScopePayloadConfig{
-			Enable: true,
-			Dir:    filepath.Join(rc.workDir, "payloads"),
-		}
-	}
-
-	scYamlPath := filepath.Join(rc.workDir, "scope.yml")
-	err := WriteScopeConfig(sc, scYamlPath)
-	util.CheckErrSprintf(err, "%v", err)
 }

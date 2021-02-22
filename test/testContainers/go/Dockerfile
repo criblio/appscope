@@ -1,7 +1,7 @@
 ARG GO_IMAGE_VER=golang:1.14
 FROM $GO_IMAGE_VER
 
-RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y vim curl file
+RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y vim curl file bsdmainutils
 
 #ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 #COPY ./libscope.so /usr/lib/libscope.so

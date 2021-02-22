@@ -2538,6 +2538,9 @@ doPayload()
                 }
 
                 if ((fd = g_fn.open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)) != -1) {
+                    if (checkEnv("SCOPE_PAYLOAD_HEADER", "true")) {
+                        g_fn.write(fd, pay, rc);
+                    }
                     g_fn.write(fd, pinfo->data, pinfo->len);
                     g_fn.close(fd);
                 }

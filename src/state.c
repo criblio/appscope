@@ -898,7 +898,6 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     } else {
         int i;
         size_t alen = (cvlen * 2) + 1;
-        char sstr[4];
 
         if ((cpdata = calloc(1, alen)) == NULL) {
             SET_PROT(net);
@@ -906,8 +905,7 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
         }
 
         for (i = 0; i < cvlen; i++) {
-            snprintf(sstr, sizeof(sstr), "%02x", (unsigned char)buf[i]);
-            strncat(cpdata, sstr, alen);
+            snprintf(&cpdata[i<<1], 3, "%02x", (unsigned char)buf[i]);
         }
 
         data = cpdata;
@@ -968,18 +966,17 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         // haven't checked for a protocol yet
         if (net && (net->protocol == PROT_NOTCHECKED) && g_payload_pre) {
             int rc;
-            char *data = buf;
+            unsigned char *data = buf;
 
             // TLS data is binary, convert to chars
             int i;
             size_t alen = (g_payload_pre->len * 2) + 1;
-            char sstr[4], cpdata[alen];
+            char cpdata[alen];
 
             memset(cpdata, 0, alen);
 
             for (i = 0; i < g_payload_pre->len; i++) {
-                snprintf(sstr, sizeof(sstr), "%02x", data[i]);
-                strncat(cpdata, sstr, alen);
+                snprintf(&cpdata[i<<1], 3, "%02x", (unsigned char)data[i]);
             }
 
             if ((rc = pcre2_match_wrapper(g_payload_pre->re, (PCRE2_SPTR)cpdata,

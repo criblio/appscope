@@ -397,6 +397,7 @@ startsWith(const char* string, const char* substring)
 //    SCOPE_GO_STRUCT_PATH           for internal testing
 //    SCOPE_HTTP_SERIALIZE_ENABLE    "true" adds guard for race condition
 //    SCOPE_NO_SIGNAL                if defined, timer for USR2 is not set
+//    SCOPE_PAYLOAD_HEADER           "true" adds json header to each tx/rx
 //    SCOPE_PERF_PRESERVE            "true" processes at 10s instead of 1ms
 //    SCOPE_SWITCH                   for internal go debugging
 //    SCOPE_PID                      provided by library

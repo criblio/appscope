@@ -20,6 +20,7 @@
 #include "state_private.h"
 #include "linklist.h"
 #include "dns.h"
+#include "utils.h"
 
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
@@ -2441,8 +2442,6 @@ doEvent()
 void
 doPayload()
 {
-    bool lsbin = FALSE;
-    bool filebin = TRUE;
     uint64_t data;
 
     while ((data = msgPayloadGet(g_ctl)) != -1) {
@@ -2506,7 +2505,7 @@ doPayload()
 
             char *bdata = NULL;
 
-            if (lsbin == TRUE) {
+            if (checkEnv(LOGSTREAM, "true")) {
                 bdata = calloc(1, hlen + pinfo->len);
                 if (bdata) {
                     memmove(bdata, pay, hlen);
@@ -2514,9 +2513,7 @@ doPayload()
                     memmove(&bdata[hlen], pinfo->data, pinfo->len);
                     cmdSendPayload(g_ctl, bdata, hlen + pinfo->len);
                 }
-            }
-
-            if (filebin == TRUE && ctlPayDir(g_ctl)) {
+            } else if (ctlPayDir(g_ctl)) {
                 int fd;
                 char path[PATH_MAX];
 
@@ -2541,6 +2538,9 @@ doPayload()
                 }
 
                 if ((fd = g_fn.open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)) != -1) {
+                    if (checkEnv("SCOPE_PAYLOAD_HEADER", "true")) {
+                        g_fn.write(fd, pay, rc);
+                    }
                     g_fn.write(fd, pinfo->data, pinfo->len);
                     g_fn.close(fd);
                 }

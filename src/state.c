@@ -23,6 +23,7 @@
 #include "pcre2.h"
 #include "fn.h"
 #include "os.h"
+#include "utils.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
@@ -47,6 +48,7 @@ int g_mtc_addr_output = TRUE;
 static search_t* g_http_redirect = NULL;
 static list_t *g_protlist;
 static unsigned int g_prot_sequence = 0;
+static protocol_def_t *g_payload_pre = NULL;
 
 // interfaces
 mtc_t *g_mtc = NULL;
@@ -55,6 +57,8 @@ ctl_t *g_ctl = NULL;
 
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
+
+#define SET_PROT(net) if (net && (net->protocol == PROT_NOTCHECKED)) net->protocol = PROT_CHECKED;
 
 #define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
 #define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)
@@ -183,6 +187,39 @@ addProtocol(request_t *req)
 }
 
 static void
+initPayloadExtract()
+{
+    int errornumber = 0;
+    PCRE2_SIZE erroroffset = 0;
+
+    if ((g_payload_pre = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+
+    g_payload_pre->binary = TRUE;
+    g_payload_pre->len = PAYLOAD_BYTESRC;
+    g_payload_pre->type = 0;
+    g_payload_pre->protname = NULL;
+    g_payload_pre->regex = PAYLOAD_REGEX;
+
+    g_payload_pre->re = pcre2_compile((PCRE2_SPTR)g_payload_pre->regex,
+                                      PCRE2_ZERO_TERMINATED, 0,
+                                      &errornumber, &erroroffset, NULL);
+
+    if (g_payload_pre->re == NULL) {
+        destroyProtEntry(g_payload_pre);
+        g_payload_pre = NULL;
+        return;
+    }
+
+    g_payload_pre->match_data = pcre2_match_data_create_from_pattern(g_payload_pre->re, NULL);
+
+    if (g_payload_pre->match_data == NULL) {
+        destroyProtEntry(g_payload_pre);
+        g_payload_pre = NULL;
+        return;
+    }
+}
+
+static void
 initProtocolDetection()
 {
     int i;
@@ -255,6 +292,7 @@ initState()
 
     g_protlist = lstCreate(destroyProtEntry);
     initProtocolDetection();
+    initPayloadExtract();
 
     initReporting();
 }
@@ -842,7 +880,7 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     if (((len <= 0) && (pre->len <= 0)) ||   // no len
         !pre->re ||                          // no regex
         (pre->len > cvlen)) {                // not enough buf for pre->len
-        net->protocol = -1;
+        SET_PROT(net);
         return FALSE;
     }
 
@@ -860,16 +898,14 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     } else {
         int i;
         size_t alen = (cvlen * 2) + 1;
-        char sstr[4];
 
         if ((cpdata = calloc(1, alen)) == NULL) {
-            net->protocol = -1;
+            SET_PROT(net);
             return FALSE;
         }
 
         for (i = 0; i < cvlen; i++) {
-            snprintf(sstr, sizeof(sstr), "%02x", (unsigned char)buf[i]);
-            strncat(cpdata, sstr, alen);
+            snprintf(&cpdata[i<<1], 3, "%02x", (unsigned char)buf[i]);
         }
 
         data = cpdata;
@@ -881,12 +917,12 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
                             match_data, NULL) > 0) {
         //DEBUG
         //scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_ERROR);
-        net->protocol = pre->type;
+        SET_PROT(net);
 
         if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
             if (cpdata) free(cpdata);
             if (match_data) pcre2_match_data_free(match_data);
-            net->protocol = -1;
+            SET_PROT(net);
             return FALSE;
         }
 
@@ -898,7 +934,7 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
         proto->data = (char *)strdup(pre->protname);
         cmdPostEvent(g_ctl, (char *)proto);
     } else {
-        net->protocol = -1;
+        SET_PROT(net);
     }
 
     if (match_data) pcre2_match_data_free(match_data);
@@ -912,6 +948,56 @@ static int
 extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     if (!buf || (len <= 0)) return -1;
+
+    // if not connected to a LogStream try to not include TLS handshake in the payload
+    if ((checkEnv(LOGSTREAM, "true") == FALSE) && ((src == NETRX) || (src == NETTX))) {
+        /*
+         * the protocol state for this socket is either
+         * PROT_NOTCHECKED: first time we've seen traffic on this connection.
+         * continue and check to see if TLS is being used.
+         * PROT_CHECKED: we have checked for a protocol, it's not TLS.
+         * no need to check for a protocol. since it's not TLS. emit payload data.
+         * PROT_TLS: determined that this connection is using TLS. emit no payload data.
+         * the SSL/TLS interposed functions will emit unencrypted payload data.
+         */
+        // the protocol used on this socket is TLS
+        if (net && (net->protocol == PROT_TLS)) return 0;
+
+        // haven't checked for a protocol yet
+        if (net && (net->protocol == PROT_NOTCHECKED) && g_payload_pre) {
+            int rc;
+            unsigned char *data = buf;
+
+            // TLS data is binary, convert to chars
+            int i;
+            size_t alen = (g_payload_pre->len * 2) + 1;
+            char cpdata[alen];
+
+            memset(cpdata, 0, alen);
+
+            for (i = 0; i < g_payload_pre->len; i++) {
+                snprintf(&cpdata[i<<1], 3, "%02x", (unsigned char)data[i]);
+            }
+
+            if ((rc = pcre2_match_wrapper(g_payload_pre->re, (PCRE2_SPTR)cpdata,
+                                          (PCRE2_SIZE)alen, 0, 0,
+                                          g_payload_pre->match_data, NULL)) > 0) {
+                net->protocol = PROT_TLS;
+                return 0;
+            } else {
+                net->protocol = PROT_CHECKED;
+                switch(rc)
+                {
+                case PCRE2_ERROR_NOMATCH:
+                    scopeLog("extractPayload: No match", sockfd, CFG_LOG_DEBUG);
+                    break;
+                default:
+                    scopeLog("extractPayload: Matching error", sockfd, CFG_LOG_DEBUG);
+                    break;
+                }
+            }
+        }
+    }
 
     payload_info *pinfo = calloc(1, sizeof(struct payload_info_t));
     if (!pinfo) {
@@ -1008,7 +1094,7 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     protocol_def_t *pre;
 
     // check once per connection
-    if (!buf || !net || (net->protocol != 0)) return;
+    if (!buf || !net || (net->protocol != PROT_NOTCHECKED)) return;
 
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((pre = lstFind(g_protlist, ptype)) != NULL) {
@@ -1063,13 +1149,12 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     if (ctlPayEnable(g_ctl)) {
         // instead of or in addition to http &/or detect?
         extractPayload(sockfd, net, buf, len, src, dtype);
-        return 0;
     }
 
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
         if (doHttp(id, sockfd, net, buf, len, src, dtype)) {
             // not doing anything with protocol... yet
-            if (net) net->protocol = 1;
+            SET_PROT(net);
             return 0;
         }
     }

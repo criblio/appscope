@@ -146,6 +146,9 @@ typedef unsigned int bool;
 // we should start moving env var constants to one place
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
+#define LOGSTREAM "SCOPE_LOGSTREAM"
+#define PAYLOAD_BYTESRC 8
+#define PAYLOAD_REGEX "^16030[0-3].{4}0[12]"
 
 #endif // __SCOPETYPES_H__
 

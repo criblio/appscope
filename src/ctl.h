@@ -41,6 +41,7 @@ typedef struct {
     unsigned int len;
     unsigned int type;
     char *protname;
+    pcre2_match_data *match_data;
 } protocol_def_t;
 
 typedef struct {

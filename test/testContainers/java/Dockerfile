@@ -10,6 +10,8 @@ ENV PATH $PATH:$CATALINA_HOME/bin
 
 ADD https://archive.apache.org/dist/tomcat/tomcat-${TOMCAT_MAJOR_VERSION}/v${TOMCAT_MINOR_VERSION}/bin/apache-tomcat-${TOMCAT_MINOR_VERSION}.tar.gz /apache-tomcat.tar.gz
 
+RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
+
 RUN tar zxf apache-tomcat.tar.gz && \
     rm apache-tomcat.tar.gz && \
     mv apache-tomcat* $CATALINA_HOME
@@ -43,3 +45,4 @@ ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV LD_PRELOAD=/usr/lib/libscope.so
 
 CMD /opt/test-runner/bin/test-ssl.sh
+#ENTRYPOINT ["tail", "-f", "/dev/null"]

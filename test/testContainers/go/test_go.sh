@@ -42,6 +42,38 @@ endtest(){
     rm $EVT_FILE
 }
 
+export SCOPE_PAYLOAD_ENABLE=true
+export SCOPE_PAYLOAD_HEADER=true
+
+evalPayload(){
+    PAYLOADERR=0
+    echo "Testing that payload files don't contain tls for $CURRENT_TEST"
+    for FILE in $(ls /tmp/*in /tmp/*out 2>/dev/null); do
+        # Continue if there aren't any .in or .out files
+        if [ $? -ne "0" ]; then
+            continue
+        fi
+
+        hexdump -C $FILE | cut -c11-58 | \
+                     egrep "7d[ \n]+0a[ \n]+1[4-7][ \n]+03[ \n]+0[0-3]"
+        if [ $? -eq "0" ]; then
+            echo "$FILE contains tls"
+            PAYLOADERR=$(($PAYLOADERR + 1))
+        fi
+    done
+
+    # There were failures.  Move them out of the way before continuing.
+    if [ $PAYLOADERR -ne "0" ]; then
+        echo "Moving payload files to /tmp/payload/$CURRENT_TEST"
+        mkdir -p /tmp/payload/$CURRENT_TEST
+        cp /tmp/*in /tmp/payload/$CURRENT_TEST
+        cp /tmp/*out /tmp/payload/$CURRENT_TEST
+        rm /tmp/*in /tmp/*out
+    fi
+
+    return $PAYLOADERR
+}
+
 
 #
 # plainServerDynamic
@@ -70,6 +102,9 @@ ERR+=$?
 grep plainServerDynamic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
 grep plainServerDynamic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+
+evalPayload
 ERR+=$?
 
 endtest
@@ -104,6 +139,9 @@ ERR+=$?
 grep plainServerStatic $EVT_FILE | grep http-metrics > /dev/null
 ERR+=$?
 
+evalPayload
+ERR+=$?
+
 endtest
 
 
@@ -134,6 +172,9 @@ ERR+=$?
 grep tlsServerDynamic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
 grep tlsServerDynamic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+
+evalPayload
 ERR+=$?
 
 endtest
@@ -169,6 +210,9 @@ ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep http-metrics > /dev/null
 ERR+=$?
 
+evalPayload
+ERR+=$?
+
 endtest
 
 
@@ -190,6 +234,9 @@ ERR+=$?
 grep plainClientDynamic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
 grep plainClientDynamic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+
+evalPayload
 ERR+=$?
 
 endtest
@@ -215,6 +262,9 @@ ERR+=$?
 grep plainClientStatic $EVT_FILE | grep http-metrics > /dev/null
 ERR+=$?
 
+evalPayload
+ERR+=$?
+
 endtest
 
 
@@ -238,6 +288,9 @@ ERR+=$?
 grep tlsClientDynamic $EVT_FILE | grep http-metrics > /dev/null
 ERR+=$?
 
+evalPayload
+ERR+=$?
+
 endtest
 
 
@@ -259,6 +312,9 @@ ERR+=$?
 grep tlsClientStatic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
 grep tlsClientStatic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+
+evalPayload
 ERR+=$?
 
 endtest
@@ -306,6 +362,9 @@ evaltest
 grep fileThread $EVT_FILE > /dev/null
 ERR+=$?
 
+evalPayload
+ERR+=$?
+
 endtest
 
 
@@ -321,6 +380,9 @@ evaltest
 grep cgoDynamic $EVT_FILE > /dev/null
 ERR+=$?
 
+evalPayload
+ERR+=$?
+
 endtest
 
 
@@ -334,6 +396,9 @@ ERR+=$?
 evaltest
 
 grep cgoStatic $EVT_FILE > /dev/null
+ERR+=$?
+
+evalPayload
 ERR+=$?
 
 endtest
@@ -390,6 +455,10 @@ influx_eval() {
     rm -r /go/influx/db/*
     touch /go/influx/db/data.txt
     touch $EVT_FILE
+
+    evalPayload
+    ERR+=$?
+
     endtest
 
 }
@@ -408,6 +477,7 @@ sleep 1
 # SCOPE_HTTP_SERIALIZE_ENABLE ensures that a close and
 # read/write can't happen at the same time.
 export SCOPE_HTTP_SERIALIZE_ENABLE=true
+unset SCOPE_PAYLOAD_ENABLE
 starttest influx_static_stress
 
 influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
@@ -417,6 +487,7 @@ SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/stress_te
 influx_eval 50 ldscope
 
 unset SCOPE_HTTP_SERIALIZE_ENABLE
+export SCOPE_PAYLOAD_ENABLE=true
 
 #
 # influx static TLS test
@@ -487,7 +558,8 @@ SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dy
 
 influx_eval 2 influxd
 
-
+unset SCOPE_PAYLOAD_ENABLE
+unset SCOPE_PAYLOAD_HEADER
 
 #
 # Done: print results

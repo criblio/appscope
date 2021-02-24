@@ -58,6 +58,8 @@ ctl_t *g_ctl = NULL;
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
 
+#define SET_PROT(net) if (net && (net->protocol == PROT_NOTCHECKED)) net->protocol = PROT_CHECKED;
+
 #define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
 #define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)
 #define CLASS_FIELD(val)        STRFIELD("class",          (val),        2)
@@ -193,10 +195,10 @@ initPayloadExtract()
     if ((g_payload_pre = calloc(1, sizeof(protocol_def_t))) == NULL) return;
 
     g_payload_pre->binary = TRUE;
-    g_payload_pre->len = 2;
+    g_payload_pre->len = PAYLOAD_BYTESRC;
     g_payload_pre->type = 0;
     g_payload_pre->protname = NULL;
-    g_payload_pre->regex = PAYLOADREGEX;
+    g_payload_pre->regex = PAYLOAD_REGEX;
 
     g_payload_pre->re = pcre2_compile((PCRE2_SPTR)g_payload_pre->regex,
                                       PCRE2_ZERO_TERMINATED, 0,
@@ -878,7 +880,7 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     if (((len <= 0) && (pre->len <= 0)) ||   // no len
         !pre->re ||                          // no regex
         (pre->len > cvlen)) {                // not enough buf for pre->len
-        net->protocol = -1;
+        SET_PROT(net);
         return FALSE;
     }
 
@@ -896,16 +898,14 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     } else {
         int i;
         size_t alen = (cvlen * 2) + 1;
-        char sstr[4];
 
         if ((cpdata = calloc(1, alen)) == NULL) {
-            net->protocol = -1;
+            SET_PROT(net);
             return FALSE;
         }
 
         for (i = 0; i < cvlen; i++) {
-            snprintf(sstr, sizeof(sstr), "%02x", (unsigned char)buf[i]);
-            strncat(cpdata, sstr, alen);
+            snprintf(&cpdata[i<<1], 3, "%02x", (unsigned char)buf[i]);
         }
 
         data = cpdata;
@@ -917,12 +917,12 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
                             match_data, NULL) > 0) {
         //DEBUG
         //scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_ERROR);
-        net->protocol = pre->type;
+        SET_PROT(net);
 
         if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
             if (cpdata) free(cpdata);
             if (match_data) pcre2_match_data_free(match_data);
-            net->protocol = -1;
+            SET_PROT(net);
             return FALSE;
         }
 
@@ -934,7 +934,7 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
         proto->data = (char *)strdup(pre->protname);
         cmdPostEvent(g_ctl, (char *)proto);
     } else {
-        net->protocol = -1;
+        SET_PROT(net);
     }
 
     if (match_data) pcre2_match_data_free(match_data);
@@ -949,50 +949,43 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
 {
     if (!buf || (len <= 0)) return -1;
 
-    if (net && g_payload_pre && (checkEnv(LOGSTREAM, "true") == FALSE)) {
-        int rc;
-        char *data = buf;
-        in_port_t localPort, remotePort;
-
-        localPort = get_port_net(net, net->localConn.ss_family, LOCAL);
-        remotePort = get_port_net(net, net->remoteConn.ss_family, REMOTE);
-
+    // if not connected to a LogStream try to not include TLS handshake in the payload
+    if ((checkEnv(LOGSTREAM, "true") == FALSE) && ((src == NETRX) || (src == NETTX))) {
         /*
-         * If we are a client receiving or a server sending, drop
-         * everything on the wire. There is no TLS happening.
-         * The SSL/TLS interposed functions will provide
-         * unencrypted data.
+         * the protocol state for this socket is either
+         * PROT_NOTCHECKED: first time we've seen traffic on this connection.
+         * continue and check to see if TLS is being used.
+         * PROT_CHECKED: we have checked for a protocol, it's not TLS.
+         * no need to check for a protocol. since it's not TLS. emit payload data.
+         * PROT_TLS: determined that this connection is using TLS. emit no payload data.
+         * the SSL/TLS interposed functions will emit unencrypted payload data.
          */
-        if ((localPort == 443) && (src == NETTX)) return 0;
-        if ((remotePort == 443) && (src == NETRX)) return 0;
+        // the protocol used on this socket is TLS
+        if (net && (net->protocol == PROT_TLS)) return 0;
 
-        /*
-         * If we are a client sending or a server receiving, then
-         * a TLS handshake is taking place. So, filter and drop
-         * TLS traffic.
-         */
-        if (((remotePort == 443) && (src == NETTX)) ||
-            ((localPort == 443) && (src == NETRX))) {
+        // haven't checked for a protocol yet
+        if (net && (net->protocol == PROT_NOTCHECKED) && g_payload_pre) {
+            int rc;
+            unsigned char *data = buf;
 
             // TLS data is binary, convert to chars
             int i;
             size_t alen = (g_payload_pre->len * 2) + 1;
-            char sstr[4], cpdata[alen];
+            char cpdata[alen];
 
             memset(cpdata, 0, alen);
 
             for (i = 0; i < g_payload_pre->len; i++) {
-                snprintf(sstr, sizeof(sstr), "%02x", data[i]);
-                strncat(cpdata, sstr, alen);
+                snprintf(&cpdata[i<<1], 3, "%02x", (unsigned char)data[i]);
             }
 
             if ((rc = pcre2_match_wrapper(g_payload_pre->re, (PCRE2_SPTR)cpdata,
                                           (PCRE2_SIZE)alen, 0, 0,
                                           g_payload_pre->match_data, NULL)) > 0) {
-                //DEBUG
-                //scopeLog("Payload remove: SUCCESS", sockfd, CFG_LOG_ERROR);
+                net->protocol = PROT_TLS;
                 return 0;
             } else {
+                net->protocol = PROT_CHECKED;
                 switch(rc)
                 {
                 case PCRE2_ERROR_NOMATCH:
@@ -1101,7 +1094,7 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     protocol_def_t *pre;
 
     // check once per connection
-    if (!buf || !net || (net->protocol != 0)) return;
+    if (!buf || !net || (net->protocol != PROT_NOTCHECKED)) return;
 
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((pre = lstFind(g_protlist, ptype)) != NULL) {
@@ -1161,7 +1154,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
         if (doHttp(id, sockfd, net, buf, len, src, dtype)) {
             // not doing anything with protocol... yet
-            if (net) net->protocol = 1;
+            SET_PROT(net);
             return 0;
         }
     }

@@ -164,7 +164,8 @@ typedef unsigned int bool;
 // https://tools.ietf.org/html/rfc5246
 // http://blog.fourthbit.com/2014/12/23/traffic-analysis-of-an-ssl-slash-tls-session/
 // https://tls13.ulfheim.net/
-#define PAYLOADREGEX "^1603|^1703|^1503|^1403"
+#define PAYLOAD_BYTESRC 8
+#define PAYLOAD_REGEX "^16030[0-3].{4}0[12]"
 
 #endif // __SCOPETYPES_H__
 

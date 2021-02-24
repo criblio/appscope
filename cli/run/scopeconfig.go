@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
@@ -47,7 +49,6 @@ type ScopeWatchConfig struct {
 
 // ScopeLibscopeConfig represents how to configure libscope
 type ScopeLibscopeConfig struct {
-	Level         string         `mapstructure:"level" json:"level" yaml:"level"`
 	ConfigEvent   bool           `mapstructure:"configevent" json:"configevent" yaml:"configevent"`
 	SummaryPeriod int            `mapstructure:"summaryperiod" jaon:"summaryperiod" yaml:"summaryperiod"`
 	CommandDir    string         `mapstructure:"commanddir" json:"commanddir" yaml:"commanddir"`
@@ -77,9 +78,12 @@ type ScopeTransport struct {
 	Buffering     string `mapstructure:"buffering,omitempty" json:"buffering,omitempty" yaml:"buffering,omitempty"`
 }
 
-// GetDefaultScopeConfig returns the default scope configuration as a struct
-func GetDefaultScopeConfig(workDir string) *ScopeConfig {
-	return &ScopeConfig{
+// setDefault sets the default scope configuration as a struct
+func (c *Config) setDefault() error {
+	if c.WorkDir == "" {
+		return fmt.Errorf("workDir not set")
+	}
+	c.sc = &ScopeConfig{
 		Metric: ScopeMetricConfig{
 			Enable: true,
 			Format: ScopeOutputFormat{
@@ -88,7 +92,7 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 			},
 			Transport: ScopeTransport{
 				TransportType: "file",
-				Path:          filepath.Join(workDir, "metrics.json"),
+				Path:          filepath.Join(c.WorkDir, "metrics.json"),
 				Buffering:     "line",
 			},
 		},
@@ -99,13 +103,13 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 			},
 			Transport: ScopeTransport{
 				TransportType: "file",
-				Path:          filepath.Join(workDir, "events.json"),
+				Path:          filepath.Join(c.WorkDir, "events.json"),
 				Buffering:     "line",
 			},
 			Watch: []ScopeWatchConfig{
 				{
 					WatchType: "file",
-					Name:      ScopeLogRegex(),
+					Name:      scopeLogRegex(),
 					Value:     ".*",
 				},
 				{
@@ -146,23 +150,98 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 		},
 		Libscope: ScopeLibscopeConfig{
 			SummaryPeriod: 10,
-			CommandDir:    filepath.Join(workDir, "cmd"),
+			CommandDir:    filepath.Join(c.WorkDir, "cmd"),
 			ConfigEvent:   false,
 			Log: ScopeLogConfig{
 				Level: "error",
 				Transport: ScopeTransport{
 					TransportType: "file",
-					Path:          filepath.Join(workDir, "ldscope.log"),
+					Path:          filepath.Join(c.WorkDir, "ldscope.log"),
 					Buffering:     "line",
 				},
 			},
 		},
 	}
+	return nil
+}
+
+// configFromRunOpts writes the scope configuration to the workdir
+func (c *Config) configFromRunOpts() error {
+	err := c.setDefault()
+	if err != nil {
+		return err
+	}
+
+	if c.Verbosity != 0 {
+		c.sc.Metric.Format.Verbosity = c.Verbosity
+	}
+
+	if c.Payloads {
+		c.sc.Payload = ScopePayloadConfig{
+			Enable: true,
+			Dir:    filepath.Join(c.WorkDir, "payloads"),
+		}
+	}
+
+	if c.MetricsFormat != "" {
+		if c.MetricsFormat != "ndjson" && c.MetricsFormat != "statsd" {
+			return fmt.Errorf("invalid metrics format %s", c.MetricsFormat)
+		}
+		c.sc.Metric.Format.FormatType = c.MetricsFormat
+	}
+
+	parseDest := func(t *ScopeTransport, dest string) error {
+		if strings.HasPrefix(dest, "tcp://") || strings.HasPrefix(dest, "udp://") {
+			if strings.HasPrefix(dest, "tcp") {
+				t.TransportType = "tcp"
+			} else {
+				t.TransportType = "udp"
+			}
+			parts := strings.Split(dest[6:], ":")
+			if len(parts) != 2 {
+				return fmt.Errorf("Cannot parse dest: %s", dest)
+			}
+			t.Host = parts[0]
+			port, err := strconv.Atoi(parts[1])
+			if err != nil {
+				return fmt.Errorf("Cannot parse port from %s: %s", dest, parts[1])
+			}
+			t.Port = port
+			t.Path = ""
+			return nil
+		} else if strings.HasPrefix(dest, "file://") {
+			t.TransportType = "file"
+			t.Path = dest[7:]
+			return nil
+		}
+		return fmt.Errorf("Invalid dest: %s", dest)
+	}
+
+	if c.MetricsDest != "" {
+		err := parseDest(&c.sc.Metric.Transport, c.MetricsDest)
+		if err != nil {
+			return err
+		}
+	}
+
+	if c.EventsDest != "" {
+		err := parseDest(&c.sc.Event.Transport, c.EventsDest)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // WriteScopeConfig writes a scope config to a file
-func WriteScopeConfig(sc *ScopeConfig, path string) error {
-	scb, err := yaml.Marshal(sc)
+func (c *Config) WriteScopeConfig(path string) error {
+	if c.sc == nil {
+		err := c.configFromRunOpts()
+		if err != nil {
+			return err
+		}
+	}
+	scb, err := yaml.Marshal(c.sc)
 	if err != nil {
 		return fmt.Errorf("error marshaling's ScopeConfig to YAML: %v", err)
 	}
@@ -173,6 +252,6 @@ func WriteScopeConfig(sc *ScopeConfig, path string) error {
 	return nil
 }
 
-func ScopeLogRegex() string {
+func scopeLogRegex() string {
 	return `[\s\/\\\.]log[s]?[\/\\\.]?`
 }

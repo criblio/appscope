@@ -176,7 +176,7 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
                     PCRE2_SIZE startoffset, uint32_t options,
                     pcre2_match_data *match_data, pcre2_match_context *mcontext)
 {
-    int rc;
+    int rc, arc;
     char *pcre_stack, *tstack, *gstack;
 
     if (g_need_stack_expand == FALSE) {
@@ -194,7 +194,7 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
     __asm__ volatile (
         "mov %%rsp, %2 \n"
         "mov %1, %%rsp \n"
-        : "=r"(rc)                   // output
+        : "=r"(arc)                  // output
         : "m"(tstack), "m"(gstack)   // input
         :                            // clobbered register
         );
@@ -204,7 +204,7 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
     // Switch stack back to the original stack
     __asm__ volatile (
         "mov %1, %%rsp \n"
-        : "=r"(rc)                        // output
+        : "=r"(arc)                       // output
         : "r"(gstack)                     // inputs
         :                                 // clobbered register
         );

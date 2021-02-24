@@ -71,7 +71,12 @@ cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope hi
 				{Name: "Timestamp", Field: "timestamp", Transform: func(obj interface{}) string { return time.Unix(int64(0), obj.(int64)).Format(time.Stamp) }},
 				{Name: "End Timestamp", Field: "endtimestamp", Transform: func(obj interface{}) string { return time.Unix(int64(0), obj.(int64)).Format(time.Stamp) }},
 				{Name: "Duration", Field: "duration", Transform: func(obj interface{}) string { return util.GetHumanDuration(obj.(time.Duration)) }},
-				{Name: "Total Events", Field: "eventCount"},
+				{Name: "Total Events", Field: "eventCount", Transform: func(obj interface{}) string {
+					if obj.(int) == -1 {
+						return "NA"
+					}
+					return fmt.Sprintf("%d", obj)
+				}},
 				{Name: "WorkDir", Field: "workDir"},
 				{Name: "ArgsPath", Field: "argspath"},
 				{Name: "CmdDirPath", Field: "cmddirpath"},
@@ -86,7 +91,12 @@ cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope hi
 				{Name: "PID", Field: "pid"},
 				{Name: "Age", Field: "timestamp", Transform: func(obj interface{}) string { return util.GetHumanDuration(time.Now().Sub(time.Unix(0, obj.(int64)))) }},
 				{Name: "Duration", Field: "duration", Transform: func(obj interface{}) string { return util.GetHumanDuration(obj.(time.Duration)) }},
-				{Name: "Total Events", Field: "eventCount"},
+				{Name: "Total Events", Field: "eventCount", Transform: func(obj interface{}) string {
+					if obj.(int) == -1 {
+						return "NA"
+					}
+					return fmt.Sprintf("%d", obj)
+				}},
 			}, sessions)
 		}
 	},

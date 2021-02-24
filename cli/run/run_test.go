@@ -23,7 +23,7 @@ func TestCreateLdscope(t *testing.T) {
 	tmpLdscope := filepath.Join(".foo", "ldscope")
 	os.Setenv("SCOPE_HOME", ".foo")
 	internal.InitConfig()
-	err := CreateLdscope()
+	err := createLdscope()
 	os.Unsetenv("SCOPE_HOME")
 	assert.NoError(t, err)
 
@@ -38,14 +38,14 @@ func TestCreateLdscope(t *testing.T) {
 	assert.Equal(t, hash2, hash3)
 
 	// Call again, should use cached copy
-	err = CreateLdscope()
+	err = createLdscope()
 	assert.NoError(t, err)
 
 	os.Chtimes(tmpLdscope, time.Now(), time.Now())
 	ldscopeInfo, _ := AssetInfo("build/ldscope")
 	stat, _ := os.Stat(tmpLdscope)
 	assert.NotEqual(t, ldscopeInfo.ModTime(), stat.ModTime())
-	err = CreateLdscope()
+	err = createLdscope()
 	assert.NoError(t, err)
 	stat, _ = os.Stat(tmpLdscope)
 	assert.Equal(t, ldscopeInfo.ModTime(), stat.ModTime())
@@ -103,7 +103,7 @@ func TestMain(m *testing.M) {
 	case "createWorkDir":
 		internal.InitConfig()
 		rc := Config{}
-		rc.CreateWorkDir("foo")
+		rc.createWorkDir("foo")
 	case "run":
 		internal.InitConfig()
 		rc := Config{}
@@ -208,7 +208,6 @@ event:
     field: .*
     value: .*
 libscope:
-  level: ""
   configevent: false
   summaryperiod: 10
   commanddir: CMDDIR
@@ -232,7 +231,7 @@ func TestSetupWorkDir(t *testing.T) {
 	os.Setenv("SCOPE_TEST", "true")
 	rc := Config{}
 	rc.now = func() time.Time { return time.Unix(0, 0) }
-	rc.SetupWorkDir([]string{"/bin/foo"})
+	rc.setupWorkDir([]string{"/bin/foo"})
 	wd := fmt.Sprintf("%s_%d_%d_%d", ".foo/history/foo", 1, os.Getpid(), 0)
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
@@ -254,34 +253,6 @@ func TestSetupWorkDir(t *testing.T) {
 	assert.True(t, payloadsDirExists)
 	os.RemoveAll(".foo")
 	os.Unsetenv("SCOPE_TEST")
-}
-
-func TestSetupScopeYaml(t *testing.T) {
-	fullpath, _ := filepath.Abs(".foo")
-	rc := Config{workDir: fullpath}
-	os.Mkdir(".foo", 0755)
-	rc.SetupScopeYaml()
-
-	expectedYaml := testDefaultScopeConfigYaml(".foo", 4)
-
-	yamlOnDisk, err := ioutil.ReadFile(".foo/scope.yml")
-	assert.NoError(t, err)
-	assert.Equal(t, expectedYaml, string(yamlOnDisk))
-
-	os.RemoveAll(".foo")
-	os.Mkdir(".foo", 0755)
-
-	rc.Verbosity = 5
-	rc.SetupScopeYaml()
-
-	expectedYaml = testDefaultScopeConfigYaml(".foo", 5)
-
-	yamlOnDisk, err = ioutil.ReadFile(".foo/scope.yml")
-	assert.NoError(t, err)
-	assert.Equal(t, expectedYaml, string(yamlOnDisk))
-
-	os.RemoveAll(".foo")
-
 }
 
 func TestRun(t *testing.T) {

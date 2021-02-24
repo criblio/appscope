@@ -1392,6 +1392,7 @@ doSetAddrs(int sockfd)
     int need_to_track_addrs =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP) ||
         (mtcEnabled(g_mtc) && g_mtc_addr_output) ||
         ctlPayEnable(g_ctl);
     if (!need_to_track_addrs) return 0;

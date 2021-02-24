@@ -39,10 +39,7 @@ struct _config_t
         char *fieldfilter[CFG_SRC_MAX];
         char *namefilter[CFG_SRC_MAX];
         unsigned src[CFG_SRC_MAX];
-        unsigned extractions;
-        http_ex_t from[CFG_HTTP_EX_MAX];
-        char *matchName[CFG_HTTP_EX_MAX];
-        char *fieldName[CFG_HTTP_EX_MAX];
+        char *headerName;
     } evt;
 
     struct {
@@ -172,13 +169,7 @@ cfgCreateDefault()
         c->evt.src[src] = srcEnabledDefault[src];
     }
 
-    c->evt.extractions = DEFAULT_HTTP_EXTRACTIONS;
-    http_ex_t http_ex;
-    for (http_ex = CFG_HTTP_EX_HEADER; http_ex < CFG_HTTP_EX_MAX; http_ex++) {
-        c->evt.from[http_ex] = DEFAULT_HTTP_FROM;
-        c->evt.matchName[http_ex] = DEFAULT_HTTP_MATCH_NAME;
-        c->evt.fieldName[http_ex] = strdup(DEFAULT_HTTP_FIELD_NAME);
-    }
+    c->evt.headerName = DEFAULT_SRC_HTTP_HEADER;
 
     which_transport_t tp;
     for (tp=CFG_MTC; tp<CFG_WHICH_MAX; tp++) {
@@ -208,10 +199,10 @@ cfgCreateDefault()
 }
 
 void
-cfgDestroy(config_t** cfg)
+cfgDestroy(config_t **cfg)
 {
     if (!cfg || !*cfg) return;
-    config_t* c = *cfg;
+    config_t *c = *cfg;
     if (c->mtc.statsd.prefix) free(c->mtc.statsd.prefix);
     if (c->commanddir) free(c->commanddir);
 
@@ -222,11 +213,7 @@ cfgDestroy(config_t** cfg)
         if (c->evt.namefilter[src]) free (c->evt.namefilter[src]);
     }
 
-    http_ex_t http_ex;
-    for (http_ex = CFG_HTTP_EX_HEADER; http_ex < CFG_HTTP_EX_MAX; http_ex++) {
-        if (c->evt.matchName[http_ex]) free(c->evt.matchName[http_ex]);
-        if (c->evt.fieldName[http_ex]) free(c->evt.fieldName[http_ex]);
-    }
+    if (c->evt.headerName) free(c->evt.headerName);
 
     which_transport_t t;
     for (t=CFG_MTC; t<CFG_WHICH_MAX; t++) {
@@ -356,6 +343,15 @@ cfgEvtFormatNameFilter(config_t* cfg, watch_t src)
     return nameFilterDefault[CFG_SRC_FILE];
 }
 
+const char *
+cfgEvtFormatHeader(config_t *cfg)
+{
+    if (cfg) return cfg->evt.headerName;
+
+    DBG(NULL);
+    return DEFAULT_SRC_HTTP_HEADER;
+}
+
 unsigned
 cfgEvtFormatSourceEnabled(config_t* cfg, watch_t src)
 {
@@ -366,34 +362,6 @@ cfgEvtFormatSourceEnabled(config_t* cfg, watch_t src)
 
     DBG("%d", src);
     return srcEnabledDefault[CFG_SRC_FILE];
-}
-
-unsigned
-cfgEvtHttpExtractEnabled(config_t *cfg)
-{
-    if (cfg) return cfg->evt.extractions;
-    return DEFAULT_HTTP_EXTRACTIONS;
-}
-
-http_ex_t
-cfgEvtHttpFrom(config_t *cfg, http_ex_t src)
-{
-    if (!cfg || (src < 0) || (src >= CFG_HTTP_EX_MAX)) return DEFAULT_HTTP_FROM;
-    return cfg->evt.from[src];
-}
-
-const char *
-cfgEvtHttpMatchName(config_t *cfg, http_ex_t src)
-{
-    if (!cfg || (src < 0) || (src >= CFG_HTTP_EX_MAX)) return DEFAULT_HTTP_MATCH_NAME;
-    return cfg->evt.matchName[src];
-}
-
-const char *
-cfgEvtHttpFieldName(config_t *cfg, http_ex_t src)
-{
-    if (!cfg || (src < 0) || (src >= CFG_HTTP_EX_MAX)) return DEFAULT_HTTP_FIELD_NAME;
-    return cfg->evt.fieldName[src];
 }
 
 unsigned
@@ -627,51 +595,6 @@ cfgEnhanceFsSet(config_t* cfg, unsigned val)
 }
 
 void
-cfgEvtHttpExtractSet(config_t *cfg, unsigned val)
-{
-    if (!cfg || (val > 1)) return;
-    cfg->evt.extractions = val;
-}
-
-void
-cfgEvtHttpExFromSet(config_t *cfg, http_ex_t src)
-{
-    if (!cfg || (src < 0) || (src >= CFG_HTTP_EX_MAX)) return;
-
-    cfg->evt.from[src] = src;
-}
-
-void
-cfgEvtHttpExMatchSet(config_t *cfg, http_ex_t src, const char *filter)
-{
-    if (!cfg || (src < 0) || (src >= CFG_HTTP_EX_MAX)) return;
-
-    if (cfg->evt.matchName[src]) free (cfg->evt.matchName[src]);
-
-    if (!filter || (filter[0] == '\0')) {
-        cfg->evt.matchName[src] = DEFAULT_HTTP_MATCH_NAME;
-        return;
-    }
-
-    cfg->evt.matchName[src] = strdup(filter);
-}
-
-void
-cfgEvtHttpExEventSet(config_t *cfg, http_ex_t src, const char *filter)
-{
-    if (!cfg || (src < 0) || (src >= CFG_HTTP_EX_MAX)) return;
-
-    if (cfg->evt.fieldName[src]) free (cfg->evt.fieldName[src]);
-
-    if (!filter || (filter[0] == '\0')) {
-        cfg->evt.fieldName[src] = DEFAULT_HTTP_FIELD_NAME;
-        return;
-    }
-
-    cfg->evt.fieldName[src] = strdup(filter);
-}
-
-void
 cfgEvtFormatValueFilterSet(config_t* cfg, watch_t src, const char* filter)
 {
     if (!cfg || src < 0 || src >= CFG_SRC_MAX) return;
@@ -708,6 +631,21 @@ cfgEvtFormatNameFilterSet(config_t* cfg, watch_t src, const char* filter)
         return;
     }
     cfg->evt.namefilter[src] = strdup(filter);
+}
+
+void
+cfgEvtFormatHeaderSet(config_t *cfg, const char *filter)
+{
+    if (!cfg) return;
+
+    if (cfg->evt.headerName) free (cfg->evt.headerName);
+
+    if (!filter || (filter[0] == '\0')) {
+        cfg->evt.headerName = DEFAULT_SRC_HTTP_HEADER;
+        return;
+    }
+
+    cfg->evt.headerName = strdup(filter);
 }
 
 void

@@ -54,10 +54,7 @@
 #define NAME_NODE                    "name"
 #define FIELD_NODE                   "field"
 #define VALUE_NODE                   "value"
-#define EXTRACT_NODE                 "extractions"
-#define FROM_NODE                       "from"
-#define MATCH_NODE                      "matchName"
-#define EXEVENT_NODE                    "eventFieldName"
+#define EX_HEADERS                   "headers"
 
 #define PAYLOAD_NODE          "payload"
 #define ENABLE_NODE              "enable"
@@ -108,12 +105,6 @@ enum_map_t watchTypeMap[] = {
     {NULL,                    -1}
 };
 
-enum_map_t watchFromMap[] = {
-    {"header",     CFG_HTTP_EX_HEADER},
-    {"payload",    CFG_HTTP_EX_PAYLOAD},
-    {NULL,         -1}
-};
-
 enum_map_t boolMap[] = {
     {"true",                  TRUE},
     {"false",                 FALSE},
@@ -142,18 +133,13 @@ void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
 void cfgPayEnableSetFromStr(config_t*, const char*);
 void cfgPayDirSetFromStr(config_t*, const char*);
-void cfgEvtHttpExtractSetFromStr(config_t *, const char *);
-void cfgEvtHttpExFromSetFromStr(config_t *, const char *);
-void cfgEvtHttpExMatchSetFromStr(config_t *, http_ex_t, const char *);
-void cfgEvtHttpExEventSetFromStr(config_t *, http_ex_t, const char *);
+void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 static void cfgSetFromFile(config_t *config, const char *path);
 
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
 static which_transport_t transport_context;
 static watch_t watch_context;
-static http_ex_t g_http_ex;
-
 static regex_t* g_regex = NULL;
 
 static char*
@@ -403,19 +389,6 @@ startsWith(const char* string, const char* substring)
 // For completeness, scope env vars that are not processed here:
 //    SCOPE_CONF_PATH (only used on startup to specify cfg file)
 //    SCOPE_HOME      (only used on startup for searching for cfg file)
-//
-// Unpublished scope env vars that are not processed here:
-//    SCOPE_APP_TYPE                 internal use only
-//    SCOPE_EXEC_TYPE                internal use only
-//    SCOPE_EXECVE                   "false" disables scope of child procs
-//    SCOPE_EXEC_PATH                specifies path to ldscope executable
-//    SCOPE_GO_STRUCT_PATH           for internal testing
-//    SCOPE_HTTP_SERIALIZE_ENABLE    "true" adds guard for race condition
-//    SCOPE_NO_SIGNAL                if defined, timer for USR2 is not set
-//    SCOPE_PERF_PRESERVE            "true" processes at 10s instead of 1ms
-//    SCOPE_SWITCH                   for internal go debugging
-//    SCOPE_PID                      provided by library
-//
 static void
 processEnvStyleInput(config_t *cfg, const char *env_line)
 {
@@ -478,6 +451,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_HEADER")) {
+        cfgEvtFormatHeaderSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_NET_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_NET, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_FS_NAME")) {
@@ -510,18 +485,6 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_EXTRACT")) {
-        cfgEvtHttpExtractSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_EXTRACT_FROM")) {
-        cfgEvtHttpExFromSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_EXTRACT_MATCH_HEADER")) {
-        cfgEvtHttpExMatchSetFromStr(cfg, CFG_HTTP_EX_HEADER, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_EXTRACT_MATCH_PAYLOAD")) {
-        cfgEvtHttpExMatchSetFromStr(cfg, CFG_HTTP_EX_PAYLOAD, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_EXTRACT_FIELD_HEADER")) {
-        cfgEvtHttpExEventSetFromStr(cfg, CFG_HTTP_EX_HEADER, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_EXTRACT_FIELD_PAYLOAD")) {
-        cfgEvtHttpExEventSetFromStr(cfg, CFG_HTTP_EX_PAYLOAD, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_NET_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_NET, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_FS_VALUE")) {
@@ -690,34 +653,6 @@ cfgEnhanceFsSetFromStr(config_t* cfg, const char* value)
 }
 
 void
-cfgEvtHttpExtractSetFromStr(config_t *cfg, const char *value)
-{
-    if (!cfg || !value) return;
-    cfgEvtHttpExtractSet(cfg, strToVal(boolMap, value));
-}
-
-void
-cfgEvtHttpExFromSetFromStr(config_t *cfg, const char *value)
-{
-    if (!cfg || !value) return;
-    cfgEvtHttpExFromSet(cfg, strToVal(watchFromMap, value));
-}
-
-void
-cfgEvtHttpExMatchSetFromStr(config_t *cfg, http_ex_t src, const char *value)
-{
-    if (!cfg || !value) return;
-    cfgEvtHttpExMatchSet(cfg, src, value);
-}
-
-void
-cfgEvtHttpExEventSetFromStr(config_t *cfg, http_ex_t src, const char *value)
-{
-    if (!cfg || !value) return;
-    cfgEvtHttpExEventSet(cfg, src, value);
-}
-
-void
 cfgEvtFormatValueFilterSetFromStr(config_t* cfg, watch_t src, const char* value)
 {
     if (!cfg || !value) return;
@@ -736,6 +671,13 @@ cfgEvtFormatNameFilterSetFromStr(config_t* cfg, watch_t src, const char* value)
 {
     if (!cfg || !value) return;
     cfgEvtFormatNameFilterSet(cfg, src, value);
+}
+
+void
+cfgEvtFormatHeaderSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgEvtFormatHeaderSet(cfg, value);
 }
 
 void
@@ -1206,55 +1148,13 @@ processWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatchExFrom(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+processWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
 
     char *value = stringVal(node);
-    g_http_ex = strToVal(watchFromMap, value);
-    cfgEvtHttpExFromSet(config, g_http_ex);
+    cfgEvtFormatHeaderSet(config, value);
     if (value) free(value);
-}
-
-static void
-processWatchExMatch(config_t *config, yaml_document_t *doc, yaml_node_t *node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-
-    char *value = stringVal(node);
-    cfgEvtHttpExMatchSet(config, g_http_ex, value);
-    if (value) free(value);
-
-    // if we are given something to match, then extraction is enabled
-    cfgEvtHttpExtractSet(config, 1);
-}
-
-static void
-processWatchExEvent(config_t *config, yaml_document_t *doc, yaml_node_t *node)
-{
-    if (node->type != YAML_SCALAR_NODE) return;
-
-    char *value = stringVal(node);
-    cfgEvtHttpExEventSet(config, g_http_ex, value);
-    if (value) free(value);
-}
-
-static void
-processWatchExtraction(config_t *config, yaml_document_t *doc, yaml_node_t *node)
-{
-    if (node->type != YAML_MAPPING_NODE) return;
-
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    FROM_NODE,            processWatchExFrom},
-        {YAML_SCALAR_NODE,    MATCH_NODE,           processWatchExMatch},
-        {YAML_SCALAR_NODE,    EXEVENT_NODE,         processWatchExEvent},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
-
-    yaml_node_pair_t *pair;
-    foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePair(t, pair, config, doc);
-    }
 }
 
 static int
@@ -1275,7 +1175,7 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    NAME_NODE,            processWatchName},
         {YAML_SCALAR_NODE,    FIELD_NODE,           processWatchField},
         {YAML_SCALAR_NODE,    VALUE_NODE,           processWatchValue},
-        {YAML_MAPPING_NODE,   EXTRACT_NODE,         processWatchExtraction},
+        {YAML_SCALAR_NODE,    EX_HEADERS,           processWatchHeader},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1897,6 +1797,9 @@ initEvtFormat(config_t *cfg)
         evtFormatFieldFilterSet(evt, src, cfgEvtFormatFieldFilter(cfg, src));
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
     }
+
+    evtFormatHeaderFilterSet(evt, cfgEvtFormatHeader(cfg));
+
     evtFormatRateLimitSet(evt, cfgEvtRateLimit(cfg));
 
     return evt;

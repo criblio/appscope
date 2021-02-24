@@ -112,7 +112,6 @@ int g_interval = DEFAULT_SUMMARY_PERIOD;
 static list_t *g_maplist;
 static search_t *g_http_status = NULL;
 static http_agg_t *g_http_agg;
-static char *dynev[NUM_DYNS] = {};
 
 static void
 destroyHttpMap(void *data)
@@ -178,22 +177,6 @@ destroyProto(protocol_info *proto)
      * when the list entry is deleted.
      */
     if (proto->data) free (proto->data);
-}
-
-static void
-destroyHreport(http_report *hreport)
-{
-    int i;
-
-    for (i = 0; i < NUM_DYNS; i++) {
-        if (dynev[i]) {
-            free(dynev[i]);
-            dynev[i] = NULL;
-        }
-    }
-
-    if (hreport->hreq) free(hreport->hreq);
-    if (hreport->hres) free(hreport->hres);
 }
 
 static int
@@ -335,72 +318,6 @@ getNetInternals(net_info *net, int type,
     return TRUE;
 }
 
-#if 0
-static int
-extractFromHTTP(char *buf, size_t len, char *tomatch, event_field_t *fields, http_report *hreport)
-{
-    if (!buf || !tomatch || (len <= 0)) return -1;
-
-    int rc, errornumber;
-    size_t reglen = 32 + strlen(tomatch);
-    char regex[reglen];
-    pcre2_code *re;
-    pcre2_match_data *match_data;
-    PCRE2_SIZE erroroffset, *ovector;
-
-    strncpy(regex, "(?i-m)", reglen);
-    strncat(regex, tomatch, reglen);
-    //strncat(regex, ".*?\r\n", reglen);
-    strncat(regex, ".*", reglen);
-
-    re = pcre2_compile((PCRE2_SPTR)regex, PCRE2_ZERO_TERMINATED,
-                       0, &errornumber, &erroroffset, NULL);
-    if (re == NULL) {
-        pcre2_code_free(re);
-        return -1;
-    }
-
-    match_data = pcre2_match_data_create_from_pattern(re, NULL);
-    if (match_data == NULL) {
-        pcre2_code_free(re);
-        return -1;
-    }
-
-    if ((rc = pcre2_match_wrapper(re, (PCRE2_SPTR)buf,
-                                  (PCRE2_SIZE)len, 0, 0,
-                                  match_data, NULL)) > 0) {
-        //DEBUG
-        scopeLog("extractFromHTTP: SUCCESS", -1, CFG_LOG_ERROR);
-
-        if ((pcre2_get_ovector_count(match_data) >= 1) &&
-            ((ovector = pcre2_get_ovector_pointer(match_data)) != NULL)) {
-            // only the first match? what if there are multiple matches?
-            // we don't get the len of the matched string; calculate from example
-            size_t mlen = ovector[1] - ovector[0];
-            char *mstr = buf + ovector[0];
-
-            // \r\n is the end of the match point past the \r
-            mstr[mlen - 1] = '\0';
-            scopeLog(mstr, -1, CFG_LOG_ERROR);
-        }
-    } else {
-        switch(rc)
-            {
-            case PCRE2_ERROR_NOMATCH:
-                scopeLog("extractFromHTTP: No match", -1, CFG_LOG_DEBUG);
-                break;
-            default:
-                scopeLog("extractFromHTTP: Matching error", -1, CFG_LOG_DEBUG);
-                break;
-            }
-    }
-
-    pcre2_match_data_free(match_data);
-    pcre2_code_free(re);
-    return 0;
-}
-#endif
-
 static size_t
 getHttpStatus(char *header, size_t len, char **stext)
 {
@@ -436,12 +353,13 @@ httpFieldEnd(event_field_t *fields, http_report *hreport)
 
 static bool
 httpFields(event_field_t *fields, http_report *hreport, char *hdr,
-           size_t hdr_len, protocol_info *proto, rtconfig *cfg)
+           size_t hdr_len, protocol_info *proto, ctl_t *ctl)
 {
     if (!fields || !hreport || !proto || !hdr) return FALSE;
 
     // Start with fields from the header
     char *savea = NULL, *header;
+
     hreport->clen = -1;
 
     if ((hreport->ptype == EVT_HREQ) && (hreport->hreq)) {
@@ -455,61 +373,37 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr,
         return FALSE;
     }
 
-    bool exenabled = FALSE;
-    if (cfg) exenabled = cfgEvtHttpExtractEnabled(cfg->staticfg);
-
-    char *reqh = strtok_r(header, "\r\n", &savea);
-    if (!reqh) {
-        scopeLog("WARN: httpFields: parse an http request header", proto->fd, CFG_LOG_WARN);
+    char *thishdr = strtok_r(header, "\r\n", &savea);
+    if (!thishdr) {
+        scopeLog("WARN: httpFields: parse an http header", proto->fd, CFG_LOG_WARN);
         return FALSE;
     }
 
-    while ((reqh = strtok_r(NULL, "\r\n", &savea)) != NULL) {
+    while ((thishdr = strtok_r(NULL, "\r\n", &savea)) != NULL) {
         // From RFC 2616 Section 4.2 "Field names are case-insensitive."
-        if (strcasestr(reqh, "Host:")) {
-            H_ATTRIB(fields[hreport->ix], "http.host", strchr(reqh, ':') + 2, 1);
+        if (strcasestr(thishdr, "Host:")) {
+            H_ATTRIB(fields[hreport->ix], "http.host", strchr(thishdr, ':') + 2, 1);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if (strcasestr(reqh, "User-Agent:")) {
-            H_ATTRIB(fields[hreport->ix], "http.user_agent", strchr(reqh, ':') + 2, 5);
+        } else if (strcasestr(thishdr, "User-Agent:")) {
+            H_ATTRIB(fields[hreport->ix], "http.user_agent", strchr(thishdr, ':') + 2, 5);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if (strcasestr(reqh, "X-Forwarded-For:")) {
-            H_ATTRIB(fields[hreport->ix], "http.client_ip", strchr(reqh, ':') + 2, 5);
+        } else if (strcasestr(thishdr, "X-Forwarded-For:")) {
+            H_ATTRIB(fields[hreport->ix], "http.client_ip", strchr(thishdr, ':') + 2, 5);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if (strcasestr(reqh, "Content-Length:")) {
+        } else if (strcasestr(thishdr, "Content-Length:")) {
             errno = 0;
-            if (((hreport->clen = strtoull(strchr(reqh, ':') + 2, NULL, 0)) == 0) || (errno != 0)) {
+            if (((hreport->clen = strtoull(strchr(thishdr, ':') + 2, NULL, 0)) == 0) || (errno != 0)) {
                 hreport->clen = -1;
             }
-        } else if (exenabled && strcasestr(reqh, "x-appscope:")) {
-                H_ATTRIB(fields[hreport->ix], "appscope-tag", strchr(reqh, ':') + 2, 5);
+        } else if (strcasestr(thishdr, "x-appscope:")) {
+                H_ATTRIB(fields[hreport->ix], "x-appscope", strchr(thishdr, ':') + 2, 5);
                 HTTP_NEXT_FLD(hreport->ix);
-        } else if (exenabled) {
-            const char *match = cfgEvtHttpMatchName(cfg->staticfg, CFG_HTTP_EX_HEADER);
-            const char *fname = cfgEvtHttpFieldName(cfg->staticfg, CFG_HTTP_EX_HEADER);
-            char *evsrc = strchr(reqh, ':');
+        } else if (ctl && ctlHeaderMatch(g_ctl, thishdr) == TRUE) {
+            char *evsrc = strchr(thishdr, ':');
 
-            if (match && fname && evsrc && strcasestr(reqh, match)) {
-                size_t rlen = evsrc - reqh;
-                size_t evlen = rlen + strlen(fname) + 2;
-                int i;
-                char **evname = NULL;
-
-                for (i = 0; i < NUM_DYNS; i++) {
-                    if (!dynev[i]) {
-                        evname = &dynev[i];
-                        break;
-                    }
-                }
-
-                if (evname && (*evname = calloc(1, evlen))) {
-                    dynev[i] = *evname;
-                    strncpy(*evname, fname, evlen);
-                    strncat(*evname, reqh, rlen);
-                } else {
-                    evname = (char **)&fname;
-                }
-
-                H_ATTRIB(fields[hreport->ix], *evname, evsrc + 2, 5);
+            if (evsrc) {
+                *evsrc = '\0';
+                H_ATTRIB(fields[hreport->ix], thishdr, evsrc + 2, 5);
                 HTTP_NEXT_FLD(hreport->ix);
             }
         }
@@ -658,7 +552,7 @@ doHttpHeader(protocol_info *proto)
         if (proto->ptype == EVT_HREQ) {
             hreport.ptype = EVT_HREQ;
             // Fields common to request & response
-            httpFields(fields, &hreport, map->req, map->req_len, proto, &g_cfg);
+            httpFields(fields, &hreport, map->req, map->req_len, proto, g_ctl);
             httpFieldsInternal(fields, &hreport, proto);
 
             if (hreport.clen != -1) {
@@ -743,7 +637,7 @@ doHttpHeader(protocol_info *proto)
         // Fields common to request & response
         if (map->req) {
             hreport.ptype = EVT_HREQ;
-            httpFields(fields, &hreport, map->req, map->req_len, proto, &g_cfg);
+            httpFields(fields, &hreport, map->req, map->req_len, proto, g_ctl);
             if (hreport.clen != -1) {
                 H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
                 HTTP_NEXT_FLD(hreport.ix);
@@ -752,7 +646,7 @@ doHttpHeader(protocol_info *proto)
         }
 
         hreport.ptype = EVT_HRES;
-        httpFields(fields, &hreport, map->resp, proto->len, proto, &g_cfg);
+        httpFields(fields, &hreport, map->resp, proto->len, proto, g_ctl);
         httpFieldsInternal(fields, &hreport, proto);
         if (hreport.clen != -1) {
             H_VALUE(fields[hreport.ix], "http.response_content_length", hreport.clen, EVENT_ONLY_ATTR);
@@ -805,7 +699,8 @@ doHttpHeader(protocol_info *proto)
         if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
     }
 
-    destroyHreport(&hreport);
+    if (hreport.hreq) free(hreport.hreq);
+    if (hreport.hres) free(hreport.hres);
     destroyProto(proto);
 }
 

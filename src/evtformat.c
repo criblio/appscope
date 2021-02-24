@@ -81,6 +81,7 @@ struct _evt_fmt_t
     local_re_t value_re[CFG_SRC_MAX];
     local_re_t field_re[CFG_SRC_MAX];
     local_re_t name_re[CFG_SRC_MAX];
+    local_re_t header_re;
     unsigned enabled[CFG_SRC_MAX];
 
     struct {
@@ -141,11 +142,11 @@ static unsigned srcEnabledDefault[] = {
 static void
 filterSet(local_re_t *re, const char *str, const char *default_val)
 {
-    if (!re || !default_val) return;
+    if (!re) return;
 
     local_re_t temp;
     temp.valid = str && !regcomp(&temp.re, str, REG_EXTENDED | REG_NOSUB);
-    if (!temp.valid) {
+    if (!temp.valid && default_val) {
         // regcomp failed on str.  Try the default.
         temp.valid = !regcomp(&temp.re, default_val, REG_EXTENDED | REG_NOSUB);
     }
@@ -156,7 +157,7 @@ filterSet(local_re_t *re, const char *str, const char *default_val)
         // In with the new
         *re = temp;
     } else {
-        DBG("%s", str);
+        if (default_val) DBG("%s", str);
     }
 }
 
@@ -176,6 +177,10 @@ evtFormatCreate()
         filterSet(&evt->name_re[src], NULL, nameFilterDefault[src]);
         evt->enabled[src] = srcEnabledDefault[src];
     }
+
+    // default regex is NULL
+    evt->header_re.valid = FALSE;
+
     evt->ratelimit.maxEvtPerSec = DEFAULT_MAXEVENTSPERSEC;
 
     return evt;
@@ -193,6 +198,8 @@ evtFormatDestroy(evt_fmt_t **evt)
         if (edestroy->field_re[src].valid) regfree(&edestroy->field_re[src].re);
         if (edestroy->name_re[src].valid) regfree(&edestroy->name_re[src].re);
     }
+
+    if (edestroy->header_re.valid) regfree(&edestroy->header_re.re);
 
     free(edestroy);
     *evt = NULL;
@@ -243,6 +250,14 @@ evtFormatNameFilter(evt_fmt_t *evt, watch_t src)
     return NULL;
 }
 
+regex_t *
+evtFormatHeaderFilter(evt_fmt_t *evt)
+{
+    if (evt && evt->header_re.valid) return &evt->header_re.re;
+
+    return NULL;
+}
+
 unsigned
 evtFormatSourceEnabled(evt_fmt_t *evt, watch_t src)
 {
@@ -284,6 +299,12 @@ evtFormatNameFilterSet(evt_fmt_t *evt, watch_t src, const char *str)
 }
 
 void
+evtFormatHeaderFilterSet(evt_fmt_t *evt, const char *str)
+{
+    filterSet(&evt->header_re, str, DEFAULT_SRC_HTTP_HEADER);
+}
+
+void
 evtFormatSourceEnabledSet(evt_fmt_t *evt, watch_t src, unsigned val)
 {
     if (!evt || src >= CFG_SRC_MAX || val > 1) return;
@@ -295,6 +316,20 @@ evtFormatRateLimitSet(evt_fmt_t *evt, unsigned val)
 {
     if (!evt) return;
     evt->ratelimit.maxEvtPerSec = val;
+}
+
+bool
+evtHeaderMatch(evt_fmt_t *evt, const char *match)
+{
+    if (!evt || !match) return FALSE;
+
+    regex_t *re;
+
+    if ((re = evtFormatHeaderFilter(evt)) == NULL) return FALSE;
+
+    if (!regexec_wrapper(re, match, 0, NULL, 0)) return TRUE;
+
+    return FALSE;
 }
 
 #define MATCH_FOUND 1

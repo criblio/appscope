@@ -40,10 +40,7 @@ const char*         cfgCustomTagValue(config_t*, const char*);
 cfg_log_level_t     cfgLogLevel(config_t*);
 unsigned int        cfgPayEnable(config_t*);
 const char *        cfgPayDir(config_t*);
-unsigned            cfgEvtHttpExtractEnabled(config_t *);
-http_ex_t           cfgEvtHttpFrom(config_t *, http_ex_t);
-const char *        cfgEvtHttpMatchName(config_t *, http_ex_t);
-const char *        cfgEvtHttpFieldName(config_t *, http_ex_t);
+const char *        cfgEvtFormatHeader(config_t *);
 
 // Setters (modifies config_t, but does not persist modifications)
 void                cfgMtcEnableSet(config_t*, unsigned);
@@ -71,8 +68,6 @@ void                cfgCustomTagAdd(config_t*, const char*, const char*);
 void                cfgLogLevelSet(config_t*, cfg_log_level_t);
 void                cfgPayEnableSet(config_t*, unsigned int);
 void                cfgPayDirSet(config_t*, const char *);
-void                cfgEvtHttpExMatchSet(config_t *, http_ex_t, const char *);
-void                cfgEvtHttpExEventSet(config_t *, http_ex_t, const char *);
-void                cfgEvtHttpExtractSet(config_t *, unsigned);
-void                cfgEvtHttpExFromSet(config_t *, http_ex_t);
+void                cfgEvtFormatHeaderSet(config_t *, const char *);
+
 #endif // __CFG_H__

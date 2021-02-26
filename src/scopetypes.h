@@ -7,7 +7,7 @@ typedef enum {CFG_FMT_STATSD,
               CFG_FMT_NDJSON,
               CFG_FORMAT_MAX} cfg_mtc_format_t;
 typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_SYSLOG, CFG_SHM, CFG_TCP} cfg_transport_t;
-typedef enum {CFG_MTC, CFG_CTL, CFG_LOG, CFG_WHICH_MAX} which_transport_t;
+typedef enum {CFG_MTC, CFG_CTL, CFG_LOG, CFG_LS, CFG_WHICH_MAX} which_transport_t;
 typedef enum {CFG_LOG_TRACE,
               CFG_LOG_DEBUG,
               CFG_LOG_INFO,
@@ -99,14 +99,14 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_FS_NAME ".*"
 #define DEFAULT_SRC_DNS_NAME ".*"
 #define DEFAULT_MTC_IPPORT_VERBOSITY 1
-#define DEFAULT_SRC_FILE FALSE
-#define DEFAULT_SRC_CONSOLE FALSE
-#define DEFAULT_SRC_SYSLOG FALSE
-#define DEFAULT_SRC_METRIC FALSE
-#define DEFAULT_SRC_HTTP FALSE
-#define DEFAULT_SRC_NET FALSE
-#define DEFAULT_SRC_FS FALSE
-#define DEFAULT_SRC_DNS FALSE
+#define DEFAULT_SRC_FILE -1
+#define DEFAULT_SRC_CONSOLE -1
+#define DEFAULT_SRC_SYSLOG -1
+#define DEFAULT_SRC_METRIC -1
+#define DEFAULT_SRC_HTTP -1
+#define DEFAULT_SRC_NET -1
+#define DEFAULT_SRC_FS -1
+#define DEFAULT_SRC_DNS -1
 #define DEFAULT_MAXEVENTSPERSEC 100000
 #define DEFAULT_ENHANCE_FS TRUE
 #define DEFAULT_PORTBLOCK 0
@@ -114,7 +114,6 @@ typedef unsigned int bool;
 #define DEFAULT_PROCESS_START_MSG TRUE
 #define DEFAULT_PAYLOAD_ENABLE FALSE
 #define DEFAULT_PAYLOAD_DIR "/tmp"
-
 
 #define DEFAULT_MTC_TYPE CFG_UDP
 #define DEFAULT_MTC_HOST "127.0.0.1"
@@ -127,11 +126,18 @@ typedef unsigned int bool;
 #define DEFAULT_CTL_PATH NULL
 #define DEFAULT_CTL_BUF CFG_BUFFER_LINE
 #define DEFAULT_LOG_TYPE CFG_FILE
+#define DEFAULT_LS_TYPE CFG_TCP
+#define DEFAULT_LS_HOST "127.0.0.1"
+#define DEFAULT_LS_PORT "10090"
+#define DEFAULT_LS_PATH NULL
+#define DEFAULT_LS_BUF CFG_BUFFER_LINE
 #define DEFAULT_LOG_HOST NULL
 #define DEFAULT_LOG_PORT NULL
 #define DEFAULT_LOG_PATH "/tmp/scope.log"
 #define DEFAULT_LOG_BUF CFG_BUFFER_LINE
 
+#define DEFAULT_LOGSTREAM FALSE
+#define DEFAULT_LOGSTREAM_LOGMSG "The following settings have been overridden by a LogStream connection: event, metric and payload transport, "
 
 /*
  * This calculation is not what we need in the long run.
@@ -155,6 +161,7 @@ typedef unsigned int bool;
 //    SCOPE_PERF_PRESERVE            "true" processes at 10s instead of 1ms
 //    SCOPE_SWITCH                   for internal go debugging
 //    SCOPE_PID                      provided by library
+//    SCOPE_PAYLOAD_HEADER           write payload headers to files
 
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"

@@ -41,6 +41,7 @@ cfg_log_level_t     cfgLogLevel(config_t*);
 unsigned int        cfgPayEnable(config_t*);
 const char *        cfgPayDir(config_t*);
 const char *        cfgEvtFormatHeader(config_t *);
+bool                cfgLogStream(config_t *);
 
 // Setters (modifies config_t, but does not persist modifications)
 void                cfgMtcEnableSet(config_t*, unsigned);
@@ -69,5 +70,6 @@ void                cfgLogLevelSet(config_t*, cfg_log_level_t);
 void                cfgPayEnableSet(config_t*, unsigned int);
 void                cfgPayDirSet(config_t*, const char *);
 void                cfgEvtFormatHeaderSet(config_t *, const char *);
+void                cfgLogStreamSet(config_t *);
 
 #endif // __CFG_H__

@@ -837,6 +837,14 @@ ctlTransportSet(ctl_t *ctl, transport_t *transport)
     ctl->transport = transport;
 }
 
+transport_t *
+ctlTransport(ctl_t *ctl)
+{
+    if (!ctl) return NULL;
+
+    return ctl->transport;
+}
+
 cfg_transport_t
 ctlTransportType(ctl_t *ctl)
 {

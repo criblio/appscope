@@ -778,7 +778,7 @@ evtFormatSourceEnabledSetAndGet(void** state)
     for (i=CFG_SRC_FILE; i<CFG_SRC_MAX+1; i++) {
         evtFormatSourceEnabledSet(evt, i, 1);
         if (i >= CFG_SRC_MAX) {
-             assert_int_equal(evtFormatSourceEnabled(evt, i), DEFAULT_SRC_FILE);
+            assert_int_equal((int)evtFormatSourceEnabled(evt, i), (int)DEFAULT_SRC_FILE);
              assert_int_equal(dbgCountMatchingLines("src/evtformat.c"), 1);
              dbgInit(); // reset dbg for the rest of the tests
         } else {

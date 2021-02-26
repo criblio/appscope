@@ -47,14 +47,14 @@ verifyDefaults(config_t* config)
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_NAME);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_NAME);
     assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_NAME);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), DEFAULT_SRC_NET);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), DEFAULT_SRC_FS);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), DEFAULT_SRC_DNS);
+    assert_int_equal       ((int)cfgEvtFormatSourceEnabled(config, (int)CFG_SRC_FILE), DEFAULT_SRC_FILE);
+    assert_int_equal       ((int)cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), (int)DEFAULT_SRC_CONSOLE);
+    assert_int_equal       ((int)cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), (int)DEFAULT_SRC_SYSLOG);
+    assert_int_equal       ((int)cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), (int)DEFAULT_SRC_METRIC);
+    assert_int_equal       ((int)cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), (int)DEFAULT_SRC_HTTP);
+    assert_int_equal       ((int)cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), (int)DEFAULT_SRC_NET);
+    assert_int_equal       ((int)cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), (int)DEFAULT_SRC_FS);
+    assert_int_equal       ((int)cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), (int)DEFAULT_SRC_DNS);
     assert_int_equal       (cfgTransportType(config, CFG_MTC), DEFAULT_MTC_TYPE);
     assert_string_equal    (cfgTransportHost(config, CFG_MTC), DEFAULT_MTC_HOST);
     assert_string_equal    (cfgTransportPort(config, CFG_MTC), DEFAULT_MTC_PORT);
@@ -335,12 +335,12 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
     for (i=CFG_SRC_FILE; i<CFG_SRC_MAX+1; i++) {
         cfgEvtFormatSourceEnabledSet(config, i, 2);
         if (i >= CFG_SRC_MAX) {
-             assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_FILE);
+             assert_int_equal((int)cfgEvtFormatSourceEnabled(config, i), (int)DEFAULT_SRC_FILE);
              assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 1);
              dbgInit(); // reset dbg for the rest of the tests
         } else {
              assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 0);
-             assert_int_equal(cfgEvtFormatSourceEnabled(config, i), 0);
+             assert_int_equal((int)cfgEvtFormatSourceEnabled(config, i), (int)-1);
         }
     }
 
@@ -348,7 +348,7 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
     for (i=CFG_SRC_FILE; i<CFG_SRC_MAX+1; i++) {
         cfgEvtFormatSourceEnabledSet(config, i, 1);
         if (i >= CFG_SRC_MAX) {
-             assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_FILE);
+             assert_int_equal((int)cfgEvtFormatSourceEnabled(config, i), (int)DEFAULT_SRC_FILE);
              assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 1);
              dbgInit(); // reset dbg for the rest of the tests
         } else {

@@ -431,6 +431,10 @@ doConfig(config_t *cfg)
     g_mtc = initMtc(cfg);
     g_ctl = initCtl(cfg);
 
+    if (cfgLogStream(cfg)) {
+        singleChannelSet(g_ctl, g_mtc);
+    }
+
     // Disconnect the old interfaces that were just replaced
     mtcDisconnect(g_prevmtc);
     logDisconnect(g_prevlog);
@@ -1059,14 +1063,19 @@ init(void)
 
     g_nsslist = lstCreate(freeNssEntry);
 
-    platform_time_t* time_struct = initTime();
+    platform_time_t *time_struct = initTime();
     if (time_struct->tsc_invariant == FALSE) {
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
 
-    char* path = cfgPath();
-    config_t* cfg = cfgRead(path);
+    char *path = cfgPath();
+    config_t *cfg = cfgRead(path);
     cfgProcessEnvironment(cfg);
+
+    if (cfgLogStream(cfg)) {
+        cfgLogStreamDefault(cfg);
+    }
+
     doConfig(cfg);
     g_staticfg = cfg;
     if (path) free(path);

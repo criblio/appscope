@@ -456,9 +456,9 @@ fmtEventJsonValue(void** state)
     event_format.data = cJSON_CreateString("поспехаў");
     event_format.sourcetype = CFG_SRC_SYSLOG;
 
-    assert_null(fmtEventJson(NULL));
+    assert_null(fmtEventJson(NULL, NULL));
 
-    cJSON* json = fmtEventJson(&event_format);
+    cJSON* json = fmtEventJson(NULL, &event_format);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
@@ -476,6 +476,54 @@ fmtEventJsonValue(void** state)
 
     free(str);
     cJSON_Delete(json);
+}
+
+static void
+fmtEventJsonWithCustomTags(void **state)
+{
+    proc_id_t proc = {.pid = 1234,
+                      .ppid = 1233,
+                      .hostname = "earl",
+                      .procname = "formattest",
+                      .cmd = "cmd",
+                      .id = "earl-formattest-cmd"};
+    event_format_t event_format;
+    event_format.timestamp = 1573058085.991;
+    event_format.src = "stdin";
+    event_format.proc = &proc;
+    event_format.uid = 0xCAFEBABEDEADBEEF;
+    event_format.data = cJSON_CreateString("поспехаў");
+    event_format.sourcetype = CFG_SRC_SYSLOG;
+
+    evt_fmt_t *efmt = evtFormatCreate();
+    custom_tag_t tag1 = {.name = "hey", .value = "you"};
+    custom_tag_t tag2 = {.name = "this", .value = "rocks"};
+    custom_tag_t *tags[] = { &tag1, &tag2, NULL };
+    evtFormatCustomTagsSet(efmt, (custom_tag_t **)&tags);
+
+    cJSON* json = fmtEventJson(efmt, &event_format);
+    assert_non_null(json);
+    char* str = cJSON_PrintUnformatted(json);
+    assert_non_null(str);
+
+    evtFormatDestroy(&efmt);
+
+    //printf("%s:%d %s\n", __FUNCTION__, __LINE__, str);
+    assert_string_equal(str, "{\"sourcetype\":\"syslog\","
+                              "\"id\":\"earl-formattest-cmd\","
+                              "\"_time\":1573058085.991,"
+                              "\"source\":\"stdin\","
+                              "\"host\":\"earl\","
+                              "\"proc\":\"formattest\","
+                              "\"cmd\":\"cmd\",\"pid\":1234,"
+                              "\"_channel\":\"14627333968688430831\","
+                              "\"hey\":\"you\","
+                              "\"this\":\"rocks\","
+                              "\"data\":\"поспехаў\"}");
+
+    free(str);
+    cJSON_Delete(json);
+
 }
 
 static void
@@ -500,7 +548,7 @@ fmtEventJsonWithEmbeddedNulls(void** state)
     event_format.sourcetype = CFG_SRC_CONSOLE;
 
     // test that data has the nulls properly escaped
-    cJSON* json = fmtEventJson(&event_format);
+    cJSON* json = fmtEventJson(NULL, &event_format);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
@@ -520,7 +568,7 @@ fmtEventJsonWithEmbeddedNulls(void** state)
 
     // test that null data omits a data field.
     event_format.data=NULL;
-    json = fmtEventJson(&event_format);
+    json = fmtEventJson(NULL, &event_format);
     assert_non_null(json);
     str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
@@ -854,6 +902,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(evtFormatLogWithAndWithoutMatchingNameFilter),
         cmocka_unit_test(evtFormatLogWithAndWithoutMatchingValueFilter),
         cmocka_unit_test(fmtEventJsonValue),
+        cmocka_unit_test(fmtEventJsonWithCustomTags),
         cmocka_unit_test(fmtEventJsonWithEmbeddedNulls),
         cmocka_unit_test(fmtMetricJsonNoFields),
         cmocka_unit_test(fmtMetricJsonWFields),

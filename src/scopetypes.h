@@ -165,7 +165,6 @@ typedef unsigned int bool;
 
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
-#define LOGSTREAM "SCOPE_LOGSTREAM"
 
 // TLS protocol refs that have been useful:
 // https://tools.ietf.org/html/rfc5246

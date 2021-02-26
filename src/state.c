@@ -950,7 +950,7 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     if (!buf || (len <= 0)) return -1;
 
     // if not connected to a LogStream try to not include TLS handshake in the payload
-    if ((checkEnv(LOGSTREAM, "true") == FALSE) && ((src == NETRX) || (src == NETTX))) {
+    if ((cfgLogStream(g_cfg.staticfg) == FALSE) && ((src == NETRX) || (src == NETTX))) {
         /*
          * the protocol state for this socket is either
          * PROT_NOTCHECKED: first time we've seen traffic on this connection.

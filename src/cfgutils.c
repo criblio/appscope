@@ -1845,7 +1845,7 @@ initEvtFormat(config_t *cfg)
     return evt;
 }
 
-ctl_t*
+ctl_t *
 initCtl(config_t *cfg)
 {
     ctl_t *ctl = ctlCreate();
@@ -1861,7 +1861,19 @@ initCtl(config_t *cfg)
         ctlDestroy(&ctl);
         return ctl;
     }
-    ctlTransportSet(ctl, trans);
+    ctlTransportSet(ctl, trans, CFG_CTL);
+
+    if (cfgLogStream(cfg) && cfgPayEnable(cfg)) {
+        transport_t *trans = initTransport(cfg, CFG_LS);
+        if (!trans) {
+            ctlDestroy(&ctl);
+            return ctl;
+        }
+
+        ctlTransportSet(ctl, trans, CFG_LS);
+    } else {
+        ctlTransportSet(ctl, NULL, CFG_LS);
+    }
 
     evt_fmt_t* evt = initEvtFormat(cfg);
     if (!evt) {
@@ -1973,7 +1985,7 @@ singleChannelSet(ctl_t *ctl, mtc_t *mtc)
         scopeLog(g_logmsg, -1, CFG_LOG_WARN);
     }
 
-    transport_t *trans = ctlTransport(ctl);
+    transport_t *trans = ctlTransport(ctl, CFG_CTL);
     if (trans) {
         mtcTransportSet(mtc, trans);
         return 0;

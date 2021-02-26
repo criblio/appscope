@@ -490,9 +490,7 @@ cfgPayDir(config_t *cfg)
 bool
 cfgLogStream(config_t *cfg)
 {
-    if (cfg) return cfg->logstream;
-
-    return FALSE;
+    return (cfg) ? cfg->logstream : DEFAULT_LOGSTREAM;
 }
 
 ///////////////////////////////////

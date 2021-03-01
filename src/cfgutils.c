@@ -1152,6 +1152,9 @@ processWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
 
+    // watch header is only valid for http
+    if (watch_context != CFG_SRC_HTTP) return;
+
     char *value = stringVal(node);
     cfgEvtFormatHeaderSet(config, value);
     if (value) free(value);
@@ -1546,6 +1549,11 @@ createWatchObjectJson(config_t* cfg, watch_t src)
                                   cfgEvtFormatFieldFilter(cfg, src))) goto err;
     if (!cJSON_AddStringToObjLN(root, VALUE_NODE,
                                   cfgEvtFormatValueFilter(cfg, src))) goto err;
+    if (src == CFG_SRC_HTTP) {
+        const char *header = cfgEvtFormatHeader(cfg);
+        header = (header) ? header : "";
+        if (!cJSON_AddStringToObjLN(root, EX_HEADERS, header)) goto err;
+    }
 
     return root;
 err:

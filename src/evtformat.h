@@ -17,6 +17,8 @@ regex_t *           evtFormatFieldFilter(evt_fmt_t *, watch_t);
 regex_t *           evtFormatNameFilter(evt_fmt_t *, watch_t);
 unsigned            evtFormatSourceEnabled(evt_fmt_t *, watch_t);
 unsigned            evtFormatRateLimit(evt_fmt_t *);
+
+custom_tag_t **     evtFormatCustomTags(evt_fmt_t *);
 bool                evtHeaderMatch(evt_fmt_t *, const char *);
 
 // These are the exposed functions that are expected to be used externally
@@ -27,7 +29,7 @@ cJSON *             evtFormatLog(evt_fmt_t *, const char *, const void *, size_t
 
 // Could be static; these are lower level funcs only exposed for testing
 cJSON *             fmtMetricJson(event_t *, regex_t *, watch_t);
-cJSON *             fmtEventJson(event_format_t *);
+cJSON *             fmtEventJson(evt_fmt_t *, event_format_t *);
 
 // Setters (modifies evt_fmt_t, but does not persist modifications)
 void                evtFormatValueFilterSet(evt_fmt_t *, watch_t, const char *);
@@ -35,6 +37,7 @@ void                evtFormatFieldFilterSet(evt_fmt_t *, watch_t, const char *);
 void                evtFormatNameFilterSet(evt_fmt_t *, watch_t, const char *);
 void                evtFormatSourceEnabledSet(evt_fmt_t *, watch_t, unsigned);
 void                evtFormatRateLimitSet(evt_fmt_t *, unsigned);
+void                evtFormatCustomTagsSet(evt_fmt_t *, custom_tag_t **);
 void                evtFormatHeaderFilterSet(evt_fmt_t *, const char *);
 
 #endif // __EVT_FORMAT_H__

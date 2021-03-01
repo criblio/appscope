@@ -92,6 +92,8 @@ struct _evt_fmt_t
         // configured param
         unsigned long maxEvtPerSec;
     } ratelimit;
+
+    custom_tag_t** tags;
 };
 
 static const char *valueFilterDefault[] = {
@@ -183,7 +185,26 @@ evtFormatCreate()
 
     evt->ratelimit.maxEvtPerSec = DEFAULT_MAXEVENTSPERSEC;
 
+    evt->tags = DEFAULT_CUSTOM_TAGS;
+
     return evt;
+}
+
+static
+void
+evtFormatDestroyTags(custom_tag_t*** tags)
+{
+    if (!tags || !*tags) return;
+    custom_tag_t** t = *tags;
+    int i = 0;
+    while (t[i]) {
+        free(t[i]->name);
+        free(t[i]->value);
+        free(t[i]);
+        i++;
+    }
+    free(t);
+    *tags = NULL;
 }
 
 void
@@ -198,6 +219,8 @@ evtFormatDestroy(evt_fmt_t **evt)
         if (edestroy->field_re[src].valid) regfree(&edestroy->field_re[src].re);
         if (edestroy->name_re[src].valid) regfree(&edestroy->name_re[src].re);
     }
+
+    evtFormatDestroyTags(&edestroy->tags);
 
     if (edestroy->header_re.valid) regfree(&edestroy->header_re.re);
 
@@ -277,6 +300,12 @@ evtFormatRateLimit(evt_fmt_t *evt)
     return (evt) ? evt->ratelimit.maxEvtPerSec : DEFAULT_MAXEVENTSPERSEC;
 }
 
+custom_tag_t**
+evtFormatCustomTags(evt_fmt_t* fmt)
+{
+    return (fmt) ? fmt->tags : DEFAULT_CUSTOM_TAGS;
+}
+
 void
 evtFormatValueFilterSet(evt_fmt_t *evt, watch_t src, const char *str)
 {
@@ -316,6 +345,44 @@ evtFormatRateLimitSet(evt_fmt_t *evt, unsigned val)
 {
     if (!evt) return;
     evt->ratelimit.maxEvtPerSec = val;
+}
+
+void
+evtFormatCustomTagsSet(evt_fmt_t* fmt, custom_tag_t** tags)
+{
+    if (!fmt) return;
+
+    // Don't leak with multiple set operations
+    evtFormatDestroyTags(&fmt->tags);
+
+    if (!tags || !*tags) return;
+
+    // get a count of how big to calloc
+    int num = 0;
+    while(tags[num]) num++;
+
+    fmt->tags = calloc(1, sizeof(custom_tag_t*) * (num+1));
+    if (!fmt->tags) {
+        DBG(NULL);
+        return;
+    }
+
+    int i, j = 0;
+    for (i = 0; i<num; i++) {
+        custom_tag_t* t = calloc(1, sizeof(custom_tag_t));
+        char* n = strdup(tags[i]->name);
+        char* v = strdup(tags[i]->value);
+        if (!t || !n || !v) {
+            if (t) free (t);
+            if (n) free (n);
+            if (v) free (v);
+            DBG("t=%p n=%p v=%p", t, n, v);
+            continue;
+        }
+        t->name = n;
+        t->value = v;
+        fmt->tags[j++]=t;
+    }
 }
 
 bool
@@ -378,8 +445,21 @@ anyValueFieldMatches(regex_t *filter, event_t *metric)
     return NO_MATCH_FOUND;
 }
 
+static void
+addCustomJsonFields(evt_fmt_t *evt, cJSON *json)
+{
+    custom_tag_t **tags = evtFormatCustomTags(evt);
+    if (!evt || !json || !tags) return;
+
+    custom_tag_t *tag;
+    int i = 0;
+    while ((tag = tags[i++])) {
+        cJSON_AddStringToObject(json, tag->name, tag->value);
+    }
+}
+
 cJSON *
-fmtEventJson(event_format_t *sev)
+fmtEventJson(evt_fmt_t *efmt, event_format_t *sev)
 {
     char numbuf[32];
 
@@ -400,6 +480,8 @@ fmtEventJson(event_format_t *sev)
     if (!cJSON_AddNumberToObjLN(json, PID, sev->proc->pid)) goto err;
     if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto err;
     if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto err;
+
+    if (efmt) addCustomJsonFields(efmt, json);
     cJSON_AddItemToObjectCS(json, DATA, sev->data);
 
     return json;
@@ -430,7 +512,7 @@ rateLimitMessage(proc_id_t *proc, watch_t src, unsigned maxEvtPerSec)
     event.data = cJSON_CreateString(string);
     event.sourcetype = src;
 
-    cJSON *json = fmtEventJson(&event);
+    cJSON *json = fmtEventJson(NULL, &event);
     return json;
 }
 
@@ -576,13 +658,13 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
 
     if (!event.data) return NULL;
 
-    return fmtEventJson(&event);
+    return fmtEventJson(evt, &event);
 }
 
 cJSON *
-evtFormatMetric(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc)
+evtFormatMetric(evt_fmt_t *efmt, event_t *metric, uint64_t uid, proc_id_t *proc)
 {
-    return evtFormatHelper(evt, metric, uid, proc, metric->src);
+    return evtFormatHelper(efmt, metric, uid, proc, metric->src);
 }
 
 cJSON *
@@ -623,7 +705,7 @@ evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
     if (!event.data) return NULL;
     event.sourcetype = logType;
 
-    cJSON *json = fmtEventJson(&event);
+    cJSON *json = fmtEventJson(evt, &event);
     if (!json) return NULL;
 
 

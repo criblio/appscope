@@ -35,10 +35,11 @@ struct _config_t
         unsigned enable;
         cfg_mtc_format_t format;
         unsigned ratelimit;
-        char* valuefilter[CFG_SRC_MAX];
-        char* fieldfilter[CFG_SRC_MAX];
-        char* namefilter[CFG_SRC_MAX];
+        char *valuefilter[CFG_SRC_MAX];
+        char *fieldfilter[CFG_SRC_MAX];
+        char *namefilter[CFG_SRC_MAX];
         unsigned src[CFG_SRC_MAX];
+        char *headerName;
     } evt;
 
     struct {
@@ -60,7 +61,6 @@ struct _config_t
     unsigned processstartmsg;
     unsigned enhancefs;
 };
-
 
 static const char* valueFilterDefault[] = {
     DEFAULT_SRC_FILE_VALUE,
@@ -140,10 +140,10 @@ static cfg_buffer_t bufDefault[] = {
 ///////////////////////////////////
 // Constructors Destructors
 ///////////////////////////////////
-config_t*
+config_t *
 cfgCreateDefault()
 { 
-    config_t* c = calloc(1, sizeof(config_t));
+    config_t *c = calloc(1, sizeof(config_t));
     if (!c) {
         DBG(NULL);
         return NULL;
@@ -160,14 +160,16 @@ cfgCreateDefault()
 
     watch_t src;
     for (src=CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
-        const char* val_def = valueFilterDefault[src];
+        const char *val_def = valueFilterDefault[src];
         c->evt.valuefilter[src] = (val_def) ? strdup(val_def) : NULL;
-        const char* field_def = fieldFilterDefault[src];
+        const char *field_def = fieldFilterDefault[src];
         c->evt.fieldfilter[src] = (field_def) ? strdup(field_def) : NULL;
-        const char* name_def = nameFilterDefault[src];
+        const char *name_def = nameFilterDefault[src];
         c->evt.namefilter[src] = (name_def) ? strdup(name_def) : NULL;
         c->evt.src[src] = srcEnabledDefault[src];
     }
+
+    c->evt.headerName = DEFAULT_SRC_HTTP_HEADER;
 
     which_transport_t tp;
     for (tp=CFG_MTC; tp<CFG_WHICH_MAX; tp++) {
@@ -197,10 +199,10 @@ cfgCreateDefault()
 }
 
 void
-cfgDestroy(config_t** cfg)
+cfgDestroy(config_t **cfg)
 {
     if (!cfg || !*cfg) return;
-    config_t* c = *cfg;
+    config_t *c = *cfg;
     if (c->mtc.statsd.prefix) free(c->mtc.statsd.prefix);
     if (c->commanddir) free(c->commanddir);
 
@@ -210,6 +212,8 @@ cfgDestroy(config_t** cfg)
         if (c->evt.fieldfilter[src]) free (c->evt.fieldfilter[src]);
         if (c->evt.namefilter[src]) free (c->evt.namefilter[src]);
     }
+
+    if (c->evt.headerName) free(c->evt.headerName);
 
     which_transport_t t;
     for (t=CFG_MTC; t<CFG_WHICH_MAX; t++) {
@@ -337,6 +341,15 @@ cfgEvtFormatNameFilter(config_t* cfg, watch_t src)
 
     DBG("%d", src);
     return nameFilterDefault[CFG_SRC_FILE];
+}
+
+const char *
+cfgEvtFormatHeader(config_t *cfg)
+{
+    if (cfg) return cfg->evt.headerName;
+
+    DBG(NULL);
+    return DEFAULT_SRC_HTTP_HEADER;
 }
 
 unsigned
@@ -618,6 +631,21 @@ cfgEvtFormatNameFilterSet(config_t* cfg, watch_t src, const char* filter)
         return;
     }
     cfg->evt.namefilter[src] = strdup(filter);
+}
+
+void
+cfgEvtFormatHeaderSet(config_t *cfg, const char *filter)
+{
+    if (!cfg) return;
+
+    if (cfg->evt.headerName) free (cfg->evt.headerName);
+
+    if (!filter || (filter[0] == '\0')) {
+        cfg->evt.headerName = DEFAULT_SRC_HTTP_HEADER;
+        return;
+    }
+
+    cfg->evt.headerName = strdup(filter);
 }
 
 void

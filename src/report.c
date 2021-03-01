@@ -21,6 +21,7 @@
 #include "linklist.h"
 #include "dns.h"
 #include "utils.h"
+#include "runtimecfg.h"
 
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
@@ -71,6 +72,8 @@
 #define EVENT_ONLY_ATTR (CFG_MAX_VERBOSITY+1)
 #define HTTP_MAX_FIELDS 30
 #define NET_MAX_FIELDS 16
+#define NUM_DYNS 4
+
 #define H_ATTRIB(field, att, val, verbosity) \
     field.name = att; \
     field.value_type = FMT_STR; \
@@ -349,12 +352,14 @@ httpFieldEnd(event_field_t *fields, http_report *hreport)
 }
 
 static bool
-httpFields(event_field_t *fields, http_report *hreport, char *hdr, size_t hdr_len, protocol_info *proto)
+httpFields(event_field_t *fields, http_report *hreport, char *hdr,
+           size_t hdr_len, protocol_info *proto, ctl_t *ctl)
 {
     if (!fields || !hreport || !proto || !hdr) return FALSE;
 
     // Start with fields from the header
     char *savea = NULL, *header;
+
     hreport->clen = -1;
 
     if ((hreport->ptype == EVT_HREQ) && (hreport->hreq)) {
@@ -368,30 +373,42 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr, size_t hdr_le
         return FALSE;
     }
 
-    char *reqh = strtok_r(header, "\r\n", &savea);
-    if (!reqh) {
-        scopeLog("WARN: httpFields: parse an http request header", proto->fd, CFG_LOG_WARN);
+    char *thishdr = strtok_r(header, "\r\n", &savea);
+    if (!thishdr) {
+        scopeLog("WARN: httpFields: parse an http header", proto->fd, CFG_LOG_WARN);
         return FALSE;
     }
 
-    while ((reqh = strtok_r(NULL, "\r\n", &savea)) != NULL) {
+    while ((thishdr = strtok_r(NULL, "\r\n", &savea)) != NULL) {
         // From RFC 2616 Section 4.2 "Field names are case-insensitive."
-        if (strcasestr(reqh, "Host:")) {
-            H_ATTRIB(fields[hreport->ix], "http.host", strchr(reqh, ':') + 2, 1);
+        if (strcasestr(thishdr, "Host:")) {
+            H_ATTRIB(fields[hreport->ix], "http.host", strchr(thishdr, ':') + 2, 1);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if (strcasestr(reqh, "User-Agent:")) {
-            H_ATTRIB(fields[hreport->ix], "http.user_agent", strchr(reqh, ':') + 2, 5);
+        } else if (strcasestr(thishdr, "User-Agent:")) {
+            H_ATTRIB(fields[hreport->ix], "http.user_agent", strchr(thishdr, ':') + 2, 5);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if(strcasestr(reqh, "X-Forwarded-For:")) {
-            H_ATTRIB(fields[hreport->ix], "http.client_ip", strchr(reqh, ':') + 2, 5);
+        } else if (strcasestr(thishdr, "X-Forwarded-For:")) {
+            H_ATTRIB(fields[hreport->ix], "http.client_ip", strchr(thishdr, ':') + 2, 5);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if(strcasestr(reqh, "Content-Length:")) {
+        } else if (strcasestr(thishdr, "Content-Length:")) {
             errno = 0;
-            if (((hreport->clen = strtoull(strchr(reqh, ':') + 2, NULL, 0)) == 0) || (errno != 0)) {
+            if (((hreport->clen = strtoull(strchr(thishdr, ':') + 2, NULL, 0)) == 0) || (errno != 0)) {
                 hreport->clen = -1;
+            }
+        } else if (strcasestr(thishdr, "x-appscope:")) {
+                H_ATTRIB(fields[hreport->ix], "x-appscope", strchr(thishdr, ':') + 2, 5);
+                HTTP_NEXT_FLD(hreport->ix);
+        } else if (ctl && ctlHeaderMatch(g_ctl, thishdr) == TRUE) {
+            char *evsrc = strchr(thishdr, ':');
+
+            if (evsrc) {
+                *evsrc = '\0';
+                H_ATTRIB(fields[hreport->ix], thishdr, evsrc + 2, 5);
+                HTTP_NEXT_FLD(hreport->ix);
             }
         }
     }
+
     return TRUE;
 }
 
@@ -535,7 +552,7 @@ doHttpHeader(protocol_info *proto)
         if (proto->ptype == EVT_HREQ) {
             hreport.ptype = EVT_HREQ;
             // Fields common to request & response
-            httpFields(fields, &hreport, map->req, map->req_len, proto);
+            httpFields(fields, &hreport, map->req, map->req_len, proto, g_ctl);
             httpFieldsInternal(fields, &hreport, proto);
 
             if (hreport.clen != -1) {
@@ -620,7 +637,7 @@ doHttpHeader(protocol_info *proto)
         // Fields common to request & response
         if (map->req) {
             hreport.ptype = EVT_HREQ;
-            httpFields(fields, &hreport, map->req, map->req_len, proto);
+            httpFields(fields, &hreport, map->req, map->req_len, proto, g_ctl);
             if (hreport.clen != -1) {
                 H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
                 HTTP_NEXT_FLD(hreport.ix);
@@ -629,7 +646,7 @@ doHttpHeader(protocol_info *proto)
         }
 
         hreport.ptype = EVT_HRES;
-        httpFields(fields, &hreport, map->resp, proto->len, proto);
+        httpFields(fields, &hreport, map->resp, proto->len, proto, g_ctl);
         httpFieldsInternal(fields, &hreport, proto);
         if (hreport.clen != -1) {
             H_VALUE(fields[hreport.ix], "http.response_content_length", hreport.clen, EVENT_ONLY_ATTR);

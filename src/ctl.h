@@ -124,6 +124,7 @@ unsigned int    ctlPayEnable(ctl_t *);
 void            ctlPayEnableSet(ctl_t *, unsigned int);
 const char *    ctlPayDir(ctl_t *);
 void            ctlPayDirSet(ctl_t *, const char *);
+bool            ctlHeaderMatch(ctl_t *, const char *);
 
 // Retreive events
 uint64_t   ctlGetEvent(ctl_t *);

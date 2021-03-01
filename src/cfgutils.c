@@ -54,6 +54,7 @@
 #define NAME_NODE                    "name"
 #define FIELD_NODE                   "field"
 #define VALUE_NODE                   "value"
+#define EX_HEADERS                   "headers"
 
 #define PAYLOAD_NODE          "payload"
 #define ENABLE_NODE              "enable"
@@ -132,13 +133,13 @@ void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
 void cfgPayEnableSetFromStr(config_t*, const char*);
 void cfgPayDirSetFromStr(config_t*, const char*);
+void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 static void cfgSetFromFile(config_t *config, const char *path);
 
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
 static which_transport_t transport_context;
 static watch_t watch_context;
-
 static regex_t* g_regex = NULL;
 
 static char*
@@ -388,22 +389,8 @@ startsWith(const char* string, const char* substring)
 // For completeness, scope env vars that are not processed here:
 //    SCOPE_CONF_PATH (only used on startup to specify cfg file)
 //    SCOPE_HOME      (only used on startup for searching for cfg file)
-//
-// Unpublished scope env vars that are not processed here:
-//    SCOPE_APP_TYPE                 internal use only
-//    SCOPE_EXEC_TYPE                internal use only
-//    SCOPE_EXECVE                   "false" disables scope of child procs
-//    SCOPE_EXEC_PATH                specifies path to ldscope executable
-//    SCOPE_GO_STRUCT_PATH           for internal testing
-//    SCOPE_HTTP_SERIALIZE_ENABLE    "true" adds guard for race condition
-//    SCOPE_NO_SIGNAL                if defined, timer for USR2 is not set
-//    SCOPE_PAYLOAD_HEADER           "true" adds json header to each tx/rx
-//    SCOPE_PERF_PRESERVE            "true" processes at 10s instead of 1ms
-//    SCOPE_SWITCH                   for internal go debugging
-//    SCOPE_PID                      provided by library
-//
 static void
-processEnvStyleInput(config_t* cfg, const char* env_line)
+processEnvStyleInput(config_t *cfg, const char *env_line)
 {
 
     if (!cfg || !env_line) return;
@@ -464,6 +451,8 @@ processEnvStyleInput(config_t* cfg, const char* env_line)
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_HEADER")) {
+        cfgEvtFormatHeaderSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_NET_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_NET, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_FS_NAME")) {
@@ -682,6 +671,13 @@ cfgEvtFormatNameFilterSetFromStr(config_t* cfg, watch_t src, const char* value)
 {
     if (!cfg || !value) return;
     cfgEvtFormatNameFilterSet(cfg, src, value);
+}
+
+void
+cfgEvtFormatHeaderSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgEvtFormatHeaderSet(cfg, value);
 }
 
 void
@@ -1151,6 +1147,19 @@ processWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (value) free(value);
 }
 
+static void
+processWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    // watch header is only valid for http
+    if (watch_context != CFG_SRC_HTTP) return;
+
+    char *value = stringVal(node);
+    cfgEvtFormatHeaderSet(config, value);
+    if (value) free(value);
+}
+
 static int
 isWatchType(yaml_document_t* doc, yaml_node_pair_t* pair)
 {
@@ -1169,6 +1178,7 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    NAME_NODE,            processWatchName},
         {YAML_SCALAR_NODE,    FIELD_NODE,           processWatchField},
         {YAML_SCALAR_NODE,    VALUE_NODE,           processWatchValue},
+        {YAML_SCALAR_NODE,    EX_HEADERS,           processWatchHeader},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1539,6 +1549,11 @@ createWatchObjectJson(config_t* cfg, watch_t src)
                                   cfgEvtFormatFieldFilter(cfg, src))) goto err;
     if (!cJSON_AddStringToObjLN(root, VALUE_NODE,
                                   cfgEvtFormatValueFilter(cfg, src))) goto err;
+    if (src == CFG_SRC_HTTP) {
+        const char *header = cfgEvtFormatHeader(cfg);
+        header = (header) ? header : "";
+        if (!cJSON_AddStringToObjLN(root, EX_HEADERS, header)) goto err;
+    }
 
     return root;
 err:
@@ -1790,6 +1805,9 @@ initEvtFormat(config_t *cfg)
         evtFormatFieldFilterSet(evt, src, cfgEvtFormatFieldFilter(cfg, src));
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
     }
+
+    evtFormatHeaderFilterSet(evt, cfgEvtFormatHeader(cfg));
+
     evtFormatRateLimitSet(evt, cfgEvtRateLimit(cfg));
     evtFormatCustomTagsSet(evt, cfgCustomTags(cfg));
 

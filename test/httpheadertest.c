@@ -11,6 +11,7 @@
 #include "plattime.h"
 #include "fn.h"
 #include "ctl.h"
+#include "cfgutils.h"
 #include "evtformat.h"
 #include "httpstate.h"
 #include "test.h"
@@ -247,6 +248,79 @@ headerRequestUnix(void **state)
     free(header_event);
 }
 
+static void
+userDefinedHeaderExtract(void **state)
+{
+    char *request = "GET /hello HTTP/1.1\r\nHost: localhost:4430\r\nUser-Agent: curl/7.68.0\r\nAccept: */*\r\nContent-Length: 12345\r\nX-MyheaderTag: utesttag\r\nX-Forwarded-For: 192.7.7.7\r\n\r\n";
+    char *result[] = {
+        "\"http.method\":\"GET\"",
+        "\"http.target\":\"/hello\"",
+        "\"http.flavor\":\"1.1\"",
+        "\"http.scheme\":\"https\"",
+        "\"http.host\":\"localhost:4430\"",
+        "\"http.user_agent\":\"curl/7.68.0\"",
+        "\"http.client_ip\":\"192.7.7.7\"",
+        "\"net.transport\":\"IP.TCP\"",
+        "\"net.peer.ip\":\"192.1.2.99\"",
+        "\"net.peer.port\":\"24862\"",
+        "\"net.host.ip\":\"192.1.2.3\"",
+        "\"net.host.port\":\"3879\"",
+        "\"http.request_content_length\":12345",
+        "\"X-MyheaderTag\":\"utesttag\""
+    };
+
+    // enable user defined heder extraction
+    config_t *cfg = cfgCreateDefault();
+    cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_HTTP, (unsigned)1);
+    cfgEvtFormatHeaderSet(cfg, "(?i)x-myheader.*");
+    g_ctl = initCtl(cfg);
+
+    net_info *net = getNet(3);
+    assert_non_null(net);
+    assert_true(doHttp(0x12345, 3, net, request, strlen(request), TLSRX, BUF));
+    //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
+    int i;
+    for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
+        //printf("looking for %s\n", result[i]);
+        assert_non_null(strstr(header_event, result[i]));
+    }
+    free(header_event);
+    cfgDestroy(&cfg);
+}
+
+static void
+xAppScopeHeaderExtract(void **state)
+{
+    char *request = "GET /hello HTTP/1.1\r\nHost: localhost:4430\r\nUser-Agent: curl/7.68.0\r\nAccept: */*\r\nContent-Length: 12345\r\nX-appScope: app=utest\r\nX-Forwarded-For: 192.7.7.7\r\n\r\n";
+    char *result[] = {
+        "\"http.method\":\"GET\"",
+        "\"http.target\":\"/hello\"",
+        "\"http.flavor\":\"1.1\"",
+        "\"http.scheme\":\"https\"",
+        "\"http.host\":\"localhost:4430\"",
+        "\"http.user_agent\":\"curl/7.68.0\"",
+        "\"http.client_ip\":\"192.7.7.7\"",
+        "\"net.transport\":\"IP.TCP\"",
+        "\"net.peer.ip\":\"192.1.2.99\"",
+        "\"net.peer.port\":\"24862\"",
+        "\"net.host.ip\":\"192.1.2.3\"",
+        "\"net.host.port\":\"3879\"",
+        "\"http.request_content_length\":12345",
+        "\"x-appscope\":\"app=utest\""
+    };
+
+    net_info *net = getNet(3);
+    assert_non_null(net);
+    assert_true(doHttp(0x12345, 3, net, request, strlen(request), TLSRX, BUF));
+    //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
+    int i;
+    for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
+        //printf("looking for %s\n", result[i]);
+        assert_non_null(strstr(header_event, result[i]));
+    }
+    free(header_event);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -258,6 +332,8 @@ main(int argc, char *argv[])
         cmocka_unit_test(headerRequestIP),
         cmocka_unit_test(headerResponseIP),
         cmocka_unit_test(headerRequestUnix),
+        cmocka_unit_test(userDefinedHeaderExtract),
+        cmocka_unit_test(xAppScopeHeaderExtract),
     };
     return cmocka_run_group_tests(tests, needleTestSetup, groupTeardown);
 }

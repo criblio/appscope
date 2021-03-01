@@ -94,6 +94,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_SYSLOG_NAME ".*"
 #define DEFAULT_SRC_METRIC_NAME ".*"
 #define DEFAULT_SRC_HTTP_NAME ".*"
+#define DEFAULT_SRC_HTTP_HEADER NULL
 #define DEFAULT_SRC_NET_NAME ".*"
 #define DEFAULT_SRC_FS_NAME ".*"
 #define DEFAULT_SRC_DNS_NAME ".*"
@@ -143,10 +144,26 @@ typedef unsigned int bool;
 #define DEFAULT_PAYLOAD_RING_SIZE 10000
 #define DEFAULT_CONFIG_SIZE 30 * 1024
 
-// we should start moving env var constants to one place
+// Unpublished scope env vars that are not processed by config:
+//    SCOPE_APP_TYPE                 internal use only
+//    SCOPE_EXEC_TYPE                internal use only
+//    SCOPE_EXECVE                   "false" disables scope of child procs
+//    SCOPE_EXEC_PATH                specifies path to ldscope executable
+//    SCOPE_GO_STRUCT_PATH           for internal testing
+//    SCOPE_HTTP_SERIALIZE_ENABLE    "true" adds guard for race condition
+//    SCOPE_NO_SIGNAL                if defined, timer for USR2 is not set
+//    SCOPE_PERF_PRESERVE            "true" processes at 10s instead of 1ms
+//    SCOPE_SWITCH                   for internal go debugging
+//    SCOPE_PID                      provided by library
+
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
 #define LOGSTREAM "SCOPE_LOGSTREAM"
+
+// TLS protocol refs that have been useful:
+// https://tools.ietf.org/html/rfc5246
+// http://blog.fourthbit.com/2014/12/23/traffic-analysis-of-an-ssl-slash-tls-session/
+// https://tls13.ulfheim.net/
 #define PAYLOAD_BYTESRC 8
 #define PAYLOAD_REGEX "^16030[0-3].{4}0[12]"
 

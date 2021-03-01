@@ -1086,6 +1086,7 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), DEFAULT_SRC_NET);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), DEFAULT_SRC_FS);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), DEFAULT_SRC_DNS);
+    assert_null            (cfgEvtFormatHeader(config));
     assert_int_equal       (cfgTransportType(config, CFG_MTC), DEFAULT_MTC_TYPE);
     assert_string_equal    (cfgTransportHost(config, CFG_MTC), DEFAULT_MTC_HOST);
     assert_string_equal    (cfgTransportPort(config, CFG_MTC), DEFAULT_MTC_PORT);
@@ -1346,7 +1347,7 @@ const char* jsonText =
     "      {'type':'console'},\n"
     "      {'type':'syslog'},\n"
     "      {'type':'metric'},\n"
-    "      {'type':'http'},\n"
+    "      {'type':'http', 'headers':'X-blah.*'},\n"
     "      {'type':'net'},\n"
     "      {'type':'fs'},\n"
     "      {'type':'dns'}\n"
@@ -1392,6 +1393,7 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), 1);
+    assert_string_equal(cfgEvtFormatHeader(config), "X-blah.*");
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), 1);

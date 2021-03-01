@@ -1832,7 +1832,8 @@ initEvtFormat(config_t *cfg)
     watch_t src;
     for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
         evtFormatSourceEnabledSet(evt, src,
-                   cfgEvtEnable(cfg) && cfgEvtFormatSourceEnabled(cfg, src));
+                                  cfgEvtEnable(cfg) &&
+                                  cfgEvtFormatSourceEnabled(cfg, src));
         evtFormatNameFilterSet(evt, src, cfgEvtFormatNameFilter(cfg, src));
         evtFormatFieldFilterSet(evt, src, cfgEvtFormatFieldFilter(cfg, src));
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
@@ -1936,36 +1937,6 @@ cfgLogStreamDefault(config_t *cfg)
         strncat(g_logmsg, "Event enable, ", 20);
     }
     cfgEvtEnableSet(cfg, (unsigned)1);
-
-    if (cfgEvtFormatSourceEnabled(cfg, CFG_SRC_FILE) == DEFAULT_SRC_FILE) {
-        strncat(g_logmsg, "File watch, ", 20);
-        cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_FILE, (unsigned)1);
-    }
-
-    if (cfgEvtFormatSourceEnabled(cfg, CFG_SRC_CONSOLE) == DEFAULT_SRC_CONSOLE) {
-        strncat(g_logmsg, "Console watch, ", 20);
-        cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_CONSOLE, (unsigned)1);
-    }
-
-    if (cfgEvtFormatSourceEnabled(cfg, CFG_SRC_HTTP) == DEFAULT_SRC_HTTP) {
-        strncat(g_logmsg, "HTTP watch, ", 20);
-        cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_HTTP, (unsigned)1);
-    }
-
-    if (cfgEvtFormatSourceEnabled(cfg, CFG_SRC_NET) == DEFAULT_SRC_NET) {
-        strncat(g_logmsg, "Net watch, ", 20);
-        cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_NET, (unsigned)1);
-    }
-
-    if (cfgEvtFormatSourceEnabled(cfg, CFG_SRC_FS) == DEFAULT_SRC_FS) {
-        strncat(g_logmsg, "FS watch, ", 20);
-        cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_FS, (unsigned)1);
-    }
-
-    if (cfgEvtFormatSourceEnabled(cfg, CFG_SRC_DNS) == DEFAULT_SRC_DNS) {
-        strncat(g_logmsg, "DNS watch, ", 20);
-        cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_DNS, (unsigned)1);
-    }
 
     if (cfgLogLevel(cfg) > CFG_LOG_WARN ) {
         strncat(g_logmsg, "Log level, ", 20);

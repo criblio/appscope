@@ -360,9 +360,9 @@ cfgEvtFormatHeader(config_t *cfg)
 }
 
 unsigned
-cfgEvtFormatSourceEnabled(config_t* cfg, watch_t src)
+cfgEvtFormatSourceEnabled(config_t *cfg, watch_t src)
 {
-    if (src >= 0 && src < CFG_SRC_MAX) {
+    if ((src >= 0) && (src < CFG_SRC_MAX)) {
         if (cfg) return cfg->evt.src[src];
         return srcEnabledDefault[src];
     }

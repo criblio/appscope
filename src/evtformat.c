@@ -263,10 +263,7 @@ evtFormatSourceEnabled(evt_fmt_t *evt, watch_t src)
 {
     if (src < CFG_SRC_MAX) {
 
-        if (evt) {
-            if (evt->enabled[src] == -1) return FALSE; 
-            return evt->enabled[src];
-        }
+        if (evt) return evt->enabled[src];
         return srcEnabledDefault[src];
     }
 

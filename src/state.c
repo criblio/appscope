@@ -2207,11 +2207,14 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
 
         if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) && ctlEnhanceFs(g_ctl)) {
             struct stat sbuf;
+            int errsave = errno;
+
             if ((g_fn.__xstat) && (g_fn.__xstat(1, g_fsinfo[fd].path, &sbuf) == 0)) {
                 g_fsinfo[fd].fuid = sbuf.st_uid;
                 g_fsinfo[fd].fgid = sbuf.st_gid;
                 g_fsinfo[fd].mode = sbuf.st_mode;
             }
+            errno = errsave;
         }
 
         doUpdateState(FS_OPEN, fd, 0, func, path);

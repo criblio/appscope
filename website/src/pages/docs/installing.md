@@ -33,10 +33,6 @@ The container provides the AppScope binary on Ubuntu 20.04.
 
 ### Explore the CLI
 
-Run `scope --help` or `scope -h` to view CLI options. Also see the complete [CLI Reference](/docs/cli-reference).
-
-
-
-### Next Steps
-
-Get into the CLI with the [Quick Start Guide](/docs/quick-start-guide).
+- Run `scope --help` or `scope -h` to view CLI options.
+- Try some basic CLI commands in [Using the CLI](/docs/quick-start-guide).
+- See the complete [CLI Reference](/docs/cli-reference).

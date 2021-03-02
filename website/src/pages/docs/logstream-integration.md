@@ -5,28 +5,44 @@ title: Integrating with LogStream
 ## Integrating with LogStream
 ---
 
-AppScope will connect to LogStream. A single configuration element is used to define a LogStream connection. The environment variable SCOPE_LOGSTREAM defines a LogStream connection:
+AppScope can easily connect to Cribl LogStream ([overview](https://cribl.io/product/) | [download](https://cribl.io/download/) | [docs](https://docs.cribl.io/docs/welcome)).
+
+To define a LogStream connection, the only configuration element needed is setting the `SCOPE_LOGSTREAM` environment variable. Here are some example definitions, which we'll unpack below:
+
+```
 SCOPE_LOGSTREAM=hostname:port
 SCOPE_LOGSTREAM=ip:port
 SCOPE_LOGSTREAM=tcp://ip:port
+```
 
-Default port is 10090
+### Requirements
 
-A host name or IPv4 address is supplied along with a port number. If no port number is supplied, the default port 10090 will be used. Optionally, the syntax “tcp://ip:port” is supported to define an IP address.
+You must supply a host name or IPv4 address, along with an optional port number. If you omit the port number, AppScope will attempt to connect on the default port `10090`. 
 
-When a LogStream connection is established, several configuration parameters are set and will override settings in a configuration file or environment variable. Any override of configuration is logged to the default AppScope log file.  The configuration settings that are not variable and potentially overridden include: 
-Metrics are enabled
-Metrics format is set to ndjson
-Events are enabled
-Transport for events, metrics and payloads utilize the LogStream connection
+### Optional TCP Syntax
 
-Configuration elements that are enabled by default when a LogStream connection is defined and can be overridden by a configuration file or environment variables:
-Event watch types are enabled
-File
-Console
-FS
-Net
-HTTP
-DNS
+You can optionally use the syntax `tcp://ip:port` to define an IP address.
 
-All other configuration elements remain default.
+
+### Parameter Overrides
+
+When AppScope establishes a LogStream connection, this sets several AppScope configuration parameters, some of which override settings in any configuration file or environment variable. Any configuration override is logged to AppScope's default log file. 
+
+Configuration settings that are potentially overridden include: 
+
+- Metrics are enabled.
+- Metrics format is set to `ndjson`.
+- Events are enabled.
+- Transport for events, metrics, and payloads use the LogStream connection.
+
+The following configuration elements are enabled by default when a LogStream connection is defined, but these can be overridden by a configuration file or by environment variables:
+
+- Event watch types
+- File
+- Console
+- FS
+- Net
+- HTTP
+- DNS
+
+Other configuration elements are not modified by a LogStream connection.

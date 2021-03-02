@@ -4,6 +4,24 @@ title: Changelog
 
 # Changelog
 
+## AppScope 0.6
+
+2021-03-02 - Maintenance Pre-Release
+
+This pre-release addresses the following issues:
+
+- **Improvement**: [#99](https://github.com/criblio/appscope/issues/99) Enable augmenting HTTP events with HTTP header and payload information
+- **Improvement**: [#38](https://github.com/criblio/appscope/issues/38) Disable (by default) TLS handshake info in payload capture
+- **Improvement**: [#36](https://github.com/criblio/appscope/issues/36) Enable sending running scope instances a signal to reload fresh configuration
+- **Improvement**: [#126](https://github.com/criblio/appscope/issues/126) Add Resolved IP Addresses list to a DNS response event
+- **Improvement**: [#100](https://github.com/criblio/appscope/issues/100) 
+Add `scope run` flags to facilitate sending scope data to third-party systems; also add a `scope k8s` command to facilitate installing a mutating admission webhook in a Kubernetes environment
+- **Improvement**: [#149](https://github.com/criblio/appscope/issues/149) 
+Apply tags set via environment variables to events, to match their application to metrics
+- **Fix**: [#37](https://github.com/criblio/appscope/issues/37) Capture DNS requests' payloads
+- **Fix**: [#2](https://github.com/criblio/appscope/issues/2) Enable scoping of scope
+- **Fix**: [#35](https://github.com/criblio/appscope/issues/35) Improve error messaging and logging when symbols are stripped from Go executables
+
 ## AppScope 0.5.1
 
 2021-02-05 - Maintenance Pre-Release

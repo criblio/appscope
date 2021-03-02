@@ -5,7 +5,7 @@ title: Installing
 ## Installing
 ---
 
-First, see [Requirements](/docs/requirements) to ensure that you’re completing these steps on a supported system. Next, getting started is easy.
+Getting started is easy. Install AppScope, then explore its CLI.
 
 ### Get AppScope
 
@@ -13,7 +13,9 @@ You can download as a binary to run on your Linux OS, or as a container.
 
 #### Download as Binary
 
-Use this command to download the CLI binary and make it executable:
+First, see [Requirements](/docs/requirements) to ensure that you’re completing these steps on a supported system. 
+
+Next, Use this command to download the CLI binary and make it executable:
 
 ```
 curl -Lo scope https://cdn.cribl.io/dl/scope/\

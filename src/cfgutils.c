@@ -816,6 +816,7 @@ cfgEvtFormatLogStreamSetFromStr(config_t *cfg, const char *value)
 {
     cfgLogStreamSet(cfg);
     cfgTransportSetFromStr(cfg, CFG_LS, value);
+    cfgTransportSetFromStr(cfg, CFG_CTL, value);
 }
 
 #ifndef NO_YAML

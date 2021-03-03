@@ -235,6 +235,18 @@ services:
         source: ./go/influx/db
         target: /go/influx/db
     privileged: true
+  go_16:
+    volumes:
+      - type: bind
+        source: ../../lib/linux/libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
+      - type: bind
+        source: ./go/influx/db
+        target: /go/influx/db
+    privileged: true
 
   java6:
     volumes:

@@ -574,6 +574,10 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
     unsigned long go_m = 0;
     char *go_g = NULL;
 
+    //grep "duration: " /tmp/scope.log | cut -d ":" -f 5 | jq -s min
+    //grep "duration: " /tmp/scope.log | cut -d ":" -f 5 | jq -s max
+    static uint64_t duration, initialTime;
+
     if (g_go_static) {
         // Get the Go routine's struct g
         __asm__ volatile (
@@ -601,6 +605,8 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 
         void *thread_fs = NULL;
         if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
+            // (4)
+            //initialTime = getTime();
             // Switch to the main thread TCB
             if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
                 scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
@@ -638,12 +644,19 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
 
-            sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
+            //sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
+            // (4)
+            //duration = getDuration(initialTime);
+            //sysprint("duration: %ld", duration);
         } else {
+            // (3)
+            //initialTime = getTime();
             if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
                 scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
                 goto out;
             }
+            //duration = getDuration(initialTime);
+            //sysprint("duration: %ld", duration);
         }
     }
 
@@ -662,10 +675,15 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 out:
     if (g_go_static && go_fs) {
         // Switch back to the 'm' TLS
+        // (2)
+        //if (duration != 0) sysprint("duration: %ld", duration);
+        //initialTime = getTime();
         if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
             scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
         }
+        //duration = getDuration(initialTime);
     }
+
     return return_addr(gfunc);
 }
 

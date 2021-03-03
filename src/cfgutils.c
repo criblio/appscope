@@ -1851,6 +1851,7 @@ initEvtFormat(config_t *cfg)
     evtFormatHeaderFilterSet(evt, cfgEvtFormatHeader(cfg));
 
     evtFormatRateLimitSet(evt, cfgEvtRateLimit(cfg));
+    evtFormatCustomTagsSet(evt, cfgCustomTags(cfg));
 
     return evt;
 }

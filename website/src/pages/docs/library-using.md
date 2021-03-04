@@ -50,4 +50,6 @@ This again executes the `ps` command using the AppScope library. But here, we al
 
 ### <span id="configuring">Configuring the Library</span>
 
-For details on configuring the library, see AppScope online help's CONFIGURATION section. For the default settings in the sample `scope.yml` configuration file, see [Config Files](/docs/config-files), or inspect the most-recent file on [GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).
+For a full list of library environment variables, execute: `./libscope.so all`
+
+For the default settings in the sample `scope.yml` configuration file, see [Config Files](/docs/config-files), or inspect the most-recent file on [GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).

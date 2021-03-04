@@ -415,6 +415,10 @@ doConfig(config_t *cfg)
     g_prevlog = g_log;
     g_prevctl = g_ctl;
 
+    if (cfgLogStream(cfg)) {
+        cfgLogStreamDefault(cfg);
+    }
+
     g_thread.interval = cfgMtcPeriod(cfg);
     setReportingInterval(cfgMtcPeriod(cfg));
     if (!g_thread.startTime) {
@@ -1070,10 +1074,6 @@ init(void)
     char *path = cfgPath();
     config_t *cfg = cfgRead(path);
     cfgProcessEnvironment(cfg);
-
-    if (cfgLogStream(cfg)) {
-        cfgLogStreamDefault(cfg);
-    }
 
     doConfig(cfg);
     g_staticfg = cfg;

@@ -106,14 +106,15 @@ void    ctlFlush(ctl_t *);
 int     ctlPostEvent(ctl_t *, char *);
 
 // Connection oriented stuff
-int              ctlNeedsConnection(ctl_t *);
-int              ctlConnection(ctl_t *);
-int              ctlConnect(ctl_t *);
-int              ctlDisconnect(ctl_t *);
-int              ctlReconnect(ctl_t *);
-void             ctlTransportSet(ctl_t *, transport_t *);
+int              ctlNeedsConnection(ctl_t *, which_transport_t);
+int              ctlConnection(ctl_t *, which_transport_t);
+int              ctlConnect(ctl_t *, which_transport_t);
+int              ctlDisconnect(ctl_t *, which_transport_t);
+int              ctlReconnect(ctl_t *, which_transport_t);
+void             ctlTransportSet(ctl_t *, transport_t *, which_transport_t);
+cfg_transport_t  ctlTransportType(ctl_t *, which_transport_t);
+transport_t *    ctlTransport(ctl_t *, which_transport_t);
 void             ctlEvtSet(ctl_t *, evt_fmt_t *);
-cfg_transport_t  ctlTransportType(ctl_t *);
 
 // Accessor for performance
 bool            ctlEvtSourceEnabled(ctl_t *, watch_t);

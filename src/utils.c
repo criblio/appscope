@@ -6,6 +6,9 @@
 #include "utils.h"
 #include "fn.h"
 #include "dbg.h"
+#include "runtimecfg.h"
+
+rtconfig g_cfg = {0};
 
 unsigned int
 strToVal(enum_map_t map[], const char *str)

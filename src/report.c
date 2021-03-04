@@ -2522,7 +2522,7 @@ doPayload()
 
             char *bdata = NULL;
 
-            if (checkEnv(LOGSTREAM, "true")) {
+            if (cfgLogStream(g_cfg.staticfg)) {
                 bdata = calloc(1, hlen + pinfo->len);
                 if (bdata) {
                     memmove(bdata, pay, hlen);

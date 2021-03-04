@@ -33,8 +33,6 @@
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
 
-rtconfig g_cfg = {0};
-
 static thread_timing g_thread = {0};
 static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
@@ -237,7 +235,7 @@ remoteConfig()
     int timeout;
     struct pollfd fds;
     int rc, success, numtries;
-    cfg_transport_t ttype = ctlTransportType(g_ctl);
+    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
@@ -253,7 +251,7 @@ remoteConfig()
         fds.events = POLLIN;
     }
 
-    fds.fd = ctlConnection(g_ctl);
+    fds.fd = ctlConnection(g_ctl, CFG_CTL);
 
     rc = g_fn.poll(&fds, 1, timeout);
 
@@ -286,7 +284,7 @@ remoteConfig()
         rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
         if (rc <= 0) {
             // Something has happened to our connection
-            ctlDisconnect(g_ctl);
+            ctlDisconnect(g_ctl, CFG_CTL);
             break;
         }
 
@@ -417,6 +415,10 @@ doConfig(config_t *cfg)
     g_prevlog = g_log;
     g_prevctl = g_ctl;
 
+    if (cfgLogStream(cfg)) {
+        cfgLogStreamDefault(cfg);
+    }
+
     g_thread.interval = cfgMtcPeriod(cfg);
     setReportingInterval(cfgMtcPeriod(cfg));
     if (!g_thread.startTime) {
@@ -431,10 +433,14 @@ doConfig(config_t *cfg)
     g_mtc = initMtc(cfg);
     g_ctl = initCtl(cfg);
 
+    if (cfgLogStream(cfg)) {
+        singleChannelSet(g_ctl, g_mtc);
+    }
+
     // Disconnect the old interfaces that were just replaced
     mtcDisconnect(g_prevmtc);
     logDisconnect(g_prevlog);
-    ctlDisconnect(g_prevctl);
+    ctlDisconnect(g_prevctl, CFG_CTL);
 }
 
 // Process dynamic config change if they are available
@@ -661,7 +667,8 @@ doReset()
 
     logReconnect(g_log);
     mtcReconnect(g_mtc);
-    ctlReconnect(g_ctl);
+    ctlReconnect(g_ctl, CFG_CTL);
+    ctlReconnect(g_ctl, CFG_LS);
 
     atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
 
@@ -794,7 +801,7 @@ periodic(void *arg)
             if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
             if (logNeedsConnection(g_log)) logConnect(g_log);
 
-            if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl) &&
+            if (ctlNeedsConnection(g_ctl, CFG_CTL) && ctlConnect(g_ctl, CFG_CTL) &&
                 g_sendprocessstart) {
                 // Hey we have a new connection!  Identify ourselves
                 // like reportProcessStart, but only on the event interface...
@@ -1059,14 +1066,15 @@ init(void)
 
     g_nsslist = lstCreate(freeNssEntry);
 
-    platform_time_t* time_struct = initTime();
+    platform_time_t *time_struct = initTime();
     if (time_struct->tsc_invariant == FALSE) {
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
 
-    char* path = cfgPath();
-    config_t* cfg = cfgRead(path);
+    char *path = cfgPath();
+    config_t *cfg = cfgRead(path);
     cfgProcessEnvironment(cfg);
+
     doConfig(cfg);
     g_staticfg = cfg;
     if (path) free(path);

@@ -630,13 +630,13 @@ cfgProcessEnvironmentTransport(void** state)
     // unrecognised value should not affect cfg
     assert_int_equal(setenv(data->env_name, "somewhere else", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_FILE);
+    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_TCP);
     assert_string_equal(cfgTransportPath(cfg, data->transport), "/some/path/somewhere");
 
     // port is required, if not there cfg should not be modified
     assert_int_equal(setenv(data->env_name, "udp://host", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_FILE);
+    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_TCP);
     assert_string_equal(cfgTransportPath(cfg, data->transport), "/some/path/somewhere");
 
     // Just don't crash on null cfg

@@ -4,6 +4,7 @@
 #include "dbg.h"
 #include "mtc.h"
 #include "circbuf.h"
+#include "runtimecfg.h"
 
 struct _mtc_t
 {
@@ -65,7 +66,7 @@ mtcSendMetric(mtc_t *mtc, event_t *evt)
 void
 mtcFlush(mtc_t *mtc)
 {
-    if (!mtc) return;
+    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return;
 
     transportFlush(mtc->transport);
 }
@@ -73,28 +74,29 @@ mtcFlush(mtc_t *mtc)
 int
 mtcNeedsConnection(mtc_t *mtc)
 {
-    if (!mtc) return 0;
+    // mtc & ctl use the same transport when LS is connected
+    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
     return transportNeedsConnection(mtc->transport);
 }
 
 int
 mtcConnect(mtc_t *mtc)
 {
-    if (!mtc) return 0;
+    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
     return transportConnect(mtc->transport);
 }
 
 int
 mtcDisconnect(mtc_t *mtc)
 {
-    if (!mtc) return 0;
+    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
     return transportDisconnect(mtc->transport);
 }
 
 int
 mtcReconnect(mtc_t *mtc)
 {
-    if (!mtc) return 0;
+    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
     return transportReconnect(mtc->transport);
 }
 

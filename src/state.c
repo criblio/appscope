@@ -950,7 +950,7 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     if (!buf || (len <= 0)) return -1;
 
     // if not connected to a LogStream try to not include TLS handshake in the payload
-    if ((checkEnv(LOGSTREAM, "true") == FALSE) && ((src == NETRX) || (src == NETTX))) {
+    if ((cfgLogStream(g_cfg.staticfg) == FALSE) && ((src == NETRX) || (src == NETTX))) {
         /*
          * the protocol state for this socket is either
          * PROT_NOTCHECKED: first time we've seen traffic on this connection.
@@ -2207,11 +2207,14 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
 
         if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) && ctlEnhanceFs(g_ctl)) {
             struct stat sbuf;
+            int errsave = errno;
+
             if ((g_fn.__xstat) && (g_fn.__xstat(1, g_fsinfo[fd].path, &sbuf) == 0)) {
                 g_fsinfo[fd].fuid = sbuf.st_uid;
                 g_fsinfo[fd].fgid = sbuf.st_gid;
                 g_fsinfo[fd].mode = sbuf.st_mode;
             }
+            errno = errsave;
         }
 
         doUpdateState(FS_OPEN, fd, 0, func, path);

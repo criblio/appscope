@@ -49,6 +49,11 @@ export SCOPE_PAYLOAD_HEADER=true
 
 evalPayload(){
     PAYLOADERR=0
+    if ! command -v hexdump; then
+        echo "hexdump is not available; skipping test of tls in payload files for $CURRENT_TEST"
+        return $PAYLOADERR
+    fi
+
     echo "Testing that payload files don't contain tls for $CURRENT_TEST"
     for FILE in $(ls /tmp/*in /tmp/*out 2>/dev/null); do
         # Continue if there aren't any .in or .out files

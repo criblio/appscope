@@ -602,7 +602,7 @@ ctlSendMsgForNullMessageDoesntCrash(void** state)
     assert_non_null(ctl);
     transport_t* t = transportCreateSyslog();
     assert_non_null(t);
-    ctlTransportSet(ctl, t);
+    ctlTransportSet(ctl, t, CFG_CTL);
     ctlSendMsg(ctl, NULL);
     ctlDestroy(&ctl);
 }
@@ -618,11 +618,11 @@ ctlTransportSetAndMtcSend(void** state)
     transport_t* t3 = transportCreateSyslog();
     transport_t* t4 = transportCreateShm();
     transport_t* t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
-    ctlTransportSet(ctl, t1);
-    ctlTransportSet(ctl, t2);
-    ctlTransportSet(ctl, t3);
-    ctlTransportSet(ctl, t4);
-    ctlTransportSet(ctl, t5);
+    ctlTransportSet(ctl, t1, CFG_CTL);
+    ctlTransportSet(ctl, t2, CFG_CTL);
+    ctlTransportSet(ctl, t3, CFG_CTL);
+    ctlTransportSet(ctl, t4, CFG_CTL);
+    ctlTransportSet(ctl, t5, CFG_CTL);
 
     // Test that transport is set by testing side effects of ctlSendMsg
     // affecting the file at file_path when connected to a file transport.
@@ -639,7 +639,7 @@ ctlTransportSetAndMtcSend(void** state)
     assert_int_not_equal(file_pos_before, file_pos_after);
 
     // Test that transport is cleared by seeing no side effects.
-    ctlTransportSet(ctl, NULL);
+    ctlTransportSet(ctl, NULL, CFG_CTL);
     file_pos_before = fileEndPosition(file_path);
     msg = strdup("Something else to send\n");
     ctlSendMsg(ctl, msg);

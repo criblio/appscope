@@ -51,3 +51,4 @@ ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV LD_PRELOAD=/opt/test-runner/bin/libscope.so
 
 CMD /opt/test-runner/bin/test-ssl.sh
+#ENTRYPOINT ["tail", "-f", "/dev/null"]

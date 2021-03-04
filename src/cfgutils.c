@@ -134,13 +134,15 @@ void cfgLogLevelSetFromStr(config_t*, const char*);
 void cfgPayEnableSetFromStr(config_t*, const char*);
 void cfgPayDirSetFromStr(config_t*, const char*);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
-static void cfgSetFromFile(config_t *config, const char *path);
+static void cfgSetFromFile(config_t *, const char *);
+static void cfgEvtFormatLogStreamSetFromStr(config_t *, const char *);
 
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
 static which_transport_t transport_context;
 static watch_t watch_context;
 static regex_t* g_regex = NULL;
+static char g_logmsg[1024] = {};
 
 static char*
 cfgPathSearch(const char* cfgname)
@@ -375,6 +377,10 @@ processReloadConfig(config_t *cfg, const char* value)
     if (path) free(path);
 
     cfgProcessEnvironment(cfg);
+
+    if (cfgLogStream(cfg)) {
+        cfgLogStreamDefault(cfg);
+    }
 }
 
 static int
@@ -507,7 +513,10 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FS, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DNS")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_DNS, value);
+    } else if (startsWith(env_line, "SCOPE_LOGSTREAM")) {
+        cfgEvtFormatLogStreamSetFromStr(cfg, value);
     }
+
 
     free(value);
 }
@@ -700,7 +709,7 @@ cfgMtcVerbositySetFromStr(config_t* cfg, const char* value)
 }
 
 void
-cfgTransportSetFromStr(config_t* cfg, which_transport_t t, const char* value)
+cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
 {
     if (!cfg || !value) return;
 
@@ -711,7 +720,7 @@ cfgTransportSetFromStr(config_t* cfg, which_transport_t t, const char* value)
         char value_cpy[1024];
         strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char* host = value_cpy + strlen("udp://");
+        char *host = value_cpy + strlen("udp://");
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -730,7 +739,7 @@ cfgTransportSetFromStr(config_t* cfg, which_transport_t t, const char* value)
         char value_cpy[1024];
         strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char* host = value_cpy + strlen("tcp://");
+        char *host = value_cpy + strlen("tcp://");
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -744,9 +753,32 @@ cfgTransportSetFromStr(config_t* cfg, which_transport_t t, const char* value)
         cfgTransportPortSet(cfg, t, port);
 
     } else if (value == strstr(value, "file://")) {
-        const char* path = value + strlen("file://");
+        const char *path = value + strlen("file://");
         cfgTransportTypeSet(cfg, t, CFG_FILE);
         cfgTransportPathSet(cfg, t, path);
+    } else {
+        // LS  is alwyas a TCP connection
+        // there is a case where SCOPE_LOGSTREAM="host:port"
+        // or SCOPE_LOGSTREAM="host"
+        // if SCOPE_LOGSTREAM="tcp://host:port" it's handled above
+        // if SCOPE_LOGSTREAM="udp://host:port" it will not connect
+        char *host, *port;
+        char value_cpy[1024];
+
+        // copied to avoid directly modifing the process's env variable
+        strncpy(value_cpy, value, sizeof(value_cpy));
+        host = value_cpy;
+
+        if ((port = strrchr(value_cpy, ':'))) {
+            *port = '\0';
+            port++;
+        } else {
+            port = strdup(DEFAULT_LS_PORT);
+        }
+
+        cfgTransportTypeSet(cfg, t, CFG_TCP);
+        cfgTransportHostSet(cfg, t, host);
+        cfgTransportPortSet(cfg, t, port);
     }
 }
 
@@ -777,6 +809,14 @@ cfgPayDirSetFromStr(config_t *cfg, const char *value)
 {
     if (!cfg || !value) return;
     cfgPayDirSet(cfg, value);
+}
+
+static void
+cfgEvtFormatLogStreamSetFromStr(config_t *cfg, const char *value)
+{
+    cfgLogStreamSet(cfg);
+    cfgTransportSetFromStr(cfg, CFG_LS, value);
+    cfgTransportSetFromStr(cfg, CFG_CTL, value);
 }
 
 #ifndef NO_YAML
@@ -1763,6 +1803,7 @@ initLog(config_t* cfg)
     }
     logTransportSet(log, t);
     logLevelSet(log, cfgLogLevel(cfg));
+
     return log;
 }
 
@@ -1800,7 +1841,8 @@ initEvtFormat(config_t *cfg)
     watch_t src;
     for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
         evtFormatSourceEnabledSet(evt, src,
-                   cfgEvtEnable(cfg) && cfgEvtFormatSourceEnabled(cfg, src));
+                                  cfgEvtEnable(cfg) &&
+                                  cfgEvtFormatSourceEnabled(cfg, src));
         evtFormatNameFilterSet(evt, src, cfgEvtFormatNameFilter(cfg, src));
         evtFormatFieldFilterSet(evt, src, cfgEvtFormatFieldFilter(cfg, src));
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
@@ -1814,7 +1856,7 @@ initEvtFormat(config_t *cfg)
     return evt;
 }
 
-ctl_t*
+ctl_t *
 initCtl(config_t *cfg)
 {
     ctl_t *ctl = ctlCreate();
@@ -1830,7 +1872,19 @@ initCtl(config_t *cfg)
         ctlDestroy(&ctl);
         return ctl;
     }
-    ctlTransportSet(ctl, trans);
+    ctlTransportSet(ctl, trans, CFG_CTL);
+
+    if (cfgLogStream(cfg) && cfgPayEnable(cfg)) {
+        transport_t *trans = initTransport(cfg, CFG_LS);
+        if (!trans) {
+            ctlDestroy(&ctl);
+            return ctl;
+        }
+
+        ctlTransportSet(ctl, trans, CFG_LS);
+    } else {
+        ctlTransportSet(ctl, NULL, CFG_LS);
+    }
 
     evt_fmt_t* evt = initEvtFormat(cfg);
     if (!evt) {
@@ -1844,6 +1898,81 @@ initCtl(config_t *cfg)
     ctlPayDirSet(ctl,    cfgPayDir(cfg));
 
     return ctl;
+}
+
+/*
+ * When connected to LogStream
+ * internal configuration, overriding default config, env vars 
+ * and the config file to:
+ *
+ * - use a single IP:port for events, metrics & remote commands
+ * - set metrics to use ndjson
+ * - use a separate connection over the single IP:port for payloads
+ * - include the abbreviated json header for payloads
+ * - watch types enabled for files, console, net, fs, http, dns
+ * - log level warning
+ * - all else uses defaults
+ */
+int
+cfgLogStreamDefault(config_t *cfg)
+{
+    if (!cfg || (cfgLogStream(cfg) == FALSE)) return -1;
+
+    const char *host = cfgTransportHost(cfg, CFG_LS);
+    const char *port = cfgTransportPort(cfg, CFG_LS);
+
+    if (!host || !port) return -1;
+
+    snprintf(g_logmsg, sizeof(g_logmsg), DEFAULT_LOGSTREAM_LOGMSG);
+
+    cfgTransportTypeSet(cfg, CFG_CTL, CFG_TCP);
+    cfgTransportHostSet(cfg, CFG_CTL, host);
+    cfgTransportPortSet(cfg, CFG_CTL, port);
+
+    cfgTransportTypeSet(cfg, CFG_MTC, CFG_TCP);
+    cfgTransportHostSet(cfg, CFG_MTC, host);
+    cfgTransportPortSet(cfg, CFG_MTC, port);
+
+    if (cfgMtcEnable(cfg) != TRUE) {
+        strncat(g_logmsg, "Metrics enable, ", 20);
+    }
+    cfgMtcEnableSet(cfg, (unsigned)1);
+
+    if (cfgMtcFormat(cfg) != TRUE) {
+        strncat(g_logmsg, "Metrics format, ", 20);
+    }
+    cfgMtcFormatSet(cfg, CFG_FMT_NDJSON);
+
+    if (cfgEvtEnable(cfg) != TRUE) {
+        strncat(g_logmsg, "Event enable, ", 20);
+    }
+    cfgEvtEnableSet(cfg, (unsigned)1);
+
+    if (cfgLogLevel(cfg) > CFG_LOG_WARN ) {
+        strncat(g_logmsg, "Log level, ", 20);
+        cfgLogLevelSet(cfg, CFG_LOG_WARN);
+    }
+
+    return 0;
+}
+
+int
+singleChannelSet(ctl_t *ctl, mtc_t *mtc)
+{
+    if (!ctl || !mtc) return -1;
+
+    // if any logs created during cfg send now
+    if (g_logmsg[0] != '\0') {
+        scopeLog(g_logmsg, -1, CFG_LOG_WARN);
+    }
+
+    transport_t *trans = ctlTransport(ctl, CFG_CTL);
+    if (trans) {
+        mtcTransportSet(mtc, trans);
+        return 0;
+    }
+
+    return -1;
 }
 
 /*

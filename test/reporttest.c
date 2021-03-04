@@ -12,10 +12,6 @@
 #include "state.h"
 #include "test.h"
 
-
-// Normally declared by wrap.c
-rtconfig g_cfg = {0};
-
 #define BUFSIZE 500
 
 event_t evtBuf[BUFSIZE] = {{0}};

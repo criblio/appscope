@@ -340,7 +340,32 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
              dbgInit(); // reset dbg for the rest of the tests
         } else {
              assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 0);
-             assert_int_equal(cfgEvtFormatSourceEnabled(config, i), 0);
+             // defaults are no longer all the same value.
+             switch (i) {
+             case CFG_SRC_FILE:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_FILE);
+                 break;
+             case CFG_SRC_SYSLOG:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_SYSLOG);
+                 break;
+             case CFG_SRC_CONSOLE:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_CONSOLE);
+                 break;
+             case CFG_SRC_METRIC:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_METRIC);
+                 break;
+             case CFG_SRC_HTTP:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_HTTP);
+                 break;
+             case CFG_SRC_NET:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_NET);
+                 break;
+             case CFG_SRC_FS:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_FS);
+                 break;
+             case CFG_SRC_DNS:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_DNS);
+                 break;             }
         }
     }
 

@@ -60,6 +60,7 @@ struct _config_t
     char* commanddir;
     unsigned processstartmsg;
     unsigned enhancefs;
+    bool logstream;
 };
 
 static const char* valueFilterDefault[] = {
@@ -110,30 +111,35 @@ static cfg_transport_t typeDefault[] = {
     DEFAULT_MTC_TYPE,
     DEFAULT_CTL_TYPE,
     DEFAULT_LOG_TYPE,
+    DEFAULT_LS_TYPE,
 };
 
 static const char* hostDefault[] = {
     DEFAULT_MTC_HOST,
     DEFAULT_CTL_HOST,
     DEFAULT_LOG_HOST,
+    DEFAULT_LS_HOST,
 };
 
 static const char* portDefault[] = {
     DEFAULT_MTC_PORT,
     DEFAULT_CTL_PORT,
     DEFAULT_LOG_PORT,
+    DEFAULT_LS_PORT,
 };
 
 static const char* pathDefault[] = {
     DEFAULT_MTC_PATH,
     DEFAULT_CTL_PATH,
     DEFAULT_LOG_PATH,
+    DEFAULT_LS_PATH,
 };
 
 static cfg_buffer_t bufDefault[] = {
     DEFAULT_MTC_BUF,
     DEFAULT_CTL_BUF,
     DEFAULT_LOG_BUF,
+    DEFAULT_LS_BUF,
 };
 
     
@@ -195,6 +201,7 @@ cfgCreateDefault()
     c->processstartmsg = DEFAULT_PROCESS_START_MSG;
     c->enhancefs = DEFAULT_ENHANCE_FS;
 
+    c->logstream = DEFAULT_LOGSTREAM;
     return c;
 }
 
@@ -353,9 +360,9 @@ cfgEvtFormatHeader(config_t *cfg)
 }
 
 unsigned
-cfgEvtFormatSourceEnabled(config_t* cfg, watch_t src)
+cfgEvtFormatSourceEnabled(config_t *cfg, watch_t src)
 {
-    if (src >= 0 && src < CFG_SRC_MAX) {
+    if ((src >= 0) && (src < CFG_SRC_MAX)) {
         if (cfg) return cfg->evt.src[src];
         return srcEnabledDefault[src];
     }
@@ -478,6 +485,12 @@ const char *
 cfgPayDir(config_t *cfg)
 {
     return (cfg) ? cfg->pay.dir : DEFAULT_PAYLOAD_DIR;
+}
+
+bool
+cfgLogStream(config_t *cfg)
+{
+    return (cfg) ? cfg->logstream : DEFAULT_LOGSTREAM;
 }
 
 ///////////////////////////////////
@@ -786,3 +799,8 @@ cfgPayDirSet(config_t *cfg, const char *dir)
     cfg->pay.dir = strdup(dir);
 }
 
+void
+cfgLogStreamSet(config_t *cfg)
+{
+    if (cfg) cfg->logstream = TRUE;
+}

@@ -10,30 +10,33 @@
 
 // cfgPath returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
-char* cfgPath(void);
+char * cfgPath(void);
 char *protocolPath(void);
 
 // reads cfg from yaml file
-config_t* cfgRead(const char* path);
+config_t * cfgRead(const char *);
 bool protocolRead(const char *, list_t *);
-void destroyProtEntry(void *data);
+void destroyProtEntry(void *);
 
 // reads cfg from a string (containing json or yaml)
-config_t* cfgFromString(const char* string);
+config_t * cfgFromString(const char *);
 
 // constructs a cJSON object heirarchy or json string
-cJSON* jsonObjectFromCfg(config_t* cfg);
-char* jsonStringFromCfg(config_t* cfg);
+cJSON * jsonObjectFromCfg(config_t *);
+char * jsonStringFromCfg(config_t *);
 
 // modify cfg per environment variables
-void cfgProcessEnvironment(config_t* cfg);
+void cfgProcessEnvironment(config_t *);
 
 // modify cfg per environment variable syntax in a file
-void cfgProcessCommands(config_t* cfg, FILE* file);
+void cfgProcessCommands(config_t *, FILE *);
 
-log_t* initLog(config_t* cfg);
-mtc_t* initMtc(config_t* cfg);
-evt_fmt_t* initEvtFormat(config_t* cfg);
-ctl_t* initCtl(config_t* cfg);
+log_t * initLog(config_t *);
+mtc_t * initMtc(config_t *);
+evt_fmt_t * initEvtFormat(config_t *);
+ctl_t * initCtl(config_t *);
+
+int cfgLogStreamDefault(config_t *);
+int singleChannelSet(ctl_t *, mtc_t *);
 
 #endif // __CFGUTILS_H__

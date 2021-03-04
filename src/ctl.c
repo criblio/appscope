@@ -11,6 +11,7 @@
 struct _ctl_t
 {
     transport_t *transport;
+    transport_t *paytrans;
     evt_fmt_t *evt;
     cbuf_handle_t events;
     cbuf_handle_t evbuf;
@@ -560,6 +561,7 @@ ctlDestroy(ctl_t **ctl)
     cbufFree((*ctl)->payload.ringbuf);
 
     transportDestroy(&(*ctl)->transport);
+    transportDestroy(&(*ctl)->paytrans);
     evtFormatDestroy(&(*ctl)->evt);
 
     free(*ctl);
@@ -772,6 +774,17 @@ ctlSendBin(ctl_t *ctl, char *buf, size_t len)
 {
     if (!ctl || !buf) return -1;
 
+    if (ctl->paytrans) {
+        if (ctlNeedsConnection(ctl, CFG_LS)) {
+            // wait for a connection?
+            // put the data back on the queue?
+            // else, we drop packets until connected
+            ctlConnect(ctl, CFG_LS);
+        }
+
+        return transportSend(ctl->paytrans, buf, len);
+    }
+
     return transportSend(ctl->transport, buf, len);
 }
 
@@ -790,59 +803,90 @@ ctlFlush(ctl_t *ctl)
 
     sendBufferedMessages(ctl);
     transportFlush(ctl->transport);
+    transportFlush(ctl->paytrans);
 }
 
 int
-ctlNeedsConnection(ctl_t *ctl)
+ctlNeedsConnection(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
-    return transportNeedsConnection(ctl->transport);
+
+    return ((who == CFG_LS) && (ctl->paytrans)) ?
+        transportNeedsConnection(ctl->paytrans) :
+        transportNeedsConnection(ctl->transport);
 }
 
 int
-ctlConnection(ctl_t *ctl)
+ctlConnection(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
-    return transportConnection(ctl->transport);
+
+    return ((who == CFG_LS) && (ctl->paytrans)) ?
+        transportConnection(ctl->paytrans) :
+        transportConnection(ctl->transport);
 }
 
 int
-ctlConnect(ctl_t *ctl)
+ctlConnect(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
-    return transportConnect(ctl->transport);
+
+    return ((who == CFG_LS) && (ctl->paytrans)) ?
+        transportConnect(ctl->paytrans) :
+        transportConnect(ctl->transport);
 }
 
 int
-ctlDisconnect(ctl_t *ctl)
+ctlDisconnect(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
-    return transportDisconnect(ctl->transport);
+
+    return ((who == CFG_LS) && (ctl->paytrans)) ?
+        transportDisconnect(ctl->paytrans) :
+        transportDisconnect(ctl->transport);
 }
 
 int
-ctlReconnect(ctl_t *ctl)
+ctlReconnect(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
-    return transportReconnect(ctl->transport);
+
+    return ((who == CFG_LS) && (ctl->paytrans)) ?
+        transportReconnect(ctl->paytrans) :
+        transportReconnect(ctl->transport);
 }
 
 void
-ctlTransportSet(ctl_t *ctl, transport_t *transport)
+ctlTransportSet(ctl_t *ctl, transport_t *transport, which_transport_t who)
 {
     if (!ctl) return;
 
-    // Don't leak if ctlTransportSet is called repeatedly
-    transportDestroy(&ctl->transport);
-    ctl->transport = transport;
+    if (who == CFG_LS) {
+        transportDestroy(&ctl->paytrans);
+        ctl->paytrans = transport;
+    } else {
+        // Don't leak if ctlTransportSet is called repeatedly
+        transportDestroy(&ctl->transport);
+        ctl->transport = transport;
+    }
+}
+
+transport_t *
+ctlTransport(ctl_t *ctl, which_transport_t who)
+{
+    if (!ctl) return NULL;
+
+    return (who == CFG_LS) ? ctl->paytrans : ctl->transport;
 }
 
 cfg_transport_t
-ctlTransportType(ctl_t *ctl)
+ctlTransportType(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return (cfg_transport_t)-1;
 
-    return transportType(ctl->transport);
+    return ((who == CFG_LS) && (ctl->paytrans)) ?
+        transportType(ctl->paytrans) :
+        transportType(ctl->transport);
 }
 
 void

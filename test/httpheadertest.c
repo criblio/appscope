@@ -19,7 +19,7 @@
 #define UNIX_SOCK_PATH "/tmp/headertestsock"
 
 extern void doProtocolMetric(protocol_info *);
-rtconfig g_cfg = {0};
+
 char *header_event = NULL;
  
 static int

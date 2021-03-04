@@ -6,8 +6,6 @@
 #include "test.h"
 #include "runtimecfg.h"
 
-rtconfig g_cfg = {0};
-
 static void
 cmdPostInfoMsgDoesNotCrash(void** state)
 {

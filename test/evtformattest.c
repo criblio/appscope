@@ -355,20 +355,20 @@ evtFormatLogWithSourceDisabledReturnsNull(void** state)
                       .cmd = "cmd-log",
                       .id = "host-evttest-cmd-4"};
 
-    // default is disabled
+    // default is enabled
     cJSON* json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
-    assert_null(json);
+    assert_non_null(json);
 
     // when enabled, we should get a non-null msg
-    evtFormatSourceEnabledSet(evt, CFG_SRC_CONSOLE, 1);
-    json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-    cJSON_Delete(json);
-
-    // Set it back to disabled, just to be sure.
     evtFormatSourceEnabledSet(evt, CFG_SRC_CONSOLE, 0);
     json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
     assert_null(json);
+    cJSON_Delete(json);
+
+    // Set it back to enabled, just to be sure.
+    evtFormatSourceEnabledSet(evt, CFG_SRC_CONSOLE, 1);
+    json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
+    assert_non_null(json);
 
     evtFormatDestroy(&evt);
 }
@@ -826,7 +826,7 @@ evtFormatSourceEnabledSetAndGet(void** state)
     for (i=CFG_SRC_FILE; i<CFG_SRC_MAX+1; i++) {
         evtFormatSourceEnabledSet(evt, i, 1);
         if (i >= CFG_SRC_MAX) {
-             assert_int_equal(evtFormatSourceEnabled(evt, i), DEFAULT_SRC_FILE);
+            assert_int_equal(evtFormatSourceEnabled(evt, i), DEFAULT_SRC_FILE);
              assert_int_equal(dbgCountMatchingLines("src/evtformat.c"), 1);
              dbgInit(); // reset dbg for the rest of the tests
         } else {

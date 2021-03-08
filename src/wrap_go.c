@@ -574,9 +574,12 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
     unsigned long go_m = 0;
     char *go_g = NULL;
 
+    size_t len = 300;  //2304; 1024
+    char go_save[300];
+
     //grep "duration: " /tmp/scope.log | cut -d ":" -f 5 | jq -s min
     //grep "duration: " /tmp/scope.log | cut -d ":" -f 5 | jq -s max
-    static uint64_t duration, initialTime;
+    //static uint64_t duration, initialTime;
 
     if (g_go_static) {
         // Get the Go routine's struct g
@@ -602,6 +605,8 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
         }
+
+        if (go_g) memcpy(go_save, go_g, len);
 
         void *thread_fs = NULL;
         if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
@@ -629,10 +634,11 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 
             thread_fs = (void *)thread;
 
-            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
-                goto out;
-            }
+            //if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
+            //    scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+            //    goto out;
+            //}
+            if (go_g) memcpy(go_g, thread_fs, len);
 
             if (pthread_barrier_destroy(&barrier) != 0) {
                 scopeLog("pthread_barrier_destroy failed", -1, CFG_LOG_ERROR);
@@ -651,10 +657,13 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
         } else {
             // (3)
             //initialTime = getTime();
+#if 0
             if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
                 scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
                 goto out;
             }
+#endif
+            if (go_g) memcpy(go_g, thread_fs, len);
             //duration = getDuration(initialTime);
             //sysprint("duration: %ld", duration);
         }
@@ -678,9 +687,12 @@ out:
         // (2)
         //if (duration != 0) sysprint("duration: %ld", duration);
         //initialTime = getTime();
-        if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
+#if 0
+        if (ggarch_prctl(ARCH_SET_FS, go_fs) == -1) {
             scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
         }
+#endif
+        if (go_g) memcpy(go_g, go_save, len);
         //duration = getDuration(initialTime);
     }
 
@@ -707,6 +719,7 @@ out:
 inline static void *
 go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
 {
+#if 0
     uint64_t rc;
     unsigned long go_tls = 0;
     unsigned long go_fs = 0;
@@ -817,6 +830,8 @@ out:
         }
     }
     return return_addr(gfunc);
+#endif
+    return NULL;
 }
 
 /*

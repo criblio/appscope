@@ -2467,17 +2467,25 @@ doPayload()
             net_info *net = &pinfo->net;
             size_t hlen = 1024;
             char pay[hlen];
-            char *srcstr = NULL, rx[]="rx", tx[]="tx", none[]="none";
+            char *srcstr = NULL,
+                netrx[]="netrx", nettx[]="nettx", none[]="none",
+                tlsrx[]="tlsrx", tlstx[]="tlstx";
 
             switch (pinfo->src) {
             case NETTX:
-            case TLSTX:
-                srcstr = tx;
+                srcstr = nettx;
                 break;
 
+            case TLSTX:
+                srcstr = tlstx;
+                 break;
+
             case NETRX:
+                srcstr = netrx;
+                break;
+
             case TLSRX:
-                srcstr = rx;
+                srcstr = tlsrx;
                 break;
 
             default:

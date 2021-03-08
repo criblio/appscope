@@ -7,6 +7,7 @@
 #include "cfgutils.h"
 #include "ctl.h"
 #include "dbg.h"
+#include "com.h"
 
 struct _ctl_t
 {
@@ -584,23 +585,31 @@ if (!msg) return;
     }
 }
 
-void
-ctlSendJson(ctl_t *ctl, cJSON *json)
+// send raw json (no envelope/messaging protocol), no buffering
+int
+ctlSendJson(ctl_t *ctl, cJSON *json, which_transport_t who)
 {
-    // This sends raw json (no envelope/messaging protocol)
-
-    if (!json) return;
+    if (!json) return -1;
     if (!ctl) {
         cJSON_Delete(json);
-        return;
+        return -1;
     }
 
-    char *streamMsg = cJSON_PrintUnformatted(json);
-    cJSON_Delete(json);
-    if (streamMsg) {
-        // put it on the ring buffer and send it
-        ctlSendMsg(ctl, streamMsg);
+    char *msg = cJSON_PrintUnformatted(json);
+
+    int rc = -1;
+    char *mnl;
+
+    if (msg && ((mnl = msgAddNewLine(msg)) != NULL)) {
+        if (who == CFG_LS) {
+            rc = transportSend(ctl->paytrans, mnl, strlen(mnl));
+        } else {
+            rc = transportSend(ctl->transport, mnl, strlen(mnl));
+        }
     }
+
+    cJSON_Delete(json);
+    return rc;
 }
 
 int

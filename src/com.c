@@ -1,10 +1,33 @@
 #define _GNU_SOURCE
+#include <string.h>
+
 #include "com.h"
 #include "dbg.h"
 
 extern rtconfig g_cfg;
 
 bool g_need_stack_expand = FALSE;
+
+// Add a newline delimiter to a msg
+char *
+msgAddNewLine(char *msg)
+{
+    if (!msg) return NULL;
+
+    int strsize = strlen(msg);
+    char *temp = realloc(msg, strsize + 2); // room for "\n\0"
+    if (!temp) {
+        DBG(NULL);
+        free(msg);
+        return NULL;
+    }
+
+    msg = temp;
+    msg[strsize] = '\n';
+    msg[strsize+1] = '\0';
+
+    return msg;
+}
 
 // for reporttest on mac __attribute__((weak))
 /*
@@ -131,8 +154,24 @@ jsonEnvironmentObject()
     // env variables???
 }
 
+void
+msgLogConfig(config_t *cfg)
+{
+    cJSON *json;
+
+    if (!(json = jsonConfigurationObject(cfg))) return;
+
+    char *cfg_text = cJSON_PrintUnformatted(json);
+
+    if (cfg_text) {
+        scopeLog(cfg_text, -1, CFG_LOG_INFO);
+    }
+
+    cJSON_Delete(json);
+}
+
 cJSON *
-msgStart(proc_id_t *proc, config_t *cfg)
+msgStart(proc_id_t *proc, config_t *cfg, which_transport_t who)
 {
     cJSON *json_root = NULL;
     cJSON *json_info;
@@ -140,7 +179,11 @@ msgStart(proc_id_t *proc, config_t *cfg)
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
-    if (!cJSON_AddStringToObjLN(json_root, "format", "ndjson")) goto err;
+    if (who == CFG_LS) {
+        if (!cJSON_AddStringToObjLN(json_root, "format", "appscope")) goto err;
+    } else {
+        if (!cJSON_AddStringToObjLN(json_root, "format", "ndjson")) goto err;
+    }
 
     if (!(json_info = cJSON_AddObjectToObjLN(json_root, "info"))) goto err;
 
@@ -153,12 +196,8 @@ msgStart(proc_id_t *proc, config_t *cfg)
     if (!(json_env = jsonEnvironmentObject())) goto err;
     cJSON_AddItemToObjectCS(json_info, "environment", json_env);
 
-    char *cfg_text = cJSON_PrintUnformatted(json_cfg);
-    if (cfg_text) {
-        scopeLog(cfg_text, -1, CFG_LOG_INFO);
-        free(cfg_text);
-    }
     return json_root;
+
 err:
     if (json_root) cJSON_Delete(json_root);
     return NULL;

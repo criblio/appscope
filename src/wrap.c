@@ -52,7 +52,7 @@ __thread int g_getdelim = 0;
 // Forward declaration
 static void *periodic(void *);
 static void doConfig(config_t *);
-static void reportProcessStart(void);
+static void reportProcessStart(bool);
 static void threadNow(int);
 
 #ifdef __LINUX__
@@ -672,7 +672,7 @@ doReset()
 
     atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
 
-    reportProcessStart();
+    reportProcessStart(TRUE);
     threadInit();
 }
 
@@ -802,13 +802,7 @@ periodic(void *arg)
             if (logNeedsConnection(g_log)) logConnect(g_log);
 
             if (ctlNeedsConnection(g_ctl, CFG_CTL) && ctlConnect(g_ctl, CFG_CTL) &&
-                g_sendprocessstart) {
-                // Hey we have a new connection!  Identify ourselves
-                // like reportProcessStart, but only on the event interface...
-                cJSON *json = msgStart(&g_proc, g_staticfg);
-                ctlSendJson(g_ctl, json);
-                ctlFlush(g_ctl);
-            }
+                g_sendprocessstart) reportProcessStart(FALSE);
 
             if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
                 reportPeriodicStuff();
@@ -829,25 +823,45 @@ periodic(void *arg)
     return NULL;
 }
 
+/*
+ * This is called in 3 contexts/use cases
+ * From the constructor
+ * From the child on a fork, before return to the child from fork
+ * From the periodic thread
+ *
+ * In all cases we send the json direct over the configured transport.
+ * No in-memory buffer or delay. Given this context it should be safe
+ * to send direct like this.
+ */
 static void
-reportProcessStart(void)
+reportProcessStart(bool init)
 {
-    // 1) Log it at startup, provided the loglevel is set to allow it
-    scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
-    char* cmd_w_args=NULL;
-    if (asprintf(&cmd_w_args, "command w/args: %s", g_proc.cmd) != -1) {
-        scopeLog(cmd_w_args, -1, CFG_LOG_INFO);
-        if (cmd_w_args) free(cmd_w_args);
+    // 1) Send a startup msg
+    if (g_sendprocessstart) {
+        cJSON *json = msgStart(&g_proc, g_staticfg, CFG_CTL);
+        ctlSendJson(g_ctl, json, CFG_CTL);
     }
 
-    // 2) Send a metric
-    sendProcessStartMetric();
+    // 2) send a payload start msg
+    if (g_sendprocessstart && cfgLogStream(g_staticfg) && cfgPayEnable(g_staticfg)) {
+        cJSON *json = msgStart(&g_proc, g_staticfg, CFG_LS);
+        ctlSendJson(g_ctl, json, CFG_LS);
+    }
 
-    // 3) Send a startup msg
-    if (g_sendprocessstart) {
-        cJSON *json = msgStart(&g_proc, g_staticfg);
-        ctlSendJson(g_ctl, json);
-        ctlFlush(g_ctl);
+    // only emit metric and log msgs at init time
+    if (init) {
+        // 3) Log it at startup, provided the loglevel is set to allow it
+        scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
+        char *cmd_w_args = NULL;
+        if (asprintf(&cmd_w_args, "command w/args: %s", g_proc.cmd) != -1) {
+            scopeLog(cmd_w_args, -1, CFG_LOG_INFO);
+            if (cmd_w_args) free(cmd_w_args);
+        }
+
+        msgLogConfig(g_staticfg);
+
+        // 4) Send a metric start; proc.start
+        sendProcessStartMetric();
     }
 }
 
@@ -1084,7 +1098,7 @@ init(void)
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
-    reportProcessStart();
+    reportProcessStart(TRUE);
 
     if (atexit(handleExit)) {
         DBG(NULL);

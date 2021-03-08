@@ -41,11 +41,3 @@ func Execute() {
 		os.Exit(1)
 	}
 }
-
-func init() {
-	cobra.OnInitialize(initConfig)
-}
-
-func initConfig() {
-	internal.InitConfig()
-}

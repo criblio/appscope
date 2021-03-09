@@ -180,7 +180,7 @@ msgStart(proc_id_t *proc, config_t *cfg, which_transport_t who)
     if (!(json_root = cJSON_CreateObject())) goto err;
 
     if (who == CFG_LS) {
-        if (!cJSON_AddStringToObjLN(json_root, "format", "appscope")) goto err;
+        if (!cJSON_AddStringToObjLN(json_root, "format", "scope")) goto err;
     } else {
         if (!cJSON_AddStringToObjLN(json_root, "format", "ndjson")) goto err;
     }

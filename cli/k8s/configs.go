@@ -151,6 +151,14 @@ spec:
       targetPort: {{ .Port }}
   selector:
     app: {{ .App }} 
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .App }}
+data:
+  scope.yml: |
+{{ .ScopeConfigYaml | toString | indent 4 }}
 `
 
 // - "k8s"

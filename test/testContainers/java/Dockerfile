@@ -18,22 +18,17 @@ RUN tar zxf apache-tomcat.tar.gz && \
     rm apache-tomcat.tar.gz && \
     mv apache-tomcat* $CATALINA_HOME
 
-RUN mkdir /opt/tomcat/certs && \
-    mkdir -p /opt/test-runner/logs && \
-    mkdir -p /opt/test-runner/bin
+RUN mkdir /opt/tomcat/certs /opt/test-runner/logs /opt/test-runner/bin
 
 RUN ${KEYTOOL} -genkey -alias "tomcat" -dname "CN=scope,O=cribl" -keyalg RSA -storetype pkcs12 -keystore /opt/tomcat/certs/tomcat.p12 -storepass changeit -keypass changeit
 
 COPY ./java/server.xml $CATALINA_HOME/conf/server.xml
 COPY ./java/test-ssl.sh /opt/test-runner/bin/test-ssl.sh
-RUN chmod +x /opt/test-runner/bin/test-ssl.sh
 
 RUN mkdir -p /opt/javassl
 COPY ./java/SSLSocketClient.java /opt/javassl/SSLSocketClient.java
 RUN javac -d /opt/javassl/ /opt/javassl/SSLSocketClient.java
 
-#ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
-#RUN chmod 755 /usr/lib/libscope.so
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=false

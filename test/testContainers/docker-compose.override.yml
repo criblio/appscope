@@ -1,88 +1,37 @@
 version: '3.5'
 services:
-  interposed_func:
+  interposed_func: &testRunnerOpts
     command: -s /opt/test-runner/bin/libscope.so
     volumes:
       - ./logs:/opt/test-runner/logs
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /opt/test-runner/bin/libscope.so
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     privileged: true
 
-  cribl:
-    command: -s /opt/test-runner/bin/libscope.so
-    volumes:
-      - ./logs:/opt/test-runner/logs
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /opt/test-runner/bin/libscope.so
-    privileged: true
-
-  nginx:
-    command: -s /opt/test-runner/bin/libscope.so
-    volumes:
-      - ./logs:/opt/test-runner/logs
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /opt/test-runner/bin/libscope.so
-    privileged: true
-
-  splunk:
-    command: -s /opt/test-runner/bin/libscope.so
-    volumes:
-      - ./logs:/opt/test-runner/logs
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /opt/test-runner/bin/libscope.so
-    privileged: true
-
-  elastic:
-    command: -s /opt/test-runner/bin/libscope.so
-    volumes:
-      - ./logs:/opt/test-runner/logs
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /opt/test-runner/bin/libscope.so
-    privileged: true
-
-  kafka:
-    command: -s /opt/test-runner/bin/libscope.so
-    volumes:
-      - ./logs:/opt/test-runner/logs
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /opt/test-runner/bin/libscope.so
-    privileged: true
+  cribl: *testRunnerOpts
+  nginx: *testRunnerOpts
+  splunk: *testRunnerOpts
+  elastic: *testRunnerOpts
+  kafka: *testRunnerOpts
 
   tls:
     volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /opt/test-runner/bin/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
+      - ../../bin/linux/ldscope:/usr/bin/ldscope
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
     privileged: true
 
   detect_proto:
     volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /opt/test-runner/bin/libscope.so
+      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
     privileged: true
 
   gogen:
     volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
+      - ../../lib/linux/libscope.so:/usr/lib/libscope.so
+      - ../../bin/linux/ldscope:/usr/bin/ldscope
     privileged: true
 
   go_2:

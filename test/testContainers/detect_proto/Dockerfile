@@ -1,31 +1,14 @@
 FROM centos:latest
 
-RUN yum -y update
-RUN yum -y install epel-release
-RUN yum -y install redis
-RUN yum -y install wget
-RUN yum -y install gdb
-RUN yum -y install openssl
-
 COPY mongodb.repo /etc/yum.repos.d/.
-RUN yum -y install mongodb-org
+RUN yum -y install epel-release redis wget gdb openssl mongodb-org \
+  && yum clean all \
+  && mkdir -p /opt/test-runner/logs /opt/test-runner/bin
 
-RUN mkdir /opt/test-runner/
-RUN mkdir /opt/test-runner/logs/
-RUN mkdir /opt/test-runner/bin
+COPY mongod.conf /etc/
+COPY test_protocols.sh mongo.js scope_protocol.yml /opt/test-runner/bin/
 
-COPY mongod.conf /etc/.
-COPY scope_protocol.yml /opt/test-runner/bin/.
-COPY mongo.js /opt/test-runner/bin/.
-
-#ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
-#RUN chmod 755 /usr/lib/libscope.so
-
-COPY test_protocols.sh /opt/test-runner/bin/test_protocols.sh
-RUN chmod +x /opt/test-runner/bin/test_protocols.sh
-
-ADD entrypoint.sh /sbin/entrypoint.sh
-ADD loaddata.sh /sbin/loaddata.sh
+COPY loaddata.sh entrypoint.sh /sbin/
 ADD session.csv /data/session.csv
 
 RUN /usr/lib/systemd/systemd --system &

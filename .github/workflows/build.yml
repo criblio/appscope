@@ -13,7 +13,7 @@ jobs:
       - run: make deps
       - run: make all
       - run: make test
-      # - run: cd test/testContainers && docker-compose up
+      - run: cd test/testContainers && docker-compose up cribl detect_proto elastic gogen interposed_func kafka nginx splunk tls
       - env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

@@ -603,12 +603,12 @@ ctlSendJson(ctl_t *ctl, cJSON *json, which_transport_t who)
     if (msg && ((mnl = msgAddNewLine(msg)) != NULL)) {
         if (who == CFG_LS) {
             if (ctlNeedsConnection(ctl, CFG_LS)) {
-                if (ctlConnect(ctl, CFG_LS)) reportProcessStart(ctl, FALSE, CFG_LS);
+                ctlConnect(ctl, CFG_LS);
             }
             rc = transportSend(ctl->paytrans, mnl, strlen(mnl));
         } else {
             if (ctlNeedsConnection(ctl, CFG_CTL)) {
-                if (ctlConnect(ctl, CFG_CTL)) reportProcessStart(ctl, FALSE, CFG_CTL);
+                ctlConnect(ctl, CFG_CTL);
             }
             rc = transportSend(ctl->transport, mnl, strlen(mnl));
         }
@@ -795,10 +795,6 @@ ctlSendBin(ctl_t *ctl, char *buf, size_t len)
         }
 
         return transportSend(ctl->paytrans, buf, len);
-    }
-
-    if (ctlNeedsConnection(ctl, CFG_CTL)) {
-        if (ctlConnect(ctl, CFG_CTL)) reportProcessStart(ctl, FALSE, CFG_CTL);
     }
 
     return transportSend(ctl->transport, buf, len);

@@ -2412,8 +2412,8 @@ doEvent()
     }
 
     if (ready == FALSE) {
-        if (ctlNeedsConnection(g_ctl, CFG_MTC)) {
-            if (ctlConnect(g_ctl, CFG_MTC)) {
+        if (mtcNeedsConnection(g_mtc)) {
+            if (mtcConnect(g_mtc)) {
                 ready = TRUE;
             }
         } else {

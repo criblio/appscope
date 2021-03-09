@@ -3,12 +3,13 @@
 
 #include "com.h"
 #include "dbg.h"
-#include "report.h"
-
-extern rtconfig g_cfg;
 
 bool g_need_stack_expand = FALSE;
 unsigned g_sendprocessstart = 0;
+
+// interfaces
+mtc_t *g_mtc = NULL;
+ctl_t *g_ctl = NULL;
 
 // Add a newline delimiter to a msg
 char *
@@ -31,6 +32,23 @@ msgAddNewLine(char *msg)
     return msg;
 }
 
+void
+sendProcessStartMetric()
+{
+    char *urlEncodedCmd = fmtUrlEncode(g_proc.cmd);
+    event_field_t fields[] = {
+        STRFIELD("proc", (g_proc.procname), 4, TRUE),
+        NUMFIELD("pid", (g_proc.pid), 4, TRUE),
+        STRFIELD("host", (g_proc.hostname), 4, TRUE),
+        STRFIELD("args", (urlEncodedCmd), 7, TRUE),
+        STRFIELD("unit", ("process"), 1, TRUE),
+        FIELDEND
+    };
+    event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
+    cmdSendMetric(g_mtc, &evt);
+    if (urlEncodedCmd) free(urlEncodedCmd);
+}
+
 /*
  * This is called in 3 contexts/use cases
  * From the constructor
@@ -42,16 +60,17 @@ msgAddNewLine(char *msg)
  * to send direct like this.
  */
 void
-reportProcessStart(ctl_t *ctl, bool init)
+reportProcessStart(ctl_t *ctl, bool init, which_transport_t who)
 {
     // 1) Send a startup msg
-    if (g_sendprocessstart) {
+    if (g_sendprocessstart && ((who == CFG_CTL) || (who == CFG_WHICH_MAX))) {
         cJSON *json = msgStart(&g_proc, g_cfg.staticfg, CFG_CTL);
         ctlSendJson(ctl, json, CFG_CTL);
     }
 
     // 2) send a payload start msg
-    if (g_sendprocessstart && cfgLogStream(g_cfg.staticfg) && cfgPayEnable(g_cfg.staticfg)) {
+    if (g_sendprocessstart && ((who == CFG_LS) || (who == CFG_WHICH_MAX)) &&
+        cfgLogStream(g_cfg.staticfg) && cfgPayEnable(g_cfg.staticfg)) {
         cJSON *json = msgStart(&g_proc, g_cfg.staticfg, CFG_LS);
         ctlSendJson(ctl, json, CFG_LS);
     }

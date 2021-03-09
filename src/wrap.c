@@ -53,7 +53,6 @@ __thread int g_getdelim = 0;
 // Forward declaration
 static void *periodic(void *);
 static void doConfig(config_t *);
-//void reportProcessStart(ctl_t *, bool);
 static void threadNow(int);
 
 #ifdef __LINUX__
@@ -673,7 +672,7 @@ doReset()
 
     atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
 
-    reportProcessStart(g_ctl, TRUE);
+    reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
     threadInit();
 }
 
@@ -802,9 +801,6 @@ periodic(void *arg)
             if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
             if (logNeedsConnection(g_log)) logConnect(g_log);
 
-            if (ctlNeedsConnection(g_ctl, CFG_CTL) && ctlConnect(g_ctl, CFG_CTL) &&
-                g_sendprocessstart) reportProcessStart(g_ctl, FALSE);
-
             if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
                 reportPeriodicStuff();
                 atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
@@ -823,49 +819,7 @@ periodic(void *arg)
 
     return NULL;
 }
-#if 0
-/*
- * This is called in 3 contexts/use cases
- * From the constructor
- * From the child on a fork, before return to the child from fork
- * From the periodic thread
- *
- * In all cases we send the json direct over the configured transport.
- * No in-memory buffer or delay. Given this context it should be safe
- * to send direct like this.
- */
-static void
-reportProcessStart(bool init)
-{
-    // 1) Send a startup msg
-    if (g_sendprocessstart) {
-        cJSON *json = msgStart(&g_proc, g_staticfg, CFG_CTL);
-        ctlSendJson(g_ctl, json, CFG_CTL);
-    }
 
-    // 2) send a payload start msg
-    if (g_sendprocessstart && cfgLogStream(g_staticfg) && cfgPayEnable(g_staticfg)) {
-        cJSON *json = msgStart(&g_proc, g_staticfg, CFG_LS);
-        ctlSendJson(g_ctl, json, CFG_LS);
-    }
-
-    // only emit metric and log msgs at init time
-    if (init) {
-        // 3) Log it at startup, provided the loglevel is set to allow it
-        scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
-        char *cmd_w_args = NULL;
-        if (asprintf(&cmd_w_args, "command w/args: %s", g_proc.cmd) != -1) {
-            scopeLog(cmd_w_args, -1, CFG_LOG_INFO);
-            if (cmd_w_args) free(cmd_w_args);
-        }
-
-        msgLogConfig(g_staticfg);
-
-        // 4) Send a metric start; proc.start
-        sendProcessStartMetric();
-    }
-}
-#endif
 // TODO; should this move to os/linux/os.c?
 #ifdef __LINUX__
 void *
@@ -1099,7 +1053,7 @@ init(void)
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
-    reportProcessStart(g_ctl, TRUE);
+    reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
 
     if (atexit(handleExit)) {
         DBG(NULL);

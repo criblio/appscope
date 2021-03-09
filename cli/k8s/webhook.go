@@ -45,7 +45,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 		log.Debug().Interface("pod", pod).Msgf("modifying pod")
 		cmd := []string{
 			"/usr/local/bin/scope",
-			"execrete",
+			"excrete",
 		}
 		if len(app.CriblDest) > 0 {
 			cmd = append(cmd,

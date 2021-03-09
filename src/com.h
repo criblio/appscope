@@ -19,6 +19,7 @@
 #define PCRE_STACK_SIZE (32 * 1024)
 
 extern bool g_need_stack_expand;
+extern unsigned g_sendprocessstart;
 
 // Post a message from report to the command buffer
 int cmdSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);
@@ -40,6 +41,7 @@ request_t *cmdParse(const char *);
 cJSON *msgStart(proc_id_t *, config_t *, which_transport_t);
 char *msgAddNewLine(char *);
 void msgLogConfig(config_t *);
+void reportProcessStart(ctl_t *, bool);
 
 // Create a json object describing the current configuration
 cJSON *jsonConfigurationObject(config_t *);

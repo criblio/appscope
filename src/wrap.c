@@ -40,9 +40,10 @@ static mtc_t *g_prevmtc = NULL;
 static ctl_t *g_prevctl = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
-static unsigned g_sendprocessstart;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
+
+unsigned g_sendprocessstart;
 
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
@@ -52,7 +53,7 @@ __thread int g_getdelim = 0;
 // Forward declaration
 static void *periodic(void *);
 static void doConfig(config_t *);
-static void reportProcessStart(bool);
+//void reportProcessStart(ctl_t *, bool);
 static void threadNow(int);
 
 #ifdef __LINUX__
@@ -672,7 +673,7 @@ doReset()
 
     atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
 
-    reportProcessStart(TRUE);
+    reportProcessStart(g_ctl, TRUE);
     threadInit();
 }
 
@@ -802,7 +803,7 @@ periodic(void *arg)
             if (logNeedsConnection(g_log)) logConnect(g_log);
 
             if (ctlNeedsConnection(g_ctl, CFG_CTL) && ctlConnect(g_ctl, CFG_CTL) &&
-                g_sendprocessstart) reportProcessStart(FALSE);
+                g_sendprocessstart) reportProcessStart(g_ctl, FALSE);
 
             if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
                 reportPeriodicStuff();
@@ -822,7 +823,7 @@ periodic(void *arg)
 
     return NULL;
 }
-
+#if 0
 /*
  * This is called in 3 contexts/use cases
  * From the constructor
@@ -864,7 +865,7 @@ reportProcessStart(bool init)
         sendProcessStartMetric();
     }
 }
-
+#endif
 // TODO; should this move to os/linux/os.c?
 #ifdef __LINUX__
 void *
@@ -1098,7 +1099,7 @@ init(void)
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
-    reportProcessStart(TRUE);
+    reportProcessStart(g_ctl, TRUE);
 
     if (atexit(handleExit)) {
         DBG(NULL);

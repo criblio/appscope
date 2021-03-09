@@ -3,10 +3,12 @@
 
 #include "com.h"
 #include "dbg.h"
+#include "report.h"
 
 extern rtconfig g_cfg;
 
 bool g_need_stack_expand = FALSE;
+unsigned g_sendprocessstart = 0;
 
 // Add a newline delimiter to a msg
 char *
@@ -27,6 +29,48 @@ msgAddNewLine(char *msg)
     msg[strsize+1] = '\0';
 
     return msg;
+}
+
+/*
+ * This is called in 3 contexts/use cases
+ * From the constructor
+ * From the child on a fork, before return to the child from fork
+ * From the periodic thread
+ *
+ * In all cases we send the json direct over the configured transport.
+ * No in-memory buffer or delay. Given this context it should be safe
+ * to send direct like this.
+ */
+void
+reportProcessStart(ctl_t *ctl, bool init)
+{
+    // 1) Send a startup msg
+    if (g_sendprocessstart) {
+        cJSON *json = msgStart(&g_proc, g_cfg.staticfg, CFG_CTL);
+        ctlSendJson(ctl, json, CFG_CTL);
+    }
+
+    // 2) send a payload start msg
+    if (g_sendprocessstart && cfgLogStream(g_cfg.staticfg) && cfgPayEnable(g_cfg.staticfg)) {
+        cJSON *json = msgStart(&g_proc, g_cfg.staticfg, CFG_LS);
+        ctlSendJson(ctl, json, CFG_LS);
+    }
+
+    // only emit metric and log msgs at init time
+    if (init) {
+        // 3) Log it at startup, provided the loglevel is set to allow it
+        scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
+        char *cmd_w_args = NULL;
+        if (asprintf(&cmd_w_args, "command w/args: %s", g_proc.cmd) != -1) {
+            scopeLog(cmd_w_args, -1, CFG_LOG_INFO);
+            if (cmd_w_args) free(cmd_w_args);
+        }
+
+        msgLogConfig(g_cfg.staticfg);
+
+        // 4) Send a metric start; proc.start
+        sendProcessStartMetric();
+    }
 }
 
 // for reporttest on mac __attribute__((weak))

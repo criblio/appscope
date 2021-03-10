@@ -800,7 +800,7 @@ cfgPayDirSet(config_t *cfg, const char *dir)
 }
 
 void
-cfgLogStreamSet(config_t *cfg)
+cfgLogStreamSet(config_t *cfg, bool value)
 {
-    if (cfg) cfg->logstream = TRUE;
+    if (cfg) cfg->logstream = value;
 }

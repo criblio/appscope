@@ -60,6 +60,10 @@
 #define ENABLE_NODE              "enable"
 #define DIR_NODE                 "dir"
 
+#define CRIBL_NODE          "cribl"
+#define ENABLE_NODE              "enable"
+#define TRANSPORT_NODE           "transport"
+
 
 enum_map_t formatMap[] = {
     {"statsd",                CFG_FMT_STATSD},
@@ -136,6 +140,7 @@ void cfgPayDirSetFromStr(config_t*, const char*);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 static void cfgSetFromFile(config_t *, const char *);
 static void cfgEvtFormatLogStreamSetFromStr(config_t *, const char *);
+static void cfgCriblEnableSetFromStr(config_t *, const char *);
 
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
@@ -513,7 +518,7 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FS, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DNS")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_DNS, value);
-    } else if (startsWith(env_line, "SCOPE_LOGSTREAM")) {
+    } else if (startsWith(env_line, "SCOPE_CRIBL")) {
         cfgEvtFormatLogStreamSetFromStr(cfg, value);
     }
 
@@ -756,29 +761,6 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         const char *path = value + strlen("file://");
         cfgTransportTypeSet(cfg, t, CFG_FILE);
         cfgTransportPathSet(cfg, t, path);
-    } else {
-        // LS  is alwyas a TCP connection
-        // there is a case where SCOPE_LOGSTREAM="host:port"
-        // or SCOPE_LOGSTREAM="host"
-        // if SCOPE_LOGSTREAM="tcp://host:port" it's handled above
-        // if SCOPE_LOGSTREAM="udp://host:port" it will not connect
-        char *host, *port;
-        char value_cpy[1024];
-
-        // copied to avoid directly modifing the process's env variable
-        strncpy(value_cpy, value, sizeof(value_cpy));
-        host = value_cpy;
-
-        if ((port = strrchr(value_cpy, ':'))) {
-            *port = '\0';
-            port++;
-        } else {
-            port = strdup(DEFAULT_LS_PORT);
-        }
-
-        cfgTransportTypeSet(cfg, t, CFG_TCP);
-        cfgTransportHostSet(cfg, t, host);
-        cfgTransportPortSet(cfg, t, port);
     }
 }
 
@@ -811,10 +793,17 @@ cfgPayDirSetFromStr(config_t *cfg, const char *value)
     cfgPayDirSet(cfg, value);
 }
 
+void
+cfgCriblEnableSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgLogStreamSet(cfg, strToVal(boolMap, value));
+}
+
 static void
 cfgEvtFormatLogStreamSetFromStr(config_t *cfg, const char *value)
 {
-    cfgLogStreamSet(cfg);
+    cfgLogStreamSet(cfg, 1);
     cfgTransportSetFromStr(cfg, CFG_LS, value);
     cfgTransportSetFromStr(cfg, CFG_CTL, value);
 }
@@ -1336,9 +1325,47 @@ processPayload(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 }
 
 static void
+processCriblEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char *value = stringVal(node);
+    cfgCriblEnableSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
+processCriblTransport(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    transport_context = CFG_LS;
+    processTransport(config, doc, node);
+
+
+    if (cfgLogStream(config)) {
+        transport_context = CFG_CTL;
+        processTransport(config, doc, node);
+    }
+}
+
+static void
+processCribl(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE,    ENABLE_NODE,          processCriblEnable},
+        {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processCriblTransport},
+        {YAML_NO_NODE,        NULL,                 NULL}
+    };
+
+    yaml_node_pair_t *pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
+static void
 setConfigFromDoc(config_t* config, yaml_document_t* doc)
 {
-    yaml_node_t* node = yaml_document_get_root_node(doc);
+    yaml_node_t *node = yaml_document_get_root_node(doc);
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
@@ -1346,10 +1373,11 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
         {YAML_MAPPING_NODE,   LIBSCOPE_NODE,        processLibscope},
         {YAML_MAPPING_NODE,   PAYLOAD_NODE,         processPayload},
         {YAML_MAPPING_NODE,   EVENT_NODE,           processEvent},
+        {YAML_MAPPING_NODE,   CRIBL_NODE,           processCribl},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
-    yaml_node_pair_t* pair;
+    yaml_node_pair_t *pair;
     foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }

@@ -125,4 +125,11 @@ libscope:
       type: file
       path: '/tmp/scope.log'
       buffering: line               # line, full
+
+cribl:
+  enable: false
+  transport:
+    type: tcp
+    host: 127.0.0.1
+    port: 10090
 ...

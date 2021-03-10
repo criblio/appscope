@@ -70,6 +70,6 @@ void                cfgLogLevelSet(config_t*, cfg_log_level_t);
 void                cfgPayEnableSet(config_t*, unsigned int);
 void                cfgPayDirSet(config_t*, const char *);
 void                cfgEvtFormatHeaderSet(config_t *, const char *);
-void                cfgLogStreamSet(config_t *);
+void                cfgLogStreamSet(config_t *, bool);
 
 #endif // __CFG_H__

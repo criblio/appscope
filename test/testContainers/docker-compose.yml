@@ -71,7 +71,7 @@ services:
     build:
       context: go
       args:
-        GO_VERSION: '1.2'
+        GO_VERSION: '1.2.2'
   go_3:
     build:
       context: go

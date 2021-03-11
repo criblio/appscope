@@ -75,11 +75,11 @@ evalPayload(){
 }
 
 checkFile() {
-    grep $1 $EVT_FILE | grep -q
+    grep $1 $EVT_FILE | grep -q http-req
     ERR+=$?
-    grep $1 $EVT_FILE | grep -q
+    grep $1 $EVT_FILE | grep -q http-resp
     ERR+=$?
-    grep $1 $EVT_FILE | grep -q
+    grep $1 $EVT_FILE | grep -q http-metrics
     ERR+=$?
 }
 

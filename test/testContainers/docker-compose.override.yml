@@ -34,168 +34,37 @@ services:
       - ../../bin/linux/ldscope:/usr/bin/ldscope
     privileged: true
 
-  go_2:
+  go_2: &goUnsupportedOpts
     volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
+      - ../../lib/linux/libscope.so:/usr/lib/libscope.so
+      - ../../bin/linux/ldscope:/usr/bin/ldscope
+      - ./logs/:/testlogs/
+    command: /go/unsupported/test_go.sh
     privileged: true
-  go_3:
+    environment:
+      - SCOPE_LOG_LEVEL=warning
+      - SCOPE_LOG_DEST=file:///go/logs.txt
+  go_3: *goUnsupportedOpts
+  go_4: *goUnsupportedOpts
+  go_5: *goUnsupportedOpts
+  go_6: *goUnsupportedOpts
+  go_7: *goUnsupportedOpts
+
+  go_8: &goOpts
     volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
+      - ../../lib/linux/libscope.so:/usr/lib/libscope.so
+      - ../../bin/linux/ldscope:/usr/bin/ldscope
+      - ./go/influx/db:/go/influx/db
     privileged: true
-  go_4:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-    privileged: true
-  go_5:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-    privileged: true
-  go_6:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-    privileged: true
-  go_7:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-    privileged: true
-  go_8:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-      - type: bind
-        source: ./go/influx/db
-        target: /go/influx/db
-    privileged: true
-  go_9:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-      - type: bind
-        source: ./go/influx/db
-        target: /go/influx/db
-    privileged: true
-  go_10:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-      - type: bind
-        source: ./go/influx/db
-        target: /go/influx/db
-    privileged: true
-  go_11:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-      - type: bind
-        source: ./go/influx/db
-        target: /go/influx/db
-    privileged: true
-  go_12:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-      - type: bind
-        source: ./go/influx/db
-        target: /go/influx/db
-    privileged: true
-  go_13:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-      - type: bind
-        source: ./go/influx/db
-        target: /go/influx/db
-    privileged: true
-  go_14:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-      - type: bind
-        source: ./go/influx/db
-        target: /go/influx/db
-    privileged: true
-  go_15:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-      - type: bind
-        source: ./go/influx/db
-        target: /go/influx/db
-    privileged: true
-  go_16:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /usr/lib/libscope.so
-      - type: bind
-        source: ../../bin/linux/ldscope
-        target: /usr/bin/ldscope
-      - type: bind
-        source: ./go/influx/db
-        target: /go/influx/db
-    privileged: true
+    command: /go/test_go.sh
+  go_9: *goOpts
+  go_10: *goOpts
+  go_11: *goOpts
+  go_12: *goOpts
+  go_13: *goOpts
+  go_14: *goOpts
+  go_15: *goOpts
+  go_16: *goOpts
 
   java6:
     volumes:

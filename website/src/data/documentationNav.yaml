@@ -51,6 +51,9 @@
     - name: Changelog
       path: /docs/changelog
 
+    - name: Known Issues
+      path: /docs/known-issues
+
 - name: Community
   child: 
     - name: Community

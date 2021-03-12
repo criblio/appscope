@@ -1,8 +1,10 @@
-FROM ubuntu:20.04
+ARG BASE_IMAGE=ubuntu:20.04
+FROM $BASE_IMAGE
 
 RUN apt-get -o Acquire::Check-Valid-Until=false update \
-  && apt-get install -y curl file bsdmainutils bison git make gcc binutils \
-  && curl -sSL https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer | bash -x
+  && apt-get install -y curl bsdmainutils bison git make gcc binutils \
+  && curl -sSL https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer | bash -x \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY ./influx/influxdb-selfsigned.key ./influx/influxdb-selfsigned.crt /etc/ssl/
 

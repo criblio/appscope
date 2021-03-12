@@ -1,34 +1,39 @@
 version: '3.5'
 services:
   interposed_func:
+    image: jbieron/scopetest_interposed_func
     build:
       context: .
       dockerfile: ./interposed_func/Dockerfile
     privileged: true
 
   cribl:
+    image: jbieron/scopetest_cribl
     build:
       context: .
       dockerfile: ./cribl/Dockerfile
 
   nginx:
+    image: jbieron/scopetest_nginx
     build:
       context: .
       dockerfile: ./nginx/Dockerfile
 
   splunk:
+    image: jbieron/scopetest_splunk
     build:
       context: .
       dockerfile: ./splunk/Dockerfile
-
     privileged: true
 
   elastic:
+    image: jbieron/scopetest_elastic
     build:
       context: .
       dockerfile: ./elastic/Dockerfile
 
   kafka:
+    image: jbieron/scopetest_kafka
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
@@ -47,98 +52,113 @@ services:
       dockerfile: ./kafka/Dockerfile
 
   tls:
+    image: jbieron/scopetest_tls
     build:
       context: tls
 
   detect_proto:
+    image: jbieron/scopetest_detect_proto
     build:
       context: detect_proto
-    ports:
-      - 6379:6379
-      - 27017:27017
 
   gogen:
+    image: jbieron/scopetest_gogen
     build:
       context: gogen
 
   go_2:
+    image: jbieron/scopetest_go_2
     build:
       context: go
       args:
         GO_VERSION: '1.2.2'
         BASE_IMAGE: debian:jessie-slim
   go_3:
+    image: jbieron/scopetest_go_3
     build:
       context: go
       args:
         GO_VERSION: '1.3'
         BASE_IMAGE: debian:jessie-slim
   go_4:
+    image: jbieron/scopetest_go_4
     build:
       context: go
       args:
         GO_VERSION: '1.4'
         BASE_IMAGE: debian:jessie-slim
   go_5:
+    image: jbieron/scopetest_go_5
     build:
       context: go
       args:
         GO_VERSION: '1.5'
         BASE_IMAGE: debian:jessie-slim
   go_6:
+    image: jbieron/scopetest_go_6
     build:
       context: go
       args:
         GO_VERSION: '1.6'
         BASE_IMAGE: debian:jessie-slim
   go_7:
+    image: jbieron/scopetest_go_7
     build:
       context: go
       args:
         GO_VERSION: '1.7'
         BASE_IMAGE: debian:jessie-slim
   go_8:
+    image: jbieron/scopetest_go_8
     build:
       context: go
       args:
         GO_VERSION: '1.8'
         BASE_IMAGE: debian:jessie-slim
   go_9:
+    image: jbieron/scopetest_go_9
     build:
       context: go
       args:
         GO_VERSION: '1.9'
   go_10:
+    image: jbieron/scopetest_go_10
     build:
       context: go
       args:
         GO_VERSION: '1.10'
   go_11:
+    image: jbieron/scopetest_go_11
     build:
       context: go
       args:
         GO_VERSION: '1.11'
   go_12:
+    image: jbieron/scopetest_go_12
     build:
       context: go
       args:
         GO_VERSION: '1.12'
   go_13:
+    image: jbieron/scopetest_go_13
     build:
       context: go
       args:
         GO_VERSION: '1.13'
   go_14:
+    image: jbieron/scopetest_go_14
     build:
       context: go
       args:
         GO_VERSION: '1.14'
   go_15:
+    image: jbieron/scopetest_go_15
     build:
       context: go
       args:
         GO_VERSION: '1.15'
   go_16:
+    image: jbieron/scopetest_go_16
     build:
       context: go
       args:

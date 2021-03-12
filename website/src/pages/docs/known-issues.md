@@ -8,7 +8,7 @@ title: Known Issues
 
 2021-03-16 - Maintenance Pre-Release
 
-As of this pre-release, AppScope has these known issues:
+As of this AppScope pre-release, known issues include:
 
 - Java JRE < v.6 is not supported.
 
@@ -21,3 +21,7 @@ As of this pre-release, AppScope has these known issues:
 - [#10](https://github.com/criblio/appscope/issues/10), [#165,](https://github.com/criblio/appscope/issues/165) Scoping the Docker executable is problematic.
 
 - [#119](https://github.com/criblio/appscope/issues/119) HTTP 2 metrics and headers can be viewed only with [Cribl LogStream](https://cribl.io/product/).
+
+<hr>
+
+See [all issues](https://github.com/criblio/appscope/issues) currently open on GitHub.

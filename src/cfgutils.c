@@ -1179,14 +1179,19 @@ processWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 static void
 processWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
+    if (node->type != YAML_SEQUENCE_NODE) return;
 
     // watch header is only valid for http
     if (watch_context != CFG_SRC_HTTP) return;
 
-    char *value = stringVal(node);
-    cfgEvtFormatHeaderSet(config, value);
-    if (value) free(value);
+    yaml_node_item_t *item;
+
+    foreach(item, node->data.sequence.items) {
+        yaml_node_t *node = yaml_document_get_node(doc, *item);
+        char *value = stringVal(node);
+        cfgEvtFormatHeaderSet(config, value);
+        if (value) free(value);
+    }
 }
 
 static int
@@ -1207,7 +1212,7 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    NAME_NODE,            processWatchName},
         {YAML_SCALAR_NODE,    FIELD_NODE,           processWatchField},
         {YAML_SCALAR_NODE,    VALUE_NODE,           processWatchValue},
-        {YAML_SCALAR_NODE,    EX_HEADERS,           processWatchHeader},
+        {YAML_SEQUENCE_NODE,  EX_HEADERS,           processWatchHeader},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1603,9 +1608,9 @@ err:
 }
 
 static cJSON*
-createWatchObjectJson(config_t* cfg, watch_t src)
+createWatchObjectJson(config_t *cfg, watch_t src)
 {
-    cJSON* root = NULL;
+    cJSON *root = NULL;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
@@ -1618,9 +1623,22 @@ createWatchObjectJson(config_t* cfg, watch_t src)
     if (!cJSON_AddStringToObjLN(root, VALUE_NODE,
                                   cfgEvtFormatValueFilter(cfg, src))) goto err;
     if (src == CFG_SRC_HTTP) {
-        const char *header = cfgEvtFormatHeader(cfg);
-        header = (header) ? header : "";
-        if (!cJSON_AddStringToObjLN(root, EX_HEADERS, header)) goto err;
+        cJSON *headers = cJSON_CreateArray();
+        if (!headers) goto err;
+
+        int numhead;
+        if ((numhead = cfgEvtFormatNumHeaders(cfg)) > 0) {
+            int i;
+
+            for (i = 0; i < numhead; i++) {
+                char *hstr = (char *)cfgEvtFormatHeader(cfg, i);
+                if (hstr) {
+                    cJSON_AddStringToObjLN(headers, "headers", hstr);
+                }
+            }
+        }
+
+        cJSON_AddItemToObject(root, "headers", headers);
     }
 
     return root;
@@ -1875,8 +1893,6 @@ initEvtFormat(config_t *cfg)
         evtFormatFieldFilterSet(evt, src, cfgEvtFormatFieldFilter(cfg, src));
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
     }
-
-    evtFormatHeaderFilterSet(evt, cfgEvtFormatHeader(cfg));
 
     evtFormatRateLimitSet(evt, cfgEvtRateLimit(cfg));
     evtFormatCustomTagsSet(evt, cfgCustomTags(cfg));

@@ -1979,14 +1979,14 @@ doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t byte
 
                 for (i = 0; i < cnt; i++) {
                     if (iov[i].iov_base) {
-                        ctlSendLog(g_ctl, fs->path, iov[i].iov_base, iov[i].iov_len, fs->uid, &g_proc);
+                        ctlSendLog(g_ctl, fd, fs->path, iov[i].iov_base, iov[i].iov_len, fs->uid, &g_proc);
                     }
                 }
 
                 return;
             }
 
-            ctlSendLog(g_ctl, fs->path, buf, bytes, fs->uid, &g_proc);
+            ctlSendLog(g_ctl, fd, fs->path, buf, bytes, fs->uid, &g_proc);
         }
     } else {
         if (fs) {

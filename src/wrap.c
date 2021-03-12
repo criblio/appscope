@@ -440,6 +440,8 @@ doConfig(config_t *cfg)
     // Disconnect the old interfaces that were just replaced
     mtcDisconnect(g_prevmtc);
     logDisconnect(g_prevlog);
+    ctlStopAggregating(g_prevctl);
+    ctlFlush(g_prevctl);
     ctlDisconnect(g_prevctl, CFG_CTL);
 }
 
@@ -761,6 +763,7 @@ handleExit(void)
 
     mtcFlush(g_mtc);
     logFlush(g_log);
+    ctlStopAggregating(g_ctl);
     ctlFlush(g_ctl);
 }
 
@@ -3164,6 +3167,11 @@ puts(const char *s)
     int rc = g_fn.puts(s);
 
     doWrite(fileno(stdout), initialTime, (rc != EOF), s, strlen(s), "puts", BUF, 0);
+
+    if (rc != EOF) {
+        // puts() "writes the string s and a trailing newline to stdout"
+        doWrite(fileno(stdout), initialTime, TRUE, "\n", 1, "puts", BUF, 0);
+    }
 
     return rc;
 }

@@ -3,7 +3,7 @@ set -e
 cd `dirname $0`/testContainers
 
 # working="cribl detect_proto elastic gogen interposed_func kafka nginx splunk tls"
-enabled="cribl detect_proto elastic gogen interposed_func kafka nginx splunk tls go_2 go_3 go_4 go_5 go_6 go_7 go_8 go_9 go_10 go_11 go_12 go_13 go_14 go_15 go_16"
+enabled="cribl detect_proto"
 docker-compose pull -q $enabled
 docker-compose build --parallel $enabled
 for s in $enabled; do

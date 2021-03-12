@@ -11,6 +11,7 @@ jobs:
       # - run: apt-get update && apt-get install -y git
       - run: ./install_build_tools.sh
       - run: make deps
+      - run: docker-compose version; cat /etc/lsb-release
       - run: make all
       - run: make test
 

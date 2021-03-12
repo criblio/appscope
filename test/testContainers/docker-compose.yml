@@ -72,6 +72,10 @@ services:
       context: go
       args:
         GO_VERSION: '1.2.2'
+        # TODO potentially unify base image
+        # go1.4 and older do not compile with ld from ubuntu:20.04 (complains that ld -r and -pie are mutually exclusive)
+        # and go1.16 does not compile with ld from debian:jessie-slim
+        # temporarily I decided to have unsupported use one image and the rest another, to not introduce another split
         BASE_IMAGE: debian:jessie-slim
   go_3:
     image: jbieron/scopetest_go_3:0.1

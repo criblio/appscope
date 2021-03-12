@@ -69,16 +69,16 @@ event:
     # Creates events from data written to files.
     # Designed for monitoring log files, but capable of capturing
     # any file writes.
-#    - type: file
-#      name: .*log.*                 # whitelist ex regex describing log file names
-#      value: .*                     # whitelist ex regex describing field values
+    - type: file
+      name: .*log.*                 # whitelist ex regex describing log file names
+      value: .*                     # whitelist ex regex describing field values
 
     # Creates events from data written to stdout, stderr, or both.
     # May be most useful for capturing debug output from processes
     # running in containerized environments.
-#    - type: console
-#      name: stdout                  # (stdout|stderr)
-#      value: .*
+    - type: console
+      name: stdout                  # (stdout|stderr)
+      value: .*
 
     # Creates events from libscope's metric (statsd) data.  May be
     # most useful for data which could overwhelm metric aggregation
@@ -90,28 +90,29 @@ event:
 #      value: .*
 
     # Enable extraction of HTTP headers
-#    - type: http
-#      name: .*                      # (http-resp)|(http-metrics)
-#      field: .*                     # whitelist regex describing field names
-#      value: .*
+    - type: http
+      name: .*                      # (http-resp)|(http-metrics)
+      field: .*                     # whitelist regex describing field names
+      value: .*
+      headers:                      # (?i)X-myHeader.*
 
     # Creates events describing network connectivity
-#    - type: net
-#      name: .*                      #
-#      field: .*                     # whitelist regex describing field names
-#      value: .*
+    - type: net
+      name: .*                      #
+      field: .*                     # whitelist regex describing field names
+      value: .*
 
     # Creates events describing file connectivity
-#    - type: fs
-#      name: .*                      #
-#      field: .*                     # whitelist regex describing field names
-#      value: .*
+    - type: fs
+      name: .*                      #
+      field: .*                     # whitelist regex describing field names
+      value: .*
 
     # Creates events describing dns activity
-#    - type: dns
-#      name: .*                      #
-#      field: .*                     # whitelist regex describing field names
-#      value: .*
+    - type: dns
+      name: .*                      #
+      field: .*                     # whitelist regex describing field names
+      value: .*
 
 payload:
   enable: false                     # true, false
@@ -123,7 +124,7 @@ libscope:
   commanddir : '/tmp'
   #  commanddir supports changes to configuration settings of running
   #  processes.  At every summary period the library looks in commanddir
-  #  to see if a file named scope.<pid> exists.  (where pid is the process ID
+  #  to see if a file named scope.<pid> exists.  (Where pid is the process ID
   #  of the process running with scope.)  If it exists, it processes every
   #  line for environment variable-style commands:
   #      SCOPE_METRIC_VERBOSITY=9
@@ -131,7 +132,7 @@ libscope:
   #  scope.<pid> file when it's complete.
 
   log:
-    level: error                    # debug, info, warning, error, none
+    level: warning                    # debug, info, warning, error, none
     transport:
       type: file
       path: '/tmp/scope.log'

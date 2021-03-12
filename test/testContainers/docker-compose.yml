@@ -1,39 +1,39 @@
 version: '3.5'
 services:
   interposed_func:
-    image: jbieron/scopetest_interposed_func
+    image: jbieron/scopetest_interposed_func:0.1
     build:
       context: .
       dockerfile: ./interposed_func/Dockerfile
     privileged: true
 
   cribl:
-    image: jbieron/scopetest_cribl
+    image: jbieron/scopetest_cribl:0.1
     build:
       context: .
       dockerfile: ./cribl/Dockerfile
 
   nginx:
-    image: jbieron/scopetest_nginx
+    image: jbieron/scopetest_nginx:0.1
     build:
       context: .
       dockerfile: ./nginx/Dockerfile
 
   splunk:
-    image: jbieron/scopetest_splunk
+    image: jbieron/scopetest_splunk:0.1
     build:
       context: .
       dockerfile: ./splunk/Dockerfile
     privileged: true
 
   elastic:
-    image: jbieron/scopetest_elastic
+    image: jbieron/scopetest_elastic:0.1
     build:
       context: .
       dockerfile: ./elastic/Dockerfile
 
   kafka:
-    image: jbieron/scopetest_kafka
+    image: jbieron/scopetest_kafka:0.1
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
@@ -52,113 +52,113 @@ services:
       dockerfile: ./kafka/Dockerfile
 
   tls:
-    image: jbieron/scopetest_tls
+    image: jbieron/scopetest_tls:0.1
     build:
       context: tls
 
   detect_proto:
-    image: jbieron/scopetest_detect_proto
+    image: jbieron/scopetest_detect_proto:0.1
     build:
       context: detect_proto
 
   gogen:
-    image: jbieron/scopetest_gogen
+    image: jbieron/scopetest_gogen:0.1
     build:
       context: gogen
 
   go_2:
-    image: jbieron/scopetest_go_2
+    image: jbieron/scopetest_go_2:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.2.2'
         BASE_IMAGE: debian:jessie-slim
   go_3:
-    image: jbieron/scopetest_go_3
+    image: jbieron/scopetest_go_3:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.3'
         BASE_IMAGE: debian:jessie-slim
   go_4:
-    image: jbieron/scopetest_go_4
+    image: jbieron/scopetest_go_4:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.4'
         BASE_IMAGE: debian:jessie-slim
   go_5:
-    image: jbieron/scopetest_go_5
+    image: jbieron/scopetest_go_5:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.5'
         BASE_IMAGE: debian:jessie-slim
   go_6:
-    image: jbieron/scopetest_go_6
+    image: jbieron/scopetest_go_6:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.6'
         BASE_IMAGE: debian:jessie-slim
   go_7:
-    image: jbieron/scopetest_go_7
+    image: jbieron/scopetest_go_7:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.7'
         BASE_IMAGE: debian:jessie-slim
   go_8:
-    image: jbieron/scopetest_go_8
+    image: jbieron/scopetest_go_8:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.8'
         BASE_IMAGE: debian:jessie-slim
   go_9:
-    image: jbieron/scopetest_go_9
+    image: jbieron/scopetest_go_9:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.9'
   go_10:
-    image: jbieron/scopetest_go_10
+    image: jbieron/scopetest_go_10:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.10'
   go_11:
-    image: jbieron/scopetest_go_11
+    image: jbieron/scopetest_go_11:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.11'
   go_12:
-    image: jbieron/scopetest_go_12
+    image: jbieron/scopetest_go_12:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.12'
   go_13:
-    image: jbieron/scopetest_go_13
+    image: jbieron/scopetest_go_13:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.13'
   go_14:
-    image: jbieron/scopetest_go_14
+    image: jbieron/scopetest_go_14:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.14'
   go_15:
-    image: jbieron/scopetest_go_15
+    image: jbieron/scopetest_go_15:0.1
     build:
       context: go
       args:
         GO_VERSION: '1.15'
   go_16:
-    image: jbieron/scopetest_go_16
+    image: jbieron/scopetest_go_16:0.1
     build:
       context: go
       args:

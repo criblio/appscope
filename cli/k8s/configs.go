@@ -124,7 +124,7 @@ spec:
           command: ["/bin/bash"]
           args:
           - "-c"
-          - "/usr/local/bin/scope k8s --server --debug --metricdest {{ .MetricDest }} --metricformat {{ .MetricFormat }} --eventdest {{ .EventDest }} || sleep 1000"
+          - "/usr/local/bin/scope k8s --server{{if .Debug}} --debug{{end}}{{if gt (len .MetricDest) 0}} --metricdest {{ .MetricDest }}{{end}}{{if and (gt (len .MetricFormat) 0) (eq (len .CriblDest) 0)}} --metricformat {{ .MetricFormat }}{{end}}{{if gt (len .EventDest) 0}} --eventdest {{ .EventDest }}{{end}}{{if gt (len .CriblDest) 0}} --cribldest {{ .CriblDest}}{{end}} || sleep 1000"
           imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: certs

@@ -62,6 +62,6 @@ func init() {
 	k8sCmd.Flags().StringVar(&opt.KeyFile, "keyfile", "/etc/certs/tls.key", "Private key file for TLS in the container (mounted secret)")
 	k8sCmd.Flags().IntVar(&opt.Port, "port", 4443, "Port to listen on")
 	k8sCmd.Flags().Bool("server", false, "Run Webhook server")
-	k8sCmd.Flags().BoolVar(&opt.Debug, "debug", false, "Turn on debug logging")
+	k8sCmd.Flags().BoolVar(&opt.Debug, "debug", false, "Turn on debug logging in the scope webhook container")
 	metricAndEventDestFlags(k8sCmd, rc)
 }

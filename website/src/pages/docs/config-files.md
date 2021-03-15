@@ -70,8 +70,8 @@ event:
     # Designed for monitoring log files, but capable of capturing
     # any file writes.
     - type: file
-      name: .*log.*                 # whitelist ex regex describing log file names
-      value: .*                     # whitelist ex regex describing field values
+      name: .*log.*                 # allowlist ex regex describing log file names
+      value: .*                     # allowlist ex regex describing field values
 
     # Creates events from data written to stdout, stderr, or both.
     # May be most useful for capturing debug output from processes
@@ -86,32 +86,32 @@ event:
     # high cardinality.
 #    - type: metric
 #      name: .*                      # (net.*)|(.*err.*)
-#      field: .*                     # whitelist regex describing field names
+#      field: .*                     # allowlist regex describing field names
 #      value: .*
 
     # Enable extraction of HTTP headers
     - type: http
       name: .*                      # (http-resp)|(http-metrics)
-      field: .*                     # whitelist regex describing field names
+      field: .*                     # allowlist regex describing field names
       value: .*
       headers:                      # (?i)X-myHeader.*
 
     # Creates events describing network connectivity
     - type: net
       name: .*                      #
-      field: .*                     # whitelist regex describing field names
+      field: .*                     # allowlist regex describing field names
       value: .*
 
     # Creates events describing file connectivity
     - type: fs
       name: .*                      #
-      field: .*                     # whitelist regex describing field names
+      field: .*                     # allowlist regex describing field names
       value: .*
 
     # Creates events describing dns activity
     - type: dns
       name: .*                      #
-      field: .*                     # whitelist regex describing field names
+      field: .*                     # allowlist regex describing field names
       value: .*
 
 payload:

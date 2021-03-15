@@ -110,13 +110,13 @@ libscope:
   summaryperiod : 10                # in seconds
   commanddir : '/tmp'
   #  commanddir supports changes to configuration settings of running
-  #  processes.  At every summary period the library looks in commanddir
-  #  to see if a file named scope.<pid> exists.  (where pid is the process ID
-  #  of the process running with scope.)  If it exists, it processes every
-  #  line for environment variable-style commands:
+  #  processes.  At every summary period, the library looks in commanddir
+  #  to see if a file named scope.<pid> exists. (Where <pid> is the process ID
+  #  of the process running with scope.) If this file exists, commanddir 
+  #  processes every line for environment variable–style commands:
   #      SCOPE_METRIC_VERBOSITY=9
   #  It changes the configuration to match the new settings, and deletes the
-  #  scope.<pid> file when it's complete.
+  #  scope.<pid> file when replacement is complete.
 
   log:
     level: error                    # debug, info, warning, error, none

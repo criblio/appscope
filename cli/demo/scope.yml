@@ -18,18 +18,18 @@ event:
     buffer: line
   watch:
     - type: file
-      name: .*log.*                 # whitelist ex regex describing log file names
-      value: .*                     # whitelist ex regex describing field values
+      name: .*log.*                 # allowlist ex regex describing log file names
+      value: .*                     # allowlist ex regex describing field values
     - type: console
       name: (stdout)|(stderr)
       value: .*
     # - type: metric
     #   name: .*                      # (net.*)|(.*err.*)
-    #   field: ^[^h]+                 # whitelist ex regex describing field names
+    #   field: ^[^h]+                 # allowlist ex regex describing field names
     #   value: .*
     - type: http
       name: .*                      # .*-res | .*-req | .*-metrics
-      field: ^[^h]+                 # ^[^h]+ whitelist ex regex describing field names
+      field: ^[^h]+                 # ^[^h]+ allowlist ex regex describing field names
       value: .*
 
   

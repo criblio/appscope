@@ -44,7 +44,7 @@ libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c s
 
 ldscope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c libscope.so
 	objcopy -I binary -O elf64-x86-64 -B i386 ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
-	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c -ldl -lrt -o ./bin/$(OS)/ldscope ./lib/$(OS)/libscope.o -I./os/$(OS)
+	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c -ldl -lrt -o ./bin/$(OS)/ldscope ./lib/$(OS)/libscope.o -I./os/$(OS) $(INCLUDES)
 	rm -f ./lib/$(OS)/libscope.o && rm -f ../../cli/run/bundle.go
 
 coreclean:

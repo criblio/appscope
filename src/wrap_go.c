@@ -443,7 +443,7 @@ initGoHook(elf_buf_t *ebuf)
         } else if (go_runtime_version) {
             snprintf(buf, sizeof(buf), "%s was compiled with go version `%s`.  AppScope can only instrument go1.8 or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version);
         } else {
-            snprintf(buf, sizeof(buf), "%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope requires symbols and can only instrument go1.8 or newer.  Continuing without AppScope.", ebuf->cmd);
+            snprintf(buf, sizeof(buf), "%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
         }
         scopeLog(buf, -1, CFG_LOG_WARN);
         return; // don't install our hooks

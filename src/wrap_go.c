@@ -422,8 +422,13 @@ initGoHook(elf_buf_t *ebuf)
     }
 
     int go_major_ver = UNKNOWN_GO_VER;
-    if ((go_ver=getSymbol(ebuf->buf, "runtime.buildVersion")) &&
-        (go_runtime_version = c_str(go_ver))) {
+    go_ver = getSymbol(ebuf->buf, "runtime.buildVersion");
+    if (!go_ver) {
+        //runtime.buildVersion symbol not found, probabaly dealing with a stripped binary
+        //try to retrieve the version symbol address from the .go.buildinfo section
+        go_ver = getGoVersionAddr(ebuf->buf);
+    }
+    if (go_ver && (go_runtime_version = c_str(go_ver))) {
 
         sysprint("go_runtime_version = %s\n", go_runtime_version);
 
@@ -451,20 +456,20 @@ initGoHook(elf_buf_t *ebuf)
      * are entering the Go func past the runtime stack check?
      * Need to investigate later.
      */
-    if ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
+    if ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
         sysprint("ERROR: can't get the address for runtime.cgocall\n");
         return; // don't install our hooks
     }
 
     // Get the interface type for a tls.Conn (set to 0 if not present)
-    go_tls_conn = (uint64_t)getSymbol(ebuf->buf, "go.itab.*crypto/tls.Conn,net.Conn");
+    go_tls_conn = (uint64_t)getGoSymbol(ebuf->buf, "go.itab.*crypto/tls.Conn,net.Conn");
 
 
     adjustGoStructOffsetsForVersion(go_major_ver);
 
     tap_t* tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
-        void* orig_func = getSymbol(ebuf->buf, tap->func_name);
+        void* orig_func = getGoSymbol(ebuf->buf, tap->func_name);
         if (!orig_func) {
             sysprint("ERROR: can't get the address for %s\n", tap->func_name);
             continue;

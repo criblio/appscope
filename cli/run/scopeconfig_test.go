@@ -33,7 +33,7 @@ import (
 //   summaryperiod: 10
 //   commanddir: /tmp
 //   log:
-//     level: error
+//     level: warning
 //     transport:
 //       type: file
 //       buffering: line

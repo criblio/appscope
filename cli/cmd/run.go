@@ -24,6 +24,7 @@ scope run --payloads -- nc -lp 10001
 scope run -- curl https://wttr.in/94105`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		internal.InitConfig()
 		rc.Run(args)
 	},
 }

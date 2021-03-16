@@ -39,7 +39,7 @@ scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:100
 
 		err = run.CreateAll(outPath)
 		util.CheckErrSprintf(err, "error excreting files: %v", err)
-		if rc.MetricsDest != "" || rc.EventsDest != "" {
+		if rc.MetricsDest != "" || rc.EventsDest != "" || rc.CriblDest != "" {
 			err = os.Rename(path.Join(outPath, "scope.yml"), path.Join(outPath, "scope_example.yml"))
 			util.CheckErrSprintf(err, "error renaming scope.yml: %v", err)
 			rc.WorkDir = outPath

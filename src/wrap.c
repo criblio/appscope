@@ -942,6 +942,27 @@ hookCallback(struct dl_phdr_info *info, size_t size, void *data)
     return 0;
 }
 
+static int
+findGlibc__write(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (strstr(info->dlpi_name, "libc.so")) {
+
+        void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
+        if (!handle) return 0;
+        void *addr = dlsym(handle, "__write");
+        dlclose(handle);
+
+        // if we don't find addr, keep going
+        if (!addr)  return 0;
+
+        // We found an addr from libc.so!  Return it!
+        *(void**)data = addr;
+        return 1;
+
+    }
+    return 0;
+}
+
 /*
  * There are 3x SSL_read functions to consider:
  * 1) the one in this file used to interpose SSL_read
@@ -960,6 +981,8 @@ hookCallback(struct dl_phdr_info *info, size_t size, void *data)
  * libscope.so by locating the path to this lib, then
  * get a handle and lookup the symbol.
  */
+
+static ssize_t __write(int fd, const void *buf, size_t size);
 
 static void
 initHook()
@@ -1012,7 +1035,10 @@ initHook()
         dlclose(handle);
     }
 
-    if (should_we_patch || g_fn.sendmmsg) {
+    g_fn.__write = 0;
+    dl_iterate_phdr(findGlibc__write, &g_fn.__write);
+
+    if (should_we_patch || g_fn.sendmmsg || g_fn.__write) {
         funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_DEBUG) {
@@ -1033,6 +1059,10 @@ initHook()
         // sendmmsg for internal libc use in DNS queries
         if (g_fn.sendmmsg) {
             rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, sendmmsg);
+        }
+
+        if (g_fn.__write) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.__write, __write);
         }
 
         // hook 'em
@@ -2094,7 +2124,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     return -1;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 __overflow(FILE *stream, int ch)
 {
     WRAP_CHECK(__overflow, EOF);
@@ -2103,6 +2133,19 @@ __overflow(FILE *stream, int ch)
     int rc = g_fn.__overflow(stream, ch);
 
     doWrite(fileno(stream), initialTime, (rc != EOF), &ch, 1, "__overflow", BUF, 0);
+
+    return rc;
+}
+
+static ssize_t
+__write(int fd, const void *buf, size_t size)
+{
+    WRAP_CHECK(__write, -1);
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.__write(fd, buf, size);
+
+    doWrite(fd, initialTime, (rc != -1), buf, rc, "__write", BUF, 0);
 
     return rc;
 }
@@ -2189,7 +2232,7 @@ syscall(long number, ...)
                         fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
 
-EXPORTON size_t
+EXPORTOFF size_t // EXPORTOFF because it's redundant with __write
 fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 {
     WRAP_CHECK(fwrite_unlocked, 0);
@@ -3106,7 +3149,7 @@ fgetpos64(FILE *stream,  fpos64_t *pos)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t // EXPORTOFF because it's redundant with __write
 write(int fd, const void *buf, size_t count)
 {
     WRAP_CHECK(write, -1);
@@ -3145,7 +3188,7 @@ writev(int fd, const struct iovec *iov, int iovcnt)
     return rc;
 }
 
-EXPORTON size_t
+EXPORTOFF size_t  // EXPORTOFF because it's redundant with __write
 fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 {
     WRAP_CHECK(fwrite, 0);
@@ -3158,7 +3201,7 @@ fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 puts(const char *s)
 {
     WRAP_CHECK(puts, EOF);
@@ -3176,7 +3219,7 @@ puts(const char *s)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 putchar(int c)
 {
     WRAP_CHECK(putchar, EOF);
@@ -3189,7 +3232,7 @@ putchar(int c)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 fputs(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs, EOF);
@@ -3202,7 +3245,7 @@ fputs(const char *s, FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 fputs_unlocked(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs_unlocked, EOF);
@@ -3387,7 +3430,7 @@ fgetc(FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 fputc(int c, FILE *stream)
 {
     WRAP_CHECK(fputc, EOF);
@@ -3400,7 +3443,7 @@ fputc(int c, FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 fputc_unlocked(int c, FILE *stream)
 {
     WRAP_CHECK(fputc_unlocked, EOF);
@@ -3413,7 +3456,7 @@ fputc_unlocked(int c, FILE *stream)
     return rc;
 }
 
-EXPORTON wint_t
+EXPORTOFF wint_t // EXPORTOFF because it's redundant with __write
 putwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(putwc, WEOF);
@@ -3426,7 +3469,7 @@ putwc(wchar_t wc, FILE *stream)
     return rc;
 }
 
-EXPORTON wint_t
+EXPORTOFF wint_t // EXPORTOFF because it's redundant with __write
 fputwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(fputwc, WEOF);

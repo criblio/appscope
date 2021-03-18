@@ -2559,14 +2559,14 @@ doPayload()
                 switch (pinfo->src) {
                 case NETTX:
                 case TLSTX:
-                    snprintf(path, PATH_MAX, "%s/%d_%s:%s:%s.out",
-                             ctlPayDir(g_ctl), g_proc.pid, rip, lport, rport);
+                    snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.out",
+                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
                     break;
 
                 case NETRX:
                 case TLSRX:
-                    snprintf(path, PATH_MAX, "%s/%d_%s:%s:%s.in",
-                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lport);
+                    snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.in",
+                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
                     break;
 
                 default:

@@ -8,7 +8,7 @@ import (
 )
 
 // StartServer starts the server
-func StartServer(opt Options) error {
+func (opt Options) StartServer() error {
 	app := &App{&opt}
 
 	http.HandleFunc("/mutate", app.HandleMutate)

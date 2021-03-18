@@ -43,10 +43,12 @@ func FindReverseLineMatchOffset(lines int, r io.ReadSeeker, match func(string) b
 
 	// Read 102400 byte buffers, backwards from the end of the file, counting lines which match a given match function
 	buf := make([]byte, 102400)
+	last := false
 	for { // Each iteration reads 102400 bytes (or as much as it can) and returns if we've found the number of matches or if we're at the beginning of the file
 		offset -= int64(cap(buf))
 		if offset < 0 {
 			offset = 0
+			last = true
 		}
 		_, err = r.Seek(offset, io.SeekStart)
 		if err != nil {
@@ -77,7 +79,7 @@ func FindReverseLineMatchOffset(lines int, r io.ReadSeeker, match func(string) b
 			}
 		}
 
-		if rBytes != cap(buf) { // we couldn't read a full buffer, so we're at the beginning. Exit indicating offset -1 which means we didn't find.
+		if rBytes != cap(buf) || last { // we couldn't read a full buffer, so we're at the beginning. Exit indicating offset -1 which means we didn't find.
 			offset = -1
 			return
 		}

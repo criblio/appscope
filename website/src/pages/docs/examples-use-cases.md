@@ -90,3 +90,7 @@ transport:
     host: ddog
     port: 5000
 ```
+
+### Next Steps
+
+Explore [Integrating with LogStream](/docs/logstream-integration).

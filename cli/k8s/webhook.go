@@ -43,19 +43,30 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 	patch := []JSONPatchEntry{}
 	if shouldModify {
 		log.Debug().Interface("pod", pod).Msgf("modifying pod")
-		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
-			Name:  "scope",
-			Image: fmt.Sprintf("cribl/scope:%s", internal.GetVersion()),
-			Command: []string{"/usr/local/bin/scope",
-				"excrete",
+		cmd := []string{
+			"/usr/local/bin/scope",
+			"excrete",
+		}
+		if len(app.CriblDest) > 0 {
+			cmd = append(cmd,
+				"--cribldest",
+				app.CriblDest,
+			)
+		} else {
+			cmd = append(cmd,
 				"--metricdest",
 				app.MetricDest,
 				"--metricformat",
 				app.MetricFormat,
 				"--eventdest",
 				app.EventDest,
-				"/scope",
-			},
+			)
+		}
+		cmd = append(cmd, "/scope")
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
+			Name:    "scope",
+			Image:   fmt.Sprintf("cribl/scope:%s", internal.GetVersion()),
+			Command: cmd,
 			VolumeMounts: []corev1.VolumeMount{{
 				Name:      "scope",
 				MountPath: "/scope",
@@ -65,6 +76,15 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 		// assumed to be emptyDir
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
 			Name: "scope",
+		}, corev1.Volume{
+			Name: "scope-conf",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "scope",
+					},
+				},
+			},
 		})
 
 		// add volume mount to all containers in the pod
@@ -72,7 +92,17 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			pod.Spec.Containers[i].VolumeMounts = append(pod.Spec.Containers[i].VolumeMounts, corev1.VolumeMount{
 				Name:      "scope",
 				MountPath: "/scope",
+			}, corev1.VolumeMount{
+				Name:      "scope-conf",
+				MountPath: "/scope/scope.yml",
+				SubPath:   "scope.yml",
 			})
+			if len(app.CriblDest) > 0 {
+				pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
+					Name:  "SCOPE_LOGSTREAM",
+					Value: app.CriblDest,
+				})
+			}
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name:  "LD_PRELOAD",
 				Value: "/scope/libscope.so",

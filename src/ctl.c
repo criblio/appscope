@@ -1020,14 +1020,6 @@ ctlSendBin(ctl_t *ctl, char *buf, size_t len)
     return transportSend(ctl->transport, buf, len);
 }
 
-bool
-ctlHeaderMatch(ctl_t *ctl, const char *match)
-{
-    if (!ctl || !match) return FALSE;
-
-    return evtHeaderMatch(ctl->evt, match);
-}
-
 void
 ctlStopAggregating(ctl_t *ctl)
 {

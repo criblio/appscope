@@ -37,6 +37,9 @@
     - name: Examples and Use Cases
       path: /docs/examples-use-cases
 
+    - name: Integrating with LogStream
+      path: /docs/logstream-integration
+
 - name: Reference
   child: 
     - name: CLI Reference
@@ -47,6 +50,9 @@
 
     - name: Changelog
       path: /docs/changelog
+
+    - name: Known Issues
+      path: /docs/known-issues
 
 - name: Community
   child: 

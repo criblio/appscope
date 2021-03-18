@@ -9,6 +9,7 @@
 
 #include "dbg.h"
 #include "plattime.h"
+#include "runtimecfg.h"
 #include "fn.h"
 #include "ctl.h"
 #include "cfgutils.h"
@@ -274,6 +275,7 @@ userDefinedHeaderExtract(void **state)
     cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_HTTP, (unsigned)1);
     cfgEvtFormatHeaderSet(cfg, "(?i)x-myheader.*");
     g_ctl = initCtl(cfg);
+    g_cfg.staticfg = cfg;
 
     net_info *net = getNet(3);
     assert_non_null(net);
@@ -309,6 +311,9 @@ xAppScopeHeaderExtract(void **state)
         "\"x-appscope\":\"app=utest\""
     };
 
+    config_t *cfg = cfgCreateDefault();
+    g_cfg.staticfg = cfg;
+
     net_info *net = getNet(3);
     assert_non_null(net);
     assert_true(doHttp(0x12345, 3, net, request, strlen(request), TLSRX, BUF));
@@ -318,7 +323,9 @@ xAppScopeHeaderExtract(void **state)
         //printf("looking for %s\n", result[i]);
         assert_non_null(strstr(header_event, result[i]));
     }
+
     free(header_event);
+    cfgDestroy(&cfg);
 }
 
 int

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -12,24 +13,31 @@ import (
 
 // ScopeConfig represents our current running configuration
 type ScopeConfig struct {
-	Metric   ScopeMetricConfig   `mapstructure:"metric" json:"metric" yaml:"metric"`
-	Event    ScopeEventConfig    `mapstructure:"event" json:"event" yaml:"event"`
+	Cribl    ScopeCriblConfig    `mapstructure:"cribl,omitempty" json:"cribl,omitempty" yaml:"cribl,omitempty"`
+	Metric   ScopeMetricConfig   `mapstructure:"metric,omitempty" json:"metric,omitempty" yaml:"metric,omitempty"`
+	Event    ScopeEventConfig    `mapstructure:"event,omitempty" json:"event,omitempty" yaml:"event,omitempty"`
 	Payload  ScopePayloadConfig  `mapstructure:"payload,omitempty" json:"payload,omitempty" yaml:"payload,omitempty"`
 	Libscope ScopeLibscopeConfig `mapstructure:"libscope" json:"libscope" yaml:"libscope"`
+}
+
+// ScopeCriblConfig represents how to output metrics
+type ScopeCriblConfig struct {
+	Enable    bool           `mapstructure:"enable" json:"enable" yaml:"enable"`
+	Transport ScopeTransport `mapstructure:"transport" json:"transport" yaml:"transport"`
 }
 
 // ScopeMetricConfig represents how to output metrics
 type ScopeMetricConfig struct {
 	Enable    bool              `mapstructure:"enable" json:"enable" yaml:"enable"`
 	Format    ScopeOutputFormat `mapstructure:"format" json:"format" yaml:"format"`
-	Transport ScopeTransport    `mapstructure:"transport" json:"transport" yaml:"transport"`
+	Transport ScopeTransport    `mapstructure:"transport,omitempty" json:"transport,omitempty" yaml:"transport,omitempty"`
 }
 
 // ScopeEventConfig represents how to output events
 type ScopeEventConfig struct {
 	Enable    bool               `mapstructure:"enable" json:"enable" yaml:"enable"`
 	Format    ScopeOutputFormat  `mapstructure:"format" json:"format" yaml:"format"`
-	Transport ScopeTransport     `mapstructure:"transport" json:"transport" yaml:"transport"`
+	Transport ScopeTransport     `mapstructure:"transport,omitempty" json:"transport,omitempty" yaml:"transport,omitempty"`
 	Watch     []ScopeWatchConfig `mapstructure:"watch" json:"watch" yaml:"watch"`
 }
 
@@ -84,6 +92,7 @@ func (c *Config) setDefault() error {
 		return fmt.Errorf("workDir not set")
 	}
 	c.sc = &ScopeConfig{
+		Cribl: ScopeCriblConfig{},
 		Metric: ScopeMetricConfig{
 			Enable: true,
 			Format: ScopeOutputFormat{
@@ -153,7 +162,7 @@ func (c *Config) setDefault() error {
 			CommandDir:    filepath.Join(c.WorkDir, "cmd"),
 			ConfigEvent:   false,
 			Log: ScopeLogConfig{
-				Level: "error",
+				Level: "warning",
 				Transport: ScopeTransport{
 					TransportType: "file",
 					Path:          filepath.Join(c.WorkDir, "ldscope.log"),
@@ -191,6 +200,7 @@ func (c *Config) configFromRunOpts() error {
 	}
 
 	parseDest := func(t *ScopeTransport, dest string) error {
+		m := regexp.MustCompile("^([^:]+):(\\d+)$").FindAllStringSubmatch(dest, -1)
 		if strings.HasPrefix(dest, "tcp://") || strings.HasPrefix(dest, "udp://") {
 			if strings.HasPrefix(dest, "tcp") {
 				t.TransportType = "tcp"
@@ -213,6 +223,15 @@ func (c *Config) configFromRunOpts() error {
 			t.TransportType = "file"
 			t.Path = dest[7:]
 			return nil
+		} else if len(m) > 0 {
+			t.TransportType = "tcp"
+			t.Host = m[0][1]
+			port, err := strconv.Atoi(m[0][2])
+			if err != nil {
+				return fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][2])
+			}
+			t.Port = port
+			return nil
 		}
 		return fmt.Errorf("Invalid dest: %s", dest)
 	}
@@ -230,20 +249,40 @@ func (c *Config) configFromRunOpts() error {
 			return err
 		}
 	}
+
+	if c.CriblDest != "" {
+		err := parseDest(&c.sc.Cribl.Transport, c.CriblDest)
+		if err != nil {
+			return err
+		}
+		c.sc.Cribl.Enable = true
+		// If we're outputting to Cribl, disable metrics and event outputs
+		c.sc.Metric.Transport = ScopeTransport{}
+		c.sc.Event.Transport = ScopeTransport{}
+	}
 	return nil
 }
 
-// WriteScopeConfig writes a scope config to a file
-func (c *Config) WriteScopeConfig(path string) error {
+// ScopeConfigYaml serializes Config to YAML
+func (c *Config) ScopeConfigYaml() ([]byte, error) {
 	if c.sc == nil {
 		err := c.configFromRunOpts()
 		if err != nil {
-			return err
+			return []byte{}, err
 		}
 	}
 	scb, err := yaml.Marshal(c.sc)
 	if err != nil {
-		return fmt.Errorf("error marshaling's ScopeConfig to YAML: %v", err)
+		return scb, fmt.Errorf("error marshaling's ScopeConfig to YAML: %v", err)
+	}
+	return scb, nil
+}
+
+// WriteScopeConfig writes a scope config to a file
+func (c *Config) WriteScopeConfig(path string) error {
+	scb, err := c.ScopeConfigYaml()
+	if err != nil {
+		return err
 	}
 	err = ioutil.WriteFile(path, scb, 0644)
 	if err != nil {

@@ -164,3 +164,9 @@ osGetCgroup(pid_t pid, char *cgroup, size_t cglen)
 {
     return FALSE;
 }
+
+int
+osNeedsConnect(int fd)
+{
+    return 0;
+}

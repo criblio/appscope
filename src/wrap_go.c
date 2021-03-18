@@ -462,8 +462,10 @@ initGoHook(elf_buf_t *ebuf)
     }
 
     // Get the interface type for a tls.Conn (set to 0 if not present)
-    go_tls_conn = (uint64_t)getGoSymbol(ebuf->buf, "go.itab.*crypto/tls.Conn,net.Conn");
-
+    go_tls_conn = (uint64_t)getSymbol(ebuf->buf, "go.itab.*crypto/tls.Conn,net.Conn");
+    if (go_tls_conn == 0) {
+        go_tls_conn = (uint64_t)getGoSymbol(ebuf->buf, "crypto/tls.(*Conn).write");
+    }
 
     adjustGoStructOffsetsForVersion(go_major_ver);
 

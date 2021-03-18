@@ -22,6 +22,7 @@
 #include "dns.h"
 #include "utils.h"
 #include "runtimecfg.h"
+#include "cfg.h"
 
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
@@ -335,13 +336,24 @@ httpFieldEnd(event_field_t *fields, http_report *hreport)
 }
 
 static bool
+headerMatch(regex_t *re, const char *match)
+{
+    if (!re || !match) return FALSE;
+
+    if (!regexec_wrapper(re, match, 0, NULL, 0)) return TRUE;
+
+    return FALSE;
+}
+
+static bool
 httpFields(event_field_t *fields, http_report *hreport, char *hdr,
-           size_t hdr_len, protocol_info *proto, ctl_t *ctl)
+           size_t hdr_len, protocol_info *proto, config_t *cfg)
 {
     if (!fields || !hreport || !proto || !hdr) return FALSE;
 
     // Start with fields from the header
     char *savea = NULL, *header;
+    size_t numExtracts;
 
     hreport->clen = -1;
 
@@ -381,13 +393,22 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr,
         } else if (strcasestr(thishdr, "x-appscope:")) {
                 H_ATTRIB(fields[hreport->ix], "x-appscope", strchr(thishdr, ':') + 2, 5);
                 HTTP_NEXT_FLD(hreport->ix);
-        } else if (ctl && ctlHeaderMatch(g_ctl, thishdr) == TRUE) {
-            char *evsrc = strchr(thishdr, ':');
+        } else if ((numExtracts = cfgEvtFormatNumHeaders(cfg)) > 0) {
+            int i;
 
-            if (evsrc) {
-                *evsrc = '\0';
-                H_ATTRIB(fields[hreport->ix], thishdr, evsrc + 2, 5);
-                HTTP_NEXT_FLD(hreport->ix);
+            for (i = 0; i < numExtracts; i++) {
+                regex_t *re;
+
+                if (((re = cfgEvtFormatHeaderRe(cfg, i)) != NULL) &&
+                    (headerMatch(re, thishdr) == TRUE)) {
+                    char *evsrc = strchr(thishdr, ':');
+
+                    if (evsrc) {
+                        *evsrc = '\0';
+                        H_ATTRIB(fields[hreport->ix], thishdr, evsrc + 2, 5);
+                        HTTP_NEXT_FLD(hreport->ix);
+                    }
+                }
             }
         }
     }
@@ -535,7 +556,7 @@ doHttpHeader(protocol_info *proto)
         if (proto->ptype == EVT_HREQ) {
             hreport.ptype = EVT_HREQ;
             // Fields common to request & response
-            httpFields(fields, &hreport, map->req, map->req_len, proto, g_ctl);
+            httpFields(fields, &hreport, map->req, map->req_len, proto, g_cfg.staticfg);
             httpFieldsInternal(fields, &hreport, proto);
 
             if (hreport.clen != -1) {
@@ -620,7 +641,7 @@ doHttpHeader(protocol_info *proto)
         // Fields common to request & response
         if (map->req) {
             hreport.ptype = EVT_HREQ;
-            httpFields(fields, &hreport, map->req, map->req_len, proto, g_ctl);
+            httpFields(fields, &hreport, map->req, map->req_len, proto, g_cfg.staticfg);
             if (hreport.clen != -1) {
                 H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
                 HTTP_NEXT_FLD(hreport.ix);
@@ -629,7 +650,7 @@ doHttpHeader(protocol_info *proto)
         }
 
         hreport.ptype = EVT_HRES;
-        httpFields(fields, &hreport, map->resp, proto->len, proto, g_ctl);
+        httpFields(fields, &hreport, map->resp, proto->len, proto, g_cfg.staticfg);
         httpFieldsInternal(fields, &hreport, proto);
         if (hreport.clen != -1) {
             H_VALUE(fields[hreport.ix], "http.response_content_length", hreport.clen, EVENT_ONLY_ATTR);

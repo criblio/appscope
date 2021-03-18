@@ -22,22 +22,33 @@ all processes in that container.`,
 kubectl label namespace default scope=enabled`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		if rc.CriblDest == "" && rc.MetricsDest == "" {
+			util.ErrAndExit("CriblDest and MetricDest not set. Must set one.")
+		}
+		if rc.MetricsDest != "" && rc.EventsDest == "" {
+			util.ErrAndExit("MetricDest set but EventDest is not")
+		}
 		if opt.Version == "" {
 			opt.Version = internal.GetVersion()
 		}
 		opt.MetricDest = rc.MetricsDest
 		opt.MetricFormat = rc.MetricsFormat
 		opt.EventDest = rc.EventsDest
+		opt.CriblDest = rc.CriblDest
+		rc.WorkDir = "/scope"
+		var err error
+		opt.ScopeConfigYaml, err = rc.ScopeConfigYaml()
+		util.CheckErrSprintf(err, "%v", err)
 		server, _ := cmd.Flags().GetBool("server")
 		if !server {
-			k8s.PrintConfig(os.Stdout, opt)
+			opt.PrintConfig(os.Stdout)
 			os.Exit(0)
 		}
 		internal.SetLogWriter(os.Stdout)
 		if opt.Debug {
 			internal.SetDebug()
 		}
-		err := k8s.StartServer(opt)
+		err = opt.StartServer()
 		util.CheckErrSprintf(err, "%v", err)
 	},
 }
@@ -51,6 +62,6 @@ func init() {
 	k8sCmd.Flags().StringVar(&opt.KeyFile, "keyfile", "/etc/certs/tls.key", "Private key file for TLS in the container (mounted secret)")
 	k8sCmd.Flags().IntVar(&opt.Port, "port", 4443, "Port to listen on")
 	k8sCmd.Flags().Bool("server", false, "Run Webhook server")
-	k8sCmd.Flags().BoolVar(&opt.Debug, "debug", false, "Turn on debug logging")
+	k8sCmd.Flags().BoolVar(&opt.Debug, "debug", false, "Turn on debug logging in the scope webhook container")
 	metricAndEventDestFlags(k8sCmd, rc)
 }

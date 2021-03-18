@@ -422,8 +422,13 @@ initGoHook(elf_buf_t *ebuf)
     }
 
     int go_major_ver = UNKNOWN_GO_VER;
-    if ((go_ver=getSymbol(ebuf->buf, "runtime.buildVersion")) &&
-        (go_runtime_version = c_str(go_ver))) {
+    go_ver = getSymbol(ebuf->buf, "runtime.buildVersion");
+    if (!go_ver) {
+        //runtime.buildVersion symbol not found, probabaly dealing with a stripped binary
+        //try to retrieve the version symbol address from the .go.buildinfo section
+        go_ver = getGoVersionAddr(ebuf->buf);
+    }
+    if (go_ver && (go_runtime_version = c_str(go_ver))) {
 
         sysprint("go_runtime_version = %s\n", go_runtime_version);
 
@@ -438,7 +443,7 @@ initGoHook(elf_buf_t *ebuf)
         } else if (go_runtime_version) {
             snprintf(buf, sizeof(buf), "%s was compiled with go version `%s`.  AppScope can only instrument go1.8 or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version);
         } else {
-            snprintf(buf, sizeof(buf), "%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope requires symbols and can only instrument go1.8 or newer.  Continuing without AppScope.", ebuf->cmd);
+            snprintf(buf, sizeof(buf), "%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
         }
         scopeLog(buf, -1, CFG_LOG_WARN);
         return; // don't install our hooks
@@ -451,20 +456,20 @@ initGoHook(elf_buf_t *ebuf)
      * are entering the Go func past the runtime stack check?
      * Need to investigate later.
      */
-    if ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
+    if ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
         sysprint("ERROR: can't get the address for runtime.cgocall\n");
         return; // don't install our hooks
     }
 
     // Get the interface type for a tls.Conn (set to 0 if not present)
-    go_tls_conn = (uint64_t)getSymbol(ebuf->buf, "go.itab.*crypto/tls.Conn,net.Conn");
+    go_tls_conn = (uint64_t)getGoSymbol(ebuf->buf, "go.itab.*crypto/tls.Conn,net.Conn");
 
 
     adjustGoStructOffsetsForVersion(go_major_ver);
 
     tap_t* tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
-        void* orig_func = getSymbol(ebuf->buf, tap->func_name);
+        void* orig_func = getGoSymbol(ebuf->buf, tap->func_name);
         if (!orig_func) {
             sysprint("ERROR: can't get the address for %s\n", tap->func_name);
             continue;

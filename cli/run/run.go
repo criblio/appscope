@@ -26,6 +26,7 @@ type Config struct {
 	MetricsDest   string
 	EventsDest    string
 	MetricsFormat string
+	CriblDest     string
 
 	now func() time.Time
 	sc  *ScopeConfig

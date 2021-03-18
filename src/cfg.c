@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "cfg.h"
 #include "dbg.h"
 
@@ -17,6 +18,12 @@ typedef struct {
         cfg_buffer_t buf_policy;
     } file;
 } transport_struct_t;
+
+typedef struct {
+    bool valid;
+    regex_t re;
+    char *filter;
+} header_extract_t;
 
 struct _config_t
 {
@@ -39,7 +46,8 @@ struct _config_t
         char *fieldfilter[CFG_SRC_MAX];
         char *namefilter[CFG_SRC_MAX];
         unsigned src[CFG_SRC_MAX];
-        char *headerName;
+        size_t numHeaders;
+        header_extract_t **hextract;
     } evt;
 
     struct {
@@ -175,7 +183,8 @@ cfgCreateDefault()
         c->evt.src[src] = srcEnabledDefault[src];
     }
 
-    c->evt.headerName = DEFAULT_SRC_HTTP_HEADER;
+    c->evt.hextract = DEFAULT_SRC_HTTP_HEADER;
+    c->evt.numHeaders = 0;
 
     which_transport_t tp;
     for (tp=CFG_MTC; tp<CFG_WHICH_MAX; tp++) {
@@ -220,7 +229,17 @@ cfgDestroy(config_t **cfg)
         if (c->evt.namefilter[src]) free (c->evt.namefilter[src]);
     }
 
-    if (c->evt.headerName) free(c->evt.headerName);
+    int i;
+    for (i = 0; i < c->evt.numHeaders; i++) {
+        if (c->evt.hextract && c->evt.hextract[i]) {
+            c->evt.hextract[i]->valid = FALSE;
+            if (c->evt.hextract[i]->filter) free(c->evt.hextract[i]->filter);
+            regfree(&c->evt.hextract[i]->re);
+            free(c->evt.hextract[i]);
+        }
+    }
+
+    if (c->evt.hextract) free(c->evt.hextract);
 
     which_transport_t t;
     for (t=CFG_MTC; t<CFG_WHICH_MAX; t++) {
@@ -350,13 +369,38 @@ cfgEvtFormatNameFilter(config_t* cfg, watch_t src)
     return nameFilterDefault[CFG_SRC_FILE];
 }
 
-const char *
-cfgEvtFormatHeader(config_t *cfg)
+size_t
+cfgEvtFormatNumHeaders(config_t *cfg)
 {
-    if (cfg) return cfg->evt.headerName;
+    if (cfg) return cfg->evt.numHeaders;
 
-    DBG(NULL);
+    return 0;
+}
+
+const char *
+cfgEvtFormatHeader(config_t *cfg, int num)
+{
+    if (cfg && (num < cfg->evt.numHeaders)) {
+        if (cfg->evt.hextract && cfg->evt.hextract[num] &&
+            (cfg->evt.hextract[num]->valid == TRUE)) {
+            return cfg->evt.hextract[num]->filter;
+        }
+    }
+
     return DEFAULT_SRC_HTTP_HEADER;
+}
+
+regex_t *
+cfgEvtFormatHeaderRe(config_t *cfg, int num)
+{
+    if (cfg && (num < cfg->evt.numHeaders)) {
+        if (cfg->evt.hextract && cfg->evt.hextract[num] &&
+            (cfg->evt.hextract[num]->valid == TRUE)) {
+            return &cfg->evt.hextract[num]->re;
+        }
+    }
+
+    return NULL;
 }
 
 unsigned
@@ -649,16 +693,31 @@ cfgEvtFormatNameFilterSet(config_t* cfg, watch_t src, const char* filter)
 void
 cfgEvtFormatHeaderSet(config_t *cfg, const char *filter)
 {
-    if (!cfg) return;
+    if (!cfg || !filter) return;
 
-    if (cfg->evt.headerName) free (cfg->evt.headerName);
+    size_t headnum = cfg->evt.numHeaders + 1;
 
-    if (!filter || (filter[0] == '\0')) {
-        cfg->evt.headerName = DEFAULT_SRC_HTTP_HEADER;
+    header_extract_t **tempex = realloc(cfg->evt.hextract, headnum * sizeof(header_extract_t *));
+    if (!tempex) {
+        DBG(NULL);
         return;
     }
 
-    cfg->evt.headerName = strdup(filter);
+    cfg->evt.hextract = tempex;
+
+    header_extract_t *hextract = calloc(1, sizeof(header_extract_t));
+    if (hextract) {
+        if (!regcomp(&hextract->re, filter, REG_EXTENDED | REG_NOSUB)) {
+            hextract->filter = strdup(filter);
+            hextract->valid = TRUE;
+        } else {
+            hextract->valid = FALSE;
+            hextract->filter = NULL;
+        }
+    }
+
+    cfg->evt.hextract[cfg->evt.numHeaders] = hextract;
+    cfg->evt.numHeaders = headnum;
 }
 
 void
@@ -800,7 +859,7 @@ cfgPayDirSet(config_t *cfg, const char *dir)
 }
 
 void
-cfgLogStreamSet(config_t *cfg)
+cfgLogStreamSet(config_t *cfg, bool value)
 {
-    if (cfg) cfg->logstream = TRUE;
+    if (cfg) cfg->logstream = value;
 }

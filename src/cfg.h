@@ -1,5 +1,7 @@
 #ifndef __CFG_H__
 #define __CFG_H__
+#include <pcre2posix.h>
+
 #include "scopetypes.h"
 
 typedef struct _config_t config_t;
@@ -40,8 +42,10 @@ const char*         cfgCustomTagValue(config_t*, const char*);
 cfg_log_level_t     cfgLogLevel(config_t*);
 unsigned int        cfgPayEnable(config_t*);
 const char *        cfgPayDir(config_t*);
-const char *        cfgEvtFormatHeader(config_t *);
+const char *        cfgEvtFormatHeader(config_t *, int);
 bool                cfgLogStream(config_t *);
+size_t              cfgEvtFormatNumHeaders(config_t *);
+regex_t *           cfgEvtFormatHeaderRe(config_t *, int);
 
 // Setters (modifies config_t, but does not persist modifications)
 void                cfgMtcEnableSet(config_t*, unsigned);
@@ -70,6 +74,6 @@ void                cfgLogLevelSet(config_t*, cfg_log_level_t);
 void                cfgPayEnableSet(config_t*, unsigned int);
 void                cfgPayDirSet(config_t*, const char *);
 void                cfgEvtFormatHeaderSet(config_t *, const char *);
-void                cfgLogStreamSet(config_t *);
+void                cfgLogStreamSet(config_t *, bool);
 
 #endif // __CFG_H__

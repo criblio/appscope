@@ -630,13 +630,13 @@ cfgProcessEnvironmentTransport(void** state)
     // unrecognised value should not affect cfg
     assert_int_equal(setenv(data->env_name, "somewhere else", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_TCP);
+    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_FILE);
     assert_string_equal(cfgTransportPath(cfg, data->transport), "/some/path/somewhere");
 
     // port is required, if not there cfg should not be modified
     assert_int_equal(setenv(data->env_name, "udp://host", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_TCP);
+    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_FILE);
     assert_string_equal(cfgTransportPath(cfg, data->transport), "/some/path/somewhere");
 
     // Just don't crash on null cfg
@@ -1086,7 +1086,7 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), DEFAULT_SRC_NET);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), DEFAULT_SRC_FS);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), DEFAULT_SRC_DNS);
-    assert_null            (cfgEvtFormatHeader(config));
+    assert_null            (cfgEvtFormatHeader(config, 0));
     assert_int_equal       (cfgTransportType(config, CFG_MTC), DEFAULT_MTC_TYPE);
     assert_string_equal    (cfgTransportHost(config, CFG_MTC), DEFAULT_MTC_HOST);
     assert_string_equal    (cfgTransportPort(config, CFG_MTC), DEFAULT_MTC_PORT);
@@ -1347,7 +1347,7 @@ const char* jsonText =
     "      {'type':'console'},\n"
     "      {'type':'syslog'},\n"
     "      {'type':'metric'},\n"
-    "      {'type':'http', 'headers':'X-blah.*'},\n"
+    "      {'type':'http', 'headers':['X-blah.*','My-goodness']},\n"
     "      {'type':'net'},\n"
     "      {'type':'fs'},\n"
     "      {'type':'dns'}\n"
@@ -1393,7 +1393,8 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), 1);
-    assert_string_equal(cfgEvtFormatHeader(config), "X-blah.*");
+    assert_string_equal(cfgEvtFormatHeader(config, 0), "X-blah.*");
+    assert_string_equal(cfgEvtFormatHeader(config, 1), "My-goodness");
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), 1);

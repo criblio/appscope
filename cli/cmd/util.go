@@ -43,6 +43,7 @@ func helpErrAndExit(cmd *cobra.Command, errText string) {
 }
 
 func metricAndEventDestFlags(cmd *cobra.Command, rc *run.Config) {
+	cmd.Flags().StringVarP(&rc.CriblDest, "cribldest", "c", "", "Set Cribl destination for metrics & events (host:port)")
 	cmd.Flags().StringVar(&rc.MetricsFormat, "metricformat", "ndjson", "Set format of metrics output (statsd|ndjson)")
 	cmd.Flags().StringVarP(&rc.MetricsDest, "metricdest", "m", "", "Set destination for metrics (tcp://host:port, udp://host:port, or file:///path/file.json)")
 	cmd.Flags().StringVarP(&rc.EventsDest, "eventdest", "e", "", "Set destination for events (tcp://host:port, udp://host:port, or file:///path/file.json)")

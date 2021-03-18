@@ -1,6 +1,8 @@
 
 CWD=$(shell pwd)
 PLATFORM=$(shell "$(CWD)"/scope_env.sh platform)
+VERSION=$(shell git describe --abbrev=0 --tags | tr -d v)
+$(shell echo -n $(VERSION) > $(CWD)/cli/VERSION)
 
 ifeq ($(PLATFORM),Linux)
 	include os/linux/Makefile

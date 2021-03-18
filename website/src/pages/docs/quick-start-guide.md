@@ -1,8 +1,8 @@
 ---
-title: Quick Start Guide
+title: Using the CLI
 ---
 
-## Quick Start Guide
+## Using the CLI
 ---
 
 ### Explore the CLI
@@ -24,7 +24,6 @@ Let's try another:
 scope curl https://google.com
 >> should see output of curl here <<
 ```
-
 
 ### Let's explore captured data
 
@@ -79,7 +78,7 @@ fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60
 
 
 
-- Display last session's captured events with `scope events`:
+- Display the last session's captured events with `scope events`:
 
 ```
 [j98] Jan 31 21:38:53 ps console stdout 19:40
@@ -104,7 +103,7 @@ fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60
 [Bh9] Jan 31 21:38:53 ps console stdout /usr/bin/ps -ef
 ```
 
-- Filter out last session's events, for just `http` with `scope events -t http`:
+- Filter out the last session's events, for just `http` with `scope events -t http`:
 
 ```
 [MJ33] Jan 31 19:55:22 cribl http http-resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
@@ -121,7 +120,7 @@ fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60
 ```
 
 
-- List this AppScope sessions history with `scope history`:
+- List this AppScope session's history with `scope history`:
 
 ```
 Displaying last 20 sessions
@@ -135,4 +134,5 @@ ID	COMMAND	CMDLINE                  	PID	AGE   	DURATION	TOTAL EVENTS
 
 ### Next Steps
 
-For guidance on taking AppScope to the next level, [join](https://cribl.io/community?utm_source=appscope&utm_medium=footer&utm_campaign=appscope) our [Community Slack](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100).
+- Explore the [Loader, Library, and .yml files](/docs/loader-library).
+- View the complete [CLI Reference](/docs/cli-reference).

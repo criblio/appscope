@@ -212,7 +212,7 @@ libscope:
   summaryperiod: 10
   commanddir: CMDDIR
   log:
-    level: error
+    level: warning
     transport:
       type: file
       path: LDSCOPELOGPATH

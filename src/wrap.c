@@ -930,7 +930,7 @@ load_func(const char *module, const char *func)
 }
 
 static int 
-hookCallback(struct dl_phdr_info *info, size_t size, void *data)
+findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
 {
     int len = strlen(info->dlpi_name);
     int libscope_so_len = 11;
@@ -942,26 +942,38 @@ hookCallback(struct dl_phdr_info *info, size_t size, void *data)
     return 0;
 }
 
-static int
-findGlibc__write(struct dl_phdr_info *info, size_t size, void *data)
+
+typedef struct
 {
-    if (strstr(info->dlpi_name, "libc.so")) {
+    const char *library;    // Input:   e.g. libpthread.so
+    const char *symbol;     // Input:   e.g. __write
+    void **out_addr;        // Output:  e.g. 0x7fffff2523A23734
+} find_sym_t;
+
+static int
+findLibSym(struct dl_phdr_info *info, size_t size, void *data)
+{
+    find_sym_t *find = (find_sym_t *)data;
+    *(find->out_addr) = NULL;
+
+    if (strstr(info->dlpi_name, find->library)) {
 
         void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
         if (!handle) return 0;
-        void *addr = dlsym(handle, "__write");
+        void *addr = dlsym(handle, find->symbol);
         dlclose(handle);
 
         // if we don't find addr, keep going
         if (!addr)  return 0;
 
-        // We found an addr from libc.so!  Return it!
-        *(void**)data = addr;
+        // We found symbol in library!  Return the address for it!
+        *(find->out_addr) = addr;
         return 1;
 
     }
     return 0;
 }
+
 
 /*
  * There are 3x SSL_read functions to consider:
@@ -982,7 +994,8 @@ findGlibc__write(struct dl_phdr_info *info, size_t size, void *data)
  * get a handle and lookup the symbol.
  */
 
-static ssize_t __write(int fd, const void *buf, size_t size);
+static ssize_t __write_libc(int fd, const void *buf, size_t size);
+static ssize_t __write_pthread(int fd, const void *buf, size_t size);
 
 static void
 initHook()
@@ -1020,7 +1033,7 @@ initHook()
     if (full_path) free(full_path);
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
-    if (dl_iterate_phdr(hookCallback, &full_path)) {
+    if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
         if (handle == NULL) {
             dlclose(handle);
@@ -1035,10 +1048,20 @@ initHook()
         dlclose(handle);
     }
 
-    g_fn.__write = 0;
-    dl_iterate_phdr(findGlibc__write, &g_fn.__write);
+    // We're funchooking __write in both libc.so and libpthread.so
+    // curl didn't work unless we funchook'd libc.
+    // test/linux/unixpeer didn't work unless we funchook'd pthread.
+    find_sym_t libc__write = {.library="libc.so",
+                              .symbol="__write",
+                              .out_addr = (void*)&g_fn.__write_libc};
+    dl_iterate_phdr(findLibSym, &libc__write);
 
-    if (should_we_patch || g_fn.sendmmsg || g_fn.__write) {
+    find_sym_t pthread__write = {.library = "libpthread.so",
+                                 .symbol = "__write",
+                                 .out_addr = (void*)&g_fn.__write_pthread};
+    dl_iterate_phdr(findLibSym, &pthread__write);
+
+    if (should_we_patch || g_fn.sendmmsg || g_fn.__write_libc || g_fn.__write_pthread) {
         funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_DEBUG) {
@@ -1061,8 +1084,11 @@ initHook()
             rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, sendmmsg);
         }
 
-        if (g_fn.__write) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.__write, __write);
+        if (g_fn.__write_libc) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
+        }
+        if (g_fn.__write_pthread) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
         }
 
         // hook 'em
@@ -2138,14 +2164,27 @@ __overflow(FILE *stream, int ch)
 }
 
 static ssize_t
-__write(int fd, const void *buf, size_t size)
+__write_libc(int fd, const void *buf, size_t size)
 {
-    WRAP_CHECK(__write, -1);
+    WRAP_CHECK(__write_libc, -1);
     uint64_t initialTime = getTime();
 
-    ssize_t rc = g_fn.__write(fd, buf, size);
+    ssize_t rc = g_fn.__write_libc(fd, buf, size);
 
-    doWrite(fd, initialTime, (rc != -1), buf, rc, "__write", BUF, 0);
+    doWrite(fd, initialTime, (rc != -1), buf, rc, "__write_libc", BUF, 0);
+
+    return rc;
+}
+
+static ssize_t
+__write_pthread(int fd, const void *buf, size_t size)
+{
+    WRAP_CHECK(__write_pthread, -1);
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.__write_pthread(fd, buf, size);
+
+    doWrite(fd, initialTime, (rc != -1), buf, rc, "__write_pthread", BUF, 0);
 
     return rc;
 }

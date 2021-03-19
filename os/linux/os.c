@@ -607,6 +607,26 @@ osGetPageProt(uint64_t addr)
     return prot;
 }
 
+int
+osNeedsConnect(int fd)
+{
+    int rc, timeout;
+    struct pollfd fds;
+
+    if (!g_fn.poll) return 0;
+
+    timeout = 0;
+    memset(&fds, 0x0, sizeof(fds));
+    fds.events = POLLRDHUP | POLLOUT;
+
+    fds.fd = fd;
+
+    rc = g_fn.poll(&fds, 1, timeout);
+
+    if ((rc != 0) && (((fds.revents & POLLRDHUP) != 0) || ((fds.revents & POLLERR) != 0))) return 1;
+    return 0;
+}
+
 /*
  * Example from /proc/<pid>/cgroup:
    2:freezer:/

@@ -1,10 +1,96 @@
 #define _GNU_SOURCE
+#include <string.h>
+
 #include "com.h"
 #include "dbg.h"
 
-extern rtconfig g_cfg;
-
 bool g_need_stack_expand = FALSE;
+unsigned g_sendprocessstart = 0;
+
+// interfaces
+mtc_t *g_mtc = NULL;
+ctl_t *g_ctl = NULL;
+
+// Add a newline delimiter to a msg
+char *
+msgAddNewLine(char *msg)
+{
+    if (!msg) return NULL;
+
+    int strsize = strlen(msg);
+    char *temp = realloc(msg, strsize + 2); // room for "\n\0"
+    if (!temp) {
+        DBG(NULL);
+        free(msg);
+        return NULL;
+    }
+
+    msg = temp;
+    msg[strsize] = '\n';
+    msg[strsize+1] = '\0';
+
+    return msg;
+}
+
+void
+sendProcessStartMetric()
+{
+    char *urlEncodedCmd = fmtUrlEncode(g_proc.cmd);
+    event_field_t fields[] = {
+        STRFIELD("proc", (g_proc.procname), 4, TRUE),
+        NUMFIELD("pid", (g_proc.pid), 4, TRUE),
+        STRFIELD("host", (g_proc.hostname), 4, TRUE),
+        STRFIELD("args", (urlEncodedCmd), 7, TRUE),
+        STRFIELD("unit", ("process"), 1, TRUE),
+        FIELDEND
+    };
+    event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
+    cmdSendMetric(g_mtc, &evt);
+    if (urlEncodedCmd) free(urlEncodedCmd);
+}
+
+/*
+ * This is called in 3 contexts/use cases
+ * From the constructor
+ * From the child on a fork, before return to the child from fork
+ * From the periodic thread
+ *
+ * In all cases we send the json direct over the configured transport.
+ * No in-memory buffer or delay. Given this context it should be safe
+ * to send direct like this.
+ */
+void
+reportProcessStart(ctl_t *ctl, bool init, which_transport_t who)
+{
+    // 1) Send a startup msg
+    if (g_sendprocessstart && ((who == CFG_CTL) || (who == CFG_WHICH_MAX))) {
+        cJSON *json = msgStart(&g_proc, g_cfg.staticfg, CFG_CTL);
+        ctlSendJson(ctl, json, CFG_CTL);
+    }
+
+    // 2) send a payload start msg
+    if (g_sendprocessstart && ((who == CFG_LS) || (who == CFG_WHICH_MAX)) &&
+        cfgLogStream(g_cfg.staticfg) && cfgPayEnable(g_cfg.staticfg)) {
+        cJSON *json = msgStart(&g_proc, g_cfg.staticfg, CFG_LS);
+        ctlSendJson(ctl, json, CFG_LS);
+    }
+
+    // only emit metric and log msgs at init time
+    if (init) {
+        // 3) Log it at startup, provided the loglevel is set to allow it
+        scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
+        char *cmd_w_args = NULL;
+        if (asprintf(&cmd_w_args, "command w/args: %s", g_proc.cmd) != -1) {
+            scopeLog(cmd_w_args, -1, CFG_LOG_INFO);
+            if (cmd_w_args) free(cmd_w_args);
+        }
+
+        msgLogConfig(g_cfg.staticfg);
+
+        // 4) Send a metric start; proc.start
+        sendProcessStartMetric();
+    }
+}
 
 // for reporttest on mac __attribute__((weak))
 /*
@@ -131,8 +217,24 @@ jsonEnvironmentObject()
     // env variables???
 }
 
+void
+msgLogConfig(config_t *cfg)
+{
+    cJSON *json;
+
+    if (!(json = jsonConfigurationObject(cfg))) return;
+
+    char *cfg_text = cJSON_PrintUnformatted(json);
+
+    if (cfg_text) {
+        scopeLog(cfg_text, -1, CFG_LOG_INFO);
+    }
+
+    cJSON_Delete(json);
+}
+
 cJSON *
-msgStart(proc_id_t *proc, config_t *cfg)
+msgStart(proc_id_t *proc, config_t *cfg, which_transport_t who)
 {
     cJSON *json_root = NULL;
     cJSON *json_info;
@@ -140,7 +242,11 @@ msgStart(proc_id_t *proc, config_t *cfg)
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
-    if (!cJSON_AddStringToObjLN(json_root, "format", "ndjson")) goto err;
+    if (who == CFG_LS) {
+        if (!cJSON_AddStringToObjLN(json_root, "format", "scope")) goto err;
+    } else {
+        if (!cJSON_AddStringToObjLN(json_root, "format", "ndjson")) goto err;
+    }
 
     if (!(json_info = cJSON_AddObjectToObjLN(json_root, "info"))) goto err;
 
@@ -153,12 +259,8 @@ msgStart(proc_id_t *proc, config_t *cfg)
     if (!(json_env = jsonEnvironmentObject())) goto err;
     cJSON_AddItemToObjectCS(json_info, "environment", json_env);
 
-    char *cfg_text = cJSON_PrintUnformatted(json_cfg);
-    if (cfg_text) {
-        scopeLog(cfg_text, -1, CFG_LOG_INFO);
-        free(cfg_text);
-    }
     return json_root;
+
 err:
     if (json_root) cJSON_Delete(json_root);
     return NULL;

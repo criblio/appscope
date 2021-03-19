@@ -43,3 +43,4 @@ extern int osGetPageProt(uint64_t);
 extern bool osTimerStop(void);
 extern bool osGetCgroup(pid_t, char *, size_t);
 extern char *osGetFileMode(mode_t);
+extern int osNeedsConnect(int);

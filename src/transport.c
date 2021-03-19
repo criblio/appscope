@@ -10,8 +10,10 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
 #include "dbg.h"
 #include "scopetypes.h"
+#include "os.h"
 #include "transport.h"
 
 struct _transport_t
@@ -187,7 +189,8 @@ transportNeedsConnection(transport_t *trans)
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            return (trans->net.sock == -1);
+            if (trans->net.sock == -1) return 1;
+            return osNeedsConnect(trans->net.sock);
         case CFG_FILE:
             // This checks to see if our file descriptor has been
             // closed by our process.  (errno == EBADF) Stream buffering
@@ -412,6 +415,7 @@ checkPendingSocketStatus(transport_t *trans)
     }
 
     int i;
+    rc = 0;
     for (i=0; i<FD_SETSIZE; i++) {
         if (!FD_ISSET(i, &pending_results)) continue;
 
@@ -445,6 +449,7 @@ checkPendingSocketStatus(transport_t *trans)
 
     // If we were successful, we can stop looking.  Clean up pending sockets.
     if (trans->net.sock != -1) {
+        rc = 1;
         for (i=0; i<FD_SETSIZE; i++) {
             if (FD_ISSET(i, &trans->net.pending_connect)) {
                 scopeLog("abandoning connect due to previous success", i, CFG_LOG_INFO);
@@ -454,7 +459,7 @@ checkPendingSocketStatus(transport_t *trans)
         }
     }
 
-    return 1;
+    return rc;
 }
 
 

@@ -149,23 +149,6 @@ sendEvent(mtc_t *mtc, event_t *event)
     }
 }
 
-void
-sendProcessStartMetric()
-{
-    char *urlEncodedCmd = fmtUrlEncode(g_proc.cmd);
-    event_field_t fields[] = {
-        PROC_FIELD(g_proc.procname),
-        PID_FIELD(g_proc.pid),
-        HOST_FIELD(g_proc.hostname),
-        ARGS_FIELD(urlEncodedCmd),
-        UNIT_FIELD("process"),
-        FIELDEND
-    };
-    event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
-    cmdSendMetric(g_mtc, &evt);
-    if (urlEncodedCmd) free(urlEncodedCmd);
-}
-
 static void
 destroyProto(protocol_info *proto)
 {
@@ -2437,6 +2420,30 @@ void
 doEvent()
 {
     uint64_t data;
+    bool ready = FALSE;
+
+    // if no connection, don't pull data from the queue
+    if (ctlNeedsConnection(g_ctl, CFG_CTL)) {
+        if (ctlConnect(g_ctl, CFG_CTL)) {
+            reportProcessStart(g_ctl, FALSE, CFG_CTL);
+            ready = TRUE;
+        }
+    } else {
+        ready = TRUE;
+    }
+
+    if (ready == FALSE) {
+        if (mtcNeedsConnection(g_mtc)) {
+            if (mtcConnect(g_mtc)) {
+                ready = TRUE;
+            }
+        } else {
+            ready = TRUE;
+        }
+    }
+
+    if (ready == FALSE) return;
+
     while ((data = msgEventGet(g_ctl)) != -1) {
         if (data) {
             evt_type *event = (evt_type *)data;
@@ -2482,23 +2489,40 @@ doPayload()
 {
     uint64_t data;
 
+    // if LS enabled, then check for a connection
+    if (cfgLogStream(g_cfg.staticfg) && ctlNeedsConnection(g_ctl, CFG_LS)) {
+        if (ctlConnect(g_ctl, CFG_LS)) {
+            reportProcessStart(g_ctl, FALSE, CFG_LS);
+        } else {
+            return;
+        }
+    }
+
     while ((data = msgPayloadGet(g_ctl)) != -1) {
         if (data) {
             payload_info *pinfo = (payload_info *)data;
             net_info *net = &pinfo->net;
             size_t hlen = 1024;
             char pay[hlen];
-            char *srcstr = NULL, rx[]="rx", tx[]="tx", none[]="none";
+            char *srcstr = NULL,
+                netrx[]="netrx", nettx[]="nettx", none[]="none",
+                tlsrx[]="tlsrx", tlstx[]="tlstx";
 
             switch (pinfo->src) {
             case NETTX:
-            case TLSTX:
-                srcstr = tx;
+                srcstr = nettx;
                 break;
 
+            case TLSTX:
+                srcstr = tlstx;
+                 break;
+
             case NETRX:
+                srcstr = netrx;
+                break;
+
             case TLSRX:
-                srcstr = rx;
+                srcstr = tlsrx;
                 break;
 
             default:

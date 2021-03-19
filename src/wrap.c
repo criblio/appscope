@@ -40,9 +40,10 @@ static mtc_t *g_prevmtc = NULL;
 static ctl_t *g_prevctl = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
-static unsigned g_sendprocessstart;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
+
+unsigned g_sendprocessstart;
 
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
@@ -52,7 +53,6 @@ __thread int g_getdelim = 0;
 // Forward declaration
 static void *periodic(void *);
 static void doConfig(config_t *);
-static void reportProcessStart(void);
 static void threadNow(int);
 
 #ifdef __LINUX__
@@ -672,7 +672,7 @@ doReset()
 
     atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
 
-    reportProcessStart();
+    reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
     threadInit();
 }
 
@@ -801,15 +801,6 @@ periodic(void *arg)
             if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
             if (logNeedsConnection(g_log)) logConnect(g_log);
 
-            if (ctlNeedsConnection(g_ctl, CFG_CTL) && ctlConnect(g_ctl, CFG_CTL) &&
-                g_sendprocessstart) {
-                // Hey we have a new connection!  Identify ourselves
-                // like reportProcessStart, but only on the event interface...
-                cJSON *json = msgStart(&g_proc, g_staticfg);
-                ctlSendJson(g_ctl, json);
-                ctlFlush(g_ctl);
-            }
-
             if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
                 reportPeriodicStuff();
                 atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
@@ -827,28 +818,6 @@ periodic(void *arg)
     }
 
     return NULL;
-}
-
-static void
-reportProcessStart(void)
-{
-    // 1) Log it at startup, provided the loglevel is set to allow it
-    scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
-    char* cmd_w_args=NULL;
-    if (asprintf(&cmd_w_args, "command w/args: %s", g_proc.cmd) != -1) {
-        scopeLog(cmd_w_args, -1, CFG_LOG_INFO);
-        if (cmd_w_args) free(cmd_w_args);
-    }
-
-    // 2) Send a metric
-    sendProcessStartMetric();
-
-    // 3) Send a startup msg
-    if (g_sendprocessstart) {
-        cJSON *json = msgStart(&g_proc, g_staticfg);
-        ctlSendJson(g_ctl, json);
-        ctlFlush(g_ctl);
-    }
 }
 
 // TODO; should this move to os/linux/os.c?
@@ -1084,7 +1053,7 @@ init(void)
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
-    reportProcessStart();
+    reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
 
     if (atexit(handleExit)) {
         DBG(NULL);

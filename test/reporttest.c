@@ -10,6 +10,7 @@
 #include "report.h"
 #include "runtimecfg.h"
 #include "state.h"
+#include "com.h"
 #include "test.h"
 
 #define BUFSIZE 500

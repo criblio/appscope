@@ -50,11 +50,6 @@ static list_t *g_protlist;
 static unsigned int g_prot_sequence = 0;
 static protocol_def_t *g_payload_pre = NULL;
 
-// interfaces
-mtc_t *g_mtc = NULL;
-ctl_t *g_ctl = NULL;
-
-
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
 

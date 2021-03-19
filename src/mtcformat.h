@@ -59,6 +59,22 @@ typedef struct event_format {
     watch_t sourcetype;
 } event_format_t;
 
+typedef struct {
+    unsigned long long uid;
+    double timestamp;
+    char *path;
+    watch_t sourcetype;
+    regex_t *valuefilter;
+    proc_id_t* proc;
+} log_id_t;
+
+typedef struct {
+    int fd;
+    log_id_t id;
+    char *data;
+    unsigned long long datalen;
+} log_event_t;
+
 typedef struct _mtc_fmt_t mtc_fmt_t;
 
 // Constructors Destructors

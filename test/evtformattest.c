@@ -343,103 +343,6 @@ evtFormatMetricRateLimitCanBeTurnedOff(void** state)
 }
 
 static void
-evtFormatLogWithSourceDisabledReturnsNull(void** state)
-{
-    evt_fmt_t* evt = evtFormatCreate();
-    assert_non_null(evt);
-
-    proc_id_t proc = {.pid = 4848,
-                      .ppid = 4847,
-                      .hostname = "host",
-                      .procname = "evttest",
-                      .cmd = "cmd-log",
-                      .id = "host-evttest-cmd-4"};
-
-    // default is enabled
-    cJSON* json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-
-    // when enabled, we should get a non-null msg
-    evtFormatSourceEnabledSet(evt, CFG_SRC_CONSOLE, 0);
-    json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
-    assert_null(json);
-    cJSON_Delete(json);
-
-    // Set it back to enabled, just to be sure.
-    evtFormatSourceEnabledSet(evt, CFG_SRC_CONSOLE, 1);
-    json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-
-    evtFormatDestroy(&evt);
-}
-
-static void
-evtFormatLogWithAndWithoutMatchingNameFilter(void** state)
-{
-    evt_fmt_t* evt = evtFormatCreate();
-    assert_non_null(evt);
-    evtFormatSourceEnabledSet(evt, CFG_SRC_FILE, 1);
-
-    proc_id_t proc = {.pid = 4848,
-                      .ppid = 4847,
-                      .hostname = "host",
-                      .procname = "evttest",
-                      .cmd = "cmd-log",
-                      .id = "host-evttest-cmd-4"};
-
-    // default name filter matches anything with log in the path
-    cJSON* json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-    cJSON_Delete(json);
-
-    // Changing the name filter to ".*my[.]log" shouldn't match.
-    evtFormatNameFilterSet(evt, CFG_SRC_FILE, ".*my[.]log");
-    json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
-    assert_null(json);
-
-    // Changing the name filter to "^/var/log/.*[.]log$" should match.
-    evtFormatNameFilterSet(evt, CFG_SRC_FILE, "^/var/log/.*[.]log$");
-    json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-    cJSON_Delete(json);
-
-    evtFormatDestroy(&evt);
-}
-
-static void
-evtFormatLogWithAndWithoutMatchingValueFilter(void** state)
-{
-    evt_fmt_t* evt = evtFormatCreate();
-    assert_non_null(evt);
-    evtFormatSourceEnabledSet(evt, CFG_SRC_FILE, 1);
-
-    proc_id_t proc = {.pid = 4848,
-                      .ppid = 4847,
-                      .hostname = "host",
-                      .procname = "evttest",
-                      .cmd = "cmd-log",
-                      .id = "host-evttest-cmd-4"};
-
-    // default value filter matches anything
-    cJSON* json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-    cJSON_Delete(json);
-
-    // Changing the value filter to "blah" shouldn't match.
-    evtFormatValueFilterSet(evt, CFG_SRC_FILE, "blah");
-    json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
-    assert_null(json);
-
-    // Changing the value filter to "hey" should match.
-    evtFormatValueFilterSet(evt, CFG_SRC_FILE, "hey");
-    json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-    cJSON_Delete(json);
-
-    evtFormatDestroy(&evt);
-}
-
-static void
 fmtEventJsonValue(void** state)
 {
     proc_id_t proc = {.pid = 1234,
@@ -898,9 +801,6 @@ main(int argc, char* argv[])
         cmocka_unit_test(evtFormatMetricWithAndWithoutMatchingValueFilter),
         cmocka_unit_test(evtFormatMetricRateLimitReturnsNotice),
         cmocka_unit_test(evtFormatMetricRateLimitCanBeTurnedOff),
-        cmocka_unit_test(evtFormatLogWithSourceDisabledReturnsNull),
-        cmocka_unit_test(evtFormatLogWithAndWithoutMatchingNameFilter),
-        cmocka_unit_test(evtFormatLogWithAndWithoutMatchingValueFilter),
         cmocka_unit_test(fmtEventJsonValue),
         cmocka_unit_test(fmtEventJsonWithCustomTags),
         cmocka_unit_test(fmtEventJsonWithEmbeddedNulls),

@@ -2,12 +2,27 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/timeb.h>
 
 #include "circbuf.h"
 #include "cfgutils.h"
+#include "com.h"
 #include "ctl.h"
 #include "dbg.h"
 #include "com.h"
+#include "fn.h"
+
+#define FS_ENTRIES 1024
+#define DEFAULT_LOG_MAX_AGG_BYTES 32768
+#define DEFAULT_LOG_FLUSH_PERIOD_IN_MS 2000
+
+typedef struct {
+    char *buf;
+    size_t bufsize;
+    FILE *stream;
+    unsigned long long tot_size;
+    log_id_t id;
+} streambuf_t;
 
 struct _ctl_t
 {
@@ -15,14 +30,31 @@ struct _ctl_t
     transport_t *paytrans;
     evt_fmt_t *evt;
     cbuf_handle_t events;
-    cbuf_handle_t evbuf;
     unsigned enhancefs;
+
+    // Used to buffer (aggregate) log and console data
+    struct {
+        // queuing from their thread to our own
+        cbuf_handle_t ringbuf;
+
+        // storage for aggregating log and console data
+        int stop_aggregating;
+        streambuf_t streamAgg[FS_ENTRIES];
+
+        // limits for how much raw data to aggregate
+        // and how long to aggregate without reporting
+        unsigned long max_agg_bytes;
+        unsigned long flush_period_in_ms;
+    } log;
 
     struct {
         unsigned int enable;
         char * dir;
         cbuf_handle_t ringbuf;
     } payload;
+
+    // Temporary, I believe...  only used for command/response w/cribl
+    cbuf_handle_t msgbuf;
 };
 
 typedef struct {
@@ -521,19 +553,21 @@ ctlCreate()
     ctl_t *ctl = calloc(1, sizeof(ctl_t));
     if (!ctl) {
         DBG(NULL);
-        return NULL;
+        goto err;
     }
 
-    ctl->evbuf = cbufInit(DEFAULT_CBUF_SIZE);
-    if (!ctl->evbuf) {
+    ctl->log.ringbuf = cbufInit(DEFAULT_CBUF_SIZE);
+    if (!ctl->log.ringbuf) {
         DBG(NULL);
-        return NULL;
+        goto err;
     }
+    ctl->log.max_agg_bytes = DEFAULT_LOG_MAX_AGG_BYTES;
+    ctl->log.flush_period_in_ms = DEFAULT_LOG_FLUSH_PERIOD_IN_MS;
 
     ctl->events = cbufInit(DEFAULT_CBUF_SIZE);
     if (!ctl->events) {
         DBG(NULL);
-        return NULL;
+        goto err;
     }
 
     ctl->enhancefs = DEFAULT_ENHANCE_FS;
@@ -543,9 +577,18 @@ ctlCreate()
     ctl->payload.ringbuf = cbufInit(DEFAULT_PAYLOAD_RING_SIZE);
     if (!ctl->payload.ringbuf) {
         DBG(NULL);
-        return NULL;
+        goto err;
     }
 
+    ctl->msgbuf = cbufInit(1000);
+    if (!ctl->msgbuf) {
+        DBG(NULL);
+        goto err;
+    }
+
+    return ctl;
+err:
+    ctlDestroy(&ctl);
     return ctl;
 }
 
@@ -554,8 +597,10 @@ ctlDestroy(ctl_t **ctl)
 {
     if (!ctl || !*ctl) return;
 
+    ctlStopAggregating(*ctl);
     ctlFlush(*ctl);
-    cbufFree((*ctl)->evbuf);
+    cbufFree((*ctl)->log.ringbuf);
+    cbufFree((*ctl)->msgbuf);
     cbufFree((*ctl)->events);
 
     if ((*ctl)->payload.dir) free((*ctl)->payload.dir);
@@ -572,13 +617,13 @@ ctlDestroy(ctl_t **ctl)
 void
 ctlSendMsg(ctl_t *ctl, char *msg)
 {
-if (!msg) return;
+    if (!msg) return;
     if (!ctl) {
         free(msg);
         return;
     }
 
-    if (cbufPut(ctl->evbuf, (uint64_t)msg) == -1) {
+    if (cbufPut(ctl->msgbuf, (uint64_t)msg) == -1) {
         // Full; drop and ignore
         DBG(NULL);
         free(msg);
@@ -715,40 +760,135 @@ ctlPostEvent(ctl_t *ctl, char *event)
     return 0;
 }
 
+log_event_t *
+createInternalLogEvent(int fd, const char *path, const void *buf, size_t count, uint64_t uid, proc_id_t *proc, watch_t logType, regex_t *valfilter)
+{
+    log_event_t *event = calloc(1, sizeof(*event));
+    char *data = malloc(count);
+    char *src = strdup(path);
+
+    if (!event || !data || !path) {
+        if (event) free(event);
+        if (data) free(data);
+        if (src) free(src);
+        DBG("event = %p, data = %p, src = %p", event, data, src);
+        return NULL;
+    }
+
+    memcpy(data, buf, count);
+
+    struct timeb tb;
+    ftime(&tb);
+    event->fd = fd;
+    event->id.uid = uid;
+    event->id.timestamp = tb.time + (double)tb.millitm/1000;
+    event->id.path = src;
+    event->id.proc = proc;
+    event->id.sourcetype = logType;
+    event->id.valuefilter = valfilter;
+    event->data = data;
+    event->datalen = count;
+
+    return event;
+}
+
+void
+destroyInternalLogEvent(log_event_t **eventptr)
+{
+    if (!eventptr || !*eventptr) return;
+
+    log_event_t *event = *eventptr;
+    if (event->id.path) free(event->id.path);
+    if (event->data)    free(event->data);
+    if (event)          free(event);
+    *eventptr = NULL;
+}
+
 int
-ctlSendLog(ctl_t *ctl, const char *path, const void *buf, size_t count, uint64_t uid, proc_id_t *proc)
+ctlSendLog(ctl_t *ctl, int fd, const char *path, const void *buf, size_t count, uint64_t uid, proc_id_t *proc)
 {
     if (!ctl || !path || !buf || !proc) return -1;
 
-    upload_t upld;
-
-    // get a cJSON object for the given log msg
-    cJSON *json = evtFormatLog(ctl->evt, path, buf, count, uid, proc);
-    if (!json) return -1;
-
-    upld.type = UPLD_EVT;
-    upld.body = json;
-    upld.req = NULL;
-    char *msg = ctlCreateTxMsg(&upld);
-    if (!msg) return -1;
-
-    if (cbufPut(ctl->evbuf, (uint64_t)msg) == -1) {
-        // Full; drop and ignore
-        DBG(NULL);
-        if (msg) free(msg);
-        return -1;
+    regex_t *filter;
+    watch_t logType;
+    if (evtFormatSourceEnabled(ctl->evt, CFG_SRC_CONSOLE) &&
+       (filter = evtFormatNameFilter(ctl->evt, CFG_SRC_CONSOLE)) &&
+       (!regexec_wrapper(filter, path, 0, NULL, 0))) {
+        logType = CFG_SRC_CONSOLE;
+    } else if (evtFormatSourceEnabled(ctl->evt, CFG_SRC_FILE) &&
+       (filter = evtFormatNameFilter(ctl->evt, CFG_SRC_FILE)) &&
+       (!regexec_wrapper(filter, path, 0, NULL, 0))) {
+        logType = CFG_SRC_FILE;
+    } else {
+        return 0;
     }
 
+    // We can't run the value filter on what might be raw binary data.
+    // Grab the correct one for our logType, and send a pointer of
+    // it to be used later, after we've created a string from the data.
+    filter = evtFormatValueFilter(ctl->evt, logType);
+
+    log_event_t *logevent;
+    logevent = createInternalLogEvent(fd, path, buf, count, uid, proc, logType, filter);
+
+    if (cbufPut(ctl->log.ringbuf, (uint64_t)logevent) == -1) {
+        // Full; drop and ignore
+        DBG(NULL);
+        destroyInternalLogEvent(&logevent);
+        return -1;
+    }
     return 0;
+}
+
+static cJSON *
+createLogEventJson(ctl_t *ctl, streambuf_t *stmbuf)
+{
+    cJSON *root = NULL;
+    cJSON *data;
+    int successful = FALSE;
+
+    event_format_t event;
+    event.timestamp = stmbuf->id.timestamp;
+    event.src = stmbuf->id.path;
+    event.proc = stmbuf->id.proc;
+    event.uid = stmbuf->id.uid;
+    event.sourcetype = stmbuf->id.sourcetype;
+
+    g_fn.fclose(stmbuf->stream);  // updates stmbuf->buf, stmbuf->bufsize
+    stmbuf->stream = NULL;
+
+    if (!(root = cJSON_CreateObject())) goto out;
+    if (!(data = cJSON_CreateStringFromBuffer(stmbuf->buf, stmbuf->bufsize))) goto out;
+    cJSON_AddItemToObjectCS(root, "message", data);
+    event.data = root;
+
+    if (data && data->valuestring) {
+        regex_t *filter = stmbuf->id.valuefilter;
+        if (filter && regexec_wrapper(filter, data->valuestring, 0, NULL, 0)) {
+            // This event doesn't match.  Drop it on the floor.
+            goto out;
+        }
+    }
+
+    if (!(root = fmtEventJson(ctl->evt, &event))) goto out;
+
+    successful = TRUE;
+out:
+    if (!successful && root) {
+        cJSON_Delete(root);
+        root = NULL;
+    }
+    free(stmbuf->buf);
+    free(stmbuf->id.path);
+
+    return root;
 }
 
 static void
 sendBufferedMessages(ctl_t *ctl)
 {
-    if (!ctl) return;
-
     uint64_t data;
-    while (cbufGet(ctl->evbuf, &data) == 0) {
+    while (cbufGet(ctl->msgbuf, &data) == 0) {
         if (data) {
             char *msg = (char*) data;
 
@@ -772,10 +912,101 @@ sendBufferedMessages(ctl_t *ctl)
     }
 }
 
+static void
+sendAggregatedLogData(ctl_t *ctl, streambuf_t *stmbuf)
+{
+    // Create json for log/console event and run the regex valuefilter
+    cJSON *json = createLogEventJson(ctl, stmbuf);
+    if (!json) return;
+
+    // Create message
+    upload_t upld;
+    upld.type = UPLD_EVT;
+    upld.body = json;
+    upld.req = NULL;
+    char *msg = prepMessage(&upld);
+    if (!msg) return;
+
+    // Send it.
+    transportSend(ctl->transport, msg, strlen(msg));
+    free(msg);
+}
+
+static void
+ctlSendAllAggregatedLogData(ctl_t *ctl)
+{
+    if (!ctl) return;
+    static unsigned long long count = 0;
+
+    // If our process is exiting or this ctl is going away, report all now.
+    // Otherwise, send the data once out of every flush_period_in_ms.
+    // (Note that this code assumes it's called once per ms.)
+    int report_now = ctl->log.stop_aggregating;
+    report_now |= !(count++ % ctl->log.flush_period_in_ms);
+    if (!report_now) return;
+
+    int i;
+    for (i=0; i<FS_ENTRIES; i++) {
+        streambuf_t *stmbuf = &ctl->log.streamAgg[i];
+        if (stmbuf->stream) {
+            sendAggregatedLogData(ctl, stmbuf);
+        }
+    }
+}
+
 void
 ctlFlushLog(ctl_t *ctl)
 {
-    return sendBufferedMessages(ctl);
+    if (!ctl) return;
+
+    // aggregate the data queued by ctlSendLog
+    uint64_t data;
+    while (cbufGet(ctl->log.ringbuf, &data) == 0) {
+        if (!data) continue;
+        log_event_t *event = (log_event_t*) data;
+
+        if ((event->fd >= 0) && (event->fd < FS_ENTRIES)) {
+
+            streambuf_t *stmbuf = &ctl->log.streamAgg[event->fd];
+
+            // See if something new is on the same FD or
+            // if adding this event would exceed our stream buffer data limit.
+            // In either of these cases, send what we have so far.
+            // The act of sending the data closes the stream buffer.
+            if (stmbuf->stream &&
+                 ((stmbuf->id.uid != event->id.uid) ||
+                 (stmbuf->tot_size + event->datalen > ctl->log.max_agg_bytes))) {
+                sendAggregatedLogData(ctl, stmbuf);
+            }
+
+            // Open a new stream buffer if needed
+            if (!stmbuf->stream) {
+                stmbuf->buf = NULL;
+                stmbuf->bufsize = 0;
+                stmbuf->tot_size = 0;
+                stmbuf->stream = open_memstream(&stmbuf->buf, &stmbuf->bufsize);
+                if (!stmbuf->stream) {
+                    DBG("log buffer create error for fd %d, path %s", event->fd, event->id.path);
+                } else {
+                    stmbuf->id = event->id;
+                    event->id.path = NULL; // Tranferring alloc'd path from event to stmbuf.
+                }
+            }
+
+            // Append the current event data onto the stream buffer
+            if (stmbuf->stream) {
+                size_t actual = g_fn.fwrite(event->data, 1, event->datalen, stmbuf->stream);
+                stmbuf->tot_size += actual;
+                if (event->datalen != actual) {
+                    DBG("log buffer write error for fd %d, path %s. tried to "
+                        "buffer %zu, but only buffered %zu", event->fd, event->id.path,
+                        event->datalen, actual);
+                }
+            }
+        }
+
+        destroyInternalLogEvent(&event);
+    }
 }
 
 int
@@ -791,11 +1022,18 @@ ctlSendBin(ctl_t *ctl, char *buf, size_t len)
 }
 
 void
+ctlStopAggregating(ctl_t *ctl)
+{
+    if (!ctl) return;
+    ctl->log.stop_aggregating = TRUE;
+}
+
+void
 ctlFlush(ctl_t *ctl)
 {
     if (!ctl) return;
-
     sendBufferedMessages(ctl);
+    ctlSendAllAggregatedLogData(ctl);
     transportFlush(ctl->transport);
     transportFlush(ctl->paytrans);
 }
@@ -966,7 +1204,7 @@ ctlGetEvent(ctl_t *ctl)
 bool
 ctlCbufEmpty(ctl_t *ctl)
 {
-    return cbufEmpty(ctl->evbuf);
+    return cbufEmpty(ctl->log.ringbuf);
 }
 
 int

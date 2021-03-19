@@ -22,8 +22,6 @@ custom_tag_t **     evtFormatCustomTags(evt_fmt_t *);
 // These are the exposed functions that are expected to be used externally
 cJSON *             evtFormatMetric(evt_fmt_t *, event_t *, uint64_t, proc_id_t *);
 cJSON *             evtFormatHttp(evt_fmt_t *, event_t *, uint64_t, proc_id_t *);
-cJSON *             evtFormatLog(evt_fmt_t *, const char *, const void *, size_t,
-                                 uint64_t, proc_id_t *);
 
 // Could be static; these are lower level funcs only exposed for testing
 cJSON *             fmtMetricJson(event_t *, regex_t *, watch_t);

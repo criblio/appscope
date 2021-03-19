@@ -200,6 +200,8 @@ typedef struct {
     int (*fstatvfs64)(int, struct statvfs64 *);
     int (*epoll_wait)(int, struct epoll_event *, int, int);
     int (*__overflow)(FILE *, int);
+    ssize_t (*__write_libc)(int, const void *, size_t);
+    ssize_t (*__write_pthread)(int, const void *, size_t);
     int (*epoll_pwait)(int, struct epoll_event *, int, int, const sigset_t *);
     int (*ppoll)(struct pollfd *, nfds_t, const struct timespec *, const sigset_t *);
     int (*pause)(void);

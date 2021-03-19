@@ -455,6 +455,7 @@ err:
     DBG("time=%s src=%s data=%p host=%s channel=%s json=%p",
             sev->timestamp, sev->src, sev->data, sev->proc->hostname, numbuf, json);
     if (json) cJSON_Delete(json);
+    if (sev->data) cJSON_Delete(sev->data);
 
     return NULL;
 }
@@ -637,53 +638,4 @@ cJSON *
 evtFormatHttp(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc)
 {
     return evtFormatHelper(evt, metric, uid, proc, CFG_SRC_HTTP);
-}
-
-cJSON *
-evtFormatLog(evt_fmt_t *evt, const char *path, const void *buf, size_t count,
-       uint64_t uid, proc_id_t *proc)
-{
-    event_format_t event;
-    struct timeb tb;
-    watch_t logType;
-
-    if (!evt || !path || !buf || !proc) return NULL;
-
-    regex_t *filter;
-    if (evtFormatSourceEnabled(evt, CFG_SRC_CONSOLE) &&
-       (filter = evtFormatNameFilter(evt, CFG_SRC_CONSOLE)) &&
-       (!regexec_wrapper(filter, path, 0, NULL, 0))) {
-        logType = CFG_SRC_CONSOLE;
-    } else if (evtFormatSourceEnabled(evt, CFG_SRC_FILE) &&
-       (filter = evtFormatNameFilter(evt, CFG_SRC_FILE)) &&
-       (!regexec_wrapper(filter, path, 0, NULL, 0))) {
-        logType = CFG_SRC_FILE;
-    } else {
-        return NULL;
-    }
-
-    ftime(&tb);
-    event.timestamp = tb.time + (double)tb.millitm/1000;
-    event.src = path;
-    event.proc = proc;
-    event.uid = uid;
-    event.data = cJSON_CreateStringFromBuffer(buf, count);
-    if (!event.data) return NULL;
-    event.sourcetype = logType;
-
-    cJSON *json = fmtEventJson(evt, &event);
-    if (!json) return NULL;
-
-
-    cJSON *dataField = cJSON_GetObjectItem(json, "data");
-    if (dataField && dataField->valuestring) {
-        filter = evtFormatValueFilter(evt, logType);
-        if (filter && regexec_wrapper(filter, dataField->valuestring, 0, NULL, 0)) {
-            // This event doesn't match.  Drop it on the floor.
-            cJSON_Delete(json);
-            return NULL;
-        }
-    }
-
-    return json;
 }

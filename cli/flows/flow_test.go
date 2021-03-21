@@ -87,7 +87,7 @@ func TestGetFlows(t *testing.T) {
 	flowList := flows.List()
 	f := flowList[1]
 	assert.NoError(t, err)
-	assert.Equal(t, 53003, f.BytesReceived)
-	assert.Equal(t, "http", f.Protocol)
+	assert.Equal(t, 47514, f.BytesReceived)
+	assert.Equal(t, "", f.Protocol)
 	os.RemoveAll("testflows")
 }

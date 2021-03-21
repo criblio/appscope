@@ -96,6 +96,7 @@ func (co colorOpts) color(color string) *color.Color {
 }
 
 var co colorOpts
+var em events.EventMatch
 
 // eventsCmd represents the events command
 var eventsCmd = &cobra.Command{
@@ -112,13 +113,8 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		id, _ := cmd.Flags().GetInt("id")
-		sources, _ := cmd.Flags().GetStringSlice("source")
-		sourcetypes, _ := cmd.Flags().GetStringSlice("sourcetype")
-		match, _ := cmd.Flags().GetString("match")
-		lastN, _ := cmd.Flags().GetInt("last")
 		follow, _ := cmd.Flags().GetBool("follow")
 		forceColor, _ := cmd.Flags().GetBool("color")
-		allEvents, _ := cmd.Flags().GetBool("all")
 
 		if forceColor {
 			color.NoColor = false
@@ -130,6 +126,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		var file util.ReadSeekCloser
 		var err error
 		file, err = os.Open(sessions[0].EventsPath)
+		util.CheckErrSprintf(err, "error opening events file: %v", err)
 		if follow {
 			file = util.NewTailReader(file)
 		}
@@ -143,37 +140,17 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		} else {
 			util.CheckErrSprintf(err, "error opening events file: %v", err)
 		}
-		offset := int64(0)
-		// EventMatch contains parameters to match again, used in the filter function
-		// sent to events.Reader
-		em := eventMatch{
-			sources:     sources,
-			sourcetypes: sourcetypes,
-			skipEvents:  0,
-			allEvents:   allEvents,
-			match:       match,
-		}
 
 		if len(args) > 0 {
-			offset, err = util.DecodeOffset(args[0])
+			em.Offset, err = util.DecodeOffset(args[0])
 			util.CheckErrSprintf(err, "Could not decode encoded offset: %v", err)
-			allEvents = false
-		} else if !allEvents {
-			offset, err = util.FindReverseLineMatchOffset(lastN, file, em.filter())
-			util.CheckErrSprintf(err, "Error searching for offset: %v", err)
-			if offset < 0 {
-				offset = int64(0)
-			}
+			em.AllEvents = false
 		}
-		util.CheckErrSprintf(err, "error opening events file: %v", err)
-		_, err = file.Seek(int64(offset), os.SEEK_SET)
-		util.CheckErrSprintf(err, "error seeking events file: %v", err)
 
-		// Read Events
-		in := make(chan map[string]interface{})
+		in := make(chan map[string]interface{}, 0)
 		go func() {
-			_, err := events.Reader(file, offset, em.filter(), in)
-			util.CheckErrSprintf(err, "error reading events: %v", err)
+			err := em.Events(file, in)
+			util.CheckErrSprintf(err, "%v", err)
 		}()
 
 		// If we were passed an EventID, read that one event, print and exit
@@ -348,55 +325,17 @@ func ansiStrip(str string) string {
 	return ansire.ReplaceAllString(str, "")
 }
 
-type eventMatch struct {
-	sources     []string
-	sourcetypes []string
-	match       string
-	skipEvents  int
-	allEvents   bool
-}
-
-func (em eventMatch) filter() func(string) bool {
-	all := []util.MatchFunc{}
-	if !em.allEvents && em.skipEvents > 0 {
-		all = append(all, util.MatchSkipN(em.skipEvents))
-	}
-	if em.match != "" {
-		all = append(all, util.MatchString(em.match))
-	}
-	if len(em.sources) > 0 {
-		matchsources := []util.MatchFunc{}
-		for _, s := range em.sources {
-			matchsources = append(matchsources, util.MatchField("source", s))
-		}
-		all = append(all, util.MatchAny(matchsources...))
-	}
-	if len(em.sourcetypes) > 0 {
-		matchsourcetypes := []util.MatchFunc{}
-		for _, t := range em.sourcetypes {
-			matchsourcetypes = append(matchsourcetypes, util.MatchField("sourcetype", t))
-		}
-		all = append(all, util.MatchAny(matchsourcetypes...))
-	}
-	if len(all) == 0 {
-		all = append(all, util.MatchAlways)
-	}
-	return func(line string) bool {
-		return util.MatchAll(all...)(line)
-	}
-}
-
 func init() {
 	eventsCmd.Flags().IntP("id", "i", -1, "Display info from specific from session ID")
-	eventsCmd.Flags().StringSliceP("source", "s", []string{}, "Display events matching supplied sources")
-	eventsCmd.Flags().StringSliceP("sourcetype", "t", []string{}, "Display events matching supplied sourcetypes")
-	eventsCmd.Flags().StringP("match", "m", "", "Display events containing supplied string")
+	eventsCmd.Flags().StringSliceVarP(&em.Sources, "source", "s", []string{}, "Display events matching supplied sources")
+	eventsCmd.Flags().StringSliceVarP(&em.Sourcetypes, "sourcetype", "t", []string{}, "Display events matching supplied sourcetypes")
+	eventsCmd.Flags().StringVarP(&em.Match, "match", "m", "", "Display events containing supplied string")
 	eventsCmd.Flags().Bool("allfields", false, "Displaying hidden fields")
-	eventsCmd.Flags().IntP("last", "n", 20, "Show last <n> events")
+	eventsCmd.Flags().IntVarP(&em.LastN, "last", "n", 20, "Show last <n> events")
 	eventsCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	eventsCmd.Flags().BoolP("follow", "f", false, "Follow a file, like tail -f")
 	eventsCmd.Flags().Bool("color", false, "Force color on (if tty detection fails or pipeing)")
-	eventsCmd.Flags().BoolP("all", "a", false, "Show all events")
+	eventsCmd.Flags().BoolVarP(&em.AllEvents, "all", "a", false, "Show all events")
 	eventsCmd.Flags().StringP("eval", "e", "", "Evaluate JavaScript expression against event. Must return truthy to print event.\nNote: Post-processes after matching, not guarantted to return last <n> events.")
 	RootCmd.AddCommand(eventsCmd)
 

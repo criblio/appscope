@@ -2,6 +2,7 @@ package util
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -296,4 +297,10 @@ func ByteCountSI(b int64) string {
 	}
 	return fmt.Sprintf("%.1f %cB",
 		float64(b)/float64(div), "kMGTPE"[exp])
+}
+
+// Returns JSON bytes for an object, ignoring errors, for use in Printf and error functions
+func JSONBytes(obj interface{}) []byte {
+	b, _ := json.Marshal(obj)
+	return b
 }

@@ -2530,20 +2530,35 @@ doPayload()
                 break;
             }
 
-            char lport[8], rport[8];
+            char lport[20], rport[20];
             char lip[INET6_ADDRSTRLEN];
             char rip[INET6_ADDRSTRLEN];
 
-            if (net) {
+            if (net && net->active) {
                 if (getConn(&net->localConn, lip, sizeof(lip), lport, sizeof(lport)) == FALSE) {
-                    strncpy(lip, "af_int_err", sizeof(lip));
-                    strncpy(lport, "0", sizeof(lport));
+                    if (net->localConn.ss_family == AF_UNIX) {
+                        strncpy(lip, "af_unix", sizeof(lip));
+                        snprintf(lport, sizeof(lport), "%ld", net->lnode);
+                    } else {
+                        strncpy(lip, srcstr, sizeof(lip));
+                        strncpy(lport, "0", sizeof(lport));
+                    }
                 }
 
                 if (getConn(&net->remoteConn, rip, sizeof(rip), rport, sizeof(rport)) == FALSE) {
-                    strncpy(rip, "af_int_err", sizeof(rip));
-                    strncpy(rport, "0", sizeof(rport));
+                    if (net->remoteConn.ss_family == AF_UNIX) {
+                        strncpy(rip, "af_unix", sizeof(rip));
+                        snprintf(rport, sizeof(rport), "%ld", net->rnode);
+                    } else {
+                        strncpy(rip, srcstr, sizeof(rip));
+                        strncpy(rport, "0", sizeof(rport));
+                    }
                 }
+            } else {
+                strncpy(lip, srcstr, sizeof(lip));
+                strncpy(lport, "0", sizeof(lport));
+                strncpy(rip, srcstr, sizeof(rip));
+                strncpy(rport, "0", sizeof(rport));
             }
 
             uint64_t netid = (net != NULL) ? net->uid : 0;
@@ -2584,13 +2599,13 @@ doPayload()
                 case NETTX:
                 case TLSTX:
                     snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.out",
-                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
+                             ctlPayDir(g_ctl), g_proc.pid, lip, lport, rip, rport);
                     break;
 
                 case NETRX:
                 case TLSRX:
                     snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.in",
-                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
+                             ctlPayDir(g_ctl), g_proc.pid, lip, lport, rip, rport);
                     break;
 
                 default:

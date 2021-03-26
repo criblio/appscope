@@ -1,11 +1,11 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 
 	"github.com/criblio/scope/history"
-	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
 
@@ -41,10 +41,11 @@ scope prune -a`,
 		}
 		if !force {
 			fmt.Printf("Are you sure you want to prune %s sessions? (y/yes): ", count)
-			var response string
-			_, err := fmt.Scanf("%s", &response)
-			util.CheckErrSprintf(err, "error reading response: %v", err)
+			in := bufio.NewScanner(os.Stdin)
+			in.Scan()
+			response := in.Text()
 			if !(response == "y" || response == "yes") {
+				fmt.Printf("Removed 0 sessions.\n")
 				os.Exit(0)
 			}
 		}

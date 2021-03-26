@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -150,6 +151,9 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		in := make(chan map[string]interface{}, 0)
 		go func() {
 			err := em.Events(file, in)
+			if err != nil && strings.Contains(err.Error(), "Error searching for Offset: EOF") {
+				err = errors.New("Empty event file.")
+			}
 			util.CheckErrSprintf(err, "%v", err)
 		}()
 

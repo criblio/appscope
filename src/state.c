@@ -1067,7 +1067,12 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         return -1;
     }
 
-    if (net) memmove(&pinfo->net, net, sizeof(net_info));
+    if (net) {
+        memmove(&pinfo->net, net, sizeof(net_info));
+    } else {
+        pinfo->net.active = 0;
+    }
+
     pinfo->evtype = EVT_PAYLOAD;
     pinfo->src = src;
     pinfo->sockfd = sockfd;

@@ -1,6 +1,7 @@
 package flows
 
 import (
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -146,6 +147,9 @@ func getFlowEvents(r io.ReadSeeker) (FlowMap, error) {
 	go func() {
 		err := em.Events(r, in)
 		if err != nil {
+			if strings.Contains(err.Error(), "Error searching for Offset: EOF") {
+				err = errors.New("Empty event file.")
+			}
 			readerr = err
 			close(in)
 		}

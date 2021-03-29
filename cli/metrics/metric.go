@@ -70,14 +70,14 @@ func parseJSONMetric(b []byte) (Metric, error) {
 	if err != nil {
 		return m, err
 	}
-	if _, ok := metricEnv["body"]; !ok {
+	if _, ok := metricEnv["body"]; ok {
+		metricMap = metricEnv["body"].(map[string]interface{})
+	} else {
 		if _, ok2 := metricEnv["_metric"]; !ok2 {
 			return m, fmt.Errorf("body missing from metric")
 		} else {
 			metricMap = metricEnv
 		}
-	} else {
-		metricMap = metricEnv["body"].(map[string]interface{})
 	}
 	m.Name = metricMap["_metric"].(string)
 	delete(metricMap, "_metric")

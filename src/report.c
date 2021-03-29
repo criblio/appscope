@@ -2599,13 +2599,13 @@ doPayload()
                 case NETTX:
                 case TLSTX:
                     snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.out",
-                             ctlPayDir(g_ctl), g_proc.pid, lip, lport, rip, rport);
+                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
                     break;
 
                 case NETRX:
                 case TLSRX:
                     snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.in",
-                             ctlPayDir(g_ctl), g_proc.pid, lip, lport, rip, rport);
+                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
                     break;
 
                 default:
@@ -2618,7 +2618,22 @@ doPayload()
                     if (checkEnv("SCOPE_PAYLOAD_HEADER", "true")) {
                         g_fn.write(fd, pay, rc);
                     }
-                    g_fn.write(fd, pinfo->data, pinfo->len);
+
+                    size_t to_write = pinfo->len;
+                    size_t written = 0;
+                    int rc;
+
+                    while (to_write > 0) {
+                        rc = g_fn.write(fd, pinfo->data, to_write);
+                        if (rc <= 0) {
+                            DBG(NULL);
+                            break;
+                        }
+
+                        written += rc;
+                        to_write -= rc;
+                    }
+
                     g_fn.close(fd);
                 }
             }

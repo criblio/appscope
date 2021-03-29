@@ -64,10 +64,20 @@ func Reader(r io.Reader, match func(string) bool, out chan Metric) (int, error) 
 
 func parseJSONMetric(b []byte) (Metric, error) {
 	m := Metric{}
+	metricEnv := map[string]interface{}{}
 	metricMap := map[string]interface{}{}
-	err := json.Unmarshal(b, &metricMap)
+	err := json.Unmarshal(b, &metricEnv)
 	if err != nil {
 		return m, err
+	}
+	if _, ok := metricEnv["body"]; ok {
+		metricMap = metricEnv["body"].(map[string]interface{})
+	} else {
+		if _, ok2 := metricEnv["_metric"]; !ok2 {
+			return m, fmt.Errorf("body missing from metric")
+		} else {
+			metricMap = metricEnv
+		}
 	}
 	m.Name = metricMap["_metric"].(string)
 	delete(metricMap, "_metric")

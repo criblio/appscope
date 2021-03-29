@@ -2624,7 +2624,7 @@ doPayload()
                     int rc;
 
                     while (to_write > 0) {
-                        rc = g_fn.write(fd, pinfo->data, to_write);
+                        rc = g_fn.write(fd, &pinfo->data[written], to_write);
                         if (rc <= 0) {
                             DBG(NULL);
                             break;

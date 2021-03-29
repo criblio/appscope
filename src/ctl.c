@@ -485,8 +485,10 @@ create_evt_json(upload_t *upld)
     if (!(json_root = cJSON_CreateObject())) goto err;
     if (!cJSON_AddStringToObjLN(json_root, "type", "evt")) goto err;
     if (upld->proc && !cJSON_AddStringToObjLN(json_root, ID, upld->proc->id)) goto err;
-    if (upld->uid && snprintf(numbuf, sizeof(numbuf), "%llu", upld->uid) < 0) goto err;
-    if (!cJSON_AddStringToObjLN(json_root, CHANNEL, numbuf)) goto err;
+    if (upld->uid) {
+        if (snprintf(numbuf, sizeof(numbuf), "%llu", upld->uid) < 0) goto err;
+        if (!cJSON_AddStringToObjLN(json_root, CHANNEL, numbuf)) goto err;
+    }
     cJSON_AddItemToObjectCS(json_root, "body", upld->body);
     return json_root;
 err:

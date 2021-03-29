@@ -565,9 +565,8 @@ ctlCreateTxMsgResp(void** state)
 static void
 ctlCreateTxMsgEvt(void** state)
 {
-    upload_t upload = {0};
-    upload.type = UPLD_EVT;
-
+    upload_t upload = { .type = UPLD_EVT, .body = NULL, .req = NULL, .uid = 0, .proc = NULL };
+    
     // If body is null, msg should be null
     assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 0);
     char* msg = ctlCreateTxMsg(&upload);

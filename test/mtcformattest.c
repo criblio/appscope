@@ -234,19 +234,23 @@ mtcFormatEventForOutputHappyPathJson(void** state)
     cJSON *json = cJSON_Parse(msg);
     assert_non_null(json);
 
+    assert_true(cJSON_HasObjectItem(json, "type"));
+    
+    cJSON *body = cJSON_GetObjectItem(json, "body");
+
     // Fields expected for all json metrics
-    assert_true(cJSON_HasObjectItem(json, "_metric"));
-    assert_true(cJSON_HasObjectItem(json, "_metric_type"));
-    assert_true(cJSON_HasObjectItem(json, "_value"));
+    assert_true(cJSON_HasObjectItem(body, "_metric"));
+    assert_true(cJSON_HasObjectItem(body, "_metric_type"));
+    assert_true(cJSON_HasObjectItem(body, "_value"));
     // Fields expected for our specific metric
-    assert_true(cJSON_HasObjectItem(json, "proc"));
-    assert_true(cJSON_HasObjectItem(json, "pid"));
-    assert_true(cJSON_HasObjectItem(json, "fd"));
-    assert_true(cJSON_HasObjectItem(json, "host"));
-    assert_true(cJSON_HasObjectItem(json, "proto"));
-    assert_true(cJSON_HasObjectItem(json, "port"));
+    assert_true(cJSON_HasObjectItem(body, "proc"));
+    assert_true(cJSON_HasObjectItem(body, "pid"));
+    assert_true(cJSON_HasObjectItem(body, "fd"));
+    assert_true(cJSON_HasObjectItem(body, "host"));
+    assert_true(cJSON_HasObjectItem(body, "proto"));
+    assert_true(cJSON_HasObjectItem(body, "port"));
     // And... _time field is required too
-    assert_true(cJSON_HasObjectItem(json, "_time"));
+    assert_true(cJSON_HasObjectItem(body, "_time"));
 
     cJSON_Delete(json);
     free(msg);

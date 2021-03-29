@@ -27,10 +27,8 @@
 #define TIME "_time"
 #define DATA "data"
 #define SOURCE "source"
-#define CHANNEL "_channel"
 #define SOURCETYPE "sourcetype"
 #define EVENT "ev"
-#define ID "id"
 #define PROCNAME "proc"
 #define CMDNAME "cmd"
 #define PID "pid"
@@ -427,8 +425,6 @@ addCustomJsonFields(evt_fmt_t *evt, cJSON *json)
 cJSON *
 fmtEventJson(evt_fmt_t *efmt, event_format_t *sev)
 {
-    char numbuf[32];
-
     if (!sev || !sev->proc) return NULL;
 
     cJSON *json = cJSON_CreateObject();
@@ -436,24 +432,20 @@ fmtEventJson(evt_fmt_t *efmt, event_format_t *sev)
 
     if (!cJSON_AddStringToObjLN(json, SOURCETYPE, valToStr(watchTypeMap, sev->sourcetype))) goto err;
 
-    if (!cJSON_AddStringToObjLN(json, ID, sev->proc->id)) goto err;
-
     if (!cJSON_AddNumberToObjLN(json, TIME, sev->timestamp)) goto err;
     if (!cJSON_AddStringToObjLN(json, SOURCE, sev->src)) goto err;
     if (!cJSON_AddStringToObjLN(json, HOST, sev->proc->hostname)) goto err;
     if (!cJSON_AddStringToObjLN(json, PROCNAME, sev->proc->procname)) goto err;
     if (!cJSON_AddStringToObjLN(json, CMDNAME, sev->proc->cmd)) goto err;
     if (!cJSON_AddNumberToObjLN(json, PID, sev->proc->pid)) goto err;
-    if (snprintf(numbuf, sizeof(numbuf), "%llu", sev->uid) < 0) goto err;
-    if (!cJSON_AddStringToObjLN(json, CHANNEL, numbuf)) goto err;
-
+    
     if (efmt) addCustomJsonFields(efmt, json);
     cJSON_AddItemToObjectCS(json, DATA, sev->data);
 
     return json;
 err:
-    DBG("time=%s src=%s data=%p host=%s channel=%s json=%p",
-            sev->timestamp, sev->src, sev->data, sev->proc->hostname, numbuf, json);
+    DBG("time=%s src=%s data=%p host=%s json=%p",
+            sev->timestamp, sev->src, sev->data, sev->proc->hostname, json);
     if (json) cJSON_Delete(json);
     if (sev->data) cJSON_Delete(sev->data);
 

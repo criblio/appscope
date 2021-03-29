@@ -53,14 +53,12 @@ evtFormatMetricHappyPath(void** state)
 
     char* expected = NULL;
     asprintf(&expected, "{\"sourcetype\":\"metric\","
-                           "\"id\":\"host-evttest-cmd-4\","
                            "\"_time\":%s,"
                            "\"source\":\"A\","
                            "\"host\":\"host\","
                            "\"proc\":\"evttest\","
                            "\"cmd\":\"cmd-4\","
                            "\"pid\":4848,"
-                           "\"_channel\":\"12345\","
                            "\"data\":{\"_metric\":\"A\",\"_metric_type\":\"counter\",\"_value\":1}}", timestr);
 
     assert_non_null(expected);
@@ -368,13 +366,11 @@ fmtEventJsonValue(void** state)
 
     //printf("%s:%d %s\n", __FUNCTION__, __LINE__, str);
     assert_string_equal(str, "{\"sourcetype\":\"syslog\","
-                              "\"id\":\"earl-formattest-cmd\","
                               "\"_time\":1573058085.991,"
                               "\"source\":\"stdin\","
                               "\"host\":\"earl\","
                               "\"proc\":\"formattest\","
                               "\"cmd\":\"cmd\",\"pid\":1234,"
-                              "\"_channel\":\"14627333968688430831\","
                               "\"data\":\"поспехаў\"}");
 
     free(str);
@@ -413,13 +409,11 @@ fmtEventJsonWithCustomTags(void **state)
 
     //printf("%s:%d %s\n", __FUNCTION__, __LINE__, str);
     assert_string_equal(str, "{\"sourcetype\":\"syslog\","
-                              "\"id\":\"earl-formattest-cmd\","
                               "\"_time\":1573058085.991,"
                               "\"source\":\"stdin\","
                               "\"host\":\"earl\","
                               "\"proc\":\"formattest\","
                               "\"cmd\":\"cmd\",\"pid\":1234,"
-                              "\"_channel\":\"14627333968688430831\","
                               "\"hey\":\"you\","
                               "\"this\":\"rocks\","
                               "\"data\":\"поспехаў\"}");
@@ -456,14 +450,12 @@ fmtEventJsonWithEmbeddedNulls(void** state)
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
     assert_string_equal(str, "{\"sourcetype\":\"console\","
-                              "\"id\":\"earl--\","
                               "\"_time\":1573058085.001,"
                               "\"source\":\"stdout\","
                               "\"host\":\"earl\","
                               "\"proc\":\"\","
                               "\"cmd\":\"\","
                               "\"pid\":1234,"
-                              "\"_channel\":\"14627333968688430831\","
                               "\"data\":\"Unë mund\\u0000të ha qelq dhe nuk\\u0000më gjen gjë\"}");
 
     free(str);
@@ -476,14 +468,12 @@ fmtEventJsonWithEmbeddedNulls(void** state)
     str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
     assert_string_equal(str, "{\"sourcetype\":\"console\","
-                              "\"id\":\"earl--\","
                               "\"_time\":1573058085.001,"
                               "\"source\":\"stdout\","
                               "\"host\":\"earl\","
                               "\"proc\":\"\","
                               "\"cmd\":\"\","
-                              "\"pid\":1234,"
-                              "\"_channel\":\"14627333968688430831\"}");
+                              "\"pid\":1234}");
     free(str);
     cJSON_Delete(json);
 }

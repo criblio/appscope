@@ -35,24 +35,24 @@
 #define PROTO_FIELD(val)        STRFIELD("proto",          (val), 2, TRUE)
 #define OP_FIELD(val)           STRFIELD("op",             (val), 3, TRUE)
 #define PID_FIELD(val)          NUMFIELD("pid",            (val), 4, TRUE)
-#define PROC_UID(val)           NUMFIELD("proc.uid",       (val), 4, TRUE)
-#define PROC_GID(val)           NUMFIELD("proc.gid",       (val), 4, TRUE)
-#define PROC_CGROUP(val)        STRFIELD("proc.cgroup",    (val), 4, TRUE)
+#define PROC_UID(val)           NUMFIELD("proc_uid",       (val), 4, TRUE)
+#define PROC_GID(val)           NUMFIELD("proc_gid",       (val), 4, TRUE)
+#define PROC_CGROUP(val)        STRFIELD("proc_cgroup",    (val), 4, TRUE)
 #define HOST_FIELD(val)         STRFIELD("host",           (val), 4, TRUE)
 #define PROC_FIELD(val)         STRFIELD("proc",           (val), 4, TRUE)
 #define HTTPSTAT_FIELD(val)     NUMFIELD("http_status",    (val), 4, TRUE)
 #define DOMAIN_FIELD(val)       STRFIELD("domain",         (val), 5, TRUE)
 
 #define FILE_FIELD(val)      STRFIELD("file",              (val), 5, TRUE)
-#define FILE_EV_NAME(val)    STRFIELD("file.name",         (val), 5, TRUE)
-#define FILE_EV_MODE(val)    NUMFIELD("file.perms",        (val), 5, TRUE)
-#define FILE_OWNER(val)      NUMFIELD("file.owner",        (val), 5, TRUE)
-#define FILE_GROUP(val)      NUMFIELD("file.group",        (val), 5, TRUE)
-#define FILE_RD_BYTES(val)   NUMFIELD("file.read_bytes",   (val), 5, TRUE)
-#define FILE_RD_OPS(val)     NUMFIELD("file.read_ops",     (val), 5, TRUE)
-#define FILE_WR_BYTES(val)   NUMFIELD("file.write_bytes",  (val), 5, TRUE)
-#define FILE_WR_OPS(val)     NUMFIELD("file.write_ops",    (val), 5, TRUE)
-#define FILE_ERRS(val)       NUMFIELD("file.errors",       (val), 5, TRUE)
+#define FILE_EV_NAME(val)    STRFIELD("file_name",         (val), 5, TRUE)
+#define FILE_EV_MODE(val)    NUMFIELD("file_perms",        (val), 5, TRUE)
+#define FILE_OWNER(val)      NUMFIELD("file_owner",        (val), 5, TRUE)
+#define FILE_GROUP(val)      NUMFIELD("file_group",        (val), 5, TRUE)
+#define FILE_RD_BYTES(val)   NUMFIELD("file_read_bytes",   (val), 5, TRUE)
+#define FILE_RD_OPS(val)     NUMFIELD("file_read_ops",     (val), 5, TRUE)
+#define FILE_WR_BYTES(val)   NUMFIELD("file_write_bytes",  (val), 5, TRUE)
+#define FILE_WR_OPS(val)     NUMFIELD("file_write_ops",    (val), 5, TRUE)
+#define FILE_ERRS(val)       NUMFIELD("file_errors",       (val), 5, TRUE)
 
 #define LOCALIP_FIELD(val)      STRFIELD("localip",        (val), 6, TRUE)
 #define REMOTEIP_FIELD(val)     STRFIELD("remoteip",       (val), 6, TRUE)
@@ -224,23 +224,23 @@ getNetInternals(net_info *net, int type,
     if (addrIsNetDomain(lconn)) {
         switch (type) {
         case SOCK_STREAM:
-            H_ATTRIB(fields[*ix], "net.transport", "IP.TCP", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "IP.TCP", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_DGRAM:
-            H_ATTRIB(fields[*ix], "net.transport", "IP.UDP", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "IP.UDP", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_RAW:
-            H_ATTRIB(fields[*ix], "net.transport", "IP.RAW", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "IP.RAW", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_RDM:
-            H_ATTRIB(fields[*ix], "net.transport", "IP.RDM", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "IP.RDM", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_SEQPACKET:
-            H_ATTRIB(fields[*ix], "net.transport", "IP.SEQPACKET", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "IP.SEQPACKET", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         default:
@@ -248,38 +248,38 @@ getNetInternals(net_info *net, int type,
         }
 
         if (getConn(rconn, raddr, alen, rport, plen) == TRUE) {
-            H_ATTRIB(fields[*ix], "net.peer.ip", raddr, 1);
+            H_ATTRIB(fields[*ix], "net_peer_ip", raddr, 1);
             NEXT_FLD(*ix, maxfld);
-            H_ATTRIB(fields[*ix], "net.peer.port", rport, 1);
+            H_ATTRIB(fields[*ix], "net_peer_port", rport, 1);
             NEXT_FLD(*ix, maxfld);
         }
 
         if (getConn(lconn, laddr, alen, lport, plen) == TRUE) {
-            H_ATTRIB(fields[*ix], "net.host.ip", laddr, 1);
+            H_ATTRIB(fields[*ix], "net_host_ip", laddr, 1);
             NEXT_FLD(*ix, maxfld);
-            H_ATTRIB(fields[*ix], "net.host.port", lport, 1);
+            H_ATTRIB(fields[*ix], "net_host_port", lport, 1);
             NEXT_FLD(*ix, maxfld);
         }
     } else if (addrIsUnixDomain(lconn)) {
         switch (type) {
         case SOCK_STREAM:
-            H_ATTRIB(fields[*ix], "net.transport", "Unix.TCP", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "Unix.TCP", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_DGRAM:
-            H_ATTRIB(fields[*ix], "net.transport", "Unix.UDP", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "Unix.UDP", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_RAW:
-            H_ATTRIB(fields[*ix], "net.transport", "Unix.RAW", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "Unix.RAW", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_RDM:
-            H_ATTRIB(fields[*ix], "net.transport", "Unix.RDM", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "Unix.RDM", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_SEQPACKET:
-            H_ATTRIB(fields[*ix], "net.transport", "Unix.SEQPACKET", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "Unix.SEQPACKET", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         default:
@@ -287,15 +287,15 @@ getNetInternals(net_info *net, int type,
         }
 
         if (net) {
-            H_VALUE(fields[*ix], "unix.peer.inode", net->rnode, 1);
+            H_VALUE(fields[*ix], "unix_peer_inode", net->rnode, 1);
             NEXT_FLD(*ix, maxfld);
-            H_VALUE(fields[*ix], "unix.local.inode", net->lnode, 1);
+            H_VALUE(fields[*ix], "unix_local_inode", net->lnode, 1);
             NEXT_FLD(*ix, maxfld);
         }
     }
 
     if (net && net->dnsName[0]) {
-        H_ATTRIB(fields[*ix], "net.peer.name", net->dnsName, 1);
+        H_ATTRIB(fields[*ix], "net_peer_name", net->dnsName, 1);
         NEXT_FLD(*ix, maxfld);
     }
 
@@ -377,13 +377,13 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr,
     while ((thishdr = strtok_r(NULL, "\r\n", &savea)) != NULL) {
         // From RFC 2616 Section 4.2 "Field names are case-insensitive."
         if (strcasestr(thishdr, "Host:")) {
-            H_ATTRIB(fields[hreport->ix], "http.host", strchr(thishdr, ':') + 2, 1);
+            H_ATTRIB(fields[hreport->ix], "http_host", strchr(thishdr, ':') + 2, 1);
             HTTP_NEXT_FLD(hreport->ix);
         } else if (strcasestr(thishdr, "User-Agent:")) {
-            H_ATTRIB(fields[hreport->ix], "http.user_agent", strchr(thishdr, ':') + 2, 5);
+            H_ATTRIB(fields[hreport->ix], "http_user_agent", strchr(thishdr, ':') + 2, 5);
             HTTP_NEXT_FLD(hreport->ix);
         } else if (strcasestr(thishdr, "X-Forwarded-For:")) {
-            H_ATTRIB(fields[hreport->ix], "http.client_ip", strchr(thishdr, ':') + 2, 5);
+            H_ATTRIB(fields[hreport->ix], "http_client_ip", strchr(thishdr, ':') + 2, 5);
             HTTP_NEXT_FLD(hreport->ix);
         } else if (strcasestr(thishdr, "Content-Length:")) {
             errno = 0;
@@ -524,7 +524,7 @@ doHttpHeader(protocol_info *proto)
         // The request specific values from Request-Line
         char *method_str = strtok_r(headertok, " ", &savea);
         if (method_str) {
-            H_ATTRIB(fields[hreport.ix], "http.method", method_str, 1);
+            H_ATTRIB(fields[hreport.ix], "http_method", method_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no method in an http request header", proto->fd, CFG_LOG_WARN);
@@ -532,7 +532,7 @@ doHttpHeader(protocol_info *proto)
 
         char *target_str = strtok_r(NULL, " ", &savea);
         if (target_str) {
-            H_ATTRIB(fields[hreport.ix], "http.target", target_str, 4);
+            H_ATTRIB(fields[hreport.ix], "http_target", target_str, 4);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no target in an http request header", proto->fd, CFG_LOG_WARN);
@@ -543,14 +543,14 @@ doHttpHeader(protocol_info *proto)
             ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
             ((flavor_str = strtok_r(NULL, "\r", &savea)))) {
             if (proto->ptype == EVT_HREQ) {
-                H_ATTRIB(fields[hreport.ix], "http.flavor", flavor_str, 1);
+                H_ATTRIB(fields[hreport.ix], "http_flavor", flavor_str, 1);
                 HTTP_NEXT_FLD(hreport.ix);
             }
         } else {
             scopeLog("WARN: doHttpHeader: no http version in an http request header", proto->fd, CFG_LOG_WARN);
         }
 
-        H_ATTRIB(fields[hreport.ix], "http.scheme", ssl, 1);
+        H_ATTRIB(fields[hreport.ix], "http_scheme", ssl, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
         if (proto->ptype == EVT_HREQ) {
@@ -560,7 +560,7 @@ doHttpHeader(protocol_info *proto)
             httpFieldsInternal(fields, &hreport, proto);
 
             if (hreport.clen != -1) {
-                H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
+                H_VALUE(fields[hreport.ix], "http_request_content_length", hreport.clen, EVENT_ONLY_ATTR);
                 HTTP_NEXT_FLD(hreport.ix);
             }
             map->clen = hreport.clen;
@@ -619,23 +619,23 @@ doHttpHeader(protocol_info *proto)
         if (flavor_str &&
             ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
             ((flavor_str = strtok_r(NULL, "", &savea)))) {
-            H_ATTRIB(fields[hreport.ix], "http.flavor", flavor_str, 1);
+            H_ATTRIB(fields[hreport.ix], "http_flavor", flavor_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no version string in an http request header", proto->fd, CFG_LOG_WARN);
         }
 
-        H_VALUE(fields[hreport.ix], "http.status_code", status, 1);
+        H_VALUE(fields[hreport.ix], "http_status_code", status, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
         // point past the status code
         char st[strlen(stext)];
         strncpy(st, stext, strlen(stext));
         char *status_str = strtok_r(st, "\r", &savea);
-        H_ATTRIB(fields[hreport.ix], "http.status_text", status_str, 1);
+        H_ATTRIB(fields[hreport.ix], "http_status_text", status_str, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
-        H_VALUE(fields[hreport.ix], "http.server.duration", map->duration, EVENT_ONLY_ATTR);
+        H_VALUE(fields[hreport.ix], "http_server_duration", map->duration, EVENT_ONLY_ATTR);
         HTTP_NEXT_FLD(hreport.ix);
 
         // Fields common to request & response
@@ -643,7 +643,7 @@ doHttpHeader(protocol_info *proto)
             hreport.ptype = EVT_HREQ;
             httpFields(fields, &hreport, map->req, map->req_len, proto, g_cfg.staticfg);
             if (hreport.clen != -1) {
-                H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
+                H_VALUE(fields[hreport.ix], "http_request_content_length", hreport.clen, EVENT_ONLY_ATTR);
                 HTTP_NEXT_FLD(hreport.ix);
             }
             map->clen = hreport.clen;
@@ -653,7 +653,7 @@ doHttpHeader(protocol_info *proto)
         httpFields(fields, &hreport, map->resp, proto->len, proto, g_cfg.staticfg);
         httpFieldsInternal(fields, &hreport, proto);
         if (hreport.clen != -1) {
-            H_VALUE(fields[hreport.ix], "http.response_content_length", hreport.clen, EVENT_ONLY_ATTR);
+            H_VALUE(fields[hreport.ix], "http_response_content_length", hreport.clen, EVENT_ONLY_ATTR);
             HTTP_NEXT_FLD(hreport.ix);
         }
 
@@ -680,7 +680,7 @@ doHttpHeader(protocol_info *proto)
         // emit statsd metrics, if enabled.
         if (mtcEnabled(g_mtc)) {
 
-            char *mtx_name = (proto->isServer) ? "http.server.duration" : "http.client.duration";
+            char *mtx_name = (proto->isServer) ? "http_server_duration" : "http_client_duration";
             event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA, fields);
             // TBD AGG Only cmdSendMetric(g_mtc, &http_dur);
             httpAggAddMetric(g_http_agg, &http_dur, map->clen, hreport.clen);
@@ -1253,7 +1253,7 @@ getNetPtotocol(net_info *net, event_field_t *nevent, int *ix)
 
     if ((localPort == 80) || (localPort == 443) ||
         (remotePort == 80) || (remotePort == 443)) {
-        H_ATTRIB(nevent[*ix], "net.protocol", "http", 1);
+        H_ATTRIB(nevent[*ix], "net_protocol", "http", 1);
         NEXT_FLD(*ix, NET_MAX_FIELDS);
     }
 
@@ -1357,7 +1357,7 @@ doNetCloseEvent(net_info *net, uint64_t dur)
                     nevent, &nix, NET_MAX_FIELDS);
 
     if (net->http.state != HTTP_NONE) {
-        H_ATTRIB(nevent[nix], "net.protocol", "http", 1);
+        H_ATTRIB(nevent[nix], "net_protocol", "http", 1);
         NEXT_FLD(nix, NET_MAX_FIELDS);
     }
 
@@ -1366,17 +1366,17 @@ doNetCloseEvent(net_info *net, uint64_t dur)
     H_VALUE(nevent[nix], "duration", dur, 1);
     NEXT_FLD(nix, NET_MAX_FIELDS);
 
-    H_VALUE(nevent[nix], "net.bytes_sent", net->txBytes.evt, 1);
+    H_VALUE(nevent[nix], "net_bytes_sent", net->txBytes.evt, 1);
     NEXT_FLD(nix, NET_MAX_FIELDS);
 
-    H_VALUE(nevent[nix], "net.bytes_recv", net->rxBytes.evt, 1);
+    H_VALUE(nevent[nix], "net_bytes_recv", net->rxBytes.evt, 1);
     NEXT_FLD(nix, NET_MAX_FIELDS);
 
     if (net->remoteClose == TRUE) {
-        H_ATTRIB(nevent[nix], "net.close.reason", "remote", 1);
+        H_ATTRIB(nevent[nix], "net_close_reason", "remote", 1);
         NEXT_FLD(nix, NET_MAX_FIELDS);
     } else {
-        H_ATTRIB(nevent[nix], "net.close.reason", "local", 1);
+        H_ATTRIB(nevent[nix], "net_close_reason", "local", 1);
         NEXT_FLD(nix, NET_MAX_FIELDS);
     }
 

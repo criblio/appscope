@@ -16,6 +16,9 @@
 #define DEFAULT_LOG_MAX_AGG_BYTES 32768
 #define DEFAULT_LOG_FLUSH_PERIOD_IN_MS 2000
 
+#define CHANNEL "_channel"
+#define ID "id"
+
 typedef struct {
     char *buf;
     size_t bufsize;
@@ -476,10 +479,16 @@ static cJSON *
 create_evt_json(upload_t *upld)
 {
     cJSON *json_root = NULL;
+    char numbuf[32];
     if (!upld || !upld->body) goto err;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
     if (!cJSON_AddStringToObjLN(json_root, "type", "evt")) goto err;
+    if (upld->proc && !cJSON_AddStringToObjLN(json_root, ID, upld->proc->id)) goto err;
+    if (upld->uid) {
+        if (snprintf(numbuf, sizeof(numbuf), "%llu", upld->uid) < 0) goto err;
+        if (!cJSON_AddStringToObjLN(json_root, CHANNEL, numbuf)) goto err;
+    }
     cJSON_AddItemToObjectCS(json_root, "body", upld->body);
     return json_root;
 err:
@@ -679,6 +688,8 @@ ctlPostMsg(ctl_t *ctl, cJSON *body, upload_type_t type, request_t *req, bool now
     upld.type = type;
     upld.body = body;
     upld.req = req;
+    upld.proc = NULL;
+    upld.uid = 0;
     streamMsg = ctlCreateTxMsg(&upld);
 
     if (streamMsg) {
@@ -710,6 +721,8 @@ ctlSendHttp(ctl_t *ctl, event_t *evt, uint64_t uid, proc_id_t *proc)
     upld.type = UPLD_EVT;
     upld.body = json;
     upld.req = NULL;
+    upld.uid = uid;
+    upld.proc = proc;
     streamMsg = prepMessage(&upld);
 
     rc = transportSend(ctl->transport, streamMsg, strlen(streamMsg));
@@ -734,6 +747,8 @@ ctlSendEvent(ctl_t *ctl, event_t *evt, uint64_t uid, proc_id_t *proc)
     upld.type = UPLD_EVT;
     upld.body = json;
     upld.req = NULL;
+    upld.uid = uid;
+    upld.proc = proc;
     streamMsg = prepMessage(&upld);
 
     rc = transportSend(ctl->transport, streamMsg, strlen(streamMsg));
@@ -924,6 +939,8 @@ sendAggregatedLogData(ctl_t *ctl, streambuf_t *stmbuf)
     upld.type = UPLD_EVT;
     upld.body = json;
     upld.req = NULL;
+    upld.proc = NULL;
+    upld.uid = 0;
     char *msg = prepMessage(&upld);
     if (!msg) return;
 

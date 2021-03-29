@@ -76,6 +76,8 @@ typedef struct {
     upload_type_t type;
     cJSON* body;
     request_t *req;            // NULL unless this is UPLD_RESP
+    unsigned long long uid;
+    proc_id_t *proc;
 } upload_t;
 
 // Functions to help with send/receive messaging

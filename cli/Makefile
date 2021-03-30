@@ -29,7 +29,7 @@ deps:
 rebuild: cliclean all
 
 local: scope
-	sudo cp $(DIR)build/scope /usr/local/bin/scope
+	sudo cp $(DIR)../bin/linux/scope /usr/local/bin/scope
 
 run/bundle.go:
 	rm -rf $(DIR)/build/*
@@ -39,14 +39,14 @@ run/bundle.go:
 	cd $(DIR) && $(GOPATH)/bin/go-bindata -o run/bundle.go -pkg run build
 
 scope: run/bundle.go
-	# GOOS=linux CGO_ENABLED=0 $(GO) build -a -tags netgo -ldflags="-s -w" -o build/scope
-	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)build/scope
+	# GOOS=linux CGO_ENABLED=0 $(GO) build -a -tags netgo -ldflags="-s -w" -o ../bin/linux/scope
+	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)../bin/linux/scope
 
 compressscope:
-	upx -9 $(DIR)build/scope
+	upx -9 $(DIR)../bin/linux/scope
 
 install: 
-	cp $(DIR)build/scope /usr/local/bin/scope
+	cp $(DIR)../bin/linux/scope /usr/local/bin/scope
 
 clitest:
 	cd $(DIR) && $(GO) test -v -coverprofile coverage.out ./...

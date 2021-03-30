@@ -124,7 +124,7 @@ scope flows --out 124x3c   # Displays the outbound payload of that flow
 		from.ToSlice(&flowsList)
 		if len(args) > 0 {
 			hash, err := util.DecodeOffset(args[0])
-			util.CheckErrSprintf(err, "could not decode flow hash %s: %v", args[0], err)
+			util.CheckErrSprintf(err, "could not decode flow id %s: %v", args[0], err)
 			if f, found := fm[hash]; found {
 				if inFile || outFile {
 					var path string
@@ -139,21 +139,19 @@ scope flows --out 124x3c   # Displays the outbound payload of that flow
 					return
 				}
 				fields := []util.ObjField{
-					{Name: "ID", Field: "hash", Transform: func(obj interface{}) string {
-						return util.EncodeOffset(obj.(int64))
-					}},
-					{Name: "Host IP", Field: "net.host.ip"},
-					{Name: "Host Port", Field: "net.host.port"},
-					{Name: "Peer IP", Field: "net.peer.ip"},
-					{Name: "Peer Port", Field: "net.peer.port"},
+					{Name: "ID", Field: "id"},
+					{Name: "Host IP", Field: "net_host_ip"},
+					{Name: "Host Port", Field: "net_host_port"},
+					{Name: "Peer IP", Field: "net_peer_ip"},
+					{Name: "Peer Port", Field: "net_peer_port"},
 					{Name: "Proc", Field: "proc"},
 					{Name: "PID", Field: "pid"},
 					{Name: "Last Sent", Field: "last_sent_time"},
 					{Name: "Duration", Field: "duration"},
-					{Name: "Bytes Recv", Field: "net.bytes_recv"},
-					{Name: "Bytes Sent", Field: "net.bytes_sent"},
-					{Name: "Protocol", Field: "net.protocol"},
-					{Name: "Close Reason", Field: "net.close.reason"},
+					{Name: "Bytes Recv", Field: "net_bytes_recv"},
+					{Name: "Bytes Sent", Field: "net_bytes_sent"},
+					{Name: "Protocol", Field: "net_protocol"},
+					{Name: "Close Reason", Field: "net_close_reason"},
 					{Name: "Base Dir", Field: "basedir"},
 					{Name: "In File", Field: "in_file"},
 					{Name: "Out File", Field: "out_file"},
@@ -165,25 +163,23 @@ scope flows --out 124x3c   # Displays the outbound payload of that flow
 				}
 				return
 			} else {
-				util.ErrAndExit("could not find flow for hash %s", args[0])
+				util.ErrAndExit("could not find flow for id %s", args[0])
 			}
 		}
 		fields := []util.ObjField{
-			{Name: "ID", Field: "hash", Transform: func(obj interface{}) string {
-				return util.EncodeOffset(obj.(int64))
-			}},
-			{Name: "Host IP", Field: "net.host.ip"},
-			{Name: "Host Port", Field: "net.host.port"},
-			{Name: "Peer IP", Field: "net.peer.ip"},
-			{Name: "Peer Port", Field: "net.peer.port"},
+			{Name: "ID", Field: "id"},
+			{Name: "Host IP", Field: "net_host_ip"},
+			{Name: "Host Port", Field: "net_host_port"},
+			{Name: "Peer IP", Field: "net_peer_ip"},
+			{Name: "Peer Port", Field: "net_peer_port"},
 			{Name: "Last Sent", Field: "last_sent_time", Transform: func(obj interface{}) string { return util.GetHumanDuration(time.Now().Sub(obj.(time.Time))) }},
 			{Name: "Duration", Field: "duration"},
 		}
 		if termWidth > 145 {
 			fields = append(fields, []util.ObjField{
-				{Name: "Bytes Recv", Field: "net.bytes_recv"},
-				{Name: "Bytes Sent", Field: "net.bytes_sent"},
-				{Name: "Protocol", Field: "net.protocol"},
+				{Name: "Bytes Recv", Field: "net_bytes_recv"},
+				{Name: "Bytes Sent", Field: "net_bytes_sent"},
+				{Name: "Protocol", Field: "net_protocol"},
 			}...)
 		}
 		if jsonOut {

@@ -21,10 +21,11 @@ import (
 
 type Flow struct {
 	Hash          int64         `json:"hash"`
-	HostIP        string        `json:"net.host.ip" mapstructure:"net.host.ip"`
-	HostPort      int           `json:"net.host.port" mapstructure:"net.host.port"`
-	PeerIP        string        `json:"net.peer.ip" mapstructure:"net.peer.ip"`
-	PeerPort      int           `json:"net.peer.port" mapstructure:"net.peer.port"`
+	ID            string        `json:"id"`
+	HostIP        string        `json:"net_host_ip" mapstructure:"net_host_ip"`
+	HostPort      int           `json:"net_host_port" mapstructure:"net_host_port"`
+	PeerIP        string        `json:"net_peer_ip" mapstructure:"net_peer_ip"`
+	PeerPort      int           `json:"net_peer_port" mapstructure:"net_peer_port"`
 	Pid           int           `json:"pid"`
 	InFile        string        `json:"in_file"`
 	OutFile       string        `json:"out_file"`
@@ -32,12 +33,12 @@ type Flow struct {
 	StartTime     time.Time     `json:"start_time"`
 	Duration      time.Duration `json:"duration" mapstructure:"duration"`
 	LastSentTime  time.Time     `json:"last_sent_time"`
-	BytesReceived int           `json:"net.bytes_recv" mapstructure:"net.bytes_recv"`
-	BytesSent     int           `json:"net.bytes_sent" mapstructure:"net.bytes_sent"`
+	BytesReceived int           `json:"net_bytes_recv" mapstructure:"net_bytes_recv"`
+	BytesSent     int           `json:"net_bytes_sent" mapstructure:"net_bytes_sent"`
 	Proc          string        `json:"proc"`
-	Protocol      string        `json:"net.protocol" mapstructure:"net.protocol"`
-	Transport     string        `json:"net.transport" mapstructure:"net.transport"`
-	CloseReason   string        `json:"net.close.reason" mapstructure:"net.close.reason"`
+	Protocol      string        `json:"net_protocol" mapstructure:"net_protocol"`
+	Transport     string        `json:"net_transport" mapstructure:"net_transport"`
+	CloseReason   string        `json:"net_close_reason" mapstructure:"net_close_reason"`
 }
 
 func (f Flow) FlowFilePrefix() string {
@@ -48,6 +49,10 @@ func (f Flow) getHash() int64 {
 	h := fnv.New32a()
 	h.Write([]byte(f.FlowFilePrefix()))
 	return int64(h.Sum32())
+}
+
+func (f Flow) getID() string {
+	return util.EncodeOffset(f.getHash())
 }
 
 type FlowMap map[int64]Flow
@@ -108,6 +113,7 @@ func getFlowFiles(path string) (FlowMap, error) {
 		flow.LastSentTime = info.ModTime()
 		flow.Duration = flow.LastSentTime.Sub(flow.StartTime)
 		flow.Hash = flow.getHash()
+		flow.ID = flow.getID()
 		if flow.InFile != "" {
 			flow.BytesReceived = int(info.Size())
 		} else if flow.OutFile != "" {
@@ -157,9 +163,11 @@ func getFlowEvents(r io.ReadSeeker) (FlowMap, error) {
 	ret := FlowMap{}
 	for e := range in {
 		// Reshape ports to ints
-		if _, found := e["data"].(map[string]interface{})["net.host.port"]; found {
-			e["data"].(map[string]interface{})["net.host.port"], _ = strconv.Atoi(e["data"].(map[string]interface{})["net.host.port"].(string))
-			e["data"].(map[string]interface{})["net.peer.port"], _ = strconv.Atoi(e["data"].(map[string]interface{})["net.peer.port"].(string))
+		if _, found := e["data"].(map[string]interface{})["net_host_port"]; found {
+			e["data"].(map[string]interface{})["net_host_port"], _ = strconv.Atoi(e["data"].(map[string]interface{})["net_host_port"].(string))
+		}
+		if _, found := e["data"].(map[string]interface{})["net_peer_port"]; found {
+			e["data"].(map[string]interface{})["net_peer_port"], _ = strconv.Atoi(e["data"].(map[string]interface{})["net_peer_port"].(string))
 		}
 		f := Flow{}
 		err := mapstructure.Decode(e["data"], &f)
@@ -172,6 +180,8 @@ func getFlowEvents(r io.ReadSeeker) (FlowMap, error) {
 		f.Proc = e["proc"].(string)
 		f.Pid = int(e["pid"].(float64))
 		f.Hash = f.getHash()
+		f.ID = f.getID()
+		f.Duration = f.Duration * time.Millisecond
 		if err != nil {
 			return ret, fmt.Errorf("error hashing flow: %v", err)
 		}

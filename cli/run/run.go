@@ -143,16 +143,24 @@ func (rc *Config) createWorkDir(cmd string) {
 	err = os.MkdirAll(payloadsDir, 0755)
 	util.CheckErrSprintf(err, "error creating payloads dir: %v", err)
 	internal.CreateLogFile(filepath.Join(rc.WorkDir, "scope.log"))
-	if rc.MetricsDest != "" {
-		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_dest"), []byte(rc.MetricsDest), 0644)
+	if rc.MetricsDest != "" || rc.CriblDest != "" {
+		metricsDest := rc.MetricsDest
+		if metricsDest == "" {
+			metricsDest = rc.CriblDest
+		}
+		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_dest"), []byte(metricsDest), 0644)
 		util.CheckErrSprintf(err, "error writing metric_dest: %v", err)
 	}
 	if rc.MetricsFormat != "" {
 		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_format"), []byte(rc.MetricsFormat), 0644)
 		util.CheckErrSprintf(err, "error writing metric_format: %v", err)
 	}
-	if rc.EventsDest != "" {
-		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "event_dest"), []byte(rc.EventsDest), 0644)
+	if rc.EventsDest != "" || rc.CriblDest != "" {
+		eventsDest := rc.EventsDest
+		if eventsDest == "" {
+			eventsDest = rc.CriblDest
+		}
+		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "event_dest"), []byte(eventsDest), 0644)
 		util.CheckErrSprintf(err, "error writing event_dest: %v", err)
 	}
 	log.Info().Str("workDir", rc.WorkDir).Msg("created working directory")

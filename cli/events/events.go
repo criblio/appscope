@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/criblio/scope/util"
+	"github.com/rs/zerolog/log"
 )
 
 // Reader reads a newline delimited JSON documents and sends parsed documents
@@ -18,7 +19,8 @@ func Reader(r io.Reader, initOffset int64, match func(string) bool, out chan map
 			if err.Error() == "config event" {
 				return nil
 			}
-			return err
+			log.Error().Err(err).Msg("error parsing event")
+			return nil
 		}
 		event["id"] = util.EncodeOffset(initOffset + Offset)
 		out <- event

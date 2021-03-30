@@ -29,7 +29,7 @@ deps:
 rebuild: cliclean all
 
 local: scope
-	sudo cp $(DIR)build/scope /usr/local/bin/scope
+	sudo cp $(DIR)../bin/linux/scope /usr/local/bin/scope
 
 run/bundle.go:
 	rm -rf $(DIR)/build/*
@@ -40,7 +40,7 @@ run/bundle.go:
 
 scope: run/bundle.go
 	# GOOS=linux CGO_ENABLED=0 $(GO) build -a -tags netgo -ldflags="-s -w" -o build/scope
-	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)build/scope
+	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)../bin/linux/scope
 
 compressscope:
 	upx -9 $(DIR)build/scope

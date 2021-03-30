@@ -259,6 +259,7 @@ func (c *Config) configFromRunOpts() error {
 		// If we're outputting to Cribl, disable metrics and event outputs
 		c.sc.Metric.Transport = ScopeTransport{}
 		c.sc.Event.Transport = ScopeTransport{}
+		c.sc.Libscope.ConfigEvent = true
 	}
 	return nil
 }

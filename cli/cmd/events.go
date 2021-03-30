@@ -54,37 +54,37 @@ var sourcetypeColors = colorOpts{
 }
 
 var sourceFields = map[string][]string{
-	"http-req": {"http.host",
-		"http.method",
-		"http.request_content_length",
-		"http.scheme",
-		"http.target"},
-	"http-resp": {"http.host",
-		"http.method",
-		"http.scheme",
-		"http.target",
-		"http.response_content_length",
-		"http.status"},
+	"http-req": {"http_host",
+		"http_method",
+		"http_request_content_length",
+		"http_scheme",
+		"http_target"},
+	"http-resp": {"http_host",
+		"http_method",
+		"http_scheme",
+		"http_target",
+		"http_response_content_length",
+		"http_status"},
 	"http-metrics": {"duration",
 		"req_per_sec"},
-	"fs.open": {"file.name"},
-	"fs.close": {"file.name",
-		"file.read_bytes",
-		"file.read_ops",
-		"file.write_bytes",
-		"file.write_ops"},
-	"net.conn.open": {"net.peer.ip",
-		"net.peer.port",
-		"net.host.ip",
-		"net.host.port",
-		"net.protocol",
-		"net.transport"},
-	"net.conn.close": {"net.peer.ip",
-		"net.peer.port",
-		"net.bytes_recv",
-		"net.bytes_sent",
-		"net.close.reason",
-		"net.protocol"},
+	"fs.open": {"file_name"},
+	"fs.close": {"file_name",
+		"file_read_bytes",
+		"file_read_ops",
+		"file_write_bytes",
+		"file_write_ops"},
+	"net.conn.open": {"net_peer_ip",
+		"net_peer_port",
+		"net_host_ip",
+		"net_host_port",
+		"net_protocol",
+		"net_transport"},
+	"net.conn.close": {"net_peer_ip",
+		"net_peer_port",
+		"net_bytes_recv",
+		"net_bytes_sent",
+		"net_close_reason",
+		"net_protocol"},
 }
 
 // color returns the matching color or the default
@@ -127,10 +127,6 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		var file util.ReadSeekCloser
 		var err error
 		file, err = os.Open(sessions[0].EventsPath)
-		util.CheckErrSprintf(err, "error opening events file: %v", err)
-		if follow {
-			file = util.NewTailReader(file)
-		}
 		if err != nil && strings.Contains(err.Error(), "events.json: no such file or directory") {
 			if util.CheckFileExists(sessions[0].EventsDestPath) {
 				dest, _ := ioutil.ReadFile(sessions[0].EventsDestPath)
@@ -140,6 +136,9 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 			promptClean(sessions[0:1])
 		} else {
 			util.CheckErrSprintf(err, "error opening events file: %v", err)
+		}
+		if follow {
+			file = util.NewTailReader(file)
 		}
 
 		if len(args) > 0 {
@@ -253,7 +252,12 @@ func getEventText(e map[string]interface{}, width int, allFields bool) string {
 			ret = ansiStrip(strings.TrimSpace(fmt.Sprintf("%s", orig)))
 			ret = util.TruncWithElipsis(ret, truncLen)
 		case map[string]interface{}:
-			ret = colorMap(orig.(map[string]interface{}), sourceFields[source.(string)])
+			if msg, ok := orig.(map[string]interface{})["message"]; ok {
+				ret = ansiStrip(strings.TrimSpace(fmt.Sprintf("%s", msg)))
+				ret = util.TruncWithElipsis(ret, truncLen)
+			} else {
+				ret = colorMap(orig.(map[string]interface{}), sourceFields[source.(string)])
+			}
 		}
 		return ret
 	})

@@ -247,6 +247,19 @@ mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
     return end_start;
 }
 
+static void
+addCustomJsonFields(mtc_fmt_t *fmt, cJSON *json)
+{
+    custom_tag_t **tags = mtcFormatCustomTags(fmt);
+    if (!fmt || !json || !tags) return;
+
+    custom_tag_t *tag;
+    int i = 0;
+    while ((tag = tags[i++])) {
+        cJSON_AddStringToObject(json, tag->name, tag->value);
+    }
+}
+
 char *
 mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
 {
@@ -260,6 +273,7 @@ mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
         msg = mtcFormatStatsDString(fmt, evt, fieldFilter);
     } else if (fmt->format == CFG_FMT_NDJSON) {
         if (!(json = fmtMetricJson(evt, NULL, CFG_SRC_METRIC))) goto out;
+        addCustomJsonFields(fmt, json);
 
         // Request is for this json, plus a _time field
         struct timeb tb;

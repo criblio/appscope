@@ -1,2 +1,2 @@
 FROM ubuntu:20.04
-COPY cli/build/scope /usr/local/bin/scope
+COPY bin/linux/scope /usr/local/bin/scope

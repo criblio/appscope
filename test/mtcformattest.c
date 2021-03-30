@@ -260,6 +260,66 @@ mtcFormatEventForOutputHappyPathJson(void** state)
 }
 
 static void
+mtcFormatEventForOutputJsonWithCustomFields(void** state)
+{
+    char* g_procname = "testapp";
+    int g_chickenTeeth = 2;
+
+    event_field_t fields[] = {
+        STRFIELD("proc",    g_procname,   2,  TRUE),
+        FIELDEND
+    };
+    event_t e = INT_EVENT("chicken.teeth", g_chickenTeeth, CURRENT, fields);
+
+    mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_NDJSON);
+    assert_non_null(fmt);
+
+    custom_tag_t t1 = {"name1", "value1"};
+    custom_tag_t t2 = {"name2", "value2"};
+    custom_tag_t* tags[] = { &t1, &t2, NULL };
+    mtcFormatCustomTagsSet(fmt, tags);
+    mtcFormatVerbositySet(fmt, CFG_MAX_VERBOSITY);
+
+    char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
+    assert_non_null(msg);
+
+    // For usability, the json string needs to be newline terminated
+    assert_int_equal(msg[strlen(msg)-1], '\n');
+
+    cJSON *json = cJSON_Parse(msg);
+    assert_non_null(json);
+
+    cJSON *type = cJSON_GetObjectItem(json, "type");
+    assert_non_null(type);
+    assert_string_equal(cJSON_GetStringValue(type), "metric");
+
+    cJSON *body = cJSON_GetObjectItem(json, "body");
+
+    // Fields expected for all json metrics
+    assert_true(cJSON_HasObjectItem(body, "_metric"));
+    assert_true(cJSON_HasObjectItem(body, "_metric_type"));
+    assert_true(cJSON_HasObjectItem(body, "_value"));
+    // Fields expected for our specific metric
+    assert_true(cJSON_HasObjectItem(body, "proc"));
+    // Fields expected for custom fields (tags)
+    cJSON *tag1 = cJSON_GetObjectItem(body, "name1");
+    assert_non_null(tag1);
+    assert_string_equal(cJSON_GetStringValue(tag1), "value1");
+    cJSON *tag2 = cJSON_GetObjectItem(body, "name2");
+    assert_non_null(tag2);
+    assert_string_equal(cJSON_GetStringValue(tag2), "value2");
+
+    // And... _time field is required too
+    assert_true(cJSON_HasObjectItem(body, "_time"));
+
+    cJSON_Delete(json);
+    free(msg);
+
+    mtcFormatDestroy(&fmt);
+    assert_null(fmt);
+}
+
+static void
 mtcFormatEventForOutputHappyPathFilteredFields(void** state)
 {
     char* g_hostname = "myhost";
@@ -634,6 +694,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(mtcFormatEventForOutputNullFmtDoesntCrash),
         cmocka_unit_test(mtcFormatEventForOutputHappyPathStatsd),
         cmocka_unit_test(mtcFormatEventForOutputHappyPathJson),
+        cmocka_unit_test(mtcFormatEventForOutputJsonWithCustomFields),
         cmocka_unit_test(mtcFormatEventForOutputHappyPathFilteredFields),
         cmocka_unit_test(mtcFormatEventForOutputWithCustomFields),
         cmocka_unit_test(mtcFormatEventForOutputWithCustomAndStatsdFields),

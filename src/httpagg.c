@@ -19,7 +19,15 @@ typedef enum {
     FIELD_MAX
 } counter_field_enum;
 
-enum_map_t fieldMap[] = {
+enum_map_t fieldMapIn[] = {
+    {"http_server_duration",          SERVER_DURATION},
+    {"http_client_duration",          CLIENT_DURATION},
+    {"http_request_content_length",   REQUEST_BYTES},
+    {"http_response_content_length",  RESPONSE_BYTES},
+    {NULL,                    -1}
+};
+
+enum_map_t fieldMapOut[] = {
     {"http.server.duration",          SERVER_DURATION},
     {"http.client.duration",          CLIENT_DURATION},
     {"http.request.content_length",   REQUEST_BYTES},
@@ -38,7 +46,7 @@ typedef struct {
 } agg_counter_t;
 
 typedef struct {
-    char * uri;           // the key that comes from http.target
+    char * uri;           // the key that comes from http_target
     status_code_t status[MAX_CODE_ENTRIES];
     agg_counter_t field[FIELD_MAX];
 } target_agg_t;
@@ -216,18 +224,18 @@ httpAggAddMetric(http_agg_t *http_agg,
     if (!http_agg || !duration) return;
 
     // Aggregation is keyed by target (uri).  Get this from the duration event.
-    const char *target_val = str_value(duration, "http.target");
+    const char *target_val = str_value(duration, "http_target");
     if (!target_val) return;
 
     target_agg_t *target_entry = get_target_entry(http_agg, target_val);
     if (!target_entry) return;
 
     // Record the status in the target_entry
-    long long status_val = num_value(duration, "http.status_code");
+    long long status_val = num_value(duration, "http_status_code");
     add_status(target_entry, status_val);
 
     // Record the field data in the target_entry
-    counter_field_enum dur_field = strToVal(fieldMap, duration->name);
+    counter_field_enum dur_field = strToVal(fieldMapIn, duration->name);
     switch (dur_field) {
         case SERVER_DURATION:
         case CLIENT_DURATION:
@@ -292,7 +300,7 @@ report_target(mtc_t *mtc, target_agg_t *target)
                 STRFIELD("unit",        unit, 4, TRUE),
                 FIELDEND
             };
-            event_t metric = INT_EVENT(valToStr(fieldMap, i),
+            event_t metric = INT_EVENT(valToStr(fieldMapOut, i),
                                        target->field[i].total, DELTA, fields);
             cmdSendMetric(mtc, &metric);
         }

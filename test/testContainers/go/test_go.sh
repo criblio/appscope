@@ -81,6 +81,7 @@ evalPayload(){
 starttest plainServerDynamic
 cd /go/net
 PORT=80
+
 ldscope ./plainServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
@@ -102,6 +103,8 @@ ERR+=$?
 grep plainServerDynamic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
 grep plainServerDynamic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+grep plainServerDynamic $EVT_FILE | grep http-resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
 evalPayload
@@ -138,6 +141,8 @@ grep plainServerStatic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
 grep plainServerStatic $EVT_FILE | grep http-metrics > /dev/null
 ERR+=$?
+grep plainServerStatic $EVT_FILE | grep http-resp | grep "127.0.0.1" > /dev/null
+ERR+=$?
 
 evalPayload
 ERR+=$?
@@ -172,6 +177,8 @@ ERR+=$?
 grep tlsServerDynamic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
 grep tlsServerDynamic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep http-resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
 evalPayload
@@ -208,6 +215,8 @@ ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep http-metrics > /dev/null
+ERR+=$?
+grep tlsServerStatic $EVT_FILE | grep http-resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
 evalPayload
@@ -441,6 +450,9 @@ influx_eval() {
     else
 	    echo "Server Success count is $cnt"
     fi
+
+    grep http-req /go/influx/db/influxd.event | grep "127.0.0.1" > /dev/null
+    ERR+=$?
 
     if [ -e  "/go/influx/db/influxc.event" ]; then
         cnt=`grep -c http-req /go/influx/db/influxc.event`

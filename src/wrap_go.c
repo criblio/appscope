@@ -51,7 +51,9 @@ go_offsets_t g_go = {.g_to_m=48,                   // 0x30
                      .pd_to_fd=16,                 // 0x10
                      .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 (defined for go1.8)
                      .bufrd_to_buf=0,              // 0x00
-                     .conn_to_rwc=16};             // 0x10
+                     .conn_to_rwc=16,              // 0x10
+                     .conn_to_tlsState=48,         // 0x30
+                     .persistConn_to_tlsState=96}; // 0x60
 
 tap_t g_go_tap[] = {
     {"syscall.write",                        go_hook_write,        NULL, 0},
@@ -74,7 +76,6 @@ uint64_t g_go_static = 0LL;
 static list_t *g_threadlist;
 static void *g_stack;
 static bool g_switch_thread;
-static uint64_t go_tls_conn;
 
 void (*go_runtime_cgocall)(void);
 
@@ -333,6 +334,7 @@ adjustGoStructOffsetsForVersion(int go_ver)
     if (go_ver < 12) {
         g_go.persistConn_to_conn = 72;  // 0x48
         g_go.persistConn_to_bufrd = 96; // 0x60
+        g_go.persistConn_to_tlsState=88; // 0x58
     }
 
 
@@ -372,6 +374,8 @@ adjustGoStructOffsetsForVersion(int go_ver)
         }
         dprintf(fd, "bufio.Reader|buf=%d|\n", g_go.bufrd_to_buf);
         dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go.conn_to_rwc);
+        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
+        dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go.persistConn_to_tlsState);
         ni_close(fd);
     }
 
@@ -459,12 +463,6 @@ initGoHook(elf_buf_t *ebuf)
     if ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
         sysprint("ERROR: can't get the address for runtime.cgocall\n");
         return; // don't install our hooks
-    }
-
-    // Get the interface type for a tls.Conn (set to 0 if not present)
-    go_tls_conn = (uint64_t)getSymbol(ebuf->buf, "go.itab.*crypto/tls.Conn,net.Conn");
-    if (go_tls_conn == 0) {
-        go_tls_conn = (uint64_t)getGoSymbol(ebuf->buf, "crypto/tls.(*Conn).write");
     }
 
     adjustGoStructOffsetsForVersion(go_major_ver);
@@ -1008,13 +1006,19 @@ c_http_server_read(char *stackaddr)
     if (!conn) return;         // protect from dereferencing null
 
     cr_conn_rwc_if = conn + g_go.conn_to_rwc;
+    uint64_t tls =  *(uint64_t*)(conn + g_go.conn_to_tlsState);
+
     /*
-     * Strict conn I/F checking. There are as many as 5 types of conn structs in Go.
-     * We only want to extract an fd from a tls.Conn. We can check to see if the I/F
-     * type matches the value of the symbol "go.itab.*crypto/tls.Conn,net.Conn".
-     * A match defines this conn as a tls.Conn.
+     * The rwc net.Conn value can be wrapped as either a *net.TCPConn or
+     * *tls.Conn. We are using tlsState *tls.ConnectionState as the indicator
+     * of type. If the tlsState field is not 0, the rwc field is of type
+     * *tls.Conn. Example; net/http/server.go type conn struct.
+     *
+     * For reference, we were looking at the I/F type from go.itab.*crypto/tls.Conn,net.Conn
+     * and checking the type to determine TLS. This doesn't work on stripped
+     * executeables and should no longer be needed.
      */
-    if (cr_conn_rwc_if && go_tls_conn && (*(uint64_t *)cr_conn_rwc_if == go_tls_conn)) {
+    if (cr_conn_rwc_if && tls) {
         cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go.iface_data);
         netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data);
         if (netFD) {
@@ -1066,8 +1070,10 @@ c_http_server_write(char *stackaddr)
     uint64_t w_conn_rwc_if, w_conn_rwc, netFD, pfd;
 
     w_conn_rwc_if = (conn + g_go.conn_to_rwc);
-    // Strict conn I/F checking. Ref the comment on c_http_server_read.
-    if (w_conn_rwc_if && go_tls_conn && (*(uint64_t *)w_conn_rwc_if == go_tls_conn)) {
+    uint64_t tls =  *(uint64_t*)(conn + g_go.conn_to_tlsState);
+
+    // conn I/F checking. Ref the comment on c_http_server_read.
+    if (w_conn_rwc_if && tls) {
         w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go.iface_data);
         netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data);
         if (netFD) {
@@ -1119,8 +1125,10 @@ c_http_client_write(char *stackaddr)
     if (rc < 1) return;
 
     pc_conn_if = (w_pc + g_go.persistConn_to_conn);
-    // Strict conn I/F checking. Ref the comment on c_http_server_read.
-    if (pc_conn_if && go_tls_conn && (*(uint64_t *)pc_conn_if == go_tls_conn)) {
+    uint64_t tls =  *(uint64_t*)(w_pc + g_go.persistConn_to_tlsState);
+
+    // conn I/F checking. Ref the comment on c_http_server_read.
+    if (pc_conn_if && tls) {
         w_pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
         netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data);
         if (!netFD) return;
@@ -1168,8 +1176,10 @@ c_http_client_read(char *stackaddr)
     uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
 
     pc_conn_if = (pc + g_go.persistConn_to_conn);
-    // Strict conn I/F checking. Ref the comment on c_http_server_read.
-    if (pc_conn_if && go_tls_conn && (*(uint64_t *)pc_conn_if == go_tls_conn)) {
+    uint64_t tls =  *(uint64_t*)(pc + g_go.persistConn_to_tlsState);
+
+    // conn I/F checking. Ref the comment on c_http_server_read.
+    if (pc_conn_if && tls) {
         pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
         netFD = *(uint64_t *)(pc_conn + g_go.iface_data);
         if (!netFD) return;

@@ -1997,6 +1997,11 @@ cfgLogStreamDefault(config_t *cfg)
         cfgLogLevelSet(cfg, CFG_LOG_WARN);
     }
 
+    if (!cfgSendProcessStartMsg(cfg)) {
+        strncat(g_logmsg, "Send proc start msg, ", 25);
+        cfgSendProcessStartMsgSet(cfg, TRUE);
+    }
+
     return 0;
 }
 

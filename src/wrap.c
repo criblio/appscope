@@ -1208,7 +1208,13 @@ fopen(const char *pathname, const char *mode)
     WRAP_CHECK(fopen, NULL);
     stream = g_fn.fopen(pathname, mode);
     if (stream != NULL) {
-        doOpen(fileno(stream), pathname, STREAM, "fopen");
+        // This check for /proc/self/maps is because we want to avoid
+        // reporting that our funchook library opens /proc/self/maps
+        // with fopen, then calls fgets and fclose on it as well...
+        // See https://github.com/criblio/appscope/issues/214 for more info
+        if (strcmp(pathname, "/proc/self/maps")) {
+            doOpen(fileno(stream), pathname, STREAM, "fopen");
+        }
     } else {
         doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "fopen", pathname);
     }

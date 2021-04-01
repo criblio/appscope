@@ -1022,16 +1022,12 @@ c_http_server_read(char *stackaddr)
         cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go.iface_data);
         netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data);
         if (netFD) {
-            if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-                pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-                if (pfd) {
-                    //funcprint("Scope: %s:%d cr %p cr.conn %p cr.conn.rwc_if %p cr.conn.rwc %p netFD %p pfd %p fd %p\n",
-                    //          __FUNCTION__, __LINE__, connReader, conn, cr_conn_rwc_if, cr_conn_rwc,
-                    //          netFD, pfd, pfd + g_go.pd_to_fd);
-                    fd = *(int *)(pfd + g_go.pd_to_fd);
-                }
-            } else {
-                fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+            if (pfd) {
+                //funcprint("Scope: %s:%d cr %p cr.conn %p cr.conn.rwc_if %p cr.conn.rwc %p netFD %p pfd %p fd %p\n",
+                //          __FUNCTION__, __LINE__, connReader, conn, cr_conn_rwc_if, cr_conn_rwc,
+                //          netFD, pfd, pfd + g_go.pd_to_fd);
+                fd = *(int *)(pfd + g_go.pd_to_fd);
             }
 
             funcprint("Scope: go_http_server_read of %ld\n", fd);
@@ -1077,13 +1073,9 @@ c_http_server_write(char *stackaddr)
         w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go.iface_data);
         netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data);
         if (netFD) {
-            if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-                pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-                if (pfd) {
-                    fd = *(int *)(pfd + g_go.pd_to_fd);
-                }
-            } else {
-                fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+            if (pfd) {
+                fd = *(int *)(pfd + g_go.pd_to_fd);
             }
 
             funcprint("Scope: c_http_server_write of %ld\n", fd);

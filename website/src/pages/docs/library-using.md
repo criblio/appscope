@@ -53,3 +53,19 @@ This again executes the `ps` command using the AppScope library. But here, we al
 For a full list of library environment variables, execute: `./libscope.so all`
 
 For the default settings in the sample `scope.yml` configuration file, see [Config Files](/docs/config-files), or inspect the most-recent file on [GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).
+
+### <span id="lambda">Deploying the Library in a Lambda Function</span>
+
+You can pull the libscope.so library into an AWS Lambda function as a [Lambda layer](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html), using these steps:
+
+1. Run `scope extract`, e.g.:
+    ```
+    scope extract /opt/<your-layer>/
+    ```
+
+1. Set these three environment variables:
+    ```
+    LD_PRELOAD=/opt/<your-layer>/libscope.so
+    SCOPE_EXEC_PATH=/opt/<your-layer>/ldscope
+    SCOPE_CONF_PATH=/opt/<your-layer>/scope.yml
+    ```

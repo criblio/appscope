@@ -460,7 +460,8 @@ initGoHook(elf_buf_t *ebuf)
      * are entering the Go func past the runtime stack check?
      * Need to investigate later.
      */
-    if ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
+    if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
+        ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
         sysprint("ERROR: can't get the address for runtime.cgocall\n");
         return; // don't install our hooks
     }
@@ -469,8 +470,9 @@ initGoHook(elf_buf_t *ebuf)
 
     tap_t* tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
-        void* orig_func = getGoSymbol(ebuf->buf, tap->func_name);
-        if (!orig_func) {
+        void* orig_func;
+        if (((orig_func = getGoSymbol(ebuf->buf, tap->func_name)) == NULL) &&
+            ((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL)) {
             sysprint("ERROR: can't get the address for %s\n", tap->func_name);
             continue;
         }

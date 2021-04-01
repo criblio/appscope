@@ -2068,7 +2068,7 @@ EXPORTON int
 execve(const char *pathname, char *const argv[], char *const envp[])
 {
     int i, nargs, saverr;
-    bool isstat = FALSE;
+    bool isstat = FALSE, isgo = FALSE;
     char **nargv;
     elf_buf_t *ebuf;
     char *scopexec = NULL;
@@ -2082,12 +2082,17 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     if ((ebuf = getElf((char *)pathname))) {
         isstat = is_static(ebuf->buf);
+        isgo = is_go(ebuf->buf);
     }
 
     // not really necessary since we're gonna exec
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
-    if (getenv("LD_PRELOAD") && (isstat == FALSE)) {
+    /*
+     * Note: the isgo check is strictly for Go dynamic execs.
+     * In this case we use ldscope only to force the use of HTTP 1.1.
+     */
+    if (getenv("LD_PRELOAD") && (isstat == FALSE) && (isgo == FALSE)) {
         return g_fn.execve(pathname, argv, envp);
     }
 

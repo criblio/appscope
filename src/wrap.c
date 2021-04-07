@@ -2185,6 +2185,13 @@ syscall(long number, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, number);
 
     switch (number) {
+    case SYS_close:
+    {
+        long rc;
+        rc = g_fn.syscall(number, fArgs.arg[0]);
+        doClose(fArgs.arg[0], "sysclose");
+        return rc;
+    }
     case SYS_accept4:
     {
         long rc;

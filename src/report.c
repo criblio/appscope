@@ -160,7 +160,7 @@ destroyProto(protocol_info *proto)
      * post->data is the http header and is freed in destroyHttpMap()
      * when the list entry is deleted.
      */
-    if (proto->data) free (proto->data);
+    if (proto->data) free(proto->data);
 }
 
 static int

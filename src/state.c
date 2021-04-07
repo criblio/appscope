@@ -234,15 +234,10 @@ initProtocolDetection()
 
     protocolRead(ppath, plist);
 
-    for (i = 0; ; i++) {
-        if ((prot = lstFind(plist, i)) != NULL) {
-            request_t req;
-
-            req.protocol = prot;
-            addProtocol(&req);
-        } else {
-            break;
-        }
+    for (i = 0; (prot = lstFind(plist, i)) != NULL; i++) {
+        request_t req;
+        req.protocol = prot;
+        addProtocol(&req);
     }
 
     if (ppath) free(ppath);

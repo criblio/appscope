@@ -758,7 +758,7 @@ osNetHeader(void *data, size_t *dlen, int socktype,
         ipv6 = (struct ipv6hdr *)(ip_data + sizeof(struct ether_header));
         ipv6->priority = 0;
         ipv6->version = 6;
-        ipv6->payload_len = *dlen;
+        ipv6->payload_len = htons(plen + *dlen);
         ipv6->nexthdr = protocol;
         ipv6->hop_limit = 255;
 

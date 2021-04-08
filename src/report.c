@@ -2645,6 +2645,7 @@ doPayload()
                     pcap_t *pd;
                     pcap_dumper_t *pdumper;
                     struct pcap_pkthdr phdr;
+                    struct stat sb;
 
                     if ((ip_data = osNetHeader(pinfo->data, &tlen, net->type,
                                                &net->localConn, &net->remoteConn)) != NULL) {
@@ -2654,8 +2655,11 @@ doPayload()
                             strncat(path, ".pcap", PATH_MAX - 6);
                         }
 
-                        // Create an output file
-                        pdumper = pcap_dump_open(pd, path);
+                        if (stat(path, &sb) == 0) {
+                            pdumper = pcap_dump_open_append(pd, path);
+                        } else {
+                            pdumper = pcap_dump_open(pd, path);
+                        }
 
                         phdr.caplen = tlen;
                         phdr.len = tlen;

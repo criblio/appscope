@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <fcntl.h>
+#include <pcap/pcap.h>
 
 #include "atomic.h"
 #include "com.h"
@@ -23,6 +24,7 @@
 #include "utils.h"
 #include "runtimecfg.h"
 #include "cfg.h"
+#include "os.h"
 
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
@@ -2594,7 +2596,6 @@ doPayload()
                 int fd;
                 char path[PATH_MAX];
 
-                ///tmp/<splunk-pid>/<src_host:src_port:dst_port>.in
                 switch (pinfo->src) {
                 case NETTX:
                 case TLSTX:
@@ -2635,6 +2636,37 @@ doPayload()
                     }
 
                     g_fn.close(fd);
+                }
+
+                bool pcap_enabled = TRUE;
+                if (pcap_enabled && net && net->active) {
+                    size_t tlen = pinfo->len;
+                    char *ip_data;
+                    pcap_t *pd;
+                    pcap_dumper_t *pdumper;
+                    struct pcap_pkthdr phdr;
+
+                    if ((ip_data = osNetHeader(pinfo->data, &tlen, net->type,
+                                               &net->localConn, &net->remoteConn)) != NULL) {
+                        pd = pcap_open_dead(DLT_EN10MB, 65535); // DLT_RAW DLT_EN10MB
+
+                        if (strlen(path) < (PATH_MAX - 6)) {
+                            strncat(path, ".pcap", PATH_MAX - 6);
+                        }
+
+                        // Create an output file
+                        pdumper = pcap_dump_open(pd, path);
+
+                        phdr.caplen = tlen;
+                        phdr.len = tlen;
+                        phdr.ts.tv_sec = getTime();
+                        phdr.ts.tv_usec = 0;
+
+                        pcap_dump((u_char *)pdumper, &phdr, (const u_char *)ip_data);
+                        free(ip_data);
+                        pcap_close(pd);
+                        pcap_dump_close(pdumper);
+                    }
                 }
             }
 

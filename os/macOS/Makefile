@@ -5,7 +5,7 @@ SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tag
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -D__MACOS__
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
 TEST_CFLAGS +=-D__MACOS__
-LD_FLAGS=$(PCRE2_AR) -Wl, -ldl -lpthread -lresolv
+LD_FLAGS=$(PCRE2_AR) -Wl, -ldl -lpthread -lresolv -lpcap
 INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 YAML_SRC=$(wildcard contrib/libyaml/src/*.c)

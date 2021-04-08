@@ -170,3 +170,11 @@ osNeedsConnect(int fd)
 {
     return 0;
 }
+
+char *
+osNetHeader(void *data, size_t *dlen, int socktype,
+            struct sockaddr_storage *localConn,
+            struct sockaddr_storage *remoteConn)
+{
+    return NULL;
+}

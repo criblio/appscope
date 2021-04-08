@@ -24,6 +24,12 @@
 #include <linux/unix_diag.h>
 #include <link.h>
 #include <sys/mman.h>
+#include <pcap/pcap.h>
+#include <net/ethernet.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
+#include <linux/udp.h>
+#include <linux/tcp.h>
 
 #include "../../src/plattime.h"
 #include "../../contrib/funchook/include/funchook.h"
@@ -61,5 +67,7 @@ extern bool osTimerStop(void);
 extern bool osGetCgroup(pid_t, char *, size_t);
 extern char *osGetFileMode(mode_t);
 extern int osNeedsConnect(int);
-
+extern char *osNetHeader(void *, size_t *, int,
+                         struct sockaddr_storage *,
+                         struct sockaddr_storage *);
 #endif  //__OS_H__

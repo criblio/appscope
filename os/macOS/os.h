@@ -44,3 +44,6 @@ extern bool osTimerStop(void);
 extern bool osGetCgroup(pid_t, char *, size_t);
 extern char *osGetFileMode(mode_t);
 extern int osNeedsConnect(int);
+extern char *osNetHeader(void *, size_t *, int,
+                         struct sockaddr_storage *,
+                         struct sockaddr_storage *);

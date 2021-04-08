@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <sys/param.h>
 #include <time.h>
+
 #include "os.h"
 #include "../../src/dbg.h"
 #include "../../src/fn.h"
@@ -696,6 +697,127 @@ osGetFileMode(mode_t perm)
     mode[8] = (perm & S_IXOTH) ? 'x' : '-';
     mode[9] = '\0';
     return mode;
+}
+
+char *
+osNetHeader(void *data, size_t *dlen, int socktype,
+            struct sockaddr_storage *localConn,
+            struct sockaddr_storage *remoteConn)
+{
+    if (!data || !localConn || !remoteConn || !dlen || (*dlen <= 0)) return NULL;
+
+    unsigned char protocol;
+    unsigned short iptype, srcport, dstport;
+    size_t tlen, hlen, iplen, plen;
+    struct ether_header *eth;
+    struct iphdr *ip;
+    struct ipv6hdr *ipv6;
+    struct udphdr *udp;
+    struct tcphdr *tcp;
+    char eth_dst[ETHER_ADDR_LEN] = {0x0a, 0x02, 0x02, 0x02, 0x02, 0x02};
+    char eth_src[ETHER_ADDR_LEN] = {0x0a, 0x02, 0x02, 0x02, 0x02, 0x01};
+
+    if (localConn->ss_family == AF_INET6) {
+        iplen = sizeof(struct ether_header) + sizeof(struct ipv6hdr);
+        iptype = ETHERTYPE_IPV6;
+    } else if (localConn->ss_family == AF_INET) {
+        iplen = sizeof(struct ether_header) + sizeof(struct iphdr);
+        iptype = ETHERTYPE_IP;
+    } else {
+        // no header if not an INET socket
+        return FALSE;
+    }
+
+    if (socktype == SOCK_STREAM) {
+        hlen = iplen + sizeof(struct tcphdr);
+        plen = sizeof(struct tcphdr);
+        tlen = hlen + *dlen;
+        protocol = IPPROTO_TCP;
+    } else if (socktype == SOCK_DGRAM) {
+        hlen = iplen + sizeof(struct udphdr);
+        plen = sizeof(struct udphdr);
+        tlen = hlen + *dlen;
+        protocol = IPPROTO_UDP;
+    } else {
+        hlen = iplen;
+        tlen = hlen + *dlen;
+        protocol = IPPROTO_RAW;
+    }
+
+    char *ip_data = calloc(1, tlen);
+    if (!ip_data) return NULL;
+
+    eth = (struct ether_header *)ip_data;
+    eth->ether_type = htons(iptype);
+    memmove(eth->ether_dhost, eth_dst, ETHER_ADDR_LEN);
+    memmove(eth->ether_shost, eth_src, ETHER_ADDR_LEN);
+
+    if (localConn->ss_family == AF_INET6) {
+        struct sockaddr_in6 *sin6;
+
+        ipv6 = (struct ipv6hdr *)(ip_data + sizeof(struct ether_header));
+        ipv6->payload_len = *dlen;
+        ipv6->nexthdr = protocol;
+        ipv6->hop_limit = 255;
+
+        sin6 = (struct sockaddr_in6 *)localConn;
+        memmove(&ipv6->saddr, &sin6->sin6_addr, sizeof(struct in6_addr));
+        srcport = sin6->sin6_port;
+        sin6 = (struct sockaddr_in6 *)remoteConn;
+        memmove(&ipv6->daddr, &sin6->sin6_addr, sizeof(struct in6_addr));
+        dstport = sin6->sin6_port;
+    } else { // default to IPv4
+        struct sockaddr_in *sin;
+
+        ip = (struct iphdr *)(ip_data + sizeof(struct ether_header));
+        ip->ihl = 5;
+        ip->version = 4;
+        ip->tos = 0;
+        ip->tot_len = htons(sizeof(struct iphdr) + plen + *dlen);
+        ip->id = htons(0x1234);
+        ip->frag_off = 0; // htons(0x4000) disable fragmentation. Needed?
+        ip->ttl = 255;
+        ip->protocol = protocol;
+        ip->check = htons(0xaabb);
+
+        sin = (struct sockaddr_in *)localConn;
+        ip->saddr = sin->sin_addr.s_addr;
+        srcport = sin->sin_port;
+        sin = (struct sockaddr_in *)remoteConn;
+        ip->daddr = sin->sin_addr.s_addr;
+        dstport = sin->sin_port;
+    }
+
+    if (socktype == SOCK_DGRAM) {
+        udp = (struct udphdr *)(ip_data + iplen);
+        udp->source = srcport;
+        udp->dest = dstport;
+        udp->len = htons(sizeof(struct udphdr) + *dlen);
+        udp->check = htons(0xaabb);
+    } else if (socktype == SOCK_STREAM) {
+        tcp = (struct tcphdr *)(ip_data + iplen);
+        tcp->source = srcport;
+        tcp->dest = dstport;
+        tcp->seq = 0;
+        tcp->ack_seq = 0;
+        tcp->doff = 5; //4 bits: 5 x 32-bit words on tcp header
+        tcp->res1 = 0; //4 bits: Not used
+        tcp->cwr = 0;  //Congestion control mechanism
+        tcp->ece = 0;  //Congestion control mechanism
+        tcp->urg = 0;  //Urgent flag
+        tcp->ack = 0;  //Acknownledge
+        tcp->psh = 0;  //Push data immediately
+        tcp->rst = 0;  //RST flag
+        tcp->syn = 1;  //SYN flag
+        tcp->fin = 0;  //Terminates the connection
+        tcp->window = htons(8192);
+        tcp->check = htons(0xaabb);
+        tcp->urg_ptr = 0;
+    }
+
+    memmove(&ip_data[hlen], data, *dlen);
+    *dlen = tlen;
+    return ip_data;
 }
 
 static const char scope_help_overview[] =

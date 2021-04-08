@@ -24,6 +24,7 @@
 #include <linux/unix_diag.h>
 #include <link.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
 #include <pcap/pcap.h>
 #include <net/ethernet.h>
 #include <linux/ip.h>

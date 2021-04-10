@@ -389,9 +389,14 @@ processReloadConfig(config_t *cfg, const char* value)
 }
 
 static int
-startsWith(const char* string, const char* substring)
+startsWith(const char* str, const char* pref)
 {
-    return (strncmp(string, substring, strlen(substring)) == 0);
+    for (; *pref != '\0'; str++, pref++) {
+        if (*pref != *str) {
+            return FALSE;
+        }
+    }
+    return TRUE;
 }
 
 //

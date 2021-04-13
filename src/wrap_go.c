@@ -457,6 +457,7 @@ initGoHook(elf_buf_t *ebuf)
         go_ver = getGoVersionAddr(ebuf->buf);
     }
 
+    // if it's a dynamic app, get the base address from /proc/self/maps
     uint64_t base = 0LL;
     if (!g_go_static && getBaseAddress(&base) != 0) {
         sysprint("ERROR: can't get the base address\n");

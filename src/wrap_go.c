@@ -381,6 +381,30 @@ adjustGoStructOffsetsForVersion(int go_ver)
 
 }
 
+int getBaseAddress(uint64_t *addr) {
+  uint64_t base_addr = 0;
+  char buf[17];
+  int fd;
+
+  if ((fd = open("/proc/self/maps", O_RDONLY)) == -1) {
+    return -1;
+  }
+
+  if (read(fd, buf, sizeof(buf))) {    
+    uint64_t addr_start;
+    if (sscanf((const char *)&buf, "%lx-", &addr_start)==1) {
+      base_addr = addr_start;
+    }
+  }
+
+  close(fd);
+  if (base_addr) {
+    *addr = base_addr;
+    return 0;
+  }
+  return -1;
+}
+
 void
 initGoHook(elf_buf_t *ebuf)
 {
@@ -432,6 +456,14 @@ initGoHook(elf_buf_t *ebuf)
         //try to retrieve the version symbol address from the .go.buildinfo section
         go_ver = getGoVersionAddr(ebuf->buf);
     }
+
+    uint64_t base = 0LL;
+    if (!g_go_static && getBaseAddress(&base) != 0) {
+        sysprint("ERROR: can't get the base address\n");
+        return; // don't install our hooks
+    }
+    go_ver = (void *) ((uint64_t)go_ver + base);
+    
     if (go_ver && (go_runtime_version = c_str(go_ver))) {
 
         sysprint("go_runtime_version = %s\n", go_runtime_version);
@@ -465,6 +497,7 @@ initGoHook(elf_buf_t *ebuf)
         sysprint("ERROR: can't get the address for runtime.cgocall\n");
         return; // don't install our hooks
     }
+    go_runtime_cgocall = (void *) ((uint64_t)go_runtime_cgocall + base);
 
     adjustGoStructOffsetsForVersion(go_major_ver);
 
@@ -481,6 +514,8 @@ initGoHook(elf_buf_t *ebuf)
         unsigned int asm_count = 0;
         _DecodedInst asm_inst[MAX_INST];
         uint64_t offset_into_txt = (uint64_t)orig_func - (uint64_t)ebuf->text_addr;
+
+        orig_func = (void *) ((uint64_t)orig_func + base);
         int rc = distorm_decode((uint64_t)orig_func, orig_func,
                                  ebuf->text_len - offset_into_txt,
                                  Decode64Bits, asm_inst, MAX_INST, &asm_count);

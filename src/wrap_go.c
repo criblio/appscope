@@ -382,27 +382,27 @@ adjustGoStructOffsetsForVersion(int go_ver)
 }
 
 int getBaseAddress(uint64_t *addr) {
-  uint64_t base_addr = 0;
-  char buf[17];
-  int fd;
+    uint64_t base_addr = 0;
+    char buf[17];
+    int fd;
 
-  if ((fd = open("/proc/self/maps", O_RDONLY)) == -1) {
-    return -1;
-  }
-
-  if (read(fd, buf, sizeof(buf))) {    
-    uint64_t addr_start;
-    if (sscanf((const char *)&buf, "%lx-", &addr_start)==1) {
-      base_addr = addr_start;
+    if ((fd = open("/proc/self/maps", O_RDONLY)) == -1) {
+        return -1;
     }
-  }
 
-  close(fd);
-  if (base_addr) {
-    *addr = base_addr;
-    return 0;
-  }
-  return -1;
+    if (read(fd, buf, sizeof(buf))) {    
+        uint64_t addr_start;
+        if (sscanf((const char *)&buf, "%lx-", &addr_start)==1) {
+        base_addr = addr_start;
+        }
+    }
+
+    close(fd);
+    if (base_addr) {
+        *addr = base_addr;
+        return 0;
+    }
+    return -1;
 }
 
 void

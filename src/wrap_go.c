@@ -393,7 +393,7 @@ int getBaseAddress(uint64_t *addr) {
     if (read(fd, buf, sizeof(buf))) {    
         uint64_t addr_start;
         if (sscanf((const char *)&buf, "%lx-", &addr_start)==1) {
-        base_addr = addr_start;
+            base_addr = addr_start;
         }
     }
 
@@ -456,10 +456,11 @@ initGoHook(elf_buf_t *ebuf)
         //try to retrieve the version symbol address from the .go.buildinfo section
         go_ver = getGoVersionAddr(ebuf->buf);
     }
-
-    // if it's a dynamic app, get the base address from /proc/self/maps
+    //check ELF type
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
+    // if it's a position independent executable, get the base address from /proc/self/maps
     uint64_t base = 0LL;
-    if (!g_go_static && getBaseAddress(&base) != 0) {
+    if (ehdr->e_type == ET_DYN && !g_go_static && getBaseAddress(&base) != 0) {
         sysprint("ERROR: can't get the base address\n");
         return; // don't install our hooks
     }

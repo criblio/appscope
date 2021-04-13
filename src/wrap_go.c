@@ -12,6 +12,7 @@
 #include "os.h"
 #include "state.h"
 #include "utils.h"
+#include "fn.h"
 #include "../contrib/funchook/distorm/include/distorm.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
@@ -386,18 +387,20 @@ int getBaseAddress(uint64_t *addr) {
     char buf[17];
     int fd;
 
-    if ((fd = open("/proc/self/maps", O_RDONLY)) == -1) {
+    if (!g_fn.open || !g_fn.read || !g_fn.close) return -1;
+
+    if ((fd = g_fn.open("/proc/self/maps", O_RDONLY)) == -1) {
         return -1;
     }
 
-    if (read(fd, buf, sizeof(buf))) {    
+    if (g_fn.read(fd, buf, sizeof(buf))) {
         uint64_t addr_start;
         if (sscanf((const char *)&buf, "%lx-", &addr_start)==1) {
             base_addr = addr_start;
         }
     }
 
-    close(fd);
+    g_fn.close(fd);
     if (base_addr) {
         *addr = base_addr;
         return 0;

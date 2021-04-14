@@ -90,7 +90,12 @@ At a minimum, you must set the `LD_PRELOAD` environment variable in your Lambda 
 LD_PRELOAD=libscope.so
 ```
 
-You must also tell AppScope where to deliver events. This can be accomplished by setting one of the following in the environment variables:
+For static executables (like the Go runtime), set `SCOPE_EXEC_PATH` to run the [loader](/docs/how-works):
+```
+SCOPE_EXEC_PATH=/lib/ldscope
+```
+
+You must also tell AppScope where to deliver events. This can be accomplished by setting one of the following environment variables:
 
 - `SCOPE_CONF_PATH=lib/scope.yml`
 or:

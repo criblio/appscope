@@ -463,10 +463,16 @@ initGoHook(elf_buf_t *ebuf)
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
     // if it's a position independent executable, get the base address from /proc/self/maps
     uint64_t base = 0LL;
-    if (ehdr->e_type == ET_DYN && !g_go_static && getBaseAddress(&base) != 0) {
-        sysprint("ERROR: can't get the base address\n");
-        return; // don't install our hooks
+    if (ehdr->e_type == ET_DYN && !g_go_static) {
+        if (getBaseAddress(&base) != 0) {
+            sysprint("ERROR: can't get the base address\n");
+            return; // don't install our hooks
+        }
+        Elf64_Shdr* textSec = getElfSection(ebuf->buf, ".text");
+        sysprint("base %lx %lx %x\n", base, (uint64_t)ebuf->text_addr, textSec->sh_offset);
+        base = base - (uint64_t)ebuf->text_addr + textSec->sh_offset;
     }
+    
     go_ver = (void *) ((uint64_t)go_ver + base);
     
     if (go_ver && (go_runtime_version = c_str(go_ver))) {
@@ -475,7 +481,6 @@ initGoHook(elf_buf_t *ebuf)
 
         go_major_ver = go_major_version(go_runtime_version);
     }
-
     if (go_major_ver < MIN_SUPPORTED_GO_VER) {
         char buf[1024];
         if (!is_go(ebuf->buf)) {
@@ -489,7 +494,6 @@ initGoHook(elf_buf_t *ebuf)
         scopeLog(buf, -1, CFG_LOG_WARN);
         return; // don't install our hooks
     }
-
     /*
      * Note: calling runtime.cgocall results in the Go error
      *       "fatal error: cgocall unavailable"
@@ -505,7 +509,6 @@ initGoHook(elf_buf_t *ebuf)
     go_runtime_cgocall = (void *) ((uint64_t)go_runtime_cgocall + base);
 
     adjustGoStructOffsetsForVersion(go_major_ver);
-
     tap_t* tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
         void* orig_func;
@@ -532,7 +535,7 @@ initGoHook(elf_buf_t *ebuf)
         }
 
         patchprint ("********************************\n");
-        patchprint ("** %s  %s **\n", go_runtime_version, tap->func_name);
+        patchprint ("** %s  %s 0x%lx **\n", go_runtime_version, tap->func_name, orig_func);
         patchprint ("********************************\n");
 
         patch_return_addrs(funchook, asm_inst, asm_count, tap);

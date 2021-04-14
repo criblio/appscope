@@ -95,3 +95,5 @@ You must also tell AppScope where to deliver events. This can be accomplished by
 - `SCOPE_CONF_PATH=lib/scope.yml`
 or:
 - `SCOPE_EVENT_DEST=tcp://localhost:9999`
+or:
+- `SCOPE_CRIBL=tcp://host:port`

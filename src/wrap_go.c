@@ -110,7 +110,10 @@ static bool
 looks_like_first_inst_of_go_func(_DecodedInst* asm_inst)
 {
     return (!strcmp((const char*)asm_inst->mnemonic.p, "MOV") &&
-            !strcmp((const char*)asm_inst->operands.p, "RCX, [FS:0xfffffffffffffff8]"));
+            !strcmp((const char*)asm_inst->operands.p, "RCX, [FS:0xfffffffffffffff8]"))
+           || // -buildmode=pie compiles to this:
+           (!strcmp((const char*)asm_inst->mnemonic.p, "MOV") &&
+            !strcmp((const char*)asm_inst->operands.p, "RCX, 0xfffffff8"));
 }
 
 static uint32_t

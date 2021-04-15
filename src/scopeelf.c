@@ -67,6 +67,27 @@ app_type(char *buf, const uint32_t sh_type, const char *sh_name)
     return FALSE;
 }
 
+Elf64_Shdr*
+getElfSection(char *buf, const char *sh_name)
+{
+    int i = 0;
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
+    Elf64_Shdr *sections;
+    const char *section_strtab = NULL;
+    const char *sec_name = NULL;
+
+    sections = (Elf64_Shdr *)(buf + ehdr->e_shoff);
+    section_strtab = buf + sections[ehdr->e_shstrndx].sh_offset;
+
+    for (i = 0; i < ehdr->e_shnum; i++) {
+        sec_name = section_strtab + sections[i].sh_name;
+        if (strcmp(sec_name, sh_name) == 0) {
+            return &sections[i];
+        }
+    }
+    return NULL;
+}
+
 elf_buf_t *
 getElf(char *path)
 {

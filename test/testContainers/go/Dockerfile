@@ -19,7 +19,7 @@ RUN cd /go/thread && CGO_ENABLED=0 go build fileThread.go
 
 RUN mkdir /go/net
 COPY ./go/net/plainServer.go /go/net
-RUN cd /go/net && go build -o plainServerDynamic plainServer.go
+RUN cd /go/net && go build -buildmode=pie -o plainServerDynamic plainServer.go
 RUN cd /go/net && CGO_ENABLED=0 go build -o plainServerStatic plainServer.go
 COPY ./go/net/tlsServer.go /go/net
 RUN cd /go/net && go build -o tlsServerDynamic tlsServer.go

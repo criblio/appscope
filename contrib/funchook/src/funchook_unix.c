@@ -395,7 +395,7 @@ int funchook_unprotect_end(funchook_t *funchook, const mem_state_t *mstate)
 
 void *funchook_resolve_func(funchook_t *funchook, void *func)
 {
-#ifdef __GLIBC__
+#ifdef RESOLVE_FUNC
     struct link_map *lmap, *lm;
     const ElfW(Ehdr) *ehdr;
     const ElfW(Dyn) *dyn;

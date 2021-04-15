@@ -2044,7 +2044,7 @@ doStatFd(int fd, int rc, const char* func)
 #endif // __LINUX__
 
 int
-doDupFile(int newfd, int oldfd, const char *func)
+doDupFile(int oldfd, int newfd, const char *func)
 {
     if (!checkFSEntry(newfd) || !checkFSEntry(oldfd)) {
         return -1;

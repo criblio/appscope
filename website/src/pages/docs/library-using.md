@@ -29,7 +29,7 @@ These examples demonstrate using `LD_PRELOAD` with additional variables.
 LD_PRELOAD=./libscope.so SCOPE_METRIC_VERBOSITY=5 ps -ef
 ```
 
-This again executes the `ps` command using the AppScope library. But it also defines the verbosity for metric extraction as level `5`. (This verbosity setting overrides any config-file setting, as well as the default value.)
+This again executes the `ps` command using the AppScope library. But it also defines the verbosity for metric extraction as level `5`. (This verbosity setting overrides any config-file setting, as well as the default value.)
 
 #### Example 2:
 
@@ -54,18 +54,51 @@ For a full list of library environment variables, execute: `./libscope.so all`
 
 For the default settings in the sample `scope.yml` configuration file, see [Config Files](/docs/config-files), or inspect the most-recent file on [GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).
 
-### <span id="lambda">Deploying the Library in a Lambda Function</span>
+### <span id="lambda">Deploying the Library in an AWS Lambda Function</span>
 
-You can pull the libscope.so library into an AWS Lambda function as a [Lambda layer](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html), using these steps:
+You can interpose the libscope.so library into an AWS Lambda function as a [Lambda layer](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html), using these steps. By default, Lambda functions use `lib` as their `LD_LIBRARY_PATH`, which makes loading AppScope very easy.
 
-1. Run `scope extract`, e.g.:
-    ```
-    scope extract /opt/<your-layer>/
-    ```
+Run `scope extract`, e.g.:
 
-1. Set these three environment variables:
-    ```
-    LD_PRELOAD=/opt/<your-layer>/libscope.so
-    SCOPE_EXEC_PATH=/opt/<your-layer>/ldscope
-    SCOPE_CONF_PATH=/opt/<your-layer>/scope.yml
-    ```
+```
+mkdir lib
+scope extract ./lib
+```
+
+Or grab the bits directly from the website:
+
+```
+mkdir lib
+curl -Ls https://cdn.cribl.io/dl/scope/$(curl -Ls https://cdn.cribl.io/dl/scope/latest)/linux/scope.tgz | tar zxf - -C lib --strip-components=1 
+```
+
+Modify the `scope.yml` configuration file as appropriate, then compress everything into a `.zip` file:
+
+```
+tar pvczf lambda_layer.zip lib/
+```
+
+Create a [Lambda layer](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-create), and associate the runtimes you want to use with AppScope in your Lambda functions. Upload the `lambda_layer.zip` file created in the previous step.
+
+Add the custom layer to your Lambda function by selecting the previously created layer and version. 
+
+#### Environment Variables
+
+At a minimum, you must set the `LD_PRELOAD` environment variable in your Lambda configuration:
+
+```
+LD_PRELOAD=libscope.so
+```
+
+For static executables (like the Go runtime), set `SCOPE_EXEC_PATH` to run the [loader](/docs/how-works):
+```
+SCOPE_EXEC_PATH=/lib/ldscope
+```
+
+You must also tell AppScope where to deliver events. This can be accomplished by setting one of the following environment variables:
+
+- `SCOPE_CONF_PATH=lib/scope.yml`
+or:
+- `SCOPE_EVENT_DEST=tcp://host:port`
+or:
+- `SCOPE_CRIBL=tcp://host:port`

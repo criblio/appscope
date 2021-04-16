@@ -15,6 +15,9 @@ gcc -o gosym ./test/manual/gosym.c
 #include <fcntl.h>
 #include <linux/limits.h>
 
+#define GOPCLNTAB_MAGIC_112 0xfffffffb
+#define GOPCLNTAB_MAGIC_116 0xfffffffa
+
 int printSymbols(const char *fname) 
 {
     int fd;
@@ -58,25 +61,80 @@ int printSymbols(const char *fname)
             More info: https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub
             */
             uint32_t magic = *((const uint32_t *)(pclntab_addr));
-            if (magic != 0xfffffffb) {
+            if (magic == GOPCLNTAB_MAGIC_112) {
+                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
+                const void *symtab_addr = pclntab_addr + 16;
+
+                printf("Symbol count = %ld\n", sym_count);
+                printf("Address\t\tSymbol Name\n");
+                printf("---------------------------\n");
+                for (i = 0; i < sym_count; i++) {
+                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
+                    uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
+                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + func_offset + 8));
+                    const char *func_name = (const char *)(pclntab_addr + name_offset);
+                    printf("0x%lx\t%s\n", sym_addr, func_name);
+                    symtab_addr += 16;
+                }
+            } else if (magic == GOPCLNTAB_MAGIC_116) {
+                // the layout of pclntab:
+                //
+                //  .gopclntab/__gopclntab [elf/macho section]
+                //    runtime.pclntab
+                //      Carrier symbol for the entire pclntab section.
+                //
+                //      runtime.pcheader  (see: runtime/symtab.go:pcHeader)
+                //        8-byte magic
+                //        nfunc [thearch.ptrsize bytes]
+                //        nfiles [thearch.ptrsize bytes]
+                //
+                //        offset to runtime.funcnametab from the beginning of runtime.pcheader
+                //        offset to runtime..cutab from the beginning of runtime.pcheader
+                //        offset to runtime.filetab from the beginning of runtime.pcheader
+                //        offset to runtime.pctab from the beginning of runtime.pcheader
+                //        offset to runtime.pclntab from the beginning of runtime.pcheader
+                //
+                //      runtime.funcnametab
+                //        []list of null terminated function names
+                //
+                //      runtime.cutab
+                //        for i=0..#CUs
+                //          for j=0..#max used file index in CU[i]
+                //            uint32 offset into runtime.filetab for the filename[j]
+                //
+                //      runtime.filetab
+                //        []null terminated filename strings
+                //
+                //      runtime.pctab
+                //        []byte of deduplicated pc data.
+                //
+                //      runtime.functab
+                //        function table, alternating PC and offset to func struct [each entry thearch.ptrsize bytes]
+                //        end PC [thearch.ptrsize bytes]
+                //        func structures, pcdata offsets, func data.
+                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
+
+                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
+                
+                const void *symtab_addr = pclntab_addr + pclntab_offset;
+
+                printf("Symbol count = %ld\n", sym_count);
+                printf("Address\t\tSymbol Name\n");
+                printf("---------------------------\n");
+                for (i = 0; i < sym_count; i++) {
+                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
+                    uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
+                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
+                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
+                    printf("0x%lx\t%s\n", sym_addr, func_name);
+                    symtab_addr += 16;
+                }
+            } else {
                 fprintf(stderr, "Invalid header in .gopclntab\n");
                 munmap(buf, st.st_size);
                 close(fd);
                 return -1;
-            }
-
-            uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
-            const void *symtab_addr = pclntab_addr + 16;
-
-            printf("Address\t\tSymbol Name\n");
-            printf("---------------------------\n");
-            for (i = 0; i < sym_count; i++) {
-                uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
-                uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
-                uint32_t name_offset = *((const uint32_t *)(pclntab_addr + func_offset + 8));
-                const char *func_name = (const char *)(pclntab_addr + name_offset);
-                printf("0x%lx\t%s\n", sym_addr, func_name);
-                symtab_addr += 16;
             }
             break;
         }

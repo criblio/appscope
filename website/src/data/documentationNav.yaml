@@ -48,6 +48,9 @@
     - name: Config Files
       path: /docs/config-files
 
+    - name: Other Resources
+      path: /docs/other-resources
+
     - name: Changelog
       path: /docs/changelog
 

@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include "scopetypes.h"
+#include <time.h>
 
 typedef struct {
     bool tsc_invariant;
@@ -25,6 +26,7 @@ extern platform_time_t g_time;
 
 static inline uint64_t
 getTime(void) {
+#ifdef __X86_64__
     unsigned low, high;
 
     /*
@@ -54,6 +56,9 @@ getTime(void) {
         asm volatile("rdtsc" : "=a" (low), "=d" (high));
     }
     return ((uint64_t)low) | (((uint64_t)high) << 32);
+#else
+    return time(NULL);
+#endif
 }
 
 

@@ -136,8 +136,9 @@ setup_libscope()
     info->fd = -1;
     info->use_memfd = check_kernel_version();
     
-    if (info->use_memfd) {
-        info->fd = _memfd_create(SHM_NAME, _MFD_CLOEXEC);
+    if (info->use_memfd &&
+        ((info->fd = _memfd_create(SHM_NAME, _MFD_CLOEXEC)) != -1)) {
+        scopeLog("Using memfd", info->fd, CFG_LOG_TRACE);
     } else {
         if (asprintf(&info->shm_name, "%s%i", SHM_NAME, getpid()) == -1) {
             perror("setup_libscope:shm_name");

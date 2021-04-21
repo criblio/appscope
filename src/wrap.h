@@ -6,6 +6,12 @@
 #define EXPORTOFF  __attribute__((visibility("hidden")))
 #define EXPORTON __attribute__((visibility("default")))
 
+#ifdef __FUNCHOOK__
+#define VAREXPORT __attribute__((visibility("hidden")))
+#else
+#define VAREXPORT __attribute__((visibility("default")))
+#endif
+
 #define DYN_CONFIG_PREFIX "scope"
 #define MAXTRIES 10
 

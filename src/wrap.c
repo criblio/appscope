@@ -4,9 +4,12 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/poll.h>
+
 #ifdef __LINUX__
 #include <sys/prctl.h>
+#ifdef __GO__
 #include <asm/prctl.h>
+#endif
 #endif
 #include <sys/syscall.h>
 #include <sys/stat.h>
@@ -831,6 +834,7 @@ memcpy(void *dest, const void *src, size_t n)
     return memmove(dest, src, n);
 }
 
+#if defined(__GO__) || defined(__FUNCHOOK__)
 static int
 ssl_read_hook(SSL *ssl, void *buf, int num)
 {
@@ -965,15 +969,17 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
 
 static ssize_t __write_libc(int fd, const void *buf, size_t size);
 static ssize_t __write_pthread(int fd, const void *buf, size_t size);
+#endif // defined(__GO__) || defined(__FUNCHOOK__)
 
 static void
 initHook()
 {
+#if defined(__GO__) || defined(__FUNCHOOK__)
     int rc;
     funchook_t *funchook;
-    char *full_path;
+    char *full_path = NULL;
     bool should_we_patch = FALSE;
-    elf_buf_t *ebuf;
+    elf_buf_t *ebuf = NULL;
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
@@ -1070,6 +1076,7 @@ initHook()
             return;
         }
     }
+#endif
 }
 #else
 static void
@@ -2258,7 +2265,7 @@ syscall(long number, ...)
                         fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
 
-EXPORTOFF size_t // EXPORTOFF because it's redundant with __write
+VAREXPORT size_t // EXPORTOFF because it's redundant with __write
 fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 {
     WRAP_CHECK(fwrite_unlocked, 0);
@@ -3175,7 +3182,7 @@ fgetpos64(FILE *stream,  fpos64_t *pos)
     return rc;
 }
 
-EXPORTOFF ssize_t // EXPORTOFF because it's redundant with __write
+VAREXPORT ssize_t // EXPORTOFF because it's redundant with __write
 write(int fd, const void *buf, size_t count)
 {
     WRAP_CHECK(write, -1);
@@ -3214,7 +3221,7 @@ writev(int fd, const struct iovec *iov, int iovcnt)
     return rc;
 }
 
-EXPORTOFF size_t  // EXPORTOFF because it's redundant with __write
+VAREXPORT size_t  // EXPORTOFF because it's redundant with __write
 fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 {
     WRAP_CHECK(fwrite, 0);
@@ -3227,7 +3234,7 @@ fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
     return rc;
 }
 
-EXPORTOFF int // EXPORTOFF because it's redundant with __write
+VAREXPORT int // EXPORTOFF because it's redundant with __write
 puts(const char *s)
 {
     WRAP_CHECK(puts, EOF);
@@ -3245,7 +3252,7 @@ puts(const char *s)
     return rc;
 }
 
-EXPORTOFF int // EXPORTOFF because it's redundant with __write
+VAREXPORT int // EXPORTOFF because it's redundant with __write
 putchar(int c)
 {
     WRAP_CHECK(putchar, EOF);
@@ -3258,7 +3265,7 @@ putchar(int c)
     return rc;
 }
 
-EXPORTOFF int // EXPORTOFF because it's redundant with __write
+VAREXPORT int // EXPORTOFF because it's redundant with __write
 fputs(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs, EOF);
@@ -3456,7 +3463,7 @@ fgetc(FILE *stream)
     return rc;
 }
 
-EXPORTOFF int // EXPORTOFF because it's redundant with __write
+VAREXPORT int // EXPORTOFF because it's redundant with __write
 fputc(int c, FILE *stream)
 {
     WRAP_CHECK(fputc, EOF);
@@ -3469,7 +3476,7 @@ fputc(int c, FILE *stream)
     return rc;
 }
 
-EXPORTOFF int // EXPORTOFF because it's redundant with __write
+VAREXPORT int // EXPORTOFF because it's redundant with __write
 fputc_unlocked(int c, FILE *stream)
 {
     WRAP_CHECK(fputc_unlocked, EOF);
@@ -3482,7 +3489,7 @@ fputc_unlocked(int c, FILE *stream)
     return rc;
 }
 
-EXPORTOFF wint_t // EXPORTOFF because it's redundant with __write
+VAREXPORT wint_t // EXPORTOFF because it's redundant with __write
 putwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(putwc, WEOF);
@@ -3495,7 +3502,7 @@ putwc(wchar_t wc, FILE *stream)
     return rc;
 }
 
-EXPORTOFF wint_t // EXPORTOFF because it's redundant with __write
+VAREXPORT wint_t // EXPORTOFF because it's redundant with __write
 fputwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(fputwc, WEOF);

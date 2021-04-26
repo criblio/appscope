@@ -55,7 +55,6 @@ initFn(void)
     g_fn.ftello = dlsym(RTLD_NEXT, "ftello");
     g_fn.fgetpos = dlsym(RTLD_NEXT, "fgetpos");
     g_fn.fsetpos = dlsym(RTLD_NEXT, "fsetpos");
-    g_fn.fsetpos64 = dlsym(RTLD_NEXT, "fsetpos64");
     g_fn.stat = dlsym(RTLD_NEXT, "stat");
     g_fn.lstat = dlsym(RTLD_NEXT, "lstat");
     g_fn.fstat = dlsym(RTLD_NEXT, "fstat");
@@ -68,7 +67,6 @@ initFn(void)
     g_fn.faccessat = dlsym(RTLD_NEXT, "faccessat");
     g_fn.rewind = dlsym(RTLD_NEXT, "rewind");
     g_fn.fcntl = dlsym(RTLD_NEXT, "fcntl");
-    g_fn.fcntl64 = dlsym(RTLD_NEXT, "fcntl64");
     g_fn.dup = dlsym(RTLD_NEXT, "dup");
     g_fn.dup2 = dlsym(RTLD_NEXT, "dup2");
     g_fn.dup3 = dlsym(RTLD_NEXT, "dup3");
@@ -102,44 +100,22 @@ initFn(void)
 #endif // __MACOS__
 
 #ifdef __LINUX__
-    g_fn.open64 = dlsym(RTLD_NEXT, "open64");
-    g_fn.openat64 = dlsym(RTLD_NEXT, "openat64");
     g_fn.__open_2 = dlsym(RTLD_NEXT, "__open_2");
     g_fn.__open64_2 = dlsym(RTLD_NEXT, "__open64_2");
     g_fn.__openat_2 = dlsym(RTLD_NEXT, "__openat_2");
     g_fn.fopen64 = dlsym(RTLD_NEXT, "fopen64");
-    g_fn.freopen64 = dlsym(RTLD_NEXT, "freopen64");
-    g_fn.creat64 = dlsym(RTLD_NEXT, "creat64");
-    g_fn.pread64 = dlsym(RTLD_NEXT, "pread64");
     g_fn.preadv = dlsym(RTLD_NEXT, "preadv");
     g_fn.preadv2 = dlsym(RTLD_NEXT, "preadv2");
-    g_fn.preadv64v2 = dlsym(RTLD_NEXT, "preadv64v2");
     g_fn.__pread_chk = dlsym(RTLD_NEXT, "__pread_chk");
     g_fn.__read_chk = dlsym(RTLD_NEXT, "__read_chk");
     g_fn.__fread_unlocked_chk = dlsym(RTLD_NEXT, "__fread_unlocked_chk");
-    g_fn.pwrite64 = dlsym(RTLD_NEXT, "pwrite64");
     g_fn.pwritev = dlsym(RTLD_NEXT, "pwritev");
-    g_fn.pwritev64 = dlsym(RTLD_NEXT, "pwritev64");
     g_fn.pwritev2 = dlsym(RTLD_NEXT, "pwritev2");
-    g_fn.pwritev64v2 = dlsym(RTLD_NEXT, "pwritev64v2");
     g_fn.fwrite_unlocked = dlsym(RTLD_NEXT, "fwrite_unlocked");
-    g_fn.sendfile64 = dlsym(RTLD_NEXT, "sendfile64");
-    g_fn.lseek64 = dlsym(RTLD_NEXT, "lseek64");
-    g_fn.fseeko64 = dlsym(RTLD_NEXT, "fseeko64");
-    g_fn.ftello64 = dlsym(RTLD_NEXT, "ftello64");
-    g_fn.statfs64 = dlsym(RTLD_NEXT, "statfs64");
-    g_fn.fstatfs64 = dlsym(RTLD_NEXT, "fstatfs64");
-    g_fn.fstatvfs64 = dlsym(RTLD_NEXT, "fstatvfs64");
-    g_fn.fgetpos64 = dlsym(RTLD_NEXT, "fgetpos64");
-    g_fn.statvfs64 = dlsym(RTLD_NEXT, "statvfs64");
     g_fn.__lxstat = dlsym(RTLD_NEXT, "__lxstat");
-    g_fn.__lxstat64 = dlsym(RTLD_NEXT, "__lxstat64");
     g_fn.__xstat = dlsym(RTLD_NEXT, "__xstat");
-    g_fn.__xstat64 = dlsym(RTLD_NEXT, "__xstat64");
     g_fn.__fxstat = dlsym(RTLD_NEXT, "__fxstat");
-    g_fn.__fxstat64 = dlsym(RTLD_NEXT, "__fxstat64");
     g_fn.__fxstatat = dlsym(RTLD_NEXT, "__fxstatat");
-    g_fn.__fxstatat64 = dlsym(RTLD_NEXT, "__fxstatat64");
     g_fn.gethostbyname_r = dlsym(RTLD_NEXT, "gethostbyname_r");
     g_fn.gethostbyname2_r = dlsym(RTLD_NEXT, "gethostbyname2_r");
     g_fn.syscall = dlsym(RTLD_NEXT, "syscall");
@@ -192,6 +168,31 @@ initFn(void)
     // where our library needs to use the glibc instance.
     // setenv was overriden in bash.
     g_fn.setenv = dlsym(RTLD_NEXT, "setenv");
-
+#ifndef __ALPINE__
+    g_fn.open64 = dlsym(RTLD_NEXT, "open64");
+    g_fn.openat64 = dlsym(RTLD_NEXT, "openat64");
+    g_fn.freopen64 = dlsym(RTLD_NEXT, "freopen64");
+    g_fn.creat64 = dlsym(RTLD_NEXT, "creat64");
+    g_fn.pread64 = dlsym(RTLD_NEXT, "pread64");
+    g_fn.preadv64v2 = dlsym(RTLD_NEXT, "preadv64v2");
+    g_fn.pwrite64 = dlsym(RTLD_NEXT, "pwrite64");
+    g_fn.pwritev64 = dlsym(RTLD_NEXT, "pwritev64");
+    g_fn.pwritev64v2 = dlsym(RTLD_NEXT, "pwritev64v2");
+    g_fn.lseek64 = dlsym(RTLD_NEXT, "lseek64");
+    g_fn.fseeko64 = dlsym(RTLD_NEXT, "fseeko64");
+    g_fn.ftello64 = dlsym(RTLD_NEXT, "ftello64");
+    g_fn.statfs64 = dlsym(RTLD_NEXT, "statfs64");
+    g_fn.fstatfs64 = dlsym(RTLD_NEXT, "fstatfs64");
+    g_fn.fstatvfs64 = dlsym(RTLD_NEXT, "fstatvfs64");
+    g_fn.fgetpos64 = dlsym(RTLD_NEXT, "fgetpos64");
+    g_fn.statvfs64 = dlsym(RTLD_NEXT, "statvfs64");
+    g_fn.sendfile64 = dlsym(RTLD_NEXT, "sendfile64");
+    g_fn.__lxstat64 = dlsym(RTLD_NEXT, "__lxstat64");
+    g_fn.__xstat64 = dlsym(RTLD_NEXT, "__xstat64");
+    g_fn.__fxstat64 = dlsym(RTLD_NEXT, "__fxstat64");
+    g_fn.__fxstatat64 = dlsym(RTLD_NEXT, "__fxstatat64");
+    g_fn.fcntl64 = dlsym(RTLD_NEXT, "fcntl64");
+    g_fn.fsetpos64 = dlsym(RTLD_NEXT, "fsetpos64");
+#endif
 #endif // __LINUX__
 }

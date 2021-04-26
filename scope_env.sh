@@ -90,6 +90,8 @@ determine_pkg_mgr() {
         echo "apt-get"
     elif brew --version &>/dev/null; then
         echo "brew"
+    elif apk --version &>/dev/null; then
+        echo "apk"
     else
         echo "Error"
     fi
@@ -178,6 +180,17 @@ install_git() {
             if ! git --version &>/dev/null; then
                 echo "Install of git is required."
                 if brew install git; then
+                    echo "Install of git was successful."
+                else
+                    echo "Install of git was unsuccessful.  Exiting."
+                    exit 1
+                fi
+            fi
+            ;;
+        "apk")
+            if ! git --version &>/dev/null; then
+                echo "Install of git is required."
+                if apk add git; then
                     echo "Install of git was successful."
                 else
                     echo "Install of git was unsuccessful.  Exiting."

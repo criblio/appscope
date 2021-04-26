@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 #include <sys/mman.h>
+#ifndef __ALPINE__
 #include <asm/prctl.h>
+#endif
 #include <sys/prctl.h>
 #include <signal.h>
 #include <pthread.h>
@@ -79,7 +81,9 @@ static bool g_switch_thread;
 
 void (*go_runtime_cgocall)(void);
 
+#ifndef __ALPINE__
 extern void __ctype_init (void);
+#endif
 
 #if NEEDEVNULL > 0
 static void
@@ -752,10 +756,10 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
 
         if (newThread) {
             while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) {};
-
+#ifndef __ALPINE__
             //Initialize pointers to locale data.
             __ctype_init();
-
+#endif
             //switch to a bigger stack
             __asm__ volatile (
                 "mov %%rsp, %0 \n"

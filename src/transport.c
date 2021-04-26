@@ -47,8 +47,8 @@ struct _transport_t
         struct {
             char *path;
             FILE *stream;
-            int stdout;  // Flag to indicate that stream is stdout
-            int stderr;  // Flag to indicate that stream is stderr
+            int t_stdout;  // Flag to indicate that stream is stdout
+            int t_stderr;  // Flag to indicate that stream is stderr
             cfg_buffer_t buf_policy;
         } file;
     };
@@ -228,7 +228,7 @@ transportDisconnect(transport_t *trans)
             }
             break;
         case CFG_FILE:
-            if (!trans->file.stdout && !trans->file.stderr) {
+            if (!trans->file.t_stdout && !trans->file.t_stderr) {
                 if (trans->file.stream) trans->fclose(trans->file.stream);
             }
             trans->file.stream = NULL;
@@ -592,10 +592,10 @@ static int
 transportConnectFile(transport_t *t)
 {
     // if stdout/stderr, set stream and skip everything else in the function.
-    if (t->file.stdout) {
+    if (t->file.t_stdout) {
         t->file.stream = stdout;
         return 1;
-    } else if (t->file.stderr) {
+    } else if (t->file.t_stderr) {
         t->file.stream = stderr;
         return 1;
     }
@@ -747,8 +747,8 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
     t->file.buf_policy = buf_policy;
 
     // See if path is "stdout" or "stderr"
-    t->file.stdout = !strcmp(path, "stdout");
-    t->file.stderr = !strcmp(path, "stderr");
+    t->file.t_stdout = !strcmp(path, "stdout");
+    t->file.t_stderr = !strcmp(path, "stderr");
 
     transportConnect(t);
 
@@ -815,7 +815,7 @@ transportDestroy(transport_t** transport)
             break;
         case CFG_FILE:
             if (t->file.path) free(t->file.path);
-            if (!t->file.stdout && !t->file.stderr) {
+            if (!t->file.t_stdout && !t->file.t_stderr) {
                 // if stdout/stderr, we didn't open stream, so don't close it
                 if (t->file.stream) t->fclose(t->file.stream);
             }

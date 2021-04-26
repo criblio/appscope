@@ -221,6 +221,8 @@ linux_determine_pkg_mgr() {
         PKG_MGR="yum"
     elif apt-get --version &>/dev/null; then
         PKG_MGR="apt-get"
+    elif apk --version &>/dev/null; then
+        PKG_MGR="apk"
     else
         return 1
     fi
@@ -717,6 +719,234 @@ apt_install() {
     exit 0
 }
 
+########################################
+##  Alpine linux apk section
+########################################
+#
+#  This was originally developed and tested on Alpine with:
+#      ID=alpine 
+#      VERSION_ID=3.13.5
+#
+apk_sudo_exists() {
+    if sudo --version &>/dev/null; then
+        echo "sudo is already installed; doing nothing for sudo."
+    else
+        echo "sudo is not already installed."
+        return 1
+    fi
+}
+
+apk_sudo_install() {
+    echo "Installing sudo."
+    apk add update && apk add sudo
+    if [ $? = 0 ]; then
+        echo "Installation of sudo successful."
+    else
+        echo "Installation of sudo failed."
+        FAILED=1
+    fi
+}
+
+apk_make_exists() {
+    if make --version &>/dev/null; then
+        echo "make is already installed; doing nothing for make."
+    else
+        echo "make is not already installed."
+        return 1
+    fi
+}
+
+apk_make_install() {
+    echo "Installing make."
+    sudo apk add make
+    if [ $? = 0 ]; then
+        echo "Installation of make successful."
+    else
+        echo "Installation of make failed."
+        FAILED=1
+    fi
+}
+
+apk_autoconf_exists() {
+    if autoconf --version &>/dev/null; then
+        echo "autoconf is already installed; doing nothing for autoconf."
+    else
+        echo "autoconf is not already installed."
+        return 1
+    fi
+}
+
+apk_autoconf_install() {
+    echo "Installing autoconf."
+    sudo apk add autoconf
+    if [ $? = 0 ]; then
+        echo "Installation of autoconf successful."
+    else
+        echo "Installation of autoconf failed."
+        FAILED=1
+    fi
+}
+
+apk_libtool_exists() {
+    if libtool --version &>/dev/null; then
+        echo "libtool is already installed; doing nothing for libtool."
+    else
+        echo "libtool is not already installed."
+        return 1
+    fi
+}
+
+apk_libtool_install() {
+    echo "Installing libtool."
+    sudo apk add libtool
+    if [ $? = 0 ]; then
+        echo "Installation of libtool successful."
+    else
+        echo "Installation of libtool failed."
+        FAILED=1
+    fi
+}
+
+apk_cmake_exists() {
+    if cmake --version &>/dev/null; then
+        echo "cmake is already installed; doing nothing for cmake."
+    else
+        echo "cmake is not already installed."
+        return 1
+    fi
+}
+
+apk_cmake_install() {
+    echo "Installing cmake."
+    sudo apk add cmake
+    if [ $? = 0 ]; then
+        echo "Installation of cmake successful."
+    else
+        echo "Installation of cmake failed."
+        FAILED=1
+    fi
+}
+
+apk_lcov_exists() {
+    if lcov --version &>/dev/null; then
+        echo "lcov is already installed; doing nothing for lcov."
+    else
+        echo "lcov is not already installed."
+        return 1
+    fi
+}
+
+apk_lcov_install() {
+    echo "Installing lcov."
+#    sudo apk add lcov
+    if [ $? = 0 ]; then
+        echo "Installation of lcov successful."
+    else
+        echo "Installation of lcov failed."
+        FAILED=1
+    fi
+}
+
+apk_go_exists() {
+    if go version &>/dev/null; then
+        echo "go is already installed; doing nothing for go."
+    else
+        echo "go is not already installed."
+        return 1
+    fi
+}
+
+apk_go_install() {
+    echo "Installing go."
+    #sudo apk add software-properties-common
+    #sudo add-apk-repository -y ppa:longsleep/golang-backports
+    #sudo apk update
+    sudo apk add musl-dev go
+    if [ $? = 0 ]; then
+        echo "Installation of go successful."
+    else
+        echo "Installation of go failed."
+        FAILED=1
+    fi
+}
+
+apk_upx_exists() {
+    if upx --version &>/dev/null; then
+        echo "upx is already installed; doing nothing for upx."
+    else
+        echo "upx is not already installed."
+        return 1
+    fi
+}
+
+apk_upx_install() {
+    echo "Installing upx."
+    sudo apk add upx
+    if [ $? = 0 ]; then
+        echo "Installation of upx successful."
+    else
+        echo "Installation of upx failed."
+        FAILED=1
+    fi
+}
+
+apk_dump_versions() {
+    # The crazy sed stuff at the end of each just provides indention.
+    if lsb_release -d &>/dev/null; then
+        lsb_release -d | sed 's/^Description:\s*/      /'
+    elif [ -f /etc/lsb-release ]; then
+        grep DISTRIB_DESCRIPTION /etc/lsb-release | cut -d \" -f2 | sed 's/^/      /'
+    fi
+    apk --version | head -n1 | sed 's/^/      /'
+    sudo --version | head -n1 | sed 's/^/      /'
+    make --version | head -n1 | sed 's/^/      /'
+    autoconf --version | head -n1 | sed 's/^/      /'
+    libtool --version | head -n1 | sed 's/^/      /'
+    cmake --version | head -n1 | sed 's/^/      /'
+    lcov --version | head -n1 | sed 's/^/      /'
+    go version | head -n1 | sed 's/^/      /'
+    upx --version | head -n1 | sed 's/^/      /'
+}
+
+apk_install() {
+    echo "Running the apk-get install."
+
+    if ! apk_sudo_exists; then
+        apk_sudo_install
+    fi
+    if ! apk_make_exists; then
+        apk_make_install
+    fi
+    if ! apk_autoconf_exists; then
+        apk_autoconf_install
+    fi
+    if ! apk_libtool_exists; then
+        apk_libtool_install
+    fi
+    if ! apk_cmake_exists; then
+        apk_cmake_install
+    fi
+    if ! apk_lcov_exists; then
+        apk_lcov_install
+    fi
+    if ! apk_go_exists; then
+        apk_go_install
+    fi
+    if ! apk_upx_exists; then
+        apk_upx_install
+    fi
+
+    echo "done"
+    if (( FAILED )); then
+        echo "Installation failure detected."
+        exit 1
+    fi
+	echo "Pertinent version info:"
+	apk_dump_versions
+    exit 0
+}
+
+echo "start"
 if [ ${PLATFORM} = "Linux" ]; then
     if ! linux_determine_pkg_mgr; then
         echo "Exiting.  install_build_tools.sh does not support this package manager."
@@ -729,6 +959,9 @@ if [ ${PLATFORM} = "Linux" ]; then
         yum_install
     elif [ ${PKG_MGR} = "apt-get" ]; then
         apt_install
+    elif [ ${PKG_MGR} = "apk" ]; then
+        apk_install
     fi
     exit 1
 fi
+

@@ -67,6 +67,154 @@ static got_list_t hook_list[] = {
     {NULL, NULL, NULL}
 };
 
+static got_list_t inject_hook_list[] = {
+    {"sigaction",   NULL, &g_fn.sigaction},
+    {"open",        NULL, &g_fn.open},
+    {"openat",      NULL, &g_fn.openat},
+    {"fopen",       NULL, &g_fn.fopen},
+    {"freopen",     NULL, &g_fn.freopen},
+    {"nanosleep",   NULL, &g_fn.nanosleep},
+    {"select",      NULL, &g_fn.select},
+    {"sigsuspend",  NULL, &g_fn.sigsuspend},
+    {"epoll_wait",  NULL, &g_fn.epoll_wait},
+    {"poll",        NULL, &g_fn.poll},
+    {"pause",       NULL, &g_fn.pause},
+    {"sigwaitinfo", NULL, &g_fn.sigwaitinfo},
+    {"sigtimedwait", NULL, &g_fn.sigtimedwait},
+    {"epoll_pwait", NULL, &g_fn.epoll_pwait},
+    {"ppoll",       NULL, &g_fn.ppoll},
+    {"pselect",     NULL, &g_fn.pselect},
+    {"msgsnd",      NULL, &g_fn.msgsnd},
+    {"msgrcv",      NULL, &g_fn.msgrcv},
+    {"semop",       NULL, &g_fn.semop},
+    {"semtimedop",  NULL, &g_fn.semtimedop},
+    {"clock_nanosleep", NULL, &g_fn.clock_nanosleep},
+    {"usleep", NULL, &g_fn.usleep},
+    {"io_getevents", NULL, &g_fn.io_getevents},
+    {"open64", NULL, &g_fn.open64},
+    {"openat64", NULL, &g_fn.openat64},
+    {"__open_2", NULL, &g_fn.__open_2},
+    {"__open64_2", NULL, &g_fn.__open64_2},
+    {"__openat_2", NULL, &g_fn.__openat_2},
+    {"creat64", NULL, &g_fn.creat64},
+    {"fopen64", NULL, &g_fn.fopen64},
+    {"freopen64", NULL, &g_fn.freopen64},
+    {"pread64", NULL, &g_fn.pread64},
+    {"preadv", NULL, &g_fn.preadv},
+    {"preadv2", NULL, &g_fn.preadv2},
+    {"preadv64v2", NULL, &g_fn.preadv64v2},
+    {"__pread_chk", NULL, &g_fn.__pread_chk},
+    {"__read_chk", NULL, &g_fn.__read_chk},
+    {"__fread_unlocked_chk", NULL, &g_fn.__fread_unlocked_chk},
+    {"pwrite64", NULL, &g_fn.pwrite64},
+    {"pwritev", NULL, &g_fn.pwritev},
+    {"pwritev64", NULL, &g_fn.pwritev64},
+    {"pwritev2", NULL, &g_fn.pwritev2},
+    {"pwritev64v2", NULL, &g_fn.pwritev64v2},
+    {"lseek64", NULL, &g_fn.lseek64},
+    {"fseeko64", NULL, &g_fn.fseeko64},
+    {"ftello64", NULL, &g_fn.ftello64},
+    {"statfs64", NULL, &g_fn.statfs64},
+    {"fstatfs64", NULL, &g_fn.fstatfs64},
+    {"fsetpos64", NULL, &g_fn.fsetpos64},
+    {"__xstat", NULL, &g_fn.__xstat},
+    {"__xstat64", NULL, &g_fn.__xstat64},
+    {"__lxstat", NULL, &g_fn.__lxstat},
+    {"__lxstat64", NULL, &g_fn.__lxstat64},
+    {"__fxstat", NULL, &g_fn.__fxstat},
+    {"__fxstatat", NULL, &g_fn.__fxstatat},
+    {"__fxstatat64", NULL, &g_fn.__fxstatat64},
+    {"statfs", NULL, &g_fn.statfs},
+    {"fstatfs", NULL, &g_fn.fstatfs},
+    {"statvfs", NULL, &g_fn.statvfs},
+    {"statvfs64", NULL, &g_fn.statvfs64},
+    {"fstatvfs", NULL, &g_fn.fstatvfs},
+    {"fstatvfs64", NULL, &g_fn.fstatvfs64},
+    {"access", NULL, &g_fn.access},
+    {"faccessat", NULL, &g_fn.faccessat},
+    {"gethostbyname_r", NULL, &g_fn.gethostbyname_r},
+    {"gethostbyname2_r", NULL, &g_fn.gethostbyname2_r},
+    {"fstatat", NULL, &g_fn.fstatat},
+    {"prctl", NULL, &g_fn.prctl},
+    {"execve", NULL, &g_fn.execve},
+    {"syscall", NULL, &g_fn.syscall},
+    {"sendfile", NULL, &g_fn.sendfile},
+    {"sendfile64", NULL, &g_fn.sendfile64},
+    {"SSL_read", NULL, &g_fn.SSL_read},
+    {"SSL_write", NULL, &g_fn.SSL_write},
+    {"gnutls_record_recv", NULL, &g_fn.gnutls_record_recv},
+    {"gnutls_record_recv_early_data", NULL, &g_fn.gnutls_record_recv_early_data},
+    {"gnutls_record_recv_packet", NULL, &g_fn.gnutls_record_recv_packet},
+    {"gnutls_record_recv_seq", NULL, &g_fn.gnutls_record_recv_seq},
+    {"gnutls_record_send", NULL, &g_fn.gnutls_record_send},
+    {"gnutls_record_send2", NULL, &g_fn.gnutls_record_send2},
+    {"gnutls_record_send_early_data", NULL, &g_fn.gnutls_record_send_early_data},
+    {"gnutls_record_send_range", NULL, &g_fn.gnutls_record_send_range},
+    {"dlopen", NULL, &g_fn.dlopen},
+    {"_exit", NULL, &g_fn._exit},
+    {"close", NULL, &g_fn.close},
+    {"fclose", NULL, &g_fn.fclose},
+    {"fcloseall", NULL, &g_fn.fcloseall},
+    {"lseek", NULL, &g_fn.lseek},
+    {"fseek", NULL, &g_fn.fseek},
+    {"fseeko", NULL, &g_fn.fseeko},
+    {"ftell", NULL, &g_fn.ftell},
+    {"ftello", NULL, &g_fn.ftello},
+    {"rewind", NULL, &g_fn.rewind},
+    {"fsetpos", NULL, &g_fn.fsetpos},
+    {"fgetpos", NULL, &g_fn.fgetpos},
+    {"fgetpos64", NULL, &g_fn.fgetpos64},
+    {"write", NULL, &g_fn.write},
+    {"pwrite", NULL, &g_fn.pwrite},
+    {"writev", NULL, &g_fn.writev},
+    {"fwrite", NULL, &g_fn.fwrite},
+    {"puts", NULL, &g_fn.puts},
+    {"putchar", NULL, &g_fn.putchar},
+    {"fputs", NULL, &g_fn.fputs},
+    {"fputs_unlocked", NULL, &g_fn.fputs_unlocked},
+    {"read", NULL, &g_fn.read},
+    {"readv", NULL, &g_fn.readv},
+    {"pread", NULL, &g_fn.pread},
+    {"fread", NULL, &g_fn.fread},
+    {"__fread_chk", NULL, &g_fn.__fread_chk},
+    {"fgets", NULL, &g_fn.fgets},
+    {"__fgets_chk", NULL, &g_fn.__fgets_chk},
+    {"fgets_unlocked", NULL, &g_fn.fgets_unlocked},
+    {"__fgetws_chk", NULL, &g_fn.__fgetws_chk},
+    {"fgetws", NULL, &g_fn.fgetws},
+    {"fgetwc", NULL, &g_fn.fgetwc},
+    {"fgetc", NULL, &g_fn.fgetc},
+    {"fputc", NULL, &g_fn.fputc},
+    {"fputc_unlocked", NULL, &g_fn.fputc_unlocked},
+    {"putwc", NULL, &g_fn.putwc},
+    {"fputwc", NULL, &g_fn.fputwc},
+    {"fscanf", NULL, &g_fn.fscanf},
+    {"getline", NULL, &g_fn.getline},
+    {"getdelim", NULL, &g_fn.getdelim},
+    {"__getdelim", NULL, &g_fn.__getdelim},
+    {"fcntl", NULL, &g_fn.fcntl},
+    {"fcntl64", NULL, &g_fn.fcntl64},
+    {"dup", NULL, &g_fn.dup},
+    {"dup2", NULL, &g_fn.dup2},
+    {"dup3", NULL, &g_fn.dup3},
+    {"vsyslog", NULL, &g_fn.vsyslog},
+    {"fork", NULL, &g_fn.fork},
+    {"socket", NULL, &g_fn.socket},
+    {"shutdown", NULL, &g_fn.shutdown},
+    {"listen", NULL, &g_fn.listen},
+    {"accept", NULL, &g_fn.accept},
+    {"accept4", NULL, &g_fn.accept4},
+    {"bind", NULL, &g_fn.bind},
+    {"connect", NULL, &g_fn.connect},
+    {"send", NULL, &g_fn.send},
+    {"sendto", NULL, &g_fn.sendto},
+    {"sendmsg", NULL, &g_fn.sendmsg},
+    {"recv", NULL, &g_fn.recv},
+    {"recvfrom", NULL, &g_fn.recvfrom},
+    {"recvmsg", NULL, &g_fn.recvmsg},
+    {NULL, NULL, NULL}
+};
+
 typedef struct
 {
     char *in_symbol;
@@ -966,6 +1114,64 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
 static ssize_t __write_libc(int fd, const void *buf, size_t size);
 static ssize_t __write_pthread(int fd, const void *buf, size_t size);
 
+static int 
+findInjected(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (strstr(info->dlpi_name, "/dev/shm/libscope") != NULL) {
+        *(char **)data = (char *) info->dlpi_name;
+        return 1;
+    }
+    return 0;
+}
+
+static void
+hookInject()
+{
+    char *full_path;
+    void *addr = NULL;
+
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+    struct link_map *lm;
+    char buf[512];
+
+
+    if (dl_iterate_phdr(findInjected, &full_path)) {
+        void *libscopeHandle = g_fn.dlopen(full_path, RTLD_NOW);
+        if (libscopeHandle == NULL) {
+            dlclose(libscopeHandle);
+            return;
+        }
+
+        void *handle = g_fn.dlopen(0, RTLD_LAZY);
+        if (handle == NULL) {
+            dlclose(handle);
+            return;
+        }
+
+        // Get the link map and ELF sections in advance of something matching
+        if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) &&
+            (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+
+            for (int i=0; inject_hook_list[i].symbol; i++) {
+                addr = dlsym(libscopeHandle, inject_hook_list[i].symbol);
+                
+                inject_hook_list[i].func = addr;
+                if ((dlsym(handle, inject_hook_list[i].symbol)) &&
+                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz) != -1)) {
+                    snprintf(buf, sizeof(buf), "\tGOT patched %s", inject_hook_list[i].symbol);
+                    scopeLog(buf, -1, CFG_LOG_DEBUG);
+                }
+            }
+        }
+        dlclose(handle);
+        dlclose(libscopeHandle);
+    }
+    
+}
+
 static void
 initHook()
 {
@@ -1030,6 +1236,9 @@ initHook()
                                  .out_addr = (void*)&g_fn.__write_pthread};
     dl_iterate_phdr(findLibSym, &pthread__write);
 
+    hookInject();
+    
+    /*
     if (should_we_patch || g_fn.sendmmsg || g_fn.__write_libc || g_fn.__write_pthread) {
         funchook = funchook_create();
 
@@ -1037,7 +1246,6 @@ initHook()
             // TODO: add some mechanism to get the config'd log file path
             funchook_set_debug_file(DEFAULT_LOG_PATH);
         }
-
         if (should_we_patch) {
             g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
     
@@ -1059,7 +1267,6 @@ initHook()
         if (g_fn.__write_pthread) {
             rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
         }
-
         // hook 'em
         rc = funchook_install(funchook, 0);
         if (rc != 0) {
@@ -1070,6 +1277,7 @@ initHook()
             return;
         }
     }
+    */
 }
 #else
 static void

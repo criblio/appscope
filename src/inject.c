@@ -19,7 +19,8 @@
 #include <dlfcn.h>
 #include "dbg.h"
 #include "inject.h"
-
+#include "fn.h"
+#include "scopeelf.h"
 
 static uint64_t 
 findLibrary(const char *library, pid_t pid) 
@@ -32,7 +33,7 @@ findLibrary(const char *library, pid_t pid)
     snprintf(filename, sizeof(filename), "/proc/%d/maps", pid);
     if ((fd = fopen(filename, "r")) == NULL) {
         printf("Failed to open maps file for process %d\n", pid);
-        exit(1);
+        return 0;
     }
 
     while(fgets(buffer, sizeof(buffer), fd)) {
@@ -59,7 +60,7 @@ freeSpaceAddr(pid_t pid)
     sprintf(filename, "/proc/%d/maps", pid);
     if ((fd = fopen(filename, "r")) == NULL) {
         printf("Failed to open maps file for process %d\n", pid);
-        exit(1);
+        return 0;
     }
 
     while(fgets(line, 850, fd) != NULL) {
@@ -72,18 +73,21 @@ freeSpaceAddr(pid_t pid)
 }
 
 static void 
-ptraceRead(int pid, uint64_t addr, void *data, int len) 
+ptraceRead(int pid, uint64_t addr, void *vptr, int len)
 {
-    long word = 0;
+    int bytesRead = 0;
     int i = 0;
-    char *ptr = (char *)data;
+    long word = 0;
+    long *ptr = (long *) vptr;
 
-    for (i=0; i < len; i+=sizeof(word), word=0) {
-        if ((word = ptrace(PTRACE_PEEKTEXT, pid, addr + i, NULL)) == -1) {
+    while (bytesRead < len) {
+        word = ptrace(PTRACE_PEEKTEXT, pid, addr + bytesRead, NULL);
+        if(word == -1) {
             perror("ptrace(PTRACE_PEEKTEXT) failed");
             exit(1);
         }
-        ptr[i] = word;
+        bytesRead += sizeof(word);
+        ptr[i++] = word;
     }
 }
 
@@ -148,7 +152,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
 
     // find free space
     freeaddr = freeSpaceAddr(pid);
-    printf("free space = %lx\n", freeaddr);
+    printf("free space = 0x%lx\n", freeaddr);
 
     //back up the code
     ptraceRead(pid, freeaddr, oldcode, oldcodeSize);
@@ -156,13 +160,14 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
     // Write our new stub
     ptraceWrite(pid, (uint64_t)freeaddr, path, strlen(path));
     //ptraceWrite(pid, (uint64_t)freeaddr, "/tmp/libscope.so\x0", 32);
-    ptraceWrite(pid, (uint64_t)freeaddr + 32, (&injectme) + 4, 256); //skip prologue
+    ptraceWrite(pid, (uint64_t)freeaddr + 32, (&injectme) + 4, 64); //skip prologue
 
     // Update RIP to point to our code
     regs.rip = freeaddr + 32;
     regs.rax = dlopenAddr;
     regs.rdi = freeaddr;  //dlopen's first arg
-    regs.rsi = RTLD_LAZY; //dlopen's second arg
+    //regs.rsi = RTLD_NOW | 0x80000000;// RTLD_LAZY; //dlopen's second arg
+    regs.rsi = RTLD_LAZY; 
 
     ptrace(PTRACE_SETREGS, pid, NULL, &regs);
 
@@ -178,7 +183,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
             printf("Scope library injected at address %p\n", (void*)regs.rax);
         } else {
             printf("Scope library could not be injected\n");
-            return;
+           // return;
         }
 
         //restore the app's state
@@ -225,13 +230,14 @@ injectScope(int pid, char* path)
     }
  
     localLib = info.addr;
-    printf("libdl found %s: %lx\n", info.path, info.addr);
-    
+    //dlopenAddr = dlsym(RTLD_DEFAULT, "__libc_dlopen_mode");
     dlopenAddr = dlsym(RTLD_DEFAULT, "dlopen");
     if (dlopenAddr == NULL) {
         fprintf(stderr, "Error locating dlopen() function\n");
         return -1;
     }
+
+    printf("libdl found %s: 0x%lx, %p\n", info.path, info.addr, dlopenAddr);
 
     // Find the base address of libdl in the target process
     remoteLib = findLibrary(info.path, pid);
@@ -246,3 +252,4 @@ injectScope(int pid, char* path)
     
     return 0;
 }
+

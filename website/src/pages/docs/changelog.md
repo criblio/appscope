@@ -4,6 +4,16 @@ title: Changelog
 
 # Changelog
 
+## AppScope 0.6.1
+
+2021-04-26 - Maintenance Pre-Release
+
+This pre-release addresses the following issues:
+
+- **Improvement**: [#238](https://github.com/criblio/appscope/issues/238) Resolve multiple issues with payloads from Node.js processes
+- **Improvement**: [#257](https://github.com/criblio/appscope/issues/257) Add missing console/log events, first observed in Python 3
+- **Improvement**: [#249](https://github.com/criblio/appscope/issues/249) Add support for Go apps built with `‑buildmode=pie`
+ 
 ## AppScope 0.6
 
 2021-03-16 - Maintenance Pre-Release

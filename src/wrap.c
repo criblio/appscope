@@ -1117,7 +1117,7 @@ static ssize_t __write_pthread(int fd, const void *buf, size_t size);
 static int 
 findInjected(struct dl_phdr_info *info, size_t size, void *data)
 {
-    if (strstr(info->dlpi_name, "/dev/shm/libscope") != NULL) {
+    if (strstr(info->dlpi_name, "/dev/shm/libscopea") != NULL) {
         *(char **)data = (char *) info->dlpi_name;
         return 1;
     }
@@ -1129,14 +1129,12 @@ hookInject()
 {
     char *full_path;
     void *addr = NULL;
-
     Elf64_Sym *sym = NULL;
     Elf64_Rela *rel = NULL;
     char *str = NULL;
     int rsz = 0;
     struct link_map *lm;
     char buf[512];
-
 
     if (dl_iterate_phdr(findInjected, &full_path)) {
         void *libscopeHandle = g_fn.dlopen(full_path, RTLD_NOW);

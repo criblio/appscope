@@ -33,6 +33,7 @@
 #define __NR_memfd_create   319
 #define _MFD_CLOEXEC		0x0001U
 #define SHM_NAME            "libscope"
+#define SHM_NAME_INJECT     "libscopea"
 #define PARENT_PROC_NAME "start_scope"
 #define GO_ENV_VAR "GODEBUG"
 #define GO_ENV_SERVER_VALUE "http2server"
@@ -124,7 +125,7 @@ release_libscope(libscope_info_t **info_ptr) {
 }
 
 static libscope_info_t *
-setup_libscope(bool forceShm)
+setup_libscope(bool inject)
 {
     libscope_info_t *info = NULL;
     int everything_successful = FALSE;
@@ -135,12 +136,12 @@ setup_libscope(bool forceShm)
     }
 
     info->fd = -1;
-    info->use_memfd = !forceShm && check_kernel_version();
+    info->use_memfd = !inject && check_kernel_version();
     
     if (info->use_memfd) {
         info->fd = _memfd_create(SHM_NAME, _MFD_CLOEXEC);
     } else {
-        if (asprintf(&info->shm_name, "%s%i", SHM_NAME, getpid()) == -1) {
+        if (asprintf(&info->shm_name, "%s%i", inject ? SHM_NAME_INJECT : SHM_NAME, getpid()) == -1) {
             perror("setup_libscope:shm_name");
             info->shm_name = NULL; // failure leaves info->shm_name undefined
             goto err;

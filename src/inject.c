@@ -158,12 +158,12 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
     ptraceRead(pid, freeaddr, oldcode, oldcodeSize);
 
     // Write our new stub
-    ptraceWrite(pid, (uint64_t)freeaddr, path, strlen(path));
+    ptraceWrite(pid, (uint64_t)freeaddr, path, strlen(path)+1);
     //ptraceWrite(pid, (uint64_t)freeaddr, "/tmp/libscope.so\x0", 32);
-    ptraceWrite(pid, (uint64_t)freeaddr + 32, (&injectme) + 4, 64); //skip prologue
+    ptraceWrite(pid, (uint64_t)freeaddr + 64, (&injectme) + 4, 64); //skip prologue
 
     // Update RIP to point to our code
-    regs.rip = freeaddr + 32;
+    regs.rip = freeaddr + 64;
     regs.rax = dlopenAddr;
     regs.rdi = freeaddr;  //dlopen's first arg
     //regs.rsi = RTLD_NOW | 0x80000000;// RTLD_LAZY; //dlopen's second arg

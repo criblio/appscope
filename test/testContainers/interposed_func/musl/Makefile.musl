@@ -1,0 +1,6 @@
+# A null makefile
+Nothing:
+
+all:
+
+.SILENT:

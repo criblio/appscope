@@ -1113,6 +1113,7 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
 
 static ssize_t __write_libc(int fd, const void *buf, size_t size);
 static ssize_t __write_pthread(int fd, const void *buf, size_t size);
+static int internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags);
 
 static int 
 findInjected(struct dl_phdr_info *info, size_t size, void *data)
@@ -1236,7 +1237,7 @@ initHook()
                                  .out_addr = (void*)&g_fn.__write_pthread};
     dl_iterate_phdr(findLibSym, &pthread__write);
 
-    bool inject = hookInject();
+    hookInject();
     
     if (should_we_patch || g_fn.sendmmsg || g_fn.__write_libc || g_fn.__write_pthread) {
         funchook = funchook_create();
@@ -1256,8 +1257,8 @@ initHook()
         }
 
         // sendmmsg for internal libc use in DNS queries
-        if (!inject && g_fn.sendmmsg) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, sendmmsg);
+        if (g_fn.sendmmsg) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
         }
 
         if (g_fn.__write_libc) {
@@ -4098,8 +4099,8 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
 }
 
 #ifdef __LINUX__
-EXPORTON int
-sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
+static int
+internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
 {
     ssize_t rc;
 
@@ -4131,6 +4132,12 @@ sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
     }
 
     return rc;
+}
+
+EXPORTON int
+sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
+{
+    return internal_sendmmsg(sockfd, msgvec, vlen, flags);
 }
 #endif // __LINUX__
 

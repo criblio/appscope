@@ -10,6 +10,7 @@
 //static char thread_delay_list[] = "chrome:nacl_helper";
 static timer_t g_timerid = 0;
 
+#ifndef __ALPINE__
 static int
 sendNL(int sd, ino_t node)
 {
@@ -164,7 +165,14 @@ osUnixSockPeer(ino_t lnode)
     g_fn.close(nsd);
     return rnode;
 }
-
+#else
+// TODO libmusl
+int
+osUnixSockPeer(ino_t lnode)
+{
+    return 0;
+}
+#endif // __ALPINE__
 int
 osGetExePath(char **path)
 {
@@ -1036,6 +1044,18 @@ static const help_list_t help_list[] = {
 char const __invoke_dynamic_linker__[] __attribute__ ((section (".interp"))) = "/lib64/ld-linux-x86-64.so.2";
 extern char** _dl_argv;
 
+static void
+print_version(char *path)
+{
+    printf("Scope Version: %s\n\n", SCOPE_VER);
+
+    if (strstr(path, "libscope")) {
+        printf("    Usage: LD_PRELOAD=%s <command name>\n", path);
+        printf("    For more info: %s help\n\n", path);
+    }
+}
+
+#ifndef __ALPINE__
 static int
 args_are_all_valid(int argc, char **argv)
 {
@@ -1060,17 +1080,6 @@ args_are_all_valid(int argc, char **argv)
 }
 
 static void
-print_version(char *path)
-{
-    printf("Scope Version: %s\n\n", SCOPE_VER);
-
-    if (strstr(path, "libscope")) {
-        printf("    Usage: LD_PRELOAD=%s <command name>\n", path);
-        printf("    For more info: %s help\n\n", path);
-    }
-}
-
-static void
 print_help(char* path)
 {
     int i;
@@ -1084,7 +1093,6 @@ print_help(char* path)
 
     if (g_fn.putchar) g_fn.putchar('\n');
 }
-
 
 __attribute__((visibility("default"))) void
 __scope_main()
@@ -1126,5 +1134,25 @@ __scope_main()
     }
     exit(0);
 }
+#else
+__attribute__((visibility("default"))) void
+__scope_main()
+{
+    int i;
 
+    // Get the full path to the library, or provide default if not possible.
+    char path[1024] = {0};
+    if (readlink("/proc/self/exe", path, sizeof(path)) == -1) {
+        snprintf(path, sizeof(path), "libscope.so");
+    }
+
+    print_version(path);
+    
+    for (i=0; help_list[i].text; i++) {
+        printf("%s", help_list[i].text);
+    }
+
+    exit(0);
+}
+#endif // __ALPINE__
 

@@ -8,7 +8,9 @@
 #include <sys/epoll.h>
 #include <poll.h>
 #include <sys/vfs.h>
+#ifndef __ALPINE__
 #include <linux/aio_abi.h>
+#endif
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #endif // __LINUX__
@@ -19,10 +21,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+// TODO: these are items that need to be resolved with libbmusl
+// just getting things to compile for now
 #ifdef __LINUX__
 #ifndef io_context_t
 #define io_context_t unsigned long
 #endif
+#endif // __LINUX__
+
+#ifdef __ALPINE__
+struct io_event;
 #endif
 
 #ifdef __MACOS__
@@ -121,16 +129,11 @@ typedef struct {
     int (*getaddrinfo)(const char *, const char *, const struct addrinfo *,
                        struct addrinfo **);
     /*
-     * We need to make these Linux only, but we're holding off until structiural changes are done.
+     * We need to make these Linux only, but we're holding off until structural changes are done.
      */
-    int (*open64)(const char *, int, ...);
-    int (*openat64)(int, const char *, int, ...);
     int (*__open_2)(const char *, int);
     int (*__open64_2)(const char *, int);
     int (*__openat_2)(int, const char *, int);
-    FILE *(*fopen64)(const char *, const char *);
-    FILE *(*freopen64)(const char *, const char *, FILE *);
-    int (*creat64)(const char *, mode_t);
     ssize_t (*__read_chk)(int, void *, size_t, size_t);
     char *(*__fgets_chk)(char *, size_t, int, FILE *);
     char *(*fgets_unlocked)(char *, int, FILE *);
@@ -141,35 +144,16 @@ typedef struct {
     size_t (*fread_unlocked)(void *, size_t, size_t, FILE *);
     size_t (*__fread_unlocked_chk)(void *, size_t, size_t, size_t, FILE *);
     ssize_t (*__getdelim)(char **, size_t *, int, FILE *);
-    ssize_t (*pread64)(int, void *, size_t, off_t);
     ssize_t (*preadv)(int, const struct iovec *, int, off_t);
     ssize_t (*preadv2)(int, const struct iovec *, int, off_t, int);
-    ssize_t (*preadv64v2)(int, const struct iovec *, int, off_t, int);
     ssize_t (*__pread_chk)(int, void *, size_t, off_t, size_t);
-    ssize_t (*pwrite64)(int, const void *, size_t, off_t);
     ssize_t (*pwritev)(int, const struct iovec *, int, off_t);
-    ssize_t (*pwritev64)(int, const struct iovec *, int, off64_t);
     ssize_t (*pwritev2)(int, const struct iovec *, int, off_t, int);
-    ssize_t (*pwritev64v2)(int, const struct iovec *, int, off_t, int);
     size_t (*fwrite_unlocked)(const void *, size_t, size_t, FILE *);
-    ssize_t (*sendfile64)(int, int, off64_t *, size_t);
-    off64_t (*lseek64)(int, off64_t, int);
-    int (*fseeko64)(FILE *, off64_t, int);
-    off64_t (*ftello64)(FILE *);
-    int (*fgetpos64)(FILE *, fpos64_t *);
-    int (*fsetpos64)(FILE *stream, const fpos64_t *pos);
-    int (*statfs64)(const char *, struct statfs64 *);
-    int (*fstatfs64)(int, struct statfs64 *);
-    int (*fstatat64)(int, const char *, struct stat64 *, int);
-    int (*__xstat)(int, const char *, struct stat *);
-    int (*__xstat64)(int, const char *, struct stat64 *);
+     int (*__xstat)(int, const char *, struct stat *);
     int (*__fxstat)(int, int, struct stat *);
-    int (*__fxstat64)(int, int, struct stat64 *);
     int (*__fxstatat)(int, int, const char *, struct stat *, int);
-    int (*__fxstatat64)(int, int, const char *, struct stat64 *, int);
     int (*__lxstat)(int, const char *, struct stat *);
-    int (*__lxstat64)(int, const char *, struct stat64 *);
-    int (*fcntl64)(int, int, ...);
     long (*syscall)(long, ...);
     int (*prctl)(int, unsigned long, unsigned long, unsigned long, unsigned long);
     int (*sigaction)(int, const struct sigaction *, struct sigaction *);
@@ -196,8 +180,6 @@ typedef struct {
     int (*nanosleep)(const struct timespec *, struct timespec *);
 #ifdef __LINUX__
     // Couldn't easily get struct definitions for these on mac
-    int (*statvfs64)(const char *, struct statvfs64 *);
-    int (*fstatvfs64)(int, struct statvfs64 *);
     int (*epoll_wait)(int, struct epoll_event *, int, int);
     int (*__overflow)(FILE *, int);
     ssize_t (*__write_libc)(int, const void *, size_t);
@@ -215,9 +197,37 @@ typedef struct {
     int (*semtimedop)(int, struct sembuf *, size_t, const struct timespec *);
     int (*clock_nanosleep)(clockid_t, int, const struct timespec *, struct timespec *);
     int (*usleep)(useconds_t);
-    int (*io_getevents)(io_context_t, long, long, struct io_event *, struct timespec *);
     int (*sendmmsg)(int, struct mmsghdr *, unsigned int, int);
     int (*recvmmsg)(int, struct mmsghdr *, unsigned int, int, struct timespec *);
+    int (*io_getevents)(io_context_t, long, long, struct io_event *, struct timespec *);
+#ifndef __ALPINE__
+    int (*open64)(const char *, int, ...);
+    int (*openat64)(int, const char *, int, ...);
+    FILE *(*fopen64)(const char *, const char *);
+    FILE *(*freopen64)(const char *, const char *, FILE *);
+    int (*creat64)(const char *, mode_t);
+    ssize_t (*pread64)(int, void *, size_t, off_t);
+    int (*statvfs64)(const char *, struct statvfs64 *);
+    int (*fstatvfs64)(int, struct statvfs64 *);
+    int (*__xstat64)(int, const char *, struct stat64 *);
+    int (*__fxstat64)(int, int, struct stat64 *);
+    int (*__lxstat64)(int, const char *, struct stat64 *);
+    int (*fcntl64)(int, int, ...);
+    int (*fgetpos64)(FILE *, fpos64_t *);
+    int (*fsetpos64)(FILE *stream, const fpos64_t *pos);
+    int (*statfs64)(const char *, struct statfs64 *);
+    int (*fstatfs64)(int, struct statfs64 *);
+    int (*fstatat64)(int, const char *, struct stat64 *, int);
+    ssize_t (*sendfile64)(int, int, off64_t *, size_t);
+    off64_t (*lseek64)(int, off64_t, int);
+    int (*fseeko64)(FILE *, off64_t, int);
+    off64_t (*ftello64)(FILE *);
+    int (*__fxstatat64)(int, int, const char *, struct stat64 *, int);
+    ssize_t (*pwrite64)(int, const void *, size_t, off_t);
+    ssize_t (*pwritev64)(int, const struct iovec *, int, off64_t);
+    ssize_t (*pwritev64v2)(int, const struct iovec *, int, off_t, int);
+    ssize_t (*preadv64v2)(int, const struct iovec *, int, off_t, int);
+#endif // __ALPINE__
 #endif // __LINUX__
 
 #if defined(__LINUX__) && defined(__STATX__)

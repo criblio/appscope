@@ -5,6 +5,16 @@
 #include "log.h"
 #include "scopetypes.h"
 
+#ifdef __ALPINE__
+#define RTLD_DEEPBIND	0x00008	/* Use deep binding.  */
+#define ARCH_SET_FS		0x1002
+#define ARCH_GET_FS		0x1003
+#define _STAT_VER	3
+#define VAR_INT unsigned int
+#else
+#define VAR_INT int
+#endif // __ALPINE__
+
 typedef struct _dbg_t dbg_t;
 
 extern dbg_t* g_dbg;

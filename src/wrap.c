@@ -3,10 +3,16 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <pthread.h>
+#ifdef __ALPINE__
+#include <poll.h>
+#else
 #include <sys/poll.h>
+#endif // __ALPINE__
 #ifdef __LINUX__
 #include <sys/prctl.h>
+#ifndef __ALPINE__
 #include <asm/prctl.h>
+#endif
 #endif
 #include <sys/syscall.h>
 #include <sys/stat.h>
@@ -42,8 +48,6 @@ static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
-
-unsigned g_sendprocessstart;
 
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
@@ -81,7 +85,15 @@ typedef struct
 // that are dynamically loaded after our constructor has run.
 // Not to point fingers, but I'm looking at you python.
 //
+#ifndef __ALPINE__
 extern void *_dl_sym(void *, const char *, void *);
+#else
+void *
+_dl_sym(void *handle, const char *name, void *who)
+{
+    return dlsym(handle, name);
+}
+#endif // __ALPINE__
 
 
 static int
@@ -1398,42 +1410,6 @@ io_getevents(io_context_t ctx_id, long min_nr, long nr,
 }
 
 EXPORTON int
-open64(const char *pathname, int flags, ...)
-{
-    int fd;
-    struct FuncArgs fArgs;
-
-    WRAP_CHECK(open64, -1);
-    LOAD_FUNC_ARGS_VALIST(fArgs, flags);
-    fd = g_fn.open64(pathname, flags, fArgs.arg[0]);
-    if (fd != -1) {
-        doOpen(fd, pathname, FD, "open64");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "open64", pathname);
-    }
-
-    return fd;
-}
-
-EXPORTON int
-openat64(int dirfd, const char *pathname, int flags, ...)
-{
-    int fd;
-    struct FuncArgs fArgs;
-
-    WRAP_CHECK(openat64, -1);
-    LOAD_FUNC_ARGS_VALIST(fArgs, flags);
-    fd = g_fn.openat64(dirfd, pathname, flags, fArgs.arg[0]);
-    if (fd != -1) {
-        doOpen(fd, pathname, FD, "openat64");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "openat64", pathname);
-    }
-
-    return fd;
-}
-
-EXPORTON int
 __open_2(const char *file, int oflag)
 {
     int fd;
@@ -1479,72 +1455,6 @@ __openat_2(int fd, const char *file, int oflag)
     return fd;
 }
 
-// Note: creat64 is defined to be obsolete
-EXPORTON int
-creat64(const char *pathname, mode_t mode)
-{
-    int fd;
-
-    WRAP_CHECK(creat64, -1);
-    fd = g_fn.creat64(pathname, mode);
-    if (fd != -1) {
-        doOpen(fd, pathname, FD, "creat64");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "creat64", pathname);
-    }
-
-    return fd;
-}
-
-EXPORTON FILE *
-fopen64(const char *pathname, const char *mode)
-{
-    FILE *stream;
-
-    WRAP_CHECK(fopen64, NULL);
-    stream = g_fn.fopen64(pathname, mode);
-    if (stream != NULL) {
-        doOpen(fileno(stream), pathname, STREAM, "fopen64");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "fopen64", pathname);
-    }
-
-    return stream;
-}
-
-EXPORTON FILE *
-freopen64(const char *pathname, const char *mode, FILE *orig_stream)
-{
-    FILE *stream;
-
-    WRAP_CHECK(freopen64, NULL);
-    stream = g_fn.freopen64(pathname, mode, orig_stream);
-    // freopen just changes the mode if pathname is null
-    if (stream != NULL) {
-        if (pathname != NULL) {
-            doOpen(fileno(stream), pathname, STREAM, "freopen64");
-            doClose(fileno(orig_stream), "freopen64");
-        }
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "freopen64", pathname);
-    }
-
-    return stream;
-}
-
-EXPORTON ssize_t
-pread64(int fd, void *buf, size_t count, off_t offset)
-{
-    WRAP_CHECK(pread64, -1);
-    uint64_t initialTime = getTime();
-
-    ssize_t rc = g_fn.pread64(fd, buf, count, offset);
-
-    doRead(fd, initialTime, (rc != -1), (void *)buf, rc, "pread64", BUF, 0);
-
-    return rc;
-}
-
 EXPORTON ssize_t
 preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
@@ -1568,19 +1478,6 @@ preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 
     doRead(fd, initialTime, (rc != -1), iov, rc, "preadv2", IOV, iovcnt);
 
-    return rc;
-}
-
-EXPORTON ssize_t
-preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
-{
-    WRAP_CHECK(preadv64v2, -1);
-    uint64_t initialTime = getTime();
-
-    ssize_t rc = g_fn.preadv64v2(fd, iov, iovcnt, offset, flags);
-
-    doRead(fd, initialTime, (rc != -1), iov, rc, "preadv64v2", IOV, iovcnt);
-    
     return rc;
 }
 
@@ -1627,19 +1524,6 @@ __fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *
 }
 
 EXPORTON ssize_t
-pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
-{
-    WRAP_CHECK(pwrite64, -1);
-    uint64_t initialTime = getTime();
-
-    ssize_t rc = g_fn.pwrite64(fd, buf, nbyte, offset);
-
-    doWrite(fd, initialTime, (rc != -1), buf, rc, "pwrite64", BUF, 0);
-
-    return rc;
-}
-
-EXPORTON ssize_t
 pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
     WRAP_CHECK(pwritev, -1);
@@ -1648,19 +1532,6 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
     ssize_t rc = g_fn.pwritev(fd, iov, iovcnt, offset);
 
     doWrite(fd, initialTime, (rc != -1), iov, rc, "pwritev", IOV, iovcnt);
-
-    return rc;
-}
-
-EXPORTON ssize_t
-pwritev64(int fd, const struct iovec *iov, int iovcnt, off64_t offset)
-{
-    WRAP_CHECK(pwritev64, -1);
-    uint64_t initialTime = getTime();
-
-    ssize_t rc = g_fn.pwritev64(fd, iov, iovcnt, offset);
-
-    doWrite(fd, initialTime, (rc != -1), iov, rc, "pwritev64", IOV, iovcnt);
 
     return rc;
 }
@@ -1678,88 +1549,6 @@ pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
-pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
-{
-    WRAP_CHECK(pwritev64v2, -1);
-    uint64_t initialTime = getTime();
-
-    ssize_t rc = g_fn.pwritev64v2(fd, iov, iovcnt, offset, flags);
-
-    doWrite(fd, initialTime, (rc != -1), iov, rc, "pwritev64v2", IOV, iovcnt);
-
-    return rc;
-}
-
-EXPORTON off64_t
-lseek64(int fd, off64_t offset, int whence)
-{
-    WRAP_CHECK(lseek64, -1);
-
-    off64_t rc = g_fn.lseek64(fd, offset, whence);
-
-    doSeek(fd, (rc != -1), "lseek64");
-
-    return rc;
-}
-
-EXPORTON int
-fseeko64(FILE *stream, off64_t offset, int whence)
-{
-    WRAP_CHECK(fseeko64, -1);
-
-    int rc = g_fn.fseeko64(stream, offset, whence);
-
-    doSeek(fileno(stream), (rc != -1), "fseeko64");
-
-    return rc;
-}
-
-EXPORTON off64_t
-ftello64(FILE *stream)
-{
-    WRAP_CHECK(ftello64, -1);
-
-    off64_t rc = g_fn.ftello64(stream);
-
-    doSeek(fileno(stream), (rc != -1), "ftello64");
-
-    return rc;
-}
-
-EXPORTON int
-statfs64(const char *path, struct statfs64 *buf)
-{
-    WRAP_CHECK(statfs64, -1);
-    int rc = g_fn.statfs64(path, buf);
-
-    doStatPath(path, rc, "statfs64");
-
-    return rc;
-}
-
-EXPORTON int
-fstatfs64(int fd, struct statfs64 *buf)
-{
-    WRAP_CHECK(fstatfs64, -1);
-    int rc = g_fn.fstatfs64(fd, buf);
-
-    doStatFd(fd, rc, "fstatfs64");
-
-    return rc;
-}
-
-EXPORTON int
-fsetpos64(FILE *stream, const fpos64_t *pos)
-{
-    WRAP_CHECK(fsetpos64, -1);
-    int rc = g_fn.fsetpos64(stream, pos);
-
-    doSeek(fileno(stream), (rc == 0), "fsetpos64");
-
-    return rc;
-}
-
 EXPORTON int
 __xstat(int ver, const char *path, struct stat *stat_buf)
 {
@@ -1767,17 +1556,6 @@ __xstat(int ver, const char *path, struct stat *stat_buf)
     int rc = g_fn.__xstat(ver, path, stat_buf);
 
     doStatPath(path, rc, "__xstat");
-
-    return rc;    
-}
-
-EXPORTON int
-__xstat64(int ver, const char *path, struct stat64 *stat_buf)
-{
-    WRAP_CHECK(__xstat64, -1);
-    int rc = g_fn.__xstat64(ver, path, stat_buf);
-
-    doStatPath(path, rc, "__xstat64");
 
     return rc;    
 }
@@ -1794,17 +1572,6 @@ __lxstat(int ver, const char *path, struct stat *stat_buf)
 }
 
 EXPORTON int
-__lxstat64(int ver, const char *path, struct stat64 *stat_buf)
-{
-    WRAP_CHECK(__lxstat64, -1);
-    int rc = g_fn.__lxstat64(ver, path, stat_buf);
-
-    doStatPath(path, rc, "__lxstat64");
-
-    return rc;
-}
-
-EXPORTON int
 __fxstat(int ver, int fd, struct stat *stat_buf)
 {
     WRAP_CHECK(__fxstat, -1);
@@ -1816,34 +1583,12 @@ __fxstat(int ver, int fd, struct stat *stat_buf)
 }
 
 EXPORTON int
-__fxstat64(int ver, int fd, struct stat64 * stat_buf)
-{
-    WRAP_CHECK(__fxstat64, -1);
-    int rc = g_fn.__fxstat64(ver, fd, stat_buf);
-
-    doStatFd(fd, rc, "__fxstat64");
-
-    return rc;
-}
-
-EXPORTON int
 __fxstatat(int ver, int dirfd, const char *path, struct stat *stat_buf, int flags)
 {
     WRAP_CHECK(__fxstatat, -1);
     int rc = g_fn.__fxstatat(ver, dirfd, path, stat_buf, flags);
 
     doStatPath(path, rc, "__fxstatat");
-
-    return rc;
-}
-
-EXPORTON int
-__fxstatat64(int ver, int dirfd, const char * path, struct stat64 * stat_buf, int flags)
-{
-    WRAP_CHECK(__fxstatat64, -1);
-    int rc = g_fn.__fxstatat64(ver, dirfd, path, stat_buf, flags);
-
-    doStatPath(path, rc, "__fxstatat64");
 
     return rc;
 }
@@ -1896,34 +1641,12 @@ statvfs(const char *path, struct statvfs *buf)
 }
 
 EXPORTON int
-statvfs64(const char *path, struct statvfs64 *buf)
-{
-    WRAP_CHECK(statvfs64, -1);
-    int rc = g_fn.statvfs64(path, buf);
-
-    doStatPath(path, rc, "statvfs64");
-
-    return rc;
-}
-
-EXPORTON int
 fstatvfs(int fd, struct statvfs *buf)
 {
     WRAP_CHECK(fstatvfs, -1);
     int rc = g_fn.fstatvfs(fd, buf);
 
     doStatFd(fd, rc, "fstatvfs");
-
-    return rc;
-}
-
-EXPORTON int
-fstatvfs64(int fd, struct statvfs64 *buf)
-{
-    WRAP_CHECK(fstatvfs64, -1);
-    int rc = g_fn.fstatvfs64(fd, buf);
-
-    doStatFd(fd, rc, "fstatvfs64");
 
     return rc;
 }
@@ -2289,19 +2012,6 @@ sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
     ssize_t rc = g_fn.sendfile(out_fd, in_fd, offset, count);
 
     doSendFile(out_fd, in_fd, initialTime, rc, "sendfile");
-
-    return rc;
-}
-
-EXPORTON ssize_t
-sendfile64(int out_fd, int in_fd, off64_t *offset, size_t count)
-{
-    WRAP_CHECK(sendfile, -1);
-    uint64_t initialTime = getTime();
-
-    ssize_t rc = g_fn.sendfile64(out_fd, in_fd, offset, count);
-
-    doSendFile(out_fd, in_fd, initialTime, rc, "sendfile64");
 
     return rc;
 }
@@ -2922,7 +2632,338 @@ _exit(int status)
     }
     __builtin_unreachable();
 }
+#ifndef __ALPINE__
+EXPORTON int
+open64(const char *pathname, int flags, ...)
+{
+    int fd;
+    struct FuncArgs fArgs;
 
+    WRAP_CHECK(open64, -1);
+    LOAD_FUNC_ARGS_VALIST(fArgs, flags);
+    fd = g_fn.open64(pathname, flags, fArgs.arg[0]);
+    if (fd != -1) {
+        doOpen(fd, pathname, FD, "open64");
+    } else {
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "open64", pathname);
+    }
+
+    return fd;
+}
+
+EXPORTON int
+openat64(int dirfd, const char *pathname, int flags, ...)
+{
+    int fd;
+    struct FuncArgs fArgs;
+
+    WRAP_CHECK(openat64, -1);
+    LOAD_FUNC_ARGS_VALIST(fArgs, flags);
+    fd = g_fn.openat64(dirfd, pathname, flags, fArgs.arg[0]);
+    if (fd != -1) {
+        doOpen(fd, pathname, FD, "openat64");
+    } else {
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "openat64", pathname);
+    }
+
+    return fd;
+}
+
+// Note: creat64 is defined to be obsolete
+EXPORTON int
+creat64(const char *pathname, mode_t mode)
+{
+    int fd;
+
+    WRAP_CHECK(creat64, -1);
+    fd = g_fn.creat64(pathname, mode);
+    if (fd != -1) {
+        doOpen(fd, pathname, FD, "creat64");
+    } else {
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "creat64", pathname);
+    }
+
+    return fd;
+}
+
+EXPORTON FILE *
+fopen64(const char *pathname, const char *mode)
+{
+    FILE *stream;
+
+    WRAP_CHECK(fopen64, NULL);
+    stream = g_fn.fopen64(pathname, mode);
+    if (stream != NULL) {
+        doOpen(fileno(stream), pathname, STREAM, "fopen64");
+    } else {
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "fopen64", pathname);
+    }
+
+    return stream;
+}
+
+EXPORTON FILE *
+freopen64(const char *pathname, const char *mode, FILE *orig_stream)
+{
+    FILE *stream;
+
+    WRAP_CHECK(freopen64, NULL);
+    stream = g_fn.freopen64(pathname, mode, orig_stream);
+    // freopen just changes the mode if pathname is null
+    if (stream != NULL) {
+        if (pathname != NULL) {
+            doOpen(fileno(stream), pathname, STREAM, "freopen64");
+            doClose(fileno(orig_stream), "freopen64");
+        }
+    } else {
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "freopen64", pathname);
+    }
+
+    return stream;
+}
+
+EXPORTON ssize_t
+pread64(int fd, void *buf, size_t count, off_t offset)
+{
+    WRAP_CHECK(pread64, -1);
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.pread64(fd, buf, count, offset);
+
+    doRead(fd, initialTime, (rc != -1), (void *)buf, rc, "pread64", BUF, 0);
+
+    return rc;
+}
+
+EXPORTON ssize_t
+pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
+{
+    WRAP_CHECK(pwrite64, -1);
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.pwrite64(fd, buf, nbyte, offset);
+
+    doWrite(fd, initialTime, (rc != -1), buf, rc, "pwrite64", BUF, 0);
+
+    return rc;
+}
+
+EXPORTON ssize_t
+pwritev64(int fd, const struct iovec *iov, int iovcnt, off64_t offset)
+{
+    WRAP_CHECK(pwritev64, -1);
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.pwritev64(fd, iov, iovcnt, offset);
+
+    doWrite(fd, initialTime, (rc != -1), iov, rc, "pwritev64", IOV, iovcnt);
+
+    return rc;
+}
+
+EXPORTON off64_t
+lseek64(int fd, off64_t offset, int whence)
+{
+    WRAP_CHECK(lseek64, -1);
+
+    off64_t rc = g_fn.lseek64(fd, offset, whence);
+
+    doSeek(fd, (rc != -1), "lseek64");
+
+    return rc;
+}
+
+EXPORTON int
+fseeko64(FILE *stream, off64_t offset, int whence)
+{
+    WRAP_CHECK(fseeko64, -1);
+
+    int rc = g_fn.fseeko64(stream, offset, whence);
+
+    doSeek(fileno(stream), (rc != -1), "fseeko64");
+
+    return rc;
+}
+
+EXPORTON off64_t
+ftello64(FILE *stream)
+{
+    WRAP_CHECK(ftello64, -1);
+
+    off64_t rc = g_fn.ftello64(stream);
+
+    doSeek(fileno(stream), (rc != -1), "ftello64");
+
+    return rc;
+}
+
+EXPORTON int
+statfs64(const char *path, struct statfs64 *buf)
+{
+    WRAP_CHECK(statfs64, -1);
+    int rc = g_fn.statfs64(path, buf);
+
+    doStatPath(path, rc, "statfs64");
+
+    return rc;
+}
+
+EXPORTON int
+fstatfs64(int fd, struct statfs64 *buf)
+{
+    WRAP_CHECK(fstatfs64, -1);
+    int rc = g_fn.fstatfs64(fd, buf);
+
+    doStatFd(fd, rc, "fstatfs64");
+
+    return rc;
+}
+
+EXPORTON int
+fsetpos64(FILE *stream, const fpos64_t *pos)
+{
+    WRAP_CHECK(fsetpos64, -1);
+    int rc = g_fn.fsetpos64(stream, pos);
+
+    doSeek(fileno(stream), (rc == 0), "fsetpos64");
+
+    return rc;
+}
+
+EXPORTON ssize_t
+preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
+{
+    WRAP_CHECK(preadv64v2, -1);
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.preadv64v2(fd, iov, iovcnt, offset, flags);
+
+    doRead(fd, initialTime, (rc != -1), iov, rc, "preadv64v2", IOV, iovcnt);
+    
+    return rc;
+}
+
+EXPORTON ssize_t
+pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
+{
+    WRAP_CHECK(pwritev64v2, -1);
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.pwritev64v2(fd, iov, iovcnt, offset, flags);
+
+    doWrite(fd, initialTime, (rc != -1), iov, rc, "pwritev64v2", IOV, iovcnt);
+
+    return rc;
+}
+
+EXPORTON int
+__xstat64(int ver, const char *path, struct stat64 *stat_buf)
+{
+    WRAP_CHECK(__xstat64, -1);
+    int rc = g_fn.__xstat64(ver, path, stat_buf);
+
+    doStatPath(path, rc, "__xstat64");
+
+    return rc;    
+}
+
+EXPORTON int
+__lxstat64(int ver, const char *path, struct stat64 *stat_buf)
+{
+    WRAP_CHECK(__lxstat64, -1);
+    int rc = g_fn.__lxstat64(ver, path, stat_buf);
+
+    doStatPath(path, rc, "__lxstat64");
+
+    return rc;
+}
+
+EXPORTON int
+__fxstat64(int ver, int fd, struct stat64 * stat_buf)
+{
+    WRAP_CHECK(__fxstat64, -1);
+    int rc = g_fn.__fxstat64(ver, fd, stat_buf);
+
+    doStatFd(fd, rc, "__fxstat64");
+
+    return rc;
+}
+
+EXPORTON int
+__fxstatat64(int ver, int dirfd, const char * path, struct stat64 * stat_buf, int flags)
+{
+    WRAP_CHECK(__fxstatat64, -1);
+    int rc = g_fn.__fxstatat64(ver, dirfd, path, stat_buf, flags);
+
+    doStatPath(path, rc, "__fxstatat64");
+
+    return rc;
+}
+
+EXPORTON int
+statvfs64(const char *path, struct statvfs64 *buf)
+{
+    WRAP_CHECK(statvfs64, -1);
+    int rc = g_fn.statvfs64(path, buf);
+
+    doStatPath(path, rc, "statvfs64");
+
+    return rc;
+}
+
+EXPORTON int
+fstatvfs64(int fd, struct statvfs64 *buf)
+{
+    WRAP_CHECK(fstatvfs64, -1);
+    int rc = g_fn.fstatvfs64(fd, buf);
+
+    doStatFd(fd, rc, "fstatvfs64");
+
+    return rc;
+}
+
+EXPORTON int
+fgetpos64(FILE *stream,  fpos64_t *pos)
+{
+    WRAP_CHECK(fgetpos64, -1);
+    int rc = g_fn.fgetpos64(stream, pos);
+
+    doSeek(fileno(stream), (rc == 0), "fgetpos64");
+
+    return rc;
+}
+
+EXPORTON int
+fcntl64(int fd, int cmd, ...)
+{
+    struct FuncArgs fArgs;
+
+    WRAP_CHECK(fcntl64, -1);
+    LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
+    int rc = g_fn.fcntl64(fd, cmd, fArgs.arg[0], fArgs.arg[1],
+                      fArgs.arg[2], fArgs.arg[3]);
+    if (cmd == F_DUPFD) {
+        doDup(fd, rc, "fcntl64", FALSE);
+    }
+
+    return rc;
+}
+
+EXPORTON ssize_t
+sendfile64(int out_fd, int in_fd, off64_t *offset, size_t count)
+{
+    WRAP_CHECK(sendfile, -1);
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.sendfile64(out_fd, in_fd, offset, count);
+
+    doSendFile(out_fd, in_fd, initialTime, rc, "sendfile64");
+
+    return rc;
+}
+
+
+#endif //__ALPINE__
 #endif // __LINUX__
 
 EXPORTON int
@@ -3160,17 +3201,6 @@ fgetpos(FILE *stream,  fpos_t *pos)
     int rc = g_fn.fgetpos(stream, pos);
 
     doSeek(fileno(stream), (rc == 0), "fgetpos");
-
-    return rc;
-}
-
-EXPORTON int
-fgetpos64(FILE *stream,  fpos64_t *pos)
-{
-    WRAP_CHECK(fgetpos64, -1);
-    int rc = g_fn.fgetpos64(stream, pos);
-
-    doSeek(fileno(stream), (rc == 0), "fgetpos64");
 
     return rc;
 }
@@ -3589,22 +3619,6 @@ fcntl(int fd, int cmd, ...)
 }
 
 EXPORTON int
-fcntl64(int fd, int cmd, ...)
-{
-    struct FuncArgs fArgs;
-
-    WRAP_CHECK(fcntl64, -1);
-    LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
-    int rc = g_fn.fcntl64(fd, cmd, fArgs.arg[0], fArgs.arg[1],
-                      fArgs.arg[2], fArgs.arg[3]);
-    if (cmd == F_DUPFD) {
-        doDup(fd, rc, "fcntl64", FALSE);
-    }
-
-    return rc;
-}
-
-EXPORTON int
 dup(int fd)
 {
     WRAP_CHECK(dup, -1);
@@ -3893,7 +3907,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
 
 #ifdef __LINUX__
 EXPORTON int
-sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
+sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, VAR_INT flags)
 {
     ssize_t rc;
 
@@ -4050,7 +4064,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
 #ifdef __LINUX__
 EXPORTON int
 recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
-         int flags, struct timespec *timeout)
+         VAR_INT flags, struct timespec *timeout)
 {
     ssize_t rc;
 

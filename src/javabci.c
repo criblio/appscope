@@ -8,7 +8,9 @@
 #include <stdint.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifndef __ALPINE__
 #include <linux/limits.h>
+#endif
 #include <endian.h>
 #include "javabci.h"
 

@@ -18,10 +18,12 @@
 #include <sys/vfs.h>
 #include <sys/prctl.h>
 #include <sys/epoll.h>
+#ifndef __ALPINE__
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/sock_diag.h>
 #include <linux/unix_diag.h>
+#endif // __ALPINE__
 #include <link.h>
 #include <sys/mman.h>
 

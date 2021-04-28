@@ -1124,7 +1124,7 @@ findInjected(struct dl_phdr_info *info, size_t size, void *data)
     return 0;
 }
 
-static void
+static bool
 hookInject()
 {
     char *full_path;
@@ -1140,13 +1140,14 @@ hookInject()
         void *libscopeHandle = g_fn.dlopen(full_path, RTLD_NOW);
         if (libscopeHandle == NULL) {
             dlclose(libscopeHandle);
-            return;
+            return FALSE;
         }
 
         void *handle = g_fn.dlopen(0, RTLD_LAZY);
         if (handle == NULL) {
+            dlclose(libscopeHandle);
             dlclose(handle);
-            return;
+            return FALSE;
         }
 
         // Get the link map and ELF sections in advance of something matching
@@ -1166,7 +1167,9 @@ hookInject()
         }
         dlclose(handle);
         dlclose(libscopeHandle);
+        return TRUE;
     }
+    return FALSE;
 }
 
 static void
@@ -1233,7 +1236,7 @@ initHook()
                                  .out_addr = (void*)&g_fn.__write_pthread};
     dl_iterate_phdr(findLibSym, &pthread__write);
 
-    hookInject();
+    bool inject = hookInject();
     
     if (should_we_patch || g_fn.sendmmsg || g_fn.__write_libc || g_fn.__write_pthread) {
         funchook = funchook_create();
@@ -1253,9 +1256,9 @@ initHook()
         }
 
         // sendmmsg for internal libc use in DNS queries
-        // if (g_fn.sendmmsg) {
-        //     rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, sendmmsg);
-        // }
+        if (!inject && g_fn.sendmmsg) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, sendmmsg);
+        }
 
         if (g_fn.__write_libc) {
             rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);

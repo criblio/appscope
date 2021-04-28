@@ -22,6 +22,8 @@
 #include "fn.h"
 #include "scopeelf.h"
 
+#define __RTLD_DLOPEN	0x80000000
+
 static uint64_t 
 findLibrary(const char *library, pid_t pid) 
 {
@@ -73,20 +75,20 @@ freeSpaceAddr(pid_t pid)
 }
 
 static void 
-ptraceRead(int pid, uint64_t addr, void *vptr, int len)
+ptraceRead(int pid, uint64_t addr, void *data, int len)
 {
-    int bytesRead = 0;
+    int numRead = 0;
     int i = 0;
     long word = 0;
-    long *ptr = (long *) vptr;
+    long *ptr = (long *) data;
 
-    while (bytesRead < len) {
-        word = ptrace(PTRACE_PEEKTEXT, pid, addr + bytesRead, NULL);
+    while (numRead < len) {
+        word = ptrace(PTRACE_PEEKTEXT, pid, addr + numRead, NULL);
         if(word == -1) {
             perror("ptrace(PTRACE_PEEKTEXT) failed");
             exit(1);
         }
-        bytesRead += sizeof(word);
+        numRead += sizeof(word);
         ptr[i++] = word;
     }
 }
@@ -95,9 +97,9 @@ static void
 ptraceWrite(int pid, uint64_t addr, void *data, int len) 
 {
     long word = 0;
-    int i=0;
+    int i = 0;
 
-    for(i=0; i < len; i+=sizeof(word), word=0) {
+    for(i=0; i < len; i += sizeof(word), word=0) {
         memcpy(&word, data + i, sizeof(word));
         if (ptrace(PTRACE_POKETEXT, pid, addr + i, word) == -1) {
             perror("ptrace(PTRACE_POKETEXT) failed");
@@ -118,7 +120,7 @@ static int ptraceAttach(pid_t target) {
         perror("waitpid failed");
         return -1;
     }
-  return 0;
+    return 0;
 }
 
 static void 
@@ -160,14 +162,14 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
     // Write our new stub
     ptraceWrite(pid, (uint64_t)freeaddr, path, strlen(path)+1);
     //ptraceWrite(pid, (uint64_t)freeaddr, "/tmp/libscope.so\x0", 32);
-    ptraceWrite(pid, (uint64_t)freeaddr + 64, (&injectme) + 4, 64); //skip prologue
+    ptraceWrite(pid, (uint64_t)freeaddr + 64, (&injectme) + 4, 64); //leave 64bytes lib path, also +4 to skip prologue
 
     // Update RIP to point to our code
     regs.rip = freeaddr + 64;
     regs.rax = dlopenAddr;
     regs.rdi = freeaddr;  //dlopen's first arg
-    //regs.rsi = RTLD_NOW | 0x80000000;// RTLD_LAZY; //dlopen's second arg
-    regs.rsi = RTLD_LAZY; 
+    regs.rsi = RTLD_NOW | __RTLD_DLOPEN; //dlopen's second arg
+    //regs.rsi = RTLD_LAZY; 
 
     ptrace(PTRACE_SETREGS, pid, NULL, &regs);
 
@@ -177,6 +179,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
 
     // Ensure that we are returned because of our int 0x3 trap
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
+
         // Get process registers, indicating if the injection suceeded
         ptrace(PTRACE_GETREGS, pid, NULL, &regs);
         if (regs.rax != 0x0) {
@@ -204,9 +207,10 @@ typedef struct {
 } libdl_info_t;
 
 static int 
-findLibld(struct dl_phdr_info *info, size_t size, void *data)
+findLib(struct dl_phdr_info *info, size_t size, void *data)
 {
-    if (strstr(info->dlpi_name, "libdl.so") != NULL) {
+    //if (strstr(info->dlpi_name, "libdl.so") != NULL) {
+    if (strstr(info->dlpi_name, "libc.so") != NULL) {
         char libpath[PATH_MAX];
         if (realpath(info->dlpi_name, libpath)) {
             ((libdl_info_t *)data)->path = libpath;
@@ -224,25 +228,29 @@ injectScope(int pid, char* path)
     void *dlopenAddr = NULL;
     libdl_info_t info;
    
-    if (!dl_iterate_phdr(findLibld, &info)) {
-        fprintf(stderr, "Failed to find libdl\n");
+    if (!dl_iterate_phdr(findLib, &info)) {
+        fprintf(stderr, "Failed to find libc\n");
         return -1;
     }
  
     localLib = info.addr;
-    //dlopenAddr = dlsym(RTLD_DEFAULT, "__libc_dlopen_mode");
-    dlopenAddr = dlsym(RTLD_DEFAULT, "dlopen");
+    dlopenAddr = dlsym(RTLD_DEFAULT, "__libc_dlopen_mode");
+    //dlopenAddr = dlsym(RTLD_DEFAULT, "dlopen");
     if (dlopenAddr == NULL) {
-        fprintf(stderr, "Error locating dlopen() function\n");
+        fprintf(stderr, "Failed to find __libc_dlopen_mode function\n");
         return -1;
     }
 
-    printf("libdl found %s: 0x%lx, %p\n", info.path, info.addr, dlopenAddr);
+    printf("libc found %s: 0x%lx, %p\n", info.path, info.addr, dlopenAddr);
 
-    // Find the base address of libdl in the target process
+    // Find the base address of libc in the target process
     remoteLib = findLibrary(info.path, pid);
+    if (!remoteLib) {
+        fprintf(stderr, "Failed to find libc in target process\n");
+        return -1;
+    }
 
-    printf("remote libdl = %p\n", (void*)remoteLib);
+    printf("remote libc = %p\n", (void*)remoteLib);
     
     // Due to ASLR, we need to calculate the address in the target process 
     dlopenAddr = remoteLib + (dlopenAddr - localLib);

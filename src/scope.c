@@ -271,7 +271,9 @@ main(int argc, char **argv, char **env)
     if (attach) {
         int pid = atoi(argv[2]);
         printf("Attaching to process %d, lib=%s\n", pid, info->path);
-        injectScope(pid, info->path);
+        if (injectScope(pid, info->path) != 0) {
+            exit(EXIT_FAILURE);
+        }
         return 0;
     }
 

@@ -1167,7 +1167,6 @@ hookInject()
         dlclose(handle);
         dlclose(libscopeHandle);
     }
-    
 }
 
 static void
@@ -1236,7 +1235,6 @@ initHook()
 
     hookInject();
     
-    /*
     if (should_we_patch || g_fn.sendmmsg || g_fn.__write_libc || g_fn.__write_pthread) {
         funchook = funchook_create();
 
@@ -1255,9 +1253,9 @@ initHook()
         }
 
         // sendmmsg for internal libc use in DNS queries
-        if (g_fn.sendmmsg) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, sendmmsg);
-        }
+        // if (g_fn.sendmmsg) {
+        //     rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, sendmmsg);
+        // }
 
         if (g_fn.__write_libc) {
             rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
@@ -1275,7 +1273,6 @@ initHook()
             return;
         }
     }
-    */
 }
 #else
 static void

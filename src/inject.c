@@ -86,7 +86,7 @@ ptraceRead(int pid, uint64_t addr, void *data, int len)
         word = ptrace(PTRACE_PEEKTEXT, pid, addr + numRead, NULL);
         if(word == -1) {
             perror("ptrace(PTRACE_PEEKTEXT) failed");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         numRead += sizeof(word);
         ptr[i++] = word;
@@ -103,24 +103,24 @@ ptraceWrite(int pid, uint64_t addr, void *data, int len)
         memcpy(&word, data + i, sizeof(word));
         if (ptrace(PTRACE_POKETEXT, pid, addr + i, word) == -1) {
             perror("ptrace(PTRACE_POKETEXT) failed");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     }
 }
 
-static int ptraceAttach(pid_t target) {
+static void 
+ptraceAttach(pid_t target) {
     int waitpidstatus;
 
     if(ptrace(PTRACE_ATTACH, target, NULL, NULL) == -1) {
         perror("ptrace(PTRACE_ATTACH) failed");
-        return -1;
+        exit(EXIT_FAILURE);
     }
 
     if(waitpid(target, &waitpidstatus, WUNTRACED) != target) {
         perror("waitpid failed");
-        return -1;
+        exit(EXIT_FAILURE);
     }
-    return 0;
 }
 
 static void 
@@ -185,8 +185,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
         if (regs.rax != 0x0) {
             printf("Scope library injected at address %p\n", (void*)regs.rax);
         } else {
-            printf("Scope library could not be injected\n");
-           // return;
+            fprintf(stderr, "Scope library could not be injected\n");
         }
 
         //restore the app's state
@@ -195,8 +194,8 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
         ptrace(PTRACE_DETACH, pid, NULL, NULL);
 
     } else {
-        printf("Fatal Error: Process stopped for unknown reason\n");
-        exit(1);
+        fprintf(stderr, "Fatal Error: Process stopped for unknown reason\n");
+        exit(EXIT_FAILURE);
     }
 }
 

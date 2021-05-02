@@ -1,7 +1,7 @@
 # ---
 # Cribl AppScope™ - Build under Docker
 #
-# by Paul Dugas <pdugas@cribl.io>
+# by Paul Dugas <paul@dugas.cc>
 #
 
 # ---

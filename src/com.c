@@ -238,6 +238,7 @@ msgLogConfig(config_t *cfg)
 
     if (cfg_text) {
         scopeLog(cfg_text, -1, CFG_LOG_INFO);
+        free(cfg_text);
     }
 
     cJSON_Delete(json);

@@ -652,16 +652,16 @@ ctlSendJson(ctl_t *ctl, cJSON *json, which_transport_t who)
     char *msg = cJSON_PrintUnformatted(json);
 
     int rc = -1;
-    char *mnl;
 
-    if (msg && ((mnl = msgAddNewLine(msg)) != NULL)) {
+    if (msg && ((msg = msgAddNewLine(msg)) != NULL)) {
         if (who == CFG_LS) {
-            rc = transportSend(ctl->paytrans, mnl, strlen(mnl));
+            rc = transportSend(ctl->paytrans, msg, strlen(msg));
         } else {
-            rc = transportSend(ctl->transport, mnl, strlen(mnl));
+            rc = transportSend(ctl->transport, msg, strlen(msg));
         }
     }
 
+    if (msg) free(msg);
     cJSON_Delete(json);
     return rc;
 }

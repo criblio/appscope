@@ -46,7 +46,7 @@ static const char *g_cmddir;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
 
-unsigned g_sendprocessstart;
+extern unsigned g_sendprocessstart;
 
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);

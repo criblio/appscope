@@ -44,4 +44,4 @@ docker-build:
 		-v "$(shell pwd):/root/appscope" \
 		--entrypoint /bin/bash \
 		$(TAG) \
-		-c "make all && make test" 
+		-c "make all test" 

@@ -64,6 +64,18 @@ To clean out files that were manually added, or were added by build commands:
 git clean -f -d
 ```
 
+## Docker
+
+If you have Docker installed on your local machine, you can skip installing the dependencies locally and instead use a container to build. Use the `Dockerfile` and the `make docker-build` target. That builds an `appscope-builder:{version}` image that is Ubuntu with the necessary dependencies installed. The target then runs the image, mounting the local directory into the container, and builds the project. You'll end up with the binary in `bin/linux/scope` assuming all goes well.
+
+By default, the current versions of Ubuntu or Go are used in the container image. Setting the `IMAGE` and `GOLANG` build arguments can override these.  Use the `BUILD_ARGS` environment variable to pass extra arguments to `docker build`.  The example below forces the builder to use Go 1.16 and Ubuntu 21.04.
+
+```shell
+$ make docker-build BUILD_ARGS="--build-arg GOLANG=golang-1.16 --build-arg IMAGE=ubuntu:21.04"
+```
+
+See the `Makefile` for the `docker run` command we use. Run it yourself without the `--entrypoint` and `-c` arguments to get a shell in the builder to fiddle around yourself.
+
 # Run
 
 There are two ways to "scope" an application (i.e., to enable AppScope to extract details from an application). You can use the `scope` executable, or you can use the dynamic loader's preload capability. 

@@ -37,9 +37,9 @@ libscope.so: $(SCOPE_SRC)
 	$(CC) -c $(CFLAGS) $(ARCH_CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
 	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/ $(ARCH_RM)
 
-ldscope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c libscope.so
+ldscope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c libscope.so
 	$(ARCH_COPY)
-	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c -ldl -lrt -o ./bin/$(OS)/$(ARCH)/ldscope ./lib/$(OS)/libscope.o -I./os/$(OS) $(INCLUDES)
+	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c -ldl -lrt -o ./bin/$(OS)/$(ARCH)/ldscope ./lib/$(OS)/libscope.o -I./os/$(OS) $(INCLUDES)
 	rm -f ./lib/$(OS)/libscope.o && rm -f ../../cli/run/bundle.go
 
 coreclean:

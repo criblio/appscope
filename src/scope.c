@@ -27,6 +27,7 @@
 #include "scopetypes.h"
 #include "os.h"
 #include "utils.h"
+#include "inject.h"
 
 #define DEVMODE 0
 #define __NR_memfd_create   319
@@ -123,7 +124,7 @@ release_libscope(libscope_info_t **info_ptr) {
 }
 
 static libscope_info_t *
-setup_libscope()
+setup_libscope(bool inject)
 {
     libscope_info_t *info = NULL;
     int everything_successful = FALSE;
@@ -134,18 +135,18 @@ setup_libscope()
     }
 
     info->fd = -1;
-    info->use_memfd = check_kernel_version();
+    info->use_memfd = !inject && check_kernel_version();
     
     if (info->use_memfd &&
         ((info->fd = _memfd_create(SHM_NAME, _MFD_CLOEXEC)) != -1)) {
         scopeLog("Using memfd", info->fd, CFG_LOG_TRACE);
     } else {
-        if (asprintf(&info->shm_name, "%s%i", SHM_NAME, getpid()) == -1) {
+        if (asprintf(&info->shm_name, "%s%i", inject ? SHM_NAME_INJECT : SHM_NAME, getpid()) == -1) {
             perror("setup_libscope:shm_name");
             info->shm_name = NULL; // failure leaves info->shm_name undefined
             goto err;
         }
-        info->fd = shm_open(info->shm_name, O_RDWR | O_CREAT, S_IRWXU);
+        info->fd = shm_open(info->shm_name, O_RDWR | O_CREAT, S_IRWXU | S_IROTH | S_IXOTH);
     }
     if (info->fd == -1) {
         perror(info->use_memfd ? "setup_libscope:memfd_create" : "setup_libscope:shm_open");
@@ -244,12 +245,17 @@ main(int argc, char **argv, char **env)
     pid_t pid;
     void *handle = NULL;
     libscope_info_t *info;
+    bool attach = FALSE;
 
     // Use dlsym to get addresses for everything in g_fn
     initFn();
     setPidEnv(getpid());
 
-    info = setup_libscope();
+    if (argc == 3 && (strncmp(argv[1], "--attach", 8) == 0)) {
+        attach = TRUE;
+    }
+
+    info = setup_libscope(attach);
     if (!info) {
         fprintf(stderr, "%s:%d ERROR: unable to set up libscope\n", __FUNCTION__, __LINE__);
         exit(EXIT_FAILURE);
@@ -261,6 +267,14 @@ main(int argc, char **argv, char **env)
         print_usage(scope_cmd, info, argc, argv);
         exit(EXIT_FAILURE);
     }
+
+    if (attach) {
+        int pid = atoi(argv[2]);
+        printf("Attaching to process %d\n", pid);
+        injectScope(pid, info->path);
+        return 0;
+    }
+
     char *inferior_command = getpath(argv[1]);
     if (!inferior_command) {
         fprintf(stderr,"%s could not find or execute command `%s`.  Exiting.\n", scope_cmd, argv[1]);

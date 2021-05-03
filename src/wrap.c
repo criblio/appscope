@@ -983,6 +983,7 @@ memcpy(void *dest, const void *src, size_t n)
     return memmove(dest, src, n);
 }
 
+#if defined(__GO__) || defined(__FUNCHOOK__)
 static int
 ssl_read_hook(SSL *ssl, void *buf, int num)
 {
@@ -1117,6 +1118,7 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
 
 static ssize_t __write_libc(int fd, const void *buf, size_t size);
 static ssize_t __write_pthread(int fd, const void *buf, size_t size);
+#endif // defined(__GO__) || defined(__FUNCHOOK__)
 static int internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags);
 
 static int 
@@ -1187,6 +1189,7 @@ hookInject()
 static void
 initHook()
 {
+#if defined(__GO__) || defined(__FUNCHOOK__)
     int rc;
     funchook_t *funchook;
     char *full_path = NULL;
@@ -1288,6 +1291,7 @@ initHook()
             return;
         }
     }
+#endif
 }
 #else
 static void

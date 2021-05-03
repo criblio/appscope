@@ -126,11 +126,13 @@ ptraceAttach(pid_t target) {
 static void 
 call_dlopen(void) 
 {
+#if defined(__GO__) || defined(__FUNCHOOK__)
     asm(
         "andq $0xfffffffffffffff0, %rsp \n" //align stack to 16-byte boundary
         "callq *%rax \n"
         "int $3 \n"
     );
+#endif // defined(__GO__) || defined(__FUNCHOOK__)
 }
 
 static void call_dlopen_end() {}
@@ -138,6 +140,7 @@ static void call_dlopen_end() {}
 static void 
 inject(pid_t pid, uint64_t dlopenAddr, char *path) 
 {
+#if defined(__GO__) || defined(__FUNCHOOK__)
     struct user_regs_struct oldregs, regs;
     unsigned char *oldcode;
     int status;
@@ -199,6 +202,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
         fprintf(stderr, "Error: Process stopped for unknown reason\n");
         exit(EXIT_FAILURE);
     }
+#endif // defined(__GO__) || defined(__FUNCHOOK__)
 }
 
 static int 

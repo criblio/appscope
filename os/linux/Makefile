@@ -33,17 +33,20 @@ libscope.so: $(SCOPE_SRC)
 	@echo "Building libscope.so ..."
 	make $(FUNCHOOK_AR)
 	make $(PCRE2_AR)
-	$(CC) $(CFLAGS) $(ARCH_CFLAGS) -shared -fvisibility=hidden -fno-stack-protector -DSCOPE_VER=\"$(SCOPE_VER)\" $(CJSON_DEFINES) $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ $(LD_FLAGS) $(ARCH_LD_FLAGS)
+	$(CC) $(CFLAGS) $(ARCH_CFLAGS) -shared -fvisibility=hidden -fno-stack-protector -DSCOPE_VER=\"$(SCOPE_VER)\" $(CJSON_DEFINES) $(YAML_DEFINES) -o ./lib/$(OS)/$(ARCH)/$@ $(INCLUDES) $^ $(LD_FLAGS) $(ARCH_LD_FLAGS)
 	$(CC) -c $(CFLAGS) $(ARCH_CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
 	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/ $(ARCH_RM)
 
 ldscope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c libscope.so
 	$(ARCH_COPY)
-	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c -ldl -lrt -o ./bin/$(OS)/ldscope ./lib/$(OS)/libscope.o -I./os/$(OS) $(INCLUDES)
+	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c -ldl -lrt -o ./bin/$(OS)/$(ARCH)/ldscope ./lib/$(OS)/libscope.o -I./os/$(OS) $(INCLUDES)
 	rm -f ./lib/$(OS)/libscope.o && rm -f ../../cli/run/bundle.go
 
 coreclean:
-	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a bin/$(OS)/ldscope
+	cd contrib/cJSON && make clean
+	cd contrib/libyaml && make clean
+	rm -rf contrib/cmocka/build && rm -rf contrib/funchook/build && rm -rf contrib/pcre2/build
+	rm -f ./lib/$(OS)/$(ARCH)/libscope.so bin/$(OS)/$(ARCH)/ldscope $(O_FILES) $(CACHE_FILES) 
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))
@@ -53,6 +56,7 @@ TEST_C_FILES:=$(wildcard test/*.c)
 TEST_C_FILES:=$(filter-out test/wraptest.c, $(TEST_C_FILES))
 C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c
 O_FILES:=$(C_FILES:.c=.o)
+CACHE_FILES:=$(shell find . -name CMakeCache.txt)
 
 coretest: $(C_FILES)
 	@echo "Building Tests"

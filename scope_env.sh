@@ -16,11 +16,12 @@ determine_lib_path() {
     fi
 
     PLATFORM=$(determine_platform)
+    ARCH=$(determine_arch)
 
     if [ $PLATFORM == "macOS" ]; then
         echo "$SCOPE_HOME/lib/macOS/libscope.so"
     elif [ $PLATFORM == "Linux" ]; then
-        echo "$SCOPE_HOME/lib/linux/libscope.so"
+        echo "$SCOPE_HOME/lib/linux/$ARCH/libscope.so"
     else
         echo "ERROR"
     fi
@@ -83,6 +84,10 @@ determine_platform() {
     fi
 }
 
+determine_arch() {
+    echo $(uname -m)
+}
+
 determine_pkg_mgr() {
     if yum --version &>/dev/null; then
         echo "yum"
@@ -136,7 +141,7 @@ install_sudo() {
         "apt-get")
             if ! sudo --version &>/dev/null; then
                 echo "Install of sudo is required."
-                if su -c "apt-get update && apt-get install sudo"; then
+                if su -c "apt-get update && apt-get install -y sudo"; then
                     echo "Install of sudo was successful."
                 else
                     echo "Install of sudo was unsuccesful.  Exiting."
@@ -166,7 +171,7 @@ install_git() {
         "apt-get")
             if ! git --version &>/dev/null; then
                 echo "Install of git is required."
-                if sudo apt-get install git; then
+                if sudo apt-get install -y git; then
                     echo "Install of git was successful."
                 else
                     echo "Install of git was unsuccesful.  Exiting."
@@ -243,6 +248,16 @@ run_make() {
 }
 
 
+prep() {
+    echo "Running scope_env.sh prep"
+    
+    platform_and_pkgmgr_defined
+    install_sudo
+    install_git
+    clone_scope
+    install_build_tools
+}
+
 build_scope() {
     echo "Running scope_env.sh."
 
@@ -255,11 +270,7 @@ build_scope() {
             PKG_MGR=$(determine_pkg_mgr)
         fi
     fi
-    platform_and_pkgmgr_defined
-    install_sudo
-    install_git
-    clone_scope
-    install_build_tools
+    prep
     run_make
     print_version
 }
@@ -287,6 +298,9 @@ for arg in "$@"; do
         ;;
     "build")
         build_scope
+        ;;
+    "prep")
+        prep
         ;;
     "help")
         print_help

@@ -1,6 +1,8 @@
 
 DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
+ARCH=$(shell uname -m)
+
 GO_VER:=$(shell go version | cut -d' ' -f3)
 
 # Allow GOPATH to be set, but don't require it.
@@ -29,24 +31,24 @@ deps:
 rebuild: cliclean all
 
 local: scope
-	sudo cp $(DIR)../bin/linux/scope /usr/local/bin/scope
+	sudo cp $(DIR)../bin/linux/$(ARCH)/scope /usr/local/bin/scope
 
 run/bundle.go:
 	rm -rf $(DIR)/build/*
-	cp $(DIR)../bin/linux/ldscope $(DIR)build/
-	cp $(DIR)../lib/linux/libscope.so $(DIR)build/
+	cp $(DIR)../bin/linux/$(ARCH)/ldscope $(DIR)build/
+	cp $(DIR)../lib/linux/$(ARCH)/libscope.so $(DIR)build/
 	cp $(DIR)../conf/*.yml $(DIR)build/
 	cd $(DIR) && $(GOPATH)/bin/go-bindata -o run/bundle.go -pkg run build
 
 scope: run/bundle.go
-	# GOOS=linux CGO_ENABLED=0 $(GO) build -a -tags netgo -ldflags="-s -w" -o ../bin/linux/scope
-	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)../bin/linux/scope
+	# GOOS=linux CGO_ENABLED=0 $(GO) build -a -tags netgo -ldflags="-s -w" -o ../bin/linux/$(ARCH)/scope
+	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)../bin/linux/$(ARCH)/scope
 
 compressscope:
-	upx -9 $(DIR)../bin/linux/scope
+	upx -9 $(DIR)../bin/linux/$(ARCH)/scope
 
 install: 
-	cp $(DIR)../bin/linux/scope /usr/local/bin/scope
+	cp $(DIR)../bin/linux/$(ARCH)/scope /usr/local/bin/scope
 
 clitest:
 	cd $(DIR) && $(GO) test -v -coverprofile coverage.out ./...

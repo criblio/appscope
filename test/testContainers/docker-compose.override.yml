@@ -5,7 +5,7 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     privileged: true
 
@@ -14,7 +14,7 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     privileged: true
 
@@ -23,7 +23,7 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     privileged: true
 
@@ -32,7 +32,7 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     privileged: true
 
@@ -41,7 +41,7 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     privileged: true
 
@@ -50,17 +50,17 @@ services:
     volumes:
       - ./logs:/opt/test-runner/logs
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     privileged: true
 
   tls:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -69,7 +69,7 @@ services:
   detect_proto:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -78,74 +78,74 @@ services:
   gogen:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
     privileged: true
 
   go_2:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
     privileged: true
   go_3:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
     privileged: true
   go_4:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
     privileged: true
   go_5:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
     privileged: true
   go_6:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
     privileged: true
   go_7:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
     privileged: true
   go_8:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
@@ -154,10 +154,10 @@ services:
   go_9:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
@@ -166,10 +166,10 @@ services:
   go_10:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
@@ -178,10 +178,10 @@ services:
   go_11:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
@@ -190,10 +190,10 @@ services:
   go_12:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
@@ -202,10 +202,10 @@ services:
   go_13:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
@@ -214,10 +214,10 @@ services:
   go_14:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
@@ -226,10 +226,10 @@ services:
   go_15:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
@@ -238,10 +238,10 @@ services:
   go_16:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /usr/lib/libscope.so
       - type: bind
-        source: ../../bin/linux/ldscope
+        source: ../../bin/linux/x86_64/ldscope
         target: /usr/bin/ldscope
       - type: bind
         source: ./go/influx/db
@@ -251,7 +251,7 @@ services:
   java6:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -260,7 +260,7 @@ services:
   java7:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -269,7 +269,7 @@ services:
   java8:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -278,7 +278,7 @@ services:
   java9:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -287,7 +287,7 @@ services:
   java10:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -296,7 +296,7 @@ services:
   java11:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -305,7 +305,7 @@ services:
   java12:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -314,7 +314,7 @@ services:
   java13:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -323,7 +323,7 @@ services:
   java14:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -332,7 +332,7 @@ services:
   oracle_java6:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -341,7 +341,7 @@ services:
   oracle_java7:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -350,7 +350,7 @@ services:
   oracle_java8:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -359,7 +359,7 @@ services:
   oracle_java9:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -368,7 +368,7 @@ services:
   oracle_java10:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -377,7 +377,7 @@ services:
   oracle_java11:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -386,7 +386,7 @@ services:
   oracle_java12:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -395,7 +395,7 @@ services:
   oracle_java13:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
@@ -404,7 +404,7 @@ services:
   oracle_java14:
     volumes:
       - type: bind
-        source: ../../lib/linux/libscope.so
+        source: ../../lib/linux/x86_64/libscope.so
         target: /opt/test-runner/bin/libscope.so
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so

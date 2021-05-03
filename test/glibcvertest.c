@@ -170,7 +170,7 @@ testEachLineInStreamWorksWithCannedData(void** state)
 static void
 testEachLineInStreamWithActualLibraryData(void** state)
 {
-    FILE* f_in = popen("nm ./lib/linux/libscope.so", "r");
+    FILE* f_in = popen("nm ./lib/linux/x86_64/libscope.so", "r");
     results_t result = {0};
     //FILE* f_out = fopen("/dev/null", "a");
     //                              replace f_out with stdout for debugging...
@@ -201,7 +201,7 @@ testEachLineInStreamWithActualLibraryData(void** state)
 static void
 testLibraryUsesFunctionsWeShouldNot(void **state)
 {
-    FILE* f_in = popen("nm ./lib/linux/libscope.so", "r");
+    FILE* f_in = popen("nm ./lib/linux/x86_64/libscope.so", "r");
     unsigned int lines_failed = 0;
 
     char line[1024];

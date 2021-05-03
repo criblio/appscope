@@ -45,7 +45,9 @@ ldscope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c
 coreclean:
 	cd contrib/cJSON && make clean
 	cd contrib/libyaml && make clean
-	rm -rf contrib/cmocka/build && rm -rf contrib/funchook/build && rm -rf contrib/pcre2/build
+	rm -rf contrib/cmocka/build && rm -rf contrib/funchook/build && rm -rf contrib/pcre2/build && rm -rf test/selfinterpose
+	rm -f bin/linux/aarch64/* && rm -f lib/linux/aarch64/*
+	rm -f bin/linux/x86_64/* && rm -f lib/linux/x86_64/*
 	rm -f ./lib/$(OS)/$(ARCH)/libscope.so bin/$(OS)/$(ARCH)/ldscope $(O_FILES) $(CACHE_FILES) 
 
 SRC_C_FILES:=$(wildcard src/*.c)

@@ -28,6 +28,12 @@ ENV TZ="America/New_York"
 # ---
 # Install packages. Note extra PPA for Go.
 #
+# Also note that this logic duplicates the top-level `install_build_tools.sh`
+# script. Trying to use that script here causes issues because of its use of
+# `sudu` when running the package installer. It clears the environment so the
+# additions above don't apply and we end up with interaction when some of the
+# dependencies (i.e. tzdata) are installed.
+#
 RUN apt-get update && \
     apt-get install -y software-properties-common gpg apt-utils && \
     add-apt-repository ppa:longsleep/golang-backports && \

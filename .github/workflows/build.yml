@@ -14,7 +14,9 @@ jobs:
       - run: make all
       - run: make test
       - run: make clean
-      - run: docker run -i --rm -v `pwd`:`pwd` --platform linux/arm64 ubuntu:20.04 sh -c "cd `pwd` && ./scope_env.sh prep && make all"
+      - run: |
+          docker run --privileged --rm tonistiigi/binfmt --install all && \
+          docker run -i --rm -v `pwd`:`pwd` --platform linux/arm64 ubuntu:20.04 sh -c "cd `pwd` && ./scope_env.sh prep && make all"
       # - run: cd test/testContainers && docker-compose up
       - env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

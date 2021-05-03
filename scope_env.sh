@@ -113,10 +113,10 @@ install_brew() {
 }
 
 platform_and_pkgmgr_defined() {
-    if [ ${PLATFORM} = "Error" ]; then
+    if [ "${PLATFORM}" = "Error" ]; then
         echo "scope_env.sh does not support this platform type.  Exiting."
         exit 1
-    elif [ ${PKG_MGR} = "Error" ]; then
+    elif [ "${PKG_MGR}" = "Error" ]; then
         echo "scope_env.sh does not support this package menager.  Exiting."
         exit 1
     else
@@ -250,7 +250,7 @@ run_make() {
 
 prep() {
     echo "Running scope_env.sh prep"
-    
+
     platform_and_pkgmgr_defined
     install_sudo
     install_git
@@ -265,7 +265,7 @@ build_scope() {
     PKG_MGR=$(determine_pkg_mgr)
 
     # Mac's brew package manager may not be there unless we put it there...
-    if [ ${PLATFORM} = "macOS" ] && [ ${PKG_MGR} = "Error" ]; then
+    if [ "${PLATFORM}" = "macOS" ] && [ "${PKG_MGR}" = "Error" ]; then
         if install_brew; then
             PKG_MGR=$(determine_pkg_mgr)
         fi

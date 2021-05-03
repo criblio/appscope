@@ -251,6 +251,9 @@ run_make() {
 prep() {
     echo "Running scope_env.sh prep"
 
+    PLATFORM=$(determine_platform)
+    PKG_MGR=$(determine_pkg_mgr)
+
     platform_and_pkgmgr_defined
     install_sudo
     install_git

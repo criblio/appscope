@@ -278,6 +278,14 @@ build_scope() {
     print_version
 }
 
+build_scope_arm64() {
+    echo "Building Scope in ARM64 via docker"
+
+    localdir=$(pwd)
+    docker run --privileged --rm tonistiigi/binfmt --install all
+    docker run -i --rm -v ${localdir}:${localdir} --platform linux/arm64 ubuntu:20.04 sh -cx "cd ${localdir} && bash -x ./scope_env.sh prep && make all"
+}
+
 
 if [ "$#" = 0 ]; then
     echo "Expected at least one argument.  Try './scope_env.sh help; for more info."
@@ -301,6 +309,9 @@ for arg in "$@"; do
         ;;
     "build")
         build_scope
+        ;;
+    "build_arm64")
+        build_scope_arm64
         ;;
     "prep")
         prep

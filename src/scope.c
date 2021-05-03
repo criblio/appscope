@@ -33,7 +33,6 @@
 #define __NR_memfd_create   319
 #define _MFD_CLOEXEC		0x0001U
 #define SHM_NAME            "libscope"
-#define SHM_NAME_INJECT     "libscopea"
 #define PARENT_PROC_NAME "start_scope"
 #define GO_ENV_VAR "GODEBUG"
 #define GO_ENV_SERVER_VALUE "http2server"
@@ -270,10 +269,8 @@ main(int argc, char **argv, char **env)
 
     if (attach) {
         int pid = atoi(argv[2]);
-        printf("Attaching to process %d, lib=%s\n", pid, info->path);
-        if (injectScope(pid, info->path) != 0) {
-            exit(EXIT_FAILURE);
-        }
+        printf("Attaching to process %d\n", pid);
+        injectScope(pid, info->path);
         return 0;
     }
 

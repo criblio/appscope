@@ -29,6 +29,7 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 #include "javaagent.h"
+#include "inject.h"
 
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
@@ -1118,12 +1119,19 @@ static int internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vl
 static int 
 findInjected(struct dl_phdr_info *info, size_t size, void *data)
 {
-    if (strstr(info->dlpi_name, "/dev/shm/libscopea") != NULL) {
+    if (strstr(info->dlpi_name, LIBSCOPE_INJECTED_PATH) != NULL) {
         *(char **)data = (char *) info->dlpi_name;
         return 1;
     }
     return 0;
 }
+
+/**
+ * Detects whether the libscope library has been injected 
+ * using the `ldscope --attach PID command` and if yes, performs GOT hooking.
+ * It iterates over all shared objects using dl_iterate_phdr and checks
+ * if there is any library whose name begins with /dev/shm/libscopea
+ */ 
 
 static bool
 hookInject()

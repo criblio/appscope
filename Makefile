@@ -39,7 +39,10 @@ docker-build: BUILD_ARGS?=
 docker-build:
 	@[ -x "$(DOCKER)" ] || \
 		( echo >&2 "error: Please install Docker first."; exit 1)
-	@$(DOCKER) build --tag $(TAG) $(BUILD_ARGS) .
+	@$(DOCKER) build \
+		--tag $(TAG) \
+		-f docker/builder/Dockerfile \
+		$(BUILD_ARGS) .
 	@$(DOCKER) run -it --rm \
 		-v "$(shell pwd):/root/appscope" \
 		--entrypoint /bin/bash \

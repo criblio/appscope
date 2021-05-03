@@ -1,2 +1,4 @@
 *
+!aarch64
+!x86_64
 !.gitignore

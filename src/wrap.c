@@ -983,7 +983,6 @@ memcpy(void *dest, const void *src, size_t n)
     return memmove(dest, src, n);
 }
 
-#if defined(__GO__) || defined(__FUNCHOOK__)
 static int
 ssl_read_hook(SSL *ssl, void *buf, int num)
 {
@@ -1289,7 +1288,6 @@ initHook()
             return;
         }
     }
-#endif
 }
 #else
 static void

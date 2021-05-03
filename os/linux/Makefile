@@ -20,7 +20,7 @@ TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
 TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl -lresolv -lrt
 
-.PHONY: coreall coreclean coretest
+.PHONY: coreall coreclean coretest buildclean
 coreall: libscope.so ldscope
 
 $(PCRE2_AR):
@@ -42,13 +42,15 @@ ldscope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c
 	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c -ldl -lrt -o ./bin/$(OS)/$(ARCH)/ldscope ./lib/$(OS)/libscope.o -I./os/$(OS) $(INCLUDES)
 	rm -f ./lib/$(OS)/libscope.o && rm -f ../../cli/run/bundle.go
 
-coreclean:
+buildclean:
 	cd contrib/cJSON && make clean
 	cd contrib/libyaml && make clean
 	rm -rf contrib/cmocka/build && rm -rf contrib/funchook/build && rm -rf contrib/pcre2/build && rm -rf test/selfinterpose
+	rm -f $(O_FILES) $(CACHE_FILES) 
+
+coreclean: buildclean
 	rm -f bin/linux/aarch64/* && rm -f lib/linux/aarch64/*
 	rm -f bin/linux/x86_64/* && rm -f lib/linux/x86_64/*
-	rm -f ./lib/$(OS)/$(ARCH)/libscope.so bin/$(OS)/$(ARCH)/ldscope $(O_FILES) $(CACHE_FILES) 
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))

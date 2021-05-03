@@ -13,7 +13,7 @@ jobs:
       - run: make deps
       - run: make all
       - run: make test
-      - run: make clean
+      - run: make buildclean
       - run: bash -ex ./scope_env.sh build_arm64
       # - run: cd test/testContainers && docker-compose up
       - env:

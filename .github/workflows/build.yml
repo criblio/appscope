@@ -14,7 +14,7 @@ jobs:
       - run: make all
       - run: make test
       - run: make clean
-      - run: ./scope_env.sh build_arm64
+      - run: bash -ex ./scope_env.sh build_arm64
       # - run: cd test/testContainers && docker-compose up
       - env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

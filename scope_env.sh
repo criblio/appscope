@@ -1,5 +1,7 @@
 #!/bin/bash
 
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 print_help() {
     echo "Usage Examples:"
     echo "    ./scope_env.sh run <cmd and args>     (executes cmd with scope library)"
@@ -195,6 +197,7 @@ install_git() {
 }
 
 clone_scope() {
+    cd ${DIR}
     if git remote -v 2>/dev/null | grep "scope.git" &>/dev/null; then
         echo "We're in an existing repo now.  No need to clone."
         return 0 
@@ -283,7 +286,7 @@ build_scope_arm64() {
 
     localdir=$(pwd)
     docker run --privileged --rm tonistiigi/binfmt --install all
-    docker run -i --rm -v ${localdir}:${localdir} --platform linux/arm64 ubuntu:20.04 sh -cx "cd ${localdir} && bash -x ./scope_env.sh prep && make all"
+    docker run -i --rm -v ${localdir}:${localdir} --platform linux/arm64 ubuntu:20.04 sh -cx "cd ${localdir} && bash -ex ./scope_env.sh prep && make all"
 }
 
 

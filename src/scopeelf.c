@@ -231,10 +231,11 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
              * as in: rel[i].r_offset + lm->l_addr
              */
             *gfn =  *gaddr;
+            uint64_t prev = *gaddr;
             *gaddr = (uint64_t)hook->func;
-            snprintf(buf, sizeof(buf), "%s:%d offset 0x%lx GOT entry %p saddr 0x%lx",
-                     __FUNCTION__, __LINE__, rel[i].r_offset, gaddr, saddr);
-            scopeLog(buf, -1, CFG_LOG_TRACE);
+            snprintf(buf, sizeof(buf), "%s:%d offset 0x%lx GOT entry %p saddr 0x%lx, prev=%lx, curr=%p",
+                     __FUNCTION__, __LINE__, rel[i].r_offset, gaddr, saddr, prev, hook->func);
+            scopeLog(buf, -1, CFG_LOG_DEBUG);
 
             if ((prot & PROT_WRITE) == 0) {
                 // if we didn't mod above leave prot settings as is

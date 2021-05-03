@@ -42,9 +42,9 @@ libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c s
 	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
 	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/ && rm ./test/selfinterpose/wrap_go.o
 
-ldscope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c libscope.so
+ldscope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c libscope.so
 	objcopy -I binary -O elf64-x86-64 -B i386 ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
-	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c -ldl -lrt -o ./bin/$(OS)/ldscope ./lib/$(OS)/libscope.o -I./os/$(OS) $(INCLUDES)
+	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c -ldl -lrt -o ./bin/$(OS)/ldscope ./lib/$(OS)/libscope.o -I./os/$(OS) $(INCLUDES)
 	rm -f ./lib/$(OS)/libscope.o && rm -f ../../cli/run/bundle.go
 
 coreclean:

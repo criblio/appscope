@@ -34,6 +34,10 @@ docker-compose build tls
 docker-compose up tls
 docker-compose down
 
+docker-compose build bash
+docker-compose up bash
+docker-compose down
+
 docker-compose build gogen
 docker-compose up gogen
 docker-compose down

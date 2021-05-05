@@ -13,6 +13,7 @@
 #include <libgen.h>
 
 #include "atomic.h"
+#include "bashmem.h"
 #include "cfg.h"
 #include "cfgutils.h"
 #include "com.h"
@@ -1301,6 +1302,14 @@ init(void)
 {
     // Use dlsym to get addresses for everything in g_fn
     initFn();
+
+    // bash can be compiled to use glibc's memory subsystem or it's own
+    // internal memory subsystem.  It's own is not threadsafe.  If we
+    // find that bash is using it's own memory, replace it with glibc's
+    // so our own thread can run safely in parallel.
+    if (in_bash_process() && func_found_in_executable("malloc")) {
+        run_bash_mem_fix();
+    }
 
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);

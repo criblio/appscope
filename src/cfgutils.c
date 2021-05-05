@@ -388,12 +388,6 @@ processReloadConfig(config_t *cfg, const char* value)
     }
 }
 
-static int
-startsWith(const char* string, const char* substring)
-{
-    return (strncmp(string, substring, strlen(substring)) == 0);
-}
-
 //
 // An example of this format: SCOPE_STATSD_MAXLEN=1024
 //

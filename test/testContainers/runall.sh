@@ -28,6 +28,9 @@ docker-compose down
 docker-compose up tls
 docker-compose down
 
+docker-compose up bash
+docker-compose down
+
 docker-compose up gogen
 docker-compose down
 

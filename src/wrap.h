@@ -5,6 +5,7 @@
 #define EXPORT __attribute__((visibility("default")))
 #define EXPORTOFF  __attribute__((visibility("hidden")))
 #define EXPORTON __attribute__((visibility("default")))
+#define EXPORTWEAK __attribute__((weak))
 
 #define DYN_CONFIG_PREFIX "scope"
 #define MAXTRIES 10

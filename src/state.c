@@ -1609,6 +1609,7 @@ getDNSName(int sd, void *pkt, int pktlen)
 static bool
 parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
 {
+#if 0 //DEBUG
     int i, nmsg;
     ns_rr rr;
     ns_msg handle;
@@ -1667,7 +1668,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
         }
         return TRUE;
     }
-
+#endif
     return FALSE;
 }
 

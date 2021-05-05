@@ -3,12 +3,144 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/utsname.h>
+#include <sys/mman.h>
+#include <elf.h>
+#include <libgen.h>
+
 #include "utils.h"
 #include "fn.h"
 #include "dbg.h"
 #include "runtimecfg.h"
 
+#define LIBMUSL "musl"
+#define LINKDIR "/tmp/libscope/"
+#define LD_LIB_ENV "LD_LIBRARY_PATH"
+
 rtconfig g_cfg = {0};
+
+// Wrapper to call memfd_create syscall
+static inline int _memfd_create(const char *name, unsigned int flags) {
+	return syscall(__NR_memfd_create, name, flags);
+}
+
+/**
+ * Checks if kernel version is >= 3.17
+ */
+static int
+check_kernel_version(void)
+{
+    struct utsname buffer;
+    char *token;
+    char *separator = ".";
+    int val;
+
+    if (uname(&buffer)) {
+        return 0;
+    }
+    token = strtok(buffer.release, separator);
+    val = atoi(token);
+    if (val < 3) {
+        return 0;
+    } else if (val > 3){
+        return 1;
+    }
+
+    token = strtok(NULL, separator);
+    val = atoi(token);
+    return (val < 17) ? 0 : 1;
+}
+
+static char *
+get_loader(char *exe)
+{
+    int i, fd;
+    struct stat sbuf;
+    char *buf, *ldso;
+    Elf64_Ehdr *elf;
+    Elf64_Phdr *phead;
+
+    if (!exe) return NULL;
+
+    if ((fd = open(exe, O_RDONLY)) == -1) {
+        perror("get_loader:open");
+        return NULL;
+    }
+
+    if (fstat(fd, &sbuf) == -1) {
+        perror("get_loader:fstat");
+        return NULL;
+    }
+
+    buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
+               PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
+    if (buf == MAP_FAILED) {
+        perror("get_loader:mmap");
+        close(fd);
+        return NULL;
+    }
+
+    close(fd);
+
+    elf = (Elf64_Ehdr *)buf;
+    phead  = (Elf64_Phdr *)&buf[elf->e_phoff];
+
+    for (i = 0; i < elf->e_phnum; i++) {
+        if ((phead[i].p_type == PT_INTERP)) {
+            char *exld = (char *)&buf[phead[i].p_vaddr];
+            printf("%s:%d exe ld.so: %s\n", __FUNCTION__, __LINE__, exld);
+
+            if ((ldso = calloc(1, strlen(exld) + 2)) != NULL) {
+                strncpy(ldso, exld, strlen(exld));
+            }
+
+            break;
+        }
+    }
+
+    munmap(buf, sbuf.st_size);
+    return ldso;
+}
+
+static void
+do_musl(char *exld, char *ldscope)
+{
+    struct stat sbuf;
+    char *lpath = NULL;
+    char *ldso = NULL;
+
+
+    // does a link to the musl ld.so exist?
+    if ((ldso = get_loader(ldscope)) != NULL) {
+
+
+        if (asprintf(&lpath, "%s%s", LINKDIR, basename(ldso)) == -1) {
+            perror("do_musl:asprintf");
+            return;
+        }
+
+        if (lstat(lpath, &sbuf) == -1) {
+            // phys, link
+            printf("%s:%d symlink %s %s \n", __FUNCTION__, __LINE__, exld, lpath);
+            if ((mkdir(LINKDIR, S_IRWXU | S_IRWXG | S_IRWXO) != -1) ||
+                (errno == EEXIST)) {
+                if (symlink((const char *)exld, lpath) == -1) {
+                    perror("do_musl:symlink");
+                }
+            }
+        }
+    }
+
+    setEnvVariable(LD_LIB_ENV, LINKDIR);
+    //if (setenv(LD_LIB_ENV, LINKDIR, 1) == -1) {
+    //    perror("do_musl:setenv");
+    //}
+
+    if (ldso) free(ldso);
+    if (lpath) free(lpath);
+}
 
 unsigned int
 strToVal(enum_map_t map[], const char *str)
@@ -186,4 +318,121 @@ sigSafeNanosleep(const struct timespec *req)
     } while (rv && (errno == EINTR));
 
     return rv;
+}
+
+void
+setEnvVariable(char *env, char *value)
+{
+    char *cur_val = getenv(env);
+
+    // If env is not set
+    if (!cur_val) {
+        if (setenv(env, value, 1)) {
+            perror("setEnvVariable:setenv");
+        }
+        return;
+    }
+
+    // env is set. try to append
+    if (!strstr(cur_val, value)) {
+        char *new_val = NULL;
+        if ((asprintf(&new_val, "%s,%s", cur_val, value) == -1)) {
+            perror("setEnvVariable:asprintf");
+            return;
+        }
+
+        if (setenv(env, new_val, 1)) {
+            perror("setEnvVariable:setenv");
+        }
+
+        if (new_val) free(new_val);
+    }
+}
+
+void
+release_bin(libscope_info *info) {
+    if (!info) return;
+
+    if (info->fd != -1) close(info->fd);
+    if (info->shm_name) {
+        if (info->fd != -1) shm_unlink(info->shm_name);
+        free(info->shm_name);
+    }
+    if (info->path) free(info->path);
+}
+
+int
+extract_bin(char *fname, libscope_info *info,
+               unsigned char *start, unsigned char *end)
+{
+    if (!fname || !info || !start || !end) return -1;
+
+    info->use_memfd = check_kernel_version();
+
+    if (info->use_memfd) {
+        info->fd = _memfd_create(fname, _MFD_CLOEXEC);
+        info->shm_name = NULL;
+    } else {
+        if (asprintf(&info->shm_name, "%s%i", fname, getpid()) == -1) {
+            perror("setup_libscope:shm_name");
+            info->shm_name = NULL; // failure leaves info->shm_name undefined
+            release_bin(info);
+            return -1;
+        }
+        info->fd = shm_open(info->shm_name, O_RDWR | O_CREAT, S_IRWXU);
+    }
+    if (info->fd == -1) {
+        perror(info->use_memfd ? "setup_libscope:memfd_create" : "setup_libscope:shm_open");
+        release_bin(info);
+        return -1;
+    }
+
+    size_t libsize = (size_t) (end - start);
+    if (write(info->fd, start, libsize) != libsize) {
+        perror("setup_libscope:write");
+        release_bin(info);
+        return -1;
+    }
+
+    int rv;
+    if (info->use_memfd) {
+        rv = asprintf(&info->path, "/proc/%i/fd/%i", getpid(), info->fd);
+    } else {
+        rv = asprintf(&info->path, "/dev/shm/%s", info->shm_name);
+    }
+    if (rv == -1) {
+        perror("setup_libscope:path");
+        info->path = NULL; // failure leaves info->path undefined
+        release_bin(info);
+        return -1;
+    }
+
+/*
+ * DEVMODE is here only to help with gdb. The debugger has
+ * a problem reading symbols from a /proc pathname.
+ * This is expected to be enabled only by developers and
+ * only when using the debugger.
+ */
+#if DEVMODE == 1
+    asprintf(&info->path, "./lib/linux/libscope.so");
+    printf("LD_PRELOAD=%s\n", info->path);
+#endif
+
+    return 0;
+}
+
+int
+setup_loader(char *exe, char *ldscope)
+{
+    char *ldso = NULL;
+
+    if (((ldso = get_loader(exe)) != NULL) &&
+        (strstr(ldso, LIBMUSL) != NULL)) {
+            // we are using the musl ld.so
+            do_musl(ldso, ldscope);
+    }
+
+    if (ldso) free(ldso);
+
+    return 0;
 }

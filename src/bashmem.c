@@ -2,7 +2,7 @@
 #include <dlfcn.h>
 #include <elf.h>
 #include <malloc.h>
-#include "../contrib/funchook/distorm/include/distorm.h"
+#include "distorm.h"
 
 #include "bashmem.h"
 #include "dbg.h"
@@ -22,20 +22,20 @@ typedef struct {
 bash_mem_fn_t g_mem_fn;
 
 // fn prototypes
-static void * bash_internal_malloc(size_t, const char *, int, int);
-static void * bash_internal_realloc(void*, size_t, const char *, int, int);
-static void bash_internal_free(void*, const char *, int, int);
-static void * bash_internal_memalign(size_t, size_t, const char *, int, int);
-static void bash_internal_cfree(void*, const char *, int, int);
+static void *bash_internal_malloc(size_t, const char *, int, int);
+static void *bash_internal_realloc(void *, size_t, const char *, int, int);
+static void bash_internal_free(void *, const char *, int, int);
+static void *bash_internal_memalign(size_t, size_t, const char *, int, int);
+static void bash_internal_cfree(void *, const char *, int, int);
 
 typedef struct {
     // constant at build time
-    const char * name;
-    const void * fn_ptr;
+    const char *name;
+    const void *fn_ptr;
 
     // set at runtime
-    void * external_addr;
-    void * internal_addr;
+    void *external_addr;
+    void *internal_addr;
 } patch_info_t;
 
 patch_info_t bash_mem_func[] = {
@@ -66,7 +66,7 @@ glibcMemFuncsFound(void)
 int
 in_bash_process(void)
 {
-    char * exe_path = NULL;
+    char *exe_path = NULL;
     osGetExePath(&exe_path);
     int is_bash = endsWith(exe_path, "/bash");
     if (exe_path) free(exe_path);
@@ -74,15 +74,15 @@ in_bash_process(void)
 }
 
 int
-func_found_in_executable(const char* symbol)
+func_found_in_executable(const char *symbol)
 {
     int func_found = FALSE;
 
     // open the exectuable (as opposed to a specific shared lib)
-    void * exe_handle = g_fn.dlopen(NULL, RTLD_LAZY);
+    void *exe_handle = g_fn.dlopen(NULL, RTLD_LAZY);
     if (!exe_handle) goto out;
 
-    void * symbol_ptr = dlsym(exe_handle, symbol);
+    void *symbol_ptr = dlsym(exe_handle, symbol);
     if (!symbol_ptr) goto out;
 
     Dl_info symbol_info;
@@ -91,8 +91,8 @@ func_found_in_executable(const char* symbol)
         !dladdr1(symbol_ptr, &symbol_info, &es, RTLD_DL_SYMENT)) {
         goto out;
     }
-    struct link_map* link_map = (struct link_map*)lm;
-    ElfW(Sym)* elf_sym = (ElfW(Sym)*)es;
+    struct link_map *link_map = (struct link_map *)lm;
+    ElfW(Sym) *elf_sym = (ElfW(Sym) *)es;
     int symbol_type = ELF64_ST_TYPE(elf_sym->st_info);
     int symbol_binding = ELF64_ST_BIND(elf_sym->st_info);
     int symbol_visibility = ELF64_ST_VISIBILITY(elf_sym->st_other);
@@ -117,13 +117,13 @@ bash_internal_malloc(size_t bytes, const char *file, int line, int flags)
 }
 
 static void *
-bash_internal_realloc(void* mem, size_t n, const char *file, int line, int flags)
+bash_internal_realloc(void *mem, size_t n, const char *file, int line, int flags)
 {
     return g_mem_fn.realloc(mem, n);
 }
 
 static void
-bash_internal_free(void* mem, const char *file, int line, int flags)
+bash_internal_free(void *mem, const char *file, int line, int flags)
 {
     g_mem_fn.free(mem);
 }
@@ -138,7 +138,7 @@ bash_internal_memalign(size_t alignment, size_t size, const char *file, int line
 extern void cfree (void *__ptr);
 
 static void
-bash_internal_cfree(void* p, const char *file, int line, int flags)
+bash_internal_cfree(void *p, const char *file, int line, int flags)
 {
     g_mem_fn.cfree(p);
 }
@@ -148,13 +148,13 @@ bashMemFuncsFound()
 {
     int num_found = 0;
 
-    void * exe_handle = g_fn.dlopen(NULL, RTLD_LAZY);
+    void *exe_handle = g_fn.dlopen(NULL, RTLD_LAZY);
     if (!exe_handle) return FALSE;
 
     int i;
     for (i=0; i<bash_mem_func_count; i++) {
         patch_info_t *func = &bash_mem_func[i];
-        void * func_ptr = dlsym(exe_handle, func->name);
+        void *func_ptr = dlsym(exe_handle, func->name);
         if (!func_ptr) {
             char buf[128];
             snprintf(buf, sizeof(buf), "Couldn't find bash function %s", func->name);
@@ -180,7 +180,7 @@ bashMemFuncsFound()
         _DecodedInst *inst;
         for (j=0; j<asm_count; j++) {
             inst = &asm_inst[j];
-            if (!strcmp((const char*)inst->mnemonic.p, "JMP") &&
+            if (!strcmp((const char *)inst->mnemonic.p, "JMP") &&
                 ((inst->size == 5) || (inst->size == 2))) {
                 break;
             }
@@ -194,17 +194,18 @@ bashMemFuncsFound()
             continue;
         }
 
-        // assumes x86_64
+        // Calculate the destination of the JMP instruction, and save it
+        // as the internal_addr that we want to hook later.  Assumes x86_64.
         int64_t addr = inst->offset; // the address of the current inst
         int64_t jmp_offset;
         switch (inst->size) {
             case 5:
                 // (05) 0xe927f4ffff -> e9 (jmp) 0xfffff427
-                jmp_offset = *(int*)(addr+1);
+                jmp_offset = *(int *)(addr+1);
                 break;
             case 2:
                 // (02) 0xebec       -> eb (jmp) 0xec
-                jmp_offset = *(char*)(addr+1);
+                jmp_offset = *(char *)(addr+1);
                 break;
             default:
                 continue;
@@ -214,21 +215,13 @@ bashMemFuncsFound()
 
         // Save away what we found
         func->external_addr = func_ptr;
-        func->internal_addr = (void*)addr;
+        func->internal_addr = (void *)addr;
         num_found++;
     }
 
     dlclose(exe_handle);
     return num_found == bash_mem_func_count;
 }
-
-/*
-    void *b_int_malloc   = (void*)0x4b95d0;
-    void *b_int_realloc  = (void*)0x4b9df0;
-    void *b_int_free     = (void*)0x4ba230;
-    void *b_int_memalign = (void*)0x4ba080;
-    void *b_int_cfree    = (void*)0x4b9180;
-*/
 
 static int
 replaceBashMemFuncs()
@@ -242,10 +235,20 @@ replaceBashMemFuncs()
         return FALSE;
     }
 
+    // Setting funchook_set_debug_file is not possible when patching memory.
+    // If funchook has a debug file, then it does a fopen of this file which
+    // calls malloc to create a memory buffer.  In this scenario, the memory
+    // buffer is created with bash's memory subsystem, but then after the
+    // patching is complete, the fclose of this file will attempt to free the
+    // memory buffer with a different memory subsystem than created it.
+    // No bueno.
+    //
+    // funchook_set_debug_file(DEFAULT_LOG_PATH);
+
     for (i=0; i<bash_mem_func_count; i++) {
         patch_info_t *func = &bash_mem_func[i];
         void *addr_to_patch = func->internal_addr;
-        rc = funchook_prepare(funchook, (void**)&addr_to_patch, (void*)func->fn_ptr);
+        rc = funchook_prepare(funchook, (void **)&addr_to_patch, (void *)func->fn_ptr);
         if (rc) {
             char buf[128];
             snprintf(buf, sizeof(buf), "funchook_prepare failed for %s at 0x%p",

@@ -153,14 +153,14 @@ out:
 
 
 int
-startsWith(const char* string, const char* substring)
+startsWith(const char *string, const char *substring)
 {
     if (!string || !substring) return FALSE;
     return (strncmp(string, substring, strlen(substring)) == 0);
 }
 
 int
-endsWith(const char* string, const char* substring)
+endsWith(const char *string, const char *substring)
 {
     if (!string || !substring) return FALSE;
     int stringlen = strlen(string);

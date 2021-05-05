@@ -46,7 +46,7 @@ echo ""
 # to look at a bash that is built without it's own memory subsystem in
 # case there are problems above.
 
-echo "Executing /mybin/mem/bash ./runbashnomem.sh"
+echo "Executing /mybin/nomem/bash ./runbashnomem.sh"
 LD_PRELOAD=/usr/lib/libscope.so /mybin/nomem/bash /mybin/runbashnomem.sh
 if [ $? -ne 0 ]; then
     echo "/mybin/nomem/bash ./runbashnomem.sh failed"

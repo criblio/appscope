@@ -697,7 +697,7 @@ osGetFileMode(mode_t perm)
     mode[9] = '\0';
     return mode;
 }
-
+#if 0 // TEMP
 static const char scope_help_overview[] =
 "    OVERVIEW:\n"
 "    The Scope library supports extraction of data from within applications.\n"
@@ -1034,7 +1034,8 @@ static const help_list_t help_list[] = {
 
 // assumes that we're only building for 64 bit...
 char const __invoke_dynamic_linker__[] __attribute__ ((section (".interp"))) = "/lib64/ld-linux-x86-64.so.2";
-extern char** _dl_argv;
+//extern char** _dl_argv;
+//static char **_dl_argv = NULL;
 
 static int
 args_are_all_valid(int argc, char **argv)
@@ -1085,12 +1086,12 @@ print_help(char* path)
     if (g_fn.putchar) g_fn.putchar('\n');
 }
 
-
 __attribute__((visibility("default"))) void
 __scope_main()
 {
     // This depends on _dl_argv being NULL terminated.
     int argc = 0;
+
     while (_dl_argv[argc]) argc++;
 
     // Get the full path to the library, or provide default if not possible.
@@ -1126,5 +1127,5 @@ __scope_main()
     }
     exit(0);
 }
-
+#endif // TEMP
 

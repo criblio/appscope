@@ -49,7 +49,7 @@ ldscopedyn: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/util
 
 ldscope: src/scope_static.c
 	objcopy -I binary -O elf64-x86-64 -B i386 ./bin/$(OS)/ldscopedyn ./bin/$(OS)/ldscopedyn.o
-	gcc -Wall -static -g -D__LINUX__ $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/scope_static.c src/utils.c $(INCLUDES) ./bin/$(OS)/ldscopedyn.o -lrt -lpthread -o ./bin/$(OS)/ldscope
+	gcc -Wall -static -g -D__LINUX__ $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/scope_static.c src/utils.c $(INCLUDES) ./bin/$(OS)/ldscopedyn.o -o ./bin/$(OS)/ldscope
 	rm -f ./bin/$(OS)/ldscopedyn.o
 
 coreclean:
@@ -58,6 +58,7 @@ coreclean:
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))
 SRC_C_FILES:=$(filter-out src/sysexec.c, $(SRC_C_FILES))
+SRC_C_FILES:=$(filter-out src/scope_static.c, $(SRC_C_FILES))
 TEST_C_FILES:=$(wildcard test/*.c)
 TEST_C_FILES:=$(filter-out test/wraptest.c, $(TEST_C_FILES))
 C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c

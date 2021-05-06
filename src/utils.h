@@ -32,9 +32,10 @@ int startsWith(const char *string, const char *substring);
 int endsWith(const char *string, const char *substring);
 
 int sigSafeNanosleep(const struct timespec *req);
-int extract_bin(char *, libscope_info *, unsigned char *, unsigned char *);
+int extract_bin(libscope_info *, unsigned char *, unsigned char *);
 void release_bin(libscope_info *);
 int setup_loader(char *, char *);
 void setEnvVariable(char *, char *);
+void setLdsoEnv(char *);
 
 #endif // __UTILS_H__

@@ -16,41 +16,59 @@
 #include "runtimecfg.h"
 
 #define LIBMUSL "musl"
-#define LINKDIR "/tmp/libscope/"
 #define LD_LIB_ENV "LD_LIBRARY_PATH"
 
 rtconfig g_cfg = {0};
 
-// Wrapper to call memfd_create syscall
-static inline int _memfd_create(const char *name, unsigned int flags) {
-	return syscall(__NR_memfd_create, name, flags);
-}
-
-/**
- * Checks if kernel version is >= 3.17
- */
-static int
-check_kernel_version(void)
+static char *
+set_loader(char *exe)
 {
-    struct utsname buffer;
-    char *token;
-    char *separator = ".";
-    int val;
+    int i, fd;
+    struct stat sbuf;
+    char *buf;
+    Elf64_Ehdr *elf;
+    Elf64_Phdr *phead;
 
-    if (uname(&buffer)) {
-        return 0;
-    }
-    token = strtok(buffer.release, separator);
-    val = atoi(token);
-    if (val < 3) {
-        return 0;
-    } else if (val > 3){
-        return 1;
+    if (!exe) return NULL;
+
+    if ((fd = open(exe, O_RDWR)) == -1) {
+        perror("set_loader:open");
+        return NULL;
     }
 
-    token = strtok(NULL, separator);
-    val = atoi(token);
-    return (val < 17) ? 0 : 1;
+    if (fstat(fd, &sbuf) == -1) {
+        perror("set_loader:fstat");
+        return NULL;
+    }
+
+    buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
+               PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, (off_t)NULL);
+    if (buf == MAP_FAILED) {
+        perror("set_loader:mmap");
+        close(fd);
+        return NULL;
+    }
+
+    elf = (Elf64_Ehdr *)buf;
+    phead  = (Elf64_Phdr *)&buf[elf->e_phoff];
+
+    for (i = 0; i < elf->e_phnum; i++) {
+        if ((phead[i].p_type == PT_INTERP)) {
+            char *exld = (char *)&buf[phead[i].p_vaddr];
+            printf("%s:%d exe ld.so: %s\n", __FUNCTION__, __LINE__, exld);
+            strncpy(exld, "/lib/ld-musl-x86_64.so.1", strlen("/lib/ld-musl-x86_64.so.1") + 1);
+            break;
+        }
+    }
+
+    int rc = write(fd, buf, sbuf.st_size);
+    if (rc < sbuf.st_size) {
+        perror("set_loader:write");
+    }
+
+    close(fd);
+    munmap(buf, sbuf.st_size);
+    return NULL;
 }
 
 static char *
@@ -107,36 +125,38 @@ get_loader(char *exe)
 static void
 do_musl(char *exld, char *ldscope)
 {
-    struct stat sbuf;
     char *lpath = NULL;
     char *ldso = NULL;
-
+    char *path;
+    char dir[strlen(ldscope)];
 
     // does a link to the musl ld.so exist?
-    if ((ldso = get_loader(ldscope)) != NULL) {
+    if ((ldso = get_loader(ldscope)) == NULL) return;
 
+    strncpy(dir, ldscope, strlen(ldscope) + 1);
+    path = dirname(dir);
 
-        if (asprintf(&lpath, "%s%s", LINKDIR, basename(ldso)) == -1) {
-            perror("do_musl:asprintf");
-            return;
-        }
-
-        if (lstat(lpath, &sbuf) == -1) {
-            // phys, link
-            printf("%s:%d symlink %s %s \n", __FUNCTION__, __LINE__, exld, lpath);
-            if ((mkdir(LINKDIR, S_IRWXU | S_IRWXG | S_IRWXO) != -1) ||
-                (errno == EEXIST)) {
-                if (symlink((const char *)exld, lpath) == -1) {
-                    perror("do_musl:symlink");
-                }
-            }
-        }
+    if (asprintf(&lpath, "%s/%s", path, basename(ldso)) == -1) {
+        perror("do_musl:asprintf");
+        if (ldso) free(ldso);
+        return;
     }
 
-    setEnvVariable(LD_LIB_ENV, LINKDIR);
-    //if (setenv(LD_LIB_ENV, LINKDIR, 1) == -1) {
-    //    perror("do_musl:setenv");
-    //}
+    // dir is expected to exist here, not creating one
+    if ((symlink((const char *)exld, lpath) == -1) &&
+        (errno != EEXIST)) {
+        perror("do_musl:symlink");
+        if (ldso) free(ldso);
+        if (lpath) free(lpath);
+        return;
+    }
+
+    set_loader(ldscope);
+
+    //setEnvVariable(LD_LIB_ENV, path);
+    if (setenv(LD_LIB_ENV, path, 1) == -1) {
+        perror("do_musl:setenv");
+    }
 
     if (ldso) free(ldso);
     if (lpath) free(lpath);
@@ -350,75 +370,72 @@ setEnvVariable(char *env, char *value)
 }
 
 void
+setLdsoEnv(char *ldscope)
+{
+    char *path;
+    char dir[strlen(ldscope)];
+
+    strncpy(dir, ldscope, strlen(ldscope) + 1);
+    path = dirname(dir);
+
+    //setEnvVariable(LD_LIB_ENV, path);
+    if (setenv(LD_LIB_ENV, path, 1) == -1) {
+        perror("setLdsoEnv:setenv");
+    }
+}
+
+void
 release_bin(libscope_info *info) {
     if (!info) return;
 
     if (info->fd != -1) close(info->fd);
     if (info->shm_name) {
-        if (info->fd != -1) shm_unlink(info->shm_name);
+        if (info->fd != -1) close(info->fd);
         free(info->shm_name);
     }
     if (info->path) free(info->path);
 }
 
 int
-extract_bin(char *fname, libscope_info *info,
-               unsigned char *start, unsigned char *end)
+extract_bin(libscope_info *info, unsigned char *start, unsigned char *end)
 {
-    if (!fname || !info || !start || !end) return -1;
+    if (!info || !start || !end || !info->path) return -1;
 
-    info->use_memfd = check_kernel_version();
+    struct stat sbuf;
 
-    if (info->use_memfd) {
-        info->fd = _memfd_create(fname, _MFD_CLOEXEC);
-        info->shm_name = NULL;
-    } else {
-        if (asprintf(&info->shm_name, "%s%i", fname, getpid()) == -1) {
-            perror("setup_libscope:shm_name");
-            info->shm_name = NULL; // failure leaves info->shm_name undefined
-            release_bin(info);
+    // if already extracted, don't do it again
+    if (lstat(info->path, &sbuf) == 0) return 0;
+
+    char *path;
+    char dir[strlen(info->path)];
+
+    info->shm_name = NULL;
+    strncpy(dir, info->path, strlen(info->path) + 1);
+    path = dirname(dir);
+
+    if (lstat(path, &sbuf) == -1) {
+        if ((mkdir(path, S_IRWXU | S_IRWXG | S_IRWXO) == -1) &&
+            (errno != EEXIST)) {
+            perror("extract_bin:mkdir");
             return -1;
         }
-        info->fd = shm_open(info->shm_name, O_RDWR | O_CREAT, S_IRWXU);
     }
+
+    info->fd = open(info->path, O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
     if (info->fd == -1) {
-        perror(info->use_memfd ? "setup_libscope:memfd_create" : "setup_libscope:shm_open");
-        release_bin(info);
+        perror("extract_bin:open");
         return -1;
     }
 
     size_t libsize = (size_t) (end - start);
     if (write(info->fd, start, libsize) != libsize) {
         perror("setup_libscope:write");
-        release_bin(info);
         return -1;
     }
 
-    int rv;
-    if (info->use_memfd) {
-        rv = asprintf(&info->path, "/proc/%i/fd/%i", getpid(), info->fd);
-    } else {
-        rv = asprintf(&info->path, "/dev/shm/%s", info->shm_name);
-    }
-    if (rv == -1) {
-        perror("setup_libscope:path");
-        info->path = NULL; // failure leaves info->path undefined
-        release_bin(info);
-        return -1;
-    }
+    close(info->fd);
 
-/*
- * DEVMODE is here only to help with gdb. The debugger has
- * a problem reading symbols from a /proc pathname.
- * This is expected to be enabled only by developers and
- * only when using the debugger.
- */
-#if DEVMODE == 1
-    asprintf(&info->path, "./lib/linux/libscope.so");
-    printf("LD_PRELOAD=%s\n", info->path);
-#endif
-
-    return 0;
+    return 1;
 }
 
 int

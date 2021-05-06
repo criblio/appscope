@@ -402,6 +402,12 @@ osInitTSC(platform_time_t *cfg)
     return 0;
 }
 
+#ifndef _STAT_VER
+// The version of lib6-dev on Ubuntu 21.04 no longer defines this so we'll
+// fallback to what it was set to in earlier versions.
+#define _STAT_VER 1
+#endif
+
 int
 osIsFilePresent(pid_t pid, const char *path)
 {

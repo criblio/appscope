@@ -164,6 +164,7 @@ initFn(void)
     g_fn.__overflow = dlsym(RTLD_NEXT, "__overflow");
     g_fn.sendmmsg = dlsym(RTLD_NEXT, "sendmmsg");
     g_fn.recvmmsg = dlsym(RTLD_NEXT, "recvmmsg");
+    g_fn.pthread_create = dlsym(RTLD_NEXT, "pthread_create");
 #ifdef __STATX__
     g_fn.statx = dlsym(RTLD_NEXT, "statx");
 #endif // __STATX__

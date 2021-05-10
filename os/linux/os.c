@@ -189,7 +189,18 @@ osGetExePath(char **path)
 int
 osGetProcname(char *pname, int len)
 {
-    strncpy(pname, program_invocation_short_name, len);
+    if (program_invocation_short_name != NULL) {
+        strncpy(pname, program_invocation_short_name, len);
+    } else {
+        char *ppath = NULL;
+
+        if (osGetExePath(&ppath) != -1) {
+            strncpy(pname, basename(ppath), len);
+            if (ppath) free(ppath);
+        } else {
+            return -1;
+        }
+    }
     return 0;
 }
 

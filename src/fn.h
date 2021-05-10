@@ -218,6 +218,8 @@ typedef struct {
     int (*io_getevents)(io_context_t, long, long, struct io_event *, struct timespec *);
     int (*sendmmsg)(int, struct mmsghdr *, unsigned int, int);
     int (*recvmmsg)(int, struct mmsghdr *, unsigned int, int, struct timespec *);
+    int (*pthread_create)(pthread_t *, const pthread_attr_t *,
+                          void *(*)(void *), void *);
 #endif // __LINUX__
 
 #if defined(__LINUX__) && defined(__STATX__)

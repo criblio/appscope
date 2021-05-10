@@ -4443,3 +4443,19 @@ scopeLog(const char *msg, int fd, cfg_log_level_t level)
     }
     logSend(g_log, buf, level);
 }
+
+EXPORTON int
+pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+               void *(*start_routine)(void *), void *arg)
+{
+    int rc;
+
+    WRAP_CHECK(pthread_create, -1);
+    rc = g_fn.pthread_create(thread, attr, start_routine, arg);
+
+    if (!g_ctl) {
+        init();
+    }
+
+    return rc;
+}

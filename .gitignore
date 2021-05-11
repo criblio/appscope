@@ -16,3 +16,5 @@ website/public/
 website/node_modules/
 website/.cache/
 
+# Editor Temps
+*.swp

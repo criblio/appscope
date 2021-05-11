@@ -1,10 +1,14 @@
-# Scope Test Containers
+# AppScope Integration Test Containers
 
 These represent containers used to test Cribl Scope. Each container is self-sufficent and self-executable. 
 General strategy is to run set of tests/challenges against target application or syscall in order to determine that target is working correctly.
 Then to run the same set of tests against the same target, but wrapped in Cribl Scope (scoped) and compare results with raw execution.
 General strategy is to use one container per target. During container build Docker set up the environment, installs target application,
 prepares environment for test-runner, ships runs the test-runner.
+
+The `runner` script here runs the integration tests. Run it without arguments
+in a local development environment and it will try to run all of the tests
+stopping on a failure. See `./runner -h` for options.
 
 ##Containers:
 ####cribl

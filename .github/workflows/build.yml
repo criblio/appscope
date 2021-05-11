@@ -8,12 +8,12 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: 1.15
-      # - run: apt-get update && apt-get install -y git
       - run: ./install_build_tools.sh
       - run: make deps
       - run: make all
       - run: make test
-      # - run: cd test/testContainers && docker-compose up
+      - if: github.ref == 'refs/heads/master'
+        run: cd test/testContainers && ./runner -c -r
       - env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

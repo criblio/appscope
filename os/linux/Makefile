@@ -49,6 +49,11 @@ ldscope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c
 
 coreclean:
 	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a bin/$(OS)/ldscope
+	rm -rf contrib/pcre2/build
+	rm -rf contrib/funchook/build
+	cd ./contrib/cJSON && make clean
+	rm -rf contrib/cmocka/build
+
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))

@@ -1,0 +1,137 @@
+#!/usr/bin/bash
+#
+# Cribl AppScope™ - Integration Test Runner
+#
+# See ./README.md for details.
+#
+
+USAGE="Usage: $(basename $0) [-h] [options] [test] ..."
+
+COMPOSE=$(which docker-compose 2>/dev/null)
+if [ -z "$COMPOSE" ]; then
+  echo >&2 "error: missing docker-compose"
+  exit 1
+fi
+
+DOCKER=$(which docker 2>/dev/null)
+if [ -z "$DOCKER" ]; then
+  echo >&2 "error: missing docker"
+  exit 1
+fi
+
+TESTS=$($COMPOSE config --services | sort -V)
+
+while getopts dhvglcrR o
+do
+  case "$o" in
+    d)
+      DEBUG=1
+      set -x
+      ;;
+    h)
+      echo >&2 "Cribl AppScope™ - Integration Test Runner"
+      echo >&2 $USAGE
+      echo >&2 "Options:"
+      echo >&2 "  -h  Display this help info"
+      echo >&2 "  -v  Enable verbose logging"
+      echo >&2 "  -g  Only run the \"go_*\" tests"
+      echo >&2 "  -l  List the tests and exit"
+      echo >&2 "  -c  Continue testing if one fails"
+      echo >&2 "  -r  Remove service container image after each test"
+      echo >&2 "  -R  Remove ALL container images between tests - DANGER!!"
+      exit 0
+      ;;
+    v)
+      VERBOSE=1
+      ;;
+    g)
+      GO=1
+      ;;
+    l)
+      echo $TESTS
+      exit 0
+      ;;
+    c)
+      CONTINUE=1
+      ;;
+    r)
+      if [ -n "$PRUNE" ]; then
+        echo >&2 "error: can't use -r with -R"
+        exit 1
+      fi
+      RM=" -rm"
+      ;;
+    R)
+      if [ -z "$CI" ]; then
+        echo >&2 "error: -R is only available in a CI workflow"
+        exit 1
+      fi
+      if [ -n "$RM" ]; then
+        echo >&2 "error: can't use -R with -r"
+        exit 1
+      fi
+      PRUNE=1
+      ;;
+    *)
+      echo >&2 $USAGE
+      exit 1
+      ;;
+  esac
+done
+shift $((OPTIND-1))
+
+BUILD="$COMPOSE build"
+RUN="$COMPOSE run$RM"
+
+HR="========================================================================="
+log() { echo; echo $HR; echo " $*"; echo $HR; }
+debug() { [ -z "$VERBOSE$DEBUG" ] || echo "debug: $*"; }
+
+contains() { [[ $1 =~ (^|[[:space:]])$2($|[[:space:]]) ]]; }
+
+ERR_COUNT=0
+ERR_TESTS=
+for TEST in $TESTS; do
+
+  [ -n "$*" ] && contains "$*" $TEST || continue
+
+  [[ "$GO" != "" && $TEST != go_* ]] && continue
+
+  log "Build Image for \"$TEST\" Test"
+  if $BUILD $TEST; then
+    debug "Image for \"$TEST\" Test is Ready"
+  else
+    log "\"$TEST\" Failed"
+    ERR_COUNT=$((ERR_COUNT+1))
+    ERR_TESTS="$ERR_TESTS $TEST(build)"
+    if [ -c "$CONTINUE" ]; then
+      log "Aborting on failed build. Use -c option to continue instead."
+      exit 1
+    fi
+  fi
+
+  log "Running \"$TEST\" Test"
+  if $RUN $TEST; then
+    log "\"$TEST\" Test Passed"
+  else
+    log "\"$TEST\" Failed"
+    ERR_COUNT=$((ERR_COUNT+1))
+    ERR_TESTS="$ERR_TESTS $TEST"
+    if [ -c "$CONTINUE" ]; then
+      log "Aborting on failed test. Use -c option to continue instead."
+      exit 1
+    fi
+  fi
+
+  [ -z "$PRUNE" ] || $DOCKER system prune --all --force
+
+done
+
+if [ $ERR_COUNT -gt 0 ]; then
+  log "$ERR_COUNT Tests Failed - $ERR_TESTS"
+  exit 1
+elif [ -z "$1" ]; then
+  log "All Tests Passed"
+fi
+
+# vim: sw=2 ts=2 et :

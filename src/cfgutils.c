@@ -151,7 +151,7 @@ static watch_t watch_context;
 static regex_t* g_regex = NULL;
 static char g_logmsg[1024] = {};
 
-static char*
+static char *
 cfgPathSearch(const char* cfgname)
 {
     // in priority order:
@@ -166,8 +166,8 @@ cfgPathSearch(const char* cfgname)
     char path[1024]; // Somewhat arbitrary choice for MAX_PATH
     if (!g_fn.access) return NULL;
 
-    const char* homedir = getenv("HOME");
-    const char* scope_home = getenv("SCOPE_HOME");
+    const char *homedir = getenv("HOME");
+    const char *scope_home = getenv("SCOPE_HOME");
     if (scope_home &&
        (snprintf(path, sizeof(path), "%s/conf/%s", scope_home, cfgname) > 0) &&
         !g_fn.access(path, R_OK)) {
@@ -204,18 +204,18 @@ cfgPathSearch(const char* cfgname)
     return NULL;
 }
 
-char*
+char *
 cfgPath(void)
 {
     const char* envPath = getenv("SCOPE_CONF_PATH");
 
     // If SCOPE_CONF_PATH is set, and the file can be opened, use it.
-    char* path;
+    char *path;
     if (envPath && (path = strdup(envPath))) {
 
-        FILE* f = NULL;
-        if (g_fn.fopen && g_fn.fclose && (f = g_fn.fopen(path, "rb"))) {
-            g_fn.fclose(f);
+        FILE *fp = NULL;
+        if (g_fn.fopen && g_fn.fclose && (fp = g_fn.fopen(path, "rb"))) {
+            g_fn.fclose(fp);
             return path;
         }
 

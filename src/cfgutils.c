@@ -9,12 +9,14 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
 #include "cfgutils.h"
 #include "dbg.h"
 #include "mtcformat.h"
 #include "scopetypes.h"
 #include "com.h"
 #include "utils.h"
+#include "fn.h"
 
 #ifndef NO_YAML
 #include "yaml.h"
@@ -162,42 +164,40 @@ cfgPathSearch(const char* cfgname)
     //   7) ./scope.yml
 
     char path[1024]; // Somewhat arbitrary choice for MAX_PATH
-    static int (*ni_access)(const char *pathname, int mode);
-    if (!ni_access) ni_access = dlsym(RTLD_NEXT, "access");
-    if (!ni_access) return NULL;
+    if (!g_fn.access) return NULL;
 
     const char* homedir = getenv("HOME");
     const char* scope_home = getenv("SCOPE_HOME");
     if (scope_home &&
        (snprintf(path, sizeof(path), "%s/conf/%s", scope_home, cfgname) > 0) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if (scope_home &&
        (snprintf(path, sizeof(path), "%s/%s", scope_home, cfgname) > 0) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if ((snprintf(path, sizeof(path), "/etc/scope/%s", cfgname) > 0 ) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if (homedir &&
        (snprintf(path, sizeof(path), "%s/conf/%s", homedir, cfgname) > 0) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if (homedir &&
        (snprintf(path, sizeof(path), "%s/%s", homedir, cfgname) > 0) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if ((snprintf(path, sizeof(path), "./conf/%s", cfgname) > 0) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if ((snprintf(path, sizeof(path), "./%s", cfgname) > 0) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
 
@@ -213,12 +213,9 @@ cfgPath(void)
     char* path;
     if (envPath && (path = strdup(envPath))) {
 
-        // ni for "non-interposed"...  a direct glibc call without scope.
-        FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
-        int (*ni_fclose)(FILE *) = dlsym(RTLD_NEXT, "fclose");
         FILE* f = NULL;
-        if (ni_fopen && ni_fclose && (f = ni_fopen(path, "rb"))) {
-            ni_fclose(f);
+        if (g_fn.fopen && g_fn.fclose && (f = g_fn.fopen(path, "rb"))) {
+            g_fn.fclose(f);
             return path;
         }
 
@@ -356,18 +353,13 @@ doEnvVariableSubstitution(const char* value)
 static void
 processCmdDebug(const char* path)
 {
-    if (!path || !path[0]) return;
-
-    static FILE *(*ni_fopen)(const char *, const char *);
-    static int (*ni_fclose)(FILE*);
-    if (!ni_fopen) ni_fopen = dlsym(RTLD_NEXT, "fopen");
-    if (!ni_fclose) ni_fclose = dlsym(RTLD_NEXT, "fclose");
-    if (!ni_fopen || !ni_fclose) return;
+    if (!path || !path[0] ||
+        !g_fn.fopen || !g_fn.fclose) return;
 
     FILE* f;
-    if (!(f = ni_fopen(path, "a"))) return;
+    if (!(f = g_fn.fopen(path, "a"))) return;
     dbgDumpAll(f);
-    ni_fclose(f);
+    g_fn.fclose(f);
 }
 
 static void
@@ -547,22 +539,18 @@ cfgProcessEnvironment(config_t* cfg)
 void
 cfgProcessCommands(config_t* cfg, FILE* file)
 {
-    if (!cfg || !file) return;
+    if (!cfg || !file || !g_fn.getline) return;
 
-    static ssize_t (*ni_getline)(char **, size_t *, FILE *);
-    if (!ni_getline) ni_getline = dlsym(RTLD_NEXT, "getline");
-    if (!ni_getline) return;
+    char *line = NULL;
+    size_t len = 0;
 
-    char* e = NULL;
-    size_t n = 0;
-
-    while (ni_getline(&e, &n, file) != -1) {
-        e[strcspn(e, "\r\n")] = '\0'; //overwrite first \r or \n with null
-        processEnvStyleInput(cfg, e);
-        e[0] = '\0';
+    while (g_fn.getline(&line, &len, file) != -1) {
+        line[strcspn(line, "\r\n")] = '\0'; //overwrite first \r or \n with null
+        processEnvStyleInput(cfg, line);
+        line[0] = '\0';
     }
 
-    if (e) free(e);
+    if (line) free(line);
 }
 
 void
@@ -1385,26 +1373,23 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
 static void
 cfgSetFromFile(config_t *config, const char* path)
 {
-    FILE* f = NULL;
+    FILE *fp = NULL;
     int parser_successful = 0;
     int doc_successful = 0;
     yaml_parser_t parser;
     yaml_document_t doc;
-    // ni for "not-interposed"... a direct glibc call without scope.
-    FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
-    int (*ni_fclose)(FILE*) = dlsym(RTLD_NEXT, "fclose");
 
-    if (!ni_fopen || !ni_fclose) goto cleanup;
+    if (!g_fn.fopen || !g_fn.fclose) goto cleanup;
 
     if (!config) goto cleanup;
     if (!path) goto cleanup;
-    f = ni_fopen(path, "rb");
-    if (!f) goto cleanup;
+    fp = g_fn.fopen(path, "rb");
+    if (!fp) goto cleanup;
 
     parser_successful = yaml_parser_initialize(&parser);
     if (!parser_successful) goto cleanup;
 
-    yaml_parser_set_input_file(&parser, f);
+    yaml_parser_set_input_file(&parser, fp);
 
     doc_successful = yaml_parser_load(&parser, &doc);
     if (!doc_successful) goto cleanup;
@@ -1415,10 +1400,10 @@ cfgSetFromFile(config_t *config, const char* path)
 cleanup:
     if (doc_successful) yaml_document_delete(&doc);
     if (parser_successful) yaml_parser_delete(&parser);
-    if (f) ni_fclose(f);
+    if (fp) g_fn.fclose(fp);
 }
 
-config_t*
+config_t *
 cfgFromString(const char* string)
 {
     config_t* config = NULL;
@@ -2048,13 +2033,9 @@ protocolRead(const char *path, list_t *plist)
     yaml_node_t *root_value, *root_key, *plist_key, *prot_key, *prot_value;
     yaml_node_item_t *pitem;
 
-    // ni for "not-interposed"... a direct glibc call without scope.
-    FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
-    int (*ni_fclose)(FILE*) = dlsym(RTLD_NEXT, "fclose");
+    if (!g_fn.fopen || !g_fn.fclose || !path) goto cleanup;
 
-    if (!ni_fopen || !ni_fclose || !path) goto cleanup;
-
-    protFile = ni_fopen(path, "r");
+    protFile = g_fn.fopen(path, "r");
     if (!protFile) goto cleanup;
 
     parser_successful = yaml_parser_initialize(&parser);
@@ -2132,7 +2113,7 @@ cleanup:
     if (prot) destroyProtEntry(prot);
     if (doc_successful) yaml_document_delete(&doc);
     if (parser_successful) yaml_parser_delete(&parser);
-    if (protFile) ni_fclose(protFile);
+    if (protFile) g_fn.fclose(protFile);
     return TRUE;
 }
 

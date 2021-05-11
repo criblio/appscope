@@ -229,8 +229,10 @@ extract_bin(libscope_info *info, unsigned char *start, unsigned char *end)
 
     struct stat sbuf;
 
+#if ALWAYSEXTRACT == 0
     // if already extracted, don't do it again
     if (lstat(info->path, &sbuf) == 0) return 0;
+#endif
 
     char *path;
     char dir[strlen(info->path)];
@@ -305,10 +307,6 @@ main(int argc, char **argv, char **env)
         fprintf(stderr, "%s:%d ERROR: unable to set up libscope\n", __FUNCTION__, __LINE__);
         exit(EXIT_FAILURE);
     }
-
-#if ALWAYSEXTRACT == 1
-    rc = 1;
-#endif
 
     if (rc == 1) {
         // new extraction of the bin

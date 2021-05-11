@@ -246,6 +246,7 @@ typedef struct {
 
 extern interposed_funcs_t g_fn;
 
+void *getDLHandle(void);
 void initFn(void);
 
 #endif // __FN_H__

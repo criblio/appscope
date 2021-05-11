@@ -353,16 +353,12 @@ adjustGoStructOffsetsForVersion(int go_ver)
     // If an OptionalTag is provided, test_go_struct.sh will not process
     // the line unless it matches a TAG_FILTER which is provided as an
     // argument to the test_go_struct.sh.
-    int (*ni_open)(const char *pathname, int flags, mode_t mode);
-    ni_open = dlsym(RTLD_NEXT, "open");
-    int (*ni_close)(int fd);
-    ni_close = dlsym(RTLD_NEXT, "close");
-    if (!ni_open || !ni_close) return;
+    if (!g_fn.open || !g_fn.close) return;
 
     char* debug_file;
     int fd;
     if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
-        ((fd = ni_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
+        ((fd = g_fn.open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
         dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
         dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
         dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
@@ -380,7 +376,7 @@ adjustGoStructOffsetsForVersion(int go_ver)
         dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go.conn_to_rwc);
         dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
         dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go.persistConn_to_tlsState);
-        ni_close(fd);
+        g_fn.close(fd);
     }
 
 }

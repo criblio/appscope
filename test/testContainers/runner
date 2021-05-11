@@ -59,7 +59,7 @@ do
         echo >&2 "error: can't use -r with -R"
         exit 1
       fi
-      RM=" -rm"
+      RM=" --rm"
       ;;
     R)
       if [ -z "$CI" ]; then

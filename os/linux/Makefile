@@ -14,6 +14,7 @@ YAML_AR=contrib/libyaml/src/.libs/libyaml.a
 JSON_AR=contrib/cJSON/libcjson.a
 FUNCHOOK_AR=contrib/funchook/build/libfunchook.a contrib/funchook/build/libdistorm.a
 PCRE2_AR=contrib/pcre2/build/libpcre2-posix.a contrib/pcre2/build/libpcre2-8.a
+OPENSSL_AR=contrib/openssl/libssl.a contrib/openssl/libcrypto.a
 TEST_AR=$(YAML_AR) $(JSON_AR) $(PCRE2_AR)
 TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
@@ -21,6 +22,11 @@ TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl -lresolv -lrt
 
 .PHONY: coreall coreclean coretest
 coreall: libscope.so ldscope
+
+$(OPENSSL_AR):
+	@echo "Building openssl"
+	cd contrib/openssl && ./Configure
+	cd contrib/openssl && make build_sw
 
 $(PCRE2_AR):
 	@echo "Building pcre2"

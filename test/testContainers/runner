@@ -93,7 +93,9 @@ ERR_COUNT=0
 ERR_TESTS=
 for TEST in $TESTS; do
 
-  [ -n "$*" ] && contains "$*" $TEST || continue
+  if [ -n "$*" ]; then
+    contains "$*" $TEST || continue
+  fi
 
   [[ "$GO" != "" && $TEST != go_* ]] && continue
 
@@ -128,7 +130,7 @@ for TEST in $TESTS; do
 done
 
 if [ $ERR_COUNT -gt 0 ]; then
-  log "$ERR_COUNT Tests Failed - $ERR_TESTS"
+  log "$ERR_COUNT Tests Failed;$ERR_TESTS"
   exit 1
 elif [ -z "$1" ]; then
   log "All Tests Passed"

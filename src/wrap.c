@@ -1048,20 +1048,6 @@ load_func(const char *module, const char *func)
     return addr;
 }
 
-static int 
-findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
-{
-    int len = strlen(info->dlpi_name);
-    int libscope_so_len = 11;
-
-    if(len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
-        *(char **)data = (char *) info->dlpi_name;
-        return 1;
-    }
-    return 0;
-}
-
-
 typedef struct
 {
     const char *library;    // Input:   e.g. libpthread.so
@@ -1125,6 +1111,19 @@ findInjected(struct dl_phdr_info *info, size_t size, void *data)
         return 1;
     }
     return 0;
+}
+
+static int 
+findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
+{
+    int len = strlen(info->dlpi_name);
+    int libscope_so_len = 11;
+
+    if(len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
+        *(char **)data = (char *) info->dlpi_name;
+        return 1;
+    }
+    return findInjected(info, size, data);
 }
 
 /**

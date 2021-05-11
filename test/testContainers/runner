@@ -5,6 +5,9 @@
 # See ./README.md for details.
 #
 
+unset RMI
+unset PRUNE
+
 USAGE="Usage: $(basename $0) [-h] [options] [test] ..."
 
 COMPOSE=$(which docker-compose 2>/dev/null)
@@ -59,14 +62,14 @@ do
         echo >&2 "error: can't use -r with -R"
         exit 1
       fi
-      RM=" --rm"
+      RMI=1
       ;;
     R)
       if [ -z "$CI" ]; then
         echo >&2 "error: -R is only available in a CI workflow"
         exit 1
       fi
-      if [ -n "$RM" ]; then
+      if [ -n "$RMI" ]; then
         echo >&2 "error: can't use -R with -r"
         exit 1
       fi
@@ -81,7 +84,7 @@ done
 shift $((OPTIND-1))
 
 BUILD="$COMPOSE build"
-RUN="$COMPOSE run$RM"
+RUN="$COMPOSE run --rm"
 
 HR="========================================================================="
 log() { echo; echo $HR; echo " $*"; echo $HR; }
@@ -124,6 +127,8 @@ for TEST in $TESTS; do
       exit 1
     fi
   fi
+
+  [ -z "$RMI" ] || $DOCKER rmi testcontainers_$TEST
 
   [ -z "$PRUNE" ] || $DOCKER system prune --all --force
 

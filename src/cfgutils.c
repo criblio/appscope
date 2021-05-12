@@ -34,6 +34,10 @@
 #define PORT_NODE                    "port"
 #define PATH_NODE                    "path"
 #define BUFFERING_NODE               "buffering"
+#define TLS_NODE                     "tls"
+#define ENABLE_NODE                      "enable"
+#define VALIDATE_NODE                    "validateserver"
+#define CACERT_NODE                      "cacertpath"
 
 #define LIBSCOPE_NODE        "libscope"
 #define LOG_NODE                 "log"
@@ -899,6 +903,51 @@ processBuf(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
+processTlsEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    which_transport_t c = transport_context;
+    cfgTransportTlsEnableSet(config, c, strToVal(boolMap, value));
+    if (value) free(value);
+}
+
+static void
+processTlsValidate(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    which_transport_t c = transport_context;
+    cfgTransportValidateServerSet(config, c, strToVal(boolMap, value));
+    if (value) free(value);
+}
+
+static void
+processTlsCaCert(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    which_transport_t c = transport_context;
+    cfgTransportCACertPathSet(config, c, value);
+    if (value) free(value);
+}
+
+static void
+processTls(config_t *config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE,    ENABLE_NODE,          processTlsEnable},
+        {YAML_SCALAR_NODE,    VALIDATE_NODE,        processTlsValidate},
+        {YAML_SCALAR_NODE,    CACERT_NODE,          processTlsCaCert},
+        {YAML_NO_NODE,        NULL,                 NULL}
+    };
+
+    yaml_node_pair_t *pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
+static void
 processTransport(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_MAPPING_NODE) return;
@@ -909,6 +958,7 @@ processTransport(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    PORT_NODE,            processPort},
         {YAML_SCALAR_NODE,    PATH_NODE,            processPath},
         {YAML_SCALAR_NODE,    BUFFERING_NODE,       processBuf},
+        {YAML_MAPPING_NODE,   TLS_NODE,             processTls},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1470,10 +1520,33 @@ cfgFromString(const char* string)
 }
 #endif
 
+static cJSON *
+createTlsJson(config_t *cfg, which_transport_t trans)
+{
+    cJSON* root = NULL;
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
+         valToStr(boolMap, cfgTransportTlsEnable(cfg, trans)))) goto err;
+    if (!cJSON_AddStringToObjLN(root, VALIDATE_NODE,
+         valToStr(boolMap, cfgTransportValidateServer(cfg, trans)))) goto err;
+
+    // Represent NULL as an empty string
+    const char *path = cfgTransportCACertPath(cfg, trans);
+    path = (path) ? path : "";
+    if (!cJSON_AddStringToObjLN(root, CACERT_NODE, path)) goto err;
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
 static cJSON*
 createTransportJson(config_t* cfg, which_transport_t trans)
 {
     cJSON* root = NULL;
+    cJSON* tls = NULL;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
@@ -1487,6 +1560,9 @@ createTransportJson(config_t* cfg, which_transport_t trans)
                                      cfgTransportHost(cfg, trans))) goto err;
             if (!cJSON_AddStringToObjLN(root, PORT_NODE,
                                      cfgTransportPort(cfg, trans))) goto err;
+
+            if (!(tls = createTlsJson(cfg, trans))) goto err;
+            cJSON_AddItemToObjectCS(root, TLS_NODE, tls);
             break;
         case CFG_UNIX:
             if (!cJSON_AddStringToObjLN(root, PATH_NODE,

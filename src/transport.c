@@ -43,6 +43,11 @@ struct _transport_t
             char *host;
             char *port;
             struct sockaddr_storage gai_addr;
+            struct {
+                unsigned enable;
+                unsigned validateserver;
+                char *cacertpath;
+            } tls;
         } net;
         struct {
             char *path;
@@ -810,6 +815,7 @@ transportDestroy(transport_t** transport)
             transportDisconnect(t);
             if (t->net.host) free (t->net.host);
             if (t->net.port) free (t->net.port);
+            if (t->net.tls.cacertpath) free(t->net.tls.cacertpath);
             break;
         case CFG_UNIX:
             break;
@@ -830,6 +836,29 @@ transportDestroy(transport_t** transport)
     free(t);
     *transport = NULL;
 }
+
+void
+transportConfigureTls(transport_t *trans, unsigned int enable,
+                      unsigned int validateserver, const char *cacertpath)
+{
+    if (!trans) return;
+    switch (trans->type) {
+        case CFG_UDP:
+        case CFG_TCP:
+            trans->net.tls.enable = enable;
+            trans->net.tls.validateserver = validateserver;
+            trans->net.tls.cacertpath = (cacertpath) ? strdup(cacertpath) : NULL;
+            break;
+        case CFG_UNIX:
+        case CFG_FILE:
+        case CFG_SYSLOG:
+        case CFG_SHM:
+            break;
+        default:
+            DBG("%d", trans->type);
+    }
+}
+
 
 int
 transportSend(transport_t *trans, const char *msg, size_t len)

@@ -1881,9 +1881,15 @@ initTransport(config_t* cfg, which_transport_t t)
             break;
         case CFG_UDP:
             transport = transportCreateUdp(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
+            transportConfigureTls(transport, cfgTransportTlsEnable(cfg, t),
+                                             cfgTransportValidateServer(cfg, t),
+                                             cfgTransportCACertPath(cfg, t));
             break;
         case CFG_TCP:
             transport = transportCreateTCP(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
+            transportConfigureTls(transport, cfgTransportTlsEnable(cfg, t),
+                                             cfgTransportValidateServer(cfg, t),
+                                             cfgTransportCACertPath(cfg, t));
             break;
         case CFG_SHM:
             transport = transportCreateShm();

@@ -89,6 +89,7 @@ RUN="$COMPOSE run --rm"
 HR="========================================================================="
 log() { echo; echo $HR; echo " $*"; echo $HR; }
 debug() { [ -z "$VERBOSE$DEBUG" ] || echo "debug: $*"; }
+result() { log "[AppScopeTestResult] $*"; }
 
 contains() { [[ $1 =~ (^|[[:space:]])$2($|[[:space:]]) ]]; }
 
@@ -106,20 +107,21 @@ for TEST in $TESTS; do
   if $BUILD $TEST; then
     debug "Image for \"$TEST\" Test is Ready"
   else
-    log "\"$TEST\" Failed"
+    result "\"$TEST\" Build Failed"
     ERR_COUNT=$((ERR_COUNT+1))
     ERR_TESTS="$ERR_TESTS $TEST(build)"
     if [ -c "$CONTINUE" ]; then
       log "Aborting on failed build. Use -c option to continue instead."
       exit 1
     fi
+    continue
   fi
 
   log "Running \"$TEST\" Test"
   if $RUN $TEST; then
-    log "\"$TEST\" Test Passed"
+    result "\"$TEST\" Test Passed"
   else
-    log "\"$TEST\" Failed"
+    result "\"$TEST\" Failed"
     ERR_COUNT=$((ERR_COUNT+1))
     ERR_TESTS="$ERR_TESTS $TEST"
     if [ -c "$CONTINUE" ]; then

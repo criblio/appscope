@@ -13,8 +13,8 @@ jobs:
       - run: make all
       - run: make test
         #- if: github.ref == 'refs/heads/master'
-        #run: cd test/testContainers && ./runner -c -r
-      - run: cd test/testContainers && ./runner -c -r
+        #run: cd test/testContainers && ./runner -c -R
+      - run: cd test/testContainers && ./runner -c -R
       - env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

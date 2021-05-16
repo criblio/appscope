@@ -286,7 +286,7 @@ func runDashboard(ctx context.Context, cancel context.CancelFunc, w *widgets) {
 	c, err := container.New(t,
 		container.ID(rootID),
 		container.Border(linestyle.Light),
-		container.BorderTitle("AppScope 0.5"))
+		container.BorderTitle("AppScope "+internal.GetVersion()))
 	if err != nil {
 		panic(err)
 	}

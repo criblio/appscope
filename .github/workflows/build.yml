@@ -41,6 +41,7 @@ jobs:
       #  run: ./docker/build.sh
 
   it-tls:
+    name: "Integration Test: tls"
     runs-on: ubuntu-latest
     needs: build-scope
     steps:
@@ -52,8 +53,8 @@ jobs:
           name: built-binaries
       - name: Run Integration Test
         run: |
-            ld -l bin/linux
-            ld -l lib/linux
+            ls -l bin/linux
+            ls -l lib/linux
             make -C test/testContainers tls
       - name: Save Image
         if: github.ref == 'refs/heads/master'
@@ -75,8 +76,8 @@ jobs:
           name: built-binaries
       - name: Run Integration Test
         run: |
-            ld -l bin/linux
-            ld -l lib/linux
+            ls -l bin/linux
+            ls -l lib/linux
             make -C test/testContainers go_2
       - name: Save Image
         if: github.ref == 'refs/heads/master'

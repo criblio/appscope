@@ -1,0 +1,103 @@
+version: '3.5'
+
+services:
+
+  syscalls:
+    privileged: true
+
+  logstream:
+    privileged: true
+
+  nginx:
+    privileged: true
+
+  splunk:
+    privileged: true
+
+  elastic:
+    privileged: true
+
+  kafka:
+    privileged: true
+
+  tls:
+    privileged: true
+
+  detect_proto:
+    privileged: true
+
+  bash:
+    privileged: true
+
+  gogen:
+    privileged: true
+
+  go_2:
+    privileged: true
+  go_3:
+    privileged: true
+  go_4:
+    privileged: true
+  go_5:
+    privileged: true
+  go_6:
+    privileged: true
+  go_7:
+    privileged: true
+  go_8:
+    privileged: true
+  go_9:
+    privileged: true
+  go_10:
+    privileged: true
+  go_11:
+    privileged: true
+  go_12:
+    privileged: true
+  go_13:
+    privileged: true
+  go_14:
+    privileged: true
+  go_15:
+    privileged: true
+  go_16:
+    privileged: true
+
+  java6:
+    privileged: true
+  java7:
+    privileged: true
+  java8:
+    privileged: true
+  java9:
+    privileged: true
+  java10:
+    privileged: true
+  java11:
+    privileged: true
+  java12:
+    privileged: true
+  java13:
+    privileged: true
+  java14:
+    privileged: true
+  oracle-java6:
+    privileged: true
+  oracle-java7:
+    privileged: true
+  oracle-java8:
+    privileged: true
+  oracle-java9:
+    privileged: true
+  oracle-java10:
+    privileged: true
+  oracle-java11:
+    privileged: true
+  oracle-java12:
+    privileged: true
+  oracle-java13:
+    privileged: true
+  oracle-java14:
+    privileged: true
+
+# vim: ts=2 sw=2 et :

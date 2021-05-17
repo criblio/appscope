@@ -4,24 +4,58 @@ jobs:
   build-scope:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v2
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
         with:
           go-version: 1.15
-      - run: ./install_build_tools.sh
-      - run: make deps
-      - run: make all
-      - run: make test
-        #- if: github.ref == 'refs/heads/master'
-        #run: cd test/testContainers && ./run -c -R
-      - run: cd test/testContainers && ./run -c -R
-      - env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
-        run: ./deploy.sh
-      - if: startsWith(github.ref, 'refs/tags/v')
+      - name: Build & Test
+        run: |
+            ./install_build_tools.sh
+            make deps
+            make all
+            make test
+      # Moving these to separate jobs --pad
+      #- name: Integration Tests
+      #  run: cd test/testContainers && ./run -c -R
+      - name: Save Built Binaries
+        uses: actions/upload-artifact@v2
+        with:
+          name: built-binaries
+          path: |
+            lib/linux/libscope.so
+            bin/linux/scope
+            bin/linux/ldscope
+      # Temporarily disabled --pad
+      #- name: Push Artifacts to S3 Bucket for CDN
+      #  env:
+      #    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #    AWS_REGION: ${{ secrets.AWS_REGION }}
+      #    CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
+      #  run: ./deploy.sh
+      #- name: Build & Push Container Image to Docker Hub
+      #  if: startsWith(github.ref, 'refs/tags/v')
+      #  env:
+      #    SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
+      #  run: ./docker/build.sh
+
+  it-tls:
+    runs-on: ubuntu-latest
+    needs: build-scope
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+      - name: Get Built Binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: built-binaries
+      - name: Run Integration Test
+        run: make -C test/testContainers tls
+      - name: Save Image
+        if: github.ref == 'refs/heads/master'
         env:
-          SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
-        run: ./docker/build.sh
+            DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+            DOCKER_HUB_PASS: ${{ secrets.DOCKER_HUB_PASS }}
+        run: make -C test/testContainers tls-push

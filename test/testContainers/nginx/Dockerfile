@@ -18,9 +18,6 @@ RUN mkdir /opt/test-runner/logs/
 
 #RUN source scl_source enable rh-python36 && virtualenv /opt/test-runner/
 
-#ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
-#COPY ./libscope.so /usr/lib/libscope.so
-#RUN chmod 755 /usr/lib/libscope.so
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
@@ -39,8 +36,12 @@ RUN python3 -m pip install -r /opt/test-runner/requirements.txt
 
 COPY ./test_runner/ /opt/test-runner/
 
-ENTRYPOINT ["python3", "/opt/test-runner/app.py", "--target", "nginx","-l","/opt/test-runner/logs/", "--scope_path", "/opt/test-runner/bin/libscope.so"]
+#ENTRYPOINT ["python3", "/opt/test-runner/app.py", "--target", "nginx","-l","/opt/test-runner/logs/", "--scope_path", "/opt/test-runner/bin/libscope.so"]
 #ENTRYPOINT ["tail", "-f", "/dev/null"]
 # python3 /opt/test-runner/app.py --target nginx -l /opt/test-runner/logs/ --scope_path=/opt/test-runner/bin/libscope.so
 # nginx -g "daemon off;"
 # ab -n 10000 -c 4 -p ./post.json http://localhost/log/
+
+COPY nginx/docker-entrypoint.sh /
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["test"]

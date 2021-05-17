@@ -32,8 +32,6 @@ RUN mkdir -p /opt/javassl
 COPY ./java/SSLSocketClient.java /opt/javassl/SSLSocketClient.java
 RUN javac -d /opt/javassl/ /opt/javassl/SSLSocketClient.java
 
-#ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
-#RUN chmod 755 /usr/lib/libscope.so
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=false
@@ -46,5 +44,7 @@ ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV LD_PRELOAD=/usr/lib/libscope.so
 
-CMD /opt/test-runner/bin/test-ssl.sh
-#ENTRYPOINT ["tail", "-f", "/dev/null"]
+COPY java/docker-entrypoint.sh /
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["test"]
+

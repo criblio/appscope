@@ -1,79 +1,90 @@
-# AppScope Integration Test Containers
+# AppScope Integration Tests
 
-These represent containers used to test Cribl Scope. Each container is self-sufficent and self-executable. 
-General strategy is to run set of tests/challenges against target application or syscall in order to determine that target is working correctly.
-Then to run the same set of tests against the same target, but wrapped in Cribl Scope (scoped) and compare results with raw execution.
-General strategy is to use one container per target. During container build Docker set up the environment, installs target application,
-prepares environment for test-runner, ships runs the test-runner.
+We run various integration tests here to exercise AppScope in a number of
+real-world scenarios. Each test has a Docker container image that provides 
+the runtime environment. They are self-sufficent and self-executable. The
+general strategy is to run set of tests/challenges against target application
+or syscall in order to determine that target is working correctly normally.
+Then, to run the same set of tests against the same target, but wrapped in
+AppScope (_scoped_) and compare results with raw execution.
 
-The `runner` script here runs the integration tests. Run it without arguments
-in a local development environment and it will try to run all of the tests
-stopping on a failure. See `./runner -h` for options.
+## Configs
 
-##Containers:
-####cribl
+Each test has a corresponding _service_ in `docker-compose.yml`. They have a
+corresponding subdirectory with their `Dockerfile` and `docker-entrypoint.sh`
+along with any additional content that needs to be included in the image.
+
+All of the tests use `/docker-entrypoint.sh` as their `ENTRYPOINT` and `test`
+as their default `CMD`. We can `docker run test /bin/sh` to get a shell into
+the containers to poke around.
+
+We mount the locally built AppScope binaries into each container when it's run
+so they are always in the same place. If you've not already built those
+binaries, running these tests will fail when they try to mount them. They get
+mounted into the container as follows.
+
+- `/usr/bin/scope`
+- `/usr/bin/ldscope`
+- `/usr/lib/libscope.so`
+
+To speed up using these tests, we keep the built container image at Docker Hub
+as `criblci/scope-(test)-it:latest`. We're not tagging separate versions for
+branches at this point. We'll revisit that later if we start stepping on each
+other.
+
+## Execution
+
+The `Makefile` provides the automation. Run `make help` for details as well as
+a list of all the tests. 
+
+```shell
+$ make help
+AppScope Integration Test Runner
+  `make help` - show this info
+  `make all` - run all tests
+  `make build` - build all test images
+  `make push` - push all test images
+  `make (test)` - run a single test
+  `make (test)-shell` - run a shell in the test's container
+  `make (test)-build` - build the test's image
+Tests: bash cribl detect-proto elastic gogen go-1.2 go-1.3 go-1.4 go-1.5 go-1.6 go-1.7 go-1.8 go-1.9 go-1.10 go-1.11 go-1.12 go-1.13 go-1.14 go-1.15 go-1.16 java6 java7 java8 java9 java10 java11 java12 java13 java14 kafka nginx oracle-java6 oracle-java7 oracle-java8 oracle-java9 oracle-java10 oracle-java11 oracle-java12 oracle-java13 oracle-java14 splunk syscalls tls
+$
+```
+
+Developers can run tests locally pretty easily with this setup. We use it for
+CI/CD logic too.
+
+## Tests
+
+As mentioned before, start with the `docker-compose.yml` file and each entry's
+`Dockerfile` and `docker-entrypoint.sh` files for details on what each test is
+doing. Some notes of a few specific tests are below.
+
+### `cribl`
+
 Test the standalone version of Cribl LogStream. 
 
-####splunk
-Tests Splunk Enterprise. Splunk instance has Cribl LogStream as Splunk Application, but LogStream capabilities are not tested or used.
+### `splunk`
 
-####interposed_func
-Tests Linux syscalls supported by Scope using executable syscall unit tests. Some unit tests provided by [LTP Project](https://github.com/linux-test-project/ltp) 
-the others are custom C test located in [interposed_func/altp folder](interposed_func/altp)
+Tests Splunk Enterprise. Splunk instance has Cribl LogStream as Splunk
+Application, but LogStream capabilities are not tested or used.
 
-####nginx
+### `syscalls`
+
+Tests Linux syscalls supported by Scope using executable syscall unit tests.
+Some unit tests provided by [LTP Project][LTP] 
+the others are custom C
+test located in [syscalls/altp folder](syscalls/altp)
+
+### `nginx`
+
 Tests Nginx web server using Apache Benchmark tool.
 
-##Execution
 
-You can run test containers using docker-compose.
-To run:
-```
-% cd scope/test/testContainers
-% docker-compose up
-```
+## `test-runner` Framework
 
-To run individual container, for example nginx :
-```
-% docker-compose up nginx
-```
+Some of the tests use a framework in the `./test-runner/` directory. In
+addition to logging to the console, they dump logs to `/opt/test-runner/logs`
+which we mount here to `./logs`. 
 
-You can also build and run containers individually using just Docker. Notice that Dockerfiles desinged to be build and run from `testContainers` folder.
-
-####Verbose output
-To see the verbose output in test runner output, run container with `-v` command:
-```commandline
-% docker-compose run nginx -v
-```
-
-####Results output
-
-By default test runner will store logs and test results in `/opt/test-runner/logs`. You can mount this folder to your local folder using docker volume feature.
-
-####Override default run mode
-By default test runner would output only INFO level messages and won't store any logs in local system. 
-If you need override this, you can use [docker-compose.override.template.yml](docker-compose.override.template.yml) file.
-It will run the test execution in more verbose mode and store logs in `./logs` directory:
-```commandline
-cp docker-compose.override.template.yml docker-compose.override.yml
-```
-
-####Using different scope library file
-By default tests will download and use a library executable from the http://cdn.cribl.io/dl/scope/latest/linux/libscope.so. 
-If you want to use a different file, you can use a `-s` flag in a test runner and provide a custom path to scope executable.
-```commandline
-docker-compose run nginx -s /opt/custom_libscope.so
-```
-By combining docker volumes and `-s` flag, you can run integration tests against locally built scope executable. 
-In your `docker.compose.override.yml`:
-```yaml
-  nginx:
-    command: -v -s /opt/test-runner/bin/libscope.so
-    volumes:
-      # taking file from default build path lib/linux/libscope.so
-      - ../../lib/linux/libscope.so:/opt/test-runner/bin/libscope.so
-``` 
-Note, that the scope executable should have a linux "executable" permission:
-```commandline
-chmod +x lib/linux/libscope.so
-```
+[LTP]: https://github.com/linux-test-project/ltp

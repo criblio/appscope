@@ -14,8 +14,10 @@ COPY ./bash/runbashmem.sh /mybin
 COPY ./bash/runbashnomem.sh /mybin
 COPY ./bash/test_bash.sh /mybin
 
-#ENV LD_PRELOAD=/usr/lib/libscope.so
-
 #ENTRYPOINT ["tail", "-f", "/dev/null"]
-ENTRYPOINT ["/mybin/test_bash.sh"]
+#ENTRYPOINT ["/mybin/test_bash.sh"]
+
+COPY bash/docker-entrypoint.sh /
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["test"]
 

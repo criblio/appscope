@@ -1,0 +1,46 @@
+#!/bin/bash
+set -e
+
+if [ "$1" = "test" ]; then
+
+    # If user changed SPLUNK_USER to root we want to change permission for
+    # SPLUNK_HOME
+    if [[ "${SPLUNK_USER}:${SPLUNK_GROUP}" != "$(stat --format %U:%G ${SPLUNK_HOME})" ]]; then
+        echo "Changing ownership of splunk files to ${SPLUNK_USER}"
+        chown -R ${SPLUNK_USER}:${SPLUNK_GROUP} ${SPLUNK_HOME}
+    fi
+
+    # If these files are different override etc folder (possible that this is
+    # upgrade or first start cases) Also override ownership of these files to
+    # splunk:splunk
+    if ! $(cmp --silent /var/opt/splunk/etc/splunk.version ${SPLUNK_HOME}/etc/splunk.version); then
+        echo "Copying files from /var/opt/splunk/etc to ${SPLUNK_HOME}"
+        cp -fR /var/opt/splunk/etc ${SPLUNK_HOME}
+        chown -R ${SPLUNK_USER}:${SPLUNK_GROUP} ${SPLUNK_HOME}/etc
+        chown -R ${SPLUNK_USER}:${SPLUNK_GROUP} ${SPLUNK_HOME}/var
+    fi
+
+    # If we have not configured yet allow user to specify some commands which
+    # can be executed before we start Splunk for the first time
+    if [[ -n ${SPLUNK_BEFORE_START_CMD} ]]; then
+        echo "Running splunk before start command: ${SPLUNK_BEFORE_START_CMD}"
+        sudo -HEu ${SPLUNK_USER} sh -c "${SPLUNK_HOME}/bin/splunk ${SPLUNK_BEFORE_START_CMD}"
+    fi
+    for n in {1..30}; do
+        if [[ -n $(eval echo \$\{SPLUNK_BEFORE_START_CMD_${n}\}) ]]; then
+            echo "Running splunk before start command:"
+            echo $SPLUNK_BEFORE_START_CMD_${n}
+            sudo -HEu ${SPLUNK_USER} sh -c "${SPLUNK_HOME}/bin/splunk $(eval echo \$\{SPLUNK_BEFORE_START_CMD_${n}\})"
+        else
+            # We do not want to iterate all, if one in the sequence is not set
+            break
+        fi
+    done
+
+    exec python3.6 /opt/test-runner/app.py \
+        -t splunk \
+	-l /opt/test-runner/logs/ \
+        -s /usr/lib/libscope.so
+fi
+
+exec "$@"

@@ -9,13 +9,6 @@ RUN apk update && apk add \
 RUN wget https://api.gogen.io/linux/gogen --no-check-certificate
 RUN chmod 755 ./gogen
 
-#ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
-#COPY ./libscope.so /usr/lib/libscope.so
-#RUN chmod 755 /usr/lib/libscope.so
-#ADD http://cdn.cribl.io/dl/scope/latest/linux/scope /usr/bin/scope
-#COPY ./scope /usr/bin/scope
-#RUN chmod 755 /usr/bin/scope
-
 # tcpserver is an app built from git@bitbucket.org:cribl/scope.git
 # gcc -g test/manual/tcpserver.c -lpthread -o tcpserver
 ADD gogen/tcpserver /usr/bin/tcpserver

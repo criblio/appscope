@@ -53,6 +53,7 @@ jobs:
           name: built-binaries
       - name: Run Integration Test
         run: |
+            chmod +x bin/linux/* lib/linux/*
             ls -l bin/linux
             ls -l lib/linux
             make -C test/testContainers tls
@@ -76,6 +77,7 @@ jobs:
           name: built-binaries
       - name: Run Integration Test
         run: |
+            chmod +x bin/linux/* lib/linux/*
             ls -l bin/linux
             ls -l lib/linux
             make -C test/testContainers go_2

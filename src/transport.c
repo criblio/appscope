@@ -16,9 +16,18 @@
 #include "os.h"
 #include "transport.h"
 
+// Yuck.  Avoids naming conflict between our src/wrap.c and libssl.a
+#define SSL_read SCOPE_SSL_read
+#define SSL_write SCOPE_SSL_write
+#include "openssl/ssl.h"
+#include "openssl/err.h"
+#undef SSL_read
+#undef SSL_write
+
 struct _transport_t
 {
     cfg_transport_t type;
+    int (*access)(const char *, int);
     ssize_t (*send)(int, const void *, size_t, int);
     int (*open)(const char *, int, ...);
     int (*dup2)(int, int);
@@ -44,9 +53,13 @@ struct _transport_t
             char *port;
             struct sockaddr_storage gai_addr;
             struct {
+                // Configuration
                 unsigned enable;
                 unsigned validateserver;
                 char *cacertpath;
+                // Operational params
+                SSL_CTX *ctx;
+                SSL *ssl;
             } tls;
         } net;
         struct {
@@ -75,6 +88,7 @@ newTransport()
         return NULL;
     }
 
+    if ((t->access = dlsym(RTLD_NEXT, "access")) == NULL) goto out;
     if ((t->send = dlsym(RTLD_NEXT, "send")) == NULL) goto out;
     if ((t->open = dlsym(RTLD_NEXT, "open")) == NULL) goto out;
     if ((t->dup2 = dlsym(RTLD_NEXT, "dup2")) == NULL) goto out;
@@ -91,10 +105,10 @@ newTransport()
     return t;
 
   out:
-    DBG("send=%p open=%p dup2=%p close=%p "
+    DBG("access=%p send=%p open=%p dup2=%p close=%p "
         "fcntl=%p fwrite=%p socket=%p connect=%p "
         "getaddrinfo=%p fclose=%p fdopen=%p select=%p",
-        t->send, t->open, t->dup2, t->close,
+        t->access, t->send, t->open, t->dup2, t->close,
         t->fcntl, t->fwrite, t->socket, t->connect,
         t->getaddrinfo, t->fclose, t->fdopen, t->select);
     free(t);
@@ -194,7 +208,8 @@ transportNeedsConnection(transport_t *trans)
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            if (trans->net.sock == -1) return 1;
+            if ((trans->net.sock == -1) ||
+                (trans->net.tls.enable && !trans->net.tls.ssl)) return 1;
             return osNeedsConnect(trans->net.sock);
         case CFG_FILE:
             // This checks to see if our file descriptor has been
@@ -216,6 +231,143 @@ transportNeedsConnection(transport_t *trans)
     return 0;
 }
 
+const char *
+rootCertFile(transport_t *trans)
+{
+    // Based off of this: https://golang.org/src/crypto/x509/root_linux.go
+    const char* rootFileList[] = {
+        "/etc/ssl/certs/ca-certificates.crt",                // Debian/Ubuntu/Gentoo etc.
+        "/etc/pki/tls/certs/ca-bundle.crt",                  // Fedora/RHEL 6
+        "/etc/ssl/ca-bundle.pem",                            // OpenSUSE
+        "/etc/pki/tls/cacert.pem",                           // OpenELEC
+        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", // CentOS/RHEL 7
+        "/etc/ssl/cert.pem",                                 // Alpine Linux
+        NULL
+    };
+
+    const char *file;
+    for (file=rootFileList[0]; file; file++) {
+        if (!trans->access (file, R_OK)) {
+            return file;
+        }
+    }
+
+    // Didn't find it from the list above.
+    return NULL;
+}
+
+static void
+shutdownTlsSession(transport_t *trans)
+{
+    if (trans->net.tls.ssl) {
+        SSL_shutdown(trans->net.tls.ssl);
+        SSL_free(trans->net.tls.ssl);
+        trans->net.tls.ssl = NULL;
+    }
+    if (trans->net.tls.ctx) {
+        SSL_CTX_free(trans->net.tls.ctx);
+        trans->net.tls.ctx = NULL;
+    }
+    if (trans->net.sock != -1) {
+        trans->close(trans->net.sock);
+        trans->net.sock = -1;
+    }
+}
+
+static int
+establishTlsSession(transport_t *trans)
+{
+    if (!trans || trans->net.sock == -1) return FALSE;
+    scopeLog("establishing tls session", trans->net.sock, CFG_LOG_INFO);
+
+    trans->net.tls.ctx = SSL_CTX_new(TLS_method());
+    if (!trans->net.tls.ctx) {
+        char msg[512] = {0};
+        char err[256] = {0};
+        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        snprintf(msg, sizeof(msg), "error creating tls context: %s", err);
+        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        goto err;
+    }
+
+    // If the configuration provides a cacertpath, use it.
+    // Otherwise, find a distro-specific root cert file.
+    const char *cafile = trans->net.tls.cacertpath;
+    if (!cafile) cafile = rootCertFile(trans);
+
+    long loc_rv = SSL_CTX_load_verify_locations(trans->net.tls.ctx, cafile, NULL);
+    if (trans->net.tls.validateserver && !loc_rv) {
+        char msg[512] = {0};
+        char err[256] = {0};
+        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        snprintf(msg, sizeof(msg), "error setting tls cacertpath: \"%s\" : %s", cafile, err);
+        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+    }
+
+    trans->net.tls.ssl = SSL_new(trans->net.tls.ctx);
+    if (!trans->net.tls.ssl) {
+        char msg[512] = {0};
+        char err[256] = {0};
+        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        snprintf(msg, sizeof(msg), "error creating tls session: %s", err);
+        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        goto err;
+    }
+
+    if (!SSL_set_fd(trans->net.tls.ssl, trans->net.sock)) {
+        char msg[512] = {0};
+        char err[256] = {0};
+        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        snprintf(msg, sizeof(msg), "error setting tls on socket: %d : %s", trans->net.sock, err);
+        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        goto err;
+    }
+
+    ERR_clear_error(); // to make SSL_get_error reliable
+    int con_rv = SSL_connect(trans->net.tls.ssl);
+    if (con_rv != 1) {
+        char msg[512] = {0};
+        char err[256] = {0};
+        int ssl_err = SSL_get_error(trans->net.tls.ssl, con_rv);
+        ERR_error_string_n(ssl_err, err, sizeof(err));
+        snprintf(msg, sizeof(msg), "error establishing tls connection: %s", err);
+        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        if (ssl_err == SSL_ERROR_SSL || ssl_err == SSL_ERROR_SYSCALL) {
+            ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+            snprintf(msg, sizeof(msg), "error establishing tls connection: %s %d", err, errno);
+            scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        }
+        goto err;
+    }
+
+    if (trans->net.tls.validateserver) {
+        // Just test that we received a server cert
+        X509* cert = SSL_get_peer_certificate(trans->net.tls.ssl);
+        if (cert) {
+            X509_free(cert);  // Looks good.  Free it immediately
+        } else {
+            scopeLog("error accessing peer certificate for tls server validation",
+                                                  trans->net.sock, CFG_LOG_INFO);
+            goto err;
+        }
+
+        long ver_rc = SSL_get_verify_result(trans->net.tls.ssl);
+        if (ver_rc != X509_V_OK) {
+            char msg[512] = {0};
+            const char *err = X509_verify_cert_error_string(ver_rc);
+            snprintf(msg, sizeof(msg), "tls server validation failed : \"%s\"", err);
+            scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+            goto err;
+        }
+    }
+
+    scopeLog("tls session established", trans->net.sock, CFG_LOG_INFO);
+    return TRUE;
+err:
+    shutdownTlsSession(trans);
+    return FALSE;
+}
+
 int
 transportDisconnect(transport_t *trans)
 {
@@ -223,8 +375,8 @@ transportDisconnect(transport_t *trans)
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            if (trans->net.sock != -1) trans->close(trans->net.sock);
-            trans->net.sock = -1;
+            // appropriate for both tls and non-tls connections...
+            shutdownTlsSession(trans);
             int i;
             for (i=0; i<FD_SETSIZE; i++) {
                 if (!FD_ISSET(i, &trans->net.pending_connect)) continue;
@@ -369,7 +521,6 @@ transportReconnect(transport_t *trans)
     return 0;
 }
 
-
 static int
 setSocketBlocking(transport_t *trans, int sock, bool block)
 {
@@ -449,6 +600,15 @@ checkPendingSocketStatus(transport_t *trans)
         if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {
             DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
         }
+
+        // We have a connected socket!  Woot!
+        // Do the tls stuff for this connection as needed.
+        if (trans->net.tls.enable) {
+            // when successful, we'll have a connected tls socket.
+            // when not, this will cleanup, disconnecting the socket.
+            establishTlsSession(trans);
+        }
+
         break;
     }
 
@@ -558,7 +718,7 @@ socketConnectionStart(transport_t *trans)
                 }
 
                 // We could create a sock, but not connect.  Clean up.
-                transportDisconnect(trans);
+                trans->close(sock);
                 continue;
             }
 
@@ -859,6 +1019,83 @@ transportConfigureTls(transport_t *trans, unsigned int enable,
     }
 }
 
+static int
+tcpSendPlain(transport_t *trans, const char *msg, size_t len)
+{
+    if (!trans || transportNeedsConnection(trans)) return -1;
+
+    if (!trans->send) {
+        DBG(NULL);
+        return -1;
+    }
+    int flags = 0;
+#ifdef __LINUX__
+    flags |= MSG_NOSIGNAL;
+#endif
+
+    size_t bytes_to_send = len;
+    size_t bytes_sent = 0;
+    int rc;
+
+    while (bytes_to_send > 0) {
+        rc = trans->send(trans->net.sock, &msg[bytes_sent], bytes_to_send, flags);
+        if (rc <= 0) break;
+
+        if (rc != bytes_to_send) {
+            DBG("rc = %d, bytes_to_send = %zu", rc, bytes_to_send);
+        }
+
+        bytes_sent += rc;
+        bytes_to_send -= rc;
+    }
+
+    if (rc < 0) {
+        switch (errno) {
+        case EBADF:
+        case EPIPE:
+            DBG(NULL);
+            transportDisconnect(trans);
+            transportConnect(trans);
+            return -1;
+        default:
+            DBG(NULL);
+        }
+    }
+    return 0;
+}
+
+static int
+tcpSendTls(transport_t *trans, const char *msg, size_t len)
+{
+    if (!trans || transportNeedsConnection(trans)) return -1;
+
+    size_t bytes_to_send = len;
+    size_t bytes_sent = 0;
+    int rc = 0;
+
+    while (bytes_to_send > 0) {
+        ERR_clear_error(); // to make SSL_get_error reliable
+        rc = SCOPE_SSL_write(trans->net.tls.ssl, &msg[bytes_sent], bytes_to_send);
+        if (rc <= 0) {
+            break;
+        }
+
+        if (rc != bytes_to_send) {
+            DBG("rc = %d, bytes_to_send = %zu", rc, bytes_to_send);
+        }
+
+        bytes_sent += rc;
+        bytes_to_send -= rc;
+    }
+
+    if (rc < 0) {
+        DBG("%d", SSL_get_error(trans->net.tls.ssl, rc));
+        transportDisconnect(trans);
+        transportConnect(trans);
+        return -1;
+    }
+    return 0;
+}
 
 int
 transportSend(transport_t *trans, const char *msg, size_t len)
@@ -891,44 +1128,10 @@ transportSend(transport_t *trans, const char *msg, size_t len)
             }
             break;
         case CFG_TCP:
-            if (trans->net.sock != -1) {
-                if (!trans->send) {
-                    DBG(NULL);
-                    break;
-                }
-                int flags = 0;
-#ifdef __LINUX__
-                flags |= MSG_NOSIGNAL;
-#endif
-
-                size_t bytes_to_send = len;
-                size_t bytes_sent = 0;
-                int rc;
-
-                while (bytes_to_send > 0) {
-                    rc = trans->send(trans->net.sock, &msg[bytes_sent], bytes_to_send, flags);
-                    if (rc <= 0) break;
-
-                    if (rc != bytes_to_send) {
-                        DBG("rc = %d, bytes_to_send = %zu", rc, bytes_to_send);
-                    }
-
-                    bytes_sent += rc;
-                    bytes_to_send -= rc;
-                }
-
-                if (rc < 0) {
-                    switch (errno) {
-                    case EBADF:
-                    case EPIPE:
-                        DBG(NULL);
-                        transportDisconnect(trans);
-                        transportConnect(trans);
-                        return -1;
-                    default:
-                        DBG(NULL);
-                    }
-                }
+            if (trans->net.tls.enable) {
+                return tcpSendTls(trans, msg, len);
+            } else {
+                return tcpSendPlain(trans, msg, len);
             }
             break;
         case CFG_FILE:

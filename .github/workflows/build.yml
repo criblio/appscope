@@ -22,15 +22,6 @@ jobs:
         run: make all
       - name: Unit Tests
         run: make test
-      - name: Archive Built Binaries
-        uses: actions/upload-artifact@v2
-        with:
-          name: built-binaries
-          path: |
-            lib/linux/libscope.so
-            bin/linux/scope
-            bin/linux/ldscope
-          retention-days: 5
       - name: Push Artifacts to S3 Bucket for CDN
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -43,34 +34,3 @@ jobs:
         env:
           SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
         run: ./docker/build.sh
-      - name: List Integration Tests
-        id: set-tests
-        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | jq -ncR '[inputs]')"
-    outputs:
-      tests: ${{ steps.set-tests.outputs.tests }}
-
-  integration-test:
-    needs: build-scope
-    strategy:
-      matrix: 
-        test: ${{ fromJson(needs.build-scope.outputs.tests) }}
-      fail-fast: false
-    name: "Test: ${{ matrix.test }}"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
-      - name: Download Built Binaries
-        uses: actions/download-artifact@v2
-        with:
-          name: built-binaries
-      - name: Run Test
-        run: |
-            chmod +x bin/linux/* lib/linux/*
-            make -C test/testContainers ${{ matrix.test }}
-      - name: Save Image
-        if: github.ref == 'refs/heads/master'
-        env:
-            DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
-            DOCKER_HUB_PASS: ${{ secrets.DOCKER_HUB_PASS }}
-        run: make -C test/testContainers ${{ matrix.test }}-push

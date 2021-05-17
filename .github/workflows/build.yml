@@ -1,4 +1,4 @@
-name: AppScope
+name: Build & Test
 
 on: [push]
 

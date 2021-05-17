@@ -40,7 +40,6 @@ help:
 	@echo "  \`make all\` - run all tests"
 	@echo "  \`make build\` - build all test images"
 	@echo "  \`make push\` - push all test images"
-	@echo "  \`make workflow\` - generate GitHub workflow jobs"
 	@echo "  \`make (test)\` - run a single test"
 	@echo "  \`make (test)-build\` - build the test's image"
 	@echo "  \`make (test)-shell\` - run a shell in the test's container"
@@ -121,32 +120,6 @@ push: $(TESTS_BUILD)
 	@$(COMPOSE) -f docker-compose.yml -f docker-compose.privileged.yml \
 		run $(@:%-shell=%) $(SHELL)
 
-workflow:
-	@for TEST in $(TESTS); do \
-		echo "  it-$$TEST:"; \
-		echo "    name: \"Integration Test: $$TEST\""; \
-		echo "    runs-on: ubuntu-latest"; \
-		echo "    needs: build-scope"; \
-		echo "    steps:"; \
-		echo "      - name: Checkout Repository"; \
-		echo "        uses: actions/checkout@v2"; \
-		echo "      - name: Download Built Binaries"; \
-		echo "        uses: actions/download-artifact@v2"; \
-		echo "        with:"; \
-		echo "          name: built-binaries"; \
-		echo "      - name: Run Test"; \
-		echo "        run: |"; \
-		echo "            chmod +x bin/linux/* lib/linux/*"; \
-		echo "            make -C test/testContainers $$TEST"; \
-		echo "      - name: Save Image"; \
-		echo "        if: github.ref == 'refs/heads/master'"; \
-		echo "        env:"; \
-		echo "            DOCKER_HUB_USER: \$${{ secrets.DOCKER_HUB_USER }}"; \
-		echo "            DOCKER_HUB_PASS: \$${{ secrets.DOCKER_HUB_PASS }}"; \
-		echo "        run: make -C test/testContainers $${TEST}-push"; \
-		echo; \
-	done
-
-.PHONY: help all build push $(TESTS) %-shell %-build %-push workflow
+.PHONY: help all build push $(TESTS) %-shell %-build %-push
 
 # vim: sw=4 ts=4 noet :

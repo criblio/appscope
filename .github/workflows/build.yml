@@ -48,7 +48,8 @@ jobs:
     strategy:
       matrix: 
         test: [bash, detect_proto, elastic, gogen, go_2, go_3, go_4, go_5, go_6, go_7, go_8, go_9, go_10, go_11, go_12, go_13, go_14, go_15, go_16, java6, java7, java8, java9, java10, java11, java12, java13, java14, kafka, logstream, nginx, oracle-java6, oracle-java7, oracle-java8, oracle-java9, oracle-java10, oracle-java11, oracle-java12, oracle-java13, oracle-java14, splunk, syscalls, tls]
-    name: "Integration Test: ${{ matrix.test }}"
+      fail-fast: false
+    name: "Test: ${{ matrix.test }}"
     runs-on: ubuntu-latest
     needs: build-scope
     steps:

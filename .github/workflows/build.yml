@@ -10,16 +10,15 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.15
-      - name: Build & Test
+      - name: Install Dependencies
         run: |
             ./install_build_tools.sh
             make deps
-            make all
-            make test
-      # Moving these to separate jobs --pad
-      #- name: Integration Tests
-      #  run: cd test/testContainers && ./run -c -R
-      - name: Save Built Binaries
+      - name: Build
+        run: make all
+      - name: Unit Tests
+        run: make test
+      - name: Archive Built Binaries
         uses: actions/upload-artifact@v2
         with:
           name: built-binaries
@@ -27,7 +26,7 @@ jobs:
             lib/linux/libscope.so
             bin/linux/scope
             bin/linux/ldscope
-      # Temporarily disabled --pad
+      # TODO: Temporarily disabled --pad
       #- name: Push Artifacts to S3 Bucket for CDN
       #  env:
       #    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -47,15 +46,42 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
-      - name: Get Built Binaries
+      - name: Download Built Binaries
         uses: actions/download-artifact@v2
         with:
           name: built-binaries
       - name: Run Integration Test
-        run: make -C test/testContainers tls
+        run: |
+            ld -l bin/linux
+            ld -l lib/linux
+            make -C test/testContainers tls
       - name: Save Image
         if: github.ref == 'refs/heads/master'
         env:
             DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
             DOCKER_HUB_PASS: ${{ secrets.DOCKER_HUB_PASS }}
         run: make -C test/testContainers tls-push
+
+  it-go_2:
+    name: "Integration Test: go-1.2"
+    runs-on: ubuntu-latest
+    needs: build-scope
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+      - name: Download Built Binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: built-binaries
+      - name: Run Integration Test
+        run: |
+            ld -l bin/linux
+            ld -l lib/linux
+            make -C test/testContainers go_2
+      - name: Save Image
+        if: github.ref == 'refs/heads/master'
+        env:
+            DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
+            DOCKER_HUB_PASS: ${{ secrets.DOCKER_HUB_PASS }}
+        run: make -C test/testContainers go_2-push
+

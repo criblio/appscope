@@ -33,10 +33,29 @@ all:
 endif
 
 .PHONY: docker-build
-docker-build: TAG?="appscope-builder:$(VERSION)"
-docker-build: DOCKER?=$(shell which docker 2>/dev/null)
-docker-build: BUILD_ARGS?=
+docker-build: TAG ?= "appscope-builder:$(VERSION)"
+docker-build: DOCKER ?= $(shell which docker 2>/dev/null)
+docker-build: BUILD_ARGS ?=
 docker-build:
+	@[ -x "$(DOCKER)" ] || \
+		( echo >&2 "error: Please install Docker first."; exit 1)
+	@$(DOCKER) build \
+		--tag $(TAG) \
+		-f docker/builder/Dockerfile \
+		$(BUILD_ARGS) .
+	$(DOCKER) run -it --rm \
+		-v "$(shell pwd):/root/appscope" \
+		--entrypoint /bin/bash \
+		$(TAG) \
+		-c "make all test"
+
+# Annoyingly not DRY
+.PHONY: docker-run
+docker-run: TAG?="appscope-builder:$(VERSION)"
+docker-run: DOCKER?=$(shell which docker 2>/dev/null)
+docker-run: PWD:=$(shell pwd)
+docker-run: BUILD_ARGS ?=
+docker-run:
 	@[ -x "$(DOCKER)" ] || \
 		( echo >&2 "error: Please install Docker first."; exit 1)
 	@$(DOCKER) build \
@@ -45,6 +64,6 @@ docker-build:
 		$(BUILD_ARGS) .
 	@$(DOCKER) run -it --rm \
 		-v "$(shell pwd):/root/appscope" \
-		--entrypoint /bin/bash \
-		$(TAG) \
-		-c "make all test" 
+		-e SCOPE_LOG_DEST=file:///root/appscope/scope.log \
+		$(TAG)
+

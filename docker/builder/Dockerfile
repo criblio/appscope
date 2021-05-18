@@ -39,8 +39,15 @@ RUN apt-get update && \
     add-apt-repository ppa:longsleep/golang-backports && \
     apt-get update && \
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 52B59B1571A79DBC054901C0F6BC817356A3D45E && \
-    apt-get install -y $GOLANG git autoconf automake libtool cmake lcov upx make && \
+    apt-get install -y $GOLANG git autoconf automake libtool cmake lcov upx make gdb vim emacs strace lsof && \
     apt-get clean
+
+# ---
+# Extra setup for use with `make docker-run`
+#
+RUN echo "set environment LD_PRELOAD=/root/appscope/lib/linux/libscope.so" >> /root/.gtbinit && \
+    echo "set breakpoint pending on" >> /root/.gtbinit && \
+    echo "set follow-fork-mode child" >> /root/.gtbinit
 
 # ---
 # The local git clone of the project is mounted as /root/appscope. See Makefile.

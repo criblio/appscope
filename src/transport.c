@@ -135,6 +135,9 @@ placeDescriptor(int fd, transport_t *t)
     // g_log has it's fd closed and reopened by another transport which
     // causes the mis-routing of data.
     static int next_fd_to_try = DEFAULT_FD;
+    if (next_fd_to_try < DEFAULT_MIN_FD) {
+        next_fd_to_try = DEFAULT_FD;
+    }
 
     int i, dupfd;
 

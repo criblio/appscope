@@ -2584,7 +2584,8 @@ gnutls_get_fd(gnutls_session_t session)
         // gnutls_transport_get_ptr() return value is the file-descriptor,
         // not a pointer to the file-descriptor. Using gnutls_check_version()
         // got messy as we may have found this behaviour switched on and off.
-        // So, we're testing here if the 
+        // So, we're testing here if the integer value of the pointer is 
+        // below the number of file-descriptors.
         if (!g_max_fds) {
             // NB: race-condition where multiple threads get here at the same
             // time and end up setting g_max_fds more than once. Decided not

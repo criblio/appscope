@@ -2580,19 +2580,19 @@ gnutls_get_fd(gnutls_session_t session)
 
     if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
             ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-	// In #279, we found that when the version of gnutls is 3.5.18, the
-	// gnutls_transport_get_ptr() return value is the file-descriptor,
-	// not a pointer to the file-descriptor. Using gnutls_check_version()
-	// got messy as we may have found this behaviour switched on and off.
-	// So, we're testing here if the 
+        // In #279, we found that when the version of gnutls is 3.5.18, the
+        // gnutls_transport_get_ptr() return value is the file-descriptor,
+        // not a pointer to the file-descriptor. Using gnutls_check_version()
+        // got messy as we may have found this behaviour switched on and off.
+        // So, we're testing here if the 
         if (!g_max_fds) {
-	    // NB: race-condition where multiple threads get here at the same
-	    // time and end up setting g_max_fds more than once. Decided not
-	    // to put this in the library consructor due only to sloth.
+            // NB: race-condition where multiple threads get here at the same
+            // time and end up setting g_max_fds more than once. Decided not
+            // to put this in the library consructor due only to sloth.
             struct rlimit fd_limit;
             if (getrlimit(RLIMIT_NOFILE, &fd_limit) != 0) {
-		// NB: could just assume limit is 1024 which appears to be the
-		// default in most places. Should this be logged?
+                // NB: could just assume limit is 1024 which appears to be the
+                // default in most places. Should this be logged?
                 return fd;
             }
             g_max_fds = fd_limit.rlim_cur;

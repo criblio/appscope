@@ -9,7 +9,7 @@
 #
 #     docker build --build-arg IMAGE=ubuntu:groovy ...
 #
-ARG IMAGE=ubuntu
+ARG IMAGE=ubuntu:18.04
 FROM $IMAGE
 
 # ---

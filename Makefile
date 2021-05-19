@@ -67,3 +67,10 @@ docker-run:
 		-e SCOPE_LOG_DEST=file:///root/appscope/scope.log \
 		$(TAG)
 
+# Using the docker-* targets above, many files here are created as root in the
+# container and end up inaccessible here. Added this here after getting bit
+# repeatedly.
+.PHONY: chown
+chown:
+	sudo chown -R $(USER):$(USER) .
+

@@ -5,9 +5,9 @@
 #
 
 # ---
-# Use the current Ubuntu image by default. Override this like below.
+# Use the Ubuntu 18.04 image by default. Override this like below.
 #
-#     docker build --build-arg IMAGE=ubuntu:groovy ...
+#     docker build --build-arg IMAGE=ubuntu:latest ...
 #
 ARG IMAGE=ubuntu:18.04
 FROM $IMAGE
@@ -45,9 +45,7 @@ RUN apt-get update && \
 # ---
 # Extra setup for use with `make docker-run`
 #
-RUN echo "set environment LD_PRELOAD=/root/appscope/lib/linux/libscope.so" >> /root/.gtbinit && \
-    echo "set breakpoint pending on" >> /root/.gtbinit && \
-    echo "set follow-fork-mode child" >> /root/.gtbinit
+COPY ./docker/builder/gdbinit /root/.gdbinit
 
 # ---
 # The local git clone of the project is mounted as /root/appscope. See Makefile.

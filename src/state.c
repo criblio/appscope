@@ -1604,33 +1604,78 @@ getDNSName(int sd, void *pkt, int pktlen)
     return 0;
 }
 
+/*
+ * Name server functions are available in a glibc distro
+ * from libresolv. They are available in libmusl on a
+ * musl based distro, no libresolv is used. So, if we
+ * link to libresolv we work on a glibc distro, but
+ * we fail on a musl distro. To avoid dealing with
+ * that we use function pointers and populate them
+ * when they are needed.
+ *
+ * For clarification, when the executable has a
+ * dependency on libresolv the function pointers
+ * are resolved at libscope constructor time.
+ * Otherwise, we do an explicit dlopen to load
+ * libresolv and get the addrs of the functions
+ * we need. The dlopen works as libresolv is
+ * located in a default lib search path.
+ */
+static bool
+getNSFuncs(void)
+{
+    if (!g_fn.dlopen) return FALSE;
+
+    void *handle = g_fn.dlopen("libresolv.so", RTLD_LAZY | RTLD_NODELETE);
+    if (handle == NULL) {
+        scopeLog("WARNING: could not locate libresolv, DNS events will be affected",
+                 -1, CFG_LOG_WARN);
+        return FALSE;
+    }
+
+    if (!g_fn.ns_initparse) g_fn.ns_initparse = dlsym(handle, "ns_initparse");
+    if (!g_fn.ns_parserr) g_fn.ns_parserr = dlsym(handle, "ns_parserr");
+    dlclose(handle);
+
+    if (!g_fn.ns_initparse || !g_fn.ns_parserr) {
+        scopeLog("WARNING: could not locate name server functions, DNS events will be affected",
+                 -1, CFG_LOG_WARN);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 #define DNSDONE(var1, var2) {if (var1) cJSON_Delete(var1); if (var2) cJSON_Delete(var2); return FALSE;}
 
 static bool
 parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
 {
-#if 0 //DEBUG
     int i, nmsg;
     ns_rr rr;
     ns_msg handle;
-    struct answer *ans = (struct answer *)buf;
+
+    if (!g_fn.ns_initparse || !g_fn.ns_parserr) {
+        if (getNSFuncs() == FALSE) return FALSE;
+    }
 
     // init ns lib
-    ns_initparse((const unsigned char *)ans, len, &handle);
+    if (g_fn.ns_initparse((const unsigned char *)buf, len, &handle) == -1) {
+        scopeLog("ERROR:init parse", -1, CFG_LOG_ERROR);
+        return FALSE;
+    }
 
     nmsg = ns_msg_count(handle, ns_s_an);
-
-    // error in the received response?
-    if (ns_msg_getflag(handle, ns_f_rcode) != ns_r_noerror) {
-        scopeLog("received a DNS response that had an error", -1, CFG_LOG_INFO);
-    }
 
     if (nmsg > 0) {
         for (i = 0; i < nmsg; i++) {
             char ipaddr[128];
             //char dispbuf[4096];
 
-            ns_parserr(&handle, ns_s_an, i, &rr);
+            if (g_fn.ns_parserr(&handle, ns_s_an, i, &rr) == -1) {
+                scopeLog("ERROR:parse rr", -1, CFG_LOG_ERROR);
+                return FALSE;
+            }
 
             // do this once, after we get the rr
             if (first == 0) {
@@ -1668,7 +1713,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
         }
         return TRUE;
     }
-#endif
+
     return FALSE;
 }
 

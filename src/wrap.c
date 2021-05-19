@@ -1145,9 +1145,11 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
  * get a handle and lookup the symbol.
  */
 
-static ssize_t __write_libc(int fd, const void *buf, size_t size);
-static ssize_t __write_pthread(int fd, const void *buf, size_t size);
-static int internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags);
+static ssize_t __write_libc(int, const void *, size_t);
+static ssize_t __write_pthread(int, const void *, size_t);
+static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
+static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
+static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
 
 static int 
 findInjected(struct dl_phdr_info *info, size_t size, void *data)
@@ -1279,14 +1281,34 @@ initHook()
     dl_iterate_phdr(findLibSym, &pthread__write);
 
     hookInject();
-    
-    if (should_we_patch || g_fn.sendmmsg || g_fn.__write_libc || g_fn.__write_pthread) {
+
+    // for DNS:
+    // On a glibc distro we hook sendmmsg because getaddrinfo calls this
+    // directly and we miss DNS requests unless it's hooked.
+    //
+    // On a musl distro the name server code calls sendto and recvfrom
+    // directly. So, we hook these in order to get DNS detail. We check
+    // to see which distro is used so as to hook only what is needed.
+    // We use the fact that on a musl distro the ld lib env var is set to
+    // a dir with a libscope-ver string. If that exists in the env var
+    // then we assume musl.
+    bool glibc = TRUE;
+    char *libpath = getenv(LD_LIB_ENV);
+    if (libpath && strstr(libpath, LD_LIB_DIR)) {
+        // we are in a libmusl distro
+        glibc = FALSE;
+    }
+
+    if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
+        ((glibc == TRUE) && g_fn.sendmmsg) ||
+        ((glibc == FALSE) && (g_fn.sendto || g_fn.recvfrom))) {
         funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_DEBUG) {
             // TODO: add some mechanism to get the config'd log file path
             funchook_set_debug_file(DEFAULT_LOG_PATH);
         }
+
         if (should_we_patch) {
             g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
     
@@ -1297,17 +1319,27 @@ initHook()
             rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
         }
 
-        // sendmmsg for internal libc use in DNS queries
-        if (g_fn.sendmmsg) {
+        // sendmmsg, sendto, recvfrom for internal libc use in DNS queries
+        if ((glibc == TRUE) && g_fn.sendmmsg) {
             rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
+        }
+
+        if ((glibc == FALSE) && g_fn.sendto) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.sendto, internal_sendto);
+        }
+
+        if ((glibc == FALSE) && g_fn.recvfrom) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
         }
 
         if (g_fn.__write_libc) {
             rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
         }
+
         if (g_fn.__write_pthread) {
             rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
         }
+
         // hook 'em
         rc = funchook_install(funchook, 0);
         if (rc != 0) {
@@ -4089,8 +4121,8 @@ send(int sockfd, const void *buf, size_t len, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
-sendto(int sockfd, const void *buf, size_t len, int flags,
+static ssize_t
+internal_sendto(int sockfd, const void *buf, size_t len, int flags,
        const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
@@ -4111,6 +4143,13 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
     }
 
     return rc;
+}
+
+EXPORTON ssize_t
+sendto(int sockfd, const void *buf, size_t len, int flags,
+       const struct sockaddr *dest_addr, socklen_t addrlen)
+{
+    return internal_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 }
 
 EXPORTON ssize_t
@@ -4215,8 +4254,8 @@ recv(int sockfd, void *buf, size_t len, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
-recvfrom(int sockfd, void *buf, size_t len, int flags,
+static ssize_t
+internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
          struct sockaddr *src_addr, socklen_t *addrlen)
 {
     ssize_t rc;
@@ -4235,6 +4274,13 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvfrom", "nopath");
     }
     return rc;
+}
+
+EXPORTON ssize_t
+recvfrom(int sockfd, void *buf, size_t len, int flags,
+         struct sockaddr *src_addr, socklen_t *addrlen)
+{
+    return internal_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
 }
 
 static int

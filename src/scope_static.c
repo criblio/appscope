@@ -14,11 +14,35 @@
 
 #include "scopetypes.h"
 
+/*
+ * This code exists solely to support the ability to
+ * build a libscope and an ldscope on a glibc distro
+ * that will execute on both a glibc distro and a
+ * musl distro.
+ *
+ * This code is used to create a static exec that will
+ * execute on both glibc and musl distros.
+ *
+ * The process:
+ * 1) extract the ldscope dynamic exec from this object.
+ * 2) open an executable file on the current FS and
+ *    read the loader string from the .interp section.
+ * 3) if it uses a musl ld.so then do musl
+ * 4) for musl; create a dir and in that dir create a
+ *    soft link to ld-musl.so from ld.linux.so (the
+ *    glibc loader).
+ * 5) for musl; create or add to the ld lib path
+ *    env var to point to the dir created above.
+ * 6) for musl; modify the loader string in .interp
+ *    of ldscope to ld-musl.so.
+ * 7) execve the extracted ldscope passing args
+ *    from this command line.
+ */
+
 #define EXE_TEST_FILE "/bin/cat"
 #define DEFAULT_BIN_DIR "/tmp"
 #define DEFAULT_BIN_FNAME "ldscopedyn"
 #define LIBMUSL "musl"
-#define LD_LIB_ENV "LD_LIBRARY_PATH"
 #define ALWAYSEXTRACT 1
 
 typedef struct libscope_info_t {

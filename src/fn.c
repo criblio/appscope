@@ -126,6 +126,8 @@ initFn(void)
     g_fn.execve = dlsym(handle, "execve");
     g_fn.poll = dlsym(handle, "poll");
     g_fn.select = dlsym(handle, "select");
+    g_fn.ns_initparse = dlsym(handle, "ns_initparse");
+    g_fn.ns_parserr = dlsym(handle, "ns_parserr");
 #ifdef __MACOS__
     g_fn.close$NOCANCEL = dlsym(handle, "close$NOCANCEL");
     g_fn.close_nocancel = dlsym(handle, "close_nocancel");

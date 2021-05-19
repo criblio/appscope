@@ -18,6 +18,8 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <arpa/nameser.h>
+
 
 #ifdef __LINUX__
 #ifndef io_context_t
@@ -194,6 +196,8 @@ typedef struct {
     int (*poll)(struct pollfd *, nfds_t, int);
     int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
     int (*nanosleep)(const struct timespec *, struct timespec *);
+    int	(*ns_initparse)(const unsigned char *, int, ns_msg *);
+    int	(*ns_parserr)(ns_msg *, ns_sect, int, ns_rr *);
 #ifdef __LINUX__
     // Couldn't easily get struct definitions for these on mac
     int (*statvfs64)(const char *, struct statvfs64 *);

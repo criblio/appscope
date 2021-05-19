@@ -2588,12 +2588,10 @@ gnutls_get_fd(gnutls_session_t session)
         // below the number of file-descriptors.
         if (!g_max_fds) {
             // NB: race-condition where multiple threads get here at the same
-            // time and end up setting g_max_fds more than once. Decided not
-            // to put this in the library consructor due only to sloth.
+            // time and end up setting g_max_fds more than once. No problem.
             struct rlimit fd_limit;
             if (getrlimit(RLIMIT_NOFILE, &fd_limit) != 0) {
-                // NB: could just assume limit is 1024 which appears to be the
-                // default in most places. Should this be logged?
+                DBG("getrlimit(0 failed");
                 return fd;
             }
             g_max_fds = fd_limit.rlim_cur;

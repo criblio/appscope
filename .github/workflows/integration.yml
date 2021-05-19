@@ -60,6 +60,5 @@ jobs:
       - name: Save Image
         if: github.ref == 'refs/heads/master'
         env:
-            DOCKER_HUB_USER: ${{ secrets.DOCKER_HUB_USER }}
-            DOCKER_HUB_PASS: ${{ secrets.DOCKER_HUB_PASS }}
+            SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
         run: make -C test/testContainers ${{ matrix.test }}-push

@@ -86,12 +86,9 @@ push: $(TESTS_BUILD)
 %-push:
 	@[ -n "$(filter $(@:%-push=%),$(TESTS))" ] || \
 		{ echo >&2 "error: $(@:%-push=%) isn't a test."; exit 1; }
-	@[ -n "$(DOCKER_HUB_USER)" ] || \
-		{ echo >&2 "error: DOCKER_HUB_USER not set."; exit 1; }
-	@[ -n "$(DOCKER_HUB_PASS)" ] || \
-		{ echo >&2 "error: DOCKER_HUB_PASS not set."; exit 1; }
-	@echo "$(DOCKER_HUB_PASS)" | \
-		$(DOCKER) login -u $(DOCKER_HUB_USER) --password-stdin
+	@[ -n "$(SCOPECI_TOKEN)" ] || \
+		{ echo >&2 "error: SCOPECI_TOKEN not set."; exit 1; }
+	@echo "$(SCOPECI_TOKEN)" | $(DOCKER) login -u scopeci --password-stdin
 	@echo
 	@echo "==================================================================="
 	@echo " $(shell date)"
@@ -101,9 +98,9 @@ push: $(TESTS_BUILD)
 	@$(DOCKER) logout
 	-@[ -f "./README.$(@:%-push=%).md" ] && $(DOCKER) run --rm \
 		-v "./README.$(@:%-push=%).md/:/data/README.md:ro" \
-		-e "DOCKERHUB_USERNAME=$(DOCKER_HUB_USER)" \
-		-e "DOCKERHUB_PASSWORD=$(DOCKER_HUB_PASS)" \
-		-e "DOCKERHUB_REPO_PREFIX=$(DOCKER_HUB_USER)" \
+		-e "DOCKERHUB_USERNAME=scopeci" \
+		-e "DOCKERHUB_PASSWORD=$(SCOPECI_TOKEN)" \
+		-e "DOCKERHUB_REPO_PREFIX=criblci" \
 		-e "DOCKERHUB_REPO_NAME=scope-$(@:%-push=%)-it" \
 		-e "SHORT_DESCRIPTION=Scope\ Integration\ Test" \
 		sheogorath/readme-to-dockerhub;

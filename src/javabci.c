@@ -404,6 +404,7 @@ javaReadClass(const unsigned char* classData)
 {
     java_class_t *classInfo = malloc(sizeof(java_class_t));
     if (memcmp(classData, magic, sizeof(magic)) != 0) {
+        free(classInfo);
         return NULL;
     }
     unsigned char *addr = (unsigned char *)classData;

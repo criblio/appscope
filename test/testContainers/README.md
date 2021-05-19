@@ -32,6 +32,9 @@ as `criblci/scope-(test)-it:latest`. We're not tagging separate versions for
 branches at this point. We'll revisit that later if we start stepping on each
 other.
 
+Create `README.test.md` files here if you want to populate the "Overview" tab
+for the resulting `criblci/scope-test-it` repository at Docker Hub.
+
 ## Execution
 
 The `Makefile` provides the automation. Run `make help` for details as well as

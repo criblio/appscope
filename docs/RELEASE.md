@@ -12,10 +12,10 @@ Our process is pretty straight forward.
   should align with the issue title. Occasionally, we skip creating an issue
   and omit the number though this is frowned upon now.
 
-* We use [Projects](/criblio/appscope/projects/) to track issues assigned to
-  releases. When assigned issues are done and merged, we create a release
-  branch named like `release/1.0` from the default branch. Note only the major
-  and minor numbers for the release are in the branch name.
+* We use [Projects](https://github.com/criblio/appscope/projects/) to track
+  issues assigned to releases. When assigned issues are done and merged, we
+  create a release branch named like `release/1.0` from the default branch.
+  Note only the major and minor numbers for the release are in the branch name.
 
 * We tag release branches like `v1.0.0-rc1` for release candidates. Any fixes
   needed get committed to the release branch and additional `-rc` tags are
@@ -28,8 +28,7 @@ Our process is pretty straight forward.
   complicated maintenance releases or when work needs to be done in parallel.
 
 It would be nice if we could put some controls in place at GitHub to enforce
-the branch and tag naming scheme but we'd need _owner_ access for that. In
-the mean time, please follow along.
+the branch and tag naming scheme. In the meantime, please follow along.
 
 ## CI/CD
 

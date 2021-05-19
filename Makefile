@@ -33,7 +33,7 @@ all:
 endif
 
 .PHONY: docker-build
-docker-build: TAG ?= "appscope-builder:$(VERSION)"
+docker-build: TAG ?= "appscope-builder"
 docker-build: DOCKER ?= $(shell which docker 2>/dev/null)
 docker-build: BUILD_ARGS ?=
 docker-build:
@@ -51,7 +51,7 @@ docker-build:
 
 # Annoyingly not DRY
 .PHONY: docker-run
-docker-run: TAG?="appscope-builder:$(VERSION)"
+docker-run: TAG?="appscope-builder"
 docker-run: DOCKER?=$(shell which docker 2>/dev/null)
 docker-run: PWD:=$(shell pwd)
 docker-run: BUILD_ARGS ?=

@@ -30,6 +30,12 @@ Our process is pretty straight forward.
 It would be nice if we could put some controls in place at GitHub to enforce
 the branch and tag naming scheme. In the meantime, please follow along.
 
+> TODO: We have a `staging` branch so the [`website/`](../website/) content can be
+  pushed to separate production and staging instances. Details of how that's to
+  be used have not been worked into this write-up yet.
+
+> TODO: Cherry-picking master commits out to release branches?
+
 ## CI/CD
 
 We use GitHub Actions to automate CI/CD tasks when changes are made in the
@@ -63,3 +69,7 @@ details. The gist is below.
 * We run a suite of [integration tests](../test/testContainers/) on the default
   branch nightly and can manually trigger this when needed. Pushes to a release
   branch should trigger these tests too but that's not in place yet.
+
+* Pushes to the default and `staging` branches trigger the
+  [`website/`](../website/) content to be built and deployed to
+  <https://appscope.dev/docs/>.

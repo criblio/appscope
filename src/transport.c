@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,6 +77,24 @@ struct _transport_t
 // process.  It's used by scopeGetaddrinfo() to avoid a bug seen in
 // node.js processes.  See transportReconnect() below for details.
 static struct addrinfo *g_cached_addr = NULL;
+
+// To avoid race condition between:
+//  1) using the tls subsystem and
+//  2) destroying the tls subsystem
+static pthread_mutex_t g_tls_lock = PTHREAD_MUTEX_INITIALIZER;
+static int g_tls_calls_are_safe = TRUE;  // until handle_tls_destroy() is called
+
+static inline void
+enterCriticalSection(void)
+{
+    pthread_mutex_lock(&g_tls_lock);
+}
+
+static inline void
+exitCriticalSection(void)
+{
+    pthread_mutex_unlock(&g_tls_lock);
+}
 
 static transport_t*
 newTransport()
@@ -262,19 +281,44 @@ rootCertFile(transport_t *trans)
 static void
 shutdownTlsSession(transport_t *trans)
 {
-    if (trans->net.tls.ssl) {
-        SSL_shutdown(trans->net.tls.ssl);
-        SSL_free(trans->net.tls.ssl);
-        trans->net.tls.ssl = NULL;
+    // Grab the lock to show that the tls subsystem is in use.
+    enterCriticalSection();
+
+    if (g_tls_calls_are_safe) {
+        if (trans->net.tls.ssl) {
+            SSL_shutdown(trans->net.tls.ssl);
+            SSL_free(trans->net.tls.ssl);
+            trans->net.tls.ssl = NULL;
+        }
+        if (trans->net.tls.ctx) {
+            SSL_CTX_free(trans->net.tls.ctx);
+            trans->net.tls.ctx = NULL;
+        }
     }
-    if (trans->net.tls.ctx) {
-        SSL_CTX_free(trans->net.tls.ctx);
-        trans->net.tls.ctx = NULL;
-    }
+
+    // Release the lock
+    exitCriticalSection();
+
     if (trans->net.sock != -1) {
         trans->close(trans->net.sock);
         trans->net.sock = -1;
     }
+}
+
+static void
+handle_tls_destroy(void)
+{
+    // Spin to make sure we don't allow our tls subsystem to be destructed
+    // while the tls library is actively being used.
+    enterCriticalSection();
+
+    // this records that this function has been called.
+    g_tls_calls_are_safe = FALSE;
+
+    // Release the lock
+    exitCriticalSection();
+
+    scopeLog("detected beginning of process exit sequence", -1, CFG_LOG_INFO);
 }
 
 static int
@@ -282,6 +326,17 @@ establishTlsSession(transport_t *trans)
 {
     if (!trans || trans->net.sock == -1) return FALSE;
     scopeLog("establishing tls session", trans->net.sock, CFG_LOG_INFO);
+
+    // Grab the lock to show that the tls subsystem is in use.
+    enterCriticalSection();
+    if (!g_tls_calls_are_safe) goto err;
+
+    // Register a handler once - to be called when OPENSSL is being destructed.
+    static int destroy_was_registered = FALSE;
+    if (!destroy_was_registered) {
+        OPENSSL_atexit(handle_tls_destroy);
+        destroy_was_registered = TRUE;
+    }
 
     trans->net.tls.ctx = SSL_CTX_new(TLS_method());
     if (!trans->net.tls.ctx) {
@@ -364,9 +419,15 @@ establishTlsSession(transport_t *trans)
         }
     }
 
+    // free the lock
+    exitCriticalSection();
+
     scopeLog("tls session established", trans->net.sock, CFG_LOG_INFO);
     return TRUE;
 err:
+    // free the lock
+    exitCriticalSection();
+
     shutdownTlsSession(trans);
     return FALSE;
 }
@@ -1075,12 +1136,29 @@ tcpSendTls(transport_t *trans, const char *msg, size_t len)
     size_t bytes_to_send = len;
     size_t bytes_sent = 0;
     int rc = 0;
+    int err = 0;
 
     while (bytes_to_send > 0) {
-        ERR_clear_error(); // to make SSL_get_error reliable
-        rc = SCOPE_SSL_write(trans->net.tls.ssl, &msg[bytes_sent], bytes_to_send);
+        // Grab the lock to show that the tls subsystem is in use.
+        enterCriticalSection();
+
+        rc = 0;
+        if (g_tls_calls_are_safe) {
+            ERR_clear_error(); // to make SSL_get_error reliable
+            rc = SCOPE_SSL_write(trans->net.tls.ssl, &msg[bytes_sent], bytes_to_send);
+            if (rc <= 0) {
+                err = SSL_get_error(trans->net.tls.ssl, rc);
+            }
+        }
+
+        // free the lock
+        exitCriticalSection();
+
         if (rc <= 0) {
-            break;
+            DBG("%d %d", err, g_tls_calls_are_safe);
+            transportDisconnect(trans);
+            transportConnect(trans);
+            return -1;
         }
 
         if (rc != bytes_to_send) {
@@ -1091,12 +1169,6 @@ tcpSendTls(transport_t *trans, const char *msg, size_t len)
         bytes_to_send -= rc;
     }
 
-    if (rc < 0) {
-        DBG("%d", SSL_get_error(trans->net.tls.ssl, rc));
-        transportDisconnect(trans);
-        transportConnect(trans);
-        return -1;
-    }
     return 0;
 }
 

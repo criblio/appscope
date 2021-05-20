@@ -11,6 +11,7 @@
 #include <sys/syscall.h>
 #include <sys/stat.h>
 #include <libgen.h>
+#include <sys/resource.h>
 
 #include "atomic.h"
 #include "bashmem.h"
@@ -44,6 +45,7 @@ static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
+static rlim_t g_max_fds = 0;
 
 extern unsigned g_sendprocessstart;
 
@@ -1048,20 +1050,6 @@ load_func(const char *module, const char *func)
     return addr;
 }
 
-static int 
-findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
-{
-    int len = strlen(info->dlpi_name);
-    int libscope_so_len = 11;
-
-    if(len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
-        *(char **)data = (char *) info->dlpi_name;
-        return 1;
-    }
-    return 0;
-}
-
-
 typedef struct
 {
     const char *library;    // Input:   e.g. libpthread.so
@@ -1125,6 +1113,19 @@ findInjected(struct dl_phdr_info *info, size_t size, void *data)
         return 1;
     }
     return 0;
+}
+
+static int 
+findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
+{
+    int len = strlen(info->dlpi_name);
+    int libscope_so_len = 11;
+
+    if(len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
+        *(char **)data = (char *) info->dlpi_name;
+        return 1;
+    }
+    return findInjected(info, size, data);
 }
 
 /**
@@ -2571,6 +2572,40 @@ SSL_write(SSL *ssl, const void *buf, int num)
     return rc;
 }
 
+static int
+gnutls_get_fd(gnutls_session_t session)
+{
+    int fd = -1;
+    gnutls_transport_ptr_t fdp;
+
+    if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
+        // In #279, we found that when the version of gnutls is 3.5.18, the
+        // gnutls_transport_get_ptr() return value is the file-descriptor,
+        // not a pointer to the file-descriptor. Using gnutls_check_version()
+        // got messy as we may have found this behaviour switched on and off.
+        // So, we're testing here if the integer value of the pointer is 
+        // below the number of file-descriptors.
+        if (!g_max_fds) {
+            // NB: race-condition where multiple threads get here at the same
+            // time and end up setting g_max_fds more than once. No problem.
+            struct rlimit fd_limit;
+            if (getrlimit(RLIMIT_NOFILE, &fd_limit) != 0) {
+                DBG("getrlimit(0 failed");
+                return fd;
+            }
+            g_max_fds = fd_limit.rlim_cur;
+        }
+        if ((uint64_t)fdp >= g_max_fds) {
+            fd = *fdp;
+        } else {
+            fd = (int)(uint64_t)fdp;
+        }
+    }
+
+    return fd;
+}
+
 EXPORTON ssize_t
 gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
 {
@@ -2581,14 +2616,7 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
     rc = g_fn.gnutls_record_recv(session, data, data_size);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
     }
     return rc;
@@ -2604,14 +2632,7 @@ gnutls_record_recv_early_data(gnutls_session_t session, void *data, size_t data_
     rc = g_fn.gnutls_record_recv_early_data(session, data, data_size);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
     }
     return rc;
@@ -2642,14 +2663,7 @@ gnutls_record_recv_seq(gnutls_session_t session, void *data, size_t data_size, u
     rc = g_fn.gnutls_record_recv_seq(session, data, data_size, seq);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
     }
     return rc;
@@ -2665,14 +2679,7 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
     rc = g_fn.gnutls_record_send(session, data, data_size);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
     }
     return rc;
@@ -2689,14 +2696,7 @@ gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size
     rc = g_fn.gnutls_record_send2(session, data, data_size, pad, flags);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
     }
     return rc;
@@ -2712,14 +2712,7 @@ gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t
     rc = g_fn.gnutls_record_send_early_data(session, data, data_size);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
     }
     return rc;
@@ -2736,14 +2729,7 @@ gnutls_record_send_range(gnutls_session_t session, const void *data, size_t data
     rc = g_fn.gnutls_record_send_range(session, data, data_size, range);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
     }
     return rc;

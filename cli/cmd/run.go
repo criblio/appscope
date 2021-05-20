@@ -17,7 +17,10 @@ var runCmd = &cobra.Command{
 	Long: `Run executes a scoped command. By default, calling scope with no subcommands will execute run for args after 
 scope. However, scope allows for additional arguments to be passed to run to capture payloads or to up metric 
 verbosity. Note, when calling the run subcommand you should call it like scope run -- <command>, to avoid scope 
-attempting to parse flags passed to the executed command.`,
+attempting to parse flags passed to the executed command.
+
+The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp/scope.log. They may also
+be set to sockets with tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
 	Example: `scope run -- /bin/echo "foo"
 scope run -- perl -e 'print "foo\n"'
 scope run --payloads -- nc -lp 10001

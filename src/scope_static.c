@@ -11,6 +11,7 @@
 #include <string.h>
 #include <elf.h>
 #include <libgen.h>
+#include <dirent.h>
 
 #include "scopetypes.h"
 
@@ -95,25 +96,26 @@ setLdsoEnv(char *ldscope)
     setEnvVariable(LD_LIB_ENV, path);
 }
 
-static char *
+// modify the loader string in the .interp section of ldscope
+static int
 set_loader(char *exe)
 {
-    int i, fd;
+    int i, fd, found, name;
     struct stat sbuf;
     char *buf;
     Elf64_Ehdr *elf;
     Elf64_Phdr *phead;
 
-    if (!exe) return NULL;
+    if (!exe) return -1;
 
     if ((fd = open(exe, O_RDWR)) == -1) {
         perror("set_loader:open");
-        return NULL;
+        return -1;
     }
 
     if (fstat(fd, &sbuf) == -1) {
         perror("set_loader:fstat");
-        return NULL;
+        return -1;
     }
 
     buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
@@ -121,29 +123,58 @@ set_loader(char *exe)
     if (buf == MAP_FAILED) {
         perror("set_loader:mmap");
         close(fd);
-        return NULL;
+        return -1;
     }
 
     elf = (Elf64_Ehdr *)buf;
     phead  = (Elf64_Phdr *)&buf[elf->e_phoff];
+    found = name = 0;
 
     for (i = 0; i < elf->e_phnum; i++) {
         if ((phead[i].p_type == PT_INTERP)) {
             char *exld = (char *)&buf[phead[i].p_vaddr];
-            printf("%s:%d exe ld.so: %s\n", __FUNCTION__, __LINE__, exld);
-            strncpy(exld, "/lib/ld-musl-x86_64.so.1", strlen("/lib/ld-musl-x86_64.so.1") + 1);
-            break;
+            DIR *dirp;
+            struct dirent *entry;
+            char buf[PATH_MAX];
+
+            snprintf(buf, sizeof(buf), "/lib/");
+            if ((dirp = opendir(buf)) == NULL) {
+                perror("set_loader:opendir");
+                break;
+            }
+
+            while ((entry = readdir(dirp)) != NULL) {
+                if ((entry->d_type != DT_DIR) &&
+                    (strstr(entry->d_name, "ld-musl"))) {
+                    strncat(buf, entry->d_name, strlen(entry->d_name));
+                    name = 1;
+                    break;
+                }
+            }
+
+            closedir(dirp);
+
+            if (name && (strlen(exld) > (strlen(buf) + 1))) {
+                printf("%s:%d exe ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, buf);
+                strncpy(exld, buf, strlen(buf) + 1);
+                found = 1;
+                break;
+            }
         }
     }
 
-    int rc = write(fd, buf, sbuf.st_size);
-    if (rc < sbuf.st_size) {
-        perror("set_loader:write");
+    if (found) {
+        int rc = write(fd, buf, sbuf.st_size);
+        if (rc < sbuf.st_size) {
+            perror("set_loader:write");
+        }
+    } else {
+        fprintf(stderr, "WARNING: can't locate or set the loader string in %s\n", exe);
     }
 
     close(fd);
     munmap(buf, sbuf.st_size);
-    return NULL;
+    return (found - 1);
 }
 
 static char *
@@ -332,13 +363,9 @@ main(int argc, char **argv, char **env)
         exit(EXIT_FAILURE);
     }
 
-    if (rc == 1) {
-        // new extraction of the bin
-        printf("path to ldscope: %s\n", info.path);
-        setup_loader(EXE_TEST_FILE, info.path);
-    } else {
-        setLdsoEnv(info.path);
-    }
+    printf("path to ldscope: %s\n", info.path);
+    // are we on glibc or musl?
+    setup_loader(EXE_TEST_FILE, info.path);
 
     execve(info.path, argv, environ);
     perror("execve");

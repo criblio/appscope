@@ -1150,6 +1150,7 @@ static ssize_t __write_pthread(int, const void *, size_t);
 static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
 static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
+static size_t __stdio_write(FILE *, const unsigned char *, size_t);
 
 static int 
 findInjected(struct dl_phdr_info *info, size_t size, void *data)
@@ -1330,6 +1331,15 @@ initHook()
 
         if ((glibc == FALSE) && g_fn.recvfrom) {
             rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
+        }
+
+        if ((glibc == FALSE) && !g_fn.__stdio_write) {
+            unsigned long *find_write;
+
+            find_write = (unsigned long *)stdout;
+            find_write += 9;
+            g_fn.__stdio_write = (size_t (*)(FILE *, const unsigned char *, size_t))*find_write;
+            rc = funchook_prepare(funchook, (void**)&g_fn.__stdio_write, __stdio_write);
         }
 
         if (g_fn.__write_libc) {
@@ -3459,6 +3469,19 @@ fgetpos64(FILE *stream,  fpos64_t *pos)
     int rc = g_fn.fgetpos64(stream, pos);
 
     doSeek(fileno(stream), (rc == 0), "fgetpos64");
+
+    return rc;
+}
+
+static size_t
+__stdio_write(FILE *stream, const unsigned char *buf, size_t len)
+{
+    WRAP_CHECK(__stdio_write, -1);
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.__stdio_write(stream, buf, len);
+
+    doWrite(fileno(stream), initialTime, (rc != -1), buf, rc, "__stdio_write", BUF, 0);
 
     return rc;
 }

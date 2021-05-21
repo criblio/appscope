@@ -198,6 +198,7 @@ typedef struct {
     int (*nanosleep)(const struct timespec *, struct timespec *);
     int	(*ns_initparse)(const unsigned char *, int, ns_msg *);
     int	(*ns_parserr)(ns_msg *, ns_sect, int, ns_rr *);
+    size_t (*__stdio_write)(FILE *, const unsigned char *, size_t);
 #ifdef __LINUX__
     // Couldn't easily get struct definitions for these on mac
     int (*statvfs64)(const char *, struct statvfs64 *);

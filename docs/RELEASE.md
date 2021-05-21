@@ -59,8 +59,8 @@ we need to.
 
 ## Workflows
 
-We use GitHub Workflows and Actions to automate CI/CD tasks for the AppScope
-code when changes are made in the project's repository. The
+We use GitHub Workflows and Actions to automate CI/CD tasks for the project
+when changes are made in the repository. The
 [`build`](../.github/workflows/build.yml) workflow builds the code and runs the
 unit tests with every push, on every branch. When the tests pass, some
 additional steps are taken depending on the trigger.
@@ -71,23 +71,24 @@ additional steps are taken depending on the trigger.
 * We build [container images](#container-images) and push them to Docker Hub
   for release tags.
 
-> TODO: build/tag `:next` images from the default branch too
+> TODO: add `:next` images from the default branch too
 
-* Our [integration tests](../test/testContainers/) are not currently run in
-  CI/CD but there is an effort underway to change this. The plan is to run them
-  for release tags and for pushes to the default and release branchs. We also
-  want to run them for PRs to the default branch.
+* We run out [integration tests](../test/testContainers/) for release tags and
+  for pushes and pull-requests to the default and release branches.
 
-The[` website`](../.github/workflows/website.yml) workflow handles building and
+> TODO: we're not actually doing this yet.
+
+The [`website`](../.github/workflows/website.yml) workflow handles building and
 deploying the [`website/`](../website/) content to <https://appscope.dev/> from
-tjhe default branch and <https://staging.appscope.dev/> from `staging`.
+the default branch and <https://staging.appscope.dev/> from `staging`. See the
+build script in that folder for details.
 
 ## CDN
 
-After the [workflow](#workflows) successfully builds and unit-tests the
-code, the `scope` binary and other artifacts of the build are pushed to an S3
+We push the built and tested `scope` binary and a TGZ package to an S3
 container at AWS which is exposed at `https://cdn.cribl.io/dl/scope/`. Below
 that base URL we have:
+
 
 * `latest` - text file with the latest release number in it; i.e. `0.6.1`
 * `$VERSION/linux/scope`
@@ -131,4 +132,7 @@ We currently build these for release tags (i.e. `v*`) and tag the images to
 match with the leading `v` striped off. If the git tag doesn't match `*-rc*`
 then we also apply the `:latest` tag to the images.
 
-> BUG: a maintenance release for an older 
+> TODO: Looking for details on what downstream uses these containers.
+
+> BUG: a maintenance release for an old major/minor release will step on the
+> `:latest` tag as the script works now.

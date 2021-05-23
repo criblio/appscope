@@ -1,36 +1,121 @@
 name: Build & Test
 
-on: [push]
+on: 
+  push:
+
+  pull_request:
+    branches:
+      - 'master'
+      - 'releases/**'
 
 jobs:
 
+  #
+  # Build the code, run the unit tests, update the CDN, and update Docker Hub.
+  #
   build-scope:
     name: Build Scope
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
+
       - name: Install Go
         uses: actions/setup-go@v2
         with:
           go-version: 1.15
+
       - name: Install Dependencies
         run: |
             ./install_build_tools.sh
             make deps
+
       - name: Build
         run: make all
+
       - name: Unit Tests
         run: make test
-      - name: Push Artifacts to S3 Bucket for CDN
+
+      - name: Save Binaries for Integration Tests
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: built-binaries
+          path: |
+            lib/linux/libscope.so
+            bin/linux/scope
+            bin/linux/ldscope
+          retention-days: 5
+
+      - name: Deploy Artifacts to CDN
+        if: ${{ github.event_name == 'push' }}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
         run: ./deploy.sh
+
       - name: Build & Push Container Image to Docker Hub
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
         run: ./docker/build.sh
+
+      - name: List Integration Tests
+        id: set-tests
+        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | jq -ncR '[inputs]')"
+
+    outputs:
+      tests: ${{ steps.set-tests.outputs.tests }}
+
+  #
+  # Run the integration tests for PRs to the default or release branches.
+  #
+  integration-test:
+    needs: build-scope
+    if: ${{ github.event_name == 'pull_request' }}
+    strategy:
+      matrix: 
+        test: ${{ fromJson(needs.build-scope.outputs.tests) }}
+      fail-fast: false
+    name: "Test: ${{ matrix.test }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Download Binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: built-binaries
+
+      - name: Run Test
+        run: |
+            chmod +x bin/linux/* lib/linux/*
+            make -C test/testContainers ${{ matrix.test }}
+
+  #
+  # Update the integration test images for pushes to the default branch.
+  #
+  integration-image:
+    needs: build-scope
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    strategy:
+      matrix: 
+        test: ${{ fromJson(needs.build-scope.outputs.tests) }}
+      fail-fast: false
+    name: "Update Image: ${{ matrix.test }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Rebuild Image
+        run: |
+            make -C test/testContainers ${{ matrix.test }}-build
+
+      - name: Save Image
+        env:
+            SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
+        run: make -C test/testContainers ${{ matrix.test }}-push

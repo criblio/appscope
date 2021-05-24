@@ -5,11 +5,11 @@
 #
 
 # ---
-# Use the current Ubuntu image by default. Override this like below.
+# Use the Ubuntu 18.04 image by default. Override this like below.
 #
-#     docker build --build-arg IMAGE=ubuntu:groovy ...
+#     docker build --build-arg IMAGE=ubuntu:latest ...
 #
-ARG IMAGE=ubuntu
+ARG IMAGE=ubuntu:18.04
 FROM $IMAGE
 
 # ---
@@ -39,8 +39,13 @@ RUN apt-get update && \
     add-apt-repository ppa:longsleep/golang-backports && \
     apt-get update && \
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 52B59B1571A79DBC054901C0F6BC817356A3D45E && \
-    apt-get install -y $GOLANG git autoconf automake libtool cmake lcov upx make && \
+    apt-get install -y $GOLANG git autoconf automake libtool cmake lcov upx make gdb vim emacs strace lsof && \
     apt-get clean
+
+# ---
+# Extra setup for use with `make docker-run`
+#
+COPY ./docker/builder/gdbinit /root/.gdbinit
 
 # ---
 # The local git clone of the project is mounted as /root/appscope. See Makefile.

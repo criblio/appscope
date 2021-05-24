@@ -4380,6 +4380,16 @@ getaddrinfo(const char *node, const char *service,
     return rc;
 }
 
+// This was added to avoid having libscope.so depend on GLIBC_2.25.
+// libssl.a or libcrypto.a need getentropy which only exists in
+// GLIBC_2.25 and newer.
+EXPORTON int
+getentropy(void *buffer, size_t length)
+{
+    WRAP_CHECK(getentropy, -1);
+    return g_fn.getentropy(buffer, length);
+}
+
 // This overrides a weak definition in src/dbg.c
 void
 scopeLog(const char *msg, int fd, cfg_log_level_t level)

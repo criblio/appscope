@@ -176,6 +176,10 @@ func testDefaultScopeConfigYaml(wd string, verbosity int) string {
     type: file
     path: METRICSPATH
     buffering: line
+    tls:
+      enable: false
+      validateserver: false
+      cacertpath: ""
 event:
   enable: true
   format:
@@ -184,6 +188,10 @@ event:
     type: file
     path: EVENTSPATH
     buffering: line
+    tls:
+      enable: false
+      validateserver: false
+      cacertpath: ""
   watch:
   - type: file
     name: '[\s\/\\\.]log[s]?[\/\\\.]?'
@@ -217,6 +225,10 @@ libscope:
       type: file
       path: LDSCOPELOGPATH
       buffering: line
+      tls:
+        enable: false
+        validateserver: false
+        cacertpath: ""
 `
 
 	expectedYaml = strings.Replace(expectedYaml, "VERBOSITY", strconv.Itoa(verbosity), 1)

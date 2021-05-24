@@ -501,7 +501,7 @@ cfgTransportTlsEnable(config_t *cfg, which_transport_t t)
 }
 
 unsigned
-cfgTransportValidateServer(config_t *cfg, which_transport_t t)
+cfgTransportTlsValidateServer(config_t *cfg, which_transport_t t)
 {
     if (t >= 0 && t < CFG_WHICH_MAX) {
         if (cfg) return cfg->transport[t].net.tls.validateserver;
@@ -512,7 +512,7 @@ cfgTransportValidateServer(config_t *cfg, which_transport_t t)
 }
 
 const char *
-cfgTransportCACertPath(config_t *cfg, which_transport_t t)
+cfgTransportTlsCACertPath(config_t *cfg, which_transport_t t)
 {
     if (t >= 0 && t < CFG_WHICH_MAX) {
         if (cfg) return cfg->transport[t].net.tls.cacertpath;
@@ -817,14 +817,14 @@ cfgTransportTlsEnableSet(config_t *cfg, which_transport_t t, unsigned val)
 }
 
 void
-cfgTransportValidateServerSet(config_t *cfg, which_transport_t t, unsigned val)
+cfgTransportTlsValidateServerSet(config_t *cfg, which_transport_t t, unsigned val)
 {
     if (!cfg || t < 0 || t >= CFG_WHICH_MAX || val > 1) return;
     cfg->transport[t].net.tls.validateserver = val;
 }
 
 void
-cfgTransportCACertPathSet(config_t *cfg, which_transport_t t, const char *path)
+cfgTransportTlsCACertPathSet(config_t *cfg, which_transport_t t, const char *path)
 {
     if (!cfg || t < 0 || t >= CFG_WHICH_MAX) return;
     if (cfg->transport[t].net.tls.cacertpath) free(cfg->transport[t].net.tls.cacertpath);

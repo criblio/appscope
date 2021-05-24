@@ -916,7 +916,7 @@ processTlsValidate(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char* value = stringVal(node);
     which_transport_t c = transport_context;
-    cfgTransportValidateServerSet(config, c, strToVal(boolMap, value));
+    cfgTransportTlsValidateServerSet(config, c, strToVal(boolMap, value));
     if (value) free(value);
 }
 
@@ -925,7 +925,7 @@ processTlsCaCert(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char* value = stringVal(node);
     which_transport_t c = transport_context;
-    cfgTransportCACertPathSet(config, c, value);
+    cfgTransportTlsCACertPathSet(config, c, value);
     if (value) free(value);
 }
 
@@ -1529,10 +1529,10 @@ createTlsJson(config_t *cfg, which_transport_t trans)
     if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
          valToStr(boolMap, cfgTransportTlsEnable(cfg, trans)))) goto err;
     if (!cJSON_AddStringToObjLN(root, VALIDATE_NODE,
-         valToStr(boolMap, cfgTransportValidateServer(cfg, trans)))) goto err;
+         valToStr(boolMap, cfgTransportTlsValidateServer(cfg, trans)))) goto err;
 
     // Represent NULL as an empty string
-    const char *path = cfgTransportCACertPath(cfg, trans);
+    const char *path = cfgTransportTlsCACertPath(cfg, trans);
     path = (path) ? path : "";
     if (!cJSON_AddStringToObjLN(root, CACERT_NODE, path)) goto err;
 
@@ -1882,14 +1882,14 @@ initTransport(config_t* cfg, which_transport_t t)
         case CFG_UDP:
             transport = transportCreateUdp(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
             transportConfigureTls(transport, cfgTransportTlsEnable(cfg, t),
-                                             cfgTransportValidateServer(cfg, t),
-                                             cfgTransportCACertPath(cfg, t));
+                                             cfgTransportTlsValidateServer(cfg, t),
+                                             cfgTransportTlsCACertPath(cfg, t));
             break;
         case CFG_TCP:
             transport = transportCreateTCP(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
             transportConfigureTls(transport, cfgTransportTlsEnable(cfg, t),
-                                             cfgTransportValidateServer(cfg, t),
-                                             cfgTransportCACertPath(cfg, t));
+                                             cfgTransportTlsValidateServer(cfg, t),
+                                             cfgTransportTlsCACertPath(cfg, t));
             break;
         case CFG_SHM:
             transport = transportCreateShm();

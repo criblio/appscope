@@ -10,8 +10,6 @@ we need to.
 
 * The default branch is `master`.
 
-> TODO: rename to `main` 
-
 * We create branches from the default branch for defects `bug/123-name` and
   feature requests `feature/123-name`. The number prefix is an issue number
   and the `-name` usually aligns with the issue title. Occasionally, we skip
@@ -72,8 +70,6 @@ additional steps are taken depending on the trigger.
 * We build [container images](#container-images) and push them to Docker Hub
   for release tags.
 
-> TODO: add `:next` images from the default branch too
-
 * We run our [integration tests](../test/testContainers/) for pull-requests to
   the default and release branches. We build and push the container images
   these tests use up to Docker Hub on pushes to the default branch.
@@ -88,7 +84,6 @@ build script in that folder for details.
 We push the built and tested `scope` binary and a TGZ package to an S3
 container at AWS which is exposed at `https://cdn.cribl.io/dl/scope/`. Below
 that base URL we have:
-
 
 * `latest` - text file with the latest release number in it; i.e. `0.6.1`
 * `$VERSION/linux/scope`
@@ -128,11 +123,19 @@ We build and push container images to the
 repositories at Docker Hub. See [`docker/`](../docker/) for details on how
 those images are built.
 
-We currently build these for release tags (i.e. `v*`) and tag the images to
-match with the leading `v` striped off. If the git tag doesn't match `*-rc*`
-then we also apply the `:latest` tag to the images.
+We currently build these for release `v*` tags and tag the images to match with
+the leading `v` striped off. If the git tag doesn't match `*-rc*` then we also
+apply the `:latest` tag to the images.
 
-> TODO: Looking for details on what downstream uses these containers.
+## To Do
 
-> BUG: a maintenance release for an old major/minor release will step on the
-> `:latest` tag as the script works now.
+* Rename `master` branch to `main`
+* Build & push `:next` images to Docker Hub from the default branch.
+* Get details on how the `scope/cribl` image is being used.
+* BUG: A maintenance release for an old major/minor release results in the
+  `:latest` tag being incorrectly updated for the `cribl/scope` image as script
+  works now.
+* Enable protection for the `master` and `release/**` branches to require PRs
+  that have been reviewed by 2+ people and where all checks have passed.
+* GitHub has no way to protect tags. Do we want to see about ways to prevent
+  inappropriate release tagging?

@@ -75,7 +75,9 @@ additional steps are taken depending on the trigger.
 > TODO: add `:next` images from the default branch too
 
 * We run our [integration tests](../test/testContainers/) for release tags and
-  for pushes and pull-requests to the default and release branches.
+  for pull-requests to the default and release branches. We build and push the
+  container images these tests use up to Docker Hub on pushes to the default
+  branch.
 
 The [`website`](../.github/workflows/website.yml) workflow handles building and
 deploying the [`website/`](../website/) content to <https://appscope.dev/> from

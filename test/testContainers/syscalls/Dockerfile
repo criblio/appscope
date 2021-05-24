@@ -10,10 +10,10 @@ RUN mkdir -p /opt/test-runner/logs/ /opt/test
 RUN source scl_source enable rh-python36 && virtualenv /opt/test-runner/
 
 RUN cd /opt/test && \
-    wget https://github.com/linux-test-project/ltp/archive/master.zip && \
-    unzip master.zip && \
-    rm master.zip && \
-    mv ltp-master ltp && \
+    wget https://github.com/linux-test-project/ltp/archive/refs/tags/20210524.zip && \
+    unzip 20210524.zip && \
+    rm 20210524.zip && \
+    mv ltp-20210524 ltp && \
     cd /opt/test/ltp && \
     make autotools && \
     ./configure && \

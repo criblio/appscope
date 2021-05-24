@@ -53,6 +53,7 @@
       ],
       "Notes for exclude tests" : [
         "sendmsg03 was kernel dependent",
+        "bind02 fails in a container",
         "bind04 and bind05 were ipv6 dependent",
         "bind06 timed out after 10 min",
         "sendto02 requires the sctp protocol",
@@ -62,6 +63,7 @@
       "exclude_tests": [
         "connect02",
         "sendmsg03",
+        "bind02",
         "bind04",
         "bind05",
         "bind06",

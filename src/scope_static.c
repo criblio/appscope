@@ -222,7 +222,7 @@ do_musl(char *exld, char *ldscope)
     char *lpath = NULL;
     char *ldso = NULL;
     char *path;
-    char dir[strlen(ldscope)];
+    char dir[strlen(ldscope) + 2];
 
     // does a link to the musl ld.so exist?
     if ((ldso = get_loader(ldscope)) == NULL) return;
@@ -325,20 +325,40 @@ setup_loader(char *exe, char *ldscope)
     return 0;
 }
 
+static void
+usage(char *prog) {
+  fprintf(stderr,"usage: %s [-h help] [-f sym link dir]\n", prog);
+  exit(-1);
+}
+
 int
 main(int argc, char **argv, char **env)
 {
-    int rc;
+    int rc, opt;
     libscope_info info;
     char *verstr;
+    char *symlinkdir = NULL;
     char scopever[64];
 
-    printf("Starting scope static...first extract\n");
+    if (argc < 2) {
+        usage(argv[0]);
+    }
+
+    while ((opt = getopt(argc, argv, "hf:")) > 0) {
+        switch (opt) {
+        case 'f': symlinkdir=strdup(optarg); break;
+        case 'h': default: usage(argv[0]); break;
+        }
+    }
+
+    printf("Starting scope static...first extract\nsym link dir %s\noption index %d\n",
+           (symlinkdir == NULL) ? "/tmp" : symlinkdir, optind);
 
     strncpy(scopever, SCOPE_VER, strlen(SCOPE_VER) + 1);
     verstr = strtok(scopever, "-");
     if (asprintf(&info.path, "%s/libscope-%s/%s",
-                 DEFAULT_BIN_DIR, verstr, DEFAULT_BIN_FNAME) == -1) {
+                 (symlinkdir == NULL) ? DEFAULT_BIN_DIR : symlinkdir,
+                 verstr, DEFAULT_BIN_FNAME) == -1) {
         perror("ldscope:path");
         exit(EXIT_FAILURE);
     }
@@ -351,10 +371,12 @@ main(int argc, char **argv, char **env)
         exit(EXIT_FAILURE);
     }
 
-    printf("path to ldscope: %s\n", info.path);
+    printf("path to ldscope: %s %s\n", info.path, argv[optind]);
     // are we on glibc or musl?
     setup_loader(EXE_TEST_FILE, info.path);
 
+    argv[0] = info.path;
+    argv[1] = argv[optind];
     execve(info.path, argv, environ);
     perror("execve");
     release_bin(&info);

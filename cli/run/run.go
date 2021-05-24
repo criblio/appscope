@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -27,6 +28,8 @@ type Config struct {
 	EventsDest    string
 	MetricsFormat string
 	CriblDest     string
+	Subprocess    bool
+	Loglevel      string
 
 	now func() time.Time
 	sc  *ScopeConfig
@@ -46,7 +49,14 @@ func (rc *Config) Run(args []string) {
 		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
 		log.Info().Bool("passthrough", rc.Passthrough).Strs("args", args).Msg("calling syscall.Exec")
 	}
-	syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)
+	if !rc.Subprocess {
+		syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)
+	}
+	cmd := exec.Command(ldscopePath(), args...)
+	cmd.Env = env
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Run()
 }
 
 func ldscopePath() string {

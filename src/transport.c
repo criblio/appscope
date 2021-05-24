@@ -78,22 +78,29 @@ struct _transport_t
 // node.js processes.  See transportReconnect() below for details.
 static struct addrinfo *g_cached_addr = NULL;
 
-// To avoid race condition between:
-//  1) using the tls subsystem and
-//  2) destroying the tls subsystem
+// This mutex avoids a race condition between:
+//    1) using the tls subsystem and
+//    2) destroying the tls subsystem
+// If a deadlock is ever seen, consider changing the initializer to
+//    PTHREAD_RECURSIVE_MUTEX_INITIALIZER -or-
+//    PTHREAD_ERRORCHECK_MUTEX_INITIALIZER
 static pthread_mutex_t g_tls_lock = PTHREAD_MUTEX_INITIALIZER;
 static int g_tls_calls_are_safe = TRUE;  // until handle_tls_destroy() is called
 
 static inline void
 enterCriticalSection(void)
 {
-    pthread_mutex_lock(&g_tls_lock);
+    if (pthread_mutex_lock(&g_tls_lock)) {
+        DBG(NULL);
+    }
 }
 
 static inline void
 exitCriticalSection(void)
 {
-    pthread_mutex_unlock(&g_tls_lock);
+    if (pthread_mutex_unlock(&g_tls_lock)) {
+        DBG(NULL);
+    }
 }
 
 static transport_t*
@@ -360,6 +367,9 @@ establishTlsSession(transport_t *trans)
         ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
         snprintf(msg, sizeof(msg), "error setting tls cacertpath: \"%s\" : %s", cafile, err);
         scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        // We're not treating this as a hard error at this point.
+        // Let the process proceed; validation below will likely fail
+        // and might provide more meaningful info.
     }
 
     trans->net.tls.ssl = SSL_new(trans->net.tls.ctx);

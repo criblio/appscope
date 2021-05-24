@@ -42,6 +42,8 @@ COPY ./test_runner/ /opt/test-runner/
 # nginx -g "daemon off;"
 # ab -n 10000 -c 4 -p ./post.json http://localhost/log/
 
+RUN yum -y install net-tools
+
 COPY nginx/docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["test"]

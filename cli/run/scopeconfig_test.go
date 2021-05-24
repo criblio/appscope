@@ -183,7 +183,19 @@ func TestConfigFromRunOpts(t *testing.T) {
 	c.MetricsDest = "tls://foo:1234"
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
-	assert.Equal(t, "tls", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "tcp", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "foo", c.sc.Metric.Transport.Host)
+	assert.Equal(t, 1234, c.sc.Metric.Transport.Port)
+	assert.Equal(t, "", c.sc.Metric.Transport.Path)
+	assert.Equal(t, true, c.sc.Metric.Transport.Tls.Enable)
+	assert.Equal(t, true, c.sc.Metric.Transport.Tls.ValidateServer)
+	assert.Equal(t, "", c.sc.Metric.Transport.Tls.CaCertPath)
+
+	// host:port
+	c.MetricsDest = "foo:1234"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "tcp", c.sc.Metric.Transport.TransportType)
 	assert.Equal(t, "foo", c.sc.Metric.Transport.Host)
 	assert.Equal(t, 1234, c.sc.Metric.Transport.Port)
 	assert.Equal(t, "", c.sc.Metric.Transport.Path)

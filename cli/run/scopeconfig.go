@@ -253,7 +253,7 @@ func (c *Config) configFromRunOpts() error {
 				t.Tls.ValidateServer = true
 			} else if (proto == "tls") {
 				// encrypted socket
-				t.TransportType = proto
+				t.TransportType = "tcp"
 				t.Host = m[0][2]
 				if (m[0][3] == "") {
 					return fmt.Errorf("Missing :port at the end of %s", dest);
@@ -274,7 +274,7 @@ func (c *Config) configFromRunOpts() error {
 			}
 		} else if (m[0][3] != "") {
 			// got "something:port", assume tls://
-			t.TransportType = "tls"
+			t.TransportType = "tcp"
 			t.Host = m[0][2]
 			port, err := strconv.Atoi(m[0][3])
 			if err != nil {
@@ -282,6 +282,8 @@ func (c *Config) configFromRunOpts() error {
 			}
 			t.Port = port
 			t.Path = ""
+			t.Tls.Enable = true
+			t.Tls.ValidateServer = true
 		} else {
 			// got "something", assume file://
 			t.TransportType = "file"

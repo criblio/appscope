@@ -60,9 +60,10 @@ we need to.
 ## Workflows
 
 We use GitHub Workflows and Actions to automate CI/CD tasks for the project
-when changes are made in the repository. The
-[`build`](../.github/workflows/build.yml) workflow builds the code and runs the
-unit tests with every push, on every branch. When the tests pass, some
+when changes are made in the repository.
+
+The [`build`](../.github/workflows/build.yml) workflow builds the code and runs
+the unit tests with every push, on every branch. When the tests pass, some
 additional steps are taken depending on the trigger.
 
 * The `scope` binary and other artifacts of the build are pushed to our
@@ -73,10 +74,8 @@ additional steps are taken depending on the trigger.
 
 > TODO: add `:next` images from the default branch too
 
-* We run out [integration tests](../test/testContainers/) for release tags and
+* We run our [integration tests](../test/testContainers/) for release tags and
   for pushes and pull-requests to the default and release branches.
-
-> TODO: we're not actually doing this yet.
 
 The [`website`](../.github/workflows/website.yml) workflow handles building and
 deploying the [`website/`](../website/) content to <https://appscope.dev/> from

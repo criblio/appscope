@@ -67,6 +67,23 @@ docker-run:
 		-e SCOPE_LOG_DEST=file:///root/appscope/scope.log \
 		$(TAG)
 
+.PHONY: docker-run-alpine
+docker-run-alpine: TAG?="appscope-builder-alpine"
+docker-run-alpine: DOCKER?=$(shell which docker 2>/dev/null)
+docker-run-alpine: PWD:=$(shell pwd)
+docker-run-alpine: BUILD_ARGS ?=
+docker-run-alpine:
+	@[ -x "$(DOCKER)" ] || \
+		( echo >&2 "error: Please install Docker first."; exit 1)
+	@$(DOCKER) build \
+		--tag $(TAG) \
+		-f docker/builder/Dockerfile.alpine \
+		$(BUILD_ARGS) .
+	@$(DOCKER) run -it --rm \
+		-v "$(shell pwd):/root/appscope" \
+		-e SCOPE_LOG_DEST=file:///root/appscope/scope.log \
+		$(TAG)
+
 # Using the docker-* targets above, many files here are created as root in the
 # container and end up inaccessible here. Added this here after getting bit
 # repeatedly.

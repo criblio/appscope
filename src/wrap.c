@@ -31,6 +31,7 @@
 #include "runtimecfg.h"
 #include "javaagent.h"
 #include "inject.h"
+#include "../contrib/libmusl/musl.h"
 
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
@@ -1150,7 +1151,7 @@ static ssize_t __write_pthread(int, const void *, size_t);
 static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
 static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
-static size_t __stdio_write(FILE *, const unsigned char *, size_t);
+static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
 
 static int 
 findInjected(struct dl_phdr_info *info, size_t size, void *data)
@@ -1287,6 +1288,7 @@ initHook()
     // On a glibc distro we hook sendmmsg because getaddrinfo calls this
     // directly and we miss DNS requests unless it's hooked.
     //
+    // For DNS and console I/O
     // On a musl distro the name server code calls sendto and recvfrom
     // directly. So, we hook these in order to get DNS detail. We check
     // to see which distro is used so as to hook only what is needed.
@@ -1333,13 +1335,29 @@ initHook()
             rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
         }
 
-        if ((glibc == FALSE) && !g_fn.__stdio_write) {
-            unsigned long *find_write;
+        // libmusl
+        // Note that both stdout & stderr objects point to the same write function.
+        // They are init'd with a static object. After the first write the
+        // write pointer is modified. We handle that mod in the interposed
+        // function __stdio_write().
+        if ((glibc == FALSE) && (!g_fn.__stdout_write || !g_fn.__stderr_write)) {
+            // Get the static initializer for the stdout write function pointer
+            struct MUSL_IO_FILE *stdout_write = (struct MUSL_IO_FILE *)stdout;
 
-            find_write = (unsigned long *)stdout;
-            find_write += 9;
-            g_fn.__stdio_write = (size_t (*)(FILE *, const unsigned char *, size_t))*find_write;
-            rc = funchook_prepare(funchook, (void**)&g_fn.__stdio_write, __stdio_write);
+            // Save the write pointer
+            g_fn.__stdout_write = (size_t (*)(FILE *, const unsigned char *, size_t))stdout_write->write;
+
+            // Modify the write pointer to use our function
+            stdout_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+
+            // same for stderr
+            struct MUSL_IO_FILE *stderr_write = (struct MUSL_IO_FILE *)stderr;
+
+            // Save the write pointer
+            g_fn.__stderr_write = (size_t (*)(FILE *, const unsigned char *, size_t))stderr_write->write;
+
+            // Modify the write pointer to use our function
+            stderr_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
         }
 
         if (g_fn.__write_libc) {
@@ -3473,16 +3491,61 @@ fgetpos64(FILE *stream,  fpos64_t *pos)
     return rc;
 }
 
+/*
+ * This function, at this time, is specific to libmusl.
+ * We have hooked the stdout/stderr write pointer.
+ * The function pointer assigned by static config is
+ * modified by libc during the first call to stdout/stderr.
+ * We check for changes and adjust as needed.
+ */
 static size_t
-__stdio_write(FILE *stream, const unsigned char *buf, size_t len)
+__stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
 {
-    WRAP_CHECK(__stdio_write, -1);
     uint64_t initialTime = getTime();
+    struct iovec iovs[2] = {
+		{ .iov_base = stream->wbase, .iov_len = stream->wpos - stream->wbase },
+		{ .iov_base = (void *)buf, .iov_len = len }
+	};
 
-    ssize_t rc = g_fn.__stdio_write(stream, buf, len);
+    struct iovec *iov = iovs;
+    int iovcnt = 2;
+    int dothis = 0;
+    ssize_t rc;
 
-    doWrite(fileno(stream), initialTime, (rc != -1), buf, rc, "__stdio_write", BUF, 0);
+    // Note: not using WRAP_CHECK because these func ptrs are not populated
+    // from symbol resolution.
+    // stdout
+    if (g_fn.__stdout_write && stream && (stream == (struct MUSL_IO_FILE *)stdout)) {
+        rc = g_fn.__stdout_write((FILE *)stream, buf, len);
+        dothis = 1;
 
+        // has the stdout write pointer changed?
+        if (stream->write != (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write) {
+            // save the new pointer
+            g_fn.__stdout_write = (size_t (*)(FILE *, const unsigned char *, size_t))stream->write;
+
+            // modify the pointer to use this function
+            stream->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+        }
+    }
+
+    // stderr
+    if (g_fn.__stderr_write && stream && (stream == (struct MUSL_IO_FILE *)stderr)) {
+        rc = g_fn.__stderr_write((FILE *)stream, buf, len);
+        dothis = 1;
+
+        // has the stderr write pointer changed?
+        if (stream->write != (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write) {
+            // save the new pointer
+            g_fn.__stderr_write = (size_t (*)(FILE *, const unsigned char *, size_t))stream->write;
+
+            // modify the pointer to use this function
+            stream->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+        }
+    }
+
+    if (dothis == 1) doWrite(fileno((FILE *)stream), initialTime, (rc != -1),
+                             iov, rc, "__stdio_write", IOV, iovcnt);
     return rc;
 }
 

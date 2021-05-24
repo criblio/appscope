@@ -2024,7 +2024,7 @@ doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t byte
                 struct iovec *iov = (struct iovec *)buf;
 
                 for (i = 0; i < cnt; i++) {
-                    if (iov[i].iov_base) {
+                    if (iov[i].iov_base && (iov[i].iov_len > 0)) {
                         ctlSendLog(g_ctl, fd, fs->path, iov[i].iov_base, iov[i].iov_len, fs->uid, &g_proc);
                     }
                 }

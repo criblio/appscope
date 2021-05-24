@@ -84,18 +84,6 @@ setEnvVariable(char *env, char *value)
     if (new_val) free(new_val);
 }
 
-static void
-setLdsoEnv(char *ldscope)
-{
-    char *path;
-    char dir[strlen(ldscope)];
-
-    strncpy(dir, ldscope, strlen(ldscope) + 1);
-    path = dirname(dir);
-
-    setEnvVariable(LD_LIB_ENV, path);
-}
-
 // modify the loader string in the .interp section of ldscope
 static int
 set_loader(char *exe)

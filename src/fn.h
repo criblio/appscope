@@ -226,6 +226,7 @@ typedef struct {
     int (*recvmmsg)(int, struct mmsghdr *, unsigned int, int, struct timespec *);
     int (*pthread_create)(pthread_t *, const pthread_attr_t *,
                           void *(*)(void *), void *);
+    int (*getentropy)(void *, size_t);
 #endif // __LINUX__
 
 #if defined(__LINUX__) && defined(__STATX__)

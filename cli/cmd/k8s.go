@@ -17,7 +17,10 @@ var k8sCmd = &cobra.Command{
 	Short: "Install scope in kubernetes",
 	Long: `The k8s command prints configurations to be passed to kubectl which will automatically instrument newly launched containers. This installs
 a mutating admission webhook which adds an initContainer to each pod along with some environment variables which installs scope for all
-all processes in that container.`,
+all processes in that container.
+
+The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp/scope.log. They may also
+be set to sockets with tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
 	Example: `scope k8s --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 | kubectl apply -f -
 kubectl label namespace default scope=enabled`,
 	Args: cobra.NoArgs,

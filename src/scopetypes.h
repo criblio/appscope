@@ -137,6 +137,9 @@ typedef unsigned int bool;
 #define DEFAULT_LOG_PORT NULL
 #define DEFAULT_LOG_PATH "/tmp/scope.log"
 #define DEFAULT_LOG_BUF CFG_BUFFER_LINE
+#define DEFAULT_TLS_ENABLE FALSE
+#define DEFAULT_TLS_VALIDATE_SERVER FALSE
+#define DEFAULT_TLS_CA_CERT NULL
 
 #define DEFAULT_LOGSTREAM FALSE
 #define DEFAULT_LOGSTREAM_LOGMSG "The following settings have been overridden by a LogStream connection: event, metric and payload transport, "

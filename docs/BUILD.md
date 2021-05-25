@@ -12,6 +12,9 @@ make
 make check
 ```
 
+> Pro Tip: `make -j8` parallelizes the compile and link tasks for a massive
+> reduction in build time; 4m40s without the option, 0m41s with it! YMMV
+
 Enable debugging with `./bootstrap --enable-debug`. Any arguments to
 `bootstrap` are passed along to `configure`. Run `./configure --help` to see
 the myriad of options available.
@@ -151,14 +154,14 @@ See [Autotools Mythbuster](https://autotools.io/) for more details.
   `scope_env.sh`. Need some feedback on that.
 
 * TODO:
-  * Move `docker/build.sh` logic into a Makefile.am
+  * Move `docker/build.sh` logic into a Makefile.am for consistency?
+  * Maybe the same for `website/deplopy.sh`?
   * Recurse into `docs/images`
   * Remove top-level `bin/` and `lib/` folders
   * Remove `test/linux/` and `test/macOS` folders
   * Remove legacy Makefiles
   * Finish integration of `test/`
-  * `make dist`
-  * RPM & DEB packages?
+  * `make dist` - likely not necessary
+  * RPM & DEB packages - also not necessary
   * coverage in `cli/` and `test/`
-  * "integration" tests in `test/testContainers`
 

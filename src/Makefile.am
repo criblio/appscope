@@ -1,5 +1,5 @@
 #
-# Cribl AppScope™ - Automake Input
+# Cribl AppScope - Automake Input
 #
 # See docs/BUILD.md for details.
 #
@@ -27,6 +27,8 @@ YAML_DEFINES = -DYAML_VERSION_MAJOR=0 \
 	       -DYAML_VERSION_MINOR=2 \
 	       -DYAML_VERSION_PATCH=2 \
 	       -DYAML_VERSION_STRING=\"0.2.2\"
+
+OPENSSL_DIR = ../contrib/openssl
 
 # -----------------------------------------------------------------------------
 # Building libscope.so
@@ -67,9 +69,13 @@ libscope_la_SOURCES += $(CJSON_DIR)/cJSON.c
 libscope_la_SOURCES += $(YAML_DIR)/src/*.c
 
 libscope_la_LDFLAGS = -e __scope_main \
-		      -ldl -lpthread -lrt -lresolv \
-		      -L$(FUNCHOOK_DIR)/build -l:libfunchook.a -l:libdistorm.a \
-		      -L$(PCRE2_DIR)/build -l:libpcre2-posix.a -l:libpcre2-8.a 
+		      -L$(FUNCHOOK_DIR)/build \
+		      -L$(PCRE2_DIR)/build \
+		      -L$(OPENSSL_DIR) \
+		      -Wl,--version-script=libscope.map
+libscope_la_LIBADD = -l:libfunchook.a -l:libdistorm.a \
+		     -l:libpcre2-posix.a -l:libpcre2-8.a \
+		     -l:libssl.a -l:libcrypto.a 
 
 # -----------------------------------------------------------------------------
 # Building ldscope
@@ -83,7 +89,7 @@ ldscope_SOURCES = \
         utils.c \
 	inject.c
 
-ldscope_LDADD = -lrt -ldl libscope.o
+ldscope_LDADD = libscope.o
 
 libscope.o: libscope.la
 	$(OBJCOPY) -I binary -O elf64-x86-64 -B i386 .libs/libscope.so libscope.o
@@ -99,7 +105,7 @@ ldscope_CFLAGS = $(AM_CFLAGS)
 AM_CPPFLAGS = 
 AM_CFLAGS =
 AM_LDFLAGS =
-LDADD = -ldl -lpthread -lrt -lresolv
+LIBS = -ldl -lpthread -lrt -lresolv
 
 if DEBUG
 AM_CFLAGS += -g -O0 -DDEBUG
@@ -121,6 +127,7 @@ AM_CPPFLAGS += -I$(YAML_DIR)/include $(YAML_DEFINES)
 AM_CPPFLAGS += -I$(CJSON_DIR) $(CJSON_DEFINES)
 AM_CPPFLAGS += -I$(PCRE2_DIR)/src -I$(PCRE2_DIR)/build
 AM_CPPFLAGS += -I$(FUNCHOOK_DIR)/src -I$(FUNCHOOK_DIR)/distorm/include
+AM_CPPFLAGS += -I$(OPENSSL_DIR)/include
 
 AM_CPPFLAGS += -I../os/linux
 			

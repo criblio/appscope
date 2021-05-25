@@ -1,5 +1,5 @@
 dnl
-dnl Cribl AppScope™ - Autoconf Input
+dnl Cribl AppScope - Autoconf Input
 dnl
 dnl See docs/BUILD.md for details.
 dnl

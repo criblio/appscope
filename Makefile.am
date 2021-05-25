@@ -1,5 +1,5 @@
 #
-# Cribl AppScope™ - Autoconf Input
+# Cribl AppScope - Autoconf Input
 #
 # See docs/BUILD.md for details.
 #

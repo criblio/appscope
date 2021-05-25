@@ -1,5 +1,5 @@
 #
-# Cribl AppScope™ - Automake Input
+# Cribl AppScope - Automake Input
 #
 # See docs/BUILD.md for details.
 #

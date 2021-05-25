@@ -1,33 +1,26 @@
-**/*.swp
-.gdb_history
-scope.log
-coverage/
-# JetBrains specific directory
-.idea
-.DS_Store
-*.pyc
 venv
 test/selfinterpose/
-contrib/funchook/build/
-contrib/pcre2/build
-contrib/openssl/
-
 test/testContainers/logs
 
-#website
+# docker-run
+.gdb_history
+scope.log
+
+# Contribs
+contrib/funchook/build/
+contrib/pcre2/build
+contrib/cmocka/build
+
+# Website
 website/.env
 website/public/
 website/node_modules/
 website/.cache/
 
-
-# ---
-# Autotools version below
-
 # Temps
-*.tmp
-*.swp
-*~
+**/*.tmp
+**/*.swp
+**/*~
 
 # IDEs
 .idea

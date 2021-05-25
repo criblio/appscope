@@ -13,6 +13,10 @@ transport_t*        transportCreateSyslog(void);
 transport_t*        transportCreateShm(void);
 void                transportDestroy(transport_t **);
 
+// Supplemental configuration
+void                transportConfigureTls(transport_t *,
+                          unsigned int, unsigned int, const char*);
+
 // Accessors
 int                 transportSend(transport_t *, const char *, size_t);
 int                 transportFlush(transport_t *);

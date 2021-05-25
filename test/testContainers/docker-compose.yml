@@ -302,3 +302,8 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-14.0.2_linux-x64_bin.tar.gz
+
+  alpine:
+    build:
+      context: .
+      dockerfile: ./alpine/Dockerfile

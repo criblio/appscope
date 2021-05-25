@@ -218,6 +218,7 @@ typedef struct {
     int (*io_getevents)(io_context_t, long, long, struct io_event *, struct timespec *);
     int (*sendmmsg)(int, struct mmsghdr *, unsigned int, int);
     int (*recvmmsg)(int, struct mmsghdr *, unsigned int, int, struct timespec *);
+    int (*getentropy)(void *, size_t);
 #endif // __LINUX__
 
 #if defined(__LINUX__) && defined(__STATX__)

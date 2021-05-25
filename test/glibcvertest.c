@@ -5,18 +5,19 @@
 
 #include "test.h"
 
-// memcpy is using GLIBC_2.14, which is newer than anything else we
-// depend on.  This dependency on a relatively new GLIBC can be avoided
-// by using memmove instead which only needs GLIBC_2.2.5
+// secure_getenv (used by libcrypto.a) is using GLIBC_2.17.  This is the
+// newest glibc symbol that we depend on.  This means that we don't expect
+// our library to run on anything older than 2012-12-25, which was the
+// release date for 2.17.
 //
-// At the moment, GLIBC_2.12 is the newest thing we need.  This test was
-// written to be the canary in the coal mine if this changes...  We'd
-// expect it to fail if someone writes code that uses memcpy instead of
-// memmove, or adds some other new dependency on a new version of glibc.
+// LATEST_LIBC_VER_NEEDED defines the newest glibc version we need.
+// This test was written to be the canary in the coal mine if this changes...
+// We'd expect it to fail if someone writes code that adds any dependency
+// on a newer version of glibc.
 //
 // If you're reading this, please consider whether this new dependency
 // can be avoided rather than just bumping up the LATEST_LIBC_VER_NEEDED
-// It's about the usability of libscope.so.
+// It's about the portability/usability of libscope.so.
 //
 // Dependencies on GLIBC versions can be observed by:
 //     nm lib/linux/libscope.so | grep GLIBC_ | fgrep -v "2.2.5"
@@ -28,7 +29,7 @@
 //     "                 U __stack_chk_fail@@GLIBC_2.4\n",
 //
 
-#define LATEST_LIBC_VER_NEEDED "2.12"
+#define LATEST_LIBC_VER_NEEDED "2.17"
 #define LIBC "GLIBC_"
 
 #define PRIVATE "PRIVATE"

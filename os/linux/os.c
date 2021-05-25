@@ -411,7 +411,7 @@ osIsFilePresent(pid_t pid, const char *path)
         return -1;
     }
 
-    if (g_fn.__xstat(_STAT_VER, path, &sb) != 0) {
+    if (g_fn.__xstat(1, path, &sb) != 0) {
         return -1;
     } else {
         return sb.st_size;

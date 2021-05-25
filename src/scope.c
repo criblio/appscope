@@ -38,8 +38,8 @@
 #define GO_ENV_SERVER_VALUE "http2server"
 #define GO_ENV_CLIENT_VALUE "http2client"
 
-extern unsigned char _binary___lib_linux_libscope_so_start;
-extern unsigned char _binary___lib_linux_libscope_so_end;
+extern unsigned char _binary__libs_libscope_so_start;
+extern unsigned char _binary__libs_libscope_so_end;
 
 typedef struct {
     char *path;
@@ -152,8 +152,8 @@ setup_libscope(bool inject)
         goto err;
     }
     
-    size_t libsize = (size_t) (&_binary___lib_linux_libscope_so_end - &_binary___lib_linux_libscope_so_start);
-    if (write(info->fd, &_binary___lib_linux_libscope_so_start, libsize) != libsize) {
+    size_t libsize = (size_t) (&_binary__libs_libscope_so_end - &_binary__libs_libscope_so_start);
+    if (write(info->fd, &_binary__libs_libscope_so_start, libsize) != libsize) {
         perror("setup_libscope:write");
         goto err;
     }

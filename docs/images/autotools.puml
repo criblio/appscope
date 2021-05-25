@@ -1,0 +1,29 @@
+@startuml
+skinparam monochrome true
+skinparam defaultTextAlignment center
+
+artifact "**configure.ac**" as configure.ac
+hexagon Autoconf
+artifact "**Makefile.am**" as Makefile.am
+hexagon Automake
+hexagon "//configure//" as configure #line.dotted
+artifact "//Makefile.in//" as Makefile.in #line.dotted
+artifact "//Makefile//" as Makefile #line.dotted
+hexagon Make
+hexagon Libtool
+artifact config.h #line.dotted
+
+Makefile.am --> Automake
+configure.ac -> Autoconf
+Autoconf --> configure
+Automake -> Makefile.in
+Makefile.in -> configure 
+configure -> Makefile
+configure --> config.h
+Makefile -> Make
+Make --> programs
+Make -> Libtool
+Libtool --> libraries
+
+Makefile.am -[hidden] configure.ac
+@enduml

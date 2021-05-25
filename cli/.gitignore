@@ -1,3 +1,4 @@
+scope
 run/bundle.go
 build/*
 !build/.gitkeep
@@ -5,3 +6,4 @@ coverage.out
 demo/demo-scripts/willsee.txt
 demo/demo-scripts/wontsee.log
 VERSION
+coverage.html

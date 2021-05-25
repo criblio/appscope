@@ -1,0 +1,198 @@
+#!/bin/sh
+#
+# Cribl AppScope - Build System Initialization
+#
+# See docs/BUILD.md for details.
+#
+
+# This allows us to "exit" from within a function using "kill -s TERM $PID".
+trap "exit 1" TERM
+export PID=$$
+
+OS=$(uname | tr '[:upper:]' '[:lower:]')
+
+is_debug() { [ -n "${DEBUG}" ]; }
+is_force() { [ -n "${NO_PROMPT}" ]; }
+need_sudo() { [ "${EUID:-$(id -u)}" -ne 0 ]; }
+is_empty() { [ -z "$(ls -A $1)" ]; }
+in_path() { [ -n "$(which $1 2>/dev/null)" ]; }
+is_linux() { [ "${OS}" = "linux" ]; }
+is_macos() { [ "${OS}" = "darwin" ]; }
+is_alpine() { is_linux && [ -f /etc/alpine-release ]; }
+is_centos() { is_linux && [ -f /etc/centos-release ]; }
+is_ubuntu() { is_linux && [ -f /etc/lsb-release ] && grep "DISTRIB_ID=Ubuntu" /etc/lsb-release >/dev/null 2>&1; }
+ok() {
+  [ -z "$1" ] || echo "$1"
+  while true; do
+    read -p ">>> OK to continue? " yn
+    case $yn in
+      [Yy]*)
+        true
+        break
+        ;;
+      [Nn]*)
+        fatal "Canceled."
+        break
+        ;;
+      *)
+        echo "Please answer yes or no."
+        ;;
+    esac
+  done
+}
+hr() { echo "==============================================================="; }
+log() { echo "$*"; }
+info() { hr; log info: "$*"; hr; }
+debug() { is_debug && log debug: "$*"; }
+error() { hr; >&2 log error: "$*"; hr; }
+fatal() { hr; >&2 log fatal: "$*"; hr; kill -s TERM $PID; }
+
+debug "OS is \"${OS}\""
+
+#is_debug && set -x
+
+SUDO=
+need_sudo && SUDO="sudo -E "
+debug "SUDO is \"${SUDO}\""
+
+if is_centos; then
+  # The "epel-release" package isn't installed by default
+  if ${SUDO}rpm -qi epel-release >/dev/null 2>/dev/null; then
+    debug "The epel-release package is already installed on CentOS."
+  else
+    if is_force || ok "info: We need to install epel-release."; then
+      ${SUDO}yum install -y epel-release
+    fi
+  fi
+
+  # The "which" program isn't installed by default
+  if which which >/dev/null 2>/dev/null; then
+    debug "Found which already installed on CentOS."
+  else
+    if is_force || ok "info: We need to install which."; then
+      ${SUDO}yum install -y which
+    fi
+  fi
+fi
+
+case "${OS}" in
+  linux)
+    if   in_path apt;     then INSTALL="${SUDO}apt -y install"
+    elif in_path apt-get; then INSTALL="${SUDO}apt-get -y install"
+    elif in_path dnf;     then INSTALL="${SUDO}dnf -y install"
+    elif in_path yum;     then INSTALL="${SUDO}yum -y install"
+    elif in_path apk;     then INSTALL="${SUDO}apk add"
+    else
+      fatal "Huh?. Didn't find an installer."
+    fi
+    ;;
+  darwin)
+    INSTALL="brew install"
+    ;;
+  msys)
+    fatal "Sorry. We don't build on Windows yet."
+    ;;
+  freebsd)
+    fatal "Sorry. We don't build on FreeBSD yet."
+    ;;
+  *)
+    fatal "Sorry. We don't build know about OS=\"$OS\" yet."
+    ;;
+esac
+debug "INSTALL is \"$INSTALL\""
+
+require_program() {
+  EXE=$1
+  PKG=${2:-${EXE}}
+  debug "Checking for program $EXE in path."
+  FOUND=$(which $EXE 2>/dev/null)
+  if [ -z "${FOUND}" ]; then
+    if is_force || ok "info: $EXE missing so we'll install $PKG."; then
+
+      if is_ubuntu && [ "${PKG}" = "golang" ]; then
+        debug "Adding Ubuntu PPA for golang."
+        $INSTALL software-properties-common
+        ${SUDO}add-apt-repository -y ppa:longsleep/golang-backports
+        ${SUDO}apt update
+      fi
+
+      $INSTALL $PKG
+
+      FOUND=$(which $EXE 2>/dev/null)
+
+      if [ -z "${FOUND}" ]; then
+        fatal "$PKG added but $EXE still not in the path?"
+      fi
+    fi
+  fi
+  log "Found $EXE at $FOUND."
+}
+
+require_file() {
+  FILE=$1
+  PKG=${2}
+  debug "Checking for file $FILE."
+  if [ ! -f "${FILE}" ]; then
+    if is_force || ok "info: $FILE missing so we'll install $PKG."; then
+
+      $INSTALL $PKG
+
+      if [ ! -f "${FILE}" ]; then
+        fatal "$PKG added but $FILE still not found?"
+      fi
+    fi
+  fi
+  log "Found $FILE."
+}
+
+if is_macos; then
+  # The binutils package on MacOS is installed in /usr/local/opt/binutils/bin
+  # but that isn't in the path by default, smh. We'll just add it just in case.
+  debug "Adding binutils to PATH on MacOS."
+  export PATH="${PATH}:/usr/local/opt/binutils/bin"
+fi
+
+
+if is_ubuntu; then
+  # Avoid interactive prompts
+  export DEBIAN_FRONTEND="noninteractive"
+  export TZ="America/New_York"
+
+  # Avoid errors about APT not being initialized
+  if is_empty /var/lib/apt/lists; then
+    info "Prepping APT on Ubuntu"
+    ${SUDO}apt update
+  fi
+fi
+
+info Checking Dependencies
+require_program go golang
+require_program autoreconf autoconf
+require_program aclocal automake
+if is_macos; then
+  debug "Checking for glibtoolize instead of libtoolize on MacOS."
+  require_program glibtoolize libtool
+else
+  require_program libtoolize libtool
+fi
+require_program cmake
+require_program make
+require_program upx upx
+require_program objcopy binutils
+require_program git git
+require_program gcc gcc
+
+if is_alpine; then
+  debug "Checking for libc-dev on Alpine."
+  require_file /usr/lib/Scrt1.o libc-dev
+fi
+
+info Generating Build System
+autoreconf -ivf -Wno-override
+
+info Running ./configure $@
+./configure "$@"
+
+info Build System Ready. Run make.
+
+# vim: set sw=2 ts=2 et :

@@ -336,10 +336,10 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
         cfgEvtFormatSourceEnabledSet(config, i, 2);
         if (i >= CFG_SRC_MAX) {
              assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_FILE);
-             assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 1);
+             assert_int_equal(dbgCountMatchingLines("cfg.c"), 1);
              dbgInit(); // reset dbg for the rest of the tests
         } else {
-             assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 0);
+             assert_int_equal(dbgCountMatchingLines("cfg.c"), 0);
              // defaults are no longer all the same value.
              switch (i) {
              case CFG_SRC_FILE:
@@ -374,10 +374,10 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
         cfgEvtFormatSourceEnabledSet(config, i, 1);
         if (i >= CFG_SRC_MAX) {
              assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_FILE);
-             assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 1);
+             assert_int_equal(dbgCountMatchingLines("cfg.c"), 1);
              dbgInit(); // reset dbg for the rest of the tests
         } else {
-             assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 0);
+             assert_int_equal(dbgCountMatchingLines("cfg.c"), 0);
              assert_int_equal(cfgEvtFormatSourceEnabled(config, i), 1);
         }
     }

@@ -30,6 +30,7 @@ type Config struct {
 	CriblDest     string
 	Subprocess    bool
 	Loglevel      string
+	LibraryPath   string
 
 	now func() time.Time
 	sc  *ScopeConfig
@@ -44,6 +45,14 @@ func (rc *Config) Run(args []string) {
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+	if len(rc.LibraryPath) > 0 {
+		// Validate path exists
+		if !util.CheckDirExists(rc.LibraryPath) {
+			util.ErrAndExit("Library Path does not exist: \"%s\"", rc.LibraryPath)
+		}
+		// Prepend "-f" [PATH] to args
+		args = append([]string{"-f", rc.LibraryPath}, args...)
+	}
 	if !rc.Passthrough {
 		rc.setupWorkDir(args)
 		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))

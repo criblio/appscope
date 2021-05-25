@@ -39,3 +39,7 @@ docker-build:
 		-c "$(CMD)"
 endif HAVE_DOCKER
 .PHONY: docker-build
+
+# Support the old target for unit-testing
+test: check
+.PHONY: test

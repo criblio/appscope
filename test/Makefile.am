@@ -10,6 +10,7 @@ JNI_DIR = ../contrib/jni
 PCRE2_DIR = ../contrib/pcre2
 YAML_DIR = ../contrib/libyaml
 CMOCKA_DIR = ../contrib/cmocka
+OPENSSL_DIR = ../contrib/openssl
 
 # -----------------------------------------------------------------------------
 # Targets
@@ -77,7 +78,8 @@ libscope_OBJECTS = ../src/wrap.lo \
 # Common
 #
 AM_CPPFLAGS = -I../src
-AM_LDFLAGS = -ldl -lpthread -lrt -lresolv
+AM_LDFLAGS = 
+LIBS = -ldl -lpthread -lrt -lresolv
 LDADD = test.o $(libscope_OBJECTS)
 
 # only Linux now
@@ -96,9 +98,11 @@ AM_CPPFLAGS += -I$(CJSON_DIR)
 AM_CPPFLAGS += -I$(PCRE2_DIR)/src -I$(PCRE2_DIR)/build
 AM_CPPFLAGS += -I$(FUNCHOOK_DIR)/src -I$(FUNCHOOK_DIR)/distorm/include
 AM_CPPFLAGS += -I$(YAML_DIR)/include
+AM_CPPFLAGS += -I$(OPENSSL_DIR)/include
 
 # libs for other contribs
 AM_LDFLAGS += -L$(CJSON_DIR) -l:libcjson.a
 AM_LDFLAGS += -L$(PCRE2_DIR)/build -l:libpcre2-posix.a -l:libpcre2-8.a
 AM_LDFLAGS += -L$(FUNCHOOK_DIR)/build -l:libfunchook.a -l:libdistorm.a
 AM_LDFLAGS += -L$(YAML_DIR)/src/.libs -l:libyaml.a
+AM_LDFLAGS += -L$(OPENSSL_DIR) -l:libssl.a -l:libcrypto.a

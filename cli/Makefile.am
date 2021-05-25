@@ -22,6 +22,8 @@ $(GOPATH)/bin/go-bindata:
 check-local:
 	$(GO) test -v -coverprofile coverage.out ./...
 	$(GO) tool cover -html=coverage.out -o coverage.html
+	$(GO) vet
+#	$(GO) lint
 
 .PHONY: clean-local
 clean-local:

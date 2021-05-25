@@ -30,6 +30,7 @@ type Config struct {
 	CriblDest     string
 	Subprocess    bool
 	Loglevel      string
+	AttachPID     int
 
 	now func() time.Time
 	sc  *ScopeConfig
@@ -44,6 +45,14 @@ func (rc *Config) Run(args []string) {
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+	if rc.AttachPID > 0 {
+		// Validate PID exists
+		if !util.CheckDirExists(fmt.Sprintf("/proc/%d", rc.AttachPID)) {
+			util.ErrAndExit("PID does not exist: \"%d\"", rc.AttachPID)
+		}
+		// Prepend "--attach" [PID] to args
+		args = append([]string{"--attach", strconv.Itoa(rc.AttachPID)}, args...)
+	}
 	if !rc.Passthrough {
 		rc.setupWorkDir(args)
 		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))

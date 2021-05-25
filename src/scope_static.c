@@ -44,7 +44,8 @@
 #define DEFAULT_BIN_DIR "/tmp"
 #define DEFAULT_BIN_FNAME "ldscopedyn"
 #define LIBMUSL "musl"
-#define ALWAYSEXTRACT 1
+#define ALWAYSEXTRACT 0
+#define DEBUG 0
 
 typedef struct libscope_info_t {
     char *path;
@@ -55,6 +56,8 @@ typedef struct libscope_info_t {
 
 extern unsigned char _binary___bin_linux_ldscopedyn_start;
 extern unsigned char _binary___bin_linux_ldscopedyn_end;
+
+static int g_debug = 0;
 
 static void
 setEnvVariable(char *env, char *value)
@@ -76,7 +79,7 @@ setEnvVariable(char *env, char *value)
         return;
     }
 
-    printf("%s:%d %s to %s\n", __FUNCTION__, __LINE__, env, new_val);
+    if (g_debug) printf("%s:%d %s to %s\n", __FUNCTION__, __LINE__, env, new_val);
     if (setenv(env, new_val, 1)) {
         perror("setEnvVariable:setenv");
     }
@@ -143,7 +146,7 @@ set_loader(char *exe)
             closedir(dirp);
 
             if (name && (strlen(exld) > (strlen(buf) + 1))) {
-                printf("%s:%d exe ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, buf);
+                if (g_debug) printf("%s:%d exe ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, buf);
                 strncpy(exld, buf, strlen(buf) + 1);
                 found = 1;
                 break;
@@ -202,7 +205,7 @@ get_loader(char *exe)
     for (i = 0; i < elf->e_phnum; i++) {
         if ((phead[i].p_type == PT_INTERP)) {
             char *exld = (char *)&buf[phead[i].p_vaddr];
-            printf("%s:%d exe ld.so: %s\n", __FUNCTION__, __LINE__, exld);
+            if (g_debug) printf("%s:%d exe ld.so: %s\n", __FUNCTION__, __LINE__, exld);
 
             if ((ldso = calloc(1, strlen(exld) + 2)) != NULL) {
                 strncpy(ldso, exld, strlen(exld));
@@ -327,14 +330,14 @@ setup_loader(char *exe, char *ldscope)
 
 static void
 usage(char *prog) {
-  fprintf(stderr,"usage: %s [-h help] [-f sym link dir]\n", prog);
+  fprintf(stderr,"usage: %s [-h help] [-f sym link dir] executable\n", prog);
   exit(-1);
 }
 
 int
 main(int argc, char **argv, char **env)
 {
-    int rc, opt;
+    int i, j, rc, optind = 1;
     libscope_info info;
     char *verstr;
     char *symlinkdir = NULL;
@@ -344,15 +347,17 @@ main(int argc, char **argv, char **env)
         usage(argv[0]);
     }
 
-    while ((opt = getopt(argc, argv, "hf:")) > 0) {
-        switch (opt) {
-        case 'f': symlinkdir=strdup(optarg); break;
-        case 'h': default: usage(argv[0]); break;
-        }
+    if ((argc >= 3) && (strncmp(argv[1], "-f", 2) == 0)) {
+        symlinkdir=strdup(argv[2]);
+        optind = 3;
     }
 
-    printf("Starting scope static...first extract\nsym link dir %s\noption index %d\n",
-           (symlinkdir == NULL) ? "/tmp" : symlinkdir, optind);
+#if DEBUG > 0
+    g_debug = 1;
+#endif
+
+    if (g_debug) printf("Starting scope static...first extract\nsym link dir %s\noption index %d\n",
+                        (symlinkdir == NULL) ? "/tmp" : symlinkdir, optind);
 
     strncpy(scopever, SCOPE_VER, strlen(SCOPE_VER) + 1);
     verstr = strtok(scopever, "-");
@@ -371,12 +376,20 @@ main(int argc, char **argv, char **env)
         exit(EXIT_FAILURE);
     }
 
-    printf("path to ldscope: %s %s\n", info.path, argv[optind]);
+    if (g_debug) printf("path to ldscope: %s %s\n", info.path, argv[optind]);
+
     // are we on glibc or musl?
     setup_loader(EXE_TEST_FILE, info.path);
 
     argv[0] = info.path;
     argv[1] = argv[optind];
+
+    for (i = optind + 1, j = 2; i < argc; i++, j++) {
+        argv[j] = argv[i];
+    }
+
+    argv[j] = NULL;
+
     execve(info.path, argv, environ);
     perror("execve");
     release_bin(&info);

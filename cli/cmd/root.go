@@ -15,7 +15,7 @@ var cfgFile string
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "scope",
-	Short: "command line interface for working with Cribl AppScope",
+	Short: "Command line interface for working with Cribl AppScope.\n\nBy default, calling scope with no subcommands will execute run for args after scope.",
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

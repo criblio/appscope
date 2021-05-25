@@ -36,6 +36,9 @@ var logsCmd = &cobra.Command{
 		if offset < 0 {
 			offset = 0
 		}
+		if err == io.EOF {
+			util.ErrAndExit("No logs generated")
+		}
 		util.CheckErrSprintf(err, "error seeking last N offset: %v", err)
 		_, err = logFile.Seek(int64(offset), io.SeekStart)
 		util.CheckErrSprintf(err, "error seeking log file: %v", err)

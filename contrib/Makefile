@@ -2,6 +2,12 @@
 # Cribl AppScope - Build Contribs
 #
 
+# --
+# We're not using Automake here since all we need is to relay through toi the
+# build system provided by each of our contribs. We need to support the usual
+# targets including `all`, `check`, `clear, etc.
+# --
+
 CMAKE ?= $(shell which cmake)
 OBJCOPY ?= $(shell which objcopy)
 
@@ -14,6 +20,7 @@ OPENSSL_LIBS = openssl/libssl.a openssl/libcrypto.a
 
 LIBS = $(CJSON_LIBS) $(FUNCHOOK_LIBS) $(PCRE2_LIBS) $(YAML_LIBS) $(CMOCKA_LIBS) $(OPENSSL_LIBS)
 
+# Build all the contrib'd libraries
 all: $(LIBS)
 
 $(CJSON_LIBS):
@@ -49,8 +56,11 @@ $(OPENSSL_LIBS):
 	$(OBJCOPY) --redefine-sym SSL_read=SCOPE_SSL_read openssl/libssl.a
 	$(OBJCOPY) --redefine-sym SSL_write=SCOPE_SSL_write openssl/libssl.a
 
-check:
+# We're not actually running any tests on contribs but `make check` at the top
+# needs them to be built so we'll make sure they are.
+check: all
 
+# Handle all the `clean` variants the same here.
 mostlyclean distclean maintainer-clean: clean
 clean:
 	cd cJSON && $(MAKE) clean

@@ -45,7 +45,7 @@
 #define DEFAULT_BIN_FNAME "ldscopedyn"
 #define LIBMUSL "musl"
 #define ALWAYSEXTRACT 0
-#define DEBUG 0
+#define DEBUG 1
 
 typedef struct libscope_info_t {
     char *path;
@@ -204,7 +204,7 @@ get_loader(char *exe)
 
     for (i = 0; i < elf->e_phnum; i++) {
         if ((phead[i].p_type == PT_INTERP)) {
-            char *exld = (char *)&buf[phead[i].p_vaddr];
+            char * exld = (char *)&buf[phead[i].p_offset];
             if (g_debug) printf("%s:%d exe ld.so: %s\n", __FUNCTION__, __LINE__, exld);
 
             if ((ldso = calloc(1, strlen(exld) + 2)) != NULL) {

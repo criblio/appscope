@@ -279,8 +279,7 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     memset(elf_info, 0, sizeof(Elf64_Addr) * ((AT_EXECFN + 1) * 2));
 
     // auxv entries start right after env is null
-    astart = (char **)env;    // leaving env in place for debugging
-    while(*astart++ != NULL);
+    astart = spp;
 
     for (auxv = (Elf64_auxv_t *)astart; auxv->a_type != AT_NULL; auxv++) {
         switch ((unsigned long)auxv->a_type) {

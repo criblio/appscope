@@ -622,10 +622,12 @@ dumb_thread(void *arg)
 inline static void *
 go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 {
+    int fs_valid = 0;
     uint64_t rc;
     unsigned long go_tls = 0;
     unsigned long go_fs = 0;
     unsigned long go_m = 0;
+    unsigned long *go_v;
     char *go_g = NULL;
 
     if (g_go_static) {
@@ -640,13 +642,31 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
         if (go_g) {
             // get struct m from g and pull out the TLS from 'm'
             go_m = *((unsigned long *)(go_g + g_go.g_to_m));
-            go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-            go_fs = go_tls + 8; //go compiler uses -8(FS)
-        } else {
+            go_v = (unsigned long *)go_m;
+
+            // first entry in a valid m is a pointer to g
+            if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
+                go_tls = (unsigned long)(go_m + g_go.m_to_tls);
+                go_v = (unsigned long *)go_tls;
+
+                // is tls set?
+                if (go_v && (*go_v != 0)) { // continue
+                    go_fs = go_tls + 8; //go compiler uses -8(FS)
+                    go_v = (unsigned long *)go_fs;
+
+                    if (go_v && (*go_v != 0)) { // continue
+                        fs_valid = 1;
+                    }
+                }
+            }
+        }
+
+        if (fs_valid == 0) {
             // We've seen a case where on process exit static cgo
             // apps do not have a go_g while they're exiting.
             // In this case we need to pull the TLS from the kernel
-            scopeLog("go_switch:did not get a 'g'; using fs from the kernel", -1, CFG_LOG_DEBUG);
+            // Also seen a case on libmusl where TLS is not set.
+            // Therefore, get fs from the kernel.
             if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
                 scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
                 goto out;

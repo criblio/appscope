@@ -137,6 +137,9 @@ void cfgEvtFormatNameFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatSourceEnabledSetFromStr(config_t*, watch_t, const char*);
 void cfgMtcVerbositySetFromStr(config_t*, const char*);
 void cfgTransportSetFromStr(config_t*, which_transport_t, const char*);
+void cfgTransportTlsEnableSetFromStr(config_t *, which_transport_t, const char *);
+void cfgTransportTlsValidateServerSetFromStr(config_t *, which_transport_t, const char *);
+void cfgTransportTlsCACertPathSetFromStr(config_t *, which_transport_t, const char *);
 void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
 void cfgPayEnableSetFromStr(config_t*, const char*);
@@ -428,8 +431,20 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgLogLevelSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_METRIC_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_MTC, value);
+    } else if (startsWith(env_line, "SCOPE_METRIC_TLS_ENABLE")) {
+        cfgTransportTlsEnableSetFromStr(cfg, CFG_MTC, value);
+    } else if (startsWith(env_line, "SCOPE_METRIC_TLS_VALIDATE_SERVER")) {
+        cfgTransportTlsValidateServerSetFromStr(cfg, CFG_MTC, value);
+    } else if (startsWith(env_line, "SCOPE_METRIC_TLS_CA_CERT_PATH")) {
+        cfgTransportTlsCACertPathSetFromStr(cfg, CFG_MTC, value);
     } else if (startsWith(env_line, "SCOPE_LOG_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_LOG, value);
+    } else if (startsWith(env_line, "SCOPE_LOG_TLS_ENABLE")) {
+        cfgTransportTlsEnableSetFromStr(cfg, CFG_LOG, value);
+    } else if (startsWith(env_line, "SCOPE_LOG_TLS_VALIDATE_SERVER")) {
+        cfgTransportTlsValidateServerSetFromStr(cfg, CFG_LOG, value);
+    } else if (startsWith(env_line, "SCOPE_LOG_TLS_CA_CERT_PATH")) {
+        cfgTransportTlsCACertPathSetFromStr(cfg, CFG_LOG, value);
     } else if (startsWith(env_line, "SCOPE_TAG_")) {
         processCustomTag(cfg, env_line, value);
     } else if (startsWith(env_line, "SCOPE_PAYLOAD_ENABLE")) {
@@ -442,6 +457,12 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         processReloadConfig(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_CTL, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_TLS_ENABLE")) {
+        cfgTransportTlsEnableSetFromStr(cfg, CFG_CTL, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_TLS_VALIDATE_SERVER")) {
+        cfgTransportTlsValidateServerSetFromStr(cfg, CFG_CTL, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_TLS_CA_CERT_PATH")) {
+        cfgTransportTlsCACertPathSetFromStr(cfg, CFG_CTL, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_ENABLE")) {
         cfgEvtEnableSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
@@ -763,6 +784,28 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
 }
 
 void
+cfgTransportTlsEnableSetFromStr(config_t *cfg, which_transport_t t, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgTransportTlsEnableSet(cfg, t, strToVal(boolMap, value));
+}
+
+void
+cfgTransportTlsValidateServerSetFromStr(config_t *cfg, which_transport_t t, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgTransportTlsValidateServerSet(cfg, t, strToVal(boolMap, value));
+}
+void
+cfgTransportTlsCACertPathSetFromStr(config_t *cfg, which_transport_t t, const char *value)
+{
+    // A little silly to define passthrough function
+    // but this keeps the interface consistent.
+    if (!cfg || !value) return;
+    cfgTransportTlsCACertPathSet(cfg, t, value);
+}
+
+void
 cfgCustomTagAddFromStr(config_t* cfg, const char* name, const char* value)
 {
     // A little silly to define passthrough function
@@ -907,7 +950,7 @@ processTlsEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char* value = stringVal(node);
     which_transport_t c = transport_context;
-    cfgTransportTlsEnableSet(config, c, strToVal(boolMap, value));
+    cfgTransportTlsEnableSetFromStr(config, c, value);
     if (value) free(value);
 }
 
@@ -916,7 +959,7 @@ processTlsValidate(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char* value = stringVal(node);
     which_transport_t c = transport_context;
-    cfgTransportTlsValidateServerSet(config, c, strToVal(boolMap, value));
+    cfgTransportTlsValidateServerSetFromStr(config, c, value);
     if (value) free(value);
 }
 
@@ -925,7 +968,7 @@ processTlsCaCert(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char* value = stringVal(node);
     which_transport_t c = transport_context;
-    cfgTransportTlsCACertPathSet(config, c, value);
+    cfgTransportTlsCACertPathSetFromStr(config, c, value);
     if (value) free(value);
 }
 

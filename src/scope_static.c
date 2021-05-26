@@ -123,10 +123,16 @@ set_loader(char *exe)
 
     for (i = 0; i < elf->e_phnum; i++) {
         if ((phead[i].p_type == PT_INTERP)) {
-            char *exld = (char *)&buf[phead[i].p_vaddr];
+            char *exld = (char *)&buf[phead[i].p_offset];
             DIR *dirp;
             struct dirent *entry;
             char buf[PATH_MAX];
+
+            if (strstr(exld, "ld-musl") != NULL) {
+                close(fd);
+                munmap(buf, sbuf.st_size);
+                return 0;
+            }
 
             snprintf(buf, sizeof(buf), "/lib/");
             if ((dirp = opendir(buf)) == NULL) {

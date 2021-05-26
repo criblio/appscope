@@ -4572,6 +4572,12 @@ scopeLog(const char *msg, int fd, cfg_log_level_t level)
     logSend(g_log, buf, level);
 }
 
+/*
+ * pthread_create was added to support go execs on libmusl.
+ * The go execs don't link to crt0/crt1 on libmusl therefore
+ * they do not call our lib constructor. We interpose this
+ * as a means to call the constructgor before the go app runs.
+ */
 EXPORTON int
 pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                void *(*start_routine)(void *), void *arg)
@@ -4586,4 +4592,96 @@ pthread_create(pthread_t *thread, const pthread_attr_t *attr,
     }
 
     return rc;
+}
+
+/*
+ * These functions are interposed to support libmusl.
+ * The addition of libssl and libcrypto pull in these
+ * glibc internal funcs.
+ */
+EXPORTON int
+__fprintf_chk(FILE *stream, int flag, const char *format, ...)
+{
+    int rc;
+    va_list ap;
+    va_start (ap, format);
+
+    if (g_fn.__fprintf_chk) {
+        rc = g_fn.__fprintf_chk(stream, flag, format, ap);
+    } else {
+        rc = fprintf(stream, format, ap);
+    }
+
+    va_end (ap);
+    return rc;
+}
+
+EXPORTON void *
+__memset_chk(void *dest, int cset, size_t len, size_t destlen)
+{
+    if (g_fn.__memset_chk) {
+        return g_fn.__memset_chk(dest, cset, len, destlen);
+    }
+
+    return memset(dest, cset, len);
+}
+
+EXPORTON void *
+__memcpy_chk(void *dest, const void *src, size_t len, size_t destlen)
+{
+    if (g_fn.__memcpy_chk) {
+        return g_fn.__memcpy_chk(dest, src, len, destlen);
+    }
+
+    return memcpy(dest, src, len);
+}
+
+EXPORTON int
+__sprintf_chk(char *str, int flag, size_t strlen, const char *format, ...)
+{
+    int rc;
+    va_list ap;
+    va_start (ap, format);
+
+    if (g_fn.__sprintf_chk) {
+        rc = g_fn.__sprintf_chk(str, flag, strlen, format, ap);
+    } else {
+        rc = sprintf(str, format, ap);
+    }
+
+    va_end (ap);
+    return rc;
+}
+
+EXPORTON long int
+__fdelt_chk(long int fdelt)
+{
+    if (g_fn.__fdelt_chk) {
+        return g_fn.__fdelt_chk(fdelt);
+    }
+
+    if (fdelt < 0 || fdelt >= FD_SETSIZE) {
+        DBG(NULL);
+        fprintf(stderr, "__fdelt_chk error: buffer overflow detected?\n");
+        abort();
+    }
+
+    return fdelt / __NFDBITS;
+}
+
+/*
+ *__register_atfork() implements pthread_atfork() as specified in ISO POSIX (2003).
+ * The additional parameter __dso_handle allows a shared object to pass in it's handle
+ * so that functions registered by __register_atfork() can be unregistered by the runtime
+ * when the shared object is unloaded.
+ */
+EXPORTON int
+__register_atfork(void (*prepare) (void), void (*parent)(void),
+                  void (*child) (void), void *__dso_handle)
+{
+    if (g_fn.__register_atfork) {
+        return g_fn.__register_atfork(prepare, parent, child, __dso_handle);
+    }
+
+    return pthread_atfork(prepare, parent, child);
 }

@@ -25,8 +25,8 @@ coreall: libscope.so ldscopedyn ldscope
 
 $(OPENSSL_AR):
 	@echo "Building openssl"
-	cd contrib/openssl && ./Configure
-	cd contrib/openssl && make
+	cd contrib/openssl && ./Configure no-async
+	cd contrib/openssl && make -j8
 	# Yuck.  Avoids naming conflict between our wrap.c and libssl.a
 	objcopy --redefine-sym SSL_read=SCOPE_SSL_read contrib/openssl/libssl.a
 	objcopy --redefine-sym SSL_write=SCOPE_SSL_write contrib/openssl/libssl.a

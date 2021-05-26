@@ -130,6 +130,13 @@ initFn(void)
     g_fn.ns_parserr = dlsym(handle, "ns_parserr");
     g_fn.__stdout_write = dlsym(handle, "__stdio_write");
     g_fn.__stderr_write = dlsym(handle, "__stdio_write");
+    // added for openssl on libmusl
+    g_fn.__fprintf_chk = dlsym(handle, "__fprintf_chk");
+    g_fn.__memset_chk = dlsym(handle, "__memset_chk");
+    g_fn.__memcpy_chk = dlsym(handle, "__memcpy_chk");
+    g_fn.__sprintf_chk = dlsym(handle, "__sprintf_chk");
+    g_fn.__fdelt_chk = dlsym(handle, "__fdelt_chk");
+    g_fn.__register_atfork = dlsym(handle, "__register_atfork");
 #ifdef __MACOS__
     g_fn.close$NOCANCEL = dlsym(handle, "close$NOCANCEL");
     g_fn.close_nocancel = dlsym(handle, "close_nocancel");

@@ -45,7 +45,7 @@
 #define DEFAULT_BIN_FNAME "ldscopedyn"
 #define LIBMUSL "musl"
 #define ALWAYSEXTRACT 0
-#define DEBUG 1
+#define DEBUG 0
 
 typedef struct libscope_info_t {
     char *path;

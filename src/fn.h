@@ -200,6 +200,12 @@ typedef struct {
     int	(*ns_parserr)(ns_msg *, ns_sect, int, ns_rr *);
     size_t (*__stdout_write)(FILE *, const unsigned char *, size_t);
     size_t (*__stderr_write)(FILE *, const unsigned char *, size_t);
+    int (*__fprintf_chk)(FILE *, int, const char *, ...);
+    void *(*__memset_chk)(void *, int, size_t, size_t);
+    void *(*__memcpy_chk)(void *, const void *, size_t, size_t);
+    int (*__sprintf_chk)(char *, int, size_t, const char *, ...);
+    long int (*__fdelt_chk)(long int);
+    int (*__register_atfork)(void (*) (void), void (*) (void), void (*) (void), void *);
 #ifdef __LINUX__
     // Couldn't easily get struct definitions for these on mac
     int (*statvfs64)(const char *, struct statvfs64 *);

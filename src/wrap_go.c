@@ -381,25 +381,30 @@ adjustGoStructOffsetsForVersion(int go_ver)
 
 }
 
-int getBaseAddress(uint64_t *addr) {
+int
+getBaseAddress(uint64_t *addr) {
     uint64_t base_addr = 0;
-    char buf[17];
-    int fd;
+    char perms[5];
+    char offset[20];
+    char buf[1024];
+    FILE *fp;
 
-    if (!g_fn.open || !g_fn.read || !g_fn.close) return -1;
+    if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose) return -1;
 
-    if ((fd = g_fn.open("/proc/self/maps", O_RDONLY)) == -1) {
+    if ((fp = g_fn.fopen("/proc/self/maps", "r")) == NULL) {
         return -1;
     }
 
-    if (g_fn.read(fd, buf, sizeof(buf))) {
+    while (g_fn.fgets(buf, sizeof(buf), fp) != NULL) {
         uint64_t addr_start;
-        if (sscanf((const char *)&buf, "%lx-", &addr_start)==1) {
+        sscanf(buf, "%lx-%*x %s %*s %s %*d", &addr_start, perms, offset);
+        if (strstr(perms, "x") != NULL) {
             base_addr = addr_start;
+            break;
         }
     }
 
-    g_fn.close(fd);
+    g_fn.fclose(fp);
     if (base_addr) {
         *addr = base_addr;
         return 0;
@@ -662,7 +667,8 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
 
-            if (pthread_create(&thread, NULL, dumb_thread, &barrier) != 0) {
+            if (!g_fn.pthread_create ||
+                (g_fn.pthread_create(&thread, NULL, dumb_thread, &barrier) != 0)) {
                 scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
                 goto out;
             }
@@ -779,7 +785,8 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
             pthread_t thread;
-            if (pthread_create(&thread, NULL, dumb_thread, NULL) != 0) {
+            if (!g_fn.pthread_create ||
+                (g_fn.pthread_create(&thread, NULL, dumb_thread, NULL) != 0)) {
                 scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
                 goto out;
             }

@@ -18,19 +18,11 @@ GO_VER_FLAGS=$(shell cd $(DIR) && $(GOPATH)/bin/govvv -flags)
 build: deps
 	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(GOPATH)/bin/scope
 
-## all: install dependencies and install the scope binary in appscope/build with compression
-all: deps scope compressscope
+## cliall: install dependencies and install the scope binary in appscope/build with compression
+cliall: deps scope compressscope
 
-## install: copy scope binary from appscope/bin/ to usr/local/bin (admin)
-install:
-	cp $(DIR)../bin/linux/scope /usr/local/bin/scope
-
-## uninstall: remove the binary from usr/local/bin (admin)
-uninstall:
-	rm /usr/local/bin/scope
-
-## clean: remove the binary from appscope/build and your GOPATH/bin directory
-clean:
+## cliclean: remove the binary from appscope/build and your GOPATH/bin directory
+cliclean:
 	rm -rf $(DIR)build/*
 	rm $(GOPATH)/bin/scope
 
@@ -43,7 +35,7 @@ deps:
 	$(GO) get github.com/ahmetb/govvv
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.40.1
 
-rebuild: clean build 
+rebuild: cliclean build 
 
 run/bundle.go:
 	rm -rf $(DIR)/build/*
@@ -58,8 +50,8 @@ scope: run/bundle.go
 compressscope:
 	upx -9 $(DIR)../bin/linux/scope
 
-## test: test all Go files
-test:
+## clitest: test all Go files
+clitest:
 	cd $(DIR) && $(GO) test -v -p 1 -failfast -timeout 600s -coverprofile coverage.out ./...
 
 ## fmt: format all Go files

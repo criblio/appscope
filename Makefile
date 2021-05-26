@@ -21,15 +21,15 @@ ifeq ($(PLATFORM),Linux)
 
 clean:
 	$(MAKE) -f os/linux/Makefile core$@
-	$(MAKE) -f cli/Makefile cli$@
+	$(MAKE) -f cli/Makefile $@
 
 test:
 	$(MAKE) -f os/linux/Makefile core$@
-	$(MAKE) -f cli/Makefile cli$@
+	$(MAKE) -f cli/Makefile $@
 
 all:
 	$(MAKE) -f os/linux/Makefile core$@
-	$(MAKE) -f cli/Makefile cli$@
+	$(MAKE) -f cli/Makefile $@
 endif
 
 .PHONY: docker-build

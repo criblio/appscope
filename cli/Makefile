@@ -12,7 +12,7 @@ GO:=go
 
 GO_VER_FLAGS=$(shell cd $(DIR) && $(GOPATH)/bin/govvv -flags)
 
-.PHONY: cliall compressscope
+.PHONY: build all install uninstall clean deps rebuild scope compressscope test fmt lint vet cover check help
 
 ## build (default): install dependencies and install the scope binary in your GOPATH/bin directory
 build: deps

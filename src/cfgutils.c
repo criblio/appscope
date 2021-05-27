@@ -146,8 +146,8 @@ void cfgPayEnableSetFromStr(config_t*, const char*);
 void cfgPayDirSetFromStr(config_t*, const char*);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 static void cfgSetFromFile(config_t *, const char *);
-static void cfgEvtFormatLogStreamSetFromStr(config_t *, const char *);
-static void cfgCriblEnableSetFromStr(config_t *, const char *);
+static void cfgCriblEnableSetFromStrEnv(config_t *, cfg_logstream_t, const char *);
+static void cfgCriblEnableSetFromStrYaml(config_t *, const char *);
 
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
@@ -537,8 +537,16 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FS, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DNS")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_DNS, value);
+    } else if (startsWith(env_line, "SCOPE_CRIBL_TLS_ENABLE")) {
+        cfgTransportTlsEnableSetFromStr(cfg, CFG_LS, value);
+    } else if (startsWith(env_line, "SCOPE_CRIBL_TLS_VALIDATE_SERVER")) {
+        cfgTransportTlsValidateServerSetFromStr(cfg, CFG_LS, value);
+    } else if (startsWith(env_line, "SCOPE_CRIBL_TLS_CA_CERT_PATH")) {
+        cfgTransportTlsCACertPathSetFromStr(cfg, CFG_LS, value);
+    } else if (startsWith(env_line, "SCOPE_CRIBL_CLOUD")) {
+        cfgCriblEnableSetFromStrEnv(cfg, CFG_LOGSTREAM_CLOUD, value);
     } else if (startsWith(env_line, "SCOPE_CRIBL")) {
-        cfgEvtFormatLogStreamSetFromStr(cfg, value);
+        cfgCriblEnableSetFromStrEnv(cfg, CFG_LOGSTREAM, value);
     }
 
 
@@ -835,18 +843,21 @@ cfgPayDirSetFromStr(config_t *cfg, const char *value)
 }
 
 void
-cfgCriblEnableSetFromStr(config_t *cfg, const char *value)
+cfgCriblEnableSetFromStrYaml(config_t *cfg, const char *value)
 {
     if (!cfg || !value) return;
+    // Sets CFG_LOGSTREAM_NONE (0) or CFG_LOGSTREAM (1)
     cfgLogStreamSet(cfg, strToVal(boolMap, value));
 }
 
 static void
-cfgEvtFormatLogStreamSetFromStr(config_t *cfg, const char *value)
+cfgCriblEnableSetFromStrEnv(config_t *cfg, cfg_logstream_t type, const char *value)
 {
-    cfgLogStreamSet(cfg, 1);
+    if (!cfg || !value) return;
+    // Sets CFG_LOGSTREAM (1) or CFG_LOGSTREAM_CLOUD (2)
+    cfgLogStreamSet(cfg, type);
+    // Sets type, host, and port
     cfgTransportSetFromStr(cfg, CFG_LS, value);
-    cfgTransportSetFromStr(cfg, CFG_CTL, value);
 }
 
 #ifndef NO_YAML
@@ -1420,7 +1431,7 @@ static void
 processCriblEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char *value = stringVal(node);
-    cfgCriblEnableSetFromStr(config, value);
+    cfgCriblEnableSetFromStrYaml(config, value);
     if (value) free(value);
 }
 
@@ -1429,12 +1440,6 @@ processCriblTransport(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     transport_context = CFG_LS;
     processTransport(config, doc, node);
-
-
-    if (cfgLogStream(config)) {
-        transport_context = CFG_CTL;
-        processTransport(config, doc, node);
-    }
 }
 
 static void
@@ -2079,22 +2084,38 @@ initCtl(config_t *cfg)
 int
 cfgLogStreamDefault(config_t *cfg)
 {
-    if (!cfg || (cfgLogStream(cfg) == FALSE)) return -1;
-
-    const char *host = cfgTransportHost(cfg, CFG_LS);
-    const char *port = cfgTransportPort(cfg, CFG_LS);
-
-    if (!host || !port) return -1;
+    if (!cfg || (cfgLogStream(cfg) == CFG_LOGSTREAM_NONE)) return -1;
 
     snprintf(g_logmsg, sizeof(g_logmsg), DEFAULT_LOGSTREAM_LOGMSG);
 
-    cfgTransportTypeSet(cfg, CFG_CTL, CFG_TCP);
-    cfgTransportHostSet(cfg, CFG_CTL, host);
-    cfgTransportPortSet(cfg, CFG_CTL, port);
+    // override the CFG_LS transport type to be TCP
+    cfgTransportTypeSet(cfg, CFG_LS, CFG_TCP);
+    // host is already set
+    // port is already set
 
-    cfgTransportTypeSet(cfg, CFG_MTC, CFG_TCP);
-    cfgTransportHostSet(cfg, CFG_MTC, host);
-    cfgTransportPortSet(cfg, CFG_MTC, port);
+    // if cloud, override tls settings too
+    if (cfgLogStream(cfg) == CFG_LOGSTREAM_CLOUD) {
+        // TLS enabled, with Server Validation, using root certs (payload)
+        cfgTransportTlsEnableSet(cfg, CFG_LS, TRUE);
+        cfgTransportTlsValidateServerSet(cfg, CFG_LS, TRUE);
+        cfgTransportTlsCACertPathSet(cfg, CFG_LS, NULL);
+    }
+
+    // copy the CFG_LS configuration to CFG_CTL
+    {
+        cfg_transport_t type = cfgTransportType(cfg, CFG_LS);
+        cfgTransportTypeSet(cfg, CFG_CTL, type);
+        const char *host = cfgTransportHost(cfg, CFG_LS);
+        cfgTransportHostSet(cfg, CFG_CTL, host);
+        const char *port = cfgTransportPort(cfg, CFG_LS);
+        cfgTransportPortSet(cfg, CFG_CTL, port);
+        unsigned int enable = cfgTransportTlsEnable(cfg, CFG_LS);
+        cfgTransportTlsEnableSet(cfg, CFG_CTL, enable);
+        unsigned int validateserver = cfgTransportTlsValidateServer(cfg, CFG_LS);
+        cfgTransportTlsValidateServerSet(cfg, CFG_CTL, validateserver);
+        const char *cacertpath = cfgTransportTlsCACertPath(cfg, CFG_LS);
+        cfgTransportTlsCACertPathSet(cfg, CFG_CTL, cacertpath);
+    }
 
     if (cfgMtcEnable(cfg) != TRUE) {
         strncat(g_logmsg, "Metrics enable, ", 20);

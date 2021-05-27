@@ -49,9 +49,7 @@
 
 typedef struct libscope_info_t {
     char *path;
-    char *shm_name;
     int fd;
-    int use_memfd;
 } libscope_info;
 
 extern unsigned char _binary___bin_linux_ldscopedyn_start;
@@ -99,7 +97,7 @@ set_loader(char *exe)
 
     if (!exe) return -1;
 
-    if ((fd = open(exe, O_RDWR)) == -1) {
+    if ((fd = open(exe, O_RDONLY)) == -1) {
         perror("set_loader:open");
         return -1;
     }
@@ -161,6 +159,18 @@ set_loader(char *exe)
     }
 
     if (found) {
+        if (close(fd) == -1) {
+            munmap(buf, sbuf.st_size);
+            return -1;
+        }
+
+        if ((fd = open(exe, O_RDWR)) == -1) {
+            perror("set_loader:open write");
+            close(fd);
+            munmap(buf, sbuf.st_size);
+            return -1;
+        }
+
         int rc = write(fd, buf, sbuf.st_size);
         if (rc < sbuf.st_size) {
             perror("set_loader:write");
@@ -233,11 +243,14 @@ do_musl(char *exld, char *ldscope)
     char *path;
     char dir[strlen(ldscope) + 2];
 
-    // does a link to the musl ld.so exist?
-    if ((ldso = get_loader(ldscope)) == NULL) return;
-
+    // alwyas set the env var
     strncpy(dir, ldscope, strlen(ldscope) + 1);
     path = dirname(dir);
+    setEnvVariable(LD_LIB_ENV, path);
+
+    // does a link to the musl ld.so exist?
+    // if so, we assume the symlink exists as well.
+    if ((ldso = get_loader(ldscope)) == NULL) return;
 
     if (asprintf(&lpath, "%s/%s", path, basename(ldso)) == -1) {
         perror("do_musl:asprintf");
@@ -256,8 +269,6 @@ do_musl(char *exld, char *ldscope)
 
     set_loader(ldscope);
 
-    setEnvVariable(LD_LIB_ENV, path);
-
     if (ldso) free(ldso);
     if (lpath) free(lpath);
 }
@@ -267,10 +278,6 @@ release_bin(libscope_info *info) {
     if (!info) return;
 
     if (info->fd != -1) close(info->fd);
-    if (info->shm_name) {
-        if (info->fd != -1) close(info->fd);
-        free(info->shm_name);
-    }
     if (info->path) free(info->path);
 }
 
@@ -281,15 +288,12 @@ extract_bin(libscope_info *info, unsigned char *start, unsigned char *end)
 
     struct stat sbuf;
 
-#if ALWAYSEXTRACT == 0
     // if already extracted, don't do it again
     if (lstat(info->path, &sbuf) == 0) return 0;
-#endif
 
     char *path;
     char dir[strlen(info->path)];
 
-    info->shm_name = NULL;
     strncpy(dir, info->path, strlen(info->path) + 1);
     path = dirname(dir);
 
@@ -334,6 +338,52 @@ setup_loader(char *exe, char *ldscope)
     return 0;
 }
 
+#if ALWAYSEXTRACT > 0
+static int
+clean_extract(char *symlinkdir, char *verstr)
+{
+    char *unpath;
+    DIR *dirp;
+    struct dirent *entry;
+
+    if (asprintf(&unpath, "%s/libscope-%s/",
+                 (symlinkdir == NULL) ? DEFAULT_BIN_DIR : symlinkdir,
+                 verstr) == -1) {
+        perror("clean_extract:asprintf");
+        if (unpath) free(unpath);
+        return -1;
+    }
+
+    if ((dirp = opendir(unpath)) == NULL) {
+        perror("clean_extract:opendir");
+        if (unpath) free(unpath);
+        return -1;
+    }
+
+    while ((entry = readdir(dirp)) != NULL) {
+        if (entry->d_type != DT_DIR) {
+            char path[PATH_MAX];
+
+            strncpy(path, unpath, strlen(unpath) + 1);
+            strncat(path, entry->d_name, strlen(entry->d_name));
+
+            if (unlink(path) == -1) {
+                perror("clean_extract:unlink");
+                printf("%s\n", entry->d_name);
+                closedir(dirp);
+                if (unpath) free(unpath);
+                return -1;
+            }
+        }
+    }
+
+    unlinkat(AT_FDCWD, unpath, AT_REMOVEDIR);
+    closedir(dirp);
+    if (unpath) free(unpath);
+    return 0;
+}
+#endif // ALWAYSEXTRACT
+
 static void
 usage(char *prog) {
   fprintf(stderr,"usage: %s [-h help] [-f sym link dir] executable\n", prog);
@@ -373,6 +423,10 @@ main(int argc, char **argv, char **env)
         perror("ldscope:path");
         exit(EXIT_FAILURE);
     }
+
+#if ALWAYSEXTRACT > 0
+    clean_extract(symlinkdir, verstr);
+#endif
 
     if ((rc = extract_bin(&info,
                           &_binary___bin_linux_ldscopedyn_start,

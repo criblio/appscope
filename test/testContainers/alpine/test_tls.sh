@@ -5,7 +5,6 @@ DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
 FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
-PRELOAD=`env | grep LD_PRELOAD`
 EVT_FILE="/opt/test/logs/events.log"
 
 starttest(){
@@ -13,13 +12,11 @@ starttest(){
     echo "==============================================="
     echo "             Testing $CURRENT_TEST             "
     echo "==============================================="
-    export $PRELOAD
     ERR=0
 }
 
 evaltest(){
     echo "             Evaluating $CURRENT_TEST"
-    unset LD_PRELOAD
 }
 
 endtest(){
@@ -82,7 +79,7 @@ evalPayload(){
 # OpenSSL
 #
 starttest OpenSSL
-ldscope /opt/test/curl-ssl --head https://cribl.io
+ldscope /opt/test/curl-ssl --http1.1 --head https://cribl.io
 evaltest
 
 grep http-req $EVT_FILE > /dev/null
@@ -92,6 +89,12 @@ grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
 grep http-metric $EVT_FILE > /dev/null
+ERR+=$?
+
+grep net.dns.req $EVT_FILE > /dev/null
+ERR+=$?
+
+grep net.dns.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -104,8 +107,7 @@ endtest
 # gnutls
 #
 starttest gnutls
-unset LD_PRELOAD
-ldscope /opt/test/curl-tls --head https://cribl.io
+ldscope /opt/test/curl-tls --http1.1 --head https://cribl.io
 evaltest
 
 grep http-req $EVT_FILE > /dev/null
@@ -115,6 +117,12 @@ grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
 grep http-metric $EVT_FILE > /dev/null
+ERR+=$?
+
+grep net.dns.req $EVT_FILE > /dev/null
+ERR+=$?
+
+grep net.dns.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -127,8 +135,7 @@ endtest
 # nss
 #
 starttest nss
-unset LD_PRELOAD
-ldscope /opt/test/curl-nss --head https://cribl.io
+ldscope /opt/test/curl-nss --http1.1 --head https://cribl.io
 evaltest
 
 grep http-req $EVT_FILE > /dev/null
@@ -138,6 +145,12 @@ grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
 grep http-metric $EVT_FILE > /dev/null
+ERR+=$?
+
+grep net.dns.req $EVT_FILE > /dev/null
+ERR+=$?
+
+grep net.dns.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -150,7 +163,6 @@ endtest
 # node.js
 #
 starttest "node.js"
-unset LD_PRELOAD
 ldscope node /opt/test/bin/nodehttp.ts > /dev/null
 evaltest
 
@@ -172,16 +184,16 @@ endtest
 #
 # Ruby
 #
+starttest Ruby
 echo "Creating key files for ruby client and server"
 (cd /opt/test/bin && openssl req -x509 -newkey rsa:4096 -keyout priv.pem -out cert.pem -days 365 -nodes -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost")
-starttest Ruby
-RUBY_HTTP_START=$(grep http- $EVT_FILE | grep -c 10101)
-(cd /opt/test/bin && ./server.rb 10101 &)
+RUBY_HTTP_START=$(grep http- $EVT_FILE | grep 10101 | wc -l)
+(cd /opt/test/bin && ldscope ./server.rb 10101 &)
 sleep 1
-(cd /opt/test/bin && ./client.rb 127.0.0.1 10101)
+(cd /opt/test/bin && ldscope ./client.rb 127.0.0.1 10101)
 sleep 1
 evaltest
-RUBY_HTTP_END=$(grep http- $EVT_FILE | grep -c 10101)
+RUBY_HTTP_END=$(grep http- $EVT_FILE | grep 10101 | wc -l)
 
 if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 6 )); then
     ERR+=1
@@ -196,17 +208,15 @@ endtest
 #
 # Python
 #
-#/opt/rh/rh-python36/root/usr/bin/pip3.6 install pyopenssl
 starttest Python
-unset LD_PRELOAD
-ldscope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test/bin/testssl.py create_certs
-ldscope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test/bin/testssl.py start_server&
+ldscope python3 /opt/test/bin/testssl.py create_certs
+ldscope python3 /opt/test/bin/testssl.py start_server&
 sleep 1
-ldscope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test/bin/testssl.py run_client
+ldscope python3 /opt/test/bin/testssl.py run_client
 sleep 1
 evaltest
 
-COUNT=$(grep -c http- $EVT_FILE)
+COUNT=$(grep http- $EVT_FILE | wc -l)
 if (( $COUNT < 6 )); then
     ERR+=1
 fi
@@ -243,12 +253,11 @@ endtest
 # php
 #
 starttest php
-unset LD_PRELOAD
-PHP_HTTP_START=$(grep http- $EVT_FILE | grep -c sslclient.php)
+PHP_HTTP_START=$(grep http- $EVT_FILE | grep sslclient.php | wc -l)
 ldscope php /opt/test/bin/sslclient.php > /dev/null
 evaltest
 
-PHP_HTTP_END=$(grep http- $EVT_FILE | grep -c sslclient.php)
+PHP_HTTP_END=$(grep http- $EVT_FILE | grep sslclient.php | wc -l)
 
 if (( $PHP_HTTP_END - $PHP_HTTP_START < 3 )); then
     ERR+=1
@@ -264,13 +273,12 @@ endtest
 # apache
 #
 starttest apache
-unset LD_PRELOAD
-APACHE_HTTP_START=$(grep http- $EVT_FILE | grep -c httpd)
+APACHE_HTTP_START=$(grep http- $EVT_FILE | grep httpd | wc -l)
 ldscope httpd -k start
-ldscope curl -k https://localhost:443/ > /dev/null
+ldscope curl -k https://localhost:443/
 ldscope httpd -k stop
 evaltest
-APACHE_HTTP_END=$(grep http- $EVT_FILE | grep -c httpd)
+APACHE_HTTP_END=$(grep http- $EVT_FILE | grep httpd | wc -l)
 
 if (( $APACHE_HTTP_END - $APACHE_HTTP_START < 3 )); then
     ERR+=1

@@ -80,7 +80,7 @@ evalPayload(){
 #
 starttest plainServerDynamic
 cd /go/net
-PORT=80
+PORT=8080
 
 ldscope ./plainServerDynamic ${PORT} &
 
@@ -118,7 +118,7 @@ endtest
 #
 starttest plainServerStatic
 cd /go/net
-PORT=81
+PORT=8081
 ldscope ./plainServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port

@@ -1,12 +1,9 @@
 FROM alpine:latest
 
-RUN apk add go openssl make bash curl autoconf automake libtool openssl-dev rust nodejs ruby python3 php apache2 apache2-ssl python3-dev py3-pip libffi-dev cargo && \
+RUN apk add go openssl make bash curl autoconf automake libtool openssl-dev rust nodejs ruby python3 php php-openssl apache2 apache2-ssl python3-dev py3-pip libffi-dev cargo && \
     go clean -cache
 
 RUN mkdir -p /go
-
-COPY ./alpine/test_go.sh /go
-COPY ./go/test_go_struct.sh /go
 
 RUN mkdir -p /go/thread
 COPY ./go/thread/fileThread.go /go/thread
@@ -75,8 +72,6 @@ RUN cd /opt/test && \
 # Install test-runner pieces
 RUN mkdir /opt/test/logs /opt/test/bin
 COPY ./tls/test_cert.pem /opt/test/.
-# Rust
-COPY ./tls/rust/http_test/target/debug/http_test /opt/test/bin/.
 # Node
 COPY ./tls/nodehttp.ts /opt/test/bin/nodehttp.ts
 # Ruby
@@ -87,11 +82,21 @@ COPY ./tls/testssl.py /opt/test/bin/testssl.py
 RUN pip install pyopenssl
 # PHP
 COPY ./tls/php/sslclient.php /opt/test/bin
+# Rust
+COPY ./tls/rust/http_test /opt/test/rust
+RUN cd /opt/test/rust && \
+    cargo build --release && \
+    cp target/release/http_test /opt/test/bin && \
+    cd /opt/test && \
+    rm -rf /opt/test/rust
 
 # Debug Tools
 COPY ./tls/alias /root/.alias
 COPY ./tls/gdbinit /root/.gdbinit
 
+# Tests
+COPY ./alpine/test_go.sh /go
+COPY ./go/test_go_struct.sh /go
 COPY ./alpine/test_tls.sh /opt/test/bin/test_tls.sh
 COPY ./alpine/test_all.sh /opt/test/bin/test_all.sh
 

@@ -23,22 +23,42 @@ maintainer-clean-local:
 	$(RM) -r aclocal.m4 compile config.h config.h.in config.h.in~ config.log config.status configure depcomp install-sh m4 Makefile.in missing stamp-h1 ar-lib config.guess config.sub ltmain.sh
 .PHONY: maintainer-clean-local
 
-if HAVE_DOCKER
-docker-build: TAG ?= "appscope-builder"
-docker-build: BUILD_ARGS ?=
-docker-build: CMD ?= ./bootstrap && make check
-docker-build:
+DOCKER_TAG ?= "appscope-builder"
+
+docker-build-image: BUILD_ARGS ?=
+docker-build-image: DOCKER := $(shell which docker 2>/dev/null)
+docker-build-image: 
+	@[ -x "$(DOCKER)" ] || \
+		{ echo >&2 "error: Please install Docker first."; exit 1; }
 	@$(DOCKER) build \
-		--tag $(TAG) \
+		--tag $(DOCKER_TAG) \
 		-f docker/builder/Dockerfile \
+		--build-arg UID=$(shell id -u) \
+		--build-arg GID=$(shell id -g) \
 		$(BUILD_ARGS) .
+.PHONY: docker-build-image
+
+docker-build: DOCKER := $(shell which docker 2>/dev/null)
+docker-build: docker-build-image
+	@[ -x "$(DOCKER)" ] || \
+		{ echo >&2 "error: Please install Docker first."; exit 1; }
 	@$(DOCKER) run -it --rm \
-		-v "$(shell pwd):/root/appscope" \
+		-v "$(shell pwd):/opt/appscope" \
+		--user $(shell id -u):$(shell id -g) \
 		--entrypoint /bin/bash \
-		$(TAG) \
-		-c "$(CMD)"
-endif HAVE_DOCKER
+		$(DOCKER_TAG) \
+		-c "./bootstrap && make -j8 all && make check"
 .PHONY: docker-build
+
+docker-run: DOCKER := $(shell which docker 2>/dev/null)
+docker-run: docker-build-image
+	@[ -x "$(DOCKER)" ] || \
+		{ echo >&2 "error: Please install Docker first."; exit 1; }
+	@$(DOCKER) run -it --rm \
+		-v "$(shell pwd):/opt/appscope" \
+		--user $(shell id -u):$(shell id -g) \
+		$(DOCKER_TAG)
+.PHONY: docker-run
 
 # Support the old target for unit-testing
 test: check

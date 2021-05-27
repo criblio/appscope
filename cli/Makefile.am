@@ -4,10 +4,10 @@
 # See docs/BUILD.md for details.
 #
 
-bin_PROGRAMS = scope
+bin_PROGRAMS = scope$(EXEEXT)
 
 scope$(EXEEXT): main.go cmd/*.go run/bundle.go
-	$(GO) build
+	$(GO) build -o $@
 
 run/bundle.go: $(GOPATH)/bin/go-bindata
 	$(RM) -r ./build/*
@@ -20,14 +20,20 @@ $(GOPATH)/bin/go-bindata:
 	$(GO) get github.com/go-bindata/go-bindata/...
 
 check-local:
+	$(GO) fmt
+	$(GO) vet
 	$(GO) test -v -coverprofile coverage.out ./...
 	$(GO) tool cover -html=coverage.out -o coverage.html
-	$(GO) vet
-#	$(GO) lint
+
+install-exec-local:
+	$(INSTALL) scope$(EXEEXT) $(gobindir)/scope$(EXEEXT)
+
+uninstall-local:
+	$(RM) $(gobindir)/scope$(EXEEXT)
 
 .PHONY: clean-local
 clean-local:
-	$(RM) scope
+	$(RM) scope$(EXEEXT)
 
 .PHONY: maintainer-clean-local
 maintainer-clean-local:

@@ -21,10 +21,6 @@ FROM $IMAGE
 ARG GOLANG=golang
 ENV GOLANG=$GOLANG
 
-# These are needed to bypass the prompts when tzdata is installed.
-ENV DEBIAN_FRONTEND="noninteractive"
-ENV TZ="America/New_York"
-
 # ---
 # Install packages. Note extra PPA for Go.
 #
@@ -34,24 +30,35 @@ ENV TZ="America/New_York"
 # additions above don't apply and we end up with interaction when some of the
 # dependencies (i.e. tzdata) are installed.
 #
+ENV DEBIAN_FRONTEND="noninteractive"
+ENV TZ="America/New_York"
 RUN apt-get update && \
     apt-get install -y software-properties-common gpg apt-utils && \
     add-apt-repository ppa:longsleep/golang-backports && \
     apt-get update && \
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 52B59B1571A79DBC054901C0F6BC817356A3D45E && \
-    apt-get install -y $GOLANG git autoconf automake libtool cmake lcov upx make gdb vim emacs strace lsof && \
-    apt-get clean
+    apt-get install -y $GOLANG git autoconf automake libtool cmake lcov upx make gdb vim emacs strace lsof sudo && \
+    apt-get clean && \
+    sed -i 's/%sudo	ALL=(ALL:ALL) ALL/%sudo	ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers
 
 # ---
-# Extra setup for use with `make docker-run`
+# Create a user 
 #
-COPY ./docker/builder/gdbinit /root/.gdbinit
+# The Makefile passes the current user's UID/GID in as these ARGs when
+# building. We then run using these IDs so the ownership of the mounted files
+# don't get hosed.
+#
+ARG UID=1000
+ARG GID=1000
+RUN addgroup --gid $GID appscope && \
+    adduser --home /opt/appscope --uid $UID --gid $GID appscope && \
+    usermod -a -G sudo appscope
 
 # ---
 # The local git clone of the project is mounted as /root/appscope. See Makefile.
 #
 #     docker run -v $(pwd):/root/appscope ...
 #
-WORKDIR /root/appscope
+WORKDIR /opt/appscope
 
 # fini

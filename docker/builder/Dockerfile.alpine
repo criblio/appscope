@@ -15,18 +15,27 @@ FROM $IMAGE
 # ---
 # Install packages.
 #
-RUN apk add --no-cache go gdb git make vim emacs strace tcpdump
+RUN apk add --no-cache go gdb git make vim emacs strace tcpdump sudo && \
+    sed -i 's/# %sudo	ALL=(ALL) ALL/%sudo	ALL=(ALL) NOPASSWD:ALL/' /etc/sudoers
 
 # ---
-# Extra setup for use with `make docker-run`
+# Create a user 
 #
-COPY ./docker/builder/gdbinit /root/.gdbinit
+# The Makefile passes the current user's UID/GID in as these ARGs when
+# building. We then run using these IDs so the ownership of the mounted files
+# don't get hosed.
+#
+ARG UID=1000
+ARG GID=1000
+RUN addgroup --gid $GID appscope && \
+    adduser --home /opt/appscope --uid $UID --gid $GID appscope && \
+    usermod -a -G sudo appscope
 
 # ---
 # The local git clone of the project is mounted as /root/appscope. See Makefile.
 #
 #     docker run -v $(pwd):/root/appscope ...
 #
-WORKDIR /root/appscope
+WORKDIR /opt/appscope
 
 # fini

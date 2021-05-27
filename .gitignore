@@ -3,7 +3,10 @@ test/selfinterpose/
 test/testContainers/logs
 
 # docker-run
+.bash_history
+.viminfo
 .gdb_history
+.sudo_as_admin_successful
 scope.log
 
 # Contribs

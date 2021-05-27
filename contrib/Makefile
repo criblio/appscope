@@ -3,70 +3,96 @@
 #
 
 # --
-# We're not using Automake here since all we need is to relay through toi the
-# build system provided by each of our contribs. We need to support the usual
-# targets including `all`, `check`, `clear, etc.
+# Notes:
+#
+#   We're not using Automake here since all we need is to relay through to the
+#   build system provided by each of our contribs. We need to support the usual
+#   targets including `all`, `check`, `clear, etc.
+#
+#   The *_LIBS variables below are the .a's we need to link against elsewhere 
+#   but the lists are truncated so they only include the first one. This is to
+#   avoid the job running twice when we use `-j` to build or test in parallel.
+#
+#   We separate out the "configure" logic from the step to actually run make
+#   for each library so we can run parallel builds.
 # --
 
 CMAKE ?= $(shell which cmake)
 OBJCOPY ?= $(shell which objcopy)
 
+all: cJSON cmocka funchook libyaml openssl pcre2
+.PHONY: all
+
 CJSON_LIBS = cJSON/libcjson.so
-FUNCHOOK_LIBS = funchook/build/libfunchook.a funchook/build/libdistorm.a
-PCRE2_LIBS = pcre2/build/libpcre2-8.a pcre2/build/libpcre2-posix.a
+cJSON: $(CJSON_LIBS)
+$(CJSON_LIBS): cJSON/build
+	$(MAKE) -C cJSON/build
+cJSON/build:
+	mkdir $@
+	cd $@ && $(CMAKE) -DENABLE_CUSTOM_COMPILER_FLAGS=OFF -DENABLE_CJSON_TEST=OFF -DCMAKE_BUILD_TYPE=Release ..
+.PHONY: cJSON
+
+FUNCHOOK_LIBS = funchook/build/libfunchook.a #funchook/build/libdistorm.a
+funchook: $(FUNCHOOK_LIBS)
+$(FUNCHOOK_LIBS): funchook/build
+	$(MAKE) -C funchook/build
+funchook/build:
+	mkdir $@
+	cd $@ && $(CMAKE) -DCMAKE_BUILD_TYPE=Release ..
+.PHONY: funchook
+
+PCRE2_LIBS = pcre2/build/libpcre2-8.a #pcre2/build/libpcre2-posix.a
+pcre2: $(PCRE2_LIBS)
+$(PCRE2_LIBS): pcre2/build
+	$(MAKE) -C pcre2/build
+pcre2/build:
+	mkdir $@
+	cd $@ && $(CMAKE) ..
+.PHONY: pcre2
+
 YAML_LIBS = libyaml/src/libyaml.la
-CMOCKA_LIBS = cmocka/build/src/libcmocka.dylib
-OPENSSL_LIBS = openssl/libssl.a openssl/libcrypto.a
-
-LIBS = $(CJSON_LIBS) $(FUNCHOOK_LIBS) $(PCRE2_LIBS) $(YAML_LIBS) $(CMOCKA_LIBS) $(OPENSSL_LIBS)
-
-# Build all the contrib'd libraries
-all: $(LIBS)
-
-$(CJSON_LIBS):
-	cd cJSON && $(MAKE)
-
-$(FUNCHOOK_LIBS):
-	@[ -d funchook/build ] || mkdir funchook/build
-	cd funchook/build && \
-		$(CMAKE) -DCMAKE_BUILD_TYPE=Release .. && \
-		$(MAKE) -j4
-
-$(PCRE2_LIBS):
-	@[ -d pcre2/build ] || mkdir pcre2/build
-	cd pcre2/build && \
-		$(CMAKE) .. && \
-		$(MAKE) -j4
-
-$(YAML_LIBS):
+libyaml: $(YAML_LIBS)
+$(YAML_LIBS): libyaml/Makefile
+	$(MAKE) -C libyaml
+libyaml/Makefile:
 	cd libyaml && \
 		./bootstrap && \
-		./configure LIBS=-ldl --disable-shared --with-pic CFLAGS="-fPIC -DPIC" && \
-		$(MAKE) -j4
+		./configure LIBS=-ldl --disable-shared --with-pic CFLAGS="-fPIC -DPIC"
+.PHONY: libyaml
 
-$(CMOCKA_LIBS):
-	@[ -d cmocka/build ] || mkdir cmocka/build
-	cd cmocka/build && \
-		$(CMAKE) -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Debug .. && \
-		$(MAKE) -j4
+CMOCKA_LIBS = Gcmocka/build/src/libcmocka.so
+cmocka: $(CMOCKA_LIBS)
+$(CMOCKA_LIBS): cmocka/build
+	$(MAKE) -C cmocka/build
+cmocka/build:
+	mkdir $@
+	cd $@ && $(CMAKE) -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Debug ..
+.PHONY: cmocka
 
-# Yuck.  The objcopy's avoid naming conflicts between our wrap.c and libssl.a
-$(OPENSSL_LIBS):
-	cd openssl && ./Configure && $(MAKE) -j4
+#
+# Yuck. The objcopy's avoid naming conflicts between our wrap.c and libssl.a.
+#
+OPENSSL_LIBS = openssl/libssl.a #openssl/libcrypto.a
+openssl: $(OPENSSL_LIBS)
+$(OPENSSL_LIBS): openssl/Makefile
+	$(MAKE) -C openssl
 	$(OBJCOPY) --redefine-sym SSL_read=SCOPE_SSL_read openssl/libssl.a
 	$(OBJCOPY) --redefine-sym SSL_write=SCOPE_SSL_write openssl/libssl.a
+openssl/Makefile:
+	cd openssl && ./Configure no-async
+.PHONY: openssl
 
-# We're not actually running any tests on contribs but `make check` at the top
-# needs them to be built so we'll make sure they are.
 check: all
+.PHONY: check
 
-# Handle all the `clean` variants the same here.
 mostlyclean distclean maintainer-clean: clean
+	$(RM) libyaml/Makefile
+	$(RM) openssl/Makefile
 clean:
-	cd cJSON && $(MAKE) clean
+	$(RM) -r cJSON/build
 	$(RM) -r funchook/build
 	$(RM) -r pcre2/build
 	cd libyaml && $(MAKE) clean
 	$(RM) -r cmocka/build
 	cd openssl && $(MAKE) clean
-
+.PHONY: mostlyclean distclean maintainer-clean clean

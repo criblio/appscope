@@ -70,7 +70,7 @@ fi
 dnl Extras derived from programs
 AM_CONDITIONAL(HAVE_DOCKER, test -n "$DOCKER")
 AM_CONDITIONAL(HAVE_GO, test -n "$GO")
-gopath=$($GO env | grep GOPATH | cut -d\" -f2)
+gopath=$($GO env | grep GOPATH | awk -F= '{print $2}' | sed 's/"//g')
 AC_SUBST([GOPATH], $gopath)
 
 dnl Enable Libtool
@@ -92,9 +92,11 @@ AC_ARG_ENABLE(debug,
     esac],
     [debug=false]
 )
-
 AM_CONDITIONAL(DEBUG, test x"$debug" = x"true")
 
+dnl Go subdirs
+AC_SUBST([godir], ${prefix}/go)
+AC_SUBST([gobindir], ${prefix}/go/bin)
 
 dnl Create config.h
 AC_CONFIG_HEADERS([config.h])

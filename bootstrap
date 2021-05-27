@@ -188,10 +188,10 @@ if is_alpine; then
 fi
 
 info Generating Build System
-autoreconf -ivf -Wno-override
+autoreconf -ivf -Wno-override || exit 1
 
 info Running ./configure $@
-./configure "$@"
+./configure "$@" || exit 1
 
 info Build System Ready. Run make.
 

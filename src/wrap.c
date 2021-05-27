@@ -387,7 +387,6 @@ remoteConfig()
     int timeout;
     struct pollfd fds;
     int rc, success, numtries;
-    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
@@ -396,13 +395,20 @@ remoteConfig()
     timeout = 1;
     memset(&fds, 0x0, sizeof(fds));
 
+/*
+    Setting fds.events = 0 to neuter ability to process remote
+    commands... until this is function is reworked to be TLS-friendly.
+
+    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
     if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
         (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {
         fds.events = 0;
     } else {
         fds.events = POLLIN;
     }
+*/
 
+    fds.events = 0;
     fds.fd = ctlConnection(g_ctl, CFG_CTL);
 
     rc = g_fn.poll(&fds, 1, timeout);

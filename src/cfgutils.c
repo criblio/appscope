@@ -2115,6 +2115,10 @@ cfgLogStreamDefault(config_t *cfg)
         cfgTransportTlsValidateServerSet(cfg, CFG_CTL, validateserver);
         const char *cacertpath = cfgTransportTlsCACertPath(cfg, CFG_LS);
         cfgTransportTlsCACertPathSet(cfg, CFG_CTL, cacertpath);
+
+        cfgTransportTypeSet(cfg, CFG_MTC, type);
+        cfgTransportHostSet(cfg, CFG_MTC, host);
+        cfgTransportPortSet(cfg, CFG_MTC, port);
     }
 
     if (cfgMtcEnable(cfg) != TRUE) {

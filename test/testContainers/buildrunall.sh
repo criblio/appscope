@@ -2,6 +2,10 @@
 
 set -e
 
+docker-compose build alpine
+docker-compose up alpine
+docker-compose down
+
 docker-compose build interposed_func
 docker-compose up interposed_func
 docker-compose down

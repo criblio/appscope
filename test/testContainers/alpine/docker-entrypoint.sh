@@ -2,8 +2,7 @@
 set -e
 
 if [ "$1" = "test" ]; then
-  echo "Running /go/test_go.sh"
-  exec /go/test_go.sh
+  exec /opt/test/bin/test_all.sh
 fi
 
 exec "$@"

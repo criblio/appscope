@@ -1,12 +1,11 @@
 FROM alpine:latest
 
-RUN apk add go openssl make bash curl
-
-run go clean -cache
+RUN apk add go openssl make bash curl autoconf automake libtool openssl-dev rust nodejs ruby python3 php apache2 apache2-ssl python3-dev py3-pip libffi-dev cargo && \
+    go clean -cache
 
 RUN mkdir -p /go
 
-COPY ./go/test_go.sh /go
+COPY ./alpine/test_go.sh /go
 COPY ./go/test_go_struct.sh /go
 
 RUN mkdir -p /go/thread
@@ -38,10 +37,63 @@ COPY ./go/cgo/myc.h /go/cgo
 COPY ./go/cgo/mygo.go /go/cgo
 RUN cd /go/cgo && make all
 
-RUN mkdir -p /go/influx
-COPY ./go/influx/* /go/influx/
-COPY ./go/influx/influxdb-selfsigned.key /etc/ssl/.
-COPY ./go/influx/influxdb-selfsigned.crt /etc/ssl/.
+# Building two versions of curl. Download the source first.
+RUN mkdir -p /opt/test && \
+    cd /opt/test && \
+    wget https://curl.haxx.se/download/curl-7.69.1.tar.gz
+# Build the SSL version
+RUN cd /opt/test && \
+    tar xvzf curl-7.69.1.tar.gz && \
+    mv curl-7.69.1 curlssl && \
+    cd curlssl && \
+    ./buildconf && \
+    ./configure --with-ssl --without-gnutls --without-nss && \
+    make -j8
+# Build the TLS version
+RUN cd /opt/test && \
+    tar xvzf curl-7.69.1.tar.gz && \
+    mv curl-7.69.1 curltls && \
+    cd curltls && \
+    ./buildconf && \
+    ./configure --without-ssl --with-gnutls --without-nss && \
+    make -j8
+# Build the NSS version
+RUN cd /opt/test && \
+    tar xvzf curl-7.69.1.tar.gz && \
+    mv curl-7.69.1 curlnss && \
+    cd curlnss && \
+    ./buildconf && \
+    ./configure --without-ssl --without-gnutls --with-nss && \
+    make -j8
+# Save the results and clean up
+RUN cd /opt/test && \
+    cp curlssl/src/.libs/curl curl-ssl && \
+    cp curltls/src/.libs/curl curl-tls && \
+    cp curlnss/src/.libs/curl curl-nss && \
+    rm -rf curlssl curltls curlnss curl-7.69.1.tar.gz
+
+# Install test-runner pieces
+RUN mkdir /opt/test/logs /opt/test/bin
+COPY ./tls/test_cert.pem /opt/test/.
+# Rust
+COPY ./tls/rust/http_test/target/debug/http_test /opt/test/bin/.
+# Node
+COPY ./tls/nodehttp.ts /opt/test/bin/nodehttp.ts
+# Ruby
+COPY ./tls/ruby/server.rb /opt/test/bin/.
+COPY ./tls/ruby/client.rb /opt/test/bin/.
+# Python
+COPY ./tls/testssl.py /opt/test/bin/testssl.py
+RUN pip install pyopenssl
+# PHP
+COPY ./tls/php/sslclient.php /opt/test/bin
+
+# Debug Tools
+COPY ./tls/alias /root/.alias
+COPY ./tls/gdbinit /root/.gdbinit
+
+COPY ./alpine/test_tls.sh /opt/test/bin/test_tls.sh
+COPY ./alpine/test_all.sh /opt/test/bin/test_all.sh
 
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4
@@ -49,7 +101,12 @@ ENV SCOPE_EVENT_LOGFILE=true
 ENV SCOPE_EVENT_CONSOLE=true
 ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
-ENV SCOPE_EVENT_DEST=file:///go/events.log
+
+# We set these in test_all.sh now
+#ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
+#ENV SCOPE_EVENT_DEST=file:///go/events.log
+
+# Don't need these
 #ENV SCOPE_METRIC_DEST=udp://localhost:8125
 #ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 #ENV LD_PRELOAD=/usr/lib/libscope.so

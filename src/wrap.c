@@ -4392,8 +4392,42 @@ getaddrinfo(const char *node, const char *service,
 EXPORTON int
 getentropy(void *buffer, size_t length)
 {
-    WRAP_CHECK(getentropy, -1);
-    return g_fn.getentropy(buffer, length);
+    if (SYMBOL_LOADED(getentropy)) {
+        return g_fn.getentropy(buffer, length);
+    }
+
+    // Must be something older than GLIBC_2.25...
+    // Looks like we're on the hook for this.
+
+#ifndef SYS_getrandom
+    errno = ENOSYS;
+    return -1;
+#else
+    if (length > 256) {
+        errno = EIO;
+        return -1;
+    }
+
+    int cancel;
+    int ret = 0;
+    char *pos = buffer;
+    pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel);
+    while (length) {
+        ret = syscall(SYS_getrandom, pos, length, 0);
+        if (ret < 0) {
+            if (errno == EINTR) {
+                continue;
+            } else {
+                break;
+            }
+        }
+        pos += ret;
+        length -= ret;
+        ret = 0;
+    }
+    pthread_setcancelstate(cancel, 0);
+    return ret;
+#endif
 }
 
 // This overrides a weak definition in src/dbg.c

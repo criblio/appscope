@@ -102,7 +102,7 @@ push: $(TESTS_BUILD)
 		-e "DOCKERHUB_PASSWORD=$(SCOPECI_TOKEN)" \
 		-e "DOCKERHUB_REPO_PREFIX=criblci" \
 		-e "DOCKERHUB_REPO_NAME=scope-$(@:%-push=%)-it" \
-		-e "SHORT_DESCRIPTION=Scope\ Integration\ Test" \
+		-e "SHORT_DESCRIPTION=AppScope\ Integration\ Test" \
 		sheogorath/readme-to-dockerhub;
 
 %-shell: SHELL ?= /bin/bash

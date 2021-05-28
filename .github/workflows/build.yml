@@ -6,7 +6,7 @@ on:
   pull_request:
     branches:
       - 'master'
-      - 'releases/**'
+      - 'releases/*'
 
 jobs:
 
@@ -70,11 +70,11 @@ jobs:
       tests: ${{ steps.set-tests.outputs.tests }}
 
   #
-  # Run the integration tests for PRs to the default or release branches.
+  # Run the integration tests for non-draft PRs to the default or release branches.
   #
   integration-test:
     needs: build-scope
-    if: ${{ github.event_name == 'pull_request' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
     strategy:
       matrix: 
         test: ${{ fromJson(needs.build-scope.outputs.tests) }}

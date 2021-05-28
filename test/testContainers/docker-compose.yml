@@ -286,18 +286,6 @@ services:
         GO_IMAGE_VER: golang:1.16
     <<: *with-all-volumes
 
-  java6:
-    image: criblci/scope-java6-it
-    build:
-      cache_from: 
-        - criblci/scope-java6-it
-      context: .
-      dockerfile: ./java/Dockerfile
-      args:
-        JDK_IMAGE: openjdk:6
-        TOMCAT_MAJOR_VERSION: 7
-        TOMCAT_MINOR_VERSION: 7.0.10
-    <<: *java-common
   java7:
     image: criblci/scope-java7-it
     build:

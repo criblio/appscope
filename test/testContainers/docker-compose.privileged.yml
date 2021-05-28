@@ -63,8 +63,6 @@ services:
   go_16:
     privileged: true
 
-  java6:
-    privileged: true
   java7:
     privileged: true
   java8:

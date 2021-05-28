@@ -18,7 +18,7 @@ Supported:
 
 ### System
 
-- CPU: x84-64 architecture
+- CPU: x86-64 architecture
 - Memory: 1GB
 - Disk: 20MB (library + CLI)
 

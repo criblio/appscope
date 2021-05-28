@@ -4603,17 +4603,24 @@ pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 EXPORTON int
 __fprintf_chk(FILE *stream, int flag, const char *format, ...)
 {
-    int rc;
     va_list ap;
+    int rc;
+
     va_start (ap, format);
-
-    if (g_fn.__fprintf_chk) {
-        rc = g_fn.__fprintf_chk(stream, flag, format, ap);
-    } else {
-        rc = fprintf(stream, format, ap);
-    }
-
+    rc = vfprintf(stream, format, ap);
     va_end (ap);
+    return rc;
+}
+
+EXPORTON int
+__sprintf_chk(char *str, int flag, size_t strlen, const char *format, ...)
+{
+    va_list ap;
+    int rc;
+
+    va_start(ap, format);
+    rc = vsnprintf(str, strlen, format, ap);
+    va_end(ap);
     return rc;
 }
 
@@ -4635,23 +4642,6 @@ __memcpy_chk(void *dest, const void *src, size_t len, size_t destlen)
     }
 
     return memcpy(dest, src, len);
-}
-
-EXPORTON int
-__sprintf_chk(char *str, int flag, size_t strlen, const char *format, ...)
-{
-    int rc;
-    va_list ap;
-    va_start (ap, format);
-
-    if (g_fn.__sprintf_chk) {
-        rc = g_fn.__sprintf_chk(str, flag, strlen, format, ap);
-    } else {
-        rc = sprintf(str, format, ap);
-    }
-
-    va_end (ap);
-    return rc;
 }
 
 EXPORTON long int

@@ -6,6 +6,16 @@
 #include "../../src/fn.h"
 #include "../../src/scopetypes.h"
 
+#ifndef _STAT_VER
+ #if defined (__aarch64__)
+  #define _STAT_VER 0
+ #elif defined (__x86_64__)
+  #define _STAT_VER 1
+ #else
+  #define _STAT_VER 3
+ #endif
+#endif
+
 // want to put this list in an obvious place
 //static char thread_delay_list[] = "chrome:nacl_helper";
 static timer_t g_timerid = 0;

@@ -4,6 +4,10 @@ title: Changelog
 
 # Changelog
 
+## AppScope 0.7
+
+2021-XX-XX - Maintenance Pre-Release
+
 ## AppScope 0.6
 
 2021-04-01 - Maintenance Pre-Release

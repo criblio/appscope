@@ -78,11 +78,11 @@ event:
 #      value: .*
 
     # Enable extraction of HTTP headers
-    - type: http
-      name: .*                      # (http-resp)|(http-metrics)
-      field: .*                     # whitelist regex describing field names
-      value: .*
-      headers:                      # (?i)X-myHeader.*
+#    - type: http
+#      name: .*                      # (http-resp)|(http-metrics)
+#      field: .*                     # whitelist regex describing field names
+#      value: .*
+#      headers:                      # (?i)X-myHeader.*
 
     # Creates events describing network connectivity
     - type: net

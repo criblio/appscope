@@ -39,6 +39,7 @@ endtest(){
     fi
 
     rm $EVT_FILE
+    touch $EVT_FILE
 }
 
 export SCOPE_PAYLOAD_ENABLE=true

@@ -387,9 +387,12 @@ getBaseAddress(uint64_t *addr) {
     char perms[5];
     char offset[20];
     char buf[1024];
+    char pname[1024];
     FILE *fp;
 
     if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose) return -1;
+
+    if (osGetProcname(pname, sizeof(pname)) == -1) return -1;
 
     if ((fp = g_fn.fopen("/proc/self/maps", "r")) == NULL) {
         return -1;
@@ -398,7 +401,7 @@ getBaseAddress(uint64_t *addr) {
     while (g_fn.fgets(buf, sizeof(buf), fp) != NULL) {
         uint64_t addr_start;
         sscanf(buf, "%lx-%*x %s %*s %s %*d", &addr_start, perms, offset);
-        if (strstr(perms, "x") != NULL) {
+        if (strstr(buf, pname) != NULL) {
             base_addr = addr_start;
             break;
         }

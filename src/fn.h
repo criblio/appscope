@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <arpa/nameser.h>
-
+#include <dlfcn.h>
 
 #ifdef __LINUX__
 #ifndef io_context_t
@@ -233,6 +233,7 @@ typedef struct {
     int (*pthread_create)(pthread_t *, const pthread_attr_t *,
                           void *(*)(void *), void *);
     int (*getentropy)(void *, size_t);
+    int (*dladdr1)(void *, Dl_info *, void **, int);
 #endif // __LINUX__
 
 #if defined(__LINUX__) && defined(__STATX__)

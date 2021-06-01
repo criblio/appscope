@@ -87,8 +87,9 @@ func_found_in_executable(const char *symbol)
 
     Dl_info symbol_info;
     void *lm, *es;
-    if (!dladdr1(symbol_ptr, &symbol_info, &lm, RTLD_DL_LINKMAP) ||
-        !dladdr1(symbol_ptr, &symbol_info, &es, RTLD_DL_SYMENT)) {
+    if (!g_fn.dladdr1 ||
+        !g_fn.dladdr1(symbol_ptr, &symbol_info, &lm, RTLD_DL_LINKMAP) ||
+        !g_fn.dladdr1(symbol_ptr, &symbol_info, &es, RTLD_DL_SYMENT)) {
         goto out;
     }
     struct link_map *link_map = (struct link_map *)lm;

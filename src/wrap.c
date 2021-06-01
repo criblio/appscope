@@ -248,7 +248,7 @@ __vfprintf_chk(FILE *fp, int flag, const char *format, va_list ap)
 EXPORTWEAK int
 __vsnprintf_chk(char *s, size_t maxlen, int flag, size_t slen, const char *format, va_list args)
 {
-    return vsnprintf(s, maxlen, format, args);
+    return vsnprintf(s, slen, format, args);
 }
 
 EXPORTWEAK void *
@@ -261,12 +261,6 @@ EXPORTWEAK void
 __ctype_init(void)
 {
     return;
-}
-
-EXPORTWEAK int
-dladdr1 (const void *address, Dl_info *info, void **extra_info, int flags)
-{
-    return 0;
 }
 
 static int
@@ -4658,21 +4652,4 @@ __fdelt_chk(long int fdelt)
     }
 
     return fdelt / __NFDBITS;
-}
-
-/*
- *__register_atfork() implements pthread_atfork() as specified in ISO POSIX (2003).
- * The additional parameter __dso_handle allows a shared object to pass in it's handle
- * so that functions registered by __register_atfork() can be unregistered by the runtime
- * when the shared object is unloaded.
- */
-EXPORTON int
-__register_atfork(void (*prepare) (void), void (*parent)(void),
-                  void (*child) (void), void *__dso_handle)
-{
-    if (g_fn.__register_atfork) {
-        return g_fn.__register_atfork(prepare, parent, child, __dso_handle);
-    }
-
-    return pthread_atfork(prepare, parent, child);
 }

@@ -1395,7 +1395,7 @@ init(void)
     // internal memory subsystem.  It's own is not threadsafe.  If we
     // find that bash is using it's own memory, replace it with glibc's
     // so our own thread can run safely in parallel.
-    if (in_bash_process() && func_found_in_executable("malloc")) {
+    if (func_found_in_executable("malloc", "bash")) {
         run_bash_mem_fix();
     }
 

@@ -275,11 +275,24 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     // end of env
     *spp++ = NULL;
 
+    // This is the destination for the new auxv array
+    // The AUX_ENT macro uses elf_info
     elf_info = (Elf64_Addr *)spp;
     memset(elf_info, 0, sizeof(Elf64_Addr) * ((AT_EXECFN + 1) * 2));
 
+    /*
+     * There is an auxv vector that defines a TLS section from the elf image.
+     * It's defined as AT_BASE or PT_TLS.
+     * The aux type of AT_BASE and PT_TLS both define the same auxv entry.
+     * If a static go exec on musl lib attempts to use the AT_BASE/PT_TLS auxv entry
+     * as a pointer to TLS it segfaults. Setting an AT_BASE auxv entry to be ignored
+     * allows both gnu and musl go static execs to function as expected.
+     */
+
+    // This is the source of the existing auxv array that is to be copied
     // auxv entries start right after env is null
-    astart = spp;
+    astart = (char **)env;
+    while(*astart++ != NULL);
 
     for (auxv = (Elf64_auxv_t *)astart; auxv->a_type != AT_NULL; auxv++) {
         switch ((unsigned long)auxv->a_type) {
@@ -292,7 +305,7 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
             break;
 
         case AT_BASE:
-            AUX_ENT(auxv->a_type, -1);
+            AUX_ENT(-1, -1);
             break;
 
         case AT_ENTRY:

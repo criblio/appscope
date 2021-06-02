@@ -29,8 +29,16 @@ typedef struct {
 
 struct _ctl_t
 {
+    // This transport serves two purposes. When AppScope is configured to
+    // connect to LogStream, this is is that connection. Otherwise, this is
+    // the event connection.
     transport_t *transport;
+
+    // This is the transport for payloads when AppScope is configured to
+    // connect to LogStream. Otherwise, this isn't used because we handle
+    // payloads differently - to separate local files.
     transport_t *paytrans;
+
     evt_fmt_t *evt;
     cbuf_handle_t events;
     unsigned enhancefs;

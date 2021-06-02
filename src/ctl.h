@@ -34,14 +34,17 @@ typedef enum {
     URL_REDIRECT_OFF
 } switch_action_t;
 
+/**
+ * Details for a payload-matching regexp for protocol detection
+ */
 typedef struct {
-    bool binary;
-    char *regex;
-    pcre2_code *re;
-    unsigned int len;
-    unsigned int type;
-    char *protname;
-    pcre2_match_data *match_data;
+    bool binary;                  // TRUE to hexdump payload before matching
+    char *regex;                  // the raw regexp string
+    pcre2_code *re;               // the compiled regexp
+    unsigned int len;             // number of bytes in subject to match against?
+    unsigned int type;            // ???
+    char *protname;               // protocol name 
+    pcre2_match_data *match_data; // preg match results
 } protocol_def_t;
 
 typedef struct {

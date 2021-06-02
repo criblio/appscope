@@ -221,6 +221,8 @@ linux_determine_pkg_mgr() {
         PKG_MGR="yum"
     elif apt-get --version &>/dev/null; then
         PKG_MGR="apt-get"
+    elif eopkg --version &>/dev/null; then
+        PKG_MGR="eopkg"
     else
         return 1
     fi
@@ -717,6 +719,239 @@ apt_install() {
     exit 0
 }
 
+########################################
+##  linux eopkg section
+########################################
+#
+#  This was originally developed and tested on solus with:
+#      Solus 4.2 Fortitude
+#      eopkg 3.2 (amd64)
+#      sudo version 1.9.7
+#      GNU Make 4.3
+#      autoconf (GNU Autoconf) 2.69
+#      libtool (GNU libtool) 2.4.6
+#      cmake version 3.20.2
+#      lcov: LCOV version 1.14
+#      go version 1.16.4 
+#
+
+eopkg_sudo_exists() {
+    if sudo --version &>/dev/null; then
+        echo "sudo is already installed; doing nothing for sudo."
+    else
+        echo "sudo is not already installed."
+        return 1
+    fi
+}
+
+eopkg_sudo_install() {
+    echo "Installing sudo."
+    eopkg install sudo
+    if [ $? = 0 ]; then
+        echo "Installation of sudo successful."
+    else
+        echo "Installation of sudo failed."
+        FAILED=1
+    fi
+}
+
+eopkg_make_exists() {
+    if make --version &>/dev/null; then
+        echo "make is already installed; doing nothing for make."
+    else
+        echo "make is not already installed."
+        return 1
+    fi
+}
+
+eopkg_make_install() {
+    echo "Installing make."
+    sudo eopkg install -y make
+    if [ $? = 0 ]; then
+        echo "Installation of make successful."
+    else
+        echo "Installation of make failed."
+        FAILED=1
+    fi
+}
+
+eopkg_autoconf_exists() {
+    if autoconf --version &>/dev/null; then
+        echo "autoconf is already installed; doing nothing for autoconf."
+    else
+        echo "autoconf is not already installed."
+        return 1
+    fi
+}
+
+eopkg_autoconf_install() {
+    echo "Installing autoconf."
+    sudo eopkg install -y autoconf
+    if [ $? = 0 ]; then
+        echo "Installation of autoconf successful."
+    else
+        echo "Installation of autoconf failed."
+        FAILED=1
+    fi
+}
+
+eopkg_libtool_exists() {
+    if libtool --version &>/dev/null; then
+        echo "libtool is already installed; doing nothing for libtool."
+    else
+        echo "libtool is not already installed."
+        return 1
+    fi
+}
+
+eopkg_libtool_install() {
+    echo "Installing libtool."
+    sudo eopkg install -y libtool
+    if [ $? = 0 ]; then
+        echo "Installation of libtool successful."
+    else
+        echo "Installation of libtool failed."
+        FAILED=1
+    fi
+}
+
+eopkg_cmake_exists() {
+    if cmake --version &>/dev/null; then
+        echo "cmake is already installed; doing nothing for cmake."
+    else
+        echo "cmake is not already installed."
+        return 1
+    fi
+}
+
+eopkg_cmake_install() {
+    echo "Installing cmake."
+    sudo eopkg install -y cmake
+    if [ $? = 0 ]; then
+        echo "Installation of cmake successful."
+    else
+        echo "Installation of cmake failed."
+        FAILED=1
+    fi
+}
+
+eopkg_lcov_exists() {
+    if lcov --version &>/dev/null; then
+        echo "lcov is already installed; doing nothing for lcov."
+    else
+        echo "lcov is not already installed."
+        return 1
+    fi
+}
+
+eopkg_lcov_install() {
+    echo "Installing lcov."
+    sudo eopkg install -y lcov
+    if [ $? = 0 ]; then
+        echo "Installation of lcov successful."
+    else
+        echo "Installation of lcov failed."
+        FAILED=1
+    fi
+}
+
+eopkg_go_exists() {
+    if go version &>/dev/null; then
+        echo "go is already installed; doing nothing for go."
+    else
+        echo "go is not already installed."
+        return 1
+    fi
+}
+
+eopkg_go_install() {
+    echo "Installing go."
+    sudo eopkg install golang
+    if [ $? = 0 ]; then
+        echo "Installation of go successful."
+    else
+        echo "Installation of go failed."
+        FAILED=1
+    fi
+}
+
+eopkg_upx_exists() {
+    if upx --version &>/dev/null; then
+        echo "upx is already installed; doing nothing for upx."
+    else
+        echo "upx is not already installed."
+        return 1
+    fi
+}
+
+eopkg_upx_install() {
+    echo "Installing upx."
+    sudo eopkg install -y upx
+    if [ $? = 0 ]; then
+        echo "Installation of upx successful."
+    else
+        echo "Installation of upx failed."
+        FAILED=1
+    fi
+}
+
+eopkg_dump_versions() {
+    # The crazy sed stuff at the end of each just provides indention.
+    if lsb_release -d &>/dev/null; then
+        lsb_release -d | sed 's/^Description:\s*/      /'
+    elif [ -f /etc/lsb-release ]; then
+        grep DISTRIB_DESCRIPTION /etc/lsb-release | cut -d \" -f2 | sed 's/^/      /'
+    fi
+    apt-get --version | head -n1 | sed 's/^/      /'
+    sudo --version | head -n1 | sed 's/^/      /'
+    make --version | head -n1 | sed 's/^/      /'
+    autoconf --version | head -n1 | sed 's/^/      /'
+    automake --version | head -n1 | sed 's/^/      /'
+    libtool --version | head -n1 | sed 's/^/      /'
+    cmake --version | head -n1 | sed 's/^/      /'
+    lcov --version | head -n1 | sed 's/^/      /'
+    go version | head -n1 | sed 's/^/      /'
+    upx --version | head -n1 | sed 's/^/      /'
+}
+
+eopkg_install() {
+    echo "Running the eopkg install."
+
+    if ! eopkg_sudo_exists; then
+        eopkg_sudo_install
+    fi
+    if ! eopkg_make_exists; then
+        eopkg_make_install
+    fi
+    if ! eopkg_autoconf_exists; then
+        eopkg_autoconf_install
+    fi
+    if ! eopkg_libtool_exists; then
+        eopkg_libtool_install
+    fi
+    if ! eopkg_cmake_exists; then
+        eopkg_cmake_install
+    fi
+    if ! eopkg_lcov_exists; then
+        eopkg_lcov_install
+    fi
+    if ! eopkg_go_exists; then
+        eopkg_go_install
+    fi
+    if ! eopkg_upx_exists; then
+        eopkg_upx_install
+    fi
+
+
+    if (( FAILED )); then
+        echo "Installation failure detected."
+	echo "Pertinent version info:"
+	eopkg_dump_versions
+	exit 1
+    fi
+    exit 0
+}
+
 if [ ${PLATFORM} = "Linux" ]; then
     if ! linux_determine_pkg_mgr; then
         echo "Exiting.  install_build_tools.sh does not support this package manager."
@@ -729,6 +964,8 @@ if [ ${PLATFORM} = "Linux" ]; then
         yum_install
     elif [ ${PKG_MGR} = "apt-get" ]; then
         apt_install
+    elif [ ${PKG_MGR} = "eopkg" ]; then
+        eopkg_install
     fi
     exit 1
 fi

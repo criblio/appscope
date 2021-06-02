@@ -88,6 +88,8 @@ determine_pkg_mgr() {
         echo "yum"
     elif apt-get --version &>/dev/null; then
         echo "apt-get"
+    elif eopkg --version &>/dev/null; then
+        echo "eopkg"
     elif brew --version &>/dev/null; then
         echo "brew"
     else
@@ -112,7 +114,7 @@ platform_and_pkgmgr_defined() {
         echo "scope_env.sh does not support this platform type.  Exiting."
         exit 1
     elif [ ${PKG_MGR} = "Error" ]; then
-        echo "scope_env.sh does not support this package menager.  Exiting."
+        echo "scope_env.sh does not support this package manager.  Exiting."
         exit 1
     else
         echo "Platform type is ${PLATFORM} with package manager ${PKG_MGR}."
@@ -140,6 +142,17 @@ install_sudo() {
                     echo "Install of sudo was successful."
                 else
                     echo "Install of sudo was unsuccesful.  Exiting."
+                    exit 1
+                fi
+            fi
+            ;;
+        "eopkg")
+            if ! sudo --version &>/dev/null; then
+                echo "Install of sudo is required."
+                if su -c "eopkg install sudo"; then
+                    echo "Install of sudo was successful."
+                else
+                    echo "Install fo sudo was unsuccessful.  Exiting."
                     exit 1
                 fi
             fi
@@ -174,6 +187,17 @@ install_git() {
                 fi
             fi
             ;; 
+        "eopkg")
+            if ! git --version &>/dev/null; then
+                echo "Install of git is required."
+                if sudo eopkg install git; then
+                    echo "Install of git was successful."
+                else
+                    echo "Install of git was unsuccessful.  Exiting."
+                    exit 1
+                fi
+            fi
+            ;;
         "brew")
             if ! git --version &>/dev/null; then
                 echo "Install of git is required."
@@ -202,13 +226,13 @@ clone_scope() {
         return 0
     fi
 
-    echo "Clone of scope.git is required."
-    if git clone git@bitbucket.org:cribl/scope.git; then
-        echo "Clone of scope.git was successful."
+    echo "Clone of appscope.git is required."
+    if git clone git@github.com:criblio/appscope.git; then
+        echo "Clone of appscope.git was successful."
         cd scope
         #rm ../scope_env.sh
     else
-        echo "Clone of scope.git was unsuccessful.  Exiting."
+        echo "Clone of appscope.git was unsuccessful.  Exiting."
         exit 1
     fi
     return 0

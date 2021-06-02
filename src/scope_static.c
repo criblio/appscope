@@ -104,6 +104,7 @@ set_loader(char *exe)
 
     if (fstat(fd, &sbuf) == -1) {
         perror("set_loader:fstat");
+        close(fd);
         return -1;
     }
 
@@ -124,7 +125,7 @@ set_loader(char *exe)
             char *exld = (char *)&buf[phead[i].p_offset];
             DIR *dirp;
             struct dirent *entry;
-            char buf[PATH_MAX];
+            char dir[PATH_MAX];
 
             if (strstr(exld, "ld-musl") != NULL) {
                 close(fd);
@@ -132,8 +133,8 @@ set_loader(char *exe)
                 return 0;
             }
 
-            snprintf(buf, sizeof(buf), "/lib/");
-            if ((dirp = opendir(buf)) == NULL) {
+            snprintf(dir, sizeof(dir), "/lib/");
+            if ((dirp = opendir(dir)) == NULL) {
                 perror("set_loader:opendir");
                 break;
             }
@@ -141,7 +142,7 @@ set_loader(char *exe)
             while ((entry = readdir(dirp)) != NULL) {
                 if ((entry->d_type != DT_DIR) &&
                     (strstr(entry->d_name, "ld-musl"))) {
-                    strncat(buf, entry->d_name, strlen(entry->d_name));
+                    strncat(dir, entry->d_name, strlen(entry->d_name) + 1);
                     name = 1;
                     break;
                 }
@@ -149,9 +150,9 @@ set_loader(char *exe)
 
             closedir(dirp);
 
-            if (name && (strlen(exld) > (strlen(buf) + 1))) {
-                if (g_debug) printf("%s:%d exe ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, buf);
-                strncpy(exld, buf, strlen(buf) + 1);
+            if (name && (strlen(exld) > (strlen(dir) + 1))) {
+                if (g_debug) printf("%s:%d exe ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, dir);
+                strncpy(exld, dir, strlen(dir) + 1);
                 found = 1;
                 break;
             }
@@ -166,7 +167,6 @@ set_loader(char *exe)
 
         if ((fd = open(exe, O_RDWR)) == -1) {
             perror("set_loader:open write");
-            close(fd);
             munmap(buf, sbuf.st_size);
             return -1;
         }
@@ -189,7 +189,7 @@ get_loader(char *exe)
 {
     int i, fd;
     struct stat sbuf;
-    char *buf, *ldso;
+    char *buf, *ldso = NULL;
     Elf64_Ehdr *elf;
     Elf64_Phdr *phead;
 
@@ -202,6 +202,7 @@ get_loader(char *exe)
 
     if (fstat(fd, &sbuf) == -1) {
         perror("get_loader:fstat");
+        close(fd);
         return NULL;
     }
 
@@ -223,9 +224,7 @@ get_loader(char *exe)
             char * exld = (char *)&buf[phead[i].p_offset];
             if (g_debug) printf("%s:%d exe ld.so: %s\n", __FUNCTION__, __LINE__, exld);
 
-            if ((ldso = calloc(1, strlen(exld) + 2)) != NULL) {
-                strncpy(ldso, exld, strlen(exld));
-            }
+            ldso = strdup(exld);
 
             break;
         }
@@ -243,7 +242,7 @@ do_musl(char *exld, char *ldscope)
     char *path;
     char dir[strlen(ldscope) + 2];
 
-    // alwyas set the env var
+    // always set the env var
     strncpy(dir, ldscope, strlen(ldscope) + 1);
     path = dirname(dir);
     setEnvVariable(LD_LIB_ENV, path);
@@ -292,7 +291,7 @@ extract_bin(libscope_info *info, unsigned char *start, unsigned char *end)
     if (lstat(info->path, &sbuf) == 0) return 0;
 
     char *path;
-    char dir[strlen(info->path)];
+    char dir[strlen(info->path) + 1];
 
     strncpy(dir, info->path, strlen(info->path) + 1);
     path = dirname(dir);
@@ -342,7 +341,7 @@ setup_loader(char *exe, char *ldscope)
 static int
 clean_extract(char *symlinkdir, char *verstr)
 {
-    char *unpath;
+    char *unpath = NULL;
     DIR *dirp;
     struct dirent *entry;
 
@@ -365,7 +364,7 @@ clean_extract(char *symlinkdir, char *verstr)
             char path[PATH_MAX];
 
             strncpy(path, unpath, strlen(unpath) + 1);
-            strncat(path, entry->d_name, strlen(entry->d_name));
+            strncat(path, entry->d_name, strlen(entry->d_name) + 1);
 
             if (unlink(path) == -1) {
                 perror("clean_extract:unlink");
@@ -386,7 +385,7 @@ clean_extract(char *symlinkdir, char *verstr)
 
 static void
 usage(char *prog) {
-  fprintf(stderr,"usage: %s [-h help] [-f sym link dir] executable\n", prog);
+  fprintf(stderr,"usage: %s [--help] [-f sym link dir] executable\n", prog);
   exit(-1);
 }
 
@@ -394,10 +393,10 @@ int
 main(int argc, char **argv, char **env)
 {
     int i, j, rc, optind = 1;
-    libscope_info info;
-    char *verstr;
+    libscope_info info = {0};
+    char *verstr = NULL;
     char *symlinkdir = NULL;
-    char scopever[64];
+    char scopever[64] = {0};
 
     if (argc < 2) {
         usage(argv[0]);

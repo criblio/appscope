@@ -402,7 +402,7 @@ static void
 print_help(void)
 {
     int i;
-    printf( "Welcome to the help for libscope.so!\n\n"
+    printf( "Welcome to the help for AppScope!\n\n"
             "    For this message:\n        ldscope --help\n"
             "    To print all help:\n       ldscope --help all\n"
             "    Or to print help by section:\n");

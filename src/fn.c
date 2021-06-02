@@ -136,7 +136,6 @@ initFn(void)
     g_fn.__memcpy_chk = dlsym(handle, "__memcpy_chk");
     g_fn.__sprintf_chk = dlsym(handle, "__sprintf_chk");
     g_fn.__fdelt_chk = dlsym(handle, "__fdelt_chk");
-    g_fn.__register_atfork = dlsym(handle, "__register_atfork");
 #ifdef __MACOS__
     g_fn.close$NOCANCEL = dlsym(handle, "close$NOCANCEL");
     g_fn.close_nocancel = dlsym(handle, "close_nocancel");

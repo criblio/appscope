@@ -236,9 +236,6 @@ typedef struct
 //
 extern void *_dl_sym(void *, const char *, void *);
 
-EXPORTWEAK uint64_t _dl_argv;
-EXPORTWEAK struct r_debug _r_debug;
-
 EXPORTWEAK int
 __vfprintf_chk(FILE *fp, int flag, const char *format, va_list ap)
 {

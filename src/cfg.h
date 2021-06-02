@@ -46,7 +46,7 @@ cfg_log_level_t     cfgLogLevel(config_t*);
 unsigned int        cfgPayEnable(config_t*);
 const char *        cfgPayDir(config_t*);
 const char *        cfgEvtFormatHeader(config_t *, int);
-bool                cfgLogStream(config_t *);
+cfg_logstream_t     cfgLogStream(config_t *);
 size_t              cfgEvtFormatNumHeaders(config_t *);
 regex_t *           cfgEvtFormatHeaderRe(config_t *, int);
 
@@ -80,6 +80,6 @@ void                cfgLogLevelSet(config_t*, cfg_log_level_t);
 void                cfgPayEnableSet(config_t*, unsigned int);
 void                cfgPayDirSet(config_t*, const char *);
 void                cfgEvtFormatHeaderSet(config_t *, const char *);
-void                cfgLogStreamSet(config_t *, bool);
+void                cfgLogStreamSet(config_t *, cfg_logstream_t);
 
 #endif // __CFG_H__

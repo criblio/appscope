@@ -414,7 +414,6 @@ remoteConfig()
     int timeout;
     struct pollfd fds;
     int rc, success, numtries;
-    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
@@ -423,13 +422,20 @@ remoteConfig()
     timeout = 1;
     memset(&fds, 0x0, sizeof(fds));
 
+/*
+    Setting fds.events = 0 to neuter ability to process remote
+    commands... until this is function is reworked to be TLS-friendly.
+
+    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
     if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
         (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {
         fds.events = 0;
     } else {
         fds.events = POLLIN;
     }
+*/
 
+    fds.events = 0;
     fds.fd = ctlConnection(g_ctl, CFG_CTL);
 
     rc = g_fn.poll(&fds, 1, timeout);
@@ -4545,8 +4551,42 @@ getaddrinfo(const char *node, const char *service,
 EXPORTON int
 getentropy(void *buffer, size_t length)
 {
-    WRAP_CHECK(getentropy, -1);
-    return g_fn.getentropy(buffer, length);
+    if (SYMBOL_LOADED(getentropy)) {
+        return g_fn.getentropy(buffer, length);
+    }
+
+    // Must be something older than GLIBC_2.25...
+    // Looks like we're on the hook for this.
+
+#ifndef SYS_getrandom
+    errno = ENOSYS;
+    return -1;
+#else
+    if (length > 256) {
+        errno = EIO;
+        return -1;
+    }
+
+    int cancel;
+    int ret = 0;
+    char *pos = buffer;
+    pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel);
+    while (length) {
+        ret = syscall(SYS_getrandom, pos, length, 0);
+        if (ret < 0) {
+            if (errno == EINTR) {
+                continue;
+            } else {
+                break;
+            }
+        }
+        pos += ret;
+        length -= ret;
+        ret = 0;
+    }
+    pthread_setcancelstate(cancel, 0);
+    return ret;
+#endif
 }
 
 // This overrides a weak definition in src/dbg.c

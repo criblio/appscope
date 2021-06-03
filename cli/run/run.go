@@ -30,6 +30,7 @@ type Config struct {
 	CriblDest     string
 	Subprocess    bool
 	Loglevel      string
+	LibraryPath   string
 	AttachPID     int
 
 	now func() time.Time
@@ -45,6 +46,14 @@ func (rc *Config) Run(args []string) {
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+	if len(rc.LibraryPath) > 0 {
+		// Validate path exists
+		if !util.CheckDirExists(rc.LibraryPath) {
+			util.ErrAndExit("Library Path does not exist: \"%s\"", rc.LibraryPath)
+		}
+		// Prepend "-f" [PATH] to args
+		args = append([]string{"-f", rc.LibraryPath}, args...)
+	}
 	if rc.AttachPID > 0 {
 		// Validate PID exists
 		if !util.CheckDirExists(fmt.Sprintf("/proc/%d", rc.AttachPID)) {

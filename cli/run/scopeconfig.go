@@ -87,7 +87,7 @@ type ScopeTransport struct {
 	Tls           TlsConfig `mapstructure:"tls" json:"tls" yaml:"tls"`
 }
 
-// TlsConfig is used when 
+// TlsConfig is used when
 type TlsConfig struct {
 	Enable         bool   `mapstructure:"enable" json:"enable" yaml:"enable"`
 	ValidateServer bool   `mapstructure:"validateserver" json:"validateserver" yaml:"validateserver"`
@@ -211,7 +211,7 @@ func (c *Config) configFromRunOpts() error {
 		//
 		// The regexp matches "proto://something:port" where the leading
 		// "proto://" is optional. If given, "proto" must be "tcp", "udp",
-		// "tls" or "file". The ":port" suffix is optional and ignored 
+		// "tls" or "file". The ":port" suffix is optional and ignored
 		// for files but required for sockets.
 		//
 		//     "relative/path"
@@ -230,18 +230,18 @@ func (c *Config) configFromRunOpts() error {
 		//
 		m := regexp.MustCompile("^(?:(?i)(file|tcp|udp|tls)://)?([^:]+)(?::(\\d+))?$").FindAllStringSubmatch(dest, -1)
 		//fmt.Printf("debug: m=%+v\n", m)
-		if (len(m) <= 0) {
+		if len(m) <= 0 {
 			// no match
 			return fmt.Errorf("Invalid dest: %s", dest)
-		} else if (m[0][1] != "") {
+		} else if m[0][1] != "" {
 			// got "proto://..."
 			proto := strings.ToLower(m[0][1])
-			if (proto == "udp" || proto == "tcp") {
+			if proto == "udp" || proto == "tcp" {
 				// clear socket
 				t.TransportType = proto
 				t.Host = m[0][2]
-				if (m[0][3] == "") {
-					return fmt.Errorf("Missing :port at the end of %s", dest);
+				if m[0][3] == "" {
+					return fmt.Errorf("Missing :port at the end of %s", dest)
 				}
 				port, err := strconv.Atoi(m[0][3])
 				if err != nil {
@@ -251,12 +251,12 @@ func (c *Config) configFromRunOpts() error {
 				t.Path = ""
 				t.Tls.Enable = false
 				t.Tls.ValidateServer = true
-			} else if (proto == "tls") {
+			} else if proto == "tls" {
 				// encrypted socket
 				t.TransportType = "tcp"
 				t.Host = m[0][2]
-				if (m[0][3] == "") {
-					return fmt.Errorf("Missing :port at the end of %s", dest);
+				if m[0][3] == "" {
+					return fmt.Errorf("Missing :port at the end of %s", dest)
 				}
 				port, err := strconv.Atoi(m[0][3])
 				if err != nil {
@@ -266,13 +266,13 @@ func (c *Config) configFromRunOpts() error {
 				t.Path = ""
 				t.Tls.Enable = true
 				t.Tls.ValidateServer = true
-			} else if (proto == "file") {
+			} else if proto == "file" {
 				t.TransportType = proto
 				t.Path = m[0][2]
 			} else {
 				return fmt.Errorf("Invalid dest protocol: %s", proto)
 			}
-		} else if (m[0][3] != "") {
+		} else if m[0][3] != "" {
 			// got "something:port", assume tls://
 			t.TransportType = "tcp"
 			t.Host = m[0][2]

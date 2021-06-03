@@ -15,6 +15,7 @@
 #include "dbg.h"
 #include "scopetypes.h"
 #include "os.h"
+#include "fn.h"
 #include "transport.h"
 
 // Yuck.  Avoids naming conflict between our src/wrap.c and libssl.a
@@ -28,24 +29,12 @@
 struct _transport_t
 {
     cfg_transport_t type;
-    int (*access)(const char *, int);
-    ssize_t (*send)(int, const void *, size_t, int);
-    int (*open)(const char *, int, ...);
-    int (*dup2)(int, int);
-    int (*close)(int);
-    int (*fcntl)(int, int, ...);
-    size_t (*fwrite)(const void *, size_t, size_t, FILE *);
-    int (*socket)(int, int, int);
-    int (*connect)(int, const struct sockaddr *, socklen_t);
     int (*getaddrinfo)(const char *, const char *,
                        const struct addrinfo *,
                        struct addrinfo **);
     int (*origGetaddrinfo)(const char *, const char *,
                            const struct addrinfo *,
                            struct addrinfo **);
-    int (*fclose)(FILE*);
-    FILE *(*fdopen)(int, const char *);
-    int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
     union {
         struct {
             int sock;
@@ -114,29 +103,24 @@ newTransport()
         return NULL;
     }
 
-    if ((t->access = dlsym(RTLD_NEXT, "access")) == NULL) goto out;
-    if ((t->send = dlsym(RTLD_NEXT, "send")) == NULL) goto out;
-    if ((t->open = dlsym(RTLD_NEXT, "open")) == NULL) goto out;
-    if ((t->dup2 = dlsym(RTLD_NEXT, "dup2")) == NULL) goto out;
-    if ((t->close = dlsym(RTLD_NEXT, "close")) == NULL) goto out;
-    if ((t->fcntl = dlsym(RTLD_NEXT, "fcntl")) == NULL) goto out;
-    if ((t->fwrite = dlsym(RTLD_NEXT, "fwrite")) == NULL) goto out;
-    if ((t->socket = dlsym(RTLD_NEXT, "socket")) == NULL) goto out;
-    if ((t->connect = dlsym(RTLD_NEXT, "connect")) == NULL) goto out;
-    if ((t->getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo")) == NULL) goto out;
+    // been inconsistent as to when we check for func pointers.
+    // do it here early on and we're good.
+    if (!g_fn.send || !g_fn.open || !g_fn.dup2 || !g_fn.close ||
+        !g_fn.fcntl || !g_fn.fwrite || !g_fn.socket || !g_fn.access ||
+        !g_fn.connect || !g_fn.getaddrinfo || !g_fn.fclose ||
+        !g_fn.select) goto out;
+
+    t->getaddrinfo = g_fn.getaddrinfo;
     t->origGetaddrinfo = t->getaddrinfo;  // store a copy
-    if ((t->fclose = dlsym(RTLD_NEXT, "fclose")) == NULL) goto out;
-    if ((t->fdopen = dlsym(RTLD_NEXT, "fdopen")) == NULL) goto out;
-    if ((t->select = dlsym(RTLD_NEXT, "select")) == NULL) goto out;
     return t;
 
   out:
-    DBG("access=%p send=%p open=%p dup2=%p close=%p "
-        "fcntl=%p fwrite=%p socket=%p connect=%p "
-        "getaddrinfo=%p fclose=%p fdopen=%p select=%p",
-        t->access, t->send, t->open, t->dup2, t->close,
-        t->fcntl, t->fwrite, t->socket, t->connect,
-        t->getaddrinfo, t->fclose, t->fdopen, t->select);
+    DBG("send=%p open=%p dup2=%p close=%p "
+        "fcntl=%p fwrite=%p socket=%p access=%p connect=%p "
+        "getaddrinfo=%p fclose=%p select=%p",
+        g_fn.send, g_fn.open, g_fn.dup2, g_fn.close,
+        g_fn.fcntl, g_fn.fwrite, g_fn.socket, g_fn.access, g_fn.connect,
+        g_fn.getaddrinfo, g_fn.fclose, g_fn.select);
     free(t);
     return NULL;
 }
@@ -154,8 +138,6 @@ newTransport()
 static int
 placeDescriptor(int fd, transport_t *t)
 {
-    if (!t || !t->fcntl || !t->dup2 || !t->close) return -1;
-
     // next_fd_to_try avoids reusing file descriptors.
     // Without this, we've had problems where the buffered stream for
     // g_log has it's fd closed and reopened by another transport which
@@ -168,15 +150,15 @@ placeDescriptor(int fd, transport_t *t)
     int i, dupfd;
 
     for (i = next_fd_to_try; i >= DEFAULT_MIN_FD; i--) {
-        if ((t->fcntl(i, F_GETFD) == -1) && (errno == EBADF)) {
+        if ((g_fn.fcntl(i, F_GETFD) == -1) && (errno == EBADF)) {
 
             // This fd is available, try to dup it
-            if ((dupfd = t->dup2(fd, i)) == -1) continue;
-            t->close(fd);
+            if ((dupfd = g_fn.dup2(fd, i)) == -1) continue;
+            g_fn.close(fd);
 
             // Set close on exec. (dup2 does not preserve FD_CLOEXEC)
-            int flags = t->fcntl(dupfd, F_GETFD, 0);
-            if (t->fcntl(dupfd, F_SETFD, flags | FD_CLOEXEC) == -1) {
+            int flags = g_fn.fcntl(dupfd, F_GETFD, 0);
+            if (g_fn.fcntl(dupfd, F_SETFD, flags | FD_CLOEXEC) == -1) {
                 DBG("%d", dupfd);
             }
 
@@ -185,7 +167,7 @@ placeDescriptor(int fd, transport_t *t)
         }
     }
     DBG("%d", t->type);
-    t->close(fd);
+    g_fn.close(fd);
     return -1;
 }
 
@@ -245,7 +227,7 @@ transportNeedsConnection(transport_t *trans)
             // closed by our process.  (errno == EBADF) Stream buffering
             // makes it harder to know when this has happened.
             if ((trans->file.stream) &&
-                   (trans->fcntl(fileno(trans->file.stream), F_GETFD) == -1)) {
+                (g_fn.fcntl(fileno(trans->file.stream), F_GETFD) == -1)) {
                 DBG(NULL);
                 transportDisconnect(trans);
             }
@@ -276,7 +258,7 @@ rootCertFile(transport_t *trans)
 
     const char *file;
     for (file=rootFileList[0]; file; file++) {
-        if (!trans->access (file, R_OK)) {
+        if (!g_fn.access (file, R_OK)) {
             return file;
         }
     }
@@ -307,7 +289,7 @@ shutdownTlsSession(transport_t *trans)
     exitCriticalSection();
 
     if (trans->net.sock != -1) {
-        trans->close(trans->net.sock);
+        g_fn.close(trans->net.sock);
         trans->net.sock = -1;
     }
 }
@@ -451,16 +433,17 @@ transportDisconnect(transport_t *trans)
         case CFG_TCP:
             // appropriate for both tls and non-tls connections...
             shutdownTlsSession(trans);
+
             int i;
             for (i=0; i<FD_SETSIZE; i++) {
                 if (!FD_ISSET(i, &trans->net.pending_connect)) continue;
-                trans->close(i);
+                g_fn.close(i);
                 FD_CLR(i, &trans->net.pending_connect);
             }
             break;
         case CFG_FILE:
             if (!trans->file.stdout && !trans->file.stderr) {
-                if (trans->file.stream) trans->fclose(trans->file.stream);
+                if (trans->file.stream) g_fn.fclose(trans->file.stream);
             }
             trans->file.stream = NULL;
             break;
@@ -600,7 +583,7 @@ setSocketBlocking(transport_t *trans, int sock, bool block)
 {
     if (!trans) return 0;
 
-    int current_flags = trans->fcntl(sock, F_GETFL, NULL);
+    int current_flags = g_fn.fcntl(sock, F_GETFL, NULL);
     if (current_flags < 0) return FALSE;
 
     int desired_flags;
@@ -614,7 +597,7 @@ setSocketBlocking(transport_t *trans, int sock, bool block)
     if (current_flags == desired_flags) return TRUE;
 
     // fcntl returns 0 if successful
-    return (trans->fcntl(sock, F_SETFL, desired_flags) == 0);
+    return (g_fn.fcntl(sock, F_SETFL, desired_flags) == 0);
 }
 
 static int
@@ -634,7 +617,7 @@ checkPendingSocketStatus(transport_t *trans)
     int rc;
     struct timeval tv = {0};
     fd_set pending_results = trans->net.pending_connect;
-    rc = trans->select(FD_SETSIZE, NULL, &pending_results, NULL, &tv);
+    rc = g_fn.select(FD_SETSIZE, NULL, &pending_results, NULL, &tv);
     if (rc < 0) {
         DBG(NULL);
         transportDisconnect(trans);
@@ -658,7 +641,7 @@ checkPendingSocketStatus(transport_t *trans)
             scopeLog("connect failed", i, CFG_LOG_INFO);
 
             FD_CLR(i, &trans->net.pending_connect);
-            trans->close(i);
+            g_fn.close(i);
             continue;
         }
 
@@ -692,7 +675,7 @@ checkPendingSocketStatus(transport_t *trans)
         for (i=0; i<FD_SETSIZE; i++) {
             if (FD_ISSET(i, &trans->net.pending_connect)) {
                 scopeLog("abandoning connect due to previous success", i, CFG_LOG_INFO);
-                trans->close(i);
+                g_fn.close(i);
                 FD_CLR(i, &trans->net.pending_connect);
             }
         }
@@ -739,15 +722,15 @@ socketConnectionStart(transport_t *trans)
     struct addrinfo* addr;
     for (addr = addr_list; addr; addr = addr->ai_next) {
         int sock;
-        sock = trans->socket(addr->ai_family,
-                             addr->ai_socktype,
-                             addr->ai_protocol);
+        sock = g_fn.socket(addr->ai_family,
+                           addr->ai_socktype,
+                           addr->ai_protocol);
 
         if (sock == -1) continue;
 
         // Set the socket to close on exec
-        int flags = trans->fcntl(sock, F_GETFD, 0);
-        if (trans->fcntl(sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
+        int flags = g_fn.fcntl(sock, F_GETFD, 0);
+        if (g_fn.fcntl(sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
             DBG("%d %s %s", sock, trans->net.host, trans->net.port);
         }
 
@@ -772,7 +755,7 @@ socketConnectionStart(transport_t *trans)
             portptr = &addr6_ptr->sin6_port;
         } else {
             DBG("%d %s %s %d", sock, trans->net.host, trans->net.port, addr->ai_family);
-            trans->close(sock);
+            g_fn.close(sock);
             continue;
         }
         char addrstr[INET6_ADDRSTRLEN];
@@ -780,9 +763,9 @@ socketConnectionStart(transport_t *trans)
         unsigned short port = ntohs(*portptr);
 
         errno = 0;
-        if (trans->connect(sock,
-                           addr->ai_addr,
-                           addr->ai_addrlen) == -1) {
+        if (g_fn.connect(sock,
+                         addr->ai_addr,
+                         addr->ai_addrlen) == -1) {
 
             if (errno != EINPROGRESS) {
                 char *logmsg = NULL;
@@ -792,7 +775,7 @@ socketConnectionStart(transport_t *trans)
                 }
 
                 // We could create a sock, but not connect.  Clean up.
-                trans->close(sock);
+                g_fn.close(sock);
                 continue;
             }
 
@@ -840,7 +823,7 @@ transportConnectFile(transport_t *t)
     }
 
     int fd;
-    fd = t->open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
+    fd = g_fn.open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
     if (fd == -1) {
         DBG("%s", t->file.path);
         transportDisconnect(t);
@@ -858,8 +841,8 @@ transportConnectFile(transport_t *t)
         DBG("%d %s", fd, t->file.path);
     }
 
-    FILE* f;
-    if (!(f = t->fdopen(fd, "a"))) {
+    FILE *f;
+    if (!(f = fdopen(fd, "a"))) {
         transportDisconnect(t);
         return 0;
     }
@@ -1057,7 +1040,7 @@ transportDestroy(transport_t** transport)
             if (t->file.path) free(t->file.path);
             if (!t->file.stdout && !t->file.stderr) {
                 // if stdout/stderr, we didn't open stream, so don't close it
-                if (t->file.stream) t->fclose(t->file.stream);
+                if (t->file.stream) g_fn.fclose(t->file.stream);
             }
             break;
         case CFG_SYSLOG:
@@ -1098,10 +1081,6 @@ tcpSendPlain(transport_t *trans, const char *msg, size_t len)
 {
     if (!trans || transportNeedsConnection(trans)) return -1;
 
-    if (!trans->send) {
-        DBG(NULL);
-        return -1;
-    }
     int flags = 0;
 #ifdef __LINUX__
     flags |= MSG_NOSIGNAL;
@@ -1112,7 +1091,7 @@ tcpSendPlain(transport_t *trans, const char *msg, size_t len)
     int rc;
 
     while (bytes_to_send > 0) {
-        rc = trans->send(trans->net.sock, &msg[bytes_sent], bytes_to_send, flags);
+        rc = g_fn.send(trans->net.sock, &msg[bytes_sent], bytes_to_send, flags);
         if (rc <= 0) break;
 
         if (rc != bytes_to_send) {
@@ -1190,11 +1169,7 @@ transportSend(transport_t *trans, const char *msg, size_t len)
     switch (trans->type) {
         case CFG_UDP:
             if (trans->net.sock != -1) {
-                if (!trans->send) {
-                    DBG(NULL);
-                    break;
-                }
-                int rc = trans->send(trans->net.sock, msg, len, 0);
+                int rc = g_fn.send(trans->net.sock, msg, len, 0);
 
                 if (rc < 0) {
                     switch (errno) {
@@ -1222,7 +1197,7 @@ transportSend(transport_t *trans, const char *msg, size_t len)
         case CFG_FILE:
             if (trans->file.stream) {
                 size_t msg_size = len;
-                int bytes = trans->fwrite(msg, 1, msg_size, trans->file.stream);
+                int bytes = g_fn.fwrite(msg, 1, msg_size, trans->file.stream);
                 if (bytes != msg_size) {
                     if (errno == EBADF) {
                         DBG("%d %d", bytes, msg_size);

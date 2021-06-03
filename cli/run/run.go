@@ -31,6 +31,7 @@ type Config struct {
 	Subprocess    bool
 	Loglevel      string
 	LibraryPath   string
+	AttachPID     int
 
 	now func() time.Time
 	sc  *ScopeConfig
@@ -52,6 +53,14 @@ func (rc *Config) Run(args []string) {
 		}
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
+	}
+	if rc.AttachPID > 0 {
+		// Validate PID exists
+		if !util.CheckDirExists(fmt.Sprintf("/proc/%d", rc.AttachPID)) {
+			util.ErrAndExit("PID does not exist: \"%d\"", rc.AttachPID)
+		}
+		// Prepend "--attach" [PID] to args
+		args = append([]string{"--attach", strconv.Itoa(rc.AttachPID)}, args...)
 	}
 	if !rc.Passthrough {
 		rc.setupWorkDir(args)

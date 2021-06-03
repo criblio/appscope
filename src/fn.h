@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <arpa/nameser.h>
 
 #ifdef __LINUX__
 #ifndef io_context_t
@@ -194,6 +195,15 @@ typedef struct {
     int (*poll)(struct pollfd *, nfds_t, int);
     int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
     int (*nanosleep)(const struct timespec *, struct timespec *);
+    int	(*ns_initparse)(const unsigned char *, int, ns_msg *);
+    int	(*ns_parserr)(ns_msg *, ns_sect, int, ns_rr *);
+    size_t (*__stdout_write)(FILE *, const unsigned char *, size_t);
+    size_t (*__stderr_write)(FILE *, const unsigned char *, size_t);
+    int (*__fprintf_chk)(FILE *, int, const char *, ...);
+    void *(*__memset_chk)(void *, int, size_t, size_t);
+    void *(*__memcpy_chk)(void *, const void *, size_t, size_t);
+    int (*__sprintf_chk)(char *, int, size_t, const char *, ...);
+    long int (*__fdelt_chk)(long int);
 #ifdef __LINUX__
     // Couldn't easily get struct definitions for these on mac
     int (*statvfs64)(const char *, struct statvfs64 *);
@@ -218,7 +228,11 @@ typedef struct {
     int (*io_getevents)(io_context_t, long, long, struct io_event *, struct timespec *);
     int (*sendmmsg)(int, struct mmsghdr *, unsigned int, int);
     int (*recvmmsg)(int, struct mmsghdr *, unsigned int, int, struct timespec *);
+    int (*pthread_create)(pthread_t *, const pthread_attr_t *,
+                          void *(*)(void *), void *);
     int (*getentropy)(void *, size_t);
+    void (*__ctype_init)(void);
+    int (*__register_atfork)(void (*) (void), void (*) (void), void (*) (void), void *);
 #endif // __LINUX__
 
 #if defined(__LINUX__) && defined(__STATX__)
@@ -245,6 +259,7 @@ typedef struct {
 
 extern interposed_funcs_t g_fn;
 
+void *getDLHandle(void);
 void initFn(void);
 
 #endif // __FN_H__

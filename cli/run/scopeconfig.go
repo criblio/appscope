@@ -318,6 +318,20 @@ func (c *Config) configFromRunOpts() error {
 		c.sc.Event.Transport = ScopeTransport{}
 		c.sc.Libscope.ConfigEvent = true
 	}
+
+	if c.Loglevel != "" {
+		levels := map[string]bool{
+			"error":   true,
+			"warning": true,
+			"info":    true,
+			"debug":   true,
+			"none":    true,
+		}
+		if _, ok := levels[c.Loglevel]; !ok {
+			return fmt.Errorf("%s is an invalid log level. Log level must be one of debug, info, warning, error, or none", c.Loglevel)
+		}
+		c.sc.Libscope.Log.Level = c.Loglevel
+	}
 	return nil
 }
 

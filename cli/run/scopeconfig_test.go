@@ -202,6 +202,15 @@ func TestConfigFromRunOpts(t *testing.T) {
 	assert.Equal(t, true, c.sc.Metric.Transport.Tls.Enable)
 	assert.Equal(t, true, c.sc.Metric.Transport.Tls.ValidateServer)
 	assert.Equal(t, "", c.sc.Metric.Transport.Tls.CaCertPath)
+
+	c.Loglevel = "foo"
+	err = c.configFromRunOpts()
+	assert.Error(t, err)
+
+	c.Loglevel = "debug"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, c.sc.Libscope.Log.Level, "debug")
 }
 
 func TestWriteScopeConfig(t *testing.T) {

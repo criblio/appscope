@@ -33,10 +33,7 @@ scope run -- curl https://wttr.in/94105`,
 }
 
 func init() {
-	runCmd.Flags().BoolVar(&rc.Passthrough, "passthrough", false, "Runs ldscope with current environment & no config.")
-	runCmd.Flags().IntVarP(&rc.Verbosity, "verbosity", "v", 4, "Set scope metric verbosity")
-	runCmd.Flags().BoolVarP(&rc.Payloads, "payloads", "p", false, "Capture payloads of network transactions")
-	metricAndEventDestFlags(runCmd, rc)
+	runCmdFlags(runCmd, rc)
 	// This may be a bad assumption, if we have any args preceding this it might fail
 	runCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		internal.InitConfig()

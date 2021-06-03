@@ -236,24 +236,6 @@ typedef struct
 //
 extern void *_dl_sym(void *, const char *, void *);
 
-EXPORTWEAK int
-__vfprintf_chk(FILE *fp, int flag, const char *format, va_list ap)
-{
-    return vfprintf(fp, format, ap);
-}
-
-EXPORTWEAK int
-__vsnprintf_chk(char *s, size_t maxlen, int flag, size_t slen, const char *format, va_list args)
-{
-    return vsnprintf(s, slen, format, args);
-}
-
-EXPORTWEAK void *
-_dl_sym(void *handle, const char *name, void *who)
-{
-    return dlsym(handle, name);
-}
-
 static int
 findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 {
@@ -4705,3 +4687,23 @@ __register_atfork(void (*prepare) (void), void (*parent) (void), void (*child) (
      */
     return ENOMEM;
 }
+
+EXPORTWEAK int
+__vfprintf_chk(FILE *fp, int flag, const char *format, va_list ap)
+{
+    return vfprintf(fp, format, ap);
+}
+
+EXPORTWEAK int
+__vsnprintf_chk(char *s, size_t maxlen, int flag, size_t slen, const char *format, va_list args)
+{
+    return vsnprintf(s, slen, format, args);
+}
+
+EXPORTWEAK void *
+_dl_sym(void *handle, const char *name, void *who)
+{
+    return dlsym(handle, name);
+}
+
+

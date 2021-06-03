@@ -4692,7 +4692,16 @@ __register_atfork(void (*prepare) (void), void (*parent) (void), void (*child) (
         return g_fn.__register_atfork(prepare, parent, child, __dso_handle);
     }
 
-    // what do we do if we can't resolve a symbol for __register_atfork?
-    // glibc returns ENOMEM on error.
+    /*
+     * What do we do if we can't resolve a symbol for __register_atfork?
+     * glibc returns ENOMEM on error.
+     *
+     * Note: __register_atfork() is defined to implement the
+     * functionality of pthread_atfork(); Therefore, it would seem
+     * reasonable to call pthread_atfork() here if the symbol for
+     * __register_atfork() is not resolved. However, glibc implements
+     * pthread_atfork() by calling __register_atfork() which causes
+     * a tight loop here and we would crash.
+     */
     return ENOMEM;
 }

@@ -55,5 +55,5 @@ func runCmdFlags(cmd *cobra.Command, rc *run.Config) {
 	cmd.Flags().BoolVarP(&rc.Payloads, "payloads", "p", false, "Capture payloads of network transactions")
 	cmd.Flags().StringVar(&rc.Loglevel, "loglevel", "", "Set ldscope log level (debug, warning, info, error, none)")
 	cmd.Flags().IntVarP(&rc.AttachPID, "attach", "a", 0, "Attach to a currently running process by PID")
-	metricAndEventDestFlags(runCmd, rc)
+	metricAndEventDestFlags(cmd, rc)
 }

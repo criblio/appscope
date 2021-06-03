@@ -254,12 +254,6 @@ _dl_sym(void *handle, const char *name, void *who)
     return dlsym(handle, name);
 }
 
-EXPORTWEAK void
-__ctype_init(void)
-{
-    return;
-}
-
 static int
 findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 {
@@ -4689,4 +4683,16 @@ __fdelt_chk(long int fdelt)
     }
 
     return fdelt / __NFDBITS;
+}
+
+EXPORTWEAK int
+__register_atfork(void (*prepare) (void), void (*parent) (void), void (*child) (void), void *__dso_handle)
+{
+    if (g_fn.__register_atfork) {
+        return g_fn.__register_atfork(prepare, parent, child, __dso_handle);
+    }
+
+    // what do we do if we can't resolve a symbol for __register_atfork?
+    // glibc returns ENOMEM on error.
+    return ENOMEM;
 }

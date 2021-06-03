@@ -231,6 +231,8 @@ typedef struct {
     int (*pthread_create)(pthread_t *, const pthread_attr_t *,
                           void *(*)(void *), void *);
     int (*getentropy)(void *, size_t);
+    void (*__ctype_init)(void);
+    int (*__register_atfork)(void (*) (void), void (*) (void), void (*) (void), void *);
 #endif // __LINUX__
 
 #if defined(__LINUX__) && defined(__STATX__)

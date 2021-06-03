@@ -210,6 +210,8 @@ initFn(void)
     g_fn.recvmmsg = dlsym(handle, "recvmmsg");
     g_fn.pthread_create = dlsym(handle, "pthread_create");
     g_fn.getentropy = dlsym(handle, "getentropy");
+    g_fn.__ctype_init = dlsym(handle, "__ctype_init");
+    g_fn.__register_atfork = dlsym(handle, "__register_atfork");
 #ifdef __STATX__
     g_fn.statx = dlsym(handle, "statx");
 #endif // __STATX__

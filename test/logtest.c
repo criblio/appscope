@@ -1,7 +1,9 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <unistd.h>
 #include "log.h"
 
+#include "fn.h"
 #include "test.h"
 
 static void
@@ -167,6 +169,7 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
+    initFn();
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(logCreateReturnsValidPtr),

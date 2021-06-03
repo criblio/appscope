@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <netdb.h>
 #include <sys/socket.h>
 #include <stdio.h>
@@ -6,9 +7,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#include "fn.h"
 #include "dbg.h"
 #include "transport.h"
-
 #include "test.h"
 
 static void
@@ -395,6 +397,7 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
+    initFn();
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(transportCreateTcpReturnsNullPtrForNullHostOrPath),

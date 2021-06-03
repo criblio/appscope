@@ -166,7 +166,7 @@ func TestGetSessionRun(t *testing.T) {
 	err = cmd.Start()
 	assert.NoError(t, err)
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	lastHome := os.Getenv("SCOPE_HOME")
 	os.Setenv("SCOPE_HOME", ".test")

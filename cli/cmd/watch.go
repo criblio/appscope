@@ -35,6 +35,7 @@ scope watch --interval=10s -- curl https://wttr.in/94105`,
 }
 
 func init() {
+	runCmdFlags(watchCmd, rc)
 	watchCmd.Flags().StringP("interval", "i", "", "Run every <x>(s|m|h)")
 	watchCmd.MarkFlagRequired("interval")
 	RootCmd.AddCommand(watchCmd)

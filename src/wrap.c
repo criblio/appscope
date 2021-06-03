@@ -32,6 +32,7 @@
 #include "runtimecfg.h"
 #include "javaagent.h"
 #include "inject.h"
+#include "../contrib/libmusl/musl.h"
 
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
@@ -234,7 +235,6 @@ typedef struct
 // Not to point fingers, but I'm looking at you python.
 //
 extern void *_dl_sym(void *, const char *, void *);
-
 
 static int
 findSymbol(struct dl_phdr_info *info, size_t size, void *data)
@@ -656,7 +656,8 @@ threadNow(int sig)
 
     osTimerStop();
 
-    if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
+    if (g_fn.pthread_create &&
+        (g_fn.pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0)) {
         scopeLog("ERROR: threadNow:pthread_create", -1, CFG_LOG_ERROR);
         if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
         return;
@@ -1107,9 +1108,12 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
  * get a handle and lookup the symbol.
  */
 
-static ssize_t __write_libc(int fd, const void *buf, size_t size);
-static ssize_t __write_pthread(int fd, const void *buf, size_t size);
-static int internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags);
+static ssize_t __write_libc(int, const void *, size_t);
+static ssize_t __write_pthread(int, const void *, size_t);
+static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
+static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
+static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
+static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
 
 static int 
 findInjected(struct dl_phdr_info *info, size_t size, void *data)
@@ -1254,14 +1258,35 @@ initHook()
     dl_iterate_phdr(findLibSym, &pthread__write);
 
     hookInject();
-    
-    if (should_we_patch || g_fn.sendmmsg || g_fn.__write_libc || g_fn.__write_pthread) {
+
+    // for DNS:
+    // On a glibc distro we hook sendmmsg because getaddrinfo calls this
+    // directly and we miss DNS requests unless it's hooked.
+    //
+    // For DNS and console I/O
+    // On a musl distro the name server code calls sendto and recvfrom
+    // directly. So, we hook these in order to get DNS detail. We check
+    // to see which distro is used so as to hook only what is needed.
+    // We use the fact that on a musl distro the ld lib env var is set to
+    // a dir with a libscope-ver string. If that exists in the env var
+    // then we assume musl.
+    bool glibc = TRUE;
+    char *libpath = getenv(LD_LIB_ENV);
+    if (libpath && strstr(libpath, LD_LIB_DIR)) {
+        // we are in a libmusl distro
+        glibc = FALSE;
+    }
+
+    if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
+        ((glibc == TRUE) && g_fn.sendmmsg) ||
+        ((glibc == FALSE) && (g_fn.sendto || g_fn.recvfrom))) {
         funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_DEBUG) {
             // TODO: add some mechanism to get the config'd log file path
             funchook_set_debug_file(DEFAULT_LOG_PATH);
         }
+
         if (should_we_patch) {
             g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
     
@@ -1272,17 +1297,52 @@ initHook()
             rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
         }
 
-        // sendmmsg for internal libc use in DNS queries
-        if (g_fn.sendmmsg) {
+        // sendmmsg, sendto, recvfrom for internal libc use in DNS queries
+        if ((glibc == TRUE) && g_fn.sendmmsg) {
             rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
+        }
+
+        if ((glibc == FALSE) && g_fn.sendto) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.sendto, internal_sendto);
+        }
+
+        if ((glibc == FALSE) && g_fn.recvfrom) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
+        }
+
+        // libmusl
+        // Note that both stdout & stderr objects point to the same write function.
+        // They are init'd with a static object. After the first write the
+        // write pointer is modified. We handle that mod in the interposed
+        // function __stdio_write().
+        if ((glibc == FALSE) && (!g_fn.__stdout_write || !g_fn.__stderr_write)) {
+            // Get the static initializer for the stdout write function pointer
+            struct MUSL_IO_FILE *stdout_write = (struct MUSL_IO_FILE *)stdout;
+
+            // Save the write pointer
+            g_fn.__stdout_write = (size_t (*)(FILE *, const unsigned char *, size_t))stdout_write->write;
+
+            // Modify the write pointer to use our function
+            stdout_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+
+            // same for stderr
+            struct MUSL_IO_FILE *stderr_write = (struct MUSL_IO_FILE *)stderr;
+
+            // Save the write pointer
+            g_fn.__stderr_write = (size_t (*)(FILE *, const unsigned char *, size_t))stderr_write->write;
+
+            // Modify the write pointer to use our function
+            stderr_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
         }
 
         if (g_fn.__write_libc) {
             rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
         }
+
         if (g_fn.__write_pthread) {
             rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
         }
+
         // hook 'em
         rc = funchook_install(funchook, 0);
         if (rc != 0) {
@@ -1314,7 +1374,7 @@ init(void)
     // internal memory subsystem.  It's own is not threadsafe.  If we
     // find that bash is using it's own memory, replace it with glibc's
     // so our own thread can run safely in parallel.
-    if (in_bash_process() && func_found_in_executable("malloc")) {
+    if (func_found_in_executable("malloc", "bash")) {
         run_bash_mem_fix();
     }
 
@@ -3391,6 +3451,64 @@ fgetpos64(FILE *stream,  fpos64_t *pos)
     return rc;
 }
 
+/*
+ * This function, at this time, is specific to libmusl.
+ * We have hooked the stdout/stderr write pointer.
+ * The function pointer assigned by static config is
+ * modified by libc during the first call to stdout/stderr.
+ * We check for changes and adjust as needed.
+ */
+static size_t
+__stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
+{
+    uint64_t initialTime = getTime();
+    struct iovec iovs[2] = {
+		{ .iov_base = stream->wbase, .iov_len = stream->wpos - stream->wbase },
+		{ .iov_base = (void *)buf, .iov_len = len }
+	};
+
+    struct iovec *iov = iovs;
+    int iovcnt = 2;
+    int dothis = 0;
+    ssize_t rc;
+
+    // Note: not using WRAP_CHECK because these func ptrs are not populated
+    // from symbol resolution.
+    // stdout
+    if (g_fn.__stdout_write && stream && (stream == (struct MUSL_IO_FILE *)stdout)) {
+        rc = g_fn.__stdout_write((FILE *)stream, buf, len);
+        dothis = 1;
+
+        // has the stdout write pointer changed?
+        if (stream->write != (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write) {
+            // save the new pointer
+            g_fn.__stdout_write = (size_t (*)(FILE *, const unsigned char *, size_t))stream->write;
+
+            // modify the pointer to use this function
+            stream->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+        }
+    }
+
+    // stderr
+    if (g_fn.__stderr_write && stream && (stream == (struct MUSL_IO_FILE *)stderr)) {
+        rc = g_fn.__stderr_write((FILE *)stream, buf, len);
+        dothis = 1;
+
+        // has the stderr write pointer changed?
+        if (stream->write != (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write) {
+            // save the new pointer
+            g_fn.__stderr_write = (size_t (*)(FILE *, const unsigned char *, size_t))stream->write;
+
+            // modify the pointer to use this function
+            stream->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+        }
+    }
+
+    if (dothis == 1) doWrite(fileno((FILE *)stream), initialTime, (rc != -1),
+                             iov, rc, "__stdio_write", IOV, iovcnt);
+    return rc;
+}
+
 EXPORTOFF ssize_t // EXPORTOFF because it's redundant with __write
 write(int fd, const void *buf, size_t count)
 {
@@ -4049,8 +4167,8 @@ send(int sockfd, const void *buf, size_t len, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
-sendto(int sockfd, const void *buf, size_t len, int flags,
+static ssize_t
+internal_sendto(int sockfd, const void *buf, size_t len, int flags,
        const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
@@ -4071,6 +4189,13 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
     }
 
     return rc;
+}
+
+EXPORTON ssize_t
+sendto(int sockfd, const void *buf, size_t len, int flags,
+       const struct sockaddr *dest_addr, socklen_t addrlen)
+{
+    return internal_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 }
 
 EXPORTON ssize_t
@@ -4175,8 +4300,8 @@ recv(int sockfd, void *buf, size_t len, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
-recvfrom(int sockfd, void *buf, size_t len, int flags,
+static ssize_t
+internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
          struct sockaddr *src_addr, socklen_t *addrlen)
 {
     ssize_t rc;
@@ -4195,6 +4320,13 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvfrom", "nopath");
     }
     return rc;
+}
+
+EXPORTON ssize_t
+recvfrom(int sockfd, void *buf, size_t len, int flags,
+         struct sockaddr *src_addr, socklen_t *addrlen)
+{
+    return internal_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
 }
 
 static int
@@ -4447,3 +4579,131 @@ scopeLog(const char *msg, int fd, cfg_log_level_t level)
     }
     logSend(g_log, buf, level);
 }
+
+/*
+ * pthread_create was added to support go execs on libmusl.
+ * The go execs don't link to crt0/crt1 on libmusl therefore
+ * they do not call our lib constructor. We interpose this
+ * as a means to call the constructgor before the go app runs.
+ */
+EXPORTON int
+pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+               void *(*start_routine)(void *), void *arg)
+{
+    int rc;
+
+    WRAP_CHECK(pthread_create, -1);
+    rc = g_fn.pthread_create(thread, attr, start_routine, arg);
+
+    if (!g_ctl) {
+        init();
+    }
+
+    return rc;
+}
+
+/*
+ * These functions are interposed to support libmusl.
+ * The addition of libssl and libcrypto pull in these
+ * glibc internal funcs.
+ */
+EXPORTON int
+__fprintf_chk(FILE *stream, int flag, const char *format, ...)
+{
+    va_list ap;
+    int rc;
+
+    va_start (ap, format);
+    rc = vfprintf(stream, format, ap);
+    va_end (ap);
+    return rc;
+}
+
+EXPORTON int
+__sprintf_chk(char *str, int flag, size_t strlen, const char *format, ...)
+{
+    va_list ap;
+    int rc;
+
+    va_start(ap, format);
+    rc = vsnprintf(str, strlen, format, ap);
+    va_end(ap);
+    return rc;
+}
+
+EXPORTON void *
+__memset_chk(void *dest, int cset, size_t len, size_t destlen)
+{
+    if (g_fn.__memset_chk) {
+        return g_fn.__memset_chk(dest, cset, len, destlen);
+    }
+
+    return memset(dest, cset, len);
+}
+
+EXPORTON void *
+__memcpy_chk(void *dest, const void *src, size_t len, size_t destlen)
+{
+    if (g_fn.__memcpy_chk) {
+        return g_fn.__memcpy_chk(dest, src, len, destlen);
+    }
+
+    return memcpy(dest, src, len);
+}
+
+EXPORTON long int
+__fdelt_chk(long int fdelt)
+{
+    if (g_fn.__fdelt_chk) {
+        return g_fn.__fdelt_chk(fdelt);
+    }
+
+    if (fdelt < 0 || fdelt >= FD_SETSIZE) {
+        DBG(NULL);
+        fprintf(stderr, "__fdelt_chk error: buffer overflow detected?\n");
+        abort();
+    }
+
+    return fdelt / __NFDBITS;
+}
+
+EXPORTWEAK int
+__register_atfork(void (*prepare) (void), void (*parent) (void), void (*child) (void), void *__dso_handle)
+{
+    if (g_fn.__register_atfork) {
+        return g_fn.__register_atfork(prepare, parent, child, __dso_handle);
+    }
+
+    /*
+     * What do we do if we can't resolve a symbol for __register_atfork?
+     * glibc returns ENOMEM on error.
+     *
+     * Note: __register_atfork() is defined to implement the
+     * functionality of pthread_atfork(); Therefore, it would seem
+     * reasonable to call pthread_atfork() here if the symbol for
+     * __register_atfork() is not resolved. However, glibc implements
+     * pthread_atfork() by calling __register_atfork() which causes
+     * a tight loop here and we would crash.
+     */
+    return ENOMEM;
+}
+
+EXPORTWEAK int
+__vfprintf_chk(FILE *fp, int flag, const char *format, va_list ap)
+{
+    return vfprintf(fp, format, ap);
+}
+
+EXPORTWEAK int
+__vsnprintf_chk(char *s, size_t maxlen, int flag, size_t slen, const char *format, va_list args)
+{
+    return vsnprintf(s, slen, format, args);
+}
+
+EXPORTWEAK void *
+_dl_sym(void *handle, const char *name, void *who)
+{
+    return dlsym(handle, name);
+}
+
+

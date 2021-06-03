@@ -7,6 +7,7 @@
 #include "ctl.h"
 #include "dbg.h"
 #include "cfgutils.h"
+#include "fn.h"
 #include "test.h"
 
 static void
@@ -684,6 +685,7 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
+    initFn();
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(ctlParseRxMsgNullReturnsParseError),

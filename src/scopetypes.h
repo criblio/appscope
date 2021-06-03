@@ -182,5 +182,9 @@ typedef unsigned int bool;
 #define PAYLOAD_BYTESRC 8
 #define PAYLOAD_REGEX "^16030[0-3].{4}0[12]"
 
+// libmusl requires LD_LIBRARY_PATH
+#define LD_LIB_ENV "LD_LIBRARY_PATH"
+#define LD_LIB_DIR "libscope-v"
+
 #endif // __SCOPETYPES_H__
 

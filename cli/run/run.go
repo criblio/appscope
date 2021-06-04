@@ -31,14 +31,13 @@ type Config struct {
 	Subprocess    bool
 	Loglevel      string
 	LibraryPath   string
-	AttachPID     int
 
 	now func() time.Time
 	sc  *ScopeConfig
 }
 
 // Run executes a scoped command
-func (rc *Config) Run(args []string) {
+func (rc *Config) Run(args []string, attach bool) {
 	if err := createLdscope(); err != nil {
 		util.ErrAndExit("error creating ldscope: %v", err)
 	}
@@ -54,13 +53,13 @@ func (rc *Config) Run(args []string) {
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
-	if rc.AttachPID > 0 {
+	if attach {
 		// Validate PID exists
-		if !util.CheckDirExists(fmt.Sprintf("/proc/%d", rc.AttachPID)) {
-			util.ErrAndExit("PID does not exist: \"%d\"", rc.AttachPID)
+		if !util.CheckDirExists(fmt.Sprintf("/proc/%s", args[0])) {
+			util.ErrAndExit("PID does not exist: \"%s\"", args[0])
 		}
-		// Prepend "--attach" [PID] to args
-		args = append([]string{"--attach", strconv.Itoa(rc.AttachPID)}, args...)
+		// Prepend "--attach" to args
+		args = append([]string{"--attach"}, args...)
 	}
 	if !rc.Passthrough {
 		rc.setupWorkDir(args)

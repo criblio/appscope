@@ -18,7 +18,11 @@ GO_VER_FLAGS=$(shell cd $(DIR) && $(GOPATH)/bin/govvv -flags)
 build: deps
 	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(GOPATH)/bin/scope
 
-## cliall: install dependencies and install the scope binary in appscope/build with compression
+## debug: build, but with gdb support
+debug: deps
+	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -gcflags=all="-N -l" -o $(GOPATH)/bin/scope
+
+## cliall (popular): install dependencies and install the scope binary in appscope/build with compression
 cliall: deps scope compressscope
 
 ## cliclean: remove the binary from appscope/build and your GOPATH/bin directory

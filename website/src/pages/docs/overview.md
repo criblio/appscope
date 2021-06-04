@@ -2,7 +2,7 @@
 title: Overview
 ---
 
-## What Is AppScope
+## What Is AppScope?
 ---
 
 AppScope is an open source, runtime-agnostic instrumentation utility for any Linux command or application. It helps users explore, understand, and gain visibility with **no code modification**. 
@@ -17,10 +17,14 @@ It’s like [strace](https://strace.io/) meets [tcpdump](https://www.tcpdump.org
 ![AppScope in-terminal monitoring](./images/AppScope-GUI-screenshot.png)
 
 
-## Features: Instrument, Collect and Observe
+## Features: Instrument, Collect, and Observe
 ---
 
-- Runtime-agnostic, no dependencies, no code development required, including static executables
+- Runtime-agnostic, no dependencies, no code development required
+- Instrument both static and dynamic executables
+- Attach to processes *while they are running* or start when the process does
+- Run on Alpine Linux, another Linux distribution based on musl libc, or on a glibc-based distro
+- Communicate safely and securely with TLS over TCP connections
 - Capture application metrics: **File, Network, Memory, CPU**
 - Capture application events: console content, stdin/out, logs, errors
 - Capture any and all payloads: DNS, HTTP, HTTPS

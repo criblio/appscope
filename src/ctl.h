@@ -35,15 +35,20 @@ typedef enum {
 } switch_action_t;
 
 /**
- * Details for a payload-matching regexp for protocol detection
+ * Protocol Detection Data
  */
 typedef struct {
-    bool binary;                  // TRUE to hexdump payload before matching
-    char *regex;                  // the raw regexp string
-    pcre2_code *re;               // the compiled regexp
-    unsigned int len;             // number of bytes in subject to match against?
-    unsigned int type;            // ???
+    // These come from the protocol file
     char *protname;               // protocol name 
+    char *regex;                  // the raw regexp string
+    bool binary;                  // TRUE to hexdump payload before matching
+    bool detect;                  // TRUE to send proto-detect events
+    bool payload;                 // TRUE to send payloads to LogStream
+    unsigned int len;             // number of bytes to hex-convert of binary
+    unsigned int type;            // optional unique ID (not set from YAML)
+
+    // These are "state" we add
+    pcre2_code *re;               // the compiled regexp
     pcre2_match_data *match_data; // preg match results
 } protocol_def_t;
 

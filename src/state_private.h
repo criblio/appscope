@@ -16,20 +16,10 @@
 
 typedef enum
 {
-    TLS_DETECT_PENDING, // Initial State, waiting for a packet
-    TLS_DETECT_FALSE,   // Packet wasn't TLS
-    TLS_DETECT_TRUE,    // Packet was TLS
-    TLS_DETECT_MAX
-} tls_detect_type_t;
-
-typedef enum
-{
-    PROTO_DETECT_PENDING, // Initial State, waiting for a packet
-    PROTO_DETECT_UNKNOWN, // Unknown protocol in packet
-    PROTO_DETECT_HTTP,    // HTTP Detected
-    //PROTO_DETECT_SNMP,    // SNMP Detected
-    PROTO_DETECT_MAX
-} proto_detect_type_t;
+    DETECT_PENDING, // Initial State, waiting for pacted to detect
+    DETECT_FALSE,   // Not detected
+    DETECT_TRUE     // Detected
+} detect_type_t;
 
 typedef enum
 {
@@ -190,8 +180,9 @@ typedef struct net_info_t {
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;
     metric_counters counters;
-    tls_detect_type_t tlsDetect;
-    proto_detect_type_t protoDetect;
+    detect_type_t tlsDetect;   // state for TLS detection on this channel
+    detect_type_t protoDetect; // state for protocol detection on this channel
+    protocol_def_t* protocol;   // The detected protocol definition or NULL
 } net_info;
 
 typedef struct fs_info_t {

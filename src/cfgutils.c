@@ -2196,6 +2196,12 @@ protocolRead(const char *path, list_t *plist)
                     errno = 0;
                     prot->len = strtoull((char *)prot_value->data.scalar.value, NULL, 0);
                     if (errno != 0) prot->len = 0;
+                } else if (!strcmp((char *)prot_key->data.scalar.value, "detect")) {
+                    prot->detect = (!strcmp((char *)prot_value->data.scalar.value, "false")) ?
+                        FALSE : TRUE; // seems like it should default to true
+                } else if (!strcmp((char *)prot_key->data.scalar.value, "payload")) {
+                    prot->payload = (!strcmp((char *)prot_value->data.scalar.value, "false")) ?
+                        FALSE : TRUE; // seems like it should default to true
                 } else {
                     continue;
                 }

@@ -1,11 +1,46 @@
 ---
+# Cribl AppScope - Protocol Detection List
+#
+# Entries in this list define protocols that AppScope should look for in
+# payloads and how to handle matches. The first packet seen on a channel
+# is checked against the given regular expression. Entries are checked in the
+# order they appear here in the file and when a match is found, later entries
+# are skipped.
+#
+# Entries have the following properties:
+#
+#   name     String protocol name used in protocol-detect events (required)
+#   regex    The regular expression to use (required)
+#   binary   Boolean indicating whether the regex should be applied to a
+#            hex-string version of the payload instead of the binary payload
+#            (default: false)
+#   detect   Boolean indicating whether protocol-detect events should be
+#            generated (default: true)
+#   payload  Boolean indicating whether payload-processing should be enabled
+#            for matching streams (default: false)
+#
+# Note when payloads are enabled globally, the payload options here are ignored.
+#
 protocol:
-  - name: Redis
-    binary: false
-    regex: "^[*]\\d+|^[+]\\w+|^[$]\\d+"
 
-  - name: Mongo
-    binary: true
-    regex: "^240100000000000000000000d407"
-    len: 32
+# Redis Example
+#    - name: Redis
+#      binary: false
+#      regex: "^[*]\\d+|^[+]\\w+|^[$]\\d+"
+
+# MongoDB Example
+#    - name: Mongo
+#      regex: "^240100000000000000000000d407"
+#      binary: true
+#      len: 32
+
+# HTTP Example
+#
+# If an entry named "HTTP" is absent above but the LogStream backend is
+# enabled, AppScope effectively adds this to the list of protocols.
+#
+#    - name: HTTP
+#      regex: " HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
+#      detect: true
+#      payload: true
 ---

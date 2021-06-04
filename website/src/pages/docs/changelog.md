@@ -4,6 +4,22 @@ title: Changelog
 
 # Changelog
 
+## AppScope 0.7
+
+2021-06-11 - Maintenance Pre-Release
+
+This pre-release addresses the following issues:
+
+- **Improvement**: [#286](https://github.com/criblio/appscope/issues/286) Add support for TLS over TCP connections, and add new TLS-related environment variables
+- **Improvement**: [#256](https://github.com/criblio/appscope/issues/256) Add support for attaching AppScope to a running process
+- **Improvement**: [#292](https://github.com/criblio/appscope/issues/292) Add support for attaching AppScope to a running process from the CLI
+- **Improvement**: [#132](https://github.com/criblio/appscope/issues/132) Add new ``scope logs`` command to view logs from the CLI
+- **Improvement**: [#XXX](https://github.com/criblio/appscope/issues/XXX) Add new ``--interval`` option to ``scope watch`` command to run AppScope at intervals, from the CLI
+- **Improvement**: [#286](https://github.com/criblio/appscope/issues/286) Drop support for CentOS 6, because TLS support requires GLIBC_2.17 or newer, and CentOS 6 is stalled at GLIBC_2.12
+- **Improvement**: [#XXX](https://github.com/criblio/appscope/issues/XXX) Make developer docs available at https://github.com/criblio/appscope/tree/master/docs
+- **Fix**: [#265](https://github.com/criblio/appscope/issues/265) Re-direct bash malloc functions to glibc to avoid segfaults and memory allocation issues
+- **Fix**: [#279](https://github.com/criblio/appscope/issues/279) Correct handling of pointers returned by gnutls, which previously could cause ``git clone`` to crash
+
 ## AppScope 0.6.1
 
 2021-04-26 - Maintenance Pre-Release

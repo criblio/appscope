@@ -18,9 +18,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"net/http"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -88,7 +88,6 @@ func (fi bindataFileInfo) IsDir() bool {
 func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
-
 
 type assetFile struct {
 	*bytes.Reader
@@ -448,13 +447,13 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"args.json":                                              argsJson,
-	"events.json":                                            eventsJson,
-	"ldscope.log":                                            ldscopeLog,
-	"metric_format":                                          metric_format,
-	"metrics.json":                                           metricsJson,
-	"scope.log":                                              scopeLog,
-	"scope.yml":                                              scopeYml,
+	"args.json":     argsJson,
+	"events.json":   eventsJson,
+	"ldscope.log":   ldscopeLog,
+	"metric_format": metric_format,
+	"metrics.json":  metricsJson,
+	"scope.log":     scopeLog,
+	"scope.yml":     scopeYml,
 	"payloads/548213_13.226.220.53:443_172.17.0.2:50466.in":  payloads548213_1322622053443_172170250466In,
 	"payloads/548213_13.226.220.53:443_172.17.0.2:50466.out": payloads548213_1322622053443_172170250466Out,
 	"payloads/548213_192.168.65.5:53_0.0.0.0:0.in":           payloads548213_19216865553_00000In,

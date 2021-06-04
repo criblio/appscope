@@ -27,9 +27,9 @@ scope watch --interval=10s -- curl https://wttr.in/94105`,
 		dur, err := time.ParseDuration(interval)
 		util.CheckErrSprintf(err, "error parsing time duration string \"%s\": %v", interval, err)
 		timer := time.Tick(dur)
-		rc.Run(args)
+		rc.Run(args, false)
 		for range timer {
-			rc.Run(args)
+			rc.Run(args, false)
 		}
 	},
 }

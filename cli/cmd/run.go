@@ -12,7 +12,7 @@ var rc *run.Config = &run.Config{}
 
 // runCmd represents the run command
 var runCmd = &cobra.Command{
-	Use:   "run [flags]",
+	Use:   "run [flags] [command]",
 	Short: "Executes a scoped command",
 	Long: `Run executes a scoped command. By default, calling scope with no subcommands will execute run for args after 
 scope. However, scope allows for additional arguments to be passed to run to capture payloads or to up metric 
@@ -28,7 +28,7 @@ scope run -- curl https://wttr.in/94105`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
-		rc.Run(args)
+		rc.Run(args, false)
 	},
 }
 

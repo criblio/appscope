@@ -19,7 +19,7 @@ This pre-release addresses the following issues:
 - **Improvement**: Add new `--interval` option to `scope watch` command to run AppScope at intervals, from the CLI
 - **Improvement**: Make developer docs available at https://github.com/criblio/appscope/tree/master/docs
 - **Fix**: [#265](https://github.com/criblio/appscope/issues/265) Re-direct bash malloc functions to glibc to avoid segfaults and memory allocation issues
-- **Fix**: [#279](https://github.com/criblio/appscope/issues/279) Correct handling of pointers returned by gnutls, which previously could cause `git clone` to crash
+- **Fix**: [#279](https://github.com/criblio/appscope/issues/279) Correct handling of pointers returned by gnutls, which otherwise could cause `git clone` to crash
 
 ## AppScope 0.6.1
 

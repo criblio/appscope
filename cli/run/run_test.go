@@ -98,7 +98,7 @@ func TestMain(m *testing.M) {
 	case "runpassthrough":
 		internal.InitConfig()
 		rc := Config{Passthrough: true}
-		rc.Run([]string{"/bin/echo", "true"})
+		rc.Run([]string{"/bin/echo", "true"}, false)
 	case "createWorkDir":
 		internal.InitConfig()
 		rc := Config{}
@@ -106,7 +106,7 @@ func TestMain(m *testing.M) {
 	case "run":
 		internal.InitConfig()
 		rc := Config{}
-		rc.Run([]string{"/bin/echo", "true"})
+		rc.Run([]string{"/bin/echo", "true"}, false)
 	default:
 		os.Exit(m.Run())
 	}
@@ -310,7 +310,7 @@ func TestSubprocess(t *testing.T) {
 	// Test SetupWorkDir, successfully
 	internal.InitConfig()
 	rc := Config{Subprocess: true}
-	rc.Run([]string{"/bin/echo", "true"})
+	rc.Run([]string{"/bin/echo", "true"}, false)
 	files, _ := ioutil.ReadDir(".test/history")
 	matched := false
 	wdbase := fmt.Sprintf("%s_%d", "echo", 1)

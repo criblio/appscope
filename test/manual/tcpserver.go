@@ -1,7 +1,7 @@
-// 
+//
 // Debug TCP Server that Mimics LogStream's AppScope Source
 //
-// `go run tcpserver2.go 10091`
+// `go run tcpserver.go 10091`
 //
 
 package main
@@ -19,8 +19,9 @@ import (
 func getBusyInABurgerKingBathroom(c net.Conn) {
 	defer c.Close()
 	fmt.Fprintf(os.Stderr, "%s: Connected\n", c.RemoteAddr().String())
+	r := bufio.NewReader(c)
 	for {
-		data, err := bufio.NewReader(c).ReadString('\n')
+		data, err := r.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
 				fmt.Fprintf(os.Stderr, "%s: Disconnected\n", c.RemoteAddr().String())
@@ -30,8 +31,8 @@ func getBusyInABurgerKingBathroom(c net.Conn) {
 			return
 		}
 
-		if (json.Valid([]byte(data))) {
-			fmt.Fprintf(os.Stdout, "%s: %s", c.RemoteAddr().String(), data);
+		if json.Valid([]byte(data)) {
+			fmt.Fprintf(os.Stdout, "%s: %s", c.RemoteAddr().String(), data)
 		} else {
 			fmt.Fprintf(os.Stderr, "%s: closing on non-JSON data\n%s", c.RemoteAddr().String(), hex.Dump([]byte(data)))
 			return
@@ -45,21 +46,20 @@ func getBusyInABurgerKingBathroom(c net.Conn) {
 		}
 
 		if "payload" == header["type"] {
-			all := int(header["len"].(float64)) + 1
-			bin := make([]byte,0)
+			need := int(header["len"].(float64))
+			bin := make([]byte, 0)
 			got := 0
-			for got < all {
-				tmp := make([]byte,all-got)
-				n, err := io.ReadFull(c, tmp)
+			for got < need {
+				chunk := make([]byte, need-got)
+				n, err := r.Read(chunk)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "error: closing on read(%d) failure; %v\n", all-got, err)
+					fmt.Fprintf(os.Stderr, "error: closing on read(%d) failure; %v\n", need-got, err)
 					return
 				}
-				fmt.Fprintf(os.Stderr, "info: read %d of %d\n", n, all-got)
 				got += n
-				bin = append(bin, tmp...)
+				bin = append(bin, chunk...)
 			}
-			fmt.Fprintf(os.Stderr, "%s: payload detected; %d bytes\n%s", c.RemoteAddr().String(), all, hex.Dump(bin))
+			fmt.Fprintf(os.Stderr, "%s: payload detected; %d bytes\n%s", c.RemoteAddr().String(), need-1, hex.Dump(bin[:need-1]))
 		}
 	}
 }
@@ -71,7 +71,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	l, err := net.Listen("tcp4", ":" + arguments[1])
+	l, err := net.Listen("tcp4", ":"+arguments[1])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: listen failed; %v\n", err)
 		os.Exit(1)

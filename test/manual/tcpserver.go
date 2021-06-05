@@ -14,17 +14,24 @@ import (
 	"io"
 	"net"
 	"os"
+	"time"
 )
+
+var start time.Time
+
+func log(c net.Conn, format string, args ...interface{}) {
+	fmt.Printf(fmt.Sprintf("%8s %s ", time.Since(start).Truncate(time.Millisecond).String(), c.RemoteAddr().String())+format, args...)
+}
 
 func getBusyInABurgerKingBathroom(c net.Conn) {
 	defer c.Close()
-	fmt.Fprintf(os.Stderr, "%s: Connected\n", c.RemoteAddr().String())
+	log(c, "Connected\n")
 	r := bufio.NewReader(c)
 	for {
 		data, err := r.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
-				fmt.Fprintf(os.Stderr, "%s: Disconnected\n", c.RemoteAddr().String())
+				log(c, "Disconnected\n")
 				return
 			}
 			fmt.Fprintf(os.Stderr, "error: closing on readln failure; %v\n", err)
@@ -32,16 +39,16 @@ func getBusyInABurgerKingBathroom(c net.Conn) {
 		}
 
 		if json.Valid([]byte(data)) {
-			fmt.Fprintf(os.Stdout, "%s: %s", c.RemoteAddr().String(), data)
+			log(c, data)
 		} else {
-			fmt.Fprintf(os.Stderr, "%s: closing on non-JSON data\n%s", c.RemoteAddr().String(), hex.Dump([]byte(data)))
+			log(c, "closing on non-JSON data\n%s", hex.Dump([]byte(data)))
 			return
 		}
 
 		var header map[string]interface{}
 
 		if err := json.Unmarshal([]byte(data), &header); err != nil {
-			fmt.Fprintf(os.Stderr, "%s: invalid JSON; %v\n", c.RemoteAddr().String(), err)
+			log(c, "closing on invalid JSON; %v\n%s\n", err, hex.Dump([]byte(data)))
 			return
 		}
 
@@ -53,25 +60,27 @@ func getBusyInABurgerKingBathroom(c net.Conn) {
 				chunk := make([]byte, need-got)
 				n, err := r.Read(chunk)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "error: closing on read(%d) failure; %v\n", need-got, err)
+					log(c, "closing on read(%d) failure; %v\n", need-got, err)
 					return
 				}
 				got += n
 				bin = append(bin, chunk...)
 			}
-			fmt.Fprintf(os.Stderr, "%s: payload detected; %d bytes\n%s", c.RemoteAddr().String(), need-1, hex.Dump(bin[:need-1]))
+			log(c, "%d-byte payload\n%s", need-1, hex.Dump(bin[:need-1]))
 		}
 	}
 }
 
 func main() {
+	start = time.Now()
+
+	port := ":10091"
 	arguments := os.Args
-	if len(arguments) == 1 {
-		fmt.Println("error: missing port argument")
-		os.Exit(1)
+	if len(arguments) > 1 {
+		port = ":" + arguments[1]
 	}
 
-	l, err := net.Listen("tcp4", ":"+arguments[1])
+	l, err := net.Listen("tcp4", port)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: listen failed; %v\n", err)
 		os.Exit(1)

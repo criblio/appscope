@@ -1,4 +1,6 @@
 **/*.swp
+*.o
+*.gcno
 .gdb_history
 scope.log
 coverage/

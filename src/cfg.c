@@ -572,7 +572,7 @@ cfgPayDir(config_t *cfg)
     return (cfg) ? cfg->pay.dir : DEFAULT_PAYLOAD_DIR;
 }
 
-bool
+cfg_logstream_t
 cfgLogStream(config_t *cfg)
 {
     return (cfg) ? cfg->logstream : DEFAULT_LOGSTREAM;
@@ -926,7 +926,8 @@ cfgPayDirSet(config_t *cfg, const char *dir)
 }
 
 void
-cfgLogStreamSet(config_t *cfg, bool value)
+cfgLogStreamSet(config_t *cfg, cfg_logstream_t value)
 {
-    if (cfg) cfg->logstream = value;
+    if (!cfg || value >= CFG_LOGSTREAM_MAX) return;
+    cfg->logstream = value;
 }

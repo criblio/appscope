@@ -24,6 +24,10 @@ typedef enum {CFG_SRC_FILE,
               CFG_SRC_FS,
               CFG_SRC_DNS,
               CFG_SRC_MAX} watch_t;
+typedef enum {CFG_LOGSTREAM_NONE,
+              CFG_LOGSTREAM,
+              CFG_LOGSTREAM_CLOUD,
+              CFG_LOGSTREAM_MAX} cfg_logstream_t;
 
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
@@ -141,7 +145,7 @@ typedef unsigned int bool;
 #define DEFAULT_TLS_VALIDATE_SERVER FALSE
 #define DEFAULT_TLS_CA_CERT NULL
 
-#define DEFAULT_LOGSTREAM FALSE
+#define DEFAULT_LOGSTREAM CFG_LOGSTREAM_NONE
 #define DEFAULT_LOGSTREAM_LOGMSG "The following settings have been overridden by a LogStream connection: event, metric and payload transport, "
 
 /*
@@ -177,6 +181,10 @@ typedef unsigned int bool;
 // https://tls13.ulfheim.net/
 #define PAYLOAD_BYTESRC 6
 #define PAYLOAD_REGEX "^16030[0-3].{4}0[12]"
+
+// libmusl requires LD_LIBRARY_PATH
+#define LD_LIB_ENV "LD_LIBRARY_PATH"
+#define LD_LIB_DIR "libscope-v"
 
 #endif // __SCOPETYPES_H__
 

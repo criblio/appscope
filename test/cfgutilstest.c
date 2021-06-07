@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -6,8 +7,9 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include "cfgutils.h"
 
+#include "fn.h"
+#include "cfgutils.h"
 #include "test.h"
 
 #define MAX_PATH 1024
@@ -1953,6 +1955,7 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
+    initFn();
 
     source_state_t log = {"SCOPE_EVENT_LOGFILE", CFG_SRC_FILE, DEFAULT_SRC_FILE};
     source_state_t con = {"SCOPE_EVENT_CONSOLE", CFG_SRC_CONSOLE, DEFAULT_SRC_CONSOLE};

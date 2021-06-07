@@ -24,7 +24,6 @@ func TestCreateLdscope(t *testing.T) {
 	os.Setenv("SCOPE_HOME", ".foo")
 	internal.InitConfig()
 	err := createLdscope()
-	os.Unsetenv("SCOPE_HOME")
 	assert.NoError(t, err)
 
 	wb, _ := Asset("build/ldscope")
@@ -51,7 +50,7 @@ func TestCreateLdscope(t *testing.T) {
 	assert.Equal(t, ldscopeInfo.ModTime(), stat.ModTime())
 
 	os.RemoveAll(".foo")
-
+	os.Unsetenv("SCOPE_HOME")
 }
 
 func TestCreateAll(t *testing.T) {
@@ -99,7 +98,7 @@ func TestMain(m *testing.M) {
 	case "runpassthrough":
 		internal.InitConfig()
 		rc := Config{Passthrough: true}
-		rc.Run([]string{"/bin/echo", "true"})
+		rc.Run([]string{"/bin/echo", "true"}, false)
 	case "createWorkDir":
 		internal.InitConfig()
 		rc := Config{}
@@ -107,7 +106,7 @@ func TestMain(m *testing.M) {
 	case "run":
 		internal.InitConfig()
 		rc := Config{}
-		rc.Run([]string{"/bin/echo", "true"})
+		rc.Run([]string{"/bin/echo", "true"}, false)
 	default:
 		os.Exit(m.Run())
 	}
@@ -240,6 +239,7 @@ libscope:
 }
 
 func TestSetupWorkDir(t *testing.T) {
+	os.Setenv("SCOPE_HOME", ".foo")
 	os.Setenv("SCOPE_TEST", "true")
 	rc := Config{}
 	rc.now = func() time.Time { return time.Unix(0, 0) }
@@ -265,6 +265,7 @@ func TestSetupWorkDir(t *testing.T) {
 	assert.True(t, payloadsDirExists)
 	os.RemoveAll(".foo")
 	os.Unsetenv("SCOPE_TEST")
+	os.Unsetenv("SCOPE_HOME")
 }
 
 func TestRun(t *testing.T) {
@@ -276,6 +277,43 @@ func TestRun(t *testing.T) {
 	files, err := ioutil.ReadDir(".test/history")
 	matched := false
 	wdbase := fmt.Sprintf("%s_%d_%d", "echo", 1, cmd.Process.Pid)
+	var wd string
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), wdbase) {
+			matched = true
+			wd = fmt.Sprintf("%s%s", ".test/history/", f.Name())
+			break
+		}
+	}
+	assert.True(t, matched)
+
+	exists := util.CheckFileExists(wd)
+	assert.True(t, exists)
+
+	argsJSONBytes, err := ioutil.ReadFile(filepath.Join(wd, "args.json"))
+	assert.NoError(t, err)
+	assert.Equal(t, `["/bin/echo","true"]`, string(argsJSONBytes))
+
+	expectedYaml := testDefaultScopeConfigYaml(wd, 4)
+
+	scopeYAMLBytes, err := ioutil.ReadFile(filepath.Join(wd, "scope.yml"))
+	assert.NoError(t, err)
+	assert.Equal(t, expectedYaml, string(scopeYAMLBytes))
+
+	cmdDirExists := util.CheckFileExists(filepath.Join(wd, "cmd"))
+	assert.True(t, cmdDirExists)
+	os.RemoveAll(".test")
+}
+
+func TestSubprocess(t *testing.T) {
+	os.Setenv("SCOPE_HOME", ".test")
+	// Test SetupWorkDir, successfully
+	internal.InitConfig()
+	rc := Config{Subprocess: true}
+	rc.Run([]string{"/bin/echo", "true"}, false)
+	files, _ := ioutil.ReadDir(".test/history")
+	matched := false
+	wdbase := fmt.Sprintf("%s_%d", "echo", 1)
 	var wd string
 	for _, f := range files {
 		if strings.HasPrefix(f.Name(), wdbase) {

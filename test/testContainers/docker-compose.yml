@@ -64,6 +64,11 @@ services:
       - 6379:6379
       - 27017:27017
 
+  bash:
+    build:
+      context: .
+      dockerfile: ./bash/Dockerfile
+
   gogen:
     build:
       context: .
@@ -297,3 +302,8 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-14.0.2_linux-x64_bin.tar.gz
+
+  alpine:
+    build:
+      context: .
+      dockerfile: ./alpine/Dockerfile

@@ -14,8 +14,10 @@
 #include <sys/syscall.h>
 #include <sys/stat.h>
 #include <libgen.h>
+#include <sys/resource.h>
 
 #include "atomic.h"
+#include "bashmem.h"
 #include "cfg.h"
 #include "cfgutils.h"
 #include "com.h"
@@ -33,6 +35,7 @@
 #include "runtimecfg.h"
 #include "javaagent.h"
 #include "inject.h"
+#include "../contrib/libmusl/musl.h"
 
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
@@ -46,6 +49,7 @@ static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
+static rlim_t g_max_fds = 0;
 
 extern unsigned g_sendprocessstart;
 
@@ -227,14 +231,13 @@ typedef struct
 } param_t;
 
 // When used with dl_iterate_phdr(), this has a similar result to
-// _dl_sym(RTLD_NEXT, ).  But, unlike _dl_sym(RTLD_NEXT, )
+// scope_dlsym(RTLD_NEXT, ).  But, unlike scope_dlsym(RTLD_NEXT, )
 // it will never return a symbol in our library.  This is
 // particularly useful for finding symbols in shared libraries
 // that are dynamically loaded after our constructor has run.
 // Not to point fingers, but I'm looking at you python.
 //
-extern void *_dl_sym(void *, const char *, void *);
-
+static void *scope_dlsym(void *, const char *, void *);
 
 static int
 findSymbol(struct dl_phdr_info *info, size_t size, void *data)
@@ -265,7 +268,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 #define WRAP_CHECK(func, rc)                                           \
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
-         if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {  \
+         if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
              scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);     \
              return rc;                                                \
          }                                                             \
@@ -284,7 +287,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
-         if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {  \
+         if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
              scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);     \
              return;                                                   \
          }                                                             \
@@ -387,7 +390,6 @@ remoteConfig()
     int timeout;
     struct pollfd fds;
     int rc, success, numtries;
-    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
@@ -396,13 +398,20 @@ remoteConfig()
     timeout = 1;
     memset(&fds, 0x0, sizeof(fds));
 
+/*
+    Setting fds.events = 0 to neuter ability to process remote
+    commands... until this is function is reworked to be TLS-friendly.
+
+    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
     if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
         (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {
         fds.events = 0;
     } else {
         fds.events = POLLIN;
     }
+*/
 
+    fds.events = 0;
     fds.fd = ctlConnection(g_ctl, CFG_CTL);
 
     rc = g_fn.poll(&fds, 1, timeout);
@@ -650,7 +659,8 @@ threadNow(int sig)
 
     osTimerStop();
 
-    if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
+    if (g_fn.pthread_create &&
+        (g_fn.pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0)) {
         scopeLog("ERROR: threadNow:pthread_create", -1, CFG_LOG_ERROR);
         if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
         return;
@@ -1051,20 +1061,6 @@ load_func(const char *module, const char *func)
     return addr;
 }
 
-static int 
-findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
-{
-    int len = strlen(info->dlpi_name);
-    int libscope_so_len = 11;
-
-    if(len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
-        *(char **)data = (char *) info->dlpi_name;
-        return 1;
-    }
-    return 0;
-}
-
-
 typedef struct
 {
     const char *library;    // Input:   e.g. libpthread.so
@@ -1116,10 +1112,14 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
  * get a handle and lookup the symbol.
  */
 
-static ssize_t __write_libc(int fd, const void *buf, size_t size);
-static ssize_t __write_pthread(int fd, const void *buf, size_t size);
 #endif // defined(__GO__) || defined(__FUNCHOOK__)
-static int internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags);
+static ssize_t __write_libc(int, const void *, size_t);
+static ssize_t __write_pthread(int, const void *, size_t);
+static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
+static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
+static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
+static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
+static long scope_syscall(long, ...);
 
 static int 
 findInjected(struct dl_phdr_info *info, size_t size, void *data)
@@ -1129,6 +1129,19 @@ findInjected(struct dl_phdr_info *info, size_t size, void *data)
         return 1;
     }
     return 0;
+}
+
+static int 
+findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
+{
+    int len = strlen(info->dlpi_name);
+    int libscope_so_len = 11;
+
+    if(len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
+        *(char **)data = (char *) info->dlpi_name;
+        return 1;
+    }
+    return findInjected(info, size, data);
 }
 
 /**
@@ -1252,14 +1265,35 @@ initHook()
     dl_iterate_phdr(findLibSym, &pthread__write);
 
     hookInject();
-    
-    if (should_we_patch || g_fn.sendmmsg || g_fn.__write_libc || g_fn.__write_pthread) {
+
+    // for DNS:
+    // On a glibc distro we hook sendmmsg because getaddrinfo calls this
+    // directly and we miss DNS requests unless it's hooked.
+    //
+    // For DNS and console I/O
+    // On a musl distro the name server code calls sendto and recvfrom
+    // directly. So, we hook these in order to get DNS detail. We check
+    // to see which distro is used so as to hook only what is needed.
+    // We use the fact that on a musl distro the ld lib env var is set to
+    // a dir with a libscope-ver string. If that exists in the env var
+    // then we assume musl.
+    bool glibc = TRUE;
+    char *libpath = getenv(LD_LIB_ENV);
+    if (libpath && strstr(libpath, LD_LIB_DIR)) {
+        // we are in a libmusl distro
+        glibc = FALSE;
+    }
+
+    if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
+        ((glibc == TRUE) && g_fn.sendmmsg) ||
+        ((glibc == FALSE) && (g_fn.sendto || g_fn.recvfrom))) {
         funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_DEBUG) {
             // TODO: add some mechanism to get the config'd log file path
             funchook_set_debug_file(DEFAULT_LOG_PATH);
         }
+
         if (should_we_patch) {
             g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
     
@@ -1270,17 +1304,56 @@ initHook()
             rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
         }
 
-        // sendmmsg for internal libc use in DNS queries
-        if (g_fn.sendmmsg) {
+        // sendmmsg, sendto, recvfrom for internal libc use in DNS queries
+        if ((glibc == TRUE) && g_fn.sendmmsg) {
             rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
+        }
+
+        if (g_fn.syscall) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.syscall, scope_syscall);
+        }
+
+        if ((glibc == FALSE) && g_fn.sendto) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.sendto, internal_sendto);
+        }
+
+        if ((glibc == FALSE) && g_fn.recvfrom) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
+        }
+
+        // libmusl
+        // Note that both stdout & stderr objects point to the same write function.
+        // They are init'd with a static object. After the first write the
+        // write pointer is modified. We handle that mod in the interposed
+        // function __stdio_write().
+        if ((glibc == FALSE) && (!g_fn.__stdout_write || !g_fn.__stderr_write)) {
+            // Get the static initializer for the stdout write function pointer
+            struct MUSL_IO_FILE *stdout_write = (struct MUSL_IO_FILE *)stdout;
+
+            // Save the write pointer
+            g_fn.__stdout_write = (size_t (*)(FILE *, const unsigned char *, size_t))stdout_write->write;
+
+            // Modify the write pointer to use our function
+            stdout_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+
+            // same for stderr
+            struct MUSL_IO_FILE *stderr_write = (struct MUSL_IO_FILE *)stderr;
+
+            // Save the write pointer
+            g_fn.__stderr_write = (size_t (*)(FILE *, const unsigned char *, size_t))stderr_write->write;
+
+            // Modify the write pointer to use our function
+            stderr_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
         }
 
         if (g_fn.__write_libc) {
             rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
         }
+
         if (g_fn.__write_pthread) {
             rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
         }
+
         // hook 'em
         rc = funchook_install(funchook, 0);
         if (rc != 0) {
@@ -1308,6 +1381,14 @@ init(void)
 {
     // Use dlsym to get addresses for everything in g_fn
     initFn();
+
+    // bash can be compiled to use glibc's memory subsystem or it's own
+    // internal memory subsystem.  It's own is not threadsafe.  If we
+    // find that bash is using it's own memory, replace it with glibc's
+    // so our own thread can run safely in parallel.
+    if (func_found_in_executable("malloc", "bash")) {
+        run_bash_mem_fix();
+    }
 
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
@@ -2398,8 +2479,8 @@ __write_pthread(int fd, const void *buf, size_t size)
  * do any dynamic memory allocation while this executes. Be careful.
  * The DBG() output is ignored until after the constructor runs.
  */
-EXPORTON long
-syscall(long number, ...)
+static long
+scope_syscall(long number, ...)
 {
     struct FuncArgs fArgs;
 
@@ -2569,6 +2650,40 @@ SSL_write(SSL *ssl, const void *buf, int num)
     return rc;
 }
 
+static int
+gnutls_get_fd(gnutls_session_t session)
+{
+    int fd = -1;
+    gnutls_transport_ptr_t fdp;
+
+    if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
+        // In #279, we found that when the version of gnutls is 3.5.18, the
+        // gnutls_transport_get_ptr() return value is the file-descriptor,
+        // not a pointer to the file-descriptor. Using gnutls_check_version()
+        // got messy as we may have found this behaviour switched on and off.
+        // So, we're testing here if the integer value of the pointer is 
+        // below the number of file-descriptors.
+        if (!g_max_fds) {
+            // NB: race-condition where multiple threads get here at the same
+            // time and end up setting g_max_fds more than once. No problem.
+            struct rlimit fd_limit;
+            if (getrlimit(RLIMIT_NOFILE, &fd_limit) != 0) {
+                DBG("getrlimit(0 failed");
+                return fd;
+            }
+            g_max_fds = fd_limit.rlim_cur;
+        }
+        if ((uint64_t)fdp >= g_max_fds) {
+            fd = *fdp;
+        } else {
+            fd = (int)(uint64_t)fdp;
+        }
+    }
+
+    return fd;
+}
+
 EXPORTON ssize_t
 gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
 {
@@ -2579,14 +2694,7 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
     rc = g_fn.gnutls_record_recv(session, data, data_size);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
     }
     return rc;
@@ -2602,14 +2710,7 @@ gnutls_record_recv_early_data(gnutls_session_t session, void *data, size_t data_
     rc = g_fn.gnutls_record_recv_early_data(session, data, data_size);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
     }
     return rc;
@@ -2640,14 +2741,7 @@ gnutls_record_recv_seq(gnutls_session_t session, void *data, size_t data_size, u
     rc = g_fn.gnutls_record_recv_seq(session, data, data_size, seq);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
     }
     return rc;
@@ -2663,14 +2757,7 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
     rc = g_fn.gnutls_record_send(session, data, data_size);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
     }
     return rc;
@@ -2687,14 +2774,7 @@ gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size
     rc = g_fn.gnutls_record_send2(session, data, data_size, pad, flags);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
     }
     return rc;
@@ -2710,14 +2790,7 @@ gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t
     rc = g_fn.gnutls_record_send_early_data(session, data, data_size);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
     }
     return rc;
@@ -2734,14 +2807,7 @@ gnutls_record_send_range(gnutls_session_t session, const void *data, size_t data
     rc = g_fn.gnutls_record_send_range(session, data, data_size, range);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
     }
     return rc;
@@ -3397,7 +3463,66 @@ fgetpos64(FILE *stream,  fpos64_t *pos)
     return rc;
 }
 
-VAREXPORT ssize_t // EXPORTOFF because it's redundant with __write
+/*
+ * This function, at this time, is specific to libmusl.
+ * We have hooked the stdout/stderr write pointer.
+ * The function pointer assigned by static config is
+ * modified by libc during the first call to stdout/stderr.
+ * We check for changes and adjust as needed.
+ */
+static size_t
+__stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
+{
+    uint64_t initialTime = getTime();
+    struct iovec iovs[2] = {
+		{ .iov_base = stream->wbase, .iov_len = stream->wpos - stream->wbase },
+		{ .iov_base = (void *)buf, .iov_len = len }
+	};
+
+    struct iovec *iov = iovs;
+    int iovcnt = 2;
+    int dothis = 0;
+    ssize_t rc;
+
+    // Note: not using WRAP_CHECK because these func ptrs are not populated
+    // from symbol resolution.
+    // stdout
+    if (g_fn.__stdout_write && stream && (stream == (struct MUSL_IO_FILE *)stdout)) {
+        rc = g_fn.__stdout_write((FILE *)stream, buf, len);
+        dothis = 1;
+
+        // has the stdout write pointer changed?
+        if (stream->write != (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write) {
+            // save the new pointer
+            g_fn.__stdout_write = (size_t (*)(FILE *, const unsigned char *, size_t))stream->write;
+
+            // modify the pointer to use this function
+            stream->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+        }
+    }
+
+    // stderr
+    if (g_fn.__stderr_write && stream && (stream == (struct MUSL_IO_FILE *)stderr)) {
+        rc = g_fn.__stderr_write((FILE *)stream, buf, len);
+        dothis = 1;
+
+        // has the stderr write pointer changed?
+        if (stream->write != (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write) {
+            // save the new pointer
+            g_fn.__stderr_write = (size_t (*)(FILE *, const unsigned char *, size_t))stream->write;
+
+            // modify the pointer to use this function
+            stream->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+        }
+    }
+
+    if (dothis == 1) doWrite(fileno((FILE *)stream), initialTime, (rc != -1),
+                             iov, rc, "__stdio_write", IOV, iovcnt);
+    return rc;
+}
+
+EXPORTOFF ssize_t // EXPORTOFF because it's redundant with __write
+
 write(int fd, const void *buf, size_t count)
 {
     WRAP_CHECK(write, -1);
@@ -4055,8 +4180,8 @@ send(int sockfd, const void *buf, size_t len, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
-sendto(int sockfd, const void *buf, size_t len, int flags,
+static ssize_t
+internal_sendto(int sockfd, const void *buf, size_t len, int flags,
        const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
@@ -4077,6 +4202,13 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
     }
 
     return rc;
+}
+
+EXPORTON ssize_t
+sendto(int sockfd, const void *buf, size_t len, int flags,
+       const struct sockaddr *dest_addr, socklen_t addrlen)
+{
+    return internal_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 }
 
 EXPORTON ssize_t
@@ -4181,8 +4313,8 @@ recv(int sockfd, void *buf, size_t len, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
-recvfrom(int sockfd, void *buf, size_t len, int flags,
+static ssize_t
+internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
          struct sockaddr *src_addr, socklen_t *addrlen)
 {
     ssize_t rc;
@@ -4201,6 +4333,13 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvfrom", "nopath");
     }
     return rc;
+}
+
+EXPORTON ssize_t
+recvfrom(int sockfd, void *buf, size_t len, int flags,
+         struct sockaddr *src_addr, socklen_t *addrlen)
+{
+    return internal_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
 }
 
 static int
@@ -4392,6 +4531,50 @@ getaddrinfo(const char *node, const char *service,
     return rc;
 }
 
+// This was added to avoid having libscope.so depend on GLIBC_2.25.
+// libssl.a or libcrypto.a need getentropy which only exists in
+// GLIBC_2.25 and newer.
+EXPORTON int
+getentropy(void *buffer, size_t length)
+{
+    if (SYMBOL_LOADED(getentropy)) {
+        return g_fn.getentropy(buffer, length);
+    }
+
+    // Must be something older than GLIBC_2.25...
+    // Looks like we're on the hook for this.
+
+#ifndef SYS_getrandom
+    errno = ENOSYS;
+    return -1;
+#else
+    if (length > 256) {
+        errno = EIO;
+        return -1;
+    }
+
+    int cancel;
+    int ret = 0;
+    char *pos = buffer;
+    pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel);
+    while (length) {
+        ret = syscall(SYS_getrandom, pos, length, 0);
+        if (ret < 0) {
+            if (errno == EINTR) {
+                continue;
+            } else {
+                break;
+            }
+        }
+        pos += ret;
+        length -= ret;
+        ret = 0;
+    }
+    pthread_setcancelstate(cancel, 0);
+    return ret;
+#endif
+}
+
 // This overrides a weak definition in src/dbg.c
 void
 scopeLog(const char *msg, int fd, cfg_log_level_t level)
@@ -4409,3 +4592,130 @@ scopeLog(const char *msg, int fd, cfg_log_level_t level)
     }
     logSend(g_log, buf, level);
 }
+
+/*
+ * pthread_create was added to support go execs on libmusl.
+ * The go execs don't link to crt0/crt1 on libmusl therefore
+ * they do not call our lib constructor. We interpose this
+ * as a means to call the constructgor before the go app runs.
+ */
+EXPORTON int
+pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+               void *(*start_routine)(void *), void *arg)
+{
+    int rc;
+
+    WRAP_CHECK(pthread_create, -1);
+    rc = g_fn.pthread_create(thread, attr, start_routine, arg);
+
+    if (!g_ctl) {
+        init();
+    }
+
+    return rc;
+}
+
+/*
+ * These functions are interposed to support libmusl.
+ * The addition of libssl and libcrypto pull in these
+ * glibc internal funcs.
+ */
+EXPORTON int
+__fprintf_chk(FILE *stream, int flag, const char *format, ...)
+{
+    va_list ap;
+    int rc;
+
+    va_start (ap, format);
+    rc = vfprintf(stream, format, ap);
+    va_end (ap);
+    return rc;
+}
+
+EXPORTON int
+__sprintf_chk(char *str, int flag, size_t strlen, const char *format, ...)
+{
+    va_list ap;
+    int rc;
+
+    va_start(ap, format);
+    rc = vsnprintf(str, strlen, format, ap);
+    va_end(ap);
+    return rc;
+}
+
+EXPORTON void *
+__memset_chk(void *dest, int cset, size_t len, size_t destlen)
+{
+    if (g_fn.__memset_chk) {
+        return g_fn.__memset_chk(dest, cset, len, destlen);
+    }
+
+    return memset(dest, cset, len);
+}
+
+EXPORTON void *
+__memcpy_chk(void *dest, const void *src, size_t len, size_t destlen)
+{
+    if (g_fn.__memcpy_chk) {
+        return g_fn.__memcpy_chk(dest, src, len, destlen);
+    }
+
+    return memcpy(dest, src, len);
+}
+
+EXPORTON long int
+__fdelt_chk(long int fdelt)
+{
+    if (g_fn.__fdelt_chk) {
+        return g_fn.__fdelt_chk(fdelt);
+    }
+
+    if (fdelt < 0 || fdelt >= FD_SETSIZE) {
+        DBG(NULL);
+        fprintf(stderr, "__fdelt_chk error: buffer overflow detected?\n");
+        abort();
+    }
+
+    return fdelt / __NFDBITS;
+}
+
+EXPORTWEAK int
+__register_atfork(void (*prepare) (void), void (*parent) (void), void (*child) (void), void *__dso_handle)
+{
+    if (g_fn.__register_atfork) {
+        return g_fn.__register_atfork(prepare, parent, child, __dso_handle);
+    }
+
+    /*
+     * What do we do if we can't resolve a symbol for __register_atfork?
+     * glibc returns ENOMEM on error.
+     *
+     * Note: __register_atfork() is defined to implement the
+     * functionality of pthread_atfork(); Therefore, it would seem
+     * reasonable to call pthread_atfork() here if the symbol for
+     * __register_atfork() is not resolved. However, glibc implements
+     * pthread_atfork() by calling __register_atfork() which causes
+     * a tight loop here and we would crash.
+     */
+    return ENOMEM;
+}
+
+EXPORTWEAK int
+__vfprintf_chk(FILE *fp, int flag, const char *format, va_list ap)
+{
+    return vfprintf(fp, format, ap);
+}
+
+EXPORTWEAK int
+__vsnprintf_chk(char *s, size_t maxlen, int flag, size_t slen, const char *format, va_list args)
+{
+    return vsnprintf(s, slen, format, args);
+}
+
+static void *
+scope_dlsym(void *handle, const char *name, void *who)
+{
+    return dlsym(handle, name);
+}
+

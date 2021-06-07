@@ -2,6 +2,10 @@
 
 set -e
 
+docker-compose build alpine
+docker-compose up alpine
+docker-compose down
+
 docker-compose build interposed_func
 docker-compose up interposed_func
 docker-compose down
@@ -32,6 +36,10 @@ docker-compose down
 
 docker-compose build tls
 docker-compose up tls
+docker-compose down
+
+docker-compose build bash
+docker-compose up bash
 docker-compose down
 
 docker-compose build gogen

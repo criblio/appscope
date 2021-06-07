@@ -6,7 +6,7 @@ TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -D__MACOS__
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
 TEST_CFLAGS +=-D__MACOS__
 LD_FLAGS=$(PCRE2_AR) -Wl, -ldl -lpthread -lresolv
-INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build
+INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build -I./contrib/funchook/distorm/include
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 YAML_SRC=$(wildcard contrib/libyaml/src/*.c)
 YAML_AR=contrib/libyaml/src/.libs/libyaml.a
@@ -26,7 +26,7 @@ $(PCRE2_AR):
 	cd contrib/pcre2/build && cmake ..
 	cd contrib/pcre2/build && make
 
-libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c src/plattime.c src/fn.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c src/search.c src/utils.c $(YAML_SRC) contrib/cJSON/cJSON.c
+libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c src/plattime.c src/fn.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c src/search.c src/utils.c src/bashmem.c $(YAML_SRC) contrib/cJSON/cJSON.c
 	@echo "Building libscope.so ..."
 	make $(PCRE2_AR)
 	$(CC) $(CFLAGS) -shared -fvisibility=hidden -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ -e,prog_version $(LD_FLAGS)

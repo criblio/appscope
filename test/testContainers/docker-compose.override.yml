@@ -75,6 +75,13 @@ services:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
     privileged: true
 
+  bash:
+    volumes:
+      - type: bind
+        source: ../../lib/linux/libscope.so
+        target: /usr/lib/libscope.so
+    privileged: true
+
   gogen:
     volumes:
       - type: bind
@@ -409,3 +416,15 @@ services:
     environment:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
     privileged: true
+
+  alpine:
+    volumes:
+      - type: bind
+        source: ../../lib/linux/libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
+      - type: bind
+        source: ../../bin/linux/scope
+        target: /usr/bin/scope

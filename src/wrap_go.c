@@ -13,7 +13,7 @@
 #include "state.h"
 #include "utils.h"
 #include "fn.h"
-#include "../contrib/funchook/distorm/include/distorm.h"
+#include "distorm.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
@@ -79,8 +79,6 @@ static void *g_stack;
 static bool g_switch_thread;
 
 void (*go_runtime_cgocall)(void);
-
-extern void __ctype_init (void);
 
 #if NEEDEVNULL > 0
 static void
@@ -353,16 +351,12 @@ adjustGoStructOffsetsForVersion(int go_ver)
     // If an OptionalTag is provided, test_go_struct.sh will not process
     // the line unless it matches a TAG_FILTER which is provided as an
     // argument to the test_go_struct.sh.
-    int (*ni_open)(const char *pathname, int flags, mode_t mode);
-    ni_open = dlsym(RTLD_NEXT, "open");
-    int (*ni_close)(int fd);
-    ni_close = dlsym(RTLD_NEXT, "close");
-    if (!ni_open || !ni_close) return;
+    if (!g_fn.open || !g_fn.close) return;
 
     char* debug_file;
     int fd;
     if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
-        ((fd = ni_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
+        ((fd = g_fn.open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
         dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
         dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
         dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
@@ -380,30 +374,38 @@ adjustGoStructOffsetsForVersion(int go_ver)
         dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go.conn_to_rwc);
         dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
         dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go.persistConn_to_tlsState);
-        ni_close(fd);
+        g_fn.close(fd);
     }
 
 }
 
-int getBaseAddress(uint64_t *addr) {
+int
+getBaseAddress(uint64_t *addr) {
     uint64_t base_addr = 0;
-    char buf[17];
-    int fd;
+    char perms[5];
+    char offset[20];
+    char buf[1024];
+    char pname[1024];
+    FILE *fp;
 
-    if (!g_fn.open || !g_fn.read || !g_fn.close) return -1;
+    if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose) return -1;
 
-    if ((fd = g_fn.open("/proc/self/maps", O_RDONLY)) == -1) {
+    if (osGetProcname(pname, sizeof(pname)) == -1) return -1;
+
+    if ((fp = g_fn.fopen("/proc/self/maps", "r")) == NULL) {
         return -1;
     }
 
-    if (g_fn.read(fd, buf, sizeof(buf))) {
+    while (g_fn.fgets(buf, sizeof(buf), fp) != NULL) {
         uint64_t addr_start;
-        if (sscanf((const char *)&buf, "%lx-", &addr_start)==1) {
+        sscanf(buf, "%lx-%*x %s %*s %s %*d", &addr_start, perms, offset);
+        if (strstr(buf, pname) != NULL) {
             base_addr = addr_start;
+            break;
         }
     }
 
-    g_fn.close(fd);
+    g_fn.fclose(fp);
     if (base_addr) {
         *addr = base_addr;
         return 0;
@@ -442,8 +444,12 @@ initGoHook(elf_buf_t *ebuf)
     }
 
     // which go_switch function are we using?
+    // Note that __ctype_init needs to be called through
+    // a function pointer since musl lib support was added.
+    // If that pointer is not initialized, then don't allow
+    // go_switch_no_thread() to be used.
     if (g_go_static == 1) {
-        if (checkEnv(SWITCH_ENV, SWITCH_USE_NO_THREAD)) {
+        if (g_fn.__ctype_init && checkEnv(SWITCH_ENV, SWITCH_USE_NO_THREAD)) {
             g_switch_thread = FALSE;
             patchClone();
         } else if (checkEnv(SWITCH_ENV, SWITCH_USE_THREAD)) {
@@ -621,10 +627,12 @@ dumb_thread(void *arg)
 inline static void *
 go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 {
+    int fs_valid = 0;
     uint64_t rc;
     unsigned long go_tls = 0;
     unsigned long go_fs = 0;
     unsigned long go_m = 0;
+    unsigned long *go_v;
     char *go_g = NULL;
 
     if (g_go_static) {
@@ -639,13 +647,31 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
         if (go_g) {
             // get struct m from g and pull out the TLS from 'm'
             go_m = *((unsigned long *)(go_g + g_go.g_to_m));
-            go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-            go_fs = go_tls + 8; //go compiler uses -8(FS)
-        } else {
+            go_v = (unsigned long *)go_m;
+
+            // first entry in a valid m is a pointer to g
+            if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
+                go_tls = (unsigned long)(go_m + g_go.m_to_tls);
+                go_v = (unsigned long *)go_tls;
+
+                // is tls set?
+                if (go_v && (*go_v != 0)) { // continue
+                    go_fs = go_tls + 8; //go compiler uses -8(FS)
+                    go_v = (unsigned long *)go_fs;
+
+                    if (go_v && (*go_v != 0)) { // continue
+                        fs_valid = 1;
+                    }
+                }
+            }
+        }
+
+        if (fs_valid == 0) {
             // We've seen a case where on process exit static cgo
             // apps do not have a go_g while they're exiting.
             // In this case we need to pull the TLS from the kernel
-            scopeLog("go_switch:did not get a 'g'; using fs from the kernel", -1, CFG_LOG_DEBUG);
+            // Also seen a case on libmusl where TLS is not set.
+            // Therefore, get fs from the kernel.
             if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
                 scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
                 goto out;
@@ -666,7 +692,8 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
 
-            if (pthread_create(&thread, NULL, dumb_thread, &barrier) != 0) {
+            if (!g_fn.pthread_create ||
+                (g_fn.pthread_create(&thread, NULL, dumb_thread, &barrier) != 0)) {
                 scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
                 goto out;
             }
@@ -742,11 +769,13 @@ out:
 inline static void *
 go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
 {
+    int fs_valid = 0;
     uint64_t rc;
     unsigned long go_tls = 0;
     unsigned long go_fs = 0;
     unsigned long go_m = 0;
     char *go_g = NULL;
+    unsigned long *go_v;
     int newThread = FALSE;
     unsigned long rsp;
 
@@ -762,13 +791,31 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
         if (go_g) {
             // get struct m from g and pull out the TLS from 'm'
             go_m = *((unsigned long *)(go_g + g_go.g_to_m));
-            go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-            go_fs = go_tls + 8; //go compiler uses -8(FS)
-        } else {
+            go_v = (unsigned long *)go_m;
+
+            // first entry in a valid m is a pointer to g
+            if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
+                go_tls = (unsigned long)(go_m + g_go.m_to_tls);
+                go_v = (unsigned long *)go_tls;
+
+                // is tls set?
+                if (go_v && (*go_v != 0)) { // continue
+                    go_fs = go_tls + 8; //go compiler uses -8(FS)
+                    go_v = (unsigned long *)go_fs;
+
+                    if (go_v && (*go_v != 0)) { // continue
+                        fs_valid = 1;
+                    }
+                }
+            }
+        }
+
+        if (fs_valid == 0) {
             // We've seen a case where on process exit static cgo
-            // apps do not have a go_g while they're exiting. 
+            // apps do not have a go_g while they're exiting.
             // In this case we need to pull the TLS from the kernel
-            scopeLog("go_switch:did not get a 'g'; using fs from the kernel", -1, CFG_LOG_DEBUG);
+            // Also seen a case on libmusl where TLS is not set.
+            // Therefore, get fs from the kernel.
             if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
                 scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
                 goto out;
@@ -783,7 +830,8 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
             pthread_t thread;
-            if (pthread_create(&thread, NULL, dumb_thread, NULL) != 0) {
+            if (!g_fn.pthread_create ||
+                (g_fn.pthread_create(&thread, NULL, dumb_thread, NULL) != 0)) {
                 scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
                 goto out;
             }
@@ -800,7 +848,7 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
             while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) {};
 
             //Initialize pointers to locale data.
-            __ctype_init();
+            if (g_fn.__ctype_init) g_fn.__ctype_init();
 
             //switch to a bigger stack
             __asm__ volatile (

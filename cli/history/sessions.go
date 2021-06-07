@@ -36,6 +36,8 @@ type Session struct {
 	EventsDestPath    string `json:"eventsdestpath"`
 	CmdDirPath        string `json:"cmddirpath"`
 	PayloadsPath      string `json:"payloadspath"`
+	ScopeLogPath      string `json:"scopelogpath"`
+	LdscopeLogPath    string `json:"ldscopelogpath"`
 }
 
 // SessionList represents a list of sessions
@@ -69,6 +71,8 @@ func GetSessions() (ret SessionList) {
 			MetricsFormatPath: filepath.Join(workDir, "metric_format"),
 			EventsDestPath:    filepath.Join(workDir, "event_dest"),
 			PayloadsPath:      filepath.Join(workDir, "payloads"),
+			ScopeLogPath:      filepath.Join(workDir, "scope.log"),
+			LdscopeLogPath:    filepath.Join(workDir, "ldscope.log"),
 		})
 	}
 	sort.Slice(ret, func(i, j int) bool { return ret[i].ID < ret[j].ID })

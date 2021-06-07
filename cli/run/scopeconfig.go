@@ -79,11 +79,19 @@ type ScopeOutputFormat struct {
 
 // ScopeTransport represents how we transport data
 type ScopeTransport struct {
-	TransportType string `mapstructure:"type" json:"type" yaml:"type"`
-	Host          string `mapstructure:"host,omitempty" json:"host,omitempty" yaml:"host,omitempty"`
-	Port          int    `mapstructure:"port,omitempty" json:"port,omitempty" yaml:"port,omitempty"`
-	Path          string `mapstructure:"path,omitempty" json:"path,omitempty" yaml:"path,omitempty"`
-	Buffering     string `mapstructure:"buffering,omitempty" json:"buffering,omitempty" yaml:"buffering,omitempty"`
+	TransportType string    `mapstructure:"type" json:"type" yaml:"type"`
+	Host          string    `mapstructure:"host,omitempty" json:"host,omitempty" yaml:"host,omitempty"`
+	Port          int       `mapstructure:"port,omitempty" json:"port,omitempty" yaml:"port,omitempty"`
+	Path          string    `mapstructure:"path,omitempty" json:"path,omitempty" yaml:"path,omitempty"`
+	Buffering     string    `mapstructure:"buffering,omitempty" json:"buffering,omitempty" yaml:"buffering,omitempty"`
+	Tls           TlsConfig `mapstructure:"tls" json:"tls" yaml:"tls"`
+}
+
+// TlsConfig is used when
+type TlsConfig struct {
+	Enable         bool   `mapstructure:"enable" json:"enable" yaml:"enable"`
+	ValidateServer bool   `mapstructure:"validateserver" json:"validateserver" yaml:"validateserver"`
+	CaCertPath     string `mapstructure:"cacertpath" json:"cacertpath" yaml:"cacertpath"`
 }
 
 // setDefault sets the default scope configuration as a struct
@@ -200,40 +208,89 @@ func (c *Config) configFromRunOpts() error {
 	}
 
 	parseDest := func(t *ScopeTransport, dest string) error {
-		m := regexp.MustCompile("^([^:]+):(\\d+)$").FindAllStringSubmatch(dest, -1)
-		if strings.HasPrefix(dest, "tcp://") || strings.HasPrefix(dest, "udp://") {
-			if strings.HasPrefix(dest, "tcp") {
+		//
+		// The regexp matches "proto://something:port" where the leading
+		// "proto://" is optional. If given, "proto" must be "tcp", "udp",
+		// "tls" or "file". The ":port" suffix is optional and ignored
+		// for files but required for sockets.
+		//
+		//     "relative/path"
+		//     "file://another/relative/path"
+		//     "/absolute/path"
+		//     "file:///another/absolute/path"
+		//     "tcp://host:port"
+		//     "udp://host:port"
+		//     "tls://host:port"
+		//     "host:port" (assume tls)
+		//
+		// m[0][0] is the full match
+		// m[0][1] is the "proto" string or an empty string
+		// m[0][2] is the "something" string
+		// m[0][3] is the "port" string or an empty string
+		//
+		m := regexp.MustCompile("^(?:(?i)(file|tcp|udp|tls)://)?([^:]+)(?::(\\d+))?$").FindAllStringSubmatch(dest, -1)
+		//fmt.Printf("debug: m=%+v\n", m)
+		if len(m) <= 0 {
+			// no match
+			return fmt.Errorf("Invalid dest: %s", dest)
+		} else if m[0][1] != "" {
+			// got "proto://..."
+			proto := strings.ToLower(m[0][1])
+			if proto == "udp" || proto == "tcp" {
+				// clear socket
+				t.TransportType = proto
+				t.Host = m[0][2]
+				if m[0][3] == "" {
+					return fmt.Errorf("Missing :port at the end of %s", dest)
+				}
+				port, err := strconv.Atoi(m[0][3])
+				if err != nil {
+					return fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][3])
+				}
+				t.Port = port
+				t.Path = ""
+				t.Tls.Enable = false
+				t.Tls.ValidateServer = true
+			} else if proto == "tls" {
+				// encrypted socket
 				t.TransportType = "tcp"
+				t.Host = m[0][2]
+				if m[0][3] == "" {
+					return fmt.Errorf("Missing :port at the end of %s", dest)
+				}
+				port, err := strconv.Atoi(m[0][3])
+				if err != nil {
+					return fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][3])
+				}
+				t.Port = port
+				t.Path = ""
+				t.Tls.Enable = true
+				t.Tls.ValidateServer = true
+			} else if proto == "file" {
+				t.TransportType = proto
+				t.Path = m[0][2]
 			} else {
-				t.TransportType = "udp"
+				return fmt.Errorf("Invalid dest protocol: %s", proto)
 			}
-			parts := strings.Split(dest[6:], ":")
-			if len(parts) != 2 {
-				return fmt.Errorf("Cannot parse dest: %s", dest)
-			}
-			t.Host = parts[0]
-			port, err := strconv.Atoi(parts[1])
+		} else if m[0][3] != "" {
+			// got "something:port", assume tls://
+			t.TransportType = "tcp"
+			t.Host = m[0][2]
+			port, err := strconv.Atoi(m[0][3])
 			if err != nil {
-				return fmt.Errorf("Cannot parse port from %s: %s", dest, parts[1])
+				return fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][3])
 			}
 			t.Port = port
 			t.Path = ""
-			return nil
-		} else if strings.HasPrefix(dest, "file://") {
+			t.Tls.Enable = true
+			t.Tls.ValidateServer = true
+		} else {
+			// got "something", assume file://
 			t.TransportType = "file"
-			t.Path = dest[7:]
-			return nil
-		} else if len(m) > 0 {
-			t.TransportType = "tcp"
-			t.Host = m[0][1]
-			port, err := strconv.Atoi(m[0][2])
-			if err != nil {
-				return fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][2])
-			}
-			t.Port = port
-			return nil
+			t.Path = m[0][2]
 		}
-		return fmt.Errorf("Invalid dest: %s", dest)
+		//fmt.Printf("debug: t=%+v\n", t)
+		return nil // success
 	}
 
 	if c.MetricsDest != "" {
@@ -260,6 +317,20 @@ func (c *Config) configFromRunOpts() error {
 		c.sc.Metric.Transport = ScopeTransport{}
 		c.sc.Event.Transport = ScopeTransport{}
 		c.sc.Libscope.ConfigEvent = true
+	}
+
+	if c.Loglevel != "" {
+		levels := map[string]bool{
+			"error":   true,
+			"warning": true,
+			"info":    true,
+			"debug":   true,
+			"none":    true,
+		}
+		if _, ok := levels[c.Loglevel]; !ok {
+			return fmt.Errorf("%s is an invalid log level. Log level must be one of debug, info, warning, error, or none", c.Loglevel)
+		}
+		c.sc.Libscope.Log.Level = c.Loglevel
 	}
 	return nil
 }

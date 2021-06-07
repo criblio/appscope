@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+
 #include "utils.h"
 #include "fn.h"
 #include "dbg.h"
@@ -150,6 +151,24 @@ out:
     return ret_val;
 }
 #endif //__MACOS__
+
+
+int
+startsWith(const char *string, const char *substring)
+{
+    if (!string || !substring) return FALSE;
+    return (strncmp(string, substring, strlen(substring)) == 0);
+}
+
+int
+endsWith(const char *string, const char *substring)
+{
+    if (!string || !substring) return FALSE;
+    int stringlen = strlen(string);
+    int sublen = strlen(substring);
+    return (sublen <= stringlen) &&
+       ((strncmp(&string[stringlen-sublen], substring, sublen)) == 0);
+}
 
 int
 sigSafeNanosleep(const struct timespec *req)

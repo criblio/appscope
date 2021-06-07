@@ -1,7 +1,7 @@
 //
-// Debug TCP Server that Mimics LogStream's AppScope Source
+// Debug TCP Server that Mimics LogStream's AppScope Source/Input
 //
-// `go run tcpserver.go 10091`
+// `go run tcpserver.go | egrep -e ^ -e '"(type|src|protocol)":"[^"]*"'`
 //
 
 package main
@@ -10,17 +10,28 @@ import (
 	"bufio"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"time"
 )
+
+var port              int
+var payloadsEnabled   bool
+var prettyEnabled     bool
+var timestampsEnabled bool
 
 var start time.Time
 
 func log(c net.Conn, format string, args ...interface{}) {
-	fmt.Printf(fmt.Sprintf("%8s %s ", time.Since(start).Truncate(time.Millisecond).String(), c.RemoteAddr().String())+format, args...)
+	if (timestampsEnabled) {
+		fmt.Printf(fmt.Sprintf("%8s %s ", time.Since(start).Truncate(time.Millisecond).String(), c.RemoteAddr().String())+format, args...)
+	} else {
+		fmt.Printf(c.RemoteAddr().String()+" "+format, args...)
+	}
 }
 
 func getBusyInABurgerKingBathroom(c net.Conn) {
@@ -38,18 +49,17 @@ func getBusyInABurgerKingBathroom(c net.Conn) {
 			return
 		}
 
-		if json.Valid([]byte(data)) {
-			log(c, data)
-		} else {
-			log(c, "closing on non-JSON data\n%s", hex.Dump([]byte(data)))
+		var header map[string]interface{}
+		if err := json.Unmarshal([]byte(data), &header); err != nil {
+			log(c, "closing on JSON error; %v\n%s", err, hex.Dump([]byte(data)))
 			return
 		}
 
-		var header map[string]interface{}
-
-		if err := json.Unmarshal([]byte(data), &header); err != nil {
-			log(c, "closing on invalid JSON; %v\n%s\n", err, hex.Dump([]byte(data)))
-			return
+		if (prettyEnabled) {
+			headerJSON, _ := json.MarshalIndent(header, "", "  ")
+			log(c, "%s\n", string(headerJSON))
+		} else {
+			log(c, data)
 		}
 
 		if "payload" == header["type"] {
@@ -66,21 +76,25 @@ func getBusyInABurgerKingBathroom(c net.Conn) {
 				got += n
 				bin = append(bin, chunk...)
 			}
-			log(c, "%d-byte payload\n%s", need-1, hex.Dump(bin[:need-1]))
+			if (payloadsEnabled) {
+				log(c, "%d-byte payload\n%s", need-1, hex.Dump(bin[:need-1]))
+			}
 		}
 	}
 }
 
 func main() {
+
+	// command-line options
+	flag.IntVar(&port, "p", 9101, "TCP port to listen on")
+	flag.BoolVar(&payloadsEnabled, "x", false, "Enable hexdumpsed payloads")
+	flag.BoolVar(&prettyEnabled, "j", false, "Enable pretty-printed JSON headers")
+	flag.BoolVar(&timestampsEnabled, "t", false, "Enabled relative-timestamped output")
+	flag.Parse()
+
 	start = time.Now()
 
-	port := ":10091"
-	arguments := os.Args
-	if len(arguments) > 1 {
-		port = ":" + arguments[1]
-	}
-
-	l, err := net.Listen("tcp4", port)
+	l, err := net.Listen("tcp4", ":" + strconv.Itoa(port))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: listen failed; %v\n", err)
 		os.Exit(1)

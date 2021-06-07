@@ -175,7 +175,7 @@ typedef unsigned int bool;
 // https://tools.ietf.org/html/rfc5246
 // http://blog.fourthbit.com/2014/12/23/traffic-analysis-of-an-ssl-slash-tls-session/
 // https://tls13.ulfheim.net/
-#define PAYLOAD_BYTESRC 8
+#define PAYLOAD_BYTESRC 6
 #define PAYLOAD_REGEX "^16030[0-3].{4}0[12]"
 
 #endif // __SCOPETYPES_H__

@@ -191,6 +191,7 @@ initPayloadDetect()
     errornumber = 0;
     erroroffset = 0;
     if ((g_tls_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+    g_tls_protocol_def->protname = "TLS";
     g_tls_protocol_def->binary = TRUE;
     g_tls_protocol_def->len = PAYLOAD_BYTESRC;
     g_tls_protocol_def->regex = PAYLOAD_REGEX;
@@ -934,7 +935,7 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
 
         if (net) {
             net->protoDetect = DETECT_TRUE;
-            net->protocol = protoDef;
+            net->protoProtoDef = protoDef;
         }
 
         if (protoDef->detect) {
@@ -1014,11 +1015,6 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     if (!buf || (len <= 0)) {
         DBG(NULL); // why whould we ever get here?
         return -1;
-    }
-
-    // Don't send TLS payloads to files; i.e. when LogStream backend disabled
-    if (!cfgLogStream(g_cfg.staticfg) && net && net->tlsDetect == DETECT_TRUE) {
-        return 0;
     }
 
     payload_info *pinfo = calloc(1, sizeof(struct payload_info_t));
@@ -1101,29 +1097,55 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     return 0;
 }
 
+/**
+ * Apply our TLS protocol-detector to a channel.
+ * 
+ * Sets net->tlsDetect and net->tlsProtoDef.
+ */
 static void
 detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     int rc;
     unsigned char *data = buf;
+    unsigned int ptype;
+    protocol_def_t *tls_proto_def = g_tls_protocol_def; // use ours by default
+
+    // Look for an overriden TLS entry from the protocol detector configs
+    for (ptype = 0; ptype <= g_prot_sequence; ptype++)
+    {
+        protocol_def_t *tmp_proto_def;
+        if ((tmp_proto_def = lstFind(g_protlist, ptype))
+            && (strcmp(tmp_proto_def->protname, "TLS") == 0)) {
+            // Use the user-provided one instead of ours
+            tls_proto_def = tmp_proto_def;
+            break;
+        }
+    }
 
     // Extract some of the payload to a hex string since it's binary.
     int i;
-    size_t alen = (g_tls_protocol_def->len * 2) + 1;
+    size_t alen = (tls_proto_def->len * 2) + 1;
     char cpdata[alen];
     memset(cpdata, 0, alen);
-    for (i = 0; i < g_tls_protocol_def->len; i++)
+    for (i = 0; i < tls_proto_def->len; i++)
     {
         snprintf(&cpdata[i << 1], 3, "%02x", data[i]);
     }
 
     // Apply the regex to the hex-string payload
-    if ((rc = pcre2_match_wrapper(g_tls_protocol_def->re, (PCRE2_SPTR)cpdata,
+    pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(tls_proto_def->re, NULL);
+    if ((rc = pcre2_match_wrapper(tls_proto_def->re, (PCRE2_SPTR)cpdata,
                                   (PCRE2_SIZE)alen, 0, 0,
-                                  g_tls_protocol_def->match_data, NULL)) > 0)
+                                  match_data, NULL)) > 0)
     {
         // matched, set the detect-state to TRUE
         net->tlsDetect = DETECT_TRUE;
+        net->tlsProtoDef = tls_proto_def;
+
+        scopeLog("detected TLS", sockfd, CFG_LOG_DEBUG);
+        if (tls_proto_def->detect) {
+            // TODO send TLS protocol-detect event
+        }
     }
     else
     {
@@ -1135,6 +1157,7 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
             scopeLog("doProtocol: TLS regex failed", sockfd, CFG_LOG_DEBUG);
         }
     }
+    pcre2_match_data_free(match_data);
 }
 
 static void
@@ -1191,9 +1214,31 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
         detectProtocol(sockfd, net, buf, len, src, dtype);
     }
 
-    // Send payloads if enabled globally or for this channel
-    if (cfgPayEnable(g_cfg.staticfg) || (net && net->protocol && net->protocol->payload)) {
-        extractPayload(sockfd, net, buf, len, src, dtype);
+    // Payload handling depends first on whether it's encrypted or not.
+    if (net && net->tlsDetect == DETECT_TRUE && (src == NETTX || src == NETRX)) {
+        // It's an encrypted TLS payload so we only want to process it if 
+        // LogStream is enabled and TLS negotiation is still in progress.
+        // 
+        // This addresses a couple requirements. First, never send encrypted
+        // payloads to disk. Second, only send encrypted payloads to LogStream
+        // during the TLS negotiation.
+        if (cfgLogStream(g_cfg.staticfg) && net->protoDetect == DETECT_PENDING) {
+            extractPayload(sockfd, net, buf, len, src, dtype);
+        }
+    } else {
+        // This is NOT an encrypted TLS payload so we only process it if
+        // payloads are enabled globally, or for the detected protocol.
+        //
+        // We have a requirement that HTTP payloads be sent when LogStream is
+        // enabled but we don't need to explicitly check for that here. If this
+        // has been detected as HTTP then net->protoProtoDef will point either
+        // to our g_http_protocol_def (which has payload set) or to another one
+        // that came from the config file and the user will have set it as they
+        // wanted. Either way, we can just use that flag here.
+        if (cfgPayEnable(g_cfg.staticfg)
+            || (net && net->protoProtoDef && net->protoProtoDef->payload)) {
+            extractPayload(sockfd, net, buf, len, src, dtype);
+        }
     }
 
     // Crack HTTP/1.x into events if HTTP source/watch is enabled

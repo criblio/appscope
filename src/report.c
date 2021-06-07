@@ -2562,9 +2562,14 @@ doPayload()
             }
 
             uint64_t netid = (net != NULL) ? net->uid : 0;
+            char * protoName = pinfo->net.protoProtoDef
+                ? pinfo->net.protoProtoDef->protname
+                : (pinfo->net.tlsProtoDef
+                   ? pinfo->net.tlsProtoDef->protname 
+                   : "");
             int rc = snprintf(pay, hlen,
                               "{\"type\":\"payload\",\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s,\"protocol\":\"%s\"}",
-                              g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport, pinfo->net.protocol?pinfo->net.protocol->protname:"");
+                              g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport, protoName);
             if (rc < 0) {
                 // unlikley
                 if (pinfo->data) free(pinfo->data);

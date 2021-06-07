@@ -29,6 +29,7 @@ class CriblTCPToFileTest(ApplicationTest):
         port = 10003
 
         logging.info(f"Sending {events_num} events to cribl tcp input at {host}:{port}")
+        time.sleep(10)
 
         sent_messages = []
 

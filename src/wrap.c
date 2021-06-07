@@ -1303,7 +1303,7 @@ initHook()
             rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
         }
 
-        if ((glibc == TRUE) && g_fn.syscall) {
+        if (g_fn.syscall) {
             rc = funchook_prepare(funchook, (void**)&g_fn.syscall, scope_syscall);
         }
 

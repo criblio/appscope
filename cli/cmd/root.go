@@ -35,7 +35,7 @@ func Execute() {
 			// If we're not a known command, exec ldscope
 			internal.InitConfig()
 			rc := run.Config{}
-			rc.Run(os.Args[1:], false)
+			rc.Run(os.Args[1:])
 		}
 		fmt.Println(err)
 		os.Exit(1)

@@ -16,11 +16,11 @@ GO_VER_FLAGS=$(shell cd $(DIR) && $(GOPATH)/bin/govvv -flags)
 
 ## build (default): install dependencies and install the scope binary in your GOPATH/bin directory
 build: deps
-	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(GOPATH)/bin/scope
+	cd $(DIR) && GOOS=linux CGO_ENABLED=0 $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(GOPATH)/bin/scope
 
 ## debug: build, but with gdb support
 debug: deps
-	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -gcflags=all="-N -l" -o $(GOPATH)/bin/scope
+	cd $(DIR) && GOOS=linux CGO_ENABLED=0 $(GO) build -ldflags="$(GO_VER_FLAGS)" -gcflags=all="-N -l" -o $(GOPATH)/bin/scope
 
 ## cliall (popular): install dependencies and install the scope binary in appscope/build with compression
 cliall: deps scope compressscope
@@ -49,7 +49,7 @@ run/bundle.go:
 	cd $(DIR) && $(GOPATH)/bin/go-bindata -o run/bundle.go -pkg run build
 
 scope: run/bundle.go
-	cd $(DIR) && GOOS=linux $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)../bin/linux/scope
+	cd $(DIR) && GOOS=linux CGO_ENABLED=0 $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)../bin/linux/scope
 
 compressscope:
 	upx -9 $(DIR)../bin/linux/scope

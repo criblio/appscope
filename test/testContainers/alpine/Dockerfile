@@ -98,6 +98,7 @@ COPY ./tls/gdbinit /root/.gdbinit
 COPY ./alpine/test_go.sh /go
 COPY ./go/test_go_struct.sh /go
 COPY ./alpine/test_tls.sh /opt/test/bin/test_tls.sh
+COPY ./alpine/test_scope.sh /opt/test/bin/test_scope.sh
 COPY ./alpine/test_all.sh /opt/test/bin/test_all.sh
 
 ENV SCOPE_LOG_LEVEL=error

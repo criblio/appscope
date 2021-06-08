@@ -33,71 +33,47 @@ endtest(){
 
 }
 
-export SCOPE_PAYLOAD_ENABLE=true
-export SCOPE_PAYLOAD_HEADER=true
-
-evalPayload(){
-    PAYLOADERR=0
-    echo "Testing that payload files don't contain tls for $CURRENT_TEST"
-    for FILE in $(ls /tmp/*in /tmp/*out 2>/dev/null); do
-        # Continue if there aren't any .in or .out files
-        if [ $? -ne "0" ]; then
-            continue
-        fi
-
-        hexdump -C $FILE | cut -c11-58 | \
-                     egrep "7d[ \n]+0a[ \n]+1[4-7][ \n]+03[ \n]+0[0-3]"
-        if [ $? -eq "0" ]; then
-            echo "$FILE contains tls"
-            PAYLOADERR=$(($PAYLOADERR + 1))
-        fi
-    done
-
-    # There were failures.  Move them out of the way before continuing.
-    if [ $PAYLOADERR -ne "0" ]; then
-        echo "Moving payload files to /tmp/payload/$CURRENT_TEST"
-        mkdir -p /tmp/payload/$CURRENT_TEST
-        cp /tmp/*in /tmp/payload/$CURRENT_TEST
-        cp /tmp/*out /tmp/payload/$CURRENT_TEST
-        rm /tmp/*in /tmp/*out
-    fi
-
-    return $PAYLOADERR
-}
 
 ################# START TESTS ################# 
-
-set -x
 
 #
 # attach
 #
 starttest attach
 
-scope version
+set -x
+
+# run sleep
 sleep 1000 & 
 sleep_pid=$!
+
+# attach to sleep process
 scope attach $sleep_pid
-echo $?
+ERR+=$?
+
+# wait for attach to execute, then end sleep process
 sleep 2
 kill $sleep_pid
 
-# .scope directory exists
-# ERR+=$?
-# .scope/history directory exists
-# contains sleep file
-# contains config
+# assert .scope directory exists
+ls .scope
+ERR+=$?
+
+# assert .scope/history directory exists
+ls .scope/history
+ERR+=$?
+
+# assert sleep session files exist
+# TODO
+
+# assert sleep config files exist
+# TODO
 
 set +x
 
 evaltest
 
 endtest
-
-
-
-
-
 
 
 ################# END TESTS ################# 

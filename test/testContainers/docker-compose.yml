@@ -1,4 +1,5 @@
 version: '3.5'
+
 services:
   interposed_func:
     build:
@@ -307,3 +308,9 @@ services:
     build:
       context: .
       dockerfile: ./alpine/Dockerfile
+
+  attach:
+    build:
+      context: .
+      dockerfile: ./attach/Dockerfile
+

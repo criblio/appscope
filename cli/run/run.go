@@ -187,6 +187,9 @@ func (rc *Config) createWorkDir(cmd string) {
 	histDir := HistoryDir()
 	err := os.MkdirAll(histDir, 0755)
 	util.CheckErrSprintf(err, "error creating history dir: %v", err)
+	libScopeConfDir := LibScopeConfigDir()
+	err = os.MkdirAll(libScopeConfDir, 0755)
+	util.CheckErrSprintf(err, "error creating libScopeConfig dir: %v", err)
 	sessionID := getSessionID()
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP
 	tmpDirName := path.Base(cmd) + "_" + sessionID + "_" + pid + "_" + ts
@@ -245,6 +248,11 @@ func HistoryDir() string {
 	return filepath.Join(util.ScopeHome(), "history")
 }
 
+// LibScopeConfigDir returns the LibScope Config directory
+func LibScopeConfigDir() string {
+	return filepath.Join(util.ScopeHome(), "libscope-v"+internal.GetVersion())
+}
+
 // setupWorkDir sets up a working directory for a given set of args
 func (rc *Config) setupWorkDir(args []string) {
 	cmd := path.Base(args[0])
@@ -277,6 +285,10 @@ func (rc *Config) setupWorkDir(args []string) {
 
 	scYamlPath := filepath.Join(rc.WorkDir, "scope.yml")
 	err = rc.WriteScopeConfig(scYamlPath)
+	util.CheckErrSprintf(err, "%v", err)
+
+	scLibScopeYamlPath := filepath.Join(LibScopeConfigDir(), args[0]+".yml")
+	err = rc.WriteScopeConfig(scLibScopeYamlPath)
 	util.CheckErrSprintf(err, "%v", err)
 
 	argsJSONPath := filepath.Join(rc.WorkDir, "args.json")

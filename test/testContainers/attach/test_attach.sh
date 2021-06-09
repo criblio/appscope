@@ -41,35 +41,61 @@ endtest(){
 #
 starttest attach
 
-set -x
-
-# run sleep
+# Run sleep
 sleep 1000 & 
 sleep_pid=$!
 
-# attach to sleep process
+# Attach to sleep process
 scope attach $sleep_pid
 ERR+=$?
 
-# wait for attach to execute, then end sleep process
+# Wait for attach to execute, then end sleep process
 sleep 2
 kill $sleep_pid
 
-# assert .scope directory exists
-ls .scope
-ERR+=$?
+# Navigate to home directory
+cd
 
-# assert .scope/history directory exists
-ls .scope/history
-ERR+=$?
+# Assert .scope directory exists
+if [ -d .scope ]; then
+	echo "PASS Scope directory exists"
+else 
+	echo "FAIL Scope directory missing"
+	ERR+=1
+fi
 
-# assert sleep session files exist
-# TODO
+# Assert .scope/history directory exists
+if [ -d .scope/history ]; then
+	echo "PASS Scope history directory exists"
+else 
+	echo "FAIL Scope history directory missing"
+	ERR+=1
+fi
 
-# assert sleep config files exist
-# TODO
+# Assert sleep session directory exist
+if [ -d .scope/history/--attach_1* ]; then
+	echo "PASS Scope sleep session directory exists"
+else 
+	echo "FAIL Scope sleep session directory missing"
+	ERR+=1
+fi
 
-set +x
+# Assert sleep config file exists
+if [ -f .scope/history/--attach_1*/scope.yml ]; then
+	echo "PASS Scope sleep session scope.yml exists"
+else 
+	echo "FAIL Scope sleep session scope.yml missing"
+	ERR+=1
+fi
+
+# Compare sleep config.yml with expected.yml
+cat ./.scope/history/--attach_1_*/scope.yml | sed -e 's/--attach_1_[0-9]_[0-9]*/--attach_1_SESSIONPATH/' | diff - /expected.yml
+if [ $? -eq 0 ]; then
+	echo "PASS Scope sleep config as expected"
+else
+	echo "FAIL Scope sleep config not as expected"
+	ERR+=1
+fi
 
 evaltest
 

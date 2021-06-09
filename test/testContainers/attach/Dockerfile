@@ -5,6 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Tests
 COPY ./attach/test_attach.sh /opt/test/bin/test_attach.sh
 COPY ./attach/test_all.sh /opt/test/bin/test_all.sh
+COPY ./attach/expected.yml /
 
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4

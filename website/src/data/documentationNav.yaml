@@ -14,6 +14,9 @@
     - name: Requirements 
       path: /docs/requirements
 
+    - name: TLS 
+      path: /docs/tls
+
     - name: Installing
       path: /docs/installing
 

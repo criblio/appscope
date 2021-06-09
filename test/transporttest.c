@@ -17,10 +17,10 @@ static void
 transportCreateTcpReturnsNullPtrForNullHostOrPath(void** state)
 {
     transport_t* t;
-    t = transportCreateTCP(NULL, "54321");
+    t = transportCreateTCP(NULL, "54321", FALSE, FALSE, NULL);
     assert_null(t);
 
-    t = transportCreateTCP("127.0.0.1", NULL);
+    t = transportCreateTCP("127.0.0.1", NULL, FALSE, FALSE, NULL);
     assert_null(t);
 }
 
@@ -28,7 +28,7 @@ static void
 transportCreateTcpReturnsValidPtrInHappyPath(void** state)
 {
     assert_false(transportNeedsConnection(NULL));
-    transport_t* t = transportCreateTCP("127.0.0.1", "54321");
+    transport_t* t = transportCreateTCP("127.0.0.1", "54321", FALSE, FALSE, NULL);
     assert_non_null(t);
     assert_true(transportNeedsConnection(t));
     transportDestroy(&t);
@@ -46,7 +46,7 @@ transportCreateTcpReturnsValidPtrForUnresolvedHostPort(void** state)
     assert_true(transportNeedsConnection(t));
     transportDestroy(&t);
 */
-    t = transportCreateTCP("127.0.0.1", "mom's apple pie recipe");
+    t = transportCreateTCP("127.0.0.1", "mom's apple pie recipe", FALSE, FALSE, NULL);
     assert_non_null(t);
     assert_true(transportNeedsConnection(t));
     transportDestroy(&t);

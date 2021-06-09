@@ -107,11 +107,6 @@ func TestMain(m *testing.M) {
 		internal.InitConfig()
 		rc := Config{}
 		rc.Run([]string{"/bin/echo", "true"})
-	case "attach":
-		internal.InitConfig()
-		rc := Config{}
-		pid := fmt.Sprintf("%d", os.Getppid())
-		rc.Attach([]string{pid})
 	default:
 		os.Exit(m.Run())
 	}
@@ -307,21 +302,6 @@ func TestRun(t *testing.T) {
 
 	cmdDirExists := util.CheckFileExists(filepath.Join(wd, "cmd"))
 	assert.True(t, cmdDirExists)
-	os.RemoveAll(".test")
-}
-
-func TestAttach(t *testing.T) {
-	// Test the output from ldscope to verify attach was attempted, i.e. the argument format is correct
-	// Validating that scope history exists and is correct is not possible without administrator privileges
-	var out bytes.Buffer
-	cmd := exec.Command(os.Args[0])
-	cmd.Stdout = &out
-	cmd.Env = append(os.Environ(), "TEST_MAIN=attach", "SCOPE_HOME=.test", "SCOPE_TEST=true")
-	cmd.Run()
-
-	exp := fmt.Sprintf("Attaching to process %d\n", os.Getpid())
-	assert.Equal(t, exp, out.String())
-
 	os.RemoveAll(".test")
 }
 

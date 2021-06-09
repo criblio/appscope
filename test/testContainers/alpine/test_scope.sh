@@ -48,6 +48,8 @@ endtest(){
 
 #
 # scope
+# The scope executable should be built as a static executable in order to be portable to Alpine/musl.
+# This test validates that the scope executable runs on alpine.
 #
 starttest scope
 

@@ -138,6 +138,22 @@ libscope:
       buffering: line               # line, full
 ...
 ```
+To use TLS for secure communication, edit the `transport` element such that `type` is set to `tcp`, and `tls : enable` is set to `true`, as shown in the example below. The remaining elements in the example can be configured to suit your environment. See [TLS](/docs/tls).
+
+```
+  transport:
+      type: tcp
+      host: 127.0.0.1
+      port: 10090
+      tls:
+        enable: true
+        validateserver: false         # false is like curl's -k option
+        cacertpath: ''
+            # cacertpath can be used to specify a private CA.
+            # If left empty, AppScope will try to use public root certs
+            # that are provided by the linux distro.
+
+```
 
 ### scope_protocol.yml Config File
 ---

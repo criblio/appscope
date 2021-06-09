@@ -149,9 +149,9 @@ To use TLS for secure communication, edit the `transport` element such that `typ
         enable: true
         validateserver: false         # false is like curl's -k option
         cacertpath: ''
-            # cacertpath can be used to specify a private CA.
-            # If left empty, AppScope will try to use public root certs
-            # that are provided by the linux distro.
+            # Use this field if you want to specify a private CA.
+            # Leave it empty if you want AppScope to use public root certs
+            # provided by the Linux distro.
 
 ```
 

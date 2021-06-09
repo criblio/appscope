@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"os/user"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -70,6 +71,13 @@ func (rc *Config) Run(args []string) {
 
 // Attach scopes an existing PID
 func (rc *Config) Attach(args []string) {
+	user, err := user.Current()
+	if err != nil {
+		util.ErrAndExit("Unable to get current user: %v", err)
+	}
+	if user.Uid != "0" {
+		util.ErrAndExit("You must have administrator privileges to attach to a process")
+	}
 	if err := createLdscope(); err != nil {
 		util.ErrAndExit("error creating ldscope: %v", err)
 	}

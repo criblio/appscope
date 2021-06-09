@@ -11,7 +11,8 @@ Requirements for AppScope are as follows:
 
 Supported:
 
-- RedHat Enterprise Linux or CentOS 6.4 and later
+- Alpine and other distributions based on musl libc
+- RedHat Enterprise Linux or CentOS 7 and later
 - Ubuntu 16 and later
 - Amazon Linux 1 and 2
 - Debian

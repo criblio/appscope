@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-RUN apk add go openssl make bash curl autoconf automake libtool openssl-dev rust nodejs ruby python3 php php-openssl apache2 apache2-ssl python3-dev py3-pip libffi-dev cargo && \
+RUN apk add go openssl make file bash curl autoconf automake libtool openssl-dev rust nodejs ruby python3 php php-openssl apache2 apache2-ssl python3-dev py3-pip libffi-dev cargo && \
     go clean -cache
 
 RUN mkdir -p /go

@@ -14,7 +14,7 @@ This pre-release addresses the following issues:
 - **Improvement**: [#292](https://github.com/criblio/appscope/issues/292) Add support for attaching AppScope to a running process from the CLI
 - **Improvement**: [#143](https://github.com/criblio/appscope/issues/143) Add support for the Alpine Linux distribution, including support for musl libc (the compact glibc alternative on which Alpine and some other Linux distributions are based)
 - **Improvement**: [#286](https://github.com/criblio/appscope/issues/286) Add support for TLS over TCP connections, with new TLS-related environment variables shown by the command `ldscope --help configuration | grep TLS`
-- **Deprecation**: [#286](https://github.com/criblio/appscope/issues/286) Dropped support for CentOS 6 (because TLS support requires glibc 2.17 or newer)
+- **Deprecation**: [#286](https://github.com/criblio/appscope/issues/286) Drop support for CentOS 6 (because TLS support requires glibc 2.17 or newer)
 - **Improvement**: [#132](https://github.com/criblio/appscope/issues/132) Add new `scope logs` command to view logs from the CLI
 - **Improvement**: Add new `--interval` option to `scope watch` command to run AppScope at intervals, from the CLI
 - **Improvement**: Make developer docs available at https://github.com/criblio/appscope/tree/master/docs

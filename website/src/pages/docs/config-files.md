@@ -3,11 +3,10 @@ title: "Config Files"
 ---
 
 ## Config Files
----
 
 ### scope.yml Config File
 
-Below are the default contents of the `scope.yml` library configuration file: 
+Below are the default contents of the `scope.yml` library configuration file:
 
 ```
 ---
@@ -138,6 +137,9 @@ libscope:
       buffering: line               # line, full
 ...
 ```
+
+#### Using TLS
+
 To use TLS for secure communication, edit the `transport` element such that `type` is set to `tcp`, and `tls : enable` is set to `true`, as shown in the example below. The remaining elements in the example can be configured to suit your environment. See [TLS](/docs/tls).
 
 ```
@@ -156,7 +158,7 @@ To use TLS for secure communication, edit the `transport` element such that `typ
 ```
 
 ### scope_protocol.yml Config File
----
+
 Below are the default contents of the `scope_protocol.yml` library configuration file: 
 
 ```

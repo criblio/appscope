@@ -3,19 +3,24 @@ title: Requirements
 ---
 
 ## Requirements
----
 
 Requirements for AppScope are as follows:
 
 ### Operating Systems (Linux Only)
 
-Supported:
+AppScope runs on:
 
+- Ubuntu 16 and later
 - Alpine and other distributions based on musl libc
 - RedHat Enterprise Linux or CentOS 7 and later
-- Ubuntu 16 and later
 - Amazon Linux 1 and 2
 - Debian
+
+When building AppScope from source, use:
+
+- Ubuntu 18.04
+
+This restriction is imposed to make the resulting executable more portable.
 
 ### System
 

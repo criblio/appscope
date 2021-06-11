@@ -3,7 +3,6 @@ title: Installing
 ---
 
 ## Installing
----
 
 Getting started is easy. Install AppScope, then explore its CLI.
 
@@ -18,9 +17,11 @@ First, see [Requirements](/docs/requirements) to ensure that you’re completing
 Next, Use this command to download the CLI binary and make it executable:
 
 ```
-curl -Lo scope https://cdn.cribl.io/dl/scope/\
-$(curl -L https://cdn.cribl.io/dl/scope/latest)/linux/scope && \
-chmod 755 ./scope
+$ LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
+$ curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/scope
+$ curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/scope.md5 | md5sum -c 
+$ chmod +x scope
+$ ./scope run …
 ```
 
 That's it!

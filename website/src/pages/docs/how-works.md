@@ -3,9 +3,13 @@ title: How AppScope Works
 ---
 
 ## How AppScope Works: Components
----
 
-AppScope is a single binary download that consists of three components:
+AppScope is a single binary download with three components: a command-line interface (CLI), a loader, and a library.
+
+There are two ways to "scope" an application:
+
+1. Attach AppScope to a running process.
+1. Configure the AppScope library to be loaded when the process starts. 
 
 ### The Command Line Interface (CLI)
 
@@ -13,6 +17,11 @@ The AppScope CLI (`scope`) provides a quick and convenient way to explore capabi
 
 <span>&#x2605;&#x2605;&#x2605;</span> **WHEN TO USE**: The easiest way to get started with AppScope is to use the CLI. This provides a rich set of capabilities intended to capture data from single applications. Data is captured in the local file system, and is managed through the CLI.
 
+To scope a running process whose process ID (pid) is `12345`:
+
+```
+Scope --attach 12345
+```
 
 ### The Loader
 
@@ -35,7 +44,7 @@ Child processes are created with the library present, if the library was present
 
 
 ## System-Level Design 
----
+
 ![AppScope system-level design](./images/AppScope_SysLvlDesign.png)
 
 

@@ -3,7 +3,6 @@ title: Using the Library
 ---
 
 ## Using the Library (libscope.so)
-----
 
 To use the library independently of the CLI or loader, you rely on the `LD_PRELOAD` environment variable. This section provides several examples – all calling the system-level `ps` command – simply to show how the syntax works.
 
@@ -47,10 +46,45 @@ LD_PRELOAD=./libscope.so SCOPE_EVENT_DEST=tcp://localhost:9999 ps -ef
 
 This again executes the `ps` command using the AppScope library. But here, we also specify that events (as opposed to metrics) will be sent over a TCP connection to localhost, using port `9999`. (This event destination setting overrides any config-file setting, as well as the default value.)
 
+#### Example 4:
+
+This adds AppScope to a `systemd` (boot-time) service. 
+
+For purposes of the example, the service will be `httpd`, described by an `httpd.service` file which contains an `EnvironmentFile=/etc/sysconfig/httpd` entry.
+
+##### Step 1
+
+Extract the library to a new directory (`/opt/scope` in this example):
+
+```
+mkdir /opt/scope && cd /opt/scope
+curl -Lo scope https://cdn.cribl.io/dl/scope/\
+ $(curl -L https://cdn.cribl.io/dl/scope/latest)/linux/scope && \
+ chmod 755 ./scope
+./scope extract .
+```
+
+The result will be that the system uses `/opt/scope/scope.yml` to configure `libscope.so`.
+
+
+##### Step 2
+
+Add an `LD_PRELOAD` environment variable to the `systemd` config file.
+
+In the `httpd.service` file, edit the `/etc/sysconfig/httpd` entry to include the following environment variables:
+
+```
+SCOPE_HOME=/opt/scope
+LD_PRELOAD=/opt/scope/libscope.so
+```
 
 ### <span id="configuring">Configuring the Library</span>
 
-For a full list of library environment variables, execute: `./libscope.so all`
+Use the `ldscope` command with the `--help` option to obtain the information you need:
+
+- `ldscope --help` shows basic help.
+- `ldscope --help all` shows the full set of help content. 
+- `ldscope --help configuration` lists the full set of library environment variables.
 
 For the default settings in the sample `scope.yml` configuration file, see [Config Files](/docs/config-files), or inspect the most-recent file on [GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).
 

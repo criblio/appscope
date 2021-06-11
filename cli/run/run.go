@@ -17,6 +17,7 @@ import (
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
+	"github.com/syndtr/gocapability/capability"
 )
 
 // Config represents options to change how we run scope
@@ -77,6 +78,17 @@ func (rc *Config) Attach(args []string) {
 	}
 	if user.Uid != "0" {
 		util.ErrAndExit("You must have administrator privileges to attach to a process")
+	}
+	c, err := capability.NewPid2(0)
+	if err != nil {
+		util.ErrAndExit("Unable to get linux capabilities for current process: %v", err)
+	}
+	err = c.Load()
+	if err != nil {
+		util.ErrAndExit("Unable to load linux capabilities: %v", err)
+	}
+	if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
+		util.ErrAndExit("You must have PTRACE capabilities to attach to a process")
 	}
 	if err := createLdscope(); err != nil {
 		util.ErrAndExit("error creating ldscope: %v", err)

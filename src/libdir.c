@@ -58,7 +58,7 @@ extern unsigned char _binary___lib_linux_libscope_so_end;
 // ----------------------------------------------------------------------------
 
 static int
-_libdirExists(const char *path)
+_libdirExists(const char *path, int requireDir)
 {
     struct stat s;
     if (stat(path, &s)) {
@@ -68,7 +68,11 @@ _libdirExists(const char *path)
         return 0;
     }
 
-    return S_ISDIR(s.st_mode) && !access(path, R_OK|W_OK|X_OK);
+    if (requireDir && !S_ISDIR(s.st_mode)) {
+        return 0; // FALSE
+    }
+
+    return !access(path, R_OK|W_OK|X_OK);
 }
 
 static int
@@ -76,7 +80,7 @@ _libdirCreateIfMissing()
 {
     const char *libdir = libdirGet();
 
-    if (!_libdirExists(libdir)) {
+    if (!_libdirExists(libdir, 1)) {
         if (mkdir(libdir, S_IRWXU|S_IRWXG|S_IRWXO) == -1) {
             perror("error: mkdir() failed");
             return -1;
@@ -94,6 +98,10 @@ _libdirExtract(const char *path, unsigned char *start, unsigned char *end)
 
     if (_libdirCreateIfMissing()) {
         return -1;
+    }
+
+    if (_libdirExists(path, 0)) {
+        return 0;
     }
 
     if (snprintf(temp, PATH_MAX, "%s.XXXXXX", path) >= PATH_MAX) {

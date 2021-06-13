@@ -30,9 +30,6 @@
 #include "utils.h"
 #include "inject.h"
 
-#define DEVMODE 0
-#define _MFD_CLOEXEC		0x0001U
-#define PARENT_PROC_NAME "start_scope"
 #define GO_ENV_VAR "GODEBUG"
 #define GO_ENV_SERVER_VALUE "http2server"
 #define GO_ENV_CLIENT_VALUE "http2client"
@@ -154,15 +151,6 @@ main(int argc, char **argv, char **env)
         showUsage(basename(argv[0]));
         return EXIT_FAILURE;
     }
-#if DEVMODE == 1
-    //
-    // DEVMODE is here only to help with gdb. The debugger has a problem
-    // reading symbols from a /proc pathname. This is expected to be enabled
-    // only by developers and only when using the debugger.
-    //
-    libraryArg = "./lib/linux/libscope.so";
-    printf("LD_PRELOAD=%s\n", libraryArg);
-#endif
     struct stat s;
     if (stat(libraryArg, &s)) {
         if (errno != ENOENT) {

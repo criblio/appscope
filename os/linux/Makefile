@@ -53,15 +53,14 @@ libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c s
 	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
 	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/ && rm ./test/selfinterpose/wrap_go.o
 
-ldscopedyn: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c libscope.so
-	objcopy -I binary -O elf64-x86-64 -B i386 ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
-	gcc -Wall -g -D__LINUX__ $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c -ldl -lrt -o ./bin/$(OS)/ldscopedyn ./lib/$(OS)/libscope.o -I./os/$(OS) $(INCLUDES)
-	rm -f ./lib/$(OS)/libscope.o && rm -f ../../cli/run/bundle.go
+ldscopedyn: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c
+	gcc -Wall -g -D__LINUX__ $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c -ldl -lrt -o ./bin/$(OS)/ldscopedyn -I./os/$(OS) $(INCLUDES)
 
-ldscope: src/scope_static.c
+ldscope: src/scope_static.c src/libdir.c ldscopedyn libscope.so
 	objcopy -I binary -O elf64-x86-64 -B i386 ./bin/$(OS)/ldscopedyn ./bin/$(OS)/ldscopedyn.o
-	gcc -Wall -static -g -D__LINUX__ $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/scope_static.c $(INCLUDES) ./bin/$(OS)/ldscopedyn.o -o ./bin/$(OS)/ldscope
-	rm -f ./bin/$(OS)/ldscopedyn.o
+	objcopy -I binary -O elf64-x86-64 -B i386 ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
+	gcc -Wall -static -g -D__LINUX__ $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/scope_static.c src/libdir.c $(INCLUDES) ./bin/$(OS)/ldscopedyn.o ./lib/$(OS)/libscope.o -o ./bin/$(OS)/ldscope
+	rm -f ./bin/$(OS)/ldscopedyn.o ./lib/$(OS)/libscope.o
 
 coreclean:
 	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a bin/$(OS)/ldscope

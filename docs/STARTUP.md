@@ -1,11 +1,9 @@
 # Cribl AppScope - Startup Logic
 
-> Warning: this document is a WIP and needs review.
+AppScope needs to detect and handle a number of different scenarios on startup.
+This document is an attempt to capture this logic.
 
-On startup, AppScope needs to detect and handle a number of different
-scenarios. This document is an attempt to capture this logic.
-
-There are three ways to start a _scoped_ process:
+There are three ways to start a new _scoped_ process:
 
 * Using the [CLI](#cli); i.e. `scope run foo`
 * Using the [Static Launcher](#static-launcher); i.e. `ldscope foo`
@@ -16,18 +14,20 @@ There are two ways to _scope_ and existing process:
 * Using the [CLI](#cli); i.e. `scope attach PID`
 * Using the [Static Launcher](#static-launcher); i.e. `ldscope --attach PID`
 
+We'll cover how each approach works in the sections that follow.
+
 ## Library Directory
 
 We need a "Library Directory" where we can put things needed for various
 startup scenarios. We need a separate one for each version of AppScope too.
 
 `${libdirbase}` is the base directory where we will create the Library
-Directory.  It defaults to `/tmp` and may be overriden with command-line
+Directory. It defaults to `/tmp` and may be overriden with command-line
 options to the [CLI](#cli) or [Static Launcher](#static-launcher). Startup fails
 if `${libdirbase}` doesn't exist or we can't create the Library Directory under
 it.
 
-`${libdir}` is the Library Directory; `${libdirbase}/libscope-${version}`.
+`${libdir}` is our Library Directory; `${libdirbase}/libscope-${version}`.
 
 ## Static Launcher
 
@@ -45,7 +45,8 @@ and does the following:
    option; i.e. `ldscope -f path ...`.
 2. Create the `${libdir}/libscope-${version}/` directory if it doesn't already
    exist.
-3. Extract the [Dynamic Launcher](#dynamic-launcher) into `${libdir}/ldscopedyn`.
+3. Extract the [Dynamic Launcher](#dynamic-launcher) into
+   `${libdir}/ldscopedyn` and the shared library into `${libdir}/libscope.so`.
 4. Check if we're in a musl libc environment by scanning the ELF structure of a
    stock executable (`/bin/cat`) to get the path for the dynamic linker/loader
    it's using (from the `PT_INTERP` header) and looking for `musl` in that
@@ -56,8 +57,9 @@ and does the following:
       not available on the musl libc system. So...
     * Create a softlink in our library directory that points to the one we got
       from `/bin/cat`; i.e. `${libdir}/ld-linux-x86-64.so.2 -> /lib/ld-musl-x86_64.so.1`.
-5. Exec `ldscopedyn` passing it the same arguments `ldscope` was passed. If we
-   found we are on a musl libc system in the previous step, we set
+5. Exec `ldscopedyn` passing it the same executable arguments `ldscope` was
+   passed along with `--attach` and `--library` options required.. If we found
+   we are on a musl libc system in the previous step, we set
    `LD_LIBRARY_PATH=${libdir}` in the exec environment too; we're tricking the
    musl system into using it's own loader even though `ldscopedyn` wants gnu's
    loader.
@@ -67,33 +69,17 @@ and does the following:
 We refer to the `${libdir}/ldscopedyn` binary that was extracted by the [Static
 Launcher](#static-launcher) as the "Dynamic Launcher". It is ultimately
 responsible for ensuring the desired process is running with our library loaded
-and initialized.
+and initialized. Here's what it does:
 
-There are a number of edge cases the logic here needs to deal with. Here's the gist:
-
-1.  `initFn()` populates `g_fn` with pointers to all the libc functions we interpose.
-2.  setenv `SCOPE_PID_ENV` to the current PID
-3.  `setup_libscope()` extracts the shared library into shared memory.
-4.  handle `--help` option and exit if set
-5.  handle `--attach PID` option and exit if set (see [Attach](#attach))
-6.  `open()` and `mmap()` the program to be run to get to the ELF headers
-7.  setenv `SCOPE_APP_TYPE` to `go` for a Go program; otherwise, to `native`
-8.  setenv to limit HTTP to HTTP/1.1 for a Go program
-9.  if the program to run is a dynamic executable
-    * setenv `LD_PRELOAD=...`
-    * setenv `SCOPE_EXEC_TYPE=dynamic`
-    * fork
-        * in the child, exec the program and it runs using [`LD_PRELOAD`](#ld_preload)
-        * in the parent, `waitpid()` the child then `release_libscope()` and exit
-10. setenv `SCOPE_EXEC_TYPE=static`
-11. if `LD_PRELOAD` is set, something's not working so we just unset it and
-    fail-safe by exec'ing the program.
-12. if program is not Go, we don't yet know how to scope non-Go statics so
-    fail-safe again by exec'ing the program.
-13. `dlopen()` the library we loaded into shared memory earlier and get
-    `sys_exec()` with `dlsym()`
-14.  exec the program using the `sys_exec()` routine which handles,
-     reinitializing the library, and starting the program.
+1.  Initial setup, command-line processing, etc.
+2.  [Attach](#attach)) and exit if the `--attach PID` option was given.
+3.  Check if the executable to scope is static or dynamic and if it's a Go program.
+4.  If it's dynamic, set `LD_PRELOAD`, exec it, wait for it to exit, and exit.
+5.  The executable is static so if it's not Go, we fail politely by just
+    exec'ing the executable. We're bailing out here because we currently can't
+    scope a non-Go static executable.
+6.  It's a static Go program so we `dlopen()` the shared library to get
+    `sys_exec()` and use that to launch the executable.
 
 ## CLI
 
@@ -101,10 +87,10 @@ There are a number of edge cases the logic here needs to deal with. Here's the g
 use AppScope with a number of peripheral tools to access and analyze the
 resulting data.
 
-When `scope` is used to scope a program:
+When `scope` is used to scope a new program:
 
-1. it sets up a new _session_ folder in `~/.scope/history/` and generates a
-   `scope.yml` config in that new folder.
+1. it sets up a new _session_ directory under `~/.scope/history/` and generates
+   a `scope.yml` config in there.
 2. it runs `ldscope` passing through the command-line of the program to be
    scoped along with the `SCOPE_CONF_PATH` environment variable set to the full
    path of the config.
@@ -138,13 +124,12 @@ The [Static Launcher](#static-launcher) simply passes the flag through to the
 
 The [Dynamic Launcher](#dynamic-launcher) sees the `--attach PID` option and:
 
-1. iterate through the program's shared objects looking for `libc.so` in the
-   name to get it's base address in memory.
-2. use `dlsym()` to find the address of `dlopen()` in the library.
-3. get the base address of the same library in the attached process using its
+1. loops through the program's shared objects looking for `libc.so` in the
+   name to get its base address in memory.
+2. uses `dlsym()` to find the address of `dlopen()` in the library.
+3. gets the base address of the same library in the attached process using its
    `/proc/PID/maps` file.
-4. use the offset of `dlopen()` in our copy of libc to calculate the address of
+4. uses the offset of `dlopen()` in our copy of libc to calculate the address of
    `dlopen()` in the attached process' copy of thge library.
-5. use ptrace() to do some voodoo that causes the library to be `dlload()`'ed
-   int he attached process and we're done.
-
+5. uses ptrace() to do some voodoo that causes the library to be `dlload()`'ed
+   in the attached process and we're done.

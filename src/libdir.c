@@ -6,15 +6,20 @@
 
 #define _XOPEN_SOURCE 500 // for FTW
 
+#include <elf.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <ftw.h>
 #include <linux/limits.h> // for PATH_MAX
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#include "scopetypes.h" // for ROUND_UP()
 
 #ifndef SCOPE_VER
 #error "Missing SCOPE_VER"
@@ -53,12 +58,22 @@ extern unsigned char _binary___bin_linux_ldscopedyn_end;
 extern unsigned char _binary___lib_linux_libscope_so_start;
 extern unsigned char _binary___lib_linux_libscope_so_end;
 
+// Representation of the .note.gnu.build-id ELF segment 
+typedef struct {
+    Elf64_Nhdr nhdr;         // Note section header
+    char       name[4];      // "GNU\0"
+    char       build_id[0];  // build-id bytes, length is nhdr.n_descsz
+} note_t;
+
+// from https://github.com/mattst88/build-id/blob/master/build-id.c
+#define ALIGN(val, align) (((val) + (align) - 1) & ~((align) - 1))
+
 // ----------------------------------------------------------------------------
 // Internal
 // ----------------------------------------------------------------------------
 
 static int
-_libdirExists(const char *path, int requireDir)
+libdirExists(const char *path, int requireDir)
 {
     struct stat s;
     if (stat(path, &s)) {
@@ -76,11 +91,11 @@ _libdirExists(const char *path, int requireDir)
 }
 
 static int
-_libdirCreateIfMissing()
+libdirCreateIfMissing()
 {
     const char *libdir = libdirGet();
 
-    if (!_libdirExists(libdir, 1)) {
+    if (!libdirExists(libdir, 1)) {
         if (mkdir(libdir, S_IRWXU|S_IRWXG|S_IRWXO) == -1) {
             perror("error: mkdir() failed");
             return -1;
@@ -90,18 +105,109 @@ _libdirCreateIfMissing()
     return 0;
 }
 
+static note_t*
+libdirGetNote(void* buf)
+{
+    Elf64_Ehdr* elf = (Elf64_Ehdr*) buf;
+    Elf64_Phdr* hdr = (Elf64_Phdr*) (buf + elf->e_phoff);
+
+    for (unsigned i = 0; i < elf->e_phnum; i++) {
+        if (hdr[i].p_type != PT_NOTE) {
+            continue;
+        }
+
+        note_t*   note = (note_t *)(buf + hdr[i].p_offset);
+        Elf64_Off len = hdr[i].p_filesz;
+        while (len >= sizeof(note_t)) {
+            if (note->nhdr.n_type == NT_GNU_BUILD_ID &&
+                note->nhdr.n_descsz != 0 &&
+                note->nhdr.n_namesz == 4 &&
+                memcmp(note->name, "GNU", 4) == 0) {
+                return note;
+            }
+
+            // TODO: This needs to be reviewed. It's from
+            // https://github.com/mattst88/build-id/blob/master/build-id.c but
+            // I'm not entirely sure what it's doing or why. --PDugas
+            size_t offset = sizeof(Elf64_Nhdr) +
+                            ALIGN(note->nhdr.n_namesz, 4) +
+                            ALIGN(note->nhdr.n_descsz, 4);
+            note = (note_t *)((char *)note + offset);
+            len -= offset;
+        }
+    }
+
+    return 0;
+}
+
+static note_t*
+libdirGetLauncherNote()
+{
+    return libdirGetNote(&_binary___bin_linux_ldscopedyn_start);
+}
+
+static note_t*
+libdirGetLibraryNote()
+{
+    return libdirGetNote(&_binary___lib_linux_libscope_so_start);
+}
+
 static int
-_libdirExtract(const char *path, unsigned char *start, unsigned char *end)
+libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t* note)
 {
     char temp[PATH_MAX];
     int fd;
 
-    if (_libdirCreateIfMissing()) {
+    if (libdirCreateIfMissing()) {
         return -1;
     }
 
-    if (_libdirExists(path, 0)) {
-        return 0;
+    if (libdirExists(path, 0)) {
+        // extracted file already exists
+        if (!note) {
+            // no note given to compare against so we're done.
+            return 0;
+        }
+
+        // open & mmap the file to get its note
+        int fd = open(path, O_RDONLY);
+        if (fd == -1) {
+            perror("error: open() failed");
+            return 0;
+        }
+
+        struct stat s;
+        if (fstat(fd, &s) == -1) {
+            close(fd);
+            perror("error: mmap() failed");
+            return 0;
+        }
+
+        void* buf = mmap(NULL, ROUND_UP(s.st_size, sysconf(_SC_PAGESIZE)),
+                PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
+        if (buf == MAP_FAILED) {
+            close(fd);
+            perror("error: mmap() failed");
+            return 0;
+        }
+
+        close(fd);
+
+        // compare the notes
+        int cmp = -1;
+        note_t* pathNote = libdirGetNote(buf);
+        if (pathNote) {
+            if (note->nhdr.n_descsz == pathNote->nhdr.n_descsz) {
+                cmp = memcmp(note->build_id, pathNote->build_id, note->nhdr.n_descsz);
+            }
+        }
+
+        munmap(buf, s.st_size);
+
+        if (cmp == 0) {
+            // notes match, don't re-extract
+            return 0;
+        }
     }
 
     if (snprintf(temp, PATH_MAX, "%s.XXXXXX", path) >= PATH_MAX) {
@@ -141,7 +247,7 @@ _libdirExtract(const char *path, unsigned char *start, unsigned char *end)
 }
 
 static int
-_libdirRemove(const char* name, const struct stat *s, int type, struct FTW *ftw)
+libdirRemove(const char* name, const struct stat *s, int type, struct FTW *ftw)
 {
     if (remove(name)) {
         perror("error: remove() failed");
@@ -226,7 +332,7 @@ libdirGet()
 int
 libdirClean()
 {
-    if (nftw(libdirGet(), _libdirRemove, 10, FTW_DEPTH|FTW_MOUNT|FTW_PHYS)) {
+    if (nftw(libdirGet(), libdirRemove, 10, FTW_DEPTH|FTW_MOUNT|FTW_PHYS)) {
         perror("error: ntfw() failed");
         return -1;
     }
@@ -237,17 +343,19 @@ libdirClean()
 int
 libdirExtractLauncher()
 {
-    return _libdirExtract(libdirGetLauncher(),
+    return libdirExtract(libdirGetLauncher(),
             &_binary___bin_linux_ldscopedyn_start,
-            &_binary___bin_linux_ldscopedyn_end);
+            &_binary___bin_linux_ldscopedyn_end,
+            libdirGetLauncherNote());
 }
 
 int
 libdirExtractLibrary()
 {
-    return _libdirExtract(libdirGetLibrary(),
+    return libdirExtract(libdirGetLibrary(),
             &_binary___lib_linux_libscope_so_start,
-            &_binary___lib_linux_libscope_so_end);
+            &_binary___lib_linux_libscope_so_end,
+            libdirGetLibraryNote());
 }
 
 const char *

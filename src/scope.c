@@ -32,7 +32,6 @@
 
 #define DEVMODE 0
 #define _MFD_CLOEXEC		0x0001U
-#define SHM_NAME            "libscope"
 #define PARENT_PROC_NAME "start_scope"
 #define GO_ENV_VAR "GODEBUG"
 #define GO_ENV_SERVER_VALUE "http2server"

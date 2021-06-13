@@ -79,7 +79,7 @@ setEnvVariable(const char *env, const char *value)
 
 // modify the loader string in the .interp section of ldscope
 static int
-set_loader(const char *exe)
+set_loader(char *exe)
 {
     int i, fd, found, name;
     struct stat sbuf;
@@ -177,7 +177,7 @@ set_loader(const char *exe)
 }
 
 static char *
-get_loader(const char *exe)
+get_loader(char *exe)
 {
     int i, fd;
     struct stat sbuf;
@@ -227,7 +227,7 @@ get_loader(const char *exe)
 }
 
 static void
-do_musl(const char *exld, const char *ldscope)
+do_musl(char *exld, char *ldscope)
 {
     char *lpath = NULL;
     char *ldso = NULL;
@@ -265,7 +265,7 @@ do_musl(const char *exld, const char *ldscope)
 }
 
 static int
-setup_loader(const char *exe, const char *ldscope)
+setup_loader(char *exe, char *ldscope)
 {
     char *ldso = NULL;
 
@@ -648,7 +648,7 @@ showUsage(char *prog)
       "options:\n"
       "  -u, --usage           display this info\n"
       "  -h, --help [SECTION]  display all or the specified help section\n"
-      "  -l, --libdir DIR      specify parent for the library directory (default: /tmp)\n"
+      "  -l, --libbasedir DIR  specify parent for the library directory (default: /tmp)\n"
       "  -f DIR                alias for \"-l DIR\" for backward compatability\n"
       "  -a, --attach PID      attach to the specified process ID\n"
       "\n"
@@ -666,18 +666,19 @@ showUsage(char *prog)
 
 // long aliases for short options
 static struct option opts[] = {
-    { "usage",   no_argument,       0, 'u'},
-    { "help",    optional_argument, 0, 'h' },
-    { "attach",  required_argument, 0, 'a' },
-    { "libdir",  required_argument, 0, 'l' },
-    { 0,         0,                 0, 0 }
+    { "usage",      no_argument,       0, 'u'},
+    { "help",       optional_argument, 0, 'h' },
+    { "attach",     required_argument, 0, 'a' },
+    { "libbasedir", required_argument, 0, 'l' },
+    { 0, 0, 0, 0 }
 };
 
 int
 main(int argc, char **argv)
 {
+    char *attachArg = 0;
+
     // process command line
-    char attachArg[32] = {0};
     for (;;) {
         int index = 0;
         //
@@ -705,11 +706,7 @@ main(int argc, char **argv)
                 }
                 return EXIT_SUCCESS;
             case 'a':
-                if (strlen(optarg) > sizeof(attachArg)-1) {
-                    fprintf(stderr, "error: --attach argument too long\n");
-                    return EXIT_FAILURE;
-                }
-                strncpy(attachArg, optarg, sizeof(attachArg)-1);
+                attachArg = optarg;
                 break;
             case 'f':
                 // accept -f as alias for -l for BC
@@ -740,7 +737,7 @@ main(int argc, char **argv)
     }
 
     // either --attach or a command are required
-    if (!attachArg[0] && optind >= argc) {
+    if (!attachArg && optind >= argc) {
         fprintf(stderr, "error: missing EXECUTABLE argument\n");
         showUsage(basename(argv[0]));
         return EXIT_FAILURE;
@@ -757,7 +754,7 @@ main(int argc, char **argv)
     }
 
     // are we on glibc or musl?
-    setup_loader(EXE_TEST_FILE, libdirGetLauncher());
+    setup_loader(EXE_TEST_FILE, (char*) libdirGetLauncher());
 
     // build exec args
     char** execArgv = calloc(argc+4, sizeof(char*)); // +4 for "-a PID -l LIB"
@@ -765,7 +762,7 @@ main(int argc, char **argv)
     execArgv[execArgc++] = (char*) libdirGetLauncher();
     execArgv[execArgc++] = "-l";
     execArgv[execArgc++] = (char*) libdirGetLibrary();
-    if (attachArg[0]) {
+    if (attachArg) {
         execArgv[execArgc++] = "-a";
         execArgv[execArgc++] = attachArg;
     }

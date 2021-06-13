@@ -27,8 +27,8 @@ cliall: deps scope compressscope
 
 ## cliclean: remove the binary from appscope/build and your GOPATH/bin directory
 cliclean:
-	rm -rf $(DIR)build/*
-	rm $(GOPATH)/bin/scope
+	$(RM) -r $(DIR)build/*
+	$(RM) $(GOPATH)/bin/scope
 
 ## deps: install all project dependencies
 deps:
@@ -42,7 +42,7 @@ deps:
 rebuild: cliclean build 
 
 run/bundle.go:
-	rm -rf $(DIR)/build/*
+	$(RM) -r $(DIR)/build/*
 	cp $(DIR)../bin/linux/ldscope $(DIR)build/
 	cp $(DIR)../lib/linux/libscope.so $(DIR)build/
 	cp $(DIR)../conf/*.yml $(DIR)build/

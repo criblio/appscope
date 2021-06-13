@@ -50,7 +50,7 @@
 static int g_debug = 0;
 
 static void
-setEnvVariable(const char *env, const char *value)
+setEnvVariable(char *env, char *value)
 {
     char *cur_val = getenv(env);
 
@@ -674,7 +674,7 @@ static struct option opts[] = {
 };
 
 int
-main(int argc, char **argv)
+main(int argc, char **argv, char **env)
 {
     char *attachArg = 0;
 

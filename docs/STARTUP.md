@@ -6,13 +6,13 @@ This document is an attempt to capture this logic.
 There are three ways to start a new _scoped_ process:
 
 * Using the [CLI](#cli); i.e. `scope run foo`
-* Using the [Static Laoder](#static-loader); i.e. `ldscope foo`
+* Using the [Static Loader](#static-loader); i.e. `ldscope foo`
 * Using [`LD_PRELOAD`](#ld_preload); i.e. `LD_PRELOAD=libscope.so foo`
 
 There are two ways to _scope_ and existing process:
 
 * Using the [CLI](#cli); i.e. `scope attach PID`
-* Using the [Static Laoder](#static-loader); i.e. `ldscope --attach PID`
+* Using the [Static Loader](#static-loader); i.e. `ldscope --attach PID`
 
 We'll cover how each approach works in the sections that follow.
 
@@ -23,16 +23,16 @@ startup scenarios. We need a separate one for each version of AppScope too.
 
 `${libdirbase}` is the base directory where we will create the Library
 Directory. It defaults to `/tmp` and may be overriden with command-line
-options to the [CLI](#cli) or [Static Laoder](#static-loader). Startup fails
+options to the [CLI](#cli) or [Static Loader](#static-loader). Startup fails
 if `${libdirbase}` doesn't exist or we can't create the Library Directory under
 it.
 
 `${libdir}` is our Library Directory; `${libdirbase}/libscope-${version}`.
 
-## Static Laoder
+## Static Loader
 
-We refer to `ldscope` as the "Static Laoder". It's responsible ultimately for
-launcing the [Dynamic Laoder](#dynamic-loader). Since we introduced musl libc
+We refer to `ldscope` as the "Static Loader". It's responsible ultimately for
+launcing the [Dynamic Loader](#dynamic-loader). Since we introduced musl libc
 support, `ldscope` is a static executable and can run without libc. Prior to
 musl support being added, `ldscope` was a dynamic executable that required
 glibc to run and thus would not run on musl libc systems.
@@ -45,7 +45,7 @@ and does the following:
    option; i.e. `ldscope -f path ...`.
 2. Create the `${libdir}/libscope-${version}/` directory if it doesn't already
    exist.
-3. Extract the [Dynamic Laoder](#dynamic-loader) into
+3. Extract the [Dynamic Loader](#dynamic-loader) into
    `${libdir}/ldscopedyn` and the shared library into `${libdir}/libscope.so`.
 4. Check if we're in a musl libc environment by scanning the ELF structure of a
    stock executable (`/bin/cat`) to get the path for the dynamic linker/loader
@@ -64,10 +64,10 @@ and does the following:
    musl system into using it's own loader even though `ldscopedyn` wants gnu's
    loader.
 
-## Dynamic Laoder
+## Dynamic Loader
 
 We refer to the `${libdir}/ldscopedyn` binary that was extracted by the [Static
-Laoder](#static-loader) as the "Dynamic Laoder". It is ultimately
+Loader](#static-loader) as the "Dynamic Loader". It is ultimately
 responsible for ensuring the desired process is running with our library loaded
 and initialized. Here's what it does:
 
@@ -95,7 +95,7 @@ When `scope` is used to scope a new program:
    scoped along with the `SCOPE_CONF_PATH` environment variable set to the full
    path of the config.
 
-The [Static Laoder](#static-loader) takes over from there as described
+The [Static Loader](#static-loader) takes over from there as described
 earlier. The CLI has a command-line option that add the `-f ${libdirbase}`
 option.
 
@@ -116,13 +116,13 @@ go.
 Attaching to an existing process instead of launching a new one is slightly
 different. The [CLI](#cli)'s `scope attach PID` command sets up the session
 directory the same way it does for `scope run ...` then runs the [Static
-Laoder](#static-loader) with the `--attach PID` option. Not much different
+Loader](#static-loader) with the `--attach PID` option. Not much different
 there.
 
-The [Static Laoder](#static-loader) simply passes the flag through to the
-[Dynamic Laoder](#dynamic-loader). Nothing different there.
+The [Static Loader](#static-loader) simply passes the flag through to the
+[Dynamic Loader](#dynamic-loader). Nothing different there.
 
-The [Dynamic Laoder](#dynamic-loader) sees the `--attach PID` option and:
+The [Dynamic Loader](#dynamic-loader) sees the `--attach PID` option and:
 
 1. loops through the program's shared objects looking for `libc.so` in the
    name to get its base address in memory.

@@ -86,7 +86,7 @@ static void
 showUsage(char *prog)
 {
     printf(
-      "Cribl AppScope Dynamic Launcher %s\n"
+      "Cribl AppScope Dynamic Loader %s\n"
       "\n"
       "usage: %s [OPTIONS] --lib LIBRARY [--] EXECUTABLE [ARGS...]\n"
       "       %s [OPTIONS] --attach PID\n"

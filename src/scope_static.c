@@ -45,7 +45,6 @@
 
 #define EXE_TEST_FILE "/bin/cat"
 #define LIBMUSL "musl"
-#define DEBUG 0
 
 static int g_debug = 0;
 
@@ -604,9 +603,9 @@ static int
 showHelp(const char *section)
 {
     printf(
-      "Cribl AppScope Static Launcher %s\n"
-      "\n"
-      "A general-purpose observable application tracing system\n"
+      "Cribl AppScope Static Loader %s\n"
+      //"\n"
+      //"A general-purpose observable application tracing system\n"
       "\n",
       SCOPE_VER
     );
@@ -638,7 +637,7 @@ static void
 showUsage(char *prog)
 {
     printf(
-      "Cribl AppScope Static Launcher %s\n" 
+      "Cribl AppScope Static Loader %s\n" 
       "\n"
       "A general-purpose observable application tracing system\n"
       "\n"
@@ -744,8 +743,8 @@ main(int argc, char **argv, char **env)
     }
 
     // extract to the library directory
-    if (libdirExtractLauncher()) {
-        fprintf(stderr, "error: failed to extract launcher\n");
+    if (libdirExtractLoader()) {
+        fprintf(stderr, "error: failed to extract loader\n");
         return EXIT_FAILURE;
     }
     if (libdirExtractLibrary()) {
@@ -754,12 +753,12 @@ main(int argc, char **argv, char **env)
     }
 
     // are we on glibc or musl?
-    setup_loader(EXE_TEST_FILE, (char*) libdirGetLauncher());
+    setup_loader(EXE_TEST_FILE, (char*) libdirGetLoader());
 
     // build exec args
     char** execArgv = calloc(argc+4, sizeof(char*)); // +4 for "-a PID -l LIB"
     int    execArgc = 0;
-    execArgv[execArgc++] = (char*) libdirGetLauncher();
+    execArgv[execArgc++] = (char*) libdirGetLoader();
     execArgv[execArgc++] = "-l";
     execArgv[execArgc++] = (char*) libdirGetLibrary();
     if (attachArg) {
@@ -771,8 +770,8 @@ main(int argc, char **argv, char **env)
     }
     execArgv[execArgc++] = NULL;
 
-    // exec the dynamic launcher
-    execve(libdirGetLauncher(), execArgv, environ);
+    // exec the dynamic loader
+    execve(libdirGetLoader(), execArgv, environ);
     free(execArgv);
     perror("error: execve failed");
     return EXIT_FAILURE;

@@ -141,7 +141,7 @@ libdirGetNote(void* buf)
 }
 
 static note_t*
-libdirGetLauncherNote()
+libdirGetLoaderNote()
 {
     return libdirGetNote(&_binary___bin_linux_ldscopedyn_start);
 }
@@ -341,12 +341,12 @@ libdirClean()
 }
 
 int
-libdirExtractLauncher()
+libdirExtractLoader()
 {
-    return libdirExtract(libdirGetLauncher(),
+    return libdirExtract(libdirGetLoader(),
             &_binary___bin_linux_ldscopedyn_start,
             &_binary___bin_linux_ldscopedyn_end,
-            libdirGetLauncherNote());
+            libdirGetLoaderNote());
 }
 
 int
@@ -359,13 +359,13 @@ libdirExtractLibrary()
 }
 
 const char *
-libdirGetLauncher()
+libdirGetLoader()
 {
     static char path[PATH_MAX];
 
     if (!path[0]) {
         if (snprintf(path, PATH_MAX, "%s/" SCOPE_LDSCOPEDYN, libdirGet()) >= PATH_MAX) {
-            fprintf(stderr, "error: launcher path too long.\n");
+            fprintf(stderr, "error: loader path too long.\n");
             return 0;
         }
     }
@@ -380,7 +380,7 @@ libdirGetLibrary()
 
     if (!path[0]) {
         if (snprintf(path, PATH_MAX, "%s/" SCOPE_LIBSCOPE_SO, libdirGet()) >= PATH_MAX) {
-            fprintf(stderr, "error: launcher path too long.\n");
+            fprintf(stderr, "error: loader path too long.\n");
             return 0;
         }
     }

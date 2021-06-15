@@ -19,8 +19,7 @@ We'll cover how each approach works in the sections that follow.
 
 We need a "Library Directory" where we can put things needed for various startup scenarios. We need a separate one for each version of AppScope, too.
 
-`${libdirbase}` is the base directory where we will create the Library Directory. It defaults to `/tmp`, but you can override this with command-line options to the [CLI](#cli) or [Static 
-Loader](#static-loader). Startup fails if `${libdirbase}` doesn't exist, or if we can't create the Library Directory under it.
+`${libdirbase}` is the base directory where we will create the Library Directory. It defaults to `/tmp`, but you can override this with command-line options to the [CLI](#cli) or [Static Loader](#static-loader). Startup fails if `${libdirbase}` doesn't exist, or if we can't create the Library Directory under it.
 
 `${libdir}` is our Library Directory: `${libdirbase}/libscope-${version}`.
 
@@ -38,7 +37,7 @@ We refer to `ldscope` as the "Static Loader." It's responsible ultimately for la
     * Create a softlink in our library directory that points to the linker/loader we got  from `/bin/cat`; i.e. `${libdir}/ld-linux-x86-64.so.2 -> /lib/ld-musl-x86_64.so.1`.
 
 5. Execute `ldscopedyn`, passing it the same executable arguments that we passed to `ldscope`, along with required `--attach` and `--library` options. If we found we are on a musl libc system in the previous step, we set `LD_LIBRARY_PATH=${libdir}` in the exec environment, too. We're tricking the musl system into using its own loader, even though `ldscopedyn` wants gnu's loader.
-1. 
+
 ## Dynamic Loader
 
 We refer to the `${libdir}/ldscopedyn` binary that was extracted by the [Static Loader](#static-loader) as the "Dynamic Loader." It is ultimately responsible for ensuring that the desired process is running, with our library loaded and initialized. Here's the decision tree it follows:
@@ -52,9 +51,7 @@ We refer to the `${libdir}/ldscopedyn` binary that was extracted by the [Static�
 
 ## CLI
 
-`scope` is the CLI front end for AppScope. It combines an "easy button" way to
-use AppScope with a number of peripheral tools to access and analyze the
-resulting data.
+`scope` is the CLI front end for AppScope. It combines an "easy button" way to use AppScope with a number of peripheral tools to access and analyze the resulting data.
 
 When `scope` is used to scope a new program:
 

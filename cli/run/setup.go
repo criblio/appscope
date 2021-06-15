@@ -100,27 +100,31 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 	sessionID := getSessionID()
 	tmpDirName := path.Base(cmd) + "_" + sessionID + "_" + pid + "_" + ts
 
+	// History directory
+	histDir := HistoryDir()
+	err := os.MkdirAll(histDir, 0755)
+	util.CheckErrSprintf(err, "error creating history dir: %v", err)
+
+	// Working directory
 	if attach {
-		// "History" directory (/tmp for attach)
 		// Validate /tmp exists
 		if !util.CheckDirExists("/tmp") {
 			util.ErrAndExit("/tmp directory does not exist")
 		}
 
-		// Working directory (0777 permissions)
+		// Create working directory in /tmp (0777 permissions)
 		rc.WorkDir = filepath.Join("/tmp", tmpDirName)
 		oldmask := syscall.Umask(0)
 		err := os.Mkdir(rc.WorkDir, 0777)
 		syscall.Umask(oldmask)
 		util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
 
-	} else {
-		// History directory
-		histDir := HistoryDir()
-		err := os.MkdirAll(histDir, 0755)
-		util.CheckErrSprintf(err, "error creating history dir: %v", err)
+		// Symbolic link between /tmp/tmpDirName and /history/tmpDirName
+		rootHistDir := filepath.Join(histDir, tmpDirName)
+		os.Symlink(rc.WorkDir, rootHistDir)
 
-		// Working directory
+	} else {
+		// Create working directory in history/
 		rc.WorkDir = filepath.Join(HistoryDir(), tmpDirName)
 		err = os.Mkdir(rc.WorkDir, 0755)
 		util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
@@ -128,7 +132,7 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 
 	// Cmd directory
 	cmdDir := filepath.Join(rc.WorkDir, "cmd")
-	err := os.Mkdir(cmdDir, 0755)
+	err = os.Mkdir(cmdDir, 0755)
 	util.CheckErrSprintf(err, "error creating cmd dir: %v", err)
 
 	// Payloads directory

@@ -604,8 +604,8 @@ showHelp(const char *section)
 {
     printf(
       "Cribl AppScope Static Loader %s\n"
-      //"\n"
-      //"A general-purpose observable application tracing system\n"
+      "\n"
+      "AppScope is a general-purpose observable application telemetry system\n"
       "\n",
       SCOPE_VER
     );

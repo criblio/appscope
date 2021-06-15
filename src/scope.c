@@ -88,6 +88,8 @@ showUsage(char *prog)
     printf(
       "Cribl AppScope Dynamic Loader %s\n"
       "\n"
+      "AppScope is a general-purpose observable applciation telemetry system.\n"
+      "\n"
       "usage: %s [OPTIONS] --lib LIBRARY [--] EXECUTABLE [ARGS...]\n"
       "       %s [OPTIONS] --attach PID\n"
       "\n"

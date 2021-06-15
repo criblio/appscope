@@ -204,7 +204,8 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
 static int 
 findLib(struct dl_phdr_info *info, size_t size, void *data)
 {
-    if (strstr(info->dlpi_name, "libc.so") != NULL) {
+    if (strstr(info->dlpi_name, "libc.so") != NULL ||
+        strstr(info->dlpi_name, "ld-musl") != NULL) {
         char libpath[PATH_MAX];
         if (realpath(info->dlpi_name, libpath)) {
             ((libdl_info_t *)data)->path = libpath;
@@ -229,6 +230,9 @@ injectScope(int pid, char* path)
  
     localLib = info.addr;
     dlopenAddr = dlsym(RTLD_DEFAULT, "__libc_dlopen_mode");
+    if (dlopenAddr == NULL) {
+        dlopenAddr = dlsym(RTLD_DEFAULT, "dlopen");
+    }
     if (dlopenAddr == NULL) {
         fprintf(stderr, "Failed to find __libc_dlopen_mode function\n");
         exit(EXIT_FAILURE);

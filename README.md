@@ -38,9 +38,11 @@ AppScope does not support the following runtimes:
 
 Open JVM &lt; v.6, Oracle JVM &lt; v.6, Go &lt; v.1.8.
 
-# Install and Build
+# Build and Install
 
 ## Linux
+
+We support building on Ubuntu 18 through 20.04. If you are unable to build locally, consider building with [Docker](#Docker).
 
 Check out the code, install build tools, build, and run tests:
 
@@ -67,6 +69,10 @@ git clean -f -d
 ## Docker
 
 If you have Docker installed on your local machine, you can skip installing the dependencies locally and instead use a container to build. Use the `docker/builder/Dockerfile` and the `make docker-build` target. That builds an `appscope-builder` image that is Ubuntu with the necessary dependencies installed. The target then runs the image, mounting the local directory into the container, and builds the project. You'll end up with the binary in `bin/linux/scope` assuming all goes well.
+
+```shell
+$ make docker-build
+```
 
 By default, the current versions of Ubuntu or Go are used in the container image. Setting the `IMAGE` and `GOLANG` build arguments can override these.  Use the `BUILD_ARGS` environment variable to pass extra arguments to `docker build`.  The example below forces the builder to use Go 1.16 and Ubuntu 21.04.
 
@@ -130,9 +136,10 @@ This will set the `LD_PRELOAD` environment variable for all commands that execut
 
 # The scope Executable
 
-`scope` provides a rich set of features for exploring data from applications that have been "scoped". `scope` supports several distinct modes:
+`scope` provides a rich set of features for exploring data from applications that have been "scoped". `scope` supports several distinct modes, including:
 
 - Run an application
+- Attach to a running application
 - Explore events from "scoped" applications
 - Explore metrics from "scoped" applications
 - Manage history and the accumulated data set
@@ -140,5 +147,6 @@ This will set the `LD_PRELOAD` environment variable for all commands that execut
 # Developer Notes
 
 - The top-level Makefile checks to see what platform you are on, and then includes the specific Makefile for that platform from the OS-specific directory.
-
 - The run script will determine which platform you are using, and will set environment variables accordingly. 
+- Visit the [docs](docs) folder to view more documentation.
+

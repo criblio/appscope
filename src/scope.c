@@ -86,6 +86,7 @@ static void
 showUsage(char *prog)
 {
     printf(
+      "\n"
       "Cribl AppScope Dynamic Loader %s\n"
       "\n"
       "AppScope is a general-purpose observable applciation telemetry system.\n"
@@ -103,7 +104,8 @@ showUsage(char *prog)
       "\n"
       "User docs are at https://appscope.dev/docs/. The project is hosted at\n"
       "https://github.com/criblio/appscope. Please direct feature requests and\n"
-      "defect reports there.\n",
+      "defect reports there.\n"
+      "\n",
       SCOPE_VER, prog, prog
     );
 }
@@ -125,7 +127,7 @@ main(int argc, char **argv, char **env)
     char *libraryArg = 0;
     for (;;) {
         int index = 0;
-        int opt = getopt_long(argc, argv, "+uha:l:", _options, &index);
+        int opt = getopt_long(argc, argv, "+:uha:l:", _options, &index);
         if (opt == -1) {
             break;
         }
@@ -139,6 +141,15 @@ main(int argc, char **argv, char **env)
                 break;
             case 'l':
                 libraryArg = optarg;
+                break;
+            case ':':
+                // options missing their value end up here
+                switch (optopt) {
+                    default:
+                        fprintf(stderr, "error: Missing value for -%c option\n", optopt);
+                        showUsage(basename(argv[0]));
+                        return EXIT_FAILURE;
+                }
                 break;
             case '?':
             default:

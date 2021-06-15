@@ -263,20 +263,28 @@ do_musl(char *exld, char *ldscope)
     if (lpath) free(lpath);
 }
 
+/*
+ * Check for and handle the extra steps needed to run under musl libc.
+ *
+ * Returns 0 if musl was not detected and 1 if it was.
+ */
 static int
 setup_loader(char *exe, char *ldscope)
 {
+    int ret = 0; // not musl
+
     char *ldso = NULL;
 
     if (((ldso = get_loader(exe)) != NULL) &&
         (strstr(ldso, LIBMUSL) != NULL)) {
             // we are using the musl ld.so
             do_musl(ldso, ldscope);
+            ret = 1; // detected musl
     }
 
     if (ldso) free(ldso);
 
-    return 0;
+    return ret;
 }
 
 static const char scope_help_overview[] =
@@ -637,9 +645,10 @@ static void
 showUsage(char *prog)
 {
     printf(
+      "\n"
       "Cribl AppScope Static Loader %s\n" 
       "\n"
-      "A general-purpose observable application tracing system\n"
+      "AppScope is a general-purpose observable application telemtry system.\n"
       "\n"
       "usage: %s [OPTIONS] [--] EXECUTABLE [ARGS...]\n"
       "       %s [OPTIONS] --attach PID\n"
@@ -658,7 +667,8 @@ showUsage(char *prog)
       "\n"
       "User docs are at https://appscope.dev/docs/. The project is hosted at\n"
       "https://github.com/criblio/appscope. Please direct feature requests and\n"
-      "defect reports there.\n",
+      "defect reports there.\n"
+      "\n",
       SCOPE_VER, prog, prog
     );
 }
@@ -723,21 +733,22 @@ main(int argc, char **argv, char **env)
                         showHelp(0);
                         return EXIT_SUCCESS;
                     default: 
-                        fprintf(stderr, "error: invalid option: -%c\n", optopt);
+                        fprintf(stderr, "error: missing value for -%c option\n", optopt);
+                        showUsage(basename(argv[0]));
                         return EXIT_FAILURE;
                 }
                 break;
             case '?':
             default:
                 fprintf(stderr, "error: invalid option: -%c\n", optopt);
-                showUsage(argv[0]);
+                showUsage(basename(argv[0]));
                 return EXIT_FAILURE;
         }
     }
 
     // either --attach or a command are required
     if (!attachArg && optind >= argc) {
-        fprintf(stderr, "error: missing EXECUTABLE argument\n");
+        fprintf(stderr, "error: missing --attach option or EXECUTABLE argument\n");
         showUsage(basename(argv[0]));
         return EXIT_FAILURE;
     }
@@ -752,8 +763,11 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    // are we on glibc or musl?
-    setup_loader(EXE_TEST_FILE, (char*) libdirGetLoader());
+    // setup for musl libc if detected
+    if (setup_loader(EXE_TEST_FILE, (char*) libdirGetLoader()) && attachArg) {
+        fprintf(stderr, "error: use of --attach in musl libs isn't currently supported\n");
+        return EXIT_FAILURE;
+    }
 
     // build exec args
     char** execArgv = calloc(argc+4, sizeof(char*)); // +4 for "-a PID -l LIB"

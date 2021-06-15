@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/criblio/scope/internal"
@@ -108,7 +109,9 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 
 		// Working directory (0777 permissions)
 		rc.WorkDir = filepath.Join("/tmp", tmpDirName)
+		oldmask := syscall.Umask(0)
 		err := os.Mkdir(rc.WorkDir, 0777)
+		syscall.Umask(oldmask)
 		util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
 
 	} else {

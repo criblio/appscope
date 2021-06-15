@@ -64,16 +64,8 @@ else
 	ERR+=1
 fi
 
-# Assert .scope/history directory exists
-if [ -d .scope/history ]; then
-	echo "PASS Scope history directory exists"
-else 
-	echo "FAIL Scope history directory missing"
-	ERR+=1
-fi
-
-# Assert sleep session directory exist
-if [ -d .scope/history/--attach_1* ]; then
+# Assert sleep session directory exists (in /tmp)
+if [ -d /tmp/$sleep_pid* ]; then
 	echo "PASS Scope sleep session directory exists"
 else 
 	echo "FAIL Scope sleep session directory missing"
@@ -81,7 +73,7 @@ else
 fi
 
 # Assert sleep config file exists
-if [ -f .scope/history/--attach_1*/scope.yml ]; then
+if [ -f /tmp/"$sleep_pid"*/scope.yml ]; then
 	echo "PASS Scope sleep session scope.yml exists"
 else 
 	echo "FAIL Scope sleep session scope.yml missing"
@@ -89,7 +81,7 @@ else
 fi
 
 # Compare sleep config.yml with expected.yml
-cat ./.scope/history/--attach_1_*/scope.yml | sed -e 's/--attach_1_[0-9]_[0-9]*/--attach_1_SESSIONPATH/' | diff - /expected.yml
+cat /tmp/"$sleep_pid"*/scope.yml | sed -e 's/"$sleep_pid"_1_[0-9]_[0-9]*/"$sleep_pid"_1_SESSIONPATH/' | diff - /expected.yml
 if [ $? -eq 0 ]; then
 	echo "PASS Scope sleep config as expected"
 else

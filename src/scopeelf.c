@@ -482,3 +482,32 @@ is_go(char *buf)
 
     return FALSE;
 }
+
+bool
+is_musl(char *buf)
+{
+    int i;
+    char *ldso = NULL;
+    Elf64_Ehdr *elf = (Elf64_Ehdr *)buf;
+    Elf64_Phdr *phead = (Elf64_Phdr *)&buf[elf->e_phoff];
+
+    for (i = 0; i < elf->e_phnum; i++) {
+        if ((phead[i].p_type == PT_INTERP)) {
+            char *exld = (char *)&buf[phead[i].p_offset];
+
+            ldso = strdup(exld);
+            if (ldso) {
+                if (strstr(ldso, "musl") != NULL) {
+                    free(ldso);
+                    return TRUE;
+                }
+                free(ldso);
+            } else {
+                DBG(NULL); // not expected
+            }
+            break;
+        }
+    }
+
+    return FALSE;
+}

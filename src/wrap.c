@@ -47,6 +47,7 @@ static const char *g_cmddir;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
 static rlim_t g_max_fds = 0;
+static bool g_ismusl = FALSE;
 
 extern unsigned g_sendprocessstart;
 
@@ -1227,6 +1228,10 @@ initHook()
         return;
     }
 
+    if (ebuf && ebuf->buf) {
+        g_ismusl = is_musl(ebuf->buf);
+    }
+
     if (full_path) free(full_path);
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
@@ -1419,7 +1424,12 @@ init(void)
     if (checkEnv("SCOPE_APP_TYPE", "go") &&
         checkEnv("SCOPE_EXEC_TYPE", "static")) {
         threadNow(0);
-    } else {
+    } else if (g_ismusl == FALSE) {
+        // The check here is meant to be temporary.
+        // The behavior of timer_delete() in musl libc
+        // is different than that of gnu libc.
+        // Therefore, until that is investigated we don't
+        // enable a timer/signal.
         threadInit();
     }
 

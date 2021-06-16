@@ -257,6 +257,7 @@ func TestSetupWorkDirAttach(t *testing.T) {
 	payloadsDirExists := util.CheckFileExists(filepath.Join(wd, "payloads"))
 	assert.True(t, payloadsDirExists)
 	os.RemoveAll(wd)
+	os.RemoveAll(".foo")
 	os.Unsetenv("SCOPE_TEST")
 	os.Unsetenv("SCOPE_HOME")
 }

@@ -122,7 +122,6 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 		// Symbolic link between /tmp/tmpDirName and /history/tmpDirName
 		rootHistDir := filepath.Join(histDir, tmpDirName)
 		os.Symlink(rc.WorkDir, rootHistDir)
-
 	} else {
 		// Create working directory in history/
 		rc.WorkDir = filepath.Join(HistoryDir(), tmpDirName)

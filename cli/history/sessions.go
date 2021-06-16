@@ -172,7 +172,19 @@ func (sessions SessionList) CountAndDuration() (ret SessionList) {
 // Remove removes all sessions in a given session list
 func (sessions SessionList) Remove() (ret SessionList) {
 	for _, s := range sessions {
-		err := os.RemoveAll(s.WorkDir)
+
+		// Delete any directories resolved by symbolic links
+		fileInfo, err := os.Lstat(s.WorkDir)
+		util.CheckErrSprintf(err, "error reading work directory: %v", err)
+		if fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
+			resolve, err := os.Readlink(s.WorkDir)
+			util.CheckErrSprintf(err, "error reading linked directory: %v", err)
+			err = os.RemoveAll(resolve)
+			util.CheckErrSprintf(err, "error removing linked directory: %v", err)
+		}
+
+		// Delete working directory
+		err = os.RemoveAll(s.WorkDir)
 		util.CheckErrSprintf(err, "error removing work directory: %v", err)
 	}
 	return []Session{}

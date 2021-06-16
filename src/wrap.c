@@ -1118,16 +1118,6 @@ static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t
 static long scope_syscall(long, ...);
 
 static int 
-findInjected(struct dl_phdr_info *info, size_t size, void *data)
-{
-    if (strstr(info->dlpi_name, LIBSCOPE_INJECTED_PATH) != NULL) {
-        *(char **)data = (char *) info->dlpi_name;
-        return 1;
-    }
-    return 0;
-}
-
-static int 
 findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
 {
     int len = strlen(info->dlpi_name);
@@ -1137,16 +1127,12 @@ findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
         *(char **)data = (char *) info->dlpi_name;
         return 1;
     }
-    return findInjected(info, size, data);
+    return 0;
 }
 
 /**
- * Detects whether the libscope library has been injected 
- * using the `ldscope --attach PID command` and if yes, performs GOT hooking.
- * It iterates over all shared objects using dl_iterate_phdr and checks
- * if there is any library whose name begins with /dev/shm/libscopea
+ * Called when injected to perform GOT hooking.
  */ 
-
 static bool
 hookInject()
 {
@@ -1159,7 +1145,7 @@ hookInject()
     struct link_map *lm;
     char buf[512];
 
-    if (dl_iterate_phdr(findInjected, &full_path)) {
+    if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *libscopeHandle = g_fn.dlopen(full_path, RTLD_NOW);
         if (libscopeHandle == NULL) {
             dlclose(libscopeHandle);
@@ -1196,7 +1182,7 @@ hookInject()
 }
 
 static void
-initHook()
+initHook(int attachedFlag)
 {
     int rc;
     funchook_t *funchook;
@@ -1263,7 +1249,9 @@ initHook()
                                  .out_addr = (void*)&g_fn.__write_pthread};
     dl_iterate_phdr(findLibSym, &pthread__write);
 
-    hookInject();
+    if (attachedFlag) {
+        hookInject();
+    }
 
     // for DNS:
     // On a glibc distro we hook sendmmsg because getaddrinfo calls this
@@ -1373,6 +1361,44 @@ initHook()
 
 #endif // __LINUX__
 
+static config_t*
+initConfig(int *attachedFlag)
+{
+    config_t* ret = 0;
+
+    *attachedFlag = 0;
+
+    // `ldscope` creates `/dev/shm/scope_attach_${pid}.yml` for us to find when
+    // we've been injected into the current process. That `${pid}` will be our
+    // PID here. If we can find it, we're attached. If it's empty, use
+    // defaults, otherwise use it.
+    char shmCfg[64] = {0};
+    int shmCfgLen = snprintf(shmCfg, sizeof(shmCfg), "/dev/shm/scope_attach_%d.yml", getpid());
+    if (shmCfgLen > 0 && shmCfgLen < sizeof(shmCfg)) {
+        struct stat s;
+        if (g_fn.stat && g_fn.stat(shmCfg, &s) == 0) {
+            *attachedFlag = 1;
+            if (s.st_size) {
+                ret = cfgRead(shmCfg);
+            } else {
+                ret = cfgCreateDefault();
+            }
+        }
+    }
+
+    // Use the default approach if not attached
+    if (!ret) {
+        char *path = cfgPath();
+        ret = cfgRead(path);
+        if (path) free(path);
+    }
+
+    if (*attachedFlag) {
+        unlink(shmCfg);
+    }
+
+    return ret;
+}
 
 __attribute__((constructor)) void
 init(void)
@@ -1400,13 +1426,12 @@ init(void)
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
 
-    char *path = cfgPath();
-    config_t *cfg = cfgRead(path);
-    cfgProcessEnvironment(cfg);
+    int attachedFlag = 0;
 
+    config_t *cfg = initConfig(&attachedFlag);
+    cfgProcessEnvironment(cfg);
     doConfig(cfg);
     g_staticfg = cfg;
-    if (path) free(path);
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
@@ -1419,7 +1444,7 @@ init(void)
         DBG(NULL);
     }
 
-    initHook();
+    initHook(attachedFlag);
     
     if (checkEnv("SCOPE_APP_TYPE", "go") &&
         checkEnv("SCOPE_EXEC_TYPE", "static")) {

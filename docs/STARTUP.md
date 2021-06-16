@@ -71,12 +71,12 @@ When our library is loaded, its constructor is called automatically. We set up o
 Attaching to an existing process instead of launching a new one is slightly different. Starting with the CLI:
 
 1. A user runs `scope attach PID` to attach to the existing process. 
-   * The CLI outputs an error and exits if the user isn't root, if PTRACE isn't enabled, or if the PID is invalid. _(TODO: Fail if process is already scoped.)_
+    * The CLI outputs an error and exits if the user isn't root, if PTRACE isn't enabled, or if the PID is invalid. _(TODO: Fail if process is already scoped.)_
     * The session folder the CLI creates goes under `/tmp` instead of `~root/.scope/history` where it would be with `scope run`. Permissions on that session folder are 0777 instead of 0755 too.
     * The CLI then sets `SCOPE_CONF_PATH=${session}/scope.yml` in the envronment and exec's `ldscope --attach PID [-f DIR]`. The `-f DIR` part of the command is only included if the CLI was run with `-l DIR` or `--librarypath DIR`.
 2. The [Static Loader](#static-loader) gets the `--attach PID` option, the `SCOPE_CONF_PATH` environment variable, and the `-f DIR` option (optionally).
     * It extracts `ldscopedyn` and `libscope.so` to the Library Directory honoring the overridden base directory if it gets `-f DIR`. No change here.
-    * Since `--attach PID` was passed in, it creates `/dev/shm/scope_${PID}.yml` and writes the contents of the file that `SCOPE_CONFIG_PATH` points to into it.
+    * Since `--attach PID` was passed in, it creates `/dev/shm/scope_attach_${PID}.yml` and writes the contents of the file that `SCOPE_CONFIG_PATH` points to into it.
     * It continues as described in step 4 of [Static Loader](#static-loader) to detect and support a musl libc environment if detected.
     * It exec's `ldscopedyn --attach PID -l ${libdir}/scope.so`.
 3. The [Dynamic Loader](#dynamic-loader) gets `--attach PID` and `-l ${libdir}/scope.so` passed in on the command line.
@@ -97,8 +97,8 @@ Attaching to an existing process instead of launching a new one is slightly diff
         * `ptrace(GETREGS)` again to get the return code from `dlopen()`
         * Restore the memory we munged and the registers and `ptrace(CONT)`.
         * The results of the call to `dlopen()` are in the registers we copied out at the end. If it was successful, the library is in the target process and its constructor was called.
-4. The constructor in `libscope.so` has logic to find the `scope.yml` file it should use. We use `/dev/shm/scope_${PID}.yml` first followed by the normal options. See `ldescope --help config`.
+4. In the attached process, the library is loaded and the constructor is run
+    * The `/dev/shm/scope_attach_${pid}.yml` exists so we load configs from that.
+4. The constructor in `libscope.so` has logic to find the `scope.yml` file it should use. We use `/dev/shm/scope_attach_${PID}.yml` first followed by the normal options. See `ldescope --help config`.
 
-If the [Static Loader](#static-loader) is run directly without using the CLI, the `SCOPE_CONF_PATH` environment variable may not be set. In that case, we check if `SCOPE_HOME` is set, we'll use `${SCOPE_HOME}/scope.yml` to populate `/dev/shm/scope_${PID}.yml`. If neither environemnt variable is set, `ldscope` doesn't create the config in shared memory at all. The library in the scoped process looks in the other normal places for configs.
-
-> TODO: Should `ldscope` use the same logic to find a suitable `scope.yml` as `libscope.so` or is the quick-and-dirty fallback described above what we want?
+If the [Static Loader](#static-loader) is run directly without using the CLI, the `SCOPE_CONF_PATH` environment variable may not be set. In that case, we check if `SCOPE_HOME` is set, we'll use `${SCOPE_HOME}/scope.yml` or `${SCOPE_HOME}/conf/scope.yml` to populate `/dev/shm/scope_attach_${PID}.yml`. It will be empty if neither `SCOPE_CONF_PATH` nor `SCOPE_HOME` are set.

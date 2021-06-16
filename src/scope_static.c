@@ -287,6 +287,77 @@ setup_loader(char *exe, char *ldscope)
     return ret;
 }
 
+/*
+ * Find which scope.yml we're using for --attach
+ *
+ * Note: This is not the same logic used on cfgPath().
+ *
+ * The returned string needs to be free'd!
+ */
+static char*
+find_scope_yml()
+{
+    const char* env;
+
+    if ((env = getenv("SCOPE_CONF_PATH"))) {
+        return strdup(env);
+    }
+
+    if ((env = getenv("SCOPE_HOME"))) {
+        char path[1024] = {0};
+        int  pathLen;
+
+        pathLen = snprintf(path, sizeof(path), "%s/%s", env, CFG_FILE_NAME);
+        if (pathLen < 0) {
+            fprintf(stderr, "error: snprintf() feaild.\n");
+            return 0;
+        }
+        if (pathLen >= sizeof(path)) {
+            fprintf(stderr, "error: $SCOPE_HOME/%s too long\n", CFG_FILE_NAME);
+            return 0;
+        }
+
+        if (access(path, R_OK) == 0)  {
+            return realpath(path, NULL);
+        }
+        
+        pathLen = snprintf(path, sizeof(path), "%s/conf/%s", env, CFG_FILE_NAME);
+        if (pathLen < 0) {
+            fprintf(stderr, "error: snprintf() feaild.\n");
+            return 0;
+        }
+        if (pathLen >= sizeof(path)) {
+            fprintf(stderr, "error: $SCOPE_HOME/conf/%s too long\n", CFG_FILE_NAME);
+            return 0;
+        }
+
+        if (access(path, R_OK) == 0)  {
+            return realpath(path, NULL);
+        }
+    }
+
+    return 0;
+}
+
+/* 
+ * This avoids a segfault when code using shm_open() is compiled statically.
+ * For some reason, compiling the code statically causes the __shm_directory()
+ * function calls in librt.a to not reach the implementation in libpthread.a.
+ * Implementing the function ourselves fixes this issue.
+ *
+ * See https://stackoverflow.com/a/47914897
+ */
+#ifndef  SHM_MOUNT
+#define  SHM_MOUNT "/dev/shm/"
+#endif
+static const char  shm_mount[] = SHM_MOUNT;
+const char *__shm_directory(size_t *len)
+{
+    if (len)
+        *len = strlen(shm_mount);
+    return shm_mount;
+}
+
 static const char scope_help_overview[] =
 "  OVERVIEW:\n"
 "    The Scope library supports extraction of data from within applications.\n"
@@ -767,6 +838,65 @@ main(int argc, char **argv, char **env)
     if (setup_loader(EXE_TEST_FILE, (char*) libdirGetLoader()) && attachArg) {
         fprintf(stderr, "error: use of --attach in musl libs isn't currently supported\n");
         return EXIT_FAILURE;
+    }
+
+    // create /dev/shm/scope_${PID}.yml when attaching
+    if (attachArg) {
+        char shmConfigPath[PATH_MAX] = {0};
+
+        errno = 0;
+        int pid = (int)strtol(attachArg, NULL, 10);
+        if (errno) {
+            perror("error: failed to convert --attach value to an integer");
+            return EXIT_FAILURE;
+        }
+
+        sprintf(shmConfigPath, "/scope_attach_%d.yml", pid);
+
+        // Permissions on the file need to allow the library in the attached
+        // process to remove the shared memory object.
+        int shmFd = shm_open(shmConfigPath, O_RDWR|O_CREAT|O_EXCL, S_IRUSR|S_IRGRP|S_IROTH);
+        if (shmFd == -1) {
+            perror("error: shm_open() failed");
+            return EXIT_FAILURE;
+        }
+
+        char* scopeYml = find_scope_yml();
+        if (scopeYml) {
+            int ymlFd = open(scopeYml, O_RDONLY);
+            if (ymlFd == -1) {
+                free(scopeYml);
+                close(shmFd);
+                shm_unlink(shmConfigPath);
+                perror("error: open() failed");
+                return EXIT_FAILURE;
+            }
+
+            char buf[4096];
+            ssize_t nIn;
+            while ((nIn = read(ymlFd, buf, sizeof(buf))) > 0) {
+                char *bufPtr = buf;
+                ssize_t nOut;
+                do {
+                    nOut = write(shmFd, bufPtr, nIn);
+                    if (nOut >= 0) {
+                        nIn -= nOut;
+                        bufPtr += nOut;
+                    } else if (errno != EINTR) {
+                        free(scopeYml);
+                        close(ymlFd);
+                        close(shmFd);
+                        shm_unlink(shmConfigPath);
+                        perror("error: write() to /dev/shm/scope_${PID}.yml failed");
+                        return EXIT_FAILURE;
+                    }
+                } while (nOut > 0);
+            }
+            free(scopeYml);
+            close(ymlFd);
+        }
+
+        close(shmFd);
     }
 
     // build exec args

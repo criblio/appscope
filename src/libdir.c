@@ -210,7 +210,12 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
         }
     }
 
-    if (snprintf(temp, PATH_MAX, "%s.XXXXXX", path) >= PATH_MAX) {
+    int tempLen = snprintf(temp, PATH_MAX, "%s.XXXXXX", path);
+    if (tempLen < 0) {
+        fprintf(stderr, "error: snprintf(0 failed.\n");
+        return -1;
+    }
+    if (tempLen >= PATH_MAX) {
         fprintf(stderr, "error: extract temp too long.\n");
         return -1;
     }
@@ -320,7 +325,12 @@ const char*
 libdirGet()
 {
     if (!g_libdir_info.path[0]) {
-        if (snprintf(g_libdir_info.path, PATH_MAX, "%s/%s", libdirGetBase(), libdirGetDir()) >= PATH_MAX) {
+        int pathLen = snprintf(g_libdir_info.path, PATH_MAX, "%s/%s", libdirGetBase(), libdirGetDir());
+        if (pathLen < 0) {
+            fprintf(stderr, "error: snprintf() failed.\n");
+            return 0;
+        }
+        if (pathLen >= PATH_MAX) {
             fprintf(stderr, "error: libdir path too long.\n");
             return 0;
         }
@@ -364,7 +374,12 @@ libdirGetLoader()
     static char path[PATH_MAX];
 
     if (!path[0]) {
-        if (snprintf(path, PATH_MAX, "%s/" SCOPE_LDSCOPEDYN, libdirGet()) >= PATH_MAX) {
+        int pathLen = snprintf(path, PATH_MAX, "%s/" SCOPE_LDSCOPEDYN, libdirGet());
+        if (pathLen < 0) {
+            fprintf(stderr, "error: snprintf() failed.\n");
+            return 0;
+        }
+        if (pathLen >= PATH_MAX) {
             fprintf(stderr, "error: loader path too long.\n");
             return 0;
         }
@@ -379,7 +394,12 @@ libdirGetLibrary()
     static char path[PATH_MAX];
 
     if (!path[0]) {
-        if (snprintf(path, PATH_MAX, "%s/" SCOPE_LIBSCOPE_SO, libdirGet()) >= PATH_MAX) {
+        int pathLen = snprintf(path, PATH_MAX, "%s/" SCOPE_LIBSCOPE_SO, libdirGet());
+        if (pathLen < 0) {
+            fprintf(stderr, "error: snprintf() failed.\n");
+            return 0;
+        }
+        if (pathLen >= PATH_MAX) {
             fprintf(stderr, "error: loader path too long.\n");
             return 0;
         }

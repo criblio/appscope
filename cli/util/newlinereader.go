@@ -99,35 +99,29 @@ func MatchAlways(in string) bool {
 // MatchString searches for a given string
 func MatchString(search string) MatchFunc {
 	return func(in string) bool {
-		if strings.Contains(in, search) {
-			return true
-		}
-		return false
+		return strings.Contains(in, search)
 	}
 }
 
 // MatchField searches for a given JSON key/value
 func MatchField(key string, val interface{}) MatchFunc {
 	strval := ""
-	switch val.(type) {
+	switch res := val.(type) {
 	case float64:
-		strval = strconv.FormatFloat(val.(float64), 'f', -1, 64)
+		strval = strconv.FormatFloat(res, 'f', -1, 64)
 	case float32:
 		strval = strconv.FormatFloat(val.(float64), 'f', -1, 32)
 	case int64, int32, int:
 		strval = fmt.Sprintf("%d", val)
 	case string:
-		strval = fmt.Sprintf("\"%s", val)
+		strval = fmt.Sprintf("\"%s", res)
 	default:
-		strval = fmt.Sprintf("%v", val)
+		strval = fmt.Sprintf("%v", res)
 	}
 	search := fmt.Sprintf("%s\":%s", key, strval)
 	return func(in string) bool {
 		// fmt.Printf("in: %s\n", in)
-		if strings.Contains(in, search) {
-			return true
-		}
-		return false
+		return strings.Contains(in, search)
 	}
 }
 

@@ -1,53 +1,14 @@
-<p align="center">
-  <a href="https://www.gatsbyjs.com/?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter">
-    <img alt="Gatsby" src="https://www.gatsbyjs.com/Gatsby-Monogram.svg" width="60" />
-  </a>
-</p>
-<h1 align="center">
-  Gatsby minimal starter
-</h1>
+# Cribl AppScope - Docs Website
 
-## 🚀 Quick start
+> WIP: working on this... YMMV
 
-1.  **Create a Gatsby site.**
+The content in the `website/` folder is used to generate the public-facing website for AppScope end-users at <https://appscope.dev/> and the staging version at <https://staging.appscope.dev/>. Our automated build systems deploy to these sites for commits to the `master` and `staging` branches, respectively. We use [Gatsby](https://www.gatsbyjs.com/) to compile to content here into static content that we then deploy to an AWS S3 bucket that is served up via the URLs mentioned earlier.
 
-    Use the Gatsby CLI to create a new site, specifying the minimal starter.
+The [`deploy.sh`](./deploy.sh) script is run by the [`website` workflow](../.gitlab/workflows/../../.github/workflows/website.yml) to handle the deployment on commits.
 
-    ```shell
-    # create a new Gatsby site using the minimal starter
-    npm init gatsby
-    ```
-
-2.  **Start developing.**
-
-    Navigate into your new site’s directory and start it up.
-
-    ```shell
-    cd my-gatsby-site/
-    npm run develop
-    ```
-
-3.  **Open the code and start customizing!**
-
-    Your site is now running at http://localhost:8000!
-
-    Edit `src/pages/index.js` to see your site update in real-time!
-
-4.  **Learn more**
-
-    - [Documentation](https://www.gatsbyjs.com/docs/?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter)
-
-    - [Tutorials](https://www.gatsbyjs.com/tutorial/?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter)
-
-    - [Guides](https://www.gatsbyjs.com/tutorial/?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter)
-
-    - [API Reference](https://www.gatsbyjs.com/docs/api-reference/?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter)
-
-    - [Plugin Library](https://www.gatsbyjs.com/plugins?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter)
-
-    - [Cheat Sheet](https://www.gatsbyjs.com/docs/cheat-sheet/?utm_source=starter&utm_medium=readme&utm_campaign=minimal-starter)
-
-## Additional Notes
-
-1.  **Images**
-    All images are optimized using gatsby image. When changing out any images you will need to ensure that the image file matches the file name and extension in in the GraphQL query. This ensures images are optimized for best performance at all viewport sizes.
+See the Gatsly docs for complete details but to spin up a local environment for content editors, it should be a matter of:
+1. Install `node` with `brew install node` on MacOS or `apt install nodejs` on Ubuntu. Keep it updated running `brew upgrade node` or `apt update`/`apt upgrade` occasionally.
+2. Install the Gatsby CLI with `sudo npm install -g gatsby-cli`. you'll be prompet for your password to approve the installation.
+3. Install local dependencies in the project with `npm ci`.
+4. Run the local development server with `...`
+5. Access the local development version of the website at [`http://127.0.0.1:8000/`](https://127.0.0.1:8000/).

@@ -102,3 +102,5 @@ Attaching to an existing process instead of launching a new one is slightly diff
 4. The constructor in `libscope.so` has logic to find the `scope.yml` file it should use. We use `/dev/shm/scope_attach_${PID}.yml` first followed by the normal options. See `ldescope --help config`.
 
 If the [Static Loader](#static-loader) is run directly without using the CLI, the `SCOPE_CONF_PATH` environment variable may not be set. In that case, we check if `SCOPE_HOME` is set, we'll use `${SCOPE_HOME}/scope.yml` or `${SCOPE_HOME}/conf/scope.yml` to populate `/dev/shm/scope_attach_${PID}.yml`. It will be empty if neither `SCOPE_CONF_PATH` nor `SCOPE_HOME` are set.
+
+> Note: You will see term "inject" used in the code. It's synonomous with "attach".

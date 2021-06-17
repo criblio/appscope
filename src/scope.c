@@ -111,7 +111,7 @@ showUsage(char *prog)
 }
 
 // long aliases for short options
-static struct option _options[] = {
+static struct option options[] = {
     {"help",    no_argument,       0, 'h'},
     {"usage",   no_argument,       0, 'u'},
     {"attach",  required_argument, 0, 'a'},
@@ -127,7 +127,7 @@ main(int argc, char **argv, char **env)
     char *libraryArg = 0;
     for (;;) {
         int index = 0;
-        int opt = getopt_long(argc, argv, "+:uha:l:", _options, &index);
+        int opt = getopt_long(argc, argv, "+:uha:l:", options, &index);
         if (opt == -1) {
             break;
         }
@@ -158,7 +158,7 @@ main(int argc, char **argv, char **env)
         }
     }
 
-    // --library is required and must be executable
+    // the `--library LIB` option is required and LIB must be executable
     if (!libraryArg) {
         fprintf(stderr, "error: missing required --library option\n");
         showUsage(basename(argv[0]));
@@ -169,12 +169,12 @@ main(int argc, char **argv, char **env)
         if (errno != ENOENT) {
             perror("error: stat() failed");
         } else {
-            perror("error: missing libscope.so");
+            fprintf(stderr, "error: %s missing\n", libraryArg);
         }
         return EXIT_FAILURE;
     }
     if (access(libraryArg, R_OK|X_OK)) {
-        fprintf(stderr, "error: libscope.so not readable or not executable\n");
+        fprintf(stderr, "error: %s not readable or not executable\n", libraryArg);
         return EXIT_FAILURE;
     }
 
@@ -206,7 +206,6 @@ main(int argc, char **argv, char **env)
         fprintf(stderr,"%s could not find or execute command `%s`.  Exiting.\n", argv[0], argv[optind]);
         exit(EXIT_FAILURE);
     }
-    //argv[1] = inferior_command; // update args with resolved inferior_command
 
     // before processing, try to set SCOPE_EXEC_PATH for execve
     char *sep;

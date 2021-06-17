@@ -684,7 +684,7 @@ showHelp(const char *section)
     printf(
       "Cribl AppScope Static Loader %s\n"
       "\n"
-      "AppScope is a general-purpose observable application telemetry system\n"
+      "AppScope is a general-purpose observable application telemetry system.\n"
       "\n",
       SCOPE_VER
     );
@@ -764,13 +764,12 @@ main(int argc, char **argv, char **env)
         //
         // The `+` here enables POSIX mode where the first non-option found
         // stops option processing so `ldscope foo -a 123` will not process the
-        // `-a 123` here and instead pass it through. We still get support for
-        // the `--` too; i.e. `ldscope -- top -a`.
+        // `-a 123` here and instead pass it through.
         //
         // The initial `:` lets us handle options with optional values like
         // `-h` and `-h SECTION`.
         //
-        int opt = getopt_long(argc, argv, "+:uh:a:l:f:F", opts, &index);
+        int opt = getopt_long(argc, argv, "+:uh:a:l:f:", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -793,9 +792,6 @@ main(int argc, char **argv, char **env)
             case 'l':
                 libdirSetBase(optarg);
                 break;
-            case 'F': // hidden option
-                libdirClean();
-                break;
             case ':':
                 // options missing their value end up here
                 switch (optopt) {
@@ -804,7 +800,7 @@ main(int argc, char **argv, char **env)
                         showHelp(0);
                         return EXIT_SUCCESS;
                     default: 
-                        fprintf(stderr, "error: missing value for -%c option\n", optopt);
+                        fprintf(stderr, "error: missing required value for -%c option\n", optopt);
                         showUsage(basename(argv[0]));
                         return EXIT_FAILURE;
                 }
@@ -836,7 +832,7 @@ main(int argc, char **argv, char **env)
 
     // setup for musl libc if detected
     if (setup_loader(EXE_TEST_FILE, (char*) libdirGetLoader()) && attachArg) {
-        fprintf(stderr, "error: use of --attach in musl libs isn't currently supported\n");
+        fprintf(stderr, "error: use of --attach in musl libc isn't currently supported\n");
         return EXIT_FAILURE;
     }
 

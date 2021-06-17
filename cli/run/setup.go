@@ -84,6 +84,14 @@ func CreateAll(path string) error {
 
 // createWorkDir creates a working directory
 func (rc *Config) createWorkDir(cmd string, attach bool) {
+	filePerms := os.FileMode(0644)
+	dirPerms := os.FileMode(0755)
+	if attach {
+		filePerms = 0777
+		dirPerms = 0777
+		oldmask := syscall.Umask(0)
+		defer syscall.Umask(oldmask)
+	}
 	if rc.WorkDir != "" {
 		if util.CheckDirExists(rc.WorkDir) {
 			// Directory exists, exit
@@ -114,9 +122,7 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 
 		// Create working directory in /tmp (0777 permissions)
 		rc.WorkDir = filepath.Join("/tmp", tmpDirName)
-		oldmask := syscall.Umask(0)
-		err := os.Mkdir(rc.WorkDir, 0777)
-		syscall.Umask(oldmask)
+		err := os.Mkdir(rc.WorkDir, filePerms)
 		util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
 
 		// Symbolic link between /tmp/tmpDirName and /history/tmpDirName
@@ -131,16 +137,16 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 
 	// Cmd directory
 	cmdDir := filepath.Join(rc.WorkDir, "cmd")
-	err = os.Mkdir(cmdDir, 0755)
+	err = os.Mkdir(cmdDir, dirPerms)
 	util.CheckErrSprintf(err, "error creating cmd dir: %v", err)
 
 	// Payloads directory
 	payloadsDir := filepath.Join(rc.WorkDir, "payloads")
-	err = os.MkdirAll(payloadsDir, 0755)
+	err = os.MkdirAll(payloadsDir, dirPerms)
 	util.CheckErrSprintf(err, "error creating payloads dir: %v", err)
 
 	// Log file
-	internal.CreateLogFile(filepath.Join(rc.WorkDir, "scope.log"))
+	internal.CreateLogFile(filepath.Join(rc.WorkDir, "scope.log"), filePerms)
 
 	// Metrics file
 	if rc.MetricsDest != "" || rc.CriblDest != "" {
@@ -148,11 +154,11 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 		if metricsDest == "" {
 			metricsDest = rc.CriblDest
 		}
-		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_dest"), []byte(metricsDest), 0644)
+		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_dest"), []byte(metricsDest), filePerms)
 		util.CheckErrSprintf(err, "error writing metric_dest: %v", err)
 	}
 	if rc.MetricsFormat != "" {
-		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_format"), []byte(rc.MetricsFormat), 0644)
+		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_format"), []byte(rc.MetricsFormat), filePerms)
 		util.CheckErrSprintf(err, "error writing metric_format: %v", err)
 	}
 
@@ -162,7 +168,7 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 		if eventsDest == "" {
 			eventsDest = rc.CriblDest
 		}
-		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "event_dest"), []byte(eventsDest), 0644)
+		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "event_dest"), []byte(eventsDest), filePerms)
 		util.CheckErrSprintf(err, "error writing event_dest: %v", err)
 	}
 
@@ -193,6 +199,13 @@ func HistoryDir() string {
 
 // setupWorkDir sets up a working directory for a given set of args
 func (rc *Config) setupWorkDir(args []string, attach bool) {
+	filePerms := os.FileMode(0644)
+	if attach {
+		filePerms = 0777
+		oldmask := syscall.Umask(0)
+		defer syscall.Umask(oldmask)
+	}
+
 	cmd := path.Base(args[0])
 	rc.createWorkDir(cmd, attach)
 
@@ -203,7 +216,7 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 		newPath, err := filepath.Abs(rc.sc.Metric.Transport.Path)
 		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Metric.Transport.Path, err)
 		rc.sc.Metric.Transport.Path = newPath
-		f, err := os.OpenFile(rc.sc.Metric.Transport.Path, os.O_CREATE, 0644)
+		f, err := os.OpenFile(rc.sc.Metric.Transport.Path, os.O_CREATE, filePerms)
 		if err != nil && !os.IsExist(err) {
 			util.ErrAndExit("cannot create metric file %s: %v", rc.sc.Metric.Transport.Path, err)
 		}
@@ -214,7 +227,7 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 		newPath, err := filepath.Abs(rc.sc.Event.Transport.Path)
 		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Event.Transport.Path, err)
 		rc.sc.Event.Transport.Path = newPath
-		f, err := os.OpenFile(rc.sc.Event.Transport.Path, os.O_CREATE, 0644)
+		f, err := os.OpenFile(rc.sc.Event.Transport.Path, os.O_CREATE, filePerms)
 		if err != nil && !os.IsExist(err) {
 			util.ErrAndExit("cannot create metric file %s: %v", rc.sc.Event.Transport.Path, err)
 		}
@@ -222,11 +235,11 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	}
 
 	scYamlPath := filepath.Join(rc.WorkDir, "scope.yml")
-	err = rc.WriteScopeConfig(scYamlPath)
+	err = rc.WriteScopeConfig(scYamlPath, filePerms)
 	util.CheckErrSprintf(err, "%v", err)
 
 	argsJSONPath := filepath.Join(rc.WorkDir, "args.json")
 	argsBytes, err := json.Marshal(args)
 	util.CheckErrSprintf(err, "error marshaling JSON: %v", err)
-	err = ioutil.WriteFile(argsJSONPath, argsBytes, 0644)
+	err = ioutil.WriteFile(argsJSONPath, argsBytes, filePerms)
 }

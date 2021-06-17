@@ -21,7 +21,7 @@ We need a "Library Directory" where we can put things needed for various startup
 
 `${libdirbase}` is the base directory where we will create the Library Directory. It defaults to `/tmp`, but you can override this with command-line options to the [CLI](#cli) or [Static Loader](#static-loader). Startup fails if `${libdirbase}` doesn't exist, or if we can't create the Library Directory under it.
 
-`${libdir}` is our Library Directory: `${libdirbase}/libscope-${version}`.
+Our Library Directory defaults to: `/tmp/libscope-${version}`. You can override this default using command-line options with the CLI or Static Loader. Below, we'll refer to your configured Library Directory path as `${libdir}`.
 
 ## Static Loader
 

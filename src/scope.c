@@ -274,6 +274,7 @@ main(int argc, char **argv, char **env)
     // Static executable path
     if (getenv("LD_PRELOAD") != NULL) {
         unsetenv("LD_PRELOAD");
+        fprintf(stderr, "warning: static executable not currently supported; running unscoped\n");
         execve(argv[optind], &argv[optind], environ);
     }
 
@@ -284,21 +285,22 @@ main(int argc, char **argv, char **env)
         // and any other static native apps...
         // Start here when we support more static binaries
         // than go.
+        fprintf(stderr, "warning: static executables not currently supported; running unscoped\n");
         execve(argv[optind], &argv[optind], environ);
     }
 
     if ((handle = dlopen(libraryArg, RTLD_LAZY)) == NULL) {
-        fprintf(stderr, "%s\n", dlerror());
+        fprintf(stderr, "error: dlopen(%s) failed: %s\n", libraryArg, dlerror());
         goto err;
     }
 
     sys_exec = dlsym(handle, "sys_exec");
     if (!sys_exec) {
-        fprintf(stderr, "%s\n", dlerror());
+        fprintf(stderr, "error: dlsym(sys_exec) failed: %s\n", dlerror());
         goto err;
     }
 
-    sys_exec(ebuf, inferior_command, argc, &argv[optind], env);
+    sys_exec(ebuf, inferior_command, argc-optind, &argv[optind], env);
 
     return 0;
 err:

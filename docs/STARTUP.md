@@ -89,7 +89,10 @@ Attaching to an existing process instead of launching a new one is slightly diff
     * The CLI then sets `SCOPE_CONF_PATH=${session}/scope.yml` in the envronment and exec's `ldscope --attach PID [-f DIR]`. The `-f DIR` part of the command is only included if the CLI was run with `-l DIR` or `--librarypath DIR`.
 2. The [Static Loader](#static-loader) gets the `--attach PID` option, the `SCOPE_CONF_PATH` environment variable, and the `-f DIR` option (optionally).
     * It extracts `ldscopedyn` and `libscope.so` to the Library Directory honoring the overridden base directory if it gets `-f DIR`. No change here.
-    * Since `--attach PID` was passed in, it creates `/dev/shm/scope_attach_${PID}.yml` and writes the contents of the file that `SCOPE_CONFIG_PATH` points to into it.
+    * Since `--attach PID` was passed in
+        * Ensure we are running as root and the PID exists
+        * open `/dev/shm/scope_attach_${PID}.yml`
+        * write the contents of the file that `SCOPE_CONFIG_PATH` points to
     * It continues as described in step 4 of [Static Loader](#static-loader) to detect and support a musl libc environment if detected.
     * It exec's `${libdir}/ldscopedyn --attach PID` with `SCOPE_LIB_PATH=${libdir}/libscope.so` added to its environment variables.
 3. The [Dynamic Loader](#dynamic-loader) gets `--attach PID` on the command line and `SCOPE_LIB_PATH` in the environment.

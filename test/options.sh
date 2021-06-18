@@ -40,6 +40,10 @@ outputs "error: missing --attach option or EXECUTABLE"
 outputs "Cribl AppScope"
 returns 1
 
+run ./bin/linux/ldscope -z 
+outputs "invalid option: -z"
+returns 1
+
 run ./bin/linux/ldscope -u
 doesnt_output "error:"
 outputs "Cribl AppScope"
@@ -150,6 +154,10 @@ returns 0
 
 run ./bin/linux/ldscopedyn
 outputs "missing --attach or EXECUTABLE"
+returns 1
+
+run ./bin/linux/ldscopedyn -z 
+outputs "invalid option: -z"
 returns 1
 
 run ./bin/linux/ldscopedyn echo

@@ -185,6 +185,11 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
+    // use --attach, ignore executable and args
+    if (attachArg && optind < argc) {
+        fprintf(stderr, "warning: ignore EXECUTABLE argument with --attach option\n");
+    }
+
     elf_buf_t *ebuf;
     int (*sys_exec)(elf_buf_t *, const char *, int, char **, char **);
     pid_t pid;
@@ -274,7 +279,7 @@ main(int argc, char **argv, char **env)
     // Static executable path
     if (getenv("LD_PRELOAD") != NULL) {
         unsetenv("LD_PRELOAD");
-        execve(argv[optind], &argv[optind], environ);
+        execve(argv[0], argv, environ);
     }
 
     program_invocation_short_name = basename(argv[1]);

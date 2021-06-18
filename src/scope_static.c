@@ -820,6 +820,11 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
+    // use --attach, ignore executable and args
+    if (attachArg && optind < argc) {
+        fprintf(stderr, "warning: ignore EXECUTABLE argument with --attach option\n");
+    }
+
     // extract to the library directory
     if (libdirExtractLoader()) {
         fprintf(stderr, "error: failed to extract loader\n");

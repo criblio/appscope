@@ -228,13 +228,13 @@ typedef struct
 } param_t;
 
 // When used with dl_iterate_phdr(), this has a similar result to
-// _dl_sym(RTLD_NEXT, ).  But, unlike _dl_sym(RTLD_NEXT, )
+// scope_dlsym(RTLD_NEXT, ).  But, unlike scope_dlsym(RTLD_NEXT, )
 // it will never return a symbol in our library.  This is
 // particularly useful for finding symbols in shared libraries
 // that are dynamically loaded after our constructor has run.
 // Not to point fingers, but I'm looking at you python.
 //
-extern void *_dl_sym(void *, const char *, void *);
+static void *scope_dlsym(void *, const char *, void *);
 
 static int
 findSymbol(struct dl_phdr_info *info, size_t size, void *data)
@@ -265,7 +265,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 #define WRAP_CHECK(func, rc)                                           \
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
-         if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {  \
+         if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
              scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);     \
              return rc;                                                \
          }                                                             \
@@ -284,7 +284,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
-         if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {  \
+         if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
              scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);     \
              return;                                                   \
          }                                                             \
@@ -1114,6 +1114,7 @@ static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
 static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
 static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
+static long scope_syscall(long, ...);
 
 static int 
 findInjected(struct dl_phdr_info *info, size_t size, void *data)
@@ -1300,6 +1301,10 @@ initHook()
         // sendmmsg, sendto, recvfrom for internal libc use in DNS queries
         if ((glibc == TRUE) && g_fn.sendmmsg) {
             rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
+        }
+
+        if (g_fn.syscall) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.syscall, scope_syscall);
         }
 
         if ((glibc == FALSE) && g_fn.sendto) {
@@ -2467,8 +2472,8 @@ __write_pthread(int fd, const void *buf, size_t size)
  * do any dynamic memory allocation while this executes. Be careful.
  * The DBG() output is ignored until after the constructor runs.
  */
-EXPORTON long
-syscall(long number, ...)
+static long
+scope_syscall(long number, ...)
 {
     struct FuncArgs fArgs;
 
@@ -4700,10 +4705,9 @@ __vsnprintf_chk(char *s, size_t maxlen, int flag, size_t slen, const char *forma
     return vsnprintf(s, slen, format, args);
 }
 
-EXPORTWEAK void *
-_dl_sym(void *handle, const char *name, void *who)
+static void *
+scope_dlsym(void *handle, const char *name, void *who)
 {
     return dlsym(handle, name);
 }
-
 

@@ -822,7 +822,7 @@ main(int argc, char **argv, char **env)
 
     // use --attach, ignore executable and args
     if (attachArg && optind < argc) {
-        fprintf(stderr, "warning: ignore EXECUTABLE argument with --attach option\n");
+        fprintf(stderr, "warning: ignoring EXECUTABLE argument with --attach option\n");
     }
 
     // extract to the library directory

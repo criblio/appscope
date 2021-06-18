@@ -294,7 +294,7 @@ libdirSetBase(const char *base)
             fprintf(stderr, "error: libdir base path too long.\n");
             return -1;
         }
-        strcpy(g_libdir_info.base, base);
+        strncpy(g_libdir_info.base, base, sizeof(g_libdir_info.base));
     }
 
     return 0;
@@ -331,7 +331,7 @@ libdirGetDir()
             return 0;
         }
 
-        strcpy(g_libdir_info.dir, SCOPE_LIBDIR_PREFIX);
+        strncpy(g_libdir_info.dir, SCOPE_LIBDIR_PREFIX, sizeof(g_libdir_info.dir));
         strncat(g_libdir_info.dir, ver, verlen);
     }
 

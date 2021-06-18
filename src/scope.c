@@ -153,28 +153,20 @@ main(int argc, char **argv, char **env)
                 break;
             case '?':
             default:
+                fprintf(stderr, "error: invalid option: -%c\n", optopt);
                 showUsage(basename(argv[0]));
                 return EXIT_FAILURE;
         }
     }
 
-    // the `--library LIB` option is required and LIB must be executable
+    // the `--library LIB` option is required and LIB must be readable & executable
     if (!libraryArg) {
         fprintf(stderr, "error: missing required --library option\n");
         showUsage(basename(argv[0]));
         return EXIT_FAILURE;
     }
-    struct stat s;
-    if (stat(libraryArg, &s)) {
-        if (errno != ENOENT) {
-            perror("error: stat() failed");
-        } else {
-            fprintf(stderr, "error: %s missing\n", libraryArg);
-        }
-        return EXIT_FAILURE;
-    }
     if (access(libraryArg, R_OK|X_OK)) {
-        fprintf(stderr, "error: %s not readable or not executable\n", libraryArg);
+        fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", libraryArg);
         return EXIT_FAILURE;
     }
 
@@ -187,7 +179,7 @@ main(int argc, char **argv, char **env)
 
     // use --attach, ignore executable and args
     if (attachArg && optind < argc) {
-        fprintf(stderr, "warning: ignore EXECUTABLE argument with --attach option\n");
+        fprintf(stderr, "warning: ignoring EXECUTABLE argument with --attach option\n");
     }
 
     elf_buf_t *ebuf;

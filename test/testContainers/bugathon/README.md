@@ -2,6 +2,19 @@
 
 The included Dockerfile provides all tools necessary to run scope and perform bugathon testing.
 
+## Download
+
+```bash
+git clone git@github.com:criblio/appscope.git
+cd appscope/test/testContainers/bugathon
+```
+-or if you already have it locally-
+```bash
+git checkout master
+git pull
+cd test/testContainers/bugathon
+```
+
 ## Build and Run
 
 You must have docker installed in order to build and run the scope bugathon container.

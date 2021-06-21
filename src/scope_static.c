@@ -864,9 +864,7 @@ main(int argc, char **argv, char **env)
 
         snprintf(path, sizeof(path), "/scope_attach_%d.yml", pid);
 
-        // Permissions on the file need to allow the library in the attached
-        // process to remove the shared memory object.
-        int shmFd = shm_open(path, O_RDWR|O_CREAT|O_EXCL, S_IRUSR|S_IRGRP|S_IROTH);
+        int shmFd = shm_open(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH);
         if (shmFd == -1) {
             perror("error: shm_open() failed");
             return EXIT_FAILURE;

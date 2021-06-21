@@ -65,7 +65,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 		cmd = append(cmd, "/scope")
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
 			Name:    "scope",
-			Image:   fmt.Sprintf("cribl/scope:%s", internal.GetVersion()),
+			Image:   fmt.Sprintf("cribl/scope:%s", internal.GetGitSummary()),
 			Command: cmd,
 			VolumeMounts: []corev1.VolumeMount{{
 				Name:      "scope",
@@ -99,7 +99,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			})
 			if len(app.CriblDest) > 0 {
 				pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
-					Name:  "SCOPE_LOGSTREAM",
+					Name:  "SCOPE_CRIBL",
 					Value: app.CriblDest,
 				})
 			}
@@ -114,6 +114,10 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name:  "SCOPE_EXEC_PATH",
 				Value: "/scope/ldscope",
+			})
+			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
+				Name:  "LD_LIBRARY_PATH",
+				Value: "/tmp/libscope-v0.7.0",
 			})
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name: "SCOPE_TAG_node_name",

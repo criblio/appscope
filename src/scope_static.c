@@ -910,6 +910,14 @@ main(int argc, char **argv, char **env)
         close(shmFd);
     }
 
+    // set SCOPE_EXEC_PATH to path to `ldscope`
+    char execPath[PATH_MAX];
+    if (readlink("/proc/self/exe", execPath, sizeof(execPath) - 1) == -1) {
+        perror("error: readlink(/proc/self/exe) failed");
+        return EXIT_FAILURE;
+    }
+    setenv("SCOPE_EXEC_PATH", execPath, 0); // don't overwrite if set
+
     // build exec args
     char** execArgv = calloc(argc+2, sizeof(char*));
     int    execArgc = 0;

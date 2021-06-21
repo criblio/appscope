@@ -26,7 +26,6 @@
 #include "dbg.h"
 #include "scopeelf.h"
 #include "scopetypes.h"
-#include "os.h"
 #include "utils.h"
 #include "inject.h"
 
@@ -191,8 +190,16 @@ main(int argc, char **argv, char **env)
             fprintf(stderr, "error: invalid PID for --attach\n");
             return EXIT_FAILURE;
         }
+
         //printf("info: attaching to process %d\n", pid);
         injectScope(pid, scopeLibPath);
+
+        // remove the config that `ldscope`
+        char path[PATH_MAX];
+        snprintf(path, sizeof(path), "/scope_attach_%d.yml", pid);
+        shm_unlink(path);
+
+        // done
         return EXIT_SUCCESS;
     }
 
@@ -200,14 +207,6 @@ main(int argc, char **argv, char **env)
     if (!inferior_command) {
         fprintf(stderr,"%s could not find or execute command `%s`.  Exiting.\n", argv[0], argv[optind]);
         exit(EXIT_FAILURE);
-    }
-
-    // before processing, try to set SCOPE_EXEC_PATH for execve
-    char *sep;
-    if (osGetExePath(&sep) == 0) {
-        // doesn't overwrite an existing env var if already set
-        setenv("SCOPE_EXEC_PATH", sep, 0);
-        free(sep);
     }
 
     ebuf = getElf(inferior_command);

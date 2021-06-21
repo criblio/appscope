@@ -1383,7 +1383,11 @@ initConfig(int *attachedFlag)
             } else {
                 ret = cfgCreateDefault();
             }
+        } else {
+            scopeLog("ERROR: stat(scope_attach_PID.yml) failed", -1, CFG_LOG_ERROR);
         }
+    } else {
+        scopeLog("ERROR: snprintf(scope_attach_PID.yml) failed", -1, CFG_LOG_ERROR);
     }
 
     // Use the default approach if not attached
@@ -1391,10 +1395,6 @@ initConfig(int *attachedFlag)
         char *path = cfgPath();
         ret = cfgRead(path);
         if (path) free(path);
-    }
-
-    if (*attachedFlag) {
-        unlink(shmCfg);
     }
 
     return ret;
@@ -1426,6 +1426,9 @@ init(void)
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
 
+    // initConfig() will set this TRUE if it detects `scope_attach_PID.yml` in
+    // `/dev/shm` with our PID indicating we were injected into a running
+    // process.
     int attachedFlag = 0;
 
     config_t *cfg = initConfig(&attachedFlag);

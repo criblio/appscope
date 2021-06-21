@@ -1264,16 +1264,9 @@ initHook(int attachedFlag)
     // We use the fact that on a musl distro the ld lib env var is set to
     // a dir with a libscope-ver string. If that exists in the env var
     // then we assume musl.
-    bool glibc = TRUE;
-    char *libpath = getenv(LD_LIB_ENV);
-    if (libpath && strstr(libpath, LD_LIB_DIR)) {
-        // we are in a libmusl distro
-        glibc = FALSE;
-    }
-
     if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
-        ((glibc == TRUE) && g_fn.sendmmsg) ||
-        ((glibc == FALSE) && (g_fn.sendto || g_fn.recvfrom))) {
+        ((g_ismusl == FALSE) && g_fn.sendmmsg) ||
+        ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
         funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_DEBUG) {
@@ -1292,7 +1285,7 @@ initHook(int attachedFlag)
         }
 
         // sendmmsg, sendto, recvfrom for internal libc use in DNS queries
-        if ((glibc == TRUE) && g_fn.sendmmsg) {
+        if ((g_ismusl == FALSE) && g_fn.sendmmsg) {
             rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
         }
 
@@ -1300,11 +1293,11 @@ initHook(int attachedFlag)
             rc = funchook_prepare(funchook, (void**)&g_fn.syscall, scope_syscall);
         }
 
-        if ((glibc == FALSE) && g_fn.sendto) {
+        if ((g_ismusl == TRUE) && g_fn.sendto) {
             rc = funchook_prepare(funchook, (void**)&g_fn.sendto, internal_sendto);
         }
 
-        if ((glibc == FALSE) && g_fn.recvfrom) {
+        if ((g_ismusl == TRUE) && g_fn.recvfrom) {
             rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
         }
 
@@ -1313,7 +1306,7 @@ initHook(int attachedFlag)
         // They are init'd with a static object. After the first write the
         // write pointer is modified. We handle that mod in the interposed
         // function __stdio_write().
-        if ((glibc == FALSE) && (!g_fn.__stdout_write || !g_fn.__stderr_write)) {
+        if ((g_ismusl == TRUE) && (!g_fn.__stdout_write || !g_fn.__stderr_write)) {
             // Get the static initializer for the stdout write function pointer
             struct MUSL_IO_FILE *stdout_write = (struct MUSL_IO_FILE *)stdout;
 

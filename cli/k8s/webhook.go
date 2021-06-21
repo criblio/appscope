@@ -65,7 +65,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 		cmd = append(cmd, "/scope")
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
 			Name:    "scope",
-			Image:   fmt.Sprintf("cribl/scope:%s", internal.GetGitSummary()),
+			Image:   fmt.Sprintf("cribl/scope:%s", internal.GetVersion()),
 			Command: cmd,
 			VolumeMounts: []corev1.VolumeMount{{
 				Name:      "scope",

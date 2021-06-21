@@ -32,7 +32,7 @@ kubectl label namespace default scope=enabled`,
 			util.ErrAndExit("MetricDest set but EventDest is not")
 		}
 		if opt.Version == "" {
-			opt.Version = internal.GetGitSummary()
+			opt.Version = internal.GetVersion()
 		}
 		opt.MetricDest = rc.MetricsDest
 		opt.MetricFormat = rc.MetricsFormat

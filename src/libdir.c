@@ -78,7 +78,7 @@ libdirExists(const char *path, int requireDir, int mode)
     struct stat s;
     if (stat(path, &s)) {
         if (errno != ENOENT) {
-            perror("error: stat() failed");
+            perror("stat() failed");
         }
         return 0;
     }
@@ -112,7 +112,7 @@ libdirCreateIfMissing()
 
     if (!libdirDirExists(libdir, R_OK|X_OK)) {
         if (mkdir(libdir, S_IRWXU|S_IRWXG|S_IRWXO) == -1) {
-            perror("error: mkdir() failed");
+            perror("mkdir() failed");
             return -1;
         }
     }
@@ -188,14 +188,14 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
         // open & mmap the file to get its note
         int fd = open(path, O_RDONLY);
         if (fd == -1) {
-            perror("error: open() failed");
+            perror("open() failed");
             return 0;
         }
 
         struct stat s;
         if (fstat(fd, &s) == -1) {
             close(fd);
-            perror("error: mmap() failed");
+            perror("mmap() failed");
             return 0;
         }
 
@@ -203,7 +203,7 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
                 PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
         if (buf == MAP_FAILED) {
             close(fd);
-            perror("error: mmap() failed");
+            perror("mmap() failed");
             return 0;
         }
 
@@ -238,7 +238,7 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
 
     if ((fd = mkstemp(temp)) < 1) {
         unlink(temp);
-        perror("error: mkstemp() failed");
+        perror("mkstemp() failed");
         return -1;
     }
 
@@ -246,7 +246,7 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
     if (write(fd, start, len) != len) {
         close(fd);
         unlink(temp);
-        perror("error: write() failed");
+        perror("write() failed");
         return -1;
     }
 
@@ -254,14 +254,14 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
     if (fchmod(fd, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)) {
         close(fd);
         unlink(temp);
-        perror("error: fchmod() failed");
+        perror("fchmod() failed");
         return -1;
     }
     close(fd);
 
     if (rename(temp, path)) {
         unlink(temp);
-        perror("error: rename() failed");
+        perror("rename() failed");
         return -1;
     }
 
@@ -272,7 +272,7 @@ static int
 libdirRemove(const char* name, const struct stat *s, int type, struct FTW *ftw)
 {
     if (remove(name)) {
-        perror("error: remove() failed");
+        perror("remove() failed");
         return -1;
     }
     return 0;
@@ -360,7 +360,7 @@ int
 libdirClean()
 {
     if (nftw(libdirGet(), libdirRemove, 10, FTW_DEPTH|FTW_MOUNT|FTW_PHYS)) {
-        perror("error: ntfw() failed");
+        perror("ntfw() failed");
         return -1;
     }
 

@@ -309,7 +309,7 @@ find_scope_yml()
 
         pathLen = snprintf(path, sizeof(path), "%s/%s", env, CFG_FILE_NAME);
         if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() feaild.\n");
+            fprintf(stderr, "error: snprintf() failed.\n");
             return 0;
         }
         if (pathLen >= sizeof(path)) {
@@ -323,7 +323,7 @@ find_scope_yml()
         
         pathLen = snprintf(path, sizeof(path), "%s/conf/%s", env, CFG_FILE_NAME);
         if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() feaild.\n");
+            fprintf(stderr, "error: snprintf() failed.\n");
             return 0;
         }
         if (pathLen >= sizeof(path)) {
@@ -866,7 +866,7 @@ main(int argc, char **argv, char **env)
 
         int shmFd = shm_open(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH);
         if (shmFd == -1) {
-            perror("error: shm_open() failed");
+            perror("shm_open() failed");
             return EXIT_FAILURE;
         }
 
@@ -877,7 +877,7 @@ main(int argc, char **argv, char **env)
                 free(scopeYml);
                 close(shmFd);
                 shm_unlink(path);
-                perror("error: open() failed");
+                perror("open() failed");
                 return EXIT_FAILURE;
             }
 
@@ -896,7 +896,7 @@ main(int argc, char **argv, char **env)
                         close(ymlFd);
                         close(shmFd);
                         shm_unlink(path);
-                        perror("error: write() to /dev/shm/scope_${PID}.yml failed");
+                        perror("write() to /dev/shm/scope_${PID}.yml failed");
                         return EXIT_FAILURE;
                     }
                 } while (nOut > 0);
@@ -908,13 +908,15 @@ main(int argc, char **argv, char **env)
         close(shmFd);
     }
 
-    // set SCOPE_EXEC_PATH to path to `ldscope`
-    char execPath[PATH_MAX];
-    if (readlink("/proc/self/exe", execPath, sizeof(execPath) - 1) == -1) {
-        perror("error: readlink(/proc/self/exe) failed");
-        return EXIT_FAILURE;
+    // set SCOPE_EXEC_PATH to path to `ldscope` if not set already
+    if (getenv("SCOPE_EXEC_PATH") == 0) {
+        char execPath[PATH_MAX];
+        if (readlink("/proc/self/exe", execPath, sizeof(execPath) - 1) == -1) {
+            perror("readlink(/proc/self/exe) failed");
+            return EXIT_FAILURE;
+        }
+        setenv("SCOPE_EXEC_PATH", execPath, 0);
     }
-    setenv("SCOPE_EXEC_PATH", execPath, 0); // don't overwrite if set
 
     // build exec args
     char** execArgv = calloc(argc+2, sizeof(char*));
@@ -932,13 +934,13 @@ main(int argc, char **argv, char **env)
 
     // pass SCOPE_LIB_PATH in environment
     if (setenv("SCOPE_LIB_PATH", libdirGetLibrary(), 1)) {
-        perror("error: setenv(SCOPE_LIB_PATH) failed");
+        perror("setenv(SCOPE_LIB_PATH) failed");
         return EXIT_FAILURE;
     }
 
     // exec the dynamic loader
     execve(libdirGetLoader(), execArgv, environ);
     free(execArgv);
-    perror("error: execve failed");
+    perror("execve failed");
     return EXIT_FAILURE;
 }

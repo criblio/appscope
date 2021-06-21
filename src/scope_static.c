@@ -820,6 +820,11 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
+    // use --attach, ignore executable and args
+    if (attachArg && optind < argc) {
+        fprintf(stderr, "warning: ignoring EXECUTABLE argument with --attach option\n");
+    }
+
     // extract to the library directory
     if (libdirExtractLoader()) {
         fprintf(stderr, "error: failed to extract loader\n");
@@ -838,20 +843,30 @@ main(int argc, char **argv, char **env)
 
     // create /dev/shm/scope_${PID}.yml when attaching
     if (attachArg) {
-        char shmConfigPath[PATH_MAX] = {0};
+        char path[PATH_MAX] = {0};
 
-        errno = 0;
-        int pid = (int)strtol(attachArg, NULL, 10);
-        if (errno) {
-            perror("error: failed to convert --attach value to an integer");
+        if (getuid()) {
+            printf("error: --attach requires root\n");
             return EXIT_FAILURE;
         }
 
-        sprintf(shmConfigPath, "/scope_attach_%d.yml", pid);
+        int pid = atoi(attachArg);
+        if (pid < 1) {
+            printf("error: invalid --attach PID: %s\n", attachArg);
+            return EXIT_FAILURE;
+        }
+
+        snprintf(path, sizeof(path), "/proc/%d", pid);
+        if (access(path, F_OK)) {
+            printf("error: --attach PID not a current process: %d\n", pid);
+            return EXIT_FAILURE;
+        }
+
+        snprintf(path, sizeof(path), "/scope_attach_%d.yml", pid);
 
         // Permissions on the file need to allow the library in the attached
         // process to remove the shared memory object.
-        int shmFd = shm_open(shmConfigPath, O_RDWR|O_CREAT|O_EXCL, S_IRUSR|S_IRGRP|S_IROTH);
+        int shmFd = shm_open(path, O_RDWR|O_CREAT|O_EXCL, S_IRUSR|S_IRGRP|S_IROTH);
         if (shmFd == -1) {
             perror("error: shm_open() failed");
             return EXIT_FAILURE;
@@ -863,7 +878,7 @@ main(int argc, char **argv, char **env)
             if (ymlFd == -1) {
                 free(scopeYml);
                 close(shmFd);
-                shm_unlink(shmConfigPath);
+                shm_unlink(path);
                 perror("error: open() failed");
                 return EXIT_FAILURE;
             }
@@ -882,7 +897,7 @@ main(int argc, char **argv, char **env)
                         free(scopeYml);
                         close(ymlFd);
                         close(shmFd);
-                        shm_unlink(shmConfigPath);
+                        shm_unlink(path);
                         perror("error: write() to /dev/shm/scope_${PID}.yml failed");
                         return EXIT_FAILURE;
                     }
@@ -895,20 +910,33 @@ main(int argc, char **argv, char **env)
         close(shmFd);
     }
 
+    // set SCOPE_EXEC_PATH to path to `ldscope`
+    char execPath[PATH_MAX];
+    if (readlink("/proc/self/exe", execPath, sizeof(execPath) - 1) == -1) {
+        perror("error: readlink(/proc/self/exe) failed");
+        return EXIT_FAILURE;
+    }
+    setenv("SCOPE_EXEC_PATH", execPath, 0); // don't overwrite if set
+
     // build exec args
-    char** execArgv = calloc(argc+4, sizeof(char*)); // +4 for "-a PID -l LIB"
+    char** execArgv = calloc(argc+2, sizeof(char*));
     int    execArgc = 0;
     execArgv[execArgc++] = (char*) libdirGetLoader();
-    execArgv[execArgc++] = "-l";
-    execArgv[execArgc++] = (char*) libdirGetLibrary();
     if (attachArg) {
         execArgv[execArgc++] = "-a";
         execArgv[execArgc++] = attachArg;
-    }
-    while (optind < argc) {
-        execArgv[execArgc++] = argv[optind++];
+    } else {
+        while (optind < argc) {
+            execArgv[execArgc++] = argv[optind++];
+        }
     }
     execArgv[execArgc++] = NULL;
+
+    // pass SCOPE_LIB_PATH in environment
+    if (setenv("SCOPE_LIB_PATH", libdirGetLibrary(), 1)) {
+        perror("error: setenv(SCOPE_LIB_PATH) failed");
+        return EXIT_FAILURE;
+    }
 
     // exec the dynamic loader
     execve(libdirGetLoader(), execArgv, environ);

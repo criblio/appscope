@@ -26,7 +26,6 @@
 #include "dbg.h"
 #include "scopeelf.h"
 #include "scopetypes.h"
-#include "os.h"
 #include "utils.h"
 #include "inject.h"
 
@@ -95,9 +94,8 @@ showUsage(char *prog)
       "       %s [OPTIONS] --attach PID\n"
       "\n"
       "options:\n"
-      "  -u, --usage            display this info\n"
-      "  -l, --library LIBRARY  specify path to libscope.so (required)\n"
-      "  -a, --attach PID       attach to the specified process ID\n"
+      "  -u, -h, --usage, --help  display this info\n"
+      "  -a, --attach PID         attach to the specified process ID\n"
       "\n"
       "Unless you are an AppScope developer, you are likely in the wrong place.\n"
       "See `scope` or `ldscope` instead.\n"
@@ -115,7 +113,6 @@ static struct option options[] = {
     {"help",    no_argument,       0, 'h'},
     {"usage",   no_argument,       0, 'u'},
     {"attach",  required_argument, 0, 'a'},
-    {"library", required_argument, 0, 'l'},
     {0, 0, 0, 0}
 };
 
@@ -124,10 +121,9 @@ main(int argc, char **argv, char **env)
 {
     // process command line
     char *attachArg = 0;
-    char *libraryArg = 0;
     for (;;) {
         int index = 0;
-        int opt = getopt_long(argc, argv, "+:uha:l:", options, &index);
+        int opt = getopt_long(argc, argv, "+:uha:", options, &index);
         if (opt == -1) {
             break;
         }
@@ -139,49 +135,43 @@ main(int argc, char **argv, char **env)
             case 'a':
                 attachArg = optarg;
                 break;
-            case 'l':
-                libraryArg = optarg;
-                break;
             case ':':
                 // options missing their value end up here
                 switch (optopt) {
                     default:
-                        fprintf(stderr, "error: Missing value for -%c option\n", optopt);
+                        fprintf(stderr, "error: missing value for -%c option\n", optopt);
                         showUsage(basename(argv[0]));
                         return EXIT_FAILURE;
                 }
                 break;
             case '?':
             default:
+                fprintf(stderr, "error: invalid option: -%c\n", optopt);
                 showUsage(basename(argv[0]));
                 return EXIT_FAILURE;
         }
     }
 
-    // the `--library LIB` option is required and LIB must be executable
-    if (!libraryArg) {
-        fprintf(stderr, "error: missing required --library option\n");
+    // either --attach or an executable is required
+    if (!attachArg && optind >= argc) {
+        fprintf(stderr, "error: missing --attach or EXECUTABLE argument\n");
         showUsage(basename(argv[0]));
-        return EXIT_FAILURE;
-    }
-    struct stat s;
-    if (stat(libraryArg, &s)) {
-        if (errno != ENOENT) {
-            perror("error: stat() failed");
-        } else {
-            fprintf(stderr, "error: %s missing\n", libraryArg);
-        }
-        return EXIT_FAILURE;
-    }
-    if (access(libraryArg, R_OK|X_OK)) {
-        fprintf(stderr, "error: %s not readable or not executable\n", libraryArg);
         return EXIT_FAILURE;
     }
 
-    // either --attach or an executable is required
-    if (!attachArg && optind >= argc) {
-        fprintf(stderr, "error: missing EXECUTABLE argument\n");
-        showUsage(basename(argv[0]));
+    // use --attach, ignore executable and args
+    if (attachArg && optind < argc) {
+        fprintf(stderr, "warning: ignoring EXECUTABLE argument with --attach option\n");
+    }
+
+    // SCOPE_LIB_PATH environment variable is required
+    char* scopeLibPath = getenv("SCOPE_LIB_PATH");
+    if (!scopeLibPath) {
+        fprintf(stderr, "error: SCOPE_LIB_PATH must be set to point to libscope.so\n");
+        return EXIT_FAILURE;
+    }
+    if (access(scopeLibPath, R_OK|X_OK)) {
+        fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", scopeLibPath);
         return EXIT_FAILURE;
     }
 
@@ -196,23 +186,27 @@ main(int argc, char **argv, char **env)
 
     if (attachArg) {
         int pid = atoi(attachArg);
-        printf("info: attaching to process %d\n", pid);
-        injectScope(pid, libraryArg);
-        return 0;
+        if (pid < 1) {
+            fprintf(stderr, "error: invalid PID for --attach\n");
+            return EXIT_FAILURE;
+        }
+
+        //printf("info: attaching to process %d\n", pid);
+        injectScope(pid, scopeLibPath);
+
+        // remove the config that `ldscope`
+        char path[PATH_MAX];
+        snprintf(path, sizeof(path), "/scope_attach_%d.yml", pid);
+        shm_unlink(path);
+
+        // done
+        return EXIT_SUCCESS;
     }
 
     char *inferior_command = getpath(argv[optind]);
     if (!inferior_command) {
         fprintf(stderr,"%s could not find or execute command `%s`.  Exiting.\n", argv[0], argv[optind]);
         exit(EXIT_FAILURE);
-    }
-
-    // before processing, try to set SCOPE_EXEC_PATH for execve
-    char *sep;
-    if (osGetExePath(&sep) == 0) {
-        // doesn't overwrite an existing env var if already set
-        setenv("SCOPE_EXEC_PATH", sep, 0);
-        free(sep);
     }
 
     ebuf = getElf(inferior_command);
@@ -236,7 +230,7 @@ main(int argc, char **argv, char **env)
         // Dynamic executable path
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
-        if (setenv("LD_PRELOAD", libraryArg, 0) == -1) {
+        if (setenv("LD_PRELOAD", scopeLibPath, 0) == -1) {
             perror("setenv");
             goto err;
         }
@@ -274,7 +268,7 @@ main(int argc, char **argv, char **env)
     // Static executable path
     if (getenv("LD_PRELOAD") != NULL) {
         unsetenv("LD_PRELOAD");
-        execve(argv[optind], &argv[optind], environ);
+        execve(argv[0], argv, environ);
     }
 
     program_invocation_short_name = basename(argv[1]);
@@ -287,7 +281,7 @@ main(int argc, char **argv, char **env)
         execve(argv[optind], &argv[optind], environ);
     }
 
-    if ((handle = dlopen(libraryArg, RTLD_LAZY)) == NULL) {
+    if ((handle = dlopen(scopeLibPath, RTLD_LAZY)) == NULL) {
         goto err;
     }
 

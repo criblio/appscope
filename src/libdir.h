@@ -17,12 +17,12 @@ const char* libdirGet();    // full path; i.e. "/tmp/libscope-1.2.3"
 int         libdirClean();  // remove it and it's contents
 
 // Put things in the Library Directory
-int libdirExtractLoader();                              // $libdir/ldscopedyn
-int libdirExtractLibrary();                             // $libdir/libscope.so
-int libdirLinkLoader(const char *from, const char *to); // $libdir/from -> to
+int libdirExtractLoader();  // extract to $libdir/ldscopedyn
+int libdirExtractLibrary(); // extract to $libdir/libscope.so
+int libdirLinkLoader(const char *from, const char *to); // ln -s $to $libdir/from
 
 // Get paths of things in the Library Directory
-const char* libdirGetLoader();  // extracts & returns "$libdir/ldscopedyn"
-const char* libdirGetLibrary(); // extracts & returns "$libdir/libscope.so"
+const char* libdirGetLoader();  // returns "$libdir/ldscopedyn"
+const char* libdirGetLibrary(); // returns "$libdir/libscope.so"
 
 #endif // _SCOPE_LIBDIR_H

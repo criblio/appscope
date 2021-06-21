@@ -73,7 +73,7 @@ typedef struct {
 // ----------------------------------------------------------------------------
 
 static int
-libdirExists(const char *path, int requireDir)
+libdirExists(const char *path, int requireDir, int mode)
 {
     struct stat s;
     if (stat(path, &s)) {
@@ -86,8 +86,23 @@ libdirExists(const char *path, int requireDir)
     if (requireDir && !S_ISDIR(s.st_mode)) {
         return 0; // FALSE
     }
+    if (!requireDir && S_ISDIR(s.st_mode)) {
+        return 0; // FALSE
+    }
 
-    return !access(path, R_OK|W_OK|X_OK);
+    return !access(path, mode);
+}
+
+static int
+libdirDirExists(const char *path, int mode)
+{
+    return libdirExists(path, 1, mode);
+}
+
+static int
+libdirFileExists(const char *path, int mode)
+{
+    return libdirExists(path, 0, mode);
 }
 
 static int
@@ -95,7 +110,7 @@ libdirCreateIfMissing()
 {
     const char *libdir = libdirGet();
 
-    if (!libdirExists(libdir, 1)) {
+    if (!libdirDirExists(libdir, R_OK|X_OK)) {
         if (mkdir(libdir, S_IRWXU|S_IRWXG|S_IRWXO) == -1) {
             perror("error: mkdir() failed");
             return -1;
@@ -162,8 +177,9 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
         return -1;
     }
 
-    if (libdirExists(path, 0)) {
+    if (libdirFileExists(path, R_OK|X_OK)) {
         // extracted file already exists
+
         if (!note) {
             // no note given to compare against so we're done.
             return 0;
@@ -234,7 +250,8 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
         return -1;
     }
 
-    if (fchmod(fd, S_IRWXU|S_IRWXG|S_IRWXO)) {
+    // 0755
+    if (fchmod(fd, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)) {
         close(fd);
         unlink(temp);
         perror("error: fchmod() failed");
@@ -277,7 +294,7 @@ libdirSetBase(const char *base)
             fprintf(stderr, "error: libdir base path too long.\n");
             return -1;
         }
-        strcpy(g_libdir_info.base, base);
+        strncpy(g_libdir_info.base, base, sizeof(g_libdir_info.base));
     }
 
     return 0;
@@ -314,7 +331,7 @@ libdirGetDir()
             return 0;
         }
 
-        strcpy(g_libdir_info.dir, SCOPE_LIBDIR_PREFIX);
+        strncpy(g_libdir_info.dir, SCOPE_LIBDIR_PREFIX, sizeof(g_libdir_info.dir));
         strncat(g_libdir_info.dir, ver, verlen);
     }
 

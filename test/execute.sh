@@ -102,8 +102,8 @@ if [ "${OS}" = "linux" ]; then
     ERR+=$?
 fi
 
-
-
+test/options.sh
+ERR+=$?
 
 #                ^
 #                |

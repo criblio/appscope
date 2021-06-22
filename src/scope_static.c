@@ -242,6 +242,9 @@ do_musl(char *exld, char *ldscope)
     // if so, we assume the symlink exists as well.
     if ((ldso = get_loader(ldscope)) == NULL) return;
 
+    // Avoid creating ld-musl-x86_64.so.1 -> /lib/ld-musl-x86_64.so.1
+    if (strstr(ldso, "musl")) return;
+
     if (asprintf(&lpath, "%s/%s", path, basename(ldso)) == -1) {
         perror("do_musl:asprintf");
         if (ldso) free(ldso);

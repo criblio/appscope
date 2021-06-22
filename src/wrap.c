@@ -1360,8 +1360,8 @@ initEnv(int *attachedFlag)
     // clear the flag by default
     *attachedFlag = 0;
 
-    if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose || !g_fn.setenv) {
-        scopeLog("ERROR: missing g_fn's for initEnv()", -1, CFG_LOG_ERROR);
+    if (!g_fn.stat || !g_fn.fopen || !g_fn.fgets || !g_fn.fclose || !g_fn.setenv) {
+        //scopeLog("ERROR: missing g_fn's for initEnv()", -1, CFG_LOG_ERROR);
         return;
     }
 
@@ -1369,14 +1369,16 @@ initEnv(int *attachedFlag)
     char path[128];
     int  pathLen = snprintf(path, sizeof(path), "/dev/shm/scope_attach_%d.env", getpid());
     if (pathLen < 0 || pathLen >= sizeof(path)) {
-        scopeLog("ERROR: snprintf(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
+        //scopeLog("ERROR: snprintf(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
         return;
     }
 
-    // make sure it's readable
+    // see if it's there
     struct stat statbuf;
-    if (g_fn.stat && g_fn.stat(path, &statbuf) != 0) {
-        scopeLog("ERROR: stat(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
+    if (g_fn.stat(path, &statbuf) != 0) {
+        //if (errno != ENOENT) {
+        //    scopeLog("ERROR: stat(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
+        //}
         return;
     }
 
@@ -1386,7 +1388,7 @@ initEnv(int *attachedFlag)
     // open it
     FILE *fd = g_fn.fopen(path, "r");
     if (fd == NULL) {
-        scopeLog("ERROR: fopen(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
+        //scopeLog("ERROR: fopen(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
         return;
     }
 
@@ -1400,7 +1402,11 @@ initEnv(int *attachedFlag)
             char *val = strtok(NULL, "=");
             if (val) {
                 g_fn.setenv(key, val, 1);
+            } else {
+                //scopeLog("ERROR: strtok(val) failed", -1, CFG_LOG_ERROR);
             }
+        } else {
+            //scopeLog("ERROR: strtok(key) failed", -1, CFG_LOG_ERROR);
         }
     }
 

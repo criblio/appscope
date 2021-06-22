@@ -164,11 +164,7 @@ Now you can use it as shown below.
 LD_PRELOAD=/opt/appscope/libscope.so curl https://cribl.io
 ```
 
-This configures the loader to run `curl`, while preloading the additional library `libscope.so`. The result is that AppScope will emit details from the execution of `curl`. The specific data emitted, the format of the data, the transport for that data are all configurable. See the help output from `opt/appscope/ldscope --help` for details:
-
-```
-libscope.so all
-```
+This configures the loader to run `curl`, while preloading the additional library `libscope.so`. The result is that AppScope will emit details from the execution of `curl`. The specific data emitted, the format of the data, the transport for that data are all configurable. See the help output from `/opt/appscope/ldscope --help` for details:
 
 From a shell prompt, you can export `LD_PRELOAD` after which any command run in the shell will be "scoped".
 

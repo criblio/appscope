@@ -1354,43 +1354,58 @@ initHook()
 
 #endif // __LINUX__
 
-static config_t*
-initConfig(int *attachedFlag)
+static void
+initEnv(int *attachedFlag)
 {
-    config_t* ret = 0;
-
+    // clear the flag by default
     *attachedFlag = 0;
 
-    // `ldscope` creates `/dev/shm/scope_attach_${pid}.yml` for us to find when
-    // we've been injected into the current process. That `${pid}` will be our
-    // PID here. If we can find it, we're attached. If it's empty, use
-    // defaults, otherwise use it.
-    char shmCfg[64] = {0};
-    int shmCfgLen = snprintf(shmCfg, sizeof(shmCfg), "/dev/shm/scope_attach_%d.yml", getpid());
-    if (shmCfgLen > 0 && shmCfgLen < sizeof(shmCfg)) {
-        struct stat s;
-        if (g_fn.stat && g_fn.stat(shmCfg, &s) == 0) {
-            *attachedFlag = 1;
-            if (s.st_size) {
-                ret = cfgRead(shmCfg);
-            } else {
-                ret = cfgCreateDefault();
+    if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose || !g_fn.setenv) {
+        scopeLog("ERROR: missing g_fn's for initEnv()", -1, CFG_LOG_ERROR);
+        return;
+    }
+
+    // build the full path of the .env file
+    char path[128];
+    int  pathLen = snprintf(path, sizeof(path), "/dev/shm/scope_attach_%d.env", getpid());
+    if (pathLen < 0 || pathLen >= sizeof(path)) {
+        scopeLog("ERROR: snprintf(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
+        return;
+    }
+
+    // make sure it's readable
+    struct stat statbuf;
+    if (g_fn.stat && g_fn.stat(path, &statbuf) != 0) {
+        scopeLog("ERROR: stat(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
+        return;
+    }
+
+    // the .env file is there so we're attached
+    *attachedFlag = 1;
+
+    // open it
+    FILE *fd = g_fn.fopen(path, "r");
+    if (fd == NULL) {
+        scopeLog("ERROR: fopen(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
+        return;
+    }
+
+    // read "KEY=VALUE\n" lines and add them to the environment
+    char line[8192];
+    while (g_fn.fgets(line, sizeof(line), fd)) {
+        int len = strlen(line);
+        if (line[len-1] == '\n') line[len-1] = '\0';
+        char *key = strtok(line, "=");
+        if (key) {
+            char *val = strtok(NULL, "=");
+            if (val) {
+                g_fn.setenv(key, val, 1);
             }
-        } else {
-            scopeLog("ERROR: stat(scope_attach_PID.yml) failed", -1, CFG_LOG_ERROR);
         }
-    } else {
-        scopeLog("ERROR: snprintf(scope_attach_PID.yml) failed", -1, CFG_LOG_ERROR);
     }
 
-    // Use the default approach if not attached
-    if (!ret) {
-        char *path = cfgPath();
-        ret = cfgRead(path);
-        if (path) free(path);
-    }
-
-    return ret;
+    // done
+    g_fn.fclose(fd);
 }
 
 __attribute__((constructor)) void
@@ -1410,6 +1425,12 @@ init(void)
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
 
+    // initEnv() will set this TRUE if it detects `scope_attach_PID.env` in
+    // `/dev/shm` with our PID indicating we were injected into a running
+    // process.
+    int attachedFlag = 0;
+    initEnv(&attachedFlag);
+
     initState();
 
     g_nsslist = lstCreate(freeNssEntry);
@@ -1419,15 +1440,13 @@ init(void)
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
 
-    // initConfig() will set this TRUE if it detects `scope_attach_PID.yml` in
-    // `/dev/shm` with our PID indicating we were injected into a running
-    // process.
-    int attachedFlag = 0;
-
-    config_t *cfg = initConfig(&attachedFlag);
+    char *path = cfgPath();
+    config_t *cfg = cfgRead(path);
     cfgProcessEnvironment(cfg);
+
     doConfig(cfg);
     g_staticfg = cfg;
+    if (path) free(path);
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 

@@ -196,7 +196,7 @@ main(int argc, char **argv, char **env)
 
         // remove the config that `ldscope`
         char path[PATH_MAX];
-        snprintf(path, sizeof(path), "/scope_attach_%d.yml", pid);
+        snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
         shm_unlink(path);
 
         // done

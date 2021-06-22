@@ -287,58 +287,6 @@ setup_loader(char *exe, char *ldscope)
     return ret;
 }
 
-/*
- * Find which scope.yml we're using for --attach
- *
- * Note: This is not the same logic used on cfgPath().
- *
- * The returned string needs to be free'd!
- */
-static char*
-find_scope_yml()
-{
-    const char* env;
-
-    if ((env = getenv("SCOPE_CONF_PATH"))) {
-        return strdup(env);
-    }
-
-    if ((env = getenv("SCOPE_HOME"))) {
-        char path[1024] = {0};
-        int  pathLen;
-
-        pathLen = snprintf(path, sizeof(path), "%s/%s", env, CFG_FILE_NAME);
-        if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() failed.\n");
-            return 0;
-        }
-        if (pathLen >= sizeof(path)) {
-            fprintf(stderr, "error: $SCOPE_HOME/%s too long\n", CFG_FILE_NAME);
-            return 0;
-        }
-
-        if (access(path, R_OK) == 0)  {
-            return realpath(path, NULL);
-        }
-        
-        pathLen = snprintf(path, sizeof(path), "%s/conf/%s", env, CFG_FILE_NAME);
-        if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() failed.\n");
-            return 0;
-        }
-        if (pathLen >= sizeof(path)) {
-            fprintf(stderr, "error: $SCOPE_HOME/conf/%s too long\n", CFG_FILE_NAME);
-            return 0;
-        }
-
-        if (access(path, R_OK) == 0)  {
-            return realpath(path, NULL);
-        }
-    }
-
-    return 0;
-}
-
 /* 
  * This avoids a segfault when code using shm_open() is compiled statically.
  * For some reason, compiling the code statically causes the __shm_directory()
@@ -841,73 +789,6 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    // create /dev/shm/scope_${PID}.yml when attaching
-    if (attachArg) {
-        char path[PATH_MAX] = {0};
-
-        if (getuid()) {
-            printf("error: --attach requires root\n");
-            return EXIT_FAILURE;
-        }
-
-        int pid = atoi(attachArg);
-        if (pid < 1) {
-            printf("error: invalid --attach PID: %s\n", attachArg);
-            return EXIT_FAILURE;
-        }
-
-        snprintf(path, sizeof(path), "/proc/%d", pid);
-        if (access(path, F_OK)) {
-            printf("error: --attach PID not a current process: %d\n", pid);
-            return EXIT_FAILURE;
-        }
-
-        snprintf(path, sizeof(path), "/scope_attach_%d.yml", pid);
-
-        int shmFd = shm_open(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH);
-        if (shmFd == -1) {
-            perror("shm_open() failed");
-            return EXIT_FAILURE;
-        }
-
-        char* scopeYml = find_scope_yml();
-        if (scopeYml) {
-            int ymlFd = open(scopeYml, O_RDONLY);
-            if (ymlFd == -1) {
-                free(scopeYml);
-                close(shmFd);
-                shm_unlink(path);
-                perror("open() failed");
-                return EXIT_FAILURE;
-            }
-
-            char buf[4096];
-            ssize_t nIn;
-            while ((nIn = read(ymlFd, buf, sizeof(buf))) > 0) {
-                char *bufPtr = buf;
-                ssize_t nOut;
-                do {
-                    nOut = write(shmFd, bufPtr, nIn);
-                    if (nOut >= 0) {
-                        nIn -= nOut;
-                        bufPtr += nOut;
-                    } else if (errno != EINTR) {
-                        free(scopeYml);
-                        close(ymlFd);
-                        close(shmFd);
-                        shm_unlink(path);
-                        perror("write() to /dev/shm/scope_${PID}.yml failed");
-                        return EXIT_FAILURE;
-                    }
-                } while (nOut > 0);
-            }
-            free(scopeYml);
-            close(ymlFd);
-        }
-
-        close(shmFd);
-    }
-
     // set SCOPE_EXEC_PATH to path to `ldscope` if not set already
     if (getenv("SCOPE_EXEC_PATH") == 0) {
         char execPath[PATH_MAX];
@@ -916,6 +797,53 @@ main(int argc, char **argv, char **env)
             return EXIT_FAILURE;
         }
         setenv("SCOPE_EXEC_PATH", execPath, 0);
+    }
+
+    // create /dev/shm/scope_${PID}.env when attaching
+    if (attachArg) {
+        char path[PATH_MAX] = {0};
+
+        // must be root
+        if (getuid()) {
+            printf("error: --attach requires root\n");
+            return EXIT_FAILURE;
+        }
+
+        // target process must exist
+        int pid = atoi(attachArg);
+        if (pid < 1) {
+            printf("error: invalid --attach PID: %s\n", attachArg);
+            return EXIT_FAILURE;
+        }
+        snprintf(path, sizeof(path), "/proc/%d", pid);
+        if (access(path, F_OK)) {
+            printf("error: --attach PID not a current process: %d\n", pid);
+            return EXIT_FAILURE;
+        }
+
+        // create .env file for the library to load
+        snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
+        int fd = shm_open(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH);
+        if (fd == -1) {
+            perror("shm_open() failed");
+            return EXIT_FAILURE;
+        }
+
+        // add the env vars we want in the library
+        char *env;
+        dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetLibrary());
+        if ((env = getenv("SCOPE_EXEC_PATH"))) {
+            dprintf(fd, "SCOPE_EXEC_PATH=%s\n", env);
+        }
+        if ((env = getenv("SCOPE_CONF_PATH"))) {
+            dprintf(fd, "SCOPE_CONF_PATH=%s\n", env);
+        }
+        if ((env = getenv("SCOPE_HOME"))) {
+            dprintf(fd, "SCOPE_HOME=%s\n", env);
+        }
+
+        // done
+        close(fd);
     }
 
     // build exec args

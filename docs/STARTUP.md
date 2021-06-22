@@ -87,14 +87,15 @@ Attaching to an existing process instead of launching a new one is slightly diff
     * The CLI outputs an error and exits if the user isn't root, if PTRACE isn't enabled, if the PID is invalid, or if process is already "scoped".
     * The session folder is created under `/tmp` instead of `~root/.scope/history` where it would be with `scope run`. Permissions on session directories and files are 0777 and 0666 instead of the normal 0755 and 0644. This could be a security concern in some scenarios so we need to make sure we note this somewhere like an "Are you sure?" prompt or a blurb in the release notes.
     * The CLI then sets `SCOPE_CONF_PATH=${session}/scope.yml` in the envronment and exec's `ldscope --attach PID [-f DIR]`. The `-f DIR` part of the command is only included if the CLI was run with `-l DIR` or `--librarypath DIR`.
+
 2. The [Static Loader](#static-loader) gets the `--attach PID` option, the `SCOPE_CONF_PATH` environment variable, and the `-f DIR` option (optionally).
     * It extracts `ldscopedyn` and `libscope.so` to the Library Directory honoring the overridden base directory if it gets `-f DIR`. No change here.
     * Since `--attach PID` was passed in
         * Ensure we are running as root and the PID exists
-        * open `/dev/shm/scope_attach_${PID}.yml`
-        * write the contents of the file that `SCOPE_CONFIG_PATH` points to
+        * Create `/dev/shm/scope_attach_${PID}.env` containing environment variables that should be set by the library once attached; `SCOPE_CONFIG_PATH`, `SCOPE_HOME`, SCOPE_EXEC_PATH`, and `SCOPE_LIB_PATH`.
     * It continues as described in step 4 of [Static Loader](#static-loader) to detect and support a musl libc environment if detected.
     * It exec's `${libdir}/ldscopedyn --attach PID` with `SCOPE_LIB_PATH=${libdir}/libscope.so` added to its environment variables.
+
 3. The [Dynamic Loader](#dynamic-loader) gets `--attach PID` on the command line and `SCOPE_LIB_PATH` in the environment.
     * To inject the library into the target process, we need first to find the address of `dlopen()` in the libc it's using. We can safely assume the offest of that function in the libc we're using is the same in the target process so:
         * find the `libc.so` or `ld-musl` library in the current process using `dl_iterate_phdr()`
@@ -113,13 +114,13 @@ Attaching to an existing process instead of launching a new one is slightly diff
           * If the return code indicated it succeeded, our library is now loaded and intialized in the target process.
         * `ptrace(GETREGS)` again to get the return code from `dlopen()`
         * Restore the memory we used and the registers then `ptrace(CONT)` to let the program continue where it was.
+
 4. In the attached process, the library is loaded and the constructor is run
     * The `/dev/shm/scope_attach_${pid}.yml` exists so we load configs from that and remove the file.
     * The presence if the config in shared memory indicates to the library that it was loaded via "attach" so it needs to use GOT hooking for the interposed functions.
-5. There a couple of relevant behaviours in the library:
-    * The constructor's logic for loading configs on startup sees `/dev/shm/scope_attach_${PID}.yml` and skips looking elsewhere.
-    * The `exec()` function interposition is adding `SCOPE_LIB_PATH` to the environment of children. It's passed through to `ldscopedyn` when we execute the child process.
 
-If the [Static Loader](#static-loader) is run directly without using the CLI, the `SCOPE_CONF_PATH` environment variable may not be set. In that case, if `SCOPE_HOME` is set, we'll use `${SCOPE_HOME}/scope.yml` or `${SCOPE_HOME}/conf/scope.yml` to populate `/dev/shm/scope_attach_${PID}.yml`. It will be empty if neither `SCOPE_CONF_PATH` nor `SCOPE_HOME` are set.
+5. There a couple of relevant behaviours in the library:
+    * The constructor's looks for `/dev/shm/scope_attach_${PID}.env` and applies the environment variables there.
+    * The presence of that file indicates we've been injected and need to handle the hooking differently.
 
 > Note: You will see term "inject" used in the code. It's synonomous with "attach".

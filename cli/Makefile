@@ -17,6 +17,7 @@ GO_VER_FLAGS=$(shell cd $(DIR) && $(GOPATH)/bin/govvv -flags)
 ## build (default): install dependencies and install the scope binary in your GOPATH/bin directory
 build: deps
 	cd $(DIR) && GOOS=linux CGO_ENABLED=0 $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(GOPATH)/bin/scope
+	cp $(GOPATH)/bin/scope $(DIR)../bin/linux/scope
 
 ## debug: build, but with gdb support
 debug: deps

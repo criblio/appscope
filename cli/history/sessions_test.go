@@ -23,11 +23,11 @@ func TestMain(m *testing.M) {
 	case "run":
 		internal.InitConfig()
 		rc := run.Config{}
-		rc.Run([]string{"/bin/echo", "true"}, false)
+		rc.Run([]string{"/bin/echo", "true"})
 	case "slow":
 		internal.InitConfig()
 		rc := run.Config{}
-		rc.Run([]string{"/bin/sleep", "10"}, false)
+		rc.Run([]string{"/bin/sleep", "10"})
 	default:
 		os.Exit(m.Run())
 	}

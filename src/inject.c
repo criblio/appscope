@@ -272,7 +272,7 @@ injectScope(int pid, char* path)
 
     // calculate the address of dlopen in the target process 
     dlopenAddr = remoteLib + (dlopenAddr - localLib);
-    
+
     // inject libscope.so into the target process
     return inject(pid, (uint64_t) dlopenAddr, path);
 }

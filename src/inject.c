@@ -196,6 +196,12 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
     ptrace(PTRACE_CONT, pid, NULL, NULL);
     waitpid(pid, &status, WUNTRACED);
 
+    // if process has been stopped by SIGSTOP send SIGCONT signal along with PTRACE_CONT call
+    if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) {
+        ptrace(PTRACE_CONT, pid, SIGCONT, NULL);
+        waitpid(pid, &status, WUNTRACED);
+    }
+
     // make sure the target process was stoppend by SIGTRAP triggered by int 0x3
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
 

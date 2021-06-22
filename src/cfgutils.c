@@ -1914,15 +1914,12 @@ initTransport(config_t* cfg, which_transport_t t)
             break;
         case CFG_UDP:
             transport = transportCreateUdp(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
-            transportConfigureTls(transport, cfgTransportTlsEnable(cfg, t),
-                                             cfgTransportTlsValidateServer(cfg, t),
-                                             cfgTransportTlsCACertPath(cfg, t));
             break;
         case CFG_TCP:
-            transport = transportCreateTCP(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
-            transportConfigureTls(transport, cfgTransportTlsEnable(cfg, t),
-                                             cfgTransportTlsValidateServer(cfg, t),
-                                             cfgTransportTlsCACertPath(cfg, t));
+            transport = transportCreateTCP(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t),
+                                           cfgTransportTlsEnable(cfg, t),
+                                           cfgTransportTlsValidateServer(cfg, t),
+                                           cfgTransportTlsCACertPath(cfg, t));
             break;
         case CFG_SHM:
             transport = transportCreateShm();

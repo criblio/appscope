@@ -38,6 +38,11 @@ func (rc *Config) Run(args []string) {
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+	if !rc.Passthrough {
+		rc.setupWorkDir(args, false)
+		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
+		log.Info().Bool("passthrough", rc.Passthrough).Strs("args", args).Msg("calling syscall.Exec")
+	}
 	if len(rc.LibraryPath) > 0 {
 		// Validate path exists
 		if !util.CheckDirExists(rc.LibraryPath) {
@@ -45,11 +50,6 @@ func (rc *Config) Run(args []string) {
 		}
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
-	}
-	if !rc.Passthrough {
-		rc.setupWorkDir(args, false)
-		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
-		log.Info().Bool("passthrough", rc.Passthrough).Strs("args", args).Msg("calling syscall.Exec")
 	}
 	if !rc.Subprocess {
 		syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)

@@ -185,8 +185,8 @@ returns 1
 
 export SCOPE_LIB_PATH=./lib/linux/libscope.so
 run ./bin/linux/ldscopedyn -a 999999999
-outputs "Failed to open maps file for process 999999999"
-outputs "Failed to find libc in target process"
+outputs "fopen(/proc/PID/maps) failed"
+outputs "failed to find libc in target process"
 returns 1
 export -n SCOPE_LIB_PATH
 

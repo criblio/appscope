@@ -192,7 +192,7 @@ main(int argc, char **argv, char **env)
         }
 
         //printf("info: attaching to process %d\n", pid);
-        injectScope(pid, scopeLibPath);
+        int ret = injectScope(pid, scopeLibPath);
 
         // remove the config that `ldscope`
         char path[PATH_MAX];
@@ -200,7 +200,7 @@ main(int argc, char **argv, char **env)
         shm_unlink(path);
 
         // done
-        return EXIT_SUCCESS;
+        return ret;
     }
 
     char *inferior_command = getpath(argv[optind]);

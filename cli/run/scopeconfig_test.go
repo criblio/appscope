@@ -225,7 +225,7 @@ func TestWriteScopeConfig(t *testing.T) {
 	// os.Remove(".cantwrite")
 
 	testYaml := testDefaultScopeConfigYaml("/foo", 4)
-	err = opt.WriteScopeConfig(".scope.yml")
+	err = opt.WriteScopeConfig(".scope.yml", 0644)
 	assert.NoError(t, err)
 	yamlBytes, err := ioutil.ReadFile(".scope.yml")
 	assert.Equal(t, testYaml, string(yamlBytes))

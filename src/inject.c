@@ -34,7 +34,7 @@ findLibrary(const char *library, pid_t pid)
 
     snprintf(filename, sizeof(filename), "/proc/%d/maps", pid);
     if ((fd = fopen(filename, "r")) == NULL) {
-        printf("Failed to open maps file for process %d\n", pid);
+        perror("fopen(/proc/PID/maps) failed");
         return 0;
     }
 
@@ -61,7 +61,7 @@ freeSpaceAddr(pid_t pid)
 
     sprintf(filename, "/proc/%d/maps", pid);
     if ((fd = fopen(filename, "r")) == NULL) {
-        printf("Failed to open maps file for process %d\n", pid);
+        perror("fopen(/proc/PID/maps) failed");
         return 0;
     }
 
@@ -74,7 +74,7 @@ freeSpaceAddr(pid_t pid)
     return addr;
 }
 
-static void 
+static int 
 ptraceRead(int pid, uint64_t addr, void *data, int len)
 {
     int numRead = 0;
@@ -86,14 +86,16 @@ ptraceRead(int pid, uint64_t addr, void *data, int len)
         word = ptrace(PTRACE_PEEKTEXT, pid, addr + numRead, NULL);
         if(word == -1) {
             perror("ptrace(PTRACE_PEEKTEXT) failed");
-            exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
         numRead += sizeof(word);
         ptr[i++] = word;
     }
+
+    return EXIT_SUCCESS;
 }
 
-static void 
+static int 
 ptraceWrite(int pid, uint64_t addr, void *data, int len) 
 {
     long word = 0;
@@ -103,24 +105,28 @@ ptraceWrite(int pid, uint64_t addr, void *data, int len)
         memcpy(&word, data + i, sizeof(word));
         if (ptrace(PTRACE_POKETEXT, pid, addr + i, word) == -1) {
             perror("ptrace(PTRACE_POKETEXT) failed");
-            exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
     }
+
+    return EXIT_SUCCESS;
 }
 
-static void 
+static int
 ptraceAttach(pid_t target) {
     int waitpidstatus;
 
     if(ptrace(PTRACE_ATTACH, target, NULL, NULL) == -1) {
         perror("ptrace(PTRACE_ATTACH) failed");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     if(waitpid(target, &waitpidstatus, WUNTRACED) != target) {
         perror("waitpid failed");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
+
+    return EXIT_SUCCESS;
 }
 
 static void 
@@ -135,7 +141,7 @@ call_dlopen(void)
 
 static void call_dlopen_end() {}
 
-static void 
+static int 
 inject(pid_t pid, uint64_t dlopenAddr, char *path) 
 {
     struct user_regs_struct oldregs, regs;
@@ -145,7 +151,9 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
     int libpathLen;
     ptrdiff_t oldcodeSize;
 
-    ptraceAttach(pid);
+    if (ptraceAttach(pid)) {
+        return EXIT_FAILURE;
+    }
 
     // save registers
     ptrace(PTRACE_GETREGS, pid, NULL, &oldregs);
@@ -153,19 +161,28 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
 
     // find free space
     freeAddr = freeSpaceAddr(pid);
+    if (!freeAddr) {
+        return EXIT_FAILURE;
+    }
     
     // back up the code
     libpathLen = strlen(path) + 1;
     oldcodeSize = (call_dlopen_end - call_dlopen) + libpathLen;
     oldcode = (unsigned char *)malloc(oldcodeSize);
-    ptraceRead(pid, freeAddr, oldcode, oldcodeSize);
+    if (ptraceRead(pid, freeAddr, oldcode, oldcodeSize)) {
+        return EXIT_FAILURE;
+    }
 
     // write the path to the library 
-    ptraceWrite(pid, freeAddr, path, libpathLen);
+    if (ptraceWrite(pid, freeAddr, path, libpathLen)) {
+        return EXIT_FAILURE;
+    }
 
     // inject the code right after the library path
     codeAddr = freeAddr + libpathLen + 1;
-    ptraceWrite(pid, codeAddr, &call_dlopen, call_dlopen_end - call_dlopen); 
+    if (ptraceWrite(pid, codeAddr, &call_dlopen, call_dlopen_end - call_dlopen)) {
+        return EXIT_FAILURE;
+    }
 
     // set RIP to point to the injected code
     regs.rip = codeAddr;
@@ -191,9 +208,9 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
         // check if the library has been successfully injected
         ptrace(PTRACE_GETREGS, pid, NULL, &regs);
         if (regs.rax != 0x0) {
-            printf("Appscope library injected at %p\n", (void*)regs.rax);
+            //printf("Appscope library injected at %p\n", (void*)regs.rax);
         } else {
-            fprintf(stderr, "Scope library could not be injected\n");
+            fprintf(stderr, "error: dlopen() failed, library could not be injected\n");
         }
 
         //restore the app's state
@@ -202,15 +219,18 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
         ptrace(PTRACE_DETACH, pid, NULL, NULL);
 
     } else {
-        fprintf(stderr, "Error: Process stopped for unknown reason\n");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "error: target process stopped\n");
+        return EXIT_FAILURE;
     }
+
+    return EXIT_SUCCESS;
 }
 
 static int 
 findLib(struct dl_phdr_info *info, size_t size, void *data)
 {
-    if (strstr(info->dlpi_name, "libc.so") != NULL) {
+    if (strstr(info->dlpi_name, "libc.so") != NULL ||
+        strstr(info->dlpi_name, "ld-musl") != NULL) {
         char libpath[PATH_MAX];
         if (realpath(info->dlpi_name, libpath)) {
             ((libdl_info_t *)data)->path = libpath;
@@ -221,7 +241,7 @@ findLib(struct dl_phdr_info *info, size_t size, void *data)
     return 0;
 }
 
-void 
+int 
 injectScope(int pid, char* path) 
 {
     uint64_t remoteLib, localLib;
@@ -229,28 +249,31 @@ injectScope(int pid, char* path)
     libdl_info_t info;
    
     if (!dl_iterate_phdr(findLib, &info)) {
-        fprintf(stderr, "Failed to find libc\n");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "error: failed to find local libc\n");
+        return EXIT_FAILURE;
     }
  
     localLib = info.addr;
     dlopenAddr = dlsym(RTLD_DEFAULT, "__libc_dlopen_mode");
     if (dlopenAddr == NULL) {
-        fprintf(stderr, "Failed to find __libc_dlopen_mode function\n");
-        exit(EXIT_FAILURE);
+        dlopenAddr = dlsym(RTLD_DEFAULT, "dlopen");
+    }
+    if (dlopenAddr == NULL) {
+        fprintf(stderr, "error: failed to find dlopen()\n");
+        return EXIT_FAILURE;
     }
 
     // find the base address of libc in the target process
     remoteLib = findLibrary(info.path, pid);
     if (!remoteLib) {
-        fprintf(stderr, "Failed to find libc in target process\n");
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "error: failed to find libc in target process\n");
+        return EXIT_FAILURE;
     }
 
     // calculate the address of dlopen in the target process 
     dlopenAddr = remoteLib + (dlopenAddr - localLib);
-    
+
     // inject libscope.so into the target process
-    inject(pid, (uint64_t) dlopenAddr, path);
+    return inject(pid, (uint64_t) dlopenAddr, path);
 }
 

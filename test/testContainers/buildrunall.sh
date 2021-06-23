@@ -7,10 +7,10 @@ for TEST in $(docker-compose config --services | sort -V); do
     echo ======================================================================
     echo Building $TEST Container Image
     echo ======================================================================
-    docker-compose build $TEST
+    time docker-compose build $TEST
     echo 
     echo ======================================================================
     echo Running $TEST Test
     echo ======================================================================
-    docker-compose run --rm $TEST
+    time docker-compose run --rm $TEST
 done

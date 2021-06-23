@@ -41,6 +41,8 @@
 static void
 setGoHttpEnvVariable(void)
 {
+    if (checkEnv("SCOPE_GO_HTTP1", "false") == TRUE) return;
+
     char *cur_val = getenv(GO_ENV_VAR);
 
     // If GODEBUG isn't set, try to set it to http2server=0,http2client=0

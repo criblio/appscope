@@ -40,6 +40,8 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 		shouldModify = false
 	}
 
+	ver := strings.Split(internal.GetVersion(), "-")
+
 	patch := []JSONPatchEntry{}
 	if shouldModify {
 		log.Debug().Interface("pod", pod).Msgf("modifying pod")
@@ -117,7 +119,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			})
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name:  "LD_LIBRARY_PATH",
-				Value: "/tmp/libscope-0.7.0",
+				Value: fmt.Sprintf("/tmp/libscope-%s", ver[0]),
 			})
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name: "SCOPE_TAG_node_name",

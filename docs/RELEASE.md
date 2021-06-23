@@ -101,8 +101,8 @@ without the extension. Example URLs below.
 
 * <https://cdn.cribl.io/dl/scope/latest>
 * <https://cdn.cribl.io/dl/scope/next/linux/scope>
-* <https://cdn.cribl.io/dl/scope/v0.6.1/linux/scope>
-* <https://cdn.cribl.io/dl/scope/v0.7.0-rc2/linux/scope>
+* <https://cdn.cribl.io/dl/scope/0.6.1/linux/scope>
+* <https://cdn.cribl.io/dl/scope/0.7.0-rc2/linux/scope>
 * <https://cdn.cribl.io/dl/scope/branch/feature/send_tls/linux/scope>
 
 We commonly use these like the example below.

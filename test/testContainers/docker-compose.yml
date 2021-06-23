@@ -166,15 +166,6 @@ services:
       args:
         GO_IMAGE_VER: golang:1.16
 
-  java6:
-    build:
-      context: .
-      dockerfile: ./java/Dockerfile
-      args:
-        JDK_IMAGE: openjdk:6
-        TOMCAT_MAJOR_VERSION: 7
-        TOMCAT_MINOR_VERSION: 7.0.10
-
   java7:
     build:
       context: .

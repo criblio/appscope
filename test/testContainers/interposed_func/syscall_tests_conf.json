@@ -62,6 +62,7 @@
       "exclude_tests": [
         "connect02",
         "sendmsg03",
+        "bind02",
         "bind04",
         "bind05",
         "bind06",

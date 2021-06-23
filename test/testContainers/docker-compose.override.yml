@@ -255,15 +255,6 @@ services:
         target: /go/influx/db
     privileged: true
 
-  java6:
-    volumes:
-      - type: bind
-        source: ../../lib/linux/libscope.so
-        target: /opt/test-runner/bin/libscope.so
-    environment:
-      - LD_PRELOAD=/opt/test-runner/bin/libscope.so
-    privileged: true
-
   java7:
     volumes:
       - type: bind

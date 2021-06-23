@@ -332,8 +332,7 @@ static const char scope_help_overview[] =
 "\n"
 "    Scope logs to a configurable destination, at a configurable\n"
 "    verbosity level. The default verbosity setting is level 4, and the\n"
-"    default destination is the file `/tmp/scope.log`.\n"
-"\n";
+"    default destination is the file `/tmp/scope.log`.\n";
 
 static const char scope_help_configuration[] =
 "  CONFIGURATION:\n"
@@ -356,7 +355,6 @@ static const char scope_help_configuration[] =
 "            ./conf/scope.yml\n"
 "            ./scope.yml\n"
 "\n"
-"        \n"
 "    Environment Variables:\n"
 "        SCOPE_CONF_PATH\n"
 "            Directly specify config file's location and name.\n"
@@ -595,8 +593,7 @@ static const char scope_help_configuration[] =
 "            /etc/ssl/ca-bundle.pem\n"
 "            /etc/pki/tls/cacert.pem\n"
 "            /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\n"
-"            /etc/ssl/cert.pem\n"
-"\n";
+"            /etc/ssl/cert.pem\n";
 
 static const char scope_help_metrics[] =
 "  METRICS:\n"
@@ -629,8 +626,7 @@ static const char scope_help_metrics[] =
 "\n"
 "    The http.status metric is emitted when the http watch type has been\n"
 "    enabled as an event. The http.status metric is not controlled with\n"
-"    summarization settings.\n"
-"\n";
+"    summarization settings.\n";
 
 static const char scope_help_events[] =
 "  EVENTS:\n"
@@ -674,8 +670,7 @@ static const char scope_help_events[] =
 "        (source) for disconnect is provided as local or remote. \n"
 "     7) DNS. Events are formatted in JSON for DNS requests and responses.\n"
 "        The event provides the domain name being resolved. On DNS response,\n"
-"        the event provides the duration of the DNS operation.\n"
-"\n";
+"        the event provides the duration of the DNS operation.\n";
 
 static const char scope_help_protocol[] =
 "  PROTOCOL DETECTION:\n"
@@ -696,14 +691,12 @@ static const char scope_help_protocol[] =
 "    does not find the protocol definitions file in that directory, it will\n"
 "    search for it, in the same search order as described for config files.\n"
 "\n"
-"\n"
 "  PAYLOAD EXTRACTION:\n"
 "    When enabled, libscope extracts payload data from network operations.\n"
 "    Payloads are emitted in binary. No formatting is applied to the data.\n"
 "    Payloads are emitted to either a local file or the LogStream channel.\n"
 "    Configuration elements for libscope support defining a path for payload\n"
-"    data.\n"
-"\n";
+"    data.\n";
 
 static int
 showHelp(const char *section)

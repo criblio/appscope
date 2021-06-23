@@ -48,7 +48,7 @@ AppScope does not support the following runtimes:
 
 ### Linux
 
-We build on Ubuntu 18.04 currently and do not support other build environments at this time. The goal is to produce a "build-once, run-anywhere" executable. Consider building with [Docker](#docker) if you are running somthing other than Ubuntu 18.04.
+We currently build on Ubuntu 18.04 and do not support other build environments. The goal is to produce a "build-once, run-anywhere" executable. Consider building with [Docker](#docker) if you are running somthing other than Ubuntu 18.04.
 
 Check out the code, install build tools, build, and run tests:
 

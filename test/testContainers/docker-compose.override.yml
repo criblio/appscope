@@ -417,6 +417,19 @@ services:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
     privileged: true
 
+  attach:
+    volumes:
+      - type: bind
+        source: ../../lib/linux/libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
+      - type: bind
+        source: ../../bin/linux/scope
+        target: /usr/bin/scope
+    privileged: true
+
   alpine:
     volumes:
       - type: bind

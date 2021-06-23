@@ -223,7 +223,7 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     char **astart;
     Elf64_Ehdr *elf;
     char **spp = (char **)sp;
-    uint64_t cnt = (uint64_t)argc - 1;
+    uint64_t cnt = (uint64_t)argc;
     Elf64_Addr *elf_info;
     
     if (!buf || !spp || !argv || !*argv || !env || !*env) return -1;
@@ -233,10 +233,10 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     // do argc
     *spp++ = (char *)cnt;
     
-    // do argv; start at argv[1] to get the app's args
-    for (i = 0; i < (argc - 1); i++) {
-        if (&argv[i + 1] && spp) {
-            *spp++ = (char *)argv[i + 1];
+    // do argv
+    for (i = 0; i < argc; i++) {
+        if (&argv[i] && spp) {
+            *spp++ = (char *)argv[i];
         } else {
             scopeLog("ERROR:copy_strings: arg entry is not correct", -1, CFG_LOG_ERROR);
             return -1;
@@ -313,7 +313,7 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
             break;
 
         case AT_EXECFN:
-            AUX_ENT(auxv->a_type, (unsigned long)argv[1]);
+            AUX_ENT(auxv->a_type, (unsigned long)argv[0]);
             break;
 
         default:

@@ -1,12 +1,12 @@
-**Cribl AppScope**
+# Cribl AppScope
 
-# Introduction
+## Introduction
 
 AppScope is an open source instrumentation utility for any application, regardless of programming language, with no code modification required. 
 
 AppScope extracts detailed information from applications as they execute, including all file operations, all network operations, and cleartext data from encrypted flows. AppScope enables you to extract all payloads in their entirety. You can capture any console I/O and updates to any log file, and can monitor CPU and memory resource usage in process detail.
 
-# Architecture and Operation
+## Architecture and Operation
 
 AppScope consists of a shared library and an executable. In simple terms, you load the library into the address space of a process. With the library loaded, details are extracted from applications as they execute. The executable provides a command line interface (CLI), which can optionally be used to control which processes are interposed, what data is extracted, and how to view and interact with the results.
 
@@ -18,29 +18,37 @@ Child processes are created with the library present, if the library was present
 
 The executable `scope` is provided with AppScope. The `scope` executable provides a rich CLI that allows for exploration of application functionality, and for detailed interaction with the data extracted from the AppScope library. The `scope` CLI supports an extensive terminal-based dashboard, providing a summary of application details. Views of the data include raw formats exported from the library, as well as formatted output, independent of data type. A history of "scoped" applications is maintained, enabling comparison and capture of full-fidelity application detail.
 
-# Requirements
+## Requirements
 
-## Operating System Support
+### Operating System Support
+
+AppScope runs on the following platforms:
 
 - RedHat Enterprise Linux or CentOS 6.4 and later
 - Ubuntu 16 and later
 - Amazon Linux 1 and 2
 
-## Resources
+### Resources
+
+AppScope requires the following minimum resources:
 
 - CPU:	x84-64 architecture 
 - Memory:	1GB
 - Disk:	20MB
 
-## Known Limitations
+### Known Limitations
 
 AppScope does not support the following runtimes:
 
-Open JVM &lt; v.6, Oracle JVM &lt; v.6, Go &lt; v.1.8.
+- Open JVM &lt; v.6
+- Oracle JVM &lt; v.6
+- Go &lt; v.1.8
 
-# Install and Build
+## Build and Install
 
-## Linux
+### Linux
+
+We currently build on Ubuntu 18.04 and do not support other build environments. The goal is to produce a "build-once, run-anywhere" executable. Consider building with [Docker](#docker) if you are running somthing other than Ubuntu 18.04.
 
 Check out the code, install build tools, build, and run tests:
 
@@ -50,7 +58,7 @@ cd appscope
 ./scope_env.sh build
 ```
 
-`./scope_env.sh build` does everything needed to get a brand new environment up and running. It can also be run on an existing environment to rebuild, and rerun tests. If desired, individual parts of `./scope_env.sh build` can be run from the appscope directory:
+`./scope_env.sh build` does everything needed to get a brand new environment up and running. It can also be run on an existing environment to rebuild, and rerun tests. If desired, individual parts of `./scope_env.sh build` can be run from the `appscope` directory:
 
 ```
 ./install_build_tools.sh
@@ -64,81 +72,112 @@ To clean out files that were manually added, or were added by build commands:
 git clean -f -d
 ```
 
-## Docker
+### Docker
 
 If you have Docker installed on your local machine, you can skip installing the dependencies locally and instead use a container to build. Use the `docker/builder/Dockerfile` and the `make docker-build` target. That builds an `appscope-builder` image that is Ubuntu with the necessary dependencies installed. The target then runs the image, mounting the local directory into the container, and builds the project. You'll end up with the binary in `bin/linux/scope` assuming all goes well.
 
+```
+make docker-build
+```
+
 By default, the current versions of Ubuntu or Go are used in the container image. Setting the `IMAGE` and `GOLANG` build arguments can override these.  Use the `BUILD_ARGS` environment variable to pass extra arguments to `docker build`.  The example below forces the builder to use Go 1.16 and Ubuntu 21.04.
 
-```shell
-$ make docker-build BUILD_ARGS="--build-arg GOLANG=golang-1.16 --build-arg IMAGE=ubuntu:21.04"
+```
+make docker-build BUILD_ARGS="--build-arg GOLANG=golang-1.16 --build-arg IMAGE=ubuntu:21.04"
 ```
 
 See the `Makefile` for the `docker run` command we use. Run it yourself without the `--entrypoint` and `-c` arguments to get a shell in the builder to fiddle around yourself.
 
-# Run
+## Scoping a Program
 
-There are two ways to "scope" an application (i.e., to enable AppScope to extract details from an application). You can use the `scope` executable, or you can use the dynamic loader's preload capability. 
+There are multiple ways to "scope" an application (i.e., to enable AppScope to extract details from an application). Most users run `scope` when getting started and when manually investigating a program or system. We provide an alternative mechanism via the dynamic loader's `LD_PRELOAD` functionality for use by sysadmins to collect data from server processes and their children.
 
-## Using `scope`
+### Using `scope`
 
 The `scope` executable provides a simple way of "scoping" an application:
 
-```bash
+```
 scope your_command params
 ```
 
-Where "your_command" is any executable and "params" are any parameters needed for the executable.
+Where `your_command` is any executable and `params` are any parameters needed for the executable.
 
-Using `scope` in this manner causes `your_command` to be loaded, as well as loading the AppScope library. The default configuration for `scope` is to emit all data to the local file system. The path for the data store is configurable. For details, display `scope` help using the `-h` or `--help` command line option:
+Using `scope` in this manner causes `your_command` to be run with the AppScope library loaded. The default configuration for `scope` is to emit all data to the local file system. The path for the data store is configurable. Run `scope` or `scope help` to get a list of commands and `scope help [command]` for details of a specific command.
 
 ```
-scope -h
+$ scope help
+Cribl AppScope Command Line Interface
+
+AppScope is a general-purpose observable application telemetry system.
+
+Running `scope` with no subcommands will execute the `scope run` command.
+
+Usage:
+  scope [command]
+
+Available Commands:
+  attach      Scope an existing PID
+  dash        Display scope dashboard
+  events      Outputs events for a session
+  extract     Output instrumentary library files to <dir>
+  flows       Observed flows from the session, potentially including payloads
+  help        Help about any command
+  history     List scope session history
+  k8s         Install scope in kubernetes
+  logs        Display scope logs
+  metrics     Outputs metrics for a session
+  prune       Prune deletes session history
+  run         Executes a scoped command
+  version     Display scope version
+  watch       Executes a scoped command on an interval
+
+Flags:
+  -h, --help   help for scope
+
+Use "scope [command] --help" for more information about a command.
 ```
 
 Here is a simple example of invoking the `scope` executable:
 
-```bash
+```
 scope bash
 ```
 
 This will cause the bash shell to be executed with the AppScope library. All subsequent commands executed from the shell will emit detailed data describing the behavior of the application.
 
-## Dynamic Loader
+Use the `scope attach [PID]` command to attach to a running process. This injects the AppScope library so the process starts emitting data based on the configuration options.
 
-The kernel runs the dynamic loader when an executable is started. The loader determines which executable to load, resolves dependencies, allocates memory, loads code, performs all required link operations, and starts the application. When resolving dependencies, the loader can be configured to load a specific library in addition to the library dependencies associated with the executable. Loading of an additional library is configured by setting the environment variable `LD_PRELOAD`. 
+### Using the Dynamic Loader
 
-Examples:
+The kernel runs the dynamic loader when an executable is started. The loader determines which executable to load, resolves dependencies, allocates memory, loads code, performs all required link operations, and starts the application. When resolving dependencies, the loader can be configured to load a specific library in addition to the library dependencies associated with the executable. Loading of an additional library is configured by setting the environment variable `LD_PRELOAD`.
 
-```bash
-LD_PRELOAD=./libscope.so curl https://cribl.io
+The AppScope library (`libscope.so`) is embedded into the `scope` binary. Use the `scope extract [DIR]` command to extract it.
+
+```
+mkdir /opt/appscope
+scope extract /opt/appscope
 ```
 
-This will configure the loader to load and run `curl`, while loading the additional library `libscope.so`. The result is that AppScope will emit details from the execution of `curl`. The specific data emitted, the format of the data, the transport for that data are all configurable. Reference the help menu with the `libscope.so` library:
+Now you can use it as shown below.
 
-```bash
-libscope.so all
+```
+LD_PRELOAD=/opt/appscope/libscope.so curl https://cribl.io
 ```
 
-From a bash shell prompt:
+This configures the loader to run `curl`, while preloading the additional library `libscope.so`. The result is that AppScope will emit details from the execution of `curl`. The specific data emitted, the format of the data, the transport for that data are all configurable. See the help output from `/opt/appscope/ldscope --help` for details:
 
-```bash
+From a shell prompt, you can export `LD_PRELOAD` after which any command run in the shell will be "scoped".
+
+```
 export LD_PRELOAD=./libscope.so
 ```
 
-This will set the `LD_PRELOAD` environment variable for all commands that execute in the current shell. The result is that all commands executed from the shell will cause `libscope.so` to be loaded and details of those applications emitted. 
+## Support & Feedback
 
-# The scope Executable
+End-user documentation built from the [website/](./website/) content here in the project is available at <https://appscope.dev/>. See the [/docs](http://appscope.dev/docs/) content there for more examples and details on how to use AppScope. Release notes and know issues are kept there currently.
 
-`scope` provides a rich set of features for exploring data from applications that have been "scoped". `scope` supports several distinct modes:
+Many of the developers are in the [Cribl Community](https://cribl.io/community/) on Slack. Use the `#appscope` channel there.
 
-- Run an application
-- Explore events from "scoped" applications
-- Explore metrics from "scoped" applications
-- Manage history and the accumulated data set
+Please submit feature requests and defect reports to the project at <https://github.com/criblio/appscope>.
 
-# Developer Notes
-
-- The top-level Makefile checks to see what platform you are on, and then includes the specific Makefile for that platform from the OS-specific directory.
-
-- The run script will determine which platform you are using, and will set environment variables accordingly. 
+We are working to expand documentation and notes for developers and maintainers here in the [docs](./docs/) folder.

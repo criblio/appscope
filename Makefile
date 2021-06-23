@@ -22,6 +22,7 @@ ifeq ($(PLATFORM),Linux)
 clean:
 	$(MAKE) -f os/linux/Makefile core$@
 	$(MAKE) -f cli/Makefile cli$@
+	$(MAKE) -C contrib $@
 
 test:
 	$(MAKE) -f os/linux/Makefile core$@

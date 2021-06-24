@@ -38,7 +38,7 @@ AppScope is not built or distributed like traditional Linux software.
 Pull a copy of the code with:
 
 ```shell
-git clone git@github.com:criblio/appscope.git
+git clone https://github.com/criblio/appscope.git
 cd appscope
 ```
 

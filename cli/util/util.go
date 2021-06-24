@@ -255,7 +255,7 @@ func EncodeOffset(offset int64) string {
 	}
 	for offset > 0 {
 		ch := codes[offset%64]
-		str = append(str, byte(ch))
+		str = append(str, ch)
 		offset /= 64
 	}
 	return string(str)

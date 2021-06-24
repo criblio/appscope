@@ -24,11 +24,11 @@ scope prune -a`,
 		del, _ := cmd.Flags().GetInt("delete")
 
 		count := ""
-		if keep == -1 && del == -1 && all == false {
+		if keep == -1 && del == -1 && !all {
 			helpErrAndExit(cmd, "Must specify keep, delete, or all")
-		} else if all != false && keep > -1 {
+		} else if all && keep > -1 {
 			helpErrAndExit(cmd, "Cannot specify keep and all")
-		} else if all != false && del > -1 {
+		} else if all && del > -1 {
 			helpErrAndExit(cmd, "Cannot specify delete and all")
 		} else if keep > -1 && del > -1 {
 			helpErrAndExit(cmd, "Cannot specify delete and keep")
@@ -36,7 +36,7 @@ scope prune -a`,
 			count = fmt.Sprintf("all but %d", keep)
 		} else if del > -1 {
 			count = fmt.Sprintf("the last %d", del)
-		} else if all != false {
+		} else if all {
 			count = "all"
 		}
 		if !force {

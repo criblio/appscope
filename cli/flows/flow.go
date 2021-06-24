@@ -108,7 +108,7 @@ func getFlowFiles(path string) (FlowMap, error) {
 			return err
 		}
 		stat := info.Sys().(*syscall.Stat_t)
-		ctime := time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec))
+		ctime := time.Unix(stat.Ctim.Sec, stat.Ctim.Nsec)
 		flow.StartTime = ctime
 		flow.LastSentTime = info.ModTime()
 		flow.Duration = flow.LastSentTime.Sub(flow.StartTime)

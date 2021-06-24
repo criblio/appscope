@@ -5,9 +5,6 @@ import (
 	"github.com/criblio/scope/internal"
 )
 
-// GitBranch is set by govvv and represents the branch we were built on
-var GitBranch string
-
 // GitSummary is produced by govvv and stores tag, commit and branch status
 var GitSummary string
 

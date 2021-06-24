@@ -1,10 +1,10 @@
-# Cribl AppScope - Release Process
+# AppScope Release Process
 
-## Branching & Tagging 
+Our process is pretty straightforward. It focuses primarily on developing
+the next release while keeping the effort devoted to maintaining older releases
+to a minimum.
 
-Our process is pretty straight forward. It's focused primarily on developing
-the next release and minimizing effort toward maintaining older releases until
-we need to.
+## Branching & Tagging
 
 ![Branching](images/branching.png)
 
@@ -30,30 +30,29 @@ we need to.
 
 * We create release candidate tags `v*.*.0-rc*` on the default branch as we
   approach the next major or minor release. When it's ready to go, we create
-  the release tag `v*.*.0` also on the default branch
+  the release tag `v*.*.0`, also on the default branch.
 
-* We create a release branch `release/0.x` with the major number and `x`
-  instead of the minor number. They're created from the default branch at the
-  point where the coresponding `v*.0.0` tag was created. This provides a 
+* We create a release branch `release/0.x`, with the major number and `x`
+  instead of the minor number. These are created from the default branch at the
+  point where the corresponding `v*.0.0` tag was created. This provides a 
   starting point for future maintenance releases.
 
 * Work toward a maintenance release is done on hotfix issue branches
   `hotfix/1234-name` created from the release branch, not the default branch.
   Like merges into the default branch, PRs are created to merge hotfixes back
-  into the release branch when they're ready. Tags for the mainteinace release
+  into the release branch when they're ready. Tags for the maintenance release
   candidates `v*.*.1-rc1` and the release itself `v*.*.1` are created on the
-  release branch. The release branch is merged back into the default branch
-  periodically.
+  release branch. Periodically, the release branch is merged back into the default branch.
 
 * Minor releases after the `*.0.0` release are tagged on the default branch
-  like normal but after they're released, we merge them back out to the
+  as usual — but after they're released, we merge them back out to the
   existing release branch. This blocks further maintenance releases for the
   prior minor release and provides a starting point for maintenance releases
   to the new minor release.
 
-* We have a `staging` branch for use with the website content. The
-  documentation team makes changes to the website content on that branch then
-  create PRs to merge their changes into the default branch.
+* We have a `staging` branch for the website content. The
+  documentation team updates the website content on that branch, then
+  creates PRs to merge their changes into the default branch.
 
 ## Workflows
 
@@ -70,7 +69,7 @@ additional steps are taken depending on the trigger.
 * We build [container images](#container-images) and push them to Docker Hub
   for release tags.
 
-* We run our [integration tests](../test/testContainers/) for pull-requests to
+* We run our [integration tests](../test/testContainers/) for pull requests to
   the default and release branches. We build and push the container images
   these tests use up to Docker Hub on pushes to the default branch.
 
@@ -81,21 +80,21 @@ build script in that folder for details.
 
 ## CDN
 
-We push the built and tested `scope` binary and a TGZ package to an S3
-container at AWS which is exposed at `https://cdn.cribl.io/dl/scope/`. Below
+We push the built and tested `scope` binary and a TGZ package to an AWS S3
+container exposed at `https://cdn.cribl.io/dl/scope/`. Below
 that base URL we have:
 
-* `latest` - text file with the latest release number in it; i.e. `0.6.1`
+* `latest` - text file with the latest release number in it; e.g., `0.6.1`
 * `$VERSION/linux/scope`
 * `$VERSION/linux/scope.md5`
 * `$VERSION/linux/scope.tgz`
 * `$VERSION/linux/scope.tgz.md5`
 
-The `latest` file is updated only for builds of `v*` tags withough `-rc` in
+The `latest` file is updated only for builds of `v*` tags without `-rc` in
 them. 
 
-The `$VERSION` string is a release tag without the leading `v` (i.e. `1.2.3`
-or `1.2.3-rc1`), an branch (i.e.  `branch/bug/1234-name`) or `next` for the
+The `$VERSION` string is a release tag without the leading `v` (e.g., `1.2.3`
+or `1.2.3-rc1`), an branch (e.g.,  `branch/bug/1234-name`) or `next` for the
 default branch. The `.md5` files are MD5 checksums of the corresponding files
 without the extension. Example URLs below.
 
@@ -105,9 +104,9 @@ without the extension. Example URLs below.
 * <https://cdn.cribl.io/dl/scope/0.7.0-rc2/linux/scope>
 * <https://cdn.cribl.io/dl/scope/branch/feature/send_tls/linux/scope>
 
-We commonly use these like the example below.
+We commonly use these as shown in the example below.
 
-```shell
+```text
 $ LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
 $ curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/scope
 $ curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/scope.md5 | md5sum -c 
@@ -124,7 +123,7 @@ repositories at Docker Hub. See [`docker/`](../docker/) for details on how
 those images are built.
 
 We currently build these for release `v*` tags and tag the images to match with
-the leading `v` striped off. If the git tag doesn't match `*-rc*` then we also
+the leading `v` stripped off. If the Git tag doesn't match `*-rc*` then we also
 apply the `:latest` tag to the images.
 
 ## To Do

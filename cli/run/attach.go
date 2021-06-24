@@ -73,6 +73,9 @@ func (rc *Config) Attach(args []string) {
 	}
 	// Prepend "--attach" to args
 	args = append([]string{"--attach"}, args...)
+	if _, present := os.LookupEnv("SUDO_USER"); present {
+		fmt.Println("NOTE: When running scope with \"sudo\", you will need to use \"sudo\" to obtain scope history, scope events, etc.")
+	}
 	if !rc.Subprocess {
 		syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)
 	}

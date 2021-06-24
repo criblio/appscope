@@ -1,6 +1,7 @@
 package run
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -50,6 +51,9 @@ func (rc *Config) Run(args []string) {
 		}
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
+	}
+	if _, present := os.LookupEnv("SUDO_USER"); present {
+		fmt.Println("NOTE: When running scope with \"sudo\", you will need to use \"sudo\" to obtain scope history, scope events, etc.")
 	}
 	if !rc.Subprocess {
 		syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)

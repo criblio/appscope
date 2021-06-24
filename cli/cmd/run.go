@@ -29,7 +29,7 @@ scope run -c tcp://127.0.0.1:10091 -- curl https://wttr.in/94105`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
-		rc.Run(args, false)
+		rc.Run(args)
 	},
 }
 

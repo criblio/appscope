@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -190,5 +191,24 @@ func TestHandleMutate(t *testing.T) {
 	respBody, err := ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
 
-	assert.Equal(t, `{"kind":"AdmissionReview","apiVersion":"admission.k8s.io/v1","response":{"uid":"922a00bc-ba06-494e-bb48-b0928658f9ce","allowed":true,"patch":"W3sib3AiOiJyZXBsYWNlIiwicGF0aCI6Ii9tZXRhZGF0YS9sYWJlbHMiLCJ2YWx1ZSI6eyJhcHAiOiJidXN5Ym94IiwiYXBwc2NvcGUuZGV2L3Njb3BlIjoidHJ1ZSJ9fSx7Im9wIjoicmVwbGFjZSIsInBhdGgiOiIvc3BlYy9pbml0Q29udGFpbmVycyIsInZhbHVlIjpbeyJuYW1lIjoic2NvcGUiLCJpbWFnZSI6ImNyaWJsL3Njb3BlOiIsImNvbW1hbmQiOlsiL3Vzci9sb2NhbC9iaW4vc2NvcGUiLCJleGNyZXRlIiwiLS1tZXRyaWNkZXN0IiwiIiwiLS1tZXRyaWNmb3JtYXQiLCIiLCItLWV2ZW50ZGVzdCIsIiIsIi9zY29wZSJdLCJyZXNvdXJjZXMiOnt9LCJ2b2x1bWVNb3VudHMiOlt7Im5hbWUiOiJzY29wZSIsIm1vdW50UGF0aCI6Ii9zY29wZSJ9XX1dfSx7Im9wIjoicmVwbGFjZSIsInBhdGgiOiIvc3BlYy9jb250YWluZXJzIiwidmFsdWUiOlt7Im5hbWUiOiJidXN5Ym94IiwiaW1hZ2UiOiJidXN5Ym94IiwiYXJncyI6WyJzbGVlcCIsIjM2MDAiXSwiZW52IjpbeyJuYW1lIjoiTERfUFJFTE9BRCIsInZhbHVlIjoiL3Njb3BlL2xpYnNjb3BlLnNvIn0seyJuYW1lIjoiU0NPUEVfQ09ORl9QQVRIIiwidmFsdWUiOiIvc2NvcGUvc2NvcGUueW1sIn0seyJuYW1lIjoiU0NPUEVfRVhFQ19QQVRIIiwidmFsdWUiOiIvc2NvcGUvbGRzY29wZSJ9LHsibmFtZSI6IlNDT1BFX1RBR19ub2RlX25hbWUiLCJ2YWx1ZUZyb20iOnsiZmllbGRSZWYiOnsiZmllbGRQYXRoIjoic3BlYy5ub2RlTmFtZSJ9fX0seyJuYW1lIjoiU0NPUEVfVEFHX25hbWVzcGFjZSIsInZhbHVlRnJvbSI6eyJmaWVsZFJlZiI6eyJmaWVsZFBhdGgiOiJtZXRhZGF0YS5uYW1lc3BhY2UifX19XSwicmVzb3VyY2VzIjp7fSwidm9sdW1lTW91bnRzIjpbeyJuYW1lIjoiZGVmYXVsdC10b2tlbi1rNWxsbSIsInJlYWRPbmx5Ijp0cnVlLCJtb3VudFBhdGgiOiIvdmFyL3J1bi9zZWNyZXRzL2t1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQifSx7Im5hbWUiOiJzY29wZSIsIm1vdW50UGF0aCI6Ii9zY29wZSJ9LHsibmFtZSI6InNjb3BlLWNvbmYiLCJtb3VudFBhdGgiOiIvc2NvcGUvc2NvcGUueW1sIiwic3ViUGF0aCI6InNjb3BlLnltbCJ9XSwidGVybWluYXRpb25NZXNzYWdlUGF0aCI6Ii9kZXYvdGVybWluYXRpb24tbG9nIiwidGVybWluYXRpb25NZXNzYWdlUG9saWN5IjoiRmlsZSIsImltYWdlUHVsbFBvbGljeSI6IkFsd2F5cyJ9XX0seyJvcCI6InJlcGxhY2UiLCJwYXRoIjoiL3NwZWMvdm9sdW1lcyIsInZhbHVlIjpbeyJuYW1lIjoiZGVmYXVsdC10b2tlbi1rNWxsbSIsInNlY3JldCI6eyJzZWNyZXROYW1lIjoiZGVmYXVsdC10b2tlbi1rNWxsbSJ9fSx7Im5hbWUiOiJzY29wZSJ9LHsibmFtZSI6InNjb3BlLWNvbmYiLCJjb25maWdNYXAiOnsibmFtZSI6InNjb3BlIn19XX1d","patchType":"JSONPatch"}}`, string(respBody))
+	r := struct {
+		Kind       string
+		ApiVersion string
+		Response   struct {
+			Uid       string
+			Allowed   bool
+			Patch     []byte
+			PatchType string
+		}
+	}{}
+
+	err = json.Unmarshal(respBody, &r)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "AdmissionReview", r.Kind)
+	assert.Equal(t, "admission.k8s.io/v1", r.ApiVersion)
+	assert.Equal(t, "922a00bc-ba06-494e-bb48-b0928658f9ce", r.Response.Uid)
+	assert.Equal(t, true, r.Response.Allowed)
+	assert.Equal(t, "JSONPatch", r.Response.PatchType)
+	assert.Equal(t, []byte(`[{"op":"replace","path":"/metadata/labels","value":{"app":"busybox","appscope.dev/scope":"true"}},{"op":"replace","path":"/spec/initContainers","value":[{"name":"scope","image":"cribl/scope:","command":["/usr/local/bin/scope","excrete","--metricdest","","--metricformat","","--eventdest","","/scope"],"resources":{},"volumeMounts":[{"name":"scope","mountPath":"/scope"}]}]},{"op":"replace","path":"/spec/containers","value":[{"name":"busybox","image":"busybox","args":["sleep","3600"],"env":[{"name":"LD_PRELOAD","value":"/scope/libscope.so"},{"name":"SCOPE_CONF_PATH","value":"/scope/scope.yml"},{"name":"SCOPE_EXEC_PATH","value":"/scope/ldscope"},{"name":"LD_LIBRARY_PATH","value":"/tmp/libscope-"},{"name":"SCOPE_TAG_node_name","valueFrom":{"fieldRef":{"fieldPath":"spec.nodeName"}}},{"name":"SCOPE_TAG_namespace","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}}],"resources":{},"volumeMounts":[{"name":"default-token-k5llm","readOnly":true,"mountPath":"/var/run/secrets/kubernetes.io/serviceaccount"},{"name":"scope","mountPath":"/scope"},{"name":"scope-conf","mountPath":"/scope/scope.yml","subPath":"scope.yml"}],"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"Always"}]},{"op":"replace","path":"/spec/volumes","value":[{"name":"default-token-k5llm","secret":{"secretName":"default-token-k5llm"}},{"name":"scope"},{"name":"scope-conf","configMap":{"name":"scope"}}]}]`), r.Response.Patch)
 }

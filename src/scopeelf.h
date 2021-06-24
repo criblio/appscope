@@ -30,6 +30,7 @@ void * getGoSymbol(const char *, char *);
 void * getGoVersionAddr(const char*);
 bool is_static(char *);
 bool is_go(char *);
+bool is_musl(char *);
 
 #endif // __LINUX__
 

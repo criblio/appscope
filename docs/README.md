@@ -1,7 +1,12 @@
-# Cribl AppScope - Developer Docs
+# AppScope Design Docs
 
-We're keeping notes and such for developers here. End-user documentation is
-kept in [`website/`](../website/src/pages/docs/) and published to
-<https://appscope.dev/docs/>. We'll be adding more details here as we can.
+Before delving into the docs here, you should be familiar already with:
 
-* [Release Process](./RELEASE.md) - Branches, tags, workflows, etc.
+- The main [README](../README.md) at the top level of this project
+- The user docs on the [AppScope website](https://appscope.dev/docs/)
+
+The docs in this directory cover aspects of the AppScope design and our development process. They are written for the developers contributing to the project, as opposed to the SREs, sys admins, and security folks who are using AppScope as a tool.
+
+- The AppScope [release process](./RELEASE.md) - Branches, tags, workflows, and so on.
+
+> We will be adding more over time.

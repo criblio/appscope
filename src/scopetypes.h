@@ -142,7 +142,7 @@ typedef unsigned int bool;
 #define DEFAULT_LOG_PATH "/tmp/scope.log"
 #define DEFAULT_LOG_BUF CFG_BUFFER_LINE
 #define DEFAULT_TLS_ENABLE FALSE
-#define DEFAULT_TLS_VALIDATE_SERVER FALSE
+#define DEFAULT_TLS_VALIDATE_SERVER TRUE
 #define DEFAULT_TLS_CA_CERT NULL
 
 #define DEFAULT_LOGSTREAM CFG_LOGSTREAM_NONE
@@ -164,6 +164,7 @@ typedef unsigned int bool;
 //    SCOPE_EXEC_TYPE                internal use only
 //    SCOPE_EXECVE                   "false" disables scope of child procs
 //    SCOPE_EXEC_PATH                specifies path to ldscope executable
+//    SCOPE_LIB_PATH                 specifies path to libscope.so library
 //    SCOPE_GO_STRUCT_PATH           for internal testing
 //    SCOPE_HTTP_SERIALIZE_ENABLE    "true" adds guard for race condition
 //    SCOPE_NO_SIGNAL                if defined, timer for USR2 is not set

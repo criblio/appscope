@@ -71,7 +71,7 @@ The content on that site is built from the [website/](website/) directory in thi
 Other resources:
 
 - Complete the [AppScope Fundamentals sandbox](https://sandbox.cribl.io/course/appscope), a tutorial that takes about 30 minutes.
-- See the [docs/](./docs/) directory in this repo if you're thinking about contributing to this project, or if you just want to understand the internal logic of AppScope.
+- See our Design Docs in the [docs/](./docs/) directory in this repo if you're thinking about contributing to this project, or if you just want to understand the internal logic of AppScope.
 - Join the [Cribl Community](https://cribl.io/community/) on Slack. The `#appscope` channel is where you'll find developers who contribute to this project.
  
 Please submit any feature requests and defect reports at <https://github.com/criblio/appscope>.

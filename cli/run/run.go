@@ -53,7 +53,7 @@ func (rc *Config) Run(args []string) {
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
 	if _, present := os.LookupEnv("SUDO_USER"); present {
-		fmt.Println("NOTE: When running scope with \"sudo\", you will need to use \"sudo\" to obtain scope history, scope events, etc.")
+		fmt.Println("Session history will be stored under the root user")
 	}
 	if !rc.Subprocess {
 		syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)

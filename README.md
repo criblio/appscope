@@ -4,7 +4,7 @@ AppScope is an open source, runtime-agnostic instrumentation utility for any Lin
 
 AppScope provides the fine-grained observability of a proxy/service mesh, without the latency of a sidecar. It emits APM-like metric and event data, in open formats, to existing log and metric tools.
 
-It’s like strace meets tcpdump – but with consumable output for events like file access, DNS, and network activity, and StatsD-style metrics for applications. AppScope can also look inside encrypted payloads, offering WAF-like visibility without proxying traffic.
+It’s like [strace](https://github.com/strace/strace) meets [tcpdump](https://www.tcpdump.org/) – but with consumable output for events like file access, DNS, and network activity, and StatsD-style metrics for applications. AppScope can also look inside encrypted payloads, offering WAF-like visibility without proxying traffic.
 
 This `README` gets you up and scoping ASAP.
 
@@ -20,55 +20,57 @@ Next, you can obtain AppScope three ways:
 
 The container image at Docker Hub and binaries at the CDN are updated for each new release of this project.
 
-Try these simple commands to verify that AppScope is available.
+Once you have downloaded and/or built AppScope, try some simple commands to verify that AppScope is available:
 
 - Scope a new process like `scope ps -ef`. Try substituting `top` or `curl https://google.com` for `ps -ef`.  Run `scope events` to see the results.
 
 - Attach to a process that *is already running*. Run `ps -ef` and find the process ID (PID) of a command or program you would like to scope. Attach to and scope the running process with `scope attach PID`. Run `scope dash` to watch events live.
 
-See the [website docs](https://appscope.dev/docs/overview) for all the details on how to use AppScope.
+See the [website docs](https://appscope.dev/docs/overview) for the full story of how to use AppScope.
 
 ## Build
 
-AppScope is not built or distributed like traditional Linux software.
+AppScope is not built or distributed like most traditional Linux software.
 
-- We only build on a platform with an older version of glibc so the resulting binaries require older glibc interfaces. We refer to this as "_build-once/run-anywhere_" and it allows us to run on a wide range of Linux platforms without having to rebuild locally.
-- We don't build OS installation packages like DEBs or RPMs so AppScope can easily be dropped in and used to investigate a running system or when building custom container images.
+- Insofar as possible, we want AppScope binaries to be  **Build Once, Run Anywhere**. To approach this goal, we build with a version of glibc that is (1) recent enough that the resulting binary contains references to versions of functions in the glibc library *that are still supported in the latest glibc*, yet (2) old enough that the binaries can run on a wide range of Linux platforms without having to rebuild locally.
+.
+- We don't build OS installation packages like DEBs or RPMs. This way, when you want to investigate a running system or build a custom container image, you can simply drop AppScope in and use it.
 
 Pull a copy of the code with:
 
-```shell
+```text
 git clone https://github.com/criblio/appscope.git
 cd appscope
 ```
 
-If you are doing this on Ubuntu 18.04, install the dependencies and build the project with:
+If you are on Ubuntu 18.04, install the dependencies and build the project with:
 
-```shell
+```text
 ./scope_env.sh build
 ```
 
-If you are doing this on another plaform or would rather avoid installing the dependencies, ensure `docker` and `make` are installed then build in a Docker container with:
+If you are on a platform other than Ubuntu 18.04, or prefer not to install the dependencies, ensure that `docker` and `make` are installed, then build in a Docker container with:
 
-```shell
+```text
 make docker-build
 ```
 
-The resulting binaries from either approach will be in `lib/linux/libscope.so`, `bin/linux/scope`, and `bin/linux/ldscope`.
+Either way, the resulting binaries will be in `lib/linux/libscope.so`, `bin/linux/scope`, and `bin/linux/ldscope`.
 
 ## Keep Going
 
-We have additional information on the [AppScope Website](https://appscope.dev/):
+On the [AppScope Website](https://appscope.dev/):
 
 - Check out the CLI [in more depth](https://appscope.dev/docs/quick-start-guide/).
 - Get an [overview](https://appscope.dev/docs/how-works/) of AppScope beyond the CLI.
 - Discover what people are [doing](https://appscope.dev/docs/what-do-with-scope) with AppScope.
 - Review advanced [examples](https://appscope.dev/docs/examples-use-cases).
+- View the [Changelog](https://appscope.dev/docs/changelog) and [Known Issues](https://appscope.dev/docs/known-issues).
 - See what happens when you [connect AppScope to Cribl LogStream](https://appscope.dev/docs/logstream-integration).
 
 The content on that site is built from the [website/](website/) directory in this project.
 
-Other resources:
+Elsewhere, you can:
 
 - Complete the [AppScope Fundamentals sandbox](https://sandbox.cribl.io/course/appscope), a tutorial that takes about 30 minutes.
 - See our Design Docs in the [docs/](./docs/) directory in this repo if you're thinking about contributing to this project, or if you just want to understand the internal logic of AppScope.

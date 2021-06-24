@@ -172,7 +172,7 @@ scope flows --out 124x3c   # Displays the outbound payload of that flow
 			{Name: "Host Port", Field: "net_host_port"},
 			{Name: "Peer IP", Field: "net_peer_ip"},
 			{Name: "Peer Port", Field: "net_peer_port"},
-			{Name: "Last Sent", Field: "last_sent_time", Transform: func(obj interface{}) string { return util.GetHumanDuration(time.Now().Sub(obj.(time.Time))) }},
+			{Name: "Last Sent", Field: "last_sent_time", Transform: func(obj interface{}) string { return util.GetHumanDuration(time.Since(obj.(time.Time))) }},
 			{Name: "Duration", Field: "duration"},
 		}
 		if termWidth > 145 {

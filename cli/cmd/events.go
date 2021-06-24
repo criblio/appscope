@@ -147,7 +147,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 			em.AllEvents = false
 		}
 
-		in := make(chan map[string]interface{}, 0)
+		in := make(chan map[string]interface{})
 		go func() {
 			err := em.Events(file, in)
 			if err != nil && strings.Contains(err.Error(), "Error searching for Offset: EOF") {
@@ -214,9 +214,9 @@ func printEvents(cmd *cobra.Command, in chan map[string]interface{}) {
 			v, err := vm.RunProgram(prog)
 			util.CheckErrSprintf(err, "error evaluating JavaScript expression: %v", err)
 			res := v.Export()
-			switch res.(type) {
+			switch r := res.(type) {
 			case bool:
-				if !res.(bool) {
+				if !r {
 					continue
 				}
 			default:

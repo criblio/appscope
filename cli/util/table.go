@@ -117,9 +117,9 @@ func printObj(fields []ObjField, obj interface{}) error {
 			if field.Transform != nil {
 				val = field.Transform(v)
 			} else {
-				switch v.(type) {
+				switch res := v.(type) {
 				case map[string]interface{}:
-					subtable := indentedSubtable(v.(map[string]interface{}), "  ")
+					subtable := indentedSubtable(res, "  ")
 					if len(subtable) > 0 {
 						table.Append([]string{color.GreenString(fmt.Sprintf("%s:", field.Name)), ""})
 						for _, row := range subtable {
@@ -130,7 +130,7 @@ func printObj(fields []ObjField, obj interface{}) error {
 					}
 					continue
 				case []string:
-					rows := v.([]string)
+					rows := res
 					if len(rows) > 0 {
 						table.Append([]string{color.GreenString(fmt.Sprintf("%s:", field.Name)), ""})
 						for _, row := range rows {
@@ -139,18 +139,17 @@ func printObj(fields []ObjField, obj interface{}) error {
 					}
 					continue
 				case float64:
-					val = color.HiBlueString("%v", v)
+					val = color.HiBlueString("%v", res)
 				case float32:
-					val = color.HiBlueString("%v", v)
+					val = color.HiBlueString("%v", res)
 				case int64:
-					val = color.HiBlueString("%v", v)
+					val = color.HiBlueString("%v", res)
 				case int32:
-					val = color.HiBlueString("%v", v)
+					val = color.HiBlueString("%v", res)
 				case int:
-					val = color.HiBlueString("%v", v)
-					val = color.HiBlueString("%v", v)
+					val = color.HiBlueString("%v", res)
 				default:
-					val = fmt.Sprintf("%v", v)
+					val = fmt.Sprintf("%v", res)
 				}
 			}
 			table.Append([]string{color.GreenString("%s:", field.Name), val})
@@ -169,12 +168,12 @@ func indentedSubtable(obj map[string]interface{}, indent string) [][]string {
 	sort.Strings(keys)
 	for _, k := range keys {
 		v := obj[k]
-		switch v.(type) {
+		switch res := v.(type) {
 		case map[string]interface{}:
 			ret = append(ret, []string{fmt.Sprintf("%s%s", indent, k), ""})
-			ret = append(ret, indentedSubtable(v.(map[string]interface{}), fmt.Sprintf("%s  ", indent))...)
+			ret = append(ret, indentedSubtable(res, fmt.Sprintf("%s  ", indent))...)
 		default:
-			ret = append(ret, []string{fmt.Sprintf("%s%s", indent, k), fmt.Sprintf("%v", v)})
+			ret = append(ret, []string{fmt.Sprintf("%s%s", indent, k), fmt.Sprintf("%v", res)})
 		}
 	}
 	return ret

@@ -89,7 +89,7 @@ cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope hi
 				{Name: "Command", Field: "cmd"},
 				{Name: "Cmdline", Field: "args", Transform: func(obj interface{}) string { return util.TruncWithElipsis(shellquote.Join(obj.([]string)...), 25) }},
 				{Name: "PID", Field: "pid"},
-				{Name: "Age", Field: "timestamp", Transform: func(obj interface{}) string { return util.GetHumanDuration(time.Now().Sub(time.Unix(0, obj.(int64)))) }},
+				{Name: "Age", Field: "timestamp", Transform: func(obj interface{}) string { return util.GetHumanDuration(time.Since(time.Unix(0, obj.(int64)))) }},
 				{Name: "Duration", Field: "duration", Transform: func(obj interface{}) string { return util.GetHumanDuration(obj.(time.Duration)) }},
 				{Name: "Total Events", Field: "eventCount", Transform: func(obj interface{}) string {
 					if obj.(int) == -1 {

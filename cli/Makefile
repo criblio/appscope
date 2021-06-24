@@ -65,7 +65,7 @@ fmt:
 
 ## lint: lint all Go files
 lint: 
-	golangci-lint run ./...
+	golangci-lint --new-from-rev=HEAD~1 run ./...
 
 ## vet: vet all Go files
 vet: 
@@ -76,7 +76,7 @@ cover:
 	cd $(DIR) && $(GO) tool cover -html=coverage.out -o coverage.html
 
 ## check: format, vet, lint and test all Go files
-check: fmt vet lint test
+check: fmt vet lint clitest
 
 help: Makefile
 	@echo

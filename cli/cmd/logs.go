@@ -40,7 +40,7 @@ var logsCmd = &cobra.Command{
 			util.ErrAndExit("No logs generated")
 		}
 		util.CheckErrSprintf(err, "error seeking last N offset: %v", err)
-		_, err = logFile.Seek(int64(offset), io.SeekStart)
+		_, err = logFile.Seek(offset, io.SeekStart)
 		util.CheckErrSprintf(err, "error seeking log file: %v", err)
 		util.NewlineReader(logFile, util.MatchAlways, func(idx int, Offset int64, b []byte) error {
 			fmt.Printf("%s\n", b)

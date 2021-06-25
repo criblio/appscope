@@ -14,7 +14,7 @@ You can download as a binary to run on your Linux OS, or as a container.
 
 First, see [Requirements](/docs/requirements) to ensure that you’re completing these steps on a supported system. 
 
-Next, Use this command to download the CLI binary and make it executable:
+Next, use these commands to download the CLI binary and make it executable:
 
 ```
 $ LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)

@@ -2,6 +2,12 @@ version: '3.5'
 
 services:
 
+  alpine:
+    privileged: true
+
+  attach:
+    privileged: true
+
   bash:
     privileged: true
 

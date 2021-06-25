@@ -35,7 +35,7 @@ TESTS=$(shell $(COMPOSE) config --services | sort -V)
 help:
 	@echo "AppScope Integration Test Runner"
 	@echo "  \`make help\` - show this info"
-	@echo "  \`make all\` - run all tests"
+	@echo "  \`make all\` - run all tests, stop of first failure"
 	@echo "  \`make build\` - build all test images"
 	@echo "  \`make push\` - push all test images"
 	@echo "  \`make (test)\` - run a single test"
@@ -43,7 +43,6 @@ help:
 	@echo "  \`make (test)-shell\` - run a shell in the test's container"
 	@echo "Tests: $(TESTS)"
 
-all: CONTINUE := 1
 all: $(TESTS)
 
 $(TESTS):
@@ -53,9 +52,7 @@ $(TESTS):
 	@echo " $(shell date)"
 	@echo " Running \"$@\" Test"
 	@echo "==================================================================="
-	@time $(COMPOSE) run $@ || if [ -z "$(CONTINUE)" ]; then \
-		{ echo >&2 "error: $(@) test failed."; exit 1; } \
-	fi
+	@time $(COMPOSE) run $@ || { echo >&2 "error: $(@) test failed."; exit 1; }
 
 build: $(addsuffix -build, $(TESTS))
 

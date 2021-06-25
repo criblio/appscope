@@ -61,7 +61,7 @@ ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
 ENV SCOPE_EVENT_DEST=file:///go/events.log
 
-ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+RUN echo "export PATH=/usr/local/scope:/usr/local/scope/bin:${PATH}" >/etc/profile.d/path.sh
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit
 

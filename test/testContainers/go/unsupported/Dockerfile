@@ -58,6 +58,7 @@ ENV SCOPE_EVENT_DEST=file:///go/events.log
 ENV SCOPE_LOG_LEVEL=warning
 ENV SCOPE_LOG_DEST=file:///go/logs.txt
 
+RUN echo "export PATH=/usr/local/scope:/usr/local/scope/bin:${PATH}" >/etc/profile.d/path.sh
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit
 

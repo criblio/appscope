@@ -24,7 +24,8 @@ ENV SCOPE_SUMMARY_PERIOD=1
 #ENV SCOPE_EVENT_HTTP=true
 ENV SCOPE_EVENT_DEST=file:///gogen/events.log
 
-ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+#ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+RUN echo "export PATH=/usr/local/scope:/usr/local/scope/bin:${PATH}" >/etc/profile.d/path.sh
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit
 

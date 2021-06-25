@@ -43,8 +43,17 @@ func helpErrAndExit(cmd *cobra.Command, errText string) {
 }
 
 func metricAndEventDestFlags(cmd *cobra.Command, rc *run.Config) {
-	cmd.Flags().StringVarP(&rc.CriblDest, "cribldest", "c", "", "Set Cribl destination for metrics & events (host:port)")
+	cmd.Flags().StringVarP(&rc.CriblDest, "cribldest", "c", "", "Set Cribl destination for metrics & events (host:port defaults to tls://)")
 	cmd.Flags().StringVar(&rc.MetricsFormat, "metricformat", "ndjson", "Set format of metrics output (statsd|ndjson)")
-	cmd.Flags().StringVarP(&rc.MetricsDest, "metricdest", "m", "", "Set destination for metrics (tcp://host:port, udp://host:port, or file:///path/file.json)")
-	cmd.Flags().StringVarP(&rc.EventsDest, "eventdest", "e", "", "Set destination for events (tcp://host:port, udp://host:port, or file:///path/file.json)")
+	cmd.Flags().StringVarP(&rc.MetricsDest, "metricdest", "m", "", "Set destination for metrics (host:port defaults to tls://)")
+	cmd.Flags().StringVarP(&rc.EventsDest, "eventdest", "e", "", "Set destination for events (host:port defaults to tls://)")
+}
+
+func runCmdFlags(cmd *cobra.Command, rc *run.Config) {
+	cmd.Flags().BoolVar(&rc.Passthrough, "passthrough", false, "Runs ldscope with current environment & no config.")
+	cmd.Flags().IntVarP(&rc.Verbosity, "verbosity", "v", 4, "Set scope metric verbosity")
+	cmd.Flags().BoolVarP(&rc.Payloads, "payloads", "p", false, "Capture payloads of network transactions")
+	cmd.Flags().StringVar(&rc.Loglevel, "loglevel", "", "Set ldscope log level (debug, warning, info, error, none)")
+	cmd.Flags().StringVarP(&rc.LibraryPath, "librarypath", "l", "", "Set path for dynamic libraries")
+	metricAndEventDestFlags(cmd, rc)
 }

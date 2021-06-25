@@ -223,7 +223,7 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     char **astart;
     Elf64_Ehdr *elf;
     char **spp = (char **)sp;
-    uint64_t cnt = (uint64_t)argc - 1;
+    uint64_t cnt = (uint64_t)argc;
     Elf64_Addr *elf_info;
     
     if (!buf || !spp || !argv || !*argv || !env || !*env) return -1;
@@ -233,10 +233,10 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     // do argc
     *spp++ = (char *)cnt;
     
-    // do argv; start at argv[1] to get the app's args
-    for (i = 0; i < (argc - 1); i++) {
-        if (&argv[i + 1] && spp) {
-            *spp++ = (char *)argv[i + 1];
+    // do argv
+    for (i = 0; i < argc; i++) {
+        if (&argv[i] && spp) {
+            *spp++ = (char *)argv[i];
         } else {
             scopeLog("ERROR:copy_strings: arg entry is not correct", -1, CFG_LOG_ERROR);
             return -1;
@@ -275,11 +275,23 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     // end of env
     *spp++ = NULL;
 
+    // This is the destination for the new auxv array
+    // The AUX_ENT macro uses elf_info
     elf_info = (Elf64_Addr *)spp;
     memset(elf_info, 0, sizeof(Elf64_Addr) * ((AT_EXECFN + 1) * 2));
 
+    /*
+     * There is an auxv vector that defines a TLS section from the elf image.
+     * It's defined as AT_BASE or PT_TLS.
+     * The aux type of AT_BASE and PT_TLS both define the same auxv entry.
+     * If a static go exec on musl lib attempts to use the AT_BASE/PT_TLS auxv entry
+     * as a pointer to TLS it segfaults. Setting an AT_BASE auxv entry to be ignored
+     * allows both gnu and musl go static execs to function as expected.
+     */
+
+    // This is the source of the existing auxv array that is to be copied
     // auxv entries start right after env is null
-    astart = (char **)env;    // leaving env in place for debugging
+    astart = (char **)env;
     while(*astart++ != NULL);
 
     for (auxv = (Elf64_auxv_t *)astart; auxv->a_type != AT_NULL; auxv++) {
@@ -293,7 +305,7 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
             break;
 
         case AT_BASE:
-            AUX_ENT(auxv->a_type, -1);
+            AUX_ENT(-1, -1);
             break;
 
         case AT_ENTRY:
@@ -301,7 +313,7 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
             break;
 
         case AT_EXECFN:
-            AUX_ENT(auxv->a_type, (unsigned long)argv[1]);
+            AUX_ENT(auxv->a_type, (unsigned long)argv[0]);
             break;
 
         default:

@@ -12,7 +12,7 @@ accumulate_coverage() {
     FILE=coverage/coverage$NUM.info
     lcov --capture --directory . --output-file $FILE
     INFOLIST=$INFOLIST"$FILE "
-    rm *\.gcda
+    rm -f *\.gcda
     ((NUM++))
 
     return 0
@@ -21,7 +21,7 @@ accumulate_coverage() {
 report_final_coverage() {
 
     genhtml -o coverage $INFOLIST
-    rm *\.gcno *\.o *\.gcda
+    rm -f *\.gcno *\.o *\.gcda
 }
 
 run_test() {
@@ -90,7 +90,7 @@ if [ "${OS}" = "linux" ]; then
     ENVVARS=$ENVVARS"LD_PRELOAD=./lib/linux/libscope.so ""SCOPE_METRIC_DEST=file:///tmp/dnstest.log ""SCOPE_METRIC_VERBOSITY=9 ""SCOPE_SUMMARY_PERIOD=1 "
     run_test test/${OS}/dnstest
     ENVARS=$SAVEVARS
-    rm "/tmp/dnstest.log"
+    rm -f "/tmp/dnstest.log"
 
     test/access_rights.sh
     ERR+=$?
@@ -102,8 +102,8 @@ if [ "${OS}" = "linux" ]; then
     ERR+=$?
 fi
 
-
-
+test/options.sh
+ERR+=$?
 
 #                ^
 #                |

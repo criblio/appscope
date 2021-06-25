@@ -1,0 +1,36 @@
+# This file configures github.com/golangci/golangci-lint.
+
+run:
+  timeout: 3m
+  tests: true
+  # default is true. Enables skipping of directories:
+  #   vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
+  skip-dirs-use-default: true
+
+linters:
+  disable-all: true
+  enable:
+    - goconst
+    - errcheck
+    - deadcode
+    - goimports
+    - gosimple
+    - ineffassign
+    - misspell
+    - unconvert
+    - varcheck
+    - staticcheck
+
+linters-settings:
+  goconst:
+    min-len: 3 # minimum length of string constant
+    min-occurrences: 6 # minimum number of occurrences
+
+issues:
+  exclude-rules:
+
+  # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
+  max-issues-per-linter: 0
+
+  # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
+  max-same-issues: 0

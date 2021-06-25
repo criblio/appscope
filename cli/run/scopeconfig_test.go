@@ -89,41 +89,128 @@ func TestConfigFromRunOpts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "statsd", c.sc.Metric.Format.FormatType)
 
+	// empty
+	c.MetricsDest = ""
+	err = c.configFromRunOpts()
+	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, ".foo/metrics.json", c.sc.Metric.Transport.Path)
+
+	// invalid proto
 	c.MetricsDest = "foo://bar"
 	err = c.configFromRunOpts()
 	assert.Equal(t, fmt.Errorf("Invalid dest: foo://bar"), err)
 
+	// missing port
+	c.MetricsDest = "tcp://bar"
+	err = c.configFromRunOpts()
+	assert.Equal(t, fmt.Errorf("Missing :port at the end of tcp://bar"), err)
+	c.MetricsDest = "udp://bar"
+	err = c.configFromRunOpts()
+	assert.Equal(t, fmt.Errorf("Missing :port at the end of udp://bar"), err)
+	c.MetricsDest = "tls://bar"
+	err = c.configFromRunOpts()
+	assert.Equal(t, fmt.Errorf("Missing :port at the end of tls://bar"), err)
+
+	// invlaid port
+	c.MetricsDest = "tcp://bar:foo"
+	err = c.configFromRunOpts()
+	assert.Equal(t, fmt.Errorf("Invalid dest: tcp://bar:foo"), err)
+	c.MetricsDest = "udp://bar:foo"
+	err = c.configFromRunOpts()
+	assert.Equal(t, fmt.Errorf("Invalid dest: udp://bar:foo"), err)
+	c.MetricsDest = "tls://bar:foo"
+	err = c.configFromRunOpts()
+	assert.Equal(t, fmt.Errorf("Invalid dest: tls://bar:foo"), err)
+
+	// file
 	c.MetricsDest = "file://foo"
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
-
-	c.MetricsDest = "tcp://foo"
-	err = c.configFromRunOpts()
-	assert.Equal(t, fmt.Errorf("Cannot parse dest: tcp://foo"), err)
-
-	c.MetricsDest = "tcp://foo:bar"
-	err = c.configFromRunOpts()
-	assert.Equal(t, fmt.Errorf("Cannot parse port from tcp://foo:bar: bar"), err)
-
-	c.MetricsDest = "tcp://foo.com:8000"
-	err = c.configFromRunOpts()
-	assert.NoError(t, err)
-	assert.Equal(t, "foo.com", c.sc.Metric.Transport.Host)
-	assert.Equal(t, 8000, c.sc.Metric.Transport.Port)
-	assert.Equal(t, "tcp", c.sc.Metric.Transport.TransportType)
-
-	c.MetricsDest = "udp://foo.com:8000"
-	err = c.configFromRunOpts()
-	assert.NoError(t, err)
-	assert.Equal(t, "foo.com", c.sc.Metric.Transport.Host)
-	assert.Equal(t, 8000, c.sc.Metric.Transport.Port)
-	assert.Equal(t, "udp", c.sc.Metric.Transport.TransportType)
-
-	c.MetricsDest = "file:///path/to/file.json"
-	err = c.configFromRunOpts()
-	assert.NoError(t, err)
-	assert.Equal(t, "/path/to/file.json", c.sc.Metric.Transport.Path)
 	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "foo", c.sc.Metric.Transport.Path)
+	c.MetricsDest = "foo"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "foo", c.sc.Metric.Transport.Path)
+	c.MetricsDest = "file:///foo/bar"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "/foo/bar", c.sc.Metric.Transport.Path)
+	c.MetricsDest = "/foo/bar"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "/foo/bar", c.sc.Metric.Transport.Path)
+	c.MetricsDest = "file://foo:1234" // port is ignored
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "foo", c.sc.Metric.Transport.Path)
+	c.MetricsDest = "file://stdout" // stdout is valid
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "stdout", c.sc.Metric.Transport.Path)
+	c.MetricsDest = "file://stderr" // stderr is valid
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "stderr", c.sc.Metric.Transport.Path)
+
+	// tcp
+	c.MetricsDest = "tcp://foo:1234"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "tcp", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "foo", c.sc.Metric.Transport.Host)
+	assert.Equal(t, 1234, c.sc.Metric.Transport.Port)
+	assert.Equal(t, "", c.sc.Metric.Transport.Path)
+	assert.Equal(t, false, c.sc.Metric.Transport.Tls.Enable)
+
+	// udp
+	c.MetricsDest = "udp://foo:1234"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "udp", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "foo", c.sc.Metric.Transport.Host)
+	assert.Equal(t, 1234, c.sc.Metric.Transport.Port)
+	assert.Equal(t, "", c.sc.Metric.Transport.Path)
+	assert.Equal(t, false, c.sc.Metric.Transport.Tls.Enable)
+
+	// tls
+	c.MetricsDest = "tls://foo:1234"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "tcp", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "foo", c.sc.Metric.Transport.Host)
+	assert.Equal(t, 1234, c.sc.Metric.Transport.Port)
+	assert.Equal(t, "", c.sc.Metric.Transport.Path)
+	assert.Equal(t, true, c.sc.Metric.Transport.Tls.Enable)
+	assert.Equal(t, true, c.sc.Metric.Transport.Tls.ValidateServer)
+	assert.Equal(t, "", c.sc.Metric.Transport.Tls.CaCertPath)
+
+	// host:port
+	c.MetricsDest = "foo:1234"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "tcp", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "foo", c.sc.Metric.Transport.Host)
+	assert.Equal(t, 1234, c.sc.Metric.Transport.Port)
+	assert.Equal(t, "", c.sc.Metric.Transport.Path)
+	assert.Equal(t, true, c.sc.Metric.Transport.Tls.Enable)
+	assert.Equal(t, true, c.sc.Metric.Transport.Tls.ValidateServer)
+	assert.Equal(t, "", c.sc.Metric.Transport.Tls.CaCertPath)
+
+	c.Loglevel = "foo"
+	err = c.configFromRunOpts()
+	assert.Error(t, err)
+
+	c.Loglevel = "debug"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, c.sc.Libscope.Log.Level, "debug")
 }
 
 func TestWriteScopeConfig(t *testing.T) {
@@ -138,7 +225,7 @@ func TestWriteScopeConfig(t *testing.T) {
 	// os.Remove(".cantwrite")
 
 	testYaml := testDefaultScopeConfigYaml("/foo", 4)
-	err = opt.WriteScopeConfig(".scope.yml")
+	err = opt.WriteScopeConfig(".scope.yml", 0644)
 	assert.NoError(t, err)
 	yamlBytes, err := ioutil.ReadFile(".scope.yml")
 	assert.Equal(t, testYaml, string(yamlBytes))

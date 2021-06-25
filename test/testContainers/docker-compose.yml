@@ -267,6 +267,7 @@ services:
         GO_IMAGE_VER: golang:1.16
     <<: *scope-common
 
+<<<<<<< HEAD
   gogen:
     image: criblci/scope-gogen-it
     build:
@@ -276,6 +277,8 @@ services:
       dockerfile: ./gogen/Dockerfile
     <<: *scope-common
 
+=======
+>>>>>>> master
   java7:
     image: criblci/scope-java7-it
     build:
@@ -457,5 +460,21 @@ services:
       args:
         JRE_TGZ: jdk/jdk-14.0.2_linux-x64_bin.tar.gz
     <<: *java-common
+
+  alpine:
+    image: criblci/scope-alpine-it
+    build:
+      cache_from:
+        - criblci/scope-alpine-it
+      context: .
+      dockerfile: ./alpine/Dockerfile
+
+  attach:
+    image: criblci/scope-attach-it
+    build:
+      cache_from:
+        - criblci/scope-attach-it
+      context: .
+      dockerfile: ./attach/Dockerfile
 
 # vim: ts=2 sw=2 et :

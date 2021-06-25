@@ -64,19 +64,10 @@ glibcMemFuncsFound(void)
 }
 
 int
-in_bash_process(void)
-{
-    char *exe_path = NULL;
-    osGetExePath(&exe_path);
-    int is_bash = endsWith(exe_path, "/bash");
-    if (exe_path) free(exe_path);
-    return is_bash;
-}
-
-int
-func_found_in_executable(const char *symbol)
+func_found_in_executable(const char *symbol, const char *exe)
 {
     int func_found = FALSE;
+    char *exe_with_preceeding_slash = NULL;
 
     // open the exectuable (as opposed to a specific shared lib)
     void *exe_handle = g_fn.dlopen(NULL, RTLD_LAZY);
@@ -86,27 +77,17 @@ func_found_in_executable(const char *symbol)
     if (!symbol_ptr) goto out;
 
     Dl_info symbol_info;
-    void *lm, *es;
-    if (!dladdr1(symbol_ptr, &symbol_info, &lm, RTLD_DL_LINKMAP) ||
-        !dladdr1(symbol_ptr, &symbol_info, &es, RTLD_DL_SYMENT)) {
+    if (!dladdr(symbol_ptr, &symbol_info)) {
         goto out;
     }
-    struct link_map *link_map = (struct link_map *)lm;
-    ElfW(Sym) *elf_sym = (ElfW(Sym) *)es;
-    int symbol_type = ELF64_ST_TYPE(elf_sym->st_info);
-    int symbol_binding = ELF64_ST_BIND(elf_sym->st_info);
-    int symbol_visibility = ELF64_ST_VISIBILITY(elf_sym->st_other);
 
-    // return true iff l_name is empty, meaning that symbol
-    // was found outside of a shared library, aka in the exectuable.
-    func_found =
-          (symbol_binding == STB_GLOBAL) &&
-          (symbol_type == STT_FUNC) &&
-          (symbol_visibility == STV_DEFAULT) &&
-          (link_map->l_name[0] == '\0'); // not a shared library name
+    // turns "bash" into "/bash", for example
+    if (asprintf(&exe_with_preceeding_slash, "/%s", exe) == -1) goto out;
+    func_found = endsWith(symbol_info.dli_fname, exe_with_preceeding_slash);
 
 out:
     if (exe_handle) dlclose(exe_handle);
+    if (exe_with_preceeding_slash) free(exe_with_preceeding_slash);
     return func_found;
 }
 

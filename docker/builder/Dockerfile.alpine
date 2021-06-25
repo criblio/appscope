@@ -1,0 +1,32 @@
+# ---
+# Cribl AppScope - Build under Docker
+#
+# by Paul Dugas <paul@dugas.cc>
+#
+
+# ---
+# Use the Ubuntu 18.04 image by default. Override this like below.
+#
+#     docker build --build-arg IMAGE=ubuntu:latest ...
+#
+ARG IMAGE=alpine:latest
+FROM $IMAGE
+
+# ---
+# Install packages.
+#
+RUN apk add --no-cache go gdb git make vim emacs strace tcpdump
+
+# ---
+# Extra setup for use with `make docker-run`
+#
+COPY ./docker/builder/gdbinit /root/.gdbinit
+
+# ---
+# The local git clone of the project is mounted as /root/appscope. See Makefile.
+#
+#     docker run -v $(pwd):/root/appscope ...
+#
+WORKDIR /root/appscope
+
+# fini

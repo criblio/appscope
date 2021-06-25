@@ -1,3 +1,8 @@
+**/*.swp
+*.o
+*.gcno
+.gdb_history
+scope.log
 coverage/
 # JetBrains specific directory
 .idea
@@ -7,6 +12,7 @@ venv
 test/selfinterpose/
 contrib/funchook/build/
 contrib/pcre2/build
+contrib/openssl/
 
 test/testContainers/logs
 

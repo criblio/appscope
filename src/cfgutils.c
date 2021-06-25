@@ -9,12 +9,14 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
 #include "cfgutils.h"
 #include "dbg.h"
 #include "mtcformat.h"
 #include "scopetypes.h"
 #include "com.h"
 #include "utils.h"
+#include "fn.h"
 
 #ifndef NO_YAML
 #include "yaml.h"
@@ -34,6 +36,10 @@
 #define PORT_NODE                    "port"
 #define PATH_NODE                    "path"
 #define BUFFERING_NODE               "buffering"
+#define TLS_NODE                     "tls"
+#define ENABLE_NODE                      "enable"
+#define VALIDATE_NODE                    "validateserver"
+#define CACERT_NODE                      "cacertpath"
 
 #define LIBSCOPE_NODE        "libscope"
 #define LOG_NODE                 "log"
@@ -133,14 +139,17 @@ void cfgEvtFormatNameFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatSourceEnabledSetFromStr(config_t*, watch_t, const char*);
 void cfgMtcVerbositySetFromStr(config_t*, const char*);
 void cfgTransportSetFromStr(config_t*, which_transport_t, const char*);
+void cfgTransportTlsEnableSetFromStr(config_t *, which_transport_t, const char *);
+void cfgTransportTlsValidateServerSetFromStr(config_t *, which_transport_t, const char *);
+void cfgTransportTlsCACertPathSetFromStr(config_t *, which_transport_t, const char *);
 void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
 void cfgPayEnableSetFromStr(config_t*, const char*);
 void cfgPayDirSetFromStr(config_t*, const char*);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 static void cfgSetFromFile(config_t *, const char *);
-static void cfgEvtFormatLogStreamSetFromStr(config_t *, const char *);
-static void cfgCriblEnableSetFromStr(config_t *, const char *);
+static void cfgCriblEnableSetFromStrEnv(config_t *, cfg_logstream_t, const char *);
+static void cfgCriblEnableSetFromStrYaml(config_t *, const char *);
 
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
@@ -149,7 +158,7 @@ static watch_t watch_context;
 static regex_t* g_regex = NULL;
 static char g_logmsg[1024] = {};
 
-static char*
+static char *
 cfgPathSearch(const char* cfgname)
 {
     // in priority order:
@@ -162,63 +171,58 @@ cfgPathSearch(const char* cfgname)
     //   7) ./scope.yml
 
     char path[1024]; // Somewhat arbitrary choice for MAX_PATH
-    static int (*ni_access)(const char *pathname, int mode);
-    if (!ni_access) ni_access = dlsym(RTLD_NEXT, "access");
-    if (!ni_access) return NULL;
+    if (!g_fn.access) return NULL;
 
-    const char* homedir = getenv("HOME");
-    const char* scope_home = getenv("SCOPE_HOME");
+    const char *homedir = getenv("HOME");
+    const char *scope_home = getenv("SCOPE_HOME");
     if (scope_home &&
        (snprintf(path, sizeof(path), "%s/conf/%s", scope_home, cfgname) > 0) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if (scope_home &&
        (snprintf(path, sizeof(path), "%s/%s", scope_home, cfgname) > 0) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if ((snprintf(path, sizeof(path), "/etc/scope/%s", cfgname) > 0 ) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if (homedir &&
        (snprintf(path, sizeof(path), "%s/conf/%s", homedir, cfgname) > 0) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if (homedir &&
        (snprintf(path, sizeof(path), "%s/%s", homedir, cfgname) > 0) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if ((snprintf(path, sizeof(path), "./conf/%s", cfgname) > 0) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
     if ((snprintf(path, sizeof(path), "./%s", cfgname) > 0) &&
-        !ni_access(path, R_OK)) {
+        !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
 
     return NULL;
 }
 
-char*
+char *
 cfgPath(void)
 {
     const char* envPath = getenv("SCOPE_CONF_PATH");
 
     // If SCOPE_CONF_PATH is set, and the file can be opened, use it.
-    char* path;
+    char *path;
     if (envPath && (path = strdup(envPath))) {
 
-        // ni for "non-interposed"...  a direct glibc call without scope.
-        FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
-        int (*ni_fclose)(FILE *) = dlsym(RTLD_NEXT, "fclose");
-        FILE* f = NULL;
-        if (ni_fopen && ni_fclose && (f = ni_fopen(path, "rb"))) {
-            ni_fclose(f);
+        FILE *fp = NULL;
+        if (g_fn.fopen && g_fn.fclose && (fp = g_fn.fopen(path, "rb"))) {
+            g_fn.fclose(fp);
             return path;
         }
 
@@ -356,18 +360,13 @@ doEnvVariableSubstitution(const char* value)
 static void
 processCmdDebug(const char* path)
 {
-    if (!path || !path[0]) return;
-
-    static FILE *(*ni_fopen)(const char *, const char *);
-    static int (*ni_fclose)(FILE*);
-    if (!ni_fopen) ni_fopen = dlsym(RTLD_NEXT, "fopen");
-    if (!ni_fclose) ni_fclose = dlsym(RTLD_NEXT, "fclose");
-    if (!ni_fopen || !ni_fclose) return;
+    if (!path || !path[0] ||
+        !g_fn.fopen || !g_fn.fclose) return;
 
     FILE* f;
-    if (!(f = ni_fopen(path, "a"))) return;
+    if (!(f = g_fn.fopen(path, "a"))) return;
     dbgDumpAll(f);
-    ni_fclose(f);
+    g_fn.fclose(f);
 }
 
 static void
@@ -424,8 +423,20 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgLogLevelSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_METRIC_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_MTC, value);
+    } else if (startsWith(env_line, "SCOPE_METRIC_TLS_ENABLE")) {
+        cfgTransportTlsEnableSetFromStr(cfg, CFG_MTC, value);
+    } else if (startsWith(env_line, "SCOPE_METRIC_TLS_VALIDATE_SERVER")) {
+        cfgTransportTlsValidateServerSetFromStr(cfg, CFG_MTC, value);
+    } else if (startsWith(env_line, "SCOPE_METRIC_TLS_CA_CERT_PATH")) {
+        cfgTransportTlsCACertPathSetFromStr(cfg, CFG_MTC, value);
     } else if (startsWith(env_line, "SCOPE_LOG_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_LOG, value);
+    } else if (startsWith(env_line, "SCOPE_LOG_TLS_ENABLE")) {
+        cfgTransportTlsEnableSetFromStr(cfg, CFG_LOG, value);
+    } else if (startsWith(env_line, "SCOPE_LOG_TLS_VALIDATE_SERVER")) {
+        cfgTransportTlsValidateServerSetFromStr(cfg, CFG_LOG, value);
+    } else if (startsWith(env_line, "SCOPE_LOG_TLS_CA_CERT_PATH")) {
+        cfgTransportTlsCACertPathSetFromStr(cfg, CFG_LOG, value);
     } else if (startsWith(env_line, "SCOPE_TAG_")) {
         processCustomTag(cfg, env_line, value);
     } else if (startsWith(env_line, "SCOPE_PAYLOAD_ENABLE")) {
@@ -438,6 +449,12 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         processReloadConfig(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_CTL, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_TLS_ENABLE")) {
+        cfgTransportTlsEnableSetFromStr(cfg, CFG_CTL, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_TLS_VALIDATE_SERVER")) {
+        cfgTransportTlsValidateServerSetFromStr(cfg, CFG_CTL, value);
+    } else if (startsWith(env_line, "SCOPE_EVENT_TLS_CA_CERT_PATH")) {
+        cfgTransportTlsCACertPathSetFromStr(cfg, CFG_CTL, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_ENABLE")) {
         cfgEvtEnableSetFromStr(cfg, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
@@ -512,8 +529,16 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FS, value);
     } else if (startsWith(env_line, "SCOPE_EVENT_DNS")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_DNS, value);
+    } else if (startsWith(env_line, "SCOPE_CRIBL_TLS_ENABLE")) {
+        cfgTransportTlsEnableSetFromStr(cfg, CFG_LS, value);
+    } else if (startsWith(env_line, "SCOPE_CRIBL_TLS_VALIDATE_SERVER")) {
+        cfgTransportTlsValidateServerSetFromStr(cfg, CFG_LS, value);
+    } else if (startsWith(env_line, "SCOPE_CRIBL_TLS_CA_CERT_PATH")) {
+        cfgTransportTlsCACertPathSetFromStr(cfg, CFG_LS, value);
+    } else if (startsWith(env_line, "SCOPE_CRIBL_CLOUD")) {
+        cfgCriblEnableSetFromStrEnv(cfg, CFG_LOGSTREAM_CLOUD, value);
     } else if (startsWith(env_line, "SCOPE_CRIBL")) {
-        cfgEvtFormatLogStreamSetFromStr(cfg, value);
+        cfgCriblEnableSetFromStrEnv(cfg, CFG_LOGSTREAM, value);
     }
 
 
@@ -547,22 +572,18 @@ cfgProcessEnvironment(config_t* cfg)
 void
 cfgProcessCommands(config_t* cfg, FILE* file)
 {
-    if (!cfg || !file) return;
+    if (!cfg || !file || !g_fn.getline) return;
 
-    static ssize_t (*ni_getline)(char **, size_t *, FILE *);
-    if (!ni_getline) ni_getline = dlsym(RTLD_NEXT, "getline");
-    if (!ni_getline) return;
+    char *line = NULL;
+    size_t len = 0;
 
-    char* e = NULL;
-    size_t n = 0;
-
-    while (ni_getline(&e, &n, file) != -1) {
-        e[strcspn(e, "\r\n")] = '\0'; //overwrite first \r or \n with null
-        processEnvStyleInput(cfg, e);
-        e[0] = '\0';
+    while (g_fn.getline(&line, &len, file) != -1) {
+        line[strcspn(line, "\r\n")] = '\0'; //overwrite first \r or \n with null
+        processEnvStyleInput(cfg, line);
+        line[0] = '\0';
     }
 
-    if (e) free(e);
+    if (line) free(line);
 }
 
 void
@@ -759,6 +780,28 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
 }
 
 void
+cfgTransportTlsEnableSetFromStr(config_t *cfg, which_transport_t t, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgTransportTlsEnableSet(cfg, t, strToVal(boolMap, value));
+}
+
+void
+cfgTransportTlsValidateServerSetFromStr(config_t *cfg, which_transport_t t, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgTransportTlsValidateServerSet(cfg, t, strToVal(boolMap, value));
+}
+void
+cfgTransportTlsCACertPathSetFromStr(config_t *cfg, which_transport_t t, const char *value)
+{
+    // A little silly to define passthrough function
+    // but this keeps the interface consistent.
+    if (!cfg || !value) return;
+    cfgTransportTlsCACertPathSet(cfg, t, value);
+}
+
+void
 cfgCustomTagAddFromStr(config_t* cfg, const char* name, const char* value)
 {
     // A little silly to define passthrough function
@@ -788,18 +831,21 @@ cfgPayDirSetFromStr(config_t *cfg, const char *value)
 }
 
 void
-cfgCriblEnableSetFromStr(config_t *cfg, const char *value)
+cfgCriblEnableSetFromStrYaml(config_t *cfg, const char *value)
 {
     if (!cfg || !value) return;
+    // Sets CFG_LOGSTREAM_NONE (0) or CFG_LOGSTREAM (1)
     cfgLogStreamSet(cfg, strToVal(boolMap, value));
 }
 
 static void
-cfgEvtFormatLogStreamSetFromStr(config_t *cfg, const char *value)
+cfgCriblEnableSetFromStrEnv(config_t *cfg, cfg_logstream_t type, const char *value)
 {
-    cfgLogStreamSet(cfg, 1);
+    if (!cfg || !value) return;
+    // Sets CFG_LOGSTREAM (1) or CFG_LOGSTREAM_CLOUD (2)
+    cfgLogStreamSet(cfg, type);
+    // Sets type, host, and port
     cfgTransportSetFromStr(cfg, CFG_LS, value);
-    cfgTransportSetFromStr(cfg, CFG_CTL, value);
 }
 
 #ifndef NO_YAML
@@ -899,6 +945,51 @@ processBuf(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
+processTlsEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    which_transport_t c = transport_context;
+    cfgTransportTlsEnableSetFromStr(config, c, value);
+    if (value) free(value);
+}
+
+static void
+processTlsValidate(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    which_transport_t c = transport_context;
+    cfgTransportTlsValidateServerSetFromStr(config, c, value);
+    if (value) free(value);
+}
+
+static void
+processTlsCaCert(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    which_transport_t c = transport_context;
+    cfgTransportTlsCACertPathSetFromStr(config, c, value);
+    if (value) free(value);
+}
+
+static void
+processTls(config_t *config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE,    ENABLE_NODE,          processTlsEnable},
+        {YAML_SCALAR_NODE,    VALIDATE_NODE,        processTlsValidate},
+        {YAML_SCALAR_NODE,    CACERT_NODE,          processTlsCaCert},
+        {YAML_NO_NODE,        NULL,                 NULL}
+    };
+
+    yaml_node_pair_t *pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
+static void
 processTransport(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_MAPPING_NODE) return;
@@ -909,6 +1000,7 @@ processTransport(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    PORT_NODE,            processPort},
         {YAML_SCALAR_NODE,    PATH_NODE,            processPath},
         {YAML_SCALAR_NODE,    BUFFERING_NODE,       processBuf},
+        {YAML_MAPPING_NODE,   TLS_NODE,             processTls},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1327,7 +1419,7 @@ static void
 processCriblEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char *value = stringVal(node);
-    cfgCriblEnableSetFromStr(config, value);
+    cfgCriblEnableSetFromStrYaml(config, value);
     if (value) free(value);
 }
 
@@ -1336,12 +1428,6 @@ processCriblTransport(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     transport_context = CFG_LS;
     processTransport(config, doc, node);
-
-
-    if (cfgLogStream(config)) {
-        transport_context = CFG_CTL;
-        processTransport(config, doc, node);
-    }
 }
 
 static void
@@ -1385,26 +1471,23 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
 static void
 cfgSetFromFile(config_t *config, const char* path)
 {
-    FILE* f = NULL;
+    FILE *fp = NULL;
     int parser_successful = 0;
     int doc_successful = 0;
     yaml_parser_t parser;
     yaml_document_t doc;
-    // ni for "not-interposed"... a direct glibc call without scope.
-    FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
-    int (*ni_fclose)(FILE*) = dlsym(RTLD_NEXT, "fclose");
 
-    if (!ni_fopen || !ni_fclose) goto cleanup;
+    if (!g_fn.fopen || !g_fn.fclose) goto cleanup;
 
     if (!config) goto cleanup;
     if (!path) goto cleanup;
-    f = ni_fopen(path, "rb");
-    if (!f) goto cleanup;
+    fp = g_fn.fopen(path, "rb");
+    if (!fp) goto cleanup;
 
     parser_successful = yaml_parser_initialize(&parser);
     if (!parser_successful) goto cleanup;
 
-    yaml_parser_set_input_file(&parser, f);
+    yaml_parser_set_input_file(&parser, fp);
 
     doc_successful = yaml_parser_load(&parser, &doc);
     if (!doc_successful) goto cleanup;
@@ -1415,10 +1498,10 @@ cfgSetFromFile(config_t *config, const char* path)
 cleanup:
     if (doc_successful) yaml_document_delete(&doc);
     if (parser_successful) yaml_parser_delete(&parser);
-    if (f) ni_fclose(f);
+    if (fp) g_fn.fclose(fp);
 }
 
-config_t*
+config_t *
 cfgFromString(const char* string)
 {
     config_t* config = NULL;
@@ -1470,10 +1553,33 @@ cfgFromString(const char* string)
 }
 #endif
 
+static cJSON *
+createTlsJson(config_t *cfg, which_transport_t trans)
+{
+    cJSON* root = NULL;
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
+         valToStr(boolMap, cfgTransportTlsEnable(cfg, trans)))) goto err;
+    if (!cJSON_AddStringToObjLN(root, VALIDATE_NODE,
+         valToStr(boolMap, cfgTransportTlsValidateServer(cfg, trans)))) goto err;
+
+    // Represent NULL as an empty string
+    const char *path = cfgTransportTlsCACertPath(cfg, trans);
+    path = (path) ? path : "";
+    if (!cJSON_AddStringToObjLN(root, CACERT_NODE, path)) goto err;
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
 static cJSON*
 createTransportJson(config_t* cfg, which_transport_t trans)
 {
     cJSON* root = NULL;
+    cJSON* tls = NULL;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
@@ -1487,6 +1593,9 @@ createTransportJson(config_t* cfg, which_transport_t trans)
                                      cfgTransportHost(cfg, trans))) goto err;
             if (!cJSON_AddStringToObjLN(root, PORT_NODE,
                                      cfgTransportPort(cfg, trans))) goto err;
+
+            if (!(tls = createTlsJson(cfg, trans))) goto err;
+            cJSON_AddItemToObjectCS(root, TLS_NODE, tls);
             break;
         case CFG_UNIX:
             if (!cJSON_AddStringToObjLN(root, PATH_NODE,
@@ -1807,7 +1916,10 @@ initTransport(config_t* cfg, which_transport_t t)
             transport = transportCreateUdp(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
             break;
         case CFG_TCP:
-            transport = transportCreateTCP(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
+            transport = transportCreateTCP(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t),
+                                           cfgTransportTlsEnable(cfg, t),
+                                           cfgTransportTlsValidateServer(cfg, t),
+                                           cfgTransportTlsCACertPath(cfg, t));
             break;
         case CFG_SHM:
             transport = transportCreateShm();
@@ -1954,22 +2066,38 @@ initCtl(config_t *cfg)
 int
 cfgLogStreamDefault(config_t *cfg)
 {
-    if (!cfg || (cfgLogStream(cfg) == FALSE)) return -1;
-
-    const char *host = cfgTransportHost(cfg, CFG_LS);
-    const char *port = cfgTransportPort(cfg, CFG_LS);
-
-    if (!host || !port) return -1;
+    if (!cfg || (cfgLogStream(cfg) == CFG_LOGSTREAM_NONE)) return -1;
 
     snprintf(g_logmsg, sizeof(g_logmsg), DEFAULT_LOGSTREAM_LOGMSG);
 
-    cfgTransportTypeSet(cfg, CFG_CTL, CFG_TCP);
-    cfgTransportHostSet(cfg, CFG_CTL, host);
-    cfgTransportPortSet(cfg, CFG_CTL, port);
+    // override the CFG_LS transport type to be TCP
+    cfgTransportTypeSet(cfg, CFG_LS, CFG_TCP);
+    // host is already set
+    // port is already set
 
-    cfgTransportTypeSet(cfg, CFG_MTC, CFG_TCP);
-    cfgTransportHostSet(cfg, CFG_MTC, host);
-    cfgTransportPortSet(cfg, CFG_MTC, port);
+    // if cloud, override tls settings too
+    if (cfgLogStream(cfg) == CFG_LOGSTREAM_CLOUD) {
+        // TLS enabled, with Server Validation, using root certs (payload)
+        cfgTransportTlsEnableSet(cfg, CFG_LS, TRUE);
+        cfgTransportTlsValidateServerSet(cfg, CFG_LS, TRUE);
+        cfgTransportTlsCACertPathSet(cfg, CFG_LS, NULL);
+    }
+
+    // copy the CFG_LS configuration to CFG_CTL
+    {
+        cfg_transport_t type = cfgTransportType(cfg, CFG_LS);
+        cfgTransportTypeSet(cfg, CFG_CTL, type);
+        const char *host = cfgTransportHost(cfg, CFG_LS);
+        cfgTransportHostSet(cfg, CFG_CTL, host);
+        const char *port = cfgTransportPort(cfg, CFG_LS);
+        cfgTransportPortSet(cfg, CFG_CTL, port);
+        unsigned int enable = cfgTransportTlsEnable(cfg, CFG_LS);
+        cfgTransportTlsEnableSet(cfg, CFG_CTL, enable);
+        unsigned int validateserver = cfgTransportTlsValidateServer(cfg, CFG_LS);
+        cfgTransportTlsValidateServerSet(cfg, CFG_CTL, validateserver);
+        const char *cacertpath = cfgTransportTlsCACertPath(cfg, CFG_LS);
+        cfgTransportTlsCACertPathSet(cfg, CFG_CTL, cacertpath);
+    }
 
     if (cfgMtcEnable(cfg) != TRUE) {
         strncat(g_logmsg, "Metrics enable, ", 20);
@@ -2048,13 +2176,9 @@ protocolRead(const char *path, list_t *plist)
     yaml_node_t *root_value, *root_key, *plist_key, *prot_key, *prot_value;
     yaml_node_item_t *pitem;
 
-    // ni for "not-interposed"... a direct glibc call without scope.
-    FILE *(*ni_fopen)(const char*, const char*) = dlsym(RTLD_NEXT, "fopen");
-    int (*ni_fclose)(FILE*) = dlsym(RTLD_NEXT, "fclose");
+    if (!g_fn.fopen || !g_fn.fclose || !path) goto cleanup;
 
-    if (!ni_fopen || !ni_fclose || !path) goto cleanup;
-
-    protFile = ni_fopen(path, "r");
+    protFile = g_fn.fopen(path, "r");
     if (!protFile) goto cleanup;
 
     parser_successful = yaml_parser_initialize(&parser);
@@ -2132,7 +2256,7 @@ cleanup:
     if (prot) destroyProtEntry(prot);
     if (doc_successful) yaml_document_delete(&doc);
     if (parser_successful) yaml_parser_delete(&parser);
-    if (protFile) ni_fclose(protFile);
+    if (protFile) g_fn.fclose(protFile);
     return TRUE;
 }
 

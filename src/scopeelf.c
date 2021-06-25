@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include "dbg.h"
 #include "os.h"
+#include "fn.h"
 #include "scopeelf.h"
 
 #define GOPCLNTAB_MAGIC_112 0xfffffffb
@@ -100,11 +101,7 @@ getElf(char *path)
     struct stat sbuf;
     int get_elf_successful = FALSE;
 
-    int (*ni_open)(const char *pathname, int flags);
-    ni_open = dlsym(RTLD_NEXT, "open");
-    int (*ni_close)(int fd);
-    ni_close = dlsym(RTLD_NEXT, "close");
-    if (!ni_open || !ni_close) {
+    if (!g_fn.open || !g_fn.close) {
         scopeLog("getElf: open/close can't be found", -1, CFG_LOG_ERROR);
         goto out;
     }
@@ -114,7 +111,7 @@ getElf(char *path)
         goto out;
     }
 
-    if ((fd = ni_open(path, O_RDONLY)) == -1) {
+    if ((fd = g_fn.open(path, O_RDONLY)) == -1) {
         scopeLog("getElf: open failed", -1, CFG_LOG_ERROR);
         goto out;
     }
@@ -162,7 +159,7 @@ getElf(char *path)
     get_elf_successful = TRUE;
 
 out:
-    if (fd != -1) ni_close(fd);
+    if (fd != -1) g_fn.close(fd);
     if (!get_elf_successful && ebuf) {
         freeElf(ebuf->buf, ebuf->len);
         free(ebuf);
@@ -481,6 +478,35 @@ is_go(char *buf)
                 app_type(buf, SHT_PROGBITS, ".gopclntab") ||
                 app_type(buf, SHT_NOTE, ".note.go.buildid"))) {
         return TRUE;
+    }
+
+    return FALSE;
+}
+
+bool
+is_musl(char *buf)
+{
+    int i;
+    char *ldso = NULL;
+    Elf64_Ehdr *elf = (Elf64_Ehdr *)buf;
+    Elf64_Phdr *phead = (Elf64_Phdr *)&buf[elf->e_phoff];
+
+    for (i = 0; i < elf->e_phnum; i++) {
+        if ((phead[i].p_type == PT_INTERP)) {
+            char *exld = (char *)&buf[phead[i].p_offset];
+
+            ldso = strdup(exld);
+            if (ldso) {
+                if (strstr(ldso, "musl") != NULL) {
+                    free(ldso);
+                    return TRUE;
+                }
+                free(ldso);
+            } else {
+                DBG(NULL); // not expected
+            }
+            break;
+        }
     }
 
     return FALSE;

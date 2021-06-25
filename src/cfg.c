@@ -12,6 +12,11 @@ typedef struct {
     struct {                             // For type = CFG_UDP
         char* host;
         char* port;
+        struct {
+            unsigned enable;
+            unsigned validateserver;
+            char *cacertpath;
+        } tls;
     } net;
     struct {
         char* path;                      // For type CFG_FILE
@@ -196,6 +201,9 @@ cfgCreateDefault()
         const char* path_def = pathDefault[tp];
         c->transport[tp].file.path = (path_def) ? strdup(path_def) : NULL;
         c->transport[tp].file.buf_policy = bufDefault[tp];
+        c->transport[tp].net.tls.enable = DEFAULT_TLS_ENABLE;
+        c->transport[tp].net.tls.validateserver = DEFAULT_TLS_VALIDATE_SERVER;
+        c->transport[tp].net.tls.cacertpath = (DEFAULT_TLS_CA_CERT) ? strdup(DEFAULT_TLS_CA_CERT) : NULL;
     }
 
     c->log.level = DEFAULT_LOG_LEVEL;
@@ -481,6 +489,39 @@ cfgTransportBuf(config_t* cfg, which_transport_t t)
     return bufDefault[CFG_LOG];
 }
 
+unsigned
+cfgTransportTlsEnable(config_t *cfg, which_transport_t t)
+{
+    if (t >= 0 && t < CFG_WHICH_MAX) {
+        if (cfg) return cfg->transport[t].net.tls.enable;
+        return DEFAULT_TLS_ENABLE;
+    }
+    DBG("%d", t);
+    return DEFAULT_TLS_ENABLE;
+}
+
+unsigned
+cfgTransportTlsValidateServer(config_t *cfg, which_transport_t t)
+{
+    if (t >= 0 && t < CFG_WHICH_MAX) {
+        if (cfg) return cfg->transport[t].net.tls.validateserver;
+        return DEFAULT_TLS_VALIDATE_SERVER;
+    }
+    DBG("%d", t);
+    return DEFAULT_TLS_VALIDATE_SERVER;
+}
+
+const char *
+cfgTransportTlsCACertPath(config_t *cfg, which_transport_t t)
+{
+    if (t >= 0 && t < CFG_WHICH_MAX) {
+        if (cfg) return cfg->transport[t].net.tls.cacertpath;
+        return DEFAULT_TLS_CA_CERT;
+    }
+    DBG("%d", t);
+    return DEFAULT_TLS_CA_CERT;
+}
+
 custom_tag_t**
 cfgCustomTags(config_t* cfg)
 {
@@ -531,7 +572,7 @@ cfgPayDir(config_t *cfg)
     return (cfg) ? cfg->pay.dir : DEFAULT_PAYLOAD_DIR;
 }
 
-bool
+cfg_logstream_t
 cfgLogStream(config_t *cfg)
 {
     return (cfg) ? cfg->logstream : DEFAULT_LOGSTREAM;
@@ -559,7 +600,7 @@ cfgMtcStatsDPrefixSet(config_t* cfg, const char* prefix)
 {
     if (!cfg) return;
     if (cfg->mtc.statsd.prefix) free(cfg->mtc.statsd.prefix);
-    if (!prefix || prefix[0] == '\0') {
+    if (!prefix || (prefix[0] == '\0')) {
         cfg->mtc.statsd.prefix = strdup(DEFAULT_STATSD_PREFIX);
         return;
     }
@@ -769,6 +810,32 @@ cfgTransportBufSet(config_t* cfg, which_transport_t t, cfg_buffer_t buf)
 }
 
 void
+cfgTransportTlsEnableSet(config_t *cfg, which_transport_t t, unsigned val)
+{
+    if (!cfg || t < 0 || t >= CFG_WHICH_MAX || val > 1) return;
+    cfg->transport[t].net.tls.enable = val;
+}
+
+void
+cfgTransportTlsValidateServerSet(config_t *cfg, which_transport_t t, unsigned val)
+{
+    if (!cfg || t < 0 || t >= CFG_WHICH_MAX || val > 1) return;
+    cfg->transport[t].net.tls.validateserver = val;
+}
+
+void
+cfgTransportTlsCACertPathSet(config_t *cfg, which_transport_t t, const char *path)
+{
+    if (!cfg || t < 0 || t >= CFG_WHICH_MAX) return;
+    if (cfg->transport[t].net.tls.cacertpath) free(cfg->transport[t].net.tls.cacertpath);
+    if (!path || (path[0] == '\0')) {
+        cfg->transport[t].net.tls.cacertpath = NULL;
+        return;
+    }
+    cfg->transport[t].net.tls.cacertpath = strdup(path);
+}
+
+void
 cfgCustomTagAdd(config_t* c, const char* name, const char* value)
 {
     if (!c || !name || !value) return;
@@ -859,7 +926,8 @@ cfgPayDirSet(config_t *cfg, const char *dir)
 }
 
 void
-cfgLogStreamSet(config_t *cfg, bool value)
+cfgLogStreamSet(config_t *cfg, cfg_logstream_t value)
 {
-    if (cfg) cfg->logstream = value;
+    if (!cfg || value >= CFG_LOGSTREAM_MAX) return;
+    cfg->logstream = value;
 }

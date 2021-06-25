@@ -36,14 +36,22 @@ RUN python3 -m pip install -r /opt/test-runner/requirements.txt
 
 COPY ./test_runner/ /opt/test-runner/
 
-#ENTRYPOINT ["python3", "/opt/test-runner/app.py", "--target", "nginx","-l","/opt/test-runner/logs/", "--scope_path", "/opt/test-runner/bin/libscope.so"]
-#ENTRYPOINT ["tail", "-f", "/dev/null"]
-# python3 /opt/test-runner/app.py --target nginx -l /opt/test-runner/logs/ --scope_path=/opt/test-runner/bin/libscope.so
-# nginx -g "daemon off;"
-# ab -n 10000 -c 4 -p ./post.json http://localhost/log/
-
 RUN yum -y install net-tools
 
-COPY nginx/docker-entrypoint.sh /
+ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+COPY scope-profile.sh /etc/profile.d/scope.sh
+COPY gdbinit /root/.gdbinit
+
+RUN  mkdir /usr/local/scope && \
+     mkdir /usr/local/scope/bin && \
+     mkdir /usr/local/scope/lib && \
+     ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
+
+COPY nginx/scope-test /usr/local/scope/scope-test
+
+COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["test"]
+

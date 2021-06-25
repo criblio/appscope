@@ -73,12 +73,22 @@ ENV SCOPE_EVENT_HTTP=true
 ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
-ENV LD_PRELOAD=/usr/lib/libscope.so
+ENV LD_PRELOAD=/usr/local/scope/lib/libscope.so
 
-#ENTRYPOINT ["/opt/test-runner/bin/test_tls.sh"]
-#ENTRYPOINT ["tail", "-f", "/dev/null"]
+ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+COPY scope-profile.sh /etc/profile.d/scope.sh
+COPY gdbinit /root/.gdbinit
 
-COPY tls/docker-entrypoint.sh /
+RUN  mkdir /usr/local/scope && \
+     mkdir /usr/local/scope/bin && \
+     mkdir /usr/local/scope/lib && \
+     ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
+
+COPY tls/scope-test /usr/local/scope/scope-test
+
+COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["test"]
 

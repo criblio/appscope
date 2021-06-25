@@ -19,6 +19,8 @@ RUN cd /opt/test && \
     ./configure && \
     make -j
 
+RUN yum -y install vim emacs gdb tcpdump lsof 
+
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_METRIC_VERBOSITY=4
@@ -38,9 +40,18 @@ RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
 COPY ./test_runner /opt/test-runner/
 COPY ./syscalls/syscall_tests_conf.json /opt/test-runner/syscall_tests_conf.json
 
-#ENTRYPOINT ["/opt/test-runner/bin/python", "/opt/test-runner/app.py", "--target", "syscalls","-l","/opt/test-runner/logs/", "--syscalls_tests_config", "/opt/test-runner/syscall_tests_conf.json"]
-#ENTRYPOINT ["tail", "-f", "/dev/null"]
+ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+COPY scope-profile.sh /etc/profile.d/scope.sh
+COPY gdbinit /root/.gdbinit
+RUN  mkdir /usr/local/scope && \
+     mkdir /usr/local/scope/bin && \
+     mkdir /usr/local/scope/lib && \
+     ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
 
-COPY syscalls/docker-entrypoint.sh /
+COPY ./syscalls/scope-test /usr/local/scope/
+
+COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["test"]

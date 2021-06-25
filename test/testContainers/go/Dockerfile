@@ -61,10 +61,20 @@ ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
 ENV SCOPE_EVENT_DEST=file:///go/events.log
 
-#ENTRYPOINT ["tail", "-f", "/dev/null"]
-#ENTRYPOINT ["/go/test_go.sh"]
+ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+COPY scope-profile.sh /etc/profile.d/scope.sh
+COPY gdbinit /root/.gdbinit
 
-COPY go/docker-entrypoint.sh /
+RUN  mkdir /usr/local/scope && \
+     mkdir /usr/local/scope/bin && \
+     mkdir /usr/local/scope/lib && \
+     ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
+
+COPY go/scope-test /usr/local/scope/scope-test
+
+COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["test"]
 

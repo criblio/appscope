@@ -2,34 +2,13 @@ version: '3.5'
 
 services:
 
-  syscalls:
-    privileged: true
-
-  logstream:
-    privileged: true
-
-  nginx:
-    privileged: true
-
-  splunk:
-    privileged: true
-
-  elastic:
-    privileged: true
-
-  kafka:
-    privileged: true
-
-  tls:
+  bash:
     privileged: true
 
   detect_proto:
     privileged: true
 
-  bash:
-    privileged: true
-
-  gogen:
+  elastic:
     privileged: true
 
   go_2:
@@ -63,6 +42,9 @@ services:
   go_16:
     privileged: true
 
+  gogen:
+    privileged: true
+
   java7:
     privileged: true
   java8:
@@ -79,6 +61,16 @@ services:
     privileged: true
   java14:
     privileged: true
+
+  kafka:
+    privileged: true
+
+  logstream:
+    privileged: true
+
+  nginx:
+    privileged: true
+
   oracle-java6:
     privileged: true
   oracle-java7:
@@ -96,6 +88,15 @@ services:
   oracle-java13:
     privileged: true
   oracle-java14:
+    privileged: true
+
+  splunk:
+    privileged: true
+
+  syscalls:
+    privileged: true
+
+  tls:
     privileged: true
 
 # vim: ts=2 sw=2 et :

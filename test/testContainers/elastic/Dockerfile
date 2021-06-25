@@ -25,7 +25,20 @@ RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
 
 COPY ./test_runner/ /opt/test-runner/
 
-COPY elastic/docker-entrypoint.sh /
+ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+COPY scope-profile.sh /etc/profile.d/scope.sh
+COPY gdbinit /root/.gdbinit
+
+RUN  mkdir /usr/local/scope && \
+     mkdir /usr/local/scope/bin && \
+     mkdir /usr/local/scope/lib && \
+     ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
+
+COPY elastic/scope-test /usr/local/scope/scope-test
+
+COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["test"]
 

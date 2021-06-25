@@ -5,17 +5,15 @@ on:
 
   pull_request:
     branches:
+      - 'main'
       - 'master'
       - 'releases/*'
 
 jobs:
 
-  #
-  # Build the code, run the unit tests, update the CDN, and update Docker Hub.
-  #
   build-scope:
     name: Build Scope
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -69,9 +67,6 @@ jobs:
     outputs:
       tests: ${{ steps.set-tests.outputs.tests }}
 
-  #
-  # Run the integration tests for non-draft PRs to the default or release branches.
-  #
   integration-test:
     needs: build-scope
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
@@ -95,9 +90,6 @@ jobs:
             chmod +x bin/linux/* lib/linux/*
             make -C test/testContainers ${{ matrix.test }}
 
-  #
-  # Update the integration test images for pushes to the default branch.
-  #
   integration-image:
     needs: build-scope
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}

@@ -32,8 +32,6 @@ endif
 
 TESTS=$(shell $(COMPOSE) config --services | sort -V)
 
-MARKER=AppScopeTest
-
 help:
 	@echo "AppScope Integration Test Runner"
 	@echo "  \`make help\` - show this info"
@@ -49,39 +47,33 @@ all: CONTINUE := 1
 all: $(TESTS)
 
 $(TESTS):
+	@$(MAKE) -s $(@)-build
 	@echo
 	@echo "==================================================================="
 	@echo " $(shell date)"
-	@echo " $(MARKER): Building Image for \"$@\" Test"
+	@echo " Running \"$@\" Test"
 	@echo "==================================================================="
-	-@[ -n "$(NOPULL)" ] || $(DOCKER) pull criblci/scope-$(@)-it
-	@$(COMPOSE) build $@ || if [ -z "$(CONTINUE)" ]; then \
-		{ echo >&2 "error: $(@) build failed."; exit 1; } \
-	fi
-	@echo
-	@echo "==================================================================="
-	@echo " $(shell date)"
-	@echo " $(MARKER): Running \"$@\" Test"
-	@echo "==================================================================="
-	@$(COMPOSE) run $@ || if [ -z "$(CONTINUE)" ]; then \
+	@time $(COMPOSE) run $@ || if [ -z "$(CONTINUE)" ]; then \
 		{ echo >&2 "error: $(@) test failed."; exit 1; } \
 	fi
 
 build: $(addsuffix -build, $(TESTS))
 
+%-build: IMAGE=criblci/scope-$(@:%-build=%)-it
+%-build: ID=$(shell $(DOCKER) images -q --filter=reference=$(IMAGE))
 %-build:
-	[ -n "$(filter $(@:%-build=%),$(TESTS))" ] || \
+	@[ -n "$(filter $(@:%-build=%),$(TESTS))" ] || \
 		{ echo >&2 "error: $(@:%-build=%) isn't a test."; exit 1; }
 	@echo
 	@echo "==================================================================="
 	@echo " $(shell date)"
-	@echo " $(MARKER): Building Image for \"$@\" Test"
+	@echo " Building Image for \"$(@:%-build=%)\" Test"
 	@echo "==================================================================="
-	-@[ -n "$(NOPULL)" ] || $(DOCKER) pull criblci/scope-$(@:%-build=%)-it
-	@$(COMPOSE) build $(@:%-build=%)
+	-@[ -n "$(ID)" ] || $(DOCKER) pull $(IMAGE) 2>/dev/null
+	@time $(COMPOSE) build $(@:%-build=%)
 
 push: $(TESTS_BUILD)
-	$(COMPOSE) push
+	time $(COMPOSE) push
 
 %-push:
 	@[ -n "$(filter $(@:%-push=%),$(TESTS))" ] || \
@@ -92,9 +84,9 @@ push: $(TESTS_BUILD)
 	@echo
 	@echo "==================================================================="
 	@echo " $(shell date)"
-	@echo " $(MARKER): Pushing Image for \"$@\" Test"
+	@echo " Pushing Image for \"$(@:%-push=%)\" Test"
 	@echo "==================================================================="
-	@$(COMPOSE) push $(@:%-push=%)
+	@time $(COMPOSE) push $(@:%-push=%)
 	@$(DOCKER) logout
 	-@[ -f "./README.$(@:%-push=%).md" ] && $(DOCKER) run --rm \
 		-v "./README.$(@:%-push=%).md/:/data/README.md:ro" \
@@ -105,17 +97,16 @@ push: $(TESTS_BUILD)
 		-e "SHORT_DESCRIPTION=AppScope\ Integration\ Test" \
 		sheogorath/readme-to-dockerhub;
 
-%-shell: SHELL ?= /bin/bash
 %-shell:
 	@[ -n "$(filter $(@:%-shell=%),$(TESTS))" ] || \
 		{ echo >&2 "error: $(@:%-shell=%) isn't a test."; exit 1; }
+	@$(MAKE) -s $(@:%-shell=%)-build
 	@echo
 	@echo "==================================================================="
 	@echo " $(shell date)"
-	@echo " $(MARKER): Shell in Container for \"$@\" Test"
+	@echo " Shell in Container for \"$(@:%-shell=%)\" Test"
 	@echo "==================================================================="
-	@$(COMPOSE) -f docker-compose.yml -f docker-compose.privileged.yml \
-		run $(@:%-shell=%) $(SHELL)
+	@$(COMPOSE) -f docker-compose.yml -f docker-compose.privileged.yml run $(@:%-shell=%) /bin/bash
 
 .PHONY: help all build push $(TESTS) %-shell %-build %-push
 

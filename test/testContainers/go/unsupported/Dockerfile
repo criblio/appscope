@@ -58,10 +58,19 @@ ENV SCOPE_EVENT_DEST=file:///go/events.log
 ENV SCOPE_LOG_LEVEL=warning
 ENV SCOPE_LOG_DEST=file:///go/logs.txt
 
-#ENTRYPOINT ["tail", "-f", "/dev/null"]
-#ENTRYPOINT ["/go/test_go.sh"]
+COPY scope-profile.sh /etc/profile.d/scope.sh
+COPY gdbinit /root/.gdbinit
 
-COPY go/unsupported/docker-entrypoint.sh /
+RUN  mkdir /usr/local/scope && \
+     mkdir /usr/local/scope/bin && \
+     mkdir /usr/local/scope/lib && \
+     ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
+
+COPY go/unsupported/scope-test /usr/local/scope/scope-test
+
+COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["test"]
 

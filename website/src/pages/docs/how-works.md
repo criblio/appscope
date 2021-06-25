@@ -17,10 +17,10 @@ The AppScope CLI (`scope`) provides a quick and convenient way to explore capabi
 
 <span>&#x2605;&#x2605;&#x2605;</span> **WHEN TO USE**: The easiest way to get started with AppScope is to use the CLI. This provides a rich set of capabilities intended to capture data from single applications. Data is captured in the local file system, and is managed through the CLI.
 
-To scope a running process whose process ID (pid) is `12345`:
+To scope a running process whose process ID (PID) is `12345`:
 
 ```
-Scope --attach 12345
+scope attach 12345
 ```
 
 ### The Loader

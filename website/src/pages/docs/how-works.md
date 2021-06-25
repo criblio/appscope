@@ -9,7 +9,7 @@ AppScope is a single binary download with three components: a command-line inter
 There are two ways to "scope" an application:
 
 1. Attach AppScope to a running process.
-1. Configure the AppScope library to be loaded when the process starts. 
+1. Scope a new process. 
 
 ### The Command Line Interface (CLI)
 
@@ -21,6 +21,11 @@ To scope a running process whose process ID (PID) is `12345`:
 
 ```
 scope attach 12345
+```
+To scope a new process, for example the `top` program:
+
+```
+scope top
 ```
 
 ### The Loader

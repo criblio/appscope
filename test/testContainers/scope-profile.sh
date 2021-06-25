@@ -1,3 +1,5 @@
+export PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+
 alias ls='ls -cF'
 alias l='ls -cF'
 alias ll='ls -cFla'

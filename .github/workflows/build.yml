@@ -17,7 +17,9 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
-      - run: git fetch --prune --unshallow
+
+      - name: Get Tag Info
+        run: git fetch --prune --unshallow
 
       - name: Install Go
         uses: actions/setup-go@v2
@@ -63,7 +65,7 @@ jobs:
 
       - name: List Integration Tests
         id: set-tests
-        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | jq -ncR '[inputs]')"
+        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | sort -V | jq -ncR '[inputs]')"
 
     outputs:
       tests: ${{ steps.set-tests.outputs.tests }}

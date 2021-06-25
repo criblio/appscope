@@ -267,7 +267,6 @@ services:
         GO_IMAGE_VER: golang:1.16
     <<: *scope-common
 
-<<<<<<< HEAD
   gogen:
     image: criblci/scope-gogen-it
     build:
@@ -277,8 +276,6 @@ services:
       dockerfile: ./gogen/Dockerfile
     <<: *scope-common
 
-=======
->>>>>>> master
   java7:
     image: criblci/scope-java7-it
     build:

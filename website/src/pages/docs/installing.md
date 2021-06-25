@@ -21,10 +21,17 @@ $ LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
 $ curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/scope
 $ curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/scope.md5 | md5sum -c 
 $ chmod +x scope
-$ ./scope run …
 ```
 
 That's it!
+
+To verify installation, run some scope commands:
+
+```
+$ ./scope run ps -ef
+$ scope events
+$ scope metrics
+```
 
 #### Download as Container
 

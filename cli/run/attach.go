@@ -7,10 +7,12 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
 	"github.com/criblio/scope/util"
+	ps "github.com/mitchellh/go-ps"
 	"github.com/rs/zerolog/log"
 	"github.com/syndtr/gocapability/capability"
 )
@@ -37,20 +39,27 @@ func (rc *Config) Attach(args []string) {
 	if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
 		util.ErrAndExit("You must have PTRACE capabilities to attach to a process")
 	}
-	// Validate PID exists
-	pidPath := fmt.Sprintf("/proc/%s", args[0])
-	if !util.CheckDirExists(pidPath) {
-		util.ErrAndExit("PID does not exist: \"%s\"", args[0])
+	// Get PID by name if non-numeric otherwise use args[0]
+	var pid int
+	if !util.IsNumeric(args[0]) {
+		pid = PidByName(args[0])
+		args[0] = fmt.Sprint(pid)
+	} else {
+		pid, err = strconv.Atoi(args[0])
+		if err != nil {
+			util.ErrAndExit("Invalid PID: ", err)
+		}
 	}
-	// Validate the process isn't already being scoped
-	pidMapFile, err := ioutil.ReadFile(pidPath + "/maps")
-	if err != nil {
-		util.ErrAndExit("Map does not exist for PID: \"%s\"", args[0])
+	// Validate PID
+	// Check PID exists and is not already being scoped
+	if !PidExists(pid) {
+		util.ErrAndExit("PID does not exist: \"%v\"", pid)
 	}
-	pidMap := string(pidMapFile)
-	if strings.Contains(pidMap, "libscope") {
+	if PidIsScoped(pid) {
 		util.ErrAndExit("Attach failed. This process is already being scoped")
 	}
+
+	// Create ldscope
 	if err := createLdscope(); err != nil {
 		util.ErrAndExit("error creating ldscope: %v", err)
 	}
@@ -81,4 +90,94 @@ func (rc *Config) Attach(args []string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Run()
+}
+
+// PidByName gets a PID by its name
+func PidByName(name string) (pid int) {
+	procs, err := ps.Processes()
+	if err != nil {
+		util.ErrAndExit("Unable to get list of processes: %v", err)
+	}
+	type process struct {
+		ID         int    `json:"id"`
+		Uid        int    `json:"uid"`
+		Pid        int    `json:"pid"`
+		PPid       int    `json:"ppid"`
+		Cmd        string `json:"cmd"`
+		Executable string `json:"executable"`
+		Scoped     bool   `json:"scoped"`
+	}
+	processes := make([]process, 0)
+	found := 0
+	lastPid := 0
+	for _, p := range procs {
+		if p.Executable() == name {
+			found++
+			lastPid = p.Pid()
+			processes = append(processes, process{
+				ID:     found,
+				Pid:    p.Pid(),
+				PPid:   p.PPid(),
+				Cmd:    PidCmd(p.Pid()),
+				Scoped: PidIsScoped(p.Pid()),
+			})
+		}
+	}
+	if found == 0 {
+		util.ErrAndExit("Unable to find process by name")
+	} else if found == 1 {
+		pid = lastPid
+	} else {
+		fmt.Println("Found multiple processes matching that name:")
+		util.PrintObj([]util.ObjField{
+			{Name: "ID", Field: "id"},
+			{Name: "UID", Field: "uid"},
+			{Name: "PID", Field: "pid"},
+			{Name: "PPID", Field: "ppid"},
+			{Name: "CMD", Field: "cmd"},
+			{Name: "Scoped", Field: "scoped"},
+		}, processes)
+		fmt.Println("Select an ID from the list:")
+		var selection string
+		fmt.Scanln(&selection)
+		id, err := strconv.Atoi(selection)
+		if err != nil || id < 1 {
+			util.ErrAndExit("Invalid Selection")
+		}
+		pid = processes[id-1].Pid
+	}
+	return pid
+}
+
+// PidExists checks if a PID is valid
+func PidExists(pid int) bool {
+	pidPath := fmt.Sprintf("/proc/%v", pid)
+	if util.CheckDirExists(pidPath) {
+		return true
+	}
+	return false
+}
+
+// PidCmd gets the command used to start the PID
+func PidCmd(pid int) string {
+	pidPath := fmt.Sprintf("/proc/%v", pid)
+	pidCmdFile, err := ioutil.ReadFile(pidPath + "/cmdline")
+	if err != nil {
+		util.ErrAndExit("cmdline does not exist for PID: \"%s\"", pid)
+	}
+	return string(pidCmdFile)
+}
+
+// PidIsScoped checks if a PID is being scoped
+func PidIsScoped(pid int) bool {
+	pidPath := fmt.Sprintf("/proc/%v", pid)
+	pidMapFile, err := ioutil.ReadFile(pidPath + "/maps")
+	if err != nil {
+		util.ErrAndExit("Map does not exist for PID: \"%s\"", pid)
+	}
+	pidMap := string(pidMapFile)
+	if strings.Contains(pidMap, "libscope") {
+		return true
+	}
+	return false
 }

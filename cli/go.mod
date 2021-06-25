@@ -20,6 +20,7 @@ require (
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/mitchellh/copystructure v1.1.1 // indirect
+	github.com/mitchellh/go-ps v1.0.0
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/mum4k/termdash v0.14.0
 	github.com/olekukonko/tablewriter v0.0.4

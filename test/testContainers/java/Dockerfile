@@ -7,7 +7,7 @@ ARG KEYTOOL=keytool
 ARG DNLD_HEXDUMP
 
 ENV CATALINA_HOME /opt/tomcat
-ENV PATH $PATH:$CATALINA_HOME/bin
+ENV PATH="${PATH}:${CATALINA_HOME}/bin"
 
 ADD https://archive.apache.org/dist/tomcat/tomcat-${TOMCAT_MAJOR_VERSION}/v${TOMCAT_MINOR_VERSION}/bin/apache-tomcat-${TOMCAT_MINOR_VERSION}.tar.gz /apache-tomcat.tar.gz
 
@@ -42,9 +42,11 @@ ENV SCOPE_SUMMARY_PERIOD=1
 ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
-ENV LD_PRELOAD=/usr/lib/libscope.so
+# move this later so we're not scoping what we're running here
+#ENV LD_PRELOAD=/usr/lib/libscope.so
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+RUN echo "export PATH=${PATH}" >> /etc/profile.d/path.sh
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit
 
@@ -56,6 +58,9 @@ RUN  mkdir /usr/local/scope && \
      ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
 
 COPY java/scope-test /usr/local/scope/scope-test
+
+# moved from earlier to here
+ENV LD_PRELOAD=/usr/lib/libscope.so
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]

@@ -465,6 +465,7 @@ services:
         - criblci/scope-alpine-it
       context: .
       dockerfile: ./alpine/Dockerfile
+    <<: *scope-common
 
   attach:
     image: criblci/scope-attach-it
@@ -473,5 +474,7 @@ services:
         - criblci/scope-attach-it
       context: .
       dockerfile: ./attach/Dockerfile
+    privileged: true
+    <<: *scope-common
 
 # vim: ts=2 sw=2 et :

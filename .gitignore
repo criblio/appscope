@@ -14,6 +14,8 @@ contrib/funchook/build/
 contrib/pcre2/build
 contrib/openssl/
 
+certs/
+
 test/testContainers/logs
 
 #website

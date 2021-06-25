@@ -17,6 +17,7 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
+      - run: git fetch --prune --unshallow
 
       - name: Install Go
         uses: actions/setup-go@v2

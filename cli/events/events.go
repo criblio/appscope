@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
@@ -71,7 +70,7 @@ func (em EventMatch) Events(file io.ReadSeeker, in chan map[string]interface{}) 
 			em.Offset = int64(0)
 		}
 	}
-	_, err = file.Seek(int64(em.Offset), os.SEEK_SET)
+	_, err = file.Seek(em.Offset, io.SeekStart)
 	if err != nil {
 		return fmt.Errorf("error seeking events file: %v", err)
 	}

@@ -134,7 +134,7 @@ cribl:
     port: 10090
     tls:
       enable: false
-      validateserver: false         # false is like curl's -k option
+      validateserver: true          # false is like curl's -k option
       cacertpath: ''
           # cacertpath can be used to specify a private CA.
           # If left empty, AppScope will try to use public root certs

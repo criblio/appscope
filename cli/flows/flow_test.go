@@ -52,6 +52,7 @@ func TestGetFlowFiles(t *testing.T) {
 
 	RestoreAssets("testflows", "")
 	flows, err = getFlowFiles("./testflows/payloads")
+	assert.NoError(t, err)
 	flowList := flows.List()
 	sort.Slice(flowList, func(i, j int) bool { return flowList[i].BytesSent < flowList[j].BytesSent })
 	assert.Equal(t, 548213, flowList[0].Pid)

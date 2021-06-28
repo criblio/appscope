@@ -517,6 +517,7 @@ doHttpHeader(protocol_info *proto)
 
         char *headertok = strtok_r(header, "\r\n", &savea);
         if (!headertok) {
+            free(hreport.hreq);
             scopeLog("WARN: doHttpHeader: parse an http request header", proto->fd, CFG_LOG_WARN);
             return;
         }

@@ -31,6 +31,12 @@ docker-compose down
 docker-compose up bash
 docker-compose down
 
+docker-compose up alpine
+docker-compose down
+
+docker-compose up attach
+docker-compose down
+
 docker-compose up gogen
 docker-compose down
 

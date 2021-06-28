@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/criblio/scope/internal"
 	"github.com/spf13/cobra"
 )
@@ -21,17 +19,11 @@ scope attach --payloads 2000`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
-		rc.Run(args, true)
+		rc.Attach(args)
 	},
 }
 
 func init() {
 	runCmdFlags(attachCmd, rc)
-	// This may be a bad assumption, if we have any args preceding this it might fail
-	attachCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		internal.InitConfig()
-		attachCmd.Run(cmd, os.Args[2:])
-		return nil
-	})
 	RootCmd.AddCommand(attachCmd)
 }

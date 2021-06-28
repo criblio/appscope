@@ -36,7 +36,7 @@ func TestPrintObjWithMap(t *testing.T) {
 
 	// os.Stdout.Write(buf.Bytes())
 
-	rows := strings.Split(string(buf.Bytes()), "\n")
+	rows := strings.Split(buf.String(), "\n")
 
 	// First row contains capital Field 1 and value1
 	assert.True(t, strings.Contains(rows[0], "Field 1"))
@@ -101,7 +101,7 @@ func TestPrintObjWithStruct(t *testing.T) {
 
 	// os.Stdout.Write(buf.Bytes())
 
-	rows := strings.Split(string(buf.Bytes()), "\n")
+	rows := strings.Split(buf.String(), "\n")
 
 	// First row contains capital Field 1 and value1
 	assert.True(t, strings.Contains(rows[0], "Field 1"))
@@ -163,7 +163,7 @@ func TestPrintObjSliceMap(t *testing.T) {
 
 	// os.Stdout.Write(buf.Bytes())
 
-	rows := strings.Split(string(buf.Bytes()), "\n")
+	rows := strings.Split(buf.String(), "\n")
 
 	// First row contains headers
 	assert.True(t, strings.Contains(rows[0], "FIELD 1"))

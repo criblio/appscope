@@ -51,6 +51,11 @@ struct _transport_t
                 SSL_CTX *ctx;
                 SSL *ssl;
             } tls;
+            struct {
+                int entries;
+                struct addrinfo *next;
+                struct addrinfo *list;
+            } addr;
         } net;
         struct {
             char *path;
@@ -219,9 +224,23 @@ transportNeedsConnection(transport_t *trans)
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
+            // If g_tls_calls_are_safe is not true, that means that our process
+            // has been notified that it is being terminated.  It's too late to
+            // try to establish any new connections.
+            if (!g_tls_calls_are_safe) return FALSE;
             if ((trans->net.sock == -1) ||
-                (trans->net.tls.enable && !trans->net.tls.ssl)) return 1;
-            return osNeedsConnect(trans->net.sock);
+                (trans->net.tls.enable && !trans->net.tls.ssl)) return TRUE;
+            if (osNeedsConnect(trans->net.sock)) {
+                DBG("fd: %d, tls:%d", trans->net.sock, trans->net.tls.enable);
+                if (trans->net.tls.enable) {
+                    scopeLog("tls session closed remotely", trans->net.sock, CFG_LOG_INFO);
+                } else {
+                    scopeLog("tcp connection closed remotely", trans->net.sock, CFG_LOG_INFO);
+                }
+                transportDisconnect(trans);
+                return TRUE;
+            }
+            return FALSE;
         case CFG_FILE:
             // This checks to see if our file descriptor has been
             // closed by our process.  (errno == EBADF) Stream buffering
@@ -557,6 +576,18 @@ transportReconnect(transport_t *trans)
             // own getaddrinfo for this situation.
 
             g_cached_addr = getExistingConnectionAddr(trans);
+
+            // We want to close the socket we got from our parent process, but don't
+            // want to send a close notification for the SSL session.  If we sent the
+            // close notification, it has the side effect of closing our parent process's
+            // ssl session.
+            enterCriticalSection();
+            if (g_tls_calls_are_safe && trans->net.tls.enable && trans->net.tls.ssl) {
+                SSL_set_quiet_shutdown(trans->net.tls.ssl, TRUE);
+            }
+            exitCriticalSection();
+
+
             transportDisconnect(trans);          // Never keep the parents connection.
             if (g_cached_addr) {
                 trans->getaddrinfo = scopeGetaddrinfo;
@@ -684,10 +715,23 @@ checkPendingSocketStatus(transport_t *trans)
     return rc;
 }
 
+static void
+freeAddressList(transport_t *trans)
+{
+    if (!trans || !trans->net.addr.list) return;
+
+    freeaddrinfo(trans->net.addr.list);
+    trans->net.addr.entries = 0;
+    trans->net.addr.list = NULL;
+    trans->net.addr.next = NULL;
+}
 
 static int
-socketConnectionStart(transport_t *trans)
+getAddressList(transport_t *trans)
 {
+    // Don't leak; clean up any prior data
+    freeAddressList(trans);
+
     struct addrinfo* addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
@@ -703,7 +747,7 @@ socketConnectionStart(transport_t *trans)
             break;
         default:
             DBG(NULL);
-            return 1;
+            return 0;
     }
 
     char *logmsg = NULL;
@@ -718,9 +762,42 @@ socketConnectionStart(transport_t *trans)
                            trans->net.port,
                            &hints, &addr_list)) return 0;
 
-    // Loop through the addresses until one works
+    // Count how many addrs we got back
     struct addrinfo* addr;
     for (addr = addr_list; addr; addr = addr->ai_next) {
+        trans->net.addr.entries++;
+    }
+    trans->net.addr.list = addr_list;
+    trans->net.addr.next = addr_list; // next is initially the first element
+
+    return trans->net.addr.entries;
+}
+
+static struct addrinfo *
+getNextAddressListEntry(transport_t *trans)
+{
+    if (!trans || !trans->net.addr.list || !trans->net.addr.next) return NULL;
+
+    // record the next value to return, and advance it for subsequent calls
+    struct addrinfo *next = trans->net.addr.next;
+    trans->net.addr.next = next->ai_next;
+
+    return next;
+}
+
+
+static int
+socketConnectionStart(transport_t *trans)
+{
+    // Get a list of addresses to try if we don't have a current list
+    // or have exhausted the entries in a current list.
+    if (!trans->net.addr.list || !trans->net.addr.next) {
+        getAddressList(trans);
+    }
+
+    // try the next address in the address list
+    struct addrinfo* addr;
+    while ((addr = getNextAddressListEntry(trans))) {
         int sock;
         sock = g_fn.socket(addr->ai_family,
                            addr->ai_socktype,
@@ -786,7 +863,7 @@ socketConnectionStart(transport_t *trans)
             }
 
             FD_SET(sock, &trans->net.pending_connect);
-            continue;
+            break;  // replace w/continue for a shotgun start.
         }
 
 
@@ -804,8 +881,6 @@ socketConnectionStart(transport_t *trans)
             DBG(NULL); // with non-blocking tcp sockets, we always expect -1
         }
     }
-
-    if (addr_list) freeaddrinfo(addr_list);
 
     return (trans->net.sock != -1);
 }
@@ -897,7 +972,8 @@ transportConnect(transport_t *trans)
 }
 
 transport_t *
-transportCreateTCP(const char *host, const char *port)
+transportCreateTCP(const char *host, const char *port, unsigned int enable,
+                      unsigned int validateserver, const char *cacertpath)
 {
     transport_t* trans = NULL;
 
@@ -911,6 +987,9 @@ transportCreateTCP(const char *host, const char *port)
     FD_ZERO(&trans->net.pending_connect);
     trans->net.host = strdup(host);
     trans->net.port = strdup(port);
+    trans->net.tls.enable = enable;
+    trans->net.tls.validateserver = validateserver;
+    trans->net.tls.cacertpath = (cacertpath) ? strdup(cacertpath) : NULL;
 
     if (!trans->net.host || !trans->net.port) {
         DBG(NULL);
@@ -1033,6 +1112,7 @@ transportDestroy(transport_t** transport)
             if (t->net.host) free (t->net.host);
             if (t->net.port) free (t->net.port);
             if (t->net.tls.cacertpath) free(t->net.tls.cacertpath);
+            freeAddressList(t);
             break;
         case CFG_UNIX:
             break;
@@ -1052,28 +1132,6 @@ transportDestroy(transport_t** transport)
     }
     free(t);
     *transport = NULL;
-}
-
-void
-transportConfigureTls(transport_t *trans, unsigned int enable,
-                      unsigned int validateserver, const char *cacertpath)
-{
-    if (!trans) return;
-    switch (trans->type) {
-        case CFG_UDP:
-        case CFG_TCP:
-            trans->net.tls.enable = enable;
-            trans->net.tls.validateserver = validateserver;
-            trans->net.tls.cacertpath = (cacertpath) ? strdup(cacertpath) : NULL;
-            break;
-        case CFG_UNIX:
-        case CFG_FILE:
-        case CFG_SYSLOG:
-        case CFG_SHM:
-            break;
-        default:
-            DBG("%d", trans->type);
-    }
 }
 
 static int

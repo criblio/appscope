@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-RUN apk add go openssl make bash curl autoconf automake libtool openssl-dev rust nodejs ruby python3 php php-openssl apache2 apache2-ssl python3-dev py3-pip libffi-dev cargo && \
+RUN apk add go openssl make file bash curl autoconf automake libtool openssl-dev rust nodejs ruby python3 php php-openssl apache2 apache2-ssl python3-dev py3-pip libffi-dev cargo && \
     go clean -cache
 
 RUN mkdir -p /go
@@ -98,6 +98,7 @@ COPY ./tls/gdbinit /root/.gdbinit
 COPY ./alpine/test_go.sh /go
 COPY ./go/test_go_struct.sh /go
 COPY ./alpine/test_tls.sh /opt/test/bin/test_tls.sh
+COPY ./alpine/test_scope.sh /opt/test/bin/test_scope.sh
 COPY ./alpine/test_all.sh /opt/test/bin/test_all.sh
 
 ENV SCOPE_LOG_LEVEL=error

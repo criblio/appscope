@@ -34,7 +34,7 @@ docker-compose down
 docker-compose up alpine
 docker-compose down
 
-docker-compose up attach
+docker-compose up cli
 docker-compose down
 
 docker-compose up gogen

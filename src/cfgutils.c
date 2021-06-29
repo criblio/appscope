@@ -2024,7 +2024,7 @@ initCtl(config_t *cfg)
     }
     ctlTransportSet(ctl, trans, CFG_CTL);
 
-    if (cfgLogStream(cfg) && cfgPayEnable(cfg)) {
+    if (cfgLogStream(cfg) || cfgPayEnable(cfg)) {
         transport_t *trans = initTransport(cfg, CFG_LS);
         if (!trans) {
             ctlDestroy(&ctl);

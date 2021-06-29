@@ -141,8 +141,11 @@ func PidScoped(pid int) bool {
 	// Look for libscope in map
 	pidMap := string(pidMapFile)
 	if strings.Contains(pidMap, "libscope") {
-		return true
+		if PidCommand(pid) != "ldscopedyn" {
+			return true
+		}
 	}
+
 	return false
 }
 
@@ -157,4 +160,13 @@ func PidCommand(pid int) string {
 	}
 
 	return pStat.Name
+}
+
+// PidExists checks if a PID is valid
+func PidExists(pid int) bool {
+	pidPath := fmt.Sprintf("/proc/%v", pid)
+	if CheckDirExists(pidPath) {
+		return true
+	}
+	return false
 }

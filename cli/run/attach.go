@@ -56,7 +56,7 @@ func (rc *Config) Attach(args []string) {
 		}
 	}
 	// Check PID exists
-	if !pidExists(pid) {
+	if !util.PidExists(pid) {
 		util.ErrAndExit("PID does not exist: \"%v\"", pid)
 	}
 	// Check PID is not already being scoped
@@ -94,15 +94,6 @@ func (rc *Config) Attach(args []string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Run()
-}
-
-// pidExists checks if a PID is valid
-func pidExists(pid int) bool {
-	pidPath := fmt.Sprintf("/proc/%v", pid)
-	if util.CheckDirExists(pidPath) {
-		return true
-	}
-	return false
 }
 
 // choosePid presents a user interface for selecting a PID

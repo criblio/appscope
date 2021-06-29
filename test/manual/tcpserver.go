@@ -77,7 +77,7 @@ func getBusyInABurgerKingBathroom(c net.Conn) {
 				bin = append(bin, chunk...)
 			}
 			if (payloadsEnabled) {
-				log(c, "%d-byte payload\n%s", need-1, hex.Dump(bin[:need-1]))
+				log(c, "%d-byte payload\n%s", need-1, hex.Dump(bin[:need]))
 			}
 		}
 	}

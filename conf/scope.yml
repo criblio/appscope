@@ -65,7 +65,7 @@ event:
     # May be most useful for capturing debug output from processes
     # running in containerized environments.
     - type: console
-      name: stdout                  # (stdout|stderr)
+      name: (stdout)|(stderr)
       value: .*
 
     # Creates events from libscope's metric (statsd) data.  May be

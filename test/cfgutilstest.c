@@ -1221,81 +1221,6 @@ cfgReadGoodYaml(void** state)
 }
 
 static void
-cfgReadStockYaml(void** state)
-{
-    // The stock scope.yml file up in ../conf/ should parse to the defaults.
-    config_t* config = cfgRead("./conf/scope.yml");
-
-    // This should duplicate the verifyDefaults() function in cfgtest.c
-    assert_int_equal       (cfgMtcEnable(config), DEFAULT_MTC_ENABLE);
-    assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
-    assert_string_equal    (cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
-    assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
-    assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
-    assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
-    assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
-    assert_int_equal       (cfgSendProcessStartMsg(config), DEFAULT_PROCESS_START_MSG);
-    assert_int_equal       (cfgEvtEnable(config), DEFAULT_EVT_ENABLE);
-    assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
-    assert_int_equal       (cfgEvtRateLimit(config), DEFAULT_MAXEVENTSPERSEC);
-    assert_int_equal       (cfgEnhanceFs(config), DEFAULT_ENHANCE_FS);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_VALUE);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_FIELD);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_NAME);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), DEFAULT_SRC_NET);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), DEFAULT_SRC_FS);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), DEFAULT_SRC_DNS);
-    assert_int_equal       (cfgTransportType(config, CFG_MTC), DEFAULT_MTC_TYPE);
-    assert_string_equal    (cfgTransportHost(config, CFG_MTC), DEFAULT_MTC_HOST);
-    assert_string_equal    (cfgTransportPort(config, CFG_MTC), DEFAULT_MTC_PORT);
-    assert_null            (cfgTransportPath(config, CFG_MTC));
-    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), DEFAULT_MTC_BUF);
-    assert_int_equal       (cfgTransportType(config, CFG_CTL), DEFAULT_CTL_TYPE);
-    assert_string_equal    (cfgTransportHost(config, CFG_CTL), DEFAULT_CTL_HOST);
-    assert_string_equal    (cfgTransportPort(config, CFG_CTL), DEFAULT_CTL_PORT);
-    assert_null            (cfgTransportPath(config, CFG_CTL));
-    assert_int_equal       (cfgTransportBuf(config, CFG_CTL), DEFAULT_CTL_BUF);
-    assert_int_equal       (cfgTransportType(config, CFG_LOG), DEFAULT_LOG_TYPE);
-    assert_null            (cfgTransportHost(config, CFG_LOG));
-    assert_null            (cfgTransportPort(config, CFG_LOG));
-    assert_string_equal    (cfgTransportPath(config, CFG_LOG), DEFAULT_LOG_PATH);
-    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), DEFAULT_LOG_BUF);
-    assert_null            (cfgCustomTags(config));
-    assert_null            (cfgCustomTagValue(config, "tagname"));
-    assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
-    assert_int_equal       (cfgPayEnable(config), DEFAULT_PAYLOAD_ENABLE);
-    assert_string_equal    (cfgPayDir(config), DEFAULT_PAYLOAD_DIR);
-
-    cfgDestroy(&config);
-}
-
-static void
 writeFileWithSubstitution(const char* path, const char* base, const char* variable)
 {
     char buf[4096];
@@ -2005,7 +1930,6 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgProcessCommandsFromFile),
         cmocka_unit_test(cfgProcessCommandsEnvSubstitution),
         cmocka_unit_test(cfgReadGoodYaml),
-        cmocka_unit_test(cfgReadStockYaml),
         cmocka_unit_test(cfgReadEveryTransportType),
         cmocka_unit_test(cfgReadEveryProcessLevel),
         cmocka_unit_test(cfgReadGoodJson),

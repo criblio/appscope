@@ -80,7 +80,7 @@ reportProcessStart(ctl_t *ctl, bool init, which_transport_t who)
 
     // 2) send a payload start msg
     if (g_sendprocessstart && ((who == CFG_LS) || (who == CFG_WHICH_MAX)) &&
-        cfgLogStream(g_cfg.staticfg) && cfgPayEnable(g_cfg.staticfg)) {
+        (cfgLogStream(g_cfg.staticfg) || cfgPayEnable(g_cfg.staticfg))) {
         cJSON *json = msgStart(&g_proc, g_cfg.staticfg, CFG_LS);
         ctlSendJson(ctl, json, CFG_LS);
     }

@@ -31,3 +31,8 @@ This restriction is imposed to make the resulting executable more portable.
 ### Known Limitations
 
 These runtimes are **not** supported: Open JVM < v.6, Oracle JVM < v.6, Go < v.1.8.
+
+AppScope cannot:
+
+- Unload the libscope library.
+- Unattach/detach from a running process, once attached.

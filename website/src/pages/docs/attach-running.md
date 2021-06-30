@@ -12,4 +12,4 @@ To attach AppScope to a running process:
 
 *clarify* Events from I/O that exist before a process is attached are not emitted. For example, activity performed on any open file descriptor will not result in an AppScope event.
 
-You cannot attach to a Musl Libc process or a process for a static executable.
+You cannot attach to a musl libc process or a static executable's process.

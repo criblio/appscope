@@ -14,7 +14,7 @@
     - name: Requirements 
       path: /docs/requirements
 
-    - name: TLS 
+    - name: Using TLS for Secure Connections 
       path: /docs/tls
 
     - name: Installing

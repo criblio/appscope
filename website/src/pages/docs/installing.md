@@ -17,10 +17,10 @@ First, see [Requirements](/docs/requirements) to ensure that you’re completing
 Next, use these commands to download the CLI binary and make it executable:
 
 ```
-$ LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
-$ curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/scope
-$ curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/scope.md5 | md5sum -c 
-$ chmod +x scope
+LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
+curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/scope
+curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/scope.md5 | md5sum -c 
+chmod +x scope
 ```
 
 That's it!
@@ -28,9 +28,9 @@ That's it!
 To verify installation, run some scope commands:
 
 ```
-$ ./scope run ps -ef
-$ scope events
-$ scope metrics
+scope run ps -ef
+scope events
+scope metrics
 ```
 
 #### Download as Container

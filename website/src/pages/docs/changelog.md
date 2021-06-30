@@ -6,7 +6,7 @@ title: Changelog
 
 ## AppScope 0.7
 
-2021-06-30 - Maintenance Pre-Release
+2021-07-02 - Maintenance Pre-Release
 
 This pre-release addresses the following issues:
 

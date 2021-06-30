@@ -13,19 +13,20 @@ AppScope downloads as a single binary, but functionally speaking has several com
 
 ### The Command Line Interface (CLI)
 
-The AppScope CLI (`scope`) provides a quick and convenient way to explore capabilities, and to obtain insight into application behavior. No installation or configuration is required to get started exploring application behavior.
+The AppScope CLI (`scope`) [provides](/docs/cli-using) a quick and convenient way to explore capabilities, and to obtain insight into application behavior. No installation or configuration is required to get started exploring application behavior.
 
 <span>&#x2605;&#x2605;&#x2605;</span> **WHEN TO USE**: The easiest way to get started with AppScope is to use the CLI. This provides a rich set of capabilities intended to capture data from single applications. Data is captured in the local file system, and is managed through the CLI.
 
-To scope a running process whose process ID (PID) is `12345`:
-
-```
-scope attach 12345
-```
 To scope a new process, for example the `top` program:
 
 ```
 scope top
+```
+
+To [scope a running process](/docs/attach-running) whose process ID (PID) is `12345`:
+
+```
+scope attach 12345
 ```
 
 ### The Loader

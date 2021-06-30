@@ -30,7 +30,7 @@ This restriction is imposed to make the resulting executable more portable.
 
 ### Filesystem Configuration
 
-The distros that AppScope supports all require the use of `/tmp`, `/dev/shm`, and `/proc`. For AppScope to run properly, you must avoid configuring your filesystem in ways that prevent AppScope from using these directories.
+The distros that AppScope supports all require the use of `/tmp`, `/dev/shm`, and `/proc`. You should avoid custom filesystem configuration that interferes with AppScope's ability to use these directories.
 
 ### Known Limitations
 

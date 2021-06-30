@@ -28,6 +28,10 @@ This restriction is imposed to make the resulting executable more portable.
 - Memory: 1GB
 - Disk: 20MB (library + CLI)
 
+### Filesystem Configuration
+
+The distros that AppScope supports all require the use of `/tmp`, `/dev/shm`, and `/proc`. For AppScope to run properly, you must avoid configuring your filesystem in ways that prevent AppScope from using these directories.
+
 ### Known Limitations
 
 These runtimes are **not** supported: Open JVM < v.6, Oracle JVM < v.6, Go < v.1.8.

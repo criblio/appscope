@@ -24,6 +24,7 @@ type Config struct {
 	Subprocess    bool
 	Loglevel      string
 	LibraryPath   string
+	NoBreaker     bool
 
 	now func() time.Time
 	sc  *ScopeConfig
@@ -38,6 +39,9 @@ func (rc *Config) Run(args []string) {
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+	if rc.NoBreaker {
+		env = append(env, "CRIBL_NO_BREAKER=true")
+	}
 	if !rc.Passthrough {
 		rc.setupWorkDir(args, false)
 		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))

@@ -42,7 +42,7 @@ cribl:
   transport:
     type: tcp  # don't use tls here, use tcp and enable tls below
     host: in.logstream.example-tenant.cribl.cloud
-    port: 10090 # cribl.cloud's port for the TLS AppSCope Source
+    port: 10090 # cribl.cloud's port for the TLS AppScope Source
     tls:
       enable: true
       validateserver: true

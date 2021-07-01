@@ -2,12 +2,14 @@
 title: How AppScope Works
 ---
 
+## How AppScope Works
+
 There are two ways to "scope" an application:
 
 1. Attach AppScope to a running process.
 1. Scope a new process. 
 
-## How AppScope Works: Components
+## AppScope Components
 
 AppScope downloads as a single binary, but functionally speaking has several components including a command-line interface (CLI), a loader, and a library.
 

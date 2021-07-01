@@ -3,7 +3,6 @@ title: Cool, but What Can I do with It?
 ---
 
 ## Cool, but What Can I Do with It?
----
 
 AppScope offers APM-like, black-box instrumentation of any unmodified Linux executable and application. You can use AppScope in single-user troubleshooting, or in a distributed production deployment, with little extra tooling infrastructure. Especially when paired with [Cribl LogStream](https://cribl.io/product/), AppScope can deliver just the data you need to your existing tools.
 

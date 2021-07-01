@@ -40,7 +40,7 @@ func (rc *Config) Run(args []string) {
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
 	if rc.NoBreaker {
-		env = append(env, "CRIBL_NO_BREAKER=true")
+		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
 	if !rc.Passthrough {
 		rc.setupWorkDir(args, false)

@@ -3,6 +3,7 @@
 
 #include "com.h"
 #include "dbg.h"
+#include "utils.h"
 
 bool g_need_stack_expand = FALSE;
 unsigned g_sendprocessstart = 0;
@@ -257,6 +258,9 @@ msgStart(proc_id_t *proc, config_t *cfg, which_transport_t who)
         if (!cJSON_AddStringToObjLN(json_root, "format", "scope")) goto err;
     } else {
         if (!cJSON_AddStringToObjLN(json_root, "format", "ndjson")) goto err;
+	if (checkEnv("SCOPE_CRIBL_NO_BREAKER", "true")) {
+		if (!cJSON_AddStringToObjLN(json_root, "breaker", "Cribl - Do Not Break Ruleset")) goto err;
+	}
     }
 
     if (!(json_info = cJSON_AddObjectToObjLN(json_root, "info"))) goto err;

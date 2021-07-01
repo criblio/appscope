@@ -44,6 +44,7 @@ typedef struct {
     const data_type_t type;
     event_field_t *fields;
     watch_t src;
+    cJSON *data;
 } event_t;
 
 #define INT_EVENT(n, v, t, f) {n, { FMT_INT, .integer=v}, t, f, CFG_SRC_METRIC}
@@ -57,6 +58,22 @@ typedef struct event_format {
     cJSON *data;
     watch_t sourcetype;
 } event_format_t;
+
+typedef struct {
+    unsigned long long uid;
+    double timestamp;
+    char *path;
+    watch_t sourcetype;
+    regex_t *valuefilter;
+    proc_id_t* proc;
+} log_id_t;
+
+typedef struct {
+    int fd;
+    log_id_t id;
+    char *data;
+    unsigned long long datalen;
+} log_event_t;
 
 typedef struct _mtc_fmt_t mtc_fmt_t;
 

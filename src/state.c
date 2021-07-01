@@ -23,6 +23,7 @@
 #include "pcre2.h"
 #include "fn.h"
 #include "os.h"
+#include "utils.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
@@ -47,14 +48,12 @@ int g_mtc_addr_output = TRUE;
 static search_t* g_http_redirect = NULL;
 static list_t *g_protlist;
 static unsigned int g_prot_sequence = 0;
-
-// interfaces
-mtc_t *g_mtc = NULL;
-ctl_t *g_ctl = NULL;
-
+static protocol_def_t *g_payload_pre = NULL;
 
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
+
+#define SET_PROT(net) if (net && (net->protocol == PROT_NOTCHECKED)) net->protocol = PROT_CHECKED;
 
 #define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
 #define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)
@@ -183,6 +182,39 @@ addProtocol(request_t *req)
 }
 
 static void
+initPayloadExtract()
+{
+    int errornumber = 0;
+    PCRE2_SIZE erroroffset = 0;
+
+    if ((g_payload_pre = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+
+    g_payload_pre->binary = TRUE;
+    g_payload_pre->len = PAYLOAD_BYTESRC;
+    g_payload_pre->type = 0;
+    g_payload_pre->protname = NULL;
+    g_payload_pre->regex = PAYLOAD_REGEX;
+
+    g_payload_pre->re = pcre2_compile((PCRE2_SPTR)g_payload_pre->regex,
+                                      PCRE2_ZERO_TERMINATED, 0,
+                                      &errornumber, &erroroffset, NULL);
+
+    if (g_payload_pre->re == NULL) {
+        destroyProtEntry(g_payload_pre);
+        g_payload_pre = NULL;
+        return;
+    }
+
+    g_payload_pre->match_data = pcre2_match_data_create_from_pattern(g_payload_pre->re, NULL);
+
+    if (g_payload_pre->match_data == NULL) {
+        destroyProtEntry(g_payload_pre);
+        g_payload_pre = NULL;
+        return;
+    }
+}
+
+static void
 initProtocolDetection()
 {
     int i;
@@ -255,6 +287,7 @@ initState()
 
     g_protlist = lstCreate(destroyProtEntry);
     initProtocolDetection();
+    initPayloadExtract();
 
     initReporting();
 }
@@ -842,7 +875,7 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     if (((len <= 0) && (pre->len <= 0)) ||   // no len
         !pre->re ||                          // no regex
         (pre->len > cvlen)) {                // not enough buf for pre->len
-        net->protocol = -1;
+        SET_PROT(net);
         return FALSE;
     }
 
@@ -860,16 +893,14 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     } else {
         int i;
         size_t alen = (cvlen * 2) + 1;
-        char sstr[4];
 
         if ((cpdata = calloc(1, alen)) == NULL) {
-            net->protocol = -1;
+            SET_PROT(net);
             return FALSE;
         }
 
         for (i = 0; i < cvlen; i++) {
-            snprintf(sstr, sizeof(sstr), "%02x", (unsigned char)buf[i]);
-            strncat(cpdata, sstr, alen);
+            snprintf(&cpdata[i<<1], 3, "%02x", (unsigned char)buf[i]);
         }
 
         data = cpdata;
@@ -881,12 +912,12 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
                             match_data, NULL) > 0) {
         //DEBUG
         //scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_ERROR);
-        net->protocol = pre->type;
+        SET_PROT(net);
 
         if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
             if (cpdata) free(cpdata);
             if (match_data) pcre2_match_data_free(match_data);
-            net->protocol = -1;
+            SET_PROT(net);
             return FALSE;
         }
 
@@ -898,7 +929,7 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
         proto->data = (char *)strdup(pre->protname);
         cmdPostEvent(g_ctl, (char *)proto);
     } else {
-        net->protocol = -1;
+        SET_PROT(net);
     }
 
     if (match_data) pcre2_match_data_free(match_data);
@@ -913,19 +944,134 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
 {
     if (!buf || (len <= 0)) return -1;
 
+    // if not connected to a LogStream try to not include TLS handshake in the payload
+    if ((cfgLogStream(g_cfg.staticfg) == FALSE) && ((src == NETRX) || (src == NETTX))) {
+        /*
+         * the protocol state for this socket is either
+         * PROT_NOTCHECKED: first time we've seen traffic on this connection.
+         * continue and check to see if TLS is being used.
+         * PROT_CHECKED: we have checked for a protocol, it's not TLS.
+         * no need to check for a protocol. since it's not TLS. emit payload data.
+         * PROT_TLS: determined that this connection is using TLS. emit no payload data.
+         * the SSL/TLS interposed functions will emit unencrypted payload data.
+         */
+        // the protocol used on this socket is TLS
+        if (net && (net->protocol == PROT_TLS)) return 0;
+
+        // haven't checked for a protocol yet
+        if (net && (net->protocol == PROT_NOTCHECKED) && g_payload_pre) {
+            int rc;
+            unsigned char *data = buf;
+
+            // TLS data is binary, convert to chars
+            int i;
+            size_t alen = (g_payload_pre->len * 2) + 1;
+            char cpdata[alen];
+
+            memset(cpdata, 0, alen);
+
+            for (i = 0; i < g_payload_pre->len; i++) {
+                snprintf(&cpdata[i<<1], 3, "%02x", (unsigned char)data[i]);
+            }
+
+            if ((rc = pcre2_match_wrapper(g_payload_pre->re, (PCRE2_SPTR)cpdata,
+                                          (PCRE2_SIZE)alen, 0, 0,
+                                          g_payload_pre->match_data, NULL)) > 0) {
+                net->protocol = PROT_TLS;
+                return 0;
+            } else {
+                net->protocol = PROT_CHECKED;
+                switch(rc)
+                {
+                case PCRE2_ERROR_NOMATCH:
+                    scopeLog("extractPayload: No match", sockfd, CFG_LOG_DEBUG);
+                    break;
+                default:
+                    scopeLog("extractPayload: Matching error", sockfd, CFG_LOG_DEBUG);
+                    break;
+                }
+            }
+        }
+    }
+
     payload_info *pinfo = calloc(1, sizeof(struct payload_info_t));
     if (!pinfo) {
         return -1;
     }
 
-    pinfo->data = calloc(1, len);
-    if (!pinfo->data) {
+    switch (dtype) {
+    case BUF:
+        pinfo->data = calloc(1, len);
+        if (!pinfo->data) {
+            free(pinfo);
+            return -1;
+        }
+
+        memmove(pinfo->data, buf, len);
+        break;
+
+    case MSG:
+    {
+        int i;
+        size_t blen = 0;
+        struct msghdr *msg = (struct msghdr *)buf;
+        struct iovec *iov;
+
+        for (i = 0; i < msg->msg_iovlen; i++) {
+            iov = &msg->msg_iov[i];
+            if (iov && iov->iov_base && (iov->iov_len > 0)) {
+                char *temp = realloc(pinfo->data, blen + iov->iov_len);
+                if (!temp) {
+                    if (pinfo->data) free(pinfo->data);
+                    free(pinfo);
+                    return -1;
+                }
+
+                pinfo->data = temp;
+                memmove(&pinfo->data[blen], iov->iov_base, iov->iov_len);
+                blen += iov->iov_len;
+            }
+        }
+        len = blen;
+        break;
+    }
+
+    case IOV:
+    {
+        int i;
+        size_t blen = 0;
+        struct iovec *iov = (struct iovec *)buf;
+
+        // len is expected to be an iovcnt for an IOV data type
+        for (i = 0; i < len; i++) {
+            if (iov[i].iov_base && (iov[i].iov_len > 0)) {
+                char *temp = realloc(pinfo->data, blen + iov[i].iov_len);
+                if (!temp) {
+                    if (pinfo->data) free(pinfo->data);
+                    free(pinfo);
+                    return -1;
+                }
+
+                pinfo->data = temp;
+                memmove(&pinfo->data[blen], iov[i].iov_base, iov[i].iov_len);
+                blen += iov[i].iov_len;
+            }
+        }
+        len = blen;
+        break;
+    }
+
+    default:
+        // no data, no need to continue
         free(pinfo);
         return -1;
     }
 
-    memmove(pinfo->data, buf, len);
-    if (net) memmove(&pinfo->net, net, sizeof(net_info));
+    if (net) {
+        memmove(&pinfo->net, net, sizeof(net_info));
+    } else {
+        pinfo->net.active = 0;
+    }
 
     pinfo->evtype = EVT_PAYLOAD;
     pinfo->src = src;
@@ -948,7 +1094,7 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     protocol_def_t *pre;
 
     // check once per connection
-    if (!buf || !net || (net->protocol != 0)) return;
+    if (!buf || !net || (net->protocol != PROT_NOTCHECKED)) return;
 
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((pre = lstFind(g_protlist, ptype)) != NULL) {
@@ -1003,13 +1149,12 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     if (ctlPayEnable(g_ctl)) {
         // instead of or in addition to http &/or detect?
         extractPayload(sockfd, net, buf, len, src, dtype);
-        return 0;
     }
 
     if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
         if (doHttp(id, sockfd, net, buf, len, src, dtype)) {
             // not doing anything with protocol... yet
-            if (net) net->protocol = 1;
+            SET_PROT(net);
             return 0;
         }
     }
@@ -1240,6 +1385,7 @@ doSetAddrs(int sockfd)
     int need_to_track_addrs =
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
+        ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP) ||
         (mtcEnabled(g_mtc) && g_mtc_addr_output) ||
         ctlPayEnable(g_ctl);
     if (!need_to_track_addrs) return 0;
@@ -1354,10 +1500,13 @@ getDNSName(int sd, void *pkt, int pktlen)
     char *dname;
     char dnsName[MAX_HOSTNAME+1];
     int dnsNameBytesUsed = 0;
+    struct net_info_t *net = getNetEntry(sd);
 
-    if (getNetEntry(sd) == NULL) {
+    if (net == NULL) {
         return -1;
     }
+
+    net->startTime = getTime();
 
     query = (struct dns_query_t *)pkt;
     header = &query->qhead;
@@ -1446,13 +1595,210 @@ getDNSName(int sd, void *pkt, int pktlen)
 
     if (strncmp(dnsName, g_netinfo[sd].dnsName, dnsNameBytesUsed) == 0) {
         // Already sent this from an interposed function
-        g_netinfo[sd].dnsSend = FALSE;
+        g_netinfo[sd].dnsSend = TRUE;
     } else {
         strncpy(g_netinfo[sd].dnsName, dnsName, dnsNameBytesUsed);
-        g_netinfo[sd].dnsSend = TRUE;
+        g_netinfo[sd].dnsSend = FALSE;
     }
 
     return 0;
+}
+
+/*
+ * Name server functions are available in a glibc distro
+ * from libresolv. They are available in libmusl on a
+ * musl based distro, no libresolv is used. So, if we
+ * link to libresolv we work on a glibc distro, but
+ * we fail on a musl distro. To avoid dealing with
+ * that we use function pointers and populate them
+ * when they are needed.
+ *
+ * For clarification, when the executable has a
+ * dependency on libresolv the function pointers
+ * are resolved at libscope constructor time.
+ * Otherwise, we do an explicit dlopen to load
+ * libresolv and get the addrs of the functions
+ * we need. The dlopen works as libresolv is
+ * located in a default lib search path.
+ */
+static bool
+getNSFuncs(void)
+{
+    if (!g_fn.dlopen) return FALSE;
+
+    void *handle = g_fn.dlopen("libresolv.so", RTLD_LAZY | RTLD_NODELETE);
+    if (handle == NULL) {
+        scopeLog("WARNING: could not locate libresolv, DNS events will be affected",
+                 -1, CFG_LOG_WARN);
+        return FALSE;
+    }
+
+    if (!g_fn.ns_initparse) g_fn.ns_initparse = dlsym(handle, "ns_initparse");
+    if (!g_fn.ns_parserr) g_fn.ns_parserr = dlsym(handle, "ns_parserr");
+    dlclose(handle);
+
+    if (!g_fn.ns_initparse || !g_fn.ns_parserr) {
+        scopeLog("WARNING: could not locate name server functions, DNS events will be affected",
+                 -1, CFG_LOG_WARN);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+#define DNSDONE(var1, var2) {if (var1) cJSON_Delete(var1); if (var2) cJSON_Delete(var2); return FALSE;}
+
+static bool
+parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
+{
+    int i, nmsg;
+    ns_rr rr;
+    ns_msg handle;
+
+    if (!g_fn.ns_initparse || !g_fn.ns_parserr) {
+        if (getNSFuncs() == FALSE) return FALSE;
+    }
+
+    // init ns lib
+    if (g_fn.ns_initparse((const unsigned char *)buf, len, &handle) == -1) {
+        scopeLog("ERROR:init parse", -1, CFG_LOG_ERROR);
+        return FALSE;
+    }
+
+    nmsg = ns_msg_count(handle, ns_s_an);
+
+    if (nmsg > 0) {
+        for (i = 0; i < nmsg; i++) {
+            char ipaddr[128];
+            //char dispbuf[4096];
+
+            if (g_fn.ns_parserr(&handle, ns_s_an, i, &rr) == -1) {
+                scopeLog("ERROR:parse rr", -1, CFG_LOG_ERROR);
+                return FALSE;
+            }
+
+            // do this once, after we get the rr
+            if (first == 0) {
+                if (!cJSON_AddStringToObjLN(json, "domain", ns_rr_name(rr))) {
+                    continue;
+                }
+                first = 1;
+            }
+
+            //ns_sprintrr(&handle, &rr, NULL, NULL, dispbuf, sizeof (dispbuf));
+            //scopeLog(dispbuf, -1, CFG_LOG_DEBUG);
+
+            // type A is IPv4, AAA is IPv6
+            if (ns_rr_type(rr) == ns_t_a) {
+                if (!inet_ntop(AF_INET, (struct sockaddr_in *)rr.rdata,
+                               ipaddr, sizeof(ipaddr))) {
+                    continue;
+                }
+            } else if (ns_rr_type(rr) == ns_t_aaaa) {
+                if (!inet_ntop(AF_INET6, (struct sockaddr_in6 *)rr.rdata,
+                               ipaddr, sizeof(ipaddr))) {
+                    continue;
+                }
+            } else {
+                DBG("DNS response received without an IP address");
+                continue;
+            }
+
+            //snprintf(dispbuf, sizeof(dispbuf), "resolved addr is %s\n", ipaddr);
+            //scopeLog(dispbuf, -1, CFG_LOG_DEBUG);
+
+            if (!cJSON_AddStringToObjLN(addrs, "addr", ipaddr)) {
+                continue;
+            }
+        }
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+bool
+getDNSAnswer(int sockfd, char *buf, size_t len, src_data_t dtype)
+{
+    bool result;
+    struct net_info_t *net = getNetEntry(sockfd);
+
+    if (!buf || !net || (len <= 0)) return FALSE;
+
+    cJSON *json = cJSON_CreateObject();
+    if (!json) return FALSE;
+
+    cJSON *addrs = cJSON_CreateArray();
+    if (!addrs) DNSDONE(json, addrs);
+
+    if (net->startTime == 0) {
+        if (!cJSON_AddNumberToObjLN(json, "duration", 0)) {
+            DNSDONE(json, addrs);
+        }
+    } else {
+        if (!cJSON_AddNumberToObjLN(json, "duration",
+                                    getDuration(net->startTime) / 1000000)) {
+            DNSDONE(json, addrs);
+        }
+    }
+
+    switch (dtype) {
+    case BUF:
+        result = parseDNSAnswer(buf, len, json, addrs, 0);
+        break;
+
+    case MSG:
+    {
+        int i;
+        struct msghdr *msg = (struct msghdr *)buf;
+        struct iovec *iov;
+
+        for (i = 0; i < msg->msg_iovlen; i++) {
+            iov = &msg->msg_iov[i];
+            if (iov && iov->iov_base && (iov->iov_len > 0)) {
+                // do we have at least one good pass?
+                if (parseDNSAnswer((char *)iov->iov_base, len, json, addrs, i) == TRUE) {
+                    result = TRUE;
+                } else {
+                    // should we stop if an iov doesn't parse? probably.
+                    break;
+                }
+            }
+        }
+        break;
+    }
+
+    case IOV:
+    {
+        int i;
+        struct iovec *iov = (struct iovec *)buf;
+
+        for (i = 0; i < len; i++) {
+            if (iov[i].iov_base && (iov[i].iov_len > 0)) {
+                if (parseDNSAnswer((char *)iov[i].iov_base, len, json, addrs, i)  == TRUE) {
+                    result = TRUE;
+                } else {
+                    break;
+                }
+            }
+        }
+        break;
+    }
+
+    default:
+        DNSDONE(json, addrs);
+    }
+
+    if (result == TRUE) {
+        cJSON_AddItemToObject(json, "addrs", addrs);
+        net->dnsAnswer = json;
+    } else {
+        net->dnsAnswer = NULL;
+        if (json) cJSON_Delete(json);
+        if (addrs) cJSON_Delete(addrs);
+    }
+
+    return TRUE;
 }
 
 int
@@ -1510,7 +1856,10 @@ doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
 
         doUpdateState(NETRX, sockfd, rc, NULL, NULL);
 
-        if (remotePortIsDNS(sockfd) && (g_netinfo[sockfd].dnsName[0])) {
+        if ((g_netinfo[sockfd].dnsRecv == FALSE) &&
+            remotePortIsDNS(sockfd) &&
+            (g_netinfo[sockfd].dnsName[0])) {
+            g_netinfo[sockfd].dnsRecv = TRUE;
             doUpdateState(DNS, sockfd, (ssize_t)1, NULL, g_netinfo[sockfd].dnsName);
         }
 
@@ -1532,12 +1881,12 @@ doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         doSetAddrs(sockfd);
         doUpdateState(NETTX, sockfd, rc, NULL, NULL);
 
-        if (get_port(sockfd, g_netinfo[sockfd].remoteConn.ss_family, REMOTE) == DNS_PORT) {
-            if (g_netinfo[sockfd].dnsName[0]) {
-                doUpdateState(DNS, sockfd, (ssize_t)0, NULL, NULL);
-            }
+        if ((g_netinfo[sockfd].dnsSend == FALSE) &&
+            remotePortIsDNS(sockfd) &&
+            (g_netinfo[sockfd].dnsName[0])) {
+            doUpdateState(DNS, sockfd, (ssize_t)0, NULL, NULL);
+            g_netinfo[sockfd].dnsSend = TRUE;
         }
-
 
         if ((sockfd != -1) && buf && (len > 0)) {
             doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETTX, src);
@@ -1675,15 +2024,15 @@ doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t byte
                 struct iovec *iov = (struct iovec *)buf;
 
                 for (i = 0; i < cnt; i++) {
-                    if (iov[i].iov_base) {
-                        ctlSendLog(g_ctl, fs->path, iov[i].iov_base, iov[i].iov_len, fs->uid, &g_proc);
+                    if (iov[i].iov_base && (iov[i].iov_len > 0)) {
+                        ctlSendLog(g_ctl, fd, fs->path, iov[i].iov_base, iov[i].iov_len, fs->uid, &g_proc);
                     }
                 }
 
                 return;
             }
 
-            ctlSendLog(g_ctl, fs->path, buf, bytes, fs->uid, &g_proc);
+            ctlSendLog(g_ctl, fd, fs->path, buf, bytes, fs->uid, &g_proc);
         }
     } else {
         if (fs) {
@@ -1741,7 +2090,7 @@ doStatFd(int fd, int rc, const char* func)
 #endif // __LINUX__
 
 int
-doDupFile(int newfd, int oldfd, const char *func)
+doDupFile(int oldfd, int newfd, const char *func)
 {
     if (!checkFSEntry(newfd) || !checkFSEntry(oldfd)) {
         return -1;
@@ -1904,11 +2253,14 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
 
         if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) && ctlEnhanceFs(g_ctl)) {
             struct stat sbuf;
+            int errsave = errno;
+
             if ((g_fn.__xstat) && (g_fn.__xstat(1, g_fsinfo[fd].path, &sbuf) == 0)) {
                 g_fsinfo[fd].fuid = sbuf.st_uid;
                 g_fsinfo[fd].fgid = sbuf.st_gid;
                 g_fsinfo[fd].mode = sbuf.st_mode;
             }
+            errno = errsave;
         }
 
         doUpdateState(FS_OPEN, fd, 0, func, path);
@@ -1994,7 +2346,7 @@ sockIsTCP(int sockfd)
 }
 
 bool
-addrIsNetDomain(struct sockaddr_storage* sock)
+addrIsNetDomain(struct sockaddr_storage *sock)
 {
     if (!sock) return FALSE;
 
@@ -2003,7 +2355,7 @@ addrIsNetDomain(struct sockaddr_storage* sock)
 }
 
 bool
-addrIsUnixDomain(struct sockaddr_storage* sock)
+addrIsUnixDomain(struct sockaddr_storage *sock)
 {
     if (!sock) return FALSE;
 
@@ -2012,7 +2364,7 @@ addrIsUnixDomain(struct sockaddr_storage* sock)
 }
 
 sock_summary_bucket_t
-getNetRxTxBucket(net_info* net)
+getNetRxTxBucket(net_info *net)
 {
     if (!net) return SOCK_OTHER;
 

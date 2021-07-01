@@ -6,7 +6,8 @@ typedef struct _transport_t transport_t;
 
 // Constructors Destructors
 transport_t*        transportCreateUdp(const char *, const char *);
-transport_t*        transportCreateTCP(const char *, const char *);
+transport_t*        transportCreateTCP(const char *, const char *,
+                                       unsigned int, unsigned int, const char*);
 transport_t*        transportCreateFile(const char *, cfg_buffer_t);
 transport_t*        transportCreateUnix(const char *);
 transport_t*        transportCreateSyslog(void);

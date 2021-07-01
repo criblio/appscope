@@ -7,22 +7,15 @@ title: Integrating with LogStream
 
 AppScope can easily connect to Cribl LogStream ([overview](https://cribl.io/product/) | [download](https://cribl.io/download/) | [docs](https://docs.cribl.io/docs/welcome)).
 
-To define a LogStream connection, the only configuration element needed is setting the `SCOPE_LOGSTREAM` environment variable. Here are some example definitions, which we'll unpack below:
+To define a LogStream connection, the only configuration element needed is setting the `SCOPE_CRIBL` environment variable. For example:
 
 ```
-SCOPE_LOGSTREAM=hostname:port
-SCOPE_LOGSTREAM=ip:port
-SCOPE_LOGSTREAM=tcp://ip:port
+SCOPE_CRIBL=tcp://ip:port
 ```
 
 ### Requirements
 
 You must supply a host name or IPv4 address, along with an optional port number. If you omit the port number, AppScope will attempt to connect on the default port `10090`. 
-
-### Optional TCP Syntax
-
-You can optionally use the syntax `tcp://ip:port` to define an IP address.
-
 
 ### Parameter Overrides
 

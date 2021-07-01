@@ -1,7 +1,7 @@
 ARG GO_IMAGE_VER=golang:1.14
 FROM $GO_IMAGE_VER
 
-RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y vim curl file
+RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y vim curl file bsdmainutils
 
 #ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
 #COPY ./libscope.so /usr/lib/libscope.so
@@ -19,7 +19,7 @@ RUN cd /go/thread && CGO_ENABLED=0 go build fileThread.go
 
 RUN mkdir /go/net
 COPY ./go/net/plainServer.go /go/net
-RUN cd /go/net && go build -o plainServerDynamic plainServer.go
+RUN cd /go/net && go build -buildmode=pie -o plainServerDynamic plainServer.go
 RUN cd /go/net && CGO_ENABLED=0 go build -o plainServerStatic plainServer.go
 COPY ./go/net/tlsServer.go /go/net
 RUN cd /go/net && go build -o tlsServerDynamic tlsServer.go

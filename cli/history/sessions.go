@@ -28,10 +28,16 @@ type Session struct {
 	EventCount   int           `json:"eventCount"`
 	Duration     time.Duration `json:"duration"`
 
-	ArgsPath    string `json:"argspath"`
-	MetricsPath string `json:"metricspath"`
-	EventsPath  string `json:"eventspath"`
-	CmdDirPath  string `json:"cmddirpath"`
+	ArgsPath          string `json:"argspath"`
+	MetricsPath       string `json:"metricspath"`
+	MetricsDestPath   string `json:"metricsdestpath"`
+	MetricsFormatPath string `json:"metricsformatpath"`
+	EventsPath        string `json:"eventspath"`
+	EventsDestPath    string `json:"eventsdestpath"`
+	CmdDirPath        string `json:"cmddirpath"`
+	PayloadsPath      string `json:"payloadspath"`
+	ScopeLogPath      string `json:"scopelogpath"`
+	LdscopeLogPath    string `json:"ldscopelogpath"`
 }
 
 // SessionList represents a list of sessions
@@ -52,15 +58,21 @@ func GetSessions() (ret SessionList) {
 		workDir := filepath.Join(histDir, f.Name())
 
 		ret = append(ret, Session{
-			ID:          id,
-			Cmd:         vals[1],
-			Pid:         pid,
-			Timestamp:   ts,
-			WorkDir:     workDir,
-			ArgsPath:    filepath.Join(workDir, "args.json"),
-			CmdDirPath:  filepath.Join(workDir, "cmd"),
-			EventsPath:  filepath.Join(workDir, "events.json"),
-			MetricsPath: filepath.Join(workDir, "metrics.json"),
+			ID:                id,
+			Cmd:               vals[1],
+			Pid:               pid,
+			Timestamp:         ts,
+			WorkDir:           workDir,
+			ArgsPath:          filepath.Join(workDir, "args.json"),
+			CmdDirPath:        filepath.Join(workDir, "cmd"),
+			EventsPath:        filepath.Join(workDir, "events.json"),
+			MetricsPath:       filepath.Join(workDir, "metrics.json"),
+			MetricsDestPath:   filepath.Join(workDir, "metric_dest"),
+			MetricsFormatPath: filepath.Join(workDir, "metric_format"),
+			EventsDestPath:    filepath.Join(workDir, "event_dest"),
+			PayloadsPath:      filepath.Join(workDir, "payloads"),
+			ScopeLogPath:      filepath.Join(workDir, "scope.log"),
+			LdscopeLogPath:    filepath.Join(workDir, "ldscope.log"),
 		})
 	}
 	sort.Slice(ret, func(i, j int) bool { return ret[i].ID < ret[j].ID })
@@ -134,7 +146,11 @@ func (sessions SessionList) CountAndDuration() (ret SessionList) {
 	for _, s := range sessions {
 		var err error
 		s.EventCount, err = util.CountLines(s.EventsPath)
-		if err == nil {
+		if err != nil {
+			if util.CheckFileExists(s.EventsDestPath) {
+				s.EventCount = -1
+			}
+		} else {
 			file, err := os.Open(s.EventsPath)
 			if err == nil {
 				in := make(chan map[string]interface{})
@@ -156,7 +172,19 @@ func (sessions SessionList) CountAndDuration() (ret SessionList) {
 // Remove removes all sessions in a given session list
 func (sessions SessionList) Remove() (ret SessionList) {
 	for _, s := range sessions {
-		err := os.RemoveAll(s.WorkDir)
+
+		// Delete any directories resolved by symbolic links
+		fileInfo, err := os.Lstat(s.WorkDir)
+		util.CheckErrSprintf(err, "error reading work directory: %v", err)
+		if fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
+			resolve, err := os.Readlink(s.WorkDir)
+			util.CheckErrSprintf(err, "error reading linked directory: %v", err)
+			err = os.RemoveAll(resolve)
+			util.CheckErrSprintf(err, "error removing linked directory: %v", err)
+		}
+
+		// Delete working directory
+		err = os.RemoveAll(s.WorkDir)
 		util.CheckErrSprintf(err, "error removing work directory: %v", err)
 	}
 	return []Session{}

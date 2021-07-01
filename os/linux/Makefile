@@ -5,21 +5,32 @@ CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -D__LINUX__ -D__
 SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -D__LINUX__
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
-LD_FLAGS=$(PCRE2_AR) -ldl -lpthread -lrt -Lcontrib/funchook/build -lfunchook -ldistorm -e __scope_main
-INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build -I./contrib/jni -I./contrib/jni/linux/
+LD_FLAGS=$(PCRE2_AR) -ldl -lpthread -lrt -Lcontrib/funchook/build -lfunchook -ldistorm
+INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build -I./contrib/funchook/distorm/include -I./contrib/jni -I./contrib/jni/linux/ -I./contrib/openssl/include
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
+CJSON_DEFINES=-DENABLE_LOCALES
 YAML_SRC=$(wildcard contrib/libyaml/src/*.c)
 YAML_AR=contrib/libyaml/src/.libs/libyaml.a
 JSON_AR=contrib/cJSON/libcjson.a
 FUNCHOOK_AR=contrib/funchook/build/libfunchook.a contrib/funchook/build/libdistorm.a
 PCRE2_AR=contrib/pcre2/build/libpcre2-posix.a contrib/pcre2/build/libpcre2-8.a
-TEST_AR=$(YAML_AR) $(JSON_AR) $(PCRE2_AR)
+OPENSSL_AR=contrib/openssl/libssl.a contrib/openssl/libcrypto.a
+TEST_AR=$(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR}
 TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
-TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl
+TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl -lresolv -lrt -lpthread
 
 .PHONY: coreall coreclean coretest
-coreall: libscope.so ldscope
+coreall: libscope.so ldscopedyn ldscope
+
+$(OPENSSL_AR):
+	@echo "Building openssl"
+	cd contrib/openssl && ./Configure no-async
+	cd contrib/openssl && make -j8
+	# Yuck.  Avoids naming conflict between our wrap.c and libssl.a
+	objcopy --redefine-sym SSL_read=SCOPE_SSL_read contrib/openssl/libssl.a
+	objcopy --redefine-sym SSL_write=SCOPE_SSL_write contrib/openssl/libssl.a
+
 
 $(PCRE2_AR):
 	@echo "Building pcre2"
@@ -33,25 +44,32 @@ $(FUNCHOOK_AR):
 	cd contrib/funchook/build && cmake -DCMAKE_BUILD_TYPE=Release ..
 	cd contrib/funchook/build && make distorm funchook-static
 
-libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c src/plattime.c src/fn.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c src/search.c src/sysexec.c src/gocontext.S src/scopeelf.c src/wrap_go.c src/utils.c $(YAML_SRC) contrib/cJSON/cJSON.c src/javabci.c src/javaagent.c
+libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c src/plattime.c src/fn.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c src/search.c src/sysexec.c src/gocontext.S src/scopeelf.c src/wrap_go.c src/utils.c src/bashmem.c $(YAML_SRC) contrib/cJSON/cJSON.c src/javabci.c src/javaagent.c
 	@echo "Building libscope.so ..."
 	make $(FUNCHOOK_AR)
 	make $(PCRE2_AR)
-	$(CC) $(CFLAGS) -shared -fvisibility=hidden -fno-stack-protector -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ $(LD_FLAGS)
+	make $(OPENSSL_AR)
+	$(CC) $(CFLAGS) -shared -fvisibility=hidden -fno-stack-protector -DSCOPE_VER=\"$(SCOPE_VER)\" $(CJSON_DEFINES) $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ $(LD_FLAGS) ${OPENSSL_AR} -Wl,--version-script=libscope.map
 	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
 	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/ && rm ./test/selfinterpose/wrap_go.o
 
-ldscope: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c libscope.so
+ldscopedyn: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c
+	gcc -Wall -g -D__LINUX__ $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c -ldl -lrt -o ./bin/$(OS)/ldscopedyn -I./os/$(OS) $(INCLUDES)
+
+
+ldscope: src/scope_static.c src/libdir.c ldscopedyn libscope.so
+	objcopy -I binary -O elf64-x86-64 -B i386 ./bin/$(OS)/ldscopedyn ./bin/$(OS)/ldscopedyn.o
 	objcopy -I binary -O elf64-x86-64 -B i386 ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
-	gcc -Wall -g -D__LINUX__ -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c -ldl -lrt -o ./bin/$(OS)/ldscope ./lib/$(OS)/libscope.o -I./os/$(OS)
-	rm -f ./lib/$(OS)/libscope.o && rm -f ../../cli/run/bundle.go
+	gcc -Wall -static -g -D__LINUX__ $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/scope_static.c src/libdir.c $(INCLUDES) ./bin/$(OS)/ldscopedyn.o ./lib/$(OS)/libscope.o -lrt -lpthread -o ./bin/$(OS)/ldscope
+	rm -f ./bin/$(OS)/ldscopedyn.o ./lib/$(OS)/libscope.o
 
 coreclean:
-	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a bin/$(OS)/ldscope
+	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a bin/$(OS)/ldscope bin/$(OS)/ldscopedyn 
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))
 SRC_C_FILES:=$(filter-out src/sysexec.c, $(SRC_C_FILES))
+SRC_C_FILES:=$(filter-out src/scope_static.c, $(SRC_C_FILES))
 TEST_C_FILES:=$(wildcard test/*.c)
 TEST_C_FILES:=$(filter-out test/wraptest.c, $(TEST_C_FILES))
 C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c
@@ -63,21 +81,21 @@ coretest: $(C_FILES)
 	make $(YAML_AR)
 	make $(JSON_AR)
 	make $(TEST_LIB)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest cfgutilstest.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o mtcformat.o com.o dbg.o circbuf.o linklist.o fn.o utils.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest cfgutilstest.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o mtcformat.o com.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest cfgtest.o cfg.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/transporttest transporttest.o transport.o dbg.o log.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/logtest logtest.o log.o transport.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/mtctest mtctest.o mtc.o log.o transport.o mtcformat.o com.o ctl.o evtformat.o cfg.o cfgutils.o dbg.o circbuf.o linklist.o fn.o utils.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/evtformattest evtformattest.o evtformat.o log.o transport.o mtcformat.o dbg.o cfg.o com.o ctl.o mtc.o circbuf.o cfgutils.o linklist.o fn.o utils.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ctltest ctltest.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o com.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o fn.o utils.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/transporttest transporttest.o transport.o dbg.o log.o fn.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/logtest logtest.o log.o transport.o dbg.o fn.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/mtctest mtctest.o mtc.o log.o transport.o mtcformat.o com.o ctl.o evtformat.o cfg.o cfgutils.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/evtformattest evtformattest.o evtformat.o log.o transport.o mtcformat.o dbg.o cfg.o com.o ctl.o mtc.o circbuf.o cfgutils.o linklist.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ctltest ctltest.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o com.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/httpstatetest httpstatetest.o httpstate.o plattime.o search.o fn.o os.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -lrt
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/httpheadertest httpheadertest.o report.o httpagg.o state.o com.o httpstate.o plattime.o fn.o utils.o os.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o search.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -lrt -Wl,--wrap=cmdSendHttp -Wl,--wrap=cmdPostEvent
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/httpheadertest httpheadertest.o report.o httpagg.o state.o com.o httpstate.o plattime.o fn.o utils.o os.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o search.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=cmdSendHttp -Wl,--wrap=cmdPostEvent
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/httpaggtest httpaggtest.o httpagg.o fn.o utils.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/reporttest reporttest.o report.o httpagg.o state.o httpstate.o com.o plattime.o fn.o utils.o os.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o search.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -lrt -Wl,--wrap=cmdSendEvent -Wl,--wrap=cmdSendMetric
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/mtcformattest mtcformattest.o mtcformat.o dbg.o log.o transport.o com.o ctl.o mtc.o evtformat.o cfg.o cfgutils.o linklist.o fn.o utils.o circbuf.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/reporttest reporttest.o report.o httpagg.o state.o httpstate.o com.o plattime.o fn.o utils.o os.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o search.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=cmdSendEvent -Wl,--wrap=cmdSendMetric
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/mtcformattest mtcformattest.o mtcformat.o dbg.o log.o transport.o com.o ctl.o mtc.o evtformat.o cfg.o cfgutils.o linklist.o fn.o utils.o circbuf.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/circbuftest circbuftest.o circbuf.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/linklisttest linklisttest.o linklist.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/comtest comtest.o com.o ctl.o log.o transport.o evtformat.o circbuf.o mtcformat.o cfgutils.o cfg.o mtc.o dbg.o linklist.o fn.o utils.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/comtest comtest.o com.o ctl.o log.o transport.o evtformat.o circbuf.o mtcformat.o cfgutils.o cfg.o mtc.o dbg.o linklist.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dbgtest dbgtest.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/glibcvertest glibcvertest.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/selfinterposetest selfinterposetest.o $(TEST_AR) $(TEST_LD_FLAGS)

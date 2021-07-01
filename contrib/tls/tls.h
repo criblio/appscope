@@ -15,8 +15,7 @@ typedef struct gnutls_packet_def *gnutls_packet_t;
 struct gnutls_range_def;
 typedef struct gnutls_range_def *gnutls_range_st;
 
-struct ssl_session_def;
-typedef struct ssl_session_def SSL;
+typedef struct ssl_st SSL;
 
 typedef int *gnutls_transport_ptr_t;
 

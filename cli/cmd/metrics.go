@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 	"os"
 	"sort"
@@ -41,6 +42,11 @@ var metricsCmd = &cobra.Command{
 
 		file, err := os.Open(sessions[0].MetricsPath)
 		if err != nil && strings.Contains(err.Error(), "metrics.json: no such file or directory") {
+			if util.CheckFileExists(sessions[0].MetricsDestPath) {
+				dest, _ := ioutil.ReadFile(sessions[0].MetricsDestPath)
+				fmt.Printf("metrics were output to %s\n", dest)
+				os.Exit(0)
+			}
 			promptClean(sessions[0:1])
 		}
 		in := make(chan metrics.Metric)

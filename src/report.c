@@ -20,6 +20,9 @@
 #include "state_private.h"
 #include "linklist.h"
 #include "dns.h"
+#include "utils.h"
+#include "runtimecfg.h"
+#include "cfg.h"
 
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
@@ -32,24 +35,24 @@
 #define PROTO_FIELD(val)        STRFIELD("proto",          (val), 2, TRUE)
 #define OP_FIELD(val)           STRFIELD("op",             (val), 3, TRUE)
 #define PID_FIELD(val)          NUMFIELD("pid",            (val), 4, TRUE)
-#define PROC_UID(val)           NUMFIELD("proc.uid",       (val), 4, TRUE)
-#define PROC_GID(val)           NUMFIELD("proc.gid",       (val), 4, TRUE)
-#define PROC_CGROUP(val)        STRFIELD("proc.cgroup",    (val), 4, TRUE)
+#define PROC_UID(val)           NUMFIELD("proc_uid",       (val), 4, TRUE)
+#define PROC_GID(val)           NUMFIELD("proc_gid",       (val), 4, TRUE)
+#define PROC_CGROUP(val)        STRFIELD("proc_cgroup",    (val), 4, TRUE)
 #define HOST_FIELD(val)         STRFIELD("host",           (val), 4, TRUE)
 #define PROC_FIELD(val)         STRFIELD("proc",           (val), 4, TRUE)
 #define HTTPSTAT_FIELD(val)     NUMFIELD("http_status",    (val), 4, TRUE)
 #define DOMAIN_FIELD(val)       STRFIELD("domain",         (val), 5, TRUE)
 
 #define FILE_FIELD(val)      STRFIELD("file",              (val), 5, TRUE)
-#define FILE_EV_NAME(val)    STRFIELD("file.name",         (val), 5, TRUE)
-#define FILE_EV_MODE(val)    NUMFIELD("file.perms",        (val), 5, TRUE)
-#define FILE_OWNER(val)      NUMFIELD("file.owner",        (val), 5, TRUE)
-#define FILE_GROUP(val)      NUMFIELD("file.group",        (val), 5, TRUE)
-#define FILE_RD_BYTES(val)   NUMFIELD("file.read_bytes",   (val), 5, TRUE)
-#define FILE_RD_OPS(val)     NUMFIELD("file.read_ops",     (val), 5, TRUE)
-#define FILE_WR_BYTES(val)   NUMFIELD("file.write_bytes",  (val), 5, TRUE)
-#define FILE_WR_OPS(val)     NUMFIELD("file.write_ops",    (val), 5, TRUE)
-#define FILE_ERRS(val)       NUMFIELD("file.errors",       (val), 5, TRUE)
+#define FILE_EV_NAME(val)    STRFIELD("file_name",         (val), 5, TRUE)
+#define FILE_EV_MODE(val)    NUMFIELD("file_perms",        (val), 5, TRUE)
+#define FILE_OWNER(val)      NUMFIELD("file_owner",        (val), 5, TRUE)
+#define FILE_GROUP(val)      NUMFIELD("file_group",        (val), 5, TRUE)
+#define FILE_RD_BYTES(val)   NUMFIELD("file_read_bytes",   (val), 5, TRUE)
+#define FILE_RD_OPS(val)     NUMFIELD("file_read_ops",     (val), 5, TRUE)
+#define FILE_WR_BYTES(val)   NUMFIELD("file_write_bytes",  (val), 5, TRUE)
+#define FILE_WR_OPS(val)     NUMFIELD("file_write_ops",    (val), 5, TRUE)
+#define FILE_ERRS(val)       NUMFIELD("file_errors",       (val), 5, TRUE)
 
 #define LOCALIP_FIELD(val)      STRFIELD("localip",        (val), 6, TRUE)
 #define REMOTEIP_FIELD(val)     STRFIELD("remoteip",       (val), 6, TRUE)
@@ -70,6 +73,8 @@
 #define EVENT_ONLY_ATTR (CFG_MAX_VERBOSITY+1)
 #define HTTP_MAX_FIELDS 30
 #define NET_MAX_FIELDS 16
+#define NUM_DYNS 4
+
 #define H_ATTRIB(field, att, val, verbosity) \
     field.name = att; \
     field.value_type = FMT_STR; \
@@ -142,23 +147,6 @@ sendEvent(mtc_t *mtc, event_t *event)
     if (cmdSendMetric(mtc, event) == -1) {
         scopeLog("ERROR: sendEvent:cmdSendMetric", -1, CFG_LOG_ERROR);
     }
-}
-
-void
-sendProcessStartMetric()
-{
-    char *urlEncodedCmd = fmtUrlEncode(g_proc.cmd);
-    event_field_t fields[] = {
-        PROC_FIELD(g_proc.procname),
-        PID_FIELD(g_proc.pid),
-        HOST_FIELD(g_proc.hostname),
-        ARGS_FIELD(urlEncodedCmd),
-        UNIT_FIELD("process"),
-        FIELDEND
-    };
-    event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
-    cmdSendMetric(g_mtc, &evt);
-    if (urlEncodedCmd) free(urlEncodedCmd);
 }
 
 static void
@@ -236,23 +224,23 @@ getNetInternals(net_info *net, int type,
     if (addrIsNetDomain(lconn)) {
         switch (type) {
         case SOCK_STREAM:
-            H_ATTRIB(fields[*ix], "net.transport", "IP.TCP", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "IP.TCP", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_DGRAM:
-            H_ATTRIB(fields[*ix], "net.transport", "IP.UDP", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "IP.UDP", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_RAW:
-            H_ATTRIB(fields[*ix], "net.transport", "IP.RAW", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "IP.RAW", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_RDM:
-            H_ATTRIB(fields[*ix], "net.transport", "IP.RDM", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "IP.RDM", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_SEQPACKET:
-            H_ATTRIB(fields[*ix], "net.transport", "IP.SEQPACKET", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "IP.SEQPACKET", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         default:
@@ -260,38 +248,38 @@ getNetInternals(net_info *net, int type,
         }
 
         if (getConn(rconn, raddr, alen, rport, plen) == TRUE) {
-            H_ATTRIB(fields[*ix], "net.peer.ip", raddr, 1);
+            H_ATTRIB(fields[*ix], "net_peer_ip", raddr, 1);
             NEXT_FLD(*ix, maxfld);
-            H_ATTRIB(fields[*ix], "net.peer.port", rport, 1);
+            H_ATTRIB(fields[*ix], "net_peer_port", rport, 1);
             NEXT_FLD(*ix, maxfld);
         }
 
         if (getConn(lconn, laddr, alen, lport, plen) == TRUE) {
-            H_ATTRIB(fields[*ix], "net.host.ip", laddr, 1);
+            H_ATTRIB(fields[*ix], "net_host_ip", laddr, 1);
             NEXT_FLD(*ix, maxfld);
-            H_ATTRIB(fields[*ix], "net.host.port", lport, 1);
+            H_ATTRIB(fields[*ix], "net_host_port", lport, 1);
             NEXT_FLD(*ix, maxfld);
         }
     } else if (addrIsUnixDomain(lconn)) {
         switch (type) {
         case SOCK_STREAM:
-            H_ATTRIB(fields[*ix], "net.transport", "Unix.TCP", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "Unix.TCP", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_DGRAM:
-            H_ATTRIB(fields[*ix], "net.transport", "Unix.UDP", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "Unix.UDP", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_RAW:
-            H_ATTRIB(fields[*ix], "net.transport", "Unix.RAW", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "Unix.RAW", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_RDM:
-            H_ATTRIB(fields[*ix], "net.transport", "Unix.RDM", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "Unix.RDM", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         case SOCK_SEQPACKET:
-            H_ATTRIB(fields[*ix], "net.transport", "Unix.SEQPACKET", 1);
+            H_ATTRIB(fields[*ix], "net_transport", "Unix.SEQPACKET", 1);
             NEXT_FLD(*ix, maxfld);
             break;
         default:
@@ -299,15 +287,15 @@ getNetInternals(net_info *net, int type,
         }
 
         if (net) {
-            H_VALUE(fields[*ix], "unix.peer.inode", net->rnode, 1);
+            H_VALUE(fields[*ix], "unix_peer_inode", net->rnode, 1);
             NEXT_FLD(*ix, maxfld);
-            H_VALUE(fields[*ix], "unix.local.inode", net->lnode, 1);
+            H_VALUE(fields[*ix], "unix_local_inode", net->lnode, 1);
             NEXT_FLD(*ix, maxfld);
         }
     }
 
     if (net && net->dnsName[0]) {
-        H_ATTRIB(fields[*ix], "net.peer.name", net->dnsName, 1);
+        H_ATTRIB(fields[*ix], "net_peer_name", net->dnsName, 1);
         NEXT_FLD(*ix, maxfld);
     }
 
@@ -348,12 +336,25 @@ httpFieldEnd(event_field_t *fields, http_report *hreport)
 }
 
 static bool
-httpFields(event_field_t *fields, http_report *hreport, char *hdr, size_t hdr_len, protocol_info *proto)
+headerMatch(regex_t *re, const char *match)
+{
+    if (!re || !match) return FALSE;
+
+    if (!regexec_wrapper(re, match, 0, NULL, 0)) return TRUE;
+
+    return FALSE;
+}
+
+static bool
+httpFields(event_field_t *fields, http_report *hreport, char *hdr,
+           size_t hdr_len, protocol_info *proto, config_t *cfg)
 {
     if (!fields || !hreport || !proto || !hdr) return FALSE;
 
     // Start with fields from the header
     char *savea = NULL, *header;
+    size_t numExtracts;
+
     hreport->clen = -1;
 
     if ((hreport->ptype == EVT_HREQ) && (hreport->hreq)) {
@@ -367,30 +368,51 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr, size_t hdr_le
         return FALSE;
     }
 
-    char *reqh = strtok_r(header, "\r\n", &savea);
-    if (!reqh) {
-        scopeLog("WARN: httpFields: parse an http request header", proto->fd, CFG_LOG_WARN);
+    char *thishdr = strtok_r(header, "\r\n", &savea);
+    if (!thishdr) {
+        scopeLog("WARN: httpFields: parse an http header", proto->fd, CFG_LOG_WARN);
         return FALSE;
     }
 
-    while ((reqh = strtok_r(NULL, "\r\n", &savea)) != NULL) {
+    while ((thishdr = strtok_r(NULL, "\r\n", &savea)) != NULL) {
         // From RFC 2616 Section 4.2 "Field names are case-insensitive."
-        if (strcasestr(reqh, "Host:")) {
-            H_ATTRIB(fields[hreport->ix], "http.host", strchr(reqh, ':') + 2, 1);
+        if (strcasestr(thishdr, "Host:")) {
+            H_ATTRIB(fields[hreport->ix], "http_host", strchr(thishdr, ':') + 2, 1);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if (strcasestr(reqh, "User-Agent:")) {
-            H_ATTRIB(fields[hreport->ix], "http.user_agent", strchr(reqh, ':') + 2, 5);
+        } else if (strcasestr(thishdr, "User-Agent:")) {
+            H_ATTRIB(fields[hreport->ix], "http_user_agent", strchr(thishdr, ':') + 2, 5);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if(strcasestr(reqh, "X-Forwarded-For:")) {
-            H_ATTRIB(fields[hreport->ix], "http.client_ip", strchr(reqh, ':') + 2, 5);
+        } else if (strcasestr(thishdr, "X-Forwarded-For:")) {
+            H_ATTRIB(fields[hreport->ix], "http_client_ip", strchr(thishdr, ':') + 2, 5);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if(strcasestr(reqh, "Content-Length:")) {
+        } else if (strcasestr(thishdr, "Content-Length:")) {
             errno = 0;
-            if (((hreport->clen = strtoull(strchr(reqh, ':') + 2, NULL, 0)) == 0) || (errno != 0)) {
+            if (((hreport->clen = strtoull(strchr(thishdr, ':') + 2, NULL, 0)) == 0) || (errno != 0)) {
                 hreport->clen = -1;
+            }
+        } else if (strcasestr(thishdr, "x-appscope:")) {
+                H_ATTRIB(fields[hreport->ix], "x-appscope", strchr(thishdr, ':') + 2, 5);
+                HTTP_NEXT_FLD(hreport->ix);
+        } else if ((numExtracts = cfgEvtFormatNumHeaders(cfg)) > 0) {
+            int i;
+
+            for (i = 0; i < numExtracts; i++) {
+                regex_t *re;
+
+                if (((re = cfgEvtFormatHeaderRe(cfg, i)) != NULL) &&
+                    (headerMatch(re, thishdr) == TRUE)) {
+                    char *evsrc = strchr(thishdr, ':');
+
+                    if (evsrc) {
+                        *evsrc = '\0';
+                        H_ATTRIB(fields[hreport->ix], thishdr, evsrc + 2, 5);
+                        HTTP_NEXT_FLD(hreport->ix);
+                    }
+                }
             }
         }
     }
+
     return TRUE;
 }
 
@@ -495,6 +517,7 @@ doHttpHeader(protocol_info *proto)
 
         char *headertok = strtok_r(header, "\r\n", &savea);
         if (!headertok) {
+            free(hreport.hreq);
             scopeLog("WARN: doHttpHeader: parse an http request header", proto->fd, CFG_LOG_WARN);
             return;
         }
@@ -502,7 +525,7 @@ doHttpHeader(protocol_info *proto)
         // The request specific values from Request-Line
         char *method_str = strtok_r(headertok, " ", &savea);
         if (method_str) {
-            H_ATTRIB(fields[hreport.ix], "http.method", method_str, 1);
+            H_ATTRIB(fields[hreport.ix], "http_method", method_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no method in an http request header", proto->fd, CFG_LOG_WARN);
@@ -510,7 +533,7 @@ doHttpHeader(protocol_info *proto)
 
         char *target_str = strtok_r(NULL, " ", &savea);
         if (target_str) {
-            H_ATTRIB(fields[hreport.ix], "http.target", target_str, 4);
+            H_ATTRIB(fields[hreport.ix], "http_target", target_str, 4);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no target in an http request header", proto->fd, CFG_LOG_WARN);
@@ -521,24 +544,24 @@ doHttpHeader(protocol_info *proto)
             ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
             ((flavor_str = strtok_r(NULL, "\r", &savea)))) {
             if (proto->ptype == EVT_HREQ) {
-                H_ATTRIB(fields[hreport.ix], "http.flavor", flavor_str, 1);
+                H_ATTRIB(fields[hreport.ix], "http_flavor", flavor_str, 1);
                 HTTP_NEXT_FLD(hreport.ix);
             }
         } else {
             scopeLog("WARN: doHttpHeader: no http version in an http request header", proto->fd, CFG_LOG_WARN);
         }
 
-        H_ATTRIB(fields[hreport.ix], "http.scheme", ssl, 1);
+        H_ATTRIB(fields[hreport.ix], "http_scheme", ssl, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
         if (proto->ptype == EVT_HREQ) {
             hreport.ptype = EVT_HREQ;
             // Fields common to request & response
-            httpFields(fields, &hreport, map->req, map->req_len, proto);
+            httpFields(fields, &hreport, map->req, map->req_len, proto, g_cfg.staticfg);
             httpFieldsInternal(fields, &hreport, proto);
 
             if (hreport.clen != -1) {
-                H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
+                H_VALUE(fields[hreport.ix], "http_request_content_length", hreport.clen, EVENT_ONLY_ATTR);
                 HTTP_NEXT_FLD(hreport.ix);
             }
             map->clen = hreport.clen;
@@ -597,41 +620,41 @@ doHttpHeader(protocol_info *proto)
         if (flavor_str &&
             ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
             ((flavor_str = strtok_r(NULL, "", &savea)))) {
-            H_ATTRIB(fields[hreport.ix], "http.flavor", flavor_str, 1);
+            H_ATTRIB(fields[hreport.ix], "http_flavor", flavor_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
             scopeLog("WARN: doHttpHeader: no version string in an http request header", proto->fd, CFG_LOG_WARN);
         }
 
-        H_VALUE(fields[hreport.ix], "http.status_code", status, 1);
+        H_VALUE(fields[hreport.ix], "http_status_code", status, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
         // point past the status code
         char st[strlen(stext)];
         strncpy(st, stext, strlen(stext));
         char *status_str = strtok_r(st, "\r", &savea);
-        H_ATTRIB(fields[hreport.ix], "http.status_text", status_str, 1);
+        H_ATTRIB(fields[hreport.ix], "http_status_text", status_str, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
-        H_VALUE(fields[hreport.ix], "http.server.duration", map->duration, EVENT_ONLY_ATTR);
+        H_VALUE(fields[hreport.ix], "http_server_duration", map->duration, EVENT_ONLY_ATTR);
         HTTP_NEXT_FLD(hreport.ix);
 
         // Fields common to request & response
         if (map->req) {
             hreport.ptype = EVT_HREQ;
-            httpFields(fields, &hreport, map->req, map->req_len, proto);
+            httpFields(fields, &hreport, map->req, map->req_len, proto, g_cfg.staticfg);
             if (hreport.clen != -1) {
-                H_VALUE(fields[hreport.ix], "http.request_content_length", hreport.clen, EVENT_ONLY_ATTR);
+                H_VALUE(fields[hreport.ix], "http_request_content_length", hreport.clen, EVENT_ONLY_ATTR);
                 HTTP_NEXT_FLD(hreport.ix);
             }
             map->clen = hreport.clen;
         }
 
         hreport.ptype = EVT_HRES;
-        httpFields(fields, &hreport, map->resp, proto->len, proto);
+        httpFields(fields, &hreport, map->resp, proto->len, proto, g_cfg.staticfg);
         httpFieldsInternal(fields, &hreport, proto);
         if (hreport.clen != -1) {
-            H_VALUE(fields[hreport.ix], "http.response_content_length", hreport.clen, EVENT_ONLY_ATTR);
+            H_VALUE(fields[hreport.ix], "http_response_content_length", hreport.clen, EVENT_ONLY_ATTR);
             HTTP_NEXT_FLD(hreport.ix);
         }
 
@@ -658,7 +681,7 @@ doHttpHeader(protocol_info *proto)
         // emit statsd metrics, if enabled.
         if (mtcEnabled(g_mtc)) {
 
-            char *mtx_name = (proto->isServer) ? "http.server.duration" : "http.client.duration";
+            char *mtx_name = (proto->isServer) ? "http_server_duration" : "http_client_duration";
             event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA, fields);
             // TBD AGG Only cmdSendMetric(g_mtc, &http_dur);
             httpAggAddMetric(g_http_agg, &http_dur, map->clen, hreport.clen);
@@ -900,11 +923,12 @@ doErrorMetric(metric_t type, control_type_t source,
 }
 
 void
-doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration, void *ctr)
+doDNSMetricName(metric_t type, net_info *net)
 {
-    if (!domain || !domain[0]) return;
+    if (!net || !net->dnsName || !net->dnsName[0]) return;
 
-    metric_counters* ctrs = (ctr) ? (metric_counters*) ctr : &g_ctrs;
+    metric_counters *ctrs = &net->counters;
+    counters_element_t *duration = &net->totalDuration;
 
     switch (type) {
     case DNS:
@@ -917,7 +941,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
                     PROC_FIELD(g_proc.procname),
                     PID_FIELD(g_proc.pid),
                     HOST_FIELD(g_proc.hostname),
-                    DOMAIN_FIELD(domain),
+                    DOMAIN_FIELD(net->dnsName),
                     UNIT_FIELD("response"),
                     FIELDEND
                 };
@@ -926,12 +950,13 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
 
                 // This creates a DNS event
                 event_field_t evfield[] = {
-                    DOMAIN_FIELD(domain),
+                    DOMAIN_FIELD(net->dnsName),
                     DURATION_FIELD(duration->evt / 1000000), // convert ns to ms.
                     FIELDEND
                 };
                 event_t dnsEvent = INT_EVENT("net.dns.resp", ctrs->numDNS.evt, DELTA, evfield);
                 dnsEvent.src = CFG_SRC_DNS;
+                dnsEvent.data = net->dnsAnswer;
                 cmdSendEvent(g_ctl, &dnsEvent, getTime(), &g_proc);
             } else {
                 // This create a DNS raw event
@@ -939,7 +964,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
                     PROC_FIELD(g_proc.procname),
                     PID_FIELD(g_proc.pid),
                     HOST_FIELD(g_proc.hostname),
-                    DOMAIN_FIELD(domain),
+                    DOMAIN_FIELD(net->dnsName),
                     UNIT_FIELD("request"),
                     FIELDEND
                 };
@@ -948,7 +973,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
 
                 // This creates a DNS event
                 event_field_t evfield[] = {
-                    DOMAIN_FIELD(domain),
+                    DOMAIN_FIELD(net->dnsName),
                     FIELDEND
                 };
                 event_t dnsEvent = INT_EVENT("net.dns.req", ctrs->numDNS.evt, DELTA, evfield);
@@ -969,7 +994,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
             HOST_FIELD(g_proc.hostname),
-            DOMAIN_FIELD(domain),
+            DOMAIN_FIELD(net->dnsName),
             DURATION_FIELD(duration->mtc / 1000000), // convert ns to ms.
             UNIT_FIELD("request"),
             FIELDEND
@@ -1002,7 +1027,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
                 PROC_FIELD(g_proc.procname),
                 PID_FIELD(g_proc.pid),
                 HOST_FIELD(g_proc.hostname),
-                DOMAIN_FIELD(domain),
+                DOMAIN_FIELD(net->dnsName),
                 NUMOPS_FIELD(cachedDurationNum),
                 UNIT_FIELD("millisecond"),
                 FIELDEND
@@ -1035,7 +1060,7 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
             HOST_FIELD(g_proc.hostname),
-            DOMAIN_FIELD(domain),
+            DOMAIN_FIELD(net->dnsName),
             NUMOPS_FIELD(cachedDurationNum),
             UNIT_FIELD("millisecond"),
             FIELDEND
@@ -1052,7 +1077,6 @@ doDNSMetricName(metric_t type, const char *domain, counters_element_t *duration,
     default:
         scopeLog("ERROR: doDNSMetric:metric type", -1, CFG_LOG_ERROR);
     }
-
 }
 
 void
@@ -1230,7 +1254,7 @@ getNetPtotocol(net_info *net, event_field_t *nevent, int *ix)
 
     if ((localPort == 80) || (localPort == 443) ||
         (remotePort == 80) || (remotePort == 443)) {
-        H_ATTRIB(nevent[*ix], "net.protocol", "http", 1);
+        H_ATTRIB(nevent[*ix], "net_protocol", "http", 1);
         NEXT_FLD(*ix, NET_MAX_FIELDS);
     }
 
@@ -1334,7 +1358,7 @@ doNetCloseEvent(net_info *net, uint64_t dur)
                     nevent, &nix, NET_MAX_FIELDS);
 
     if (net->http.state != HTTP_NONE) {
-        H_ATTRIB(nevent[nix], "net.protocol", "http", 1);
+        H_ATTRIB(nevent[nix], "net_protocol", "http", 1);
         NEXT_FLD(nix, NET_MAX_FIELDS);
     }
 
@@ -1343,17 +1367,17 @@ doNetCloseEvent(net_info *net, uint64_t dur)
     H_VALUE(nevent[nix], "duration", dur, 1);
     NEXT_FLD(nix, NET_MAX_FIELDS);
 
-    H_VALUE(nevent[nix], "net.bytes_sent", net->txBytes.evt, 1);
+    H_VALUE(nevent[nix], "net_bytes_sent", net->txBytes.evt, 1);
     NEXT_FLD(nix, NET_MAX_FIELDS);
 
-    H_VALUE(nevent[nix], "net.bytes_recv", net->rxBytes.evt, 1);
+    H_VALUE(nevent[nix], "net_bytes_recv", net->rxBytes.evt, 1);
     NEXT_FLD(nix, NET_MAX_FIELDS);
 
     if (net->remoteClose == TRUE) {
-        H_ATTRIB(nevent[nix], "net.close.reason", "remote", 1);
+        H_ATTRIB(nevent[nix], "net_close_reason", "remote", 1);
         NEXT_FLD(nix, NET_MAX_FIELDS);
     } else {
-        H_ATTRIB(nevent[nix], "net.close.reason", "local", 1);
+        H_ATTRIB(nevent[nix], "net_close_reason", "local", 1);
         NEXT_FLD(nix, NET_MAX_FIELDS);
     }
 
@@ -2383,7 +2407,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // For next time
         net->dnsSend = FALSE;
 
-        doDNSMetricName(DNS, net->dnsName, 0, NULL);
+        doDNSMetricName(DNS, net);
 
         break;
     }
@@ -2397,6 +2421,30 @@ void
 doEvent()
 {
     uint64_t data;
+    bool ready = FALSE;
+
+    // if no connection, don't pull data from the queue
+    if (ctlNeedsConnection(g_ctl, CFG_CTL)) {
+        if (ctlConnect(g_ctl, CFG_CTL)) {
+            reportProcessStart(g_ctl, FALSE, CFG_CTL);
+            ready = TRUE;
+        }
+    } else {
+        ready = TRUE;
+    }
+
+    if (ready == FALSE) {
+        if (mtcNeedsConnection(g_mtc)) {
+            if (mtcConnect(g_mtc)) {
+                ready = TRUE;
+            }
+        } else {
+            ready = TRUE;
+        }
+    }
+
+    if (ready == FALSE) return;
+
     while ((data = msgEventGet(g_ctl)) != -1) {
         if (data) {
             evt_type *event = (evt_type *)data;
@@ -2419,7 +2467,7 @@ doEvent()
                 doStatMetric(staterr->funcop, staterr->name, &staterr->counters);
             } else if (event->evtype == EVT_DNS) {
                 net = (net_info *)data;
-                doDNSMetricName(net->data_type, net->dnsName, &net->totalDuration, &net->counters);
+                doDNSMetricName(net->data_type, net);
             } else if (event->evtype == EVT_PROTO) {
                 proto = (protocol_info *)data;
                 doProtocolMetric(proto);
@@ -2440,9 +2488,16 @@ doEvent()
 void
 doPayload()
 {
-    bool lsbin = FALSE;
-    bool filebin = TRUE;
     uint64_t data;
+
+    // if LS enabled, then check for a connection
+    if (cfgLogStream(g_cfg.staticfg) && ctlNeedsConnection(g_ctl, CFG_LS)) {
+        if (ctlConnect(g_ctl, CFG_LS)) {
+            reportProcessStart(g_ctl, FALSE, CFG_LS);
+        } else {
+            return;
+        }
+    }
 
     while ((data = msgPayloadGet(g_ctl)) != -1) {
         if (data) {
@@ -2450,17 +2505,25 @@ doPayload()
             net_info *net = &pinfo->net;
             size_t hlen = 1024;
             char pay[hlen];
-            char *srcstr = NULL, rx[]="rx", tx[]="tx", none[]="none";
+            char *srcstr = NULL,
+                netrx[]="netrx", nettx[]="nettx", none[]="none",
+                tlsrx[]="tlsrx", tlstx[]="tlstx";
 
             switch (pinfo->src) {
             case NETTX:
-            case TLSTX:
-                srcstr = tx;
+                srcstr = nettx;
                 break;
 
+            case TLSTX:
+                srcstr = tlstx;
+                 break;
+
             case NETRX:
+                srcstr = netrx;
+                break;
+
             case TLSRX:
-                srcstr = rx;
+                srcstr = tlsrx;
                 break;
 
             default:
@@ -2468,20 +2531,35 @@ doPayload()
                 break;
             }
 
-            char lport[8], rport[8];
+            char lport[20], rport[20];
             char lip[INET6_ADDRSTRLEN];
             char rip[INET6_ADDRSTRLEN];
 
-            if (net) {
+            if (net && net->active) {
                 if (getConn(&net->localConn, lip, sizeof(lip), lport, sizeof(lport)) == FALSE) {
-                    strncpy(lip, "af_int_err", sizeof(lip));
-                    strncpy(lport, "0", sizeof(lport));
+                    if (net->localConn.ss_family == AF_UNIX) {
+                        strncpy(lip, "af_unix", sizeof(lip));
+                        snprintf(lport, sizeof(lport), "%ld", net->lnode);
+                    } else {
+                        strncpy(lip, srcstr, sizeof(lip));
+                        strncpy(lport, "0", sizeof(lport));
+                    }
                 }
 
                 if (getConn(&net->remoteConn, rip, sizeof(rip), rport, sizeof(rport)) == FALSE) {
-                    strncpy(rip, "af_int_err", sizeof(rip));
-                    strncpy(rport, "0", sizeof(rport));
+                    if (net->remoteConn.ss_family == AF_UNIX) {
+                        strncpy(rip, "af_unix", sizeof(rip));
+                        snprintf(rport, sizeof(rport), "%ld", net->rnode);
+                    } else {
+                        strncpy(rip, srcstr, sizeof(rip));
+                        strncpy(rport, "0", sizeof(rport));
+                    }
                 }
+            } else {
+                strncpy(lip, srcstr, sizeof(lip));
+                strncpy(lport, "0", sizeof(lport));
+                strncpy(rip, srcstr, sizeof(rip));
+                strncpy(rport, "0", sizeof(rport));
             }
 
             uint64_t netid = (net != NULL) ? net->uid : 0;
@@ -2505,7 +2583,7 @@ doPayload()
 
             char *bdata = NULL;
 
-            if (lsbin == TRUE) {
+            if (cfgLogStream(g_cfg.staticfg)) {
                 bdata = calloc(1, hlen + pinfo->len);
                 if (bdata) {
                     memmove(bdata, pay, hlen);
@@ -2513,9 +2591,7 @@ doPayload()
                     memmove(&bdata[hlen], pinfo->data, pinfo->len);
                     cmdSendPayload(g_ctl, bdata, hlen + pinfo->len);
                 }
-            }
-
-            if (filebin == TRUE && ctlPayDir(g_ctl)) {
+            } else if (ctlPayDir(g_ctl)) {
                 int fd;
                 char path[PATH_MAX];
 
@@ -2523,14 +2599,14 @@ doPayload()
                 switch (pinfo->src) {
                 case NETTX:
                 case TLSTX:
-                    snprintf(path, PATH_MAX, "%s/%d_%s:%s:%s.out",
-                             ctlPayDir(g_ctl), g_proc.pid, rip, lport, rport);
+                    snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.out",
+                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
                     break;
 
                 case NETRX:
                 case TLSRX:
-                    snprintf(path, PATH_MAX, "%s/%d_%s:%s:%s.in",
-                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lport);
+                    snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.in",
+                             ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
                     break;
 
                 default:
@@ -2540,7 +2616,25 @@ doPayload()
                 }
 
                 if ((fd = g_fn.open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)) != -1) {
-                    g_fn.write(fd, pinfo->data, pinfo->len);
+                    if (checkEnv("SCOPE_PAYLOAD_HEADER", "true")) {
+                        g_fn.write(fd, pay, rc);
+                    }
+
+                    size_t to_write = pinfo->len;
+                    size_t written = 0;
+                    int rc;
+
+                    while (to_write > 0) {
+                        rc = g_fn.write(fd, &pinfo->data[written], to_write);
+                        if (rc <= 0) {
+                            DBG(NULL);
+                            break;
+                        }
+
+                        written += rc;
+                        to_write -= rc;
+                    }
+
                     g_fn.close(fd);
                 }
             }

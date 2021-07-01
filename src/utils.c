@@ -3,22 +3,28 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+
 #include "utils.h"
 #include "fn.h"
 #include "dbg.h"
+#include "runtimecfg.h"
 
-unsigned int strToVal(enum_map_t map[], const char* str)
+rtconfig g_cfg = {0};
+
+unsigned int
+strToVal(enum_map_t map[], const char *str)
 {
-    enum_map_t* m;
+    enum_map_t *m;
     for (m=map; m->str; m++) {
         if (!strcmp(str, m->str)) return m->val;
     }
     return -1;
 }
 
-const char* valToStr(enum_map_t map[], unsigned int val)
+const char *
+valToStr(enum_map_t map[], unsigned int val)
 {
-    enum_map_t* m;
+    enum_map_t *m;
     for (m=map; m->str; m++) {
         if (val == m->val) return m->str;
     }
@@ -51,6 +57,15 @@ setPidEnv(int pid)
              g_fn.setenv, SCOPE_PID_ENV, val);
     }
 }
+
+#ifdef __MACOS__
+char *
+getpath(const char *cmd)
+{
+    return NULL;
+}
+
+#else
 
 // This tests to see if cmd can be resolved to an executable file.
 // If so it will return a malloc'd buffer containing an absolute path,
@@ -134,6 +149,25 @@ getpath(const char *cmd)
 out:
     if (path_env) free(path_env);
     return ret_val;
+}
+#endif //__MACOS__
+
+
+int
+startsWith(const char *string, const char *substring)
+{
+    if (!string || !substring) return FALSE;
+    return (strncmp(string, substring, strlen(substring)) == 0);
+}
+
+int
+endsWith(const char *string, const char *substring)
+{
+    if (!string || !substring) return FALSE;
+    int stringlen = strlen(string);
+    int sublen = strlen(substring);
+    return (sublen <= stringlen) &&
+       ((strncmp(&string[stringlen-sublen], substring, sublen)) == 0);
 }
 
 int

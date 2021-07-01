@@ -11,8 +11,10 @@
 #include <sys/syscall.h>
 #include <sys/stat.h>
 #include <libgen.h>
+#include <sys/resource.h>
 
 #include "atomic.h"
+#include "bashmem.h"
 #include "cfg.h"
 #include "cfgutils.h"
 #include "com.h"
@@ -29,21 +31,25 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 #include "javaagent.h"
+#include "inject.h"
+#include "../contrib/libmusl/musl.h"
 
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
-
-rtconfig g_cfg = {0};
 
 static thread_timing g_thread = {0};
 static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static mtc_t *g_prevmtc = NULL;
+static ctl_t *g_prevctl = NULL;
 static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
-static unsigned g_sendprocessstart;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
+static rlim_t g_max_fds = 0;
+static bool g_ismusl = FALSE;
+
+extern unsigned g_sendprocessstart;
 
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
@@ -53,7 +59,6 @@ __thread int g_getdelim = 0;
 // Forward declaration
 static void *periodic(void *);
 static void doConfig(config_t *);
-static void reportProcessStart(void);
 static void threadNow(int);
 
 #ifdef __LINUX__
@@ -68,6 +73,154 @@ static got_list_t hook_list[] = {
     {NULL, NULL, NULL}
 };
 
+static got_list_t inject_hook_list[] = {
+    {"sigaction",   NULL, &g_fn.sigaction},
+    {"open",        NULL, &g_fn.open},
+    {"openat",      NULL, &g_fn.openat},
+    {"fopen",       NULL, &g_fn.fopen},
+    {"freopen",     NULL, &g_fn.freopen},
+    {"nanosleep",   NULL, &g_fn.nanosleep},
+    {"select",      NULL, &g_fn.select},
+    {"sigsuspend",  NULL, &g_fn.sigsuspend},
+    {"epoll_wait",  NULL, &g_fn.epoll_wait},
+    {"poll",        NULL, &g_fn.poll},
+    {"pause",       NULL, &g_fn.pause},
+    {"sigwaitinfo", NULL, &g_fn.sigwaitinfo},
+    {"sigtimedwait", NULL, &g_fn.sigtimedwait},
+    {"epoll_pwait", NULL, &g_fn.epoll_pwait},
+    {"ppoll",       NULL, &g_fn.ppoll},
+    {"pselect",     NULL, &g_fn.pselect},
+    {"msgsnd",      NULL, &g_fn.msgsnd},
+    {"msgrcv",      NULL, &g_fn.msgrcv},
+    {"semop",       NULL, &g_fn.semop},
+    {"semtimedop",  NULL, &g_fn.semtimedop},
+    {"clock_nanosleep", NULL, &g_fn.clock_nanosleep},
+    {"usleep", NULL, &g_fn.usleep},
+    {"io_getevents", NULL, &g_fn.io_getevents},
+    {"open64", NULL, &g_fn.open64},
+    {"openat64", NULL, &g_fn.openat64},
+    {"__open_2", NULL, &g_fn.__open_2},
+    {"__open64_2", NULL, &g_fn.__open64_2},
+    {"__openat_2", NULL, &g_fn.__openat_2},
+    {"creat64", NULL, &g_fn.creat64},
+    {"fopen64", NULL, &g_fn.fopen64},
+    {"freopen64", NULL, &g_fn.freopen64},
+    {"pread64", NULL, &g_fn.pread64},
+    {"preadv", NULL, &g_fn.preadv},
+    {"preadv2", NULL, &g_fn.preadv2},
+    {"preadv64v2", NULL, &g_fn.preadv64v2},
+    {"__pread_chk", NULL, &g_fn.__pread_chk},
+    {"__read_chk", NULL, &g_fn.__read_chk},
+    {"__fread_unlocked_chk", NULL, &g_fn.__fread_unlocked_chk},
+    {"pwrite64", NULL, &g_fn.pwrite64},
+    {"pwritev", NULL, &g_fn.pwritev},
+    {"pwritev64", NULL, &g_fn.pwritev64},
+    {"pwritev2", NULL, &g_fn.pwritev2},
+    {"pwritev64v2", NULL, &g_fn.pwritev64v2},
+    {"lseek64", NULL, &g_fn.lseek64},
+    {"fseeko64", NULL, &g_fn.fseeko64},
+    {"ftello64", NULL, &g_fn.ftello64},
+    {"statfs64", NULL, &g_fn.statfs64},
+    {"fstatfs64", NULL, &g_fn.fstatfs64},
+    {"fsetpos64", NULL, &g_fn.fsetpos64},
+    {"__xstat", NULL, &g_fn.__xstat},
+    {"__xstat64", NULL, &g_fn.__xstat64},
+    {"__lxstat", NULL, &g_fn.__lxstat},
+    {"__lxstat64", NULL, &g_fn.__lxstat64},
+    {"__fxstat", NULL, &g_fn.__fxstat},
+    {"__fxstatat", NULL, &g_fn.__fxstatat},
+    {"__fxstatat64", NULL, &g_fn.__fxstatat64},
+    {"statfs", NULL, &g_fn.statfs},
+    {"fstatfs", NULL, &g_fn.fstatfs},
+    {"statvfs", NULL, &g_fn.statvfs},
+    {"statvfs64", NULL, &g_fn.statvfs64},
+    {"fstatvfs", NULL, &g_fn.fstatvfs},
+    {"fstatvfs64", NULL, &g_fn.fstatvfs64},
+    {"access", NULL, &g_fn.access},
+    {"faccessat", NULL, &g_fn.faccessat},
+    {"gethostbyname_r", NULL, &g_fn.gethostbyname_r},
+    {"gethostbyname2_r", NULL, &g_fn.gethostbyname2_r},
+    {"fstatat", NULL, &g_fn.fstatat},
+    {"prctl", NULL, &g_fn.prctl},
+    {"execve", NULL, &g_fn.execve},
+    {"syscall", NULL, &g_fn.syscall},
+    {"sendfile", NULL, &g_fn.sendfile},
+    {"sendfile64", NULL, &g_fn.sendfile64},
+    {"SSL_read", NULL, &g_fn.SSL_read},
+    {"SSL_write", NULL, &g_fn.SSL_write},
+    {"gnutls_record_recv", NULL, &g_fn.gnutls_record_recv},
+    {"gnutls_record_recv_early_data", NULL, &g_fn.gnutls_record_recv_early_data},
+    {"gnutls_record_recv_packet", NULL, &g_fn.gnutls_record_recv_packet},
+    {"gnutls_record_recv_seq", NULL, &g_fn.gnutls_record_recv_seq},
+    {"gnutls_record_send", NULL, &g_fn.gnutls_record_send},
+    {"gnutls_record_send2", NULL, &g_fn.gnutls_record_send2},
+    {"gnutls_record_send_early_data", NULL, &g_fn.gnutls_record_send_early_data},
+    {"gnutls_record_send_range", NULL, &g_fn.gnutls_record_send_range},
+    {"dlopen", NULL, &g_fn.dlopen},
+    {"_exit", NULL, &g_fn._exit},
+    {"close", NULL, &g_fn.close},
+    {"fclose", NULL, &g_fn.fclose},
+    {"fcloseall", NULL, &g_fn.fcloseall},
+    {"lseek", NULL, &g_fn.lseek},
+    {"fseek", NULL, &g_fn.fseek},
+    {"fseeko", NULL, &g_fn.fseeko},
+    {"ftell", NULL, &g_fn.ftell},
+    {"ftello", NULL, &g_fn.ftello},
+    {"rewind", NULL, &g_fn.rewind},
+    {"fsetpos", NULL, &g_fn.fsetpos},
+    {"fgetpos", NULL, &g_fn.fgetpos},
+    {"fgetpos64", NULL, &g_fn.fgetpos64},
+    {"write", NULL, &g_fn.write},
+    {"pwrite", NULL, &g_fn.pwrite},
+    {"writev", NULL, &g_fn.writev},
+    {"fwrite", NULL, &g_fn.fwrite},
+    {"puts", NULL, &g_fn.puts},
+    {"putchar", NULL, &g_fn.putchar},
+    {"fputs", NULL, &g_fn.fputs},
+    {"fputs_unlocked", NULL, &g_fn.fputs_unlocked},
+    {"read", NULL, &g_fn.read},
+    {"readv", NULL, &g_fn.readv},
+    {"pread", NULL, &g_fn.pread},
+    {"fread", NULL, &g_fn.fread},
+    {"__fread_chk", NULL, &g_fn.__fread_chk},
+    {"fgets", NULL, &g_fn.fgets},
+    {"__fgets_chk", NULL, &g_fn.__fgets_chk},
+    {"fgets_unlocked", NULL, &g_fn.fgets_unlocked},
+    {"__fgetws_chk", NULL, &g_fn.__fgetws_chk},
+    {"fgetws", NULL, &g_fn.fgetws},
+    {"fgetwc", NULL, &g_fn.fgetwc},
+    {"fgetc", NULL, &g_fn.fgetc},
+    {"fputc", NULL, &g_fn.fputc},
+    {"fputc_unlocked", NULL, &g_fn.fputc_unlocked},
+    {"putwc", NULL, &g_fn.putwc},
+    {"fputwc", NULL, &g_fn.fputwc},
+    {"fscanf", NULL, &g_fn.fscanf},
+    {"getline", NULL, &g_fn.getline},
+    {"getdelim", NULL, &g_fn.getdelim},
+    {"__getdelim", NULL, &g_fn.__getdelim},
+    {"fcntl", NULL, &g_fn.fcntl},
+    {"fcntl64", NULL, &g_fn.fcntl64},
+    {"dup", NULL, &g_fn.dup},
+    {"dup2", NULL, &g_fn.dup2},
+    {"dup3", NULL, &g_fn.dup3},
+    {"vsyslog", NULL, &g_fn.vsyslog},
+    {"fork", NULL, &g_fn.fork},
+    {"socket", NULL, &g_fn.socket},
+    {"shutdown", NULL, &g_fn.shutdown},
+    {"listen", NULL, &g_fn.listen},
+    {"accept", NULL, &g_fn.accept},
+    {"accept4", NULL, &g_fn.accept4},
+    {"bind", NULL, &g_fn.bind},
+    {"connect", NULL, &g_fn.connect},
+    {"send", NULL, &g_fn.send},
+    {"sendto", NULL, &g_fn.sendto},
+    {"sendmsg", NULL, &g_fn.sendmsg},
+    {"recv", NULL, &g_fn.recv},
+    {"recvfrom", NULL, &g_fn.recvfrom},
+    {"recvmsg", NULL, &g_fn.recvmsg},
+    {NULL, NULL, NULL}
+};
+
 typedef struct
 {
     char *in_symbol;
@@ -76,14 +229,13 @@ typedef struct
 } param_t;
 
 // When used with dl_iterate_phdr(), this has a similar result to
-// _dl_sym(RTLD_NEXT, ).  But, unlike _dl_sym(RTLD_NEXT, )
+// scope_dlsym(RTLD_NEXT, ).  But, unlike scope_dlsym(RTLD_NEXT, )
 // it will never return a symbol in our library.  This is
 // particularly useful for finding symbols in shared libraries
 // that are dynamically loaded after our constructor has run.
 // Not to point fingers, but I'm looking at you python.
 //
-extern void *_dl_sym(void *, const char *, void *);
-
+static void *scope_dlsym(void *, const char *, void *);
 
 static int
 findSymbol(struct dl_phdr_info *info, size_t size, void *data)
@@ -114,7 +266,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 #define WRAP_CHECK(func, rc)                                           \
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
-         if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {  \
+         if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
              scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);     \
              return rc;                                                \
          }                                                             \
@@ -133,7 +285,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
-         if ((g_fn.func = _dl_sym(RTLD_NEXT, #func, func)) == NULL) {  \
+         if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
              scopeLog("ERROR: "#func":NULL\n", -1, CFG_LOG_ERROR);     \
              return;                                                   \
          }                                                             \
@@ -236,7 +388,6 @@ remoteConfig()
     int timeout;
     struct pollfd fds;
     int rc, success, numtries;
-    cfg_transport_t ttype = ctlTransportType(g_ctl);
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
@@ -245,14 +396,21 @@ remoteConfig()
     timeout = 1;
     memset(&fds, 0x0, sizeof(fds));
 
+/*
+    Setting fds.events = 0 to neuter ability to process remote
+    commands... until this is function is reworked to be TLS-friendly.
+
+    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
     if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
         (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {
         fds.events = 0;
     } else {
         fds.events = POLLIN;
     }
+*/
 
-    fds.fd = ctlConnection(g_ctl);
+    fds.events = 0;
+    fds.fd = ctlConnection(g_ctl, CFG_CTL);
 
     rc = g_fn.poll(&fds, 1, timeout);
 
@@ -285,7 +443,7 @@ remoteConfig()
         rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
         if (rc <= 0) {
             // Something has happened to our connection
-            ctlClose(g_ctl);
+            ctlDisconnect(g_ctl, CFG_CTL);
             break;
         }
 
@@ -414,6 +572,11 @@ doConfig(config_t *cfg)
     // Save the current objects to get cleaned up on the periodic thread
     g_prevmtc = g_mtc;
     g_prevlog = g_log;
+    g_prevctl = g_ctl;
+
+    if (cfgLogStream(cfg)) {
+        cfgLogStreamDefault(cfg);
+    }
 
     g_thread.interval = cfgMtcPeriod(cfg);
     setReportingInterval(cfgMtcPeriod(cfg));
@@ -427,11 +590,18 @@ doConfig(config_t *cfg)
 
     g_log = initLog(cfg);
     g_mtc = initMtc(cfg);
-    ctlEvtSet(g_ctl, initEvtFormat(cfg));
+    g_ctl = initCtl(cfg);
+
+    if (cfgLogStream(cfg)) {
+        singleChannelSet(g_ctl, g_mtc);
+    }
 
     // Disconnect the old interfaces that were just replaced
     mtcDisconnect(g_prevmtc);
     logDisconnect(g_prevlog);
+    ctlStopAggregating(g_prevctl);
+    ctlFlush(g_prevctl);
+    ctlDisconnect(g_prevctl, CFG_CTL);
 }
 
 // Process dynamic config change if they are available
@@ -487,7 +657,8 @@ threadNow(int sig)
 
     osTimerStop();
 
-    if (pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0) {
+    if (g_fn.pthread_create &&
+        (g_fn.pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0)) {
         scopeLog("ERROR: threadNow:pthread_create", -1, CFG_LOG_ERROR);
         if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
         return;
@@ -658,11 +829,12 @@ doReset()
 
     logReconnect(g_log);
     mtcReconnect(g_mtc);
-    ctlReconnect(g_ctl);
+    ctlReconnect(g_ctl, CFG_CTL);
+    ctlReconnect(g_ctl, CFG_LS);
 
     atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
 
-    reportProcessStart();
+    reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
     threadInit();
 }
 
@@ -672,84 +844,67 @@ reportPeriodicStuff(void)
     long mem;
     int nthread, nfds, children;
     long long cpu = 0;
-    bool perf;
     static long long cpuState = 0;
-    static time_t summaryTime = 0;
 
-    if (summaryTime == 0) {
-        summaryTime = time(NULL) + g_thread.interval;
+    // We report CPU time for this period.
+    cpu = doGetProcCPU();
+    if (cpu != -1) {
+        doProcMetric(PROC_CPU, cpu - cpuState);
+        cpuState = cpu;
     }
 
-    perf = checkEnv(PRESERVE_PERF_REPORTING, "true");
+    mem = osGetProcMemory(g_proc.pid);
+    if (mem != -1) doProcMetric(PROC_MEM, mem);
 
-    // Process any events that have been posted
-    if (perf == FALSE) {
-        doEvent();
-        doPayload();
+    nthread = osGetNumThreads(g_proc.pid);
+    if (nthread != -1) doProcMetric(PROC_THREAD, nthread);
+
+    nfds = osGetNumFds(g_proc.pid);
+    if (nfds != -1) doProcMetric(PROC_FD, nfds);
+
+    children = osGetNumChildProcs(g_proc.pid);
+    if (children < 0) {
+        children = 0;
     }
+    doProcMetric(PROC_CHILD, children);
 
-    if (time(NULL) >= summaryTime) {
-        // We report CPU time for this period.
-        cpu = doGetProcCPU();
-        if (cpu != -1) {
-            doProcMetric(PROC_CPU, cpu - cpuState);
-            cpuState = cpu;
-        }
+    // report totals (not by file descriptor/socket descriptor)
+    doTotal(TOT_READ);
+    doTotal(TOT_WRITE);
+    doTotal(TOT_RX);
+    doTotal(TOT_TX);
+    doTotal(TOT_SEEK);
+    doTotal(TOT_STAT);
+    doTotal(TOT_OPEN);
+    doTotal(TOT_CLOSE);
+    doTotal(TOT_DNS);
 
-        mem = osGetProcMemory(g_proc.pid);
-        if (mem != -1) doProcMetric(PROC_MEM, mem);
+    doTotal(TOT_PORTS);
+    doTotal(TOT_TCP_CONN);
+    doTotal(TOT_UDP_CONN);
+    doTotal(TOT_OTHER_CONN);
 
-        nthread = osGetNumThreads(g_proc.pid);
-        if (nthread != -1) doProcMetric(PROC_THREAD, nthread);
+    doTotalDuration(TOT_FS_DURATION);
+    doTotalDuration(TOT_NET_DURATION);
+    doTotalDuration(TOT_DNS_DURATION);
 
-        nfds = osGetNumFds(g_proc.pid);
-        if (nfds != -1) doProcMetric(PROC_FD, nfds);
+    // Report errors
+    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
 
-        children = osGetNumChildProcs(g_proc.pid);
-        if (children < 0) {
-            children = 0;
-        }
-        doProcMetric(PROC_CHILD, children);
+    // report net and file by descriptor
+    reportAllFds(PERIODIC);
 
-        // report totals (not by file descriptor/socket descriptor)
-        doTotal(TOT_READ);
-        doTotal(TOT_WRITE);
-        doTotal(TOT_RX);
-        doTotal(TOT_TX);
-        doTotal(TOT_SEEK);
-        doTotal(TOT_STAT);
-        doTotal(TOT_OPEN);
-        doTotal(TOT_CLOSE);
-        doTotal(TOT_DNS);
+    // empty the event queues
+    doEvent();
 
-        doTotal(TOT_PORTS);
-        doTotal(TOT_TCP_CONN);
-        doTotal(TOT_UDP_CONN);
-        doTotal(TOT_OTHER_CONN);
+    doPayload();
 
-        doTotalDuration(TOT_FS_DURATION);
-        doTotalDuration(TOT_NET_DURATION);
-        doTotalDuration(TOT_DNS_DURATION);
-
-        // Report errors
-        doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
-        doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
-        doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
-        doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
-        doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
-        doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
-
-        // report net and file by descriptor
-        reportAllFds(PERIODIC);
-        mtcFlush(g_mtc);
-
-        if (perf == TRUE) {
-            doEvent();
-            doPayload();
-        }
-
-        summaryTime = time(NULL) + g_thread.interval;
-    }
+    mtcFlush(g_mtc);
 }
 
 void
@@ -769,6 +924,7 @@ handleExit(void)
 
     mtcFlush(g_mtc);
     logFlush(g_log);
+    ctlStopAggregating(g_ctl);
     ctlFlush(g_ctl);
 }
 
@@ -785,64 +941,47 @@ periodic(void *arg)
     sigset_t mask;
     sigfillset(&mask);
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
+    bool perf;
+    static time_t summaryTime;
+
+    summaryTime = time(NULL) + g_thread.interval;
+
+    perf = checkEnv(PRESERVE_PERF_REPORTING, "true");
 
     while (1) {
+        if (time(NULL) >= summaryTime) {
+            // Process dynamic config changes, if any
+            dynConfig();
 
-        // Process dynamic config changes, if any
-        dynConfig();
+            // TODO: need to ensure that the previous object is no longer in use
+            // Clean up previous objects if they exist.
+            //if (g_prevmtc) mtcDestroy(&g_prevmtc);
+            //if (g_prevlog) logDestroy(&g_prevlog);
 
-        // TODO: need to ensure that the previous object is no longer in use
-        // Clean up previous objects if they exist.
-        //if (g_prevmtc) mtcDestroy(&g_prevmtc);
-        //if (g_prevlog) logDestroy(&g_prevlog);
+            // Q: What does it mean to connect transports we expect to be
+            // "connectionless"?  A: We've observed some processes close all
+            // file/socket descriptors during their initialization.
+            // If this happens, this the way we manage re-init.
+            if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
+            if (logNeedsConnection(g_log)) logConnect(g_log);
 
-        // Q: What does it mean to connect transports we expect to be
-        // "connectionless"?  A: We've observed some processes close all
-        // file/socket descriptors during their initialization.
-        // If this happens, this the way we manage re-init.
-        if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
-        if (logNeedsConnection(g_log)) logConnect(g_log);
+            if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+                reportPeriodicStuff();
+                atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
+            }
 
-        if (ctlNeedsConnection(g_ctl) && ctlConnect(g_ctl) &&
-            g_sendprocessstart) {
-            // Hey we have a new connection!  Identify ourselves
-            // like reportProcessStart, but only on the event interface...
-            cJSON *json = msgStart(&g_proc, g_staticfg);
-            ctlSendJson(g_ctl, json);
-            ctlFlush(g_ctl);
+            summaryTime = time(NULL) + g_thread.interval;
+        } else if (perf == FALSE) {
+            if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+                doEvent();
+                doPayload();
+                atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
+            }
         }
-
-        if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
-            reportPeriodicStuff();
-            atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
-        }
-
         remoteConfig();
     }
 
     return NULL;
-}
-
-static void
-reportProcessStart(void)
-{
-    // 1) Log it at startup, provided the loglevel is set to allow it
-    scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
-    char* cmd_w_args=NULL;
-    if (asprintf(&cmd_w_args, "command w/args: %s", g_proc.cmd) != -1) {
-        scopeLog(cmd_w_args, -1, CFG_LOG_INFO);
-        if (cmd_w_args) free(cmd_w_args);
-    }
-
-    // 2) Send a metric
-    sendProcessStartMetric();
-
-    // 3) Send a startup msg
-    if (g_sendprocessstart) {
-        cJSON *json = msgStart(&g_proc, g_staticfg);
-        ctlSendJson(g_ctl, json);
-        ctlFlush(g_ctl);
-    }
 }
 
 // TODO; should this move to os/linux/os.c?
@@ -920,18 +1059,37 @@ load_func(const char *module, const char *func)
     return addr;
 }
 
-static int 
-hookCallback(struct dl_phdr_info *info, size_t size, void *data)
+typedef struct
 {
-    int len = strlen(info->dlpi_name);
-    int libscope_so_len = 11;
+    const char *library;    // Input:   e.g. libpthread.so
+    const char *symbol;     // Input:   e.g. __write
+    void **out_addr;        // Output:  e.g. 0x7fffff2523A23734
+} find_sym_t;
 
-    if(len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
-        *(char **)data = (char *) info->dlpi_name;
+static int
+findLibSym(struct dl_phdr_info *info, size_t size, void *data)
+{
+    find_sym_t *find = (find_sym_t *)data;
+    *(find->out_addr) = NULL;
+
+    if (strstr(info->dlpi_name, find->library)) {
+
+        void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
+        if (!handle) return 0;
+        void *addr = dlsym(handle, find->symbol);
+        dlclose(handle);
+
+        // if we don't find addr, keep going
+        if (!addr)  return 0;
+
+        // We found symbol in library!  Return the address for it!
+        *(find->out_addr) = addr;
         return 1;
+
     }
     return 0;
 }
+
 
 /*
  * There are 3x SSL_read functions to consider:
@@ -952,8 +1110,80 @@ hookCallback(struct dl_phdr_info *info, size_t size, void *data)
  * get a handle and lookup the symbol.
  */
 
+static ssize_t __write_libc(int, const void *, size_t);
+static ssize_t __write_pthread(int, const void *, size_t);
+static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
+static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
+static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
+static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
+static long scope_syscall(long, ...);
+
+static int 
+findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
+{
+    int len = strlen(info->dlpi_name);
+    int libscope_so_len = 11;
+
+    if(len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
+        *(char **)data = (char *) info->dlpi_name;
+        return 1;
+    }
+    return 0;
+}
+
+/**
+ * Called when injected to perform GOT hooking.
+ */ 
+static bool
+hookInject()
+{
+    char *full_path;
+    void *addr = NULL;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+    struct link_map *lm;
+    char buf[512];
+
+    if (dl_iterate_phdr(findLibscopePath, &full_path)) {
+        void *libscopeHandle = g_fn.dlopen(full_path, RTLD_NOW);
+        if (libscopeHandle == NULL) {
+            dlclose(libscopeHandle);
+            return FALSE;
+        }
+
+        void *handle = g_fn.dlopen(0, RTLD_LAZY);
+        if (handle == NULL) {
+            dlclose(libscopeHandle);
+            dlclose(handle);
+            return FALSE;
+        }
+
+        // Get the link map and ELF sections in advance of something matching
+        if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) &&
+            (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+
+            for (int i=0; inject_hook_list[i].symbol; i++) {
+                addr = dlsym(libscopeHandle, inject_hook_list[i].symbol);
+                
+                inject_hook_list[i].func = addr;
+                if ((dlsym(handle, inject_hook_list[i].symbol)) &&
+                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz) != -1)) {
+                    snprintf(buf, sizeof(buf), "\tGOT patched %s", inject_hook_list[i].symbol);
+                    scopeLog(buf, -1, CFG_LOG_DEBUG);
+                }
+            }
+        }
+        dlclose(handle);
+        dlclose(libscopeHandle);
+        return TRUE;
+    }
+    return FALSE;
+}
+
 static void
-initHook()
+initHook(int attachedFlag)
 {
     int rc;
     funchook_t *funchook;
@@ -985,10 +1215,14 @@ initHook()
         return;
     }
 
+    if (ebuf && ebuf->buf && (strstr(full_path, "ldscope") == NULL)) {
+        g_ismusl = is_musl(ebuf->buf);
+    }
+
     if (full_path) free(full_path);
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
-    if (dl_iterate_phdr(hookCallback, &full_path)) {
+    if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
         if (handle == NULL) {
             dlclose(handle);
@@ -1003,34 +1237,113 @@ initHook()
         dlclose(handle);
     }
 
-    if (!should_we_patch) {
-      scopeLog("not installing SSL_read and SSL_write hooks...", -1, CFG_LOG_DEBUG);
-      return;
+    // We're funchooking __write in both libc.so and libpthread.so
+    // curl didn't work unless we funchook'd libc.
+    // test/linux/unixpeer didn't work unless we funchook'd pthread.
+    find_sym_t libc__write = {.library="libc.so",
+                              .symbol="__write",
+                              .out_addr = (void*)&g_fn.__write_libc};
+    dl_iterate_phdr(findLibSym, &libc__write);
+
+    find_sym_t pthread__write = {.library = "libpthread.so",
+                                 .symbol = "__write",
+                                 .out_addr = (void*)&g_fn.__write_pthread};
+    dl_iterate_phdr(findLibSym, &pthread__write);
+
+    if (attachedFlag) {
+        hookInject();
     }
 
-    funchook = funchook_create();
+    // for DNS:
+    // On a glibc distro we hook sendmmsg because getaddrinfo calls this
+    // directly and we miss DNS requests unless it's hooked.
+    //
+    // For DNS and console I/O
+    // On a musl distro the name server code calls sendto and recvfrom
+    // directly. So, we hook these in order to get DNS detail. We check
+    // to see which distro is used so as to hook only what is needed.
+    // We use the fact that on a musl distro the ld lib env var is set to
+    // a dir with a libscope-ver string. If that exists in the env var
+    // then we assume musl.
+    if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
+        ((g_ismusl == FALSE) && g_fn.sendmmsg) ||
+        ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
+        funchook = funchook_create();
 
-    if (logLevel(g_log) <= CFG_LOG_DEBUG) {
-        // TODO: add some mechanism to get the config'd log file path
-        funchook_set_debug_file(DEFAULT_LOG_PATH);
-    }
+        if (logLevel(g_log) <= CFG_LOG_DEBUG) {
+            // TODO: add some mechanism to get the config'd log file path
+            funchook_set_debug_file(DEFAULT_LOG_PATH);
+        }
 
-    g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
+        if (should_we_patch) {
+            g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
     
-    rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
+            rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
 
-    g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
+            g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
 
-    rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
+            rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
+        }
 
-    /* hook SSL_read and SSL_write*/
-    rc = funchook_install(funchook, 0);
-    if (rc != 0) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "ERROR: failed to install SSL_read hook. (%s)\n",
-                funchook_error_message(funchook));
-        scopeLog(buf, -1, CFG_LOG_ERROR);
-        return;
+        // sendmmsg, sendto, recvfrom for internal libc use in DNS queries
+        if ((g_ismusl == FALSE) && g_fn.sendmmsg) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
+        }
+
+        if (g_fn.syscall) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.syscall, scope_syscall);
+        }
+
+        if ((g_ismusl == TRUE) && g_fn.sendto) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.sendto, internal_sendto);
+        }
+
+        if ((g_ismusl == TRUE) && g_fn.recvfrom) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
+        }
+
+        // libmusl
+        // Note that both stdout & stderr objects point to the same write function.
+        // They are init'd with a static object. After the first write the
+        // write pointer is modified. We handle that mod in the interposed
+        // function __stdio_write().
+        if ((g_ismusl == TRUE) && (!g_fn.__stdout_write || !g_fn.__stderr_write)) {
+            // Get the static initializer for the stdout write function pointer
+            struct MUSL_IO_FILE *stdout_write = (struct MUSL_IO_FILE *)stdout;
+
+            // Save the write pointer
+            g_fn.__stdout_write = (size_t (*)(FILE *, const unsigned char *, size_t))stdout_write->write;
+
+            // Modify the write pointer to use our function
+            stdout_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+
+            // same for stderr
+            struct MUSL_IO_FILE *stderr_write = (struct MUSL_IO_FILE *)stderr;
+
+            // Save the write pointer
+            g_fn.__stderr_write = (size_t (*)(FILE *, const unsigned char *, size_t))stderr_write->write;
+
+            // Modify the write pointer to use our function
+            stderr_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+        }
+
+        if (g_fn.__write_libc) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
+        }
+
+        if (g_fn.__write_pthread) {
+            rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+        }
+
+        // hook 'em
+        rc = funchook_install(funchook, 0);
+        if (rc != 0) {
+            char buf[128];
+            snprintf(buf, sizeof(buf), "ERROR: failed to install SSL_read hook. (%s)\n",
+                     funchook_error_message(funchook));
+            scopeLog(buf, -1, CFG_LOG_ERROR);
+            return;
+        }
     }
 }
 #else
@@ -1042,6 +1355,56 @@ initHook()
 
 #endif // __LINUX__
 
+static void
+initEnv(int *attachedFlag)
+{
+    // clear the flag by default
+    *attachedFlag = 0;
+
+    if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose || !g_fn.setenv) {
+        //scopeLog("ERROR: missing g_fn's for initEnv()", -1, CFG_LOG_ERROR);
+        return;
+    }
+
+    // build the full path of the .env file
+    char path[128];
+    int  pathLen = snprintf(path, sizeof(path), "/dev/shm/scope_attach_%d.env", getpid());
+    if (pathLen < 0 || pathLen >= sizeof(path)) {
+        //scopeLog("ERROR: snprintf(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
+        return;
+    }
+
+    // open it
+    FILE *fd = g_fn.fopen(path, "r");
+    if (fd == NULL) {
+        //scopeLog("ERROR: fopen(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
+        return;
+    }
+
+    // the .env file is there so we're attached
+    *attachedFlag = 1;
+
+    // read "KEY=VALUE\n" lines and add them to the environment
+    char line[8192];
+    while (g_fn.fgets(line, sizeof(line), fd)) {
+        int len = strlen(line);
+        if (line[len-1] == '\n') line[len-1] = '\0';
+        char *key = strtok(line, "=");
+        if (key) {
+            char *val = strtok(NULL, "=");
+            if (val) {
+                g_fn.setenv(key, val, 1);
+            } else {
+                //scopeLog("ERROR: strtok(val) failed", -1, CFG_LOG_ERROR);
+            }
+        } else {
+            //scopeLog("ERROR: strtok(key) failed", -1, CFG_LOG_ERROR);
+        }
+    }
+
+    // done
+    g_fn.fclose(fd);
+}
 
 __attribute__((constructor)) void
 init(void)
@@ -1049,23 +1412,37 @@ init(void)
     // Use dlsym to get addresses for everything in g_fn
     initFn();
 
+    // bash can be compiled to use glibc's memory subsystem or it's own
+    // internal memory subsystem.  It's own is not threadsafe.  If we
+    // find that bash is using it's own memory, replace it with glibc's
+    // so our own thread can run safely in parallel.
+    if (func_found_in_executable("malloc", "bash")) {
+        run_bash_mem_fix();
+    }
+
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
+
+    // initEnv() will set this TRUE if it detects `scope_attach_PID.env` in
+    // `/dev/shm` with our PID indicating we were injected into a running
+    // process.
+    int attachedFlag = 0;
+    initEnv(&attachedFlag);
 
     initState();
 
     g_nsslist = lstCreate(freeNssEntry);
 
-    platform_time_t* time_struct = initTime();
+    platform_time_t *time_struct = initTime();
     if (time_struct->tsc_invariant == FALSE) {
         scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
     }
 
-    char* path = cfgPath();
-    config_t* cfg = cfgRead(path);
+    char *path = cfgPath();
+    config_t *cfg = cfgRead(path);
     cfgProcessEnvironment(cfg);
+
     doConfig(cfg);
-    g_ctl = initCtl(cfg);
     g_staticfg = cfg;
     if (path) free(path);
     if (!g_dbg) dbgInit();
@@ -1074,18 +1451,23 @@ init(void)
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
-    reportProcessStart();
+    reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
 
     if (atexit(handleExit)) {
         DBG(NULL);
     }
 
-    initHook();
+    initHook(attachedFlag);
     
     if (checkEnv("SCOPE_APP_TYPE", "go") &&
         checkEnv("SCOPE_EXEC_TYPE", "static")) {
         threadNow(0);
-    } else {
+    } else if (g_ismusl == FALSE) {
+        // The check here is meant to be temporary.
+        // The behavior of timer_delete() in musl libc
+        // is different than that of gnu libc.
+        // Therefore, until that is investigated we don't
+        // enable a timer/signal.
         threadInit();
     }
 
@@ -1170,7 +1552,13 @@ fopen(const char *pathname, const char *mode)
     WRAP_CHECK(fopen, NULL);
     stream = g_fn.fopen(pathname, mode);
     if (stream != NULL) {
-        doOpen(fileno(stream), pathname, STREAM, "fopen");
+        // This check for /proc/self/maps is because we want to avoid
+        // reporting that our funchook library opens /proc/self/maps
+        // with fopen, then calls fgets and fclose on it as well...
+        // See https://github.com/criblio/appscope/issues/214 for more info
+        if (strcmp(pathname, "/proc/self/maps")) {
+            doOpen(fileno(stream), pathname, STREAM, "fopen");
+        }
     } else {
         doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "fopen", pathname);
     }
@@ -1906,7 +2294,7 @@ faccessat(int dirfd, const char *pathname, int mode, int flags)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
                 struct hostent **result, int *h_errnop)
 {
@@ -1930,7 +2318,7 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 gethostbyname2_r(const char *name, int af, struct hostent *ret, char *buf,
                  size_t buflen, struct hostent **result, int *h_errnop)
 {
@@ -2024,7 +2412,7 @@ EXPORTON int
 execve(const char *pathname, char *const argv[], char *const envp[])
 {
     int i, nargs, saverr;
-    bool isstat = FALSE;
+    bool isstat = FALSE, isgo = FALSE;
     char **nargv;
     elf_buf_t *ebuf;
     char *scopexec = NULL;
@@ -2038,12 +2426,17 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     if ((ebuf = getElf((char *)pathname))) {
         isstat = is_static(ebuf->buf);
+        isgo = is_go(ebuf->buf);
     }
 
     // not really necessary since we're gonna exec
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
-    if (getenv("LD_PRELOAD") && (isstat == FALSE)) {
+    /*
+     * Note: the isgo check is strictly for Go dynamic execs.
+     * In this case we use ldscope only to force the use of HTTP 1.1.
+     */
+    if (getenv("LD_PRELOAD") && (isstat == FALSE) && (isgo == FALSE)) {
         return g_fn.execve(pathname, argv, envp);
     }
 
@@ -2081,7 +2474,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     return -1;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 __overflow(FILE *stream, int ch)
 {
     WRAP_CHECK(__overflow, EOF);
@@ -2094,6 +2487,32 @@ __overflow(FILE *stream, int ch)
     return rc;
 }
 
+static ssize_t
+__write_libc(int fd, const void *buf, size_t size)
+{
+    WRAP_CHECK(__write_libc, -1);
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.__write_libc(fd, buf, size);
+
+    doWrite(fd, initialTime, (rc != -1), buf, rc, "__write_libc", BUF, 0);
+
+    return rc;
+}
+
+static ssize_t
+__write_pthread(int fd, const void *buf, size_t size)
+{
+    WRAP_CHECK(__write_pthread, -1);
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.__write_pthread(fd, buf, size);
+
+    doWrite(fd, initialTime, (rc != -1), buf, rc, "__write_pthread", BUF, 0);
+
+    return rc;
+}
+
 /*
  * Note:
  * The syscall function in libc is called from the loader for
@@ -2101,8 +2520,8 @@ __overflow(FILE *stream, int ch)
  * do any dynamic memory allocation while this executes. Be careful.
  * The DBG() output is ignored until after the constructor runs.
  */
-EXPORTON long
-syscall(long number, ...)
+static long
+scope_syscall(long number, ...)
 {
     struct FuncArgs fArgs;
 
@@ -2110,6 +2529,13 @@ syscall(long number, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, number);
 
     switch (number) {
+    case SYS_close:
+    {
+        long rc;
+        rc = g_fn.syscall(number, fArgs.arg[0]);
+        doClose(fArgs.arg[0], "sysclose");
+        return rc;
+    }
     case SYS_accept4:
     {
         long rc;
@@ -2176,7 +2602,7 @@ syscall(long number, ...)
                         fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
 
-EXPORTON size_t
+EXPORTOFF size_t // EXPORTOFF because it's redundant with __write
 fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 {
     WRAP_CHECK(fwrite_unlocked, 0);
@@ -2265,6 +2691,40 @@ SSL_write(SSL *ssl, const void *buf, int num)
     return rc;
 }
 
+static int
+gnutls_get_fd(gnutls_session_t session)
+{
+    int fd = -1;
+    gnutls_transport_ptr_t fdp;
+
+    if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
+            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
+        // In #279, we found that when the version of gnutls is 3.5.18, the
+        // gnutls_transport_get_ptr() return value is the file-descriptor,
+        // not a pointer to the file-descriptor. Using gnutls_check_version()
+        // got messy as we may have found this behaviour switched on and off.
+        // So, we're testing here if the integer value of the pointer is 
+        // below the number of file-descriptors.
+        if (!g_max_fds) {
+            // NB: race-condition where multiple threads get here at the same
+            // time and end up setting g_max_fds more than once. No problem.
+            struct rlimit fd_limit;
+            if (getrlimit(RLIMIT_NOFILE, &fd_limit) != 0) {
+                DBG("getrlimit(0 failed");
+                return fd;
+            }
+            g_max_fds = fd_limit.rlim_cur;
+        }
+        if ((uint64_t)fdp >= g_max_fds) {
+            fd = *fdp;
+        } else {
+            fd = (int)(uint64_t)fdp;
+        }
+    }
+
+    return fd;
+}
+
 EXPORTON ssize_t
 gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
 {
@@ -2275,14 +2735,7 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
     rc = g_fn.gnutls_record_recv(session, data, data_size);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
     }
     return rc;
@@ -2298,14 +2751,7 @@ gnutls_record_recv_early_data(gnutls_session_t session, void *data, size_t data_
     rc = g_fn.gnutls_record_recv_early_data(session, data, data_size);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
     }
     return rc;
@@ -2336,14 +2782,7 @@ gnutls_record_recv_seq(gnutls_session_t session, void *data, size_t data_size, u
     rc = g_fn.gnutls_record_recv_seq(session, data, data_size, seq);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, data, rc, TLSRX, BUF);
     }
     return rc;
@@ -2359,14 +2798,7 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
     rc = g_fn.gnutls_record_send(session, data, data_size);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
     }
     return rc;
@@ -2383,14 +2815,7 @@ gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size
     rc = g_fn.gnutls_record_send2(session, data, data_size, pad, flags);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
     }
     return rc;
@@ -2406,14 +2831,7 @@ gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t
     rc = g_fn.gnutls_record_send_early_data(session, data, data_size);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
     }
     return rc;
@@ -2430,14 +2848,7 @@ gnutls_record_send_range(gnutls_session_t session, const void *data, size_t data
     rc = g_fn.gnutls_record_send_range(session, data, data_size, range);
 
     if (rc > 0) {
-        int fd = -1;
-        gnutls_transport_ptr_t fdp;
-
-        if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
-            fd = *fdp;
-        }
-
+        int fd = gnutls_get_fd(session);
         doProtocol((uint64_t)session, fd, (void *)data, rc, TLSTX, BUF);
     }
     return rc;
@@ -2966,7 +3377,7 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
     return rc;
 }
 
-EXPORTON int32_t
+EXPORTOFF int32_t
 DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
                       const char *fullname, uint16_t rrtype, uint16_t rrclass,
                       void *callback, void *context)
@@ -3093,7 +3504,65 @@ fgetpos64(FILE *stream,  fpos64_t *pos)
     return rc;
 }
 
-EXPORTON ssize_t
+/*
+ * This function, at this time, is specific to libmusl.
+ * We have hooked the stdout/stderr write pointer.
+ * The function pointer assigned by static config is
+ * modified by libc during the first call to stdout/stderr.
+ * We check for changes and adjust as needed.
+ */
+static size_t
+__stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
+{
+    uint64_t initialTime = getTime();
+    struct iovec iovs[2] = {
+		{ .iov_base = stream->wbase, .iov_len = stream->wpos - stream->wbase },
+		{ .iov_base = (void *)buf, .iov_len = len }
+	};
+
+    struct iovec *iov = iovs;
+    int iovcnt = 2;
+    int dothis = 0;
+    ssize_t rc;
+
+    // Note: not using WRAP_CHECK because these func ptrs are not populated
+    // from symbol resolution.
+    // stdout
+    if (g_fn.__stdout_write && stream && (stream == (struct MUSL_IO_FILE *)stdout)) {
+        rc = g_fn.__stdout_write((FILE *)stream, buf, len);
+        dothis = 1;
+
+        // has the stdout write pointer changed?
+        if (stream->write != (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write) {
+            // save the new pointer
+            g_fn.__stdout_write = (size_t (*)(FILE *, const unsigned char *, size_t))stream->write;
+
+            // modify the pointer to use this function
+            stream->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+        }
+    }
+
+    // stderr
+    if (g_fn.__stderr_write && stream && (stream == (struct MUSL_IO_FILE *)stderr)) {
+        rc = g_fn.__stderr_write((FILE *)stream, buf, len);
+        dothis = 1;
+
+        // has the stderr write pointer changed?
+        if (stream->write != (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write) {
+            // save the new pointer
+            g_fn.__stderr_write = (size_t (*)(FILE *, const unsigned char *, size_t))stream->write;
+
+            // modify the pointer to use this function
+            stream->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+        }
+    }
+
+    if (dothis == 1) doWrite(fileno((FILE *)stream), initialTime, (rc != -1),
+                             iov, rc, "__stdio_write", IOV, iovcnt);
+    return rc;
+}
+
+EXPORTOFF ssize_t // EXPORTOFF because it's redundant with __write
 write(int fd, const void *buf, size_t count)
 {
     WRAP_CHECK(write, -1);
@@ -3132,7 +3601,7 @@ writev(int fd, const struct iovec *iov, int iovcnt)
     return rc;
 }
 
-EXPORTON size_t
+EXPORTOFF size_t  // EXPORTOFF because it's redundant with __write
 fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 {
     WRAP_CHECK(fwrite, 0);
@@ -3145,7 +3614,7 @@ fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 puts(const char *s)
 {
     WRAP_CHECK(puts, EOF);
@@ -3155,10 +3624,15 @@ puts(const char *s)
 
     doWrite(fileno(stdout), initialTime, (rc != EOF), s, strlen(s), "puts", BUF, 0);
 
+    if (rc != EOF) {
+        // puts() "writes the string s and a trailing newline to stdout"
+        doWrite(fileno(stdout), initialTime, TRUE, "\n", 1, "puts", BUF, 0);
+    }
+
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 putchar(int c)
 {
     WRAP_CHECK(putchar, EOF);
@@ -3171,7 +3645,7 @@ putchar(int c)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 fputs(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs, EOF);
@@ -3184,7 +3658,7 @@ fputs(const char *s, FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 fputs_unlocked(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs_unlocked, EOF);
@@ -3369,7 +3843,7 @@ fgetc(FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 fputc(int c, FILE *stream)
 {
     WRAP_CHECK(fputc, EOF);
@@ -3382,7 +3856,7 @@ fputc(int c, FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int // EXPORTOFF because it's redundant with __write
 fputc_unlocked(int c, FILE *stream)
 {
     WRAP_CHECK(fputc_unlocked, EOF);
@@ -3395,7 +3869,7 @@ fputc_unlocked(int c, FILE *stream)
     return rc;
 }
 
-EXPORTON wint_t
+EXPORTOFF wint_t // EXPORTOFF because it's redundant with __write
 putwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(putwc, WEOF);
@@ -3408,7 +3882,7 @@ putwc(wchar_t wc, FILE *stream)
     return rc;
 }
 
-EXPORTON wint_t
+EXPORTOFF wint_t // EXPORTOFF because it's redundant with __write
 fputwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(fputwc, WEOF);
@@ -3746,9 +4220,9 @@ send(int sockfd, const void *buf, size_t len, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
-sendto(int sockfd, const void *buf, size_t len, int flags,
-       const struct sockaddr *dest_addr, socklen_t addrlen)
+static ssize_t
+internal_sendto(int sockfd, const void *buf, size_t len, int flags,
+                const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
     WRAP_CHECK(sendto, -1);
@@ -3768,6 +4242,13 @@ sendto(int sockfd, const void *buf, size_t len, int flags,
     }
 
     return rc;
+}
+
+EXPORTON ssize_t
+sendto(int sockfd, const void *buf, size_t len, int flags,
+       const struct sockaddr *dest_addr, socklen_t addrlen)
+{
+    return internal_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 }
 
 EXPORTON ssize_t
@@ -3804,6 +4285,49 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
     return rc;
 }
 
+#ifdef __LINUX__
+static int
+internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(sendmmsg, -1);
+    rc = g_fn.sendmmsg(sockfd, msgvec, vlen, flags);
+    if (rc != -1) {
+        scopeLog("sendmmsg", sockfd, CFG_LOG_TRACE);
+
+        // For UDP connections the msg is a remote addr
+        if (!sockIsTCP(sockfd)) {
+            if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                sizeof(struct sockaddr_in6), REMOTE);
+            } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                sizeof(struct sockaddr_in), REMOTE);
+            }
+        }
+
+        if (remotePortIsDNS(sockfd)) {
+            getDNSName(sockfd, msgvec->msg_hdr.msg_iov->iov_base, msgvec->msg_hdr.msg_iov->iov_len);
+        }
+
+        doSend(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
+
+    } else {
+        setRemoteClose(sockfd, errno);
+        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendmmsg", "nopath");
+    }
+
+    return rc;
+}
+
+EXPORTON int
+sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
+{
+    return internal_sendmmsg(sockfd, msgvec, vlen, flags);
+}
+#endif // __LINUX__
+
 EXPORTON ssize_t
 recv(int sockfd, void *buf, size_t len, int flags)
 {
@@ -3816,6 +4340,11 @@ recv(int sockfd, void *buf, size_t len, int flags)
     }
 
     if (rc != -1) {
+        // it's possible to get DNS over TCP
+        if (remotePortIsDNS(sockfd)) {
+            getDNSAnswer(sockfd, buf, rc, BUF);
+        }
+
         doRecv(sockfd, rc, buf, rc, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recv", "nopath");
@@ -3824,8 +4353,8 @@ recv(int sockfd, void *buf, size_t len, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
-recvfrom(int sockfd, void *buf, size_t len, int flags,
+static ssize_t
+internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
          struct sockaddr *src_addr, socklen_t *addrlen)
 {
     ssize_t rc;
@@ -3834,11 +4363,23 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
     if (rc != -1) {
         scopeLog("recvfrom", sockfd, CFG_LOG_TRACE);
+
+        if (remotePortIsDNS(sockfd)) {
+            getDNSAnswer(sockfd, buf, rc, BUF);
+        }
+
         doRecv(sockfd, rc, buf, rc, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvfrom", "nopath");
     }
     return rc;
+}
+
+EXPORTON ssize_t
+recvfrom(int sockfd, void *buf, size_t len, int flags,
+         struct sockaddr *src_addr, socklen_t *addrlen)
+{
+    return internal_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
 }
 
 static int
@@ -3900,6 +4441,10 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
             }
         }
 
+        if (remotePortIsDNS(sockfd)) {
+            getDNSAnswer(sockfd, (char *)msg, rc, MSG);
+        }
+
         doRecv(sockfd, rc, msg, rc, MSG);
         doAccessRights(msg);
     } else {
@@ -3909,7 +4454,44 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     return rc;
 }
 
-EXPORTON struct hostent *
+#ifdef __LINUX__
+EXPORTON int
+recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
+         int flags, struct timespec *timeout)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(recvmmsg, -1);
+    rc = g_fn.recvmmsg(sockfd, msgvec, vlen, flags, timeout);
+    if (rc != -1) {
+        scopeLog("recvmmsg", sockfd, CFG_LOG_TRACE);
+
+        // For UDP connections the msg is a remote addr
+        if (msgvec) {
+            if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                sizeof(struct sockaddr_in6), REMOTE);
+            } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                sizeof(struct sockaddr_in), REMOTE);
+            }
+        }
+
+        if (remotePortIsDNS(sockfd)) {
+            getDNSAnswer(sockfd, (char *)&msgvec->msg_hdr, rc, MSG);
+        }
+
+        doRecv(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
+        doAccessRights(&msgvec->msg_hdr);
+    } else {
+        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmmsg", "nopath");
+    }
+
+    return rc;
+}
+#endif //__LINUX__
+
+EXPORTOFF struct hostent *
 gethostbyname(const char *name)
 {
     struct hostent *rc;
@@ -3933,7 +4515,7 @@ gethostbyname(const char *name)
     return rc;
 }
 
-EXPORTON struct hostent *
+EXPORTOFF struct hostent *
 gethostbyname2(const char *name, int af)
 {
     struct hostent *rc;
@@ -3957,7 +4539,12 @@ gethostbyname2(const char *name, int af)
     return rc;
 }
 
-EXPORTON int
+/*
+ * we use this to get the DNS request if sendmmsg
+ * is not funchooked or if the lib uses a different
+ * internal function to send the dns request.
+ */
+EXPORTOFF int
 getaddrinfo(const char *node, const char *service,
             const struct addrinfo *hints,
             struct addrinfo **res)
@@ -3966,6 +4553,7 @@ getaddrinfo(const char *node, const char *service,
     elapsed_t time = {0};
     
     WRAP_CHECK(getaddrinfo, -1);
+
     doUpdateState(DNS, -1, 0, NULL, node);
     time.initial = getTime();
     rc = g_fn.getaddrinfo(node, service, hints, res);
@@ -3981,6 +4569,50 @@ getaddrinfo(const char *node, const char *service,
     }
 
     return rc;
+}
+
+// This was added to avoid having libscope.so depend on GLIBC_2.25.
+// libssl.a or libcrypto.a need getentropy which only exists in
+// GLIBC_2.25 and newer.
+EXPORTON int
+getentropy(void *buffer, size_t length)
+{
+    if (SYMBOL_LOADED(getentropy)) {
+        return g_fn.getentropy(buffer, length);
+    }
+
+    // Must be something older than GLIBC_2.25...
+    // Looks like we're on the hook for this.
+
+#ifndef SYS_getrandom
+    errno = ENOSYS;
+    return -1;
+#else
+    if (length > 256) {
+        errno = EIO;
+        return -1;
+    }
+
+    int cancel;
+    int ret = 0;
+    char *pos = buffer;
+    pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel);
+    while (length) {
+        ret = syscall(SYS_getrandom, pos, length, 0);
+        if (ret < 0) {
+            if (errno == EINTR) {
+                continue;
+            } else {
+                break;
+            }
+        }
+        pos += ret;
+        length -= ret;
+        ret = 0;
+    }
+    pthread_setcancelstate(cancel, 0);
+    return ret;
+#endif
 }
 
 // This overrides a weak definition in src/dbg.c
@@ -4000,3 +4632,130 @@ scopeLog(const char *msg, int fd, cfg_log_level_t level)
     }
     logSend(g_log, buf, level);
 }
+
+/*
+ * pthread_create was added to support go execs on libmusl.
+ * The go execs don't link to crt0/crt1 on libmusl therefore
+ * they do not call our lib constructor. We interpose this
+ * as a means to call the constructgor before the go app runs.
+ */
+EXPORTON int
+pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+               void *(*start_routine)(void *), void *arg)
+{
+    int rc;
+
+    WRAP_CHECK(pthread_create, -1);
+    rc = g_fn.pthread_create(thread, attr, start_routine, arg);
+
+    if (!g_ctl) {
+        init();
+    }
+
+    return rc;
+}
+
+/*
+ * These functions are interposed to support libmusl.
+ * The addition of libssl and libcrypto pull in these
+ * glibc internal funcs.
+ */
+EXPORTON int
+__fprintf_chk(FILE *stream, int flag, const char *format, ...)
+{
+    va_list ap;
+    int rc;
+
+    va_start (ap, format);
+    rc = vfprintf(stream, format, ap);
+    va_end (ap);
+    return rc;
+}
+
+EXPORTON int
+__sprintf_chk(char *str, int flag, size_t strlen, const char *format, ...)
+{
+    va_list ap;
+    int rc;
+
+    va_start(ap, format);
+    rc = vsnprintf(str, strlen, format, ap);
+    va_end(ap);
+    return rc;
+}
+
+EXPORTON void *
+__memset_chk(void *dest, int cset, size_t len, size_t destlen)
+{
+    if (g_fn.__memset_chk) {
+        return g_fn.__memset_chk(dest, cset, len, destlen);
+    }
+
+    return memset(dest, cset, len);
+}
+
+EXPORTON void *
+__memcpy_chk(void *dest, const void *src, size_t len, size_t destlen)
+{
+    if (g_fn.__memcpy_chk) {
+        return g_fn.__memcpy_chk(dest, src, len, destlen);
+    }
+
+    return memcpy(dest, src, len);
+}
+
+EXPORTON long int
+__fdelt_chk(long int fdelt)
+{
+    if (g_fn.__fdelt_chk) {
+        return g_fn.__fdelt_chk(fdelt);
+    }
+
+    if (fdelt < 0 || fdelt >= FD_SETSIZE) {
+        DBG(NULL);
+        fprintf(stderr, "__fdelt_chk error: buffer overflow detected?\n");
+        abort();
+    }
+
+    return fdelt / __NFDBITS;
+}
+
+EXPORTWEAK int
+__register_atfork(void (*prepare) (void), void (*parent) (void), void (*child) (void), void *__dso_handle)
+{
+    if (g_fn.__register_atfork) {
+        return g_fn.__register_atfork(prepare, parent, child, __dso_handle);
+    }
+
+    /*
+     * What do we do if we can't resolve a symbol for __register_atfork?
+     * glibc returns ENOMEM on error.
+     *
+     * Note: __register_atfork() is defined to implement the
+     * functionality of pthread_atfork(); Therefore, it would seem
+     * reasonable to call pthread_atfork() here if the symbol for
+     * __register_atfork() is not resolved. However, glibc implements
+     * pthread_atfork() by calling __register_atfork() which causes
+     * a tight loop here and we would crash.
+     */
+    return ENOMEM;
+}
+
+EXPORTWEAK int
+__vfprintf_chk(FILE *fp, int flag, const char *format, va_list ap)
+{
+    return vfprintf(fp, format, ap);
+}
+
+EXPORTWEAK int
+__vsnprintf_chk(char *s, size_t maxlen, int flag, size_t slen, const char *format, va_list args)
+{
+    return vsnprintf(s, slen, format, args);
+}
+
+static void *
+scope_dlsym(void *handle, const char *name, void *who)
+{
+    return dlsym(handle, name);
+}
+

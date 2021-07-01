@@ -12,7 +12,8 @@
 #include "os.h"
 #include "state.h"
 #include "utils.h"
-#include "../contrib/funchook/distorm/include/distorm.h"
+#include "fn.h"
+#include "distorm.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
@@ -51,7 +52,9 @@ go_offsets_t g_go = {.g_to_m=48,                   // 0x30
                      .pd_to_fd=16,                 // 0x10
                      .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 (defined for go1.8)
                      .bufrd_to_buf=0,              // 0x00
-                     .conn_to_rwc=16};             // 0x10
+                     .conn_to_rwc=16,              // 0x10
+                     .conn_to_tlsState=48,         // 0x30
+                     .persistConn_to_tlsState=96}; // 0x60
 
 tap_t g_go_tap[] = {
     {"syscall.write",                        go_hook_write,        NULL, 0},
@@ -74,11 +77,8 @@ uint64_t g_go_static = 0LL;
 static list_t *g_threadlist;
 static void *g_stack;
 static bool g_switch_thread;
-static uint64_t go_tls_conn;
 
 void (*go_runtime_cgocall)(void);
-
-extern void __ctype_init (void);
 
 #if NEEDEVNULL > 0
 static void
@@ -108,7 +108,10 @@ static bool
 looks_like_first_inst_of_go_func(_DecodedInst* asm_inst)
 {
     return (!strcmp((const char*)asm_inst->mnemonic.p, "MOV") &&
-            !strcmp((const char*)asm_inst->operands.p, "RCX, [FS:0xfffffffffffffff8]"));
+            !strcmp((const char*)asm_inst->operands.p, "RCX, [FS:0xfffffffffffffff8]"))
+           || // -buildmode=pie compiles to this:
+           (!strcmp((const char*)asm_inst->mnemonic.p, "MOV") &&
+            !strcmp((const char*)asm_inst->operands.p, "RCX, 0xfffffff8"));
 }
 
 static uint32_t
@@ -333,6 +336,7 @@ adjustGoStructOffsetsForVersion(int go_ver)
     if (go_ver < 12) {
         g_go.persistConn_to_conn = 72;  // 0x48
         g_go.persistConn_to_bufrd = 96; // 0x60
+        g_go.persistConn_to_tlsState=88; // 0x58
     }
 
 
@@ -347,16 +351,12 @@ adjustGoStructOffsetsForVersion(int go_ver)
     // If an OptionalTag is provided, test_go_struct.sh will not process
     // the line unless it matches a TAG_FILTER which is provided as an
     // argument to the test_go_struct.sh.
-    int (*ni_open)(const char *pathname, int flags, mode_t mode);
-    ni_open = dlsym(RTLD_NEXT, "open");
-    int (*ni_close)(int fd);
-    ni_close = dlsym(RTLD_NEXT, "close");
-    if (!ni_open || !ni_close) return;
+    if (!g_fn.open || !g_fn.close) return;
 
     char* debug_file;
     int fd;
     if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
-        ((fd = ni_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
+        ((fd = g_fn.open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
         dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
         dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
         dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
@@ -372,9 +372,45 @@ adjustGoStructOffsetsForVersion(int go_ver)
         }
         dprintf(fd, "bufio.Reader|buf=%d|\n", g_go.bufrd_to_buf);
         dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go.conn_to_rwc);
-        ni_close(fd);
+        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
+        dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go.persistConn_to_tlsState);
+        g_fn.close(fd);
     }
 
+}
+
+int
+getBaseAddress(uint64_t *addr) {
+    uint64_t base_addr = 0;
+    char perms[5];
+    char offset[20];
+    char buf[1024];
+    char pname[1024];
+    FILE *fp;
+
+    if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose) return -1;
+
+    if (osGetProcname(pname, sizeof(pname)) == -1) return -1;
+
+    if ((fp = g_fn.fopen("/proc/self/maps", "r")) == NULL) {
+        return -1;
+    }
+
+    while (g_fn.fgets(buf, sizeof(buf), fp) != NULL) {
+        uint64_t addr_start;
+        sscanf(buf, "%lx-%*x %s %*s %s %*d", &addr_start, perms, offset);
+        if (strstr(buf, pname) != NULL) {
+            base_addr = addr_start;
+            break;
+        }
+    }
+
+    g_fn.fclose(fp);
+    if (base_addr) {
+        *addr = base_addr;
+        return 0;
+    }
+    return -1;
 }
 
 void
@@ -408,8 +444,12 @@ initGoHook(elf_buf_t *ebuf)
     }
 
     // which go_switch function are we using?
+    // Note that __ctype_init needs to be called through
+    // a function pointer since musl lib support was added.
+    // If that pointer is not initialized, then don't allow
+    // go_switch_no_thread() to be used.
     if (g_go_static == 1) {
-        if (checkEnv(SWITCH_ENV, SWITCH_USE_NO_THREAD)) {
+        if (g_fn.__ctype_init && checkEnv(SWITCH_ENV, SWITCH_USE_NO_THREAD)) {
             g_switch_thread = FALSE;
             patchClone();
         } else if (checkEnv(SWITCH_ENV, SWITCH_USE_THREAD)) {
@@ -422,24 +462,47 @@ initGoHook(elf_buf_t *ebuf)
     }
 
     int go_major_ver = UNKNOWN_GO_VER;
-    if ((go_ver=getSymbol(ebuf->buf, "runtime.buildVersion")) &&
-        (go_runtime_version = c_str(go_ver))) {
+    go_ver = getSymbol(ebuf->buf, "runtime.buildVersion");
+    if (!go_ver) {
+        //runtime.buildVersion symbol not found, probabaly dealing with a stripped binary
+        //try to retrieve the version symbol address from the .go.buildinfo section
+        go_ver = getGoVersionAddr(ebuf->buf);
+    }
+    //check ELF type
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
+    // if it's a position independent executable, get the base address from /proc/self/maps
+    uint64_t base = 0LL;
+    if (ehdr->e_type == ET_DYN && !g_go_static) {
+        if (getBaseAddress(&base) != 0) {
+            sysprint("ERROR: can't get the base address\n");
+            return; // don't install our hooks
+        }
+        Elf64_Shdr* textSec = getElfSection(ebuf->buf, ".text");
+        sysprint("base %lx %lx %x\n", base, (uint64_t)ebuf->text_addr, textSec->sh_offset);
+        base = base - (uint64_t)ebuf->text_addr + textSec->sh_offset;
+    }
+    
+    go_ver = (void *) ((uint64_t)go_ver + base);
+    
+    if (go_ver && (go_runtime_version = c_str(go_ver))) {
 
         sysprint("go_runtime_version = %s\n", go_runtime_version);
 
         go_major_ver = go_major_version(go_runtime_version);
     }
-
     if (go_major_ver < MIN_SUPPORTED_GO_VER) {
-        if (go_runtime_version) {
-            fprintf(stderr, "%s was compiled with go version `%s`.\n",
-                    ebuf->cmd, go_runtime_version);
+        char buf[1024];
+        if (!is_go(ebuf->buf)) {
+            // Don't expect to get here, but try to be clear if we do.
+            snprintf(buf, sizeof(buf), "%s is not a go application.  Continuing without AppScope.", ebuf->cmd);
+        } else if (go_runtime_version) {
+            snprintf(buf, sizeof(buf), "%s was compiled with go version `%s`.  AppScope can only instrument go1.8 or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version);
+        } else {
+            snprintf(buf, sizeof(buf), "%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
         }
-        fprintf(stderr, "%s was compiled with a version of go older than go1.8."
-                "  This is not supported by scope.  Continuing without scope.\n", ebuf->cmd);
-       return; // don't install our hooks
+        scopeLog(buf, -1, CFG_LOG_WARN);
+        return; // don't install our hooks
     }
-
     /*
      * Note: calling runtime.cgocall results in the Go error
      *       "fatal error: cgocall unavailable"
@@ -447,21 +510,19 @@ initGoHook(elf_buf_t *ebuf)
      * are entering the Go func past the runtime stack check?
      * Need to investigate later.
      */
-    if ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
+    if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
+        ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
         sysprint("ERROR: can't get the address for runtime.cgocall\n");
         return; // don't install our hooks
     }
-
-    // Get the interface type for a tls.Conn (set to 0 if not present)
-    go_tls_conn = (uint64_t)getSymbol(ebuf->buf, "go.itab.*crypto/tls.Conn,net.Conn");
-
+    go_runtime_cgocall = (void *) ((uint64_t)go_runtime_cgocall + base);
 
     adjustGoStructOffsetsForVersion(go_major_ver);
-
     tap_t* tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
-        void* orig_func = getSymbol(ebuf->buf, tap->func_name);
-        if (!orig_func) {
+        void* orig_func;
+        if (((orig_func = getGoSymbol(ebuf->buf, tap->func_name)) == NULL) &&
+            ((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL)) {
             sysprint("ERROR: can't get the address for %s\n", tap->func_name);
             continue;
         }
@@ -470,6 +531,8 @@ initGoHook(elf_buf_t *ebuf)
         unsigned int asm_count = 0;
         _DecodedInst asm_inst[MAX_INST];
         uint64_t offset_into_txt = (uint64_t)orig_func - (uint64_t)ebuf->text_addr;
+
+        orig_func = (void *) ((uint64_t)orig_func + base);
         int rc = distorm_decode((uint64_t)orig_func, orig_func,
                                  ebuf->text_len - offset_into_txt,
                                  Decode64Bits, asm_inst, MAX_INST, &asm_count);
@@ -481,7 +544,7 @@ initGoHook(elf_buf_t *ebuf)
         }
 
         patchprint ("********************************\n");
-        patchprint ("** %s  %s **\n", go_runtime_version, tap->func_name);
+        patchprint ("** %s  %s 0x%lx **\n", go_runtime_version, tap->func_name, orig_func);
         patchprint ("********************************\n");
 
         patch_return_addrs(funchook, asm_inst, asm_count, tap);
@@ -564,10 +627,12 @@ dumb_thread(void *arg)
 inline static void *
 go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 {
+    int fs_valid = 0;
     uint64_t rc;
     unsigned long go_tls = 0;
     unsigned long go_fs = 0;
     unsigned long go_m = 0;
+    unsigned long *go_v;
     char *go_g = NULL;
 
     if (g_go_static) {
@@ -582,13 +647,31 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
         if (go_g) {
             // get struct m from g and pull out the TLS from 'm'
             go_m = *((unsigned long *)(go_g + g_go.g_to_m));
-            go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-            go_fs = go_tls + 8; //go compiler uses -8(FS)
-        } else {
+            go_v = (unsigned long *)go_m;
+
+            // first entry in a valid m is a pointer to g
+            if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
+                go_tls = (unsigned long)(go_m + g_go.m_to_tls);
+                go_v = (unsigned long *)go_tls;
+
+                // is tls set?
+                if (go_v && (*go_v != 0)) { // continue
+                    go_fs = go_tls + 8; //go compiler uses -8(FS)
+                    go_v = (unsigned long *)go_fs;
+
+                    if (go_v && (*go_v != 0)) { // continue
+                        fs_valid = 1;
+                    }
+                }
+            }
+        }
+
+        if (fs_valid == 0) {
             // We've seen a case where on process exit static cgo
             // apps do not have a go_g while they're exiting.
             // In this case we need to pull the TLS from the kernel
-            scopeLog("go_switch:did not get a 'g'; using fs from the kernel", -1, CFG_LOG_DEBUG);
+            // Also seen a case on libmusl where TLS is not set.
+            // Therefore, get fs from the kernel.
             if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
                 scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
                 goto out;
@@ -609,7 +692,8 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
 
-            if (pthread_create(&thread, NULL, dumb_thread, &barrier) != 0) {
+            if (!g_fn.pthread_create ||
+                (g_fn.pthread_create(&thread, NULL, dumb_thread, &barrier) != 0)) {
                 scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
                 goto out;
             }
@@ -685,11 +769,13 @@ out:
 inline static void *
 go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
 {
+    int fs_valid = 0;
     uint64_t rc;
     unsigned long go_tls = 0;
     unsigned long go_fs = 0;
     unsigned long go_m = 0;
     char *go_g = NULL;
+    unsigned long *go_v;
     int newThread = FALSE;
     unsigned long rsp;
 
@@ -705,13 +791,31 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
         if (go_g) {
             // get struct m from g and pull out the TLS from 'm'
             go_m = *((unsigned long *)(go_g + g_go.g_to_m));
-            go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-            go_fs = go_tls + 8; //go compiler uses -8(FS)
-        } else {
+            go_v = (unsigned long *)go_m;
+
+            // first entry in a valid m is a pointer to g
+            if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
+                go_tls = (unsigned long)(go_m + g_go.m_to_tls);
+                go_v = (unsigned long *)go_tls;
+
+                // is tls set?
+                if (go_v && (*go_v != 0)) { // continue
+                    go_fs = go_tls + 8; //go compiler uses -8(FS)
+                    go_v = (unsigned long *)go_fs;
+
+                    if (go_v && (*go_v != 0)) { // continue
+                        fs_valid = 1;
+                    }
+                }
+            }
+        }
+
+        if (fs_valid == 0) {
             // We've seen a case where on process exit static cgo
-            // apps do not have a go_g while they're exiting. 
+            // apps do not have a go_g while they're exiting.
             // In this case we need to pull the TLS from the kernel
-            scopeLog("go_switch:did not get a 'g'; using fs from the kernel", -1, CFG_LOG_DEBUG);
+            // Also seen a case on libmusl where TLS is not set.
+            // Therefore, get fs from the kernel.
             if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
                 scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
                 goto out;
@@ -726,7 +830,8 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
             pthread_t thread;
-            if (pthread_create(&thread, NULL, dumb_thread, NULL) != 0) {
+            if (!g_fn.pthread_create ||
+                (g_fn.pthread_create(&thread, NULL, dumb_thread, NULL) != 0)) {
                 scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
                 goto out;
             }
@@ -743,7 +848,7 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
             while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) {};
 
             //Initialize pointers to locale data.
-            __ctype_init();
+            if (g_fn.__ctype_init) g_fn.__ctype_init();
 
             //switch to a bigger stack
             __asm__ volatile (
@@ -997,26 +1102,28 @@ c_http_server_read(char *stackaddr)
     if (!conn) return;         // protect from dereferencing null
 
     cr_conn_rwc_if = conn + g_go.conn_to_rwc;
+    uint64_t tls =  *(uint64_t*)(conn + g_go.conn_to_tlsState);
+
     /*
-     * Strict conn I/F checking. There are as many as 5 types of conn structs in Go.
-     * We only want to extract an fd from a tls.Conn. We can check to see if the I/F
-     * type matches the value of the symbol "go.itab.*crypto/tls.Conn,net.Conn".
-     * A match defines this conn as a tls.Conn.
+     * The rwc net.Conn value can be wrapped as either a *net.TCPConn or
+     * *tls.Conn. We are using tlsState *tls.ConnectionState as the indicator
+     * of type. If the tlsState field is not 0, the rwc field is of type
+     * *tls.Conn. Example; net/http/server.go type conn struct.
+     *
+     * For reference, we were looking at the I/F type from go.itab.*crypto/tls.Conn,net.Conn
+     * and checking the type to determine TLS. This doesn't work on stripped
+     * executeables and should no longer be needed.
      */
-    if (cr_conn_rwc_if && go_tls_conn && (*(uint64_t *)cr_conn_rwc_if == go_tls_conn)) {
+    if (cr_conn_rwc_if && tls) {
         cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go.iface_data);
         netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data);
         if (netFD) {
-            if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-                pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-                if (pfd) {
-                    //funcprint("Scope: %s:%d cr %p cr.conn %p cr.conn.rwc_if %p cr.conn.rwc %p netFD %p pfd %p fd %p\n",
-                    //          __FUNCTION__, __LINE__, connReader, conn, cr_conn_rwc_if, cr_conn_rwc,
-                    //          netFD, pfd, pfd + g_go.pd_to_fd);
-                    fd = *(int *)(pfd + g_go.pd_to_fd);
-                }
-            } else {
-                fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+            if (pfd) {
+                //funcprint("Scope: %s:%d cr %p cr.conn %p cr.conn.rwc_if %p cr.conn.rwc %p netFD %p pfd %p fd %p\n",
+                //          __FUNCTION__, __LINE__, connReader, conn, cr_conn_rwc_if, cr_conn_rwc,
+                //          netFD, pfd, pfd + g_go.pd_to_fd);
+                fd = *(int *)(pfd + g_go.pd_to_fd);
             }
 
             funcprint("Scope: go_http_server_read of %ld\n", fd);
@@ -1055,18 +1162,16 @@ c_http_server_write(char *stackaddr)
     uint64_t w_conn_rwc_if, w_conn_rwc, netFD, pfd;
 
     w_conn_rwc_if = (conn + g_go.conn_to_rwc);
-    // Strict conn I/F checking. Ref the comment on c_http_server_read.
-    if (w_conn_rwc_if && go_tls_conn && (*(uint64_t *)w_conn_rwc_if == go_tls_conn)) {
+    uint64_t tls =  *(uint64_t*)(conn + g_go.conn_to_tlsState);
+
+    // conn I/F checking. Ref the comment on c_http_server_read.
+    if (w_conn_rwc_if && tls) {
         w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go.iface_data);
         netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data);
         if (netFD) {
-            if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-                pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-                if (pfd) {
-                    fd = *(int *)(pfd + g_go.pd_to_fd);
-                }
-            } else {
-                fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+            if (pfd) {
+                fd = *(int *)(pfd + g_go.pd_to_fd);
             }
 
             funcprint("Scope: c_http_server_write of %ld\n", fd);
@@ -1108,8 +1213,10 @@ c_http_client_write(char *stackaddr)
     if (rc < 1) return;
 
     pc_conn_if = (w_pc + g_go.persistConn_to_conn);
-    // Strict conn I/F checking. Ref the comment on c_http_server_read.
-    if (pc_conn_if && go_tls_conn && (*(uint64_t *)pc_conn_if == go_tls_conn)) {
+    uint64_t tls =  *(uint64_t*)(w_pc + g_go.persistConn_to_tlsState);
+
+    // conn I/F checking. Ref the comment on c_http_server_read.
+    if (pc_conn_if && tls) {
         w_pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
         netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data);
         if (!netFD) return;
@@ -1157,8 +1264,10 @@ c_http_client_read(char *stackaddr)
     uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
 
     pc_conn_if = (pc + g_go.persistConn_to_conn);
-    // Strict conn I/F checking. Ref the comment on c_http_server_read.
-    if (pc_conn_if && go_tls_conn && (*(uint64_t *)pc_conn_if == go_tls_conn)) {
+    uint64_t tls =  *(uint64_t*)(pc + g_go.persistConn_to_tlsState);
+
+    // conn I/F checking. Ref the comment on c_http_server_read.
+    if (pc_conn_if && tls) {
         pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
         netFD = *(uint64_t *)(pc_conn + g_go.iface_data);
         if (!netFD) return;

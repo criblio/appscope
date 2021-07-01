@@ -16,6 +16,14 @@
 
 typedef enum
 {
+    PROT_NOTCHECKED,
+    PROT_CHECKED,
+    PROT_TLS,
+    PROT_MAX
+} protocol_type_t;
+
+typedef enum
+{
     INET_TCP,
     INET_UDP,
     UNIX_TCP,
@@ -161,6 +169,7 @@ typedef struct net_info_t {
     counters_element_t txBytes;
     counters_element_t rxBytes;
     bool dnsSend;
+    bool dnsRecv;
     uint64_t startTime;
     counters_element_t numDuration;
     counters_element_t totalDuration;
@@ -168,10 +177,11 @@ typedef struct net_info_t {
     uint64_t lnode;
     uint64_t rnode;
     char dnsName[MAX_HOSTNAME];
+    cJSON *dnsAnswer;
     struct sockaddr_storage localConn;
     struct sockaddr_storage remoteConn;
     metric_counters counters;
-    unsigned int protocol;
+    protocol_type_t protocol;
 } net_info;
 
 typedef struct fs_info_t {

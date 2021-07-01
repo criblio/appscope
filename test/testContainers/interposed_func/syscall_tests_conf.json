@@ -57,10 +57,12 @@
         "bind06 timed out after 10 min",
         "sendto02 requires the sctp protocol",
         "connect02 is kernel specific, works on ubuntu 19 not on 18",
-        "sendto03 is a check for vulnerability in thekernel function tpacket_rcv()"],
+        "sendto03 is a check for vulnerability in thekernel function tpacket_rcv()",
+        "writev03: requires a specific file system: Filesystem ntfs is not supported"],
       "exclude_tests": [
         "connect02",
         "sendmsg03",
+        "bind02",
         "bind04",
         "bind05",
         "bind06",
@@ -117,7 +119,8 @@
         "creat07",
         "sendmsg02",
         "sendto02",
-        "sendto03"
+        "sendto03",
+        "writev03"
       ]
     },
     {

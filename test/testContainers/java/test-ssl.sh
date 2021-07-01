@@ -44,6 +44,44 @@ endtest(){
     rm $EVT_FILE
 }
 
+export SCOPE_PAYLOAD_ENABLE=true
+export SCOPE_PAYLOAD_HEADER=true
+
+evalPayload(){
+    PAYLOADERR=0
+    if ! command -v hexdump; then
+        echo "hexdump is not available; skipping test of tls in payload files for $CURRENT_TEST"
+        return $PAYLOADERR
+    fi
+
+    echo "Testing that payload files don't contain tls for $CURRENT_TEST"
+    for FILE in $(ls /tmp/*in /tmp/*out 2>/dev/null); do
+        # Continue if there aren't any .in or .out files
+        if [ $? -ne "0" ]; then
+            continue
+        fi
+
+        hexdump -C $FILE | cut -c11-58 | \
+                     egrep "7d[ \n]+0a[ \n]+1[4-7][ \n]+03[ \n]+0[0-3]"
+        if [ $? -eq "0" ]; then
+            echo "$FILE contains tls"
+            PAYLOADERR=$(($PAYLOADERR + 1))
+        fi
+    done
+
+    # There were failures.  Move them out of the way before continuing.
+    if [ $PAYLOADERR -ne "0" ]; then
+        echo "Moving payload files to /tmp/payload/$CURRENT_TEST"
+        mkdir -p /tmp/payload/$CURRENT_TEST
+        cp /tmp/*in /tmp/payload/$CURRENT_TEST
+        cp /tmp/*out /tmp/payload/$CURRENT_TEST
+        rm /tmp/*in /tmp/*out
+    fi
+
+    return $PAYLOADERR
+}
+
+
 
 starttest Tomcat
 /opt/tomcat/bin/catalina.sh run &
@@ -65,10 +103,13 @@ ERR+=$?
 grep http-metric $EVT_FILE > /dev/null
 ERR+=$?
 
-grep '"net.peer.ip":"127.0.0.1"' $EVT_FILE > /dev/null
+grep '"net_peer_ip":"127.0.0.1"' $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -E '"net\.peer\.port":"[0-9]+"' $EVT_FILE > /dev/null
+grep -E '"net_peer_port":"[0-9]+"' $EVT_FILE > /dev/null
+ERR+=$?
+
+evalPayload
 ERR+=$?
 
 endtest
@@ -87,15 +128,21 @@ ERR+=$?
 grep http-metric $EVT_FILE > /dev/null
 ERR+=$?
 
-grep '"net.peer.ip":"127.0.0.1"' $EVT_FILE > /dev/null
+grep '"net_peer_ip":"127.0.0.1"' $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -E '"net\.peer\.port":"[0-9]+"' $EVT_FILE > /dev/null
+grep -E '"net_peer_port":"[0-9]+"' $EVT_FILE > /dev/null
+ERR+=$?
+
+evalPayload
 ERR+=$?
 
 endtest
 
 /opt/tomcat/bin/catalina.sh stop
+
+unset SCOPE_PAYLOAD_ENABLE
+unset SCOPE_PAYLOAD_HEADER
 
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""

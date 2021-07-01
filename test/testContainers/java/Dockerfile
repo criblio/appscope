@@ -1,14 +1,18 @@
-ARG JDK_IMAGE=openjdk:8
+ARG JDK_IMAGE
 FROM $JDK_IMAGE
 
 ARG TOMCAT_MAJOR_VERSION=8
 ARG TOMCAT_MINOR_VERSION=8.0.49
 ARG KEYTOOL=keytool
+ARG DNLD_HEXDUMP
 
 ENV CATALINA_HOME /opt/tomcat
 ENV PATH $PATH:$CATALINA_HOME/bin
 
 ADD https://archive.apache.org/dist/tomcat/tomcat-${TOMCAT_MAJOR_VERSION}/v${TOMCAT_MINOR_VERSION}/bin/apache-tomcat-${TOMCAT_MINOR_VERSION}.tar.gz /apache-tomcat.tar.gz
+
+# for hexdump.  java 11 and under seems to use apt-get, 12 and 13 uses yum, 14 uses microdnf
+RUN eval $DNLD_HEXDUMP
 
 RUN tar zxf apache-tomcat.tar.gz && \
     rm apache-tomcat.tar.gz && \
@@ -43,3 +47,4 @@ ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV LD_PRELOAD=/usr/lib/libscope.so
 
 CMD /opt/test-runner/bin/test-ssl.sh
+#ENTRYPOINT ["tail", "-f", "/dev/null"]

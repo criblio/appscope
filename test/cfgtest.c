@@ -55,21 +55,21 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), DEFAULT_SRC_NET);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), DEFAULT_SRC_FS);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), DEFAULT_SRC_DNS);
-    assert_int_equal       (cfgTransportType(config, CFG_MTC), CFG_UDP);
-    assert_string_equal    (cfgTransportHost(config, CFG_MTC), "127.0.0.1");
+    assert_int_equal       (cfgTransportType(config, CFG_MTC), DEFAULT_MTC_TYPE);
+    assert_string_equal    (cfgTransportHost(config, CFG_MTC), DEFAULT_MTC_HOST);
     assert_string_equal    (cfgTransportPort(config, CFG_MTC), DEFAULT_MTC_PORT);
     assert_null            (cfgTransportPath(config, CFG_MTC));
-    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), CFG_BUFFER_LINE);
-    assert_int_equal       (cfgTransportType(config, CFG_CTL), CFG_TCP);
-    assert_string_equal    (cfgTransportHost(config, CFG_CTL), "127.0.0.1");
+    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), DEFAULT_MTC_BUF);
+    assert_int_equal       (cfgTransportType(config, CFG_CTL), DEFAULT_CTL_TYPE);
+    assert_string_equal    (cfgTransportHost(config, CFG_CTL), DEFAULT_CTL_HOST);
     assert_string_equal    (cfgTransportPort(config, CFG_CTL), DEFAULT_CTL_PORT);
     assert_null            (cfgTransportPath(config, CFG_CTL));
-    assert_int_equal       (cfgTransportBuf(config, CFG_CTL), CFG_BUFFER_FULLY);
-    assert_int_equal       (cfgTransportType(config, CFG_LOG), CFG_FILE);
+    assert_int_equal       (cfgTransportBuf(config, CFG_CTL), DEFAULT_CTL_BUF);
+    assert_int_equal       (cfgTransportType(config, CFG_LOG), DEFAULT_LOG_TYPE);
     assert_null            (cfgTransportHost(config, CFG_LOG));
     assert_null            (cfgTransportPort(config, CFG_LOG));
-    assert_string_equal    (cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
-    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), CFG_BUFFER_LINE);
+    assert_string_equal    (cfgTransportPath(config, CFG_LOG), DEFAULT_LOG_PATH);
+    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), DEFAULT_LOG_BUF);
     assert_null            (cfgCustomTags(config));
     assert_null            (cfgCustomTagValue(config, "tagname"));
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
@@ -340,7 +340,32 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
              dbgInit(); // reset dbg for the rest of the tests
         } else {
              assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 0);
-             assert_int_equal(cfgEvtFormatSourceEnabled(config, i), 0);
+             // defaults are no longer all the same value.
+             switch (i) {
+             case CFG_SRC_FILE:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_FILE);
+                 break;
+             case CFG_SRC_SYSLOG:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_SYSLOG);
+                 break;
+             case CFG_SRC_CONSOLE:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_CONSOLE);
+                 break;
+             case CFG_SRC_METRIC:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_METRIC);
+                 break;
+             case CFG_SRC_HTTP:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_HTTP);
+                 break;
+             case CFG_SRC_NET:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_NET);
+                 break;
+             case CFG_SRC_FS:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_FS);
+                 break;
+             case CFG_SRC_DNS:
+                 assert_int_equal(cfgEvtFormatSourceEnabled(config, i), DEFAULT_SRC_DNS);
+                 break;             }
         }
     }
 

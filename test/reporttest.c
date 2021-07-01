@@ -10,11 +10,8 @@
 #include "report.h"
 #include "runtimecfg.h"
 #include "state.h"
+#include "com.h"
 #include "test.h"
-
-
-// Normally declared by wrap.c
-rtconfig g_cfg = {0};
 
 #define BUFSIZE 500
 

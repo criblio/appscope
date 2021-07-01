@@ -46,16 +46,14 @@ COPY ./go/influx/* /go/influx/
 COPY ./go/influx/influxdb-selfsigned.key /etc/ssl/.
 COPY ./go/influx/influxdb-selfsigned.crt /etc/ssl/.
 
-ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=true
 ENV SCOPE_EVENT_CONSOLE=true
 ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
 ENV SCOPE_EVENT_DEST=file:///go/events.log
-#ENV SCOPE_METRIC_DEST=udp://localhost:8125
-#ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
-#ENV LD_PRELOAD=/usr/lib/libscope.so
+ENV SCOPE_LOG_LEVEL=warning
+ENV SCOPE_LOG_DEST=file:///go/logs.txt
 
 #ENTRYPOINT ["tail", "-f", "/dev/null"]
 ENTRYPOINT ["/go/test_go.sh"]

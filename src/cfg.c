@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "cfg.h"
 #include "dbg.h"
 
@@ -11,12 +12,23 @@ typedef struct {
     struct {                             // For type = CFG_UDP
         char* host;
         char* port;
+        struct {
+            unsigned enable;
+            unsigned validateserver;
+            char *cacertpath;
+        } tls;
     } net;
     struct {
         char* path;                      // For type CFG_FILE
         cfg_buffer_t buf_policy;
     } file;
 } transport_struct_t;
+
+typedef struct {
+    bool valid;
+    regex_t re;
+    char *filter;
+} header_extract_t;
 
 struct _config_t
 {
@@ -35,10 +47,12 @@ struct _config_t
         unsigned enable;
         cfg_mtc_format_t format;
         unsigned ratelimit;
-        char* valuefilter[CFG_SRC_MAX];
-        char* fieldfilter[CFG_SRC_MAX];
-        char* namefilter[CFG_SRC_MAX];
+        char *valuefilter[CFG_SRC_MAX];
+        char *fieldfilter[CFG_SRC_MAX];
+        char *namefilter[CFG_SRC_MAX];
         unsigned src[CFG_SRC_MAX];
+        size_t numHeaders;
+        header_extract_t **hextract;
     } evt;
 
     struct {
@@ -59,28 +73,8 @@ struct _config_t
     char* commanddir;
     unsigned processstartmsg;
     unsigned enhancefs;
+    bool logstream;
 };
-
-#define DEFAULT_SUMMARY_PERIOD 10
-#define DEFAULT_MTC_TYPE CFG_UDP
-#define DEFAULT_MTC_HOST "127.0.0.1"
-//#define DEFAULT_MTC_PORT DEFAULT_MTC_PORT (defined in scopetypes.h)
-#define DEFAULT_MTC_PATH NULL
-//#define DEFAULT_MTC_BUF CFG_BUFFER_FULLY
-#define DEFAULT_MTC_BUF CFG_BUFFER_LINE
-#define DEFAULT_CTL_TYPE CFG_TCP
-#define DEFAULT_CTL_HOST "127.0.0.1"
-//#define DEFAULT_CTL_PORT DEFAULT_CTL_PORT (defined in scopetypes.h)
-#define DEFAULT_CTL_PATH NULL
-#define DEFAULT_CTL_BUF CFG_BUFFER_FULLY
-#define DEFAULT_LOG_TYPE CFG_FILE
-#define DEFAULT_LOG_HOST NULL
-#define DEFAULT_LOG_PORT NULL
-#define DEFAULT_LOG_BUF CFG_BUFFER_FULLY
-#define DEFAULT_TAGS NULL
-#define DEFAULT_NUM_TAGS 8
-#define DEFAULT_COMMAND_DIR "/tmp"
-
 
 static const char* valueFilterDefault[] = {
     DEFAULT_SRC_FILE_VALUE,
@@ -130,40 +124,45 @@ static cfg_transport_t typeDefault[] = {
     DEFAULT_MTC_TYPE,
     DEFAULT_CTL_TYPE,
     DEFAULT_LOG_TYPE,
+    DEFAULT_LS_TYPE,
 };
 
 static const char* hostDefault[] = {
     DEFAULT_MTC_HOST,
     DEFAULT_CTL_HOST,
     DEFAULT_LOG_HOST,
+    DEFAULT_LS_HOST,
 };
 
 static const char* portDefault[] = {
     DEFAULT_MTC_PORT,
     DEFAULT_CTL_PORT,
     DEFAULT_LOG_PORT,
+    DEFAULT_LS_PORT,
 };
 
 static const char* pathDefault[] = {
     DEFAULT_MTC_PATH,
     DEFAULT_CTL_PATH,
     DEFAULT_LOG_PATH,
+    DEFAULT_LS_PATH,
 };
 
 static cfg_buffer_t bufDefault[] = {
     DEFAULT_MTC_BUF,
     DEFAULT_CTL_BUF,
     DEFAULT_LOG_BUF,
+    DEFAULT_LS_BUF,
 };
 
     
 ///////////////////////////////////
 // Constructors Destructors
 ///////////////////////////////////
-config_t*
+config_t *
 cfgCreateDefault()
 { 
-    config_t* c = calloc(1, sizeof(config_t));
+    config_t *c = calloc(1, sizeof(config_t));
     if (!c) {
         DBG(NULL);
         return NULL;
@@ -180,14 +179,17 @@ cfgCreateDefault()
 
     watch_t src;
     for (src=CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
-        const char* val_def = valueFilterDefault[src];
+        const char *val_def = valueFilterDefault[src];
         c->evt.valuefilter[src] = (val_def) ? strdup(val_def) : NULL;
-        const char* field_def = fieldFilterDefault[src];
+        const char *field_def = fieldFilterDefault[src];
         c->evt.fieldfilter[src] = (field_def) ? strdup(field_def) : NULL;
-        const char* name_def = nameFilterDefault[src];
+        const char *name_def = nameFilterDefault[src];
         c->evt.namefilter[src] = (name_def) ? strdup(name_def) : NULL;
         c->evt.src[src] = srcEnabledDefault[src];
     }
+
+    c->evt.hextract = DEFAULT_SRC_HTTP_HEADER;
+    c->evt.numHeaders = 0;
 
     which_transport_t tp;
     for (tp=CFG_MTC; tp<CFG_WHICH_MAX; tp++) {
@@ -199,6 +201,9 @@ cfgCreateDefault()
         const char* path_def = pathDefault[tp];
         c->transport[tp].file.path = (path_def) ? strdup(path_def) : NULL;
         c->transport[tp].file.buf_policy = bufDefault[tp];
+        c->transport[tp].net.tls.enable = DEFAULT_TLS_ENABLE;
+        c->transport[tp].net.tls.validateserver = DEFAULT_TLS_VALIDATE_SERVER;
+        c->transport[tp].net.tls.cacertpath = (DEFAULT_TLS_CA_CERT) ? strdup(DEFAULT_TLS_CA_CERT) : NULL;
     }
 
     c->log.level = DEFAULT_LOG_LEVEL;
@@ -206,21 +211,22 @@ cfgCreateDefault()
     c->pay.enable = DEFAULT_PAYLOAD_ENABLE;
     c->pay.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
 
-    c->tags = DEFAULT_TAGS;
+    c->tags = DEFAULT_CUSTOM_TAGS;
     c->max_tags = DEFAULT_NUM_TAGS;
 
     c->commanddir = (DEFAULT_COMMAND_DIR) ? strdup(DEFAULT_COMMAND_DIR) : NULL;
     c->processstartmsg = DEFAULT_PROCESS_START_MSG;
     c->enhancefs = DEFAULT_ENHANCE_FS;
 
+    c->logstream = DEFAULT_LOGSTREAM;
     return c;
 }
 
 void
-cfgDestroy(config_t** cfg)
+cfgDestroy(config_t **cfg)
 {
     if (!cfg || !*cfg) return;
-    config_t* c = *cfg;
+    config_t *c = *cfg;
     if (c->mtc.statsd.prefix) free(c->mtc.statsd.prefix);
     if (c->commanddir) free(c->commanddir);
 
@@ -230,6 +236,18 @@ cfgDestroy(config_t** cfg)
         if (c->evt.fieldfilter[src]) free (c->evt.fieldfilter[src]);
         if (c->evt.namefilter[src]) free (c->evt.namefilter[src]);
     }
+
+    int i;
+    for (i = 0; i < c->evt.numHeaders; i++) {
+        if (c->evt.hextract && c->evt.hextract[i]) {
+            c->evt.hextract[i]->valid = FALSE;
+            if (c->evt.hextract[i]->filter) free(c->evt.hextract[i]->filter);
+            regfree(&c->evt.hextract[i]->re);
+            free(c->evt.hextract[i]);
+        }
+    }
+
+    if (c->evt.hextract) free(c->evt.hextract);
 
     which_transport_t t;
     for (t=CFG_MTC; t<CFG_WHICH_MAX; t++) {
@@ -359,10 +377,44 @@ cfgEvtFormatNameFilter(config_t* cfg, watch_t src)
     return nameFilterDefault[CFG_SRC_FILE];
 }
 
-unsigned
-cfgEvtFormatSourceEnabled(config_t* cfg, watch_t src)
+size_t
+cfgEvtFormatNumHeaders(config_t *cfg)
 {
-    if (src >= 0 && src < CFG_SRC_MAX) {
+    if (cfg) return cfg->evt.numHeaders;
+
+    return 0;
+}
+
+const char *
+cfgEvtFormatHeader(config_t *cfg, int num)
+{
+    if (cfg && (num < cfg->evt.numHeaders)) {
+        if (cfg->evt.hextract && cfg->evt.hextract[num] &&
+            (cfg->evt.hextract[num]->valid == TRUE)) {
+            return cfg->evt.hextract[num]->filter;
+        }
+    }
+
+    return DEFAULT_SRC_HTTP_HEADER;
+}
+
+regex_t *
+cfgEvtFormatHeaderRe(config_t *cfg, int num)
+{
+    if (cfg && (num < cfg->evt.numHeaders)) {
+        if (cfg->evt.hextract && cfg->evt.hextract[num] &&
+            (cfg->evt.hextract[num]->valid == TRUE)) {
+            return &cfg->evt.hextract[num]->re;
+        }
+    }
+
+    return NULL;
+}
+
+unsigned
+cfgEvtFormatSourceEnabled(config_t *cfg, watch_t src)
+{
+    if ((src >= 0) && (src < CFG_SRC_MAX)) {
         if (cfg) return cfg->evt.src[src];
         return srcEnabledDefault[src];
     }
@@ -437,10 +489,43 @@ cfgTransportBuf(config_t* cfg, which_transport_t t)
     return bufDefault[CFG_LOG];
 }
 
+unsigned
+cfgTransportTlsEnable(config_t *cfg, which_transport_t t)
+{
+    if (t >= 0 && t < CFG_WHICH_MAX) {
+        if (cfg) return cfg->transport[t].net.tls.enable;
+        return DEFAULT_TLS_ENABLE;
+    }
+    DBG("%d", t);
+    return DEFAULT_TLS_ENABLE;
+}
+
+unsigned
+cfgTransportTlsValidateServer(config_t *cfg, which_transport_t t)
+{
+    if (t >= 0 && t < CFG_WHICH_MAX) {
+        if (cfg) return cfg->transport[t].net.tls.validateserver;
+        return DEFAULT_TLS_VALIDATE_SERVER;
+    }
+    DBG("%d", t);
+    return DEFAULT_TLS_VALIDATE_SERVER;
+}
+
+const char *
+cfgTransportTlsCACertPath(config_t *cfg, which_transport_t t)
+{
+    if (t >= 0 && t < CFG_WHICH_MAX) {
+        if (cfg) return cfg->transport[t].net.tls.cacertpath;
+        return DEFAULT_TLS_CA_CERT;
+    }
+    DBG("%d", t);
+    return DEFAULT_TLS_CA_CERT;
+}
+
 custom_tag_t**
 cfgCustomTags(config_t* cfg)
 {
-    return (cfg) ? cfg->tags : DEFAULT_TAGS;
+    return (cfg) ? cfg->tags : DEFAULT_CUSTOM_TAGS;
 }
 
 static custom_tag_t*
@@ -487,6 +572,12 @@ cfgPayDir(config_t *cfg)
     return (cfg) ? cfg->pay.dir : DEFAULT_PAYLOAD_DIR;
 }
 
+cfg_logstream_t
+cfgLogStream(config_t *cfg)
+{
+    return (cfg) ? cfg->logstream : DEFAULT_LOGSTREAM;
+}
+
 ///////////////////////////////////
 // Setters 
 ///////////////////////////////////
@@ -509,7 +600,7 @@ cfgMtcStatsDPrefixSet(config_t* cfg, const char* prefix)
 {
     if (!cfg) return;
     if (cfg->mtc.statsd.prefix) free(cfg->mtc.statsd.prefix);
-    if (!prefix || prefix[0] == '\0') {
+    if (!prefix || (prefix[0] == '\0')) {
         cfg->mtc.statsd.prefix = strdup(DEFAULT_STATSD_PREFIX);
         return;
     }
@@ -641,6 +732,36 @@ cfgEvtFormatNameFilterSet(config_t* cfg, watch_t src, const char* filter)
 }
 
 void
+cfgEvtFormatHeaderSet(config_t *cfg, const char *filter)
+{
+    if (!cfg || !filter) return;
+
+    size_t headnum = cfg->evt.numHeaders + 1;
+
+    header_extract_t **tempex = realloc(cfg->evt.hextract, headnum * sizeof(header_extract_t *));
+    if (!tempex) {
+        DBG(NULL);
+        return;
+    }
+
+    cfg->evt.hextract = tempex;
+
+    header_extract_t *hextract = calloc(1, sizeof(header_extract_t));
+    if (hextract) {
+        if (!regcomp(&hextract->re, filter, REG_EXTENDED | REG_NOSUB)) {
+            hextract->filter = strdup(filter);
+            hextract->valid = TRUE;
+        } else {
+            hextract->valid = FALSE;
+            hextract->filter = NULL;
+        }
+    }
+
+    cfg->evt.hextract[cfg->evt.numHeaders] = hextract;
+    cfg->evt.numHeaders = headnum;
+}
+
+void
 cfgEvtFormatSourceEnabledSet(config_t* cfg, watch_t src, unsigned val)
 {
     if (!cfg || src < 0 || src >= CFG_SRC_MAX || val > 1) return;
@@ -686,6 +807,32 @@ cfgTransportBufSet(config_t* cfg, which_transport_t t, cfg_buffer_t buf)
     if (!cfg || t < 0 || t >= CFG_WHICH_MAX) return;
     if (buf < CFG_BUFFER_FULLY || buf > CFG_BUFFER_LINE) return;
     cfg->transport[t].file.buf_policy = buf;
+}
+
+void
+cfgTransportTlsEnableSet(config_t *cfg, which_transport_t t, unsigned val)
+{
+    if (!cfg || t < 0 || t >= CFG_WHICH_MAX || val > 1) return;
+    cfg->transport[t].net.tls.enable = val;
+}
+
+void
+cfgTransportTlsValidateServerSet(config_t *cfg, which_transport_t t, unsigned val)
+{
+    if (!cfg || t < 0 || t >= CFG_WHICH_MAX || val > 1) return;
+    cfg->transport[t].net.tls.validateserver = val;
+}
+
+void
+cfgTransportTlsCACertPathSet(config_t *cfg, which_transport_t t, const char *path)
+{
+    if (!cfg || t < 0 || t >= CFG_WHICH_MAX) return;
+    if (cfg->transport[t].net.tls.cacertpath) free(cfg->transport[t].net.tls.cacertpath);
+    if (!path || (path[0] == '\0')) {
+        cfg->transport[t].net.tls.cacertpath = NULL;
+        return;
+    }
+    cfg->transport[t].net.tls.cacertpath = strdup(path);
 }
 
 void
@@ -778,3 +925,9 @@ cfgPayDirSet(config_t *cfg, const char *dir)
     cfg->pay.dir = strdup(dir);
 }
 
+void
+cfgLogStreamSet(config_t *cfg, cfg_logstream_t value)
+{
+    if (!cfg || value >= CFG_LOGSTREAM_MAX) return;
+    cfg->logstream = value;
+}

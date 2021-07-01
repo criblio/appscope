@@ -1,6 +1,10 @@
 #ifndef _DNS_H_
 #define _DNS_H_
 
+#include <arpa/nameser.h>
+#include <resolv.h>
+#include <arpa/inet.h>
+
 #define DNS_SERVICE 0x7f000035 // 127.0.0.53
 #define DNS_PORT 53
 #define OPCODE_QUERY 0
@@ -75,4 +79,10 @@ typedef struct dns_query_t {
     unsigned char name[];
 } dns_query;
 
+#ifdef __LINUX__
+struct response {
+    HEADER hdr;
+    u_char buf[NS_PACKETSZ];      /* defined in arpa/nameser.h */
+};
+#endif // __LINUX__
 #endif // _DNS_H_

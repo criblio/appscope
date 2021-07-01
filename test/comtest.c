@@ -6,8 +6,6 @@
 #include "test.h"
 #include "runtimecfg.h"
 
-rtconfig g_cfg = {0};
-
 static void
 cmdPostInfoMsgDoesNotCrash(void** state)
 {
@@ -84,13 +82,13 @@ msgStartHasExpectedSubNodes(void** state)
     config_t *cfg = cfgCreateDefault();
     cJSON *json;
 
-    json = msgStart(NULL, NULL);
+    json = msgStart(NULL, NULL, CFG_CTL);
     assert_null(json);
-    json = msgStart(NULL, cfg);
+    json = msgStart(NULL, cfg, CFG_CTL);
     assert_null(json);
-    json = msgStart(&proc, NULL);
+    json = msgStart(&proc, NULL, CFG_CTL);
     assert_null(json);
-    json = msgStart(&proc, cfg);
+    json = msgStart(&proc, cfg, CFG_CTL);
     assert_non_null(json);
 
     // Make sure there is a "format" field, with value "ndjson"

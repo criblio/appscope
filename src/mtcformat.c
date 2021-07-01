@@ -247,18 +247,33 @@ mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
     return end_start;
 }
 
+static void
+addCustomJsonFields(mtc_fmt_t *fmt, cJSON *json)
+{
+    custom_tag_t **tags = mtcFormatCustomTags(fmt);
+    if (!fmt || !json || !tags) return;
+
+    custom_tag_t *tag;
+    int i = 0;
+    while ((tag = tags[i++])) {
+        cJSON_AddStringToObject(json, tag->name, tag->value);
+    }
+}
+
 char *
 mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
 {
     if (!fmt || !evt ) return NULL;
 
     char *msg = NULL;
+    cJSON *json = NULL;
+    cJSON *json_root = NULL;
 
     if (fmt->format == CFG_FMT_STATSD) {
         msg = mtcFormatStatsDString(fmt, evt, fieldFilter);
     } else if (fmt->format == CFG_FMT_NDJSON) {
-        cJSON *json = fmtMetricJson(evt, NULL, CFG_SRC_METRIC);
-        if (!json) return NULL;
+        if (!(json = fmtMetricJson(evt, NULL, CFG_SRC_METRIC))) goto out;
+        addCustomJsonFields(fmt, json);
 
         // Request is for this json, plus a _time field
         struct timeb tb;
@@ -266,7 +281,14 @@ mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
         double timestamp = tb.time + (double)tb.millitm/1000;
         cJSON_AddNumberToObjLN(json, "_time", timestamp);
 
-        if ((msg = cJSON_PrintUnformatted(json))) {
+        // add envelope for metric events 
+        // https://github.com/criblio/appscope/issues/198
+        
+        if (!(json_root = cJSON_CreateObject())) goto out;
+        if (!cJSON_AddStringToObjLN(json_root, "type", "metric")) goto out;
+        cJSON_AddItemToObjectCS(json_root, "body", json);
+
+        if ((msg = cJSON_PrintUnformatted(json_root))) {
             int strsize = strlen(msg);
             char *temp = realloc(msg, strsize+2); // room for "\n\0"
             if (!temp) {
@@ -280,9 +302,14 @@ mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
                 msg[strsize+1] = '\0';
             }
         }
-        cJSON_Delete(json);
     }
 
+out:
+    if (json_root) {
+        cJSON_Delete(json_root);
+    } else if (json) {
+        cJSON_Delete(json);
+    }
     return msg;
 }
 

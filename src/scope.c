@@ -20,172 +20,18 @@
 #include <sys/utsname.h>
 #include <limits.h>
 #include <errno.h>
+#include <getopt.h>
 
 #include "fn.h"
 #include "dbg.h"
 #include "scopeelf.h"
 #include "scopetypes.h"
-#include "os.h"
 #include "utils.h"
+#include "inject.h"
 
-#define DEVMODE 0
-#define __NR_memfd_create   319
-#define _MFD_CLOEXEC		0x0001U
-#define SHM_NAME            "libscope"
-#define PARENT_PROC_NAME "start_scope"
 #define GO_ENV_VAR "GODEBUG"
 #define GO_ENV_SERVER_VALUE "http2server"
 #define GO_ENV_CLIENT_VALUE "http2client"
-
-extern unsigned char _binary___lib_linux_libscope_so_start;
-extern unsigned char _binary___lib_linux_libscope_so_end;
-
-typedef struct {
-    char *path;
-    char *shm_name;
-    int fd;
-    int use_memfd;
-} libscope_info_t;
-
-// Wrapper to call memfd_create syscall
-static inline int _memfd_create(const char *name, unsigned int flags) {
-	return syscall(__NR_memfd_create, name, flags);
-}
-
-static void
-print_usage(char *prog, libscope_info_t *info, int argc, char **argv) {
-    void (*__scope_main)(void);
-    void *handle = NULL;
-
-    __scope_main = dlsym(RTLD_NEXT, "__scope_main");
-    if (!__scope_main) {
-        if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
-            fprintf(stderr, "handle error: %s\n", dlerror());
-            exit(EXIT_FAILURE);
-        }
-
-        __scope_main = dlsym(handle, "__scope_main");
-        if (!__scope_main) {
-            fprintf(stderr, "symbol error: %s from %s\n", dlerror(), info->path);
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    printf("usage: %s command [args]\n", prog);
-    if (argc == 2) {
-        strncpy(argv[1], "all", strlen(argv[1]));
-    }
-
-    __scope_main();
-}
-
-/**
- * Checks if kernel version is >= 3.17
- */
-static int
-check_kernel_version(void)
-{
-    struct utsname buffer;
-    char *token;
-    char *separator = ".";
-    int val;
-
-    if (uname(&buffer)) {
-        return 0;
-    }
-    token = strtok(buffer.release, separator);
-    val = atoi(token);
-    if (val < 3) {
-        return 0;
-    } else if (val > 3){
-        return 1;
-    }
-
-    token = strtok(NULL, separator);
-    val = atoi(token);
-    return (val < 17) ? 0 : 1;
-}
-
-static void
-release_libscope(libscope_info_t **info_ptr) {
-    if (!info_ptr || !*info_ptr) return;
-
-    libscope_info_t *info = *info_ptr;
-
-    if (info->fd != -1) close(info->fd);
-    if (info->shm_name) {
-        if (info->fd != -1) shm_unlink(info->shm_name);
-        free(info->shm_name);
-    }
-    if (info->path) free(info->path);
-    free(info);
-    *info_ptr = NULL;
-}
-
-static libscope_info_t *
-setup_libscope()
-{
-    libscope_info_t *info = NULL;
-    int everything_successful = FALSE;
-
-    if (!(info = calloc(1, sizeof(libscope_info_t)))) {
-        perror("setup_libscope:calloc");
-        goto err;
-    }
-
-    info->fd = -1;
-    info->use_memfd = check_kernel_version();
-    
-    if (info->use_memfd) {
-        info->fd = _memfd_create(SHM_NAME, _MFD_CLOEXEC);
-    } else {
-        if (asprintf(&info->shm_name, "%s%i", SHM_NAME, getpid()) == -1) {
-            perror("setup_libscope:shm_name");
-            info->shm_name = NULL; // failure leaves info->shm_name undefined
-            goto err;
-        }
-        info->fd = shm_open(info->shm_name, O_RDWR | O_CREAT, S_IRWXU);
-    }
-    if (info->fd == -1) {
-        perror(info->use_memfd ? "setup_libscope:memfd_create" : "setup_libscope:shm_open");
-        goto err;
-    }
-    
-    size_t libsize = (size_t) (&_binary___lib_linux_libscope_so_end - &_binary___lib_linux_libscope_so_start);
-    if (write(info->fd, &_binary___lib_linux_libscope_so_start, libsize) != libsize) {
-        perror("setup_libscope:write");
-        goto err;
-    }
-
-    int rv;
-    if (info->use_memfd) {
-        rv = asprintf(&info->path, "/proc/%i/fd/%i", getpid(), info->fd);
-    } else {
-        rv = asprintf(&info->path, "/dev/shm/%s", info->shm_name);
-    }
-    if (rv == -1) {
-        perror("setup_libscope:path");
-        info->path = NULL; // failure leaves info->path undefined
-        goto err;
-    }
-
-/*
- * DEVMODE is here only to help with gdb. The debugger has
- * a problem reading symbols from a /proc pathname.
- * This is expected to be enabled only by developers and
- * only when using the debugger.
- */
-#if DEVMODE == 1
-    asprintf(&info->path, "./lib/linux/libscope.so");
-    printf("LD_PRELOAD=%s\n", info->path);
-#endif
-
-    everything_successful = TRUE;
-
-err:
-    if (!everything_successful) release_libscope(&info);
-    return info;
-}
 
 // If possible, we want to set GODEBUG=http2server=0,http2client=0
 // This tells go not to upgrade to http2, which allows
@@ -195,6 +41,8 @@ err:
 static void
 setGoHttpEnvVariable(void)
 {
+    if (checkEnv("SCOPE_GO_HTTP1", "false") == TRUE) return;
+
     char *cur_val = getenv(GO_ENV_VAR);
 
     // If GODEBUG isn't set, try to set it to http2server=0,http2client=0
@@ -235,44 +83,132 @@ setGoHttpEnvVariable(void)
     }
 }
 
+static void
+showUsage(char *prog)
+{
+    printf(
+      "\n"
+      "Cribl AppScope Dynamic Loader %s\n"
+      "\n"
+      "AppScope is a general-purpose observable applciation telemetry system.\n"
+      "\n"
+      "usage: %s [OPTIONS] --lib LIBRARY [--] EXECUTABLE [ARGS...]\n"
+      "       %s [OPTIONS] --attach PID\n"
+      "\n"
+      "options:\n"
+      "  -u, -h, --usage, --help  display this info\n"
+      "  -a, --attach PID         attach to the specified process ID\n"
+      "\n"
+      "Unless you are an AppScope developer, you are likely in the wrong place.\n"
+      "See `scope` or `ldscope` instead.\n"
+      "\n"
+      "User docs are at https://appscope.dev/docs/. The project is hosted at\n"
+      "https://github.com/criblio/appscope. Please direct feature requests and\n"
+      "defect reports there.\n"
+      "\n",
+      SCOPE_VER, prog, prog
+    );
+}
+
+// long aliases for short options
+static struct option options[] = {
+    {"help",    no_argument,       0, 'h'},
+    {"usage",   no_argument,       0, 'u'},
+    {"attach",  required_argument, 0, 'a'},
+    {0, 0, 0, 0}
+};
+
 int
 main(int argc, char **argv, char **env)
 {
+    // process command line
+    char *attachArg = 0;
+    for (;;) {
+        int index = 0;
+        int opt = getopt_long(argc, argv, "+:uha:", options, &index);
+        if (opt == -1) {
+            break;
+        }
+        switch (opt) {
+            case 'u':
+            case 'h':
+                showUsage(basename(argv[0]));
+                return EXIT_SUCCESS;
+            case 'a':
+                attachArg = optarg;
+                break;
+            case ':':
+                // options missing their value end up here
+                switch (optopt) {
+                    default:
+                        fprintf(stderr, "error: missing value for -%c option\n", optopt);
+                        showUsage(basename(argv[0]));
+                        return EXIT_FAILURE;
+                }
+                break;
+            case '?':
+            default:
+                fprintf(stderr, "error: invalid option: -%c\n", optopt);
+                showUsage(basename(argv[0]));
+                return EXIT_FAILURE;
+        }
+    }
+
+    // either --attach or an executable is required
+    if (!attachArg && optind >= argc) {
+        fprintf(stderr, "error: missing --attach or EXECUTABLE argument\n");
+        showUsage(basename(argv[0]));
+        return EXIT_FAILURE;
+    }
+
+    // use --attach, ignore executable and args
+    if (attachArg && optind < argc) {
+        fprintf(stderr, "warning: ignoring EXECUTABLE argument with --attach option\n");
+    }
+
+    // SCOPE_LIB_PATH environment variable is required
+    char* scopeLibPath = getenv("SCOPE_LIB_PATH");
+    if (!scopeLibPath) {
+        fprintf(stderr, "error: SCOPE_LIB_PATH must be set to point to libscope.so\n");
+        return EXIT_FAILURE;
+    }
+    if (access(scopeLibPath, R_OK|X_OK)) {
+        fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", scopeLibPath);
+        return EXIT_FAILURE;
+    }
+
     elf_buf_t *ebuf;
     int (*sys_exec)(elf_buf_t *, const char *, int, char **, char **);
     pid_t pid;
     void *handle = NULL;
-    libscope_info_t *info;
 
     // Use dlsym to get addresses for everything in g_fn
     initFn();
     setPidEnv(getpid());
 
-    info = setup_libscope();
-    if (!info) {
-        fprintf(stderr, "%s:%d ERROR: unable to set up libscope\n", __FUNCTION__, __LINE__);
-        exit(EXIT_FAILURE);
+    if (attachArg) {
+        int pid = atoi(attachArg);
+        if (pid < 1) {
+            fprintf(stderr, "error: invalid PID for --attach\n");
+            return EXIT_FAILURE;
+        }
+
+        //printf("info: attaching to process %d\n", pid);
+        int ret = injectScope(pid, scopeLibPath);
+
+        // remove the config that `ldscope`
+        char path[PATH_MAX];
+        snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
+        shm_unlink(path);
+
+        // done
+        return ret;
     }
 
-    //check command line arguments 
-    char *scope_cmd = argv[0];
-    if ((argc < 2) || ((argc == 2) && (strncmp(argv[1], "--help", 6) == 0))) {
-        print_usage(scope_cmd, info, argc, argv);
-        exit(EXIT_FAILURE);
-    }
-    char *inferior_command = getpath(argv[1]);
+    char *inferior_command = getpath(argv[optind]);
     if (!inferior_command) {
-        fprintf(stderr,"%s could not find or execute command `%s`.  Exiting.\n", scope_cmd, argv[1]);
+        fprintf(stderr,"%s could not find or execute command `%s`.  Exiting.\n", argv[0], argv[optind]);
         exit(EXIT_FAILURE);
-    }
-    argv[1] = inferior_command; // update args with resolved inferior_command
-
-    // before processing, try to set SCOPE_EXEC_PATH for execve
-    char *sep;
-    if (osGetExePath(&sep) == 0) {
-        // doesn't overwrite an existing env var if already set
-        setenv("SCOPE_EXEC_PATH", sep, 0);
-        free(sep);
     }
 
     ebuf = getElf(inferior_command);
@@ -296,7 +232,7 @@ main(int argc, char **argv, char **env)
         // Dynamic executable path
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
-        if (setenv("LD_PRELOAD", info->path, 0) == -1) {
+        if (setenv("LD_PRELOAD", scopeLibPath, 0) == -1) {
             perror("setenv");
             goto err;
         }
@@ -317,11 +253,10 @@ main(int argc, char **argv, char **env)
                 ret = waitpid(pid, &status, 0);
             } while (ret == -1 && errno == EINTR);
 
-            release_libscope(&info);
             if (WIFEXITED(status)) exit(WEXITSTATUS(status));
             exit(EXIT_FAILURE);
         } else {
-            execve(inferior_command, &argv[1], environ);
+            execve(inferior_command, &argv[optind], environ);
             perror("execve");
             goto err;
         }
@@ -340,24 +275,27 @@ main(int argc, char **argv, char **env)
 
     program_invocation_short_name = basename(argv[1]);
 
-    if ((handle = dlopen(info->path, RTLD_LAZY)) == NULL) {
-        fprintf(stderr, "%s\n", dlerror());
+    if (!is_go(ebuf->buf)) {
+        // We're getting here with upx-encoded binaries
+        // and any other static native apps...
+        // Start here when we support more static binaries
+        // than go.
+        execve(argv[optind], &argv[optind], environ);
+    }
+
+    if ((handle = dlopen(scopeLibPath, RTLD_LAZY)) == NULL) {
         goto err;
     }
 
     sys_exec = dlsym(handle, "sys_exec");
     if (!sys_exec) {
-        fprintf(stderr, "%s\n", dlerror());
         goto err;
     }
 
-    release_libscope(&info);
-
-    sys_exec(ebuf, inferior_command, argc, argv, env);
+    sys_exec(ebuf, inferior_command, argc-optind, &argv[optind], env);
 
     return 0;
 err:
-    release_libscope(&info);
     if (ebuf) free(ebuf);
     exit(EXIT_FAILURE);
 }

@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -6,8 +7,9 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include "cfgutils.h"
 
+#include "fn.h"
+#include "cfgutils.h"
 #include "test.h"
 
 #define MAX_PATH 1024
@@ -1086,21 +1088,22 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), DEFAULT_SRC_NET);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), DEFAULT_SRC_FS);
     assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), DEFAULT_SRC_DNS);
-    assert_int_equal       (cfgTransportType(config, CFG_MTC), CFG_UDP);
-    assert_string_equal    (cfgTransportHost(config, CFG_MTC), "127.0.0.1");
-    assert_string_equal    (cfgTransportPort(config, CFG_MTC), "8125");
+    assert_null            (cfgEvtFormatHeader(config, 0));
+    assert_int_equal       (cfgTransportType(config, CFG_MTC), DEFAULT_MTC_TYPE);
+    assert_string_equal    (cfgTransportHost(config, CFG_MTC), DEFAULT_MTC_HOST);
+    assert_string_equal    (cfgTransportPort(config, CFG_MTC), DEFAULT_MTC_PORT);
     assert_null            (cfgTransportPath(config, CFG_MTC));
-    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), CFG_BUFFER_LINE);
-    assert_int_equal       (cfgTransportType(config, CFG_CTL), CFG_TCP);
-    assert_string_equal    (cfgTransportHost(config, CFG_CTL), "127.0.0.1");
+    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), DEFAULT_MTC_BUF);
+    assert_int_equal       (cfgTransportType(config, CFG_CTL), DEFAULT_CTL_TYPE);
+    assert_string_equal    (cfgTransportHost(config, CFG_CTL), DEFAULT_CTL_HOST);
     assert_string_equal    (cfgTransportPort(config, CFG_CTL), DEFAULT_CTL_PORT);
     assert_null            (cfgTransportPath(config, CFG_CTL));
-    assert_int_equal       (cfgTransportBuf(config, CFG_CTL), CFG_BUFFER_FULLY);
-    assert_int_equal       (cfgTransportType(config, CFG_LOG), CFG_FILE);
+    assert_int_equal       (cfgTransportBuf(config, CFG_CTL), DEFAULT_CTL_BUF);
+    assert_int_equal       (cfgTransportType(config, CFG_LOG), DEFAULT_LOG_TYPE);
     assert_null            (cfgTransportHost(config, CFG_LOG));
     assert_null            (cfgTransportPort(config, CFG_LOG));
-    assert_string_equal    (cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
-    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), CFG_BUFFER_LINE);
+    assert_string_equal    (cfgTransportPath(config, CFG_LOG), DEFAULT_LOG_PATH);
+    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), DEFAULT_LOG_BUF);
     assert_null            (cfgCustomTags(config));
     assert_null            (cfgCustomTagValue(config, "tagname"));
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
@@ -1346,7 +1349,7 @@ const char* jsonText =
     "      {'type':'console'},\n"
     "      {'type':'syslog'},\n"
     "      {'type':'metric'},\n"
-    "      {'type':'http'},\n"
+    "      {'type':'http', 'headers':['X-blah.*','My-goodness']},\n"
     "      {'type':'net'},\n"
     "      {'type':'fs'},\n"
     "      {'type':'dns'}\n"
@@ -1392,6 +1395,8 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), 1);
+    assert_string_equal(cfgEvtFormatHeader(config, 0), "X-blah.*");
+    assert_string_equal(cfgEvtFormatHeader(config, 1), "My-goodness");
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), 1);
@@ -1875,6 +1880,7 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
+    initFn();
 
     source_state_t log = {"SCOPE_EVENT_LOGFILE", CFG_SRC_FILE, DEFAULT_SRC_FILE};
     source_state_t con = {"SCOPE_EVENT_CONSOLE", CFG_SRC_CONSOLE, DEFAULT_SRC_CONSOLE};

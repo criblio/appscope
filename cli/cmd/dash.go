@@ -73,7 +73,7 @@ func readMetrics(workDir string, w *widgets) {
 
 	for m := range in {
 		// Every 10 seconds, flush current values, setting 0 for those values which are not present
-		if m.Time.Sub(lastT) > time.Duration(10*time.Second) {
+		if m.Time.Sub(lastT) > 10*time.Second {
 			mnames := []string{"proc.cpu_perc",
 				"proc.mem",
 				"proc.fd",
@@ -286,7 +286,7 @@ func runDashboard(ctx context.Context, cancel context.CancelFunc, w *widgets) {
 	c, err := container.New(t,
 		container.ID(rootID),
 		container.Border(linestyle.Light),
-		container.BorderTitle("AppScope 0.5"))
+		container.BorderTitle("AppScope "+internal.GetVersion()))
 	if err != nil {
 		panic(err)
 	}
@@ -459,13 +459,13 @@ func (w widgets) newGrid(ctx context.Context) ([]container.Option, error) {
 
 func writeSingleValue(s *segmentdisplay.SegmentDisplay, val interface{}) {
 	var chunk *segmentdisplay.TextChunk
-	switch val.(type) {
+	switch res := val.(type) {
 	case int:
-		chunk = segmentdisplay.NewChunk(fmt.Sprintf("%d", val))
+		chunk = segmentdisplay.NewChunk(fmt.Sprintf("%d", res))
 	case float64:
-		chunk = segmentdisplay.NewChunk(fmt.Sprintf("%.0f", val))
+		chunk = segmentdisplay.NewChunk(fmt.Sprintf("%.0f", res))
 	case string:
-		chunk = segmentdisplay.NewChunk(val.(string))
+		chunk = segmentdisplay.NewChunk(res)
 	}
 	if err := s.Write([]*segmentdisplay.TextChunk{chunk}); err != nil {
 		panic(err)

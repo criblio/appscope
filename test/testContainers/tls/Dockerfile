@@ -35,7 +35,7 @@ RUN cd /opt/test/curltls && ./buildconf
 RUN cd /opt/test/curltls && ./configure --with-gnutls --without-ssl
 RUN cd /opt/test/curltls && make
 
-RUN /opt/test/src/curl https://sh.rustup.rs -sSf | sh -s -- -y
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 COPY ./tls/rust/http_test/target/debug/http_test /opt/test-runner/bin/.
 
 RUN rm -f /opt/test/curl-7.69.1.tar.gz

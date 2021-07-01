@@ -33,7 +33,7 @@ This pre-release addresses the following issues:
  
 ## AppScope 0.6
 
-2021-03-16 - Maintenance Pre-Release
+2021-04-01 - Maintenance Pre-Release
 
 This pre-release addresses the following issues:
 

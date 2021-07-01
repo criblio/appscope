@@ -5,35 +5,36 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
 #include "dbg.h"
 #include "scopetypes.h"
+#include "os.h"
+#include "fn.h"
 #include "transport.h"
+
+// Yuck.  Avoids naming conflict between our src/wrap.c and libssl.a
+#define SSL_read SCOPE_SSL_read
+#define SSL_write SCOPE_SSL_write
+#include "openssl/ssl.h"
+#include "openssl/err.h"
+#undef SSL_read
+#undef SSL_write
 
 struct _transport_t
 {
     cfg_transport_t type;
-    ssize_t (*send)(int, const void *, size_t, int);
-    int (*open)(const char *, int, ...);
-    int (*dup2)(int, int);
-    int (*close)(int);
-    int (*fcntl)(int, int, ...);
-    size_t (*fwrite)(const void *, size_t, size_t, FILE *);
-    int (*socket)(int, int, int);
-    int (*connect)(int, const struct sockaddr *, socklen_t);
     int (*getaddrinfo)(const char *, const char *,
                        const struct addrinfo *,
                        struct addrinfo **);
     int (*origGetaddrinfo)(const char *, const char *,
                            const struct addrinfo *,
                            struct addrinfo **);
-    int (*fclose)(FILE*);
-    FILE *(*fdopen)(int, const char *);
-    int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
     union {
         struct {
             int sock;
@@ -41,6 +42,20 @@ struct _transport_t
             char *host;
             char *port;
             struct sockaddr_storage gai_addr;
+            struct {
+                // Configuration
+                unsigned enable;
+                unsigned validateserver;
+                char *cacertpath;
+                // Operational params
+                SSL_CTX *ctx;
+                SSL *ssl;
+            } tls;
+            struct {
+                int entries;
+                struct addrinfo *next;
+                struct addrinfo *list;
+            } addr;
         } net;
         struct {
             char *path;
@@ -57,6 +72,31 @@ struct _transport_t
 // node.js processes.  See transportReconnect() below for details.
 static struct addrinfo *g_cached_addr = NULL;
 
+// This mutex avoids a race condition between:
+//    1) using the tls subsystem and
+//    2) destroying the tls subsystem
+// If a deadlock is ever seen, consider changing the initializer to
+//    PTHREAD_RECURSIVE_MUTEX_INITIALIZER -or-
+//    PTHREAD_ERRORCHECK_MUTEX_INITIALIZER
+static pthread_mutex_t g_tls_lock = PTHREAD_MUTEX_INITIALIZER;
+static int g_tls_calls_are_safe = TRUE;  // until handle_tls_destroy() is called
+
+static inline void
+enterCriticalSection(void)
+{
+    if (pthread_mutex_lock(&g_tls_lock)) {
+        DBG(NULL);
+    }
+}
+
+static inline void
+exitCriticalSection(void)
+{
+    if (pthread_mutex_unlock(&g_tls_lock)) {
+        DBG(NULL);
+    }
+}
+
 static transport_t*
 newTransport()
 {
@@ -68,28 +108,24 @@ newTransport()
         return NULL;
     }
 
-    if ((t->send = dlsym(RTLD_NEXT, "send")) == NULL) goto out;
-    if ((t->open = dlsym(RTLD_NEXT, "open")) == NULL) goto out;
-    if ((t->dup2 = dlsym(RTLD_NEXT, "dup2")) == NULL) goto out;
-    if ((t->close = dlsym(RTLD_NEXT, "close")) == NULL) goto out;
-    if ((t->fcntl = dlsym(RTLD_NEXT, "fcntl")) == NULL) goto out;
-    if ((t->fwrite = dlsym(RTLD_NEXT, "fwrite")) == NULL) goto out;
-    if ((t->socket = dlsym(RTLD_NEXT, "socket")) == NULL) goto out;
-    if ((t->connect = dlsym(RTLD_NEXT, "connect")) == NULL) goto out;
-    if ((t->getaddrinfo = dlsym(RTLD_NEXT, "getaddrinfo")) == NULL) goto out;
+    // been inconsistent as to when we check for func pointers.
+    // do it here early on and we're good.
+    if (!g_fn.send || !g_fn.open || !g_fn.dup2 || !g_fn.close ||
+        !g_fn.fcntl || !g_fn.fwrite || !g_fn.socket || !g_fn.access ||
+        !g_fn.connect || !g_fn.getaddrinfo || !g_fn.fclose ||
+        !g_fn.select) goto out;
+
+    t->getaddrinfo = g_fn.getaddrinfo;
     t->origGetaddrinfo = t->getaddrinfo;  // store a copy
-    if ((t->fclose = dlsym(RTLD_NEXT, "fclose")) == NULL) goto out;
-    if ((t->fdopen = dlsym(RTLD_NEXT, "fdopen")) == NULL) goto out;
-    if ((t->select = dlsym(RTLD_NEXT, "select")) == NULL) goto out;
     return t;
 
   out:
     DBG("send=%p open=%p dup2=%p close=%p "
-        "fcntl=%p fwrite=%p socket=%p connect=%p "
-        "getaddrinfo=%p fclose=%p fdopen=%p select=%p",
-        t->send, t->open, t->dup2, t->close,
-        t->fcntl, t->fwrite, t->socket, t->connect,
-        t->getaddrinfo, t->fclose, t->fdopen, t->select);
+        "fcntl=%p fwrite=%p socket=%p access=%p connect=%p "
+        "getaddrinfo=%p fclose=%p select=%p",
+        g_fn.send, g_fn.open, g_fn.dup2, g_fn.close,
+        g_fn.fcntl, g_fn.fwrite, g_fn.socket, g_fn.access, g_fn.connect,
+        g_fn.getaddrinfo, g_fn.fclose, g_fn.select);
     free(t);
     return NULL;
 }
@@ -107,26 +143,27 @@ newTransport()
 static int
 placeDescriptor(int fd, transport_t *t)
 {
-    if (!t || !t->fcntl || !t->dup2 || !t->close) return -1;
-
     // next_fd_to_try avoids reusing file descriptors.
     // Without this, we've had problems where the buffered stream for
     // g_log has it's fd closed and reopened by another transport which
     // causes the mis-routing of data.
     static int next_fd_to_try = DEFAULT_FD;
+    if (next_fd_to_try < DEFAULT_MIN_FD) {
+        next_fd_to_try = DEFAULT_FD;
+    }
 
     int i, dupfd;
 
     for (i = next_fd_to_try; i >= DEFAULT_MIN_FD; i--) {
-        if ((t->fcntl(i, F_GETFD) == -1) && (errno == EBADF)) {
+        if ((g_fn.fcntl(i, F_GETFD) == -1) && (errno == EBADF)) {
 
             // This fd is available, try to dup it
-            if ((dupfd = t->dup2(fd, i)) == -1) continue;
-            t->close(fd);
+            if ((dupfd = g_fn.dup2(fd, i)) == -1) continue;
+            g_fn.close(fd);
 
             // Set close on exec. (dup2 does not preserve FD_CLOEXEC)
-            int flags = t->fcntl(dupfd, F_GETFD, 0);
-            if (t->fcntl(dupfd, F_SETFD, flags | FD_CLOEXEC) == -1) {
+            int flags = g_fn.fcntl(dupfd, F_GETFD, 0);
+            if (g_fn.fcntl(dupfd, F_SETFD, flags | FD_CLOEXEC) == -1) {
                 DBG("%d", dupfd);
             }
 
@@ -135,7 +172,7 @@ placeDescriptor(int fd, transport_t *t)
         }
     }
     DBG("%d", t->type);
-    t->close(fd);
+    g_fn.close(fd);
     return -1;
 }
 
@@ -187,13 +224,29 @@ transportNeedsConnection(transport_t *trans)
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            return (trans->net.sock == -1);
+            // If g_tls_calls_are_safe is not true, that means that our process
+            // has been notified that it is being terminated.  It's too late to
+            // try to establish any new connections.
+            if (!g_tls_calls_are_safe) return FALSE;
+            if ((trans->net.sock == -1) ||
+                (trans->net.tls.enable && !trans->net.tls.ssl)) return TRUE;
+            if (osNeedsConnect(trans->net.sock)) {
+                DBG("fd: %d, tls:%d", trans->net.sock, trans->net.tls.enable);
+                if (trans->net.tls.enable) {
+                    scopeLog("tls session closed remotely", trans->net.sock, CFG_LOG_INFO);
+                } else {
+                    scopeLog("tcp connection closed remotely", trans->net.sock, CFG_LOG_INFO);
+                }
+                transportDisconnect(trans);
+                return TRUE;
+            }
+            return FALSE;
         case CFG_FILE:
             // This checks to see if our file descriptor has been
             // closed by our process.  (errno == EBADF) Stream buffering
             // makes it harder to know when this has happened.
             if ((trans->file.stream) &&
-                   (trans->fcntl(fileno(trans->file.stream), F_GETFD) == -1)) {
+                (g_fn.fcntl(fileno(trans->file.stream), F_GETFD) == -1)) {
                 DBG(NULL);
                 transportDisconnect(trans);
             }
@@ -208,6 +261,188 @@ transportNeedsConnection(transport_t *trans)
     return 0;
 }
 
+const char *
+rootCertFile(transport_t *trans)
+{
+    // Based off of this: https://golang.org/src/crypto/x509/root_linux.go
+    const char* rootFileList[] = {
+        "/etc/ssl/certs/ca-certificates.crt",                // Debian/Ubuntu/Gentoo etc.
+        "/etc/pki/tls/certs/ca-bundle.crt",                  // Fedora/RHEL 6
+        "/etc/ssl/ca-bundle.pem",                            // OpenSUSE
+        "/etc/pki/tls/cacert.pem",                           // OpenELEC
+        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", // CentOS/RHEL 7
+        "/etc/ssl/cert.pem",                                 // Alpine Linux
+        NULL
+    };
+
+    const char *file;
+    for (file=rootFileList[0]; file; file++) {
+        if (!g_fn.access (file, R_OK)) {
+            return file;
+        }
+    }
+
+    // Didn't find it from the list above.
+    return NULL;
+}
+
+static void
+shutdownTlsSession(transport_t *trans)
+{
+    // Grab the lock to show that the tls subsystem is in use.
+    enterCriticalSection();
+
+    if (g_tls_calls_are_safe) {
+        if (trans->net.tls.ssl) {
+            SSL_shutdown(trans->net.tls.ssl);
+            SSL_free(trans->net.tls.ssl);
+            trans->net.tls.ssl = NULL;
+        }
+        if (trans->net.tls.ctx) {
+            SSL_CTX_free(trans->net.tls.ctx);
+            trans->net.tls.ctx = NULL;
+        }
+    }
+
+    // Release the lock
+    exitCriticalSection();
+
+    if (trans->net.sock != -1) {
+        g_fn.close(trans->net.sock);
+        trans->net.sock = -1;
+    }
+}
+
+static void
+handle_tls_destroy(void)
+{
+    // Spin to make sure we don't allow our tls subsystem to be destructed
+    // while the tls library is actively being used.
+    enterCriticalSection();
+
+    // this records that this function has been called.
+    g_tls_calls_are_safe = FALSE;
+
+    // Release the lock
+    exitCriticalSection();
+
+    scopeLog("detected beginning of process exit sequence", -1, CFG_LOG_INFO);
+}
+
+static int
+establishTlsSession(transport_t *trans)
+{
+    if (!trans || trans->net.sock == -1) return FALSE;
+    scopeLog("establishing tls session", trans->net.sock, CFG_LOG_INFO);
+
+    // Grab the lock to show that the tls subsystem is in use.
+    enterCriticalSection();
+    if (!g_tls_calls_are_safe) goto err;
+
+    // Register a handler once - to be called when OPENSSL is being destructed.
+    static int destroy_was_registered = FALSE;
+    if (!destroy_was_registered) {
+        OPENSSL_atexit(handle_tls_destroy);
+        destroy_was_registered = TRUE;
+    }
+
+    trans->net.tls.ctx = SSL_CTX_new(TLS_method());
+    if (!trans->net.tls.ctx) {
+        char msg[512] = {0};
+        char err[256] = {0};
+        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        snprintf(msg, sizeof(msg), "error creating tls context: %s", err);
+        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        goto err;
+    }
+
+    // If the configuration provides a cacertpath, use it.
+    // Otherwise, find a distro-specific root cert file.
+    const char *cafile = trans->net.tls.cacertpath;
+    if (!cafile) cafile = rootCertFile(trans);
+
+    long loc_rv = SSL_CTX_load_verify_locations(trans->net.tls.ctx, cafile, NULL);
+    if (trans->net.tls.validateserver && !loc_rv) {
+        char msg[512] = {0};
+        char err[256] = {0};
+        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        snprintf(msg, sizeof(msg), "error setting tls cacertpath: \"%s\" : %s", cafile, err);
+        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        // We're not treating this as a hard error at this point.
+        // Let the process proceed; validation below will likely fail
+        // and might provide more meaningful info.
+    }
+
+    trans->net.tls.ssl = SSL_new(trans->net.tls.ctx);
+    if (!trans->net.tls.ssl) {
+        char msg[512] = {0};
+        char err[256] = {0};
+        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        snprintf(msg, sizeof(msg), "error creating tls session: %s", err);
+        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        goto err;
+    }
+
+    if (!SSL_set_fd(trans->net.tls.ssl, trans->net.sock)) {
+        char msg[512] = {0};
+        char err[256] = {0};
+        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        snprintf(msg, sizeof(msg), "error setting tls on socket: %d : %s", trans->net.sock, err);
+        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        goto err;
+    }
+
+    ERR_clear_error(); // to make SSL_get_error reliable
+    int con_rv = SSL_connect(trans->net.tls.ssl);
+    if (con_rv != 1) {
+        char msg[512] = {0};
+        char err[256] = {0};
+        int ssl_err = SSL_get_error(trans->net.tls.ssl, con_rv);
+        ERR_error_string_n(ssl_err, err, sizeof(err));
+        snprintf(msg, sizeof(msg), "error establishing tls connection: %s", err);
+        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        if (ssl_err == SSL_ERROR_SSL || ssl_err == SSL_ERROR_SYSCALL) {
+            ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+            snprintf(msg, sizeof(msg), "error establishing tls connection: %s %d", err, errno);
+            scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        }
+        goto err;
+    }
+
+    if (trans->net.tls.validateserver) {
+        // Just test that we received a server cert
+        X509* cert = SSL_get_peer_certificate(trans->net.tls.ssl);
+        if (cert) {
+            X509_free(cert);  // Looks good.  Free it immediately
+        } else {
+            scopeLog("error accessing peer certificate for tls server validation",
+                                                  trans->net.sock, CFG_LOG_INFO);
+            goto err;
+        }
+
+        long ver_rc = SSL_get_verify_result(trans->net.tls.ssl);
+        if (ver_rc != X509_V_OK) {
+            char msg[512] = {0};
+            const char *err = X509_verify_cert_error_string(ver_rc);
+            snprintf(msg, sizeof(msg), "tls server validation failed : \"%s\"", err);
+            scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+            goto err;
+        }
+    }
+
+    // free the lock
+    exitCriticalSection();
+
+    scopeLog("tls session established", trans->net.sock, CFG_LOG_INFO);
+    return TRUE;
+err:
+    // free the lock
+    exitCriticalSection();
+
+    shutdownTlsSession(trans);
+    return FALSE;
+}
+
 int
 transportDisconnect(transport_t *trans)
 {
@@ -215,18 +450,19 @@ transportDisconnect(transport_t *trans)
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            if (trans->net.sock != -1) trans->close(trans->net.sock);
-            trans->net.sock = -1;
+            // appropriate for both tls and non-tls connections...
+            shutdownTlsSession(trans);
+
             int i;
             for (i=0; i<FD_SETSIZE; i++) {
                 if (!FD_ISSET(i, &trans->net.pending_connect)) continue;
-                trans->close(i);
+                g_fn.close(i);
                 FD_CLR(i, &trans->net.pending_connect);
             }
             break;
         case CFG_FILE:
             if (!trans->file.stdout && !trans->file.stderr) {
-                if (trans->file.stream) trans->fclose(trans->file.stream);
+                if (trans->file.stream) g_fn.fclose(trans->file.stream);
             }
             trans->file.stream = NULL;
             break;
@@ -340,6 +576,18 @@ transportReconnect(transport_t *trans)
             // own getaddrinfo for this situation.
 
             g_cached_addr = getExistingConnectionAddr(trans);
+
+            // We want to close the socket we got from our parent process, but don't
+            // want to send a close notification for the SSL session.  If we sent the
+            // close notification, it has the side effect of closing our parent process's
+            // ssl session.
+            enterCriticalSection();
+            if (g_tls_calls_are_safe && trans->net.tls.enable && trans->net.tls.ssl) {
+                SSL_set_quiet_shutdown(trans->net.tls.ssl, TRUE);
+            }
+            exitCriticalSection();
+
+
             transportDisconnect(trans);          // Never keep the parents connection.
             if (g_cached_addr) {
                 trans->getaddrinfo = scopeGetaddrinfo;
@@ -361,13 +609,12 @@ transportReconnect(transport_t *trans)
     return 0;
 }
 
-
 static int
 setSocketBlocking(transport_t *trans, int sock, bool block)
 {
     if (!trans) return 0;
 
-    int current_flags = trans->fcntl(sock, F_GETFL, NULL);
+    int current_flags = g_fn.fcntl(sock, F_GETFL, NULL);
     if (current_flags < 0) return FALSE;
 
     int desired_flags;
@@ -381,7 +628,7 @@ setSocketBlocking(transport_t *trans, int sock, bool block)
     if (current_flags == desired_flags) return TRUE;
 
     // fcntl returns 0 if successful
-    return (trans->fcntl(sock, F_SETFL, desired_flags) == 0);
+    return (g_fn.fcntl(sock, F_SETFL, desired_flags) == 0);
 }
 
 static int
@@ -401,7 +648,7 @@ checkPendingSocketStatus(transport_t *trans)
     int rc;
     struct timeval tv = {0};
     fd_set pending_results = trans->net.pending_connect;
-    rc = trans->select(FD_SETSIZE, NULL, &pending_results, NULL, &tv);
+    rc = g_fn.select(FD_SETSIZE, NULL, &pending_results, NULL, &tv);
     if (rc < 0) {
         DBG(NULL);
         transportDisconnect(trans);
@@ -412,6 +659,7 @@ checkPendingSocketStatus(transport_t *trans)
     }
 
     int i;
+    rc = 0;
     for (i=0; i<FD_SETSIZE; i++) {
         if (!FD_ISSET(i, &pending_results)) continue;
 
@@ -424,7 +672,7 @@ checkPendingSocketStatus(transport_t *trans)
             scopeLog("connect failed", i, CFG_LOG_INFO);
 
             FD_CLR(i, &trans->net.pending_connect);
-            trans->close(i);
+            g_fn.close(i);
             continue;
         }
 
@@ -440,27 +688,50 @@ checkPendingSocketStatus(transport_t *trans)
         if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {
             DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
         }
+
+        // We have a connected socket!  Woot!
+        // Do the tls stuff for this connection as needed.
+        if (trans->net.tls.enable) {
+            // when successful, we'll have a connected tls socket.
+            // when not, this will cleanup, disconnecting the socket.
+            establishTlsSession(trans);
+        }
+
         break;
     }
 
     // If we were successful, we can stop looking.  Clean up pending sockets.
     if (trans->net.sock != -1) {
+        rc = 1;
         for (i=0; i<FD_SETSIZE; i++) {
             if (FD_ISSET(i, &trans->net.pending_connect)) {
                 scopeLog("abandoning connect due to previous success", i, CFG_LOG_INFO);
-                trans->close(i);
+                g_fn.close(i);
                 FD_CLR(i, &trans->net.pending_connect);
             }
         }
     }
 
-    return 1;
+    return rc;
 }
 
+static void
+freeAddressList(transport_t *trans)
+{
+    if (!trans || !trans->net.addr.list) return;
+
+    freeaddrinfo(trans->net.addr.list);
+    trans->net.addr.entries = 0;
+    trans->net.addr.list = NULL;
+    trans->net.addr.next = NULL;
+}
 
 static int
-socketConnectionStart(transport_t *trans)
+getAddressList(transport_t *trans)
 {
+    // Don't leak; clean up any prior data
+    freeAddressList(trans);
+
     struct addrinfo* addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
@@ -476,7 +747,7 @@ socketConnectionStart(transport_t *trans)
             break;
         default:
             DBG(NULL);
-            return 1;
+            return 0;
     }
 
     char *logmsg = NULL;
@@ -491,19 +762,52 @@ socketConnectionStart(transport_t *trans)
                            trans->net.port,
                            &hints, &addr_list)) return 0;
 
-    // Loop through the addresses until one works
+    // Count how many addrs we got back
     struct addrinfo* addr;
     for (addr = addr_list; addr; addr = addr->ai_next) {
+        trans->net.addr.entries++;
+    }
+    trans->net.addr.list = addr_list;
+    trans->net.addr.next = addr_list; // next is initially the first element
+
+    return trans->net.addr.entries;
+}
+
+static struct addrinfo *
+getNextAddressListEntry(transport_t *trans)
+{
+    if (!trans || !trans->net.addr.list || !trans->net.addr.next) return NULL;
+
+    // record the next value to return, and advance it for subsequent calls
+    struct addrinfo *next = trans->net.addr.next;
+    trans->net.addr.next = next->ai_next;
+
+    return next;
+}
+
+
+static int
+socketConnectionStart(transport_t *trans)
+{
+    // Get a list of addresses to try if we don't have a current list
+    // or have exhausted the entries in a current list.
+    if (!trans->net.addr.list || !trans->net.addr.next) {
+        getAddressList(trans);
+    }
+
+    // try the next address in the address list
+    struct addrinfo* addr;
+    while ((addr = getNextAddressListEntry(trans))) {
         int sock;
-        sock = trans->socket(addr->ai_family,
-                             addr->ai_socktype,
-                             addr->ai_protocol);
+        sock = g_fn.socket(addr->ai_family,
+                           addr->ai_socktype,
+                           addr->ai_protocol);
 
         if (sock == -1) continue;
 
         // Set the socket to close on exec
-        int flags = trans->fcntl(sock, F_GETFD, 0);
-        if (trans->fcntl(sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
+        int flags = g_fn.fcntl(sock, F_GETFD, 0);
+        if (g_fn.fcntl(sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
             DBG("%d %s %s", sock, trans->net.host, trans->net.port);
         }
 
@@ -528,7 +832,7 @@ socketConnectionStart(transport_t *trans)
             portptr = &addr6_ptr->sin6_port;
         } else {
             DBG("%d %s %s %d", sock, trans->net.host, trans->net.port, addr->ai_family);
-            trans->close(sock);
+            g_fn.close(sock);
             continue;
         }
         char addrstr[INET6_ADDRSTRLEN];
@@ -536,9 +840,9 @@ socketConnectionStart(transport_t *trans)
         unsigned short port = ntohs(*portptr);
 
         errno = 0;
-        if (trans->connect(sock,
-                           addr->ai_addr,
-                           addr->ai_addrlen) == -1) {
+        if (g_fn.connect(sock,
+                         addr->ai_addr,
+                         addr->ai_addrlen) == -1) {
 
             if (errno != EINPROGRESS) {
                 char *logmsg = NULL;
@@ -548,7 +852,7 @@ socketConnectionStart(transport_t *trans)
                 }
 
                 // We could create a sock, but not connect.  Clean up.
-                transportDisconnect(trans);
+                g_fn.close(sock);
                 continue;
             }
 
@@ -559,7 +863,7 @@ socketConnectionStart(transport_t *trans)
             }
 
             FD_SET(sock, &trans->net.pending_connect);
-            continue;
+            break;  // replace w/continue for a shotgun start.
         }
 
 
@@ -578,8 +882,6 @@ socketConnectionStart(transport_t *trans)
         }
     }
 
-    if (addr_list) freeaddrinfo(addr_list);
-
     return (trans->net.sock != -1);
 }
 
@@ -596,7 +898,7 @@ transportConnectFile(transport_t *t)
     }
 
     int fd;
-    fd = t->open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
+    fd = g_fn.open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
     if (fd == -1) {
         DBG("%s", t->file.path);
         transportDisconnect(t);
@@ -614,8 +916,8 @@ transportConnectFile(transport_t *t)
         DBG("%d %s", fd, t->file.path);
     }
 
-    FILE* f;
-    if (!(f = t->fdopen(fd, "a"))) {
+    FILE *f;
+    if (!(f = fdopen(fd, "a"))) {
         transportDisconnect(t);
         return 0;
     }
@@ -670,7 +972,8 @@ transportConnect(transport_t *trans)
 }
 
 transport_t *
-transportCreateTCP(const char *host, const char *port)
+transportCreateTCP(const char *host, const char *port, unsigned int enable,
+                      unsigned int validateserver, const char *cacertpath)
 {
     transport_t* trans = NULL;
 
@@ -684,6 +987,9 @@ transportCreateTCP(const char *host, const char *port)
     FD_ZERO(&trans->net.pending_connect);
     trans->net.host = strdup(host);
     trans->net.port = strdup(port);
+    trans->net.tls.enable = enable;
+    trans->net.tls.validateserver = validateserver;
+    trans->net.tls.cacertpath = (cacertpath) ? strdup(cacertpath) : NULL;
 
     if (!trans->net.host || !trans->net.port) {
         DBG(NULL);
@@ -805,6 +1111,8 @@ transportDestroy(transport_t** transport)
             transportDisconnect(t);
             if (t->net.host) free (t->net.host);
             if (t->net.port) free (t->net.port);
+            if (t->net.tls.cacertpath) free(t->net.tls.cacertpath);
+            freeAddressList(t);
             break;
         case CFG_UNIX:
             break;
@@ -812,7 +1120,7 @@ transportDestroy(transport_t** transport)
             if (t->file.path) free(t->file.path);
             if (!t->file.stdout && !t->file.stderr) {
                 // if stdout/stderr, we didn't open stream, so don't close it
-                if (t->file.stream) t->fclose(t->file.stream);
+                if (t->file.stream) g_fn.fclose(t->file.stream);
             }
             break;
         case CFG_SYSLOG:
@@ -826,6 +1134,91 @@ transportDestroy(transport_t** transport)
     *transport = NULL;
 }
 
+static int
+tcpSendPlain(transport_t *trans, const char *msg, size_t len)
+{
+    if (!trans || transportNeedsConnection(trans)) return -1;
+
+    int flags = 0;
+#ifdef __LINUX__
+    flags |= MSG_NOSIGNAL;
+#endif
+
+    size_t bytes_to_send = len;
+    size_t bytes_sent = 0;
+    int rc;
+
+    while (bytes_to_send > 0) {
+        rc = g_fn.send(trans->net.sock, &msg[bytes_sent], bytes_to_send, flags);
+        if (rc <= 0) break;
+
+        if (rc != bytes_to_send) {
+            DBG("rc = %d, bytes_to_send = %zu", rc, bytes_to_send);
+        }
+
+        bytes_sent += rc;
+        bytes_to_send -= rc;
+    }
+
+    if (rc < 0) {
+        switch (errno) {
+        case EBADF:
+        case EPIPE:
+            DBG(NULL);
+            transportDisconnect(trans);
+            transportConnect(trans);
+            return -1;
+        default:
+            DBG(NULL);
+        }
+    }
+    return 0;
+}
+
+static int
+tcpSendTls(transport_t *trans, const char *msg, size_t len)
+{
+    if (!trans || transportNeedsConnection(trans)) return -1;
+
+    size_t bytes_to_send = len;
+    size_t bytes_sent = 0;
+    int rc = 0;
+    int err = 0;
+
+    while (bytes_to_send > 0) {
+        // Grab the lock to show that the tls subsystem is in use.
+        enterCriticalSection();
+
+        rc = 0;
+        if (g_tls_calls_are_safe) {
+            ERR_clear_error(); // to make SSL_get_error reliable
+            rc = SCOPE_SSL_write(trans->net.tls.ssl, &msg[bytes_sent], bytes_to_send);
+            if (rc <= 0) {
+                err = SSL_get_error(trans->net.tls.ssl, rc);
+            }
+        }
+
+        // free the lock
+        exitCriticalSection();
+
+        if (rc <= 0) {
+            DBG("%d %d", err, g_tls_calls_are_safe);
+            transportDisconnect(trans);
+            transportConnect(trans);
+            return -1;
+        }
+
+        if (rc != bytes_to_send) {
+            DBG("rc = %d, bytes_to_send = %zu", rc, bytes_to_send);
+        }
+
+        bytes_sent += rc;
+        bytes_to_send -= rc;
+    }
+
+    return 0;
+}
+
 int
 transportSend(transport_t *trans, const char *msg, size_t len)
 {
@@ -834,11 +1227,7 @@ transportSend(transport_t *trans, const char *msg, size_t len)
     switch (trans->type) {
         case CFG_UDP:
             if (trans->net.sock != -1) {
-                if (!trans->send) {
-                    DBG(NULL);
-                    break;
-                }
-                int rc = trans->send(trans->net.sock, msg, len, 0);
+                int rc = g_fn.send(trans->net.sock, msg, len, 0);
 
                 if (rc < 0) {
                     switch (errno) {
@@ -857,50 +1246,16 @@ transportSend(transport_t *trans, const char *msg, size_t len)
             }
             break;
         case CFG_TCP:
-            if (trans->net.sock != -1) {
-                if (!trans->send) {
-                    DBG(NULL);
-                    break;
-                }
-                int flags = 0;
-#ifdef __LINUX__
-                flags |= MSG_NOSIGNAL;
-#endif
-
-                size_t bytes_to_send = len;
-                size_t bytes_sent = 0;
-                int rc;
-
-                while (bytes_to_send > 0) {
-                    rc = trans->send(trans->net.sock, &msg[bytes_sent], bytes_to_send, flags);
-                    if (rc <= 0) break;
-
-                    if (rc != bytes_to_send) {
-                        DBG("rc = %d, bytes_to_send = %zu", rc, bytes_to_send);
-                    }
-
-                    bytes_sent += rc;
-                    bytes_to_send -= rc;
-                }
-
-                if (rc < 0) {
-                    switch (errno) {
-                    case EBADF:
-                    case EPIPE:
-                        DBG(NULL);
-                        transportDisconnect(trans);
-                        transportConnect(trans);
-                        return -1;
-                    default:
-                        DBG(NULL);
-                    }
-                }
+            if (trans->net.tls.enable) {
+                return tcpSendTls(trans, msg, len);
+            } else {
+                return tcpSendPlain(trans, msg, len);
             }
             break;
         case CFG_FILE:
             if (trans->file.stream) {
                 size_t msg_size = len;
-                int bytes = trans->fwrite(msg, 1, msg_size, trans->file.stream);
+                int bytes = g_fn.fwrite(msg, 1, msg_size, trans->file.stream);
                 if (bytes != msg_size) {
                     if (errno == EBADF) {
                         DBG("%d %d", bytes, msg_size);

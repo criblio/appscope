@@ -58,10 +58,9 @@ export default function CriblSiteNav() {
                             onMouseLeave={() => setIsHovered(false)}
                             onToggle={() => setIsClicked(!isClicked)}
                             show={isClicked || isHovered}
+                            href={childItem.url}
                           >
-                            <Nav.Link href={childItem.url}>
-                              {childItem.link}
-                            </Nav.Link>
+                            {childItem.link}
                           </NavDropdown.Item>
                         );
                       })}

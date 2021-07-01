@@ -1,8 +1,6 @@
 #ifndef __FN_H__
 #define __FN_H__
 
-#define _GNU_SOURCE
-#define __USE_LARGEFILE64 1
 #include <wchar.h>
 #include <sys/statvfs.h>
 #include <netdb.h>
@@ -20,12 +18,12 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <arpa/nameser.h>
 
 #ifdef __LINUX__
 #ifndef io_context_t
 #define io_context_t unsigned long
 #endif
-typedef _G_fpos64_t fpos64_t;
 #endif
 
 #ifdef __MACOS__
@@ -38,6 +36,9 @@ typedef uint64_t off64_t;
 typedef uint64_t fpos64_t;
 #endif
 
+#ifndef nfds_t
+typedef unsigned int nfds_t;
+#endif
 #endif // __MACOS__
 
 
@@ -193,16 +194,27 @@ typedef struct {
     int (*execve)(const char *, char * const *, char * const *);
     int (*poll)(struct pollfd *, nfds_t, int);
     int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
+    int (*nanosleep)(const struct timespec *, struct timespec *);
+    int	(*ns_initparse)(const unsigned char *, int, ns_msg *);
+    int	(*ns_parserr)(ns_msg *, ns_sect, int, ns_rr *);
+    size_t (*__stdout_write)(FILE *, const unsigned char *, size_t);
+    size_t (*__stderr_write)(FILE *, const unsigned char *, size_t);
+    int (*__fprintf_chk)(FILE *, int, const char *, ...);
+    void *(*__memset_chk)(void *, int, size_t, size_t);
+    void *(*__memcpy_chk)(void *, const void *, size_t, size_t);
+    int (*__sprintf_chk)(char *, int, size_t, const char *, ...);
+    long int (*__fdelt_chk)(long int);
 #ifdef __LINUX__
     // Couldn't easily get struct definitions for these on mac
     int (*statvfs64)(const char *, struct statvfs64 *);
     int (*fstatvfs64)(int, struct statvfs64 *);
     int (*epoll_wait)(int, struct epoll_event *, int, int);
     int (*__overflow)(FILE *, int);
+    ssize_t (*__write_libc)(int, const void *, size_t);
+    ssize_t (*__write_pthread)(int, const void *, size_t);
     int (*epoll_pwait)(int, struct epoll_event *, int, int, const sigset_t *);
     int (*ppoll)(struct pollfd *, nfds_t, const struct timespec *, const sigset_t *);
     int (*pause)(void);
-    int (*nanosleep)(const struct timespec *, struct timespec *);
     int (*sigsuspend)(const sigset_t *);
     int (*sigwaitinfo)(const sigset_t *, siginfo_t *);
     int (*sigtimedwait)(const sigset_t *, siginfo_t *, const struct timespec *);
@@ -214,6 +226,13 @@ typedef struct {
     int (*clock_nanosleep)(clockid_t, int, const struct timespec *, struct timespec *);
     int (*usleep)(useconds_t);
     int (*io_getevents)(io_context_t, long, long, struct io_event *, struct timespec *);
+    int (*sendmmsg)(int, struct mmsghdr *, unsigned int, int);
+    int (*recvmmsg)(int, struct mmsghdr *, unsigned int, int, struct timespec *);
+    int (*pthread_create)(pthread_t *, const pthread_attr_t *,
+                          void *(*)(void *), void *);
+    int (*getentropy)(void *, size_t);
+    void (*__ctype_init)(void);
+    int (*__register_atfork)(void (*) (void), void (*) (void), void (*) (void), void *);
 #endif // __LINUX__
 
 #if defined(__LINUX__) && defined(__STATX__)
@@ -240,6 +259,7 @@ typedef struct {
 
 extern interposed_funcs_t g_fn;
 
+void *getDLHandle(void);
 void initFn(void);
 
 #endif // __FN_H__

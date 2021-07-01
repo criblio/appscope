@@ -53,14 +53,12 @@ evtFormatMetricHappyPath(void** state)
 
     char* expected = NULL;
     asprintf(&expected, "{\"sourcetype\":\"metric\","
-                           "\"id\":\"host-evttest-cmd-4\","
                            "\"_time\":%s,"
                            "\"source\":\"A\","
                            "\"host\":\"host\","
                            "\"proc\":\"evttest\","
                            "\"cmd\":\"cmd-4\","
                            "\"pid\":4848,"
-                           "\"_channel\":\"12345\","
                            "\"data\":{\"_metric\":\"A\",\"_metric_type\":\"counter\",\"_value\":1}}", timestr);
 
     assert_non_null(expected);
@@ -343,103 +341,6 @@ evtFormatMetricRateLimitCanBeTurnedOff(void** state)
 }
 
 static void
-evtFormatLogWithSourceDisabledReturnsNull(void** state)
-{
-    evt_fmt_t* evt = evtFormatCreate();
-    assert_non_null(evt);
-
-    proc_id_t proc = {.pid = 4848,
-                      .ppid = 4847,
-                      .hostname = "host",
-                      .procname = "evttest",
-                      .cmd = "cmd-log",
-                      .id = "host-evttest-cmd-4"};
-
-    // default is disabled
-    cJSON* json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
-    assert_null(json);
-
-    // when enabled, we should get a non-null msg
-    evtFormatSourceEnabledSet(evt, CFG_SRC_CONSOLE, 1);
-    json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-    cJSON_Delete(json);
-
-    // Set it back to disabled, just to be sure.
-    evtFormatSourceEnabledSet(evt, CFG_SRC_CONSOLE, 0);
-    json = evtFormatLog(evt, "stdout", "hey", 4, 12345, &proc);
-    assert_null(json);
-
-    evtFormatDestroy(&evt);
-}
-
-static void
-evtFormatLogWithAndWithoutMatchingNameFilter(void** state)
-{
-    evt_fmt_t* evt = evtFormatCreate();
-    assert_non_null(evt);
-    evtFormatSourceEnabledSet(evt, CFG_SRC_FILE, 1);
-
-    proc_id_t proc = {.pid = 4848,
-                      .ppid = 4847,
-                      .hostname = "host",
-                      .procname = "evttest",
-                      .cmd = "cmd-log",
-                      .id = "host-evttest-cmd-4"};
-
-    // default name filter matches anything with log in the path
-    cJSON* json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-    cJSON_Delete(json);
-
-    // Changing the name filter to ".*my[.]log" shouldn't match.
-    evtFormatNameFilterSet(evt, CFG_SRC_FILE, ".*my[.]log");
-    json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
-    assert_null(json);
-
-    // Changing the name filter to "^/var/log/.*[.]log$" should match.
-    evtFormatNameFilterSet(evt, CFG_SRC_FILE, "^/var/log/.*[.]log$");
-    json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-    cJSON_Delete(json);
-
-    evtFormatDestroy(&evt);
-}
-
-static void
-evtFormatLogWithAndWithoutMatchingValueFilter(void** state)
-{
-    evt_fmt_t* evt = evtFormatCreate();
-    assert_non_null(evt);
-    evtFormatSourceEnabledSet(evt, CFG_SRC_FILE, 1);
-
-    proc_id_t proc = {.pid = 4848,
-                      .ppid = 4847,
-                      .hostname = "host",
-                      .procname = "evttest",
-                      .cmd = "cmd-log",
-                      .id = "host-evttest-cmd-4"};
-
-    // default value filter matches anything
-    cJSON* json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-    cJSON_Delete(json);
-
-    // Changing the value filter to "blah" shouldn't match.
-    evtFormatValueFilterSet(evt, CFG_SRC_FILE, "blah");
-    json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
-    assert_null(json);
-
-    // Changing the value filter to "hey" should match.
-    evtFormatValueFilterSet(evt, CFG_SRC_FILE, "hey");
-    json = evtFormatLog(evt, "/var/log/something.log", "hey", 4, 12345, &proc);
-    assert_non_null(json);
-    cJSON_Delete(json);
-
-    evtFormatDestroy(&evt);
-}
-
-static void
 fmtEventJsonValue(void** state)
 {
     proc_id_t proc = {.pid = 1234,
@@ -456,26 +357,70 @@ fmtEventJsonValue(void** state)
     event_format.data = cJSON_CreateString("поспехаў");
     event_format.sourcetype = CFG_SRC_SYSLOG;
 
-    assert_null(fmtEventJson(NULL));
+    assert_null(fmtEventJson(NULL, NULL));
 
-    cJSON* json = fmtEventJson(&event_format);
+    cJSON* json = fmtEventJson(NULL, &event_format);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
 
     //printf("%s:%d %s\n", __FUNCTION__, __LINE__, str);
     assert_string_equal(str, "{\"sourcetype\":\"syslog\","
-                              "\"id\":\"earl-formattest-cmd\","
                               "\"_time\":1573058085.991,"
                               "\"source\":\"stdin\","
                               "\"host\":\"earl\","
                               "\"proc\":\"formattest\","
                               "\"cmd\":\"cmd\",\"pid\":1234,"
-                              "\"_channel\":\"14627333968688430831\","
                               "\"data\":\"поспехаў\"}");
 
     free(str);
     cJSON_Delete(json);
+}
+
+static void
+fmtEventJsonWithCustomTags(void **state)
+{
+    proc_id_t proc = {.pid = 1234,
+                      .ppid = 1233,
+                      .hostname = "earl",
+                      .procname = "formattest",
+                      .cmd = "cmd",
+                      .id = "earl-formattest-cmd"};
+    event_format_t event_format;
+    event_format.timestamp = 1573058085.991;
+    event_format.src = "stdin";
+    event_format.proc = &proc;
+    event_format.uid = 0xCAFEBABEDEADBEEF;
+    event_format.data = cJSON_CreateString("поспехаў");
+    event_format.sourcetype = CFG_SRC_SYSLOG;
+
+    evt_fmt_t *efmt = evtFormatCreate();
+    custom_tag_t tag1 = {.name = "hey", .value = "you"};
+    custom_tag_t tag2 = {.name = "this", .value = "rocks"};
+    custom_tag_t *tags[] = { &tag1, &tag2, NULL };
+    evtFormatCustomTagsSet(efmt, (custom_tag_t **)&tags);
+
+    cJSON* json = fmtEventJson(efmt, &event_format);
+    assert_non_null(json);
+    char* str = cJSON_PrintUnformatted(json);
+    assert_non_null(str);
+
+    evtFormatDestroy(&efmt);
+
+    //printf("%s:%d %s\n", __FUNCTION__, __LINE__, str);
+    assert_string_equal(str, "{\"sourcetype\":\"syslog\","
+                              "\"_time\":1573058085.991,"
+                              "\"source\":\"stdin\","
+                              "\"host\":\"earl\","
+                              "\"proc\":\"formattest\","
+                              "\"cmd\":\"cmd\",\"pid\":1234,"
+                              "\"hey\":\"you\","
+                              "\"this\":\"rocks\","
+                              "\"data\":\"поспехаў\"}");
+
+    free(str);
+    cJSON_Delete(json);
+
 }
 
 static void
@@ -500,19 +445,17 @@ fmtEventJsonWithEmbeddedNulls(void** state)
     event_format.sourcetype = CFG_SRC_CONSOLE;
 
     // test that data has the nulls properly escaped
-    cJSON* json = fmtEventJson(&event_format);
+    cJSON* json = fmtEventJson(NULL, &event_format);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
     assert_string_equal(str, "{\"sourcetype\":\"console\","
-                              "\"id\":\"earl--\","
                               "\"_time\":1573058085.001,"
                               "\"source\":\"stdout\","
                               "\"host\":\"earl\","
                               "\"proc\":\"\","
                               "\"cmd\":\"\","
                               "\"pid\":1234,"
-                              "\"_channel\":\"14627333968688430831\","
                               "\"data\":\"Unë mund\\u0000të ha qelq dhe nuk\\u0000më gjen gjë\"}");
 
     free(str);
@@ -520,19 +463,17 @@ fmtEventJsonWithEmbeddedNulls(void** state)
 
     // test that null data omits a data field.
     event_format.data=NULL;
-    json = fmtEventJson(&event_format);
+    json = fmtEventJson(NULL, &event_format);
     assert_non_null(json);
     str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
     assert_string_equal(str, "{\"sourcetype\":\"console\","
-                              "\"id\":\"earl--\","
                               "\"_time\":1573058085.001,"
                               "\"source\":\"stdout\","
                               "\"host\":\"earl\","
                               "\"proc\":\"\","
                               "\"cmd\":\"\","
-                              "\"pid\":1234,"
-                              "\"_channel\":\"14627333968688430831\"}");
+                              "\"pid\":1234}");
     free(str);
     cJSON_Delete(json);
 }
@@ -778,7 +719,7 @@ evtFormatSourceEnabledSetAndGet(void** state)
     for (i=CFG_SRC_FILE; i<CFG_SRC_MAX+1; i++) {
         evtFormatSourceEnabledSet(evt, i, 1);
         if (i >= CFG_SRC_MAX) {
-             assert_int_equal(evtFormatSourceEnabled(evt, i), DEFAULT_SRC_FILE);
+            assert_int_equal(evtFormatSourceEnabled(evt, i), DEFAULT_SRC_FILE);
              assert_int_equal(dbgCountMatchingLines("src/evtformat.c"), 1);
              dbgInit(); // reset dbg for the rest of the tests
         } else {
@@ -850,10 +791,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(evtFormatMetricWithAndWithoutMatchingValueFilter),
         cmocka_unit_test(evtFormatMetricRateLimitReturnsNotice),
         cmocka_unit_test(evtFormatMetricRateLimitCanBeTurnedOff),
-        cmocka_unit_test(evtFormatLogWithSourceDisabledReturnsNull),
-        cmocka_unit_test(evtFormatLogWithAndWithoutMatchingNameFilter),
-        cmocka_unit_test(evtFormatLogWithAndWithoutMatchingValueFilter),
         cmocka_unit_test(fmtEventJsonValue),
+        cmocka_unit_test(fmtEventJsonWithCustomTags),
         cmocka_unit_test(fmtEventJsonWithEmbeddedNulls),
         cmocka_unit_test(fmtMetricJsonNoFields),
         cmocka_unit_test(fmtMetricJsonWFields),

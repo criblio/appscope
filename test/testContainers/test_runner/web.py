@@ -1,3 +1,4 @@
+import time
 from ab import run_apache_benchmark
 
 from common import ApplicationTest, AppController
@@ -35,6 +36,7 @@ class TestPostToUrl(ApplicationTest):
         self.post_file = post_file
 
     def do_run(self, scoped):
+        time.sleep(10)
         benchmark_results = run_apache_benchmark(url=self.url, requests=self.requests, post_file=self.post_file)
 
         test_result = validate_ab(benchmark_results)
@@ -47,3 +49,4 @@ def validate_ab(benchmark_results):
         (benchmark_results.failed_requests == 0, f"Failed requests detected {benchmark_results.failed_requests}"),
         (benchmark_results.write_errors == 0, f"Write errors detected {benchmark_results.write_errors}")
     )
+

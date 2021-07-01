@@ -3,31 +3,42 @@ package run
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
 
 // ScopeConfig represents our current running configuration
 type ScopeConfig struct {
-	Metric   ScopeMetricConfig   `mapstructure:"metric" json:"metric" yaml:"metric"`
-	Event    ScopeEventConfig    `mapstructure:"event" json:"event" yaml:"event"`
+	Cribl    ScopeCriblConfig    `mapstructure:"cribl,omitempty" json:"cribl,omitempty" yaml:"cribl,omitempty"`
+	Metric   ScopeMetricConfig   `mapstructure:"metric,omitempty" json:"metric,omitempty" yaml:"metric,omitempty"`
+	Event    ScopeEventConfig    `mapstructure:"event,omitempty" json:"event,omitempty" yaml:"event,omitempty"`
 	Payload  ScopePayloadConfig  `mapstructure:"payload,omitempty" json:"payload,omitempty" yaml:"payload,omitempty"`
 	Libscope ScopeLibscopeConfig `mapstructure:"libscope" json:"libscope" yaml:"libscope"`
+}
+
+// ScopeCriblConfig represents how to output metrics
+type ScopeCriblConfig struct {
+	Enable    bool           `mapstructure:"enable" json:"enable" yaml:"enable"`
+	Transport ScopeTransport `mapstructure:"transport" json:"transport" yaml:"transport"`
 }
 
 // ScopeMetricConfig represents how to output metrics
 type ScopeMetricConfig struct {
 	Enable    bool              `mapstructure:"enable" json:"enable" yaml:"enable"`
 	Format    ScopeOutputFormat `mapstructure:"format" json:"format" yaml:"format"`
-	Transport ScopeTransport    `mapstructure:"transport" json:"transport" yaml:"transport"`
+	Transport ScopeTransport    `mapstructure:"transport,omitempty" json:"transport,omitempty" yaml:"transport,omitempty"`
 }
 
 // ScopeEventConfig represents how to output events
 type ScopeEventConfig struct {
 	Enable    bool               `mapstructure:"enable" json:"enable" yaml:"enable"`
 	Format    ScopeOutputFormat  `mapstructure:"format" json:"format" yaml:"format"`
-	Transport ScopeTransport     `mapstructure:"transport" json:"transport" yaml:"transport"`
+	Transport ScopeTransport     `mapstructure:"transport,omitempty" json:"transport,omitempty" yaml:"transport,omitempty"`
 	Watch     []ScopeWatchConfig `mapstructure:"watch" json:"watch" yaml:"watch"`
 }
 
@@ -47,7 +58,6 @@ type ScopeWatchConfig struct {
 
 // ScopeLibscopeConfig represents how to configure libscope
 type ScopeLibscopeConfig struct {
-	Level         string         `mapstructure:"level" json:"level" yaml:"level"`
 	ConfigEvent   bool           `mapstructure:"configevent" json:"configevent" yaml:"configevent"`
 	SummaryPeriod int            `mapstructure:"summaryperiod" jaon:"summaryperiod" yaml:"summaryperiod"`
 	CommandDir    string         `mapstructure:"commanddir" json:"commanddir" yaml:"commanddir"`
@@ -70,16 +80,28 @@ type ScopeOutputFormat struct {
 
 // ScopeTransport represents how we transport data
 type ScopeTransport struct {
-	TransportType string `mapstructure:"type" json:"type" yaml:"type"`
-	Host          string `mapstructure:"host,omitempty" json:"host,omitempty" yaml:"host,omitempty"`
-	Port          int    `mapstructure:"port,omitempty" json:"port,omitempty" yaml:"port,omitempty"`
-	Path          string `mapstructure:"path,omitempty" json:"path,omitempty" yaml:"path,omitempty"`
-	Buffering     string `mapstructure:"buffering,omitempty" json:"buffering,omitempty" yaml:"buffering,omitempty"`
+	TransportType string    `mapstructure:"type" json:"type" yaml:"type"`
+	Host          string    `mapstructure:"host,omitempty" json:"host,omitempty" yaml:"host,omitempty"`
+	Port          int       `mapstructure:"port,omitempty" json:"port,omitempty" yaml:"port,omitempty"`
+	Path          string    `mapstructure:"path,omitempty" json:"path,omitempty" yaml:"path,omitempty"`
+	Buffering     string    `mapstructure:"buffering,omitempty" json:"buffering,omitempty" yaml:"buffering,omitempty"`
+	Tls           TlsConfig `mapstructure:"tls" json:"tls" yaml:"tls"`
 }
 
-// GetDefaultScopeConfig returns the default scope configuration as a struct
-func GetDefaultScopeConfig(workDir string) *ScopeConfig {
-	return &ScopeConfig{
+// TlsConfig is used when
+type TlsConfig struct {
+	Enable         bool   `mapstructure:"enable" json:"enable" yaml:"enable"`
+	ValidateServer bool   `mapstructure:"validateserver" json:"validateserver" yaml:"validateserver"`
+	CaCertPath     string `mapstructure:"cacertpath" json:"cacertpath" yaml:"cacertpath"`
+}
+
+// setDefault sets the default scope configuration as a struct
+func (c *Config) setDefault() error {
+	if c.WorkDir == "" {
+		return fmt.Errorf("workDir not set")
+	}
+	c.sc = &ScopeConfig{
+		Cribl: ScopeCriblConfig{},
 		Metric: ScopeMetricConfig{
 			Enable: true,
 			Format: ScopeOutputFormat{
@@ -88,7 +110,7 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 			},
 			Transport: ScopeTransport{
 				TransportType: "file",
-				Path:          filepath.Join(workDir, "metrics.json"),
+				Path:          filepath.Join(c.WorkDir, "metrics.json"),
 				Buffering:     "line",
 			},
 		},
@@ -99,13 +121,13 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 			},
 			Transport: ScopeTransport{
 				TransportType: "file",
-				Path:          filepath.Join(workDir, "events.json"),
+				Path:          filepath.Join(c.WorkDir, "events.json"),
 				Buffering:     "line",
 			},
 			Watch: []ScopeWatchConfig{
 				{
 					WatchType: "file",
-					Name:      ScopeLogRegex(),
+					Name:      scopeLogRegex(),
 					Value:     ".*",
 				},
 				{
@@ -146,33 +168,202 @@ func GetDefaultScopeConfig(workDir string) *ScopeConfig {
 		},
 		Libscope: ScopeLibscopeConfig{
 			SummaryPeriod: 10,
-			CommandDir:    filepath.Join(workDir, "cmd"),
+			CommandDir:    filepath.Join(c.WorkDir, "cmd"),
 			ConfigEvent:   false,
 			Log: ScopeLogConfig{
-				Level: "error",
+				Level: "warning",
 				Transport: ScopeTransport{
 					TransportType: "file",
-					Path:          filepath.Join(workDir, "ldscope.log"),
+					Path:          filepath.Join(c.WorkDir, "ldscope.log"),
 					Buffering:     "line",
 				},
 			},
 		},
 	}
+	return nil
+}
+
+// configFromRunOpts writes the scope configuration to the workdir
+func (c *Config) configFromRunOpts() error {
+	err := c.setDefault()
+	if err != nil {
+		return err
+	}
+
+	if c.Verbosity != 0 {
+		c.sc.Metric.Format.Verbosity = c.Verbosity
+	}
+
+	if c.Payloads {
+		c.sc.Payload = ScopePayloadConfig{
+			Enable: true,
+			Dir:    filepath.Join(c.WorkDir, "payloads"),
+		}
+	}
+
+	if c.MetricsFormat != "" {
+		if c.MetricsFormat != "ndjson" && c.MetricsFormat != "statsd" {
+			return fmt.Errorf("invalid metrics format %s", c.MetricsFormat)
+		}
+		c.sc.Metric.Format.FormatType = c.MetricsFormat
+	}
+
+	parseDest := func(t *ScopeTransport, dest string) error {
+		//
+		// The regexp matches "proto://something:port" where the leading
+		// "proto://" is optional. If given, "proto" must be "tcp", "udp",
+		// "tls" or "file". The ":port" suffix is optional and ignored
+		// for files but required for sockets.
+		//
+		//     "relative/path"
+		//     "file://another/relative/path"
+		//     "/absolute/path"
+		//     "file:///another/absolute/path"
+		//     "tcp://host:port"
+		//     "udp://host:port"
+		//     "tls://host:port"
+		//     "host:port" (assume tls)
+		//
+		// m[0][0] is the full match
+		// m[0][1] is the "proto" string or an empty string
+		// m[0][2] is the "something" string
+		// m[0][3] is the "port" string or an empty string
+		//
+		m := regexp.MustCompile("^(?:(?i)(file|tcp|udp|tls)://)?([^:]+)(?::(\\d+))?$").FindAllStringSubmatch(dest, -1)
+		//fmt.Printf("debug: m=%+v\n", m)
+		if len(m) <= 0 {
+			// no match
+			return fmt.Errorf("Invalid dest: %s", dest)
+		} else if m[0][1] != "" {
+			// got "proto://..."
+			proto := strings.ToLower(m[0][1])
+			if proto == "udp" || proto == "tcp" {
+				// clear socket
+				t.TransportType = proto
+				t.Host = m[0][2]
+				if m[0][3] == "" {
+					return fmt.Errorf("Missing :port at the end of %s", dest)
+				}
+				port, err := strconv.Atoi(m[0][3])
+				if err != nil {
+					return fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][3])
+				}
+				t.Port = port
+				t.Path = ""
+				t.Tls.Enable = false
+				t.Tls.ValidateServer = true
+			} else if proto == "tls" {
+				// encrypted socket
+				t.TransportType = "tcp"
+				t.Host = m[0][2]
+				if m[0][3] == "" {
+					return fmt.Errorf("Missing :port at the end of %s", dest)
+				}
+				port, err := strconv.Atoi(m[0][3])
+				if err != nil {
+					return fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][3])
+				}
+				t.Port = port
+				t.Path = ""
+				t.Tls.Enable = true
+				t.Tls.ValidateServer = true
+			} else if proto == "file" {
+				t.TransportType = proto
+				t.Path = m[0][2]
+			} else {
+				return fmt.Errorf("Invalid dest protocol: %s", proto)
+			}
+		} else if m[0][3] != "" {
+			// got "something:port", assume tls://
+			t.TransportType = "tcp"
+			t.Host = m[0][2]
+			port, err := strconv.Atoi(m[0][3])
+			if err != nil {
+				return fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][3])
+			}
+			t.Port = port
+			t.Path = ""
+			t.Tls.Enable = true
+			t.Tls.ValidateServer = true
+		} else {
+			// got "something", assume file://
+			t.TransportType = "file"
+			t.Path = m[0][2]
+		}
+		//fmt.Printf("debug: t=%+v\n", t)
+		return nil // success
+	}
+
+	if c.MetricsDest != "" {
+		err := parseDest(&c.sc.Metric.Transport, c.MetricsDest)
+		if err != nil {
+			return err
+		}
+	}
+
+	if c.EventsDest != "" {
+		err := parseDest(&c.sc.Event.Transport, c.EventsDest)
+		if err != nil {
+			return err
+		}
+	}
+
+	if c.CriblDest != "" {
+		err := parseDest(&c.sc.Cribl.Transport, c.CriblDest)
+		if err != nil {
+			return err
+		}
+		c.sc.Cribl.Enable = true
+		// If we're outputting to Cribl, disable metrics and event outputs
+		c.sc.Metric.Transport = ScopeTransport{}
+		c.sc.Event.Transport = ScopeTransport{}
+		c.sc.Libscope.ConfigEvent = true
+	}
+
+	if c.Loglevel != "" {
+		levels := map[string]bool{
+			"error":   true,
+			"warning": true,
+			"info":    true,
+			"debug":   true,
+			"none":    true,
+		}
+		if _, ok := levels[c.Loglevel]; !ok {
+			return fmt.Errorf("%s is an invalid log level. Log level must be one of debug, info, warning, error, or none", c.Loglevel)
+		}
+		c.sc.Libscope.Log.Level = c.Loglevel
+	}
+	return nil
+}
+
+// ScopeConfigYaml serializes Config to YAML
+func (c *Config) ScopeConfigYaml() ([]byte, error) {
+	if c.sc == nil {
+		err := c.configFromRunOpts()
+		if err != nil {
+			return []byte{}, err
+		}
+	}
+	scb, err := yaml.Marshal(c.sc)
+	if err != nil {
+		return scb, fmt.Errorf("error marshaling's ScopeConfig to YAML: %v", err)
+	}
+	return scb, nil
 }
 
 // WriteScopeConfig writes a scope config to a file
-func WriteScopeConfig(sc *ScopeConfig, path string) error {
-	scb, err := yaml.Marshal(sc)
+func (c *Config) WriteScopeConfig(path string, filePerms os.FileMode) error {
+	scb, err := c.ScopeConfigYaml()
 	if err != nil {
-		return fmt.Errorf("error marshaling's ScopeConfig to YAML: %v", err)
+		return err
 	}
-	err = ioutil.WriteFile(path, scb, 0644)
+	err = ioutil.WriteFile(path, scb, filePerms)
 	if err != nil {
 		return fmt.Errorf("error writing ScopeConfig to file %s: %v", path, err)
 	}
 	return nil
 }
 
-func ScopeLogRegex() string {
+func scopeLogRegex() string {
 	return `[\s\/\\\.]log[s]?[\/\\\.]?`
 }

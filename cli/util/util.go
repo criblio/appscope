@@ -2,6 +2,7 @@ package util
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -40,21 +41,14 @@ func RandString(n int) string {
 	return string(b)
 }
 
-// Cache home value
-var scopeHome string
-
 // ScopeHome returns the scope home directory, default $HOME/.scope
 func ScopeHome() string {
-	if scopeHome != "" {
-		return scopeHome
-	}
 	base, match := os.LookupEnv("SCOPE_HOME")
 	if match {
 		if absPath, err := filepath.Abs(base); err == nil {
 			base = absPath
 		}
-		scopeHome = base
-		return scopeHome
+		return base
 	}
 	home, match := os.LookupEnv("HOME")
 	if !match {
@@ -63,8 +57,7 @@ func ScopeHome() string {
 			home = "/tmp"
 		}
 	}
-	scopeHome = filepath.Join(home, ".scope")
-	return scopeHome
+	return filepath.Join(home, ".scope")
 }
 
 // GetConfigPath returns path to our default config file
@@ -262,7 +255,7 @@ func EncodeOffset(offset int64) string {
 	}
 	for offset > 0 {
 		ch := codes[offset%64]
-		str = append(str, byte(ch))
+		str = append(str, ch)
 		offset /= 64
 	}
 	return string(str)
@@ -296,4 +289,10 @@ func ByteCountSI(b int64) string {
 	}
 	return fmt.Sprintf("%.1f %cB",
 		float64(b)/float64(div), "kMGTPE"[exp])
+}
+
+// Returns JSON bytes for an object, ignoring errors, for use in Printf and error functions
+func JSONBytes(obj interface{}) []byte {
+	b, _ := json.Marshal(obj)
+	return b
 }

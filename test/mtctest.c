@@ -1,7 +1,9 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 
+#include "fn.h"
 #include "mtc.h"
 #include "test.h"
 
@@ -126,6 +128,7 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
+    initFn();
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(mtcCreateReturnsValidPtr),

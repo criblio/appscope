@@ -83,7 +83,7 @@ func logoTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "logo.txt", size: 113020, mode: os.FileMode(511), modTime: time.Unix(1492060977, 0)}
+	info := bindataFileInfo{name: "logo.txt", size: 113020, mode: os.FileMode(0777), modTime: time.Unix(1492060977, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

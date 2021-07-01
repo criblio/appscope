@@ -1,4 +1,5 @@
 version: '3.5'
+
 services:
   interposed_func:
     build:
@@ -63,6 +64,11 @@ services:
     ports:
       - 6379:6379
       - 27017:27017
+
+  bash:
+    build:
+      context: .
+      dockerfile: ./bash/Dockerfile
 
   gogen:
     build:
@@ -153,15 +159,12 @@ services:
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.15
-
-  java6:
+  go_16:
     build:
       context: .
-      dockerfile: ./java/Dockerfile
+      dockerfile: ./go/Dockerfile
       args:
-        JDK_IMAGE: openjdk:6
-        TOMCAT_MAJOR_VERSION: 7
-        TOMCAT_MINOR_VERSION: 7.0.10
+        GO_IMAGE_VER: golang:1.16
 
   java7:
     build:
@@ -169,6 +172,7 @@ services:
       dockerfile: ./java/Dockerfile
       args:
         JDK_IMAGE: openjdk:7
+        DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
 
   java8:
     build:
@@ -176,6 +180,7 @@ services:
       dockerfile: ./java/Dockerfile
       args:
         JDK_IMAGE: openjdk:8
+        DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
   
   java9:
     build:
@@ -183,6 +188,7 @@ services:
       dockerfile: ./java/Dockerfile
       args:
         JDK_IMAGE: openjdk:9
+        DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
 
   java10:
     build:
@@ -190,6 +196,7 @@ services:
       dockerfile: ./java/Dockerfile
       args:
         JDK_IMAGE: openjdk:10
+        DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
 
   java11:
     build:
@@ -197,6 +204,7 @@ services:
       dockerfile: ./java/Dockerfile
       args:
         JDK_IMAGE: openjdk:11
+        DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
   
   java12:
     build:
@@ -204,6 +212,7 @@ services:
       dockerfile: ./java/Dockerfile
       args:
         JDK_IMAGE: openjdk:12
+        DNLD_HEXDUMP: yum -y install util-linux
 
   java13:
     build:
@@ -211,6 +220,7 @@ services:
       dockerfile: ./java/Dockerfile
       args:
         JDK_IMAGE: openjdk:13
+        DNLD_HEXDUMP: yum -y install util-linux
 
   java14:
     build:
@@ -218,6 +228,7 @@ services:
       dockerfile: ./java/Dockerfile
       args:
         JDK_IMAGE: openjdk:14
+        DNLD_HEXDUMP: microdnf install util-linux
 
   oracle_java6:
     build:
@@ -283,3 +294,14 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-14.0.2_linux-x64_bin.tar.gz
+
+  alpine:
+    build:
+      context: .
+      dockerfile: ./alpine/Dockerfile
+
+  attach:
+    build:
+      context: .
+      dockerfile: ./attach/Dockerfile
+

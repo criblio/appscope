@@ -41,6 +41,7 @@ typedef struct {
     unsigned int len;
     unsigned int type;
     char *protname;
+    pcre2_match_data *match_data;
 } protocol_def_t;
 
 typedef struct {
@@ -75,6 +76,8 @@ typedef struct {
     upload_type_t type;
     cJSON* body;
     request_t *req;            // NULL unless this is UPLD_RESP
+    unsigned long long uid;
+    proc_id_t *proc;
 } upload_t;
 
 // Functions to help with send/receive messaging
@@ -94,25 +97,27 @@ void    ctlDestroy(ctl_t **);
 
 // Raw Send (without messaging protocol)
 void    ctlSendMsg(ctl_t *, char *);
-void    ctlSendJson(ctl_t *, cJSON *);
+int    ctlSendJson(ctl_t *, cJSON *, which_transport_t);
 
 // Messaging protocol send
 int     ctlPostMsg(ctl_t *, cJSON *, upload_type_t, request_t *, bool);
 int     ctlSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);
 int     ctlSendHttp(ctl_t *, event_t *, uint64_t, proc_id_t *);
-int     ctlSendLog(ctl_t *, const char *, const void *, size_t, uint64_t, proc_id_t *);
+int     ctlSendLog(ctl_t *, int, const char *, const void *, size_t, uint64_t, proc_id_t *);
+void    ctlStopAggregating(ctl_t *);
 void    ctlFlush(ctl_t *);
 int     ctlPostEvent(ctl_t *, char *);
 
 // Connection oriented stuff
-int              ctlNeedsConnection(ctl_t *);
-int              ctlConnection(ctl_t *);
-int              ctlConnect(ctl_t *);
-int              ctlClose(ctl_t *);
-int              ctlReconnect(ctl_t *);
-void             ctlTransportSet(ctl_t *, transport_t *);
+int              ctlNeedsConnection(ctl_t *, which_transport_t);
+int              ctlConnection(ctl_t *, which_transport_t);
+int              ctlConnect(ctl_t *, which_transport_t);
+int              ctlDisconnect(ctl_t *, which_transport_t);
+int              ctlReconnect(ctl_t *, which_transport_t);
+void             ctlTransportSet(ctl_t *, transport_t *, which_transport_t);
+cfg_transport_t  ctlTransportType(ctl_t *, which_transport_t);
+transport_t *    ctlTransport(ctl_t *, which_transport_t);
 void             ctlEvtSet(ctl_t *, evt_fmt_t *);
-cfg_transport_t  ctlTransportType(ctl_t *);
 
 // Accessor for performance
 bool            ctlEvtSourceEnabled(ctl_t *, watch_t);

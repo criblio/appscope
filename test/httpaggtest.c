@@ -48,11 +48,11 @@ httpAggAddMetricHappyPath(void **state)
     http_agg_t *http_agg = httpAggCreate();
 
     event_field_t fields[] = {
-        STRFIELD("http.target", "/", 4, FALSE),
-        NUMFIELD("http.status_code", 200, 1, FALSE),
+        STRFIELD("http_target", "/", 4, FALSE),
+        NUMFIELD("http_status_code", 200, 1, FALSE),
         FIELDEND
     };
-    event_t event = INT_EVENT("http.server.duration", 2, DELTA, fields);
+    event_t event = INT_EVENT("http_server_duration", 2, DELTA, fields);
 
     // any report before we've received events should be empty 
     assert_int_equal(g_send_metric_count, 0);
@@ -102,11 +102,11 @@ httpAggAddMetricWithQueryStringsAreAggregatedTogether(void **state)
     int i;
     for (i=0; i<(sizeof(target)/sizeof(target[0])); i++) {
         event_field_t fields[] = {
-            STRFIELD("http.target", target[i], 4, FALSE),
-            NUMFIELD("http.status_code", 200, 1, FALSE),
+            STRFIELD("http_target", target[i], 4, FALSE),
+            NUMFIELD("http_status_code", 200, 1, FALSE),
             FIELDEND
         };
-        event_t event = INT_EVENT("http.client.duration", 42, DELTA, fields);
+        event_t event = INT_EVENT("http_client_duration", 42, DELTA, fields);
         httpAggAddMetric(http_agg, &event, -1, -1);
 
         // We expect all of these targets to be aggregated together.
@@ -133,11 +133,11 @@ httpAggAddMetricWithManyStatusCodesDoesNotCrash(void **state)
     int i;
     for (i=1; i<=100; i++) {
         event_field_t fields[] = {
-            STRFIELD("http.target", "/", 4, FALSE),
-            NUMFIELD("http.status_code", i, 1, FALSE),
+            STRFIELD("http_target", "/", 4, FALSE),
+            NUMFIELD("http_status_code", i, 1, FALSE),
             FIELDEND
         };
-        event_t event = INT_EVENT("http.client.duration", 2, DELTA, fields);
+        event_t event = INT_EVENT("http_client_duration", 2, DELTA, fields);
         httpAggAddMetric(http_agg, &event, -1, -1);
     }
     httpAggSendReport(http_agg, bogus_mtc_addr);
@@ -157,11 +157,11 @@ httpAggAddMetricWithManyHttpTargetsDoesNotCrash(void **state)
         char http_target[128];
         snprintf(http_target, sizeof(http_target), "/%d", i);
         event_field_t fields[] = {
-            STRFIELD("http.target", http_target, 4, FALSE),
-            NUMFIELD("http.status_code", 200, 1, FALSE),
+            STRFIELD("http_target", http_target, 4, FALSE),
+            NUMFIELD("http_status_code", 200, 1, FALSE),
             FIELDEND
         };
-        event_t event = INT_EVENT("http.client.duration", 2, DELTA, fields);
+        event_t event = INT_EVENT("http_client_duration", 2, DELTA, fields);
         httpAggAddMetric(http_agg, &event, -1, -1);
     }
     httpAggSendReport(http_agg, bogus_mtc_addr);

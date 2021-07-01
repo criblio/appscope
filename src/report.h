@@ -85,7 +85,6 @@ extern ctl_t *g_ctl;
 
 void initReporting(void);
 void setReportingInterval(int);
-void sendProcessStartMetric();
 void doErrorMetric(metric_t, control_type_t, const char *, const char *, void *);
 void doProcMetric(metric_t, long long);
 void doStatMetric(const char *, const char *, void *);

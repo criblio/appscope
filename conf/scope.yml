@@ -57,16 +57,16 @@ event:
     # Creates events from data written to files.
     # Designed for monitoring log files, but capable of capturing
     # any file writes.
-#    - type: file
-#      name: .*log.*                 # allowlist ex regex describing log file names
-#      value: .*                     # allowlist ex regex describing field values
+    - type: file
+      name: .*log.*                 # whitelist ex regex describing log file names
+      value: .*                     # whitelist ex regex describing field values
 
     # Creates events from data written to stdout, stderr, or both.
     # May be most useful for capturing debug output from processes
     # running in containerized environments.
-#    - type: console
-#      name: stdout                  # (stdout|stderr)
-#      value: .*
+    - type: console
+      name: stdout                  # (stdout|stderr)
+      value: .*
 
     # Creates events from libscope's metric (statsd) data.  May be
     # most useful for data which could overwhelm metric aggregation
@@ -78,28 +78,29 @@ event:
 #      value: .*
 
     # Enable extraction of HTTP headers
-#    - type: http
-#      name: .*                      # (http-resp)|(http-metrics)
-#      field: .*                     # allowlist regex describing field names
-#      value: .*
+    - type: http
+      name: .*                      # (http-resp)|(http-metrics)
+      field: .*                     # whitelist regex describing field names
+      value: .*
+      headers:                      # (?i)X-myHeader.*
 
     # Creates events describing network connectivity
-#    - type: net
-#      name: .*                      #
-#      field: .*                     # allowlist regex describing field names
-#      value: .*
+    - type: net
+      name: .*                      #
+      field: .*                     # whitelist regex describing field names
+      value: .*
 
     # Creates events describing file connectivity
-#    - type: fs
-#      name: .*                      #
-#      field: .*                     # allowlist regex describing field names
-#      value: .*
+    - type: fs
+      name: .*                      #
+      field: .*                     # whitelist regex describing field names
+      value: .*
 
     # Creates events describing dns activity
-#    - type: dns
-#      name: .*                      #
-#      field: .*                     # allowlist regex describing field names
-#      value: .*
+    - type: dns
+      name: .*                      #
+      field: .*                     # whitelist regex describing field names
+      value: .*
 
 payload:
   enable: false                     # true, false
@@ -119,9 +120,23 @@ libscope:
   #  scope.<pid> file when replacement is complete.
 
   log:
-    level: error                    # debug, info, warning, error, none
+    level: warning                    # debug, info, warning, error, none
     transport:
       type: file
       path: '/tmp/scope.log'
       buffering: line               # line, full
+
+cribl:
+  enable: false
+  transport:
+    type: tcp
+    host: 127.0.0.1
+    port: 10090
+    tls:
+      enable: false
+      validateserver: true          # false is like curl's -k option
+      cacertpath: ''
+          # cacertpath can be used to specify a private CA.
+          # If left empty, AppScope will try to use public root certs
+          # that are provided by the linux distro.
 ...

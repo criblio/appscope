@@ -2,6 +2,7 @@
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "fn.h"
 
@@ -20,19 +21,28 @@ void *
 getDLHandle(void)
 {
     char *enval;
+    struct stat sbuf;
+    char path[128];
 
-    // This represents the case where a go static exec
-    // is running. We need to start the dlsym search
-    // from the exec and not next.
-    if (((enval = getenv("SCOPE_APP_TYPE")) != NULL) &&
-        (strstr(enval, "go")) &&
-        ((enval = getenv("SCOPE_EXEC_TYPE")) != NULL) &&
-        (strstr(enval, "static"))) {
+    snprintf(path, sizeof(path), "/dev/shm/scope_attach_%d.env", getpid());
+
+    // This represents the cases where we know from
+    // empirical evidence that the symbol search needs
+    // to start from the executable and not next.
+    //
+    // The stat check is an indicator that we are called as a
+    // result of an attach. It's the best/only indication that
+    // we are doing an attach. In the attach case musl requires
+    // that the symbol search starts from the exec.
+    if ((stat(path, &sbuf) != -1) ||
+        (((enval = getenv("SCOPE_APP_TYPE")) != NULL) &&
+         (strstr(enval, "go")) &&
+         ((enval = getenv("SCOPE_EXEC_TYPE")) != NULL) &&
+         (strstr(enval, "static")))) {
         return RTLD_DEFAULT;
     }
 
-    //return RTLD_NEXT;
-    return RTLD_DEFAULT;
+    return RTLD_NEXT;
 }
 
 void

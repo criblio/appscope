@@ -21,10 +21,9 @@ getDLHandle(void)
 {
     char *enval;
 
-    // Not sure if this test is correct.
-    // It represents the case where a change
-    // in handle is needed. Until we know more
-    // about what's needed, we'll go with this.
+    // This represents the case where a go static exec
+    // is running. We need to start the dlsym search
+    // from the exec and not next.
     if (((enval = getenv("SCOPE_APP_TYPE")) != NULL) &&
         (strstr(enval, "go")) &&
         ((enval = getenv("SCOPE_EXEC_TYPE")) != NULL) &&
@@ -32,8 +31,8 @@ getDLHandle(void)
         return RTLD_DEFAULT;
     }
 
-    // this is the value we've been using by default
-    return RTLD_NEXT;
+    //return RTLD_NEXT;
+    return RTLD_DEFAULT;
 }
 
 void

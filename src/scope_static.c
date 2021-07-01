@@ -850,14 +850,18 @@ main(int argc, char **argv, char **env)
         fprintf(stderr, "error: failed to extract loader\n");
         return EXIT_FAILURE;
     }
+
     if (libdirExtractLibrary()) {
         fprintf(stderr, "error: failed to extract library\n");
         return EXIT_FAILURE;
     }
 
     // setup for musl libc if detected
-    if (setup_loader(EXE_TEST_FILE, (char*) libdirGetLoader()) && attachArg) {
-        fprintf(stderr, "error: use of --attach in musl libc isn't currently supported\n");
+    char *loader = (char *)libdirGetLoader();
+    if (loader) {
+        setup_loader(EXE_TEST_FILE, loader);
+    } else {
+        fprintf(stderr, "error: failed to get a loader path\n");
         return EXIT_FAILURE;
     }
 

@@ -16,7 +16,7 @@ This pre-release addresses the following issues:
 - **Improvement**: [#164](https://github.com/criblio/appscope/issues/164), [#286](https://github.com/criblio/appscope/issues/286) Add support for TLS over TCP connections, with new TLS-related environment variables shown by the command `ldscope --help configuration | grep TLS`.
 - **Deprecation**: [#286](https://github.com/criblio/appscope/issues/286) Drop support for CentOS 6 (because TLS support requires glibc 2.17 or newer).
 - **Improvement**: [#132](https://github.com/criblio/appscope/issues/132) Add new `scope logs` command to view logs from the CLI.
-- **Improvement**: Add new `--interval` option to `scope watch` command to run AppScope at intervals, from the CLI.
+- **Improvement**: Add new `scope watch` command to run AppScope at intervals of seconds, minutes, or hours, from the CLI.
 - **Improvement**: Make developer docs available at [https://github.com/criblio/appscope/tree/master/docs](https://github.com/criblio/appscope/tree/master/docs).
 - **Fix**: [#265](https://github.com/criblio/appscope/issues/265) Re-direct bash malloc functions to glibc, to avoid segfaults and memory allocation issues.
 - **Fix**: [#279](https://github.com/criblio/appscope/issues/279) Correct handling of pointers returned by gnutls, which otherwise could cause `git clone` to crash.

@@ -2,6 +2,8 @@
 title: Using TLS for Secure Connections
 ---
 
+## Using TLS for Secure Connections
+
 AppScope supports TLS over TCP connections: 
 
 - AppScope can use TLS when connecting to LogStream or another application (including its events and metrics destinations).

@@ -3,7 +3,6 @@ title: Integrating with LogStream
 ---
 
 ## Integrating with LogStream
----
 
 AppScope can easily connect to Cribl LogStream ([overview](https://cribl.io/product/) | [download](https://cribl.io/download/) | [docs](https://docs.cribl.io/docs/welcome)).
 

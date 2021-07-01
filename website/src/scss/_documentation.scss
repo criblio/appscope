@@ -39,7 +39,6 @@
     margin-bottom: 10px;
   }
   p,
-  ol,
   li,
   code {
     font-size: 16px;
@@ -50,7 +49,9 @@
     margin: 10px 0;
   }
   ol {
-    padding: 0;
+    /* padding: 0; */
+    margin: 5px 0;
+    font-size: 16px;  
   }
   li {
     margin: 5px 0;

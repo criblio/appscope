@@ -2,6 +2,9 @@
 title: Scoping a Running Process
 ---
 
+## Scoping a Running Process
+
+
 Some aspects of scoping a running process are not self-evident.
 
 To attach AppScope to a running process:

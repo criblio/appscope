@@ -58,6 +58,9 @@ func (rc *Config) Attach(args []string) {
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+	if rc.NoBreaker {
+		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
+	}
 	if !rc.Passthrough {
 		rc.setupWorkDir(args, true)
 		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))

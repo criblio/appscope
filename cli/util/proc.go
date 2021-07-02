@@ -153,23 +153,23 @@ func PidScoped(pid int) bool {
 func PidCommand(pid int) string {
 	pidPath := fmt.Sprintf("/proc/%v", pid)
 
-	// Get name from status
+	// Get command from status
 	pStat, err := linuxproc.ReadProcessStatus(pidPath + "/status")
 	if err != nil {
-		ErrAndExit("Error getting process name: %v", err)
+		ErrAndExit("Error getting process command: %v", err)
 	}
 
 	return pStat.Name
 }
 
-// PidCmdline gets the command used to start the process specified by PID
+// PidCmdline gets the cmdline used to start the process specified by PID
 func PidCmdline(pid int) string {
 	pidPath := fmt.Sprintf("/proc/%v", pid)
 
-	// Get name from status
+	// Get cmdline
 	cmdline, err := linuxproc.ReadProcessCmdline(pidPath + "/cmdline")
 	if err != nil {
-		ErrAndExit("Error getting process name: %v", err)
+		ErrAndExit("Error getting process cmdline: %v", err)
 	}
 
 	return cmdline

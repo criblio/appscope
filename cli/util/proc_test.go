@@ -3,6 +3,7 @@ package util
 import (
 	"os"
 	"os/user"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ func TestProcessesByName(t *testing.T) {
 			ID:      1,
 			Pid:     os.Getpid(),
 			User:    user.Username,
-			Command: "util.test",
+			Command: strings.Join(os.Args[:], " "),
 			Scoped:  false,
 		},
 	}
@@ -56,6 +57,16 @@ func TestPidCommand(t *testing.T) {
 	pid := os.Getpid()
 	result := PidCommand(pid)
 	assert.Equal(t, "util.test", result)
+}
+
+// TestPidCmdline
+// Assertions:
+// - The expected cmdline value is returned
+func TestPidCmdline(t *testing.T) {
+	// Current process command
+	pid := os.Getpid()
+	result := PidCmdline(pid)
+	assert.Equal(t, strings.Join(os.Args[:], " "), result)
 }
 
 // TestPidExists

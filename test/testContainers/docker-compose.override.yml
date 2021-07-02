@@ -408,7 +408,7 @@ services:
       - LD_PRELOAD=/opt/test-runner/bin/libscope.so
     privileged: true
 
-  attach:
+  cli:
     volumes:
       - type: bind
         source: ../../lib/linux/libscope.so

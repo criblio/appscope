@@ -300,8 +300,8 @@ services:
       context: .
       dockerfile: ./alpine/Dockerfile
 
-  attach:
+  cli:
     build:
       context: .
-      dockerfile: ./attach/Dockerfile
+      dockerfile: ./cli/Dockerfile
 

@@ -2,12 +2,11 @@ package run
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
-	"strings"
+	"strconv"
 	"syscall"
 
 	"github.com/criblio/scope/util"
@@ -37,20 +36,34 @@ func (rc *Config) Attach(args []string) {
 	if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
 		util.ErrAndExit("You must have PTRACE capabilities to attach to a process")
 	}
-	// Validate PID exists
-	pidPath := fmt.Sprintf("/proc/%s", args[0])
-	if !util.CheckDirExists(pidPath) {
-		util.ErrAndExit("PID does not exist: \"%s\"", args[0])
+	// Get PID by name if non-numeric, otherwise validate/use args[0]
+	var pid int
+	if !util.IsNumeric(args[0]) {
+		procs := util.ProcessesByName(args[0])
+		if len(procs) == 1 {
+			pid = procs[0].Pid
+		} else if len(procs) > 1 {
+			fmt.Println("Found multiple processes matching that name...")
+			pid = choosePid(procs)
+		} else {
+			util.ErrAndExit("No process found matching that name")
+		}
+		args[0] = fmt.Sprint(pid)
+	} else {
+		pid, err = strconv.Atoi(args[0])
+		if err != nil {
+			util.ErrAndExit("Invalid PID: %s", err)
+		}
 	}
-	// Validate the process isn't already being scoped
-	pidMapFile, err := ioutil.ReadFile(pidPath + "/maps")
-	if err != nil {
-		util.ErrAndExit("Map does not exist for PID: \"%s\"", args[0])
+	// Check PID exists
+	if !util.PidExists(pid) {
+		util.ErrAndExit("PID does not exist: \"%v\"", pid)
 	}
-	pidMap := string(pidMapFile)
-	if strings.Contains(pidMap, "libscope") {
+	// Check PID is not already being scoped
+	if util.PidScoped(pid) {
 		util.ErrAndExit("Attach failed. This process is already being scoped")
 	}
+	// Create ldscope
 	if err := createLdscope(); err != nil {
 		util.ErrAndExit("error creating ldscope: %v", err)
 	}
@@ -84,4 +97,24 @@ func (rc *Config) Attach(args []string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Run()
+}
+
+// choosePid presents a user interface for selecting a PID
+func choosePid(procs util.Processes) int {
+	util.PrintObj([]util.ObjField{
+		{Name: "ID", Field: "id"},
+		{Name: "Pid", Field: "pid"},
+		{Name: "User", Field: "user"},
+		{Name: "Command", Field: "command"},
+		{Name: "Scoped", Field: "scoped"},
+	}, procs)
+	fmt.Println("Select an ID from the list:")
+	var selection string
+	fmt.Scanln(&selection)
+	i, err := strconv.Atoi(selection)
+	i--
+	if err != nil || i < 0 || i > len(procs) {
+		util.ErrAndExit("Invalid Selection")
+	}
+	return procs[i].Pid
 }

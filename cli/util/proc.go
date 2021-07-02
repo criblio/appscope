@@ -127,7 +127,7 @@ func PidUser(pid int) string {
 		ErrAndExit("Unable to find user: %v", err)
 	}
 
-	return user.Name
+	return user.Username
 }
 
 // PidScoped checks if a process specified by PID is being scoped

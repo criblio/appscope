@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
@@ -22,6 +25,9 @@ var psCmd = &cobra.Command{
 			{Name: "Command", Field: "command"},
 			{Name: "Scoped", Field: "scoped"},
 		}, procs)
+		if _, present := os.LookupEnv("SUDO_USER"); !present {
+			fmt.Println("INFO: Run as root (or via sudo) to see all scoped processes")
+		}
 	},
 }
 

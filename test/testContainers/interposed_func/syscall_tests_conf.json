@@ -58,7 +58,8 @@
         "sendto02 requires the sctp protocol",
         "connect02 is kernel specific, works on ubuntu 19 not on 18",
         "sendto03 is a check for vulnerability in thekernel function tpacket_rcv()",
-        "writev03: requires a specific file system: Filesystem ntfs is not supported"],
+        "writev03: requires a specific file system: Filesystem ntfs is not supported",
+        "fcntl38 tests the kernel feature dnotify and requires access to a kernel config file."],
       "exclude_tests": [
         "connect02",
         "sendmsg03",
@@ -120,7 +121,9 @@
         "sendmsg02",
         "sendto02",
         "sendto03",
-        "writev03"
+        "writev03",
+        "fcntl38",
+        "fcntl38_64"
       ]
     },
     {

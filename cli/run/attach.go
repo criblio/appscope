@@ -73,9 +73,6 @@ func (rc *Config) Attach(args []string) {
 	}
 	// Prepend "--attach" to args
 	args = append([]string{"--attach"}, args...)
-	if _, present := os.LookupEnv("SUDO_USER"); present {
-		fmt.Println("WARNING: Session history will be stored under the root user")
-	}
 	if !rc.Subprocess {
 		syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)
 	}

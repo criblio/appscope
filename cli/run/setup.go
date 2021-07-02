@@ -113,6 +113,11 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 	err := os.MkdirAll(histDir, 0755)
 	util.CheckErrSprintf(err, "error creating history dir: %v", err)
 
+	// Sudo user warning
+	if _, present := os.LookupEnv("SUDO_USER"); present {
+		fmt.Printf("WARNING: Session history will be stored in %s and owned by root\n", histDir)
+	}
+
 	// Working directory
 	if attach {
 		// Validate /tmp exists

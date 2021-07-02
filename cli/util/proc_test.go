@@ -8,10 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-/*
- * This test will not pass on the github runner due to permissions on /proc
- * This is now covered in an integration test instead
- *
 // TestProcessesByName
 // Assertions:
 // - The expected process array is returned
@@ -31,7 +27,6 @@ func TestProcessesByName(t *testing.T) {
 	}
 	assert.Equal(t, exp, result)
 }
-*/
 
 // TestPidUser
 // Assertions:

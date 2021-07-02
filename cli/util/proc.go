@@ -58,7 +58,7 @@ func ProcessesByName(name string) Processes {
 				ID:      i,
 				Pid:     pid,
 				User:    PidUser(pid),
-				Command: command,
+				Command: PidCmdline(pid),
 				Scoped:  PidScoped(pid),
 			})
 			i++
@@ -102,7 +102,7 @@ func ProcessesScoped() Processes {
 				ID:      i,
 				Pid:     pid,
 				User:    PidUser(pid),
-				Command: PidCommand(pid),
+				Command: PidCmdline(pid),
 				Scoped:  scoped,
 			})
 			i++
@@ -160,6 +160,19 @@ func PidCommand(pid int) string {
 	}
 
 	return pStat.Name
+}
+
+// PidCmdline gets the command used to start the process specified by PID
+func PidCmdline(pid int) string {
+	pidPath := fmt.Sprintf("/proc/%v", pid)
+
+	// Get name from status
+	cmdline, err := linuxproc.ReadProcessCmdline(pidPath + "/cmdline")
+	if err != nil {
+		ErrAndExit("Error getting process name: %v", err)
+	}
+
+	return cmdline
 }
 
 // PidExists checks if a PID is valid

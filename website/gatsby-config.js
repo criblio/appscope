@@ -63,13 +63,6 @@ module.exports = {
         plugins: [
           `gatsby-remark-autolink-headers`,
           `gatsby-remark-prismjs`,
-        ],
-      },
-    },
-    {
-      resolve: "gatsby-transformer-remark",
-      options: {
-        plugins: [
           {
             resolve: "gatsby-remark-images",
             options: {

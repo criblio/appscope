@@ -3,7 +3,6 @@ title: Integrating with LogStream
 ---
 
 ## Integrating with LogStream
----
 
 AppScope can easily connect to Cribl LogStream ([overview](https://cribl.io/product/) | [download](https://cribl.io/download/) | [docs](https://docs.cribl.io/docs/welcome)).
 
@@ -39,3 +38,9 @@ The following configuration elements are enabled by default when a LogStream con
 - DNS
 
 Other configuration elements are not modified by a LogStream connection.
+
+## Using TLS for Secure Connections
+
+AppScope supports TLS over TCP connections.
+
+See [Using TLS for Secure Connections](/docs/tls).

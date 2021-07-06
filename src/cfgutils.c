@@ -399,150 +399,156 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
 
     if (!cfg || !env_line) return;
 
-    char* env_ptr, *value;
-    if (!(env_ptr = strchr(env_line, '='))) return;
-    if (!(value = doEnvVariableSubstitution(&env_ptr[1]))) return;
+    char *env_name = NULL;
+    char *value = NULL;
+    char *env_ptr;
+    env_name = strdup(env_line);
+    if (!env_name) goto cleanup;
+    if (!(env_ptr = strchr(env_name, '='))) goto cleanup;
+    *env_ptr = '\0'; // Delimiting env_name
+    if (!(value = doEnvVariableSubstitution(&env_ptr[1]))) goto cleanup;
 
-    if (startsWith(env_line, "SCOPE_METRIC_ENABLE")) {
+    if (!strcmp(env_name, "SCOPE_METRIC_ENABLE")) {
         cfgMtcEnableSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_METRIC_FORMAT")) {
+    } else if (!strcmp(env_name, "SCOPE_METRIC_FORMAT")) {
         cfgMtcFormatSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_STATSD_PREFIX")) {
+    } else if (!strcmp(env_name, "SCOPE_STATSD_PREFIX")) {
         cfgMtcStatsDPrefixSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_STATSD_MAXLEN")) {
+    } else if (!strcmp(env_name, "SCOPE_STATSD_MAXLEN")) {
         cfgMtcStatsDMaxLenSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_SUMMARY_PERIOD")) {
+    } else if (!strcmp(env_name, "SCOPE_SUMMARY_PERIOD")) {
         cfgMtcPeriodSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_CMD_DIR")) {
+    } else if (!strcmp(env_name, "SCOPE_CMD_DIR")) {
         cfgCmdDirSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_CONFIG_EVENT")) {
+    } else if (!strcmp(env_name, "SCOPE_CONFIG_EVENT")) {
         cfgConfigEventSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_METRIC_VERBOSITY")) {
+    } else if (!strcmp(env_name, "SCOPE_METRIC_VERBOSITY")) {
         cfgMtcVerbositySetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_LOG_LEVEL")) {
+    } else if (!strcmp(env_name, "SCOPE_LOG_LEVEL")) {
         cfgLogLevelSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_METRIC_DEST")) {
+    } else if (!strcmp(env_name, "SCOPE_METRIC_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_MTC, value);
-    } else if (startsWith(env_line, "SCOPE_METRIC_TLS_ENABLE")) {
+    } else if (!strcmp(env_name, "SCOPE_METRIC_TLS_ENABLE")) {
         cfgTransportTlsEnableSetFromStr(cfg, CFG_MTC, value);
-    } else if (startsWith(env_line, "SCOPE_METRIC_TLS_VALIDATE_SERVER")) {
+    } else if (!strcmp(env_name, "SCOPE_METRIC_TLS_VALIDATE_SERVER")) {
         cfgTransportTlsValidateServerSetFromStr(cfg, CFG_MTC, value);
-    } else if (startsWith(env_line, "SCOPE_METRIC_TLS_CA_CERT_PATH")) {
+    } else if (!strcmp(env_name, "SCOPE_METRIC_TLS_CA_CERT_PATH")) {
         cfgTransportTlsCACertPathSetFromStr(cfg, CFG_MTC, value);
-    } else if (startsWith(env_line, "SCOPE_LOG_DEST")) {
+    } else if (!strcmp(env_name, "SCOPE_LOG_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_LOG, value);
-    } else if (startsWith(env_line, "SCOPE_LOG_TLS_ENABLE")) {
+    } else if (!strcmp(env_name, "SCOPE_LOG_TLS_ENABLE")) {
         cfgTransportTlsEnableSetFromStr(cfg, CFG_LOG, value);
-    } else if (startsWith(env_line, "SCOPE_LOG_TLS_VALIDATE_SERVER")) {
+    } else if (!strcmp(env_name, "SCOPE_LOG_TLS_VALIDATE_SERVER")) {
         cfgTransportTlsValidateServerSetFromStr(cfg, CFG_LOG, value);
-    } else if (startsWith(env_line, "SCOPE_LOG_TLS_CA_CERT_PATH")) {
+    } else if (!strcmp(env_name, "SCOPE_LOG_TLS_CA_CERT_PATH")) {
         cfgTransportTlsCACertPathSetFromStr(cfg, CFG_LOG, value);
-    } else if (startsWith(env_line, "SCOPE_TAG_")) {
-        processCustomTag(cfg, env_line, value);
-    } else if (startsWith(env_line, "SCOPE_PAYLOAD_ENABLE")) {
+    } else if (!strcmp(env_name, "SCOPE_PAYLOAD_ENABLE")) {
         cfgPayEnableSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_PAYLOAD_DIR")) {
+    } else if (!strcmp(env_name, "SCOPE_PAYLOAD_DIR")) {
         cfgPayDirSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_CMD_DBG_PATH")) {
+    } else if (!strcmp(env_name, "SCOPE_CMD_DBG_PATH")) {
         processCmdDebug(value);
-    } else if (startsWith(env_line, "SCOPE_CONF_RELOAD")) {
+    } else if (!strcmp(env_name, "SCOPE_CONF_RELOAD")) {
         processReloadConfig(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_DEST")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_CTL, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_TLS_ENABLE")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_TLS_ENABLE")) {
         cfgTransportTlsEnableSetFromStr(cfg, CFG_CTL, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_TLS_VALIDATE_SERVER")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_TLS_VALIDATE_SERVER")) {
         cfgTransportTlsValidateServerSetFromStr(cfg, CFG_CTL, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_TLS_CA_CERT_PATH")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_TLS_CA_CERT_PATH")) {
         cfgTransportTlsCACertPathSetFromStr(cfg, CFG_CTL, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_ENABLE")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_ENABLE")) {
         cfgEvtEnableSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_FORMAT")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_FORMAT")) {
         cfgEventFormatSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_MAXEPS")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_MAXEPS")) {
         cfgEvtRateLimitSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_ENHANCE_FS")) {
+    } else if (!strcmp(env_name, "SCOPE_ENHANCE_FS")) {
         cfgEnhanceFsSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_NAME")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_LOGFILE_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_NAME")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_CONSOLE_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG_NAME")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_SYSLOG_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_METRIC_NAME")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_METRIC_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_NAME")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_HTTP_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_HEADER")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_HTTP_HEADER")) {
         cfgEvtFormatHeaderSetFromStr(cfg, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_NET_NAME")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_NET_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_NET, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_FS_NAME")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_FS_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FS, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_DNS_NAME")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_DNS_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_DNS, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_FIELD")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_LOGFILE_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_FILE, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_FIELD")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_CONSOLE_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG_FIELD")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_SYSLOG_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_METRIC_FIELD")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_METRIC_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_FIELD")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_HTTP_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_NET_FIELD")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_NET_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_NET, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_FS_FIELD")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_FS_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_FS, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_DNS_FIELD")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_DNS_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_DNS, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE_VALUE")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_LOGFILE_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_FILE, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE_VALUE")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_CONSOLE_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG_VALUE")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_SYSLOG_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_METRIC_VALUE")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_METRIC_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP_VALUE")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_HTTP_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_NET_VALUE")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_NET_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_NET, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_FS_VALUE")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_FS_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_FS, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_DNS_VALUE")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_DNS_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_DNS, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_LOGFILE")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_LOGFILE")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FILE, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_CONSOLE")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_CONSOLE")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_CONSOLE, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_SYSLOG")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_SYSLOG")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_SYSLOG, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_METRIC")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_METRIC")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_METRIC, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_HTTP")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_HTTP")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_HTTP, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_NET")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_NET")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_NET, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_FS")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_FS")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FS, value);
-    } else if (startsWith(env_line, "SCOPE_EVENT_DNS")) {
+    } else if (!strcmp(env_name, "SCOPE_EVENT_DNS")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_DNS, value);
-    } else if (startsWith(env_line, "SCOPE_CRIBL_TLS_ENABLE")) {
+    } else if (!strcmp(env_name, "SCOPE_CRIBL_TLS_ENABLE")) {
         cfgTransportTlsEnableSetFromStr(cfg, CFG_LS, value);
-    } else if (startsWith(env_line, "SCOPE_CRIBL_TLS_VALIDATE_SERVER")) {
+    } else if (!strcmp(env_name, "SCOPE_CRIBL_TLS_VALIDATE_SERVER")) {
         cfgTransportTlsValidateServerSetFromStr(cfg, CFG_LS, value);
-    } else if (startsWith(env_line, "SCOPE_CRIBL_TLS_CA_CERT_PATH")) {
+    } else if (!strcmp(env_name, "SCOPE_CRIBL_TLS_CA_CERT_PATH")) {
         cfgTransportTlsCACertPathSetFromStr(cfg, CFG_LS, value);
-    } else if (startsWith(env_line, "SCOPE_CRIBL_CLOUD")) {
+    } else if (!strcmp(env_name, "SCOPE_CRIBL_CLOUD")) {
         cfgCriblEnableSetFromStrEnv(cfg, CFG_LOGSTREAM_CLOUD, value);
-    } else if (startsWith(env_line, "SCOPE_CRIBL")) {
+    } else if (!strcmp(env_name, "SCOPE_CRIBL")) {
         cfgCriblEnableSetFromStrEnv(cfg, CFG_LOGSTREAM, value);
+    } else if (startsWith(env_name, "SCOPE_TAG_")) {
+        processCustomTag(cfg, env_line, value);
     }
 
-
-    free(value);
+cleanup:
+    if (value) free(value);
+    if (env_name) free(env_name);
 }
 
 

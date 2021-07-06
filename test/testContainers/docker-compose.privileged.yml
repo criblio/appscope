@@ -5,7 +5,7 @@ services:
   alpine:
     privileged: true
 
-  attach:
+  cli:
     privileged: true
 
   bash:

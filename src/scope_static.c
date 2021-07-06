@@ -902,16 +902,13 @@ main(int argc, char **argv, char **env)
         }
 
         // add the env vars we want in the library
-        char *env;
         dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetLibrary());
-        if ((env = getenv("SCOPE_EXEC_PATH"))) {
-            dprintf(fd, "SCOPE_EXEC_PATH=%s\n", env);
-        }
-        if ((env = getenv("SCOPE_CONF_PATH"))) {
-            dprintf(fd, "SCOPE_CONF_PATH=%s\n", env);
-        }
-        if ((env = getenv("SCOPE_HOME"))) {
-            dprintf(fd, "SCOPE_HOME=%s\n", env);
+
+        int i;
+        for (i = 0; environ[i]; i++) {
+            if (strlen(environ[i]) > 6 && strncmp(environ[i], "SCOPE_", 6) == 0) {
+                dprintf(fd, "%s\n", environ[i]);
+            }
         }
 
         // done

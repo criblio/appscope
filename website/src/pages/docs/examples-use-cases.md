@@ -3,7 +3,6 @@ title: Examples and Use Cases
 ---
 
 ## Examples and Use Cases
----
 
 Here are some examples of using AppScope to monitor specific applications, and to send the resulting data to specific destinations.
 

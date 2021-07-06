@@ -467,13 +467,13 @@ services:
       dockerfile: ./alpine/Dockerfile
     <<: *scope-common
 
-  attach:
-    image: criblci/scope-attach-it
+  cli:
+    image: criblci/scope-cli-it
     build:
       cache_from:
-        - criblci/scope-attach-it
+        - criblci/scope-cli-it
       context: .
-      dockerfile: ./attach/Dockerfile
+      dockerfile: ./cli/Dockerfile
     privileged: true
     <<: *scope-common
 

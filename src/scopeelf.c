@@ -259,15 +259,33 @@ getElfEntries(struct link_map *lm, Elf64_Rela **rel, Elf64_Sym **sym, char **str
 
     for (dyn = lm->l_ld; dyn->d_tag != DT_NULL; dyn++) {
         if (dyn->d_tag == DT_SYMTAB) {
-            *sym = (Elf64_Sym *)((char *)(dyn->d_un.d_ptr + lm->l_addr));
+            // Note: using osGetPageProt() to determine if the addr is present in the
+            // process address space. We don't need the prot value.
+            if (osGetPageProt((uint64_t)dyn->d_un.d_ptr) != -1) {
+                *sym = (Elf64_Sym *)((char *)(dyn->d_un.d_ptr));
+            } else {
+                *sym = (Elf64_Sym *)((char *)(dyn->d_un.d_ptr + lm->l_addr));
+            }
         } else if (dyn->d_tag == DT_STRTAB) {
-            *str = (char *)(dyn->d_un.d_ptr + lm->l_addr);
+            if (osGetPageProt((uint64_t)dyn->d_un.d_ptr) != -1) {
+                *str = (char *)(dyn->d_un.d_ptr);
+            } else {
+                *str = (char *)(dyn->d_un.d_ptr + lm->l_addr);
+            }
         } else if (dyn->d_tag == DT_JMPREL) {
-            *rel = (Elf64_Rela *)((char *)(dyn->d_un.d_ptr + lm->l_addr));
+            if (osGetPageProt((uint64_t)dyn->d_un.d_ptr) != -1) {
+                *rel = (Elf64_Rela *)((char *)(dyn->d_un.d_ptr));
+            } else {
+                *rel = (Elf64_Rela *)((char *)(dyn->d_un.d_ptr + lm->l_addr));
+            }
         } else if (dyn->d_tag == DT_PLTRELSZ) {
             *rsz = dyn->d_un.d_val;
         } else if (dyn->d_tag == DT_PLTGOT) {
-            got = (char *)(dyn->d_un.d_ptr + lm->l_addr);
+            if (osGetPageProt((uint64_t)dyn->d_un.d_ptr) != -1) {
+                got = (char *)(dyn->d_un.d_ptr);
+            } else {
+                got = (char *)(dyn->d_un.d_ptr + lm->l_addr);
+            }
         }
     }
 

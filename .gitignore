@@ -19,8 +19,6 @@ test/testContainers/logs
 #website
 website/.env
 website/public/
-!website/node_modules/
-website/node_modules/*
-!website/node_modules/prismjs/
+website/node_modules/
 website/.cache/
 

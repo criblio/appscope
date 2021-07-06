@@ -153,8 +153,8 @@ starttest "Scope ps"
 
 # Scope ps
 run scope ps
-outputs "ID	PID	USER	COMMAND	SCOPED
-1	${sleep_pid} 	root	sleep  	true"
+outputs "ID	PID	USER	COMMAND
+1	${sleep_pid} 	root	sleep"
 returns 0
 
 

@@ -68,7 +68,7 @@ docker-run:
 	@$(DOCKER) run -it --rm \
 		-v "$(shell pwd):/home/builder/appscope" \
 		-u $(shell id -u):$(shell id -g) \
-		$(TAG)
+		$(TAG) bash --login
 
 .PHONY: docker-run-alpine
 docker-run-alpine: TAG?="appscope-builder-alpine"
@@ -84,4 +84,4 @@ docker-run-alpine:
 	@$(DOCKER) run -it --rm \
 		-v "$(shell pwd):/home/builder/appscope" \
 		-u $(shell id -u):$(shell id -g) \
-		$(TAG)
+		$(TAG) bash --login

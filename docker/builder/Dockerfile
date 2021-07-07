@@ -40,11 +40,30 @@ RUN apt-get update && \
     add-apt-repository ppa:longsleep/golang-backports && \
     apt-get update && \
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 52B59B1571A79DBC054901C0F6BC817356A3D45E && \
-    apt-get install -y $GOLANG git autoconf automake libtool cmake lcov upx make gdb vim emacs strace lsof tzdata && \
+    apt-get install -y \
+        $GOLANG \
+        autoconf \
+        automake \
+        cmake \
+        emacs \
+        gdb \
+        git \
+        lcov \
+        libtool \
+        lsof \
+        make \
+        strace \
+        sudo \
+        tzdata \
+        upx \
+        vim \
+        && \
     dpkg-reconfigure --frontend noninteractive tzdata && \
     apt-get clean
 
 RUN useradd -d /home/builder -m builder && \
+    \
+    echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/builder && \
     \
     echo "alias ll='ls -alF'" >> /home/builder/.bashrc && \
     echo "alias la='ls -A'" >> /home/builder/.bashrc && \

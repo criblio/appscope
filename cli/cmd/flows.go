@@ -49,7 +49,12 @@ scope flows --out 124x3c   # Displays the outbound payload of that flow
 		// }
 
 		termWidth, _, err := terminal.GetSize(0)
-		util.CheckErrSprintf(err, "error getting terminal width: %v", err)
+		if err != nil {
+			// If we cannot get the terminal size, we are dealing with redirected stdin
+			// as opposed to an actual terminal, so we will assume terminal width is
+			// 160, to show all columns.
+			termWidth = 160
+		}
 
 		sessions := sessionByID(id)
 

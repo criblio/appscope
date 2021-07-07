@@ -161,10 +161,6 @@ event:
   - type: console
     name: (stdout|stderr)
     value: .*
-  - type: http
-    name: .*
-    field: .*
-    value: .*
   - type: net
     name: .*
     field: .*
@@ -174,6 +170,10 @@ event:
     field: .*
     value: .*
   - type: dns
+    name: .*
+    field: .*
+    value: .*
+  - type: http
     name: .*
     field: .*
     value: .*

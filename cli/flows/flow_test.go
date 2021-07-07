@@ -1,6 +1,7 @@
 package flows
 
 import (
+	"errors"
 	"os"
 	"sort"
 	"testing"
@@ -9,33 +10,138 @@ import (
 )
 
 func TestParseFlowFileName(t *testing.T) {
-	files := []string{
-		"asdf",
-		"14942_65.8.158.81:443_172.17.0.2:42694.out",
-		"14942_65.8.158.81:443_172.17.0.2:42694.in",
+
+	tests := []struct {
+		name        string
+		filename    string
+		expErr      interface{}
+		expPid      int
+		expHostIP   string
+		expPeerIP   string
+		expPeerPort int
+		expHostPort int
+		expInFile   string
+		expOutFile  string
+	}{
+		{
+			name:     "random string",
+			filename: "asdf",
+			expErr:   errors.New("error parsing filename: asdf"),
+		},
+		{
+			name:        "ip and port outfile",
+			filename:    "14942_65.8.158.81:443_172.17.0.2:42694.out",
+			expErr:      nil,
+			expPid:      14942,
+			expHostIP:   "172.17.0.2",
+			expPeerIP:   "65.8.158.81",
+			expPeerPort: 443,
+			expHostPort: 42694,
+			expInFile:   "",
+			expOutFile:  "14942_65.8.158.81:443_172.17.0.2:42694.out",
+		},
+		{
+			name:        "ip and port infile",
+			filename:    "14942_65.8.158.81:443_172.17.0.2:42694.in",
+			expErr:      nil,
+			expPid:      14942,
+			expHostIP:   "172.17.0.2",
+			expPeerIP:   "65.8.158.81",
+			expPeerPort: 443,
+			expHostPort: 42694,
+			expInFile:   "14942_65.8.158.81:443_172.17.0.2:42694.in",
+			expOutFile:  "",
+		},
+		{
+			name:        "af_unix outfile",
+			filename:    "44603_af_unix:198372_af_unix:198371.out",
+			expErr:      nil,
+			expPid:      44603,
+			expHostIP:   "af_unix",
+			expPeerIP:   "af_unix",
+			expPeerPort: 198372,
+			expHostPort: 198371,
+			expInFile:   "",
+			expOutFile:  "44603_af_unix:198372_af_unix:198371.out",
+		},
+		{
+			name:        "af_unix infile",
+			filename:    "44603_af_unix:198372_af_unix:198371.in",
+			expErr:      nil,
+			expPid:      44603,
+			expHostIP:   "af_unix",
+			expPeerIP:   "af_unix",
+			expPeerPort: 198372,
+			expHostPort: 198371,
+			expInFile:   "44603_af_unix:198372_af_unix:198371.in",
+			expOutFile:  "",
+		},
+		{
+			name:        "tlsrx infile",
+			filename:    "44603_tlsrx:0_tlsrx:0.in",
+			expErr:      nil,
+			expPid:      44603,
+			expHostIP:   "tlsrx",
+			expPeerIP:   "tlsrx",
+			expPeerPort: 0,
+			expHostPort: 0,
+			expInFile:   "44603_tlsrx:0_tlsrx:0.in",
+			expOutFile:  "",
+		},
+		{
+			name:        "tlstx outfile",
+			filename:    "44603_tlstx:0_tlstx:0.out",
+			expErr:      nil,
+			expPid:      44603,
+			expHostIP:   "tlstx",
+			expPeerIP:   "tlstx",
+			expPeerPort: 0,
+			expHostPort: 0,
+			expInFile:   "",
+			expOutFile:  "44603_tlstx:0_tlstx:0.out",
+		},
+		{
+			name:        "netrx infile",
+			filename:    "44603_netrx:0_netrx:0.in",
+			expErr:      nil,
+			expPid:      44603,
+			expHostIP:   "netrx",
+			expPeerIP:   "netrx",
+			expPeerPort: 0,
+			expHostPort: 0,
+			expInFile:   "44603_netrx:0_netrx:0.in",
+			expOutFile:  "",
+		},
+		{
+			name:        "nettx outfile",
+			filename:    "44603_nettx:0_nettx:0.out",
+			expErr:      nil,
+			expPid:      44603,
+			expHostIP:   "nettx",
+			expPeerIP:   "nettx",
+			expPeerPort: 0,
+			expHostPort: 0,
+			expInFile:   "",
+			expOutFile:  "44603_nettx:0_nettx:0.out",
+		},
 	}
-	_, err := parseFlowFileName(files[0])
-	assert.Error(t, err)
-	flow, err := parseFlowFileName(files[1])
-	assert.NoError(t, err)
-	assert.Equal(t, Flow{
-		Pid:      14942,
-		HostIP:   "172.17.0.2",
-		PeerIP:   "65.8.158.81",
-		PeerPort: 443,
-		HostPort: 42694,
-		OutFile:  "14942_65.8.158.81:443_172.17.0.2:42694.out",
-	}, flow)
-	flow, err = parseFlowFileName(files[2])
-	assert.NoError(t, err)
-	assert.Equal(t, Flow{
-		Pid:      14942,
-		HostIP:   "172.17.0.2",
-		PeerIP:   "65.8.158.81",
-		PeerPort: 443,
-		HostPort: 42694,
-		InFile:   "14942_65.8.158.81:443_172.17.0.2:42694.in",
-	}, flow)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := parseFlowFileName(tc.filename)
+			if err != nil {
+				assert.Equal(t, tc.expErr, err)
+				return
+			}
+			assert.Equal(t, tc.expPid, res.Pid)
+			assert.Equal(t, tc.expHostIP, res.HostIP)
+			assert.Equal(t, tc.expPeerIP, res.PeerIP)
+			assert.Equal(t, tc.expPeerPort, res.PeerPort)
+			assert.Equal(t, tc.expHostPort, res.HostPort)
+			assert.Equal(t, tc.expInFile, res.InFile)
+			assert.Equal(t, tc.expOutFile, res.OutFile)
+		})
+	}
 }
 
 func TestGetFlowFiles(t *testing.T) {

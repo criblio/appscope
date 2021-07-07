@@ -174,6 +174,16 @@ func (c *Config) setDefault() error {
 			},
 		},
 	}
+
+	if c.CriblDest == "" {
+		c.sc.Event.Watch = append(c.sc.Event.Watch, ScopeWatchConfig{
+			WatchType: "http",
+			Name:      ".*",
+			Field:     ".*",
+			Value:     ".*",
+		})
+	}
+
 	return nil
 }
 
@@ -312,13 +322,6 @@ func (c *Config) configFromRunOpts() error {
 		c.sc.Metric.Transport = ScopeTransport{}
 		c.sc.Event.Transport = ScopeTransport{}
 		c.sc.Libscope.ConfigEvent = true
-	} else {
-		c.sc.Event.Watch = append(c.sc.Event.Watch, ScopeWatchConfig{
-			WatchType: "http",
-			Name:      ".*",
-			Field:     ".*",
-			Value:     ".*",
-		})
 	}
 
 	if c.Loglevel != "" {

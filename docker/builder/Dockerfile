@@ -24,6 +24,7 @@ ENV GOLANG=$GOLANG
 # These are needed to bypass the prompts when tzdata is installed.
 ENV DEBIAN_FRONTEND="noninteractive"
 ENV TZ="America/New_York"
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # ---
 # Install packages. Note extra PPA for Go.
@@ -39,19 +40,29 @@ RUN apt-get update && \
     add-apt-repository ppa:longsleep/golang-backports && \
     apt-get update && \
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 52B59B1571A79DBC054901C0F6BC817356A3D45E && \
-    apt-get install -y $GOLANG git autoconf automake libtool cmake lcov upx make gdb vim emacs strace lsof && \
+    apt-get install -y $GOLANG git autoconf automake libtool cmake lcov upx make gdb vim emacs strace lsof tzdata && \
+    dpkg-reconfigure --frontend noninteractive tzdata && \
     apt-get clean
 
-# ---
-# Extra setup for use with `make docker-run`
-#
-COPY ./docker/builder/gdbinit /root/.gdbinit
+RUN useradd -d /home/builder -m builder && \
+    \
+    echo "alias ll='ls -alF'" >> /home/builder/.bashrc && \
+    echo "alias la='ls -A'" >> /home/builder/.bashrc && \
+    echo "alias l='ls -CF'" >> /home/builder/.bashrc && \
+    echo "alias h='history'" >> /home/builder/.bashrc && \
+    \
+    echo "#set environment LD_PRELOAD=/home/builder/appscope/lib/linux/libscope.so" >> /home/builder/.gdbinit && \
+    echo "set follow-fork-mode child" >> /home/builder/.gdbinit && \
+    echo "set breakpoint pending on" >> /home/builder/.gdbinit && \
+    echo "set directories /home/builder/appscope" >> /home/builder/.gdbinit && \
+    \
+    mkdir /home/builder/appscope
 
 # ---
-# The local git clone of the project is mounted as /root/appscope. See Makefile.
+# The local git clone of the project is mounted as /home/builder/appscope. See Makefile.
 #
-#     docker run -v $(pwd):/root/appscope ...
+#     docker run -v $(pwd):/home/builder/appscope ...
 #
-WORKDIR /root/appscope
+WORKDIR /home/builder/appscope
 
 # fini

@@ -432,3 +432,15 @@ services:
       - type: bind
         source: ../../bin/linux/scope
         target: /usr/bin/scope
+
+  http:
+    volumes:
+      - type: bind
+        source: ../../lib/linux/libscope.so
+        target: /usr/lib/libscope.so
+      - type: bind
+        source: ../../bin/linux/ldscope
+        target: /usr/bin/ldscope
+      - type: bind
+        source: ../../bin/linux/scope
+        target: /usr/bin/scope

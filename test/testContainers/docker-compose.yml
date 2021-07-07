@@ -305,3 +305,10 @@ services:
       context: .
       dockerfile: ./attach/Dockerfile
 
+
+  http:
+    build:
+      context: .
+      dockerfile: ./http/Dockerfile
+    ports:
+      - "9000:9000"

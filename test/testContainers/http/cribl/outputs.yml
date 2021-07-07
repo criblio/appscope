@@ -1,0 +1,17 @@
+outputs:
+  tmp:
+    systemFields:
+      - cribl_pipe
+    addIdToStagePath: false
+    removeEmptyDirs: true
+    partitionExpr: "``"
+    format: json
+    baseFileName: "`CriblOut`"
+    compress: none
+    maxFileSizeMB: 32
+    maxFileOpenTimeSec: 300
+    maxFileIdleTimeSec: 30
+    maxOpenFiles: 100
+    onBackpressure: block
+    type: filesystem
+    destPath: /tmp/

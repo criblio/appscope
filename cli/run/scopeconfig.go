@@ -3,6 +3,7 @@ package run
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -351,12 +352,12 @@ func (c *Config) ScopeConfigYaml() ([]byte, error) {
 }
 
 // WriteScopeConfig writes a scope config to a file
-func (c *Config) WriteScopeConfig(path string) error {
+func (c *Config) WriteScopeConfig(path string, filePerms os.FileMode) error {
 	scb, err := c.ScopeConfigYaml()
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(path, scb, 0644)
+	err = ioutil.WriteFile(path, scb, filePerms)
 	if err != nil {
 		return fmt.Errorf("error writing ScopeConfig to file %s: %v", path, err)
 	}

@@ -255,7 +255,7 @@ func EncodeOffset(offset int64) string {
 	}
 	for offset > 0 {
 		ch := codes[offset%64]
-		str = append(str, byte(ch))
+		str = append(str, ch)
 		offset /= 64
 	}
 	return string(str)
@@ -295,4 +295,10 @@ func ByteCountSI(b int64) string {
 func JSONBytes(obj interface{}) []byte {
 	b, _ := json.Marshal(obj)
 	return b
+}
+
+// IsNumeric returns true if the string passed in is purely numeric
+func IsNumeric(s string) bool {
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil
 }

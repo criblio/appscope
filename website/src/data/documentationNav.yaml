@@ -14,6 +14,9 @@
     - name: Requirements 
       path: /docs/requirements
 
+    - name: Using TLS for Secure Connections 
+      path: /docs/tls
+
     - name: Installing
       path: /docs/installing
 
@@ -27,6 +30,9 @@
   child: 
     - name: Using the CLI
       path: /docs/quick-start-guide
+
+    - name: Scoping a Running Process
+      path: /docs/attach-running
 
     - name: Loader and Library
       path: /docs/loader-library
@@ -47,6 +53,9 @@
 
     - name: Config Files
       path: /docs/config-files
+
+    - name: Other Resources
+      path: /docs/other-resources
 
     - name: Changelog
       path: /docs/changelog

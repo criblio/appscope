@@ -50,6 +50,7 @@ static const char *g_cmddir;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
 static rlim_t g_max_fds = 0;
+static bool g_ismusl = FALSE;
 
 extern unsigned g_sendprocessstart;
 
@@ -903,6 +904,7 @@ reportPeriodicStuff(void)
 
     // empty the event queues
     doEvent();
+
     doPayload();
 
     mtcFlush(g_mtc);
@@ -1122,16 +1124,6 @@ static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t
 static long scope_syscall(long, ...);
 
 static int 
-findInjected(struct dl_phdr_info *info, size_t size, void *data)
-{
-    if (strstr(info->dlpi_name, LIBSCOPE_INJECTED_PATH) != NULL) {
-        *(char **)data = (char *) info->dlpi_name;
-        return 1;
-    }
-    return 0;
-}
-
-static int 
 findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
 {
     int len = strlen(info->dlpi_name);
@@ -1141,16 +1133,12 @@ findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
         *(char **)data = (char *) info->dlpi_name;
         return 1;
     }
-    return findInjected(info, size, data);
+    return 0;
 }
 
 /**
- * Detects whether the libscope library has been injected 
- * using the `ldscope --attach PID command` and if yes, performs GOT hooking.
- * It iterates over all shared objects using dl_iterate_phdr and checks
- * if there is any library whose name begins with /dev/shm/libscopea
+ * Called when injected to perform GOT hooking.
  */ 
-
 static bool
 hookInject()
 {
@@ -1163,7 +1151,7 @@ hookInject()
     struct link_map *lm;
     char buf[512];
 
-    if (dl_iterate_phdr(findInjected, &full_path)) {
+    if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *libscopeHandle = g_fn.dlopen(full_path, RTLD_NOW);
         if (libscopeHandle == NULL) {
             dlclose(libscopeHandle);
@@ -1200,7 +1188,7 @@ hookInject()
 }
 
 static void
-initHook()
+initHook(int attachedFlag)
 {
 #if defined(__GO__) || defined(__FUNCHOOK__)
     int rc;
@@ -1231,6 +1219,10 @@ initHook()
         if (full_path) free(full_path);
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
         return;
+    }
+
+    if (ebuf && ebuf->buf && (strstr(full_path, "ldscope") == NULL)) {
+        g_ismusl = is_musl(ebuf->buf);
     }
 
     if (full_path) free(full_path);
@@ -1264,7 +1256,9 @@ initHook()
                                  .out_addr = (void*)&g_fn.__write_pthread};
     dl_iterate_phdr(findLibSym, &pthread__write);
 
-    hookInject();
+    if (attachedFlag) {
+        hookInject();
+    }
 
     // for DNS:
     // On a glibc distro we hook sendmmsg because getaddrinfo calls this
@@ -1277,16 +1271,9 @@ initHook()
     // We use the fact that on a musl distro the ld lib env var is set to
     // a dir with a libscope-ver string. If that exists in the env var
     // then we assume musl.
-    bool glibc = TRUE;
-    char *libpath = getenv(LD_LIB_ENV);
-    if (libpath && strstr(libpath, LD_LIB_DIR)) {
-        // we are in a libmusl distro
-        glibc = FALSE;
-    }
-
     if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
-        ((glibc == TRUE) && g_fn.sendmmsg) ||
-        ((glibc == FALSE) && (g_fn.sendto || g_fn.recvfrom))) {
+        ((g_ismusl == FALSE) && g_fn.sendmmsg) ||
+        ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
         funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_DEBUG) {
@@ -1305,7 +1292,7 @@ initHook()
         }
 
         // sendmmsg, sendto, recvfrom for internal libc use in DNS queries
-        if ((glibc == TRUE) && g_fn.sendmmsg) {
+        if ((g_ismusl == FALSE) && g_fn.sendmmsg) {
             rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
         }
 
@@ -1313,11 +1300,11 @@ initHook()
             rc = funchook_prepare(funchook, (void**)&g_fn.syscall, scope_syscall);
         }
 
-        if ((glibc == FALSE) && g_fn.sendto) {
+        if ((g_ismusl == TRUE) && g_fn.sendto) {
             rc = funchook_prepare(funchook, (void**)&g_fn.sendto, internal_sendto);
         }
 
-        if ((glibc == FALSE) && g_fn.recvfrom) {
+        if ((g_ismusl == TRUE) && g_fn.recvfrom) {
             rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
         }
 
@@ -1326,7 +1313,7 @@ initHook()
         // They are init'd with a static object. After the first write the
         // write pointer is modified. We handle that mod in the interposed
         // function __stdio_write().
-        if ((glibc == FALSE) && (!g_fn.__stdout_write || !g_fn.__stderr_write)) {
+        if ((g_ismusl == TRUE) && (!g_fn.__stdout_write || !g_fn.__stderr_write)) {
             // Get the static initializer for the stdout write function pointer
             struct MUSL_IO_FILE *stdout_write = (struct MUSL_IO_FILE *)stdout;
 
@@ -1375,6 +1362,56 @@ initHook()
 
 #endif // __LINUX__
 
+static void
+initEnv(int *attachedFlag)
+{
+    // clear the flag by default
+    *attachedFlag = 0;
+
+    if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose || !g_fn.setenv) {
+        //scopeLog("ERROR: missing g_fn's for initEnv()", -1, CFG_LOG_ERROR);
+        return;
+    }
+
+    // build the full path of the .env file
+    char path[128];
+    int  pathLen = snprintf(path, sizeof(path), "/dev/shm/scope_attach_%d.env", getpid());
+    if (pathLen < 0 || pathLen >= sizeof(path)) {
+        //scopeLog("ERROR: snprintf(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
+        return;
+    }
+
+    // open it
+    FILE *fd = g_fn.fopen(path, "r");
+    if (fd == NULL) {
+        //scopeLog("ERROR: fopen(scope_attach_PID.env) failed", -1, CFG_LOG_ERROR);
+        return;
+    }
+
+    // the .env file is there so we're attached
+    *attachedFlag = 1;
+
+    // read "KEY=VALUE\n" lines and add them to the environment
+    char line[8192];
+    while (g_fn.fgets(line, sizeof(line), fd)) {
+        int len = strlen(line);
+        if (line[len-1] == '\n') line[len-1] = '\0';
+        char *key = strtok(line, "=");
+        if (key) {
+            char *val = strtok(NULL, "=");
+            if (val) {
+                g_fn.setenv(key, val, 1);
+            } else {
+                //scopeLog("ERROR: strtok(val) failed", -1, CFG_LOG_ERROR);
+            }
+        } else {
+            //scopeLog("ERROR: strtok(key) failed", -1, CFG_LOG_ERROR);
+        }
+    }
+
+    // done
+    g_fn.fclose(fd);
+}
 
 __attribute__((constructor)) void
 init(void)
@@ -1392,6 +1429,12 @@ init(void)
 
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
+
+    // initEnv() will set this TRUE if it detects `scope_attach_PID.env` in
+    // `/dev/shm` with our PID indicating we were injected into a running
+    // process.
+    int attachedFlag = 0;
+    initEnv(&attachedFlag);
 
     initState();
 
@@ -1421,12 +1464,17 @@ init(void)
         DBG(NULL);
     }
 
-    initHook();
+    initHook(attachedFlag);
     
     if (checkEnv("SCOPE_APP_TYPE", "go") &&
         checkEnv("SCOPE_EXEC_TYPE", "static")) {
         threadNow(0);
-    } else {
+    } else if (g_ismusl == FALSE) {
+        // The check here is meant to be temporary.
+        // The behavior of timer_delete() in musl libc
+        // is different than that of gnu libc.
+        // Therefore, until that is investigated we don't
+        // enable a timer/signal.
         threadInit();
     }
 
@@ -4182,7 +4230,7 @@ send(int sockfd, const void *buf, size_t len, int flags)
 
 static ssize_t
 internal_sendto(int sockfd, const void *buf, size_t len, int flags,
-       const struct sockaddr *dest_addr, socklen_t addrlen)
+                const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
     WRAP_CHECK(sendto, -1);

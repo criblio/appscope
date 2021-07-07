@@ -97,13 +97,13 @@ func parseJSONMetric(b []byte) (Metric, error) {
 	delete(metricMap, "_time")
 	for k, v := range metricMap {
 		t := MetricTag{Name: k}
-		switch v.(type) {
+		switch res := v.(type) {
 		case float64:
-			t.Value = fmt.Sprintf("%.0f", v.(float64))
+			t.Value = fmt.Sprintf("%.0f", res)
 		case int:
-			t.Value = fmt.Sprintf("%d", v.(int))
+			t.Value = fmt.Sprintf("%d", res)
 		case string:
-			t.Value = v.(string)
+			t.Value = res
 		}
 		m.Tags = append(m.Tags, t)
 	}

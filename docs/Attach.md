@@ -8,6 +8,9 @@ The design approach follows well established patterns. We use `ptrace` to attach
 We use `dlopen` to load the libscope library. Therefore, it is a matter of finding the address of `dlopen` in the attach process, setting up parameters and calling `dlopen`.
 
 When libscope is loaded the library constructor is run and it determines that we are attaching and performs GOT hooking on a list of functions. This establishes interposition and detailed data extraction begins.  
+
+![Attach Preview](images/attach1.jpeg)
+
 ## Issues
 We quickly ran into several issues. 
 1. How to configure the library in an attached process
@@ -37,11 +40,15 @@ The design and implementation of musl libc is impressive. It works well and appe
 
 During the attach sequence, the symbol search algorithm used by ld.musl.so requires that the search starts with the executable object and not the next object. This implies that `dlsym` needs to use the `RTLD_DEFAULT` handle and not `RTLD_NEXT`. When `RTLD_NEXT` is used the symbols required in the `g_fn` structure are not resolved and that, of course, causes issues. The requirement to start at the executable makes sense in the context of attach. This required that we determine if we are attaching at the time `g_fn` is initialized. That required a bit of thought. In the end, a simple approach is in place.
 
-The next issue we encountered using ld.musl.so was in walking through all the dynamic symbols in the attached process during constructor execution. The address values defined in the .dynamic section are virtual addresses that should be computed based on the original file value and the memory base address. In cases thus far, on a glibc distro, the base address as defined in the link map is 0. Therefore, the address values in a .dynamic section were used directly, without adding a memory base address. This was not the case on a musl libc distro. Of course, attempting to use a `d_un.d_ptr` from a .dynamic section without adjusting to the base address causes a segfault where the base address needs to be applied. Therefore, adding the base address from the corresponding link map resolves the issue. Which is, of course, correct behavior. 
+The next issue we encountered using ld.musl.so was in walking through all the dynamic symbols in the attached process during constructor execution. The address values defined in the .dynamic section are virtual addresses that should be computed based on the original file value and the memory base address. In some cases, on a glibc distro, the base address as defined in the link map is 0. Therefore, the address values in a .dynamic section were used directly, without adding a memory base address. This was not the case on a musl libc distro. Of course, attempting to use a `d_un.d_ptr` from a .dynamic section without adjusting to the base address causes a segfault where the base address needs to be applied. Therefore, adding the base address from the corresponding link map resolves the issue. Which is, of course, correct behavior.
+
+In other cases, we found that the virtual addresses were not an offset and the base address was not 0. Of course, in this case the base address can not be added to a `d_un.d_ptr`. Given the apparent variation we added a check to determine if the address defined in a `d_un.d_ptr`can be found in the process address space. If it is found, we do not add a base address. While this approach feels a bit uncomfortable it appears to function correctly in all test cases. 
 ### Python3
 The issue with python3 turned out to be difficult to understand. Once we understood, it was a one line code change. The issue originated in the GOT hooking code.
 
-When GOT hooking we have 2 arrays that need to be managed; 1) the GOT entries and 2) the `g_fn` entries. The GOT entries are updated to cause the interposed function to be called by the application. The `g_fn` functions represent the original function called from the interposed function.  
+When GOT hooking we have 2 arrays that need to be managed; 1) the GOT entries and 2) the `g_fn` entries. The GOT entries are updated to cause the interposed function to be called by the application. The `g_fn` functions represent the original function called from the interposed function.
+
+![Attach and the GOT](images/attach2.jpeg)
 
 Once we were able to see details by using the memory based logs it became clear that the GOT entries were accurate. The location of the GOT and entries along with the values being updated were accurate. When we update the GOT entry we assign the previous GOT entry to the corresponding `g_fn` entry. For example, the GOT entry for `fclose` is updated to call the `fclose` interposed function in libscope and `g_fn.fclose` is updated with the original value from the GOT entry. Works great...except in the case where the `g_fn` function is used during constructor execution.
 

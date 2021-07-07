@@ -15,18 +15,30 @@ FROM $IMAGE
 # ---
 # Install packages.
 #
-RUN apk add --no-cache go gdb git make vim emacs strace tcpdump
+RUN apk add --no-cache bash go gdb git make vim emacs strace tcpdump
 
 # ---
-# Extra setup for use with `make docker-run`
+# Add the "builder" user
 #
-COPY ./docker/builder/gdbinit /root/.gdbinit
+RUN adduser -h /home/builder -D builder && \
+    \
+    echo "alias ll='ls -alF'" >> /home/builder/.bashrc && \
+    echo "alias la='ls -A'" >> /home/builder/.bashrc && \
+    echo "alias l='ls -CF'" >> /home/builder/.bashrc && \
+    echo "alias h='history'" >> /home/builder/.bashrc && \
+    \
+    echo "#set environment LD_PRELOAD=/home/builder/appscope/lib/linux/libscope.so" >> /home/builder/.gdbinit && \
+    echo "set follow-fork-mode child" >> /home/builder/.gdbinit && \
+    echo "set breakpoint pending on" >> /home/builder/.gdbinit && \
+    echo "set directories /home/builder/appscope" >> /home/builder/.gdbinit && \
+    \
+    mkdir /home/builder/appscope
 
 # ---
-# The local git clone of the project is mounted as /root/appscope. See Makefile.
+# The local git clone of the project is mounted as /home/builder/appscope. See Makefile.
 #
-#     docker run -v $(pwd):/root/appscope ...
+#     docker run -v $(pwd):/home/builder/appscope ...
 #
-WORKDIR /root/appscope
+WORKDIR /home/builder/appscope
 
 # fini

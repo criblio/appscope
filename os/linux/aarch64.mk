@@ -1,6 +1,7 @@
 ARCH_CFLAGS=-D__ARM64__
 ARCH_LD_FLAGS=
 ARCH_BINARY=elf64-littleaarch64
+ARCH_OBJ=$(ARCH)
 FUNCHOOK_AR=contrib/funchook/build/libfunchook.a
 $(FUNCHOOK_AR):
 	@echo "Building funchook and distorm"

@@ -42,8 +42,8 @@ ldscopedyn: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/util
 
 
 ldscope: src/scope_static.c src/libdir.c ldscopedyn libscope.so
-	objcopy -I binary -O $(ARCH_BINARY) -B $(ARCH) ./bin/$(OS)/ldscopedyn ./bin/$(OS)/ldscopedyn.o
-	objcopy -I binary -O $(ARCH_BINARY) -B $(ARCH) ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
+	objcopy -I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) ./bin/$(OS)/ldscopedyn ./bin/$(OS)/ldscopedyn.o
+	objcopy -I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
 	gcc -Wall -static -g -D__LINUX__ $(ARCH_CFLAGS) $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/scope_static.c src/libdir.c $(INCLUDES) ./bin/$(OS)/ldscopedyn.o ./lib/$(OS)/libscope.o -lrt -lpthread -o ./bin/$(OS)/ldscope
 	rm -f ./bin/$(OS)/ldscopedyn.o ./lib/$(OS)/libscope.o
 

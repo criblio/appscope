@@ -19,6 +19,20 @@
 
 #define __RTLD_DLOPEN	0x80000000
 
+/*
+ * It turns out that PTRACE_GETREGS & PTRACE_SETREGS are arch specific.
+ * From the man page: PTRACE_GETREGS and PTRACE_GETFPREGS are not present on all architectures.
+ * We will need to use PTRACE_GETREGSET and PTRACE_SETREGSET as these are defined to read
+ * registers in an architecture-dependent way.
+ * TODO: the code needs to be updated to handle this when we apply ARM64 specifics.
+ */
+#ifndef PTRACE_GETREGS
+#define PTRACE_GETREGS PTRACE_GETREGSET
+#endif
+#ifndef PTRACE_SETREGS
+#define PTRACE_SETREGS PTRACE_SETREGSET
+#endif
+
 typedef struct {
     char *path;
     uint64_t addr;
@@ -132,13 +146,13 @@ ptraceAttach(pid_t target) {
 static void 
 call_dlopen(void) 
 {
-#if defined(__GO__) || defined(__FUNCHOOK__)
+#ifdef __x86_64__
     asm(
         "andq $0xfffffffffffffff0, %rsp \n" //align stack to 16-byte boundary
         "callq *%rax \n"
         "int $3 \n"
     );
-#endif // defined(__GO__) || defined(__FUNCHOOK__)
+#endif // __x86_64__
 }
 
 static void call_dlopen_end() {}
@@ -146,7 +160,6 @@ static void call_dlopen_end() {}
 static int 
 inject(pid_t pid, uint64_t dlopenAddr, char *path) 
 {
-#if defined(__GO__) || defined(__FUNCHOOK__)
     struct user_regs_struct oldregs, regs;
     unsigned char *oldcode;
     int status;
@@ -187,12 +200,13 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
         return EXIT_FAILURE;
     }
 
+#ifdef __x86_64__
     // set RIP to point to the injected code
     regs.rip = codeAddr;
     regs.rax = dlopenAddr;               // address of dlopen
     regs.rdi = freeAddr;                 // dlopen's first arg - path to the library
     regs.rsi = RTLD_NOW | __RTLD_DLOPEN; // dlopen's second arg - flags
-
+#endif  // __x86_64__
     ptrace(PTRACE_SETREGS, pid, NULL, &regs);
 
     // continue execution and wait until the target process is stopped
@@ -210,7 +224,11 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
 
         // check if the library has been successfully injected
         ptrace(PTRACE_GETREGS, pid, NULL, &regs);
+#ifdef __x86_64__
         if (regs.rax != 0x0) {
+#elif defined(__ARM64__)
+        if (regs.pc != 0) { // TODO: bogus reg, update when applying ARM64 specifics
+#endif
             //printf("Appscope library injected at %p\n", (void*)regs.rax);
         } else {
             fprintf(stderr, "error: dlopen() failed, library could not be injected\n");
@@ -225,8 +243,6 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
         fprintf(stderr, "error: target process stopped\n");
         return EXIT_FAILURE;
     }
-
-#endif // defined(__GO__) || defined(__FUNCHOOK__)
 
     return EXIT_SUCCESS;
 }

@@ -988,14 +988,13 @@ periodic(void *arg)
 }
 
 // TODO; should this move to os/linux/os.c?
-#ifdef __LINUX__
 void *
 memcpy(void *dest, const void *src, size_t n)
 {
     return memmove(dest, src, n);
 }
 
-#if defined(__GO__) || defined(__FUNCHOOK__)
+#ifdef __FUNCHOOK__
 static int
 ssl_read_hook(SSL *ssl, void *buf, int num)
 {
@@ -1093,7 +1092,7 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
     }
     return 0;
 }
-
+#endif // __FUNCHOOK__
 
 /*
  * There are 3x SSL_read functions to consider:
@@ -1113,15 +1112,15 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
  * libscope.so by locating the path to this lib, then
  * get a handle and lookup the symbol.
  */
-
-#endif // defined(__GO__) || defined(__FUNCHOOK__)
 static ssize_t __write_libc(int, const void *, size_t);
 static ssize_t __write_pthread(int, const void *, size_t);
 static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
 static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
 static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
+#ifdef __FUNCHOOK__  // TODO: remove when funchook is working with ARM64, just keeping warnings at bay
 static long scope_syscall(long, ...);
+#endif
 
 static int 
 findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
@@ -1190,11 +1189,12 @@ hookInject()
 static void
 initHook(int attachedFlag)
 {
-#if defined(__GO__) || defined(__FUNCHOOK__)
+#ifdef __FUNCHOOK__
     int rc;
     funchook_t *funchook;
-    char *full_path = NULL;
     bool should_we_patch = FALSE;
+#endif
+    char *full_path = NULL;
     elf_buf_t *ebuf = NULL;
 
     // env vars are not always set as needed, be explicit here
@@ -1202,6 +1202,7 @@ initHook(int attachedFlag)
     if ((osGetExePath(&full_path) != -1) &&
         ((ebuf = getElf(full_path))) &&
         (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
+#ifdef _GO__
         initGoHook(ebuf);
         threadNow(0);
         if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
@@ -1219,6 +1220,7 @@ initHook(int attachedFlag)
         if (full_path) free(full_path);
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
         return;
+#endif  // __GO__
     }
 
     if (ebuf && ebuf->buf && (strstr(full_path, "ldscope") == NULL)) {
@@ -1228,6 +1230,11 @@ initHook(int attachedFlag)
     if (full_path) free(full_path);
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
+    if (attachedFlag) {
+        hookInject();
+    }
+
+#ifdef __FUNCHOOK__
     if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
         if (handle == NULL) {
@@ -1255,10 +1262,6 @@ initHook(int attachedFlag)
                                  .symbol = "__write",
                                  .out_addr = (void*)&g_fn.__write_pthread};
     dl_iterate_phdr(findLibSym, &pthread__write);
-
-    if (attachedFlag) {
-        hookInject();
-    }
 
     // for DNS:
     // On a glibc distro we hook sendmmsg because getaddrinfo calls this
@@ -1351,16 +1354,8 @@ initHook(int attachedFlag)
             return;
         }
     }
-#endif
+#endif  // __FUNCHOOK__
 }
-#else
-static void
-initHook()
-{
-    return;
-}
-
-#endif // __LINUX__
 
 static void
 initEnv(int *attachedFlag)
@@ -2527,6 +2522,7 @@ __write_pthread(int fd, const void *buf, size_t size)
  * do any dynamic memory allocation while this executes. Be careful.
  * The DBG() output is ignored until after the constructor runs.
  */
+#ifdef __FUNCHOOK__  // TODO: remove when funchook is working with ARM64, just keeping warnings at bay
 static long
 scope_syscall(long number, ...)
 {
@@ -2608,6 +2604,7 @@ scope_syscall(long number, ...)
     return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
                         fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
+#endif // __FUNCHOOK__
 
 VAREXPORT size_t // EXPORTOFF because it's redundant with __write
 fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)

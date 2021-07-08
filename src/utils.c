@@ -188,3 +188,18 @@ sigSafeNanosleep(const struct timespec *req)
 
     return rv;
 }
+
+#ifndef __FUNCHOOK__
+int
+func_found_in_executable(const char *symbol, const char *exe)
+{
+    return 0;
+}
+
+int
+run_bash_mem_fix(void)
+{
+    return 0;
+}
+
+#endif

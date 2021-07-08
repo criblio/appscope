@@ -1,11 +1,7 @@
 CWD = $(shell pwd)
 OS=linux
 CC=gcc
-ARCH=$(shell uname -m)
-include os/linux/$(ARCH).mk
 CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -D__LINUX__
-INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build -I./contrib/funchook/distorm/include -I./contrib/jni -I./contrib/jni/linux/ -I./contrib/openssl/include
-LD_FLAGS=$(PCRE2_AR) -ldl -lpthread -lrt -Lcontrib/funchook/build -lfunchook -ldistorm
 SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -D__LINUX__
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
@@ -20,6 +16,9 @@ TEST_AR=$(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR}
 TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
 TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl -lresolv -lrt -lpthread
+
+ARCH=$(shell uname -m)
+include os/linux/$(ARCH).mk
 
 .PHONY: coreall coreclean coretest
 coreall: libscope.so ldscopedyn ldscope
@@ -38,29 +37,14 @@ $(PCRE2_AR):
 	cd contrib/pcre2/build && cmake ..
 	cd contrib/pcre2/build && make
 
-$(FUNCHOOK_AR):
-	@echo "Building funchook and distorm"
-	cd contrib/funchook && mkdir -p build
-	cd contrib/funchook/build && cmake -DCMAKE_BUILD_TYPE=Release ..
-	cd contrib/funchook/build && make distorm funchook-static
-
-libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c src/plattime.c src/fn.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c src/search.c src/sysexec.c src/gocontext.S src/scopeelf.c src/wrap_go.c src/utils.c src/bashmem.c $(YAML_SRC) contrib/cJSON/cJSON.c src/javabci.c src/javaagent.c
-	@echo "Building libscope.so ..."
-	make $(FUNCHOOK_AR)
-	make $(PCRE2_AR)
-	make $(OPENSSL_AR)
-	$(CC) $(CFLAGS) -shared -fvisibility=hidden -fno-stack-protector -DSCOPE_VER=\"$(SCOPE_VER)\" $(CJSON_DEFINES) $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ $(LD_FLAGS) ${OPENSSL_AR} -Wl,--version-script=libscope.map
-	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
-	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/ && rm ./test/selfinterpose/wrap_go.o
-
 ldscopedyn: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c
-	gcc -Wall -g -D__LINUX__ $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c -ldl -lrt -o ./bin/$(OS)/ldscopedyn -I./os/$(OS) $(INCLUDES)
+	gcc -Wall -g -D__LINUX__ $(ARCH_CFLAGS) $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c -ldl -lrt -o ./bin/$(OS)/ldscopedyn -I./os/$(OS) $(INCLUDES)
 
 
 ldscope: src/scope_static.c src/libdir.c ldscopedyn libscope.so
-	objcopy -I binary -O elf64-x86-64 -B i386 ./bin/$(OS)/ldscopedyn ./bin/$(OS)/ldscopedyn.o
-	objcopy -I binary -O elf64-x86-64 -B i386 ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
-	gcc -Wall -static -g -D__LINUX__ $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/scope_static.c src/libdir.c $(INCLUDES) ./bin/$(OS)/ldscopedyn.o ./lib/$(OS)/libscope.o -lrt -lpthread -o ./bin/$(OS)/ldscope
+	objcopy -I binary -O $(ARCH_BINARY) -B $(ARCH) ./bin/$(OS)/ldscopedyn ./bin/$(OS)/ldscopedyn.o
+	objcopy -I binary -O $(ARCH_BINARY) -B $(ARCH) ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
+	gcc -Wall -static -g -D__LINUX__ $(ARCH_CFLAGS) $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/scope_static.c src/libdir.c $(INCLUDES) ./bin/$(OS)/ldscopedyn.o ./lib/$(OS)/libscope.o -lrt -lpthread -o ./bin/$(OS)/ldscope
 	rm -f ./bin/$(OS)/ldscopedyn.o ./lib/$(OS)/libscope.o
 
 coreclean:

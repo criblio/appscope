@@ -62,7 +62,7 @@ module.exports = {
         // Plugins configs
         plugins: [
           `gatsby-remark-autolink-headers`,
-          `gatsby-remark-prismjs`,
+          // `gatsby-remark-prismjs`,
           {
             resolve: "gatsby-remark-images",
             options: {

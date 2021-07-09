@@ -40,12 +40,9 @@ from each one.
   test installs their own version of the `scope-test` command.
 
 * We _cache_ the container images in Docker Hub repositories for each test
-  named `criblci/scope-${TEST}-it`. The Makefile will pull them down and use
-  them to speed up building the local versions. We used `make push` to push
+  named `scopeci/scope-${TEST}-it`. The Makefile will pull them down and use
+  them to speed up building the local versions. We use `make push` to push
   them back up to Docker Hub. 
-
-  We use `README.${TEST}.md` files if found in this directory to update the
-  "Overview" tab for the repository.
 
 ## Execution
 

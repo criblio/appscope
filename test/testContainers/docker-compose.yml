@@ -14,19 +14,19 @@ x-java-common: &java-common
 services:
 
   syscalls:
-    image: criblci/scope-syscalls-it
+    image: scopeci/scope-syscalls-it
     build:
       cache_from: 
-        - criblci/scope-syscalls-it
+        - scopeci/scope-syscalls-it
       context: .
       dockerfile: ./syscalls/Dockerfile
     <<: *scope-common
 
   logstream:
-    image: criblci/scope-logstream-it
+    image: scopeci/scope-logstream-it
     build:
       cache_from: 
-        - criblci/scope-logstream-it
+        - scopeci/scope-logstream-it
       context: .
       dockerfile: ./logstream/Dockerfile
     ports:
@@ -34,19 +34,19 @@ services:
     <<: *scope-common
 
   nginx:
-    image: criblci/scope-nginx-it
+    image: scopeci/scope-nginx-it
     build:
       cache_from:
-        - criblci/scope-nginx-it
+        - scopeci/scope-nginx-it
       context: .
       dockerfile: ./nginx/Dockerfile
     <<: *scope-common
 
   splunk:
-    image: criblci/scope-splunk-it
+    image: scopeci/scope-splunk-it
     build:
       cache_from:
-        - criblci/scope-splunk-it
+        - scopeci/scope-splunk-it
       context: .
       dockerfile: ./splunk/Dockerfile
     ports:
@@ -54,19 +54,19 @@ services:
     <<: *scope-common
 
   elastic:
-    image: criblci/scope-elastic-it
+    image: scopeci/scope-elastic-it
     build:
       cache_from:
-        - criblci/scope-elastic-it
+        - scopeci/scope-elastic-it
       context: .
       dockerfile: ./elastic/Dockerfile
     <<: *scope-common
 
   kafka:
-    image: criblci/scope-kafka-it
+    image: scopeci/scope-kafka-it
     build:
       cache_from:
-        - criblci/scope-kafka-it
+        - scopeci/scope-kafka-it
       context: .
       dockerfile: ./kafka/Dockerfile
     ports:
@@ -87,19 +87,19 @@ services:
     <<: *scope-common
 
   tls:
-    image: criblci/scope-tls-it
+    image: scopeci/scope-tls-it
     build:
       cache_from: 
-        - criblci/scope-tls-it
+        - scopeci/scope-tls-it
       context: .
       dockerfile: ./tls/Dockerfile
     <<: *scope-common
 
   detect_proto:
-    image: criblci/scope-detect_proto-it
+    image: scopeci/scope-detect_proto-it
     build:
       cache_from: 
-        - criblci/scope-detect_proto-it
+        - scopeci/scope-detect_proto-it
       context: .
       dockerfile: ./detect_proto/Dockerfile
     ports:
@@ -108,159 +108,159 @@ services:
     <<: *scope-common
 
   bash:
-    image: criblci/scope-bash-it
+    image: scopeci/scope-bash-it
     build:
       cache_from: 
-        - criblci/scope-bash-it
+        - scopeci/scope-bash-it
       context: .
       dockerfile: ./bash/Dockerfile
     <<: *scope-common
 
   go_2:
-    image: criblci/scope-go_2-it
+    image: scopeci/scope-go_2-it
     build:
       cache_from: 
-        - criblci/scope-go_2-it
+        - scopeci/scope-go_2-it
       context: .
       dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.2
     <<: *scope-common
   go_3:
-    image: criblci/scope-go_3-it
+    image: scopeci/scope-go_3-it
     build:
       cache_from: 
-        - criblci/scope-go_3-it
+        - scopeci/scope-go_3-it
       context: .
       dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.3
     <<: *scope-common
   go_4:
-    image: criblci/scope-go_4-it
+    image: scopeci/scope-go_4-it
     build:
       cache_from: 
-        - criblci/scope-go_4-it
+        - scopeci/scope-go_4-it
       context: .
       dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.4
     <<: *scope-common
   go_5:
-    image: criblci/scope-go_5-it
+    image: scopeci/scope-go_5-it
     build:
       cache_from: 
-        - criblci/scope-go_5-it
+        - scopeci/scope-go_5-it
       context: .
       dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.5
     <<: *scope-common
   go_6:
-    image: criblci/scope-go_6-it
+    image: scopeci/scope-go_6-it
     build:
       cache_from: 
-        - criblci/scope-go_6-it
+        - scopeci/scope-go_6-it
       context: .
       dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.6
     <<: *scope-common
   go_7:
-    image: criblci/scope-go_7-it
+    image: scopeci/scope-go_7-it
     build:
       cache_from: 
-        - criblci/scope-go_7-it
+        - scopeci/scope-go_7-it
       context: .
       dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.7
     <<: *scope-common
   go_8:
-    image: criblci/scope-go_8-it
+    image: scopeci/scope-go_8-it
     build:
       cache_from: 
-        - criblci/scope-go_8-it
+        - scopeci/scope-go_8-it
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.8
     <<: *scope-common
   go_9:
-    image: criblci/scope-go_9-it
+    image: scopeci/scope-go_9-it
     build:
       cache_from: 
-        - criblci/scope-go_9-it
+        - scopeci/scope-go_9-it
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.9
     <<: *scope-common
   go_10:
-    image: criblci/scope-go_10-it
+    image: scopeci/scope-go_10-it
     build:
       cache_from: 
-        - criblci/scope-go_10-it
+        - scopeci/scope-go_10-it
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.10
     <<: *scope-common
   go_11:
-    image: criblci/scope-go_11-it
+    image: scopeci/scope-go_11-it
     build:
       cache_from: 
-        - criblci/scope-go_11-it
+        - scopeci/scope-go_11-it
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.11
     <<: *scope-common
   go_12:
-    image: criblci/scope-go_12-it
+    image: scopeci/scope-go_12-it
     build:
       cache_from: 
-        - criblci/scope-go_12-it
+        - scopeci/scope-go_12-it
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.12
     <<: *scope-common
   go_13:
-    image: criblci/scope-go_13-it
+    image: scopeci/scope-go_13-it
     build:
       cache_from: 
-        - criblci/scope-go_13-it
+        - scopeci/scope-go_13-it
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.13
     <<: *scope-common
   go_14:
-    image: criblci/scope-go_14-it
+    image: scopeci/scope-go_14-it
     build:
       cache_from: 
-        - criblci/scope-go_14-it
+        - scopeci/scope-go_14-it
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.14
     <<: *scope-common
   go_15:
-    image: criblci/scope-go_15-it
+    image: scopeci/scope-go_15-it
     build:
       cache_from: 
-        - criblci/scope-go_15-it
+        - scopeci/scope-go_15-it
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.15
     <<: *scope-common
   go_16:
-    image: criblci/scope-go_16-it
+    image: scopeci/scope-go_16-it
     build:
       cache_from: 
-        - criblci/scope-go_16-it
+        - scopeci/scope-go_16-it
       context: .
       dockerfile: ./go/Dockerfile
       args:
@@ -268,19 +268,19 @@ services:
     <<: *scope-common
 
   gogen:
-    image: criblci/scope-gogen-it
+    image: scopeci/scope-gogen-it
     build:
       cache_from: 
-        - criblci/scope-gogen-it
+        - scopeci/scope-gogen-it
       context: .
       dockerfile: ./gogen/Dockerfile
     <<: *scope-common
 
   java7:
-    image: criblci/scope-java7-it
+    image: scopeci/scope-java7-it
     build:
       cache_from: 
-        - criblci/scope-java7-it
+        - scopeci/scope-java7-it
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -288,10 +288,10 @@ services:
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
     <<: *java-common
   java8:
-    image: criblci/scope-java8-it
+    image: scopeci/scope-java8-it
     build:
       cache_from: 
-        - criblci/scope-java8-it
+        - scopeci/scope-java8-it
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -299,10 +299,10 @@ services:
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
     <<: *java-common
   java9:
-    image: criblci/scope-java9-it
+    image: scopeci/scope-java9-it
     build:
       cache_from: 
-        - criblci/scope-java9-it
+        - scopeci/scope-java9-it
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -310,10 +310,10 @@ services:
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
     <<: *java-common
   java10:
-    image: criblci/scope-java10-it
+    image: scopeci/scope-java10-it
     build:
       cache_from: 
-        - criblci/scope-java10-it
+        - scopeci/scope-java10-it
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -321,10 +321,10 @@ services:
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
     <<: *java-common
   java11:
-    image: criblci/scope-java11-it
+    image: scopeci/scope-java11-it
     build:
       cache_from: 
-        - criblci/scope-java11-it
+        - scopeci/scope-java11-it
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -332,10 +332,10 @@ services:
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
     <<: *java-common
   java12:
-    image: criblci/scope-java12-it
+    image: scopeci/scope-java12-it
     build:
       cache_from: 
-        - criblci/scope-java12-it
+        - scopeci/scope-java12-it
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -343,10 +343,10 @@ services:
         DNLD_HEXDUMP: yum -y install util-linux
     <<: *java-common
   java13:
-    image: criblci/scope-java13-it
+    image: scopeci/scope-java13-it
     build:
       cache_from: 
-        - criblci/scope-java13-it
+        - scopeci/scope-java13-it
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -354,10 +354,10 @@ services:
         DNLD_HEXDUMP: yum -y install util-linux
     <<: *java-common
   java14:
-    image: criblci/scope-java14-it
+    image: scopeci/scope-java14-it
     build:
       cache_from: 
-        - criblci/scope-java14-it
+        - scopeci/scope-java14-it
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -366,10 +366,10 @@ services:
     <<: *java-common
 
   oracle-java6:
-    image: criblci/scope-oracle-java6-it
+    image: scopeci/scope-oracle-java6-it
     build:
       cache_from: 
-        - criblci/scope-oracle-java6-it
+        - scopeci/scope-oracle-java6-it
       context: .
       dockerfile: ./java/Dockerfile.oracle6
       args:
@@ -378,80 +378,80 @@ services:
         KEYTOOL: /usr/java/jre1.6.0_45/bin/keytool
     <<: *java-common
   oracle-java7:
-    image: criblci/scope-oracle-java7-it
+    image: scopeci/scope-oracle-java7-it
     build:
       cache_from: 
-        - criblci/scope-oracle-java7-it
+        - scopeci/scope-oracle-java7-it
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jre/jre-7u80-linux-x64.tar.gz
     <<: *java-common
   oracle-java8:
-    image: criblci/scope-oracle-java8-it
+    image: scopeci/scope-oracle-java8-it
     build:
       cache_from: 
-        - criblci/scope-oracle-java8-it
+        - scopeci/scope-oracle-java8-it
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jre/jre-8u251-linux-x64.tar.gz
     <<: *java-common
   oracle-java9:
-    image: criblci/scope-oracle-java9-it
+    image: scopeci/scope-oracle-java9-it
     build:
       cache_from: 
-        - criblci/scope-oracle-java9-it
+        - scopeci/scope-oracle-java9-it
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jre/jre-9.0.4_linux-x64_bin.tar.gz
     <<: *java-common
   oracle-java10:
-    image: criblci/scope-oracle-java10-it
+    image: scopeci/scope-oracle-java10-it
     build:
       cache_from: 
-        - criblci/scope-oracle-java10-it
+        - scopeci/scope-oracle-java10-it
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jre/jre-10.0.2_linux-x64_bin.tar.gz
     <<: *java-common
   oracle-java11:
-    image: criblci/scope-oracle-java11-it
+    image: scopeci/scope-oracle-java11-it
     build:
       cache_from: 
-        - criblci/scope-oracle-java11-it
+        - scopeci/scope-oracle-java11-it
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-11.0.6_linux-x64_bin.tar.gz
     <<: *java-common
   oracle-java12:
-    image: criblci/scope-oracle-java12-it
+    image: scopeci/scope-oracle-java12-it
     build:
       cache_from: 
-        - criblci/scope-oracle-java12-it
+        - scopeci/scope-oracle-java12-it
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-12.0.2_linux-x64_bin.tar.gz
     <<: *java-common
   oracle-java13:
-    image: criblci/scope-oracle-java13-it
+    image: scopeci/scope-oracle-java13-it
     build:
       cache_from: 
-        - criblci/scope-oracle-java13-it
+        - scopeci/scope-oracle-java13-it
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-13.0.2_linux-x64_bin.tar.gz
     <<: *java-common
   oracle-java14:
-    image: criblci/scope-oracle-java14-it
+    image: scopeci/scope-oracle-java14-it
     build:
       cache_from: 
-        - criblci/scope-oracle-java14-it
+        - scopeci/scope-oracle-java14-it
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
@@ -459,19 +459,19 @@ services:
     <<: *java-common
 
   alpine:
-    image: criblci/scope-alpine-it
+    image: scopeci/scope-alpine-it
     build:
       cache_from:
-        - criblci/scope-alpine-it
+        - scopeci/scope-alpine-it
       context: .
       dockerfile: ./alpine/Dockerfile
     <<: *scope-common
 
   cli:
-    image: criblci/scope-cli-it
+    image: scopeci/scope-cli-it
     build:
       cache_from:
-        - criblci/scope-cli-it
+        - scopeci/scope-cli-it
       context: .
       dockerfile: ./cli/Dockerfile
     privileged: true

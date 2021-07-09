@@ -56,7 +56,7 @@ $(TESTS):
 
 build: $(addsuffix -build, $(TESTS))
 
-%-build: IMAGE=criblci/scope-$(@:%-build=%)-it
+%-build: IMAGE=scopeci/scope-$(@:%-build=%)-it
 %-build: ID=$(shell $(DOCKER) images -q --filter=reference=$(IMAGE))
 %-build:
 	@[ -n "$(filter $(@:%-build=%),$(TESTS))" ] || \
@@ -69,7 +69,7 @@ build: $(addsuffix -build, $(TESTS))
 	-@[ -n "$(ID)" ] || $(DOCKER) pull $(IMAGE) 2>/dev/null
 	@time $(COMPOSE) build $(@:%-build=%)
 
-push: $(TESTS_BUILD)
+push: $(addsuffix -push, $(TESTS))
 	time $(COMPOSE) push
 
 %-push:
@@ -77,6 +77,7 @@ push: $(TESTS_BUILD)
 		{ echo >&2 "error: $(@:%-push=%) isn't a test."; exit 1; }
 	@[ -n "$(SCOPECI_TOKEN)" ] || \
 		{ echo >&2 "error: SCOPECI_TOKEN not set."; exit 1; }
+	@$(MAKE) -s $(@:%-push=%)-build
 	@echo "$(SCOPECI_TOKEN)" | $(DOCKER) login -u scopeci --password-stdin
 	@echo
 	@echo "==================================================================="
@@ -85,11 +86,11 @@ push: $(TESTS_BUILD)
 	@echo "==================================================================="
 	@time $(COMPOSE) push $(@:%-push=%)
 	@$(DOCKER) logout
-	-@[ -f "./README.$(@:%-push=%).md" ] && $(DOCKER) run --rm \
-		-v "./README.$(@:%-push=%).md/:/data/README.md:ro" \
+	-@$(DOCKER) run --rm \
+		-v "$(shell pwd)/OVERVIEW.md:/data/README.md:ro" \
 		-e "DOCKERHUB_USERNAME=scopeci" \
 		-e "DOCKERHUB_PASSWORD=$(SCOPECI_TOKEN)" \
-		-e "DOCKERHUB_REPO_PREFIX=criblci" \
+		-e "DOCKERHUB_REPO_PREFIX=scopeci" \
 		-e "DOCKERHUB_REPO_NAME=scope-$(@:%-push=%)-it" \
 		-e "SHORT_DESCRIPTION=AppScope\ Integration\ Test" \
 		sheogorath/readme-to-dockerhub;

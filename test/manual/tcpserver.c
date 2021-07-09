@@ -110,7 +110,7 @@ socket_setup(int port)
 {
     int optval; /* flag value for setsockopt */
 
-	// create socket
+    // create socket
     int parentfd;
     parentfd = socket(AF_INET, SOCK_STREAM, 0);
     if (parentfd < 0) {

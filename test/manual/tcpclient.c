@@ -96,26 +96,26 @@ main(int argc, char *argv[])
 int
 socket_setup(int port)
 {
-	// create socket
+    // create socket
     int parent_fd;
-	parent_fd = socket(AF_INET , SOCK_STREAM , 0);
-	if (parent_fd < 0)	{
+    parent_fd = socket(AF_INET , SOCK_STREAM , 0);
+    if (parent_fd < 0)	{
         fprintf(stderr, "Error opening socket\n");
         return -1;
-	}
+    }
 
     // server properties
-	struct sockaddr_in server;
+    struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port = htons((unsigned short)port);
 
-	// connect to remote server
-	if (connect(parent_fd , (struct sockaddr *)&server , sizeof(server)) < 0)
-	{
+    // connect to remote server
+    if (connect(parent_fd , (struct sockaddr *)&server , sizeof(server)) < 0)
+    {
         fprintf(stderr, "Connection failed\n");
         return -1;
-	}
+    }
     printf("TCP connected.\n");
 
     return parent_fd;

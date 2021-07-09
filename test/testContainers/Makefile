@@ -70,7 +70,6 @@ build: $(addsuffix -build, $(TESTS))
 	@time $(COMPOSE) build $(@:%-build=%)
 
 push: $(addsuffix -push, $(TESTS))
-	time $(COMPOSE) push
 
 %-push:
 	@[ -n "$(filter $(@:%-push=%),$(TESTS))" ] || \

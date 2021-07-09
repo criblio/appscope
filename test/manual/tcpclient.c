@@ -197,7 +197,6 @@ tcp_ssl(int socket)
     if (ret < 0) {
         return -1;
     }
-    printf("Client shut down TLS session.\n");
 
     if (shutdown(socket, SHUT_RDWR)) {
         perror("client shutdown failed");

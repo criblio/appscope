@@ -6,6 +6,9 @@
  *
  * requires: libssl-dev
  * build: gcc -g test/manual/tcpserver.c -lpthread -lssl -lcrypto -o tcpserver
+ *
+ * generate unencrypted TLS key and certificate:
+ * openssl req -nodes -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem
  */
 
 #include <stdio.h>
@@ -34,8 +37,8 @@
 #define CMDFILE "/tmp/cmdin"
 
 int socket_setup(int port);
-void tcp(int socket);
-void tcp_ssl(int socket);
+int tcp(int socket);
+int tcp_ssl(int socket);
 
 // long aliases for short options
 static struct option options[] = {
@@ -53,6 +56,9 @@ showUsage()
 int
 main(int argc, char *argv[])
 {
+    // ignore SIGPIPE when writing to a closed socket
+    signal(SIGPIPE, SIG_IGN);
+
     int opt = -1;
     int option_index = 0;
     bool tls = false;
@@ -87,9 +93,13 @@ main(int argc, char *argv[])
     
     int socket = socket_setup(port);
     if (tls) {
-        tcp_ssl(socket);
+        if (!tcp_ssl(socket)) {
+            exit (EXIT_FAILURE);
+        }
     } else {
-        tcp(socket);
+        if (!tcp(socket)) {
+            exit (EXIT_FAILURE);
+        }
     }
 
     exit(EXIT_SUCCESS);
@@ -98,15 +108,14 @@ main(int argc, char *argv[])
 int
 socket_setup(int port)
 {
-    struct sockaddr_in serveraddr; /* server's addr */
     int optval; /* flag value for setsockopt */
-    int parentfd; /* parent socket */
 
-    // socket: create the parent socket 
+	// create socket
+    int parentfd;
     parentfd = socket(AF_INET, SOCK_STREAM, 0);
     if (parentfd < 0) {
-        perror("ERROR opening socket");
-        exit(1);
+        fprintf(stderr, "Error opening socket\n");
+        return -1;
     }
 
     /* setsockopt: Handy debugging trick that lets 
@@ -118,47 +127,36 @@ socket_setup(int port)
     setsockopt(parentfd, SOL_SOCKET, SO_REUSEADDR, 
             (const void *)&optval , sizeof(int));
 
-    /*
-     * build the server's Internet address
-     */
+    // server properties
+    struct sockaddr_in serveraddr; /* server's addr */
     bzero((char *) &serveraddr, sizeof(serveraddr));
-
-    /* this is an Internet address */
     serveraddr.sin_family = AF_INET;
-
-    /* let the system figure out our IP address */
     serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-    /* this is the port we will listen on */
     serveraddr.sin_port = htons((unsigned short)port);
 
-    /* 
-     * bind: associate the parent socket with a port 
-     */
+    // bind: associate the parent socket with a port 
     if (bind(parentfd, (struct sockaddr *) &serveraddr, 
                 sizeof(serveraddr)) < 0) {
-        perror("ERROR on binding");
-        exit(1);
+        fprintf(stderr, "Error on binding\n");
+        return -1;
     }
 
-    /* 
-     * listen: make this socket ready to accept connection requests 
-     */
+    // listen: make this socket ready to accept connection requests 
     if (listen(parentfd, 15) < 0) { /* allow 15 requests to queue up */ 
-        perror("ERROR on listen");
-        exit(1);
+        fprintf(stderr, "Error on listen\n");
+        return -1;
     }
 
     return parentfd;
 }
 
 // wait for a connection request then echo
-void
+int
 tcp(int socket)
 {
     struct sockaddr_in clientaddr; /* client addr */
     int childfd; /* child socket */
-    int clientlen;
+    socklen_t clientlen;
     int timeout;
     int numfds;
     struct pollfd fds[MAXFDS];
@@ -324,80 +322,111 @@ tcp(int socket)
             }
         }
     }
-    return;
+    return 0;
 }
 
-// wait for a connection request then echo.
-// tls 1.3 implementation
-void
-tcp_ssl(int socket)
+SSL_CTX*
+ssl_ctx_new()
 {
-    pid_t server_pid;
-    int wstatus;
-    char buffer[1024];
-    int processed;
     SSL_CTX *ssl_ctx;
-    SSL *ssl;
-    int fd;
-    int retval;
-
-    fd = accept(socket, NULL, 0);
-    if (fd < 0) {
-        perror("accept failed");
-        exit(EXIT_FAILURE);
-    }
-    printf("TCP accepted.\n");
-    /*if (!OPENSSL_init_ssl(0, NULL)) {
-        fprintf(stderr, "OPENSSL_init_ssl failed\n");
-        exit(EXIT_FAILURE);
-    }*/
-    /*OpenSSL_add_ssl_algorithms();*/
     ssl_ctx = SSL_CTX_new(TLS_server_method());
     if (!ssl_ctx) {
         fprintf(stderr, "SSL_CTX_new failed\n");
-        exit(EXIT_FAILURE);
+        return NULL;
     }
     if (1 != SSL_CTX_use_PrivateKey_file(ssl_ctx, "key.pem", SSL_FILETYPE_PEM)) {
-        fprintf(stderr, "SSL_CTX_use_PrivateKey_file failed: ");
+        fprintf(stderr, "SSL_CTX_use_PrivatKey_file failed: ");
         ERR_print_errors_fp(stderr);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "\n");
+        return NULL;
     }
     if (1 != SSL_CTX_use_certificate_file(ssl_ctx, "cert.pem", SSL_FILETYPE_PEM)) {
         fprintf(stderr, "SSL_CTX_use_certificate_file failed: ");
         ERR_print_errors_fp(stderr);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "\n");
+        return NULL;
     }
+    return ssl_ctx;
+}
+
+SSL*
+ssl_new(int fd, SSL_CTX *ssl_ctx)
+{
+    SSL* ssl;
     ssl = SSL_new(ssl_ctx);
     if (!ssl) {
         fprintf(stderr, "SSL_new failed\n");
-        exit(EXIT_FAILURE);
+        return NULL;
     }
     if (!SSL_set_fd(ssl, fd)) {
         fprintf(stderr, "SSL_set_fd failed\n");
-        exit(EXIT_FAILURE);
+        return NULL;
     }
-#if OPENSSL_VERSION_NUMBER >= 0x1010100fL
-    /* TLS 1.3 server sends session tickets after a handhake as part of
-     * the SSL_accept(). If a client finishes all its job before server
-     * sends the tickets, SSL_accept() fails with EPIPE errno. Since we
-     * are not interested in a session resumption, we can not to send the
-     * tickets. */
-    /*if (1 != SSL_set_num_tickets(ssl, 0)) {
-        fprintf(stderr, "SSL_set_num_tickets failed\n");
-        exit(EXIT_FAILURE);
+    return ssl;
+}
+
+int
+ssl_shutdown(SSL* ssl) {
+    int ret;
+    ret = SSL_shutdown(ssl);
+    if (ret < 0) {
+        int ssl_err = SSL_get_error(ssl, ret);
+        fprintf(stderr, "Server SSL_shutdown failed: ssl_err=%d\n", ssl_err);
+        return -1;
     }
-    Or we can perform two-way shutdown. Client must call SSL_read() before
-    the final SSL_shutdown(). */
-#endif
-    retval = SSL_accept(ssl);
-    if (retval  <= 0) {
+    printf("Server shut down a TLS session.\n");
+    if (ret != 1) {
+        ret = SSL_shutdown(ssl);
+        if (ret != 1) {
+            int ssl_err = SSL_get_error(ssl, ret);
+            fprintf(stderr,
+                    "Waiting for client shutdown using SSL_shutdown failed: "
+                    "ssl_err=%d\n", ssl_err);
+            return -1;
+        }
+    }
+    printf("Server thinks a client shut down the TLS session.\n");
+    return 0;
+}
+
+// wait for a connection request then echo.
+// tls 1.3 implementation
+int
+tcp_ssl(int socket)
+{
+    int wstatus;
+    char buffer[BUFSIZE];
+    int processed;
+    int fd;
+    int ret;
+
+    fd = accept(socket, NULL, 0);
+    if (fd < 0) {
+        fprintf(stderr, "accept failed\n");
+        return -1;
+    }
+    printf("TCP accepted.\n");
+
+    SSL *ssl;
+    SSL_CTX *ssl_ctx;
+    ssl_ctx = ssl_ctx_new();
+    if (!ssl_ctx) {
+        return -1;
+    }
+    ssl = ssl_new(fd, ssl_ctx);
+    if (!ssl) {
+        return -1;
+    }
+    ret = SSL_accept(ssl);
+    if (ret  <= 0) {
         fprintf(stderr, "SSL_accept failed ssl_err=%d errno=%s: ",
-                SSL_get_error(ssl, retval), strerror(errno));
+                SSL_get_error(ssl, ret), strerror(errno));
         ERR_print_errors_fp(stderr);
         fprintf(stderr, "\n");
-        exit(EXIT_FAILURE);
+        return -1;
     }
     printf("SSL accepted.\n");
+
     while (1) {
         processed = SSL_read(ssl, buffer, sizeof(buffer));
         printf("Server SSL_read returned %d\n", processed);
@@ -414,34 +443,20 @@ tcp_ssl(int socket)
                 fprintf(stderr, "server read failed: ssl_error=%d:", ssl_error);
                 ERR_print_errors_fp(stderr);
                 fprintf(stderr, "\n");
-                exit(EXIT_FAILURE);
+                return -1;
             }
         }
     };
     printf("Server read finished.\n");
-    retval = SSL_shutdown(ssl);
-    if (retval < 0) {
-        int ssl_err = SSL_get_error(ssl, retval);
-        fprintf(stderr, "Server SSL_shutdown failed: ssl_err=%d\n", ssl_err);
-        kill(server_pid, SIGTERM);
-        exit(EXIT_FAILURE);
+
+    ret = ssl_shutdown(ssl);
+    if (ret < 0) {
+        return -1;
     }
-    printf("Server shut down a TLS session.\n");
-    if (retval != 1) {
-        retval = SSL_shutdown(ssl);
-        if (retval != 1) {
-            int ssl_err = SSL_get_error(ssl, retval);
-            fprintf(stderr,
-                    "Waiting for client shutdown using SSL_shutdown failed: "
-                    "ssl_err=%d\n", ssl_err);
-            kill(server_pid, SIGTERM);
-            exit(EXIT_FAILURE);
-        }
-    }
-    printf("Server thinks a client shut down the TLS session.\n");
     SSL_free(ssl);
     SSL_CTX_free(ssl_ctx);
     close(fd);
 
-    return;
+    return 0;
 }
+

@@ -69,6 +69,7 @@
 #define CRIBL_NODE          "cribl"
 #define ENABLE_NODE              "enable"
 #define TRANSPORT_NODE           "transport"
+#define AUTHTOKEN_NODE           "authtoken"
 
 
 enum_map_t formatMap[] = {
@@ -146,6 +147,7 @@ void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
 void cfgPayEnableSetFromStr(config_t*, const char*);
 void cfgPayDirSetFromStr(config_t*, const char*);
+void cfgAuthTokenSetFromStr(config_t*, const char*);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 static void cfgSetFromFile(config_t *, const char *);
 static void cfgCriblEnableSetFromStrEnv(config_t *, cfg_logstream_t, const char *);
@@ -854,6 +856,13 @@ cfgCriblEnableSetFromStrEnv(config_t *cfg, cfg_logstream_t type, const char *val
     cfgTransportSetFromStr(cfg, CFG_LS, value);
 }
 
+void
+cfgAuthTokenSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgAuthTokenSet(cfg, value);
+}
+
 #ifndef NO_YAML
 
 #define foreach(pair, pairs) \
@@ -1437,6 +1446,14 @@ processCriblTransport(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 }
 
 static void
+processAuthToken(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    cfgAuthTokenSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
 processCribl(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     if (node->type != YAML_MAPPING_NODE) return;
@@ -1444,6 +1461,7 @@ processCribl(config_t *config, yaml_document_t *doc, yaml_node_t *node)
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,    ENABLE_NODE,          processCriblEnable},
         {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processCriblTransport},
+        {YAML_SCALAR_NODE,    AUTHTOKEN_NODE,       processAuthToken},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 

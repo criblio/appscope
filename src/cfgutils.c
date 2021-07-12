@@ -1859,22 +1859,6 @@ err:
 }
 
 static cJSON*
-createAuthTokenJson(config_t *cfg)
-{
-    cJSON *root = NULL;
-
-    if (!(root = cJSON_CreateObject())) goto err;
-
-    if (!cJSON_AddStringToObjLN(root, AUTHTOKEN_NODE,
-                         cfgAuthToken(cfg))) goto err;
-
-    return root;
-err:
-    if (root) cJSON_Delete(root);
-    return NULL;
-}
-
-static cJSON*
 createLibscopeJson(config_t* cfg)
 {
     cJSON* root = NULL;
@@ -1904,7 +1888,7 @@ cJSON*
 jsonObjectFromCfg(config_t* cfg)
 {
     cJSON* json_root = NULL;
-    cJSON* metric, *libscope, *event, *payload, *authtoken;
+    cJSON* metric, *libscope, *event, *payload;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
@@ -1919,9 +1903,6 @@ jsonObjectFromCfg(config_t* cfg)
 
     if (!(payload = createPayloadJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(json_root, PAYLOAD_NODE, payload);
-
-    if (!(authtoken = createAuthTokenJson(cfg))) goto err;
-    cJSON_AddItemToObjectCS(json_root, AUTHTOKEN_NODE, authtoken);
 
     return json_root;
 err:

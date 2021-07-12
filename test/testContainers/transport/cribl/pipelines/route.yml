@@ -1,0 +1,12 @@
+id: default
+groups: {}
+routes:
+  - id: default
+    name: default
+    final: true
+    disabled: false
+    pipeline: passthru
+    description: ""
+    clones: []
+    filter: "true"
+    output: tmp

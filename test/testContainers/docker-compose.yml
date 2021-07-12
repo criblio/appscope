@@ -305,3 +305,9 @@ services:
       context: .
       dockerfile: ./cli/Dockerfile
 
+  transport:
+    build:
+      context: .
+      dockerfile: ./transport/Dockerfile
+    ports:
+      - "9000:9000"

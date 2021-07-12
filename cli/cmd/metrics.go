@@ -98,7 +98,12 @@ var metricsCmd = &cobra.Command{
 
 		if graph {
 			termWidth, _, err := terminal.GetSize(0)
-			util.CheckErrSprintf(err, "error getting terminal width: %v", err)
+			if err != nil {
+				// If we cannot get the terminal size, we are dealing with redirected stdin
+				// as opposed to an actual terminal, so we will assume terminal width is
+				// 160, to show all columns.
+				termWidth = 160
+			}
 
 			q := linq.From(values)
 			max := q.Max().(float64)
@@ -140,7 +145,13 @@ var metricsCmd = &cobra.Command{
 		r, w := io.Pipe()
 		util.SetOut(w)
 		scanner := bufio.NewScanner(r)
-		termWidth, _, _ := terminal.GetSize(0)
+		termWidth, _, err := terminal.GetSize(0)
+		if err != nil {
+			// If we cannot get the terminal size, we are dealing with redirected stdin
+			// as opposed to an actual terminal, so we will assume terminal width is
+			// 160, to show all columns.
+			termWidth = 160
+		}
 		go func() {
 			first := true
 			for scanner.Scan() {

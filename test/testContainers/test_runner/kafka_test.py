@@ -34,7 +34,7 @@ class KafkaAppController(AppController):
         subprocess.Popen(start_command.split(), env=env, start_new_session=True, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL)
 
-        time.sleep(5)
+        time.sleep(10)
 
         start_command = "/kafka/bin/kafka-server-start.sh /kafka/config/server.properties"
 

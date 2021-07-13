@@ -3,18 +3,24 @@ title: Requirements
 ---
 
 ## Requirements
----
 
 Requirements for AppScope are as follows:
 
 ### Operating Systems (Linux Only)
 
-Supported:
+AppScope runs on:
 
-- RedHat Enterprise Linux or CentOS 6.4 and later
 - Ubuntu 16 and later
+- Alpine and other distributions based on musl libc
+- RedHat Enterprise Linux or CentOS 7 and later
 - Amazon Linux 1 and 2
 - Debian
+
+When building AppScope from source, use:
+
+- Ubuntu 18.04
+
+This restriction is imposed to make the resulting executable more portable.
 
 ### System
 
@@ -22,6 +28,15 @@ Supported:
 - Memory: 1GB
 - Disk: 20MB (library + CLI)
 
+### Filesystem Configuration
+
+The distros that AppScope supports all require the use of `/tmp`, `/dev/shm`, and `/proc`. You should avoid custom filesystem configuration that interferes with AppScope's ability to use these directories.
+
 ### Known Limitations
 
 These runtimes are **not** supported: Open JVM < v.6, Oracle JVM < v.6, Go < v.1.8.
+
+AppScope cannot:
+
+- Unload the libscope library.
+- Unattach/detach from a running process, once attached.

@@ -197,7 +197,12 @@ func printEvents(cmd *cobra.Command, in chan map[string]interface{}) {
 	eval, _ := cmd.Flags().GetString("eval")
 	enc := json.NewEncoder(os.Stdout)
 	termWidth, _, err := terminal.GetSize(0)
-	util.CheckErrSprintf(err, "error getting terminal width: %v", err)
+	if err != nil {
+		// If we cannot get the terminal size, we are dealing with redirected stdin
+		// as opposed to an actual terminal, so we will assume terminal width is
+		// 160, to show all columns.
+		termWidth = 160
+	}
 
 	var vm *goja.Runtime
 	var prog *goja.Program

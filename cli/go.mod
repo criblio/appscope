@@ -9,6 +9,7 @@ require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
 	github.com/ahmetb/govvv v0.3.0 // indirect
 	github.com/alicebob/gopher-json v0.0.0-20200520072559-a9ecdc9d1d3a
+	github.com/c9s/goprocinfo v0.0.0-20210130143923-c95fcf8c64a8
 	github.com/dlclark/regexp2 v1.4.0 // indirect
 	github.com/dop251/goja v0.0.0-20201221183957-6b6d5e2b5d80
 	github.com/fatih/color v1.7.0
@@ -20,6 +21,7 @@ require (
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/mitchellh/copystructure v1.1.1 // indirect
+	github.com/mitchellh/go-ps v1.0.0
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/mum4k/termdash v0.14.0
 	github.com/olekukonko/tablewriter v0.0.4

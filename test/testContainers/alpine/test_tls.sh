@@ -75,18 +75,27 @@ evalPayload(){
 }
 
 
-set -x
 
+echo
+echo ">>> env <<<"
 env
+echo
+echo ">>> /etc/resolv.conf <<<"
 cat /etc/resolv.conf
-nslookup cribl.io
+echo
+echo ">>> nslookup cribl.io <<<"
+nslookup https://cribl.io
+echo 
+echo ">>> curl cribl.io <<<"
+curl --head https://cribl.io
+echo 
 
 #
 # OpenSSL
 #
 starttest OpenSSL
-#ldscope /opt/test/curl-ssl --http1.1 --head https://cribl.io
 /opt/test/curl-ssl --http1.1 --head https://cribl.io
+ldscope /opt/test/curl-ssl --http1.1 --head https://cribl.io
 evaltest
 
 grep http-req $EVT_FILE > /dev/null

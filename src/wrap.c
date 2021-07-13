@@ -3558,8 +3558,7 @@ __stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
     }
 
     if (dothis == 1 && stream)
-        //doWrite(fileno((FILE *)stream), initialTime, (rc != -1),
-        doWrite(stream->fd, initialTime, (rc != -1),
+        doWrite(fileno((FILE *)stream), initialTime, (rc != -1),
                 iov, rc, "__stdio_write", IOV, iovcnt);
     return rc;
 }

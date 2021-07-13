@@ -26,6 +26,15 @@ jobs:
         with:
           go-version: 1.15
 
+      - uses: actions/cache@v2
+        with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
       - name: Install Dependencies
         run: |
             ./install_build_tools.sh

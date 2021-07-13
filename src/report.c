@@ -682,7 +682,7 @@ doHttpHeader(protocol_info *proto)
         if (mtcEnabled(g_mtc)) {
 
             char *mtx_name = (proto->isServer) ? "http_server_duration" : "http_client_duration";
-            event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA, fields);
+            event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA_MS, fields);
             // TBD AGG Only cmdSendMetric(g_mtc, &http_dur);
             httpAggAddMetric(g_http_agg, &http_dur, map->clen, hreport.clen);
 

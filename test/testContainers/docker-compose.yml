@@ -483,5 +483,6 @@ services:
       dockerfile: ./transport/Dockerfile
     ports:
       - "9000:9000"
+    <<: *scope-common
 
 # vim: ts=2 sw=2 et :

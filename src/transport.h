@@ -25,4 +25,6 @@ int                 transportReconnect(transport_t *);
 cfg_transport_t     transportType(transport_t *);
 int                 transportSetFD(int, transport_t *);
 
+// Misc
+void                transportRegisterForExitNotification(void (*fn)(void));
 #endif // __TRANSPORT_H__

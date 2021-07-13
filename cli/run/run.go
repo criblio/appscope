@@ -25,6 +25,7 @@ type Config struct {
 	Loglevel      string
 	LibraryPath   string
 	NoBreaker     bool
+	AuthToken     string
 
 	now func() time.Time
 	sc  *ScopeConfig

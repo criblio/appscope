@@ -477,4 +477,11 @@ services:
     privileged: true
     <<: *scope-common
 
+  transport:
+    build:
+      context: .
+      dockerfile: ./transport/Dockerfile
+    ports:
+      - "9000:9000"
+
 # vim: ts=2 sw=2 et :

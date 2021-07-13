@@ -542,6 +542,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgTransportTlsCACertPathSetFromStr(cfg, CFG_LS, value);
     } else if (!strcmp(env_name, "SCOPE_CRIBL_CLOUD")) {
         cfgCriblEnableSetFromStrEnv(cfg, CFG_LOGSTREAM_CLOUD, value);
+    } else if (!strcmp(env_name, "SCOPE_CRIBL_AUTHTOKEN")) {
+        cfgAuthTokenSetFromStr(cfg, value);
     } else if (!strcmp(env_name, "SCOPE_CRIBL")) {
         cfgCriblEnableSetFromStrEnv(cfg, CFG_LOGSTREAM, value);
     } else if (startsWith(env_name, "SCOPE_TAG_")) {

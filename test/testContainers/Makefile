@@ -58,6 +58,8 @@ build: $(addsuffix -build, $(TESTS))
 
 %-build: IMAGE=scopeci/scope-$(@:%-build=%)-it
 %-build: ID=$(shell $(DOCKER) images -q --filter=reference=$(IMAGE))
+%-build: COMPOSE_DOCKER_CLI_BUILD=1
+%-build: DOCKER_BUILDKIT=1
 %-build:
 	@[ -n "$(filter $(@:%-build=%),$(TESTS))" ] || \
 		{ echo >&2 "error: $(@:%-build=%) isn't a test."; exit 1; }

@@ -80,7 +80,7 @@ evalPayload(){
 # OpenSSL
 #
 starttest OpenSSL
-ldscope /opt/test/curl-ssl --http1.1 --head https://example.com
+ldscope /opt/test/curl-ssl --http1.1 --head https://cribl.io
 evaltest
 
 grep http-req $EVT_FILE > /dev/null
@@ -108,7 +108,7 @@ endtest
 # gnutls
 #
 starttest gnutls
-ldscope /opt/test/curl-tls --http1.1 --head https://example.com
+ldscope /opt/test/curl-tls --http1.1 --head https://cribl.io
 evaltest
 
 grep http-req $EVT_FILE > /dev/null
@@ -136,7 +136,7 @@ endtest
 # nss
 #
 starttest nss
-ldscope /opt/test/curl-nss --http1.1 --head https://example.com
+ldscope /opt/test/curl-nss --http1.1 --head https://cribl.io
 evaltest
 
 grep http-req $EVT_FILE > /dev/null

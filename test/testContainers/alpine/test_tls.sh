@@ -75,12 +75,18 @@ evalPayload(){
 }
 
 
+set -x
+
+env
+cat /etc/resolv.conf
+nslookup cribl.io
 
 #
 # OpenSSL
 #
 starttest OpenSSL
-ldscope /opt/test/curl-ssl --http1.1 --head https://cribl.io
+#ldscope /opt/test/curl-ssl --http1.1 --head https://cribl.io
+/opt/test/curl-ssl --http1.1 --head https://cribl.io
 evaltest
 
 grep http-req $EVT_FILE > /dev/null

@@ -3,71 +3,60 @@ FROM alpine:latest
 RUN apk add go openssl make file bash curl autoconf automake libtool openssl-dev rust nodejs ruby python3 php php-openssl apache2 apache2-ssl python3-dev py3-pip libffi-dev cargo && \
     go clean -cache
 
-RUN mkdir -p /go
+RUN mkdir -p /go /go/thread /go/net /go/cgo
 
-RUN mkdir -p /go/thread
-COPY ./go/thread/fileThread.go /go/thread
-RUN cd /go/thread && CGO_ENABLED=0 go build fileThread.go
+COPY ./go/thread/* /go/thread/
+COPY ./go/net/* /go/net/
+COPY ./go/cgo/* /go/cgo/
 
-RUN mkdir -p /go/net
-COPY ./go/net/plainServer.go /go/net
-RUN cd /go/net && go build -buildmode=pie -o plainServerDynamic plainServer.go
-RUN cd /go/net && CGO_ENABLED=0 go build -o plainServerStatic plainServer.go
-COPY ./go/net/tlsServer.go /go/net
-RUN cd /go/net && go build -o tlsServerDynamic tlsServer.go
-RUN cd /go/net && CGO_ENABLED=0 go build -o tlsServerStatic tlsServer.go
-RUN cd /go/net && openssl genrsa -out server.key 2048 && \
-                  openssl ecparam -genkey -name secp384r1 -out server.key && \
-                  openssl req -new -x509 -sha256 -key server.key -out server.crt \
-       -days 3650 -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost"
-COPY ./go/net/plainClient.go /go/net
-RUN cd /go/net && go build -o plainClientDynamic plainClient.go
-RUN cd /go/net && CGO_ENABLED=0 go build -o plainClientStatic plainClient.go
-COPY ./go/net/tlsClient.go /go/net
-RUN cd /go/net && go build -o tlsClientDynamic tlsClient.go
-RUN cd /go/net && CGO_ENABLED=0 go build -o tlsClientStatic tlsClient.go
+# Build all the Go test programs
+RUN cd /go/thread && \
+      CGO_ENABLED=0 go build fileThread.go && \
+    cd /go/net && \
+      go build -buildmode=pie -o plainServerDynamic plainServer.go && \
+      CGO_ENABLED=0 go build -o plainServerStatic plainServer.go && \
+      go build -o tlsServerDynamic tlsServer.go && \
+      CGO_ENABLED=0 go build -o tlsServerStatic tlsServer.go && \
+      openssl genrsa -out server.key 2048 && \
+      openssl ecparam -genkey -name secp384r1 -out server.key && \
+      openssl req -new -x509 -sha256 -key server.key -out server.crt \
+        -days 3650 -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost" && \
+      go build -o plainClientDynamic plainClient.go && \
+      CGO_ENABLED=0 go build -o plainClientStatic plainClient.go && \
+      go build -o tlsClientDynamic tlsClient.go && \
+      CGO_ENABLED=0 go build -o tlsClientStatic tlsClient.go && \
+    cd /go/cgo && \
+      make all
 
-RUN mkdir -p /go/cgo
-COPY ./go/cgo/Makefile /go/cgo
-COPY ./go/cgo/myc.c /go/cgo
-COPY ./go/cgo/myc.h /go/cgo
-COPY ./go/cgo/mygo.go /go/cgo
-RUN cd /go/cgo && make all
-
-# Building two versions of curl. Download the source first.
+# Building three versions of curl; curl-ssl, curl-tls, and curl-nss
 RUN mkdir -p /opt/test && \
     cd /opt/test && \
-    wget https://curl.haxx.se/download/curl-7.69.1.tar.gz
-# Build the SSL version
-RUN cd /opt/test && \
-    tar xvzf curl-7.69.1.tar.gz && \
-    mv curl-7.69.1 curlssl && \
-    cd curlssl && \
-    ./buildconf && \
-    ./configure --with-ssl --without-gnutls --without-nss && \
-    make -j8
-# Build the TLS version
-RUN cd /opt/test && \
-    tar xvzf curl-7.69.1.tar.gz && \
-    mv curl-7.69.1 curltls && \
-    cd curltls && \
-    ./buildconf && \
-    ./configure --without-ssl --with-gnutls --without-nss && \
-    make -j8
-# Build the NSS version
-RUN cd /opt/test && \
-    tar xvzf curl-7.69.1.tar.gz && \
-    mv curl-7.69.1 curlnss && \
-    cd curlnss && \
-    ./buildconf && \
-    ./configure --without-ssl --without-gnutls --with-nss && \
-    make -j8
-# Save the results and clean up
-RUN cd /opt/test && \
-    cp curlssl/src/.libs/curl curl-ssl && \
-    cp curltls/src/.libs/curl curl-tls && \
-    cp curlnss/src/.libs/curl curl-nss && \
-    rm -rf curlssl curltls curlnss curl-7.69.1.tar.gz
+      wget https://curl.haxx.se/download/curl-7.69.1.tar.gz && \
+      tar xvzf curl-7.69.1.tar.gz && \
+      mv curl-7.69.1 curlssl && \
+    cd /opt/test/curlssl && \
+      ./buildconf && \
+      ./configure --with-ssl --without-gnutls --without-nss && \
+      make -j8 && \
+    cd /opt/test && \
+      tar xvzf curl-7.69.1.tar.gz && \
+      mv curl-7.69.1 curltls && \
+    cd /opt/test/curltls && \
+      ./buildconf && \
+      ./configure --without-ssl --with-gnutls --without-nss && \
+      make -j8 && \
+    cd /opt/test && \
+      tar xvzf curl-7.69.1.tar.gz && \
+      mv curl-7.69.1 curlnss && \
+    cd /opt/test/curlnss && \
+      ./buildconf && \
+      ./configure --without-ssl --without-gnutls --with-nss && \
+      make -j8 && \
+    cd /opt/test && \
+      cp curlssl/src/.libs/curl curl-ssl && \
+      cp curltls/src/.libs/curl curl-tls && \
+      cp curlnss/src/.libs/curl curl-nss && \
+      rm -rf curlssl curltls curlnss curl-7.69.1.tar.gz
 
 # Install test-runner pieces
 RUN mkdir /opt/test/logs /opt/test/bin

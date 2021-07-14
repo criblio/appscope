@@ -115,11 +115,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - name: Rebuild Image
-        run: |
-            make -C test/testContainers ${{ matrix.test }}-build
+      - name: Login to Container Registry
+        uses: docker/login-action@v1
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
 
-      - name: Save Image
-        env:
-            SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
+      - name: Update Image
         run: make -C test/testContainers ${{ matrix.test }}-push

@@ -56,10 +56,13 @@ $(TESTS):
 
 build: $(addsuffix -build, $(TESTS))
 
+# --
+# Check if an image already exists locally with the tag before pulling it again
+# so we can build a newer version with newer configs and not have to rebuilt it
+# every time. That's what ID is for.
+# --
 %-build: IMAGE=scopeci/scope-$(@:%-build=%)-it
 %-build: ID=$(shell $(DOCKER) images -q --filter=reference=$(IMAGE))
-%-build: export COMPOSE_DOCKER_CLI_BUILD=1
-%-build: export DOCKER_BUILDKIT=1
 %-build:
 	@[ -n "$(filter $(@:%-build=%),$(TESTS))" ] || \
 		{ echo >&2 "error: $(@:%-build=%) isn't a test."; exit 1; }
@@ -79,14 +82,12 @@ push: $(addsuffix -push, $(TESTS))
 	@[ -n "$(SCOPECI_TOKEN)" ] || \
 		{ echo >&2 "error: SCOPECI_TOKEN not set."; exit 1; }
 	@$(MAKE) -s $(@:%-push=%)-build
-	@echo "$(SCOPECI_TOKEN)" | $(DOCKER) login -u scopeci --password-stdin
 	@echo
 	@echo "==================================================================="
 	@echo " $(shell date)"
 	@echo " Pushing Image for \"$(@:%-push=%)\" Test"
 	@echo "==================================================================="
 	@time $(COMPOSE) push $(@:%-push=%)
-	@$(DOCKER) logout
 	-@$(DOCKER) run --rm \
 		-v "$(shell pwd)/OVERVIEW.md:/data/README.md:ro" \
 		-e "DOCKERHUB_USERNAME=scopeci" \

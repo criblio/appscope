@@ -478,7 +478,10 @@ services:
     <<: *scope-common
 
   transport:
+    image: scopeci/scope-transport-it
     build:
+      cache_from:
+        - scopeci/scope-transport-it
       context: .
       dockerfile: ./transport/Dockerfile
     ports:

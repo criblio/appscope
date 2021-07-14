@@ -19,15 +19,33 @@ echo
 echo ===============================================================================
 echo Testing HTTP/1.1
 rm -rf /tmp/out/appscope:in_appscope
-scope run -c tcp://localhost:10090 -- curl --http1.1 $URL
+scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $URL
 sleep 6
 if compgen -G "/tmp/out/appscope:in_appscope/CriblOut-*.json" > /dev/null; then
-    echo "  PASSED?? Well, got somthing..."
-    egrep '"source" *: *"http-' /tmp/out/appscope:in_appscope/CriblOut-*.json | jq -CS . -
+    echo "  PASSED?? Well, got something..."
+    cat /tmp/out/appscope:in_appscope/CriblOut-*.json
+    #egrep '"source" *: *"http-' /tmp/out/appscope:in_appscope/CriblOut-*.json | jq -CS . -
 else
     echo "  FAILED, nothing there..."
     ERR+=1
     ERRORS="$ERRORS HTTP/1.1"
+    ls -lR /tmp/out 
+fi
+
+echo
+echo ===============================================================================
+echo Testing HTTP/2-Prior-Knowledge
+rm -rf /tmp/out/appscope:in_appscope
+scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http2-prior-knowledge $URL
+sleep 6
+if compgen -G "/tmp/out/appscope:in_appscope/CriblOut-*.json" > /dev/null; then
+    echo "  PASSED?? Well, got something..."
+    cat /tmp/out/appscope:in_appscope/CriblOut-*.json
+    #egrep '"source" *: *"http-' /tmp/out/appscope:in_appscope/CriblOut-*.json | jq -CS . -
+else
+    echo "  FAILED, nothing there..."
+    ERR+=1
+    ERRORS="$ERRORS HTTP/2-Prior-Knowledge"
     ls -lR /tmp/out
 fi
 

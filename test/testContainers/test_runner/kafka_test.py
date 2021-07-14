@@ -34,20 +34,19 @@ class KafkaAppController(AppController):
         subprocess.Popen(start_command.split(), env=env, start_new_session=True, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL)
 
-        time.sleep(10)
-
         start_command = "/kafka/bin/kafka-server-start.sh /kafka/config/server.properties"
 
         logging.debug(f"Command is {start_command}.")
         subprocess.Popen(start_command.split(), env=env, start_new_session=True, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL)
 
-        time.sleep(10)
+        time.sleep(20)
 
     def stop(self):
+        logging.info(f"Stopping app {self.name}.")
         subprocess.Popen("/kafka/bin/kafka-server-stop.sh", start_new_session=True)
         subprocess.Popen("/kafka/bin/zookeeper-server-stop.sh", start_new_session=True)
-        time.sleep(5)
+        time.sleep(20)
 
     def assert_running(self):
         completed_proc = subprocess.run("/kafka/bin/zookeeper-shell.sh localhost:2181 ls /brokers/ids", shell=True,

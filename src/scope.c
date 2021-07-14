@@ -193,7 +193,7 @@ main(int argc, char **argv, char **env)
             return EXIT_FAILURE;
         }
 
-        //printf("info: attaching to process %d\n", pid);
+        printf("Attaching to process %d\n", pid);
         int ret = injectScope(pid, scopeLibPath);
 
         // remove the config that `ldscope`

@@ -46,16 +46,16 @@ endtest(){
 ################ BEGIN TESTS ################
 
 #
-# static 
+# scope_cli_static
 # 
-starttest static
+starttest scope_cli_static
 
 # Assert that scope is built as a static executable in order to be portable to Alpine/musl.
-file /usr/bin/scope | grep "statically linked"
+file $(realpath $(which scope)) | grep "statically linked"
 if [ $? -eq 0 ]; then
 	echo "PASS Scope is a static executable"
 else
-	echo "FAIL Scope is a dynamic executable"
+	echo "FAIL Scope isn't static!"
 	ERR+=1
 fi
 
@@ -63,21 +63,16 @@ evaltest
 
 endtest
 
-
-
-
-
-
 #
-# scope
+# scope_cli_runs
 #
-starttest scope
+starttest scope_cli_runs
 
 # Assert that the scope executable runs on alpine.
 if [ scope ]; then
-	echo "PASS Scope is a static executable"
+	echo "PASS Scope CLI is runnable"
 else
-	echo "FAIL Scope is a dynamic executable"
+	echo "FAIL Scope CLI won't run"
 	ERR+=1
 fi
 

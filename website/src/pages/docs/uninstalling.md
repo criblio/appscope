@@ -3,7 +3,6 @@ title: Uninstalling
 ---
 
 ## Uninstalling
-----
 
 You can uninstall AppScope by simply deleting the binary:
 

@@ -39,7 +39,7 @@
     margin-bottom: 10px;
   }
   p,
-  ol,
+  /* ol, */
   li,
   code {
     font-size: 16px;
@@ -50,7 +50,10 @@
     margin: 10px 0;
   }
   ol {
-    padding: 0;
+    /* padding: 0; */
+    padding-left: 20px;
+    margin: 5px 0;
+    font-size: 16px;
   }
   li {
     margin: 5px 0;
@@ -59,7 +62,7 @@
     padding: 0;
     margin: 0;
   }
-  li ul {
+  li ul, li ol {
     margin: 0;
     li {
       list-style-type: none;

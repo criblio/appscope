@@ -113,7 +113,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_FS TRUE
 #define DEFAULT_SRC_DNS TRUE
 
-#define DEFAULT_MAXEVENTSPERSEC 100000
+#define DEFAULT_MAXEVENTSPERSEC 10000
 #define DEFAULT_ENHANCE_FS TRUE
 #define DEFAULT_PORTBLOCK 0
 #define DEFAULT_METRIC_CBUF_SIZE 50 * 1024
@@ -164,6 +164,7 @@ typedef unsigned int bool;
 //    SCOPE_EXEC_TYPE                internal use only
 //    SCOPE_EXECVE                   "false" disables scope of child procs
 //    SCOPE_EXEC_PATH                specifies path to ldscope executable
+//    SCOPE_CRIBL_NO_BREAKER         adds breaker property to process start message
 //    SCOPE_LIB_PATH                 specifies path to libscope.so library
 //    SCOPE_GO_STRUCT_PATH           for internal testing
 //    SCOPE_HTTP_SERIALIZE_ENABLE    "true" adds guard for race condition

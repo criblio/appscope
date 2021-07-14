@@ -25,6 +25,7 @@ type ScopeConfig struct {
 type ScopeCriblConfig struct {
 	Enable    bool           `mapstructure:"enable" json:"enable" yaml:"enable"`
 	Transport ScopeTransport `mapstructure:"transport" json:"transport" yaml:"transport"`
+	AuthToken string         `mapstructure:"authtoken" json:"authtoken" yaml:"authtoken"`
 }
 
 // ScopeMetricConfig represents how to output metrics
@@ -322,6 +323,7 @@ func (c *Config) configFromRunOpts() error {
 		c.sc.Metric.Transport = ScopeTransport{}
 		c.sc.Event.Transport = ScopeTransport{}
 		c.sc.Libscope.ConfigEvent = true
+		c.sc.Cribl.AuthToken = c.AuthToken
 	}
 
 	if c.Loglevel != "" {

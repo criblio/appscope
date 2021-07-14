@@ -3,11 +3,10 @@ title: "Config Files"
 ---
 
 ## Config Files
----
 
 ### scope.yml Config File
 
-Below are the default contents of the `scope.yml` library configuration file: 
+Below are the default contents of the `scope.yml` library configuration file:
 
 ```
 ---
@@ -140,8 +139,27 @@ libscope:
 ...
 ```
 
+#### Using TLS
+
+To use TLS for secure communication, edit the `transport` element such that `type` is set to `tcp`, and `tls : enable` is set to `true`, as shown in the example below. The remaining elements in the example can be configured to suit your environment. See [TLS](/docs/tls).
+
+```
+  transport:
+      type: tcp
+      host: 127.0.0.1
+      port: 10090
+      tls:
+        enable: true
+        validateserver: false         # false is like curl's -k option
+        cacertpath: ''
+            # Use this field if you want to specify a private CA.
+            # Leave it empty if you want AppScope to use public root certs
+            # provided by the Linux distro.
+
+```
+
 ### scope_protocol.yml Config File
----
+
 Below are the default contents of the `scope_protocol.yml` library configuration file: 
 
 ```

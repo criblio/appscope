@@ -1,0 +1,13 @@
+#!/bin/bash
+netstat -s
+if python3 \
+    /opt/test-runner/app.py \
+    -v \
+    -t nginx \
+    -l /opt/test-runner/logs/ \
+    -s /usr/local/scope/lib/libscope.so; then
+    exit 0
+else
+    netstat -s
+    exit 1
+fi

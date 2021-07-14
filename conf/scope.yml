@@ -65,7 +65,7 @@ event:
     # May be most useful for capturing debug output from processes
     # running in containerized environments.
     - type: console
-      name: stdout                  # (stdout|stderr)
+      name: (stdout)|(stderr)
       value: .*
 
     # Creates events from libscope's metric (statsd) data.  May be
@@ -74,7 +74,7 @@ event:
     # high cardinality.
 #    - type: metric
 #      name: .*                      # (net.*)|(.*err.*)
-#      field: .*                     # whitelist regex describing field names
+#      field: .*                     # allowlist regex describing field names
 #      value: .*
 
     # Enable extraction of HTTP headers
@@ -111,13 +111,13 @@ libscope:
   summaryperiod : 10                # in seconds
   commanddir : '/tmp'
   #  commanddir supports changes to configuration settings of running
-  #  processees.  At every summary period the library looks in commanddir
-  #  to see if a file named scope.<pid> exists.  (where pid is the process ID
-  #  of the process running with scope.)  If it exists, it processes every
-  #  line for environment variable-style commands:
+  #  processes.  At every summary period, the library looks in commanddir
+  #  to see if a file named scope.<pid> exists. (Where <pid> is the process ID
+  #  of the process running with scope.) If this file exists, commanddir 
+  #  processes every line for environment variable–style commands:
   #      SCOPE_METRIC_VERBOSITY=9
   #  It changes the configuration to match the new settings, and deletes the
-  #  scope.<pid> file when it's complete.
+  #  scope.<pid> file when replacement is complete.
 
   log:
     level: warning                    # debug, info, warning, error, none

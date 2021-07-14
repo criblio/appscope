@@ -1,20 +1,28 @@
 FROM cribl/cribl:latest
 
-# Dependencies
 RUN apt update && apt install -y \
   curl \
+  emacs \
+  gdb \
+  vim \
 && rm -rf /var/lib/apt/lists/*
 
-# Configure Cribl LogStream
 ENV CRIBL_NOAUTH=1
 COPY http/cribl/ /opt/cribl/local/cribl/
 
-# Test Environment
-RUN mkdir -p /opt/test/bin
-COPY http/scope-test /opt/test/bin
-ENV SCOPE_CRIBL=tcp://localhost:10090
+ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+COPY scope-profile.sh /etc/profile.d/scope.sh
+COPY gdbinit /root/.gdbinit
 
-# Startup
-COPY http/docker-entrypoint.sh /
+RUN  mkdir /usr/local/scope && \
+     mkdir /usr/local/scope/bin && \
+     mkdir /usr/local/scope/lib && \
+     ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
+
+COPY http/scope-test /usr/local/scope/
+
+COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["test"]

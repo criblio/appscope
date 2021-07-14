@@ -1,12 +1,42 @@
 #!/bin/bash
 
-# wait for LogStream to be up
+#set -x
+
+ERR=0
+ERRORS=
+
+URL=http://nghttp2.org/robots.txt
+
+echo
+echo ===============================================================================
+echo "Starting Cribl LogStream"
+openssl req -newkey rsa:2048 -nodes -keyout /tmp/appscope.key -x509 -days 365 -out /tmp/appscope.crt -subj '/C=US/ST=GA/L=Canton/O=AppScope/OU=IT/CN=appscope'
+mkdir /tmp/out
+/opt/cribl/bin/cribl start
 sleep 5
 
-# testing...
-scope run -p -- curl -o /dev/null https://cribl.io
-sleep 5
-ls -lR /tmp
+echo
+echo ===============================================================================
+echo Testing HTTP/1.1
+rm -rf /tmp/out/appscope:in_appscope
+scope run -c tcp://localhost:10090 -- curl --http1.1 $URL
+sleep 6
+if compgen -G "/tmp/out/appscope:in_appscope/CriblOut-*.json" > /dev/null; then
+    echo "  PASSED?? Well, got somthing..."
+    egrep '"source" *: *"http-' /tmp/out/appscope:in_appscope/CriblOut-*.json | jq -CS . -
+else
+    echo "  FAILED, nothing there..."
+    ERR+=1
+    ERRORS="$ERRORS HTTP/1.1"
+    ls -lR /tmp/out
+fi
 
-echo >&2 "error: http test not implemented"
-exit 1
+echo
+echo ===============================================================================
+if [ -n "$ERRORS" ]; then
+    echo >&2 "$ERR HTTP tests failed; $ERRORS"
+else
+    echo "All HTTP tests passed"
+fi
+exit $ERR
+

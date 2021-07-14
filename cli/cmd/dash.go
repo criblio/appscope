@@ -170,6 +170,12 @@ func readEvents(workDir string, w *widgets) {
 	in := make(chan map[string]interface{})
 	eventCount, _ := util.CountLines(eventsPath)
 	termWidth, _, err := terminal.GetSize(0)
+	if err != nil {
+		// If we cannot get the terminal size, we are dealing with redirected stdin
+		// as opposed to an actual terminal, so we will assume terminal width is
+		// 160, to show all columns.
+		termWidth = 160
+	}
 	skipEvents := eventCount - 20
 	if skipEvents < 0 {
 		skipEvents = 0

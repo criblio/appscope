@@ -5,9 +5,12 @@
 ERR=0
 ERRORS=
 
-# wait for LogStream to be up
 echo
-echo Waiting for LogStream...
+echo ===============================================================================
+echo "Starting Cribl LogStream"
+openssl req -newkey rsa:2048 -nodes -keyout /tmp/appscope.key -x509 -days 365 -out /tmp/appscope.crt -subj '/C=US/ST=GA/L=Canton/O=AppScope/OU=IT/CN=appscope'
+mkdir /tmp/out
+/opt/cribl/bin/cribl start
 sleep 5
 
 echo

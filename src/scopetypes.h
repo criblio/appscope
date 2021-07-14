@@ -93,7 +93,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_NET_FIELD ".*"
 #define DEFAULT_SRC_FS_FIELD ".*"
 #define DEFAULT_SRC_DNS_FIELD ".*"
-#define DEFAULT_SRC_FILE_NAME ".*log.*"
+#define DEFAULT_SRC_FILE_NAME "(\\/logs?\\/)|(\\.log$)|(\\.log[.\\d])"
 #define DEFAULT_SRC_CONSOLE_NAME "(stdout)|(stderr)"
 #define DEFAULT_SRC_SYSLOG_NAME ".*"
 #define DEFAULT_SRC_METRIC_NAME ".*"

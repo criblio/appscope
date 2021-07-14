@@ -1,24 +1,8 @@
 #
-# Cribl AppScope™ - Integration Test Runner
+# AppScope - Integration Test Runner
 #
 # See ./README.md for details.
 #
-
-# ---
-# Head's Up...
-#
-# There is a nasty issue with docker-compose 1.25.0 which is current at this
-# time. `docker-compose pull` doesn't actually pull anything for a service that
-# has a `build` config. The "feature" has since been reverted in their code but
-# it's not out in general release yet. I'm not sure if/when it will appear in
-# the images GitHub uses for workflows either. So, we're using `docker pull`
-# and assuming we can guess the image names here instead of the normal
-# `docker-compose pull`.
-#
-# Screw You Docker Compose!
-#
-# pd
-# ---
 
 COMPOSE ?= $(shell which docker-compose 2>/dev/null)
 ifeq (, $(COMPOSE))
@@ -59,7 +43,8 @@ build: $(addsuffix -build, $(TESTS))
 # --
 # Check if an image already exists locally with the tag before pulling it again
 # so we can build a newer version with newer configs and not have to rebuilt it
-# every time. That's what ID is for.
+# every time. That's what ID is for. Should have no effect in CI as the local
+# images list should be empty.
 # --
 %-build: IMAGE=scopeci/scope-$(@:%-build=%)-it
 %-build: ID=$(shell $(DOCKER) images -q --filter=reference=$(IMAGE))
@@ -71,7 +56,7 @@ build: $(addsuffix -build, $(TESTS))
 	@echo " $(shell date)"
 	@echo " Building Image for \"$(@:%-build=%)\" Test"
 	@echo "==================================================================="
-	-@[ -n "$(ID)" ] || $(DOCKER) pull $(IMAGE) 2>/dev/null
+	-[ -n "$(ID)" ] || $(COMPOSE) pull $(@:%-build=%)
 	@$(COMPOSE) build --progress tty $(@:%-build=%)
 
 push: $(addsuffix -push, $(TESTS))
@@ -79,8 +64,6 @@ push: $(addsuffix -push, $(TESTS))
 %-push:
 	@[ -n "$(filter $(@:%-push=%),$(TESTS))" ] || \
 		{ echo >&2 "error: $(@:%-push=%) isn't a test."; exit 1; }
-	@[ -n "$(SCOPECI_TOKEN)" ] || \
-		{ echo >&2 "error: SCOPECI_TOKEN not set."; exit 1; }
 	@$(MAKE) -s $(@:%-push=%)-build
 	@echo
 	@echo "==================================================================="
@@ -88,7 +71,7 @@ push: $(addsuffix -push, $(TESTS))
 	@echo " Pushing Image for \"$(@:%-push=%)\" Test"
 	@echo "==================================================================="
 	@time $(COMPOSE) push $(@:%-push=%)
-	-@$(DOCKER) run --rm \
+	@[ -z "$(SCOPECI_TOKEN)"] || $(DOCKER) run --rm \
 		-v "$(shell pwd)/OVERVIEW.md:/data/README.md:ro" \
 		-e "DOCKERHUB_USERNAME=scopeci" \
 		-e "DOCKERHUB_PASSWORD=$(SCOPECI_TOKEN)" \
@@ -97,6 +80,7 @@ push: $(addsuffix -push, $(TESTS))
 		-e "SHORT_DESCRIPTION=AppScope\ Integration\ Test" \
 		sheogorath/readme-to-dockerhub;
 
+%-shell: CMD?=/bin/bash
 %-shell:
 	@[ -n "$(filter $(@:%-shell=%),$(TESTS))" ] || \
 		{ echo >&2 "error: $(@:%-shell=%) isn't a test."; exit 1; }
@@ -106,8 +90,8 @@ push: $(addsuffix -push, $(TESTS))
 	@echo " $(shell date)"
 	@echo " Shell in Container for \"$(@:%-shell=%)\" Test"
 	@echo "==================================================================="
-	@$(COMPOSE) -f docker-compose.yml -f docker-compose.privileged.yml run $(@:%-shell=%) /bin/bash
+	@$(COMPOSE) -f docker-compose.yml -f docker-compose.privileged.yml run $(@:%-shell=%) $(CMD)
 
-.PHONY: help all build push $(TESTS) %-shell %-build %-push
+.PHONY: help all build push $(TESTS) %-build %-push %-shell
 
 # vim: sw=4 ts=4 noet :

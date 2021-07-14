@@ -3,7 +3,7 @@ FROM ubuntu:20.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get -o Acquire::Check-Valid-Until=false update && \
-    apt-get install -y vim git gawk build-essential gdb emacs lsof tcpdump wget curl && \
+    apt-get install -y vim git gawk build-essential gdb emacs lsof tcpdump wget curl autoconf automake libtool && \
     apt-get clean
 
 RUN git clone https://git.savannah.gnu.org/git/bash.git && \

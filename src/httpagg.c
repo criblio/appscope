@@ -284,11 +284,14 @@ report_target(mtc_t *mtc, target_agg_t *target)
         for (i = SERVER_DURATION; i < FIELD_MAX; i++) {
             if (target->field[i].num_entries == 0) continue;
             char *unit;
+            data_type_t metric_type;
 
             if ((i == SERVER_DURATION) || (i == CLIENT_DURATION)) {
                 unit = "millisecond";
+                metric_type = DELTA_MS;
             } else {
                 unit = "byte";
+                metric_type = DELTA;
             }
 
             event_field_t fields[] = {
@@ -301,7 +304,7 @@ report_target(mtc_t *mtc, target_agg_t *target)
                 FIELDEND
             };
             event_t metric = INT_EVENT(valToStr(fieldMapOut, i),
-                                       target->field[i].total, DELTA, fields);
+                                       target->field[i].total, metric_type, fields);
             cmdSendMetric(mtc, &metric);
         }
     }

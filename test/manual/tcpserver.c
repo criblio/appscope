@@ -1,5 +1,5 @@
 /* 
- * tcpserver.c - A simple TCP echo server 
+ * tcpserver.c - A simple TCP server 
  *
  * usage: tcpserver [OPTIONS] PORT
  * options: -t, --tls       use TLSv1.3
@@ -36,16 +36,18 @@
 #define MAXFDS 500
 #define CMDFILE "/tmp/cmdin"
 
-int socket_setup(int port);
-int tcp(int socket);
-int tcp_ssl(int socket);
+// Forward declarations
+int socket_setup(int);
+int socket_teardown(int);
+int tcp(int);
+int tcp_ssl(int);
 
-// long aliases for short options
+// Long aliases for short options
 static struct option options[] = {
     {"tls", no_argument, 0, 't'}
 };
 
-// program helper
+// Program helper
 void
 showUsage()
 {
@@ -91,15 +93,23 @@ main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
     
-    int socket = socket_setup(port);
+    int socket;
+    if ((socket = socket_setup(port)) < 0) {
+        exit(EXIT_FAILURE);
+    }
+
     if (tls) {
-        if (!tcp_ssl(socket)) {
-            exit (EXIT_FAILURE);
+        if (tcp_ssl(socket) < 0) {
+            exit(EXIT_FAILURE);
         }
     } else {
-        if (!tcp(socket)) {
-            exit (EXIT_FAILURE);
+        if (tcp(socket) < 0) {
+            exit(EXIT_FAILURE);
         }
+    }
+
+    if (socket_teardown(socket) < 0) {
+        exit(EXIT_FAILURE);
     }
 
     exit(EXIT_SUCCESS);
@@ -125,7 +135,7 @@ socket_setup(int port)
      */
     optval = 1;
     setsockopt(parentfd, SOL_SOCKET, SO_REUSEADDR, 
-            (const void *)&optval , sizeof(int));
+            (const void *)&optval , sizeof(optval));
 
     // server properties
     struct sockaddr_in serveraddr; /* server's addr */
@@ -147,10 +157,26 @@ socket_setup(int port)
         return -1;
     }
 
+    printf("Server set up parent TCP socket.\n");
+
     return parentfd;
 }
 
-// wait for a connection request then echo
+// Socket teardown
+int 
+socket_teardown(int socket)
+{
+    if (shutdown(socket, SHUT_RDWR)) {
+        fprintf(stderr, "server shutdown failed\n");
+        return -1;
+    }
+    printf("Server shut down parent TCP socket.\n");
+    close(socket);
+    printf("Server closed parent TCP socket.\n");
+    return 0;
+}
+
+// Wait for a connection request then print messages to stdout.
 int
 tcp(int socket)
 {
@@ -311,12 +337,12 @@ tcp(int socket)
                         fds[i].fd = -1;
                         fds[i].events = 0;
                     }
-                    // echo input to stdout
+                    // print input to stdout
                     write(1, buf, rc);
 
                     // Artifical delay...
-                    //struct timespec ts = {.tv_sec=0, .tv_nsec=001000000}; // 1 ms
-                    //nanosleep(&ts, NULL);
+                    // struct timespec ts = {.tv_sec=0, .tv_nsec=001000000}; // 1 ms
+                    // nanosleep(&ts, NULL);
 
                 } while (1);
             }
@@ -325,6 +351,7 @@ tcp(int socket)
     return 0;
 }
 
+// Generate SSL context and load certificates
 SSL_CTX*
 ssl_ctx_new()
 {
@@ -335,7 +362,7 @@ ssl_ctx_new()
         return NULL;
     }
     if (1 != SSL_CTX_use_PrivateKey_file(ssl_ctx, "key.pem", SSL_FILETYPE_PEM)) {
-        fprintf(stderr, "SSL_CTX_use_PrivatKey_file failed: ");
+        fprintf(stderr, "SSL_CTX_use_PrivateKey_file failed: ");
         ERR_print_errors_fp(stderr);
         fprintf(stderr, "\n");
         return NULL;
@@ -349,6 +376,7 @@ ssl_ctx_new()
     return ssl_ctx;
 }
 
+// Generate SSL from context
 SSL*
 ssl_new(int fd, SSL_CTX *ssl_ctx)
 {
@@ -365,6 +393,7 @@ ssl_new(int fd, SSL_CTX *ssl_ctx)
     return ssl;
 }
 
+// Bidirectional SSL shutdown
 int
 ssl_shutdown(SSL* ssl) {
     int ret;
@@ -389,8 +418,8 @@ ssl_shutdown(SSL* ssl) {
     return 0;
 }
 
-// wait for a connection request then echo.
-// tls 1.3 implementation
+// Wait for a connection request then print messages to stdout.
+// TLS 1.3 implementation
 int
 tcp_ssl(int socket)
 {
@@ -405,7 +434,7 @@ tcp_ssl(int socket)
         fprintf(stderr, "accept failed\n");
         return -1;
     }
-    printf("TCP accepted.\n");
+    printf("TCP connection accepted.\n");
 
     SSL *ssl;
     SSL_CTX *ssl_ctx;
@@ -425,7 +454,7 @@ tcp_ssl(int socket)
         fprintf(stderr, "\n");
         return -1;
     }
-    printf("SSL accepted.\n");
+    printf("TLS connection accepted.\n");
 
     while (1) {
         processed = SSL_read(ssl, buffer, sizeof(buffer));
@@ -455,7 +484,9 @@ tcp_ssl(int socket)
     }
     SSL_free(ssl);
     SSL_CTX_free(ssl_ctx);
+
     close(fd);
+    printf("Server closed TCP socket.\n");
 
     return 0;
 }

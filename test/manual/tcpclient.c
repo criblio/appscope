@@ -25,15 +25,17 @@
 #include <getopt.h>
 #include <stdbool.h>
 
-int socket_setup(int port);
-int tcp_ssl(int socket);
+// Forward declarations
+int socket_setup(int);
+int socket_teardown(int);
+int tcp_ssl(int);
 
-// long aliases for short options
+// Long aliases for short options
 static struct option options[] = {
     {"tls", no_argument, 0, 't'}
 };
 
-// program helper
+// Program helper
 void
 showUsage()
 {
@@ -73,26 +75,35 @@ main(int argc, char *argv[])
     int port = atoi(argv[optind]);
     if (port < 1) {
         showUsage();
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     if(!tls) {
         printf("Currently supports -t only\n");
-        exit (EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
     
-    int socket = socket_setup(port);
+    int socket;
+    if ((socket = socket_setup(port)) < 0) {
+        exit(EXIT_FAILURE);
+    }
+
     if (tls) {
-        if (!tcp_ssl(socket)) {
-            exit (EXIT_FAILURE);
+        if (tcp_ssl(socket) < 0) {
+            exit(EXIT_FAILURE);
         }
     } else {
         // tcp not yet supported
     }
 
+    if (socket_teardown(socket) < 0) {
+        exit(EXIT_FAILURE);
+    }
+
     exit(EXIT_SUCCESS);
 }
 
+// Create a socket and connect to the server
 int
 socket_setup(int port)
 {
@@ -110,6 +121,8 @@ socket_setup(int port)
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port = htons((unsigned short)port);
 
+    printf("Client set up TCP socket.\n");
+
     // connect to remote server
     if (connect(parent_fd , (struct sockaddr *)&server , sizeof(server)) < 0)
     {
@@ -121,6 +134,21 @@ socket_setup(int port)
     return parent_fd;
 }
 
+// Socket teardown
+int 
+socket_teardown(int socket)
+{
+    if (shutdown(socket, SHUT_RDWR)) {
+        fprintf(stderr, "client shutdown failed\n");
+        return -1;
+    }
+    printf("Client shut down TCP socket.\n");
+    close(socket);
+    printf("Client closed TCP socket.\n");
+    return 0;
+}
+
+// Bidirectional SSL shutdown
 int
 ssl_shutdown(SSL* ssl) {
     int ret;
@@ -145,6 +173,8 @@ ssl_shutdown(SSL* ssl) {
     return 0;
 }
 
+// Establish an SSL connection and send a TLS encrypted message 
+// Then shutdown the SSL connection
 int
 tcp_ssl(int socket)
 {
@@ -197,12 +227,6 @@ tcp_ssl(int socket)
     if (ret < 0) {
         return -1;
     }
-
-    if (shutdown(socket, SHUT_RDWR)) {
-        perror("client shutdown failed");
-        return -1;
-    }
-    printf("Client shut down TCP.\n");
 
     SSL_free(ssl);
     SSL_CTX_free(ssl_ctx);

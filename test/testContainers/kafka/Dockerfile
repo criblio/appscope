@@ -5,7 +5,7 @@ RUN yum -y install centos-release-scl
 RUN yum -y install rh-python36
 RUN yum -y install epel-release
 RUN yum -y install java-1.8.0-openjdk
-RUN yum -y install mc
+RUN yum -y install mc net-tools lsof vim emacs gdb
 
 RUN mkdir -p /opt/test-runner/logs/
 

@@ -48,6 +48,41 @@
 
 static int g_debug = 0;
 
+static int
+get_dir(const char *path, char *fres, size_t len)
+{
+    DIR *dirp;
+    struct dirent *entry;
+    char *dcopy, *pcopy, *dname, *fname;
+
+    if (!path || !fres || (len <= 0)) return -1;
+
+    pcopy = strdup(path);
+    dname = dirname(pcopy);
+
+    if ((dirp = opendir(dname)) == NULL) {
+        perror("get_dir:opendir");
+        if (pcopy) free(pcopy);
+        return -1;
+    }
+
+    dcopy = strdup(path);
+    fname = basename(dcopy);
+
+    while ((entry = readdir(dirp)) != NULL) {
+        if ((entry->d_type != DT_DIR) &&
+            (strstr(entry->d_name, fname))) {
+            strncpy(fres, entry->d_name, len);
+            break;
+        }
+    }
+
+    closedir(dirp);
+    if (pcopy) free(pcopy);
+    if (dcopy) free(dcopy);
+    return 0;
+}
+
 static void
 setEnvVariable(char *env, char *value)
 {
@@ -140,6 +175,7 @@ set_library(void)
                 if (dyn->d_tag == DT_NEEDED) {
                     char *depstr = (char *)(strtab + dyn->d_un.d_val);
                     if (depstr && strstr(depstr, "ld-linux")) {
+#if 0
                         DIR *dirp;
                         struct dirent *entry;
                         char *newdep;
@@ -165,6 +201,14 @@ set_library(void)
                         closedir(dirp);
 
                         if (name && (strlen(depstr) >= (strlen(newdep) + 1))) {
+                            strncpy(depstr, newdep, strlen(newdep) + 1);
+                            found = 1;
+                            break;
+                        }
+#endif
+                        char newdep[PATH_MAX];
+                        if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) break;
+                        if (strlen(depstr) >= (strlen(newdep) + 1)) {
                             strncpy(depstr, newdep, strlen(newdep) + 1);
                             found = 1;
                             break;

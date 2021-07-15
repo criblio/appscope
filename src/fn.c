@@ -8,12 +8,16 @@
 #include "dbg.h"
 #include "fn.h"
 
-#define GETADDR(val, sym)                           \
-    ares.in_symbol = sym;                           \
-    if (dl_iterate_phdr(getAddr, &ares)) {          \
-        val = ares.out_addr;                        \
-    } else {                                        \
-        val = NULL;                                 \
+#define GETADDR(val, sym)                              \
+    ares.in_symbol = sym;                              \
+    if (dl_iterate_phdr(getAddr, &ares)) {             \
+        val = ares.out_addr;                           \
+    } else if ((val = dlsym(RTLD_NEXT, sym))) {        \
+        DBG(NULL);                                     \
+    } else if ((val = dlsym(RTLD_DEFAULT, sym))) {     \
+        DBG(NULL);                                     \
+    } else {                                           \
+        val = NULL;                                    \
     }
 
 interposed_funcs_t g_fn;
@@ -31,10 +35,10 @@ getAddr(struct dl_phdr_info *info, size_t size, void *data)
 
     ares->out_addr = NULL;
 
-    if (strstr(info->dlpi_name, "libscope") != NULL) return 0;
+    if (strstr(info->dlpi_name, "librt.so") == NULL) return 0;
 
     // can we find the symbol in this object
-    void *handle = dlopen(info->dlpi_name, RTLD_NOW);
+    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
     if (!handle) return 0;
 
     void *addr = dlsym(handle, ares->in_symbol);
@@ -54,12 +58,9 @@ void
 initFn(void)
 {
     addresult_t ares;
-    ares.in_symbol = "vsyslog";
-    if (dl_iterate_phdr(getAddr, &ares)) {
-        g_fn.vsyslog = ares.out_addr;
-    } else {
-        g_fn.vsyslog = NULL;
-    }
+
+    g_fn.dlopen = dlsym(RTLD_NEXT, "dlopen");
+    if (!g_fn.dlopen) g_fn.dlopen = dlsym(RTLD_DEFAULT, "dlopen");
 
     GETADDR(g_fn.vsyslog, "vsyslog");
     GETADDR(g_fn.fork, "fork");
@@ -211,7 +212,7 @@ initFn(void)
     GETADDR(g_fn.gnutls_record_send_range, "gnutls_record_send_range");
     GETADDR(g_fn.gnutls_transport_get_ptr, "gnutls_transport_get_ptr");
     GETADDR(g_fn.SSL_ImportFD, "SSL_ImportFD");
-    GETADDR(g_fn.dlopen, "dlopen");
+    //GETADDR(g_fn.dlopen, "dlopen");
     GETADDR(g_fn.PR_FileDesc2NativeHandle, "PR_FileDesc2NativeHandle");
     GETADDR(g_fn.PR_SetError, "PR_SetError");
     GETADDR(g_fn.__overflow, "__overflow");

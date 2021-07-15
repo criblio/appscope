@@ -395,7 +395,7 @@ ssl_new(int fd, SSL_CTX *ssl_ctx)
 
 // Bidirectional SSL shutdown
 int
-ssl_shutdown(SSL* ssl) {
+ssl_shutdown(SSL *ssl) {
     int ret;
     ret = SSL_shutdown(ssl);
     if (ret < 0) {
@@ -418,16 +418,49 @@ ssl_shutdown(SSL* ssl) {
     return 0;
 }
 
-// Wait for a connection request then print messages to stdout.
-// TLS 1.3 implementation
+// Read from SSL socket
+int
+ssl_read(SSL *ssl)
+{
+    char buffer[BUFSIZE];
+    int processed;
+
+    processed = SSL_read(ssl, buffer, sizeof(buffer));
+    if (processed > 0) {
+        printf("%.*s", (int)processed, buffer);
+    } else {
+        int ssl_error = SSL_get_error(ssl, processed);
+        if (ssl_error == SSL_ERROR_ZERO_RETURN) {
+            printf("Server thinks a client closed a TLS session\n");
+            return 0;
+        }
+        if (ssl_error != SSL_ERROR_WANT_READ &&
+                ssl_error != SSL_ERROR_WANT_WRITE) {
+            fprintf(stderr, "server read failed: ssl_error=%d:", ssl_error);
+            ERR_print_errors_fp(stderr);
+            fprintf(stderr, "\n");
+            return -1;
+        }
+    }
+
+    printf("Server read finished.\n");
+    return processed;
+}
+
+// Wait for a connection request then print messages to stdout
+// SSL implementation
 int
 tcp_ssl(int socket)
 {
     int wstatus;
-    char buffer[BUFSIZE];
-    int processed;
     int fd;
     int ret;
+    fd_set read_set;
+
+    SSL_CTX *ssl_ctx = ssl_ctx_new();
+    if (!ssl_ctx) {
+        return -1;
+    }
 
     fd = accept(socket, NULL, 0);
     if (fd < 0) {
@@ -436,18 +469,12 @@ tcp_ssl(int socket)
     }
     printf("TCP connection accepted.\n");
 
-    SSL *ssl;
-    SSL_CTX *ssl_ctx;
-    ssl_ctx = ssl_ctx_new();
-    if (!ssl_ctx) {
-        return -1;
-    }
-    ssl = ssl_new(fd, ssl_ctx);
+    SSL *ssl = ssl_new(fd, ssl_ctx);
     if (!ssl) {
         return -1;
     }
     ret = SSL_accept(ssl);
-    if (ret  <= 0) {
+    if (ret <= 0) {
         fprintf(stderr, "SSL_accept failed ssl_err=%d errno=%s: ",
                 SSL_get_error(ssl, ret), strerror(errno));
         ERR_print_errors_fp(stderr);
@@ -456,38 +483,37 @@ tcp_ssl(int socket)
     }
     printf("TLS connection accepted.\n");
 
-    while (1) {
-        processed = SSL_read(ssl, buffer, sizeof(buffer));
-        printf("Server SSL_read returned %d\n", processed);
-        if (processed > 0) {
-            printf("%.*s", (int)processed, buffer);
-        } else {
-            int ssl_error = SSL_get_error(ssl, processed);
-            if (ssl_error == SSL_ERROR_ZERO_RETURN) {
-                printf("Server thinks a client closed a TLS session\n");
+    FD_ZERO(&read_set);
+    FD_SET(fd, &read_set);
+
+    while(1) {
+        int r = select(fd+1, &read_set, NULL, NULL, NULL);
+        if (r < 0) {
+            fprintf(stderr, "error in select\n");
+            return -1;
+        } else if (r > 0) {
+            ret = ssl_read(ssl);
+            if (ret < 0) {
+                return -1;
+            } else if (ret == 0) {
                 break;
             }
-            if (ssl_error != SSL_ERROR_WANT_READ &&
-                    ssl_error != SSL_ERROR_WANT_WRITE) {
-                fprintf(stderr, "server read failed: ssl_error=%d:", ssl_error);
-                ERR_print_errors_fp(stderr);
-                fprintf(stderr, "\n");
-                return -1;
-            }
         }
-    };
-    printf("Server read finished.\n");
+    }
 
     ret = ssl_shutdown(ssl);
     if (ret < 0) {
         return -1;
     }
-    SSL_free(ssl);
-    SSL_CTX_free(ssl_ctx);
 
     close(fd);
     printf("Server closed TCP socket.\n");
 
+    SSL_free(ssl);
+    SSL_CTX_free(ssl_ctx);
     return 0;
 }
+
+
+
 

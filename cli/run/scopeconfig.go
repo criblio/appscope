@@ -367,5 +367,6 @@ func (c *Config) WriteScopeConfig(path string, filePerms os.FileMode) error {
 }
 
 func scopeLogRegex() string {
-	return `[\s\/\\\.]log[s]?[\/\\\.]?`
+	// see scopeconfig_test.go for example paths that match
+	return `(\/logs?\/)|(\.log$)|(\.log[.\d])`;
 }

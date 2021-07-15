@@ -58,7 +58,8 @@ event:
     # Designed for monitoring log files, but capable of capturing
     # any file writes.
     - type: file
-      name: .*log.*                 # whitelist ex regex describing log file names
+      name: (\/logs?\/)|(\.log$)|(\.log[.\d]) # whitelist ex regex
+                                              # describing log file names
       value: .*                     # whitelist ex regex describing field values
 
     # Creates events from data written to stdout, stderr, or both.

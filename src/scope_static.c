@@ -175,37 +175,6 @@ set_library(void)
                 if (dyn->d_tag == DT_NEEDED) {
                     char *depstr = (char *)(strtab + dyn->d_un.d_val);
                     if (depstr && strstr(depstr, "ld-linux")) {
-#if 1
-                        DIR *dirp;
-                        struct dirent *entry;
-                        char *newdep;
-                        char dir[PATH_MAX];
-
-                        snprintf(dir, sizeof(dir), "/lib/");
-                        if ((dirp = opendir(dir)) == NULL) {
-                            perror("set_library:opendir");
-                            close(fd);
-                            munmap(buf, sbuf.st_size);
-                            return -1;
-                        }
-
-                        while ((entry = readdir(dirp)) != NULL) {
-                            if ((entry->d_type != DT_DIR) &&
-                                (strstr(entry->d_name, "ld-musl"))) {
-                                strncat(dir, entry->d_name, strlen(entry->d_name) + 1);
-                                newdep = basename(dir);
-                                name = 1;
-                                break;
-                            }
-                        }
-                        closedir(dirp);
-
-                        if (name && (strlen(depstr) >= (strlen(newdep) + 1))) {
-                            strncpy(depstr, newdep, strlen(newdep) + 1);
-                            found = 1;
-                            break;
-                        }
-#else
                         char newdep[PATH_MAX];
                         if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) break;
                         if (strlen(depstr) >= (strlen(newdep) + 1)) {
@@ -213,7 +182,6 @@ set_library(void)
                             found = 1;
                             break;
                         }
-#endif
                     }
                 }
             }

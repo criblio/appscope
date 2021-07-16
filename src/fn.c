@@ -9,6 +9,77 @@
 #include "utils.h"
 #include "fn.h"
 
+/*
+ * We need to adjust to how ld.so, libdl, dlopen, dlsym together
+ * resolve symbols. Several use cases have revealed different
+ * behavior as symbols are resolved. We have been able to resolve
+ * symbols for g_fn using the RTLD_NEXT handle with dlsym(). That
+ * has worked in all preload cases. When we added an attach feature
+ * it was revealed that symbols were not resolved as expected in
+ * several cases. The context in which the library is loaded and
+ * therefore, the context in which the constructor is run, is quite
+ * different as compared to process load time when preload is applied.
+ * Resolving symbols at load time versus run time, or preload versus
+ * postload, is, in many cases, quite different. In the attach case
+ * the lib constructor is run after all required libs have been loaded.
+ * In the post load attach case we will see ld.so resolve symbols from
+ * libscope where they need to be resolved by system libs; libc, libpthred,
+ * libdl, et al.
+ *
+ * It becomes important to note that the handle obtained by dlopen() and used
+ * with dlsym() is a starting point. That is, the symbol search can be made to
+ * start at a specific object, but it is not limited to the symbols defined by
+ * that object. In fact, the starting point defined by a handle defines a
+ * hierarchical walk of the symbols defined by ld.so. For example, a handle
+ * returned by dlopen("libdl.so") will search symbols in libdl.so. If the symbol
+ * is not resolved the search will continue to include shared objects that are
+ * required by libdl.so and then those used by the executable at large.
+ *
+ * In the libscope.so case there are several dependent libs; libc, libdl, librt,
+ * libpthread, ld.so. In general, a hierarchy exists, not quite literal, but in
+ * practical terms, libc is not dependent on other libs. Likewise, libpthread is
+ * dependent on libc and librt is dependent on libpthread and libc. We make use
+ * of this dependency by starting a symbol search at librt. The search order becomes
+ * librt, libpthread, libc, executable. The intent is that a symbol will be resolved
+ * by librt or libpthread before libc. There are duplicate symbols in libs. For example,
+ * the function read() is defined in libpthread and libc. The idea being that some
+ * symbols in libc are utilized for single threaded apps where the overhead of locking
+ * is not needed. The use of weak symbol definitions allow the duplication to work. We
+ * want to resolve to thread safe implementations where they exist. Therefore, if a symbol
+ * could be resolved in libpthread and libc, we'd like to resolve from libpthread.
+ *
+ * In general, what we've done is walk all objects in an executable using dl_iterate_phdr().
+ * We use a call back function that causes a symbol search that starts at librt. This is
+ * accomplished with a dlopen("librt") and a dlsym() with the resulting handle.In a
+ * GNU libc distro this resolves most symbols from libpthread and libc.
+ *
+ * A musl libc distro doesn't contain a lib hierarchy such as that found in a GNU libc
+ * based distro. There is, for the most part, a single lib that includes all supported
+ * POSIX definitions in a musl libc distro. Therefore, the act of walking all shared
+ * objects, starting with librt doesn't function the same in a musl libc instance.
+ * Symbols aren't resolved in this case. We add a second clause to symbol resolution
+ * to use the RTLD_NEXT handle with dlsym() in order to resolve symbols in the musl libc
+ * case. This works well for preload and postload cases with the exception of static execs.
+ *
+ * On a musl libc distro symbols from a static executable cannot be resolved with the
+ * RTLD_NEXT handle. Presumably, there is no next in the static exec. It makes sense in
+ * that all of the functions are fully resolved and resident in the exec. Therefore, starting
+ * a symbol search from an object after the exec could be seen as problematic. This can be
+ * confusing as the use of the RTLD_NEXT handle in static exec works with ld-linux.so, the
+ * GNU loader.
+ *
+ * In order to effectively support static execs we add a clause to symbol resolution to
+ * detect a static exec and use the RTLD_DEFAULT handle with dlsym(). While this is not
+ * strictly required in a GNU libc distro, it does appear to be correct behavior. We see
+ * that ld-linux.so resolves symbols as expected on static execs with RTLD_DEFAULT.
+ *
+ * It's important to note that the use of RTLD_DEFAULT in a dynamic exec generally
+ * results in symbols being resolved from libscope. Therefore, we need to use this
+ * handle in a static exec case only. It makes sense in that RTLD_DEFAULT causes a
+ * symbol search to begin with the current object. When executed from the libscope
+ * constructor, this results in symbols that we want to locate in libpthread or libc
+ * to be resolved from libscope. That doesn't work.
+*/
 #define GETADDR(val, sym)                                \
     ares.in_symbol = sym;                                \
     if (checkEnv("SCOPE_EXEC_TYPE", "static") == TRUE) { \

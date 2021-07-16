@@ -32,7 +32,7 @@ echo ""
 
 echo "Executing /mybin/mem/bash ./runbashmem.sh"
 export SCOPE_SUMMARY_PERIOD=1
-LD_PRELOAD=/usr/lib/libscope.so /mybin/mem/bash /mybin/runbashmem.sh
+LD_PRELOAD=/usr/local/scope/lib/libscope.so /mybin/mem/bash /mybin/runbashmem.sh
 if [ $? -ne 0 ]; then
     echo "/mybin/mem/bash ./runbashmem.sh failed"
     exit 1
@@ -47,7 +47,7 @@ echo ""
 # case there are problems above.
 
 echo "Executing /mybin/nomem/bash ./runbashnomem.sh"
-LD_PRELOAD=/usr/lib/libscope.so /mybin/nomem/bash /mybin/runbashnomem.sh
+LD_PRELOAD=/usr/local/scope/lib/libscope.so /mybin/nomem/bash /mybin/runbashnomem.sh
 if [ $? -ne 0 ]; then
     echo "/mybin/nomem/bash ./runbashnomem.sh failed"
     exit 1

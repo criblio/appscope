@@ -49,6 +49,7 @@ const char *        cfgEvtFormatHeader(config_t *, int);
 cfg_logstream_t     cfgLogStream(config_t *);
 size_t              cfgEvtFormatNumHeaders(config_t *);
 regex_t *           cfgEvtFormatHeaderRe(config_t *, int);
+const char *        cfgAuthToken(config_t *);
 
 // Setters (modifies config_t, but does not persist modifications)
 void                cfgMtcEnableSet(config_t*, unsigned);
@@ -81,5 +82,6 @@ void                cfgPayEnableSet(config_t*, unsigned int);
 void                cfgPayDirSet(config_t*, const char *);
 void                cfgEvtFormatHeaderSet(config_t *, const char *);
 void                cfgLogStreamSet(config_t *, cfg_logstream_t);
+void                cfgAuthTokenSet(config_t *, const char *);
 
 #endif // __CFG_H__

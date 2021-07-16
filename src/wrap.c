@@ -923,9 +923,13 @@ handleExit(void)
     }
 
     mtcFlush(g_mtc);
-    logFlush(g_log);
+    mtcDisconnect(g_mtc);
     ctlStopAggregating(g_ctl);
     ctlFlush(g_ctl);
+    ctlDisconnect(g_ctl, CFG_LS);
+    ctlDisconnect(g_ctl, CFG_CTL);
+    logFlush(g_log);
+    logDisconnect(g_log);
 }
 
 static void *
@@ -1451,9 +1455,10 @@ init(void)
 
     reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
 
-    if (atexit(handleExit)) {
-        DBG(NULL);
-    }
+    // replaces atexit(handleExit);  Allows events to be reported before
+    // the TLS destructors are run.  This mechanism is used regardless
+    // of whether TLS is actually configured on any transport.
+    transportRegisterForExitNotification(handleExit);
 
     initHook(attachedFlag);
     
@@ -3555,7 +3560,7 @@ __stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
         }
     }
 
-    if (dothis == 1) doWrite(fileno((FILE *)stream), initialTime, (rc != -1),
+    if (dothis == 1) doWrite(stream->fd, initialTime, (rc != -1),
                              iov, rc, "__stdio_write", IOV, iovcnt);
     return rc;
 }

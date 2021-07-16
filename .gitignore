@@ -7,6 +7,7 @@
 scope.log
 
 # Editor Temps
+*.swp
 **/*.swp
 .idea
 .DS_Store
@@ -26,6 +27,10 @@ testtempdir2/
 contrib/funchook/build/
 contrib/pcre2/build
 contrib/openssl/
+
+certs/
+
+test/testContainers/logs
 
 # Website Temps
 website/.env

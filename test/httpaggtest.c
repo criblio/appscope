@@ -52,7 +52,7 @@ httpAggAddMetricHappyPath(void **state)
         NUMFIELD("http_status_code", 200, 1, FALSE),
         FIELDEND
     };
-    event_t event = INT_EVENT("http_server_duration", 2, DELTA, fields);
+    event_t event = INT_EVENT("http_server_duration", 2, DELTA_MS, fields);
 
     // any report before we've received events should be empty 
     assert_int_equal(g_send_metric_count, 0);
@@ -106,7 +106,7 @@ httpAggAddMetricWithQueryStringsAreAggregatedTogether(void **state)
             NUMFIELD("http_status_code", 200, 1, FALSE),
             FIELDEND
         };
-        event_t event = INT_EVENT("http_client_duration", 42, DELTA, fields);
+        event_t event = INT_EVENT("http_client_duration", 42, DELTA_MS, fields);
         httpAggAddMetric(http_agg, &event, -1, -1);
 
         // We expect all of these targets to be aggregated together.
@@ -137,7 +137,7 @@ httpAggAddMetricWithManyStatusCodesDoesNotCrash(void **state)
             NUMFIELD("http_status_code", i, 1, FALSE),
             FIELDEND
         };
-        event_t event = INT_EVENT("http_client_duration", 2, DELTA, fields);
+        event_t event = INT_EVENT("http_client_duration", 2, DELTA_MS, fields);
         httpAggAddMetric(http_agg, &event, -1, -1);
     }
     httpAggSendReport(http_agg, bogus_mtc_addr);
@@ -161,7 +161,7 @@ httpAggAddMetricWithManyHttpTargetsDoesNotCrash(void **state)
             NUMFIELD("http_status_code", 200, 1, FALSE),
             FIELDEND
         };
-        event_t event = INT_EVENT("http_client_duration", 2, DELTA, fields);
+        event_t event = INT_EVENT("http_client_duration", 2, DELTA_MS, fields);
         httpAggAddMetric(http_agg, &event, -1, -1);
     }
     httpAggSendReport(http_agg, bogus_mtc_addr);

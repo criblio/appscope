@@ -5,10 +5,9 @@ RUN yum -y install centos-release-scl
 RUN yum -y install rh-python36
 RUN yum -y install epel-release
 RUN yum -y install java-1.8.0-openjdk
-RUN yum -y install mc
+RUN yum -y install mc net-tools lsof vim emacs gdb
 
-RUN mkdir /opt/test-runner/
-RUN mkdir /opt/test-runner/logs/
+RUN mkdir -p /opt/test-runner/logs/
 
 RUN source scl_source enable rh-python36 && virtualenv /opt/test-runner/
 
@@ -42,9 +41,6 @@ RUN groupadd kafka && \
   useradd -d /kafka -g kafka -s /bin/false kafka && \
   chown -R kafka:kafka /kafka /data /logs
 
-#ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
-#COPY ./libscope.so /usr/lib/libscope.so
-#RUN chmod 755 /usr/lib/libscope.so
 #ENV SCOPE_OUT_DEST=udp://localhost:8125
 #ENV SCOPE_OUT_VERBOSITY=4
 #ENV SCOPE_EVENT_DEST=tcp://172.16.198.132:9109
@@ -69,6 +65,21 @@ WORKDIR /kafka
 # broker, jmx
 VOLUME [ "/data", "/logs" ]
 
-ENTRYPOINT ["/opt/test-runner/bin/python", "/opt/test-runner/app.py", "--target", "kafka","-l","/opt/test-runner/logs/"]
-#ENTRYPOINT ["tail", "-f", "/dev/null"]
-# /opt/test-runner/bin/python /opt/test-runner/app.py --target kafka -l /opt/test-runner/logs/ --scope_path=/opt/test-runner/bin/libscope.so
+ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+COPY scope-profile.sh /etc/profile.d/scope.sh
+COPY gdbinit /root/.gdbinit
+
+RUN  mkdir /usr/local/scope && \
+     mkdir /usr/local/scope/bin && \
+     mkdir /usr/local/scope/lib && \
+     ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
+
+COPY kafka/scope-test /usr/local/scope/scope-test
+
+COPY docker-entrypoint.sh /
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["test"]
+
+

@@ -1,0 +1,6 @@
+#!/bin/bash
+exec /opt/test-runner/bin/python \
+  /opt/test-runner/app.py \
+  -t elastic \
+  -l /opt/test-runner/logs/ \
+  -s //usr/local/scope/lib/libscope.so

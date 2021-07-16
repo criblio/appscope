@@ -1,28 +1,128 @@
-name: build
-on: [push]
+name: Build & Test
+
+on: 
+  push:
+
+  pull_request:
+    branches:
+      - 'main'
+      - 'master'
+      - 'releases/*'
+
 jobs:
+
   build-scope:
-    runs-on: ubuntu-latest
+    name: Build Scope
+    runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v2
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Get Tag Info
+        run: git fetch --prune --unshallow
+
+      - name: Install Go
+        uses: actions/setup-go@v2
         with:
           go-version: 1.15
-      # - run: apt-get update && apt-get install -y git
-      - run: ./install_build_tools.sh
-      - run: make deps
-      - run: make all
-      - run: make test
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install Dependencies
+        run: |
+            ./install_build_tools.sh
+            make deps
+
+      - name: Build
+        run: make all
+
+      - name: Unit Tests
+        run: make test
+
+      # TODO Revisit these...
       - run: make buildclean
       - run: bash -ex ./scope_env.sh build_arm64
-      # - run: cd test/testContainers && docker-compose up
-      - env:
+
+      - name: Save Binaries for Integration Tests
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: built-binaries
+          path: |
+            lib/linux/libscope.so
+            bin/linux/scope
+            bin/linux/ldscope
+          retention-days: 5
+
+      - name: Deploy Artifacts to CDN
+        if: ${{ github.event_name == 'push' }}
+        env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
         run: ./deploy.sh
-      - if: startsWith(github.ref, 'refs/tags/v')
+
+      - name: Build & Push Container Image to Docker Hub
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
         run: ./docker/build.sh
+
+      - name: List Integration Tests
+        id: set-tests
+        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | sort -V | jq -ncR '[inputs]')"
+
+    outputs:
+      tests: ${{ steps.set-tests.outputs.tests }}
+
+  integration-test:
+    needs: build-scope
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+    strategy:
+      matrix: 
+        test: ${{ fromJson(needs.build-scope.outputs.tests) }}
+      fail-fast: false
+    name: "Test: ${{ matrix.test }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Download Binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: built-binaries
+
+      - name: Run Test
+        run: |
+            chmod +x bin/linux/* lib/linux/*
+            make -C test/testContainers ${{ matrix.test }}
+
+  integration-image:
+    needs: build-scope
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    strategy:
+      matrix: 
+        test: ${{ fromJson(needs.build-scope.outputs.tests) }}
+      fail-fast: false
+    name: "Update Image: ${{ matrix.test }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v1
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
+
+      - name: Update Image
+        run: make -C test/testContainers ${{ matrix.test }}-push

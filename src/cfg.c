@@ -74,6 +74,7 @@ struct _config_t
     unsigned processstartmsg;
     unsigned enhancefs;
     bool logstream;
+    char *authtoken;
 };
 
 static const char* valueFilterDefault[] = {
@@ -578,6 +579,12 @@ cfgLogStream(config_t *cfg)
     return (cfg) ? cfg->logstream : DEFAULT_LOGSTREAM;
 }
 
+const char *
+cfgAuthToken(config_t * cfg)
+{
+    return (cfg) ? cfg->authtoken : NULL;
+}
+
 ///////////////////////////////////
 // Setters 
 ///////////////////////////////////
@@ -930,4 +937,17 @@ cfgLogStreamSet(config_t *cfg, cfg_logstream_t value)
 {
     if (!cfg || value >= CFG_LOGSTREAM_MAX) return;
     cfg->logstream = value;
+}
+
+void
+cfgAuthTokenSet(config_t * cfg, const char * authtoken)
+{
+    if (!cfg) return;
+    if (cfg->authtoken) free(cfg->authtoken);
+    if (!authtoken || (authtoken[0] == '\0')) {
+        cfg->authtoken = NULL;
+        return;
+    }
+
+    cfg->authtoken = strdup(authtoken);
 }

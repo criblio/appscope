@@ -600,6 +600,16 @@ cfgPayDirSetAndGet(void** state)
     cfgDestroy(&config);
 }
 
+static void
+cfgAuthTokenSetAndGet(void** state)
+{
+    config_t* config = cfgCreateDefault();
+    cfgAuthTokenSet(config, "sometoken");
+    assert_string_equal(cfgAuthToken(config), "sometoken");
+    cfgAuthTokenSet(config, NULL);
+    assert_null(cfgAuthToken(config));
+    cfgDestroy(&config);
+}
 
 int
 main(int argc, char* argv[])
@@ -687,6 +697,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgLogLevelSetAndGet),
         cmocka_unit_test(cfgPayEnableSetAndGet),
         cmocka_unit_test(cfgPayDirSetAndGet),
+        cmocka_unit_test(cfgAuthTokenSetAndGet),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

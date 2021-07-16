@@ -175,7 +175,7 @@ set_library(void)
                 if (dyn->d_tag == DT_NEEDED) {
                     char *depstr = (char *)(strtab + dyn->d_un.d_val);
                     if (depstr && strstr(depstr, "ld-linux")) {
-#if 0
+#if 1
                         DIR *dirp;
                         struct dirent *entry;
                         char *newdep;
@@ -205,7 +205,7 @@ set_library(void)
                             found = 1;
                             break;
                         }
-#endif
+#else
                         char newdep[PATH_MAX];
                         if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) break;
                         if (strlen(depstr) >= (strlen(newdep) + 1)) {
@@ -213,6 +213,7 @@ set_library(void)
                             found = 1;
                             break;
                         }
+#endif
                     }
                 }
             }

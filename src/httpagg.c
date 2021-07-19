@@ -265,8 +265,8 @@ report_target(mtc_t *mtc, target_agg_t *target)
             if (target->status[i].code == 0) break;
 
             event_field_t fields[] = {
-                STRFIELD("http.target", target->uri, 4, TRUE),
-                NUMFIELD("http.status_code", target->status[i].code, 1, TRUE),
+                STRFIELD("http_target", target->uri, 4, TRUE),
+                NUMFIELD("http_status_code", target->status[i].code, 1, TRUE),
                 STRFIELD("proc",        g_proc.procname, 4, TRUE),
                 NUMFIELD("pid",         g_proc.pid,      4, TRUE),
                 STRFIELD("host",        g_proc.hostname, 4, TRUE),
@@ -295,7 +295,7 @@ report_target(mtc_t *mtc, target_agg_t *target)
             }
 
             event_field_t fields[] = {
-                STRFIELD("http.target", target->uri,     4, TRUE),
+                STRFIELD("http_target", target->uri,     4, TRUE),
                 NUMFIELD("numops",      target->field[i].num_entries, 8, TRUE),
                 STRFIELD("proc",        g_proc.procname, 4, TRUE),
                 NUMFIELD("pid",         g_proc.pid,      4, TRUE),

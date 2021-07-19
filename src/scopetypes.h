@@ -173,6 +173,7 @@ typedef unsigned int bool;
 //    SCOPE_SWITCH                   for internal go debugging
 //    SCOPE_PID                      provided by library
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
+//    SCOPE_ALLOW_MUSL_ATTACH        allows attach for musl processes
 
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"

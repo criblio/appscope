@@ -1001,7 +1001,12 @@ main(int argc, char **argv, char **env)
     // setup for musl libc if detected
     char *loader = (char *)libdirGetLoader();
     if (loader) {
-        setup_loader(EXE_TEST_FILE, loader);
+        int is_musl = setup_loader(EXE_TEST_FILE, loader);
+        if (is_musl && attachArg && !getenv("SCOPE_ALLOW_MUSL_ATTACH")) {
+            fprintf(stderr, "error: use of --attach in musl libc isn't currently supported\n");
+            fprintf(stderr, "error: set SCOPE_ALLOW_MUSL_ATTACH=true to attempt anyway\n");
+            return EXIT_FAILURE;
+        }
     } else {
         fprintf(stderr, "error: failed to get a loader path\n");
         return EXIT_FAILURE;

@@ -142,7 +142,7 @@ call_dlopen(void)
 static void call_dlopen_end() {}
 
 static int 
-inject(pid_t pid, uint64_t dlopenAddr, char *path) 
+inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
 {
     struct user_regs_struct oldregs, regs;
     unsigned char *oldcode;
@@ -188,7 +188,13 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
     regs.rip = codeAddr;
     regs.rax = dlopenAddr;               // address of dlopen
     regs.rdi = freeAddr;                 // dlopen's first arg - path to the library
-    regs.rsi = RTLD_NOW | __RTLD_DLOPEN; // dlopen's second arg - flags
+
+    if (glibc == TRUE) {
+         // GNU ld.so uses a custom flag
+        regs.rsi = RTLD_NOW | __RTLD_DLOPEN;
+    } else {
+        regs.rsi = RTLD_NOW;
+    }
 
     ptrace(PTRACE_SETREGS, pid, NULL, &regs);
 
@@ -247,6 +253,7 @@ injectScope(int pid, char* path)
     uint64_t remoteLib, localLib;
     void *dlopenAddr = NULL;
     libdl_info_t info;
+    int glibc = TRUE;
    
     if (!dl_iterate_phdr(findLib, &info)) {
         fprintf(stderr, "error: failed to find local libc\n");
@@ -257,7 +264,9 @@ injectScope(int pid, char* path)
     dlopenAddr = dlsym(RTLD_DEFAULT, "__libc_dlopen_mode");
     if (dlopenAddr == NULL) {
         dlopenAddr = dlsym(RTLD_DEFAULT, "dlopen");
+        glibc = FALSE;
     }
+
     if (dlopenAddr == NULL) {
         fprintf(stderr, "error: failed to find dlopen()\n");
         return EXIT_FAILURE;
@@ -274,6 +283,6 @@ injectScope(int pid, char* path)
     dlopenAddr = remoteLib + (dlopenAddr - localLib);
 
     // inject libscope.so into the target process
-    return inject(pid, (uint64_t) dlopenAddr, path);
+    return inject(pid, (uint64_t) dlopenAddr, path, glibc);
 }
 

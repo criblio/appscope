@@ -75,11 +75,10 @@ static struct addrinfo *g_cached_addr = NULL;
 // This mutex avoids a race condition between:
 //    1) using the tls subsystem and
 //    2) destroying the tls subsystem
-// If a deadlock is ever seen, consider changing the initializer to
-//    PTHREAD_RECURSIVE_MUTEX_INITIALIZER -or-
-//    PTHREAD_ERRORCHECK_MUTEX_INITIALIZER
-static pthread_mutex_t g_tls_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t g_tls_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 static int g_tls_calls_are_safe = TRUE;  // until handle_tls_destroy() is called
+
+static void (*handleExit_fn)(void) = NULL;
 
 static inline void
 enterCriticalSection(void)
@@ -294,7 +293,19 @@ shutdownTlsSession(transport_t *trans)
 
     if (g_tls_calls_are_safe) {
         if (trans->net.tls.ssl) {
-            SSL_shutdown(trans->net.tls.ssl);
+            if (!SSL_shutdown(trans->net.tls.ssl)) {
+                // This is prescribed for a "bidirectional shutdown"
+                char buf[4096];
+                while (1) {
+                    ERR_clear_error(); // to make SSL_get_error reliable
+                    int rv = SCOPE_SSL_read(trans->net.tls.ssl, buf, sizeof(buf));
+                    if ((rv <= 0) &&
+                        (SSL_get_error(trans->net.tls.ssl, rv) == SSL_ERROR_ZERO_RETURN)) {
+                        break;
+                    }
+                }
+                SSL_shutdown(trans->net.tls.ssl);
+            }
             SSL_free(trans->net.tls.ssl);
             trans->net.tls.ssl = NULL;
         }
@@ -316,6 +327,10 @@ shutdownTlsSession(transport_t *trans)
 static void
 handle_tls_destroy(void)
 {
+    scopeLog("detected beginning of process exit sequence", -1, CFG_LOG_INFO);
+
+    if (handleExit_fn) handleExit_fn();
+
     // Spin to make sure we don't allow our tls subsystem to be destructed
     // while the tls library is actively being used.
     enterCriticalSection();
@@ -325,8 +340,22 @@ handle_tls_destroy(void)
 
     // Release the lock
     exitCriticalSection();
+}
 
-    scopeLog("detected beginning of process exit sequence", -1, CFG_LOG_INFO);
+void
+transportRegisterForExitNotification(void (*fn)(void))
+{
+    // call OPENSSL_init_ssl once to ensure that handle_tls_destroy()
+    // will get called during process exit.
+    if (!handleExit_fn) OPENSSL_init_ssl(0, NULL);
+
+    // remember what to call when OPENSSL is being destructed.
+    handleExit_fn = fn;
+
+    // register so handle_tls_destroy() is called as the process exits.
+    if (!OPENSSL_atexit(handle_tls_destroy)) {
+        DBG(NULL);
+    }
 }
 
 static int
@@ -338,13 +367,6 @@ establishTlsSession(transport_t *trans)
     // Grab the lock to show that the tls subsystem is in use.
     enterCriticalSection();
     if (!g_tls_calls_are_safe) goto err;
-
-    // Register a handler once - to be called when OPENSSL is being destructed.
-    static int destroy_was_registered = FALSE;
-    if (!destroy_was_registered) {
-        OPENSSL_atexit(handle_tls_destroy);
-        destroy_was_registered = TRUE;
-    }
 
     trans->net.tls.ctx = SSL_CTX_new(TLS_method());
     if (!trans->net.tls.ctx) {

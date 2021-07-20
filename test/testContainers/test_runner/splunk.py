@@ -36,7 +36,7 @@ class SplunkAppController(AppController):
         subprocess.run(start_command, check=True, shell=True)
 
     def stop(self):
-        subprocess.run("/opt/splunk/bin/splunk stop", check=True, shell=True)
+        subprocess.run("timeout 30 /opt/splunk/bin/splunk stop --force", check=False, shell=True)
 
     def assert_running(self):
         completed_proc = subprocess.run("/opt/splunk/bin/splunk status", check=True, shell=True,

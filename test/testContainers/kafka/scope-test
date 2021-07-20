@@ -1,0 +1,6 @@
+#!/bin/bash
+/opt/test-runner/bin/python \
+    /opt/test-runner/app.py \
+    -t kafka \
+    -l /opt/test-runner/logs/ \
+    -s /usr/local/scope/lib/libscope.so

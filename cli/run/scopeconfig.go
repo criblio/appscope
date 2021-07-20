@@ -25,6 +25,7 @@ type ScopeConfig struct {
 type ScopeCriblConfig struct {
 	Enable    bool           `mapstructure:"enable" json:"enable" yaml:"enable"`
 	Transport ScopeTransport `mapstructure:"transport" json:"transport" yaml:"transport"`
+	AuthToken string         `mapstructure:"authtoken" json:"authtoken" yaml:"authtoken"`
 }
 
 // ScopeMetricConfig represents how to output metrics
@@ -318,6 +319,7 @@ func (c *Config) configFromRunOpts() error {
 		c.sc.Metric.Transport = ScopeTransport{}
 		c.sc.Event.Transport = ScopeTransport{}
 		c.sc.Libscope.ConfigEvent = true
+		c.sc.Cribl.AuthToken = c.AuthToken
 	}
 
 	if c.Loglevel != "" {
@@ -365,5 +367,6 @@ func (c *Config) WriteScopeConfig(path string, filePerms os.FileMode) error {
 }
 
 func scopeLogRegex() string {
-	return `[\s\/\\\.]log[s]?[\/\\\.]?`
+	// see scopeconfig_test.go for example paths that match
+	return `(\/logs?\/)|(\.log$)|(\.log[.\d])`;
 }

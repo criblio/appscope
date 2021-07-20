@@ -48,6 +48,41 @@
 
 static int g_debug = 0;
 
+static int
+get_dir(const char *path, char *fres, size_t len)
+{
+    DIR *dirp;
+    struct dirent *entry;
+    char *dcopy, *pcopy, *dname, *fname;
+
+    if (!path || !fres || (len <= 0)) return -1;
+
+    pcopy = strdup(path);
+    dname = dirname(pcopy);
+
+    if ((dirp = opendir(dname)) == NULL) {
+        perror("get_dir:opendir");
+        if (pcopy) free(pcopy);
+        return -1;
+    }
+
+    dcopy = strdup(path);
+    fname = basename(dcopy);
+
+    while ((entry = readdir(dirp)) != NULL) {
+        if ((entry->d_type != DT_DIR) &&
+            (strstr(entry->d_name, fname))) {
+            strncpy(fres, entry->d_name, len);
+            break;
+        }
+    }
+
+    closedir(dirp);
+    if (pcopy) free(pcopy);
+    if (dcopy) free(dcopy);
+    return 0;
+}
+
 static void
 setEnvVariable(char *env, char *value)
 {
@@ -74,6 +109,109 @@ setEnvVariable(char *env, char *value)
     }
 
     if (new_val) free(new_val);
+}
+
+// modify NEEDED entries in libscope.so to avoid dependecies
+static int
+set_library(void)
+{
+    int i, fd, found, name;
+    struct stat sbuf;
+    const char *libpath;
+    char *buf;
+    Elf64_Ehdr *elf;
+    Elf64_Shdr *sections;
+    Elf64_Dyn *dyn;
+    const char *section_strtab = NULL;
+    const char *strtab = NULL;
+    const char *sec_name = NULL;
+
+    if ((libpath = libdirGetLibrary()) == NULL) return -1;
+
+    if ((fd = open(libpath, O_RDONLY)) == -1) {
+        perror("set_library:open");
+        return -1;
+    }
+
+    if (fstat(fd, &sbuf) == -1) {
+        perror("set_library:fstat");
+        close(fd);
+        return -1;
+    }
+
+    buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
+               PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, (off_t)NULL);
+    if (buf == MAP_FAILED) {
+        perror("set_loader:mmap");
+        close(fd);
+        return -1;
+    }
+
+    // get the elf header, section table and string table
+    elf = (Elf64_Ehdr *)buf;
+    sections = (Elf64_Shdr *)((char *)buf + elf->e_shoff);
+    section_strtab = (char *)buf + sections[elf->e_shstrndx].sh_offset;
+    found = name = 0;
+
+    // locate the .dynstr section
+    for (i = 0; i < elf->e_shnum; i++) {
+        sec_name = section_strtab + sections[i].sh_name;
+        if (sections[i].sh_type == SHT_STRTAB && strcmp(sec_name, ".dynstr") == 0) {
+            strtab = (const char *)(buf + sections[i].sh_offset);
+        }
+    }
+
+    if (strtab == NULL) {
+        fprintf(stderr, "ERROR:%s: did not locate the .dynstr from %s", __FUNCTION__, libpath);
+        close(fd);
+        munmap(buf, sbuf.st_size);
+        return -1;
+    }
+
+    // locate the .dynamic section
+    for (i = 0; i < elf->e_shnum; i++) {
+        if (sections[i].sh_type == SHT_DYNAMIC) {
+            for (dyn = (Elf64_Dyn *)((char *)buf + sections[i].sh_offset); dyn != DT_NULL; dyn++) {
+                if (dyn->d_tag == DT_NEEDED) {
+                    char *depstr = (char *)(strtab + dyn->d_un.d_val);
+                    if (depstr && strstr(depstr, "ld-linux")) {
+                        char newdep[PATH_MAX];
+                        if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) break;
+                        if (strlen(depstr) >= (strlen(newdep) + 1)) {
+                            strncpy(depstr, newdep, strlen(newdep) + 1);
+                            found = 1;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (found == 1) break;
+    }
+
+    if (found) {
+        if (close(fd) == -1) {
+            munmap(buf, sbuf.st_size);
+            return -1;
+        }
+
+        if ((fd = open(libpath, O_RDWR)) == -1) {
+            perror("set_library:open write");
+            munmap(buf, sbuf.st_size);
+            return -1;
+        }
+
+        int rc = write(fd, buf, sbuf.st_size);
+        if (rc < sbuf.st_size) {
+            perror("set_library:write");
+        }
+    } else {
+        fprintf(stderr, "WARNING: can't locate or set the loader string in %s\n", libpath);
+    }
+
+    close(fd);
+    munmap(buf, sbuf.st_size);
+    return (found - 1);
 }
 
 // modify the loader string in the .interp section of ldscope
@@ -261,6 +399,7 @@ do_musl(char *exld, char *ldscope)
     }
 
     set_loader(ldscope);
+    set_library();
 
     if (ldso) free(ldso);
     if (lpath) free(lpath);
@@ -552,6 +691,9 @@ static const char scope_help_configuration[] =
 "            Format is:\n"
 "                tcp://host:port\n"
 "                    If no port is provided, defaults to 10090\n"
+"        SCOPE_CRIBL_AUTHTOKEN\n"
+"            Authentication token provided by Cribl.\n"
+"            Default is an empty string.\n"
 "        SCOPE_CRIBL_TLS_ENABLE\n"
 "            Flag to enable Transport Layer Security (TLS). Only affects\n"
 "            tcp:// destinations. true,false  Default is false.\n"
@@ -850,14 +992,23 @@ main(int argc, char **argv, char **env)
         fprintf(stderr, "error: failed to extract loader\n");
         return EXIT_FAILURE;
     }
+
     if (libdirExtractLibrary()) {
         fprintf(stderr, "error: failed to extract library\n");
         return EXIT_FAILURE;
     }
 
     // setup for musl libc if detected
-    if (setup_loader(EXE_TEST_FILE, (char*) libdirGetLoader()) && attachArg) {
-        fprintf(stderr, "error: use of --attach in musl libc isn't currently supported\n");
+    char *loader = (char *)libdirGetLoader();
+    if (loader) {
+        int is_musl = setup_loader(EXE_TEST_FILE, loader);
+        if (is_musl && attachArg && !getenv("SCOPE_ALLOW_MUSL_ATTACH")) {
+            fprintf(stderr, "error: use of --attach in musl libc isn't currently supported\n");
+            fprintf(stderr, "error: set SCOPE_ALLOW_MUSL_ATTACH=true to attempt anyway\n");
+            return EXIT_FAILURE;
+        }
+    } else {
+        fprintf(stderr, "error: failed to get a loader path\n");
         return EXIT_FAILURE;
     }
 
@@ -902,16 +1053,13 @@ main(int argc, char **argv, char **env)
         }
 
         // add the env vars we want in the library
-        char *env;
         dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetLibrary());
-        if ((env = getenv("SCOPE_EXEC_PATH"))) {
-            dprintf(fd, "SCOPE_EXEC_PATH=%s\n", env);
-        }
-        if ((env = getenv("SCOPE_CONF_PATH"))) {
-            dprintf(fd, "SCOPE_CONF_PATH=%s\n", env);
-        }
-        if ((env = getenv("SCOPE_HOME"))) {
-            dprintf(fd, "SCOPE_HOME=%s\n", env);
+
+        int i;
+        for (i = 0; environ[i]; i++) {
+            if (strlen(environ[i]) > 6 && strncmp(environ[i], "SCOPE_", 6) == 0) {
+                dprintf(fd, "%s\n", environ[i]);
+            }
         }
 
         // done
@@ -938,7 +1086,7 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    // exec the dynamic loader
+    // exec the dynamic ldscope
     execve(libdirGetLoader(), execArgv, environ);
     free(execArgv);
     perror("execve failed");

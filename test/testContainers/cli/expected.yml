@@ -1,0 +1,62 @@
+metric:
+  enable: true
+  format:
+    type: ndjson
+    verbosity: 4
+  transport:
+    type: file
+    path: /tmp/SESSIONPATH/metrics.json
+    buffering: line
+    tls:
+      enable: false
+      validateserver: false
+      cacertpath: ""
+event:
+  enable: true
+  format:
+    type: ndjson
+  transport:
+    type: file
+    path: /tmp/SESSIONPATH/events.json
+    buffering: line
+    tls:
+      enable: false
+      validateserver: false
+      cacertpath: ""
+  watch:
+  - type: file
+    name: (\/logs?\/)|(\.log$)|(\.log[.\d])
+    value: .*
+  - type: console
+    name: (stdout|stderr)
+    value: .*
+  - type: http
+    name: .*
+    field: .*
+    value: .*
+  - type: net
+    name: .*
+    field: .*
+    value: .*
+  - type: fs
+    name: .*
+    field: .*
+    value: .*
+  - type: dns
+    name: .*
+    field: .*
+    value: .*
+libscope:
+  configevent: false
+  summaryperiod: 10
+  commanddir: /tmp/SESSIONPATH/cmd
+  log:
+    level: warning
+    transport:
+      type: file
+      path: /tmp/SESSIONPATH/ldscope.log
+      buffering: line
+      tls:
+        enable: false
+        validateserver: false
+        cacertpath: ""

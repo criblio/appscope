@@ -1,0 +1,84 @@
+#!/bin/bash
+
+#set -x
+
+ERR=0
+ERRORS=
+
+echo
+echo ===============================================================================
+echo "Starting Cribl LogStream"
+openssl req -newkey rsa:2048 -nodes -keyout /tmp/appscope.key -x509 -days 365 -out /tmp/appscope.crt -subj '/C=US/ST=GA/L=Canton/O=AppScope/OU=IT/CN=appscope'
+mkdir /tmp/out
+/opt/cribl/bin/cribl start
+sleep 5
+
+echo
+echo ===============================================================================
+echo "Testing Cribl/TLS Transport"
+rm -rf /tmp/out/appscope:in_appscope_tls
+SCOPE_CRIBL_TLS_CA_CERT_PATH=/tmp/appscope.crt \
+    scope run -c tls://localhost:10090 -- echo Hello >/dev/null
+sleep 6
+if compgen -G "/tmp/out/appscope:in_appscope_tls/CriblOut-*.json" > /dev/null; then
+    echo "  PASSED"
+else
+    echo "  FAILED"
+    ERR+=1
+    ERRORS="$ERRORS Cribl/TLS"
+    ls -lR /tmp/out
+fi
+
+echo
+echo ===============================================================================
+echo "Testing Cribl/TCP Transport"
+rm -rf /tmp/out/appscope:in_appscope_tcp
+scope run -c tcp://localhost:10091 -- echo Hello >/dev/null
+sleep 6
+if compgen -G "/tmp/out/appscope:in_appscope_tcp/CriblOut-*.json" > /dev/null; then
+    echo "  PASSED"
+else
+    echo "  FAILED"
+    ERR+=1
+    ERRORS="$ERRORS Cribl/TCP"
+    ls -lR /tmp/out
+fi
+
+echo
+echo ===============================================================================
+echo "Testing Event/TCP Transport"
+rm -rf /tmp/out/tcpjson:in_tcp_json
+scope run -e tcp://localhost:10070 -- echo Hello >/dev/null
+sleep 6
+if compgen -G "/tmp/out/tcpjson:in_tcp_json/CriblOut-*.json" > /dev/null; then
+    echo "  PASSED"
+else
+    echo "  FAILED"
+    ERR+=1
+    ERRORS="$ERRORS Event/TCP"
+    ls -lR /tmp/out
+fi
+
+echo
+echo ===============================================================================
+echo "Testing Metric/UDP Transport"
+rm -rf /tmp/out/metrics:in_metrics:udp
+scope run -m udp://localhost:8125 --metricformat statsd -- echo Hello >/dev/null
+sleep 6
+if compgen -G "/tmp/out/metrics:in_metrics:udp/CriblOut-*.json" > /dev/null; then
+    echo "  PASSED"
+else
+    echo "  FAILED"
+    ERR+=1
+    ERRORS="$ERRORS Metric/UDP"
+    ls -lR /tmp/out
+fi
+
+echo
+echo ===============================================================================
+if [ -n "$ERRORS" ]; then
+    echo >&2 "$ERR test failed; $ERRORS"
+else
+    echo "All tests passed"
+fi
+exit $ERR

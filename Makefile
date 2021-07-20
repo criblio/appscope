@@ -51,13 +51,14 @@ PLATFORMS := $(subst $(_space),$(_comma),$(foreach ARCH,$(ARCH_LIST),linux/$(PLA
 # set in CI so don't overwrite it
 BUILDER ?= appscope
 
+# docker registries
+REGISTRY_github := ghcr.io
+REGISTRY_docker := docker.io
+
 # docker image tag (without :version suffix)
 # allow it to be overridden
-IMAGE_TAG ?= $(GITHUB_REPOSITORY)
-
-# docker registry for builder cache images
-#REGISTRY ?= ghcr.io
-REGISTRY ?= docker.io
+DIST_IMAGE ?= $(GITHUB_REPOSITORY)
+BUILD_IMAGE ?= $(REGISTRY_github)/$(GITHUB_REPOSITORY)-builder
 
 # default target builds everything
 all:
@@ -122,7 +123,7 @@ build: require-docker require-qemu-binfmt
 		--privileged \
 		--platform $(ARCH) \
 		--name appscope-builder-$(DIST)-$(ARCH) \
-		$(IMAGE_TAG)-builder:$(DIST)-$(ARCH) \
+		$(BUILD_IMAGE):$(DIST)-$(ARCH) \
 	       	$(CMD)
 
 # run a shell our builder container without starting a build
@@ -143,15 +144,16 @@ exec:
 
 # build the builder image for the given ARCH
 builder: DIST ?= ubuntu
-builder: AUTH := $(shell grep $(REGISTRY) ~/.docker/config.json >/dev/null 2>&1 && echo true)
-builder: TAG := $(IMAGE_TAG)-builder:$(DIST)-$(ARCH)
+builder: AUTH := $(shell grep $(REGISTRY_github) ~/.docker/config.json >/dev/null 2>&1 && echo true)
+builder: TAG := $(BUILD_IMAGE):$(DIST)-$(ARCH)
 builder: require-docker-buildx-builder
+	cat ~/.docker/config.json
 	@echo "\(Re\)Building the AppScope $(DIST)/$(ARCH) Builder Image"
 	@docker buildx build \
 		--builder $(BUILDER) \
 		--tag $(TAG) \
-		$(if $(AUTH),(--cache-from type=registry,ref=$(REGISTRY)/$(TAG)-cache)) \
-		$(if $(AUTH),(--cache-to type=registry,ref=$(REGISTRY)/$(TAG)-cache)) \
+		$(if $(AUTH),--cache-from type=registry$(_comma)ref=$(TAG)-cache) \
+		$(if $(AUTH),--cache-to type=registry$(_comma)ref=$(TAG)-cache) \
 		--platform linux/$(PLATFORM_$(ARCH)) \
 		--label "org.opencontainers.image.description=AppScope $(ARCH) Builder ($(PLATFORM_$(ARCH)))" \
 		--load \
@@ -166,13 +168,13 @@ image:
 	@docker buildx build \
 		$(if $(LATEST),--tag $(TAG):latest)) \
 		--builder $(BUILDER) \
-		--tag $(IMAGE_TAG):$(VERSION) \
+		--tag $(DIST_IMAGE):$(VERSION) \
 		--platform $(PLATFORMS) \
 		--output type=$(if $(PUSH),registry,image) \
 		--file docker/base/Dockerfile \
 		.
 	@[ -z "$(PUSH)" ] || \
-		echo "info: pushed $(IMAGE_TAG):$(VERSION)$(if $(LATEST), and $(TAG):latest,)"
+		echo "info: pushed $(DIST_IMAGE):$(VERSION)$(if $(LATEST), and $(DIST_IMAGE):latest,)"
 
 # setup the buildx builder if it's not running already
 require-docker-buildx-builder: require-docker-buildx require-qemu-binfmt

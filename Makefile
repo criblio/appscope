@@ -49,7 +49,7 @@ PLATFORMS := $(subst $(_space),$(_comma),$(foreach ARCH,$(ARCH_LIST),linux/$(PLA
 
 # docker buildx builder name
 # set in CI so don't overwrite it
-BUILDER ?= appscope-builder
+BUILDER ?= appscope
 
 # docker image tag (without :version suffix)
 # allow it to be overridden
@@ -79,8 +79,13 @@ clean:
 	@$(RM) bin/*/*/scope bin/*/*/ldscope bin/*/*/ldscopedyn lib/*/*/libscope.so
 	@$(RM) -rf newdir testtempdir1 testtempdir2 coverage go .bash_history .cache .viminfo scope.log *.gcda
 
-# include the OS-specific targets
+# target architecture and OS/ARCH-specific Makefile
+ARCH ?= $(shell uname -m)
+ifneq (,$(findstring $(ARCH),$(ARCH_LIST)))
 include os/$(OS)/Makefile
+else
+$(error error: invalid ARCH; "$(ARCH)")
+endif
 
 # include the CLI targets with "cli" prefix plus "scope" shortcut
 cli%:
@@ -107,10 +112,10 @@ docker-run-alpine:
 
 # build in our builder container for the given ARCH
 build: DIST ?= ubuntu
-build: ARCH ?= $(shell uname -m)
 build: CMD ?= make all test
 build: require-docker require-qemu-binfmt
 	@$(MAKE) -s builder DIST="$(DIST)" ARCH="$(ARCH)"
+	@echo "Building AppScope on $(DIST)/$(ARCH)"
 	@docker run --rm -it \
 		-v $(shell pwd):/home/builder/appscope \
 		-u $(shell id -u):$(shell id -g) \
@@ -120,32 +125,28 @@ build: require-docker require-qemu-binfmt
 		$(IMAGE_TAG)-builder:$(DIST)-$(ARCH) \
 	       	$(CMD)
 
-# build all architectures
-build-all:
-	@for ARCH in $(ARCH_LIST); do $(MAKE) -s build ARCH=$${ARCH}; done
-
 # run a shell our builder container without starting a build
 run: DIST ?= ubuntu
-run: ARCH ?= $(shell uname -m)
 run: CMD ?= /bin/bash --login
 run:
+	@echo Running the AppScope $(DIST)/$(ARCH) Builder Container
 	@$(MAKE) -s build DIST="$(DIST)" ARCH="$(ARCH)" CMD="$(CMD)"
 
 # get another shell in an existing builder container
 exec: DIST ?= ubuntu
-exec: ARCH ?= $(shell uname -m)
 exec: CMD ?= /bin/bash
 exec:
 	@[ -n "$(shell docker ps -q -f "name=appscope-builder-$(DIST)-$(ARCH)")" ] || \
 		{ echo >&2 "error: appscope-builder-$(DIST)-$(ARCH) not running"; exit 1; }
+	@echo "Exec'ing into the AppScope $(DIST)/$(ARCH) Builder Container"
 	@docker exec -it $(shell docker ps -q -f "name=appscope-builder-$(DIST)-$(ARCH)") $(CMD)
 
 # build the builder image for the given ARCH
 builder: DIST ?= ubuntu
-builder: ARCH ?= $(shell uname -m)
 builder: AUTH := $(shell grep $(REGISTRY) ~/.docker/config.json >/dev/null 2>&1 && echo true)
 builder: TAG := $(IMAGE_TAG)-builder:$(DIST)-$(ARCH)
 builder: require-docker-buildx-builder
+	@echo "(Re)Building the AppScope $(DIST)/$(ARCH) Builder Image"
 	@docker buildx build \
 		--builder $(BUILDER) \
 		--tag $(TAG) \
@@ -161,6 +162,7 @@ builder: require-docker-buildx-builder
 #   - set LATEST to add the ":latest" tag
 #   - set PUSH to push to the registry
 image:
+	@echo "Building the AppScope Distribution Image (LATEST=$(LATEST), PUSH=$(PUSH))"
 	@docker buildx build \
 		$(if $(LATEST),--tag $(TAG):latest)) \
 		--builder $(BUILDER) \
@@ -169,6 +171,8 @@ image:
 		--output type=$(if $(PUSH),registry,image) \
 		--file docker/base/Dockerfile \
 		.
+	@[ -z "$(PUSH)" ] || \
+		echo "info: pushed $(IMAGE_TAG):$(VERSION)$(if $(LATEST), and $(TAG):latest,)"
 
 # setup the buildx builder if it's not running already
 require-docker-buildx-builder: require-docker-buildx require-qemu-binfmt

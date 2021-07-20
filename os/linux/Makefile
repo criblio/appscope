@@ -87,12 +87,12 @@ coretest: $(C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
 	$(CC) -c $(TEST_CFLAGS) $(C_FILES) $(INCLUDES) $(TEST_INCLUDES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest cfgutilstest.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o mtcformat.o com.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest cfgtest.o cfg.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/transporttest transporttest.o transport.o dbg.o log.o fn.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/logtest logtest.o log.o transport.o dbg.o fn.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/transporttest transporttest.o transport.o dbg.o log.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/logtest logtest.o log.o transport.o dbg.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/mtctest mtctest.o mtc.o log.o transport.o mtcformat.o com.o ctl.o evtformat.o cfg.o cfgutils.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/evtformattest evtformattest.o evtformat.o log.o transport.o mtcformat.o dbg.o cfg.o com.o ctl.o mtc.o circbuf.o cfgutils.o linklist.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ctltest ctltest.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o com.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/httpstatetest httpstatetest.o httpstate.o plattime.o search.o fn.o os.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -lrt
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/httpstatetest httpstatetest.o httpstate.o plattime.o search.o fn.o utils.o os.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -lrt
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/httpheadertest httpheadertest.o report.o httpagg.o state.o com.o httpstate.o plattime.o fn.o utils.o os.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o search.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=cmdSendHttp -Wl,--wrap=cmdPostEvent
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/httpaggtest httpaggtest.o httpagg.o fn.o utils.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/reporttest reporttest.o report.o httpagg.o state.o httpstate.o com.o plattime.o fn.o utils.o os.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o search.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=cmdSendEvent -Wl,--wrap=cmdSendMetric

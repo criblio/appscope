@@ -175,7 +175,7 @@ out:
  * The relocation table's entries have a one-to-one correspondence with the PLT.
  */
 int
-doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym, char *str, int rsz)
+doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym, char *str, int rsz, int attach)
 {
     int i, match = -1;
     char buf[128];
@@ -227,11 +227,11 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
              * of the shared module as defined in the link map's l_addr + offset.
              * as in: rel[i].r_offset + lm->l_addr
              */
-            *gfn =  *gaddr;
+            if (!attach) *gfn = *gaddr;
             uint64_t prev = *gaddr;
             *gaddr = (uint64_t)hook->func;
-            snprintf(buf, sizeof(buf), "%s:%d offset 0x%lx GOT entry %p saddr 0x%lx, prev=%lx, curr=%p",
-                     __FUNCTION__, __LINE__, rel[i].r_offset, gaddr, saddr, prev, hook->func);
+            snprintf(buf, sizeof(buf), "%s:%d sym=%s offset 0x%lx GOT entry %p saddr 0x%lx, prev=0x%lx, curr=%p",
+                     __FUNCTION__, __LINE__, hook->symbol, rel[i].r_offset, gaddr, saddr, prev, hook->func);
             scopeLog(buf, -1, CFG_LOG_DEBUG);
 
             if ((prot & PROT_WRITE) == 0) {
@@ -259,20 +259,38 @@ getElfEntries(struct link_map *lm, Elf64_Rela **rel, Elf64_Sym **sym, char **str
 
     for (dyn = lm->l_ld; dyn->d_tag != DT_NULL; dyn++) {
         if (dyn->d_tag == DT_SYMTAB) {
-            *sym = (Elf64_Sym *)dyn->d_un.d_ptr;
+            // Note: using osGetPageProt() to determine if the addr is present in the
+            // process address space. We don't need the prot value.
+            if (osGetPageProt((uint64_t)dyn->d_un.d_ptr) != -1) {
+                *sym = (Elf64_Sym *)((char *)(dyn->d_un.d_ptr));
+            } else {
+                *sym = (Elf64_Sym *)((char *)(dyn->d_un.d_ptr + lm->l_addr));
+            }
         } else if (dyn->d_tag == DT_STRTAB) {
-            *str = (char *)dyn->d_un.d_ptr;
+            if (osGetPageProt((uint64_t)dyn->d_un.d_ptr) != -1) {
+                *str = (char *)(dyn->d_un.d_ptr);
+            } else {
+                *str = (char *)(dyn->d_un.d_ptr + lm->l_addr);
+            }
         } else if (dyn->d_tag == DT_JMPREL) {
-            *rel = (Elf64_Rela *)dyn->d_un.d_ptr;
+            if (osGetPageProt((uint64_t)dyn->d_un.d_ptr) != -1) {
+                *rel = (Elf64_Rela *)((char *)(dyn->d_un.d_ptr));
+            } else {
+                *rel = (Elf64_Rela *)((char *)(dyn->d_un.d_ptr + lm->l_addr));
+            }
         } else if (dyn->d_tag == DT_PLTRELSZ) {
             *rsz = dyn->d_un.d_val;
         } else if (dyn->d_tag == DT_PLTGOT) {
-            got = (char *)dyn->d_un.d_ptr;
+            if (osGetPageProt((uint64_t)dyn->d_un.d_ptr) != -1) {
+                got = (char *)(dyn->d_un.d_ptr);
+            } else {
+                got = (char *)(dyn->d_un.d_ptr + lm->l_addr);
+            }
         }
     }
 
-    snprintf(buf, sizeof(buf), "%s:%d dyn %p sym %p rel %p str %p rsz %d got %p laddr 0x%lx\n",
-             __FUNCTION__, __LINE__, dyn, *sym, *rel, *str, *rsz, got, lm->l_addr);
+    snprintf(buf, sizeof(buf), "%s:%d name: %s dyn %p sym %p rel %p str %p rsz %d got %p laddr 0x%lx\n",
+             __FUNCTION__, __LINE__, lm->l_name, dyn, *sym, *rel, *str, *rsz, got, lm->l_addr);
     scopeLog(buf, -1, CFG_LOG_TRACE);
 
     if (*sym == NULL || *rel == NULL || (*rsz < sizeof(Elf64_Rela))) {

@@ -9,120 +9,253 @@ on:
       - 'master'
       - 'releases/*'
 
+env:
+  #REGISTRY: ghcr.io
+  REGISTRY: docker.io
+  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
 jobs:
 
-  build-scope:
-    name: Build Scope
-    runs-on: ubuntu-18.04
+  info:
+    name: Get Build Info
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - name: Get Tag Info
-        run: git fetch --prune --unshallow
+      - name: Get Version
+        id: version
+        uses: battila7/get-version-action@v2
 
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.15
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Install Dependencies
+      - name: Get Tag
+        id: tag
         run: |
-            ./install_build_tools.sh
-            make deps
-
-      - name: Build
-        run: make all
-
-      - name: Unit Tests
-        run: make test
-
-      # TODO Revisit these...
-      - run: make buildclean
-      - run: bash -ex ./scope_env.sh build_arm64
-
-      - name: Save Binaries for Integration Tests
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: actions/upload-artifact@v2
-        with:
-          name: built-binaries
-          path: |
-            lib/linux/libscope.so
-            bin/linux/scope
-            bin/linux/ldscope
-          retention-days: 5
-
-      - name: Deploy Artifacts to CDN
-        if: ${{ github.event_name == 'push' }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
-        run: ./deploy.sh
-
-      - name: Build & Push Container Image to Docker Hub
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
-        run: ./docker/build.sh
+          if [ "true" = "${{ steps.version.outputs.is-semver }}" ]; then
+              TAG=${{ steps.version.outputs.version-without-v }}
+              echo "::set-output name=push::true"
+              if [ -z "${{ steps.version.outputs.prerelease }}" ]; then
+                # TODO: make sure it's really the latest and not a maintenance relase for an older version
+                echo "::set-output name=latest::true"
+              fi
+          else
+            if [ "refs/heads/main" = "${GITHUB_REF}" ]; then
+              TAG=next
+              echo "::set-output name=push::true"
+            else
+              TAG=unreleased
+            fi
+          fi
+          echo "::set-output name=tag::${TAG}"
 
       - name: List Integration Tests
-        id: set-tests
+        id: tests
         run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | sort -V | jq -ncR '[inputs]')"
 
-    outputs:
-      tests: ${{ steps.set-tests.outputs.tests }}
-
-  integration-test:
-    needs: build-scope
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
-    strategy:
-      matrix: 
-        test: ${{ fromJson(needs.build-scope.outputs.tests) }}
-      fail-fast: false
-    name: "Test: ${{ matrix.test }}"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
-
-      - name: Download Binaries
-        uses: actions/download-artifact@v2
-        with:
-          name: built-binaries
-
-      - name: Run Test
+      - name: Create Release
+        id: release
+        if: ${{ steps.version.outputs.is-semver == 'true' }}
         run: |
-            chmod +x bin/linux/* lib/linux/*
-            make -C test/testContainers ${{ matrix.test }}
+            if gh release view ${{ steps.version.outputs.version }} >/dev/null 2>&1; then \
+              echo "info: ${{ steps.version.outputs.version }} release already exists"; \
+            else
+              if [ -n "${{ steps.version.outputs.prerelease }}" ]; then
+                gh release create ${{ steps.version.outputs.version }} -p \
+                  -n "${{ steps.notes.outputs.release_notes }}" \
+                  -t "Pre-Release ${{ steps.version.outputs.version-without-v }}"
+              else
+                gh release create ${{ steps.version.outputs.version }} \
+                  -n "${{ steps.notes.outputs.release_notes }}" \
+                  -t "Release ${{ steps.version.outputs.version-without-v }}"
+              fi \
+            fi
 
-  integration-image:
-    needs: build-scope
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-    strategy:
-      matrix: 
-        test: ${{ fromJson(needs.build-scope.outputs.tests) }}
-      fail-fast: false
-    name: "Update Image: ${{ matrix.test }}"
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-semver: ${{ steps.version.outputs.is-semver }}
+      tag: ${{ steps.tag.outputs.tag }}
+      latest: ${{ steps.tag.outputs.latest }}
+      push: ${{ steps.tag.outputs.push }}
+      tests: ${{ steps.tests.outputs.tests }}
+
+  builder:
+    name: Update Builder
+    needs: info
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dist: [ubuntu]
+        arch: [x86_64,aarch64]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
 
       - name: Login to Container Registry
         uses: docker/login-action@v1
         with:
+          registry: ${{ env.REGISTRY }}
+          #username: ${{ github.actor }}
+          #password: ${{ secrets.GITHUB_TOKEN }}
           username: scopeci
           password: ${{ secrets.SCOPECI_TOKEN }}
 
-      - name: Update Image
-        run: make -C test/testContainers ${{ matrix.test }}-push
+      - name: Build Image
+        run: make builder DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }} BUILDER=${{ steps.buildx.outputs.name }} PUSH=${{ needs.info.outputs.push }}
+
+  build:
+    name: Build & Test
+    needs: [info,builder]
+    runs-on: ubuntu-latest
+    matrix:
+        dist: [ubuntu]
+        arch: [x86_64,aarch64]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build & Test
+        run: make build DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }} VERSION=${{ needs.info.outputs.tag }}
+
+      - name: Add Assets to Release
+        id: release
+        if: ${{ needs.info.outputs.is-semver == 'true' }}
+        run: |
+          gh release upload ${{ needs.info.outputs.version }} "bin/linux/${{ matrix.arch }}/scope#scope-${{ matrix.arch }}"
+          gh release upload ${{ needs.info.outputs.version }} "lib/linux/${{ matrix.arch }}/libscope.so#ldscope-${{ matrix.arch }}.so"
+
+      - name: Upload Binaries
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: binaries ${{ matrix.dist }} ${{ matrix.arch })
+          path: |
+            lib/linux/${{ matrix.arch }}/libscope.so
+            bin/linux/${{ matrix.arch }}/scope
+            bin/linux/${{ matrix.arch }}/ldscope
+          retention-days: 5
+
+      #- name: Deploy Artifacts to CDN
+      #  if: ${{ github.event_name == 'push' }}
+      #  env:
+      #    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #    AWS_REGION: ${{ secrets.AWS_REGION }}
+      #    CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
+      #  run: ./deploy.sh
+
+      #- name: Build & Push Container Image to Docker Hub
+      #  if: startsWith(github.ref, 'refs/tags/v')
+      #  env:
+      #    SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
+      #  run: ./docker/build.sh
+
+#  test:
+#    name: Test
+#    needs: build
+#    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+#    strategy:
+#      matrix: 
+#        test: ${{ fromJson(needs.build-scope.outputs.tests) }}
+#        dist: [ubuntu]
+#        arch: [x86_64,aarch64]
+#      fail-fast: false
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout Repository
+#        uses: actions/checkout@v2
+#
+#      - name: Setup QEMU
+#        uses: docker/setup-qemu-action@v1
+#
+#      - name: Setup Docker Buildx
+#        id: buildx
+#        uses: docker/setup-buildx-action@v1
+#
+#      - name: Download Binaries
+#        uses: actions/download-artifact@v2
+#        with:
+#          name: binaries ${{ matrix.dist }} ${{ matrix.arch }}
+#          path: bin
+#
+#      - name: Run Test
+#        run: |
+#          chmod +x bin/linux/${{ matrix.arch }}/* lib/linux/${{ matrix.arch }}/*
+#          make -C test/testContainers ${{ matrix.test }}
+
+#  test-image:
+#    needs: build
+#    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+#    strategy:
+#      matrix: 
+#        test: ${{ fromJson(needs.build-scope.outputs.tests) }}
+#      fail-fast: false
+#    name: "Update Image: ${{ matrix.test }}"
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout Repository
+#        uses: actions/checkout@v2
+#
+#      - name: Login to Container Registry
+#        uses: docker/login-action@v1
+#        with:
+#          username: scopeci
+#          password: ${{ secrets.SCOPECI_TOKEN }}
+#
+#      - name: Update Image
+#        run: make -C test/testContainers ${{ matrix.test }}-push
+
+#  image:
+#    name: Build Image
+#    needs: [info,builder,build,test]
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        dist: [ubuntu]
+#    steps:
+#      - name: Checkout Repository
+#        uses: actions/checkout@v2
+#
+#      - name: Setup QEMU
+#        uses: docker/setup-qemu-action@v1
+#
+#      - name: Setup Docker Buildx
+#        id: buildx
+#        uses: docker/setup-buildx-action@v1
+#
+#      - name: Login to Container Registry
+#        uses: docker/login-action@v1
+#        with:
+#          registry: ${{ env.REGISTRY }}
+#          #username: ${{ github.actor }}
+#          #password: ${{ secrets.GITHUB_TOKEN }}
+#          username: scopeci
+#          password: ${{ secrets.SCOPECI_TOKEN }}
+#
+#      - name: Download x86_64 Binaries
+#        uses: actions/download-artifact@v2
+#        with:
+#          name: binaries ${{ matrix.os }} x86_64
+#          path: bin
+#
+#      - name: Download aarch64 Binaries
+#        uses: actions/download-artifact@v2
+#        with:
+#          name: binaries ${{ matrix.os }} aarch64
+#          path: bin
+#
+#      - name: Build Image
+#        run: make image DIST=${{ matrix.dist }} BUILDER=${{ steps.buildx.outputs.name }} VERSION=${{ needs.info.outputs.tag }} LATEST=${{ needs.info.outputs.latest }} PUSH=${{ needs.info.outputs.push }}
+

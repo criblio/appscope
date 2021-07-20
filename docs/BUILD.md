@@ -56,15 +56,23 @@ We use simple Makefiles to build the binaries and run the tests. GitHub Workflow
   * `make builder ARCH=aarch64` took 5m34.032s
   * `make build CMD="make coreall"` took 0m59.942s
   * `make build CMD="make coreall" ARCH=aarch64` took 14m52.233s
-* To Do
-  * wring out the `image` target
-  * add `cdn` target
+* Status & To Do
+  * make
+    * wring out the `image` target
+    * add `cdn` target
+    * any reason to pull the website build/deploy into here?
   * integration tests
-  * sudo not working in the Ubuntu/ARM builder for some reason.
+    * not started
+  * workflow
+    * initial effort in place - later stages commented out for now
+  * builder
+    * sudo not working in the Ubuntu/ARM builder for some reason
 * Changes to warn devs about:
   * We no longer include `cli/Makefile` in the top-level `Makefile` because it caused target collisions. Instead, we are using `$(MAKE) -C cli` to build any targets that start with `cli` by `cd`'ing there first. So, `make clifoo` effectively becomes `cd cli && make foo`.
   * The built `scope` binary is no longer being put in `~/go/bin/scope` because of the multi-architecture builds. It's in `bin/$(OS)/$(ARCH)/scope`.
   * Dependencies have been cleaned up or added for various CLI and core targets. There may be surprise noop makes still as these get polished.
+  * The `make docker-*` targets are deprecated. Use `make build` and `make run`.
+  * Added `.github/dependabot.yml` config. GitHub should warn us when actions in our workflows are out of date.
 
 [qemu-user-static]: https://github.com/multiarch/qemu-user-static
 [Docker BuildX]: https://docs.docker.com/buildx/working-with-buildx/

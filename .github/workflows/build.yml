@@ -83,8 +83,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dist: [ubuntu]
         arch: [x86_64,aarch64]
+        dist: [ubuntu]
       fail-fast: false
     steps:
       - name: Checkout Repository
@@ -116,8 +116,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dist: [ubuntu]
         arch: [x86_64,aarch64]
+        dist: [ubuntu]
       fail-fast: false
     steps:
       - name: Checkout Repository

@@ -28,6 +28,10 @@ LDSCOPEDYN=bin/$(OS)/$(ARCH)/ldscopedyn
 
 coreall: $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN)
 
+corerebuild:
+	@$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN)
+	@$(MAKE) coreall
+
 include os/linux/$(ARCH).mk
 
 $(OPENSSL_AR):
@@ -132,4 +136,4 @@ $(TEST_LIB):
 # don't install on the host.
 # We can tell the linker where to find the .dylib file
 
-.PHONY: coreall coreclean coretest
+.PHONY: coreall coreclean coretest corerebuild

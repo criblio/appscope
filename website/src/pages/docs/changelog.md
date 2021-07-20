@@ -15,10 +15,10 @@ This pre-release addresses the following issues:
 - **Improvement**: [#363](https://github.com/criblio/appscope/pull/363) Add a new `scope ps` command to report on all processes into which the libscope library is loaded.
 - **Improvement**: [#363](https://github.com/criblio/appscope/pull/363) Add support for attaching to a process by name (preserving existing attach by PID functionality).
 - **Improvement**: [#304](https://github.com/criblio/appscope/issues/304) Add support for configuring an `authToken` to pass to LogStream as a header, using `scope run -a ${authToken}` in the CLI, or the `cribl` section of `scope.yml`.
-- **Improvement**:[#368](https://github.com/criblio/appscope/issues/368) Add the new `-n` or `--nobreaker` option for configuring LogStream breaker behavior from AppScope. This sets the `SCOPE_CRIBL_NO_BREAKER` environment variable to `true` when you start scope with `run` or `attach`.
-- **Improvement**:[#359](https://github.com/criblio/appscope/pull/359) Users who run scope as root now see the message `WARNING: Session history will be stored in $HOME/.scope/history and owned by root`.
+- **Improvement**: [#368](https://github.com/criblio/appscope/issues/368) Add the new `-n` or `--nobreaker` option for configuring LogStream breaker behavior from AppScope. This sets the `SCOPE_CRIBL_NO_BREAKER` environment variable to `true` when you start scope with `run` or `attach`.
+- **Improvement**: [#359](https://github.com/criblio/appscope/pull/359) Users who run scope as root now see the message `WARNING: Session history will be stored in $HOME/.scope/history and owned by root`.
 - **Improvement**: [#278](https://github.com/criblio/appscope/pull/278) Integration tests are now enabled for PRs to the `master` and `release/*` branches.
-- **Improvement**:[#381](https://github.com/criblio/appscope/pull/381) Commits to master now redeploy the website only when there are changes in the `website/` content.
+- **Improvement**: [#381](https://github.com/criblio/appscope/pull/381) Commits to master now redeploy the website only when there are changes in the `website/` content.
 - **Improvement**: [#350](https://github.com/criblio/appscope/issues/350) In `docker-build`, add support for:
   - Overriding the `build` command, for example: `make docker-build CMD="make coreall"`.
   - Passing `-u $(id -u):$(id -g)` to Docker so that the current user owns build results.
@@ -29,7 +29,7 @@ This pre-release addresses the following issues:
 - **Fix**: [#309](https://github.com/criblio/appscope/issues/309) The `scope flows` command now works when `stdin` is a pipe.
 - **Fix**: [#358](https://github.com/criblio/appscope/pull/358) The defaults for `scope prune -d` and `scope prune -k` are now set to `0`.
 - **Fix**: [#388](https://github.com/criblio/appscope/issues/388) Ensure that all dimension names contain underscores (`_`) rather than periods (`.`).
-- **Fix**: [#393](https://github.com/criblio/appscope/pull/393) The metrics `http.client.duration` and `http.server.duration` are now the correct type, `timer`. 
+- **Fix**: [#393](https://github.com/criblio/appscope/pull/393) The metrics `http.client.duration` and `http.server.duration` are now the correct type, `timer`.
 
 # Changelog
 

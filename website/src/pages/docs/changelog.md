@@ -4,7 +4,7 @@ title: Changelog
 
 # Changelog
 
-See the AppsScope repo to view [all issues](https://github.com/criblio/appscope/issues).
+See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
 ## AppScope 0.7.1
 

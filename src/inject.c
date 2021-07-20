@@ -226,8 +226,10 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path)
         ptrace(PTRACE_GETREGS, pid, NULL, &regs);
 #ifdef __x86_64__
         if (regs.rax != 0x0) {
-#elif defined(__ARM64__)
+#elif defined(__aarch64__)
         if (regs.pc != 0) { // TODO: bogus reg, update when applying ARM64 specifics
+#else
+#error Unknown architecture!
 #endif
             //printf("Appscope library injected at %p\n", (void*)regs.rax);
         } else {

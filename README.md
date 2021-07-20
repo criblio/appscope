@@ -8,8 +8,6 @@ AppScope provides the fine-grained observability of a proxy/service mesh, withou
 
 It’s like [strace](https://github.com/strace/strace) meets [tcpdump](https://www.tcpdump.org/) – but with consumable output for events like file access, DNS, and network activity, and StatsD-style metrics for applications. AppScope can also look inside encrypted payloads, offering WAF-like visibility without proxying traffic.
 
-This `README` gets you up and scoping ASAP.
-
 ## Get Started
 
 Before you begin, make sure that your environment meets AppScope [requirements](https://appscope.dev/docs/requirements).
@@ -45,19 +43,27 @@ git clone https://github.com/criblio/appscope.git
 cd appscope
 ```
 
-If you are on Ubuntu 18.04, install the dependencies and build the project with:
+If you are on Ubuntu 18.04, install the build dependencies with:
 
 ```text
-./scope_env.sh build
+./install_build_tools.sh
 ```
 
-If you are on a platform other than Ubuntu 18.04, or prefer not to install the dependencies, ensure that `docker` and `make` are installed, then build in a Docker container with:
+Then, build and test the code with:
 
 ```text
-make docker-build
+make all test
 ```
 
-Either way, the resulting binaries will be in `lib/linux/libscope.so`, `bin/linux/scope`, and `bin/linux/ldscope`.
+If you are on a platform other than Ubuntu 18.04, or prefer not to install the dependencies, ensure that [Docker], [BuildX], and `make` are installed, then build in a container with:
+
+```text
+make build
+```
+
+Either way, the resulting binaries will be in `lib/linux/$(uname -m)/libscope.so`, `bin/linux/$(uname -m)/scope`, and `bin/linux/$(uname -m)/ldscope`.
+
+We support building `x86_64` (amd64) or `aarch64` (arm64/v8) binaries by adding `ARCH=x86_64` or `ARCH=aarch64` to the `make build` command. See the [BUILD](docs/BUILD.md) doc for details.
 
 ## Keep Going
 
@@ -79,3 +85,6 @@ Elsewhere, you can:
 - Join the [Cribl Community](https://cribl.io/community/) on Slack. The `#appscope` channel is where you'll find developers who contribute to this project.
  
 Please submit any feature requests and defect reports at <https://github.com/criblio/appscope>.
+
+[Docker]: https://docs.docker.com/engine/install/
+[BuildX]: https://docs.docker.com/buildx/working-with-buildx/

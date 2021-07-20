@@ -1,73 +1,90 @@
+ARCH := $(shell uname -m)
 
-DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-
-ARCH=$(shell uname -m)
-
-GO_VER:=$(shell go version | cut -d' ' -f3)
-
-# Allow GOPATH to be set, but don't require it.
-ifndef GOPATH
-GOPATH:=$(shell go env | grep GOPATH | cut -d\" -f2)
+GO ?= $(shell which go 2>&1)
+ifeq (,$(GO))
+$(error "error: \`go\` not in PATH; install or set GO to it's path")
 endif
+GO_VER := $(shell $(GO) version | cut -d' ' -f3)
+GOPATH ?= $(shell $(GO) env | grep GOPATH | cut -d\" -f2)
+GO_BINDIR := $(GOPATH)/bin
 
-GO:=go
+BINDIR := ../bin/linux/$(ARCH)
+LIBDIR := ../lib/linux/$(ARCH)
+CONFDIR := ../conf
 
-GO_VER_FLAGS=$(shell cd $(DIR) && $(GOPATH)/bin/govvv -flags)
+SCOPE := $(BINDIR)/scope
+LDSCOPE := $(BINDIR)/ldscope
+LIBSCOPE := $(LIBDIR)/libscope.so
+CONF_YML := $(wildcard $(CONFDIR)/*.yml)
 
-.PHONY: build all install uninstall clean deps rebuild scope compressscope test fmt lint vet cover check help
+GO_BINDATA := $(GO_BINDIR)/go-bindata
+GOVVV := $(GO_BINDIR)/govvv
+GOLANGCI_LINT := $(GO_BINDIR)/golangci-lint
 
-## build (default): install dependencies and install the scope binary in your GOPATH/bin directory
-build: deps
-	cd $(DIR) && GOOS=linux CGO_ENABLED=0 $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(GOPATH)/bin/scope
-	cp $(GOPATH)/bin/scope $(DIR)../bin/linux/scope
+## build: build all (default)
+build: all
 
-## debug: build, but with gdb support
-debug: deps
-	cd $(DIR) && GOOS=linux CGO_ENABLED=0 $(GO) build -ldflags="$(GO_VER_FLAGS)" -gcflags=all="-N -l" -o $(GOPATH)/bin/scope
+## debug: build with gdb support
+debug:
+	$(MAKE) scope BUILD_OPTS="-gcflags=all=\"-N -l\""
 
-## cliall (popular): install dependencies and install the scope binary in appscope/build with compression
-cliall: deps scope compressscope
+## all: build and compress \`scope\`
+all: scope compressscope
 
-## cliclean: remove the binary from appscope/build and your GOPATH/bin directory
-cliclean:
-	$(RM) -r $(DIR)build/*
-	$(RM) $(GOPATH)/bin/scope
+## clean: remove the binary from appscope/build and your GOPATH/bin directory
+clean:
+	$(RM) -r build/* 
+	$(RM) run/bundle.go $(SCOPE)
+	$(RM) coverage.out coverage.html
 
-## deps: install all project dependencies
-deps:
-	@echo DIR=$(DIR)
-	@echo GO_VER=$(GO_VER)
-	@echo GOPATH=$(GOPATH)
+## deps: install dependencies
+deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT)
+$(GO_BINDATA):
 	$(GO) get github.com/go-bindata/go-bindata/...
+$(GOVVV):
 	$(GO) get github.com/ahmetb/govvv
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.40.1
+$(GOLANGCI_LINT):
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
+		sh -s -- -b $(GO_BINDIR) v1.40.1
 
-rebuild: cliclean build 
+rebuild: clean build 
 
-run/bundle.go:
-	$(RM) -r $(DIR)/build/*
-	cp $(DIR)../bin/linux/ldscope $(DIR)build/
-	cp $(DIR)../lib/linux/libscope.so $(DIR)build/
-	cp $(DIR)../conf/*.yml $(DIR)build/
-	cd $(DIR) && $(GOPATH)/bin/go-bindata -o run/bundle.go -pkg run build
+run/bundle.go: $(GO_BINDATA) $(LDSCOPE) $(LIBSCOPE) $(CONF_YML)
+	$(RM) -r build/*
+	cp $(LDSCOPE) $(LIBSCOPE) $(CONF_YML) build/
+	$(GO_BINDATA) -o $@ -pkg run build
 
-scope: run/bundle.go
-	cd $(DIR) && GOOS=linux CGO_ENABLED=0 $(GO) build -ldflags="$(GO_VER_FLAGS)" -o $(DIR)../bin/linux/scope
+# in case someone is building here before the C code is built
+$(LDSCOPE):
+	@$(MAKE) -C .. bin/linux/$(ARCH)/ldscope
+$(LIBSCOPE):
+	@$(MAKE) -C .. lib/linux/$(ARCH)/libscope.so
 
-compressscope:
-	upx -9 $(DIR)../bin/linux/$(ARCH)/scope
+# shortcut "easy button"
+scope: $(SCOPE)
 
-## clitest: test all Go files
-clitest:
-	cd $(DIR) && $(GO) test -v -p 1 -failfast -timeout 600s -coverprofile coverage.out ./...
+$(SCOPE): export GOOS=linux
+$(SCOPE): export CGO_ENABLED=0
+$(SCOPE): run/bundle.go $(GOVVV)
+	$(GO) build \
+		-ldflags="$(shell $(GOVVV) -flags)" \
+		$(BUILD_OPTS) \
+	       	-o $(SCOPE)
+
+compressscope: $(SCOPE)
+	upx -l $(SCOPE) >/dev/null 2>&1 || upx -9 $(SCOPE)
+
+## test: run unit tests
+test:
+	$(GO) test -v -p 1 -failfast -timeout 600s -coverprofile coverage.out ./...
 
 ## fmt: format all Go files
 fmt:
 	$(GO) fmt ./...
 
 ## lint: lint all Go files
-lint: 
-	golangci-lint --new-from-rev=HEAD~1 run ./...
+lint: $(GOLANGCI_LINT)
+	$(GOLANGCI_LINT) --new-from-rev=HEAD~1 run ./...
 
 ## vet: vet all Go files
 vet: 
@@ -75,10 +92,10 @@ vet:
 
 ## cover: produce a test coverage report
 cover: 
-	cd $(DIR) && $(GO) tool cover -html=coverage.out -o coverage.html
+	$(GO) tool cover -html=coverage.out -o coverage.html
 
 ## check: format, vet, lint and test all Go files
-check: fmt vet lint clitest
+check: fmt vet lint test
 
 help: Makefile
 	@echo
@@ -86,3 +103,5 @@ help: Makefile
 	@echo
 	@sed -n 's/^##//p' $< | column -t -s ':' |  sed -e 's/^/ /'
 	@echo
+
+.PHONY: build debug all clean deps rebuild scope compressscope test fmt lint vet cover check help

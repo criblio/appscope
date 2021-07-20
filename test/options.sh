@@ -33,7 +33,9 @@ returns() {
     fi
 }
 
-echo "Testing Command-Line Options"
+echo "================================="
+echo "    Command Line Options Test"
+echo "================================="
 
 run ./bin/linux/ldscope
 outputs "error: missing --attach option or EXECUTABLE"

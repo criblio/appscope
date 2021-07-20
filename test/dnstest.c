@@ -355,6 +355,11 @@ dnsGethostbyname2(void** state)
 static void
 dnsGetaddrinfo(void** state)
 {
+#if defined(__aarch64__)
+    // TODO: restore after we re-enable hooking getaddrinfo() on ARM
+    skip();
+#endif
+
     struct addrinfo hints = {0};
     struct addrinfo *addrs = NULL;
 

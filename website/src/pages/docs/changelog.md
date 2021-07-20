@@ -4,6 +4,24 @@ title: Changelog
 
 # Changelog
 
+## AppScope 0.7.1
+
+2021-07-20 - Maintenance Pre-Release
+
+This pre-release addresses the following issues:
+
+- **Improvement**: [#350] In `docker-build`, add support for:
+  - Overriding the `build` command, for example `make docker-build CMD="make coreall"`.
+  - Passing `-u $(id -u):$(id -g)` to Docker so that the current user owns build results.
+  - Using `.dockerignore` to omit unnecessary and potentially large items like `**/core`, `website/`, `test/testContainers`.
+- **Improvement**: [#304](https://github.com/criblio/appscope/issues/304) Add support for configuring an `authToken` to pass to LogStream as a header, using `scope run -a ${authToken}` in the CLI, or the `cribl` section of `scope.yml`.
+- **Improvement**:[#368](https://github.com/criblio/appscope/issues/368) Add the new `-n` or `--nobreaker` option for configuring LogStream breaker behavior from AppScope.
+- **Fix**: [#388](https://github.com/criblio/appscope/issues/388) Ensure that all dimension names contain underscores rather than dots.
+- **Fix**: [#364](https://github.com/criblio/appscope/issues/364) Console data is now received reliably when using TLS in both low latency (all local) and relatively high latency environments (LogStream cloud).
+- **Fix**: [#309](https://github.com/criblio/appscope/issues/309) The `scope flows` command now works when `stdin` is a pipe.
+
+# Changelog
+
 ## AppScope 0.7
 
 2021-07-02 - Maintenance Pre-Release

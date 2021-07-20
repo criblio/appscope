@@ -117,7 +117,7 @@ build: CMD ?= make all test
 build: require-docker require-qemu-binfmt
 	@$(MAKE) -s builder DIST="$(DIST)" ARCH="$(ARCH)"
 	@echo "Building AppScope on $(DIST)/$(ARCH)"
-	@docker run --rm -it \
+	@docker run --rm $(if $(CI),,-it) \
 		-v $(shell pwd):/home/builder/appscope \
 		-u $(shell id -u):$(shell id -g) \
 		--privileged \
@@ -144,7 +144,6 @@ exec:
 
 # build the builder image for the given ARCH
 builder: DIST ?= ubuntu
-builder: AUTH := $(shell grep $(REGISTRY_github) ~/.docker/config.json >/dev/null 2>&1 && echo true)
 builder: TAG := $(BUILD_IMAGE):$(DIST)-$(ARCH)
 builder: require-docker-buildx-builder
 	@echo "\(Re\)Building the AppScope $(DIST)/$(ARCH) Builder Image"
@@ -152,7 +151,7 @@ builder: require-docker-buildx-builder
 		--builder $(BUILDER) \
 		--tag $(TAG) \
 		--cache-from type=registry,ref=$(TAG)-cache \
-		$(if $(AUTH),--cache-to type=registry$(_comma)ref=$(TAG)-cache) \
+		$(if $(PUSH),--cache-to type=registry$(_comma)ref=$(TAG)-cache) \
 		--platform linux/$(PLATFORM_$(ARCH)) \
 		--label "org.opencontainers.image.description=AppScope $(ARCH) Builder ($(PLATFORM_$(ARCH)))" \
 		--load \

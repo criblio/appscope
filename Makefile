@@ -147,12 +147,11 @@ builder: DIST ?= ubuntu
 builder: AUTH := $(shell grep $(REGISTRY_github) ~/.docker/config.json >/dev/null 2>&1 && echo true)
 builder: TAG := $(BUILD_IMAGE):$(DIST)-$(ARCH)
 builder: require-docker-buildx-builder
-	cat ~/.docker/config.json
 	@echo "\(Re\)Building the AppScope $(DIST)/$(ARCH) Builder Image"
 	@docker buildx build \
 		--builder $(BUILDER) \
 		--tag $(TAG) \
-		$(if $(AUTH),--cache-from type=registry$(_comma)ref=$(TAG)-cache) \
+		--cache-from type=registry,ref=$(TAG)-cache \
 		$(if $(AUTH),--cache-to type=registry$(_comma)ref=$(TAG)-cache) \
 		--platform linux/$(PLATFORM_$(ARCH)) \
 		--label "org.opencontainers.image.description=AppScope $(ARCH) Builder ($(PLATFORM_$(ARCH)))" \

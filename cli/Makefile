@@ -40,6 +40,9 @@ clean:
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT)
 $(GO_BINDATA):
+	@echo PWD=$(shell pwd)
+	@echo HOME=$(HOME)
+	@id -a
 	$(GO) env
 	@echo GO_VER=$(GO_VER)
 	@echo GOPATH=$(GOPATH)

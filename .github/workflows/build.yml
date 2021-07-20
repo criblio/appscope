@@ -112,7 +112,8 @@ jobs:
     name: Build & Test
     needs: [info,builder]
     runs-on: ubuntu-latest
-    matrix:
+    strategy:
+      matrix:
         dist: [ubuntu]
         arch: [x86_64,aarch64]
     steps:

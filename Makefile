@@ -146,7 +146,7 @@ builder: DIST ?= ubuntu
 builder: AUTH := $(shell grep $(REGISTRY) ~/.docker/config.json >/dev/null 2>&1 && echo true)
 builder: TAG := $(IMAGE_TAG)-builder:$(DIST)-$(ARCH)
 builder: require-docker-buildx-builder
-	@echo "(Re)Building the AppScope $(DIST)/$(ARCH) Builder Image"
+	@echo "\(Re\)Building the AppScope $(DIST)/$(ARCH) Builder Image"
 	@docker buildx build \
 		--builder $(BUILDER) \
 		--tag $(TAG) \

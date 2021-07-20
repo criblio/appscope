@@ -128,7 +128,7 @@ jobs:
         uses: docker/setup-buildx-action@v1
 
       - name: Build & Test
-        run: make build DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }} VERSION=${{ needs.info.outputs.tag }}
+        run: make build BUILDER=${{ steps.buildx.outputs.name }} DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }} VERSION=${{ needs.info.outputs.tag }}
 
       - name: Add Assets to Release
         id: release

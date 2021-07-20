@@ -4,9 +4,11 @@ GO ?= $(shell which go 2>&1)
 ifeq (,$(GO))
 $(error "error: \`go\` not in PATH; install or set GO to it's path")
 endif
-GO_VER := $(shell $(GO) version | cut -d' ' -f3)
-GOPATH ?= $(shell $(GO) env | grep GOPATH | cut -d\" -f2)
-GO_BINDIR := $(GOPATH)/bin
+
+# cache downloaded modules and binaries locally
+export GOBIN := $(shell pwd)/.gobin/$(ARCH)
+export GOCACHE := $(shell pwd)/.gocache
+export GOMODCACHE := $(shell pwd)/.gomod
 
 BINDIR := ../bin/linux/$(ARCH)
 LIBDIR := ../lib/linux/$(ARCH)
@@ -17,9 +19,9 @@ LDSCOPE := $(BINDIR)/ldscope
 LIBSCOPE := $(LIBDIR)/libscope.so
 CONF_YML := $(wildcard $(CONFDIR)/*.yml)
 
-GO_BINDATA := $(GO_BINDIR)/go-bindata
-GOVVV := $(GO_BINDIR)/govvv
-GOLANGCI_LINT := $(GO_BINDIR)/golangci-lint
+GO_BINDATA := $(GOBIN)/go-bindata
+GOVVV := $(GOBIN)/govvv
+GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
 ## build: build all (default)
 build: all
@@ -31,21 +33,15 @@ debug:
 ## all: build and compress \`scope\`
 all: scope compressscope
 
-## clean: remove the binary from appscope/build and your GOPATH/bin directory
+## clean: remove the built binary
 clean:
-	$(RM) -r build/* 
+	$(RM) -r build/*
 	$(RM) run/bundle.go $(SCOPE)
 	$(RM) coverage.out coverage.html
 
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT)
 $(GO_BINDATA):
-	@echo PWD=$(shell pwd)
-	@echo HOME=$(HOME)
-	@id -a
-	$(GO) env
-	@echo GO_VER=$(GO_VER)
-	@echo GOPATH=$(GOPATH)
 	$(GO) get github.com/go-bindata/go-bindata/...
 $(GOVVV):
 	$(GO) get github.com/ahmetb/govvv

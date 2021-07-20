@@ -70,6 +70,7 @@ We use simple Makefiles to build the binaries and run the tests. GitHub Workflow
 * Changes to warn devs about:
   * We no longer include `cli/Makefile` in the top-level `Makefile` because it caused target collisions. Instead, we are using `$(MAKE) -C cli` to build any targets that start with `cli` by `cd`'ing there first. So, `make clifoo` effectively becomes `cd cli && make foo`.
   * The built `scope` binary is no longer being put in `~/go/bin/scope` because of the multi-architecture builds. It's in `bin/$(OS)/$(ARCH)/scope`.
+  * Downloaded Go modules and such are now cached in `cli/.gobin/$(uname -m)`, `cli/.gocache/`, and `cli/.gomod/`. This was done do deal with multi-arch builds using the same filesystem. It also addresses some permission issue with the default destinations when build in our builder container inside a GitHub workflow container. Finally, it lets us cache those folders in CI to improve build speeds.
   * Dependencies have been cleaned up or added for various CLI and core targets. There may be surprise noop makes still as these get polished.
   * The `make docker-*` targets are deprecated. Use `make build` and `make run`.
   * Added `.github/dependabot.yml` config. GitHub should warn us when actions in our workflows are out of date.

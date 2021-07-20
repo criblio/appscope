@@ -117,6 +117,7 @@ build: CMD ?= make all test
 build: require-docker require-qemu-binfmt
 	@$(MAKE) -s builder DIST="$(DIST)" ARCH="$(ARCH)"
 	@echo "Building AppScope on $(DIST)/$(ARCH)"
+	@echo "ROOT=$(shell [ 0 -eq $(shell id -u) ] && echo "true" || echo "false")"
 	@docker run --rm $(if $(CI),,-it) \
 		-v $(shell pwd):/home/builder/appscope \
 		-u $(shell id -u):$(shell id -g) \
@@ -146,7 +147,7 @@ exec:
 builder: DIST ?= ubuntu
 builder: TAG := $(BUILD_IMAGE):$(DIST)-$(ARCH)
 builder: require-docker-buildx-builder
-	@echo "\(Re\)Building the AppScope $(DIST)/$(ARCH) Builder Image"
+	@echo "(Re)Building the AppScope $(DIST)/$(ARCH) Builder Image"
 	@docker buildx build \
 		--builder $(BUILDER) \
 		--tag $(TAG) \

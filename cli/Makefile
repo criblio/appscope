@@ -40,6 +40,9 @@ clean:
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT)
 $(GO_BINDATA):
+	$(GO) env
+	@echo GO_VER=$(GO_VER)
+	@echo GOPATH=$(GOPATH)
 	$(GO) get github.com/go-bindata/go-bindata/...
 $(GOVVV):
 	$(GO) get github.com/ahmetb/govvv

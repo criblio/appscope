@@ -141,7 +141,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v2
         with:
-          name: binaries ${{ matrix.dist }} ${{ matrix.arch })
+          name: binaries ${{ matrix.dist }} ${{ matrix.arch }}
           path: |
             lib/linux/${{ matrix.arch }}/libscope.so
             bin/linux/${{ matrix.arch }}/scope

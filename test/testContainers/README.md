@@ -66,6 +66,10 @@ $
 Developers can run tests locally pretty easily with this setup. We use it for
 CI/CD logic too.
 
+Set `START=${TEST}` to the name of a test when running `make all` to skip the
+tests ahead of it. Useful when one fails and you want to pickup where you left
+off; i.e. `make all START=logstream` skips the test before `logstream`.
+
 ## Tests
 
 As mentioned before, start with the `docker-compose.yml` file and each entry's

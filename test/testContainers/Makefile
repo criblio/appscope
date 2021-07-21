@@ -27,7 +27,17 @@ help:
 	@echo "  \`make (test)-shell\` - run a shell in the test's container"
 	@echo "Tests: $(TESTS)"
 
-all: $(TESTS)
+all:
+	@STARTED=; for TEST in $(TESTS); do \
+		if [ -n "$(START)" -a -z "$$STARTED" ]; then \
+			if [ "$(START)" = "$$TEST" ]; then \
+				STARTED=1; \
+			else \
+				continue; \
+			fi; \
+		fi; \
+		$(MAKE) -s $${TEST}; \
+	done
 
 $(TESTS):
 	@$(MAKE) -s $(@)-build

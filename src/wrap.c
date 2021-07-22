@@ -1416,6 +1416,8 @@ init(void)
     // Use dlsym to get addresses for everything in g_fn
     initFn();
 
+// TODO: will want to see if this is needed for bash built on ARM...
+#ifndef __aarch64__
     // bash can be compiled to use glibc's memory subsystem or it's own
     // internal memory subsystem.  It's own is not threadsafe.  If we
     // find that bash is using it's own memory, replace it with glibc's
@@ -1423,6 +1425,7 @@ init(void)
     if (func_found_in_executable("malloc", "bash")) {
         run_bash_mem_fix();
     }
+#endif
 
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);

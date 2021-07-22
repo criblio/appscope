@@ -1,0 +1,2 @@
+#!/bin/bash
+/opt/test-runner/bin/test_tls.sh

@@ -10,9 +10,6 @@ RUN mkdir /opt/test-runner/logs/
 
 RUN source scl_source enable rh-python36 && virtualenv /opt/test-runner/
 
-#ADD http://cdn.cribl.io/dl/scope/latest/linux/libscope.so /usr/lib/libscope.so
-#COPY ./libscope.so /usr/lib/libscope.so
-#RUN chmod 755 /usr/lib/libscope.so
 ENV SCOPE_OUT_DEST=udp://localhost:8125
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
@@ -28,5 +25,20 @@ RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
 
 COPY ./test_runner/ /opt/test-runner/
 
-ENTRYPOINT ["/opt/test-runner/bin/python", "/opt/test-runner/app.py", "--target", "elastic","-l","/opt/test-runner/logs/"]
-#ENTRYPOINT ["/usr/bin/bash", "-i"]
+ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+COPY scope-profile.sh /etc/profile.d/scope.sh
+COPY gdbinit /root/.gdbinit
+
+RUN  mkdir /usr/local/scope && \
+     mkdir /usr/local/scope/bin && \
+     mkdir /usr/local/scope/lib && \
+     ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
+
+COPY elastic/scope-test /usr/local/scope/scope-test
+
+COPY docker-entrypoint.sh /
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["test"]
+

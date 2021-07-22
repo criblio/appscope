@@ -1,9 +1,11 @@
-name: website
+name: Deploy Website
 on:
   push:
     branches:
       - master
       - staging
+    paths:
+      - 'website/**'
 jobs:
   website:
     runs-on: ubuntu-latest

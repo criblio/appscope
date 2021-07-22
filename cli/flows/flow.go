@@ -211,9 +211,9 @@ func (f *Flow) mergeEventFlow(ef Flow) {
 
 func parseFlowFileName(filename string) (Flow, error) {
 	ret := Flow{}
-	re := regexp.MustCompile(`(\d+)_([0-9\.]+):(\d+)_([0-9\.]+):(\d+).(in|out)`)
+	re := regexp.MustCompile(`(\d+)_([0-9.:a-f]+|af_unix|netrx|nettx|tlsrx|tlstx):(\d+)_([0-9.:a-f]+|af_unix|netrx|nettx|tlsrx|tlstx):(\d+)\.(in|out)`)
 	parts := re.FindStringSubmatch(filename)
-	if parts == nil {
+	if len(parts) < 7 {
 		return ret, fmt.Errorf("error parsing filename: %s", filename)
 	}
 	var err error

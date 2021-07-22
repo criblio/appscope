@@ -93,7 +93,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_NET_FIELD ".*"
 #define DEFAULT_SRC_FS_FIELD ".*"
 #define DEFAULT_SRC_DNS_FIELD ".*"
-#define DEFAULT_SRC_FILE_NAME ".*log.*"
+#define DEFAULT_SRC_FILE_NAME "(\\/logs?\\/)|(\\.log$)|(\\.log[.\\d])"
 #define DEFAULT_SRC_CONSOLE_NAME "(stdout)|(stderr)"
 #define DEFAULT_SRC_SYSLOG_NAME ".*"
 #define DEFAULT_SRC_METRIC_NAME ".*"
@@ -113,7 +113,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_FS TRUE
 #define DEFAULT_SRC_DNS TRUE
 
-#define DEFAULT_MAXEVENTSPERSEC 100000
+#define DEFAULT_MAXEVENTSPERSEC 10000
 #define DEFAULT_ENHANCE_FS TRUE
 #define DEFAULT_PORTBLOCK 0
 #define DEFAULT_METRIC_CBUF_SIZE 50 * 1024
@@ -173,6 +173,7 @@ typedef unsigned int bool;
 //    SCOPE_SWITCH                   for internal go debugging
 //    SCOPE_PID                      provided by library
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
+//    SCOPE_ALLOW_MUSL_ATTACH        allows attach for musl processes
 
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"

@@ -238,10 +238,22 @@ func TestScopeLogRegex(t *testing.T) {
 		Matches bool
 	}{
 		{"/var/log/messages", true},
+		{"/app/logs/stdout", true},
+		{"/app/logs/stderr", true},
+		{"/opt/cribl/log/foo.txt", true},
 		{"/opt/cribl/log/cribl.log", true},
 		{"/some/container/path.log", true},
+		{"/some/container/path.log1", true},
+		{"/some/container/path.log42", true},
+		{"/some/container/path.log.1", true},
+		{"/some/container/path.log.2", true},
+		{"/some/container/path.log.fancy", true},
+		// negative tests
 		{"/opt/cribl/blog/foo.txt", false},
-		{"/opt/cribl/log/foo.txt", true},
+		{"/opt/cribl/log420/foo.txt", false},
+		{"/opt/cribl/local/logger.yml", false},
+		{"/opt/cribl/local/file.logger", false},
+		{"/opt/cribl/local/file.420", false},
 	}
 
 	re := regexp.MustCompile(scopeLogRegex())

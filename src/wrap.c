@@ -923,9 +923,13 @@ handleExit(void)
     }
 
     mtcFlush(g_mtc);
-    logFlush(g_log);
+    mtcDisconnect(g_mtc);
     ctlStopAggregating(g_ctl);
     ctlFlush(g_ctl);
+    ctlDisconnect(g_ctl, CFG_LS);
+    ctlDisconnect(g_ctl, CFG_CTL);
+    logFlush(g_log);
+    logDisconnect(g_log);
 }
 
 static void *
@@ -1149,14 +1153,12 @@ hookInject()
     if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *libscopeHandle = g_fn.dlopen(full_path, RTLD_NOW);
         if (libscopeHandle == NULL) {
-            dlclose(libscopeHandle);
             return FALSE;
         }
 
         void *handle = g_fn.dlopen(0, RTLD_LAZY);
         if (handle == NULL) {
             dlclose(libscopeHandle);
-            dlclose(handle);
             return FALSE;
         }
 
@@ -1169,7 +1171,7 @@ hookInject()
                 
                 inject_hook_list[i].func = addr;
                 if ((dlsym(handle, inject_hook_list[i].symbol)) &&
-                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz) != -1)) {
+                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
                     snprintf(buf, sizeof(buf), "\tGOT patched %s", inject_hook_list[i].symbol);
                     scopeLog(buf, -1, CFG_LOG_DEBUG);
                 }
@@ -1453,9 +1455,10 @@ init(void)
 
     reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
 
-    if (atexit(handleExit)) {
-        DBG(NULL);
-    }
+    // replaces atexit(handleExit);  Allows events to be reported before
+    // the TLS destructors are run.  This mechanism is used regardless
+    // of whether TLS is actually configured on any transport.
+    transportRegisterForExitNotification(handleExit);
 
     initHook(attachedFlag);
     
@@ -3229,7 +3232,7 @@ dlopen(const char *filename, int flags)
             // for each symbol in the list try to hook
             for (i=0; hook_list[i].symbol; i++) {
                 if ((dlsym(handle, hook_list[i].symbol)) &&
-                    (doGotcha(lm, (got_list_t *)&hook_list[i], rel, sym, str, rsz) != -1)) {
+                    (doGotcha(lm, (got_list_t *)&hook_list[i], rel, sym, str, rsz, 0) != -1)) {
                     snprintf(buf, sizeof(buf), "\tdlopen interposed  %s", hook_list[i].symbol);
                     scopeLog(buf, -1, CFG_LOG_DEBUG);
                 }
@@ -3557,7 +3560,7 @@ __stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
         }
     }
 
-    if (dothis == 1) doWrite(fileno((FILE *)stream), initialTime, (rc != -1),
+    if (dothis == 1) doWrite(stream->fd, initialTime, (rc != -1),
                              iov, rc, "__stdio_write", IOV, iovcnt);
     return rc;
 }
@@ -4615,12 +4618,59 @@ getentropy(void *buffer, size_t length)
 #endif
 }
 
+/*
+ * Debug in the constructor.
+ * The constructor is run in the context of ld.so.
+ * In this context we can't use the debugger, write to stdout or
+ * log to files. Note that when we attach to a running process,
+ * the attach code is executed in the constructor context.
+ *
+ * To debug:
+ * 1) ensure that the value of CDBG_ADDR + CDBG_SIZE represents a
+ * viable unused address space. Adjust as ncessary.
+ * 2) set g_cdbg to CDBG_ENABLE
+ * 3) adjust the (level == CFG_LOG_DEBUG) clause as desired
+ * 4) build libscope & run your test
+ * 5) examine messages in gdb using 'x/32s 0x00100000'
+ *    or whatever variation works. Note that 0x00100000
+ *    should be the value of CDBG_ADDR.
+ */
+#define CDBG_DISABLE NULL
+#define CDBG_ENABLE (char *)-1
+#define CDBG_ADDR (void *)0x00100000
+#define CDBG_SIZE (1024 * 16)
+static char *g_cdbg = CDBG_DISABLE;
+
 // This overrides a weak definition in src/dbg.c
 void
 scopeLog(const char *msg, int fd, cfg_log_level_t level)
 {
-    cfg_log_level_t cfg_level = logLevel(g_log);
+    if (g_cdbg == CDBG_ENABLE) {
+        if ((g_cdbg = mmap(CDBG_ADDR, CDBG_SIZE,
+                           PROT_READ | PROT_WRITE,
+                           MAP_PRIVATE | MAP_ANONYMOUS,
+                           -1, (off_t)NULL)) == MAP_FAILED) {
+            g_cdbg = NULL;
+            return;
+        }
 
+        *g_cdbg++ = '!';
+        *g_cdbg++ = '@';
+        *g_cdbg++ = '#';
+        *g_cdbg++ = '$';
+        *g_cdbg += 1;
+        g_cdbg += 1;
+    }
+
+    if ((g_cdbg != CDBG_ENABLE) && (g_cdbg != CDBG_DISABLE) &&
+        ((g_cdbg + (strlen(msg) + 2)) < (char *)(CDBG_ADDR + CDBG_SIZE)) &&
+        (level == CFG_LOG_DEBUG)) {
+        snprintf(g_cdbg, strlen(msg) + 2, "%s\n", msg);
+        g_cdbg += strlen(g_cdbg) + 1;
+        return;
+    }
+
+    cfg_log_level_t cfg_level = logLevel(g_log);
     if ((cfg_level == CFG_LOG_NONE) || (cfg_level > level)) return;
     if (!g_log || !msg || !g_proc.procname[0]) return;
 
@@ -4637,7 +4687,7 @@ scopeLog(const char *msg, int fd, cfg_log_level_t level)
  * pthread_create was added to support go execs on libmusl.
  * The go execs don't link to crt0/crt1 on libmusl therefore
  * they do not call our lib constructor. We interpose this
- * as a means to call the constructgor before the go app runs.
+ * as a means to call the constructor before the go app runs.
  */
 EXPORTON int
 pthread_create(pthread_t *thread, const pthread_attr_t *attr,

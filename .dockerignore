@@ -1,0 +1,7 @@
+# List stuff never needed when building container images from this directory
+**/core
+.cache/
+coverage/
+go/
+test/testContainers
+website/

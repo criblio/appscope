@@ -48,6 +48,7 @@ func metricAndEventDestFlags(cmd *cobra.Command, rc *run.Config) {
 	cmd.Flags().StringVarP(&rc.MetricsDest, "metricdest", "m", "", "Set destination for metrics (host:port defaults to tls://)")
 	cmd.Flags().StringVarP(&rc.EventsDest, "eventdest", "e", "", "Set destination for events (host:port defaults to tls://)")
 	cmd.Flags().BoolVarP(&rc.NoBreaker, "nobreaker", "n", false, "Set Cribl to not break streams into events.")
+	cmd.Flags().StringVarP(&rc.AuthToken, "authtoken", "a", "", "Set AuthToken for Cribl")
 }
 
 func runCmdFlags(cmd *cobra.Command, rc *run.Config) {

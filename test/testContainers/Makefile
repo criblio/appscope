@@ -27,7 +27,22 @@ help:
 	@echo "  \`make (test)-shell\` - run a shell in the test's container"
 	@echo "Tests: $(TESTS)"
 
-all: $(TESTS)
+all:
+	@STARTED=; for TEST in $(TESTS); do \
+		if [ -n "$(START)" -a -z "$$STARTED" ]; then \
+			if [ "$(START)" = "$$TEST" ]; then \
+				STARTED=1; \
+			else \
+				continue; \
+			fi; \
+		fi; \
+		if ! $(MAKE) -s $${TEST}; then  \
+		if [ -z "$(CONTINUE)" ]; then \
+				echo >&2 "error: aborting \`make all\` on test failure"; \
+				exit 1; \
+			fi; \
+		fi; \
+	done
 
 $(TESTS):
 	@$(MAKE) -s $(@)-build

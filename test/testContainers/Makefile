@@ -36,7 +36,12 @@ all:
 				continue; \
 			fi; \
 		fi; \
-		$(MAKE) -s $${TEST}; \
+		if ! $(MAKE) -s $${TEST}; then  \
+		if [ -z "$(CONTINUE)" ]; then \
+				echo >&2 "error: aborting \`make all\` on test failure"; \
+				exit 1; \
+			fi; \
+		fi; \
 	done
 
 $(TESTS):

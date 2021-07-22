@@ -1437,10 +1437,7 @@ init(void)
 
     g_nsslist = lstCreate(freeNssEntry);
 
-    platform_time_t *time_struct = initTime();
-    if (time_struct->tsc_invariant == FALSE) {
-        scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
-    }
+    initTime();
 
     char *path = cfgPath();
     config_t *cfg = cfgRead(path);

@@ -1,4 +1,4 @@
-FROM cribl/cribl:latest
+FROM cribl-dev-c9b1c605
 
 RUN apt update && apt install -y \
   curl \
@@ -7,8 +7,14 @@ RUN apt update && apt install -y \
   vim \
 && rm -rf /var/lib/apt/lists/*
 
+
+
+
 ENV CRIBL_NOAUTH=1
 COPY http/cribl/ /opt/cribl/local/cribl/
+
+COPY http/conf_1 /conf_1
+COPY http/conf_2 /conf_2
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh

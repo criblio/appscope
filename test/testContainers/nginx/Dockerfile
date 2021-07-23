@@ -9,9 +9,9 @@ FROM centos:latest
 #RUN curl https://www.getpagespeed.com/files/centos6-scl-rh-eol.repo --output /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo
 #RUN yum -y install centos-release-scl
 #RUN yum -y install rh-python36
-RUN yum -y install python3
-RUN yum -y install epel-release
-RUN yum -y install nginx httpd-tools
+RUN yum -y install python3 && \
+    yum -y install epel-release && \
+    yum -y install nginx httpd-tools
 
 RUN mkdir /opt/test-runner/
 RUN mkdir /opt/test-runner/logs/

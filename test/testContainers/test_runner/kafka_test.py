@@ -26,10 +26,10 @@ class KafkaAppController(AppController):
         if scoped:
             env["LD_PRELOAD"] = self.scope_path
 
-        #logging.info("Sockets before start()")
-        #os.system('netstat -an | grep -w 9092')
-        #logging.info("ps before start()")
-        #os.system('ps -ef')
+        logging.info("Sockets before start()")
+        os.system('netstat -an | grep -w 9092')
+        logging.info("ps before start()")
+        os.system('ps -ef')
 
         logging.info(f"Starting app {self.name} in {'scoped' if scoped else 'unscoped'} mode.")
 
@@ -49,10 +49,10 @@ class KafkaAppController(AppController):
 
         time.sleep(15)
 
-        #logging.info("Sockets after start()")
-        #os.system('netstat -an | grep -w 9092')
-        #logging.info("ps after start()")
-        #os.system('ps -ef')
+        logging.info("Sockets after start()")
+        os.system('netstat -an | grep -w 9092')
+        logging.info("ps after start()")
+        os.system('ps -ef')
 
     def stop(self):
         # https://kafka.apache.org/quickstart says CTRL-C to stop these and
@@ -63,10 +63,12 @@ class KafkaAppController(AppController):
         self.server.terminate();   self.server.wait()
         self.zookeper.terminate(); self.zookeper.wait()
 
-        #logging.info("Sockets after stop()")
-        #os.system('netstat -an | grep -w 9092')
-        #logging.info("ps after stop()")
-        #os.system('ps -ef')
+        time.sleep(5)
+
+        logging.info("Sockets after stop()")
+        os.system('netstat -an | grep -w 9092')
+        logging.info("ps after stop()")
+        os.system('ps -ef')
 
     def assert_running(self):
         completed_proc = subprocess.run("/kafka/bin/zookeeper-shell.sh localhost:2181 ls /brokers/ids", shell=True,
@@ -77,10 +79,10 @@ class KafkaAppController(AppController):
 class KafkaMsgTest(ApplicationTest):
 
     def do_run(self, scoped) -> Tuple[TestResult, Any]:
-        #logging.info("9092 Sockets before do_run()")
-        #os.system('netstat -an | grep -w 9092')
-        #logging.info("ps before do_run()")
-        #os.system('ps -ef')
+        logging.info("9092 Sockets before do_run()")
+        os.system('netstat -an | grep -w 9092')
+        logging.info("ps before do_run()")
+        os.system('ps -ef')
 
         logging.info(f"Connecting to Kafka")
         producer = KafkaProducer(bootstrap_servers=['localhost:9092'])

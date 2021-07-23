@@ -39,7 +39,7 @@ static struct option options[] = {
 void
 showUsage()
 {
-    printf("usage: tcpserver [OPTIONS] PORT\n");
+    printf("usage: tcpclient [OPTIONS] PORT\n");
     printf("options: -t, --tls       use TLSv1.3\n");
 }
 

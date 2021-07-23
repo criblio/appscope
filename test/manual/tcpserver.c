@@ -9,6 +9,9 @@
  *
  * generate unencrypted TLS key and certificate:
  * openssl req -nodes -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem
+ *
+ * example scope client usage:
+ * SCOPE_CRIBL_TLS_VALIDATE_SERVER=false scope run -c tls://127.0.0.1:9000 -- top
  */
 
 #include <stdio.h>
@@ -46,6 +49,16 @@ int tcp_ssl(int);
 static struct option options[] = {
     {"tls", no_argument, 0, 't'}
 };
+
+// Flag that tells the server to exit
+static volatile sig_atomic_t exit_request = 0;
+ 
+// Signal handler
+void
+hdl(int sig)
+{
+	exit_request = 1;
+}
 
 // Program helper
 void
@@ -443,7 +456,6 @@ ssl_read(SSL *ssl)
         }
     }
 
-    printf("Server read finished.\n");
     return processed;
 }
 
@@ -452,6 +464,13 @@ ssl_read(SSL *ssl)
 int
 tcp_ssl(int socket)
 {
+    struct sigaction sa;
+	sa.sa_flags = 0;
+	sa.sa_handler = &hdl;
+	sigfillset(&sa.sa_mask);
+	sigdelset(&sa.sa_mask, SIGINT);
+	sigaction(SIGINT, &sa, NULL);
+ 
     int wstatus;
     int fd;
     int ret;
@@ -487,7 +506,11 @@ tcp_ssl(int socket)
     FD_SET(fd, &read_set);
 
     while(1) {
-        int r = select(fd+1, &read_set, NULL, NULL, NULL);
+        int r = pselect(fd+1, &read_set, NULL, NULL, NULL, &sa.sa_mask);
+        if (exit_request) {
+            printf("\nReceived interrupt, exiting gracefully\n");
+			break;
+		}
         if (r < 0) {
             fprintf(stderr, "error in select\n");
             return -1;
@@ -513,7 +536,5 @@ tcp_ssl(int socket)
     SSL_CTX_free(ssl_ctx);
     return 0;
 }
-
-
 
 

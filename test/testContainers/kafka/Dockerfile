@@ -1,15 +1,16 @@
 FROM centos:7
 
-RUN yum -y update
-RUN yum -y install centos-release-scl
-RUN yum -y install rh-python36
-RUN yum -y install epel-release
-RUN yum -y install java-1.8.0-openjdk
-RUN yum -y install mc net-tools lsof vim emacs gdb
+RUN yum -y update && \
+    yum -y install centos-release-scl && \
+    yum -y install rh-python38 python-virtualenv && \
+    yum -y install epel-release && \
+    yum -y install java-1.8.0-openjdk && \
+    yum -y install mc net-tools lsof vim emacs gdb
 
 RUN mkdir -p /opt/test-runner/logs/
 
-RUN source scl_source enable rh-python36 && virtualenv /opt/test-runner/
+RUN source scl_source enable rh-python38 &&\
+    virtualenv -p $(which python) /opt/test-runner/
 
 # Originally used 2.1.1 and 2.11, but they're too old now.
 ENV KAFKA_VERSION=2.7.0 KAFKA_SCALA_VERSION=2.13
@@ -59,6 +60,9 @@ RUN /opt/test-runner/bin/pip install kafka-python
 
 COPY ./test_runner/ /opt/test-runner/
 
+# Switching to Python 3.8 required this hack. Not sure where the kafka packages are coming from.
+RUN sed -i 's/\basync\b/is_async/g' /opt/test-runner/lib/python3.8/site-packages/kafka/producer/*.py
+
 ENV PATH /kafka/bin:$PATH
 WORKDIR /kafka
 
@@ -81,5 +85,3 @@ COPY kafka/scope-test /usr/local/scope/scope-test
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["test"]
-
-

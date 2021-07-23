@@ -28,21 +28,39 @@ help:
 	@echo "Tests: $(TESTS)"
 
 all:
-	@STARTED=; for TEST in $(TESTS); do \
+	@STARTED=; RAN=0; SKIP=0; PASS=0; FAIL=0; TOTAL=$(words $(TESTS)); ERR=; \
+	for TEST in $(TESTS); do \
 		if [ -n "$(START)" -a -z "$$STARTED" ]; then \
 			if [ "$(START)" = "$$TEST" ]; then \
 				STARTED=1; \
 			else \
+				SKIP=$$((SKIP+1)); \
 				continue; \
 			fi; \
 		fi; \
-		if ! $(MAKE) -s $${TEST}; then  \
-		if [ -z "$(CONTINUE)" ]; then \
+		if $(MAKE) -s $${TEST}; then  \
+			RAN=$$((RAN+1)); \
+			PASS=$$((PASS+1)); \
+		else \
+			RAN=$$((RAN+1)); \
+			FAIL=$$((FAIL+1)); \
+			ERR="$${ERR}$${TEST} "; \
+			if [ -z "$(CONTINUE)" ]; then \
 				echo >&2 "error: aborting \`make all\` on test failure"; \
+				echo >&2 "       ran $${RAN}/$${TOTAL} tests, skipped $${SKIP}"; \
+				echo >&2 "       $${PASS} passed, $${FAIL} failed ($${ERR})"; \
 				exit 1; \
 			fi; \
 		fi; \
-	done
+	done; \
+	if [ $$PASS -gt 0 ]; then \
+		echo >&2 "info: ran $${RAN}/$${TOTAL} tests, skipped $${SKIP}"; \
+		echo >&2 "      $${PASS} passed, $${FAIL} failed"; \
+	else \
+		echo >&2 "error: ran $${RAN}/$${TOTAL} tests, skipped $${SKIP}"; \
+		echo >&2 "       $${PASS} passed, $${FAIL} failed ($${ERR})"; \
+		exit 1; \
+	fi
 
 $(TESTS):
 	@$(MAKE) -s $(@)-build

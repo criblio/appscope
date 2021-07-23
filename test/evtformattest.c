@@ -668,19 +668,50 @@ evtFormatFieldFilterSetAndGet(void** state)
     assert_int_equal(regexec(default_re, "dohost", 0, NULL, 0), 0);
 }
 
+typedef struct {
+    const char *filename;
+    int matches;
+} result_entry_t;
+
 static void
 evtFormatNameFilterSetAndGet(void** state)
 {
     evt_fmt_t* evt = evtFormatCreate();
 
+    result_entry_t expected[] = {
+		{"/var/log/messages", TRUE},
+		{"/app/logs/stdout", TRUE},
+		{"/app/logs/stderr", TRUE},
+		{"/opt/cribl/log/foo.txt", TRUE},
+		{"/opt/cribl/log/cribl.log", TRUE},
+		{"/some/container/path.log", TRUE},
+		{"/some/container/path.log1", TRUE},
+		{"/some/container/path.log42", TRUE},
+		{"/some/container/path.log.1", TRUE},
+		{"/some/container/path.log.2", TRUE},
+		{"/some/container/path.log.fancy", TRUE},
+		// negative tests
+		{"/opt/cribl/blog/foo.txt", FALSE},
+		{"/opt/cribl/log420/foo.txt", FALSE},
+		{"/opt/cribl/local/logger.yml", FALSE},
+		{"/opt/cribl/local/file.logger", FALSE},
+		{"/opt/cribl/local/file.420", FALSE},
+        // delimiter for this array
+        {NULL, FALSE}
+    };
+    result_entry_t* test;
     /*
      * WARNING: This is hardcoded!! 
-     * The default is ".*log.*"
+     * The default is "(\/logs?\/)|(\.log$)|(\.log[.\d])"
      * When the default changes this needs to change
     */
     regex_t* default_re = evtFormatNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(default_re);
-    assert_int_equal(regexec(default_re, "anythingwithlogmatches", 0, NULL, 0), 0);
+    for (test = expected; test->filename; test++) {
+        assert_int_equal(regexec(default_re, test->filename, 0, NULL, 0),
+            (test->matches) ? 0 : REG_NOMATCH);
+    }
+    test = expected;
 
     // Make sure it can be changed
     evtFormatNameFilterSet(evt, CFG_SRC_FILE, "net.*");
@@ -699,14 +730,16 @@ evtFormatNameFilterSetAndGet(void** state)
     evtFormatNameFilterSet(evt, CFG_SRC_FILE, "W![T^F?");
     new_re = evtFormatNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(new_re);
-    assert_int_equal(regexec(new_re, "anythingwithlog", 0, NULL, 0), 0);
+    assert_int_equal(regexec(new_re, test->filename, 0, NULL, 0),
+        (test->matches) ? 0 : REG_NOMATCH);
 
     evtFormatDestroy(&evt);
 
     // Get a default filter, even if evt is NULL
     default_re = evtFormatNameFilter(evt, CFG_SRC_FILE);
     assert_non_null(default_re);
-    assert_int_equal(regexec(default_re, "logthingsmatch", 0, NULL, 0), 0);
+    assert_int_equal(regexec(default_re, test->filename, 0, NULL, 0),
+        (test->matches) ? 0 : REG_NOMATCH);
 }
 
 static void

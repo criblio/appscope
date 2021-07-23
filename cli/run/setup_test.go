@@ -156,7 +156,7 @@ event:
       cacertpath: ""
   watch:
   - type: file
-    name: '[\s\/\\\.]log[s]?[\/\\\.]?'
+    name: (\/logs?\/)|(\.log$)|(\.log[.\d])
     value: .*
   - type: console
     name: (stdout|stderr)

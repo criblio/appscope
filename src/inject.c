@@ -26,10 +26,8 @@
  * registers in an architecture-dependent way.
  * TODO: the code needs to be updated to handle this when we apply ARM64 specifics.
  */
-#ifndef PTRACE_GETREGS
+#ifdef __aarch64__
 #define PTRACE_GETREGS PTRACE_GETREGSET
-#endif
-#ifndef PTRACE_SETREGS
 #define PTRACE_SETREGS PTRACE_SETREGSET
 #endif
 
@@ -152,7 +150,7 @@ call_dlopen(void)
         "callq *%rax \n"
         "int $3 \n"
     );
-#endif // __x86_64__
+#endif
 }
 
 static void call_dlopen_end() {}
@@ -199,7 +197,6 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     if (ptraceWrite(pid, codeAddr, &call_dlopen, call_dlopen_end - call_dlopen)) {
         return EXIT_FAILURE;
     }
-
 #ifdef __x86_64__
     // set RIP to point to the injected code
     regs.rip = codeAddr;
@@ -212,12 +209,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     } else {
         regs.rsi = RTLD_NOW;
     }
-#elif defined(__aarch64__)
-#warning Inject for ARM not implemented yet...
-#else
-#error Unknown architecture!
 #endif
-
     ptrace(PTRACE_SETREGS, pid, NULL, &regs);
 
     // continue execution and wait until the target process is stopped
@@ -237,16 +229,11 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
         ptrace(PTRACE_GETREGS, pid, NULL, &regs);
 #ifdef __x86_64__
         if (regs.rax != 0x0) {
-#elif defined(__aarch64__)
-        if (regs.pc != 0) { // TODO: bogus reg, update when applying ARM64 specifics
-#else
-#error Unknown architecture!
-#endif
             //printf("Appscope library injected at %p\n", (void*)regs.rax);
         } else {
             fprintf(stderr, "error: dlopen() failed, library could not be injected\n");
         }
-
+#endif
         //restore the app's state
         ptraceWrite(pid, freeAddr, oldcode, oldcodeSize);
         ptrace(PTRACE_SETREGS, pid, NULL, &oldregs);

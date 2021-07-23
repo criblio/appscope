@@ -3,7 +3,7 @@ ENV discovery.type=single-node
 
 RUN yum -y update && \
     yum -y install centos-release-scl && \
-    yum -y install rh-python38 python-virtualenv
+    yum -y install rh-python38 python-virtualenv which
 
 RUN mkdir /opt/test-runner/ /opt/test-runner/logs/
 
@@ -23,7 +23,7 @@ ENV SCOPE_EVENT_HTTP=true
 COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
 RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
 
-COPY ./test_runner/ /opt/test-runner/Z
+COPY ./test_runner/ /opt/test-runner/
 
 # Switching to Python 3.8 required this hack. Not sure where the kafka packages are coming from.
 RUN sed -i 's/\basync\b/is_async/g' /opt/test-runner/lib/python3.8/site-packages/kafka/producer/*.py

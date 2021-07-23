@@ -1204,7 +1204,7 @@ initHook(int attachedFlag)
     if ((osGetExePath(&full_path) != -1) &&
         ((ebuf = getElf(full_path))) &&
         (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
-#ifdef _GO__
+#ifdef __GO__
         initGoHook(ebuf);
         threadNow(0);
         if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {

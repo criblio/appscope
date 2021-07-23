@@ -1,3 +1,5 @@
+# This docker image was loaded manually, since the latest version of cribl in docker
+# hub does not include the changes to the appscope source that are required to parse http1
 FROM cribl-dev-c9b1c605
 
 RUN apt update && apt install -y \

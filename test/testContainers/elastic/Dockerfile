@@ -1,4 +1,4 @@
-FROM docker.elastic.co/elasticsearch/elasticsearch:7.4.2
+FROM docker.elastic.co/elasticsearch/elasticsearch:7.8.1
 ENV discovery.type=single-node
 
 RUN yum -y update && \

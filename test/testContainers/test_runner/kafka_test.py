@@ -47,7 +47,7 @@ class KafkaAppController(AppController):
                 start_new_session=True, stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL)
 
-        time.sleep(15)
+        time.sleep(30)
 
         logging.info("Sockets after start()")
         os.system('netstat -an | grep -w 9092')
@@ -58,12 +58,12 @@ class KafkaAppController(AppController):
         # https://kafka.apache.org/quickstart says CTRL-C to stop these and
         # these scropts are not working reliably so switching to sending
         # SIGTERM and wait().
-        #subprocess.Popen("/kafka/bin/kafka-server-stop.sh", start_new_session=True)
-        #subprocess.Popen("/kafka/bin/zookeeper-server-stop.sh", start_new_session=True)
-        self.server.terminate();   self.server.wait()
-        self.zookeper.terminate(); self.zookeper.wait()
+        subprocess.Popen("/kafka/bin/kafka-server-stop.sh", start_new_session=True)
+        subprocess.Popen("/kafka/bin/zookeeper-server-stop.sh", start_new_session=True)
+        #self.server.terminate();   self.server.wait()
+        #self.zookeper.terminate(); self.zookeper.wait()
 
-        time.sleep(5)
+        time.sleep(30)
 
         logging.info("Sockets after stop()")
         os.system('netstat -an | grep -w 9092')

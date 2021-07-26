@@ -125,7 +125,7 @@ push: $(addsuffix -push, $(TESTS))
 	@echo " $(shell date)"
 	@echo " Shell in Container for \"$(@:%-shell=%)\" Test"
 	@echo "==================================================================="
-	@$(COMPOSE) -f docker-compose.privileged.yml run --rm $(@:%-shell=%) $(CMD)
+	@$(COMPOSE) run --rm $(@:%-shell=%) $(CMD)
 
 .PHONY: help all build push $(TESTS) %-build %-push %-shell
 

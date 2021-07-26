@@ -5,6 +5,7 @@ x-scope-common: &scope-common
     - ./logs:/opt/test-runner/logs:rw
     - ../..:/opt/appscope
   working_dir: /opt/appscope
+  privileged: true
 
 x-java-common: &java-common
   environment:
@@ -18,7 +19,7 @@ services:
   syscalls:
     image: scopeci/scope-syscalls-it
     build:
-      cache_from: 
+      cache_from:
         - scopeci/scope-syscalls-it
       context: .
       dockerfile: ./syscalls/Dockerfile

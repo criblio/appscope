@@ -19,8 +19,8 @@ RUN cd /opt/test && \
       ./configure && \
       make -j
 
-RUN source scl_source enable rh-python38 \
-    && virtualenv -p $(which python) /opt/test-runner/
+RUN source scl_source enable rh-python38 && \
+    virtualenv -p $(which python) /opt/test-runner/
 
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_METRIC_DEST=udp://localhost:8125

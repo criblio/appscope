@@ -46,7 +46,7 @@ COPY ./tls/ruby/client.rb /opt/test-runner/ruby
 RUN chmod u+x /opt/test-runner/ruby/*rb
 
 RUN /opt/rh/rh-python38/root/usr/bin/python3.8 -m pip install --upgrade pip
-#RUN /opt/rh/rh-python38/root/usr/bin/pip3.8 install pyopenssl
+RUN /opt/rh/rh-python38/root/usr/local/bin/pip3.8 install pyopenssl
 COPY ./tls/testssl.py /opt/test-runner/bin/testssl.py
 
 RUN mkdir /opt/test-runner/php

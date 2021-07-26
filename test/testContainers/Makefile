@@ -14,6 +14,8 @@ ifeq (, $(DOCKER))
     $(error Missing docker)
 endif
 
+COMPOSE := $(COMPOSE) -f docker-compose.yml -f docker-compose.$(shell uname -m).yml
+
 TESTS=$(shell $(COMPOSE) config --services | sort -V)
 
 help:
@@ -69,7 +71,7 @@ $(TESTS):
 	@echo " $(shell date)"
 	@echo " Running \"$@\" Test"
 	@echo "==================================================================="
-	@time $(COMPOSE) run $@ || { echo >&2 "error: $(@) test failed."; exit 1; }
+	@time $(COMPOSE) run --rm $@ || { echo >&2 "error: $(@) test failed."; exit 1; }
 
 build: $(addsuffix -build, $(TESTS))
 
@@ -123,7 +125,7 @@ push: $(addsuffix -push, $(TESTS))
 	@echo " $(shell date)"
 	@echo " Shell in Container for \"$(@:%-shell=%)\" Test"
 	@echo "==================================================================="
-	@$(COMPOSE) -f docker-compose.yml -f docker-compose.privileged.yml run $(@:%-shell=%) $(CMD)
+	@$(COMPOSE) -f docker-compose.privileged.yml run --rm $(@:%-shell=%) $(CMD)
 
 .PHONY: help all build push $(TESTS) %-build %-push %-shell
 

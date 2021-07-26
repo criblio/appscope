@@ -1,0 +1,16 @@
+version: '3.5'
+
+x-scope-common: &scope-common
+  volumes:
+    - ./logs:/opt/test-runner/logs:rw
+    - ../..:/opt/appscope
+  working_dir: /opt/appscope
+
+x-java-common: &java-common
+  environment:
+    - LD_PRELOAD=/usr/local/scope/lib/libscope.so
+  <<: *scope-common
+
+services:
+
+  # These tests run only on aarch64

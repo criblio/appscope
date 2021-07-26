@@ -1,10 +1,10 @@
 FROM centos:latest
 
 COPY detect_proto/mongodb.repo /etc/yum.repos.d/.
-RUN yum -y update
-RUN yum -y install epel-release
-RUN yum -y install redis wget gdb openssl mongodb-org
-
+RUN yum -y update && \
+    yum -y install epel-release && \
+    yum -y install redis wget gdb openssl
+RUN [ "aarch64" = "$(uname -m)" ] || yum -y install mongodb-org
 
 RUN mkdir /opt/test-runner/
 RUN mkdir /opt/test-runner/logs/

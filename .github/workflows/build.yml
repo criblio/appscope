@@ -76,22 +76,17 @@ jobs:
       latest: ${{ steps.tag.outputs.latest }}
       push: ${{ steps.tag.outputs.push }}
       tests: ${{ steps.tests.outputs.tests }}
-      arch_x86_64: amd64
-      arch_aarch64: arm64
-      arch_amd64: x86_64
-      arch_arm64: aarch64
 
-  builder:
+  builder-amd64:
     name: Update Builder
     needs: info
     strategy:
       matrix:
-        arch: [amd64,arm64]
         dist: [ubuntu]
       fail-fast: false
-    runs-on:
-      - ubuntu-latest
-      - ${{ matrix.arch }}
+    runs-on: [ ubuntu-latest, AMD64 ]
+    env:
+        ARCH: x86_64
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -114,19 +109,52 @@ jobs:
           #password: ${{ secrets.SCOPECI_TOKEN }}
 
       - name: Build Image
-        run: make builder DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }} BUILDER=${{ steps.buildx.outputs.name }} PUSH=${{ needs.info.outputs.push }}
+        run: make builder DIST=${{ matrix.dist }} ARCH=${{ env.ARCH }} BUILDER=${{ steps.buildx.outputs.name }} PUSH=${{ needs.info.outputs.push }}
 
-  build:
-    name: Build & Test
-    needs: [info,builder]
+  builder-arm64:
+    name: Update Builder
+    needs: info
     strategy:
       matrix:
-        arch: [amd64,arm64]
         dist: [ubuntu]
       fail-fast: false
-    runs-on:
-      - ubuntu-latest
-      - ${{ matrix.arch }}
+    runs-on: [ ubuntu-latest, self-hosted, ARM64 ]
+    env:
+        ARCH: aarch64
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to Container Registry
+        if: ${{ needs.info.outputs.push }}
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          #username: scopeci
+          #password: ${{ secrets.SCOPECI_TOKEN }}
+
+      - name: Build Image
+        run: make builder DIST=${{ matrix.dist }} ARCH=${{ env.ARCH }} BUILDER=${{ steps.buildx.outputs.name }} PUSH=${{ needs.info.outputs.push }}
+
+  build-amd64:
+    name: Build & Test
+    needs: [info,builder-amd64]
+    strategy:
+      matrix:
+        dist: [ubuntu]
+      fail-fast: false
+    runs-on: [ ubuntu-latest, AMD64 ]
+    env:
+        ARCH: x86_64
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -151,24 +179,93 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Build & Test
-        run: make build BUILDER=${{ steps.buildx.outputs.name }} DIST=${{ matrix.dist }} ARCH=${{ matrix.arch }} VERSION=${{ needs.info.outputs.tag }}
+        run: make build BUILDER=${{ steps.buildx.outputs.name }} DIST=${{ matrix.dist }} ARCH=${{ env.ARCH }} VERSION=${{ needs.info.outputs.tag }}
 
       - name: Add Assets to Release
         id: release
         if: ${{ needs.info.outputs.is-semver == 'true' }}
         run: |
-          gh release upload ${{ needs.info.outputs.version }} "bin/linux/${{ matrix.arch }}/scope#scope-${{ matrix.arch }}"
-          gh release upload ${{ needs.info.outputs.version }} "lib/linux/${{ matrix.arch }}/libscope.so#ldscope-${{ matrix.arch }}.so"
+          gh release upload ${{ needs.info.outputs.version }} "bin/linux/${{ env.ARCH }}/scope#scope-${{ env.ARCH }}"
+          gh release upload ${{ needs.info.outputs.version }} "lib/linux/${{ env.ARCH }}/libscope.so#ldscope-${{ env.ARCH }}.so"
 
       - name: Upload Binaries
         if: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v2
         with:
-          name: binaries ${{ matrix.dist }} ${{ matrix.arch }}
+          name: binaries ${{ matrix.dist }} ${{ env.ARCH }}
           path: |
-            lib/linux/${{ matrix.arch }}/libscope.so
-            bin/linux/${{ matrix.arch }}/scope
-            bin/linux/${{ matrix.arch }}/ldscope
+            lib/linux/${{ env.ARCH }}/libscope.so
+            bin/linux/${{ env.ARCH }}/scope
+            bin/linux/${{ env.ARCH }}/ldscope
+          retention-days: 5
+
+      #- name: Deploy Artifacts to CDN
+      #  if: ${{ github.event_name == 'push' }}
+      #  env:
+      #    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #    AWS_REGION: ${{ secrets.AWS_REGION }}
+      #    CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
+      #  run: ./deploy.sh
+
+      #- name: Build & Push Container Image to Docker Hub
+      #  if: startsWith(github.ref, 'refs/tags/v')
+      #  env:
+      #    SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
+      #  run: ./docker/build.sh
+
+  build-arm64:
+    name: Build & Test
+    needs: [info,builder-arm64]
+    strategy:
+      matrix:
+        dist: [ubuntu]
+      fail-fast: false
+    runs-on: [ ubuntu-latest, self-hosted, ARM64 ]
+    env:
+        ARCH: aarch64
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            cli/.gobin
+            cli/.gocache
+            cli/.gomod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build & Test
+        run: make build BUILDER=${{ steps.buildx.outputs.name }} DIST=${{ matrix.dist }} ARCH=${{ env.ARCH }} VERSION=${{ needs.info.outputs.tag }}
+
+      - name: Add Assets to Release
+        id: release
+        if: ${{ needs.info.outputs.is-semver == 'true' }}
+        run: |
+          gh release upload ${{ needs.info.outputs.version }} "bin/linux/${{ env.ARCH }}/scope#scope-${{ env.ARCH }}"
+          gh release upload ${{ needs.info.outputs.version }} "lib/linux/${{ env.ARCH }}/libscope.so#ldscope-${{ env.ARCH }}.so"
+
+      - name: Upload Binaries
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: binaries ${{ matrix.dist }} ${{ env.ARCH }}
+          path: |
+            lib/linux/${{ env.ARCH }}/libscope.so
+            bin/linux/${{ env.ARCH }}/scope
+            bin/linux/${{ env.ARCH }}/ldscope
           retention-days: 5
 
       #- name: Deploy Artifacts to CDN

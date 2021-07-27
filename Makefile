@@ -42,6 +42,9 @@ ARCH_LIST := x86_64 aarch64
 PLATFORM_x86_64 := amd64
 PLATFORM_aarch64 := arm64
 
+FROM_PLATFORM_amd64 := x86_64
+FROM_PLATFORM_arm64 := aarch64
+
 # platforms we build for
 _space := $(subst ,, )
 _comma := ,
@@ -82,6 +85,16 @@ clean:
 
 # target architecture and OS/ARCH-specific Makefile
 ARCH ?= $(shell uname -m)
+
+ifeq (,$(PLATFORM_$(ARCH))) 
+ifeq (,$(FROM_PLATFORM_$(ARCH))) 
+$(error error: invalid ARCH alias; "$(ARCH)")
+else
+$(info info: translating "$(ARCH)" ARCH to "$(FROM_PLATFORM_$(ARCH))")
+override ARCH := $(FROM_PLATFORM_$(ARCH))
+endif
+endif
+
 ifneq (,$(findstring $(ARCH),$(ARCH_LIST)))
 include os/$(OS)/Makefile
 else

@@ -10,17 +10,17 @@ RUN yum -y update && \
 RUN mkdir -p /opt/test-runner/logs/ /opt/test
 
 RUN cd /opt/test && \
-    wget https://github.com/linux-test-project/ltp/archive/refs/tags/20210524.zip && \
-    unzip 20210524.zip && \
-    rm -f 20210524.zip && \
-    mv ltp-20210524 ltp && \
+      wget https://github.com/linux-test-project/ltp/archive/refs/tags/20210524.zip && \
+      unzip 20210524.zip && \
+      rm -f 20210524.zip && \
+      mv ltp-20210524 ltp && \
     cd /opt/test/ltp && \
-    make autotools && \
-    ./configure && \
-    make -j
+      make autotools && \
+      ./configure && \
+      make -j
 
-RUN source scl_source enable rh-python38 \
-    && virtualenv -p $(which python) /opt/test-runner/
+RUN source scl_source enable rh-python38 && \
+    virtualenv -p $(which python) /opt/test-runner/
 
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_METRIC_DEST=udp://localhost:8125

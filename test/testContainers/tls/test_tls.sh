@@ -197,13 +197,12 @@ endtest
 #
 # Python
 #
-/opt/rh/rh-python36/root/usr/bin/pip3.6 install pyopenssl
 starttest Python
 unset LD_PRELOAD
-ldscope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py create_certs
-ldscope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py start_server&
+ldscope /opt/rh/rh-python38/root/usr/bin/python3.8 /opt/test-runner/bin/testssl.py create_certs
+ldscope /opt/rh/rh-python38/root/usr/bin/python3.8 /opt/test-runner/bin/testssl.py start_server&
 sleep 1
-ldscope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py run_client
+ldscope /opt/rh/rh-python38/root/usr/bin/python3.8 /opt/test-runner/bin/testssl.py run_client
 sleep 1
 evaltest
 

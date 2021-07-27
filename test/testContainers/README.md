@@ -19,6 +19,10 @@ container. Since they're in subdirectories in the mount, they can be rebuilt
 and the container will have access to the updated versions without having to
 restart - handy when debugging.
 
+We have moved some of the test service definitions out of `docker-compose.yml`
+into separate arch-specific configs; `docker-compose.$(uname -m).yml`. This
+was done because the base images for some of them are not available on ARM.
+
 We have an additional config named `docker-compose.privileged.yml` that sets
 the privileged option in each container when run with `make ${TEST}-shell` so
 we can use `gdb` and other restricted tools.

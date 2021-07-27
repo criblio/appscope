@@ -26,10 +26,10 @@ class KafkaAppController(AppController):
         if scoped:
             env["LD_PRELOAD"] = self.scope_path
 
-        logging.info("Sockets before start()")
-        os.system('netstat -an | grep -w 9092')
-        logging.info("ps before start()")
-        os.system('ps -ef')
+        #logging.info("Sockets before start()")
+        #os.system('netstat -an | grep -w 9092')
+        #logging.info("ps before start()")
+        #os.system('ps -ef')
 
         logging.info(f"Starting app {self.name} in {'scoped' if scoped else 'unscoped'} mode.")
 
@@ -47,23 +47,64 @@ class KafkaAppController(AppController):
                 start_new_session=True, stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL)
 
-        time.sleep(15)
+        # wait for the "LISTEN" socket
+        timeout = 90
+        netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+        while b'LISTEN' not in netstat:
+            netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+            time.sleep(1)
+            timeout -= 1
+            if timeout <= 0:
+                logging.info("Giving up waiting for start")
+                break
 
-        logging.info("Sockets after start()")
-        os.system('netstat -an | grep -w 9092')
-        logging.info("ps after start()")
-        os.system('ps -ef')
+        #logging.info("Sockets after start()")
+        #os.system('netstat -an | grep -w 9092')
+        #logging.info("ps after start()")
+        #os.system('ps -ef')
 
     def stop(self):
-        # https://kafka.apache.org/quickstart says CTRL-C to stop these and
-        # these scropts are not working reliably so switching to sending
-        # SIGTERM and wait().
-        #subprocess.Popen("/kafka/bin/kafka-server-stop.sh", start_new_session=True)
-        #subprocess.Popen("/kafka/bin/zookeeper-server-stop.sh", start_new_session=True)
-        self.server.terminate();   self.server.wait()
-        self.zookeper.terminate(); self.zookeper.wait()
-
-        time.sleep(5)
+        logging.info(f"Stopping app {self.name}.")
+        arch = subprocess.check_output(["uname","-m"])
+        if arch.startswith(b'x86'):
+            # kafka behaves with SIGTERM on x86
+            self.server.terminate()    self.server.wait()
+            self.zookeper.terminate(); self.zookeper.wait()
+        else:
+            # this is crazy but stopping Kafka isn't easy on ARM
+            subprocess.Popen("/kafka/bin/kafka-server-stop.sh", start_new_session=True)
+            subprocess.Popen("/kafka/bin/zookeeper-server-stop.sh", start_new_session=True)
+            timeout = 30
+            netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+            while b'LISTEN' in netstat:
+                netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+                time.sleep(1)
+                timeout -= 1
+                if timeout <= 0:
+                    logging.info("Giving up waiting for stop after scripts")
+                    break
+            if timeout <= 0:
+                os.system('pkill java')
+                timeout = 30
+                netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+                while b'LISTEN' in netstat:
+                    netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+                    time.sleep(1)
+                    timeout -= 1
+                    if timeout <= 0:
+                        logging.info("Giving up waiting for stop after pkill")
+                        break
+            if timeout <= 0:
+                os.system('pkill -9 java')
+                timeout = 30
+                netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+                while b'LISTEN' in netstat:
+                    netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+                    time.sleep(1)
+                    timeout -= 1
+                    if timeout <= 0:
+                        logging.info("Giving up waiting for stop after pkill -9")
+                        break
 
         logging.info("Sockets after stop()")
         os.system('netstat -an | grep -w 9092')
@@ -79,10 +120,10 @@ class KafkaAppController(AppController):
 class KafkaMsgTest(ApplicationTest):
 
     def do_run(self, scoped) -> Tuple[TestResult, Any]:
-        logging.info("9092 Sockets before do_run()")
-        os.system('netstat -an | grep -w 9092')
-        logging.info("ps before do_run()")
-        os.system('ps -ef')
+        #logging.info("9092 Sockets before do_run()")
+        #os.system('netstat -an | grep -w 9092')
+        #logging.info("ps before do_run()")
+        #os.system('ps -ef')
 
         logging.info(f"Connecting to Kafka")
         producer = KafkaProducer(bootstrap_servers=['localhost:9092'])

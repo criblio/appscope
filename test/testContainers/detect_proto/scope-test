@@ -6,7 +6,9 @@ mkdir -p /var/log/gogen /var/log/beats
 
 redis-server --protected-mode no &
 
+if [ "x86_64" = "$(uname -m)" ]; then
 #service mongod start
 mongod --dbpath /var/lib/mongo --logpath /var/log/mongodb/mongod.log --fork
+fi
 
 exec /opt/test-runner/bin/test_protocols.sh

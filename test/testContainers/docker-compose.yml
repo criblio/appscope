@@ -5,6 +5,7 @@ x-scope-common: &scope-common
     - ./logs:/opt/test-runner/logs:rw
     - ../..:/opt/appscope
   working_dir: /opt/appscope
+  privileged: true
 
 x-java-common: &java-common
   environment:
@@ -13,10 +14,12 @@ x-java-common: &java-common
 
 services:
 
+  # These tests run on all platforms; x86_64 and aarch64
+
   syscalls:
     image: scopeci/scope-syscalls-it
     build:
-      cache_from: 
+      cache_from:
         - scopeci/scope-syscalls-it
       context: .
       dockerfile: ./syscalls/Dockerfile
@@ -40,17 +43,6 @@ services:
         - scopeci/scope-nginx-it
       context: .
       dockerfile: ./nginx/Dockerfile
-    <<: *scope-common
-
-  splunk:
-    image: scopeci/scope-splunk-it
-    build:
-      cache_from:
-        - scopeci/scope-splunk-it
-      context: .
-      dockerfile: ./splunk/Dockerfile
-    ports:
-      - 8000:8000
     <<: *scope-common
 
   elastic:
@@ -107,186 +99,6 @@ services:
       - 27017:27017
     <<: *scope-common
 
-  bash:
-    image: scopeci/scope-bash-it
-    build:
-      cache_from: 
-        - scopeci/scope-bash-it
-      context: .
-      dockerfile: ./bash/Dockerfile
-    <<: *scope-common
-
-  go_2:
-    image: scopeci/scope-go_2-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_2-it
-      context: .
-      dockerfile: ./go/unsupported/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.2
-    <<: *scope-common
-  go_3:
-    image: scopeci/scope-go_3-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_3-it
-      context: .
-      dockerfile: ./go/unsupported/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.3
-    <<: *scope-common
-  go_4:
-    image: scopeci/scope-go_4-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_4-it
-      context: .
-      dockerfile: ./go/unsupported/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.4
-    <<: *scope-common
-  go_5:
-    image: scopeci/scope-go_5-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_5-it
-      context: .
-      dockerfile: ./go/unsupported/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.5
-    <<: *scope-common
-  go_6:
-    image: scopeci/scope-go_6-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_6-it
-      context: .
-      dockerfile: ./go/unsupported/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.6
-    <<: *scope-common
-  go_7:
-    image: scopeci/scope-go_7-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_7-it
-      context: .
-      dockerfile: ./go/unsupported/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.7
-    <<: *scope-common
-  go_8:
-    image: scopeci/scope-go_8-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_8-it
-      context: .
-      dockerfile: ./go/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.8
-    <<: *scope-common
-  go_9:
-    image: scopeci/scope-go_9-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_9-it
-      context: .
-      dockerfile: ./go/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.9
-    <<: *scope-common
-  go_10:
-    image: scopeci/scope-go_10-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_10-it
-      context: .
-      dockerfile: ./go/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.10
-    <<: *scope-common
-  go_11:
-    image: scopeci/scope-go_11-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_11-it
-      context: .
-      dockerfile: ./go/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.11
-    <<: *scope-common
-  go_12:
-    image: scopeci/scope-go_12-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_12-it
-      context: .
-      dockerfile: ./go/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.12
-    <<: *scope-common
-  go_13:
-    image: scopeci/scope-go_13-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_13-it
-      context: .
-      dockerfile: ./go/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.13
-    <<: *scope-common
-  go_14:
-    image: scopeci/scope-go_14-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_14-it
-      context: .
-      dockerfile: ./go/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.14
-    <<: *scope-common
-  go_15:
-    image: scopeci/scope-go_15-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_15-it
-      context: .
-      dockerfile: ./go/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.15
-    <<: *scope-common
-  go_16:
-    image: scopeci/scope-go_16-it
-    build:
-      cache_from: 
-        - scopeci/scope-go_16-it
-      context: .
-      dockerfile: ./go/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.16
-    <<: *scope-common
-
-  gogen:
-    image: scopeci/scope-gogen-it
-    build:
-      cache_from: 
-        - scopeci/scope-gogen-it
-      context: .
-      dockerfile: ./gogen/Dockerfile
-    <<: *scope-common
-
-  java7:
-    image: scopeci/scope-java7-it
-    build:
-      cache_from: 
-        - scopeci/scope-java7-it
-      context: .
-      dockerfile: ./java/Dockerfile
-      args:
-        JDK_IMAGE: openjdk:7
-        DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
-    <<: *java-common
   java8:
     image: scopeci/scope-java8-it
     build:
@@ -365,99 +177,6 @@ services:
         DNLD_HEXDUMP: microdnf install util-linux
     <<: *java-common
 
-  oracle-java6:
-    image: scopeci/scope-oracle-java6-it
-    build:
-      cache_from: 
-        - scopeci/scope-oracle-java6-it
-      context: .
-      dockerfile: ./java/Dockerfile.oracle6
-      args:
-        TOMCAT_MAJOR_VERSION: 7
-        TOMCAT_MINOR_VERSION: 7.0.10
-        KEYTOOL: /usr/java/jre1.6.0_45/bin/keytool
-    <<: *java-common
-  oracle-java7:
-    image: scopeci/scope-oracle-java7-it
-    build:
-      cache_from: 
-        - scopeci/scope-oracle-java7-it
-      context: .
-      dockerfile: ./java/Dockerfile.oracle
-      args:
-        JRE_TGZ: jre/jre-7u80-linux-x64.tar.gz
-    <<: *java-common
-  oracle-java8:
-    image: scopeci/scope-oracle-java8-it
-    build:
-      cache_from: 
-        - scopeci/scope-oracle-java8-it
-      context: .
-      dockerfile: ./java/Dockerfile.oracle
-      args:
-        JRE_TGZ: jre/jre-8u251-linux-x64.tar.gz
-    <<: *java-common
-  oracle-java9:
-    image: scopeci/scope-oracle-java9-it
-    build:
-      cache_from: 
-        - scopeci/scope-oracle-java9-it
-      context: .
-      dockerfile: ./java/Dockerfile.oracle
-      args:
-        JRE_TGZ: jre/jre-9.0.4_linux-x64_bin.tar.gz
-    <<: *java-common
-  oracle-java10:
-    image: scopeci/scope-oracle-java10-it
-    build:
-      cache_from: 
-        - scopeci/scope-oracle-java10-it
-      context: .
-      dockerfile: ./java/Dockerfile.oracle
-      args:
-        JRE_TGZ: jre/jre-10.0.2_linux-x64_bin.tar.gz
-    <<: *java-common
-  oracle-java11:
-    image: scopeci/scope-oracle-java11-it
-    build:
-      cache_from: 
-        - scopeci/scope-oracle-java11-it
-      context: .
-      dockerfile: ./java/Dockerfile.oracle
-      args:
-        JRE_TGZ: jdk/jdk-11.0.6_linux-x64_bin.tar.gz
-    <<: *java-common
-  oracle-java12:
-    image: scopeci/scope-oracle-java12-it
-    build:
-      cache_from: 
-        - scopeci/scope-oracle-java12-it
-      context: .
-      dockerfile: ./java/Dockerfile.oracle
-      args:
-        JRE_TGZ: jdk/jdk-12.0.2_linux-x64_bin.tar.gz
-    <<: *java-common
-  oracle-java13:
-    image: scopeci/scope-oracle-java13-it
-    build:
-      cache_from: 
-        - scopeci/scope-oracle-java13-it
-      context: .
-      dockerfile: ./java/Dockerfile.oracle
-      args:
-        JRE_TGZ: jdk/jdk-13.0.2_linux-x64_bin.tar.gz
-    <<: *java-common
-  oracle-java14:
-    image: scopeci/scope-oracle-java14-it
-    build:
-      cache_from: 
-        - scopeci/scope-oracle-java14-it
-      context: .
-      dockerfile: ./java/Dockerfile.oracle
-      args:
-        JRE_TGZ: jdk/jdk-14.0.2_linux-x64_bin.tar.gz
-    <<: *java-common
-
   alpine:
     image: scopeci/scope-alpine-it
     build:
@@ -465,16 +184,6 @@ services:
         - scopeci/scope-alpine-it
       context: .
       dockerfile: ./alpine/Dockerfile
-    <<: *scope-common
-
-  cli:
-    image: scopeci/scope-cli-it
-    build:
-      cache_from:
-        - scopeci/scope-cli-it
-      context: .
-      dockerfile: ./cli/Dockerfile
-    privileged: true
     <<: *scope-common
 
   transport:

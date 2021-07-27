@@ -26,6 +26,8 @@ fi
 
 rm /opt/test-runner/logs/events.log
 
+if [ "x86_64" = "$(uname -m)" ]; then # x86_64 only
+
 echo "==============================================="
 echo "             Testing Mongo                     "
 echo "==============================================="
@@ -46,6 +48,8 @@ else
     echo "*************** Mongo Test Failed ***************"
 #    cat /opt/test-runner/logs/events.log
 fi
+
+fi # x86_64 only
 
 rm /opt/test-runner/logs/events.log
 exit ${ERR}

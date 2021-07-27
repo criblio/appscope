@@ -16,6 +16,16 @@ services:
 
   # These tests run only on x86_64
 
+  # busted on ARM for now
+  alpine:
+    image: scopeci/scope-alpine-it
+    build:
+      cache_from:
+        - scopeci/scope-alpine-it
+      context: .
+      dockerfile: ./alpine/Dockerfile
+    <<: *scope-common
+
   # requires "privileged" on ARM but not on x86
   syscalls:
     image: scopeci/scope-syscalls-it

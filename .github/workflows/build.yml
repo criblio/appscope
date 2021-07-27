@@ -78,7 +78,7 @@ jobs:
       tests: ${{ steps.tests.outputs.tests }}
 
   builder-amd64:
-    name: Update Builder
+    name: Update AMD64 Builder
     needs: info
     runs-on: ubuntu-latest
     steps:
@@ -106,7 +106,7 @@ jobs:
         run: make builder BUILDER=${{ steps.buildx.outputs.name }} PUSH=${{ needs.info.outputs.push }}
 
   builder-arm64:
-    name: Update Builder
+    name: Update ARM64 Builder
     needs: info
     runs-on: [self-hosted,ARM64]
     steps:
@@ -134,7 +134,7 @@ jobs:
         run: make builder BUILDER=${{ steps.buildx.outputs.name }} PUSH=${{ needs.info.outputs.push }}
 
   build-amd64:
-    name: Build & Test
+    name: Build & Test AMD64
     needs: [info,builder-amd64]
     runs-on: ubuntu-latest
     steps:
@@ -197,7 +197,7 @@ jobs:
       #  run: ./docker/build.sh
 
   build-arm64:
-    name: Build & Test
+    name: Build & Test ARM64
     needs: [info,builder-arm64]
     runs-on: [self-hosted,ARM64]
     steps:

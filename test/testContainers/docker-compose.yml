@@ -177,15 +177,6 @@ services:
         DNLD_HEXDUMP: microdnf install util-linux
     <<: *java-common
 
-  alpine:
-    image: scopeci/scope-alpine-it
-    build:
-      cache_from:
-        - scopeci/scope-alpine-it
-      context: .
-      dockerfile: ./alpine/Dockerfile
-    <<: *scope-common
-
   transport:
     image: scopeci/scope-transport-it
     build:

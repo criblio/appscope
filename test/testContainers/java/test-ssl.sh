@@ -84,7 +84,7 @@ evalPayload(){
 
 
 starttest Tomcat
-/opt/tomcat/bin/catalina.sh run &
+ldscope /opt/tomcat/bin/catalina.sh run &
 evaltest
 
 until [ "`curl $CURL_PARAMS  -k --silent --connect-timeout 1 -I https://localhost:8443 | grep 'Coyote'`" != "" ];
@@ -117,7 +117,7 @@ endtest
 
 starttest SSLSocketClient
 cd /opt/javassl
-java -Djavax.net.ssl.trustStore=/opt/tomcat/certs/tomcat.p12 -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=pkcs12 SSLSocketClient > /dev/null
+ldscope java -Djavax.net.ssl.trustStore=/opt/tomcat/certs/tomcat.p12 -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=pkcs12 SSLSocketClient > /dev/null
 evaltest
 grep http-req $EVT_FILE > /dev/null
 ERR+=$?

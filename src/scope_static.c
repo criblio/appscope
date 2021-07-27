@@ -13,6 +13,7 @@
 #include <libgen.h>
 #include <dirent.h>
 #include <getopt.h>
+#include <sys/utsname.h>
 
 #include "scopetypes.h"
 #include "libdir.h"
@@ -920,6 +921,7 @@ static struct option opts[] = {
 int
 main(int argc, char **argv, char **env)
 {
+    int is_musl;
     char *attachArg = 0;
     char path[PATH_MAX] = {0};
 
@@ -1004,7 +1006,7 @@ main(int argc, char **argv, char **env)
     // setup for musl libc if detected
     char *loader = (char *)libdirGetLoader();
     if (loader) {
-        int is_musl = setup_loader(EXE_TEST_FILE, loader);
+        is_musl = setup_loader(EXE_TEST_FILE, loader);
         if (is_musl && attachArg && !getenv("SCOPE_ALLOW_MUSL_ATTACH")) {
             fprintf(stderr, "error: use of --attach in musl libc isn't currently supported\n");
             fprintf(stderr, "error: set SCOPE_ALLOW_MUSL_ATTACH=true to attempt anyway\n");
@@ -1095,19 +1097,24 @@ main(int argc, char **argv, char **env)
     }
 
     // exec the dynamic ldscope
-#ifdef __x86_64__
-    execve(libdirGetLoader(), execArgv, environ);
-#elif defined(__aarch64__)
-    strncpy(path, "/lib/", 8);
-    if (get_dir("/lib/ld-", path + strlen(path), sizeof(path) - strlen(path)) == -1) {
-        fprintf(stderr, "ERROR: can't get the path for ld-musl");
+    struct utsname ubuf;
+
+    if (uname(&ubuf) != 0) {
+        perror("uname");
         return EXIT_FAILURE;
     }
 
-    execve(path, execArgv, environ);
-#else
-#error Architecture is not defined
-#endif
+    if (is_musl && ubuf.machine && (strstr(ubuf.machine, "aarch64") != NULL)) {
+        strncpy(path, "/lib/", 8);
+        if (get_dir("/lib/ld-", path + strlen(path), sizeof(path) - strlen(path)) == -1) {
+            fprintf(stderr, "ERROR: can't get the path for ld-musl");
+            return EXIT_FAILURE;
+        }
+
+        execve(path, execArgv, environ);
+    } else {
+        execve(libdirGetLoader(), execArgv, environ);
+    }
 
     free(execArgv);
     perror("execve failed");

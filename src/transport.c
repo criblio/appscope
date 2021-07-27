@@ -293,19 +293,42 @@ shutdownTlsSession(transport_t *trans)
 
     if (g_tls_calls_are_safe) {
         if (trans->net.tls.ssl) {
-            if (!SSL_shutdown(trans->net.tls.ssl)) {
-                // This is prescribed for a "bidirectional shutdown"
+            int ret = SSL_shutdown(trans->net.tls.ssl);
+            if (ret < 0) {
+                // protocol error occurred
+                int ssl_err = SSL_get_error(trans->net.tls.ssl, ret);
+                char *logmsg = NULL;
+                if (asprintf(&logmsg, "Client SSL_shutdown failed: ssl_err=%d\n",
+                         ssl_err)) {
+                    scopeLog(logmsg, -1, CFG_LOG_INFO);
+                    if (logmsg) free(logmsg);
+                }
+
+            } else if (ret == 0) {
+                // shutdown not complete, call again
                 char buf[4096];
-                while (1) {
-                    ERR_clear_error(); // to make SSL_get_error reliable
-                    int rv = SCOPE_SSL_read(trans->net.tls.ssl, buf, sizeof(buf));
-                    if ((rv <= 0) &&
-                        (SSL_get_error(trans->net.tls.ssl, rv) == SSL_ERROR_ZERO_RETURN)) {
-                        break;
+                while(1) {
+                   ret = SSL_read(trans->net.tls.ssl, buf, sizeof(buf));
+                   if (ret <= 0) {
+                       break;
+                   }
+                }
+               
+                ret = SSL_shutdown(trans->net.tls.ssl);
+                if (ret != 1) {
+                    // second shutdown not successful
+                    int ssl_err = SSL_get_error(trans->net.tls.ssl, ret);
+                    char *logmsg = NULL;
+                    if (asprintf(&logmsg, "Waiting for server shutdown using SSL_shutdown failed: "
+                                "ssl_err=%d\n", ssl_err)) {
+                        scopeLog(logmsg, -1, CFG_LOG_INFO);
+                        if (logmsg) free(logmsg);
                     }
                 }
-                SSL_shutdown(trans->net.tls.ssl);
             }
+        }
+
+        if (trans->net.tls.ssl) {
             SSL_free(trans->net.tls.ssl);
             trans->net.tls.ssl = NULL;
         }

@@ -308,7 +308,7 @@ shutdownTlsSession(transport_t *trans)
                 // shutdown not complete, call again
                 char buf[4096];
                 while(1) {
-                   ret = SSL_read(trans->net.tls.ssl, buf, sizeof(buf));
+                   ret = SCOPE_SSL_read(trans->net.tls.ssl, buf, sizeof(buf));
                    if (ret <= 0) {
                        break;
                    }

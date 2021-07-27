@@ -81,12 +81,7 @@ jobs:
     name: Update Builder
     needs: info
     strategy:
-      matrix:
-        dist: [ubuntu]
-      fail-fast: false
-    runs-on: [ ubuntu-latest, AMD64 ]
-    env:
-        ARCH: x86_64
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -109,18 +104,12 @@ jobs:
           #password: ${{ secrets.SCOPECI_TOKEN }}
 
       - name: Build Image
-        run: make builder DIST=${{ matrix.dist }} ARCH=${{ env.ARCH }} BUILDER=${{ steps.buildx.outputs.name }} PUSH=${{ needs.info.outputs.push }}
+        run: make builder BUILDER=${{ steps.buildx.outputs.name }} PUSH=${{ needs.info.outputs.push }}
 
   builder-arm64:
     name: Update Builder
     needs: info
-    strategy:
-      matrix:
-        dist: [ubuntu]
-      fail-fast: false
-    runs-on: [ ubuntu-latest, self-hosted, ARM64 ]
-    env:
-        ARCH: aarch64
+    runs-on: [self-hosted,ARM64]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -143,18 +132,12 @@ jobs:
           #password: ${{ secrets.SCOPECI_TOKEN }}
 
       - name: Build Image
-        run: make builder DIST=${{ matrix.dist }} ARCH=${{ env.ARCH }} BUILDER=${{ steps.buildx.outputs.name }} PUSH=${{ needs.info.outputs.push }}
+        run: make builder BUILDER=${{ steps.buildx.outputs.name }} PUSH=${{ needs.info.outputs.push }}
 
   build-amd64:
     name: Build & Test
     needs: [info,builder-amd64]
-    strategy:
-      matrix:
-        dist: [ubuntu]
-      fail-fast: false
-    runs-on: [ ubuntu-latest, AMD64 ]
-    env:
-        ARCH: x86_64
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -179,24 +162,24 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Build & Test
-        run: make build BUILDER=${{ steps.buildx.outputs.name }} DIST=${{ matrix.dist }} ARCH=${{ env.ARCH }} VERSION=${{ needs.info.outputs.tag }}
+        run: make build BUILDER=${{ steps.buildx.outputs.name }} VERSION=${{ needs.info.outputs.tag }}
 
       - name: Add Assets to Release
         id: release
         if: ${{ needs.info.outputs.is-semver == 'true' }}
         run: |
-          gh release upload ${{ needs.info.outputs.version }} "bin/linux/${{ env.ARCH }}/scope#scope-${{ env.ARCH }}"
-          gh release upload ${{ needs.info.outputs.version }} "lib/linux/${{ env.ARCH }}/libscope.so#ldscope-${{ env.ARCH }}.so"
+          gh release upload ${{ needs.info.outputs.version }} "bin/linux/x86_64/scope#scope-x86_64"
+          gh release upload ${{ needs.info.outputs.version }} "lib/linux/x86_64/libscope.so#ldscope-x86_64.so"
 
       - name: Upload Binaries
         if: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v2
         with:
-          name: binaries ${{ matrix.dist }} ${{ env.ARCH }}
+          name: binaries x86_64
           path: |
-            lib/linux/${{ env.ARCH }}/libscope.so
-            bin/linux/${{ env.ARCH }}/scope
-            bin/linux/${{ env.ARCH }}/ldscope
+            lib/linux/x86_64/libscope.so
+            bin/linux/x86_64/scope
+            bin/linux/x86_64/ldscope
           retention-days: 5
 
       #- name: Deploy Artifacts to CDN
@@ -217,13 +200,7 @@ jobs:
   build-arm64:
     name: Build & Test
     needs: [info,builder-arm64]
-    strategy:
-      matrix:
-        dist: [ubuntu]
-      fail-fast: false
-    runs-on: [ ubuntu-latest, self-hosted, ARM64 ]
-    env:
-        ARCH: aarch64
+    runs-on: [self-hosted,ARM64]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -248,24 +225,24 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Build & Test
-        run: make build BUILDER=${{ steps.buildx.outputs.name }} DIST=${{ matrix.dist }} ARCH=${{ env.ARCH }} VERSION=${{ needs.info.outputs.tag }}
+        run: make build BUILDER=${{ steps.buildx.outputs.name }} VERSION=${{ needs.info.outputs.tag }}
 
       - name: Add Assets to Release
         id: release
         if: ${{ needs.info.outputs.is-semver == 'true' }}
         run: |
-          gh release upload ${{ needs.info.outputs.version }} "bin/linux/${{ env.ARCH }}/scope#scope-${{ env.ARCH }}"
-          gh release upload ${{ needs.info.outputs.version }} "lib/linux/${{ env.ARCH }}/libscope.so#ldscope-${{ env.ARCH }}.so"
+          gh release upload ${{ needs.info.outputs.version }} "bin/linux/aarch64/scope#scope-aarch64"
+          gh release upload ${{ needs.info.outputs.version }} "lib/linux/aarch64/libscope.so#ldscope-aarch64.so"
 
       - name: Upload Binaries
         if: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v2
         with:
-          name: binaries ${{ matrix.dist }} ${{ env.ARCH }}
+          name: binaries aarch64
           path: |
-            lib/linux/${{ env.ARCH }}/libscope.so
-            bin/linux/${{ env.ARCH }}/scope
-            bin/linux/${{ env.ARCH }}/ldscope
+            lib/linux/aarch64/libscope.so
+            bin/linux/aarch64/scope
+            bin/linux/aarch64/ldscope
           retention-days: 5
 
       #- name: Deploy Artifacts to CDN

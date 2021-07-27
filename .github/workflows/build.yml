@@ -80,7 +80,6 @@ jobs:
   builder-amd64:
     name: Update Builder
     needs: info
-    strategy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository

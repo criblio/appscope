@@ -143,39 +143,6 @@ services:
         JDK_IMAGE: openjdk:11
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
     <<: *java-common
-  java12:
-    image: scopeci/scope-java12-it
-    build:
-      cache_from: 
-        - scopeci/scope-java12-it
-      context: .
-      dockerfile: ./java/Dockerfile
-      args:
-        JDK_IMAGE: openjdk:12
-        DNLD_HEXDUMP: yum -y install util-linux
-    <<: *java-common
-  java13:
-    image: scopeci/scope-java13-it
-    build:
-      cache_from: 
-        - scopeci/scope-java13-it
-      context: .
-      dockerfile: ./java/Dockerfile
-      args:
-        JDK_IMAGE: openjdk:13
-        DNLD_HEXDUMP: yum -y install util-linux
-    <<: *java-common
-  java14:
-    image: scopeci/scope-java14-it
-    build:
-      cache_from: 
-        - scopeci/scope-java14-it
-      context: .
-      dockerfile: ./java/Dockerfile
-      args:
-        JDK_IMAGE: openjdk:14
-        DNLD_HEXDUMP: microdnf install util-linux
-    <<: *java-common
 
   transport:
     image: scopeci/scope-transport-it

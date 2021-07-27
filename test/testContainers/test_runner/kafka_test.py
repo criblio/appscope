@@ -68,7 +68,7 @@ class KafkaAppController(AppController):
         arch = subprocess.check_output(["uname","-m"])
         if arch.startswith(b'x86'):
             # kafka behaves with SIGTERM on x86
-            self.server.terminate()    self.server.wait()
+            self.server.terminate();   self.server.wait()
             self.zookeper.terminate(); self.zookeper.wait()
         else:
             # this is crazy but stopping Kafka isn't easy on ARM

@@ -100,6 +100,12 @@ def configure(runner: Runner, app_config):
 
         included_tests = location.get("include_tests", [])
         excluded_tests = location.get("exclude_tests", [])
+        arch = subprocess.check_output(["uname","-m"])
+        if b'x86_64' in arch:
+            excluded_tests = excluded_tests + location.get("exclude_x86_64_tests", [])
+        elif b'aarch64' in arch:
+            excluded_tests = excluded_tests + location.get("exclude_aarch_tests", [])
+
         tests = locate_tests(home_dir, included_tests, excluded_tests)
 
         runner.add_tests(tests)

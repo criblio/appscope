@@ -125,6 +125,21 @@
         "writev03",
         "fcntl38",
         "fcntl38_64"
+      ],
+      "Notes for exclude arch tests" : [
+        "the aarch64 exclusions are tests that fail on ARM unscoped"
+      ],
+      "exclude_x86_64_tests": [
+      ],
+      "exclude_aarch64_tests": [
+        "__fxstatat64_01",
+        "__fxstatat_01",
+        "__fxstat64_01",
+        "fgetwc_02",
+        "fgetwc_01",
+        "__xstat_01",
+        "__xstat64_01",
+        "__fxstat_01"
       ]
     },
     {

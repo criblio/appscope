@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <libgen.h>
 #include <sys/resource.h>
+#include <setjmp.h>
 
 #include "atomic.h"
 #include "bashmem.h"
@@ -4807,6 +4808,13 @@ __vsnprintf_chk(char *s, size_t maxlen, int flag, size_t slen, const char *forma
 {
     return vsnprintf(s, slen, format, args);
 }
+
+EXPORTWEAK void
+__longjmp_chk(jmp_buf env, int val)
+{
+    longjmp(env, val);
+}
+
 
 static void *
 scope_dlsym(void *handle, const char *name, void *who)

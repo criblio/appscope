@@ -76,16 +76,20 @@ jobs:
       latest: ${{ steps.tag.outputs.latest }}
       push: ${{ steps.tag.outputs.push }}
       tests: ${{ steps.tests.outputs.tests }}
+      arch_x86_64: amd64
+      arch_aarch64: arm64
+      arch_amd64: x86_64
+      arch_arm64: aarch64
 
   builder:
     name: Update Builder
     needs: info
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: [x86_64,aarch64]
         dist: [ubuntu]
       fail-fast: false
+    runs-on: [ubuntu-latest,${{ needs.info.outputs.arch_${{ matrix.arch }} }}]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -113,12 +117,12 @@ jobs:
   build:
     name: Build & Test
     needs: [info,builder]
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: [x86_64,aarch64]
         dist: [ubuntu]
       fail-fast: false
+    runs-on: [ubuntu-latest,${{ needs.info.outputs.arch_${{ matrix.arch }} }}]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2

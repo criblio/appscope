@@ -86,10 +86,10 @@ jobs:
     needs: info
     strategy:
       matrix:
-        arch: [x86_64,aarch64]
+        arch: [amd64,arm64]
         dist: [ubuntu]
       fail-fast: false
-    runs-on: [ubuntu-latest,${{ needs.info.outputs.arch_${{ matrix.arch }} }}]
+    runs-on: [ubuntu-latest,${{ matrix.arch }}]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -119,10 +119,10 @@ jobs:
     needs: [info,builder]
     strategy:
       matrix:
-        arch: [x86_64,aarch64]
+        arch: [amd64,arm64]
         dist: [ubuntu]
       fail-fast: false
-    runs-on: [ubuntu-latest,${{ needs.info.outputs.arch_${{ matrix.arch }} }}]
+    runs-on: [ubuntu-latest,${{ matrix.arch }}]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2

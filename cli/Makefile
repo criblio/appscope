@@ -9,6 +9,7 @@ endif
 export GOBIN := $(shell pwd)/.gobin/$(ARCH)
 export GOCACHE := $(shell pwd)/.gocache
 export GOMODCACHE := $(shell pwd)/.gomod
+export GOFLAGS := -modcacherw
 
 BINDIR := ../bin/linux/$(ARCH)
 LIBDIR := ../lib/linux/$(ARCH)

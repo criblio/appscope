@@ -57,7 +57,7 @@ all:
 	done; \
 	if [ $$PASS -gt 0 ]; then \
 		echo >&2 "info: ran $${RAN}/$${TOTAL} tests, skipped $${SKIP}"; \
-		echo >&2 "      $${PASS} passed, $${FAIL} failed"; \
+		echo >&2 "      $${PASS} passed, $${FAIL} failed ($${ERR})"; \
 	else \
 		echo >&2 "error: ran $${RAN}/$${TOTAL} tests, skipped $${SKIP}"; \
 		echo >&2 "       $${PASS} passed, $${FAIL} failed ($${ERR})"; \

@@ -53,8 +53,6 @@ static uint64_t reentrancy_guard = 0ULL;
 static rlim_t g_max_fds = 0;
 static bool g_ismusl = FALSE;
 
-extern unsigned g_sendprocessstart;
-
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
 
@@ -914,6 +912,9 @@ reportPeriodicStuff(void)
 void
 handleExit(void)
 {
+    if (g_exitdone == TRUE) return;
+    g_exitdone = TRUE;
+
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
         struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
 

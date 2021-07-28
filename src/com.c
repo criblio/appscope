@@ -7,6 +7,7 @@
 
 bool g_need_stack_expand = FALSE;
 unsigned g_sendprocessstart = 0;
+bool g_exitdone = FALSE;
 
 // interfaces
 mtc_t *g_mtc = NULL;

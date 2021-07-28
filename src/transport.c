@@ -345,10 +345,6 @@ handle_tls_destroy(void)
 void
 transportRegisterForExitNotification(void (*fn)(void))
 {
-    // call OPENSSL_init_ssl once to ensure that handle_tls_destroy()
-    // will get called during process exit.
-    if (!handleExit_fn) OPENSSL_init_ssl(OPENSSL_INIT_NO_ATEXIT, NULL);
-
     // remember what to call when OPENSSL is being destructed.
     handleExit_fn = fn;
 
@@ -356,6 +352,10 @@ transportRegisterForExitNotification(void (*fn)(void))
     if (!OPENSSL_atexit(handle_tls_destroy)) {
         DBG(NULL);
     }
+
+    // This ensures that where TLS is not enabled we will get our exit
+    // handler called. It's safe to call the handler more than once.
+    atexit(fn);
 }
 
 static int

@@ -3,7 +3,7 @@ FROM centos:latest
 COPY detect_proto/mongodb.repo /etc/yum.repos.d/.
 RUN yum -y update && \
     yum -y install epel-release && \
-    yum -y install redis wget gdb openssl
+    yum -y install redis wget gdb openssl net-tools
 RUN [ "aarch64" = "$(uname -m)" ] || yum -y install mongodb-org
 
 RUN mkdir /opt/test-runner/
@@ -22,8 +22,6 @@ ADD detect_proto/session.csv /data/session.csv
 
 RUN /usr/lib/systemd/systemd --system &
 CMD ["start"]
-
-ENV LD_PRELOAD=/usr/local/scope/lib/libscope.so
 
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///tmp/scope.log

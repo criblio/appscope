@@ -44,3 +44,9 @@ Other configuration elements are not modified by a LogStream connection.
 AppScope supports TLS over TCP connections.
 
 See [Using TLS for Secure Connections](/docs/tls).
+
+## Scoping Short-lived Processes
+
+When scoping a short-lived process and sending events to LogStream or a remote destination, it may be useful to set `SCOPE_CONNECT_TIMEOUT_SECS` to `1` or higher. This gives AppScope time to make a connection and send events before the process exits. 
+
+When `SCOPE_CONNECT_TIMEOUT_SECS` remains at its default value of `0`, the destination might not receive any events when you scope a short-lived process.

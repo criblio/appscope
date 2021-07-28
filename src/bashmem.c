@@ -2,7 +2,7 @@
 #include <dlfcn.h>
 #include <elf.h>
 #include <malloc.h>
-#include "distorm.h"
+#include "capstone/capstone.h"
 
 #include "bashmem.h"
 #include "dbg.h"
@@ -17,6 +17,9 @@ typedef struct {
     void (*free)(void *ptr);
     void *(*memalign)(size_t alignment, size_t size);
     void (*cfree)(void *ptr);
+    // Needed for our capstone disassembler
+    void *(*calloc)(size_t nmemb, size_t size);
+    int (*vsnprintf)(char *str, size_t size, const char *format, va_list ap);
 } bash_mem_fn_t;
 
 bash_mem_fn_t g_mem_fn;
@@ -55,12 +58,18 @@ glibcMemFuncsFound(void)
     g_mem_fn.free = dlsym(RTLD_NEXT, "free");
     g_mem_fn.memalign = dlsym(RTLD_NEXT, "memalign");
     g_mem_fn.cfree = dlsym(RTLD_NEXT, "cfree");
+    // Needed for our capstone disassembler
+    g_mem_fn.calloc = dlsym(RTLD_NEXT, "calloc");
+    g_mem_fn.vsnprintf = dlsym(RTLD_NEXT, "vsnprintf");
 
     return g_mem_fn.malloc &&
            g_mem_fn.realloc &&
            g_mem_fn.free &&
            g_mem_fn.memalign &&
-           g_mem_fn.cfree;
+           g_mem_fn.cfree &&
+           // Needed for our capstone disassembler
+           g_mem_fn.calloc &&
+           g_mem_fn.vsnprintf;
 }
 
 int
@@ -130,10 +139,31 @@ bashMemFuncsFound()
     int num_found = 0;
 
     void *exe_handle = g_fn.dlopen(NULL, RTLD_LAZY);
-    if (!exe_handle) return FALSE;
+    if (!exe_handle) goto out;
+
+    csh disass_handle = 0;
+    cs_arch arch;
+    cs_mode mode;
+#if defined(__aarch64__)
+    arch = CS_ARCH_ARM64;
+    mode = CS_MODE_LITTLE_ENDIAN;
+#elif defined(__x86_64__)
+    arch = CS_ARCH_X86;
+    mode = CS_MODE_64;
+#else
+    goto out;
+#endif
+    if (cs_open(arch, mode, &disass_handle) != CS_ERR_OK) goto out;
 
     int i;
+    cs_insn *asm_inst = NULL;
+    unsigned int asm_count = 0;
     for (i=0; i<bash_mem_func_count; i++) {
+        if (asm_inst) {
+            cs_free(asm_inst, asm_count);
+            asm_inst = NULL;
+            asm_count = 0;
+        }
         patch_info_t *func = &bash_mem_func[i];
         void *func_ptr = dlsym(exe_handle, func->name);
         if (!func_ptr) {
@@ -143,13 +173,9 @@ bashMemFuncsFound()
             continue;
         }
 
-        const int MAX_INST = 15;
         const int DECODE_BYTES = 50;
-        unsigned int asm_count = 0;
-        _DecodedInst asm_inst[MAX_INST];
-        int rc = distorm_decode((uint64_t)func_ptr, func_ptr, DECODE_BYTES,
-                         Decode64Bits, asm_inst, MAX_INST, &asm_count);
-        if (rc == DECRES_INPUTERR) {
+        asm_count = cs_disasm(disass_handle, func_ptr, DECODE_BYTES, (uint64_t)func_ptr, 0, &asm_inst);
+        if (asm_count <= 0) {
             char buf[128];
             snprintf(buf, sizeof(buf), "Couldn't disassemble bash function %s", func->name);
             scopeLog(buf, -1, CFG_LOG_ERROR);
@@ -158,10 +184,10 @@ bashMemFuncsFound()
 
         // look for the first jmp instruction
         int j;
-        _DecodedInst *inst;
+        cs_insn *inst;
         for (j=0; j<asm_count; j++) {
             inst = &asm_inst[j];
-            if (!strcmp((const char *)inst->mnemonic.p, "JMP") &&
+            if (!strcmp((const char *)inst->mnemonic, "jmp") &&
                 ((inst->size == 5) || (inst->size == 2))) {
                 break;
             }
@@ -169,15 +195,15 @@ bashMemFuncsFound()
         if (j==asm_count) {
             char buf[128];
             snprintf(buf, sizeof(buf), "For bash function %s, couldn't find "
-                "a JMP instruction in the first %d instructions from 0x%p",
+                "a jmp instruction in the first %d instructions from 0x%p",
                 func->name, asm_count, func_ptr);
             scopeLog(buf, -1, CFG_LOG_ERROR);
             continue;
         }
 
-        // Calculate the destination of the JMP instruction, and save it
+        // Calculate the destination of the jmp instruction, and save it
         // as the internal_addr that we want to hook later.  Assumes x86_64.
-        int64_t addr = inst->offset; // the address of the current inst
+        int64_t addr = inst->address; // the address of the current inst
         int64_t jmp_offset;
         switch (inst->size) {
             case 5:
@@ -200,7 +226,14 @@ bashMemFuncsFound()
         num_found++;
     }
 
-    dlclose(exe_handle);
+    if (asm_inst) {
+        cs_free(asm_inst, asm_count);
+    }
+
+out:
+
+    if (exe_handle) dlclose(exe_handle);
+    if (disass_handle) cs_close(&disass_handle);
     return num_found == bash_mem_func_count;
 }
 
@@ -258,6 +291,19 @@ run_bash_mem_fix(void)
 
     // fill in g_mem_fn by looking up glibc funcs
     if (!glibcMemFuncsFound()) goto out;
+
+    // Take charge of what memory functions capstone, our disassembler,
+    // uses.  We can't use bash's memory functions and switch away from
+    // them at the same time.  This CS_OPT_MEM call ensures that capstone
+    // uses glibc's memory subsystem instead of bash's.  It's important
+    // to make this call before before calls to bashMemFuncsFound() and
+    // replaceBashMemFuncs(), since these use the disassembler.
+    cs_opt_mem capstone_mem = {.malloc = g_mem_fn.malloc,
+                               .calloc = g_mem_fn.calloc,
+                               .realloc = g_mem_fn.realloc,
+                               .free = g_mem_fn.free,
+                               .vsnprintf = g_mem_fn.vsnprintf};
+    if ((cs_option(0, CS_OPT_MEM, (size_t)&capstone_mem)) != 0) goto out;
 
     // fill in bash_mem_func by looking up external bash mem funcs
     // then finding where they jmp to within bash (internal bash mem funcs)

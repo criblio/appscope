@@ -1,17 +1,17 @@
 ARCH_CFLAGS=-D__GO__ -D__FUNCHOOK__ -D__x86_64__
-ARCH_LD_FLAGS=-ldistorm
+ARCH_LD_FLAGS=-lcapstone
 ARCH_BINARY=elf64-x86-64
 ARCH_OBJ=i386
-FUNCHOOK_AR=contrib/funchook/build/libfunchook.a contrib/funchook/build/libdistorm.a
+FUNCHOOK_AR=contrib/funchook/build/libfunchook.a contrib/funchook/build/capstone_src-prefix/src/capstone_src-build/libcapstone.a
 
 $(FUNCHOOK_AR):
-	@echo "Building funchook and distorm"
+	@echo "Building funchook and capstone"
 	cd contrib/funchook && mkdir -p build
-	cd contrib/funchook/build && cmake -DCMAKE_BUILD_TYPE=Release ..
-	cd contrib/funchook/build && make distorm funchook-static
+	cd contrib/funchook/build && cmake -DCMAKE_BUILD_TYPE=Release -DFUNCHOOK_DISASM=capstone ..
+	cd contrib/funchook/build && make capstone_src funchook-static
 
-LD_FLAGS=$(PCRE2_AR) -ldl -lpthread -lrt -Lcontrib/funchook/build -lfunchook -ldistorm
-INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build -I./contrib/funchook/distorm/include -I./contrib/jni -I./contrib/jni/linux/ -I./contrib/openssl/include
+LD_FLAGS=$(PCRE2_AR) -ldl -lpthread -lrt -Lcontrib/funchook/build -lfunchook -Lcontrib/funchook/build/capstone_src-prefix/src/capstone_src-build -lcapstone
+INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build -I./contrib/funchook/build/capstone_src-prefix/src/capstone_src/include -I./contrib/jni -I./contrib/jni/linux/ -I./contrib/openssl/include
 
 #ARCH_RM=&& rm ./test/selfinterpose/wrap_go.o
 #ARCH_COPY=cp ./lib/$(OS)/$(ARCH)/libscope.so ./lib/$(OS)/libscope.so && \

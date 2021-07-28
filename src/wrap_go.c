@@ -13,7 +13,7 @@
 #include "state.h"
 #include "utils.h"
 #include "fn.h"
-#include "distorm.h"
+#include "capstone/capstone.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
@@ -105,17 +105,17 @@ c_str(gostring_t *go_str)
 }
 
 static bool
-looks_like_first_inst_of_go_func(_DecodedInst* asm_inst)
+looks_like_first_inst_of_go_func(cs_insn* asm_inst)
 {
-    return (!strcmp((const char*)asm_inst->mnemonic.p, "MOV") &&
-            !strcmp((const char*)asm_inst->operands.p, "RCX, [FS:0xfffffffffffffff8]"))
+    return (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
+            !strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]"))
            || // -buildmode=pie compiles to this:
-           (!strcmp((const char*)asm_inst->mnemonic.p, "MOV") &&
-            !strcmp((const char*)asm_inst->operands.p, "RCX, 0xfffffff8"));
+           (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
+            !strcmp((const char*)asm_inst->op_str, "rcx, -8"));
 }
 
 static uint32_t
-add_argument(_DecodedInst* asm_inst)
+add_argument(cs_insn* asm_inst)
 {
     if (!asm_inst) return 0;
 
@@ -123,7 +123,7 @@ add_argument(_DecodedInst* asm_inst)
     // 000000000063a083 (04) 4883c458                 ADD RSP, 0x58
     // 000000000063a087 (01) c3                       RET
     if (asm_inst->size == 4) {
-        unsigned char* inst_addr = (unsigned char*)asm_inst->offset;
+        unsigned char* inst_addr = (unsigned char*)asm_inst->address;
         return ((unsigned char*)inst_addr)[3];
     }
 
@@ -131,7 +131,7 @@ add_argument(_DecodedInst* asm_inst)
     // 00000000004a9cc9 (07) 4881c480000000           ADD RSP, 0x80
     // 00000000004a9cd0 (01) c3                       RET
     if (asm_inst->size == 7) {
-        unsigned char* inst_addr = (unsigned char*)asm_inst->offset;
+        unsigned char* inst_addr = (unsigned char*)asm_inst->address;
         // x86_64 is little-endian.
         return inst_addr[3] +
               (inst_addr[4] << 8 ) +
@@ -149,32 +149,31 @@ add_argument(_DecodedInst* asm_inst)
 // to understand what this comment is telling you.
 static void
 patch_first_instruction(funchook_t *funchook,
-               _DecodedInst* asm_inst, unsigned int asm_count, tap_t* tap)
+               cs_insn* asm_inst, unsigned int asm_count, tap_t* tap)
 {
     int i;
     for (i=0; i<asm_count; i++) {
 
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!strcmp((const char*)asm_inst[i].mnemonic.p, "INT 3") &&
+                  (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
                   asm_inst[i].size == 1 ))) {
             break;
         }
 
-        patchprint("%0*lx (%02d) %-24s %s%s%s\n",
+        patchprint("%0*lx (%02d) %-24s %s%s\n",
                16,
-               asm_inst[i].offset,
+               asm_inst[i].address,
                asm_inst[i].size,
-               (char*)asm_inst[i].instructionHex.p,
-               (char*)asm_inst[i].mnemonic.p,
-               asm_inst[i].operands.length != 0 ? " " : "",
-               (char*)asm_inst[i].operands.p);
+               (char*)asm_inst[i].bytes,
+               (char*)asm_inst[i].mnemonic,
+               (char*)asm_inst[i].op_str);
 
         uint32_t add_arg=8; // not used, but can't be zero because of go_switch
         if (i == 0) {
 
-            void *pre_patch_addr = (void*)asm_inst[i].offset;
-            void *patch_addr = (void*)asm_inst[i].offset;
+            void *pre_patch_addr = (void*)asm_inst[i].address;
+            void *patch_addr = (void*)asm_inst[i].address;
 
             if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
                 patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
@@ -191,7 +190,7 @@ patch_first_instruction(funchook_t *funchook,
 
 static void
 patch_return_addrs(funchook_t *funchook,
-                   _DecodedInst* asm_inst, unsigned int asm_count, tap_t* tap)
+                   cs_insn* asm_inst, unsigned int asm_count, tap_t* tap)
 {
     if (!funchook || !asm_inst || !asm_count || !tap) return;
 
@@ -214,30 +213,29 @@ patch_return_addrs(funchook_t *funchook,
 
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!strcmp((const char*)asm_inst[i].mnemonic.p, "INT 3") &&
+                  (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
                   asm_inst[i].size == 1 ))) {
             break;
         }
 
-        patchprint("%0*lx (%02d) %-24s %s%s%s\n",
+        patchprint("%0*lx (%02d) %-24s %s%s\n",
                16,
-               asm_inst[i].offset,
+               asm_inst[i].address,
                asm_inst[i].size,
-               (char*)asm_inst[i].instructionHex.p,
-               (char*)asm_inst[i].mnemonic.p,
-               asm_inst[i].operands.length != 0 ? " " : "",
-               (char*)asm_inst[i].operands.p);
+               (char*)asm_inst[i].bytes,
+               (char*)asm_inst[i].mnemonic,
+               (char*)asm_inst[i].op_str);
 
         // If the current instruction is a RET
         // we want to patch the ADD immediately before it.
         uint32_t add_arg = 0;
-        if ((!strcmp((const char*)asm_inst[i].mnemonic.p, "RET") &&
+        if ((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
              asm_inst[i].size == 1) &&
-             !strcmp((const char*)asm_inst[i-1].mnemonic.p, "ADD") &&
+             !strcmp((const char*)asm_inst[i-1].mnemonic, "add") &&
              (add_arg = add_argument(&asm_inst[i-1]))) {
 
-            void *pre_patch_addr = (void*)asm_inst[i-1].offset;
-            void *patch_addr = (void*)asm_inst[i-1].offset;
+            void *pre_patch_addr = (void*)asm_inst[i-1].address;
+            void *patch_addr = (void*)asm_inst[i-1].address;
 
             // all add_arg values within a function should be the same
             if (tap->frame_size && (tap->frame_size != add_arg)) {
@@ -517,9 +515,33 @@ initGoHook(elf_buf_t *ebuf)
     }
     go_runtime_cgocall = (void *) ((uint64_t)go_runtime_cgocall + base);
 
+    csh disass_handle = 0;
+    cs_arch arch;
+    cs_mode mode;
+#if defined(__aarch64__)
+    arch = CS_ARCH_ARM64;
+    mode = CS_MODE_LITTLE_ENDIAN;
+#elif defined(__x86_64__)
+    arch = CS_ARCH_X86;
+    mode = CS_MODE_64;
+#else
+    return;
+#endif
+    if (cs_open(arch, mode, &disass_handle) != CS_ERR_OK) return;
+
+    cs_insn *asm_inst = NULL;
+    unsigned int asm_count = 0;
+
     adjustGoStructOffsetsForVersion(go_major_ver);
     tap_t* tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
+
+        if (asm_inst) {
+            cs_free(asm_inst, asm_count);
+            asm_inst = NULL;
+            asm_count = 0;
+        }
+
         void* orig_func;
         if (((orig_func = getGoSymbol(ebuf->buf, tap->func_name)) == NULL) &&
             ((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL)) {
@@ -527,18 +549,18 @@ initGoHook(elf_buf_t *ebuf)
             continue;
         }
 
-        const int MAX_INST = 250;
-        unsigned int asm_count = 0;
-        _DecodedInst asm_inst[MAX_INST];
         uint64_t offset_into_txt = (uint64_t)orig_func - (uint64_t)ebuf->text_addr;
+        uint64_t text_len_left = ebuf->text_len - offset_into_txt;
+        uint64_t max_bytes = 4096;  // somewhat arbitrary limit.  Allows for
+                                  // >250 instructions @ 15 bytes/inst (x86_64)
+        uint64_t size = MIN(text_len_left, max_bytes); // limit size
 
         orig_func = (void *) ((uint64_t)orig_func + base);
-        int rc = distorm_decode((uint64_t)orig_func, orig_func,
-                                 ebuf->text_len - offset_into_txt,
-                                 Decode64Bits, asm_inst, MAX_INST, &asm_count);
-        if (rc == DECRES_INPUTERR) {
-            sysprint("ERROR: disassembler fails: %s\n\tlen %d dt %d code %p result %d\n\ttext addr %p text len %d oinfotext %p\n",
-                     tap->func_name, ebuf->text_len - offset_into_txt, Decode64Bits,
+        asm_count = cs_disasm(disass_handle, orig_func, size,
+                                 (uint64_t)orig_func, 0, &asm_inst);
+        if (asm_count <= 0) {
+            sysprint("ERROR: disassembler fails: %s\n\tlen %d code %p result %d\n\ttext addr %p text len %d oinfotext %p\n",
+                     tap->func_name, size,
                      orig_func, sizeof(asm_inst), ebuf->text_addr, ebuf->text_len, offset_into_txt);
             continue;
         }
@@ -550,6 +572,10 @@ initGoHook(elf_buf_t *ebuf)
         patch_return_addrs(funchook, asm_inst, asm_count, tap);
     }
 
+    if (asm_inst) {
+        cs_free(asm_inst, asm_count);
+    }
+    cs_close(&disass_handle);
 
     // hook a few Go funcs
     rc = funchook_install(funchook, 0);

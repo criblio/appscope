@@ -64,7 +64,7 @@ ENV SCOPE_EVENT_HTTP=true
 ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
-ENV LD_PRELOAD=/usr/local/scope/lib/libscope.so
+#ENV LD_PRELOAD=/usr/local/scope/lib/libscope.so
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh

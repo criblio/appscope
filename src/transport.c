@@ -347,7 +347,7 @@ transportRegisterForExitNotification(void (*fn)(void))
 {
     // call OPENSSL_init_ssl once to ensure that handle_tls_destroy()
     // will get called during process exit.
-    if (!handleExit_fn) OPENSSL_init_ssl(0, NULL);
+    if (!handleExit_fn) OPENSSL_init_ssl(OPENSSL_INIT_NO_ATEXIT, NULL);
 
     // remember what to call when OPENSSL is being destructed.
     handleExit_fn = fn;

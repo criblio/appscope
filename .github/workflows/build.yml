@@ -74,7 +74,7 @@ jobs:
 
   build-amd64:
     name: Build & Test on AMD64/x86_64
-    needs: [info,builder-amd64]
+    needs: info
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -158,7 +158,7 @@ jobs:
 
   build-arm64:
     name: Build & Test on ARM64/aarch64
-    needs: [info,builder-arm64]
+    needs: info
     runs-on: [self-hosted,ARM64]
     steps:
       - name: Checkout Repository

@@ -47,10 +47,6 @@ jobs:
           fi
           echo "::set-output name=tag::${TAG}"
 
-      - name: List Integration Tests
-        id: tests
-        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | sort -V | jq -ncR '[inputs]')"
-
       - name: Create Release
         id: release
         if: ${{ steps.version.outputs.is-semver == 'true' }}
@@ -75,7 +71,6 @@ jobs:
       tag: ${{ steps.tag.outputs.tag }}
       latest: ${{ steps.tag.outputs.latest }}
       push: ${{ steps.tag.outputs.push }}
-      tests: ${{ steps.tests.outputs.tests }}
 
   builder-amd64:
     name: Update AMD64 Builder
@@ -96,9 +91,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-builder-amd64-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-builder-amd64-buildx
+          key: ${{ runner.os }}-builder-amd64-buildx
 
       - name: Login to Container Registry
         if: ${{ needs.info.outputs.push }}
@@ -113,12 +106,17 @@ jobs:
       - name: Build Image
         run: make builder BUILDER=${{ steps.buildx.outputs.name }} PUSH=${{ needs.info.outputs.push }} CACHE_FROM=type=local,src=/tmp/.buildx-cache CACHE_TO=type=local,dest=/tmp/.buildx-cache-new
 
+      - name: List Integration Tests
+        id: tests
+        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | sort -V | jq -ncR '[inputs]')"
+
       - name: Update Docker Cache
         run: |
-          ls -lR /tmp/.buildx-cache
-          ls -lR /tmp/.buildx-cache-new
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+    outputs:
+      tests: ${{ steps.tests.outputs.tests }}
 
   builder-arm64:
     name: Update ARM64 Builder
@@ -147,6 +145,13 @@ jobs:
 
       - name: Build Image
         run: make builder BUILDER=${{ steps.buildx.outputs.name }} PUSH=${{ needs.info.outputs.push }}
+
+      - name: List Integration Tests
+        id: tests
+        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | sort -V | jq -ncR '[inputs]')"
+
+    outputs:
+      tests: ${{ steps.tests.outputs.tests }}
 
   build-amd64:
     name: Build & Test AMD64

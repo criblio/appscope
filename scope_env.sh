@@ -16,11 +16,12 @@ determine_lib_path() {
     fi
 
     PLATFORM=$(determine_platform)
+    ARCH=$(determine_arch)
 
     if [ $PLATFORM == "macOS" ]; then
         echo "$SCOPE_HOME/lib/macOS/libscope.so"
     elif [ $PLATFORM == "Linux" ]; then
-        echo "$SCOPE_HOME/lib/linux/libscope.so"
+        echo "$SCOPE_HOME/lib/linux/$ARCH/libscope.so"
     else
         echo "ERROR"
     fi
@@ -83,6 +84,10 @@ determine_platform() {
     fi
 }
 
+determine_arch() {
+    echo $(uname -m)
+}
+
 determine_pkg_mgr() {
     if yum --version &>/dev/null; then
         echo "yum"
@@ -108,10 +113,10 @@ install_brew() {
 }
 
 platform_and_pkgmgr_defined() {
-    if [ ${PLATFORM} = "Error" ]; then
+    if [ "${PLATFORM}" = "Error" ]; then
         echo "scope_env.sh does not support this platform type.  Exiting."
         exit 1
-    elif [ ${PKG_MGR} = "Error" ]; then
+    elif [ "${PKG_MGR}" = "Error" ]; then
         echo "scope_env.sh does not support this package menager.  Exiting."
         exit 1
     else
@@ -136,7 +141,7 @@ install_sudo() {
         "apt-get")
             if ! sudo --version &>/dev/null; then
                 echo "Install of sudo is required."
-                if su -c "apt-get update && apt-get install sudo"; then
+                if su -c "apt-get update && apt-get install -y sudo"; then
                     echo "Install of sudo was successful."
                 else
                     echo "Install of sudo was unsuccesful.  Exiting."
@@ -166,7 +171,7 @@ install_git() {
         "apt-get")
             if ! git --version &>/dev/null; then
                 echo "Install of git is required."
-                if sudo apt-get install git; then
+                if sudo apt-get install -y git; then
                     echo "Install of git was successful."
                 else
                     echo "Install of git was unsuccesful.  Exiting."
@@ -190,7 +195,7 @@ install_git() {
 }
 
 clone_scope() {
-    if git remote -v 2>/dev/null | grep "scope.git" &>/dev/null; then
+    if [ -d .git ]; then
         echo "We're in an existing repo now.  No need to clone."
         return 0 
     fi
@@ -243,6 +248,19 @@ run_make() {
 }
 
 
+prep() {
+    echo "Running scope_env.sh prep"
+
+    PLATFORM=$(determine_platform)
+    PKG_MGR=$(determine_pkg_mgr)
+
+    platform_and_pkgmgr_defined
+    install_sudo
+    install_git
+    clone_scope
+    install_build_tools
+}
+
 build_scope() {
     echo "Running scope_env.sh."
 
@@ -250,18 +268,22 @@ build_scope() {
     PKG_MGR=$(determine_pkg_mgr)
 
     # Mac's brew package manager may not be there unless we put it there...
-    if [ ${PLATFORM} = "macOS" ] && [ ${PKG_MGR} = "Error" ]; then
+    if [ "${PLATFORM}" = "macOS" ] && [ "${PKG_MGR}" = "Error" ]; then
         if install_brew; then
             PKG_MGR=$(determine_pkg_mgr)
         fi
     fi
-    platform_and_pkgmgr_defined
-    install_sudo
-    install_git
-    clone_scope
-    install_build_tools
+    prep
     run_make
     print_version
+}
+
+build_scope_arm64() {
+    echo "Building Scope in ARM64 via docker"
+
+    localdir=$(pwd)
+    docker run --privileged --rm tonistiigi/binfmt --install all
+    docker run -i --rm -v ${localdir}:${localdir} --platform linux/arm64 ubuntu:20.04 sh -cx "cd ${localdir} && bash -ex ./scope_env.sh prep && make all"
 }
 
 
@@ -287,6 +309,12 @@ for arg in "$@"; do
         ;;
     "build")
         build_scope
+        ;;
+    "build_arm64")
+        build_scope_arm64
+        ;;
+    "prep")
+        prep
         ;;
     "help")
         print_help

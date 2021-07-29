@@ -5,7 +5,6 @@ DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
 FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
-PRELOAD=`env | grep LD_PRELOAD`
 EVT_FILE="/opt/test-runner/logs/events.log"
 
 starttest(){
@@ -13,13 +12,11 @@ starttest(){
     echo "==============================================="
     echo "             Testing $CURRENT_TEST             "
     echo "==============================================="
-    export $PRELOAD
     ERR=0
 }
 
 evaltest(){
     echo "             Evaluating $CURRENT_TEST"
-    unset LD_PRELOAD
 }
 
 endtest(){
@@ -38,10 +35,10 @@ endtest(){
 
     # copy the EVT_FILE to help with debugging
     if (( $DEBUG )) || [ $RESULT == "FAILED" ]; then
-        cp $EVT_FILE $EVT_FILE.$CURRENT_TEST
+        cp -f $EVT_FILE $EVT_FILE.$CURRENT_TEST
     fi
 
-    rm $EVT_FILE
+    rm -f $EVT_FILE
 }
 
 export SCOPE_PAYLOAD_ENABLE=true
@@ -105,7 +102,6 @@ endtest
 # gnutls
 #
 starttest gnutls
-unset LD_PRELOAD
 ldscope ./curltls/src/curl --head https://cribl.io
 evaltest
 
@@ -128,7 +124,6 @@ endtest
 # nss
 #
 starttest nss
-unset LD_PRELOAD
 ldscope curl --head https://cribl.io
 evaltest
 
@@ -151,7 +146,6 @@ endtest
 # node.js
 #
 starttest "node.js"
-unset LD_PRELOAD
 ldscope node /opt/test-runner/bin/nodehttp.ts > /dev/null
 evaltest
 
@@ -176,15 +170,15 @@ endtest
 echo "Creating key files for ruby client and server"
 (cd /opt/test-runner/ruby && openssl req -x509 -newkey rsa:4096 -keyout priv.pem -out cert.pem -days 365 -nodes -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost")
 starttest Ruby
-RUBY_HTTP_START=$(grep http- $EVT_FILE | grep -c 10101)
+RUBY_HTTP_START=$(grep http- $EVT_FILE 2>/dev/null | grep -c 10101)
 (cd /opt/test-runner/ruby && ./server.rb 10101 &)
 sleep 1
-(cd /opt/test-runner/ruby && ./client.rb 127.0.0.1 10101)
+(cd /opt/test-runner/ruby && ldscope ./client.rb 127.0.0.1 10101)
 sleep 1
 evaltest
-RUBY_HTTP_END=$(grep http- $EVT_FILE | grep -c 10101)
+RUBY_HTTP_END=$(grep http- $EVT_FILE 2>/dev/null | grep -c 10101)
 
-if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 6 )); then
+if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 3 )); then
     ERR+=1
 fi
 
@@ -197,18 +191,16 @@ endtest
 #
 # Python
 #
-/opt/rh/rh-python36/root/usr/bin/pip3.6 install pyopenssl
 starttest Python
-unset LD_PRELOAD
-ldscope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py create_certs
-ldscope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py start_server&
+/opt/rh/rh-python38/root/usr/bin/python3.8 /opt/test-runner/bin/testssl.py create_certs
+/opt/rh/rh-python38/root/usr/bin/python3.8 /opt/test-runner/bin/testssl.py start_server&
 sleep 1
-ldscope /opt/rh/rh-python36/root/usr/bin/python3.6 /opt/test-runner/bin/testssl.py run_client
+ldscope /opt/rh/rh-python38/root/usr/bin/python3.8 /opt/test-runner/bin/testssl.py run_client
 sleep 1
 evaltest
 
 COUNT=$(grep -c http- $EVT_FILE)
-if (( $COUNT < 6 )); then
+if (( $COUNT < 3 )); then
     ERR+=1
 fi
 
@@ -218,33 +210,36 @@ ERR+=$?
 endtest
 
 
-#
-# Rust
-#
-starttest Rust
-ldscope /opt/test-runner/bin/http_test > /dev/null
-evaltest
+# TODO skip on ARM for now, need to recompile the binary
+if [ "aarch64" != "$(uname -m)" ]; then
+	#
+	# Rust
+	#
+	starttest Rust
+	ldscope /opt/test-runner/bin/http_test > /dev/null
+	sleep 1
+	evaltest
 
-grep http-req $EVT_FILE > /dev/null
-ERR+=$?
+	grep http-req $EVT_FILE > /dev/null
+	ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
-ERR+=$?
+	grep http-resp $EVT_FILE > /dev/null
+	ERR+=$?
 
-grep http-metric $EVT_FILE > /dev/null
-ERR+=$?
+	grep http-metric $EVT_FILE > /dev/null
+	ERR+=$?
 
-evalPayload
-ERR+=$?
+	evalPayload
+	ERR+=$?
 
-endtest
+	endtest
+fi
 
 
 #
 # php
 #
 starttest php
-unset LD_PRELOAD
 PHP_HTTP_START=$(grep http- $EVT_FILE | grep -c sslclient.php)
 ldscope php /opt/test-runner/php/sslclient.php > /dev/null
 evaltest
@@ -265,7 +260,6 @@ endtest
 # apache
 #
 starttest apache
-unset LD_PRELOAD
 APACHE_HTTP_START=$(grep http- $EVT_FILE | grep -c httpd)
 ldscope httpd -k start
 ldscope curl -k https://localhost:443/ > /dev/null

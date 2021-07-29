@@ -4,15 +4,19 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/poll.h>
+
 #ifdef __LINUX__
 #include <sys/prctl.h>
+#ifdef __GO__
 #include <asm/prctl.h>
+#endif
 #endif
 #include <sys/syscall.h>
 #include <sys/stat.h>
 #include <libgen.h>
 #include <sys/resource.h>
 #include <errno.h>
+#include <setjmp.h>
 
 #include "atomic.h"
 #include "bashmem.h"
@@ -49,8 +53,6 @@ static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
 static rlim_t g_max_fds = 0;
 static bool g_ismusl = FALSE;
-
-extern unsigned g_sendprocessstart;
 
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
@@ -911,6 +913,9 @@ reportPeriodicStuff(void)
 void
 handleExit(void)
 {
+  if (g_exitdone == TRUE) return;
+    g_exitdone = TRUE;
+
     struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
 
     char *wait;
@@ -927,6 +932,9 @@ handleExit(void)
             }
         }
     }
+
+    if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+        struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
 
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
         // let the periodic thread finish
@@ -1005,13 +1013,13 @@ periodic(void *arg)
 }
 
 // TODO; should this move to os/linux/os.c?
-#ifdef __LINUX__
 void *
 memcpy(void *dest, const void *src, size_t n)
 {
     return memmove(dest, src, n);
 }
 
+#ifdef __FUNCHOOK__
 static int
 ssl_read_hook(SSL *ssl, void *buf, int num)
 {
@@ -1109,7 +1117,7 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
     }
     return 0;
 }
-
+#endif // __FUNCHOOK__
 
 /*
  * There are 3x SSL_read functions to consider:
@@ -1129,14 +1137,15 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
  * libscope.so by locating the path to this lib, then
  * get a handle and lookup the symbol.
  */
-
 static ssize_t __write_libc(int, const void *, size_t);
 static ssize_t __write_pthread(int, const void *, size_t);
 static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
 static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
 static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
+#ifdef __FUNCHOOK__  // TODO: remove when funchook is working with ARM64, just keeping warnings at bay
 static long scope_syscall(long, ...);
+#endif
 
 static int 
 findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
@@ -1203,17 +1212,20 @@ hookInject()
 static void
 initHook(int attachedFlag)
 {
+#ifdef __FUNCHOOK__
     int rc;
     funchook_t *funchook;
-    char *full_path;
     bool should_we_patch = FALSE;
-    elf_buf_t *ebuf;
+#endif
+    char *full_path = NULL;
+    elf_buf_t *ebuf = NULL;
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
     if ((osGetExePath(&full_path) != -1) &&
         ((ebuf = getElf(full_path))) &&
         (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
+#ifdef __GO__
         initGoHook(ebuf);
         threadNow(0);
         if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
@@ -1231,6 +1243,7 @@ initHook(int attachedFlag)
         if (full_path) free(full_path);
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
         return;
+#endif  // __GO__
     }
 
     if (ebuf && ebuf->buf && (strstr(full_path, "ldscope") == NULL)) {
@@ -1240,6 +1253,11 @@ initHook(int attachedFlag)
     if (full_path) free(full_path);
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
+    if (attachedFlag) {
+        hookInject();
+    }
+
+#ifdef __FUNCHOOK__
     if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
         if (handle == NULL) {
@@ -1267,10 +1285,6 @@ initHook(int attachedFlag)
                                  .symbol = "__write",
                                  .out_addr = (void*)&g_fn.__write_pthread};
     dl_iterate_phdr(findLibSym, &pthread__write);
-
-    if (attachedFlag) {
-        hookInject();
-    }
 
     // for DNS:
     // On a glibc distro we hook sendmmsg because getaddrinfo calls this
@@ -1363,15 +1377,8 @@ initHook(int attachedFlag)
             return;
         }
     }
+#endif  // __FUNCHOOK__
 }
-#else
-static void
-initHook()
-{
-    return;
-}
-
-#endif // __LINUX__
 
 static void
 initEnv(int *attachedFlag)
@@ -1430,6 +1437,8 @@ init(void)
     // Use dlsym to get addresses for everything in g_fn
     initFn();
 
+// TODO: will want to see if this is needed for bash built on ARM...
+#ifndef __aarch64__
     // bash can be compiled to use glibc's memory subsystem or it's own
     // internal memory subsystem.  It's own is not threadsafe.  If we
     // find that bash is using it's own memory, replace it with glibc's
@@ -1437,6 +1446,7 @@ init(void)
     if (func_found_in_executable("malloc", "bash")) {
         run_bash_mem_fix();
     }
+#endif
 
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
@@ -1451,10 +1461,7 @@ init(void)
 
     g_nsslist = lstCreate(freeNssEntry);
 
-    platform_time_t *time_struct = initTime();
-    if (time_struct->tsc_invariant == FALSE) {
-        scopeLog("ERROR: TSC is not invariant", -1, CFG_LOG_ERROR);
-    }
+    initTime();
 
     char *path = cfgPath();
     config_t *cfg = cfgRead(path);
@@ -2539,6 +2546,7 @@ __write_pthread(int fd, const void *buf, size_t size)
  * do any dynamic memory allocation while this executes. Be careful.
  * The DBG() output is ignored until after the constructor runs.
  */
+#ifdef __FUNCHOOK__  // TODO: remove when funchook is working with ARM64, just keeping warnings at bay
 static long
 scope_syscall(long number, ...)
 {
@@ -2620,8 +2628,9 @@ scope_syscall(long number, ...)
     return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
                         fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
+#endif // __FUNCHOOK__
 
-EXPORTOFF size_t // EXPORTOFF because it's redundant with __write
+VAREXPORT size_t // EXPORTOFF because it's redundant with __write
 fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 {
     WRAP_CHECK(fwrite_unlocked, 0);
@@ -3582,6 +3591,7 @@ __stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
 }
 
 EXPORTOFF ssize_t // EXPORTOFF because it's redundant with __write
+
 write(int fd, const void *buf, size_t count)
 {
     WRAP_CHECK(write, -1);
@@ -3620,7 +3630,7 @@ writev(int fd, const struct iovec *iov, int iovcnt)
     return rc;
 }
 
-EXPORTOFF size_t  // EXPORTOFF because it's redundant with __write
+VAREXPORT size_t  // EXPORTOFF because it's redundant with __write
 fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 {
     WRAP_CHECK(fwrite, 0);
@@ -3633,7 +3643,7 @@ fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
     return rc;
 }
 
-EXPORTOFF int // EXPORTOFF because it's redundant with __write
+VAREXPORT int // EXPORTOFF because it's redundant with __write
 puts(const char *s)
 {
     WRAP_CHECK(puts, EOF);
@@ -3651,7 +3661,7 @@ puts(const char *s)
     return rc;
 }
 
-EXPORTOFF int // EXPORTOFF because it's redundant with __write
+VAREXPORT int // EXPORTOFF because it's redundant with __write
 putchar(int c)
 {
     WRAP_CHECK(putchar, EOF);
@@ -3664,7 +3674,7 @@ putchar(int c)
     return rc;
 }
 
-EXPORTOFF int // EXPORTOFF because it's redundant with __write
+VAREXPORT int // EXPORTOFF because it's redundant with __write
 fputs(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs, EOF);
@@ -3862,7 +3872,7 @@ fgetc(FILE *stream)
     return rc;
 }
 
-EXPORTOFF int // EXPORTOFF because it's redundant with __write
+VAREXPORT int // EXPORTOFF because it's redundant with __write
 fputc(int c, FILE *stream)
 {
     WRAP_CHECK(fputc, EOF);
@@ -3875,7 +3885,7 @@ fputc(int c, FILE *stream)
     return rc;
 }
 
-EXPORTOFF int // EXPORTOFF because it's redundant with __write
+VAREXPORT int // EXPORTOFF because it's redundant with __write
 fputc_unlocked(int c, FILE *stream)
 {
     WRAP_CHECK(fputc_unlocked, EOF);
@@ -3888,7 +3898,7 @@ fputc_unlocked(int c, FILE *stream)
     return rc;
 }
 
-EXPORTOFF wint_t // EXPORTOFF because it's redundant with __write
+VAREXPORT wint_t // EXPORTOFF because it's redundant with __write
 putwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(putwc, WEOF);
@@ -3901,7 +3911,7 @@ putwc(wchar_t wc, FILE *stream)
     return rc;
 }
 
-EXPORTOFF wint_t // EXPORTOFF because it's redundant with __write
+VAREXPORT wint_t // EXPORTOFF because it's redundant with __write
 fputwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(fputwc, WEOF);
@@ -4818,6 +4828,13 @@ __vsnprintf_chk(char *s, size_t maxlen, int flag, size_t slen, const char *forma
 {
     return vsnprintf(s, slen, format, args);
 }
+
+EXPORTWEAK void
+__longjmp_chk(jmp_buf env, int val)
+{
+    longjmp(env, val);
+}
+
 
 static void *
 scope_dlsym(void *handle, const char *name, void *who)

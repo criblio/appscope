@@ -11,7 +11,7 @@ platform_time_t g_time = {0};
 platform_time_t *
 initTime(void)
 {
-    osInitTSC(&g_time);
+    osInitTimer(&g_time);
     return &g_time;
 }
 

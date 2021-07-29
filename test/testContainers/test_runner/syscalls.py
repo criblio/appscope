@@ -61,6 +61,7 @@ def locate_tests(root_path: str, included_tests: List[str], excluded_tests: List
             if os.path.isdir(item):
                 tests.extend(locate_in_dir(item, excluded_tests))
             elif os.path.isfile(item) and os.access(item, os.X_OK):
+                logging.debug(f"{item} is added to tests")
                 tests.append(SyscallTest(path=item))
             else:
                 logging.debug(f"{item} is not suitable for tests")
@@ -100,6 +101,14 @@ def configure(runner: Runner, app_config):
 
         included_tests = location.get("include_tests", [])
         excluded_tests = location.get("exclude_tests", [])
+        arch = subprocess.check_output(["uname","-m"])
+        if b'x86_64' in arch:
+            logging.info("merging x86_64 excluded tests")
+            excluded_tests = excluded_tests + location.get("exclude_x86_64_tests", [])
+        elif b'aarch64' in arch:
+            logging.info("merging aarch64 excluded tests")
+            excluded_tests = excluded_tests + location.get("exclude_aarch64_tests", [])
+
         tests = locate_tests(home_dir, included_tests, excluded_tests)
 
         runner.add_tests(tests)

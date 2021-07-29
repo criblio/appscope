@@ -14,6 +14,8 @@ ifeq (, $(DOCKER))
     $(error Missing docker)
 endif
 
+COMPOSE := $(COMPOSE) -f docker-compose.yml -f docker-compose.$(shell uname -m).yml
+
 TESTS=$(shell $(COMPOSE) config --services | sort -V)
 
 help:
@@ -27,16 +29,54 @@ help:
 	@echo "  \`make (test)-shell\` - run a shell in the test's container"
 	@echo "Tests: $(TESTS)"
 
-all: $(TESTS)
+all:
+	@STARTED=; RAN=0; SKIP=0; PASS=0; FAIL=0; TOTAL=$(words $(TESTS)); OK=; ERR=; \
+	for TEST in $(TESTS); do \
+		if [ -n "$(START)" -a -z "$$STARTED" ]; then \
+			if [ "$(START)" = "$$TEST" ]; then \
+				STARTED=1; \
+			else \
+				SKIP=$$((SKIP+1)); \
+				continue; \
+			fi; \
+		fi; \
+		if $(MAKE) -s $${TEST}; then  \
+			RAN=$$((RAN+1)); \
+			PASS=$$((PASS+1)); \
+			OK="$${OK}$${TEST} "; \
+		else \
+			RAN=$$((RAN+1)); \
+			FAIL=$$((FAIL+1)); \
+			ERR="$${ERR}$${TEST} "; \
+			if [ -z "$(CONTINUE)" ]; then \
+				echo >&2 "error: aborting \`make all\` on test failure"; \
+				echo >&2 "       ran $${RAN}/$${TOTAL} tests, skipped $${SKIP}"; \
+				echo >&2 "       $${PASS} passed, $${OK}"; \
+				echo >&2 "       $${FAIL} failed, $${ERR}"; \
+				exit 1; \
+			fi; \
+		fi; \
+	done; \
+	if [ $$PASS -gt 0 ]; then \
+		echo "info: ran $${RAN}/$${TOTAL} tests, skipped $${SKIP}"; \
+		echo "      $${PASS} passed, $${OK}"; \
+		echo "      $${FAIL} failed, $${ERR}"; \
+	else \
+		echo >&2 "error: ran $${RAN}/$${TOTAL} tests, skipped $${SKIP}"; \
+		echo >&2 "      $${PASS} passed, $${OK}"; \
+		echo >&2 "      $${FAIL} failed, $${ERR}"; \
+		exit 1; \
+	fi
 
 $(TESTS):
-	@$(MAKE) -s $(@)-build
+	@[ -n "$(NOBUILD)" ] || $(MAKE) -s $(@)-build
 	@echo
 	@echo "==================================================================="
 	@echo " $(shell date)"
 	@echo " Running \"$@\" Test"
 	@echo "==================================================================="
-	@time $(COMPOSE) run $@ || { echo >&2 "error: $(@) test failed."; exit 1; }
+	@time $(COMPOSE) run --rm --name scope-$(@)-it $@ || \
+		{ echo >&2 "error: $(@) test failed."; exit 1; }
 
 build: $(addsuffix -build, $(TESTS))
 
@@ -84,13 +124,24 @@ push: $(addsuffix -push, $(TESTS))
 %-shell:
 	@[ -n "$(filter $(@:%-shell=%),$(TESTS))" ] || \
 		{ echo >&2 "error: $(@:%-shell=%) isn't a test."; exit 1; }
-	@$(MAKE) -s $(@:%-shell=%)-build
+	@[ -n "$(NOBUILD)" ] || $(MAKE) -s $(@:%-shell=%)-build
 	@echo
 	@echo "==================================================================="
 	@echo " $(shell date)"
 	@echo " Shell in Container for \"$(@:%-shell=%)\" Test"
 	@echo "==================================================================="
-	@$(COMPOSE) -f docker-compose.yml -f docker-compose.privileged.yml run $(@:%-shell=%) $(CMD)
+	@$(COMPOSE) run --rm --service-ports --name scope-$(@:%-shell=%)-it $(@:%-shell=%) $(CMD)
+
+%-exec: CMD?=/bin/bash
+%-exec:
+	@[ -n "$(filter $(@:%-exec=%),$(TESTS))" ] || \
+		{ echo >&2 "error: $(@:%-exec=%) isn't a test."; exit 1; }
+	@echo
+	@echo "==================================================================="
+	@echo " $(shell date)"
+	@echo " Exec'ing into Container for \"$(@:%-exec=%)\" Test"
+	@echo "==================================================================="
+	@$(DOCKER) exec -it scope-$(@:%-exec=%)-it $(CMD)
 
 .PHONY: help all build push $(TESTS) %-build %-push %-shell
 

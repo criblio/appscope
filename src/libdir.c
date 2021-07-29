@@ -51,12 +51,12 @@ static struct {
 // We use `objcopy` in the Makefile to get `ldscopedyn` into an object we then
 // link into the `ldscope` binary. These globals them point to the start and
 // end of the binary bytes for those files.
-extern unsigned char _binary___bin_linux_ldscopedyn_start;
-extern unsigned char _binary___bin_linux_ldscopedyn_end;
+extern unsigned char _binary_ldscopedyn_start;
+extern unsigned char _binary_ldscopedyn_end;
 
 // Same as above for `libscope.so`.
-extern unsigned char _binary___lib_linux_libscope_so_start;
-extern unsigned char _binary___lib_linux_libscope_so_end;
+extern unsigned char _binary_libscope_so_start;
+extern unsigned char _binary_libscope_so_end;
 
 // Representation of the .note.gnu.build-id ELF segment 
 typedef struct {
@@ -158,13 +158,13 @@ libdirGetNote(void* buf)
 static note_t*
 libdirGetLoaderNote()
 {
-    return libdirGetNote(&_binary___bin_linux_ldscopedyn_start);
+    return libdirGetNote(&_binary_ldscopedyn_start);
 }
 
 static note_t*
 libdirGetLibraryNote()
 {
-    return libdirGetNote(&_binary___lib_linux_libscope_so_start);
+    return libdirGetNote(&_binary_libscope_so_start);
 }
 
 static int
@@ -371,8 +371,8 @@ int
 libdirExtractLoader()
 {
     return libdirExtract(libdirGetLoader(),
-            &_binary___bin_linux_ldscopedyn_start,
-            &_binary___bin_linux_ldscopedyn_end,
+            &_binary_ldscopedyn_start,
+            &_binary_ldscopedyn_end,
             libdirGetLoaderNote());
 }
 
@@ -380,8 +380,8 @@ int
 libdirExtractLibrary()
 {
     return libdirExtract(libdirGetLibrary(),
-            &_binary___lib_linux_libscope_so_start,
-            &_binary___lib_linux_libscope_so_end,
+            &_binary_libscope_so_start,
+            &_binary_libscope_so_end,
             libdirGetLibraryNote());
 }
 

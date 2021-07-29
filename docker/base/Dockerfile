@@ -4,4 +4,5 @@ RUN apt update -y && \
     apt install -y ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-COPY bin/linux/scope /usr/local/bin/scope
+ARG TARGETARCH
+COPY bin/linux/${TARGETARCH}/scope /usr/local/bin/scope

@@ -24,7 +24,10 @@ scope prune -a`,
 		del, _ := cmd.Flags().GetInt("delete")
 
 		count := ""
-		if keep == 0 && del == 0 && !all {
+
+		if keep < 0 || del < 0 {
+			helpErrAndExit(cmd, "Must be a positive number")
+		} else if keep == 0 && del == 0 && !all {
 			helpErrAndExit(cmd, "Must specify keep, delete, or all")
 		} else if all && keep > 0 {
 			helpErrAndExit(cmd, "Cannot specify keep and all")

@@ -164,8 +164,8 @@ builder: require-docker-buildx-builder
 	@docker buildx build \
 		--builder $(BUILDER) \
 		--tag $(TAG) \
-		--cache-from type=registry,ref=$(TAG)-cache \
-		$(if $(PUSH),--cache-to type=registry$(_comma)ref=$(TAG)-cache) \
+		$(if $(CACHE_FROM),--cache-from $(CACHE_FROM)) \
+		$(if $(CACHE_TO),--cache-to $(CACHE_TO)) \
 		--platform linux/$(PLATFORM_$(ARCH)) \
 		--label "org.opencontainers.image.description=AppScope $(ARCH) Builder ($(PLATFORM_$(ARCH)))" \
 		--load \

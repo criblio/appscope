@@ -168,7 +168,7 @@ builder: require-docker-buildx-builder
 		$(if $(CACHE_TO),--cache-to $(CACHE_TO)) \
 		--platform linux/$(PLATFORM_$(ARCH)) \
 		--label "org.opencontainers.image.description=AppScope $(ARCH) Builder ($(PLATFORM_$(ARCH)))" \
-		--load \
+		$(if $(NOLOAD),,--load) \
 		--file docker/builder/Dockerfile.$(DIST) \
 		.
 

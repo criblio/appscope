@@ -7,11 +7,6 @@ x-scope-common: &scope-common
   working_dir: /opt/appscope
   privileged: true
 
-x-java-common: &java-common
-  environment:
-    - LD_PRELOAD=/usr/local/scope/lib/libscope.so
-  <<: *scope-common
-
 services:
 
   # These tests run on all platforms; x86_64 and aarch64
@@ -85,7 +80,7 @@ services:
       args:
         JDK_IMAGE: openjdk:8
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
-    <<: *java-common
+    <<: *scope-common
   java9:
     image: scopeci/scope-java9-it
     build:
@@ -96,7 +91,7 @@ services:
       args:
         JDK_IMAGE: openjdk:9
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
-    <<: *java-common
+    <<: *scope-common
   java10:
     image: scopeci/scope-java10-it
     build:
@@ -107,7 +102,7 @@ services:
       args:
         JDK_IMAGE: openjdk:10
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
-    <<: *java-common
+    <<: *scope-common
   java11:
     image: scopeci/scope-java11-it
     build:
@@ -118,7 +113,7 @@ services:
       args:
         JDK_IMAGE: openjdk:11
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
-    <<: *java-common
+    <<: *scope-common
 
   transport:
     image: scopeci/scope-transport-it

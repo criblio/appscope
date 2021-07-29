@@ -7,11 +7,6 @@ x-scope-common: &scope-common
   working_dir: /opt/appscope
   privileged: true
 
-x-java-common: &java-common
-  environment:
-    - LD_PRELOAD=/usr/local/scope/lib/libscope.so
-  <<: *scope-common
-
 #services:
 
   # These tests run only on aarch64

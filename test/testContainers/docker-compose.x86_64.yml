@@ -7,11 +7,6 @@ x-scope-common: &scope-common
   working_dir: /opt/appscope
   privileged: true
 
-x-java-common: &java-common
-  environment:
-    - LD_PRELOAD=/usr/local/scope/lib/libscope.so
-  <<: *scope-common
-
 services:
 
   # These tests run only on x86_64
@@ -282,7 +277,7 @@ services:
       args:
         JDK_IMAGE: openjdk:7
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
-    <<: *java-common
+    <<: *scope-common
   java12:
     image: scopeci/scope-java12-it
     build:
@@ -293,7 +288,7 @@ services:
       args:
         JDK_IMAGE: openjdk:12
         DNLD_HEXDUMP: yum -y install util-linux
-    <<: *java-common
+    <<: *scope-common
   java13:
     image: scopeci/scope-java13-it
     build:
@@ -304,7 +299,7 @@ services:
       args:
         JDK_IMAGE: openjdk:13
         DNLD_HEXDUMP: yum -y install util-linux
-    <<: *java-common
+    <<: *scope-common
   java14:
     image: scopeci/scope-java14-it
     build:
@@ -315,7 +310,7 @@ services:
       args:
         JDK_IMAGE: openjdk:14
         DNLD_HEXDUMP: microdnf install util-linux
-    <<: *java-common
+    <<: *scope-common
 
 
   # Pulls x86 RPM from Cribl CDN
@@ -330,7 +325,7 @@ services:
         TOMCAT_MAJOR_VERSION: 7
         TOMCAT_MINOR_VERSION: 7.0.10
         KEYTOOL: /usr/java/jre1.6.0_45/bin/keytool
-    <<: *java-common
+    <<: *scope-common
   oracle-java7:
     image: scopeci/scope-oracle-java7-it
     build:
@@ -340,7 +335,7 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jre/jre-7u80-linux-x64.tar.gz
-    <<: *java-common
+    <<: *scope-common
   oracle-java8:
     image: scopeci/scope-oracle-java8-it
     build:
@@ -350,7 +345,7 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jre/jre-8u251-linux-x64.tar.gz
-    <<: *java-common
+    <<: *scope-common
   oracle-java9:
     image: scopeci/scope-oracle-java9-it
     build:
@@ -360,7 +355,7 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jre/jre-9.0.4_linux-x64_bin.tar.gz
-    <<: *java-common
+    <<: *scope-common
   oracle-java10:
     image: scopeci/scope-oracle-java10-it
     build:
@@ -370,7 +365,7 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jre/jre-10.0.2_linux-x64_bin.tar.gz
-    <<: *java-common
+    <<: *scope-common
   oracle-java11:
     image: scopeci/scope-oracle-java11-it
     build:
@@ -380,7 +375,7 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-11.0.6_linux-x64_bin.tar.gz
-    <<: *java-common
+    <<: *scope-common
   oracle-java12:
     image: scopeci/scope-oracle-java12-it
     build:
@@ -390,7 +385,7 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-12.0.2_linux-x64_bin.tar.gz
-    <<: *java-common
+    <<: *scope-common
   oracle-java13:
     image: scopeci/scope-oracle-java13-it
     build:
@@ -400,7 +395,7 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-13.0.2_linux-x64_bin.tar.gz
-    <<: *java-common
+    <<: *scope-common
   oracle-java14:
     image: scopeci/scope-oracle-java14-it
     build:
@@ -410,3 +405,5 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-14.0.2_linux-x64_bin.tar.gz
+    <<: *scope-common
+

@@ -1,5 +1,8 @@
 #! /bin/bash
 
+# in some cases, the /etc/profile.d 
+[ -n "$(which scope)" ] || export PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+
 DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
 
 FAILED_TEST_LIST=""

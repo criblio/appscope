@@ -96,9 +96,9 @@ jobs:
         uses: actions/cache@v2
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-amd64-buildx-${{ github.sha }}
+          key: ${{ runner.os }}-builder-amd64-buildx-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-amd64-buildx-
+            ${{ runner.os }}-builder-amd64-buildx
 
       - name: Login to Container Registry
         if: ${{ needs.info.outputs.push }}
@@ -115,6 +115,8 @@ jobs:
 
       - name: Update Docker Cache
         run: |
+          ls -lR /tmp/.buildx-cache
+          ls -lR /tmp/.buildx-cache-new
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 

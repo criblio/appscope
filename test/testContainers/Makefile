@@ -69,13 +69,14 @@ all:
 	fi
 
 $(TESTS):
-	@$(MAKE) -s $(@)-build
+	@[ -n "$(NOBUILD)" ] || $(MAKE) -s $(@)-build
 	@echo
 	@echo "==================================================================="
 	@echo " $(shell date)"
 	@echo " Running \"$@\" Test"
 	@echo "==================================================================="
-	@time $(COMPOSE) run --rm $@ || { echo >&2 "error: $(@) test failed."; exit 1; }
+	@time $(COMPOSE) run --rm --name scope-$(@)-it $@ || \
+		{ echo >&2 "error: $(@) test failed."; exit 1; }
 
 build: $(addsuffix -build, $(TESTS))
 
@@ -123,13 +124,24 @@ push: $(addsuffix -push, $(TESTS))
 %-shell:
 	@[ -n "$(filter $(@:%-shell=%),$(TESTS))" ] || \
 		{ echo >&2 "error: $(@:%-shell=%) isn't a test."; exit 1; }
-	@$(MAKE) -s $(@:%-shell=%)-build
+	@[ -n "$(NOBUILD)" ] || $(MAKE) -s $(@:%-shell=%)-build
 	@echo
 	@echo "==================================================================="
 	@echo " $(shell date)"
 	@echo " Shell in Container for \"$(@:%-shell=%)\" Test"
 	@echo "==================================================================="
-	@$(COMPOSE) run --rm --service-ports $(@:%-shell=%) $(CMD)
+	@$(COMPOSE) run --rm --service-ports --name scope-$(@:%-shell=%)-it $(@:%-shell=%) $(CMD)
+
+%-exec: CMD?=/bin/bash
+%-exec:
+	@[ -n "$(filter $(@:%-exec=%),$(TESTS))" ] || \
+		{ echo >&2 "error: $(@:%-exec=%) isn't a test."; exit 1; }
+	@echo
+	@echo "==================================================================="
+	@echo " $(shell date)"
+	@echo " Exec'ing into Container for \"$(@:%-exec=%)\" Test"
+	@echo "==================================================================="
+	@$(DOCKER) exec -it scope-$(@:%-exec=%)-it $(CMD)
 
 .PHONY: help all build push $(TESTS) %-build %-push %-shell
 

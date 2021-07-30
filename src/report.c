@@ -732,6 +732,7 @@ doDetection(protocol_info *proto)
     };
 
     event_t evt = INT_EVENT("remote_protocol", proto->fd, SET, fields);
+    evt.src = CFG_SRC_NET;
     cmdSendEvent(g_ctl, &evt, proto->uid, &g_proc);
     destroyProto(proto);
 }
@@ -740,7 +741,6 @@ void
 doProtocolMetric(protocol_info *proto)
 {
     if (!proto) return;
-
     if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
         doHttpHeader(proto);
     } else if (proto->ptype == EVT_DETECT) {

@@ -910,8 +910,7 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
     match_data = pcre2_match_data_create_from_pattern(pre->re, NULL);
     if (pcre2_match_wrapper(pre->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0,
                             match_data, NULL) > 0) {
-        //DEBUG
-        //scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_ERROR);
+        scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_DEBUG);
         SET_PROT(net);
 
         if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
@@ -1159,7 +1158,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
         }
     }
 
-    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC)) {
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
         detectProtocol(sockfd, net, buf, len, src, dtype);
     }
 

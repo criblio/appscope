@@ -67,13 +67,21 @@ BUILD_IMAGE ?= $(REGISTRY_github)/$(GITHUB_REPOSITORY)-builder
 all:
 	@[ "ubuntu-18.04" = "$(OS_ID)-$(OS_VER)" ] || \
 		echo >&2 "warning: building on $(OS_ID)-$(OS_VER) is unsupported; use \`make build\` instead"
+	@[ -z "$(CI)" ] || echo "::group::make coreall"
 	@$(MAKE) coreall
+	@[ -z "$(CI)" ] || echo "::endgroup::"
+	@[ -z "$(CI)" ] || echo "::group::make cliall"
 	@$(MAKE) -C cli all
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 # run unit tests
 test:
+	@[ -z "$(CI)" ] || echo "::group::make coretest"
 	@$(MAKE) coretest
+	@[ -z "$(CI)" ] || echo "::endgroup::"
+	@[ -z "$(CI)" ] || echo "::group::make clitest"
 	@$(MAKE) -C cli test
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 # remove built content
 clean:
@@ -129,7 +137,6 @@ build: DIST ?= ubuntu
 build: CMD ?= make all test
 build: require-docker require-qemu-binfmt
 	@$(MAKE) -s builder DIST="$(DIST)" ARCH="$(ARCH)"
-	@echo "Building AppScope on $(DIST)/$(ARCH)"
 	@echo "ROOT=$(shell [ 0 -eq $(shell id -u) ] && echo "true" || echo "false")"
 	@docker run --rm $(if $(CI),,-it) \
 		-v $(shell pwd):/home/builder/appscope \
@@ -160,7 +167,7 @@ exec:
 builder: DIST ?= ubuntu
 builder: TAG := $(BUILD_IMAGE):$(DIST)-$(ARCH)
 builder: require-docker-buildx-builder
-	@echo "(Re)Building the AppScope $(DIST)/$(ARCH) Builder Image"
+	@[ -z "$(CI)" ] || echo "Update $(DIST)/$(ARCH) Builder Image"
 	@docker buildx build \
 		--builder $(BUILDER) \
 		--tag $(TAG) \
@@ -171,6 +178,7 @@ builder: require-docker-buildx-builder
 		$(if $(NOLOAD),,--load) \
 		--file docker/builder/Dockerfile.$(DIST) \
 		.
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 # build the distribution image
 #   - set LATEST to add the ":latest" tag
@@ -210,7 +218,7 @@ require-docker-buildx: require-docker
 # see https://github.com/multiarch/qemu-user-static
 require-qemu-binfmt: require-docker
 	@[ -n "$(wildcard /proc/sys/fs/binfmt_misc/qemu-*)" ] || \
-		docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+		docker run --rm --privileged tonistiigi/binfmt:latest --install all
 
 .PHONY: all test clean
 .PHONY: cli% scope

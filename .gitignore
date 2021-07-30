@@ -19,6 +19,7 @@ test/selfinterpose/
 test/testContainers/logs
 **/*.gcda
 **/*.gcov
+**/.test/
 newdir/
 testtempdir1/
 testtempdir2/

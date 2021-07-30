@@ -98,12 +98,8 @@ if [ "${OS}" = "linux" ]; then
     test/unixpeer.sh 2>&1
     ERR+=$?
 
-    # XXX This test is failing on ARM but only during CI so I'm being lazy and
-    #     just disabling ti for now. --pd
-    if [ -z "${CI}" ]; then
-        test/undefined_sym.sh 2>&1
-        ERR+=$?
-    fi
+    test/undefined_sym.sh 2>&1
+    ERR+=$?
 fi
 
 test/options.sh 2>&1

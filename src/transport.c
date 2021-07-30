@@ -672,6 +672,9 @@ checkPendingSocketStatus(transport_t *trans)
     fd_set pending_results = trans->net.pending_connect;
     rc = g_fn.select(FD_SETSIZE, NULL, &pending_results, NULL, &tv);
     if (rc < 0) {
+        if (errno == EINTR) {
+          return 0;
+        }
         DBG(NULL);
         transportDisconnect(trans);
         return 0;
@@ -982,7 +985,7 @@ transportConnect(transport_t *trans)
                 // If it does, we're done.
                 if (socketConnectionStart(trans)) return 1;
             }
-            // Check to see if the a pending connetion has been successful.
+            // Check to see if the a pending connection has been successful.
             return checkPendingSocketStatus(trans);
         case CFG_FILE:
             return transportConnectFile(trans);

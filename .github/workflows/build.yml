@@ -85,8 +85,10 @@ jobs:
             echo "::group::pwd"
             pwd
             echo "::endgroup::"
-            echo "::group::hostname"
+            echo "::group::net"
             hostname
+            ip addr
+            cat /etc/resolv.conf
             echo "::endgroup::"
             echo "::group::uname"
             uname -a
@@ -199,8 +201,10 @@ jobs:
             echo "::group::pwd"
             pwd
             echo "::endgroup::"
-            echo "::group::hostname"
+            echo "::group::net"
             hostname
+            ip addr
+            cat /etc/resolv.conf
             echo "::endgroup::"
             echo "::group::uname"
             uname -a

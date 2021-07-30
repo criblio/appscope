@@ -29,7 +29,7 @@ run_test() {
     echo "$ENVVARS$1"
 
     # run the test
-    (export $ENVVARS; $1)
+    (export $ENVVARS; $1 2>&1)
     #(export $ENVVARS; valgrind $1)
 
     # accumulate errors reported by the return value of the test
@@ -92,17 +92,17 @@ if [ "${OS}" = "linux" ]; then
     ENVARS=$SAVEVARS
     rm -f "/tmp/dnstest.log"
 
-    test/access_rights.sh
+    test/access_rights.sh 2>&1
     ERR+=$?
 
-    test/unixpeer.sh
+    test/unixpeer.sh 2>&1
     ERR+=$?
 
-    test/undefined_sym.sh
+    test/undefined_sym.sh 2>&1
     ERR+=$?
 fi
 
-test/options.sh
+test/options.sh 2>&1
 ERR+=$?
 
 #                ^

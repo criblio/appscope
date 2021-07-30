@@ -136,9 +136,9 @@ jobs:
             cli/.gobin
             cli/.gocache
             cli/.gomod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-amd-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ runner.os }}-amd-go-
 
       - name: Build & Test
         env:
@@ -184,6 +184,11 @@ jobs:
       #  env:
       #    SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
       #  run: ./docker/build.sh
+
+      - name: Update Docker Cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
     outputs:
       tests: ${{ steps.tests.outputs.tests }}
@@ -296,6 +301,11 @@ jobs:
       #  env:
       #    SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
       #  run: ./docker/build.sh
+
+      - name: Update Docker Cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
     outputs:
       tests: ${{ steps.tests.outputs.tests }}

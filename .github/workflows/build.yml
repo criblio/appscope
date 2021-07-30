@@ -73,10 +73,37 @@ jobs:
       push: ${{ steps.tag.outputs.push }}
 
   build-amd64:
-    name: Build & Test on AMD64/x86_64
+    name: Build & Test on x86_64/amd64
     needs: info
     runs-on: ubuntu-latest
     steps:
+      - name: Dump Environment
+        run: |
+            echo "::group::env"
+            env
+            echo "::endgroup::"
+            echo "::group::pwd"
+            pwd
+            echo "::endgroup::"
+            echo "::group::hostname"
+            hostname
+            echo "::endgroup::"
+            echo "::group::uname"
+            uname -a
+            echo "::endgroup::"
+            echo "::group::couinfo"
+            cat /proc/cpuinfo
+            echo "::endgroup::"
+            echo "::group::lscpu"
+            lscpu
+            echo "::endgroup::"
+            echo "::group::ldd"
+            ldd --version
+            echo "::endgroup::"
+            echo "::group::free"
+            free
+            echo "::endgroup::"
+
       - name: Checkout Repository
         uses: actions/checkout@v2
 
@@ -157,10 +184,37 @@ jobs:
       tests: ${{ steps.tests.outputs.tests }}
 
   build-arm64:
-    name: Build & Test on ARM64/aarch64
+    name: Build & Test on aarch64/arm64
     needs: info
     runs-on: [self-hosted,ARM64]
     steps:
+      - name: Dump Environment
+        run: |
+            echo "::group::env"
+            env
+            echo "::endgroup::"
+            echo "::group::pwd"
+            pwd
+            echo "::endgroup::"
+            echo "::group::hostname"
+            hostname
+            echo "::endgroup::"
+            echo "::group::uname"
+            uname -a
+            echo "::endgroup::"
+            echo "::group::couinfo"
+            cat /proc/cpuinfo
+            echo "::endgroup::"
+            echo "::group::lscpu"
+            lscpu
+            echo "::endgroup::"
+            echo "::group::ldd"
+            ldd --version
+            echo "::endgroup::"
+            echo "::group::free"
+            free
+            echo "::endgroup::"
+
       - name: Checkout Repository
         uses: actions/checkout@v2
 

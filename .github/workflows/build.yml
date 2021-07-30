@@ -91,7 +91,7 @@ jobs:
             echo "::group::uname"
             uname -a
             echo "::endgroup::"
-            echo "::group::couinfo"
+            echo "::group::cpuinfo"
             cat /proc/cpuinfo
             echo "::endgroup::"
             echo "::group::lscpu"
@@ -202,7 +202,7 @@ jobs:
             echo "::group::uname"
             uname -a
             echo "::endgroup::"
-            echo "::group::couinfo"
+            echo "::group::cpuinfo"
             cat /proc/cpuinfo
             echo "::endgroup::"
             echo "::group::lscpu"

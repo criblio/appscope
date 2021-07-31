@@ -343,10 +343,10 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
         run: |
-          if [ "unreleased" = "${{ need.info.outputs.tag }}" ]; then
-            VERSION=${{ need.info.outputs.branch }}
+          if [ "unreleased" = "${{ needs.info.outputs.tag }}" ]; then
+            VERSION=${{ needs.info.outputs.branch }}
           else
-            VERSION=${{ need.info.outputs.tag }}
+            VERSION=${{ needs.info.outputs.tag }}
           fi
 
           echo "::group::Deploying to https://cdn.cribl.io/dl/scope/${VERSION}"
@@ -366,8 +366,8 @@ jobs:
           done
 
 
-          if [ -n "${{ need.info.outputs.latest }}" ]; then
-            echo "${{ need.info.outputs.tag }}" > ${TMPDIR}/latest
+          if [ -n "${{ needs.info.outputs.latest }}" ]; then
+            echo "${{ needs.info.outputs.tag }}" > ${TMPDIR}/latest
             aws s3 cp ${TMPDIR}/latest ${S3_SCOPE}/latest
           fi
 

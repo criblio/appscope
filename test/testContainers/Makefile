@@ -96,15 +96,18 @@ build: $(addsuffix -build, $(TESTS))
 	@echo " $(shell date)"
 	@echo " Building Image for \"$(@:%-build=%)\" Test"
 	@echo "==================================================================="
-	-[ -n "$(ID)" ] || $(COMPOSE) pull $(@:%-build=%)
-	@$(COMPOSE) build --progress tty $(@:%-build=%)
+	-@[ -n "$(ID)" -o -n "$(NOPULL)" ] || $(COMPOSE) pull $(@:%-build=%)
+	@DOCKER_BUILDKIT=1 $(COMPOSE) build \
+		--progress tty \
+		--build-arg BUILDKIT_INLINE_CACHE=1 \
+		$(@:%-build=%)
 
 push: $(addsuffix -push, $(TESTS))
 
 %-push:
 	@[ -n "$(filter $(@:%-push=%),$(TESTS))" ] || \
 		{ echo >&2 "error: $(@:%-push=%) isn't a test."; exit 1; }
-	@$(MAKE) -s $(@:%-push=%)-build
+	@[ -n "$(NOBUILD)" ] || $(MAKE) -s $(@:%-push=%)-build
 	@echo
 	@echo "==================================================================="
 	@echo " $(shell date)"

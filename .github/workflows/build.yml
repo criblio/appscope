@@ -130,9 +130,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v1
-
       - name: Setup Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v1
@@ -158,13 +155,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-amd64-go-
 
-      - name: Build & Test
+      - name: Update Builder
         env:
-          VERSION: ${{ needs.info.outputs.tag }}
           BUILDER: ${{ steps.buildx.outputs.name }}
           CACHE_FROM: type=local,src=/tmp/.buildx-cache
           CACHE_TO: type=local,dest=/tmp/.buildx-cache-new
-        run: make build
+        run: make builder
+
+      - name: Build AppScope
+        env:
+          VERSION: ${{ needs.info.outputs.tag }}
+          BUILDER: ${{ steps.buildx.outputs.name }}
+        run: make build NOBUILD=1 CMD="make all"
+
+      - name: Unit-Test AppScope
+        env:
+          VERSION: ${{ needs.info.outputs.tag }}
+          BUILDER: ${{ steps.buildx.outputs.name }}
+        run: make build NOBUILD=1 CMD="make test"
 
       - name: List Integration Tests
         id: tests
@@ -228,9 +236,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v1
-
       - name: Setup Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v1
@@ -255,13 +260,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-arm64-go-
 
-      - name: Build & Test
+      - name: Update Builder
         env:
-          VERSION: ${{ needs.info.outputs.tag }}
           BUILDER: ${{ steps.buildx.outputs.name }}
           CACHE_FROM: type=local,src=/tmp/.buildx-cache
           CACHE_TO: type=local,dest=/tmp/.buildx-cache-new
-        run: make build
+        run: make builder
+
+      - name: Build AppScope
+        env:
+          VERSION: ${{ needs.info.outputs.tag }}
+          BUILDER: ${{ steps.buildx.outputs.name }}
+        run: make build NOBUILD=1 CMD="make all"
+
+      - name: Unit-Test AppScope
+        env:
+          VERSION: ${{ needs.info.outputs.tag }}
+          BUILDER: ${{ steps.buildx.outputs.name }}
+        run: make build NOBUILD=1 CMD="make test"
 
       - name: List Integration Tests
         id: tests
@@ -325,8 +341,9 @@ jobs:
           TMPDIR=$(mktemp -d)
           mkdir ${TMPDIR}/scope
 
-          cp conf/{scope.yml,scope_protocol.yml} ${TMPDIR}/scope
-          if ARCH in x86_64 aarch64; do
+          cp conf/scope.yml          ${TMPDIR}/scope
+          cp conf/scope_protocol.yml ${TMPDIR}/scope
+          for ARCH in x86_64 aarch64; do
             cp bin/linux/${ARCH}/{scope,ldscope} ${TMPDIR}/scope
             cp lib/linux/${ARCH}/libscope.so ${TMPDIR}/scope
             (cd ${TMPDIR} && tar cfz scope.tgz scope)
@@ -334,7 +351,6 @@ jobs:
             (cd ${TMPDIR}/scope && md5sum scope > ../scope-${ARCH}.md5)
             cp ${TMPDIR}/scope/scope ${TMPDIR}/scope-${ARCH}
           done
-
 
           if [ -n "${{ needs.info.outputs.latest }}" ]; then
             echo "${{ needs.info.outputs.tag }}" > ${TMPDIR}/latest
@@ -346,7 +362,7 @@ jobs:
           aws s3 cp ${TMPDIR}/scope-x86_64.tgz     ${S3_SCOPE}/${VERSION}/linux/scope.tgz
           aws s3 cp ${TMPDIR}/scope-x86_64.tgz.md5 ${S3_SCOPE}/${VERSION}/linux/scope.tgz.md5
 
-          if ARCH in x86_64 aarch64; do
+          for ARCH in x86_64 aarch64; do
             aws s3 cp ${TMPDIR}/scope-${ARCH}         ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope
             aws s3 cp ${TMPDIR}/scope-${ARCH}.md5     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.md5
             aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz
@@ -358,7 +374,7 @@ jobs:
           echo "::endgroup::"
 
           if [ "true" = "${{ needs.info.outputs.is-semver }}" ]; then
-            if ARCH in x86_64 aarch64; do
+            for ARCH in x86_64 aarch64; do
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}"
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.md5"
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.tgz"
@@ -380,39 +396,30 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v1
-
-      - name: Setup Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Setup Docker Cache
-        uses: actions/cache@v2
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-amd64-test-${{ matrix.test }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-amd64-test-${{ matrix.test }}-
-
       - name: Download Binaries
         uses: actions/download-artifact@v2
         with:
           name: binaries-amd64
 
-      - name: Check Binaries
-        run: |
-          ls -laR bin lib
+      - name: Fix Permissions
+        run: chmod +x bin/linux/*/* lib/linux/*/*
+
+      - name: Login to Container Registry
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        uses: docker/login-action@v1
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
+
+      - name: Update Test Image
+        run: make -C test/testContainers ${{ matrix.test }}-build
 
       - name: Run Test
-        run: |
-          chmod +x bin/linux/*/* lib/linux/*/*
-          make -C test/testContainers ${{ matrix.test }}
+        run: make -C test/testContainers ${{ matrix.test }} NOBUILD=1
 
-      - name: Update Docker Cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+      - name: Upload Test Image
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        run: make -C test/testContainers ${{ matrix.test }}-push NOBUILD=1
 
   test-arm64:
     name: Test x86_64/arm64
@@ -428,35 +435,30 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v1
-
-      - name: Setup Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Setup Docker Cache
-        uses: actions/cache@v2
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-arm64-test-${{ matrix.test }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-arm64-test-${{ matrix.test }}-
-
       - name: Download Binaries
         uses: actions/download-artifact@v2
         with:
           name: binaries-arm64
 
-      - name: Run Test
-        run: |
-          chmod +x bin/linux/*/* lib/linux/*/*
-          make -C test/testContainers ${{ matrix.test }}
+      - name: Fix Permissions
+        run: chmod +x bin/linux/*/* lib/linux/*/*
 
-      - name: Update Docker Cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+      - name: Login to Container Registry
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        uses: docker/login-action@v1
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
+
+      - name: Update Test Image
+        run: make -C test/testContainers ${{ matrix.test }}-build
+
+      - name: Run Test
+        run: make -C test/testContainers ${{ matrix.test }} NOBUILD=1
+
+      - name: Upload Test Image
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        run: make -C test/testContainers ${{ matrix.test }}-push NOBUILD=1
 
   image:
     name: Build Image

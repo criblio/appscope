@@ -128,8 +128,7 @@ docker-run-alpine:
 build: DIST ?= ubuntu
 build: CMD ?= make all test
 build: require-docker require-qemu-binfmt
-	@$(MAKE) -s builder DIST="$(DIST)" ARCH="$(ARCH)"
-	@echo "ROOT=$(shell [ 0 -eq $(shell id -u) ] && echo "true" || echo "false")"
+	@[ -n "$(NOBUILD)" ] || $(MAKE) -s builder DIST="$(DIST)" ARCH="$(ARCH)"
 	@docker run --rm $(if $(CI),,-it) \
 		-v $(shell pwd):/home/builder/appscope \
 		-u $(shell id -u):$(shell id -g) \
@@ -170,22 +169,6 @@ builder: require-docker-buildx-builder
 		$(if $(NOLOAD),,--load) \
 		--file docker/builder/Dockerfile.$(DIST) \
 		.
-
-# build the distribution image
-#   - set LATEST to add the ":latest" tag
-#   - set PUSH to push to the registry
-image:
-	@echo "Building the AppScope Distribution Image (LATEST=$(LATEST), PUSH=$(PUSH))"
-	@docker buildx build \
-		$(if $(LATEST),--tag $(TAG):latest)) \
-		--builder $(BUILDER) \
-		--tag $(DIST_IMAGE):$(VERSION) \
-		--platform $(PLATFORMS) \
-		--output type=$(if $(PUSH),registry,image) \
-		--file docker/base/Dockerfile \
-		.
-	@[ -z "$(PUSH)" ] || \
-		echo "info: pushed $(DIST_IMAGE):$(VERSION)$(if $(LATEST), and $(DIST_IMAGE):latest,)"
 
 # setup the buildx builder if it's not running already
 require-docker-buildx-builder: require-docker-buildx require-qemu-binfmt

@@ -317,7 +317,7 @@ jobs:
 
   cdn: 
     name: Update CDN
-    needs: [info,build-amd64,build-arm64}
+    needs: [info,build-amd64,build-arm64]
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' }}
     steps:

@@ -353,7 +353,7 @@ jobs:
             cp lib/linux/${ARCH}/libscope.so ${TMPDIR}/scope
             (cd ${TMPDIR} && tar cfz scope.tgz scope)
             (cd ${TMPDIR} && md5sum scope.tgz > scope-${ARCH}.tgz.md5)
-            (cd ${TMPDIR} && mc scope.tgz scope-${ARCH}.tgz)
+            (cd ${TMPDIR} && mv scope.tgz scope-${ARCH}.tgz)
             (cd ${TMPDIR}/scope && md5sum scope > ../scope-${ARCH}.md5)
             cp ${TMPDIR}/scope/scope ${TMPDIR}/scope-${ARCH}
           done

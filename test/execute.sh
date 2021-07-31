@@ -48,10 +48,10 @@ mkdir $CWD/coverage
 
 if uname -s 2> /dev/null | grep -i "linux" > /dev/null; then
     OS="linux"
-    ENVVARS=$ENVVARS"LD_LIBRARY_PATH=contrib/cmocka/build/src/ "
+    ENVVARS=$ENVVARS"LD_LIBRARY_PATH=contrib/build/cmocka/src/ "
 elif uname -s 2> /dev/null | grep -i darwin > /dev/null; then
     OS="macOS"
-    ENVVARS=$ENVVARS"DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ "
+    ENVVARS=$ENVVARS"DYLD_LIBRARY_PATH=contrib/build/cmocka/src/ "
 else
     OS="unknown"
 fi
@@ -114,9 +114,9 @@ ERR+=$?
 # wraptest has special requirements, env wise...
 #ENVVARS="SCOPE_HOME=${CWD}/test/ "
 #if [ "${OS}" = "linux" ]; then
-#    ENVVARS=$ENVVARS"LD_LIBRARY_PATH=lib/${OS}:contrib/cmocka/build/src/ "
+#    ENVVARS=$ENVVARS"LD_LIBRARY_PATH=lib/${OS}:contrib/build/cmocka/src/ "
 #elif [ "${OS}" = "macOS" ]; then
-#    ENVVARS=$ENVVARS"DYLD_LIBRARY_PATH=lib/${OS}:contrib/cmocka/build/src/ "
+#    ENVVARS=$ENVVARS"DYLD_LIBRARY_PATH=lib/${OS}:contrib/build/cmocka/src/ "
 #    ENVVARS=$ENVVARS"DYLD_INSERT_LIBRARIES=${CWD}/lib/${OS}/libscope.so "
 #    ENVVARS=$ENVVARS"DYLD_FORCE_FLAT_NAMESPACE=1 "
 #fi

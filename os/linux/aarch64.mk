@@ -3,16 +3,12 @@ ARCH_CFLAGS=-D__FUNCHOOK__
 ARCH_LD_FLAGS=-lcapstone
 ARCH_BINARY=elf64-littleaarch64
 ARCH_OBJ=$(ARCH)
-FUNCHOOK_AR=contrib/funchook/build/libfunchook.a contrib/funchook/build/capstone_src-prefix/src/capstone_src-build/libcapstone.a
+FUNCHOOK_AR=contrib/build/funchook/libfunchook.a contrib/build/funchook/capstone_src-prefix/src/capstone_src-build/libcapstone.a
 $(FUNCHOOK_AR):
-	@echo "$${CI:+::group::}Building funchook and capstone"
-	cd contrib/funchook && mkdir -p build
-	cd contrib/funchook/build && cmake -DCMAKE_BUILD_TYPE=Release ..
-	cd contrib/funchook/build && make capstone_src funchook-static
-	@[ -z "$(CI)" ] || echo "::endgroup::"
+	@(MAKE) -C contrib funchook
 
-LD_FLAGS=$(PCRE2_AR) -ldl -lpthread -lrt -lresolv -Lcontrib/funchook/build -lfunchook -Lcontrib/funchook/build/capstone_src-prefix/src/capstone_src-build -lcapstone
-INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build -I./contrib/funchook/build/capstone_src-prefix/src/capstone_src/include -I./contrib/jni -I./contrib/jni/linux/ -I./contrib/openssl/include -I./contrib/openssl/build/include
+LD_FLAGS=$(PCRE2_AR) -ldl -lpthread -lrt -lresolv -Lcontrib/build/funchook -lfunchook -Lcontrib/build/funchook/capstone_src-prefix/src/capstone_src-build -lcapstone
+INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/build/pcre2 -I./contrib/build/funchook/capstone_src-prefix/src/capstone_src/include -I./contrib/jni -I./contrib/jni/linux/ -I./contrib/openssl/include -I./contrib/build/openssl/include
 
 $(LIBSCOPE): src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c src/plattime.c src/fn.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c src/search.c src/scopeelf.c src/utils.c $(YAML_SRC) contrib/cJSON/cJSON.c src/javabci.c src/javaagent.c
 	$(MAKE) $(FUNCHOOK_AR)

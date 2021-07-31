@@ -10,15 +10,15 @@ TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 CJSON_DEFINES=-DENABLE_LOCALES
 YAML_SRC=$(wildcard contrib/libyaml/src/*.c)
-YAML_AR=contrib/libyaml/build/src/.libs/libyaml.a
+YAML_AR=contrib/build/libyaml/src/.libs/libyaml.a
 JSON_AR=contrib/cJSON/libcjson.a
-PCRE2_AR=contrib/pcre2/build/libpcre2-posix.a contrib/pcre2/build/libpcre2-8.a
-OPENSSL_AR=contrib/openssl/build/libssl.a contrib/openssl/build/libcrypto.a
+PCRE2_AR=contrib/build/pcre2/libpcre2-posix.a contrib/build/pcre2/libpcre2-8.a
+OPENSSL_AR=contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a
 TEST_AR=$(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR}
-#TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
-TEST_LIB=contrib/cmocka/build/src/libcmocka.so
+#TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
+TEST_LIB=contrib/build/cmocka/src/libcmocka.so
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
-TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl -lresolv -lrt -lpthread
+TEST_LD_FLAGS=-Lcontrib/build/cmocka/src -lcmocka -ldl -lresolv -lrt -lpthread
 
 ARCH=$(shell uname -m)
 
@@ -66,7 +66,7 @@ $(LDSCOPE): src/scope_static.c src/libdir.c $(LDSCOPEDYN) $(LIBSCOPE)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 coreclean:
-	$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN) contrib/funchook/build/*.a
+	$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN) contrib/build/funchook/*.a
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))

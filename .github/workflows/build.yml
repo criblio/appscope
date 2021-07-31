@@ -168,10 +168,11 @@ jobs:
 
       - name: List Integration Tests
         id: tests
-        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | sort -V | jq -ncR '[inputs]')"
+        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml -f test/testContainers/docker-compose.x86_64.yml config --services | sort -V | jq -ncR '[inputs]')"
 
       - name: Save Binaries for Testing
-        if: ${{ github.event_name == 'pull_request' }}
+        # XXX
+        #if: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v2
         with:
           name: binaries amd64
@@ -279,10 +280,11 @@ jobs:
 
       - name: List Integration Tests
         id: tests
-        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | sort -V | jq -ncR '[inputs]')"
+        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml -f test/testContainers/docker-compose.aarch64.yml config --services | sort -V | jq -ncR '[inputs]')"
 
       - name: Save Binaries for Testing
-        if: ${{ github.event_name == 'pull_request' }}
+        # XXX
+        #if: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v2
         with:
           name: binaries arm64

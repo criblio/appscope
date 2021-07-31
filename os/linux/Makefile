@@ -35,26 +35,31 @@ corerebuild:
 include os/linux/$(ARCH).mk
 
 $(OPENSSL_AR):
-	@echo "Building openssl"
+	@echo "$${CI:+::group::}Building OpenSSL"
 	cd contrib/openssl && ./Configure no-async
 	cd contrib/openssl && make -j8
 	# Yuck.  Avoids naming conflict between our wrap.c and libssl.a
 	objcopy --redefine-sym SSL_read=SCOPE_SSL_read contrib/openssl/libssl.a
 	objcopy --redefine-sym SSL_write=SCOPE_SSL_write contrib/openssl/libssl.a
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 $(PCRE2_AR):
-	@echo "Building pcre2"
+	@echo "$${CI:+::group::}Building PCRE2"
 	cd contrib/pcre2 && mkdir -p build
 	cd contrib/pcre2/build && cmake ..
 	cd contrib/pcre2/build && make
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 $(LDSCOPEDYN): src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c
+	@echo "$${CI:+::group::}Building $@"
 	gcc -Wall -g -D__LINUX__ $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
 		-DSCOPE_VER=\"$(SCOPE_VER)\" \
 		src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c \
 		-ldl -lrt -o $@ -I./os/$(OS) $(INCLUDES)
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 $(LDSCOPE): src/scope_static.c src/libdir.c $(LDSCOPEDYN) $(LIBSCOPE)
+	@echo "$${CI:+::group::}Building $@"
 	cd $(dir $(LDSCOPEDYN)) && objcopy \
 		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
 		$(notdir $(LDSCOPEDYN)) $(notdir $(LDSCOPEDYN)).o
@@ -68,6 +73,7 @@ $(LDSCOPE): src/scope_static.c src/libdir.c $(LDSCOPEDYN) $(LIBSCOPE)
 		$(LDSCOPEDYN).o $(LIBSCOPE:.so=.o) \
 		-lrt -lpthread -o $@
 	$(RM) $(LDSCOPEDYN).o $(LIBSCOPE:.so=.o)
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 coreclean:
 	$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN) contrib/funchook/build/*.a
@@ -87,7 +93,7 @@ O_FILES:=$(C_FILES:.c=.o)
 CACHE_FILES:=$(shell find . -name CMakeCache.txt)
 
 coretest: $(C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
-	@echo "Building Tests"
+	@echo "$${CI:+::group::}Building Tests"
 	$(CC) -c $(TEST_CFLAGS) $(C_FILES) $(INCLUDES) $(TEST_INCLUDES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest cfgutilstest.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o mtcformat.o com.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest cfgtest.o cfg.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
@@ -112,28 +118,33 @@ coretest: $(C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/searchtest searchtest.o search.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) test/manual/passfd.c -lpthread -o test/$(OS)/passfd
 	$(CC) $(TEST_CFLAGS) test/manual/unixpeer.c -lpthread -o test/$(OS)/unixpeer
-	@echo "Running Tests and Generating Test Coverage"
+	@[ -z "$(CI)" ] || echo "::endgroup::"
+	@echo "$${CI:+::group::}Running Tests and Generating Test Coverage"
 	test/execute.sh
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 # see file:///Users/cribl/scope/coverage/index.html
 
 $(YAML_AR): $(YAML_SRC)
-	@echo "Building libyaml"
+	@echo "$${CI:+::group::}Building libyaml"
 	cd ./contrib/libyaml && ./bootstrap
 	cd ./contrib/libyaml && ./configure LIBS=-ldl
 	cd ./contrib/libyaml && $(MAKE)
 # don't install on the host.  We only need the static .a file
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 $(JSON_AR): contrib/cJSON/cJSON.c
-	@echo "Building cJSON"
+	@echo "$${CI:+::group::}Building cJSON"
 	cd ./contrib/cJSON && $(MAKE) clean
 	cd ./contrib/cJSON && $(MAKE) all
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 $(TEST_LIB):
-	@echo "Building cmocka"
+	@echo "$${CI:+::group::}Building cmocka"
 	cd contrib/cmocka && test -d ./build || mkdir ./build
 	cd contrib/cmocka/build && cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Debug ..
 	cd contrib/cmocka/build && $(MAKE)
 # don't install on the host.
 # We can tell the linker where to find the .dylib file
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 .PHONY: coreall coreclean coretest corerebuild

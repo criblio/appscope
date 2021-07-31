@@ -31,21 +31,35 @@ jobs:
         id: tag
         run: |
           if [ "true" = "${{ steps.version.outputs.is-semver }}" ]; then
-              TAG=${{ steps.version.outputs.version-without-v }}
+              echo "::set-output name=tag::${{ steps.version.outputs.version-without-v }}"
               echo "::set-output name=push::true"
               if [ -z "${{ steps.version.outputs.prerelease }}" ]; then
-                # TODO: make sure it's really the latest and not a maintenance relase for an older version
-                echo "::set-output name=latest::true"
+                if [ "${{ steps.version.outputs.version }}" = "$(git tag -l v* | sort -V | tail -1)" ]; then
+                  echo "::set-output name=latest::true"
+                fi
               fi
           else
+            echo "::set-output name=branch::${GITHUB_REF#*refs/heads/}"
             if [ "refs/heads/main" = "${GITHUB_REF}" -o "refs/heads/master" = "${GITHUB_REF}" ]; then
-              TAG=next
+              echo "::set-output name=tag::next"
               echo "::set-output name=push::true"
             else
-              TAG=unreleased
+              echo "::set-output name=tag::unreleased"
             fi
           fi
-          echo "::set-output name=tag::${TAG}"
+          echo "::group::outputs"
+          echo "version=\"${{ steps.version.outputs.version }}\""
+          echo "major=\"${{ steps.version.outputs.major }}\""
+          echo "minor=\"${{ steps.version.outputs.minor }}\""
+          echo "maintenance=\"${{ steps.version.outputs.patch }}\""
+          echo "prerelease=\"${{ steps.version.outputs.prerelease }}\""
+          echo "build=\"${{ steps.version.outputs.build }}\""
+          echo "is-semver=\"${{ steps.version.outputs.is-semver }}\""
+          echo "tag=\"${{ steps.tag.outputs.tag }}\""
+          echo "latest=\"${{ steps.tag.outputs.latest }}\""
+          echo "push=\"${{ steps.tag.outputs.push }}\""
+          echo "branch=\"${{ steps.tag.outputs.branch }}\""
+          echo "::endgroup::"
 
       - name: Create Release
         id: release
@@ -58,10 +72,12 @@ jobs:
                 gh release create ${{ steps.version.outputs.version }} -p \
                   -n "${{ steps.notes.outputs.release_notes }}" \
                   -t "Pre-Release ${{ steps.version.outputs.version-without-v }}"
+                echo "info: created Pre-Release ${{ steps.version.outputs.version-without-v }}"; \
               else
                 gh release create ${{ steps.version.outputs.version }} \
                   -n "${{ steps.notes.outputs.release_notes }}" \
                   -t "Release ${{ steps.version.outputs.version-without-v }}"
+                echo "info: created Release ${{ steps.version.outputs.version-without-v }}"; \
               fi \
             fi
 
@@ -71,6 +87,7 @@ jobs:
       tag: ${{ steps.tag.outputs.tag }}
       latest: ${{ steps.tag.outputs.latest }}
       push: ${{ steps.tag.outputs.push }}
+      branch: ${{ steps.tag.outputs.branch }}
 
   build-amd64:
     name: Build x86_64/amd64
@@ -80,7 +97,7 @@ jobs:
       - name: Dump Environment
         run: |
             echo "::group::env"
-            env
+            env | sort
             echo "::endgroup::"
             echo "::group::pwd"
             pwd
@@ -89,6 +106,7 @@ jobs:
             hostname
             ip addr
             cat /etc/resolv.conf
+            resolvectl status
             echo "::endgroup::"
             echo "::group::uname"
             uname -a
@@ -152,18 +170,11 @@ jobs:
         id: tests
         run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | sort -V | jq -ncR '[inputs]')"
 
-      - name: Add Binaries to the Release
-        id: release
-        if: ${{ needs.info.outputs.is-semver == 'true' }}
-        run: |
-          gh release upload ${{ needs.info.outputs.version }} "bin/linux/x86_64/scope#scope-x86_64"
-          gh release upload ${{ needs.info.outputs.version }} "lib/linux/x86_64/libscope.so#ldscope-x86_64.so"
-
       - name: Save Binaries for Testing
         if: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v2
         with:
-          name: binaries x86_64
+          name: binaries amd64
           path: |
             lib/linux/x86_64/libscope.so
             bin/linux/x86_64/scope
@@ -201,7 +212,7 @@ jobs:
       - name: Dump Environment
         run: |
             echo "::group::env"
-            env
+            env | sort
             echo "::endgroup::"
             echo "::group::pwd"
             pwd
@@ -210,6 +221,7 @@ jobs:
             hostname
             ip addr
             cat /etc/resolv.conf
+            resolvectl status
             echo "::endgroup::"
             echo "::group::uname"
             uname -a
@@ -269,18 +281,11 @@ jobs:
         id: tests
         run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml config --services | sort -V | jq -ncR '[inputs]')"
 
-      - name: Add Binaries to the Release
-        id: release
-        if: ${{ needs.info.outputs.is-semver == 'true' }}
-        run: |
-          gh release upload ${{ needs.info.outputs.version }} "bin/linux/aarch64/scope#scope-aarch64"
-          gh release upload ${{ needs.info.outputs.version }} "lib/linux/aarch64/libscope.so#ldscope-aarch64.so"
-
       - name: Save Binaries for Testing
         if: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v2
         with:
-          name: binaries aarch64
+          name: binaries arm64
           path: |
             lib/linux/aarch64/libscope.so
             bin/linux/aarch64/scope
@@ -310,100 +315,226 @@ jobs:
     outputs:
       tests: ${{ steps.tests.outputs.tests }}
 
-#  test:
-#    name: Test
-#    needs: build
-#    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
-#    strategy:
-#      matrix: 
-#        test: ${{ fromJson(needs.build-scope.outputs.tests) }}
-#        dist: [ubuntu]
-#        arch: [x86_64,aarch64]
-#      fail-fast: false
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: Checkout Repository
-#        uses: actions/checkout@v2
-#
-#      - name: Setup QEMU
-#        uses: docker/setup-qemu-action@v1
-#
-#      - name: Setup Docker Buildx
-#        id: buildx
-#        uses: docker/setup-buildx-action@v1
-#
-#      - name: Download Binaries
-#        uses: actions/download-artifact@v2
-#        with:
-#          name: binaries ${{ matrix.dist }} ${{ matrix.arch }}
-#          path: bin
-#
-#      - name: Run Test
-#        run: |
-#          chmod +x bin/linux/${{ matrix.arch }}/* lib/linux/${{ matrix.arch }}/*
-#          make -C test/testContainers ${{ matrix.test }}
+  cdn: 
+    name: Update CDN
+    needs: [info,build-amd64,build-arm64}
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
 
-#  test-image:
-#    needs: build
-#    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-#    strategy:
-#      matrix: 
-#        test: ${{ fromJson(needs.build-scope.outputs.tests) }}
-#      fail-fast: false
-#    name: "Update Image: ${{ matrix.test }}"
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: Checkout Repository
-#        uses: actions/checkout@v2
-#
-#      - name: Login to Container Registry
-#        uses: docker/login-action@v1
-#        with:
-#          username: scopeci
-#          password: ${{ secrets.SCOPECI_TOKEN }}
-#
-#      - name: Update Image
-#        run: make -C test/testContainers ${{ matrix.test }}-push
+      - name: Download x86_64/amd64 Binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries amd64
+          path: bin
 
-#  image:
-#    name: Build Image
-#    needs: [info,builder,build,test]
-#    runs-on: ubuntu-latest
-#    strategy:
-#      matrix:
-#        dist: [ubuntu]
-#    steps:
-#      - name: Checkout Repository
-#        uses: actions/checkout@v2
-#
-#      - name: Setup QEMU
-#        uses: docker/setup-qemu-action@v1
-#
-#      - name: Setup Docker Buildx
-#        id: buildx
-#        uses: docker/setup-buildx-action@v1
-#
-#      - name: Login to Container Registry
-#        uses: docker/login-action@v1
-#        with:
-#          registry: ${{ env.REGISTRY }}
-#          #username: ${{ github.actor }}
-#          #password: ${{ secrets.GITHUB_TOKEN }}
-#          username: scopeci
-#          password: ${{ secrets.SCOPECI_TOKEN }}
-#
-#      - name: Download x86_64 Binaries
-#        uses: actions/download-artifact@v2
-#        with:
-#          name: binaries ${{ matrix.os }} x86_64
-#          path: bin
-#
-#      - name: Download aarch64 Binaries
-#        uses: actions/download-artifact@v2
-#        with:
-#          name: binaries ${{ matrix.os }} aarch64
-#          path: bin
-#
-#      - name: Build Image
-#        run: make image DIST=${{ matrix.dist }} BUILDER=${{ steps.buildx.outputs.name }} VERSION=${{ needs.info.outputs.tag }} LATEST=${{ needs.info.outputs.latest }} PUSH=${{ needs.info.outputs.push }}
+      - name: Download aarch64/arm64 Binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries arm64
+          path: bin
+
+      - name: Deploy
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
+        run: |
+          if [ "unreleased" = "${{ need.info.outputs.tag }}" ]; then
+            VERSION=${{ need.info.outputs.branch }}
+          else
+            VERSION=${{ need.info.outputs.tag }}
+          fi
+
+          echo "::group::Deploying to https://cdn.cribl.io/dl/scope/${VERSION}"
+
+          S3_SCOPE=s3://io.cribl.cdn/dl/scope
+          TMPDIR=$(mktemp -d)
+          mkdir ${TMPDIR}/scope
+
+          cp conf/{scope.yml,scope_protocol.yml} ${TMPDIR}/scope
+          if ARCH in x86_64 aarch64; do
+            cp bin/linux/${ARCH}/{scope,ldscope} ${TMPDIR}/scope
+            cp lib/linux/${ARCH}/libscope.so ${TMPDIR}/scope
+            (cd ${TMPDIR} && tar cfz scope.tgz scope)
+            (cd ${TMPDIR} && md5sum scope.tgz > scope-${ARCH}.tgz.md5)
+            (cd ${TMPDIR}/scope && md5sum scope > ../scope-${ARCH}.md5)
+            cp ${TMPDIR}/scope/scope ${TMPDIR}/scope-${ARCH}
+          done
+
+
+          if [ -n "${{ need.info.outputs.latest }}" ]; then
+            echo "${{ need.info.outputs.tag }}" > ${TMPDIR}/latest
+            aws s3 cp ${TMPDIR}/latest ${S3_SCOPE}/latest
+          fi
+
+          aws s3 cp ${TMPDIR}/scope-x86_64         ${S3_SCOPE}/${VERSION}/linux/scope
+          aws s3 cp ${TMPDIR}/scope-x86_64.md5     ${S3_SCOPE}/${VERSION}/linux/scope.md5
+          aws s3 cp ${TMPDIR}/scope-x86_64.tgz     ${S3_SCOPE}/${VERSION}/linux/scope.tgz
+          aws s3 cp ${TMPDIR}/scope-x86_64.tgz.md5 ${S3_SCOPE}/${VERSION}/linux/scope.tgz.md5
+
+          if ARCH in x86_64 aarch64; do
+            aws s3 cp ${TMPDIR}/scope-${ARCH}         ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope
+            aws s3 cp ${TMPDIR}/scope-${ARCH}.md5     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.md5
+            aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz
+            aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz.md5 ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz.md5
+          done
+
+          aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*'
+
+          echo "::endgroup::"
+
+          if [ "true" = "${{ needs.info.outputs.is-semver }}" ]; then
+            if ARCH in x86_64 aarch64; do
+              gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}"
+              gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.md5"
+              gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.tgz"
+              gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.tgz.md5"
+            done
+          fi
+
+  test-amd64:
+    name: Test x86_64/amd64
+    needs: build-amd64
+    # XXX
+    #if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+    strategy:
+      matrix: 
+        test: ${{ fromJson(needs.build-amd64.outputs.tests) }}
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Setup Docker Cache
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-amd64-test-${{ matrix.test }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-amd64-test-${{ matrix.test }}-
+
+      - name: Download Binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries amd64
+          path: bin
+
+      - name: Run Test
+        run: |
+          chmod +x bin/linux/*/* lib/linux/*/*
+          make -C test/testContainers ${{ matrix.test }}
+
+      - name: Update Docker Cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  test-arm64:
+    name: Test x86_64/arm64
+    needs: build-arm64
+    # XXX
+    #if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+    strategy:
+      matrix: 
+        test: ${{ fromJson(needs.build-arm64.outputs.tests) }}
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Setup Docker Cache
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-arm64-test-${{ matrix.test }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-arm64-test-${{ matrix.test }}-
+
+      - name: Download Binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries arm64
+          path: bin
+
+      - name: Run Test
+        run: |
+          chmod +x bin/linux/*/* lib/linux/*/*
+          make -C test/testContainers ${{ matrix.test }}
+
+      - name: Update Docker Cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  image:
+    name: Build Image
+    needs: [info,build-amd64,build-arm64,test-amd64,test-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          #username: scopeci
+          #password: ${{ secrets.SCOPECI_TOKEN }}
+
+      - name: Download x86_64/amd64 Binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries amd64
+          path: bin
+
+      - name: Download aarch64/arm64 Binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries arm64
+          path: bin
+
+      - name: Build Image
+        env:
+          VERSION: ${{ needs.info.outputs.tag }}
+          LATEST: ${{ needs.info.outputs.latest }}
+          PUSH: ${{ needs.info.outputs.push }}
+        run: |
+          [ "${PUSH}" ] && TYPE=registry || TYPE=local
+          docker buildx build \
+                --builder ${{ steps.buildx.outputs.name }} \
+                --tag ${GITHUB_REPOSITORY}:${VERSION} \
+                ${LATEST:+ --tag ${GITHUB_REPOSITORY}:latest} \
+                --platform linux/amd64,linux/arm64/v8 \
+                --output type=${TYPE} \
+                --file docker/base/Dockerfile \
+                .
 

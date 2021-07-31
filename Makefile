@@ -67,21 +67,13 @@ BUILD_IMAGE ?= $(REGISTRY_github)/$(GITHUB_REPOSITORY)-builder
 all:
 	@[ "ubuntu-18.04" = "$(OS_ID)-$(OS_VER)" ] || \
 		echo >&2 "warning: building on $(OS_ID)-$(OS_VER) is unsupported; use \`make build\` instead"
-	@[ -z "$(CI)" ] || echo "::group::make coreall"
 	@$(MAKE) coreall
-	@[ -z "$(CI)" ] || echo "::endgroup::"
-	@[ -z "$(CI)" ] || echo "::group::make cliall"
 	@$(MAKE) -C cli all
-	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 # run unit tests
 test:
-	@[ -z "$(CI)" ] || echo "::group::make coretest"
 	@$(MAKE) coretest
-	@[ -z "$(CI)" ] || echo "::endgroup::"
-	@[ -z "$(CI)" ] || echo "::group::make clitest"
 	@$(MAKE) -C cli test
-	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 # remove built content
 clean:
@@ -178,7 +170,6 @@ builder: require-docker-buildx-builder
 		$(if $(NOLOAD),,--load) \
 		--file docker/builder/Dockerfile.$(DIST) \
 		.
-	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 # build the distribution image
 #   - set LATEST to add the ":latest" tag

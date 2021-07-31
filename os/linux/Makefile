@@ -10,10 +10,10 @@ TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 CJSON_DEFINES=-DENABLE_LOCALES
 YAML_SRC=$(wildcard contrib/libyaml/src/*.c)
-YAML_AR=contrib/libyaml/src/.libs/libyaml.a
+YAML_AR=contrib/libyaml/build/src/.libs/libyaml.a
 JSON_AR=contrib/cJSON/libcjson.a
 PCRE2_AR=contrib/pcre2/build/libpcre2-posix.a contrib/pcre2/build/libpcre2-8.a
-OPENSSL_AR=contrib/openssl/libssl.a contrib/openssl/libcrypto.a
+OPENSSL_AR=contrib/openssl/build/libssl.a contrib/openssl/build/libcrypto.a
 TEST_AR=$(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR}
 #TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
 TEST_LIB=contrib/cmocka/build/src/libcmocka.so
@@ -35,20 +35,10 @@ corerebuild:
 include os/linux/$(ARCH).mk
 
 $(OPENSSL_AR):
-	@echo "$${CI:+::group::}Building OpenSSL"
-	cd contrib/openssl && ./Configure no-async
-	cd contrib/openssl && make -j8
-	# Yuck.  Avoids naming conflict between our wrap.c and libssl.a
-	objcopy --redefine-sym SSL_read=SCOPE_SSL_read contrib/openssl/libssl.a
-	objcopy --redefine-sym SSL_write=SCOPE_SSL_write contrib/openssl/libssl.a
-	@[ -z "$(CI)" ] || echo "::endgroup::"
+	@$(MAKE) -C contrib openssl
 
 $(PCRE2_AR):
-	@echo "$${CI:+::group::}Building PCRE2"
-	cd contrib/pcre2 && mkdir -p build
-	cd contrib/pcre2/build && cmake ..
-	cd contrib/pcre2/build && make
-	@[ -z "$(CI)" ] || echo "::endgroup::"
+	@$(MAKE) -C contrib pcre2
 
 $(LDSCOPEDYN): src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c
 	@echo "$${CI:+::group::}Building $@"
@@ -125,26 +115,12 @@ coretest: $(C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
 # see file:///Users/cribl/scope/coverage/index.html
 
 $(YAML_AR): $(YAML_SRC)
-	@echo "$${CI:+::group::}Building libyaml"
-	cd ./contrib/libyaml && ./bootstrap
-	cd ./contrib/libyaml && ./configure LIBS=-ldl
-	cd ./contrib/libyaml && $(MAKE)
-# don't install on the host.  We only need the static .a file
-	@[ -z "$(CI)" ] || echo "::endgroup::"
+	@$(MAKE) -C contrib libyaml
 
 $(JSON_AR): contrib/cJSON/cJSON.c
-	@echo "$${CI:+::group::}Building cJSON"
-	cd ./contrib/cJSON && $(MAKE) clean
-	cd ./contrib/cJSON && $(MAKE) all
-	@[ -z "$(CI)" ] || echo "::endgroup::"
+	@$(MAKE) -C contrib cJSON
 
 $(TEST_LIB):
-	@echo "$${CI:+::group::}Building cmocka"
-	cd contrib/cmocka && test -d ./build || mkdir ./build
-	cd contrib/cmocka/build && cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Debug ..
-	cd contrib/cmocka/build && $(MAKE)
-# don't install on the host.
-# We can tell the linker where to find the .dylib file
-	@[ -z "$(CI)" ] || echo "::endgroup::"
+	@$(MAKE) -C contrib cmocka
 
 .PHONY: coreall coreclean coretest corerebuild

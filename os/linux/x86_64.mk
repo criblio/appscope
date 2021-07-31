@@ -12,7 +12,7 @@ $(FUNCHOOK_AR):
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 LD_FLAGS=$(PCRE2_AR) -ldl -lpthread -lrt -Lcontrib/funchook/build -lfunchook -Lcontrib/funchook/build/capstone_src-prefix/src/capstone_src-build -lcapstone
-INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build -I./contrib/funchook/build/capstone_src-prefix/src/capstone_src/include -I./contrib/jni -I./contrib/jni/linux/ -I./contrib/openssl/include
+INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build -I./contrib/funchook/build/capstone_src-prefix/src/capstone_src/include -I./contrib/jni -I./contrib/jni/linux/ -I./contrib/openssl/include -I./contrib/openssl/build/include
 
 #ARCH_RM=&& rm ./test/selfinterpose/wrap_go.o
 #ARCH_COPY=cp ./lib/$(OS)/$(ARCH)/libscope.so ./lib/$(OS)/libscope.so && \

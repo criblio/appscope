@@ -182,21 +182,6 @@ jobs:
             bin/linux/x86_64/ldscope
           retention-days: 5
 
-      #- name: Deploy Artifacts to CDN
-      #  if: ${{ github.event_name == 'push' }}
-      #  env:
-      #    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #    AWS_REGION: ${{ secrets.AWS_REGION }}
-      #    CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
-      #  run: ./deploy.sh
-
-      #- name: Build & Push Container Image to Docker Hub
-      #  if: startsWith(github.ref, 'refs/tags/v')
-      #  env:
-      #    SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
-      #  run: ./docker/build.sh
-
       - name: Update Docker Cache
         run: |
           rm -rf /tmp/.buildx-cache
@@ -293,21 +278,6 @@ jobs:
             bin/linux/aarch64/scope
             bin/linux/aarch64/ldscope
           retention-days: 5
-
-      #- name: Deploy Artifacts to CDN
-      #  if: ${{ github.event_name == 'push' }}
-      #  env:
-      #    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #    AWS_REGION: ${{ secrets.AWS_REGION }}
-      #    CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
-      #  run: ./deploy.sh
-
-      #- name: Build & Push Container Image to Docker Hub
-      #  if: startsWith(github.ref, 'refs/tags/v')
-      #  env:
-      #    SCOPECI_TOKEN: ${{ secrets.SCOPECI_TOKEN }}
-      #  run: ./docker/build.sh
 
       - name: Update Docker Cache
         run: |
@@ -432,6 +402,10 @@ jobs:
         with:
           name: binaries amd64
           path: bin
+
+      - name: Check Binaries
+        run: |
+          ls -laR bin lib
 
       - name: Run Test
         run: |

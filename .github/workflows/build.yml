@@ -168,13 +168,13 @@ jobs:
         env:
           VERSION: ${{ needs.info.outputs.tag }}
           BUILDER: ${{ steps.buildx.outputs.name }}
-        run: make build NOBUILD=1 CMD="make all"
+        run: make build NOBUILD=1 CMD="make all" CI=${CI}
 
       - name: Unit-Test AppScope
         env:
           VERSION: ${{ needs.info.outputs.tag }}
           BUILDER: ${{ steps.buildx.outputs.name }}
-        run: make build NOBUILD=1 CMD="make test"
+        run: make build NOBUILD=1 CMD="make test" CI=${CI}
 
       - name: List Integration Tests
         id: tests
@@ -276,13 +276,13 @@ jobs:
         env:
           VERSION: ${{ needs.info.outputs.tag }}
           BUILDER: ${{ steps.buildx.outputs.name }}
-        run: make build NOBUILD=1 CMD="make all"
+        run: make build NOBUILD=1 CMD="make all" CI=${CI}
 
       - name: Unit-Test AppScope
         env:
           VERSION: ${{ needs.info.outputs.tag }}
           BUILDER: ${{ steps.buildx.outputs.name }}
-        run: make build NOBUILD=1 CMD="make test"
+        run: make build NOBUILD=1 CMD="make test" CI=${CI}
 
       - name: List Integration Tests
         id: tests

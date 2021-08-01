@@ -103,7 +103,6 @@ build: $(addsuffix -build, $(TESTS))
 	-@[ -n "$(ID)" -o -n "$(NOPULL)" ] || $(DOCKER) pull $(IMAGE)
 	@TAG=$(ARCH) $(COMPOSE) build \
 		--progress tty \
-		--build-arg BUILDKIT_INLINE_CACHE=1 \
 		$(@:%-build=%)
 
 push: $(addsuffix -push, $(TESTS))

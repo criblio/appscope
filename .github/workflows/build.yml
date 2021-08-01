@@ -509,7 +509,7 @@ jobs:
       matrix: 
         test: ${{ fromJson(needs.build-arm64.outputs.tests) }}
       fail-fast: false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted,ARM64]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2

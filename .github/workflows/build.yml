@@ -269,6 +269,9 @@ jobs:
             echo "::group::free"
             free
             echo "::endgroup::"
+            echo "::group::home"
+            ls -la $HOME
+            echo "::endgroup::"
 
       - name: Checkout Repository
         uses: actions/checkout@v2
@@ -483,7 +486,7 @@ jobs:
         run: chmod +x lib/linux/*/* bin/linux/*/*
 
       - name: Login to Container Registry
-        #if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
@@ -497,7 +500,7 @@ jobs:
         run: make -C test/testContainers ${{ matrix.test }} NOBUILD=1
 
       - name: Upload Test Image
-        #if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         run: make -C test/testContainers ${{ matrix.test }}-push NOBUILD=1
 
   test-arm64:
@@ -523,7 +526,7 @@ jobs:
         run: chmod +x lib/linux/*/* bin/linux/*/*
 
       - name: Login to Container Registry
-        #if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
@@ -537,7 +540,7 @@ jobs:
         run: make -C test/testContainers ${{ matrix.test }} NOBUILD=1
 
       - name: Upload Test Image
-        #if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         run: make -C test/testContainers ${{ matrix.test }}-push NOBUILD=1
 
   image:
@@ -582,7 +585,7 @@ jobs:
           docker buildx build \
                 --builder ${{ steps.buildx.outputs.name }} \
                 --tag ${GITHUB_REPOSITORY}:${VERSION} \
-                ${LATEST:+ --tag ${GITHUB_REPOSITORY}:latest} \
+                ${LATEST:+--tag ${GITHUB_REPOSITORY}:latest} \
                 --platform linux/amd64,linux/arm64/v8 \
                 --output type=${TYPE} \
                 --file docker/base/Dockerfile \

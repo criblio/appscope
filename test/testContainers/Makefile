@@ -31,7 +31,7 @@ help:
 	@echo "Tests: $(TESTS)"
 
 tests:
-	@echo $(TESTS)
+	@TAG=$(ARCH) $(COMPOSE) config --services | sort -V
 
 all:
 	@STARTED=; RAN=0; SKIP=0; PASS=0; FAIL=0; TOTAL=$(words $(TESTS)); OK=; ERR=; \

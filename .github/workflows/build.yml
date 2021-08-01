@@ -157,6 +157,33 @@ jobs:
             ${{ runner.os }}-amd64-go-
           upload-chunk-size: 1000000
 
+      - name: Setup cmocka Cache
+        uses: actions/cache@v2
+        with:
+          path: contrib/build/cmocka
+          key: ${{ runner.os }}-amd64-cmocka-${{ hashFiles('contrib/cmocka/**') }}
+          restore-keys: |
+            ${{ runner.os }}-amd64-cmocka-
+          upload-chunk-size: 1000000
+
+      - name: Setup funchook Cache
+        uses: actions/cache@v2
+        with:
+          path: contrib/build/funchook
+          key: ${{ runner.os }}-amd64-funchook-${{ hashFiles('contrib/funchook/**') }}
+          restore-keys: |
+            ${{ runner.os }}-amd64-funchook-
+          upload-chunk-size: 1000000
+
+      - name: Setup pcre2 Cache
+        uses: actions/cache@v2
+        with:
+          path: contrib/build/pcre2
+          key: ${{ runner.os }}-amd64-pcre2-${{ hashFiles('contrib/cpre2/**') }}
+          restore-keys: |
+            ${{ runner.os }}-amd64-pcre2-
+          upload-chunk-size: 1000000
+
       - name: Setup openssl Cache
         uses: actions/cache@v2
         with:
@@ -271,6 +298,33 @@ jobs:
           key: ${{ runner.os }}-arm64-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-arm64-go-
+          upload-chunk-size: 1000000
+
+      - name: Setup cmocka Cache
+        uses: actions/cache@v2
+        with:
+          path: contrib/build/cmocka
+          key: ${{ runner.os }}-arm64-cmocka-${{ hashFiles('contrib/cmocka/**') }}
+          restore-keys: |
+            ${{ runner.os }}-arm64-cmocka-
+          upload-chunk-size: 1000000
+
+      - name: Setup funchook Cache
+        uses: actions/cache@v2
+        with:
+          path: contrib/build/funchook
+          key: ${{ runner.os }}-arm64-funchook-${{ hashFiles('contrib/funchook/**') }}
+          restore-keys: |
+            ${{ runner.os }}-arm64-funchook-
+          upload-chunk-size: 1000000
+
+      - name: Setup pcre2 Cache
+        uses: actions/cache@v2
+        with:
+          path: contrib/build/pcre2
+          key: ${{ runner.os }}-arm64-pcre2-${{ hashFiles('contrib/pcre2/**') }}
+          restore-keys: |
+            ${{ runner.os }}-arm64-pcre2-
           upload-chunk-size: 1000000
 
       - name: Setup openssl Cache

@@ -187,7 +187,7 @@ jobs:
 
       - name: List Integration Tests
         id: tests
-        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml -f test/testContainers/docker-compose.x86_64.yml config --services | sort -V | jq -ncR '[inputs]')"
+        run: echo "::set-output name=tests::$(make -s -C test/testContainers tests | sort -V | jq -ncR '[inputs]')"
 
       - name: Upload Binaries
         # XXX
@@ -303,7 +303,7 @@ jobs:
 
       - name: List Integration Tests
         id: tests
-        run: echo "::set-output name=tests::$(docker-compose -f test/testContainers/docker-compose.yml -f test/testContainers/docker-compose.aarch64.yml config --services | sort -V | jq -ncR '[inputs]')"
+        run: echo "::set-output name=tests::$(make -s -C test/testContainers tests | sort -V | jq -ncR '[inputs]')"
 
       - name: Upload Binaries
         # XXX

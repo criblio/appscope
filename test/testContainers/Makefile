@@ -30,6 +30,9 @@ help:
 	@echo "  \`make (test)-shell\` - run a shell in the test's container"
 	@echo "Tests: $(TESTS)"
 
+tests:
+	@echo $(TESTS)
+
 all:
 	@STARTED=; RAN=0; SKIP=0; PASS=0; FAIL=0; TOTAL=$(words $(TESTS)); OK=; ERR=; \
 	for TEST in $(TESTS); do \

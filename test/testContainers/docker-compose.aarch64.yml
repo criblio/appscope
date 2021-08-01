@@ -2,7 +2,6 @@ version: '3.5'
 
 x-scope-common: &scope-common
   volumes:
-    - ./logs:/opt/test-runner/logs:rw
     - ../..:/opt/appscope
   working_dir: /opt/appscope
   privileged: true

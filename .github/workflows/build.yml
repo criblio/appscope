@@ -157,6 +157,15 @@ jobs:
             ${{ runner.os }}-amd64-go-
           upload-chunk-size: 1000000
 
+      - name: Setup openssl Cache
+        uses: actions/cache@v2
+        with:
+          path: contrib/build/openssl
+          key: ${{ runner.os }}-amd64-openssl-${{ hashFiles('contrib/openssl/**') }}
+          restore-keys: |
+            ${{ runner.os }}-amd64-openssl-
+          upload-chunk-size: 1000000
+
       - name: Update Builder
         env:
           BUILDER: ${{ steps.buildx.outputs.name }}
@@ -262,6 +271,15 @@ jobs:
           key: ${{ runner.os }}-arm64-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-arm64-go-
+          upload-chunk-size: 1000000
+
+      - name: Setup openssl Cache
+        uses: actions/cache@v2
+        with:
+          path: contrib/build/openssl
+          key: ${{ runner.os }}-arm64-openssl-${{ hashFiles('contrib/openssl/**') }}
+          restore-keys: |
+            ${{ runner.os }}-arm64-openssl-
           upload-chunk-size: 1000000
 
       - name: Update Builder

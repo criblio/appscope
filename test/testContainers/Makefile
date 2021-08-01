@@ -14,9 +14,10 @@ ifeq (, $(DOCKER))
     $(error Missing docker)
 endif
 
-COMPOSE := $(COMPOSE) -f docker-compose.yml -f docker-compose.$(shell uname -m).yml
+ARCH ?= $(shell uname -m)
 
-TESTS=$(shell $(COMPOSE) config --services | sort -V)
+COMPOSE := $(COMPOSE) -f docker-compose.yml -f docker-compose.$(ARCH).yml
+TESTS := $(shell TAG=$(ARCH) $(COMPOSE) config --services | sort -V)
 
 help:
 	@echo "AppScope Integration Test Runner"
@@ -75,7 +76,7 @@ $(TESTS):
 	@echo " $(shell date)"
 	@echo " Running \"$@\" Test"
 	@echo "==================================================================="
-	@time $(COMPOSE) run --rm --name scope-$(@)-it $@ || \
+	@TAG=$(ARCH) $(COMPOSE) run --rm --name appscope-test-$(@) $@ || \
 		{ echo >&2 "error: $(@) test failed."; exit 1; }
 
 build: $(addsuffix -build, $(TESTS))
@@ -86,7 +87,7 @@ build: $(addsuffix -build, $(TESTS))
 # every time. That's what ID is for. Should have no effect in CI as the local
 # images list should be empty.
 # --
-%-build: IMAGE=scopeci/scope-$(@:%-build=%)-it
+%-build: IMAGE=ghcr.io/criblio/appscope-test-$(@:%-build=%):$(ARCH)
 %-build: ID=$(shell $(DOCKER) images -q --filter=reference=$(IMAGE))
 %-build:
 	@[ -n "$(filter $(@:%-build=%),$(TESTS))" ] || \
@@ -96,14 +97,15 @@ build: $(addsuffix -build, $(TESTS))
 	@echo " $(shell date)"
 	@echo " Building Image for \"$(@:%-build=%)\" Test"
 	@echo "==================================================================="
-	-@[ -n "$(ID)" -o -n "$(NOPULL)" ] || $(COMPOSE) pull $(@:%-build=%)
-	@DOCKER_BUILDKIT=1 $(COMPOSE) build \
+	-@[ -n "$(ID)" -o -n "$(NOPULL)" ] || $(DOCKER) pull $(IMAGE)
+	@TAG=$(ARCH) $(COMPOSE) build \
 		--progress tty \
 		--build-arg BUILDKIT_INLINE_CACHE=1 \
 		$(@:%-build=%)
 
 push: $(addsuffix -push, $(TESTS))
 
+%-push: IMAGE=ghcr.io/criblio/appscope-test-$(@:%-push=%):$(ARCH)
 %-push:
 	@[ -n "$(filter $(@:%-push=%),$(TESTS))" ] || \
 		{ echo >&2 "error: $(@:%-push=%) isn't a test."; exit 1; }
@@ -113,15 +115,7 @@ push: $(addsuffix -push, $(TESTS))
 	@echo " $(shell date)"
 	@echo " Pushing Image for \"$(@:%-push=%)\" Test"
 	@echo "==================================================================="
-	@time $(COMPOSE) push $(@:%-push=%)
-	@[ -z "$(SCOPECI_TOKEN)"] || $(DOCKER) run --rm \
-		-v "$(shell pwd)/OVERVIEW.md:/data/README.md:ro" \
-		-e "DOCKERHUB_USERNAME=scopeci" \
-		-e "DOCKERHUB_PASSWORD=$(SCOPECI_TOKEN)" \
-		-e "DOCKERHUB_REPO_PREFIX=scopeci" \
-		-e "DOCKERHUB_REPO_NAME=scope-$(@:%-push=%)-it" \
-		-e "SHORT_DESCRIPTION=AppScope\ Integration\ Test" \
-		sheogorath/readme-to-dockerhub;
+	@time $(DOCKER) push $(IMAGE)
 
 %-shell: CMD?=/bin/bash
 %-shell:
@@ -133,7 +127,10 @@ push: $(addsuffix -push, $(TESTS))
 	@echo " $(shell date)"
 	@echo " Shell in Container for \"$(@:%-shell=%)\" Test"
 	@echo "==================================================================="
-	@$(COMPOSE) run --rm --service-ports --name scope-$(@:%-shell=%)-it $(@:%-shell=%) $(CMD)
+	@TAG=$(ARCH) $(COMPOSE) run --rm \
+		--service-ports \
+		--name appscope-test-$(@:%-shell=%) \
+		$(@:%-shell=%) $(CMD)
 
 %-exec: CMD?=/bin/bash
 %-exec:
@@ -144,7 +141,7 @@ push: $(addsuffix -push, $(TESTS))
 	@echo " $(shell date)"
 	@echo " Exec'ing into Container for \"$(@:%-exec=%)\" Test"
 	@echo "==================================================================="
-	@$(DOCKER) exec -it scope-$(@:%-exec=%)-it $(CMD)
+	@TAG=$(ARCH) $(DOCKER) exec -it appscope-test-$(@:%-exec=%) $(CMD)
 
 .PHONY: help all build push $(TESTS) %-build %-push %-shell
 

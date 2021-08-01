@@ -217,8 +217,6 @@ jobs:
         run: echo "::set-output name=tests::$(make -s -C test/testContainers tests | sort -V | jq -ncR '[inputs]')"
 
       - name: Upload Binaries
-        # XXX
-        #if: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v2
         with:
           name: binaries
@@ -363,8 +361,6 @@ jobs:
         run: echo "::set-output name=tests::$(make -s -C test/testContainers tests | sort -V | jq -ncR '[inputs]')"
 
       - name: Upload Binaries
-        # XXX
-        #if: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v2
         with:
           name: binaries
@@ -466,7 +462,7 @@ jobs:
   test-amd64:
     name: Test x86_64/amd64
     needs: build-amd64
-    # XXX
+    # Uncomment this to go back to only running the integration tests for pull requests.
     #if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
     strategy:
       matrix: 
@@ -506,7 +502,7 @@ jobs:
   test-arm64:
     name: Test aarch64/arm64
     needs: build-arm64
-    # XXX
+    # Uncomment this to go back to only running the integration tests for pull requests.
     #if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
     strategy:
       matrix: 
@@ -526,7 +522,8 @@ jobs:
         run: chmod +x lib/linux/*/* bin/linux/*/*
 
       - name: Login to Container Registry
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        # XXX Temporary to prime the cached images
+        #if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
@@ -540,7 +537,8 @@ jobs:
         run: make -C test/testContainers ${{ matrix.test }} NOBUILD=1
 
       - name: Upload Test Image
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        # XXX Temporary to prime the cached images
+        #if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         run: make -C test/testContainers ${{ matrix.test }}-push NOBUILD=1
 
   image:

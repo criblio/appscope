@@ -3278,11 +3278,13 @@ close(int fd)
 {
     WRAP_CHECK(close, -1);
 
-    if ((fd = ctlConnection(g_ctl, CFG_CTL)) || 
-    (fd = ctlConnection(g_ctl, CFG_LS)) ||
-    (fd = mtcConnection(g_mtc, CFG_CTL)) ||
-    (fd = logConnection(g_log))) {
-        return 0;
+    if (fd != -1) {
+        if ((fd == ctlConnection(g_ctl, CFG_CTL)) || 
+        (fd == ctlConnection(g_ctl, CFG_LS)) ||
+        (fd == mtcConnection(g_mtc)) ||
+        (fd == logConnection(g_log))) {
+            return 0;
+        }
     }
 
     int rc = g_fn.close(fd);

@@ -698,12 +698,12 @@ checkPendingSocketStatus(transport_t *trans)
     // We have a connection
     scopeLog("connect successful", trans->net.pending_connect, CFG_LOG_INFO);
 
+    // Socket no longer pending
+    trans->net.pending_connect = -1;
+
     // Move this descriptor up out of the way
     trans->net.sock = placeDescriptor(trans->net.pending_connect, trans);
     if (trans->net.sock == -1) return 0;
-
-    // Socket no longer pending
-    trans->net.pending_connect = -1;
 
     // Set the TCP socket to blocking
     if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {

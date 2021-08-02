@@ -368,6 +368,12 @@ establishTlsSession(transport_t *trans)
     enterCriticalSection();
     if (!g_tls_calls_are_safe) goto err;
 
+    static int init_called = FALSE;
+    if (!init_called) {
+        OPENSSL_init_ssl(OPENSSL_INIT_NO_ATEXIT, NULL);
+        init_called = TRUE;
+    }
+
     trans->net.tls.ctx = SSL_CTX_new(TLS_method());
     if (!trans->net.tls.ctx) {
         char msg[512] = {0};

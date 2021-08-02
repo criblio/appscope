@@ -73,7 +73,7 @@ On the [AppScope Website](https://appscope.dev/):
 - Get an [overview](https://appscope.dev/docs/how-works/) of AppScope beyond the CLI.
 - Discover what people are [doing](https://appscope.dev/docs/what-do-with-scope) with AppScope.
 - Review advanced [examples](https://appscope.dev/docs/examples-use-cases).
-- View the [Changelog](https://appscope.dev/docs/changelog) and [Known Issues](https://appscope.dev/docs/known-issues).
+- View the [Changelog](https://appscope.dev/docs/changelog) and [Known Issues](https://github.com/criblio/appscope/issues?q=is%3Aissue+is%3Aopen+label%3Aknown-issue).
 - See what happens when you [connect AppScope to Cribl LogStream](https://appscope.dev/docs/logstream-integration).
 
 The content on that site is built from the [website/](website/) directory in this project.

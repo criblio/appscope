@@ -2,7 +2,6 @@ version: '3.5'
 
 x-scope-common: &scope-common
   volumes:
-    - ./logs:/opt/test-runner/logs:rw
     - ../..:/opt/appscope
   working_dir: /opt/appscope
   privileged: true
@@ -14,10 +13,10 @@ services:
   # kafka doesn't restart cleanly on ARM
   # not a scope problem
   kafka:
-    image: scopeci/scope-kafka-it
+    image: ghcr.io/criblio/appscope-test-kafka:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-kafka-it
+        - ghcr.io/criblio/appscope-test-kafka:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./kafka/Dockerfile
     ports:
@@ -39,30 +38,30 @@ services:
 
   # busted on ARM for now
   alpine:
-    image: scopeci/scope-alpine-it
+    image: ghcr.io/criblio/appscope-test-alpine:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-alpine-it
+        - ghcr.io/criblio/appscope-test-alpine:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./alpine/Dockerfile
     <<: *scope-common
 
   # requires "privileged" on ARM but not on x86
   syscalls:
-    image: scopeci/scope-syscalls-it
+    image: ghcr.io/criblio/appscope-test-syscalls:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-syscalls-it
+        - ghcr.io/criblio/appscope-test-syscalls:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./syscalls/Dockerfile
     <<: *scope-common
 
   # There are no arm64 splunk/splunk images at Docker Hub
   splunk:
-    image: scopeci/scope-splunk-it
+    image: ghcr.io/criblio/appscope-test-splunk:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-splunk-it
+        - ghcr.io/criblio/appscope-test-splunk:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./splunk/Dockerfile
     ports:
@@ -71,20 +70,20 @@ services:
 
   # skipped on ARM - not supported yet
   bash:
-    image: scopeci/scope-bash-it
+    image: ghcr.io/criblio/appscope-test-bash:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-bash-it
+        - ghcr.io/criblio/appscope-test-bash:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./bash/Dockerfile
     <<: *scope-common
 
   # skipped on ARM - no attach support yet
   cli:
-    image: scopeci/scope-cli-it
+    image: ghcr.io/criblio/appscope-test-cli:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-cli-it
+        - ghcr.io/criblio/appscope-test-cli:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./cli/Dockerfile
     privileged: true
@@ -92,60 +91,60 @@ services:
 
   # There are no arm64 golang images at Docker Hub for these versions of Go
   go_2:
-    image: scopeci/scope-go_2-it
+    image: ghcr.io/criblio/appscope-test-go_2:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_2-it
+        - ghcr.io/criblio/appscope-test-go_2:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.2
     <<: *scope-common
   go_3:
-    image: scopeci/scope-go_3-it
+    image: ghcr.io/criblio/appscope-test-go_3:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_3-it
+        - ghcr.io/criblio/appscope-test-go_3:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.3
     <<: *scope-common
   go_4:
-    image: scopeci/scope-go_4-it
+    image: ghcr.io/criblio/appscope-test-go_4:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_4-it
+        - ghcr.io/criblio/appscope-test-go_4:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.4
     <<: *scope-common
   go_5:
-    image: scopeci/scope-go_5-it
+    image: ghcr.io/criblio/appscope-test-go_5:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_5-it
+        - ghcr.io/criblio/appscope-test-go_5:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.5
     <<: *scope-common
   go_6:
-    image: scopeci/scope-go_6-it
+    image: ghcr.io/criblio/appscope-test-go_6:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_6-it
+        - ghcr.io/criblio/appscope-test-go_6:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.6
     <<: *scope-common
   go_7:
-    image: scopeci/scope-go_7-it
+    image: ghcr.io/criblio/appscope-test-go_7:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_7-it
+        - ghcr.io/criblio/appscope-test-go_7:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/unsupported/Dockerfile
       args:
@@ -154,10 +153,10 @@ services:
 
   # golang:1.8 is available for arm64 but some Debian dependencies aren't
   go_8:
-    image: scopeci/scope-go_8-it
+    image: ghcr.io/criblio/appscope-test-go_8:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_8-it
+        - ghcr.io/criblio/appscope-test-go_8:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/Dockerfile
       args:
@@ -166,90 +165,90 @@ services:
 
   # the rest of the Go tests are skipped on ARM until we add support in scope
   go_8:
-    image: scopeci/scope-go_8-it
+    image: ghcr.io/criblio/appscope-test-go_8:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_8-it
+        - ghcr.io/criblio/appscope-test-go_8:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.8
     <<: *scope-common
   go_9:
-    image: scopeci/scope-go_9-it
+    image: ghcr.io/criblio/appscope-test-go_9:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_9-it
+        - ghcr.io/criblio/appscope-test-go_9:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.9
     <<: *scope-common
   go_10:
-    image: scopeci/scope-go_10-it
+    image: ghcr.io/criblio/appscope-test-go_10:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_10-it
+        - ghcr.io/criblio/appscope-test-go_10:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.10
     <<: *scope-common
   go_11:
-    image: scopeci/scope-go_11-it
+    image: ghcr.io/criblio/appscope-test-go_11:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_11-it
+        - ghcr.io/criblio/appscope-test-go_11:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.11
     <<: *scope-common
   go_12:
-    image: scopeci/scope-go_12-it
+    image: ghcr.io/criblio/appscope-test-go_12:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_12-it
+        - ghcr.io/criblio/appscope-test-go_12:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.12
     <<: *scope-common
   go_13:
-    image: scopeci/scope-go_13-it
+    image: ghcr.io/criblio/appscope-test-go_13:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_13-it
+        - ghcr.io/criblio/appscope-test-go_13:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.13
     <<: *scope-common
   go_14:
-    image: scopeci/scope-go_14-it
+    image: ghcr.io/criblio/appscope-test-go_14:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_14-it
+        - ghcr.io/criblio/appscope-test-go_14:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.14
     <<: *scope-common
   go_15:
-    image: scopeci/scope-go_15-it
+    image: ghcr.io/criblio/appscope-test-go_15:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_15-it
+        - ghcr.io/criblio/appscope-test-go_15:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.15
     <<: *scope-common
   go_16:
-    image: scopeci/scope-go_16-it
+    image: ghcr.io/criblio/appscope-test-go_16:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-go_16-it
+        - ghcr.io/criblio/appscope-test-go_16:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./go/Dockerfile
       args:
@@ -258,20 +257,20 @@ services:
 
   # no arm64 image
   gogen:
-    image: scopeci/scope-gogen-it
+    image: ghcr.io/criblio/appscope-test-gogen:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-gogen-it
+        - ghcr.io/criblio/appscope-test-gogen:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./gogen/Dockerfile
     <<: *scope-common
 
   # no arm64 images
   java7:
-    image: scopeci/scope-java7-it
+    image: ghcr.io/criblio/appscope-test-java7:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-java7-it
+        - ghcr.io/criblio/appscope-test-java7:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -279,10 +278,10 @@ services:
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
     <<: *scope-common
   java12:
-    image: scopeci/scope-java12-it
+    image: ghcr.io/criblio/appscope-test-java12:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-java12-it
+        - ghcr.io/criblio/appscope-test-java12:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -290,10 +289,10 @@ services:
         DNLD_HEXDUMP: yum -y install util-linux
     <<: *scope-common
   java13:
-    image: scopeci/scope-java13-it
+    image: ghcr.io/criblio/appscope-test-java13:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-java13-it
+        - ghcr.io/criblio/appscope-test-java13:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -301,10 +300,10 @@ services:
         DNLD_HEXDUMP: yum -y install util-linux
     <<: *scope-common
   java14:
-    image: scopeci/scope-java14-it
+    image: ghcr.io/criblio/appscope-test-java14:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-java14-it
+        - ghcr.io/criblio/appscope-test-java14:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -315,10 +314,10 @@ services:
 
   # Pulls x86 RPM from Cribl CDN
   oracle-java6:
-    image: scopeci/scope-oracle-java6-it
+    image: ghcr.io/criblio/appscope-test-oracle-java6:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-oracle-java6-it
+        - ghcr.io/criblio/appscope-test-oracle-java6:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile.oracle6
       args:
@@ -327,80 +326,80 @@ services:
         KEYTOOL: /usr/java/jre1.6.0_45/bin/keytool
     <<: *scope-common
   oracle-java7:
-    image: scopeci/scope-oracle-java7-it
+    image: ghcr.io/criblio/appscope-test-oracle-java7:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-oracle-java7-it
+        - ghcr.io/criblio/appscope-test-oracle-java7:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jre/jre-7u80-linux-x64.tar.gz
     <<: *scope-common
   oracle-java8:
-    image: scopeci/scope-oracle-java8-it
+    image: ghcr.io/criblio/appscope-test-oracle-java8:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-oracle-java8-it
+        - ghcr.io/criblio/appscope-test-oracle-java8:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jre/jre-8u251-linux-x64.tar.gz
     <<: *scope-common
   oracle-java9:
-    image: scopeci/scope-oracle-java9-it
+    image: ghcr.io/criblio/appscope-test-oracle-java9:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-oracle-java9-it
+        - ghcr.io/criblio/appscope-test-oracle-java9:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jre/jre-9.0.4_linux-x64_bin.tar.gz
     <<: *scope-common
   oracle-java10:
-    image: scopeci/scope-oracle-java10-it
+    image: ghcr.io/criblio/appscope-test-oracle-java10:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-oracle-java10-it
+        - ghcr.io/criblio/appscope-test-oracle-java10:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jre/jre-10.0.2_linux-x64_bin.tar.gz
     <<: *scope-common
   oracle-java11:
-    image: scopeci/scope-oracle-java11-it
+    image: ghcr.io/criblio/appscope-test-oracle-java11:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-oracle-java11-it
+        - ghcr.io/criblio/appscope-test-oracle-java11:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-11.0.6_linux-x64_bin.tar.gz
     <<: *scope-common
   oracle-java12:
-    image: scopeci/scope-oracle-java12-it
+    image: ghcr.io/criblio/appscope-test-oracle-java12:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-oracle-java12-it
+        - ghcr.io/criblio/appscope-test-oracle-java12:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-12.0.2_linux-x64_bin.tar.gz
     <<: *scope-common
   oracle-java13:
-    image: scopeci/scope-oracle-java13-it
+    image: ghcr.io/criblio/appscope-test-oracle-java13:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-oracle-java13-it
+        - ghcr.io/criblio/appscope-test-oracle-java13:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-13.0.2_linux-x64_bin.tar.gz
     <<: *scope-common
   oracle-java14:
-    image: scopeci/scope-oracle-java14-it
+    image: ghcr.io/criblio/appscope-test-oracle-java14:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-oracle-java14-it
+        - ghcr.io/criblio/appscope-test-oracle-java14:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile.oracle
       args:

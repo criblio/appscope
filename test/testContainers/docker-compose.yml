@@ -2,7 +2,6 @@ version: '3.5'
 
 x-scope-common: &scope-common
   volumes:
-    - ./logs:/opt/test-runner/logs:rw
     - ../..:/opt/appscope
   working_dir: /opt/appscope
   privileged: true
@@ -12,19 +11,19 @@ services:
   # These tests run on all platforms; x86_64 and aarch64
 
   syscalls:
-    image: scopeci/scope-syscalls-it
+    image: ghcr.io/criblio/appscope-test-syscalls:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-syscalls-it
+        - ghcr.io/criblio/appscope-test-syscalls:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./syscalls/Dockerfile
     <<: *scope-common
 
   logstream:
-    image: scopeci/scope-logstream-it
+    image: ghcr.io/criblio/appscope-test-logstream:${TAG:?Missing TAG environment variable}
     build:
       cache_from: 
-        - scopeci/scope-logstream-it
+        - ghcr.io/criblio/appscope-test-logstream:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./logstream/Dockerfile
     ports:
@@ -32,37 +31,37 @@ services:
     <<: *scope-common
 
   nginx:
-    image: scopeci/scope-nginx-it
+    image: ghcr.io/criblio/appscope-test-nginx:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-nginx-it
+        - ghcr.io/criblio/appscope-test-nginx:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./nginx/Dockerfile
     <<: *scope-common
 
   elastic:
-    image: scopeci/scope-elastic-it
+    image: ghcr.io/criblio/appscope-test-elastic:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-elastic-it
+        - ghcr.io/criblio/appscope-test-elastic:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./elastic/Dockerfile
     <<: *scope-common
 
   tls:
-    image: scopeci/scope-tls-it
+    image: ghcr.io/criblio/appscope-test-tls:${TAG:?Missing TAG environment variable}
     build:
       cache_from: 
-        - scopeci/scope-tls-it
+        - ghcr.io/criblio/appscope-test-tls:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./tls/Dockerfile
     <<: *scope-common
 
   detect_proto:
-    image: scopeci/scope-detect_proto-it
+    image: ghcr.io/criblio/appscope-test-detect_proto:${TAG:?Missing TAG environment variable}
     build:
       cache_from: 
-        - scopeci/scope-detect_proto-it
+        - ghcr.io/criblio/appscope-test-detect_proto:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./detect_proto/Dockerfile
     ports:
@@ -71,10 +70,10 @@ services:
     <<: *scope-common
 
   java8:
-    image: scopeci/scope-java8-it
+    image: ghcr.io/criblio/appscope-test-java8:${TAG:?Missing TAG environment variable}
     build:
       cache_from: 
-        - scopeci/scope-java8-it
+        - ghcr.io/criblio/appscope-test-java8:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -82,10 +81,10 @@ services:
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
     <<: *scope-common
   java9:
-    image: scopeci/scope-java9-it
+    image: ghcr.io/criblio/appscope-test-java9:${TAG:?Missing TAG environment variable}
     build:
       cache_from: 
-        - scopeci/scope-java9-it
+        - ghcr.io/criblio/appscope-test-java9:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -93,10 +92,10 @@ services:
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
     <<: *scope-common
   java10:
-    image: scopeci/scope-java10-it
+    image: ghcr.io/criblio/appscope-test-java10:${TAG:?Missing TAG environment variable}
     build:
       cache_from: 
-        - scopeci/scope-java10-it
+        - ghcr.io/criblio/appscope-test-java10:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -104,10 +103,10 @@ services:
         DNLD_HEXDUMP: apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y bsdmainutils
     <<: *scope-common
   java11:
-    image: scopeci/scope-java11-it
+    image: ghcr.io/criblio/appscope-test-java11:${TAG:?Missing TAG environment variable}
     build:
       cache_from: 
-        - scopeci/scope-java11-it
+        - ghcr.io/criblio/appscope-test-java11:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./java/Dockerfile
       args:
@@ -116,10 +115,10 @@ services:
     <<: *scope-common
 
   transport:
-    image: scopeci/scope-transport-it
+    image: ghcr.io/criblio/appscope-test-transport:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-transport-it
+        - ghcr.io/criblio/appscope-test-transport:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./transport/Dockerfile
     ports:

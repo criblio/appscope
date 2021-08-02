@@ -46,6 +46,7 @@ func (mt MetricType) String() string {
 var metricTypesToCodes map[string]MetricType = map[string]MetricType{
 	"counter": Count,
 	"gauge":   Gauge,
+	"timer":   Timer,
 }
 
 // Reader reads dogstatsd metrics from a file

@@ -79,7 +79,7 @@ $(TESTS):
 	@echo " $(shell date)"
 	@echo " Running \"$@\" Test"
 	@echo "==================================================================="
-	@TAG=$(ARCH) $(COMPOSE) run --rm --name appscope-test-$(@) $@ || \
+	@TAG=$(ARCH) $(COMPOSE) run --rm $(if $(CI),,--name appscope-test-$(@)) $@ || \
 		{ echo >&2 "error: $(@) test failed."; exit 1; }
 
 build: $(addsuffix -build, $(TESTS))

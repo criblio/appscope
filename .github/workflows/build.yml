@@ -1,21 +1,25 @@
+#
+# AppScope - Build Workflow
+#
+# This is the GitHub Workflow to build, test, package, and publish AppScope.
+#
+
 name: Build & Test
 
 on: 
+  # Run on pushes to any branch
   push:
 
+  # Run on PRs targeting the default branch or a release branche
   pull_request:
     branches:
       - 'main'
       - 'master'
       - 'releases/*'
 
-env:
-  #REGISTRY: ghcr.io
-  REGISTRY: docker.io
-  GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
 jobs:
 
+  # This is the first stage of the workflow where we do some initial setup.
   info:
     name: Get Build Info
     runs-on: ubuntu-latest
@@ -23,10 +27,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
+      # This defines a number of outputs based on the tage being built if there
+      # is one. We'll use the outputs in other places.
       - name: Get Version
         id: version
         uses: battila7/get-version-action@v2
 
+      # This is our logic to decide how to tag the results and whether things
+      # get published or not.
       - name: Get Tag
         id: tag
         run: |
@@ -61,9 +69,14 @@ jobs:
           echo "branch=\"${{ steps.tag.outputs.branch }}\""
           echo "::endgroup::"
 
+      # If we're building a release tag and a corresponding release hasn't been
+      # created in GitHub already, create it so we can attach artifacts to it
+      # later.
       - name: Create Release
         id: release
         if: ${{ steps.version.outputs.is-semver == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
             if gh release view ${{ steps.version.outputs.version }} >/dev/null 2>&1; then \
               echo "info: ${{ steps.version.outputs.version }} release already exists"; \
@@ -81,6 +94,7 @@ jobs:
               fi \
             fi
 
+    # Make these available to later stages.
     outputs:
       version: ${{ steps.version.outputs.version }}
       is-semver: ${{ steps.version.outputs.is-semver }}
@@ -89,12 +103,22 @@ jobs:
       push: ${{ steps.tag.outputs.push }}
       branch: ${{ steps.tag.outputs.branch }}
 
-  build-amd64:
-    name: Build x86_64/amd64
+  # Build and unit-test the code. This is run in a matrix; once on GitHub's
+  # standard `ubuntu-latest` runner which is x86, and once on our self-hosted
+  # ARM64 runner.
+  build:
+    name: Build
     needs: info
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.ox }}
+    strategy:
+      matrix:
+        on: [[ubuntu-latest],[self-hosted,ARM64]]
     steps:
+
+      # Some diagnostic info on the build environment. This also outputs `arch`
+      # which we use elsewhere for architecture-specific things.
       - name: Dump Environment
+        id: env
         run: |
             echo "::group::env"
             env | sort
@@ -126,23 +150,36 @@ jobs:
             echo "::group::home"
             ls -la $HOME
             echo "::endgroup::"
+            echo "::set-output name=arch::$(uname -m)"
 
+      # Clone the repos
       - name: Checkout Repository
         uses: actions/checkout@v2
 
+      # This installs the `/proc/sys/fs/binfmt` entries that allow the CI host
+      # to build for other architectures under QEMU emulation. It's not really
+      # needed here since we're only building natively but we're leaving it in
+      # since it'll be done by our build system anyway.
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v1
+
+      # Start a BuildX builder. We'll use the ouptuts later so give it an ID.
       - name: Setup Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v1
 
+      # We'll tell BuildX to `--cache-from` this folder to speed up the build
+      # of our `appscope-builder` image. 
       - name: Setup Docker Cache
         uses: actions/cache@v2
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-amd64-buildx-${{ github.sha }}
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-buildx-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-amd64-buildx-
+            ${{ runner.os }}-${{ steps.env.outputs.arch }}-buildx-
           upload-chunk-size: 1000000
 
+      # Cache downloaded Go dependencies.
       - name: Setup Go Cache
         uses: actions/cache@v2
         with:
@@ -152,47 +189,59 @@ jobs:
             cli/.gobin
             cli/.gocache
             cli/.gomod
-          key: ${{ runner.os }}-amd64-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-go-${{ hashFiles('cli/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-amd64-go-
+            ${{ runner.os }}-${{ steps.env.outputs.arch }}-go-
           upload-chunk-size: 1000000
 
+      # Cache the cmocka build. Use a key based on a hash of all the files used
+      # in the build.
       - name: Setup cmocka Cache
         uses: actions/cache@v2
         with:
           path: contrib/build/cmocka
-          key: ${{ runner.os }}-amd64-cmocka-${{ hashFiles('contrib/cmocka/**') }}
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-cmocka-${{ hashFiles('contrib/Makefile', 'contrib/cmocka/**') }}
           restore-keys: |
-            ${{ runner.os }}-amd64-cmocka-
+            ${{ runner.os }}-${{ steps.env.outputs.arch }}-cmocka-
           upload-chunk-size: 1000000
 
+      # Cache the funchook build. Use a key based on a hash of all the files
+      # used in the build.
       - name: Setup funchook Cache
         uses: actions/cache@v2
         with:
           path: contrib/build/funchook
-          key: ${{ runner.os }}-amd64-funchook-${{ hashFiles('contrib/funchook/**') }}
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-funchook-${{ hashFiles('contrib/Makefile', 'contrib/funchook/**') }}
           restore-keys: |
-            ${{ runner.os }}-amd64-funchook-
+            ${{ runner.os }}-${{ steps.env.outputs.arch }}-funchook-
           upload-chunk-size: 1000000
 
+      # Cache the funchook build. Use a key based on a hash of all the files
+      # used in the build.
       - name: Setup pcre2 Cache
         uses: actions/cache@v2
         with:
           path: contrib/build/pcre2
-          key: ${{ runner.os }}-amd64-pcre2-${{ hashFiles('contrib/cpre2/**') }}
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-pcre2-${{ hashFiles('contrib/Makefile', 'contrib/cpre2/**') }}
           restore-keys: |
-            ${{ runner.os }}-amd64-pcre2-
+            ${{ runner.os }}-${{ steps.env.outputs.arch }}-pcre2-
           upload-chunk-size: 1000000
 
+      # Cache the openssl build. Use a key based on a hash of all the files
+      # used in the build.
       - name: Setup openssl Cache
         uses: actions/cache@v2
         with:
           path: contrib/build/openssl
-          key: ${{ runner.os }}-amd64-openssl-${{ hashFiles('contrib/openssl/**') }}
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-openssl-${{ hashFiles('contrib/Makefile', 'contrib/openssl/**') }}
           restore-keys: |
-            ${{ runner.os }}-amd64-openssl-
+            ${{ runner.os }}-${{ steps.env.outputs.arch }}-openssl-
           upload-chunk-size: 1000000
 
+      # Build our `appscope-builder` image. This should only end up using the
+      # cached image but because it needs to transfer the results from the
+      # builder container into the local Docker registry, it stills take more
+      # time that we'd like.
       - name: Update Builder
         env:
           BUILDER: ${{ steps.buildx.outputs.name }}
@@ -200,206 +249,81 @@ jobs:
           CACHE_TO: type=local,dest=/tmp/.buildx-cache-new
         run: make builder
 
+      # Run `make all` in the builder container to build the core and CLI.
       - name: Build AppScope
         env:
           VERSION: ${{ needs.info.outputs.tag }}
           BUILDER: ${{ steps.buildx.outputs.name }}
         run: make build NOBUILD=1 CMD="make all" CI=${CI}
 
+      # Run `make test` in the builder container to unit-test the core and CLI.
       - name: Unit-Test AppScope
         env:
           VERSION: ${{ needs.info.outputs.tag }}
           BUILDER: ${{ steps.buildx.outputs.name }}
         run: make build NOBUILD=1 CMD="make test" CI=${CI}
 
+      # Get a list of the integration tests to be run. The output is JSON so it
+      # can be used as a matrix deimension in a later stage. Give it an ID so
+      # we can reference the output.
       - name: List Integration Tests
         id: tests
-        run: echo "::set-output name=tests::$(make -s -C test/testContainers tests | sort -V | jq -ncR '[inputs]')"
+        run: echo "::set-output name=tests-${{ steps.env.outputs.arch }}::$(make -s -C test/testContainers tests | sort -V | jq -ncR '[inputs]')"
 
+      # Upload the built binaries for use by later stages. We specify the same
+      # artifact name for this job as well as the other job for ARM. The result
+      # is a single artifact with binaries from both jobs.
       - name: Upload Binaries
         uses: actions/upload-artifact@v2
         with:
           name: binaries
           path: |
-            lib/linux/x86_64/libscope.so
-            bin/linux/x86_64/scope
-            bin/linux/x86_64/ldscope
+            lib/linux/${{ steps.env.outputs.arch }}/libscope.so
+            bin/linux/${{ steps.env.outputs.arch }}/scope
+            bin/linux/${{ steps.env.outputs.arch }}/ldscope
 
+      # To prevent the cache from growing uncbounded, we used `--cache-to` a
+      # different folder that the `--cache-from`. This moves the results of the
+      # build to where the cache action expect to find the results.
       - name: Update Docker Cache
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
+    # Make these available to the test stage.
     outputs:
-      tests: ${{ steps.tests.outputs.tests }}
+      tests-x86_64: ${{ steps.tests.outputs.tests-x86_64 }}
+      tests-aarch64: ${{ steps.tests.outputs.tests-aarch64 }}
 
-  build-arm64:
-    name: Build aarch64/arm64
-    needs: info
-    runs-on: [self-hosted,ARM64]
-    steps:
-      - name: Dump Environment
-        run: |
-            echo "::group::env"
-            env | sort
-            echo "::endgroup::"
-            echo "::group::pwd"
-            pwd
-            echo "::endgroup::"
-            echo "::group::net"
-            hostname
-            ip addr
-            cat /etc/resolv.conf
-            resolvectl status
-            echo "::endgroup::"
-            echo "::group::uname"
-            uname -a
-            echo "::endgroup::"
-            echo "::group::cpuinfo"
-            cat /proc/cpuinfo
-            echo "::endgroup::"
-            echo "::group::lscpu"
-            lscpu
-            echo "::endgroup::"
-            echo "::group::ldd"
-            ldd --version
-            echo "::endgroup::"
-            echo "::group::free"
-            free
-            echo "::endgroup::"
-            echo "::group::home"
-            ls -la $HOME
-            echo "::endgroup::"
-
-      - name: Checkout Repository
-        uses: actions/checkout@v2
-
-      - name: Setup Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Setup Docker Cache
-        uses: actions/cache@v2
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-arm64-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-arm64-buildx-
-          upload-chunk-size: 1000000
-
-      - name: Setup Go Cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-            cli/.gobin
-            cli/.gocache
-            cli/.gomod
-          key: ${{ runner.os }}-arm64-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-arm64-go-
-          upload-chunk-size: 1000000
-
-      - name: Setup cmocka Cache
-        uses: actions/cache@v2
-        with:
-          path: contrib/build/cmocka
-          key: ${{ runner.os }}-arm64-cmocka-${{ hashFiles('contrib/cmocka/**') }}
-          restore-keys: |
-            ${{ runner.os }}-arm64-cmocka-
-          upload-chunk-size: 1000000
-
-      - name: Setup funchook Cache
-        uses: actions/cache@v2
-        with:
-          path: contrib/build/funchook
-          key: ${{ runner.os }}-arm64-funchook-${{ hashFiles('contrib/funchook/**') }}
-          restore-keys: |
-            ${{ runner.os }}-arm64-funchook-
-          upload-chunk-size: 1000000
-
-      - name: Setup pcre2 Cache
-        uses: actions/cache@v2
-        with:
-          path: contrib/build/pcre2
-          key: ${{ runner.os }}-arm64-pcre2-${{ hashFiles('contrib/pcre2/**') }}
-          restore-keys: |
-            ${{ runner.os }}-arm64-pcre2-
-          upload-chunk-size: 1000000
-
-      - name: Setup openssl Cache
-        uses: actions/cache@v2
-        with:
-          path: contrib/build/openssl
-          key: ${{ runner.os }}-arm64-openssl-${{ hashFiles('contrib/openssl/**') }}
-          restore-keys: |
-            ${{ runner.os }}-arm64-openssl-
-          upload-chunk-size: 1000000
-
-      - name: Update Builder
-        env:
-          BUILDER: ${{ steps.buildx.outputs.name }}
-          CACHE_FROM: type=local,src=/tmp/.buildx-cache
-          CACHE_TO: type=local,dest=/tmp/.buildx-cache-new
-        run: make builder
-
-      - name: Build AppScope
-        env:
-          VERSION: ${{ needs.info.outputs.tag }}
-          BUILDER: ${{ steps.buildx.outputs.name }}
-        run: make build NOBUILD=1 CMD="make all" CI=${CI}
-
-      - name: Unit-Test AppScope
-        env:
-          VERSION: ${{ needs.info.outputs.tag }}
-          BUILDER: ${{ steps.buildx.outputs.name }}
-        run: make build NOBUILD=1 CMD="make test" CI=${CI}
-
-      - name: List Integration Tests
-        id: tests
-        run: echo "::set-output name=tests::$(make -s -C test/testContainers tests | sort -V | jq -ncR '[inputs]')"
-
-      - name: Upload Binaries
-        uses: actions/upload-artifact@v2
-        with:
-          name: binaries
-          path: |
-            lib/linux/aarch64/libscope.so
-            bin/linux/aarch64/scope
-            bin/linux/aarch64/ldscope
-
-      - name: Update Docker Cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-    outputs:
-      tests: ${{ steps.tests.outputs.tests }}
-
+  # Push the results to the CDN when the builds succeed.
   cdn: 
     name: Update CDN
-    needs: [info,build-amd64,build-arm64]
+    needs: [info,build]
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' }}
     steps:
+      # Clone the repos
       - name: Checkout Repository
         uses: actions/checkout@v2
 
+      # Download the built binaries
       - name: Download Binaries
         uses: actions/download-artifact@v2
         with:
           name: binaries
 
+      # Fix permissions on the binaries
       - name: Chmod Binaries
         run: chmod +x lib/linux/*/* bin/linux/*/*
 
+      # Depoly to the CDN
       - name: Deploy
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "unreleased" = "${{ needs.info.outputs.tag }}" ]; then
             VERSION=${{ needs.info.outputs.branch }}
@@ -459,14 +383,15 @@ jobs:
             done
           fi
 
+  # Run the x86 Integration tests.
   test-amd64:
     name: Test x86_64/amd64
-    needs: build-amd64
-    # Uncomment this to go back to only running the integration tests for pull requests.
+    needs: build
+    # XXX Uncomment this to go back to only running the integration tests for pull requests.
     #if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
     strategy:
-      matrix: 
-        test: ${{ fromJson(needs.build-amd64.outputs.tests) }}
+      matrix:
+        test: ${{ fromJson(needs.build.outputs.tests-x86_64) }}
       fail-fast: false
     runs-on: ubuntu-latest
     steps:
@@ -481,6 +406,7 @@ jobs:
       - name: Chmod Binaries
         run: chmod +x lib/linux/*/* bin/linux/*/*
 
+      # We skip this step if we're not going to push the resulting container image
       - name: Login to Container Registry
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         uses: docker/login-action@v1
@@ -495,18 +421,20 @@ jobs:
       - name: Run Test
         run: make -C test/testContainers ${{ matrix.test }} NOBUILD=1
 
+      # We only save the resulting container image when testing the default branch
       - name: Upload Test Image
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         run: make -C test/testContainers ${{ matrix.test }}-push NOBUILD=1
 
+  # Run the ARM Integration tests.
   test-arm64:
     name: Test aarch64/arm64
-    needs: build-arm64
+    needs: build
     # Uncomment this to go back to only running the integration tests for pull requests.
     #if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
     strategy:
       matrix: 
-        test: ${{ fromJson(needs.build-arm64.outputs.tests) }}
+        test: ${{ fromJson(needs.build.outputs.tests-aarch64) }}
       fail-fast: false
     runs-on: [self-hosted,ARM64]
     steps:
@@ -522,8 +450,7 @@ jobs:
         run: chmod +x lib/linux/*/* bin/linux/*/*
 
       - name: Login to Container Registry
-        # XXX Temporary to prime the cached images
-        #if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
@@ -537,13 +464,13 @@ jobs:
         run: make -C test/testContainers ${{ matrix.test }} NOBUILD=1
 
       - name: Upload Test Image
-        # XXX Temporary to prime the cached images
-        #if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         run: make -C test/testContainers ${{ matrix.test }}-push NOBUILD=1
 
+  # Build the container image if build and tests all passed.
   image:
     name: Build Image
-    needs: [info,build-amd64,build-arm64,test-amd64,test-arm64]
+    needs: [info,build,test-amd64,test-arm64]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -556,10 +483,12 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v1
 
+      # We skip this step if we're not going to push the resulting container image
       - name: Login to Container Registry
+        if: ${{ needs.info.outputs.push == 'true' }}
         uses: docker/login-action@v1
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
           #username: scopeci
@@ -573,6 +502,9 @@ jobs:
       - name: Chmod Binaries
         run: chmod +x lib/linux/*/* bin/linux/*/*
 
+      # Build the multi-architecture container image. If we decided to push in
+      # the info stage, we'll push the results here. Otherwise, we just run the
+      # build to ensure the process works.
       - name: Build Image
         env:
           VERSION: ${{ needs.info.outputs.tag }}

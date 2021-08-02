@@ -1,3 +1,15 @@
+#
+# AppScope - Contrib Builds
+#
+# The `contrib/` folder contains a number of external dependencies we keep
+# locally to ensure things don't change under us. The logic here builds them.
+# 
+# To support caching the results, we build most of these into subdirectories of
+# `./build/` and try not to make any changes/additions in the source folders
+# themselves. In CI, we can hash the source folder to get a key for caching the
+# results of the build if nothing actually changes.
+#
+
 ARCH ?= $(shell uname -m)
 
 all: cJSON cmocka funchook libyaml openssl pcre2
@@ -14,6 +26,7 @@ openssl: build/openssl
 pcre2: build/pcre2
 .PHONY: cJSON cmocka funchook libyaml openssl pcre2
 
+# Can't be cached because the build is in the source folder.
 cJSON/libcjson.a:
 	@echo "$${CI:+::group::}Building cJSON"
 	cd cJSON && $(MAKE)
@@ -39,6 +52,7 @@ build/funchook:
 	cd build/funchook && $(MAKE) capstone_src funchook-static
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
+# Can't be cached because we have to `autoreconf` the source folder.
 build/libyaml:
 	@echo "$${CI:+::group::}Building libyaml"
 	mkdir build/libyaml

@@ -149,6 +149,7 @@ func (sessions SessionList) CountAndDuration() (ret SessionList) {
 		if err != nil {
 			if util.CheckFileExists(s.EventsDestPath) {
 				s.EventCount = -1
+				s.Duration = -1
 			}
 		} else {
 			file, err := os.Open(s.EventsPath)

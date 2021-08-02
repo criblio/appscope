@@ -109,7 +109,7 @@ jobs:
   build:
     name: Build
     needs: info
-    runs-on: ${{ matrix.ox }}
+    runs-on: ${{ matrix.on }}
     strategy:
       matrix:
         on: [[ubuntu-latest],[self-hosted,ARM64]]

@@ -198,7 +198,7 @@ transportConnection(transport_t *trans)
     switch(trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            if (trans->net.sock) {
+            if (trans->net.sock != -1) {
                 return trans->net.sock;
             }
             return trans->net.pending_connect;
@@ -662,7 +662,7 @@ socketConnectIsPending(transport_t *trans)
 static int
 checkPendingSocketStatus(transport_t *trans)
 {
-    if (!trans) return 0;
+    if (!trans || trans->net.pending_connect == -1) return 0;
     int rc;
     struct timeval tv = {0};
 

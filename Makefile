@@ -134,7 +134,7 @@ build: require-docker require-qemu-binfmt
 		-u $(shell id -u):$(shell id -g) \
 		--privileged \
 		--platform $(ARCH) \
-		--name appscope-builder-$(DIST)-$(ARCH) \
+		$(if $(CI),,--name appscope-builder-$(DIST)-$(ARCH)) \
 		$(BUILD_IMAGE):$(DIST)-$(ARCH) \
 	       	$(CMD)
 

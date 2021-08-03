@@ -520,7 +520,7 @@ jobs:
           TYPE=registry
           docker buildx build \
                 --builder ${{ steps.buildx.outputs.name }} \
-                --tag ${GITHUB_REPOSITORY}:${VERSION} \
+                --tag ghcr.io/${GITHUB_REPOSITORY}:${VERSION} \
                 ${LATEST:+--tag ${GITHUB_REPOSITORY}:latest} \
                 --platform linux/amd64,linux/arm64/v8 \
                 --output type=${TYPE} \

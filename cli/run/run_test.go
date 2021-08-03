@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 func TestRunPassthrough(t *testing.T) {
 	// Test Passthrough, read from Stderr
 	cmd := exec.Command(os.Args[0])
-	cmd.Env = append(os.Environ(), "TEST_MAIN=runpassthrough", "SCOPE_METRIC_DEST=file://stderr")
+	cmd.Env = append(os.Environ(), "TEST_MAIN=runpassthrough", "SCOPE_HOME=.test", "SCOPE_METRIC_DEST=file://stderr")
 	var outb, errb bytes.Buffer
 	cmd.Stdout = &outb
 	cmd.Stderr = &errb
@@ -50,6 +50,7 @@ func TestRunPassthrough(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "true\n", outb.String())
 	assert.Contains(t, errb.String(), "proc.start")
+	os.RemoveAll(".test")
 }
 
 func TestRun(t *testing.T) {

@@ -5,73 +5,140 @@
 ERR=0
 ERRORS=
 
+wait_for_port() {
+    TIMEOUT=${2:-60}
+    while ! netstat -an | grep -w ${1} >/dev/null 2>&1; do
+        sleep 1
+        ((TIMEOUT=TIMEOUT-1))
+        if [ $TIMEOUT -le 0 ]; then
+            echo >&2 "warn: timed out waiting for port ${1} listener"
+            netstat -an | grep -w LISTEN >&2
+            return
+        fi
+    done
+    echo 1
+}
+
+wait_for_files() {
+    TIMEOUT=${2:-60}
+    while ! compgen -G "${1}" > /dev/null; do
+        sleep 1
+        ((TIMEOUT=TIMEOUT-1))
+        if [ $TIMEOUT -le 0 ]; then
+            echo >&2 "warn: timed out waiting for port ${1} files"
+            ls -lRa /tmp/out >&2
+            return
+        fi
+    done
+    echo 1
+}
+
+# Start Cribl/LogStream with:
+#   - AppScope TLS source on tcp:10090 (cert/key in /tmp)
+#   - AppScope TCP source on tcp:10091
+#   - TCP-JSON source on tcp:10070
+#   - Metrics source on udp:8125
+#   - Filesystem dest to /tmp/out/${source}/CriblOut-*.json (5 sec idle timeout)
+# So, anything sent to the sources should appear as JSON in /tmp/out ~5 secs later.
 echo
 echo ===============================================================================
 echo "Starting Cribl LogStream"
-openssl req -newkey rsa:2048 -nodes -keyout /tmp/appscope.key -x509 -days 365 -out /tmp/appscope.crt -subj '/C=US/ST=GA/L=Canton/O=AppScope/OU=IT/CN=appscope'
-mkdir /tmp/out
+[ -e /tmp/appscope.key -a -e /tmp/appscope.crt ] || \
+    openssl req \
+    -newkey rsa:2048 -nodes -x509 -days 365 \
+    -keyout /tmp/appscope.key \
+    -out /tmp/appscope.crt \
+    -subj '/C=US/ST=GA/L=Canton/O=AppScope/OU=IT/CN=appscope'
+[ -z "$(pgrep cribl)" ] || { /opt/cribl/bin/cribl stop; sleep 5; }
+[ -d /tmp/out ] && rm -rf /tmp/out
+[ -d /tmp/out ] || mkdir /tmp/out
 /opt/cribl/bin/cribl start
-sleep 5
+
+
+# For each of thes tests, we're waiting for the server socket to be available
+# first. Then we run a `curl` command with the right settings to have events
+# and/or metrics sent via the backend transport being tested. Finally, we wait
+# for the files to appear in /tmp/out.
 
 echo
 echo ===============================================================================
 echo "Testing Cribl/TLS Transport"
-rm -rf /tmp/out/appscope:in_appscope_tls
-SCOPE_CRIBL_TLS_CA_CERT_PATH=/tmp/appscope.crt \
-    scope run -c tls://localhost:10090 -- echo Hello >/dev/null
-sleep 6
-if compgen -G "/tmp/out/appscope:in_appscope_tls/CriblOut-*.json" > /dev/null; then
-    echo "  PASSED"
+if [ "$(wait_for_port 10090)" ]; then
+    rm -rf /tmp/out/appscope:in_appscope_tls
+    SCOPE_CRIBL_TLS_CA_CERT_PATH=/tmp/appscope.crt \
+        scope run -c tls://127.0.0.1:10090 -- curl -Lso /dev/null https://cribl.io
+    if [ "$(wait_for_files "/tmp/out/appscope:in_appscope_tls/CriblOut-*.json")" ]; then
+        echo "  PASSED"
+    else
+        echo "  FAILED - missing output files"
+        ERR+=1
+        ERRORS="$ERRORS Cribl/TLS"
+        ls -lR /tmp/out
+    fi
 else
-    echo "  FAILED"
+    echo "  FAILED - no listener"
     ERR+=1
     ERRORS="$ERRORS Cribl/TLS"
-    ls -lR /tmp/out
 fi
 
 echo
 echo ===============================================================================
 echo "Testing Cribl/TCP Transport"
-rm -rf /tmp/out/appscope:in_appscope_tcp
-scope run -c tcp://localhost:10091 -- echo Hello >/dev/null
-sleep 6
-if compgen -G "/tmp/out/appscope:in_appscope_tcp/CriblOut-*.json" > /dev/null; then
-    echo "  PASSED"
+if [ "$(wait_for_port 10091)" ]; then
+    rm -rf /tmp/out/appscope:in_appscope_tcp
+    scope run -c tcp://127.0.0.1:10091 -- curl -Lso /dev/null https://cribl.io
+    if [ "$(wait_for_files "/tmp/out/appscope:in_appscope_tcp/CriblOut-*.json")" ]; then
+        echo "  PASSED"
+    else
+        echo "  FAILED - missing output files"
+        ERR+=1
+        ERRORS="$ERRORS Cribl/TCP"
+        ls -lR /tmp/out
+    fi
 else
-    echo "  FAILED"
+    echo "  FAILED - no listener"
     ERR+=1
     ERRORS="$ERRORS Cribl/TCP"
-    ls -lR /tmp/out
 fi
 
 echo
 echo ===============================================================================
 echo "Testing Event/TCP Transport"
-rm -rf /tmp/out/tcpjson:in_tcp_json
-scope run -e tcp://localhost:10070 -- echo Hello >/dev/null
-sleep 6
-if compgen -G "/tmp/out/tcpjson:in_tcp_json/CriblOut-*.json" > /dev/null; then
-    echo "  PASSED"
+if [ "$(wait_for_port 10070)" ]; then
+    rm -rf /tmp/out/tcpjson:in_tcp_json
+    scope run -e tcp://127.0.0.1:10070 -- curl -Lso /dev/null https://cribl.io
+    if [ "$(wait_for_files "/tmp/out/tcpjson:in_tcp_json/CriblOut-*.json")" ]; then
+        echo "  PASSED"
+    else
+        echo "  FAILED - missing output files"
+        ERR+=1
+        ERRORS="$ERRORS Event/TCP"
+        ls -lR /tmp/out
+    fi
 else
-    echo "  FAILED"
+    echo "  FAILED - no listener"
     ERR+=1
     ERRORS="$ERRORS Event/TCP"
-    ls -lR /tmp/out
 fi
 
 echo
 echo ===============================================================================
 echo "Testing Metric/UDP Transport"
-rm -rf /tmp/out/metrics:in_metrics:udp
-scope run -m udp://localhost:8125 --metricformat statsd -- echo Hello >/dev/null
-sleep 6
-if compgen -G "/tmp/out/metrics:in_metrics:udp/CriblOut-*.json" > /dev/null; then
-    echo "  PASSED"
+if [ "$(wait_for_port 8125)" ]; then
+    rm -rf /tmp/out/metrics:in_metrics:udp
+    scope run -m udp://127.0.0.1:8125 --metricformat statsd -- curl -Lso /dev/null https://cribl.io
+    if [ "$(wait_for_files "/tmp/out/metrics:in_metrics:udp/CriblOut-*.json")" ]; then
+        echo "  PASSED"
+    else
+        echo "  FAILED - missing output files"
+        ERR+=1
+        ERRORS="$ERRORS Metric/UDP"
+        ls -lR /tmp/out
+    fi
 else
-    echo "  FAILED"
+    echo "  FAILED - no listener"
     ERR+=1
     ERRORS="$ERRORS Metric/UDP"
-    ls -lR /tmp/out
 fi
 
 echo

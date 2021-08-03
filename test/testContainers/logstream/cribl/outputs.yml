@@ -11,5 +11,5 @@ outputs:
     compress: none
     maxFileSizeMB: 32
     maxFileOpenTimeSec: 300
-    maxFileIdleTimeSec: 30
+    maxFileIdleTimeSec: 5
     maxOpenFiles: 100

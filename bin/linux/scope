@@ -1,0 +1,5 @@
+#!/bin/sh
+EXE=$(dirname $(realpath $0))/$(uname -m)/scope
+[ -x $EXE ] && exec ${EXE} $*
+echo >&2 "error: build $(uname -m)/scope first"
+exit 1

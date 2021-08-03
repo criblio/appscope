@@ -19,6 +19,18 @@
 
 #define __RTLD_DLOPEN	0x80000000
 
+/*
+ * It turns out that PTRACE_GETREGS & PTRACE_SETREGS are arch specific.
+ * From the man page: PTRACE_GETREGS and PTRACE_GETFPREGS are not present on all architectures.
+ * We will need to use PTRACE_GETREGSET and PTRACE_SETREGSET as these are defined to read
+ * registers in an architecture-dependent way.
+ * TODO: the code needs to be updated to handle this when we apply ARM64 specifics.
+ */
+#ifdef __aarch64__
+#define PTRACE_GETREGS PTRACE_GETREGSET
+#define PTRACE_SETREGS PTRACE_SETREGSET
+#endif
+
 typedef struct {
     char *path;
     uint64_t addr;
@@ -132,11 +144,13 @@ ptraceAttach(pid_t target) {
 static void 
 call_dlopen(void) 
 {
+#ifdef __x86_64__
     asm(
         "andq $0xfffffffffffffff0, %rsp \n" //align stack to 16-byte boundary
         "callq *%rax \n"
         "int $3 \n"
     );
+#endif
 }
 
 static void call_dlopen_end() {}
@@ -183,7 +197,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     if (ptraceWrite(pid, codeAddr, &call_dlopen, call_dlopen_end - call_dlopen)) {
         return EXIT_FAILURE;
     }
-
+#ifdef __x86_64__
     // set RIP to point to the injected code
     regs.rip = codeAddr;
     regs.rax = dlopenAddr;               // address of dlopen
@@ -195,7 +209,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     } else {
         regs.rsi = RTLD_NOW;
     }
-
+#endif
     ptrace(PTRACE_SETREGS, pid, NULL, &regs);
 
     // continue execution and wait until the target process is stopped
@@ -213,12 +227,13 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
 
         // check if the library has been successfully injected
         ptrace(PTRACE_GETREGS, pid, NULL, &regs);
+#ifdef __x86_64__
         if (regs.rax != 0x0) {
             //printf("Appscope library injected at %p\n", (void*)regs.rax);
         } else {
             fprintf(stderr, "error: dlopen() failed, library could not be injected\n");
         }
-
+#endif
         //restore the app's state
         ptraceWrite(pid, freeAddr, oldcode, oldcodeSize);
         ptrace(PTRACE_SETREGS, pid, NULL, &oldregs);

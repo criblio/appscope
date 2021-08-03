@@ -171,7 +171,13 @@ testEachLineInStreamWorksWithCannedData(void** state)
 static void
 testEachLineInStreamWithActualLibraryData(void** state)
 {
-    FILE* f_in = popen("nm ./lib/linux/libscope.so", "r");
+#if defined(__x86_64__)
+    FILE* f_in = popen("nm ./lib/linux/x86_64/libscope.so", "r");
+#elif defined(__aarch64__)
+    FILE* f_in = popen("nm ./lib/linux/aarch64/libscope.so", "r");
+#else
+#error Unknown architecture!
+#endif
     results_t result = {0};
     //FILE* f_out = fopen("/dev/null", "a");
     //                              replace f_out with stdout for debugging...
@@ -203,7 +209,13 @@ testEachLineInStreamWithActualLibraryData(void** state)
 static void
 testLibraryUsesFunctionsWeShouldNot(void **state)
 {
-    FILE* f_in = popen("nm ./lib/linux/libscope.so", "r");
+#if defined(__x86_64__)
+    FILE* f_in = popen("nm ./lib/linux/x86_64/libscope.so", "r");
+#elif defined(__aarch64__)
+    FILE* f_in = popen("nm ./lib/linux/aarch64/libscope.so", "r");
+#else
+#error Unknown architecture!
+#endif
     unsigned int lines_failed = 0;
 
     char line[1024];

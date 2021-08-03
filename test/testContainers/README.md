@@ -19,6 +19,10 @@ container. Since they're in subdirectories in the mount, they can be rebuilt
 and the container will have access to the updated versions without having to
 restart - handy when debugging.
 
+We have moved some of the test service definitions out of `docker-compose.yml`
+into separate arch-specific configs; `docker-compose.$(uname -m).yml`. This
+was done because the base images for some of them are not available on ARM.
+
 We have an additional config named `docker-compose.privileged.yml` that sets
 the privileged option in each container when run with `make ${TEST}-shell` so
 we can use `gdb` and other restricted tools.
@@ -66,6 +70,10 @@ $
 Developers can run tests locally pretty easily with this setup. We use it for
 CI/CD logic too.
 
+Set `START=${TEST}` to the name of a test when running `make all` to skip the
+tests ahead of it. Useful when one fails and you want to pickup where you left
+off; i.e. `make all START=logstream` skips the test before `logstream`.
+
 ## Tests
 
 As mentioned before, start with the `docker-compose.yml` file and each entry's
@@ -84,9 +92,13 @@ Application, but LogStream capabilities are not tested or used.
 ### `syscalls`
 
 Tests Linux syscalls supported by Scope using executable syscall unit tests.
-Some unit tests provided by [LTP Project][LTP] 
-the others are custom C
-test located in [syscalls/altp folder](syscalls/altp)
+Some unit tests provided by [LTP Project][LTP]; others are custom C tests
+located in [syscalls/altp folder](syscalls/altp).
+
+This test is explicity using `LD_PRELOAD` while other tests are using a mix of
+`scope` and `ldscope` and `LD_PRELOAD`. We have been removing use of
+`LD_PRELOAD` from some other tests to speed them up but we'll keep it here to
+make sure that startup scheme is getting wrung out.
 
 ### `nginx`
 

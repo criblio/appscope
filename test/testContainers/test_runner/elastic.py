@@ -91,7 +91,7 @@ class ElasticIndexAndSearchTest(ApplicationTest):
 
 def configure(runner: Runner, config):
     app_controller = SubprocessAppController(["/usr/local/bin/docker-entrypoint.sh"], "elastic", config.scope_path,
-                                             config.logs_path, start_wait=15)
+                                             config.logs_path, start_wait=60)
 
     runner.add_tests([ElasticIndexAndSearchTest(app_controller)])
 

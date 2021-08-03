@@ -589,6 +589,7 @@ apt_cmake_exists() {
 
 apt_cmake_install() {
     echo "Installing cmake."
+    sudo -E DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata
     sudo apt-get install -y cmake
     if [ $? = 0 ]; then
         echo "Installation of cmake successful."
@@ -629,7 +630,8 @@ apt_go_exists() {
 
 apt_go_install() {
     echo "Installing go."
-    sudo apt-get install -y software-properties-common
+    sudo -E DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata
+    sudo apt-get install -y software-properties-common 
     sudo add-apt-repository -y ppa:longsleep/golang-backports
     sudo apt update
     sudo apt-get install -y golang-go

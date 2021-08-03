@@ -56,7 +56,10 @@ jobs:
               echo "::set-output name=tag::unreleased"
             fi
           fi
-          echo "::group::outputs"
+
+      # Display these for troubleshooting
+      - name: Version/Tag Outputs
+        run: |
           echo "version=\"${{ steps.version.outputs.version }}\""
           echo "major=\"${{ steps.version.outputs.major }}\""
           echo "minor=\"${{ steps.version.outputs.minor }}\""
@@ -68,7 +71,6 @@ jobs:
           echo "latest=\"${{ steps.tag.outputs.latest }}\""
           echo "push=\"${{ steps.tag.outputs.push }}\""
           echo "branch=\"${{ steps.tag.outputs.branch }}\""
-          echo "::endgroup::"
 
       # If we're building a release tag and a corresponding release hasn't been
       # created in GitHub already, create it so we can attach artifacts to it
@@ -84,12 +86,12 @@ jobs:
             else
               if [ -n "${{ steps.version.outputs.prerelease }}" ]; then
                 gh release create ${{ steps.version.outputs.version }} -p \
-                  -n "${{ steps.notes.outputs.release_notes }}" \
+                  -n "Release description coming soon..." \
                   -t "Pre-Release ${{ steps.version.outputs.version-without-v }}"
                 echo "info: created Pre-Release ${{ steps.version.outputs.version-without-v }}"; \
               else
                 gh release create ${{ steps.version.outputs.version }} \
-                  -n "${{ steps.notes.outputs.release_notes }}" \
+                  -n "Release description coming soon..." \
                   -t "Release ${{ steps.version.outputs.version-without-v }}"
                 echo "info: created Release ${{ steps.version.outputs.version-without-v }}"; \
               fi \
@@ -331,11 +333,10 @@ jobs:
           else
             VERSION=${{ needs.info.outputs.tag }}
           fi
-
-          echo "::group::Deploying to https://cdn.cribl.io/dl/scope/${VERSION}"
-
           S3_SCOPE=s3://io.cribl.cdn/dl/scope
-          TMPDIR=$(mktemp -d)
+          TMPDIR=${RUNNER_TEMP}
+
+          echo "::group::Prep Content"
           mkdir ${TMPDIR}/scope
 
           cp conf/scope.yml          ${TMPDIR}/scope
@@ -349,39 +350,36 @@ jobs:
             (cd ${TMPDIR}/scope && md5sum scope > ../scope-${ARCH}.md5)
             cp ${TMPDIR}/scope/scope ${TMPDIR}/scope-${ARCH}
           done
-
           ls -laR ${TMPDIR}
+          echo "::endgroup::"
 
+          echo "::group::Deploy to https://cdn.cribl.io/dl/scope/${VERSION}"
           if [ -n "${{ needs.info.outputs.latest }}" ]; then
             echo "${{ needs.info.outputs.tag }}" > ${TMPDIR}/latest
             aws s3 cp ${TMPDIR}/latest ${S3_SCOPE}/latest
           fi
-
           aws s3 cp ${TMPDIR}/scope-x86_64         ${S3_SCOPE}/${VERSION}/linux/scope
           aws s3 cp ${TMPDIR}/scope-x86_64.md5     ${S3_SCOPE}/${VERSION}/linux/scope.md5
           aws s3 cp ${TMPDIR}/scope-x86_64.tgz     ${S3_SCOPE}/${VERSION}/linux/scope.tgz
           aws s3 cp ${TMPDIR}/scope-x86_64.tgz.md5 ${S3_SCOPE}/${VERSION}/linux/scope.tgz.md5
-
           for ARCH in x86_64 aarch64; do
             aws s3 cp ${TMPDIR}/scope-${ARCH}         ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope
             aws s3 cp ${TMPDIR}/scope-${ARCH}.md5     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.md5
             aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz
             aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz.md5 ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz.md5
           done
-
           aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*'
-
-          rm -rf ${TMPDIR}
-
           echo "::endgroup::"
 
           if [ "true" = "${{ needs.info.outputs.is-semver }}" ]; then
+            echo "::group::Attach Release Assets to https://github.com/criblio/appscope/releases/tag/${{ needs.info.outputs.version }}"
             for ARCH in x86_64 aarch64; do
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}"
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.md5"
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.tgz"
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.tgz.md5"
             done
+            echo "::endgroup::"
           fi
 
   # Run the x86 Integration tests.
@@ -513,7 +511,13 @@ jobs:
           PUSH: ${{ needs.info.outputs.push }}
         run: |
           # TODO only if needs.test-*.results == 'success'
-          [ "${PUSH}" ] && TYPE=registry || TYPE=local,dest=${RUNNER_TEMP}
+          if [ "${PUSH}" ]; then
+            echo "::group::Build ghcr.io/${GITHUB_REPOSITORY}:${VERSION} Image"
+            TYPE=registry
+          else
+            echo "::group::Build Test Image (no upload after)"
+            TYPE=local,dest=${RUNNER_TEMP}
+          fi
           docker buildx build \
                 --builder ${{ steps.buildx.outputs.name }} \
                 --tag ghcr.io/${GITHUB_REPOSITORY}:${VERSION} \
@@ -522,4 +526,5 @@ jobs:
                 --output type=${TYPE} \
                 --file docker/base/Dockerfile \
                 .
+          echo "::endgroup::"
 

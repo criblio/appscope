@@ -467,9 +467,10 @@ jobs:
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         run: make -C test/testContainers ${{ matrix.test }}-push NOBUILD=1
 
-  # Build the container image if build and tests all passed.
+  # Build the container image
   image:
     name: Build Image
+    if: always()
     needs: [info,build,test-amd64,test-arm64]
     runs-on: ubuntu-latest
     steps:
@@ -485,7 +486,8 @@ jobs:
 
       # We skip this step if we're not going to push the resulting container image
       - name: Login to Container Registry
-        # XXX
+        # XXX Re-enable this
+        # TODO only if needs.test-*.results == 'succeess'
         #if: ${{ needs.info.outputs.push == 'true' }}
         uses: docker/login-action@v1
         with:
@@ -513,6 +515,7 @@ jobs:
           PUSH: ${{ needs.info.outputs.push }}
         run: |
           # XXX testing PUSH
+          # TODO only if needs.test-*.results == 'succeess'
           #[ "${PUSH}" ] && TYPE=registry || TYPE=local,dest=${RUNNER_TEMP}
           TYPE=registry
           docker buildx build \

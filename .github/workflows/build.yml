@@ -511,7 +511,9 @@ jobs:
           LATEST: ${{ needs.info.outputs.latest }}
           PUSH: ${{ needs.info.outputs.push }}
         run: |
-          [ "${PUSH}" ] && TYPE=registry || TYPE=local,dest=${RUNNER_TEMP}
+          # XXX testing PUSH
+          #[ "${PUSH}" ] && TYPE=registry || TYPE=local,dest=${RUNNER_TEMP}
+          TYPE=registry
           docker buildx build \
                 --builder ${{ steps.buildx.outputs.name }} \
                 --tag ${GITHUB_REPOSITORY}:${VERSION} \

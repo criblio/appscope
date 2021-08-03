@@ -698,11 +698,13 @@ checkPendingSocketStatus(transport_t *trans)
     // We have a connection
     scopeLog("connect successful", trans->net.pending_connect, CFG_LOG_INFO);
 
-    // Socket no longer pending
-    trans->net.pending_connect = -1;
-
     // Move this descriptor up out of the way
     trans->net.sock = placeDescriptor(trans->net.pending_connect, trans);
+
+    // Remove the pending status from the transport
+    trans->net.pending_connect = -1;
+
+    // If the placeDescriptor call failed, we're done
     if (trans->net.sock == -1) return 0;
 
     // Set the TCP socket to blocking

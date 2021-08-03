@@ -38,7 +38,7 @@ struct _transport_t
     union {
         struct {
             int sock;
-            fd_set pending_connect;
+            int pending_connect;
             char *host;
             char *port;
             struct sockaddr_storage gai_addr;
@@ -198,7 +198,10 @@ transportConnection(transport_t *trans)
     switch(trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            return trans->net.sock;
+            if (trans->net.sock != -1) {
+                return trans->net.sock;
+            }
+            return trans->net.pending_connect;
         case CFG_FILE:
             if (trans->file.stream) {
                 return fileno(trans->file.stream);
@@ -474,12 +477,9 @@ transportDisconnect(transport_t *trans)
         case CFG_TCP:
             // appropriate for both tls and non-tls connections...
             shutdownTlsSession(trans);
-
-            int i;
-            for (i=0; i<FD_SETSIZE; i++) {
-                if (!FD_ISSET(i, &trans->net.pending_connect)) continue;
-                g_fn.close(i);
-                FD_CLR(i, &trans->net.pending_connect);
+            if (trans->net.pending_connect) {
+                g_fn.close(trans->net.pending_connect);
+                trans->net.pending_connect = -1;
             }
             break;
         case CFG_FILE:
@@ -656,22 +656,24 @@ setSocketBlocking(transport_t *trans, int sock, bool block)
 static int
 socketConnectIsPending(transport_t *trans)
 {
-    int i;
-    for (i=0; i<FD_SETSIZE; i++) {
-        if (FD_ISSET(i, &trans->net.pending_connect)) return TRUE;
-    }
-    return FALSE;
+    return (!trans || trans->net.pending_connect < 0) ? FALSE : TRUE;
 }
 
 static int
 checkPendingSocketStatus(transport_t *trans)
 {
-    if (!trans) return 0;
+    if (!trans || trans->net.pending_connect == -1) return 0;
     int rc;
     struct timeval tv = {0};
-    fd_set pending_results = trans->net.pending_connect;
+
+    fd_set pending_results;
+    FD_ZERO(&pending_results);
+    FD_SET(trans->net.pending_connect, &pending_results);
     rc = g_fn.select(FD_SETSIZE, NULL, &pending_results, NULL, &tv);
     if (rc < 0) {
+        if (errno == EINTR) {
+          return 0;
+        }
         DBG(NULL);
         transportDisconnect(trans);
         return 0;
@@ -680,61 +682,45 @@ checkPendingSocketStatus(transport_t *trans)
         return 0;
     }
 
-    int i;
-    rc = 0;
-    for (i=0; i<FD_SETSIZE; i++) {
-        if (!FD_ISSET(i, &pending_results)) continue;
-
-        // If we can't get socket status, or the status is an error, close the
-        // socket that failed to connect and remove it from the pending list.
-        int opt;
-        socklen_t optlen = sizeof(opt);
-        if ((getsockopt(i, SOL_SOCKET, SO_ERROR, (void*)(&opt), &optlen) < 0)
+    // If we can't get socket status, or the status is an error, close the
+    // socket that failed to connect and remove it from the pending list.
+    int opt;
+    socklen_t optlen = sizeof(opt);
+    if ((getsockopt(trans->net.pending_connect, SOL_SOCKET, SO_ERROR, (void*)(&opt), &optlen) < 0)
             || opt) {
-            scopeLog("connect failed", i, CFG_LOG_INFO);
+        scopeLog("connect failed", trans->net.pending_connect, CFG_LOG_INFO);
 
-            FD_CLR(i, &trans->net.pending_connect);
-            g_fn.close(i);
-            continue;
-        }
-
-        scopeLog("connect successful", i, CFG_LOG_INFO);
-
-        // Hey!  We found one that will work!
-        // Move this descriptor up out of the way
-        FD_CLR(i, &trans->net.pending_connect);
-        trans->net.sock = placeDescriptor(i, trans);
-        if (trans->net.sock == -1) continue;
-
-        // Set the TCP socket to blocking
-        if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {
-            DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
-        }
-
-        // We have a connected socket!  Woot!
-        // Do the tls stuff for this connection as needed.
-        if (trans->net.tls.enable) {
-            // when successful, we'll have a connected tls socket.
-            // when not, this will cleanup, disconnecting the socket.
-            establishTlsSession(trans);
-        }
-
-        break;
+        g_fn.close(trans->net.pending_connect);
+        trans->net.pending_connect = -1;
+        return 0;
     }
 
-    // If we were successful, we can stop looking.  Clean up pending sockets.
-    if (trans->net.sock != -1) {
-        rc = 1;
-        for (i=0; i<FD_SETSIZE; i++) {
-            if (FD_ISSET(i, &trans->net.pending_connect)) {
-                scopeLog("abandoning connect due to previous success", i, CFG_LOG_INFO);
-                g_fn.close(i);
-                FD_CLR(i, &trans->net.pending_connect);
-            }
-        }
+    // We have a connection
+    scopeLog("connect successful", trans->net.pending_connect, CFG_LOG_INFO);
+
+    // Move this descriptor up out of the way
+    trans->net.sock = placeDescriptor(trans->net.pending_connect, trans);
+
+    // Remove the pending status from the transport
+    trans->net.pending_connect = -1;
+
+    // If the placeDescriptor call failed, we're done
+    if (trans->net.sock == -1) return 0;
+
+    // Set the TCP socket to blocking
+    if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {
+        DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
     }
 
-    return rc;
+    // We have a connected socket!  Woot!
+    // Do the tls stuff for this connection as needed.
+    if (trans->net.tls.enable) {
+        // when successful, we'll have a connected tls socket.
+        // when not, this will cleanup, disconnecting the socket.
+        establishTlsSession(trans);
+    }
+
+    return 1;
 }
 
 static void
@@ -884,7 +870,7 @@ socketConnectionStart(transport_t *trans)
                 if (logmsg) free(logmsg);
             }
 
-            FD_SET(sock, &trans->net.pending_connect);
+            trans->net.pending_connect = sock;
             break;  // replace w/continue for a shotgun start.
         }
 
@@ -982,7 +968,7 @@ transportConnect(transport_t *trans)
                 // If it does, we're done.
                 if (socketConnectionStart(trans)) return 1;
             }
-            // Check to see if the a pending connetion has been successful.
+            // Check to see if the a pending connection has been successful.
             return checkPendingSocketStatus(trans);
         case CFG_FILE:
             return transportConnectFile(trans);
@@ -1006,7 +992,7 @@ transportCreateTCP(const char *host, const char *port, unsigned int enable,
 
     trans->type = CFG_TCP;
     trans->net.sock = -1;
-    FD_ZERO(&trans->net.pending_connect);
+    trans->net.pending_connect = -1;
     trans->net.host = strdup(host);
     trans->net.port = strdup(port);
     trans->net.tls.enable = enable;
@@ -1036,7 +1022,7 @@ transportCreateUdp(const char* host, const char* port)
 
     t->type = CFG_UDP;
     t->net.sock = -1;
-    FD_ZERO(&t->net.pending_connect);
+    t->net.pending_connect = -1;
     t->net.host = strdup(host);
     t->net.port = strdup(port);
 

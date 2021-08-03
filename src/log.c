@@ -74,6 +74,13 @@ logConnect(log_t* log)
 }
 
 int
+logConnection(log_t *log)
+{
+    if (!log) return -1;
+    return transportConnection(log->transport);
+}
+
+int
 logDisconnect(log_t* log)
 {
     if (!log) return 0;

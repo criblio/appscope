@@ -24,6 +24,7 @@ jobs:
     name: Get Build Info
     runs-on: ubuntu-latest
     steps:
+      # Clone the repo
       - name: Checkout Repository
         uses: actions/checkout@v2
 
@@ -387,8 +388,7 @@ jobs:
   test-amd64:
     name: Test x86_64/amd64
     needs: build
-    # XXX Uncomment this to go back to only running the integration tests for pull requests.
-    #if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
     strategy:
       matrix:
         test: ${{ fromJson(needs.build.outputs.tests-x86_64) }}
@@ -430,8 +430,7 @@ jobs:
   test-arm64:
     name: Test aarch64/arm64
     needs: build
-    # Uncomment this to go back to only running the integration tests for pull requests.
-    #if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
     strategy:
       matrix: 
         test: ${{ fromJson(needs.build.outputs.tests-aarch64) }}
@@ -486,9 +485,8 @@ jobs:
 
       # We skip this step if we're not going to push the resulting container image
       - name: Login to Container Registry
-        # XXX Re-enable this
-        # TODO only if needs.test-*.results == 'succeess'
-        #if: ${{ needs.info.outputs.push == 'true' }}
+        # TODO only if needs.test-*.results == 'success'
+        if: ${{ needs.info.outputs.push == 'true' }}
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
@@ -514,10 +512,8 @@ jobs:
           LATEST: ${{ needs.info.outputs.latest }}
           PUSH: ${{ needs.info.outputs.push }}
         run: |
-          # XXX testing PUSH
-          # TODO only if needs.test-*.results == 'succeess'
-          #[ "${PUSH}" ] && TYPE=registry || TYPE=local,dest=${RUNNER_TEMP}
-          TYPE=registry
+          # TODO only if needs.test-*.results == 'success'
+          [ "${PUSH}" ] && TYPE=registry || TYPE=local,dest=${RUNNER_TEMP}
           docker buildx build \
                 --builder ${{ steps.buildx.outputs.name }} \
                 --tag ghcr.io/${GITHUB_REPOSITORY}:${VERSION} \

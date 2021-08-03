@@ -1259,7 +1259,6 @@ initHook(int attachedFlag)
     if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
         if (handle == NULL) {
-            dlclose(handle);
             return;
         }
 

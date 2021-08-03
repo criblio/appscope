@@ -137,11 +137,11 @@ static int
 bashMemFuncsFound()
 {
     int num_found = 0;
+    csh disass_handle = 0;
 
     void *exe_handle = g_fn.dlopen(NULL, RTLD_LAZY);
     if (!exe_handle) goto out;
 
-    csh disass_handle = 0;
     cs_arch arch;
     cs_mode mode;
 #if defined(__aarch64__)

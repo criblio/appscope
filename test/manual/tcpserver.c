@@ -5,7 +5,7 @@
  * options: -t, --tls       use TLSv1.3
  *
  * requires: libssl-dev
- * build: gcc -g test/manual/tcpserver.c -Icontrib/openssl/include -L contrib/openssl -Wl,-R$PWD/contrib/openssl -lpthread -lssl -lcrypto -o tcpserver
+ * build: gcc -g test/manual/tcpserver.c -Icontrib/build/openssl/include -Icontrib/openssl/include -L contrib/build/openssl -Wl,-R$PWD/contrib/build/openssl -lpthread -lssl -lcrypto -o tcpserver
  *
  * generate unencrypted TLS key and certificate:
  * openssl req -nodes -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem

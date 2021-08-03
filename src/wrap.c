@@ -12,7 +12,6 @@
 #include <sys/stat.h>
 #include <libgen.h>
 #include <sys/resource.h>
-#include <errno.h>
 
 #include "atomic.h"
 #include "bashmem.h"
@@ -911,24 +910,9 @@ reportPeriodicStuff(void)
 void
 handleExit(void)
 {
-    struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
-
-    char *wait;
-    if ((wait = getenv("SCOPE_CONNECT_TIMEOUT_SECS")) != NULL) {
-        // wait for a connection to be established 
-        // before we call doEvent
-        int wait_time;
-        errno = 0;
-        wait_time = strtoul(wait, NULL, 10);
-        if (!errno && wait_time) {
-            for (int i = 0; i < 100000 * wait_time; i++) {
-                if (!ctlNeedsConnection(g_ctl, CFG_CTL)) break; 
-                sigSafeNanosleep(&ts);
-            }
-        }
-    }
-
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+        struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
+
         // let the periodic thread finish
         while (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
             sigSafeNanosleep(&ts);

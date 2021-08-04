@@ -42,6 +42,29 @@ checkEnv(char *env, char *val)
     return FALSE;
 }
 
+/*
+ * Handling the case where there can be 2 instances
+ * of setenv; 1) libc and 2) application.
+ */
+int
+fullSetenv(const char *key, const char *val, int overwrite)
+{
+    int lrc = 0, arc = 0;
+
+    if (!g_fn.setenv || (g_fn.setenv(key, val, overwrite) == -1)) {
+        DBG("g_fn.setenv=%p, g_fn.app_setenv=%p key=%s, val=%s",
+            g_fn.setenv, g_fn.app_setenv, key, val);
+        lrc = -1;
+    }
+
+    if (g_fn.app_setenv && (g_fn.app_setenv != g_fn.setenv)) {
+        arc = g_fn.app_setenv(key, val, overwrite);
+    }
+
+    if ((lrc == -1) || (arc == -1)) return -1;
+    return 0;
+}
+
 void
 setPidEnv(int pid)
 {
@@ -52,9 +75,10 @@ setPidEnv(int pid)
         return;
     }
 
-    if (!g_fn.setenv || g_fn.setenv(SCOPE_PID_ENV, val, 1) == -1) {
-        DBG("g_fn.setenv=%p, SCOPE_PID_ENV=%s, val=%s",
-             g_fn.setenv, SCOPE_PID_ENV, val);
+    if (fullSetenv(SCOPE_PID_ENV, val, 1) == -1) {
+        char dbmsg[PATH_MAX];
+        snprintf(dbmsg, sizeof(dbmsg), "setPidEnv: %s:%s", SCOPE_PID_ENV, val);
+        scopeLog(dbmsg, -1, CFG_LOG_DEBUG);
     }
 }
 

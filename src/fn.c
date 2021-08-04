@@ -311,6 +311,7 @@ initFn(void)
     GETADDR(g_fn.usleep, "usleep");
     GETADDR(g_fn.io_getevents, "io_getevents");
     GETADDR(g_fn.setenv, "setenv");
+    g_fn.app_setenv = dlsym(RTLD_DEFAULT, "setenv");
 #ifdef __STATX__
     GETADDR(g_fn.statx, "statx");
 #endif

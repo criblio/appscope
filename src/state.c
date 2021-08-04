@@ -931,24 +931,16 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
     match_data = pcre2_match_data_create_from_pattern(protoDef->re, NULL);
     if (pcre2_match_wrapper(protoDef->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0,
                             match_data, NULL) > 0) {
-        char *buf = NULL;
-        if (asprintf(&buf, "protocol detected; %s", protoDef->protname) != -1) {
-            scopeLog(buf, sockfd, CFG_LOG_DEBUG);
-            if (buf) free(buf);
-        } else {
-            scopeLog("protocol detected", sockfd, CFG_LOG_DEBUG);
-        }
+        scopeLog("protocol detected", sockfd, CFG_LOG_DEBUG);
 
         if (net) {
             net->protoDetect = DETECT_TRUE;
             net->protoProtoDef = protoDef;
         }
 
-        if (protoDef->detect) {
-            // Build and send the protocol-detect event
+        if (protoDef->detect && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
             if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL)
             {
-                // alloc failed, cleanup and return false
                 if (cpdata)
                     free(cpdata);
                 if (match_data)
@@ -961,13 +953,12 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
             proto->fd = sockfd;
             if (net) proto->uid = net->uid;
             proto->data = (char *)strdup(protoDef->protname);
-            scopeLog("posting protocol-detect event", sockfd, CFG_LOG_DEBUG);
             cmdPostEvent(g_ctl, (char *)proto);
         }
 
         ret = TRUE; // matched
     } else {
-        // PREG for protocol DID NOT match
+        // the regex for protocol DID NOT match
         if (net) net->protoDetect = DETECT_FALSE;
     }
 

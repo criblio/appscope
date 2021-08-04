@@ -1918,12 +1918,21 @@ cfgReadProtocol(void **state)
         "    binary: 'false'\n"
         "    regex: 'sup up?'\n"
         "    len: 222\n"
+        "\n"
+        "  - name: test3\n"
+        "    binary: false\n"
+        "    regex: 'sup er?'\n"
+        "    len: 333\n"
+        "    detect: false\n"
+        "    payload: true\n"
         "...\n";
 
-    char *name[2] = {"test1", "test2"};
-    char *regex[2] = {"sup?", "sup up?"};
-    int binary[2] = {1, 0};
-    int len[2] = {111, 222};
+    char *name[3] = {"test1", "test2", "test3"};
+    char *regex[3] = {"sup?", "sup up?", "sup er?"};
+    int binary[3] = {1, 0, 0};
+    int len[3] = {111, 222, 333};
+    int detect[3] = {1, 1, 0};
+    int payload[3] = {0, 0, 1};
     int i;
     list_t *plist = lstCreate(destroyProtEntry);
     char *ppath = PROTOCOL_FILE_NAME;
@@ -1936,13 +1945,15 @@ cfgReadProtocol(void **state)
 
     protocolRead(ppath, plist);
 
-    for (i = 0; i < 2; i++) {
+    for (i = 0; i < 3; i++) {
         if ((prot = lstFind(plist, i)) != NULL) {
             assert_non_null(prot);
             assert_string_equal(prot->protname, name[i]);
             assert_string_equal(prot->regex, regex[i]);
             assert_int_equal(prot->binary, binary[i]);
             assert_int_equal(prot->len, len[i]);
+            assert_int_equal(prot->detect, detect[i]);
+            assert_int_equal(prot->payload, payload[i]);
         } else {
             break;
         }

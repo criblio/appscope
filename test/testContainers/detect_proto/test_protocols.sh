@@ -21,16 +21,57 @@ echo "==============================================="
 echo "             Testing Redis                     "
 echo "==============================================="
 if [ "$(wait_for_port 6379)" ]; then
-	ldscope redis-cli SET detect hello
-	grep remote_protocol /opt/test-runner/logs/events.log > /dev/null
-	ERR+=$?
-	grep '"protocol":"Redis"' /opt/test-runner/logs/events.log > /dev/null
-	ERR+=$?
-	if [ $ERR -eq "0" ]; then
+    # Looking for "source":"remote_protocol" events from scoped Redis client.
+    # Note thae the `detect` entry in scope_protocol.yml is `true` to start.
+
+    # Should not get the event with SCOPE_EVENT_NET=false
+    rm -f /opt/test-runner/logs/events.log
+	SCOPE_EVENT_NET=false ldscope redis-cli SET detect hello >/dev/null 2>&1
+	if grep remote_protocol /opt/test-runner/logs/events.log > /dev/null; then
+        echo "fail: got event with detect:true,  SCOPE_EVENT_NET=false"
+        ERR+=1
+    else
+        echo "pass: no  event with detect:true,  SCOPE_EVENT_NET=false"
+    fi
+
+    # Should get the event when SCOPE_EVENT_NET=true
+    rm -f /opt/test-runner/logs/events.log
+	SCOPE_EVENT_NET=true ldscope redis-cli SET detect hello >/dev/null 2>&1
+	if grep remote_protocol /opt/test-runner/logs/events.log > /dev/null; then
+        echo "pass: got event with detect:true,  SCOPE_EVENT_NET=true"
+    else
+        echo "fail: no  event with detect:true,  SCOPE_EVENT_NET=true"
+        ERR+=1
+    fi
+
+    # Set detect:false in scope_protocol.yml
+    sed -i 's/detect: true/detect: false/' /opt/test-runner/bin/scope_protocol.yml
+
+    # Should not get the event when SCOPE_EVENT_NET=false
+    rm -f /opt/test-runner/logs/events.log
+	SCOPE_EVENT_NET=true ldscope redis-cli SET detect hello >/dev/null 2>&1
+	if grep remote_protocol /opt/test-runner/logs/events.log > /dev/null; then
+        echo "fail: got event with detect:false, SCOPE_EVENT_NET=false"
+        ERR+=1
+    else
+        echo "pass: no  event with detect:false, SCOPE_EVENT_NET=false"
+    fi
+
+    # Should not get the event when SCOPE_EVENT_NET=true
+    rm -f /opt/test-runner/logs/events.log
+	SCOPE_EVENT_NET=true ldscope redis-cli SET detect hello >/dev/null 2>&1
+	if grep remote_protocol /opt/test-runner/logs/events.log > /dev/null; then
+        echo "fail: got event with detect:false, SCOPE_EVENT_NET=true"
+        ERR+=1
+    else
+        echo "pass: no  event with detect:false, SCOPE_EVENT_NET=true"
+    fi
+
+	if [ $ERR -eq 0 ]; then
 		echo "*************** Redis Success ***************"
 	else
 		echo "*************** Redis Test Failed ***************"
-		cat /opt/test-runner/logs/events.log
+		#cat /opt/test-runner/logs/events.log
 	fi
 	rm /opt/test-runner/logs/events.log
 else

@@ -125,4 +125,13 @@ services:
       - "9000:9000"
     <<: *scope-common
 
+  node:
+    image: ghcr.io/criblio/appscope-test-node:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-node:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./node/Dockerfile
+    <<: *scope-common
+
 # vim: ts=2 sw=2 et :

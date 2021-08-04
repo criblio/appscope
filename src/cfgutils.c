@@ -2242,6 +2242,9 @@ protocolRead(const char *path, list_t *plist)
             if ((prot = calloc(1, sizeof(protocol_def_t))) == NULL) goto cleanup;
             name_found = FALSE;
 
+            // set non-zero defaults
+            prot->detect = TRUE;
+
             foreach (prot_pair, (yaml_node_pair_t *)plist_key->data.sequence.items) {
                 // 3rd level
                 prot_key = yaml_document_get_node(&doc, prot_pair->key);

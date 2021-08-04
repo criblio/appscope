@@ -1,86 +1,90 @@
+# Note: Please see `gcc -dM -E - < /dev/null` for what the compiler already defines automatically before adding things.
+
 CWD = $(shell pwd)
 OS=linux
 CC=gcc
-CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -D__LINUX__ -D__GO__
+CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -D__LINUX__
 SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -D__LINUX__
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
-LD_FLAGS=$(PCRE2_AR) -ldl -lpthread -lrt -Lcontrib/funchook/build -lfunchook -ldistorm
-INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/pcre2/build -I./contrib/funchook/distorm/include -I./contrib/jni -I./contrib/jni/linux/ -I./contrib/openssl/include
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 CJSON_DEFINES=-DENABLE_LOCALES
 YAML_SRC=$(wildcard contrib/libyaml/src/*.c)
-YAML_AR=contrib/libyaml/src/.libs/libyaml.a
+YAML_AR=contrib/build/libyaml/src/.libs/libyaml.a
 JSON_AR=contrib/cJSON/libcjson.a
-FUNCHOOK_AR=contrib/funchook/build/libfunchook.a contrib/funchook/build/libdistorm.a
-PCRE2_AR=contrib/pcre2/build/libpcre2-posix.a contrib/pcre2/build/libpcre2-8.a
-OPENSSL_AR=contrib/openssl/libssl.a contrib/openssl/libcrypto.a
+PCRE2_AR=contrib/build/pcre2/libpcre2-posix.a contrib/build/pcre2/libpcre2-8.a
+OPENSSL_AR=contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a
 TEST_AR=$(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR}
-TEST_LIB=contrib/cmocka/build/src/libcmocka.dylib
+#TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
+TEST_LIB=contrib/build/cmocka/src/libcmocka.so
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include
-TEST_LD_FLAGS=-Lcontrib/cmocka/build/src -lcmocka -ldl -lresolv -lrt -lpthread
+TEST_LD_FLAGS=-Lcontrib/build/cmocka/src -lcmocka -ldl -lresolv -lrt -lpthread
 
-.PHONY: coreall coreclean coretest
-coreall: libscope.so ldscopedyn ldscope
+ARCH=$(shell uname -m)
+
+LIBSCOPE=lib/$(OS)/$(ARCH)/libscope.so
+LDSCOPE=bin/$(OS)/$(ARCH)/ldscope
+LDSCOPEDYN=bin/$(OS)/$(ARCH)/ldscopedyn
+
+coreall: $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN)
+
+corerebuild:
+	@$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN)
+	@$(MAKE) coreall
+
+include os/linux/$(ARCH).mk
 
 $(OPENSSL_AR):
-	@echo "Building openssl"
-	cd contrib/openssl && ./Configure no-async
-	cd contrib/openssl && make -j8
-	# Yuck.  Avoids naming conflict between our wrap.c and libssl.a
-	objcopy --redefine-sym SSL_read=SCOPE_SSL_read contrib/openssl/libssl.a
-	objcopy --redefine-sym SSL_write=SCOPE_SSL_write contrib/openssl/libssl.a
-
+	@$(MAKE) -C contrib openssl
 
 $(PCRE2_AR):
-	@echo "Building pcre2"
-	cd contrib/pcre2 && mkdir -p build
-	cd contrib/pcre2/build && cmake ..
-	cd contrib/pcre2/build && make
+	@$(MAKE) -C contrib pcre2
 
-$(FUNCHOOK_AR):
-	@echo "Building funchook and distorm"
-	cd contrib/funchook && mkdir -p build
-	cd contrib/funchook/build && cmake -DCMAKE_BUILD_TYPE=Release ..
-	cd contrib/funchook/build && make distorm funchook-static
+$(LDSCOPEDYN): src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c
+	@echo "$${CI:+::group::}Building $@"
+	gcc -Wall -g -D__LINUX__ $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
+		-DSCOPE_VER=\"$(SCOPE_VER)\" \
+		src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c \
+		-ldl -lrt -o $@ -I./os/$(OS) $(INCLUDES)
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
-libscope.so: src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c src/plattime.c src/fn.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c src/search.c src/sysexec.c src/gocontext.S src/scopeelf.c src/wrap_go.c src/utils.c src/bashmem.c $(YAML_SRC) contrib/cJSON/cJSON.c src/javabci.c src/javaagent.c
-	@echo "Building libscope.so ..."
-	make $(FUNCHOOK_AR)
-	make $(PCRE2_AR)
-	make $(OPENSSL_AR)
-	$(CC) $(CFLAGS) -shared -fvisibility=hidden -fno-stack-protector -DSCOPE_VER=\"$(SCOPE_VER)\" $(CJSON_DEFINES) $(YAML_DEFINES) -o ./lib/$(OS)/$@ $(INCLUDES) $^ $(LD_FLAGS) ${OPENSSL_AR} -Wl,--version-script=libscope.map
-	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
-	rm -rf ./test/selfinterpose && mkdir ./test/selfinterpose && mv *.o ./test/selfinterpose/ && rm ./test/selfinterpose/wrap_go.o
-
-ldscopedyn: src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c
-	gcc -Wall -g -D__LINUX__ $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c -ldl -lrt -o ./bin/$(OS)/ldscopedyn -I./os/$(OS) $(INCLUDES)
-
-
-ldscope: src/scope_static.c src/libdir.c ldscopedyn libscope.so
-	objcopy -I binary -O elf64-x86-64 -B i386 ./bin/$(OS)/ldscopedyn ./bin/$(OS)/ldscopedyn.o
-	objcopy -I binary -O elf64-x86-64 -B i386 ./lib/$(OS)/libscope.so ./lib/$(OS)/libscope.o
-	gcc -Wall -static -g -D__LINUX__ $(DISTRO_FLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" src/scope_static.c src/libdir.c $(INCLUDES) ./bin/$(OS)/ldscopedyn.o ./lib/$(OS)/libscope.o -lrt -lpthread -o ./bin/$(OS)/ldscope
-	rm -f ./bin/$(OS)/ldscopedyn.o ./lib/$(OS)/libscope.o
+$(LDSCOPE): src/scope_static.c src/libdir.c $(LDSCOPEDYN) $(LIBSCOPE)
+	@echo "$${CI:+::group::}Building $@"
+	cd $(dir $(LDSCOPEDYN)) && objcopy \
+		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
+		$(notdir $(LDSCOPEDYN)) $(notdir $(LDSCOPEDYN)).o
+	cd $(dir $(LIBSCOPE)) && objcopy \
+		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
+		$(notdir $(LIBSCOPE)) $(notdir $(LIBSCOPE:.so=.o))
+	gcc -Wall -static -g -D__LINUX__ $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
+		-DSCOPE_VER=\"$(SCOPE_VER)\" \
+		src/scope_static.c src/libdir.c \
+		$(INCLUDES) \
+		$(LDSCOPEDYN).o $(LIBSCOPE:.so=.o) \
+		-lrt -lpthread -o $@
+	$(RM) $(LDSCOPEDYN).o $(LIBSCOPE:.so=.o)
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 coreclean:
-	rm -f ./lib/$(OS)/libscope.so contrib/funchook/build/*.a bin/$(OS)/ldscope bin/$(OS)/ldscopedyn 
+	$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN) contrib/build/funchook/*.a
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))
 SRC_C_FILES:=$(filter-out src/sysexec.c, $(SRC_C_FILES))
+SRC_C_FILES:=$(filter-out src/wrap_go.c, $(SRC_C_FILES))
 SRC_C_FILES:=$(filter-out src/scope_static.c, $(SRC_C_FILES))
+ifeq (aarch64,$(ARCH))
+SRC_C_FILES:=$(filter-out src/bashmem.c, $(SRC_C_FILES))
+endif
 TEST_C_FILES:=$(wildcard test/*.c)
 TEST_C_FILES:=$(filter-out test/wraptest.c, $(TEST_C_FILES))
 C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c
 O_FILES:=$(C_FILES:.c=.o)
+CACHE_FILES:=$(shell find . -name CMakeCache.txt)
 
-coretest: $(C_FILES)
-	@echo "Building Tests"
-	$(CC) -c $(TEST_CFLAGS) $^ $(INCLUDES) $(TEST_INCLUDES)
-	make $(YAML_AR)
-	make $(JSON_AR)
-	make $(TEST_LIB)
+coretest: $(C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
+	@echo "$${CI:+::group::}Building Tests"
+	$(CC) -c $(TEST_CFLAGS) $(C_FILES) $(INCLUDES) $(TEST_INCLUDES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest cfgutilstest.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o mtcformat.o com.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest cfgtest.o cfg.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/transporttest transporttest.o transport.o dbg.o log.o fn.o utils.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
@@ -104,26 +108,19 @@ coretest: $(C_FILES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/searchtest searchtest.o search.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) test/manual/passfd.c -lpthread -o test/$(OS)/passfd
 	$(CC) $(TEST_CFLAGS) test/manual/unixpeer.c -lpthread -o test/$(OS)/unixpeer
-	@echo "Running Tests and Generating Test Coverage"
+	@[ -z "$(CI)" ] || echo "::endgroup::"
+	@echo "$${CI:+::group::}Running Tests and Generating Test Coverage"
 	test/execute.sh
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 # see file:///Users/cribl/scope/coverage/index.html
 
 $(YAML_AR): $(YAML_SRC)
-	@echo "Building libyaml"
-	cd ./contrib/libyaml && ./bootstrap
-	cd ./contrib/libyaml && ./configure LIBS=-ldl
-	cd ./contrib/libyaml && make
-# don't install on the host.  We only need the static .a file
+	@$(MAKE) -C contrib libyaml
 
 $(JSON_AR): contrib/cJSON/cJSON.c
-	@echo "Building cJSON"
-	cd ./contrib/cJSON && make clean
-	cd ./contrib/cJSON && make all
+	@$(MAKE) -C contrib cJSON
 
 $(TEST_LIB):
-	@echo "Building cmocka"
-	cd contrib/cmocka && test -d ./build || mkdir ./build
-	cd contrib/cmocka/build && cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Debug ..
-	cd contrib/cmocka/build && make
-# don't install on the host.
-# We can tell the linker where to find the .dylib file
+	@$(MAKE) -C contrib cmocka
+
+.PHONY: coreall coreclean coretest corerebuild

@@ -47,7 +47,16 @@ class KafkaAppController(AppController):
                 start_new_session=True, stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL)
 
-        time.sleep(15)
+        # wait for the "LISTEN" socket
+        timeout = 90
+        netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+        while b'LISTEN' not in netstat:
+            netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+            time.sleep(1)
+            timeout -= 1
+            if timeout <= 0:
+                logging.info("Giving up waiting for start")
+                break
 
         #logging.info("Sockets after start()")
         #os.system('netstat -an | grep -w 9092')
@@ -55,18 +64,52 @@ class KafkaAppController(AppController):
         #os.system('ps -ef')
 
     def stop(self):
-        # https://kafka.apache.org/quickstart says CTRL-C to stop these and
-        # these scropts are not working reliably so switching to sending
-        # SIGTERM and wait().
-        #subprocess.Popen("/kafka/bin/kafka-server-stop.sh", start_new_session=True)
-        #subprocess.Popen("/kafka/bin/zookeeper-server-stop.sh", start_new_session=True)
-        self.server.terminate();   self.server.wait()
-        self.zookeper.terminate(); self.zookeper.wait()
+        logging.info(f"Stopping app {self.name}.")
+        arch = subprocess.check_output(["uname","-m"])
+        if arch.startswith(b'x86'):
+            # kafka behaves with SIGTERM on x86
+            self.server.terminate();   self.server.wait()
+            self.zookeper.terminate(); self.zookeper.wait()
+        else:
+            # this is crazy but stopping Kafka isn't easy on ARM
+            subprocess.Popen("/kafka/bin/kafka-server-stop.sh", start_new_session=True)
+            subprocess.Popen("/kafka/bin/zookeeper-server-stop.sh", start_new_session=True)
+            timeout = 30
+            netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+            while b'LISTEN' in netstat:
+                netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+                time.sleep(1)
+                timeout -= 1
+                if timeout <= 0:
+                    logging.info("Giving up waiting for stop after scripts")
+                    break
+            if timeout <= 0:
+                os.system('pkill java')
+                timeout = 30
+                netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+                while b'LISTEN' in netstat:
+                    netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+                    time.sleep(1)
+                    timeout -= 1
+                    if timeout <= 0:
+                        logging.info("Giving up waiting for stop after pkill")
+                        break
+            if timeout <= 0:
+                os.system('pkill -9 java')
+                timeout = 30
+                netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+                while b'LISTEN' in netstat:
+                    netstat = subprocess.check_output('netstat -an | grep -w 9092 || true', shell=True)
+                    time.sleep(1)
+                    timeout -= 1
+                    if timeout <= 0:
+                        logging.info("Giving up waiting for stop after pkill -9")
+                        break
 
-        #logging.info("Sockets after stop()")
-        #os.system('netstat -an | grep -w 9092')
-        #logging.info("ps after stop()")
-        #os.system('ps -ef')
+        logging.info("Sockets after stop()")
+        os.system('netstat -an | grep -w 9092')
+        logging.info("ps after stop()")
+        os.system('ps -ef')
 
     def assert_running(self):
         completed_proc = subprocess.run("/kafka/bin/zookeeper-shell.sh localhost:2181 ls /brokers/ids", shell=True,

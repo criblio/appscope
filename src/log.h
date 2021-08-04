@@ -17,6 +17,7 @@ void                logFlush(log_t*);
 // Setters (modifies log_t, but does not persist modifications)
 int                 logNeedsConnection(log_t*);
 int                 logConnect(log_t*);
+int                 logConnection(log_t*);
 int                 logDisconnect(log_t*);
 int                 logReconnect(log_t*);
 void                logTransportSet(log_t*, transport_t*);

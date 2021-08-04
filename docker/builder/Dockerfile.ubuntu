@@ -45,6 +45,7 @@ RUN apt-get update && \
         autoconf \
         automake \
         cmake \
+        curl \
         emacs \
         gdb \
         git \
@@ -62,8 +63,10 @@ RUN apt-get update && \
     apt-get clean
 
 RUN useradd -d /home/builder -m builder && \
+    useradd -d /home/builder -m builder1 && \
     \
     echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/builder && \
+    echo "builder1 ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/builder && \
     \
     echo "alias ll='ls -alF'" >> /home/builder/.bashrc && \
     echo "alias la='ls -A'" >> /home/builder/.bashrc && \

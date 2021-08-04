@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import socket
+import subprocess
 import time
 from typing import Tuple, Any
 
@@ -28,8 +29,18 @@ class CriblTCPToFileTest(ApplicationTest):
         host = "127.0.0.1"
         port = 10003
 
+        logging.info(f"Waiting for {host}:{port} listener...")
+        timeout = 90
+        netstat = subprocess.check_output(f"netstat -an | grep -w {port} || true", shell=True)
+        while b'LISTEN' not in netstat:
+            netstat = subprocess.check_output(f"netstat -an | grep -w {port} || true", shell=True)
+            time.sleep(1)
+            timeout -= 1
+            if timeout <= 0:
+                logging.info(f"Giving up waiting for {host}:{port} listener")
+                break
+
         logging.info(f"Sending {events_num} events to cribl tcp input at {host}:{port}")
-        time.sleep(10)
 
         sent_messages = []
 

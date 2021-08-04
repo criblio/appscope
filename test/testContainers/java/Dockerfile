@@ -42,8 +42,6 @@ ENV SCOPE_SUMMARY_PERIOD=1
 ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
-# move this later so we're not scoping what we're running here
-#ENV LD_PRELOAD=/usr/lib/libscope.so
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 RUN echo "export PATH=${PATH}" >> /etc/profile.d/path.sh
@@ -53,14 +51,11 @@ COPY gdbinit /root/.gdbinit
 RUN  mkdir /usr/local/scope && \
      mkdir /usr/local/scope/bin && \
      mkdir /usr/local/scope/lib && \
-     ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
-     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
-     ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
+     ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/$(uname -m)/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
 COPY java/scope-test /usr/local/scope/scope-test
-
-# moved from earlier to here
-ENV LD_PRELOAD=/usr/lib/libscope.so
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]

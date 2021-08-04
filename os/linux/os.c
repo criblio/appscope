@@ -145,6 +145,38 @@ getNL(int sd)
     return (ino_t)-1;
 }
 
+static uint64_t
+getProcVal(char *srcbuf, const char *tag)
+{
+    char *entry, *last, *buf;
+    uint64_t val = -1;
+    const char delim[] = ":";
+
+    if (!srcbuf) return -1;
+    buf = strdup(srcbuf);
+
+    entry = strtok_r(buf, delim, &last);
+    while (1) {
+        if ((entry = strtok_r(NULL, delim, &last)) == NULL) {
+            break;
+        }
+
+        if (strcasestr((const char *)entry, tag) != NULL) {
+            // The next token should be what we want
+            if ((entry = strtok_r(NULL, delim, &last)) != NULL) {
+                if ((val = (uint64_t)strtoll(entry, NULL, 0)) == (long long)0) {
+                    val = (uint64_t)-1;
+                }
+                break;
+            }
+        }
+    }
+
+    if (buf) free(buf);
+    return val;
+}
+
+
 int
 osUnixSockPeer(ino_t lnode)
 {
@@ -339,14 +371,12 @@ osGetNumChildProcs(pid_t pid)
 }
 
 int
-osInitTSC(platform_time_t *cfg)
+osInitTimer(platform_time_t *cfg)
 {
     int fd;
-    char *entry, *last;
-    const char delim[] = ":";
-    const char path[] = "/proc/cpuinfo";
-    const char freqStr[] = "cpu MHz";
+    uint64_t val;
     char *buf;
+    const char path[] = "/proc/cpuinfo";
 
     if (!g_fn.open || !g_fn.read || !g_fn.close) {
         return -1;
@@ -385,25 +415,49 @@ osInitTSC(platform_time_t *cfg)
     } else {
         cfg->tsc_invariant = TRUE;
     }
-    
-    entry = strtok_r(buf, delim, &last);
-    while (1) {
-        if ((entry = strtok_r(NULL, delim, &last)) == NULL) {
-            cfg->freq = (uint64_t)-1;
-            break;
-        }
 
-        if (strcasestr((const char *)entry, freqStr) != NULL) {
-            // The next token should be what we want
-            if ((entry = strtok_r(NULL, delim, &last)) != NULL) {
-                if ((cfg->freq = (uint64_t)strtoll(entry, NULL, 0)) == (long long)0) {
-                    cfg->freq = (uint64_t)-1;
-                }
-                break;
-            }
-        }
+    if ((cfg->freq = getProcVal(buf, "cpu MHz")) == -1) {
+        cfg->freq = -1;
     }
-    
+
+    if (((val = getProcVal(buf, "CPU architecture")) != -1) &&
+        (val >= 8)) {
+        cfg->gptimer_avail = TRUE;
+    } else {
+        cfg->gptimer_avail = FALSE;
+    }
+
+#ifdef __aarch64__
+    /*
+     * This uses the General Purpose Timer definiton in an aarch64 instance.
+     * The frequency is the lower 32 bits of the CNTFRQ_EL0 register and
+     * is defined as HZ. The configured freq is defined in Mhz.
+     */
+    if (cfg->gptimer_avail == TRUE) {
+        uint64_t freq;
+
+        __asm__ volatile (
+            "mrs x1, CNTFRQ_EL0 \n"
+            "mov %0, x1  \n"
+            : "=r" (freq)                // output
+            :                            // inputs
+            :                            // clobbered register
+            );
+
+        freq &= 0x0000000ffffffff;
+        freq /= 1000000;
+        cfg->freq = freq;
+    }
+#elif defined(__x86_64__)
+    if ((cfg->tsc_invariant == TRUE) && (cfg->freq != -1)) {
+        cfg->gptimer_avail = TRUE;
+    } else {
+        cfg->gptimer_avail = FALSE;
+    }
+#else
+#error No architecture defined
+#endif
+
     g_fn.close(fd);
     free(buf);
     if (cfg->freq == (uint64_t)-1) {

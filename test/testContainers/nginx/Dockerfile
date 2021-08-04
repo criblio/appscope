@@ -9,9 +9,9 @@ FROM centos:latest
 #RUN curl https://www.getpagespeed.com/files/centos6-scl-rh-eol.repo --output /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo
 #RUN yum -y install centos-release-scl
 #RUN yum -y install rh-python36
-RUN yum -y install python3
-RUN yum -y install epel-release
-RUN yum -y install nginx httpd-tools
+RUN yum -y install python3 && \
+    yum -y install epel-release && \
+    yum -y install nginx httpd-tools
 
 RUN mkdir /opt/test-runner/
 RUN mkdir /opt/test-runner/logs/
@@ -45,9 +45,9 @@ COPY gdbinit /root/.gdbinit
 RUN  mkdir /usr/local/scope && \
      mkdir /usr/local/scope/bin && \
      mkdir /usr/local/scope/lib && \
-     ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
-     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
-     ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
+     ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/$(uname -m)/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
 COPY nginx/scope-test /usr/local/scope/scope-test
 

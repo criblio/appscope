@@ -29,7 +29,7 @@ run_test() {
     echo "$ENVVARS$1"
 
     # run the test
-    (export $ENVVARS; $1)
+    (export $ENVVARS; $1 2>&1)
     #(export $ENVVARS; valgrind $1)
 
     # accumulate errors reported by the return value of the test
@@ -48,10 +48,10 @@ mkdir $CWD/coverage
 
 if uname -s 2> /dev/null | grep -i "linux" > /dev/null; then
     OS="linux"
-    ENVVARS=$ENVVARS"LD_LIBRARY_PATH=contrib/cmocka/build/src/ "
+    ENVVARS=$ENVVARS"LD_LIBRARY_PATH=contrib/build/cmocka/src/ "
 elif uname -s 2> /dev/null | grep -i darwin > /dev/null; then
     OS="macOS"
-    ENVVARS=$ENVVARS"DYLD_LIBRARY_PATH=contrib/cmocka/build/src/ "
+    ENVVARS=$ENVVARS"DYLD_LIBRARY_PATH=contrib/build/cmocka/src/ "
 else
     OS="unknown"
 fi
@@ -87,22 +87,22 @@ run_test test/${OS}/selfinterposetest
 
 if [ "${OS}" = "linux" ]; then
     SAVEVARS=$ENVARS
-    ENVVARS=$ENVVARS"LD_PRELOAD=./lib/linux/libscope.so ""SCOPE_METRIC_DEST=file:///tmp/dnstest.log ""SCOPE_METRIC_VERBOSITY=9 ""SCOPE_SUMMARY_PERIOD=1 "
+    ENVVARS=$ENVVARS"LD_PRELOAD=./lib/linux/$(uname -m)/libscope.so ""SCOPE_METRIC_DEST=file:///tmp/dnstest.log ""SCOPE_METRIC_VERBOSITY=9 ""SCOPE_SUMMARY_PERIOD=1 "
     run_test test/${OS}/dnstest
     ENVARS=$SAVEVARS
     rm -f "/tmp/dnstest.log"
 
-    test/access_rights.sh
+    test/access_rights.sh 2>&1
     ERR+=$?
 
-    test/unixpeer.sh
+    test/unixpeer.sh 2>&1
     ERR+=$?
 
-    test/undefined_sym.sh
+    test/undefined_sym.sh 2>&1
     ERR+=$?
 fi
 
-test/options.sh
+test/options.sh 2>&1
 ERR+=$?
 
 #                ^
@@ -114,9 +114,9 @@ ERR+=$?
 # wraptest has special requirements, env wise...
 #ENVVARS="SCOPE_HOME=${CWD}/test/ "
 #if [ "${OS}" = "linux" ]; then
-#    ENVVARS=$ENVVARS"LD_LIBRARY_PATH=lib/${OS}:contrib/cmocka/build/src/ "
+#    ENVVARS=$ENVVARS"LD_LIBRARY_PATH=lib/${OS}:contrib/build/cmocka/src/ "
 #elif [ "${OS}" = "macOS" ]; then
-#    ENVVARS=$ENVVARS"DYLD_LIBRARY_PATH=lib/${OS}:contrib/cmocka/build/src/ "
+#    ENVVARS=$ENVVARS"DYLD_LIBRARY_PATH=lib/${OS}:contrib/build/cmocka/src/ "
 #    ENVVARS=$ENVVARS"DYLD_INSERT_LIBRARIES=${CWD}/lib/${OS}/libscope.so "
 #    ENVVARS=$ENVVARS"DYLD_FORCE_FLAT_NAMESPACE=1 "
 #fi

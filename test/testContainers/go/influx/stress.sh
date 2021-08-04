@@ -1,7 +1,7 @@
 #! /bin/bash
 
 influx_verbose=1
-scope_path="../../../../bin/linux/scope"
+scope_path="../../../../bin/linux/$(uname -m)/scope"
 influx_path="./"
 dbfile="$influx_path/db/meta/meta.db"
 

@@ -1,10 +1,10 @@
 FROM centos:latest
 
 COPY detect_proto/mongodb.repo /etc/yum.repos.d/.
-RUN yum -y update
-RUN yum -y install epel-release
-RUN yum -y install redis wget gdb openssl mongodb-org
-
+RUN yum -y update && \
+    yum -y install epel-release && \
+    yum -y install redis wget gdb openssl net-tools
+RUN [ "aarch64" = "$(uname -m)" ] || yum -y install mongodb-org
 
 RUN mkdir /opt/test-runner/
 RUN mkdir /opt/test-runner/logs/
@@ -22,8 +22,6 @@ ADD detect_proto/session.csv /data/session.csv
 
 RUN /usr/lib/systemd/systemd --system &
 CMD ["start"]
-
-ENV LD_PRELOAD=/usr/local/scope/lib/libscope.so
 
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///tmp/scope.log
@@ -47,9 +45,9 @@ COPY gdbinit /root/.gdbinit
 RUN  mkdir /usr/local/scope && \
      mkdir /usr/local/scope/bin && \
      mkdir /usr/local/scope/lib && \
-     ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
-     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
-     ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
+     ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/$(uname -m)/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
 COPY detect_proto/scope-test /usr/local/scope/scope-test
 

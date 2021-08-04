@@ -20,6 +20,7 @@
 
 extern bool g_need_stack_expand;
 extern unsigned g_sendprocessstart;
+extern bool g_exitdone;
 
 // Post a message from report to the command buffer
 int cmdSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);

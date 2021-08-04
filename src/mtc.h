@@ -19,12 +19,12 @@ void                mtcFlush(mtc_t*);
 // Setters (modifies mtc_t, but does not persist modifications)
 int                 mtcNeedsConnection(mtc_t *);
 int                 mtcConnect(mtc_t *);
+int                 mtcConnection(mtc_t*);
 int                 mtcDisconnect(mtc_t *);
 int                 mtcReconnect(mtc_t *);
 void                mtcEnabledSet(mtc_t*, unsigned);
 void                mtcTransportSet(mtc_t*, transport_t*);
 void                mtcFormatSet(mtc_t*, mtc_fmt_t*);
-
 
 #endif // __MTC_H__
 

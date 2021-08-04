@@ -1193,12 +1193,6 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     }
 }
 
-/**
- * Handle potential "protocol" events.
- *
- * This is called by our doSend() and doRecv() handlers and our wrappers of the
- * corresponding interposed functions.
- */
 int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {

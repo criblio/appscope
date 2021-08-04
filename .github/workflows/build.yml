@@ -487,11 +487,8 @@ jobs:
         if: ${{ needs.info.outputs.push == 'true' }}
         uses: docker/login-action@v1
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          #username: scopeci
-          #password: ${{ secrets.SCOPECI_TOKEN }}
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
 
       - name: Download Binaries
         uses: actions/download-artifact@v2
@@ -512,7 +509,7 @@ jobs:
         run: |
           # TODO only if needs.test-*.results == 'success'
           if [ "${PUSH}" ]; then
-            echo "::group::Build ghcr.io/${GITHUB_REPOSITORY}:${VERSION} Image"
+            echo "::group::Build cribl/scope:${VERSION} Image"
             TYPE=registry
           else
             echo "::group::Build Test Image (no upload after)"
@@ -520,8 +517,8 @@ jobs:
           fi
           docker buildx build \
                 --builder ${{ steps.buildx.outputs.name }} \
-                --tag ghcr.io/${GITHUB_REPOSITORY}:${VERSION} \
-                ${LATEST:+--tag ${GITHUB_REPOSITORY}:latest} \
+                --tag cribl/scope:${VERSION} \
+                ${LATEST:+--tag cribl/scope:latest} \
                 --platform linux/amd64,linux/arm64/v8 \
                 --output type=${TYPE} \
                 --file docker/base/Dockerfile \

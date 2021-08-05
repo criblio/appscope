@@ -66,7 +66,7 @@ $(LDSCOPE): src/scope_static.c src/libdir.c $(LDSCOPEDYN) $(LIBSCOPE)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 coreclean:
-	$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN) contrib/build/funchook/*.a
+	$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN)
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))

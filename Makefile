@@ -32,7 +32,7 @@ $(shell echo -n $(VERSION) > cli/VERSION)
 
 # github repostiory name; i.e. criblio/appscope
 # set automatically in CI so don't overwrite that
-GITHUB_REPOSITORY ?= $(shell git config --get remote.origin.url | cut -d: -f2 | sed 's/\.git$$//')
+GITHUB_REPOSITORY ?= $(shell git config --get remote.origin.url | cut -d: -f2 | sed -e 's/^\/\///' -e 's/\.git$$//')
 
 # architectures we build for
 # `uname -m` values; not Docker platform values like `amd64` or `arm64`

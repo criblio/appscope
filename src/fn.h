@@ -255,6 +255,9 @@ typedef struct {
     // where our library needs to use the glibc instance.
     // setenv was overriden in bash.
     int (*setenv)(const char *name, const char *value, int overwrite);
+
+    // intended for shells and any app that has it's own setenv
+    int (*app_setenv)(const char *name, const char *value, int overwrite);
 } interposed_funcs_t;
 
 extern interposed_funcs_t g_fn;

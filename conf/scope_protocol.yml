@@ -1,4 +1,5 @@
-# Cribl AppScope - Protocol Detector Configs
+# 
+# AppScope - Protocol Detection Configs
 #
 # Entries in this list define protocols that AppScope should detect in
 # payloads and how to handle matches. The first packet seen on a channel is

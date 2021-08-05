@@ -1,4 +1,4 @@
-FROM cribl/cribl:3.1.0-RC3
+FROM cribl/cribl:3.1.0-RC4
 
 RUN apt update && apt install -y \
   curl \

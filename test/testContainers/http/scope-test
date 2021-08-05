@@ -5,6 +5,7 @@
 # This is the URL for a file on a server that supports various HTTP/1.x and
 # HTTP/2 requests. We found it in the tests for WireShark.
 URL=http://nghttp2.org/robots.txt
+URL_HTTPS=https://nghttp2.org/robots.txt
 
 # LogStream will be configured to dump NDJSON output files here.
 DEST=/tmp/out/appscope:in_appscope
@@ -15,7 +16,7 @@ FAILED_TEST_COUNT=0
 starttest(){
     CURRENT_TEST=$1
     echo "=============================================="
-    echo "             Testing $CURRENT_TEST            "
+    echo "         Testing $CURRENT_TEST"
     echo "=============================================="
     ERR=0
 }
@@ -219,6 +220,52 @@ if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
         ERR+=1
     else
         echo "PASS: http-resp not found"
+    fi
+else
+    echo "FAIL: no output files"
+    ERR+=1
+fi
+endtest
+
+# Should get HTTP events from HTTP/1.x traffic via HTTPS
+starttest "HTTP/1.1 + HTTPS"
+rm -rf ${DEST}
+scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $URL_HTTPS
+if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
+    if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http-req found"
+    else
+        echo "FAIL: http-req not found"
+        ERR+=1
+    fi
+    if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http-resp found"
+    else
+        echo "FAIL: http-resp not found"
+        ERR+=1
+    fi
+else
+    echo "FAIL: no output files"
+    ERR+=1
+fi
+endtest
+
+# Should get HTTP events from HTTP/2 traffic via HTTPS
+starttest "HTTP/2 + HTTPS"
+rm -rf ${DEST}
+scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http2-prior-knowledge $URL_HTTPS
+if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
+    if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http-req found"
+    else
+        echo "FAIL: http-req not found"
+        ERR+=1
+    fi
+    if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http-resp found"
+    else
+        echo "FAIL: http-resp not found"
+        ERR+=1
     fi
 else
     echo "FAIL: no output files"

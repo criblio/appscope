@@ -47,7 +47,7 @@ if [ "$(wait_for_port 6379)" ]; then
     # Set detect:false in scope_protocol.yml
     sed -i 's/detect: true/detect: false/' /opt/test-runner/bin/scope_protocol.yml
 
-    # Should not get the event when SCOPE_EVENT_NET=false
+    # Should not get the event when SCOPE_EVENT_NET=true now
     rm -f /opt/test-runner/logs/events.log
 	SCOPE_EVENT_NET=true ldscope redis-cli SET detect hello >/dev/null 2>&1
 	if grep remote_protocol /opt/test-runner/logs/events.log > /dev/null; then
@@ -57,7 +57,7 @@ if [ "$(wait_for_port 6379)" ]; then
         echo "pass: no  event with detect:false, SCOPE_EVENT_NET=false"
     fi
 
-    # Should not get the event when SCOPE_EVENT_NET=true
+    # Should not get the event when SCOPE_EVENT_NET=true now
     rm -f /opt/test-runner/logs/events.log
 	SCOPE_EVENT_NET=true ldscope redis-cli SET detect hello >/dev/null 2>&1
 	if grep remote_protocol /opt/test-runner/logs/events.log > /dev/null; then

@@ -78,7 +78,6 @@ typedef enum {
     STREAM,
 } fs_type_t;
 
-
 // Interfaces
 extern mtc_t *g_mtc;
 extern ctl_t *g_ctl;

@@ -2,11 +2,17 @@
 #define __UTILS_H__
 
 #include <time.h>
+#include <stdint.h>
 
 typedef struct {
     const char *str;
     unsigned val;
 } enum_map_t;
+
+typedef struct {
+    uint64_t initial;
+    uint64_t duration;
+} elapsed_t;
 
 unsigned int strToVal(enum_map_t[], const char*);
 const char* valToStr(enum_map_t[], unsigned int);

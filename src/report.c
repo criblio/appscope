@@ -2445,7 +2445,15 @@ doEvent()
 
     if (ready == FALSE) return;
 
+    elapsed_t time = {0};
+    time.initial = getTime();
+
     while ((data = msgEventGet(g_ctl)) != -1) {
+
+        // timeout after 1 second
+        time.duration = getDuration(time.initial);
+        if (time.duration > 1) break;
+
         if (data) {
             evt_type *event = (evt_type *)data;
             net_info *net;

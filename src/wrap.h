@@ -30,11 +30,6 @@ typedef struct thread_timing_t {
     const struct sigaction *act;
 } thread_timing;
 
-typedef struct {
-    uint64_t initial;
-    uint64_t duration;
-} elapsed_t;
-
 extern int close$NOCANCEL(int);
 extern int guarded_close_np(int, void *);
 

@@ -933,10 +933,10 @@ handleExit(void)
     }
 
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
-        struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
-
         // let the periodic thread finish
-        while (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
+        // or timeout after 1 second
+        for (int i = 0; i < 100000; i++) {
+            if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) break;
             sigSafeNanosleep(&ts);
         }
         doEvent();

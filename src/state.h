@@ -15,11 +15,15 @@
 #endif
 #endif // __MACOS__
 
+
+/**
+ * Options for `do*()` indicating how to interpret the `buf` and `len` values.
+ */
 typedef enum {
-    BUF,
-    MSG,
-    IOV,
-    NONE
+    BUF, // `buf` points to raw bytes, `len` is the number of bytes
+    MSG, // `buf` points to a `struct msghdr`, `len` is unused
+    IOV, // `buf` points to a `struct iovec` array, `len` is the array length
+    NONE // `buf` is unavailable, typically NULL but `len` is what?
 } src_data_t;
 
 void initState();

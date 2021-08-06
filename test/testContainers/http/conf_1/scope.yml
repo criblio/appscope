@@ -128,7 +128,7 @@ libscope:
       buffering: line               # line, full
 
 cribl:
-  enable: false
+  enable: true
   transport:
     type: tcp
     host: 127.0.0.1

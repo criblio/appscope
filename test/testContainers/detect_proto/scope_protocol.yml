@@ -3,6 +3,7 @@ protocol:
   - name: Redis
     binary: false
     regex: "^[*]\\d+|^[+]\\w+|^[$]\\d+"
+    detect: true
 
   - name: Mongo
     binary: true

@@ -332,7 +332,7 @@ javaAddField(java_class_t *info, const char* name, const char* descriptor, uint1
     *((uint16_t *)buf) = htobe16(accessFlags);      buf += 2;
     *((uint16_t *)buf) = htobe16(nameIndex);        buf += 2;
     *((uint16_t *)buf) = htobe16(descriptorIndex);  buf += 2;
-    *((uint16_t *)buf) = htobe16(attrCount);        buf += 2;
+    *((uint16_t *)buf) = htobe16(attrCount);
 }
 
 void 

@@ -19,6 +19,8 @@ RUN mkdir /opt/test-runner/logs/
 #RUN source scl_source enable rh-python36 && virtualenv /opt/test-runner/
 
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
+ENV SCOPE_EVENT_DEST=file:///dev/null
+ENV SCOPE_EVENT_ENABLE=false
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV SCOPE_METRIC_VERBOSITY=4
@@ -35,8 +37,6 @@ COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
 RUN python3 -m pip install -r /opt/test-runner/requirements.txt
 
 COPY ./test_runner/ /opt/test-runner/
-
-RUN yum -y install net-tools
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh

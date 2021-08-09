@@ -62,6 +62,7 @@ __thread int g_getdelim = 0;
 static void *periodic(void *);
 static void doConfig(config_t *);
 static void threadNow(int);
+static ssize_t __sys_write(int, const void *, size_t);
 
 #ifdef __LINUX__
 extern int arch_prctl(int, unsigned long);
@@ -1357,12 +1358,14 @@ initHook(int attachedFlag)
         }
 
         if (g_fn.__write_libc) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
+            //rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
         }
 
         if (g_fn.__write_pthread) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+            //rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
         }
+
+        g_fn.write = __sys_write;
 
         // hook 'em
         rc = funchook_install(funchook, 0);
@@ -2535,6 +2538,12 @@ __write_pthread(int fd, const void *buf, size_t size)
     doWrite(fd, initialTime, (rc != -1), buf, rc, "__write_pthread", BUF, 0);
 
     return rc;
+}
+
+static ssize_t
+__sys_write(int fd, const void *buf, size_t size)
+{
+    return (ssize_t)syscall(SYS_write, fd, buf, size);
 }
 
 /*

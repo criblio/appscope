@@ -36,3 +36,5 @@ require (
 	k8s.io/api v0.20.2
 	k8s.io/apimachinery v0.20.2
 )
+
+replace github.com/olekukonko/tablewriter => github.com/cockroachdb/tablewriter v0.0.5-0.20200105123400-bd15540e8847

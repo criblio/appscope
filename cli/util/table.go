@@ -82,6 +82,7 @@ func printSlice(fields []ObjField, obj interface{}) error {
 	table.SetBorder(false)
 	table.SetTablePadding("\t")
 	table.SetNoWhiteSpace(true)
+	table.SetTrimWhiteSpaceAtEOL(true)
 	// table.SetHeaderColor(headerColors...)
 	table.SetBorder(false)
 	refval := GetValue(obj)
@@ -108,6 +109,7 @@ func printObj(fields []ObjField, obj interface{}) error {
 	table.SetColumnSeparator("  ")
 	table.SetCenterSeparator("  ")
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetTrimWhiteSpaceAtEOL(true)
 	// Iterate over fields
 	for _, field := range fields {
 		// Lookup field pointed to by Field

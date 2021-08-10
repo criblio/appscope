@@ -683,12 +683,12 @@ cribl:
   # Enable the cribl backend
   #   Type:     boolean
   #   Values:   true, false
-  #   Default:  true
+  #   Default:  false
   #
   # This is set true if $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD are set to a valid
   # transport URL.
   #
-  enable: true
+  enable: false
 
   # Authentication token
   #   Type:     string

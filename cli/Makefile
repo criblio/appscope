@@ -64,12 +64,11 @@ $(LDSCOPE):
 $(LIBSCOPE):
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libscope.so
 
-# shortcut "easy button"
 scope: $(SCOPE)
 
 $(SCOPE): export GOOS=linux
 $(SCOPE): export CGO_ENABLED=0
-$(SCOPE): run/bundle.go $(GOVVV)
+$(SCOPE): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	$(GO) build \
 		-ldflags="$(shell $(GOVVV) -flags)" \
 		$(BUILD_OPTS) \

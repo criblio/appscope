@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"path/filepath"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -43,12 +44,18 @@ Example: `scope service  cribl -c tls://in.my-instance.cribl.cloud:10090`,
 		}
 
 		// the service name must exist
-		serviceFile := fmt.Sprintf("/etc/systemd/system/%s.service", serviceName)
-		if _, err := os.Stat(serviceFile); err != nil {
-			serviceFile := fmt.Sprintf("/etc/systemd/user/%s.service", serviceName)
-			if _, err := os.Stat(serviceFile); err != nil {
-				util.ErrAndExit("error: didn't find service file; " + serviceName + ".service")
+		serviceFile := ""
+		filepath.Walk("/etc/systemd", func(path string, info os.FileInfo, err error) error {
+			if err == nil && info.Name() == serviceName + ".service" {
+				serviceFile = path + "/" + info.Name()
+				return nil
 			}
+			return nil
+		})
+		if serviceFile == "" {
+			util.ErrAndExit("error: didn't find service file; " + serviceName + ".service")
+		} else {
+			//os.Stdout.WriteString("info: found service file; " + serviceFile + "\n")
 		}
 
 		// get uname pieces

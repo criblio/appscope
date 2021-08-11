@@ -53,7 +53,7 @@ cribl:
 
 ## Scoping Without TLS
 
-If you prefer to communicate in without encryption, connect to port 10091 instead of port 10090.
+If you prefer to communicate without encryption, connect to port 10091 instead of port 10090.
 
 If it is enabled, disable the `tls` element in `scope.yml`.
 

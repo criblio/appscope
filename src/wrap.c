@@ -1137,6 +1137,12 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
  */
 static ssize_t __write_libc(int, const void *, size_t);
 static ssize_t __write_pthread(int, const void *, size_t);
+static ssize_t scope_write(int, const void *, size_t);
+static int __close_libc(int);
+static int __close_pthread(int);
+static int __close_nocancel_libc(int);
+static int __close_nocancel_pthread(int);
+static int scope_close(int);
 static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
 static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
@@ -1283,6 +1289,27 @@ initHook(int attachedFlag)
                                  .out_addr = (void*)&g_fn.__write_pthread};
     dl_iterate_phdr(findLibSym, &pthread__write);
 
+    find_sym_t libc__close = {.library="libc.so",
+                              .symbol="__close",
+                              .out_addr = (void*)&g_fn.__close_libc};
+    dl_iterate_phdr(findLibSym, &libc__close);
+
+    find_sym_t pthread__close = {.library = "libpthread.so",
+                                 .symbol = "__close",
+                                 .out_addr = (void*)&g_fn.__close_pthread};
+    dl_iterate_phdr(findLibSym, &pthread__close);
+
+    find_sym_t libc__close_nocancel = {.library="libc.so",
+                              .symbol="__close_nocancel",
+                              .out_addr = (void*)&g_fn.__close_nocancel_libc};
+    dl_iterate_phdr(findLibSym, &libc__close_nocancel);
+
+    find_sym_t pthread__close_nocancel = {.library = "libpthread.so",
+                                 .symbol = "__close_nocancel",
+                                 .out_addr = (void*)&g_fn.__close_nocancel_pthread};
+    dl_iterate_phdr(findLibSym, &pthread__close_nocancel);
+
+
     // for DNS:
     // On a glibc distro we hook sendmmsg because getaddrinfo calls this
     // directly and we miss DNS requests unless it's hooked.
@@ -1295,6 +1322,8 @@ initHook(int attachedFlag)
     // a dir with a libscope-ver string. If that exists in the env var
     // then we assume musl.
     if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
+        g_fn.__close_libc || g_fn.__close_pthread ||
+        g_fn.__close_nocancel_libc || g_fn.__close_nocancel_pthread ||
         ((g_ismusl == FALSE) && g_fn.sendmmsg) ||
         ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
         funchook = funchook_create();
@@ -1356,12 +1385,37 @@ initHook(int attachedFlag)
             stderr_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
         }
 
-        if (g_fn.__write_libc) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
-        }
+        if (g_ismusl == FALSE) {
+            if (g_fn.__write_libc) {
+                rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
+            }
 
-        if (g_fn.__write_pthread) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+            if (g_fn.__write_pthread) {
+                rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+            }
+
+            if (g_fn.__close_libc) {
+                rc = funchook_prepare(funchook, (void**)&g_fn.__close_libc, __close_libc);
+            }
+
+            if (g_fn.__close_pthread) {
+                rc = funchook_prepare(funchook, (void**)&g_fn.__close_pthread, __close_pthread);
+            }
+
+            if (g_fn.__close_nocancel_libc) {
+                rc = funchook_prepare(funchook, (void**)&g_fn.__close_nocancel_libc, __close_nocancel_libc);
+            }
+
+            if (g_fn.__close_nocancel_pthread) {
+                rc = funchook_prepare(funchook, (void**)&g_fn.__close_nocancel_pthread, __close_nocancel_pthread);
+            }
+
+            // We want to be able to use g_fn.write and g_fn.close without
+            // accidentally interposing these functions.  This resolves
+            // https://github.com/criblio/appscope/issues/472
+            g_fn.write = scope_write;
+            g_fn.close = scope_close;
+
         }
 
         // hook 'em
@@ -2537,6 +2591,78 @@ __write_pthread(int fd, const void *buf, size_t size)
     return rc;
 }
 
+static int
+isAnAppScopeConnection(int fd)
+{
+    if (fd == -1) return FALSE;
+
+    if ((fd == ctlConnection(g_ctl, CFG_CTL)) ||
+        (fd == ctlConnection(g_ctl, CFG_LS)) ||
+        (fd == mtcConnection(g_mtc)) ||
+        (fd == logConnection(g_log))) {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static int
+__close_libc(int fd)
+{
+    WRAP_CHECK(__close_libc, -1);
+
+    if (isAnAppScopeConnection(fd)) return 0;
+
+    int rc = g_fn.__close_libc(fd);
+
+    doCloseAndReportFailures(fd, (rc != -1), "close");
+
+    return rc;
+}
+
+static int
+__close_pthread(int fd)
+{
+    WRAP_CHECK(__close_pthread, -1);
+
+    if (isAnAppScopeConnection(fd)) return 0;
+
+    int rc = g_fn.__close_pthread(fd);
+
+    doCloseAndReportFailures(fd, (rc != -1), "close");
+
+    return rc;
+}
+
+static int
+__close_nocancel_libc(int fd)
+{
+    WRAP_CHECK(__close_nocancel_libc, -1);
+
+    if (isAnAppScopeConnection(fd)) return 0;
+
+    int rc = g_fn.__close_nocancel_libc(fd);
+
+    doCloseAndReportFailures(fd, (rc != -1), "close_nocancel");
+
+    return rc;
+}
+
+static int
+__close_nocancel_pthread(int fd)
+{
+    WRAP_CHECK(__close_nocancel_pthread, -1);
+
+    if (isAnAppScopeConnection(fd)) return 0;
+
+    int rc = g_fn.__close_nocancel_pthread(fd);
+
+    doCloseAndReportFailures(fd, (rc != -1), "close_nocancel");
+
+    return rc;
+}
+
+
 /*
  * Note:
  * The syscall function in libc is called from the loader for
@@ -2626,6 +2752,19 @@ scope_syscall(long number, ...)
     return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
                         fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
+
+static ssize_t
+scope_write(int fd, const void* buf, size_t size)
+{
+    return (ssize_t)syscall(SYS_write, fd, buf, size);
+}
+
+static int
+scope_close(int fd)
+{
+    return (int)syscall(SYS_close, fd);
+}
+
 #endif // __FUNCHOOK__
 
 VAREXPORT size_t // EXPORTOFF because it's redundant with __write
@@ -3280,19 +3419,12 @@ _exit(int status)
 
 #endif // __LINUX__
 
-EXPORTON int
+VAREXPORT int
 close(int fd)
 {
     WRAP_CHECK(close, -1);
 
-    if (fd != -1) {
-        if ((fd == ctlConnection(g_ctl, CFG_CTL)) || 
-        (fd == ctlConnection(g_ctl, CFG_LS)) ||
-        (fd == mtcConnection(g_mtc)) ||
-        (fd == logConnection(g_log))) {
-            return 0;
-        }
-    }
+    if (isAnAppScopeConnection(fd)) return 0;
 
     int rc = g_fn.close(fd);
 
@@ -3301,7 +3433,7 @@ close(int fd)
     return rc;
 }
 
-EXPORTON int
+VAREXPORT int
 fclose(FILE *stream)
 {
     WRAP_CHECK(fclose, EOF);
@@ -3314,7 +3446,7 @@ fclose(FILE *stream)
     return rc;
 }
 
-EXPORTON int
+VAREXPORT int
 fcloseall(void)
 {
     WRAP_CHECK(close, EOF);

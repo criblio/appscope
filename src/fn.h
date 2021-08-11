@@ -212,6 +212,10 @@ typedef struct {
     int (*__overflow)(FILE *, int);
     ssize_t (*__write_libc)(int, const void *, size_t);
     ssize_t (*__write_pthread)(int, const void *, size_t);
+    int (*__close_libc)(int);
+    int (*__close_pthread)(int);
+    int (*__close_nocancel_libc)(int);
+    int (*__close_nocancel_pthread)(int);
     int (*epoll_pwait)(int, struct epoll_event *, int, int, const sigset_t *);
     int (*ppoll)(struct pollfd *, nfds_t, const struct timespec *, const sigset_t *);
     int (*pause)(void);

@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <fcntl.h>
+#include <sys/timeb.h>
 
 #include "atomic.h"
 #include "com.h"
@@ -2568,9 +2569,12 @@ doPayload()
                 : (pinfo->net.tlsProtoDef
                    ? pinfo->net.tlsProtoDef->protname 
                    : "");
+            struct timeb tb;
+            ftime(&tb);
+            double timestamp = tb.time + (double)tb.millitm/1000;
             int rc = snprintf(pay, hlen,
-                              "{\"type\":\"payload\",\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s,\"protocol\":\"%s\"}",
-                              g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport, protoName);
+                              "{\"type\":\"payload\",\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s,\"protocol\":\"%s\",\"_time\":%.3f}",
+                              g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport, protoName, timestamp);
             if (rc < 0) {
                 // unlikley
                 if (pinfo->data) free(pinfo->data);

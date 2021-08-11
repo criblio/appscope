@@ -5,7 +5,6 @@ import (
 	"net"
 
 	"github.com/criblio/scope/run"
-	log "github.com/sirupsen/logrus"
 )
 
 // Connection is a connection object model
@@ -32,8 +31,6 @@ func NewConnection() (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	log.Info("Connected to Cribl Destination")
 
 	c := &Connection{
 		Conn: conn,

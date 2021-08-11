@@ -41,6 +41,7 @@ scope relay -c tls://127.0.0.1:10090`,
 func init() {
 	relay.InitConfiguration()
 	relayCmd.Flags().StringVarP(&relay.Config.CriblDest, "cribldest", "c", "", "Set Cribl destination for metrics & events (host:port defaults to tls://)")
+	relayCmd.Flags().StringVarP(&relay.Config.AuthToken, "authtoken", "a", "", "Set AuthToken for Cribl")
 	relayCmd.MarkFlagRequired("cribldest")
 	RootCmd.AddCommand(relayCmd)
 }

@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/signal"
@@ -20,12 +21,17 @@ func Receiver(gctx context.Context, sq Queue) func() error {
 		for {
 			select {
 
-			// TODO case client:
+			// case client connect:
 			// accept
+			// add to clients
 
-			// TODO case data:
+			// case client data:
 			// listen on unix domain sockets
 			// push everything to sq
+
+			// case client disconnect:
+			// disconnect
+			// remove from clients
 
 			case <-gctx.Done():
 				return gctx.Err()
@@ -45,6 +51,21 @@ func Sender(gctx context.Context, sq Queue) func() error {
 		if err != nil {
 			return err
 		}
+
+		log.Info("Connected to Cribl Destination")
+
+		header := NewHeader()
+		header.Format = "ndjson"
+		header.AuthToken = Config.AuthToken
+		headerJson, err := json.Marshal(header)
+		if err != nil {
+			return err
+		}
+		if err = c.Send(Message(headerJson) + "\n"); err != nil {
+			return err
+		}
+
+		log.Info("Send Connection Header to Cribl Destination")
 
 		for {
 			select {

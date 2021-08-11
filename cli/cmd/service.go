@@ -156,8 +156,8 @@ Example: `scope service  cribl -c tls://in.my-instance.cribl.cloud:10090`,
 			err = os.Rename(configPath, examplePath)
 			util.CheckErrSprintf(err, "error: failed to move scope.yml to soppe_example.yml; %v", err)
 			rc.WorkDir = configDir
-			//rc.sc.LibScopeLog.Transport.Path = logDir + "/cribl.log"
-			//rc.sc.LibScopeLog.CommandDir = runDir
+			rc.GetScopeConfig().Libscope.Log.Transport.Path = logDir + "/cribl.log"
+			rc.GetScopeConfig().Libscope.CommandDir = runDir
 			err = rc.WriteScopeConfig(configPath, 0644)
 			util.CheckErrSprintf(err, "error: failed to create scope.yml: %v", err)
 		}
@@ -165,7 +165,7 @@ Example: `scope service  cribl -c tls://in.my-instance.cribl.cloud:10090`,
 		// extract scope_protocol.yml
 		protocolPath := fmt.Sprintf("/etc/scope/%s/scope_protocol.yml", serviceName)
 		if _, err := os.Stat(protocolPath); err == nil {
-			unameSysnameutil.ErrAndExit("error: scope_protocol.yml already exists; " + protocolPath)
+			util.ErrAndExit("error: scope_protocol.yml already exists; " + protocolPath)
 		}
 		asset, err = run.Asset("build/scope_protocol.yml")
 		util.CheckErrSprintf(err, "error: failed to find scope_protocol.yml asset; %v", err)
@@ -197,7 +197,9 @@ Example: `scope service  cribl -c tls://in.my-instance.cribl.cloud:10090`,
         }
 
 		fmt.Printf("\nThe %s service has been updated to run with AppScope.\n", serviceName)
-		fmt.Printf("Restart it with `systemctl restart %s` to take effect.\n", serviceName)
+		fmt.Printf("\nPlease review the configs in %s/ and check their permissions to\nensure the scoped service can read them.\n", configDir)
+		fmt.Printf("\nAlso, please review permissions on %s and %s to ensure\nthe scoped service can write there.\n", logDir, runDir)
+		fmt.Printf("\nRestart the service with `systemctl restart %s` so the changes take effect.\n", serviceName)
 	},
 }
 

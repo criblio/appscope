@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/un.h>
 
 #include "dbg.h"
 #include "scopetypes.h"
@@ -41,7 +42,9 @@ struct _transport_t
             int pending_connect;
             char *host;
             char *port;
+            char *upath;
             struct sockaddr_storage gai_addr;
+            struct sockaddr_un ucaddr;
             struct {
                 // Configuration
                 unsigned enable;
@@ -198,6 +201,7 @@ transportConnection(transport_t *trans)
     switch(trans->type) {
         case CFG_UDP:
         case CFG_TCP:
+        case CFG_UNIX:
             if (trans->net.sock != -1) {
                 return trans->net.sock;
             }
@@ -208,7 +212,6 @@ transportConnection(transport_t *trans)
             } else {
                 return -1;
             }
-        case CFG_UNIX:
         case CFG_SYSLOG:
         case CFG_SHM:
             break;
@@ -254,6 +257,8 @@ transportNeedsConnection(transport_t *trans)
             }
             return (trans->file.stream == NULL);
         case CFG_UNIX:
+            if ((trans->net.sock != -1) && (trans->net.pending_connect != -1)) return FALSE;
+            return TRUE;
         case CFG_SYSLOG:
         case CFG_SHM:
             break;
@@ -518,6 +523,10 @@ transportDisconnect(transport_t *trans)
             trans->file.stream = NULL;
             break;
         case CFG_UNIX:
+            g_fn.close(trans->net.sock);
+            trans->net.sock = -1;
+            trans->net.pending_connect = -1;
+            break;
         case CFG_SYSLOG:
         case CFG_SHM:
             break;
@@ -1001,6 +1010,31 @@ transportConnect(transport_t *trans)
             return checkPendingSocketStatus(trans);
         case CFG_FILE:
             return transportConnectFile(trans);
+        case CFG_UNIX:
+            memset((char *)&trans->net.ucaddr, 0, sizeof(struct sockaddr_un));
+            trans->net.ucaddr.sun_family = AF_UNIX;
+            strncpy(&trans->net.ucaddr.sun_path[1], trans->net.upath, strlen(trans->net.upath));
+
+            // The size is calculated as the strlen of the abstract name,
+            // 2 bytes for the address family type and 1 byte for the leading \0
+            // that makes this an abstract socket.
+            // /usr/include/x86_64-linux-gnu/bits/sockaddr.h:typedef unsigned short int sa_family_t;
+            if (g_fn.connect(trans->net.sock, (const struct sockaddr *)&trans->net.ucaddr,
+                             strlen(trans->net.upath) + sizeof(sa_family_t) + 1) == -1) {
+                g_fn.close(trans->net.sock);
+                trans->net.sock = -1;
+                DBG("NULL");
+                return -1;
+            }
+
+            // We have a connection
+            scopeLog("connect successful", trans->net.pending_connect, CFG_LOG_INFO);
+
+            // Move this descriptor up out of the way
+            trans->net.sock = placeDescriptor(trans->net.sock, trans);
+
+            // Remove the pending status from the transport
+            trans->net.pending_connect = 0;
         default:
             DBG(NULL);
     }
@@ -1093,19 +1127,38 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
     return t;
 }
 
-transport_t*
-transportCreateUnix(const char* path)
+transport_t *
+transportCreateUnix(const char *path)
 {
     if (!path) return NULL;
-    transport_t* t = calloc(1, sizeof(transport_t));
-    if (!t) {
+    transport_t *trans = newTransport();
+    if (!trans) return NULL;
+
+    if ((strlen(path)) > sizeof(trans->net.ucaddr.sun_path)) {
         DBG(NULL);
+        free(trans);
         return NULL;
     }
 
-    t->type = CFG_UNIX;
+    trans->type = CFG_UNIX;
+    trans->net.sock = -1;
+    trans->net.upath = strdup(path);
+    trans->net.pending_connect = -1;
+    trans->net.host = NULL;
+    trans->net.port = NULL;
+    trans->net.tls.enable = FALSE;
+    trans->net.tls.validateserver = FALSE;
+    trans->net.tls.cacertpath = NULL;
 
-    return t;
+    if ((trans->net.sock = g_fn.socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+        DBG("NULL");
+        return NULL;
+    }
+
+    setSocketBlocking(trans, trans->net.sock, FALSE);
+    transportConnect(trans);
+
+    return trans;
 }
 
 transport_t*
@@ -1137,27 +1190,28 @@ transportCreateShm()
 }
 
 void
-transportDestroy(transport_t** transport)
+transportDestroy(transport_t **transport)
 {
     if (!transport || !*transport) return;
 
-    transport_t* t = *transport;
-    switch (t->type) {
+    transport_t *trans = *transport;
+    switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            transportDisconnect(t);
-            if (t->net.host) free (t->net.host);
-            if (t->net.port) free (t->net.port);
-            if (t->net.tls.cacertpath) free(t->net.tls.cacertpath);
-            freeAddressList(t);
+            transportDisconnect(trans);
+            if (trans->net.host) free (trans->net.host);
+            if (trans->net.port) free (trans->net.port);
+            if (trans->net.tls.cacertpath) free(trans->net.tls.cacertpath);
+            freeAddressList(trans);
             break;
         case CFG_UNIX:
+            if (trans->net.upath) free(trans->net.upath);
             break;
         case CFG_FILE:
-            if (t->file.path) free(t->file.path);
-            if (!t->file.stdout && !t->file.stderr) {
+            if (trans->file.path) free(trans->file.path);
+            if (!trans->file.stdout && !trans->file.stderr) {
                 // if stdout/stderr, we didn't open stream, so don't close it
-                if (t->file.stream) g_fn.fclose(t->file.stream);
+                if (trans->file.stream) g_fn.fclose(trans->file.stream);
             }
             break;
         case CFG_SYSLOG:
@@ -1165,9 +1219,9 @@ transportDestroy(transport_t** transport)
         case CFG_SHM:
             break;
         default:
-            DBG("%d", t->type);
+            DBG("%d", trans->type);
     }
-    free(t);
+    free(trans);
     *transport = NULL;
 }
 
@@ -1306,6 +1360,25 @@ transportSend(transport_t *trans, const char *msg, size_t len)
             }
             break;
         case CFG_UNIX:
+            if (trans->net.sock != -1) {
+                int rc = g_fn.send(trans->net.sock, msg, len, 0);
+
+                if (rc < 0) {
+                    switch (errno) {
+                    case EBADF:
+                        DBG(NULL);
+                        transportDisconnect(trans);
+                        transportConnect(trans);
+                        return -1;
+                    case EWOULDBLOCK:
+                        DBG(NULL);
+                        break;
+                    default:
+                        DBG(NULL);
+                    }
+                }
+            }
+            break;
         case CFG_SYSLOG:
         case CFG_SHM:
             return -1;

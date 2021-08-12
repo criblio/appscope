@@ -987,7 +987,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     );
 
 
-    // Set env varibles to test indirect substitution
+    // Set env variables to test indirect substitution
     assert_int_equal(setenv("MASTER_ENABLE", "false", 1), 0);
     assert_int_equal(setenv("VAR1", "longer", 1), 0);
     assert_int_equal(setenv("MY_ENV_VAR", "shorter", 1), 0);
@@ -1009,7 +1009,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_string_equal(cfgCmdDir(cfg), "/home/mydir/scope/");
     assert_int_equal(cfgSendProcessStartMsg(cfg), FALSE);
     assert_int_equal(cfgMtcVerbosity(cfg), 1);
-    // test escaped substitution  (a match preceeded by '\')
+    // test escaped substitution  (a match preceded by '\')
     assert_string_equal(cfgTransportPath(cfg, CFG_MTC), "/$VAR1/shorter/");
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/file.tmp2");
     assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM"), "11");
@@ -1673,7 +1673,7 @@ static void
 cfgReadEnvSubstitution(void** state)
 {
 
-    // Set env varibles to test indirect substitution
+    // Set env variables to test indirect substitution
     assert_int_equal(setenv("MASTER_ENABLE", "true", 1), 0);
     assert_int_equal(setenv("VAR1", "longer", 1), 0);
     assert_int_equal(setenv("MY_ENV_VAR", "shorter", 1), 0);
@@ -1748,7 +1748,7 @@ cfgReadEnvSubstitution(void** state)
     assert_string_equal(cfgCmdDir(cfg), "/home/mydir/scope/");
     assert_int_equal(cfgSendProcessStartMsg(cfg), TRUE);
     assert_int_equal(cfgMtcVerbosity(cfg), 1);
-    // test escaped substitution  (a match preceeded by '\')
+    // test escaped substitution  (a match preceded by '\')
     assert_string_equal(cfgTransportPath(cfg, CFG_MTC), "/$VAR1/shorter/");
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/file.tmp2");
     assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM"), "11");

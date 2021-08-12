@@ -453,7 +453,7 @@ getGoVersionAddr(const char* buf)
         // -----------------------------------------------------------
         // 0x0                      build info magic = "\xff Go buildinf:"
         // 0xe                      binary ptrSize
-        // 0xf                      endianess
+        // 0xf                      endianness
         // 0x10                     pointer to string runtime.buildVersion
         // 0x10 + ptrSize           pointer to runtime.modinfo
         // 0x10 + 2 * ptr size      pointer to build flags

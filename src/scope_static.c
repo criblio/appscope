@@ -112,7 +112,7 @@ setEnvVariable(char *env, char *value)
     if (new_val) free(new_val);
 }
 
-// modify NEEDED entries in libscope.so to avoid dependecies
+// modify NEEDED entries in libscope.so to avoid dependencies
 static int
 set_library(void)
 {
@@ -884,7 +884,7 @@ showUsage(char *prog)
       "\n"
       "Cribl AppScope Static Loader %s\n" 
       "\n"
-      "AppScope is a general-purpose observable application telemtry system.\n"
+      "AppScope is a general-purpose observable application telemetry system.\n"
       "\n"
       "usage: %s [OPTIONS] [--] EXECUTABLE [ARGS...]\n"
       "       %s [OPTIONS] --attach PID\n"
@@ -893,7 +893,7 @@ showUsage(char *prog)
       "  -u, --usage           display this info\n"
       "  -h, --help [SECTION]  display all or the specified help section\n"
       "  -l, --libbasedir DIR  specify parent for the library directory (default: /tmp)\n"
-      "  -f DIR                alias for \"-l DIR\" for backward compatability\n"
+      "  -f DIR                alias for \"-l DIR\" for backward compatibility\n"
       "  -a, --attach PID      attach to the specified process ID\n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"

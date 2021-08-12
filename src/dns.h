@@ -44,7 +44,7 @@ struct dns_header
     unsigned short id; // identification number
     unsigned char qr :1;     // query/response flag
     unsigned char opcode :4; // purpose of message
-    unsigned char aa :1;     // authoritive answer
+    unsigned char aa :1;     // authoritative answer
     unsigned char tc :1;     // truncated message
     unsigned char rd :1;     // recursion desired
 

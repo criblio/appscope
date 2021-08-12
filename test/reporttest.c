@@ -1422,7 +1422,7 @@ doFSReadWriteErrorNoSummarization(void** state)
     assert_int_equal(eventCalls("fs.error"), 2);
     assert_int_equal(eventValues("fs.error"), 2);
 
-    // Nothing to see here, becaues it was reported earlier
+    // Nothing to see here, because it was reported earlier
     clearTestData();
     doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls(NULL), 0);
@@ -1451,7 +1451,7 @@ doFSReadWriteErrorSummarization(void** state)
     assert_int_equal(eventCalls("fs.error"), 2);
     assert_int_equal(eventValues("fs.error"), 2);
 
-    // Ok, this should report the ealier fs.errors
+    // Ok, this should report the earlier fs.errors
     clearTestData();
     doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
     assert_int_equal(metricCalls("fs.error"), 1);
@@ -1637,7 +1637,7 @@ main(int argc, char* argv[])
     printf("running %s\n", argv[0]);
 
     // Make sure that the functions can be hit before anything
-    // is initialized (before constuctor).
+    // is initialized (before constructor).
     const struct CMUnitTest preInitTests[] = {
         cmocka_unit_test(nothingCrashesBeforeAnyInit),
     };

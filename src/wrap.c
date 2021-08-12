@@ -1401,7 +1401,7 @@ initEnv(int *attachedFlag)
     *attachedFlag = 0;
 
     if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose || !g_fn.setenv) {
-        // these log statements use debug level so they can be used with consturctor debug
+        // these log statements use debug level so they can be used with constructor debug
         scopeLog("ERROR: missing g_fn's for initEnv()", -1, CFG_LOG_DEBUG);
         return;
     }

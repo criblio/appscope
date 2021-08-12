@@ -3,7 +3,7 @@ import java.io.*;
 import javax.net.ssl.*;
 
 /*
- * This example demostrates how to use a SSLSocket as client to
+ * This example demonstrates how to use a SSLSocket as client to
  * send a HTTP request and get response from an HTTPS server.
  * It assumes that the client is not behind a firewall
  */

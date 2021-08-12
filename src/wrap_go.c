@@ -462,7 +462,7 @@ initGoHook(elf_buf_t *ebuf)
     int go_major_ver = UNKNOWN_GO_VER;
     go_ver = getSymbol(ebuf->buf, "runtime.buildVersion");
     if (!go_ver) {
-        //runtime.buildVersion symbol not found, probabaly dealing with a stripped binary
+        //runtime.buildVersion symbol not found, probably dealing with a stripped binary
         //try to retrieve the version symbol address from the .go.buildinfo section
         go_ver = getGoVersionAddr(ebuf->buf);
     }
@@ -504,7 +504,7 @@ initGoHook(elf_buf_t *ebuf)
     /*
      * Note: calling runtime.cgocall results in the Go error
      *       "fatal error: cgocall unavailable"
-     * Calling runtime.asmcgocall does work. Possibly becasue we
+     * Calling runtime.asmcgocall does work. Possibly because we
      * are entering the Go func past the runtime stack check?
      * Need to investigate later.
      */
@@ -641,7 +641,7 @@ dumb_thread(void *arg)
  * env var and set the variable g_go_static.
  * If not 0 the executable is static.
  *
- * In the static case we swtich TLS/TCB.
+ * In the static case we switch TLS/TCB.
  * In the dynamic case we do not switch TLS/TCB.
  */
 /*
@@ -1138,7 +1138,7 @@ c_http_server_read(char *stackaddr)
      *
      * For reference, we were looking at the I/F type from go.itab.*crypto/tls.Conn,net.Conn
      * and checking the type to determine TLS. This doesn't work on stripped
-     * executeables and should no longer be needed.
+     * executables and should no longer be needed.
      */
     if (cr_conn_rwc_if && tls) {
         cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go.iface_data);
@@ -1329,7 +1329,7 @@ static void
 c_exit(char *stackaddr)
 {
     // don't use stackaddr; patch_first_instruction() does not provide
-    // frame_size, so stackaddr isn't useable
+    // frame_size, so stackaddr isn't usable
     funcprint("c_exit");
 
     int i;

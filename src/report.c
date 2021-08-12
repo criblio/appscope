@@ -421,7 +421,7 @@ static bool
 httpFieldsInternal(event_field_t *fields, http_report *hreport, protocol_info *proto)
 {
     /*
-    Compression and getting to an attribute with compressed and uncompressed lenghts.
+    Compression and getting to an attribute with compressed and uncompressed lengths.
     https://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html
     https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.11
     https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
@@ -1282,7 +1282,7 @@ getNetPtotocol(net_info *net, event_field_t *nevent, int *ix)
     "net.peer.name": wttr.in,
     "net.host.ip": "172.17.0.2",
     "net.host.port": 49202,
-    "net.host.name": "scope-vm", (removed as redunant with host)
+    "net.host.name": "scope-vm", (removed as redundant with host)
     "net.protocol": "http",
   },
   "_time": timestamp
@@ -1333,7 +1333,7 @@ doNetOpenEvent(net_info *net)
     "net.peer.name": wttr.in,
     "net.host.ip": "172.17.0.2",
     "net.host.port": 49202,
-    "net.host.name": "scope-vm", (removed as redunant with host)
+    "net.host.name": "scope-vm", (removed as redundant with host)
     "net.protocol": "http",
     "duration": 243,
     "net.close.reason": "normal",
@@ -2589,7 +2589,7 @@ doPayload()
                               "{\"type\":\"payload\",\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s,\"protocol\":\"%s\",\"_time\":%.3f}",
                               g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport, protoName, timestamp);
             if (rc < 0) {
-                // unlikley
+                // unlikely
                 if (pinfo->data) free(pinfo->data);
                 if (pinfo) free(pinfo);
                 DBG(NULL);

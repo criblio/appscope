@@ -105,7 +105,7 @@ function check_expected_file_args() {
   fi
 
   if [ -z $2 ]; then
-      echo "test_go_struct.sh is missing a required arg; the path to a go execuable"
+      echo "test_go_struct.sh is missing a required arg; the path to a go executable"
       exit 1
   fi
 

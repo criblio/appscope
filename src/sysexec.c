@@ -78,7 +78,7 @@ get_file_size(const char *path)
     }
 
     if (g_fn.close && g_fn.close(fd) == -1) {
-        scopeLog("EROR: get_file_size:close", -1, CFG_LOG_ERROR);
+        scopeLog("ERROR: get_file_size:close", -1, CFG_LOG_ERROR);
         return -1;        
     }
 

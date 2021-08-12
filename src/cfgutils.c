@@ -746,7 +746,7 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
     // see if value starts with udp:// or file://
     if (value == strstr(value, "udp://")) {
 
-        // copied to avoid directly modifing the process's env variable
+        // copied to avoid directly modifying the process's env variable
         char value_cpy[1024];
         strncpy(value_cpy, value, sizeof(value_cpy));
 
@@ -765,7 +765,7 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
 
     } else if (value == strstr(value, "tcp://")) {
 
-        // copied to avoid directly modifing the process's env variable
+        // copied to avoid directly modifying the process's env variable
         char value_cpy[1024];
         strncpy(value_cpy, value, sizeof(value_cpy));
 

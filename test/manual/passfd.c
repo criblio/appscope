@@ -1,6 +1,6 @@
 /*
  * passfd.c - Test to see that Scope is handling the passing of fd access
- * rights between proceses correctly
+ * rights between processes correctly
  *
  * gcc -g -Wall test/manual/passfd.c -lpthread -o test/linux/passfd
  *

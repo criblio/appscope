@@ -26,7 +26,7 @@ func sessionByID(id int) history.SessionList {
 }
 
 func promptClean(sl history.SessionList) {
-	fmt.Print("Invalid session, likely an invalid command was scoped. Would you like to delete this session? (default: yes) [y/n] ")
+	fmt.Print("Invalid session, likely an invalid command was scoped or a session file was modified. Would you like to delete this session? (default: yes) [y/n] ")
 	var response string
 	_, err := fmt.Scanf("%s", &response)
 	util.CheckErrSprintf(err, "error reading response: %v", err)

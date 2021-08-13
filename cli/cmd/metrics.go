@@ -35,7 +35,7 @@ var metricsCmd = &cobra.Command{
 		sessions := sessionByID(id)
 
 		if graph && len(names) == 0 {
-			helpErrAndExit(cmd, "Must specify a metric names with --graph")
+			helpErrAndExit(cmd, "Must specify metric names with --graph")
 		} else if cols && len(names) == 0 {
 			helpErrAndExit(cmd, "Must specify metric names with --cols")
 		}
@@ -109,6 +109,10 @@ var metricsCmd = &cobra.Command{
 		}
 
 		if graph {
+			if len(values) == 0 {
+				util.ErrAndExit("Valid metric names required with --graph")
+			}
+
 			termWidth, _, err := terminal.GetSize(0)
 			if err != nil {
 				// If we cannot get the terminal size, we are dealing with redirected stdin

@@ -49,6 +49,17 @@ var metricsCmd = &cobra.Command{
 			}
 			promptClean(sessions[0:1])
 		}
+		defer file.Close()
+
+		// Check for empty metrics file
+		fstat, err := file.Stat()
+		if err != nil {
+			util.ErrAndExit("Couldn't stat file: %s", file.Name())
+		}
+		if fstat.Size() == 0 {
+			os.Exit(0)
+		}
+
 		in := make(chan metrics.Metric)
 		offsetChan := make(chan int)
 		filters := []util.MatchFunc{}

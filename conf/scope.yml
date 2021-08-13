@@ -198,7 +198,7 @@ metric:
     #
     # Only applies when connection type is file.
     #
-    path:
+    #path:
 
     # File buffering
     #   Type:     string
@@ -212,7 +212,7 @@ metric:
     # scrambling of the log file. Setting this to full may improve performance
     # in single-writer scenarios.
     #
-    buffer: line
+    #buffer: line
 
     # TLS connection settings
     tls:
@@ -377,7 +377,7 @@ event:
     - type: dns
       name: .*
       field: .*
-      value: .
+      value: .*
 
     # The http category includes HTTP request and response events. It currently
     # only supports HTTP/1.x, not HTTP/2. The name, field, value, and headers
@@ -470,7 +470,7 @@ event:
     #
     # Only applies when connection type is file.
     #
-    path:
+    #path:
 
     # File buffering
     #   Type:     string
@@ -484,7 +484,7 @@ event:
     # scrambling of the log file. Setting this to full may improve performance
     # in single-writer scenarios.
     #
-    buffer: line
+    #buffer: line
 
     # TLS connection settings
     tls:
@@ -700,7 +700,7 @@ cribl:
   # If set, the value is added as a top-level authToken property in the initial
   # config-event (header) sent to Cribl when the library connects.
   #
-  authtoken:
+  #authtoken:
 
   # Backend connection for cribl
   #

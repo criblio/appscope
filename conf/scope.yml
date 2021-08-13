@@ -93,7 +93,7 @@ metric:
     # Metrics have at a minimum name, value, and type properties. Optional tags
     # can be added to provide additional detail on the measurement. The library
     # adds expanded Statsd tags depending on the value of this setting as
-    # described below. These affect the "cardinality" of the metrics data.
+    # described below. These affect the cardinality of the metrics data.
     #   
     #   0  none
     #   1  adds data and unit
@@ -361,7 +361,7 @@ event:
       field: .*
       value: .*
 
-    # The dns category includes DNS requests and responses. The name, field,
+    # The dns category includes DNS request and response events. The name, field,
     # and value properties are regular expressions applied to the corresponding
     # event properties. Events will be generated when all match.
     #
@@ -384,7 +384,9 @@ event:
     # $SCOPE_EVENT_HTTP_NAME, $SCOPE_EVENT_HTTP_FIELD, $SCOPE_EVENT_HTTP_VALUE,
     # and $SCOPE_EVENT_HTTP_HEADER.
     #
-    # When the `cribl` backend is enabled, this is disabled.
+    # This category of events is disabled by default, but you should enable it
+    # when you define any type of connection other than `cribl`. If you are
+    # using the `cribl` backend, leave this event category disabled.   
     #
     #- type: http
     #  name: .*
@@ -454,8 +456,6 @@ event:
     #   Values:   IP port number or service name
     #   Default:  9109
     #   Override: the port token in the $SCOPE_EVENT_DEST URL
-    #
-    # The default 9109 is from TBD
     #
     port: 9109
 
@@ -564,9 +564,7 @@ libscope:
   #
   # The connect-event message is the first one set on the connection and
   # contains details identifying the scoped program and the runtime configs.
-  # It's referred to as the connect-header in some places and process-start
-  # elsewhere, because it is analogous to the proc.start metric sent on the
-  # metric backend. This setting does not affect the proc.start metric.
+  # It's  more commonly referred to as the process-start message.
   #
   configevent: true
 

@@ -31,10 +31,15 @@
 #   - `metric > format` is set to ndjson
 #   - `event > transport` is redirected to the `cribl` backend
 #   - `event > enable` is set to true
+#   - `event > watch[]` with `name: http` is disabled
 #   - `libscope > log > level` is set to warn
 #   - `libscope > configevent` is set to true
 #
 # Use the `scope extract` command to get a copy of the default `scope.yml`.
+#
+# Use the command below to get a stripped down version of this config.
+#
+#   egrep -v '^ *#.*$' scope.yml | sed '/^$/d' >scope-minimal.yml
 # 
 
 # Settings for metrics
@@ -380,19 +385,17 @@ event:
     # properties. Events will be generated when all match.
     #
     # Set $SCOPE_EVENT_HTTP to true or false to enable or disable this
-    # category. The regular expressions can be set with
-    # $SCOPE_EVENT_HTTP_NAME, $SCOPE_EVENT_HTTP_FIELD, $SCOPE_EVENT_HTTP_VALUE,
-    # and $SCOPE_EVENT_HTTP_HEADER.
+    # category. The regular expressions can be set with $SCOPE_EVENT_HTTP_NAME,
+    # $SCOPE_EVENT_HTTP_FIELD, $SCOPE_EVENT_HTTP_VALUE, and
+    # $SCOPE_EVENT_HTTP_HEADER.
     #
-    # This category of events is disabled by default, but you should enable it
-    # when you define any type of connection other than `cribl`. If you are
-    # using the `cribl` backend, leave this event category disabled.   
+    # When the `cribl` backend is enabled, this is disabled.
     #
-    #- type: http
-    #  name: .*
-    #  field: .*
-    #  value: .*
-    #  headers: .*                 # yes, this should be singular but it's not.
+    - type: http
+      name: .*
+      field: .*
+      value: .*
+      headers: .*                 # yes, this should be singular but it's not.
 
     # The metric category is very seldom used. It includes events for
     # operations that are included in the metric aggregation described earlier
@@ -789,4 +792,5 @@ cribl:
       # Only applies if the connection type is tcp and TLS is enabled.
       #
       cacertpath: ''
-...
+
+# EOF

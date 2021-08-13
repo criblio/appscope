@@ -130,7 +130,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		if err != nil && strings.Contains(err.Error(), "events.json: no such file or directory") {
 			if util.CheckFileExists(sessions[0].EventsDestPath) {
 				dest, _ := ioutil.ReadFile(sessions[0].EventsDestPath)
-				fmt.Printf("events were output to %s\n", dest)
+				fmt.Printf("Events were output to %s\n", dest)
 				os.Exit(0)
 			}
 			promptClean(sessions[0:1])

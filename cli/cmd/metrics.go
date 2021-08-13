@@ -44,7 +44,7 @@ var metricsCmd = &cobra.Command{
 		if err != nil && strings.Contains(err.Error(), "metrics.json: no such file or directory") {
 			if util.CheckFileExists(sessions[0].MetricsDestPath) {
 				dest, _ := ioutil.ReadFile(sessions[0].MetricsDestPath)
-				fmt.Printf("metrics were output to %s\n", dest)
+				fmt.Printf("Metrics were output to %s\n", dest)
 				os.Exit(0)
 			}
 			promptClean(sessions[0:1])
@@ -57,6 +57,7 @@ var metricsCmd = &cobra.Command{
 			util.ErrAndExit("Couldn't stat file: %s", file.Name())
 		}
 		if fstat.Size() == 0 {
+			fmt.Println("No metrics available")
 			os.Exit(0)
 		}
 

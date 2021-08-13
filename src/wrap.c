@@ -1137,6 +1137,7 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
  */
 static ssize_t __write_libc(int, const void *, size_t);
 static ssize_t __write_pthread(int, const void *, size_t);
+static ssize_t scope_write(int, const void *, size_t);
 static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
 static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
@@ -1356,12 +1357,19 @@ initHook(int attachedFlag)
             stderr_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
         }
 
-        if (g_fn.__write_libc) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
-        }
+        if (g_ismusl == FALSE) {
+            if (g_fn.__write_libc) {
+                rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
+            }
 
-        if (g_fn.__write_pthread) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+            if (g_fn.__write_pthread) {
+                rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+            }
+
+            // We want to be able to use g_fn.write without
+            // accidentally interposing this function.  This resolves
+            // https://github.com/criblio/appscope/issues/472
+            g_fn.write = scope_write;
         }
 
         // hook 'em
@@ -2537,6 +2545,21 @@ __write_pthread(int fd, const void *buf, size_t size)
     return rc;
 }
 
+static int
+isAnAppScopeConnection(int fd)
+{
+    if (fd == -1) return FALSE;
+
+    if ((fd == ctlConnection(g_ctl, CFG_CTL)) ||
+        (fd == ctlConnection(g_ctl, CFG_LS)) ||
+        (fd == mtcConnection(g_mtc)) ||
+        (fd == logConnection(g_log))) {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 /*
  * Note:
  * The syscall function in libc is called from the loader for
@@ -2626,6 +2649,13 @@ scope_syscall(long number, ...)
     return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
                         fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
+
+static ssize_t
+scope_write(int fd, const void* buf, size_t size)
+{
+    return (ssize_t)syscall(SYS_write, fd, buf, size);
+}
+
 #endif // __FUNCHOOK__
 
 VAREXPORT size_t // EXPORTOFF because it's redundant with __write
@@ -3285,14 +3315,7 @@ close(int fd)
 {
     WRAP_CHECK(close, -1);
 
-    if (fd != -1) {
-        if ((fd == ctlConnection(g_ctl, CFG_CTL)) || 
-        (fd == ctlConnection(g_ctl, CFG_LS)) ||
-        (fd == mtcConnection(g_mtc)) ||
-        (fd == logConnection(g_log))) {
-            return 0;
-        }
-    }
+    if (isAnAppScopeConnection(fd)) return 0;
 
     int rc = g_fn.close(fd);
 
@@ -3306,6 +3329,8 @@ fclose(FILE *stream)
 {
     WRAP_CHECK(fclose, EOF);
     int fd = fileno(stream);
+
+    if (isAnAppScopeConnection(fd)) return 0;
 
     int rc = g_fn.fclose(stream);
 

@@ -22,9 +22,9 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 - **Fix**: [#416](https://github.com/criblio/appscope/issues/416) Ensure that file descriptors opened by libscope are not closed by ssh, to avoid scenarios where processes operating over network connections can get stuck at 100% CPU utilization.
 
-- **Fix**: [#417](https://github.com/criblio/appscope/issues/417) Ensure that AppScope performs exit handling only after SSL is finished. This avoid double free errors where the OpenSSL exit handler, being called while TLS is not enabled, frees memory that was not allocated.
+- **Fix**: [#417](https://github.com/criblio/appscope/issues/417) Ensure that AppScope performs exit handling only after SSL is finished. This avoids double free errors where the OpenSSL exit handler, being called while TLS is not enabled, frees memory that was not allocated.
 
-- **Fix**: [#327](https://github.com/criblio/appscope/issues/327) Change protocol-detect events to use the `net` event type. This prevents protocol-detect events from being dropped by periodic threads.
+- **Fix**: [#327](https://github.com/criblio/appscope/issues/327) Protocol-detect events now use the `net` event type, which prevents them from being dropped by periodic threads.
 
 This pre-release addresses the following issues:
 

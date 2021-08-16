@@ -24,7 +24,7 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 - **Fix**: [#417](https://github.com/criblio/appscope/issues/417) Ensure that AppScope performs exit handling only after SSL is finished. This avoid double free errors where the OpenSSL exit handler, being called while TLS is not enabled, frees memory that was not allocated.
 
-- **Fix**: [#327](https://github.com/criblio/appscope/issues/327) Change detect protocol events to use the `net` event type. This prevents detect protocol events from being dropped by periodic threads.
+- **Fix**: [#327](https://github.com/criblio/appscope/issues/327) Change protocol-detect events to use the `net` event type. This prevents protocol-detect events from being dropped by periodic threads.
 
 This pre-release addresses the following issues:
 

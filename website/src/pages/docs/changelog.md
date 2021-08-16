@@ -6,6 +6,28 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 0.7.2
+
+2021-08-17 - Maintenance Pre-Release
+
+- **Improvement**: [#444](https://github.com/criblio/appscope/pull/444) Add experimental support for Arm64 architecture, with limitations described in [issue 241](https://github.com/criblio/appscope/issues/241).
+
+- **Improvement**: [#447](https://github.com/criblio/appscope/pull/447) When scope attaches to a bash process, it now emits events for any child processes.
+
+- **Improvement**: [#440](https://github.com/criblio/appscope/pull/440) Add a new environment variable, `SCOPE_CONNECT_TIMEOUT_SECS`, to configure wait behavior. This prevents events and metrics from being dropped when a scoped command exits quickly while using a connection with network latency.
+
+- **Improvement**: [#312](https://github.com/criblio/appscope/pull/312) AppScope can now get HTTP events in LogStream for both HTTP/1.1 and HTTP/2 traffic.
+
+- **Improvement**: [#420](https://github.com/criblio/appscope/pull/420) Negative numbers are no longer allowed as arguments to `scope prune`. 
+
+- **Fix**: [#416](https://github.com/criblio/appscope/issues/416) Ensure that file descriptors opened by libscope are not closed by ssh, to avoid scenarios where processes operating over network connections can get stuck at 100% CPU utilization.
+
+- **Fix**: [#417](https://github.com/criblio/appscope/issues/417) Ensure that AppScope performs exit handling only after SSL is finished. This avoid double free errors where the OpenSSL exit handler, being called while TLS is not enabled, frees memory that was not allocated.
+
+- **Fix**: [#327](https://github.com/criblio/appscope/issues/327) Change detect protocol events to use the `net` event type. This prevents detect protocol events from being dropped by periodic threads.
+
+This pre-release addresses the following issues:
+
 ## AppScope 0.7.1
 
 2021-07-20 - Maintenance Pre-Release

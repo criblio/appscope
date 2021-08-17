@@ -10,17 +10,17 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 2021-08-17 - Maintenance Pre-Release
 
-- **Improvement**: [#241](https://github.com/criblio/appscope/issues/241) Add experimental support for Arm64 architecture, with [limitations](https://github.com/criblio/appscope/issues/241#issuecomment-824428842).
+- **Improvement**: [#241](https://github.com/criblio/appscope/issues/241) Add experimental support for ARM64 architecture, with [limitations](https://github.com/criblio/appscope/issues/241#issuecomment-824428842).
 
-- **Improvement**: [#401](https://github.com/criblio/appscope/issues/401) When scope attaches to a bash process, it now emits events for any child processes.
+- **Improvement**: [#401](https://github.com/criblio/appscope/issues/401) When `scope` attaches to a bash process, it now emits events for any child processes.
 
 - **Improvement**: [#395](https://github.com/criblio/appscope/issues/395) Add a new environment variable, `SCOPE_CONNECT_TIMEOUT_SECS`, to configure wait behavior. This prevents events and metrics from being dropped when a scoped command exits quickly while using a connection with network latency.
 
-- **Improvement**: [#311](https://github.com/criblio/appscope/issues/311) AppScope can now get HTTP events in LogStream for both HTTP/1.1 and HTTP/2 traffic.
+- **Improvement**: [#311](https://github.com/criblio/appscope/issues/311) AppScope can now receive HTTP events from LogStream, whether the events originate as HTTP/1.1 or HTTP/2 traffic.
 
 - **Improvement**: [#407](https://github.com/criblio/appscope/issues/407) Negative numbers are no longer allowed as arguments to `scope prune`. 
 
-- **Fix**: [#416](https://github.com/criblio/appscope/issues/416) Ensure that file descriptors opened by libscope are not closed by ssh, to avoid scenarios where processes operating over network connections can get stuck at 100% CPU utilization.
+- **Fix**: [#416](https://github.com/criblio/appscope/issues/416) Ensure that file descriptors opened by libscope are not closed by SSH, to avoid scenarios where processes operating over network connections can get stuck at 100% CPU utilization.
 
 - **Fix**: [#417](https://github.com/criblio/appscope/issues/417) Ensure that AppScope performs exit handling only after SSL is finished. This avoids double free errors where the OpenSSL exit handler, being called while TLS is not enabled, frees memory that was not allocated.
 

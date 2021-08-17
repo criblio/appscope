@@ -7,12 +7,14 @@ require (
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/ahmetb/go-linq/v3 v3.2.0
+	github.com/ahmetb/govvv v0.3.0 // indirect
 	github.com/c9s/goprocinfo v0.0.0-20210130143923-c95fcf8c64a8
 	github.com/dlclark/regexp2 v1.4.0 // indirect
 	github.com/dop251/goja v0.0.0-20201221183957-6b6d5e2b5d80
 	github.com/fatih/color v1.7.0
 	github.com/fatih/structs v1.1.0
 	github.com/gin-gonic/gin v1.7.4
+	github.com/go-bindata/go-bindata v3.1.2+incompatible // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/guptarohit/asciigraph v0.5.1
 	github.com/huandu/xstrings v1.3.2 // indirect

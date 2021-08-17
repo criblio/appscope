@@ -27,13 +27,13 @@ func Signal(gctx context.Context) func() error {
 				switch s {
 				case syscall.SIGINT:
 					log.Info("Interrupt Signal received. Beginning shutdown")
-					return errors.New("Signal Detected")
+					return errors.New("User Signal Detected")
 				case syscall.SIGTERM:
 					log.Info("Terminate Signal received. Beginning shutdown")
-					return errors.New("Signal Detected")
+					return errors.New("User Signal Detected")
 				case syscall.SIGQUIT:
 					log.Info("Quit Signal received. Beginning shutdown")
-					return errors.New("Signal Detected")
+					return errors.New("User Signal Detected")
 				}
 			case <-gctx.Done():
 				return gctx.Err()

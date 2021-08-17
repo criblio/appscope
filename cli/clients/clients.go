@@ -14,15 +14,18 @@ type Client struct {
 	ProcessStart libscope.Header
 }
 
+// Clients is an object model for client storage
 type Clients struct {
 	ClientsMap map[uint]*Client
 	*sync.RWMutex
+	Groups
 }
 
 // NewClients constructs and returns a new Clients object
 func NewClients() Clients {
 	return Clients{
 		ClientsMap: make(map[uint]*Client),
+		Groups:     NewGroups(),
 	}
 }
 
@@ -68,6 +71,9 @@ func (c *Clients) Update(id uint, conn UnixConnection, psm libscope.Header) erro
 
 	if conn.Conn != nil {
 		c.ClientsMap[id].Conn = conn
+	}
+	if psm.Format != "" {
+		c.ClientsMap[id].ProcessStart = psm
 	}
 
 	return nil

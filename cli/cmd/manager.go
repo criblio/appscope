@@ -7,6 +7,7 @@ import (
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/relay"
 	"github.com/criblio/scope/util"
+	"github.com/criblio/scope/web"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -31,12 +32,10 @@ scope manager -c tls://127.0.0.1:10090`,
 
 		g.Go(util.Signal(gctx))
 		g.Go(clients.Receiver(gctx, g, sq, c))
+		g.Go(web.Server(gctx, g, c))
 
-		// if relayflag
+		// TODO: if relayflag
 		g.Go(relay.Sender(gctx, sq))
-
-		// launch web server
-		// pass in c object
 
 		if err := g.Wait(); err != nil {
 			util.ErrAndExit(err.Error())

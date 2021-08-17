@@ -2,9 +2,7 @@ package relay
 
 import (
 	"context"
-	"encoding/json"
 
-	"github.com/criblio/scope/libscope"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -22,18 +20,20 @@ func Sender(gctx context.Context, sq Queue) func() error {
 
 		log.Info("Connected to Cribl Destination")
 
-		header := libscope.NewHeader()
-		header.Format = "ndjson"
-		header.AuthToken = Config.AuthToken
-		headerJson, err := json.Marshal(header)
-		if err != nil {
-			return err
-		}
-		if err = c.Send(Message(headerJson) + "\n"); err != nil {
-			return err
-		}
-
-		log.Info("Send Connection Header to Cribl Destination")
+		/*
+			// send a connection header on connection to the cribl destination
+			header := libscope.NewHeader()
+			header.Format = "ndjson"
+			header.AuthToken = Config.AuthToken
+			headerJson, err := json.Marshal(header)
+			if err != nil {
+				return err
+			}
+			if err = c.Send(Message(headerJson) + "\n"); err != nil {
+				return err
+			}
+			log.Info("Sent Connection Header to Cribl Destination")
+		*/
 
 		for {
 			select {

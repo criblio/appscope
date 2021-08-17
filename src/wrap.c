@@ -848,6 +848,10 @@ reportPeriodicStuff(void)
     long long cpu = 0;
     static long long cpuState = 0;
 
+    // empty the event queues
+    doEvent();
+    doPayload();
+
     // We report CPU time for this period.
     cpu = doGetProcCPU();
     if (cpu != -1) {
@@ -901,11 +905,6 @@ reportPeriodicStuff(void)
     // report net and file by descriptor
     reportAllFds(PERIODIC);
 
-    // empty the event queues
-    doEvent();
-
-    doPayload();
-
     mtcFlush(g_mtc);
 }
 
@@ -915,23 +914,6 @@ handleExit(void)
     if (g_exitdone == TRUE) return;
     g_exitdone = TRUE;
 
-    struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
-
-    char *wait;
-    if ((wait = getenv("SCOPE_CONNECT_TIMEOUT_SECS")) != NULL) {
-        // wait for a connection to be established 
-        // before we call doEvent
-        int wait_time;
-        errno = 0;
-        wait_time = strtoul(wait, NULL, 10);
-        if (!errno && wait_time) {
-            for (int i = 0; i < 100000 * wait_time; i++) {
-                if (!ctlNeedsConnection(g_ctl, CFG_CTL)) break; 
-                sigSafeNanosleep(&ts);
-            }
-        }
-    }
-
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
         struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
 
@@ -939,10 +921,26 @@ handleExit(void)
         while (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
             sigSafeNanosleep(&ts);
         }
-        doEvent();
-    } else {
-        reportPeriodicStuff();
     }
+
+    struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
+
+    char *wait;
+    if ((wait = getenv("SCOPE_CONNECT_TIMEOUT_SECS")) != NULL) {
+        // wait for a connection to be established 
+        // before we emit data
+        int wait_time;
+        errno = 0;
+        wait_time = strtoul(wait, NULL, 10);
+        if (!errno && wait_time) {
+            for (int i = 0; i < 100000 * wait_time; i++) {
+                if (doConnection() == TRUE) break;
+                sigSafeNanosleep(&ts);
+            }
+        }
+    }
+
+    reportPeriodicStuff();
 
     mtcFlush(g_mtc);
     mtcDisconnect(g_mtc);

@@ -2417,10 +2417,9 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
     }
 }
 
-void
-doEvent()
+bool
+doConnection(void)
 {
-    uint64_t data;
     bool ready = FALSE;
 
     // if no connection, don't pull data from the queue
@@ -2443,7 +2442,15 @@ doEvent()
         }
     }
 
-    if (ready == FALSE) return;
+    return ready;
+}
+
+void
+doEvent()
+{
+    uint64_t data;
+
+    if (doConnection() == FALSE) return;
 
     while ((data = msgEventGet(g_ctl)) != -1) {
         if (data) {

@@ -10,7 +10,7 @@ import (
 
 // Receiver listens for new unix socket connections and manages clients
 // It creates a new goroutine for each client
-func Receiver(gctx context.Context, g *errgroup.Group, sq relay.Queue) func() error {
+func Receiver(gctx context.Context, g *errgroup.Group, sq relay.Queue, c Clients) func() error {
 	return func() error {
 
 		log.Info("Receiver routine running")

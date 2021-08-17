@@ -26,17 +26,17 @@ scope manager -c tls://127.0.0.1:10090`,
 
 		c := clients.NewClients()
 		sq := relay.NewSenderQueue()
-
 		ctx := context.Context(context.Background())
 		g, gctx := errgroup.WithContext(ctx)
 
 		g.Go(util.Signal(gctx))
-		g.Go(clients.Receiver(gctx, g, sq))
+		g.Go(clients.Receiver(gctx, g, sq, c))
 
 		// if relayflag
 		g.Go(relay.Sender(gctx, sq))
 
 		// launch web server
+		// pass in c object
 
 		if err := g.Wait(); err != nil {
 			util.ErrAndExit(err.Error())

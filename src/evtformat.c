@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/timeb.h>
+#include <sys/time.h>
 #include <time.h>
 
 #include "dbg.h"
@@ -457,9 +457,10 @@ rateLimitMessage(proc_id_t *proc, watch_t src, unsigned maxEvtPerSec)
 {
     event_format_t event;
 
-    struct timeb tb;
-    ftime(&tb);
-    event.timestamp = tb.time + (double)tb.millitm/1000;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    event.timestamp = tv.tv_sec + tv.tv_usec/1e6;
     event.src = "notice";
     event.proc = proc;
     event.uid = 0ULL;
@@ -564,8 +565,9 @@ static cJSON *
 evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, watch_t src)
 {
     event_format_t event;
-    struct timeb tb;
-    time_t now;
+
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
     
     regex_t *filter;
 
@@ -581,8 +583,8 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
     // rate limited to maxEvtPerSec
     if (evt->ratelimit.maxEvtPerSec == 0) {
         ; // no rate limiting.
-    } else if (time(&now) != evt->ratelimit.time) {
-        evt->ratelimit.time = now;
+    } else if (tv.tv_sec != evt->ratelimit.time) {
+        evt->ratelimit.time = tv.tv_sec;
         evt->ratelimit.evtCount = evt->ratelimit.notified = 0;
     } else if (++evt->ratelimit.evtCount >= evt->ratelimit.maxEvtPerSec) {
         // one notice per truncate
@@ -601,8 +603,7 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
         return NULL;
     }
 
-    ftime(&tb);
-    event.timestamp = tb.time + (double)tb.millitm/1000;
+    event.timestamp = tv.tv_sec + tv.tv_usec/1e6;
     event.src = metric->name;
     event.proc = proc;
     event.uid = uid;

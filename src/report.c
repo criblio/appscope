@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <fcntl.h>
-#include <sys/timeb.h>
+#include <sys/time.h>
 
 #include "atomic.h"
 #include "com.h"
@@ -479,8 +479,11 @@ doHttpHeader(protocol_info *proto)
             return;
         }
 
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+
         map->id = post->id;
-        map->first_time = time(NULL);
+        map->first_time = tv.tv_sec;
         map->req = NULL;
         map->req_len = 0;
     }
@@ -593,8 +596,11 @@ doHttpHeader(protocol_info *proto)
             return;
         }
 
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+
         int rps = map->frequency;
-        int sec = (map->first_time > 0) ? (int)time(NULL) - map->first_time : 1;
+        int sec = (map->first_time > 0) ? (int)tv.tv_sec - map->first_time : 1;
         if (sec > 0) {
             rps = map->frequency / sec;
         }
@@ -2569,9 +2575,9 @@ doPayload()
                 : (pinfo->net.tlsProtoDef
                    ? pinfo->net.tlsProtoDef->protname 
                    : "");
-            struct timeb tb;
-            ftime(&tb);
-            double timestamp = tb.time + (double)tb.millitm/1000;
+            struct timeval tv;
+            gettimeofday(&tv, NULL);
+            double timestamp = tv.tv_sec + tv.tv_usec/1e6;
             int rc = snprintf(pay, hlen,
                               "{\"type\":\"payload\",\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s,\"protocol\":\"%s\",\"_time\":%.3f}",
                               g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport, protoName, timestamp);

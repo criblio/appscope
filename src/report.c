@@ -732,6 +732,7 @@ doDetection(protocol_info *proto)
     };
 
     event_t evt = INT_EVENT("remote_protocol", proto->fd, SET, fields);
+    evt.src = CFG_SRC_NET;
     cmdSendEvent(g_ctl, &evt, proto->uid, &g_proc);
     destroyProto(proto);
 }
@@ -740,7 +741,6 @@ void
 doProtocolMetric(protocol_info *proto)
 {
     if (!proto) return;
-
     if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
         doHttpHeader(proto);
     } else if (proto->ptype == EVT_DETECT) {
@@ -2417,10 +2417,9 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
     }
 }
 
-void
-doEvent()
+bool
+doConnection(void)
 {
-    uint64_t data;
     bool ready = FALSE;
 
     // if no connection, don't pull data from the queue
@@ -2433,7 +2432,7 @@ doEvent()
         ready = TRUE;
     }
 
-    if (ready == FALSE) {
+    if ((cfgLogStream(g_cfg.staticfg) == FALSE) && (ready == FALSE)) {
         if (mtcNeedsConnection(g_mtc)) {
             if (mtcConnect(g_mtc)) {
                 ready = TRUE;
@@ -2443,7 +2442,15 @@ doEvent()
         }
     }
 
-    if (ready == FALSE) return;
+    return ready;
+}
+
+void
+doEvent()
+{
+    uint64_t data;
+
+    if (doConnection() == FALSE) return;
 
     while ((data = msgEventGet(g_ctl)) != -1) {
         if (data) {
@@ -2563,9 +2570,14 @@ doPayload()
             }
 
             uint64_t netid = (net != NULL) ? net->uid : 0;
+            char * protoName = pinfo->net.protoProtoDef
+                ? pinfo->net.protoProtoDef->protname
+                : (pinfo->net.tlsProtoDef
+                   ? pinfo->net.tlsProtoDef->protname 
+                   : "");
             int rc = snprintf(pay, hlen,
-                              "{\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s}",
-                              g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport);
+                              "{\"type\":\"payload\",\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s,\"protocol\":\"%s\"}",
+                              g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport, protoName);
             if (rc < 0) {
                 // unlikley
                 if (pinfo->data) free(pinfo->data);

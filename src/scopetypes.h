@@ -108,7 +108,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_CONSOLE TRUE
 #define DEFAULT_SRC_SYSLOG FALSE
 #define DEFAULT_SRC_METRIC FALSE
-#define DEFAULT_SRC_HTTP TRUE
+#define DEFAULT_SRC_HTTP FALSE
 #define DEFAULT_SRC_NET TRUE
 #define DEFAULT_SRC_FS TRUE
 #define DEFAULT_SRC_DNS TRUE
@@ -182,7 +182,7 @@ typedef unsigned int bool;
 // https://tools.ietf.org/html/rfc5246
 // http://blog.fourthbit.com/2014/12/23/traffic-analysis-of-an-ssl-slash-tls-session/
 // https://tls13.ulfheim.net/
-#define PAYLOAD_BYTESRC 8
+#define PAYLOAD_BYTESRC 6
 #define PAYLOAD_REGEX "^16030[0-3].{4}0[12]"
 
 // libmusl requires LD_LIBRARY_PATH

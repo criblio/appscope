@@ -5,8 +5,9 @@
     SSL_ImportFD;
     *;
   local:
-    SCOPE_SSL_*;
-    a2d_*;
+    cs_*;          # hides capstone symbols
+    SCOPE_SSL_*;   # hides our renamed SSL symbols
+    a2d_*;         # the beginning of libssl, libcrypto symbols
     a2i_*;
     ACCESS_*;
     ADMISSIONS_*;

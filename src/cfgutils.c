@@ -2050,7 +2050,7 @@ initCtl(config_t *cfg)
     }
     ctlTransportSet(ctl, trans, CFG_CTL);
 
-    if (cfgLogStream(cfg) && cfgPayEnable(cfg)) {
+    if (cfgLogStream(cfg)) {
         transport_t *trans = initTransport(cfg, CFG_LS);
         if (!trans) {
             ctlDestroy(&ctl);
@@ -2242,6 +2242,9 @@ protocolRead(const char *path, list_t *plist)
             if ((prot = calloc(1, sizeof(protocol_def_t))) == NULL) goto cleanup;
             name_found = FALSE;
 
+            // set non-zero defaults
+            prot->detect = TRUE;
+
             foreach (prot_pair, (yaml_node_pair_t *)plist_key->data.sequence.items) {
                 // 3rd level
                 prot_key = yaml_document_get_node(&doc, prot_pair->key);
@@ -2264,6 +2267,12 @@ protocolRead(const char *path, list_t *plist)
                     errno = 0;
                     prot->len = strtoull((char *)prot_value->data.scalar.value, NULL, 0);
                     if (errno != 0) prot->len = 0;
+                } else if (!strcmp((char *)prot_key->data.scalar.value, "detect")) {
+                    prot->detect = (!strcmp((char *)prot_value->data.scalar.value, "false")) ?
+                        FALSE : TRUE; // seems like it should default to true
+                } else if (!strcmp((char *)prot_key->data.scalar.value, "payload")) {
+                    prot->payload = (!strcmp((char *)prot_value->data.scalar.value, "false")) ?
+                        FALSE : TRUE; // seems like it should default to true
                 } else {
                     continue;
                 }

@@ -1,13 +1,17 @@
-#ifndef __TIME_H__
-#define __TIME_H__
+#ifndef __PLATTIME_H__
+#define __PLATTIME_H__
 
 #include <limits.h>
 #include <stdint.h>
 #include "scopetypes.h"
+#include <time.h>
+
+#define DEFAULT_HW_TIMER TRUE
 
 typedef struct {
     bool tsc_invariant;
     bool tsc_rdtscp;
+    bool gptimer_avail;
     uint64_t freq;
 } platform_time_t;
 
@@ -25,6 +29,20 @@ extern platform_time_t g_time;
 
 static inline uint64_t
 getTime(void) {
+
+    // If we do not have a h/w timer available or we default to not using a
+    // h/w timer then use the kernel timer. Note that no checks for a gate
+    // function in VDSO have been applied.
+    if ((g_time.gptimer_avail == FALSE) || (DEFAULT_HW_TIMER == FALSE)) {
+        uint64_t cnt;
+        struct timespec ts;
+
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        cnt = ts.tv_sec * 1000000000 + ts.tv_nsec;
+        return cnt;
+    }
+
+#ifdef __x86_64__
     unsigned low, high;
 
     /*
@@ -54,6 +72,20 @@ getTime(void) {
         asm volatile("rdtsc" : "=a" (low), "=d" (high));
     }
     return ((uint64_t)low) | (((uint64_t)high) << 32);
+#elif defined(__aarch64__)
+    uint64_t cnt;
+    __asm__ volatile (
+        "mrs x1, CNTVCT_EL0 \n"
+        "mov %0, x1  \n"
+        : "=r" (cnt)                // output
+        :                           // inputs
+        :                           // clobbered register
+        );
+
+    return cnt;
+#else
+#error Architecture is not defined
+#endif
 }
 
 
@@ -76,7 +108,11 @@ getDuration(uint64_t start)
      */
     uint64_t now = getTime();
     if (start < now) {
-        return ((now - start) * 1000) / g_time.freq;
+        if ((g_time.gptimer_avail == TRUE) && (DEFAULT_HW_TIMER == TRUE)) {
+            return ((now - start) * 1000) / g_time.freq;
+        } else {
+            return now - start;
+        }
     } else {
         return (((ULONG_MAX - start) + now) * 1000) / g_time.freq;
     }
@@ -101,10 +137,14 @@ getDurationNow(uint64_t now, uint64_t start)
      * A roll over is rare. But, we should handle it.
      */
     if (start < now) {
-        return ((now - start) * 1000) / g_time.freq;
+        if ((g_time.gptimer_avail == TRUE) && (DEFAULT_HW_TIMER == TRUE)) {
+            return ((now - start) * 1000) / g_time.freq;
+        } else {
+            return now - start;
+        }
     } else {
         return (((ULONG_MAX - start) + now) * 1000) / g_time.freq;
     }
 }
 
-#endif // __TIME_H__
+#endif // __PLATTIME_H__

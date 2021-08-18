@@ -92,5 +92,6 @@ void doTotal(metric_t);
 void doTotalDuration(metric_t);
 void doEvent(void);
 void doPayload(void);
+bool doConnection(void);
 
 #endif // __REPORT_H__

@@ -13,27 +13,21 @@ scope.log
 .DS_Store
 
 # Test Leftovers
-venv
-coverage/
-test/selfinterpose/
-test/testContainers/logs
+/venv
+/coverage/
+/test/selfinterpose/
+/test/testContainers/logs
 **/*.gcda
 **/*.gcov
-newdir/
-testtempdir1/
-testtempdir2/
-
-# Contribs
-contrib/funchook/build/
-contrib/pcre2/build
-contrib/openssl/
-
-certs/
-
-test/testContainers/logs
+**/.test/
+/newdir/
+/testtempdir1/
+/testtempdir2/
+/certs/
+/test/testContainers/logs
 
 # Website Temps
-website/.env
-website/public/
-website/node_modules/
-website/.cache/
+/website/.env
+/website/public/
+/website/node_modules/
+/website/.cache/

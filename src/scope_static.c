@@ -13,6 +13,7 @@
 #include <libgen.h>
 #include <dirent.h>
 #include <getopt.h>
+#include <sys/utsname.h>
 
 #include "scopetypes.h"
 #include "libdir.h"
@@ -398,8 +399,10 @@ do_musl(char *exld, char *ldscope)
         return;
     }
 
+#ifdef __x86_64__
     set_loader(ldscope);
     set_library();
+#endif
 
     if (ldso) free(ldso);
     if (lpath) free(lpath);
@@ -918,7 +921,9 @@ static struct option opts[] = {
 int
 main(int argc, char **argv, char **env)
 {
+    int is_musl;
     char *attachArg = 0;
+    char path[PATH_MAX] = {0};
 
     // process command line
     for (;;) {
@@ -1001,7 +1006,7 @@ main(int argc, char **argv, char **env)
     // setup for musl libc if detected
     char *loader = (char *)libdirGetLoader();
     if (loader) {
-        int is_musl = setup_loader(EXE_TEST_FILE, loader);
+        is_musl = setup_loader(EXE_TEST_FILE, loader);
         if (is_musl && attachArg && !getenv("SCOPE_ALLOW_MUSL_ATTACH")) {
             fprintf(stderr, "error: use of --attach in musl libc isn't currently supported\n");
             fprintf(stderr, "error: set SCOPE_ALLOW_MUSL_ATTACH=true to attempt anyway\n");
@@ -1024,8 +1029,6 @@ main(int argc, char **argv, char **env)
 
     // create /dev/shm/scope_${PID}.env when attaching
     if (attachArg) {
-        char path[PATH_MAX] = {0};
-
         // must be root
         if (getuid()) {
             printf("error: --attach requires root\n");
@@ -1067,9 +1070,15 @@ main(int argc, char **argv, char **env)
     }
 
     // build exec args
-    char** execArgv = calloc(argc+2, sizeof(char*));
-    int    execArgc = 0;
-    execArgv[execArgc++] = (char*) libdirGetLoader();
+    int execArgc = 0;
+    char **execArgv = calloc(argc + 4, sizeof(char *));
+    if (!execArgv) {
+        perror("calloc");
+        return EXIT_FAILURE;
+    }
+
+    execArgv[execArgc++] = (char *) libdirGetLoader();
+
     if (attachArg) {
         execArgv[execArgc++] = "-a";
         execArgv[execArgc++] = attachArg;
@@ -1078,6 +1087,7 @@ main(int argc, char **argv, char **env)
             execArgv[execArgc++] = argv[optind++];
         }
     }
+
     execArgv[execArgc++] = NULL;
 
     // pass SCOPE_LIB_PATH in environment
@@ -1087,7 +1097,25 @@ main(int argc, char **argv, char **env)
     }
 
     // exec the dynamic ldscope
-    execve(libdirGetLoader(), execArgv, environ);
+    struct utsname ubuf;
+
+    if (uname(&ubuf) != 0) {
+        perror("uname");
+        return EXIT_FAILURE;
+    }
+
+    if (is_musl && ubuf.machine && (strstr(ubuf.machine, "aarch64") != NULL)) {
+        strncpy(path, "/lib/", 8);
+        if (get_dir("/lib/ld-", path + strlen(path), sizeof(path) - strlen(path)) == -1) {
+            fprintf(stderr, "ERROR: can't get the path for ld-musl");
+            return EXIT_FAILURE;
+        }
+
+        execve(path, execArgv, environ);
+    } else {
+        execve(libdirGetLoader(), execArgv, environ);
+    }
+
     free(execArgv);
     perror("execve failed");
     return EXIT_FAILURE;

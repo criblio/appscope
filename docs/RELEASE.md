@@ -93,8 +93,17 @@ that base URL we have:
 The `latest` file is updated only for builds of `v*` tags without `-rc` in
 them. 
 
+Starting with the `v0.7.2` release, we are building separate x86 and ARM
+versions of AppScope. The links described above still lead to the x86 files.
+We've added arch-specific links for the `x86_64` and `aarch64` files.
+
+* `$VERSION/linux/$(uname -m)/scope`
+* `$VERSION/linux/$(uname -m)/scope.md5`
+* `$VERSION/linux/$(uname -m)/scope.tgz`
+* `$VERSION/linux/$(uname -m)/scope.tgz.md5`
+
 The `$VERSION` string is a release tag without the leading `v` (e.g., `1.2.3`
-or `1.2.3-rc1`), an branch (e.g.,  `branch/bug/1234-name`) or `next` for the
+or `1.2.3-rc1`), a branch (e.g.,  `branch/bug/1234-name`) or `next` for the
 default branch. The `.md5` files are MD5 checksums of the corresponding files
 without the extension. Example URLs below.
 
@@ -102,14 +111,15 @@ without the extension. Example URLs below.
 * <https://cdn.cribl.io/dl/scope/next/linux/scope>
 * <https://cdn.cribl.io/dl/scope/0.6.1/linux/scope>
 * <https://cdn.cribl.io/dl/scope/0.7.0-rc2/linux/scope>
+* <https://cdn.cribl.io/dl/scope/0.7.2-rc1/linux/x86_64/scope>
 * <https://cdn.cribl.io/dl/scope/branch/feature/send_tls/linux/scope>
 
 We commonly use these as shown in the example below.
 
 ```text
 $ LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
-$ curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/scope
-$ curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/scope.md5 | md5sum -c 
+$ curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope
+$ curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope.md5 | md5sum -c 
 $ chmod +x scope
 $ ./scope run ...
 ```
@@ -123,18 +133,13 @@ repositories at Docker Hub. See [`docker/`](../docker/) for details on how
 those images are built.
 
 We currently build these for release `v*` tags and tag the images to match with
-the leading `v` stripped off. If the Git tag doesn't match `*-rc*` then we also
-apply the `:latest` tag to the images.
+the leading `v` stripped off. If the git tag isn't a preprelease tag and is the
+last one then we apply the `:latest` tag to the image too.
 
-## To Do
-
-* Rename `master` branch to `main`
-* Build & push `:next` images to Docker Hub from the default branch.
-* Get details on how the `scope/cribl` image is being used.
-* BUG: A maintenance release for an old major/minor release results in the
-  `:latest` tag being incorrectly updated for the `cribl/scope` image as script
-  works now.
-* Enable protection for the `master` and `release/**` branches to require PRs
-  that have been reviewed by 2+ people and where all checks have passed.
-* GitHub has no way to protect tags. Do we want to see about ways to prevent
-  inappropriate release tagging?
+```text
+docker run --rm -it cribl/scope:latest
+```
+or
+```text
+docker run --rm -it cribl/scope:0.7.0
+```

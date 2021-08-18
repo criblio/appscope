@@ -48,12 +48,12 @@ int g_mtc_addr_output = TRUE;
 static search_t* g_http_redirect = NULL;
 static list_t *g_protlist;
 static unsigned int g_prot_sequence = 0;
-static protocol_def_t *g_payload_pre = NULL;
+
+static protocol_def_t *g_tls_protocol_def = NULL;
+static protocol_def_t *g_http_protocol_def = NULL;
 
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
-
-#define SET_PROT(net) if (net && (net->protocol == PROT_NOTCHECKED)) net->protocol = PROT_CHECKED;
 
 #define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
 #define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)
@@ -182,40 +182,60 @@ addProtocol(request_t *req)
 }
 
 static void
-initPayloadExtract()
+initPayloadDetect()
 {
     int errornumber = 0;
     PCRE2_SIZE erroroffset = 0;
 
-    if ((g_payload_pre = calloc(1, sizeof(protocol_def_t))) == NULL) return;
-
-    g_payload_pre->binary = TRUE;
-    g_payload_pre->len = PAYLOAD_BYTESRC;
-    g_payload_pre->type = 0;
-    g_payload_pre->protname = NULL;
-    g_payload_pre->regex = PAYLOAD_REGEX;
-
-    g_payload_pre->re = pcre2_compile((PCRE2_SPTR)g_payload_pre->regex,
-                                      PCRE2_ZERO_TERMINATED, 0,
-                                      &errornumber, &erroroffset, NULL);
-
-    if (g_payload_pre->re == NULL) {
-        destroyProtEntry(g_payload_pre);
-        g_payload_pre = NULL;
-        return;
+    // Setup the TLS protocol-detect regex
+    errornumber = 0;
+    erroroffset = 0;
+    if ((g_tls_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+    g_tls_protocol_def->protname = "TLS";
+    g_tls_protocol_def->binary = TRUE;
+    g_tls_protocol_def->len = PAYLOAD_BYTESRC;
+    g_tls_protocol_def->regex = PAYLOAD_REGEX;
+    g_tls_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_tls_protocol_def->regex,
+                                           PCRE2_ZERO_TERMINATED, 0,
+                                           &errornumber, &erroroffset, NULL);
+    if (g_tls_protocol_def->re == NULL) {
+        goto error;
+    }
+    g_tls_protocol_def->match_data = pcre2_match_data_create_from_pattern(g_tls_protocol_def->re, NULL);
+    if (g_tls_protocol_def->match_data == NULL) {
+        goto error;
     }
 
-    g_payload_pre->match_data = pcre2_match_data_create_from_pattern(g_payload_pre->re, NULL);
-
-    if (g_payload_pre->match_data == NULL) {
-        destroyProtEntry(g_payload_pre);
-        g_payload_pre = NULL;
-        return;
+    // Setup the HTTP protocol-detect regex
+    errornumber = 0;
+    erroroffset = 0;
+    if ((g_http_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+    g_http_protocol_def->protname = "HTTP";
+    g_http_protocol_def->regex = "(?: HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n)";
+    g_http_protocol_def->detect = TRUE;
+    g_http_protocol_def->payload = TRUE;
+    g_http_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_http_protocol_def->regex,
+                                            PCRE2_ZERO_TERMINATED, 0,
+                                            &errornumber, &erroroffset, NULL);
+    if (g_http_protocol_def->re == NULL) {
+        goto error;
     }
+    g_http_protocol_def->match_data = pcre2_match_data_create_from_pattern(g_http_protocol_def->re, NULL);
+    if (g_http_protocol_def->match_data == NULL) {
+        goto error;
+    }
+
+    return;
+
+error:
+    destroyProtEntry(g_tls_protocol_def);
+    g_tls_protocol_def = NULL;
+    destroyProtEntry(g_http_protocol_def);
+    g_http_protocol_def = NULL;
 }
 
 static void
-initProtocolDetection()
+initProtocolDetect()
 {
     int i;
     list_t *plist = lstCreate(NULL);
@@ -286,8 +306,8 @@ initState()
     g_http_redirect = searchComp(REDIRECTURL);
 
     g_protlist = lstCreate(destroyProtEntry);
-    initProtocolDetection();
-    initPayloadExtract();
+    initProtocolDetect();
+    initPayloadDetect();
 
     initReporting();
 }
@@ -864,38 +884,39 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 }
 
 static bool
-setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t len)
+setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size_t len)
 {
     char *data, *cpdata = NULL;
     pcre2_match_data *match_data;
     protocol_info *proto;
+    bool ret = FALSE;
 
     // nothing we can do; don't risk reading past end of a buffer
     size_t cvlen = (len < MAX_CONVERT) ? len : MAX_CONVERT;
-    if (((len <= 0) && (pre->len <= 0)) ||   // no len
-        !pre->re ||                          // no regex
-        (pre->len > cvlen)) {                // not enough buf for pre->len
-        SET_PROT(net);
+    if (((len <= 0) && (protoDef->len <= 0)) ||   // no len
+        !protoDef->re ||                          // no regex
+        (protoDef->len > cvlen)) {                // not enough buf for protoDef->len
+        if (net) net->protoDetect = DETECT_FALSE;
         return FALSE;
     }
 
-    /*
-     * precedence to a len defined with the protocol definition
-     * if a len was not provided in the definition use the one passed
-     * therefore, len is now pre->len
-     */
-    if (pre->len > 0) {
-        cvlen = pre->len;
+    // precedence to a len defined with the protocol definition
+    // if a len was not provided in the definition use the one passed
+    // therefore, len is now protoDef->len
+    if (protoDef->len > 0) {
+        cvlen = protoDef->len;
     }
 
-    if (pre->binary == FALSE) {
+    if (protoDef->binary == FALSE) {
+        // non-binary data so we can preg-match against it as is.
         data = buf;
     } else {
+        // otherwise, hexdump it
         int i;
         size_t alen = (cvlen * 2) + 1;
 
         if ((cpdata = calloc(1, alen)) == NULL) {
-            SET_PROT(net);
+            if (net) net->protoDetect = DETECT_FALSE;
             return FALSE;
         }
 
@@ -907,91 +928,90 @@ setProtocol(int sockfd, protocol_def_t *pre, net_info *net, char *buf, size_t le
         cvlen = cvlen * 2;
     }
 
-    match_data = pcre2_match_data_create_from_pattern(pre->re, NULL);
-    if (pcre2_match_wrapper(pre->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0,
+    match_data = pcre2_match_data_create_from_pattern(protoDef->re, NULL);
+    if (pcre2_match_wrapper(protoDef->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0,
                             match_data, NULL) > 0) {
-        //DEBUG
-        //scopeLog("setProtocol: SUCCESS", sockfd, CFG_LOG_ERROR);
-        SET_PROT(net);
+        scopeLog("protocol detected", sockfd, CFG_LOG_DEBUG);
 
-        if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
-            if (cpdata) free(cpdata);
-            if (match_data) pcre2_match_data_free(match_data);
-            SET_PROT(net);
-            return FALSE;
+        if (net) {
+            net->protoDetect = DETECT_TRUE;
+            net->protoProtoDef = protoDef;
         }
 
-        proto->evtype = EVT_PROTO;
-        proto->ptype = EVT_DETECT;
-        proto->len = sizeof(protocol_def_t);
-        proto->fd = sockfd;
-        proto->uid = net->uid;
-        proto->data = (char *)strdup(pre->protname);
-        cmdPostEvent(g_ctl, (char *)proto);
+        if (protoDef->detect && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
+            if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL)
+            {
+                if (cpdata)
+                    free(cpdata);
+                if (match_data)
+                    pcre2_match_data_free(match_data);
+                return FALSE;
+            }
+            proto->evtype = EVT_PROTO;
+            proto->ptype = EVT_DETECT;
+            proto->len = sizeof(protocol_def_t);
+            proto->fd = sockfd;
+            if (net) proto->uid = net->uid;
+            proto->data = (char *)strdup(protoDef->protname);
+            cmdPostEvent(g_ctl, (char *)proto);
+        }
+
+        ret = TRUE; // matched
     } else {
-        SET_PROT(net);
+        // the regex for protocol DID NOT match
+        if (net) net->protoDetect = DETECT_FALSE;
     }
 
     if (match_data) pcre2_match_data_free(match_data);
     if (cpdata) free(cpdata);
 
-    // return true implies no error and not a match; completed a scan
-    return TRUE;
+    return ret;
+}
+
+// This is just calling setProtocol() different ways depending on buffer type.
+static bool
+setProtocolByType(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size_t len, src_data_t dtype)
+{
+    bool ret = FALSE;
+
+    if (dtype == BUF) {
+        // simple buffer, pass it through
+        ret = ret || setProtocol(sockfd, protoDef, net, buf, len);
+    } else if (dtype == MSG) {
+        // buffer is a msghdr for sendmsg/recvmsg
+        int i;
+        struct msghdr *msg = (struct msghdr *)buf;
+        struct iovec *iov;
+        for (i = 0; i < msg->msg_iovlen; i++) {
+            iov = &msg->msg_iov[i];
+            if (iov && iov->iov_base && (iov->iov_len > 0)) {
+                // check every vector?
+                ret = ret || setProtocol(sockfd, protoDef, net, iov->iov_base, iov->iov_len);
+            }
+        }
+    } else if ( dtype == IOV) {
+        // buffer is an iovec, len is the iovcnt
+        int i;
+        struct iovec *iov = (struct iovec *)buf;
+        for (i = 0; i < len; i++) {
+            if (iov[i].iov_base && (iov[i].iov_len > 0)) {
+                // check every vector?
+                ret = ret || setProtocol(sockfd, protoDef, net, iov[i].iov_base, iov[i].iov_len);
+            }
+        }
+    } else {
+        DBG(NULL); // how do we even get here?
+    }
+
+    return ret;
 }
 
 static int
 extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
-    if (!buf || (len <= 0)) return -1;
-
-    // if not connected to a LogStream try to not include TLS handshake in the payload
-    if ((cfgLogStream(g_cfg.staticfg) == FALSE) && ((src == NETRX) || (src == NETTX))) {
-        /*
-         * the protocol state for this socket is either
-         * PROT_NOTCHECKED: first time we've seen traffic on this connection.
-         * continue and check to see if TLS is being used.
-         * PROT_CHECKED: we have checked for a protocol, it's not TLS.
-         * no need to check for a protocol. since it's not TLS. emit payload data.
-         * PROT_TLS: determined that this connection is using TLS. emit no payload data.
-         * the SSL/TLS interposed functions will emit unencrypted payload data.
-         */
-        // the protocol used on this socket is TLS
-        if (net && (net->protocol == PROT_TLS)) return 0;
-
-        // haven't checked for a protocol yet
-        if (net && (net->protocol == PROT_NOTCHECKED) && g_payload_pre) {
-            int rc;
-            unsigned char *data = buf;
-
-            // TLS data is binary, convert to chars
-            int i;
-            size_t alen = (g_payload_pre->len * 2) + 1;
-            char cpdata[alen];
-
-            memset(cpdata, 0, alen);
-
-            for (i = 0; i < g_payload_pre->len; i++) {
-                snprintf(&cpdata[i<<1], 3, "%02x", (unsigned char)data[i]);
-            }
-
-            if ((rc = pcre2_match_wrapper(g_payload_pre->re, (PCRE2_SPTR)cpdata,
-                                          (PCRE2_SIZE)alen, 0, 0,
-                                          g_payload_pre->match_data, NULL)) > 0) {
-                net->protocol = PROT_TLS;
-                return 0;
-            } else {
-                net->protocol = PROT_CHECKED;
-                switch(rc)
-                {
-                case PCRE2_ERROR_NOMATCH:
-                    scopeLog("extractPayload: No match", sockfd, CFG_LOG_DEBUG);
-                    break;
-                default:
-                    scopeLog("extractPayload: Matching error", sockfd, CFG_LOG_DEBUG);
-                    break;
-                }
-            }
-        }
+    if (!buf || (len <= 0)) {
+        DBG(NULL); // why whould we ever get here?
+        return -1;
     }
 
     payload_info *pinfo = calloc(1, sizeof(struct payload_info_t));
@@ -999,24 +1019,18 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         return -1;
     }
 
-    switch (dtype) {
-    case BUF:
+    if (dtype == BUF) {
         pinfo->data = calloc(1, len);
         if (!pinfo->data) {
             free(pinfo);
             return -1;
         }
-
         memmove(pinfo->data, buf, len);
-        break;
-
-    case MSG:
-    {
+    } else if (dtype == MSG) {
         int i;
         size_t blen = 0;
         struct msghdr *msg = (struct msghdr *)buf;
         struct iovec *iov;
-
         for (i = 0; i < msg->msg_iovlen; i++) {
             iov = &msg->msg_iov[i];
             if (iov && iov->iov_base && (iov->iov_len > 0)) {
@@ -1033,16 +1047,10 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
             }
         }
         len = blen;
-        break;
-    }
-
-    case IOV:
-    {
+    } else if (dtype == IOV) {
         int i;
         size_t blen = 0;
         struct iovec *iov = (struct iovec *)buf;
-
-        // len is expected to be an iovcnt for an IOV data type
         for (i = 0; i < len; i++) {
             if (iov[i].iov_base && (iov[i].iov_len > 0)) {
                 char *temp = realloc(pinfo->data, blen + iov[i].iov_len);
@@ -1058,10 +1066,7 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
             }
         }
         len = blen;
-        break;
-    }
-
-    default:
+    } else {
         // no data, no need to continue
         free(pinfo);
         return -1;
@@ -1078,6 +1083,8 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     pinfo->sockfd = sockfd;
     pinfo->len = len;
 
+    scopeLog("posting payload", sockfd, CFG_LOG_DEBUG);
+
     if (cmdPostPayload(g_ctl, (char *)pinfo) == -1) {
         if (pinfo->data) free(pinfo->data);
         if (pinfo) free(pinfo);
@@ -1087,57 +1094,99 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     return 0;
 }
 
+/**
+ * Apply our TLS protocol-detector to a channel.
+ * 
+ * Sets net->tlsDetect and net->tlsProtoDef.
+ */
+static void
+detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
+{
+    int rc;
+    unsigned char *data = buf;
+    unsigned int ptype;
+    protocol_def_t *tls_proto_def = g_tls_protocol_def; // use ours by default
+
+    // Look for an overriden TLS entry from the protocol detector configs
+    for (ptype = 0; ptype <= g_prot_sequence; ptype++)
+    {
+        protocol_def_t *tmp_proto_def;
+        if ((tmp_proto_def = lstFind(g_protlist, ptype))
+            && (strcmp(tmp_proto_def->protname, "TLS") == 0)) {
+            // Use the user-provided one instead of ours
+            tls_proto_def = tmp_proto_def;
+            break;
+        }
+    }
+
+    // Extract some of the payload to a hex string since it's binary.
+    int i;
+    size_t alen = (tls_proto_def->len * 2) + 1;
+    char cpdata[alen];
+    memset(cpdata, 0, alen);
+    for (i = 0; i < tls_proto_def->len; i++)
+    {
+        snprintf(&cpdata[i << 1], 3, "%02x", data[i]);
+    }
+
+    // Apply the regex to the hex-string payload
+    pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(tls_proto_def->re, NULL);
+    if ((rc = pcre2_match_wrapper(tls_proto_def->re, (PCRE2_SPTR)cpdata,
+                                  (PCRE2_SIZE)alen, 0, 0,
+                                  match_data, NULL)) > 0)
+    {
+        // matched, set the detect-state to TRUE
+        net->tlsDetect = DETECT_TRUE;
+        net->tlsProtoDef = tls_proto_def;
+
+        scopeLog("detected TLS", sockfd, CFG_LOG_DEBUG);
+        if (tls_proto_def->detect) {
+            // TODO send TLS protocol-detect event
+        }
+    }
+    else
+    {
+        // didn't match, set the detect-state to FALSE
+        net->tlsDetect = DETECT_FALSE;
+        if (rc != PCRE2_ERROR_NOMATCH)
+        {
+            DBG(NULL);
+            scopeLog("doProtocol: TLS regex failed", sockfd, CFG_LOG_DEBUG);
+        }
+    }
+    pcre2_match_data_free(match_data);
+}
+
 static void
 detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     unsigned int ptype;
-    protocol_def_t *pre;
+    protocol_def_t *protoDef;
+    bool sawHTTP = FALSE;
 
-    // check once per connection
-    if (!buf || !net || (net->protocol != PROT_NOTCHECKED)) return;
+    // No need to try protocol detection in raw TLS data
+    if (net && net->tlsDetect == DETECT_TRUE     // TLS detected already
+        && (src == NETRX || src == NETTX)) {     // raw payload
+        return;
+    }
 
+    // Check first against the protocol entries in the configs.
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
-        if ((pre = lstFind(g_protlist, ptype)) != NULL) {
-            switch (dtype) {
-            case BUF:
-                setProtocol(sockfd, pre, net, buf, len);
-                break;
-
-            case MSG:
-            {
-                int i;
-                struct msghdr *msg = (struct msghdr *)buf;
-                struct iovec *iov;
-
-                for (i = 0; i < msg->msg_iovlen; i++) {
-                    iov = &msg->msg_iov[i];
-                    if (iov && iov->iov_base && (iov->iov_len > 0)) {
-                        // check every vector?
-                        setProtocol(sockfd, pre, net, iov->iov_base, iov->iov_len);
-                    }
-                }
-                break;
+        if ((protoDef = lstFind(g_protlist, ptype)) != NULL) {
+            if (strcmp(protoDef->protname, "HTTP") == 0) {
+                // Remember we saw an HTTP entry in the configs.
+                sawHTTP = TRUE;
             }
-
-            case IOV:
-            {
-                int i;
-                struct iovec *iov = (struct iovec *)buf;
-
-                // len is expected to be an iovcnt for an IOV data type
-                for (i = 0; i < len; i++) {
-                    if (iov[i].iov_base && (iov[i].iov_len > 0)) {
-                        // check every vector?
-                        setProtocol(sockfd, pre, net, iov[i].iov_base, iov[i].iov_len);
-                    }
-                }
-                break;
-            }
-
-            default:
-                break;
+            if (setProtocolByType(sockfd, protoDef, net, buf, len, dtype)) {
+                // We're done since it matched.
+                return;
             }
         }
+    }
+
+    // Try our HTTP detection if we've not seen one and LogStream is enabled
+    if (!sawHTTP && cfgLogStream(g_cfg.staticfg)) {
+        setProtocolByType(sockfd, g_http_protocol_def, net, buf, len, dtype);
     }
 }
 
@@ -1146,21 +1195,46 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
 {
     net_info *net = getNetEntry(sockfd);
 
-    if (ctlPayEnable(g_ctl)) {
-        // instead of or in addition to http &/or detect?
-        extractPayload(sockfd, net, buf, len, src, dtype);
+    // Do TLS detection if not already done
+    if (net && net->tlsDetect == DETECT_PENDING) {
+        detectTLS(sockfd, net, buf, len, src, dtype);
     }
 
-    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) {
-        if (doHttp(id, sockfd, net, buf, len, src, dtype)) {
-            // not doing anything with protocol... yet
-            SET_PROT(net);
-            return 0;
+    // Do protocol-detection if not already done on the channel
+    if (net && net->protoDetect == DETECT_PENDING) {
+        detectProtocol(sockfd, net, buf, len, src, dtype);
+    }
+
+    // Payload handling depends first on whether it's encrypted or not.
+    if (net && net->tlsDetect == DETECT_TRUE && (src == NETTX || src == NETRX)) {
+        // It's an encrypted TLS payload so we only want to process it if 
+        // LogStream is enabled and TLS negotiation is still in progress.
+        // 
+        // This addresses a couple requirements. First, never send encrypted
+        // payloads to disk. Second, only send encrypted payloads to LogStream
+        // during the TLS negotiation.
+        if (cfgLogStream(g_cfg.staticfg) && net->protoDetect == DETECT_PENDING) {
+            extractPayload(sockfd, net, buf, len, src, dtype);
+        }
+    } else {
+        // This is NOT an encrypted TLS payload so we only process it if
+        // payloads are enabled globally, or for the detected protocol.
+        //
+        // We have a requirement that HTTP payloads be sent when LogStream is
+        // enabled but we don't need to explicitly check for that here. If this
+        // has been detected as HTTP then net->protoProtoDef will point either
+        // to our g_http_protocol_def (which has payload set) or to another one
+        // that came from the config file and the user will have set it as they
+        // wanted. Either way, we can just use that flag here.
+        if (cfgPayEnable(g_cfg.staticfg)
+            || (net && net->protoProtoDef && net->protoProtoDef->payload)) {
+            extractPayload(sockfd, net, buf, len, src, dtype);
         }
     }
 
-    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC)) {
-        detectProtocol(sockfd, net, buf, len, src, dtype);
+    // Crack HTTP/1.x into events if HTTP source/watch is enabled
+    if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
+        doHttp(id, sockfd, net, buf, len, src, dtype);
     }
 
     return 0;

@@ -7,6 +7,7 @@
 
 bool g_need_stack_expand = FALSE;
 unsigned g_sendprocessstart = 0;
+bool g_exitdone = FALSE;
 
 // interfaces
 mtc_t *g_mtc = NULL;
@@ -81,7 +82,7 @@ reportProcessStart(ctl_t *ctl, bool init, which_transport_t who)
 
     // 2) send a payload start msg
     if (g_sendprocessstart && ((who == CFG_LS) || (who == CFG_WHICH_MAX)) &&
-        cfgLogStream(g_cfg.staticfg) && cfgPayEnable(g_cfg.staticfg)) {
+        cfgLogStream(g_cfg.staticfg)) {
         cJSON *json = msgStart(&g_proc, g_cfg.staticfg, CFG_LS);
         ctlSendJson(ctl, json, CFG_LS);
     }
@@ -298,13 +299,14 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
                     PCRE2_SIZE startoffset, uint32_t options,
                     pcre2_match_data *match_data, pcre2_match_context *mcontext)
 {
-    int rc, arc;
-    char *pcre_stack, *tstack, *gstack;
 
     if (g_need_stack_expand == FALSE) {
         return pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
     }
 
+#ifdef __GO__
+    int rc, arc;
+    char *pcre_stack, *tstack, *gstack;
     if ((pcre_stack = malloc(PCRE_STACK_SIZE)) == NULL) {
         scopeLog("ERROR; pcre2_match_wrapper: malloc", -1, CFG_LOG_ERROR);
         return -1;
@@ -333,20 +335,25 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
 
     if (pcre_stack) free(pcre_stack);
     return rc;
+#else
+    return pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
+#endif
+
 }
 
 int
 regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
                 regmatch_t *pmatch, int eflags)
 {
-    int rc, arc;
-    char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
-
-    if (g_need_stack_expand == FALSE) {
+   if (g_need_stack_expand == FALSE) {
         return regexec(preg, string, nmatch, pmatch, eflags);
     }
 
-    if ((pcre_stack = malloc(PCRE_STACK_SIZE)) == NULL) {
+#ifdef __GO__
+    int rc, arc;
+    char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
+
+     if ((pcre_stack = malloc(PCRE_STACK_SIZE)) == NULL) {
         scopeLog("ERROR; regexec_wrapper: malloc", -1, CFG_LOG_ERROR);
         return -1;
     }
@@ -374,6 +381,9 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
 
     if (pcre_stack) free(pcre_stack);
     return rc;
+#else
+    return regexec(preg, string, nmatch, pmatch, eflags);
+#endif
 }
 
 bool

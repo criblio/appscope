@@ -208,7 +208,14 @@ testNoInterposedSymbolIsUsed(void** state)
 #ifdef __MACOS__
     os = "macOS";
 #endif // __MACOS__
-    snprintf(cmdbuf, sizeof(cmdbuf), "nm ./lib/%s/libscope.so", os);
+#if defined(__x86_64__)
+    snprintf(cmdbuf, sizeof(cmdbuf), "nm ./lib/%s/x86_64/libscope.so", os);
+#elif defined(__aarch64__)
+    snprintf(cmdbuf, sizeof(cmdbuf), "nm ./lib/%s/aarch64/libscope.so", os);
+#else
+#error Unsupported architecture!
+#endif
+
     FILE* f_in = popen(cmdbuf, "r");
     fn_list_t* interpose_list = symbolList(f_in, " T ");
     pclose(f_in);

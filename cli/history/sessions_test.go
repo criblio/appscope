@@ -58,7 +58,7 @@ func TestGetSessions(t *testing.T) {
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(5000 * time.Millisecond)
 
 	lastHome := os.Getenv("SCOPE_HOME")
 	os.Setenv("SCOPE_HOME", ".test")
@@ -166,7 +166,7 @@ func TestGetSessionRun(t *testing.T) {
 	err = cmd.Start()
 	assert.NoError(t, err)
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(5000 * time.Millisecond)
 
 	lastHome := os.Getenv("SCOPE_HOME")
 	os.Setenv("SCOPE_HOME", ".test")

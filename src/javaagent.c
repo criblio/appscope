@@ -3,6 +3,8 @@
 #include "fn.h"
 #include "os.h"
 #include "state.h"
+#include "utils.h"
+
 #include <jni.h>
 #include <jvmti.h>
 #include "javabci.h"
@@ -625,7 +627,7 @@ initJavaAgent() {
         buf = malloc(bufsize);
         snprintf(buf, bufsize, "%s%s%s", env != NULL ? env : "", env != NULL ? " " : "", opt);
 
-        int result = g_fn.setenv("JAVA_TOOL_OPTIONS", buf, 1);
+        int result = fullSetenv("JAVA_TOOL_OPTIONS", buf, 1);
         if (result) {
             scopeLog("ERROR: Could not set JAVA_TOOL_OPTIONS failed\n", -1, CFG_LOG_ERROR);
         }

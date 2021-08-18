@@ -1,0 +1,72 @@
+# Cribl AppScope - Protocol Detector Configs
+#
+# Entries in this list define protocols that AppScope should detect in
+# payloads and how to handle matches. The first packet seen on a channel is
+# checked against the regular expression in each entry in the order they appear
+# in this file. When one matches, later entries are skipped.
+#
+# Entries have the following properties:
+#
+#   name     String protocol name used in protocol-detect events and payload
+#            headers sent to LogStream (required)
+#   regex    The regular expression to use (required)
+#   binary   Boolean indicating whether the regex should be applied to a
+#            hex-string version of the payload instead of the binary payload
+#            (default: false)
+#   detect   Boolean indicating whether protocol-detect events should be
+#            generated (default: true)
+#   payload  Boolean indicating whether payload-processing should be enabled
+#            for matching streams (default: false)
+#
+# When payloads are enabled globally, the payload options here are ignored.
+#
+# Warning: The name is currently inserted into the JSON header for payloads
+# sent to LogStream so it cannot contain double quotes or back-slashes without
+# breaking the JSON. It needs to be kept fairly short too so the header doesn't
+# exceed the 1k limit. If this becomes a problem, we'll consider adding logging
+# and validation.
+#
+
+
+protocol:
+
+
+# Example detector for the plain-text Redis protocol using the default detect
+# and payload settings
+#
+#    - name: Redis
+#      regex: "^[*]\\d+|^[+]\\w+|^[$]\\d+"
+
+
+# Example detector for the MongoDB protocol showing how to detect a binary
+# protocol
+#
+#    - name: Mongo
+#      regex: "^240100000000000000000000d407"
+#      binary: true
+#      len: 14
+
+
+# AppScope uses an internally defined protocol detector for HTTP like the
+# example below automatically when the LogStream backend is enabled.
+#
+# Uncomment this and adjust as needed to override the defaults or to enable
+# HTTP detection when not using LogStream.
+#
+    - name: HTTP
+      regex: " HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
+      detect: true
+      payload: false
+
+
+# AppScope uses another internally defined protocol detector for TLS like the
+# example below by default.
+#
+# Uncomment this entry to override the regex details or to set detect to false.
+# The payload setting here is never used. AppScope never sends encrypted
+# payloads to disk and only sends payloads to LogSteam during TLS negotiation.
+#
+#    - name: TLS
+#      regex: "^16030[0-3].{4}0[12]"
+#      binary: true
+#      len: 6

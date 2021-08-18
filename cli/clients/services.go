@@ -51,6 +51,10 @@ func Receiver(gctx context.Context, g *errgroup.Group, sq relay.Queue, c *Client
 // clientListener listens for new clients
 // Since Listen is a blocking call, this can be terminated at any time
 func clientListener(l net.Listener, newConns chan net.Conn) {
+
+	log.Info("Client listener routine running")
+	defer log.Info("Client listener routine exited")
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -65,6 +69,9 @@ func clientListener(l net.Listener, newConns chan net.Conn) {
 // clientHandler is a dedicated handler for a unix client
 func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clients) func() error {
 	return func() error {
+
+		log.Info("Handling client ", client.Id)
+		defer log.Info("Stopped handling client ", client.Id)
 
 		received := make([]byte, 0)
 

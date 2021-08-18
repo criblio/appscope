@@ -2432,7 +2432,7 @@ doConnection(void)
         ready = TRUE;
     }
 
-    if (ready == FALSE) {
+    if ((cfgLogStream(g_cfg.staticfg) == FALSE) && (ready == FALSE)) {
         if (mtcNeedsConnection(g_mtc)) {
             if (mtcConnect(g_mtc)) {
                 ready = TRUE;

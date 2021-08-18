@@ -801,8 +801,7 @@ createInternalLogEvent(int fd, const char *path, const void *buf, size_t count, 
     memcpy(data, buf, count);
 
     struct timeval tv;
-    gettimeofday
-        (&tv, NULL);
+    gettimeofday(&tv, NULL);
     event->fd = fd;
     event->id.uid = uid;
     event->id.timestamp = tv.tv_sec + tv.tv_usec/1e6;

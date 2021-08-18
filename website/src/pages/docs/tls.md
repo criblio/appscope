@@ -57,7 +57,7 @@ When you connect AppScope to LogStream or another application, you can usually a
 
 This might not hold true if the command or application being scoped exits quickly and network connection latency is relatively high. Under these conditions, events and metrics can be dropped and never reach the destination.
 
-To mitigate this problem, you can set the `SCOPE_CONNECT_TIMEOUT_SECS` environment variable (which is unset by default) to `1`. Then, the AppScope library will keep the scoped process open for 1 second, which should be enough time for AppScope to connect and stream data over the network.
+To mitigate this problem, you can set the `SCOPE_CONNECT_TIMEOUT_SECS` environment variable (which is unset by default) to `N`. Then, the AppScope library will keep the scoped process open for `N` seconds, giving AppScope that amount of time to connect and stream data over the network.
 
 ## Scoping Without TLS
 

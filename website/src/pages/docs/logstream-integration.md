@@ -43,9 +43,9 @@ Other configuration elements are not modified by a LogStream connection.
 
 ### HTTP Traffic
 
-AppScope streams HTTP payloads to LogStream, whether the payloads originate as HTTP/1.1 or HTTP/2 traffic. LogStream then converts the payloads to HTTP events.
+The AppScope Source streams HTTP payloads to LogStream, whether the payloads originate as HTTP/1.1 or HTTP/2 traffic. LogStream then converts the payloads to HTTP events.
 
-Separately, the AppScope can convert HTTP/1.1 (not HTTP/2) payloads to HTTP events. This is mainly useful for streaming HTTP events to destinations **other than** LogStream.
+Separately, the AppScope library can convert HTTP/1.1 (not HTTP/2) payloads to HTTP events. This is mainly useful for streaming HTTP events to destinations **other than** LogStream.
 
 ## Using TLS for Secure Connections
 

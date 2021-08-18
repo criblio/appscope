@@ -7,15 +7,17 @@ import (
 	"github.com/criblio/scope/libscope"
 )
 
-// Client is an object model for our unix clients
+// Client is an object model for our unix Clients
 type Client struct {
+	Id           uint
 	Conn         UnixConnection
 	OutBuffer    string
 	ProcessStart libscope.Header
 }
 
-// Clients is an object model for client storage
+// Clients is an object model for Client storage
 type Clients struct {
+	Id         uint
 	ClientsMap map[uint]*Client
 	*sync.RWMutex
 	Groups
@@ -29,38 +31,51 @@ func NewClients() Clients {
 	}
 }
 
-// Create a client in Clients
-func (c *Clients) Create(id uint, conn UnixConnection, psm libscope.Header) error {
+// Search for a Client in Clients
+func (c *Clients) Search() []Client {
+	c.RLock()
+	defer c.RUnlock()
+
+	clients := make([]Client, c.Id)
+
+	for _, c := range c.ClientsMap {
+		clients = append(clients, *c)
+	}
+
+	return clients
+}
+
+// Create a Client in Clients
+func (c *Clients) Create(conn UnixConnection, psm libscope.Header) *Client {
 	c.Lock()
 	defer c.Unlock()
 
-	if _, exists := c.ClientsMap[id]; exists {
-		return errors.New("Client already exists")
-	}
-
-	client := Client{
+	client := &Client{
+		Id:           c.Id,
 		Conn:         conn,
 		ProcessStart: psm,
 	}
 
-	c.ClientsMap[id] = &client
+	c.ClientsMap[c.Id] = client
 
-	return nil
+	c.Id++
+
+	return client
 }
 
-// Read a client from Clients
-func (c *Clients) Read(id uint) (*Client, error) {
+// Read a Client from Clients
+func (c *Clients) Read(id uint) (Client, error) {
 	c.RLock()
 	defer c.RUnlock()
 
 	if _, exists := c.ClientsMap[id]; !exists {
-		return nil, errors.New("Client not found")
+		return Client{}, errors.New("Client not found")
 	}
 
-	return c.ClientsMap[id], nil
+	return *c.ClientsMap[id], nil
 }
 
-// Update a client in Clients
+// Update a Client in Clients
 func (c *Clients) Update(id uint, conn UnixConnection, psm libscope.Header) error {
 	c.Lock()
 	defer c.Unlock()
@@ -79,7 +94,7 @@ func (c *Clients) Update(id uint, conn UnixConnection, psm libscope.Header) erro
 	return nil
 }
 
-// Delete a client from Clients
+// Delete a Client from Clients
 func (c *Clients) Delete(id uint) error {
 	c.Lock()
 	defer c.Unlock()
@@ -91,4 +106,9 @@ func (c *Clients) Delete(id uint) error {
 	delete(c.ClientsMap, id)
 
 	return nil
+}
+
+// Push Config to one Client
+func (c *Clients) PushConfig(id uint, config libscope.HeaderConf) {
+
 }

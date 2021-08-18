@@ -31,8 +31,8 @@ scope manager -c tls://127.0.0.1:10090`,
 		g, gctx := errgroup.WithContext(ctx)
 
 		g.Go(util.Signal(gctx))
-		g.Go(clients.Receiver(gctx, g, sq, c))
-		g.Go(web.Server(gctx, g, c))
+		g.Go(clients.Receiver(gctx, g, sq, &c))
+		g.Go(web.Server(gctx, g, &c))
 
 		if relay.Config.CriblDest != "" {
 			g.Go(relay.Sender(gctx, sq))

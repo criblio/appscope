@@ -8,13 +8,14 @@ import (
 
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/relay"
+	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
 // Receiver listens for new unix socket connections and manages clients
 // It creates a new goroutine for each client
-func Receiver(gctx context.Context, g *errgroup.Group, sq relay.Queue, c Clients) func() error {
+func Receiver(gctx context.Context, g *errgroup.Group, sq relay.Queue, c *Clients) func() error {
 	return func() error {
 
 		log.Info("Receiver routine running")
@@ -38,7 +39,7 @@ func Receiver(gctx context.Context, g *errgroup.Group, sq relay.Queue, c Clients
 					return errors.New("Error in Accept")
 				}
 				client := c.Create(UnixConnection{conn}, libscope.Header{})
-				g.Go(clientHandler(gctx, sq, client))
+				g.Go(clientHandler(gctx, sq, client, c))
 
 			case <-gctx.Done():
 				return gctx.Err()
@@ -62,14 +63,14 @@ func clientListener(l net.Listener, newConns chan net.Conn) {
 }
 
 // clientHandler is a dedicated handler for a unix client
-func clientHandler(gctx context.Context, sq relay.Queue, c *Client) func() error {
+func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clients) func() error {
 	return func() error {
 
 		received := make([]byte, 0)
 
 		for {
 			buf := make([]byte, 512)
-			count, err := c.Conn.Conn.Read(buf)
+			count, err := client.Conn.Conn.Read(buf)
 			if err != nil && err != io.EOF {
 				return err
 			}
@@ -78,8 +79,14 @@ func clientHandler(gctx context.Context, sq relay.Queue, c *Client) func() error
 			// push data to relay sender
 			sq <- relay.Message(received)
 
-			if c.ProcessStart.Format == "" {
-				// loadHeader()
+			if client.ProcessStart.Format == "" {
+				var header libscope.Header
+				if err := mapstructure.Decode(received, &header); err != nil {
+					return err
+				}
+				if err := c.Update(client.Id, UnixConnection{}, header); err != nil {
+					return err
+				}
 			}
 
 			// case client disconnect:

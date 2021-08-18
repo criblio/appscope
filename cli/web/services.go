@@ -13,7 +13,7 @@ import (
 
 // Server serves static web content to provide our web interface
 // and provides a backend/endpoints to serve supported http requests
-func Server(gctx context.Context, g *errgroup.Group, c clients.Clients) func() error {
+func Server(gctx context.Context, g *errgroup.Group, c *clients.Clients) func() error {
 	return func() error {
 
 		log.Info("Web Server routine running")

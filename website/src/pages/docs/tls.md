@@ -51,6 +51,14 @@ cribl:
       cacertpath: ''
 ```
 
+## Adapting to Network Latency
+
+When you connect AppScope to LogStream or another application, you can usually assume that the process you are scoping will last long enough for AppScope to make the network connection and stream the data to the destination.
+
+This might not hold true if the command or application being scoped exits quickly and network connection latency is relatively high. Under these conditions, events and metrics can be dropped and never reach the destination.
+
+To mitigate this problem, you can set the `SCOPE_CONNECT_TIMEOUT_SECS` environment variable (which is unset by default) to `N`. Then, the AppScope library will keep the scoped process open for `N` seconds, giving AppScope that amount of time to connect and stream data over the network.
+
 ## Scoping Without TLS
 
 If you prefer to communicate without encryption, connect to port 10091 instead of port 10090.

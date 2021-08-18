@@ -16,7 +16,7 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 - **Improvement**: [#395](https://github.com/criblio/appscope/issues/395) Add a new environment variable, `SCOPE_CONNECT_TIMEOUT_SECS`, to configure wait behavior. This prevents events and metrics from being dropped when a scoped command exits quickly while using a connection with network latency.
 
-- **Improvement**: [#311](https://github.com/criblio/appscope/issues/311) AppScope can now receive HTTP events from LogStream, whether the events originate as HTTP/1.1 or HTTP/2 traffic.
+- **Improvement**: [#311](https://github.com/criblio/appscope/issues/311) AppScope can now stream HTTP payloads to LogStream, whether the payloads originate as HTTP/1.1 or HTTP/2 traffic. LogStream then converts the payloads to HTTP events.
 
 - **Fix**: [#407](https://github.com/criblio/appscope/issues/407) To prevent errors, `scope prune` now rejects negative numbers as arguments. Positive arguments implicitly mean "how many sessions back" to delete or keep.
 

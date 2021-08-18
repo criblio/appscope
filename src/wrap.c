@@ -923,7 +923,7 @@ handleExit(void)
         }
     }
 
-    struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
+    struct timespec ts = {.tv_sec = 1, .tv_nsec = 0}; // 1 s
 
     char *wait;
     if ((wait = getenv("SCOPE_CONNECT_TIMEOUT_SECS")) != NULL) {
@@ -933,7 +933,7 @@ handleExit(void)
         errno = 0;
         wait_time = strtoul(wait, NULL, 10);
         if (!errno && wait_time) {
-            for (int i = 0; i < 100000 * wait_time; i++) {
+            for (int i = 0; i < wait_time; i++) {
                 if (doConnection() == TRUE) break;
                 sigSafeNanosleep(&ts);
             }

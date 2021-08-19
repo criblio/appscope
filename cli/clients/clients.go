@@ -24,9 +24,10 @@ type Clients struct {
 }
 
 // NewClients constructs and returns a new Clients object
-func NewClients() Clients {
-	return Clients{
+func NewClients() *Clients {
+	return &Clients{
 		ClientsMap: make(map[uint]*Client),
+		RWMutex:    new(sync.RWMutex),
 		Groups:     NewGroups(),
 	}
 }

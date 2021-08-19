@@ -26,6 +26,7 @@ type Groups struct {
 func NewGroups() Groups {
 	return Groups{
 		GroupsMap: make(map[uint]*Group),
+		RWMutex:   new(sync.RWMutex),
 	}
 }
 

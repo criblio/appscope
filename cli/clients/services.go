@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 
@@ -82,6 +83,8 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 				return err
 			}
 			received = append(received, buf[:count]...)
+
+			fmt.Println(received)
 
 			// push data to relay sender
 			sq <- relay.Message(received)

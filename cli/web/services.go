@@ -22,88 +22,17 @@ func Server(gctx context.Context, g *errgroup.Group, c *clients.Clients) func() 
 
 		router := gin.Default()
 
-        // search scopes
-        router.GET("/api/scope", func(ctx *gin.Context) {
-            items := c.Search()
+        router.GET("/api/scope",      scopeSearchHandler(c))
+        router.GET("/api/scope/:id",  scopeReadHandler(c))
+        router.POST("/api/scope/:id", scopeConfigHandler(c))
 
-            ctx.JSON(http.StatusOK, gin.H{
-                "success": true,
-                "len": len(items),
-                "items": items,
-            })
-        })
+        router.GET("/api/group",           groupSearchHandler(c))
+        router.POST("/api/group",          groupCreateHandler(c))
+        router.GET("/api/group/:id",       groupReadHandler(c))
+        router.PUT("/api/group/:id",       groupUpdateHandler(c))
+        router.DELETE("/api/group/:id",    groupDeleteHandler(c))
+        router.GET("/api/group/:id/apply", groupApplyHandler(c))
 
-        // read one scope
-        router.GET("/api/scope/:id", func(ctx *gin.Context) {
-			id, err := strconv.Atoi(ctx.Param("id"))
-			if err != nil || id < 0 {
-				ctx.JSON(http.StatusBadRequest, gin.H{
-					"success": false,
-					"error": "Invalid ID; " + err.Error(),
-				})
-				return
-			}
-
-            item, err := c.Read(uint(id))
-			if err != nil {
-				ctx.JSON(http.StatusNotFound, gin.H{
-					"success": false,
-					"error": err.Error(),
-				})
-				return
-			}
-
-			ctx.JSON(http.StatusOK, gin.H{
-				"success": true,
-				"len": 1,
-				"items": [1]clients.Client{item},
-			})
-        })
-
-/*
-        // push config to one scope
-        router.POST("/api/scope/:id", func(ctx *gin.Context) {
-            var config libscope.HeaderConfig
-            c.BindJSON(&config)
-            c.PushConfig(ctx.Param("id"), config)
-            ctx.JSON(http.StatusOK, gin.H{
-                "success": true,
-            })
-        })
-
-        // search groups
-        router.GET("/api/group", func(ctx *gin.Context) {
-            items := c.Groups.Search()
-            ctx.JSON(http.StatusOK, gin.H{
-                "success": true,
-                "len": len(items),
-                "items": items,
-            })
-        })
-
-        // read one group
-        router.GET("/api/group/:id", func(ctx *gin.Context) {
-            items := c.Groups.Read(ctx.Param("id"))
-            ctx.JSON(http.StatusOK, gin.H{
-                "success": true,
-                "len": len(items),
-                "items": items,
-            })
-        })
-
-        // update one group
-        router.POST("/api/group/:id", func(ctx *gin.Context) {
-            var group clients.Group
-            c.BindJSON(&group)
-            c.Groups.Update(ctx.Param("id"), group)
-            ctx.JSON(http.StatusOK, gin.H{
-                "success": true,
-                "items": group, // make array
-            })
-        })
-
-        //router.PUT("/api/group/:id/apply", ... push config to members)
-*/
 		srv := &http.Server{
 			Addr:    ":8080",
 			Handler: router,
@@ -134,3 +63,129 @@ func Server(gctx context.Context, g *errgroup.Group, c *clients.Clients) func() 
 		}
 	}
 }
+
+func scopeSearchHandler(c *clients.Clients) gin.HandlerFunc {
+    return func(ctx *gin.Context) {
+		items := c.Search()
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"len": len(items),
+			"items": items,
+		})
+    }
+}
+
+func scopeReadHandler(c *clients.Clients) gin.HandlerFunc {
+    return func(ctx *gin.Context) {
+		id, err := strconv.Atoi(ctx.Param("id"))
+		if err != nil || id < 0 {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error": "Invalid ID; " + err.Error(),
+			})
+			return
+		}
+
+		item, err := c.Read(uint(id))
+		if err != nil {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error": err.Error(),
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"len": 1,
+			"items": [1]clients.Client{item},
+		})
+	}
+}
+
+func scopeConfigHandler(c *clients.Clients) gin.HandlerFunc {
+    return func(ctx *gin.Context) {
+		ctx.JSON(http.StatusNotImplemented, gin.H{
+			"success": false,
+			"error": "Not implemented",
+		})
+	}
+}
+
+func groupSearchHandler(c *clients.Clients) gin.HandlerFunc {
+    return func(ctx *gin.Context) {
+		items := c.Groups.Search()
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"len": len(items),
+			"items": items,
+		})
+    }
+}
+
+func groupCreateHandler(c *clients.Clients) gin.HandlerFunc {
+    return func(ctx *gin.Context) {
+		ctx.JSON(http.StatusNotImplemented, gin.H{
+			"success": false,
+			"error": "Not implemented",
+		})
+    }
+}
+
+func groupReadHandler(c *clients.Clients) gin.HandlerFunc {
+    return func(ctx *gin.Context) {
+		id, err := strconv.Atoi(ctx.Param("id"))
+		if err != nil || id < 0 {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error": "Invalid ID; " + err.Error(),
+			})
+			return
+		}
+
+		item, err := c.Groups.Read(uint(id))
+		if err != nil {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error": err.Error(),
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"len": 1,
+			"items": [1]clients.Group{*item},
+		})
+	}
+}
+
+func groupUpdateHandler(c *clients.Clients) gin.HandlerFunc {
+    return func(ctx *gin.Context) {
+		ctx.JSON(http.StatusNotImplemented, gin.H{
+			"success": false,
+			"error": "Not implemented",
+		})
+	}
+}
+
+func groupDeleteHandler(c *clients.Clients) gin.HandlerFunc {
+    return func(ctx *gin.Context) {
+		ctx.JSON(http.StatusNotImplemented, gin.H{
+			"success": false,
+			"error": "Not implemented",
+		})
+    }
+}
+
+func groupApplyHandler(c *clients.Clients) gin.HandlerFunc {
+    return func(ctx *gin.Context) {
+		ctx.JSON(http.StatusNotImplemented, gin.H{
+			"success": false,
+			"error": "Not implemented",
+		})
+	}
+}
+

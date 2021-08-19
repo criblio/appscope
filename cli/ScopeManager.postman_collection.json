@@ -1,0 +1,47 @@
+{
+	"info": {
+		"_postman_id": "4a87cdd7-5fa7-437b-99f4-5307f95e1cdf",
+		"name": "ScopeManager",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Search Scopes",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "localhost:8080/api/scope",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"scope"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Read Scope",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "localhost:8080/api/scope",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"scope"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

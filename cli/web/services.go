@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/criblio/scope/clients"
@@ -20,11 +21,89 @@ func Server(gctx context.Context, g *errgroup.Group, c *clients.Clients) func() 
 		defer log.Info("Web Server routine exited")
 
 		router := gin.Default()
-		router.GET("/ping", func(c *gin.Context) {
-			c.JSON(200, gin.H{
-				"message": "pong",
+
+        // search scopes
+        router.GET("/api/scope", func(ctx *gin.Context) {
+            items := c.Search()
+
+            ctx.JSON(http.StatusOK, gin.H{
+                "success": true,
+                "len": len(items),
+                "items": items,
+            })
+        })
+
+        // read one scope
+        router.GET("/api/scope/:id", func(ctx *gin.Context) {
+			id, err := strconv.Atoi(ctx.Param("id"))
+			if err != nil || id < 0 {
+				ctx.JSON(http.StatusBadRequest, gin.H{
+					"success": false,
+					"error": "Invalid ID; " + err.Error(),
+				})
+				return
+			}
+
+            item, err := c.Read(uint(id))
+			if err != nil {
+				ctx.JSON(http.StatusNotFound, gin.H{
+					"success": false,
+					"error": err.Error(),
+				})
+				return
+			}
+
+			ctx.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"len": 1,
+				"items": [1]clients.Client{item},
 			})
-		})
+        })
+
+/*
+        // push config to one scope
+        router.POST("/api/scope/:id", func(ctx *gin.Context) {
+            var config libscope.HeaderConfig
+            c.BindJSON(&config)
+            c.PushConfig(ctx.Param("id"), config)
+            ctx.JSON(http.StatusOK, gin.H{
+                "success": true,
+            })
+        })
+
+        // search groups
+        router.GET("/api/group", func(ctx *gin.Context) {
+            items := c.Groups.Search()
+            ctx.JSON(http.StatusOK, gin.H{
+                "success": true,
+                "len": len(items),
+                "items": items,
+            })
+        })
+
+        // read one group
+        router.GET("/api/group/:id", func(ctx *gin.Context) {
+            items := c.Groups.Read(ctx.Param("id"))
+            ctx.JSON(http.StatusOK, gin.H{
+                "success": true,
+                "len": len(items),
+                "items": items,
+            })
+        })
+
+        // update one group
+        router.POST("/api/group/:id", func(ctx *gin.Context) {
+            var group clients.Group
+            c.BindJSON(&group)
+            c.Groups.Update(ctx.Param("id"), group)
+            ctx.JSON(http.StatusOK, gin.H{
+                "success": true,
+                "items": group, // make array
+            })
+        })
+
+        //router.PUT("/api/group/:id/apply", ... push config to members)
+*/
 		srv := &http.Server{
 			Addr:    ":8080",
 			Handler: router,

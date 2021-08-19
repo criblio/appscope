@@ -37,7 +37,7 @@ func (c *Clients) Search() []Client {
 	c.RLock()
 	defer c.RUnlock()
 
-	clients := make([]Client, c.Id)
+	clients := make([]Client, 0, c.Id)
 
 	for _, c := range c.ClientsMap {
 		clients = append(clients, *c)

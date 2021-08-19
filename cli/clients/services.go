@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	//"fmt"
 	"net"
 
 	"github.com/criblio/scope/libscope"
@@ -75,26 +75,41 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 		log.Info("Handling client ", client.Id)
 		defer log.Info("Stopped handling client ", client.Id)
 
+		reader := bufio.NewReader(client.Conn.Conn)
 		for {
-			reader := bufio.NewReader(client.Conn.Conn)
 			msg, err := ReadMessage(reader)
 			if err != nil {
+				log.WithFields(log.Fields{
+					"err": err,
+				}).Warn("ReadMessage failed")
 				return err
 			}
+			log.WithFields(log.Fields{
+				"msg": msg,
+			}).Info("Got message")
 
 			if len(msg.Data) > 0 {
 
 				// Push data to relay sender
 				// sq <- relay.Message(msg)
 
-				fmt.Println(msg.Data)
+				//fmt.Println(msg.Data)
 
 				if client.ProcessStart.Format == "" {
 					var header libscope.Header
 					if err := json.Unmarshal([]byte(msg.Raw), &header); err != nil {
+						log.WithFields(log.Fields{
+							"err": err,
+						}).Warn("Unmarshal failed")
 						return err
 					}
+					log.WithFields(log.Fields{
+						"header": header,
+					}).Info("Got header")
 					if err := c.Update(client.Id, header); err != nil {
+						log.WithFields(log.Fields{
+							"err": err,
+						}).Warn("Update failed")
 						return err
 					}
 				}

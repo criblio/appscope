@@ -38,7 +38,7 @@ func (g *Groups) Search() []Group {
 	g.RLock()
 	defer g.RUnlock()
 
-	groups := make([]Group, g.Id)
+	groups := make([]Group, 0, g.Id)
 
 	for _, g := range g.GroupsMap {
 		groups = append(groups, *g)

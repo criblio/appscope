@@ -75,11 +75,11 @@ type HeaderConfMetric struct {
 
 // HeaderConfMetricFormat is the `info.configuration.current.metric.format` node in the JSON header object
 type HeaderConfMetricFormat struct {
-	Type         string              `json:"type"`
-	StatsdPrefix string              `json:"statsdprefix"`
-	StatsdMaxLen int                 `json:"statsdmaxlen"`
-	Verbosity    int                 `json:"verbosity"`
-	Tags         map[string]string{} `json:"tags"`
+	Type         string            `json:"type"`
+	StatsdPrefix string            `json:"statsdprefix"`
+	StatsdMaxLen int               `json:"statsdmaxlen"`
+	Verbosity    int               `json:"verbosity"`
+	Tags         map[string]string `json:"tags"`
 }
 
 // HeaderConfPayload is the `info.configuration.current.payload` node in the JSON header object

@@ -9,7 +9,6 @@ import (
 
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/relay"
-	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -64,6 +63,7 @@ func clientListener(l net.Listener, newConns chan net.Conn) {
 			return
 		}
 		newConns <- conn
+		break
 	}
 }
 
@@ -82,21 +82,25 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 			if err != nil && err != io.EOF {
 				return err
 			}
-			received = append(received, buf[:count]...)
 
-			fmt.Println(received)
+			if count > 0 {
+				received = append(received, buf[:count]...)
 
-			// push data to relay sender
-			sq <- relay.Message(received)
+				// push data to relay sender
+				// sq <- relay.Message(received)
 
-			if client.ProcessStart.Format == "" {
-				var header libscope.Header
-				if err := mapstructure.Decode(received, &header); err != nil {
-					return err
-				}
-				if err := c.Update(client.Id, UnixConnection{}, header); err != nil {
-					return err
-				}
+				fmt.Println(string(received))
+
+				/*			if client.ProcessStart.Format == "" {
+								var header libscope.Header
+								if err := mapstructure.Decode(received, &header); err != nil {
+									return err
+								}
+								if err := c.Update(client.Id, UnixConnection{}, header); err != nil {
+									return err
+								}
+							}
+				*/
 			}
 
 			// case client disconnect:

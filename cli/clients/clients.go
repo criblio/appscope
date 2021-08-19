@@ -9,10 +9,10 @@ import (
 
 // Client is an object model for our unix Clients
 type Client struct {
-	Id           uint
-	Conn         UnixConnection
-	OutBuffer    string
-	ProcessStart libscope.Header
+	Id           uint            `json:"id"`
+	Conn         UnixConnection  `json:"-"`
+	OutBuffer    string          `json:"-"`
+	ProcessStart libscope.Header `json:"processStart"`
 }
 
 // Clients is an object model for Client storage
@@ -77,7 +77,7 @@ func (c *Clients) Read(id uint) (Client, error) {
 }
 
 // Update a Client in Clients
-func (c *Clients) Update(id uint, conn UnixConnection, psm libscope.Header) error {
+func (c *Clients) Update(id uint, obj interface{}) error {
 	c.Lock()
 	defer c.Unlock()
 
@@ -85,11 +85,15 @@ func (c *Clients) Update(id uint, conn UnixConnection, psm libscope.Header) erro
 		return errors.New("Client not found")
 	}
 
-	if conn.Conn != nil {
-		c.ClientsMap[id].Conn = conn
-	}
-	if psm.Format != "" {
-		c.ClientsMap[id].ProcessStart = psm
+	switch o := obj.(type) {
+	// Update UnixConnection
+	case UnixConnection:
+		c.ClientsMap[id].Conn = o
+	// Update Header
+	case libscope.Header:
+		c.ClientsMap[id].ProcessStart = o
+	default:
+		return errors.New("Invalid type passed into Update")
 	}
 
 	return nil
@@ -110,6 +114,6 @@ func (c *Clients) Delete(id uint) error {
 }
 
 // Push Config to one Client
-func (c *Clients) PushConfig(id uint, config libscope.HeaderConf) {
+func (c *Clients) PushConfig(id uint, config libscope.HeaderConfCurrent) {
 
 }

@@ -9,10 +9,10 @@ import (
 
 // Group is an object model for our client groups
 type Group struct {
-	Id      uint
-	Name    string
-	Config  libscope.HeaderConf
-	Filters map[string]interface{}
+	Id      uint                       `json:"id"`
+	Name    string                     `json:"name"`
+	Config  libscope.HeaderConfCurrent `json:"config"`
+	Filters Filters                    `json:"filters"`
 }
 
 // Groups is an object model for group storage
@@ -21,6 +21,9 @@ type Groups struct {
 	GroupsMap map[uint]*Group
 	*sync.RWMutex
 }
+
+// Filters is an object model for filters
+type Filters map[string]interface{}
 
 // NewGroups constructs and returns a new Groups object
 func NewGroups() Groups {
@@ -45,7 +48,7 @@ func (g *Groups) Search() []Group {
 }
 
 // Create a Group in Groups
-func (g *Groups) Create(name string, config libscope.HeaderConf, filters map[string]interface{}) *Group {
+func (g *Groups) Create(name string, config libscope.HeaderConfCurrent, filters map[string]interface{}) *Group {
 	g.Lock()
 	defer g.Unlock()
 
@@ -76,7 +79,7 @@ func (g *Groups) Read(id uint) (*Group, error) {
 }
 
 // Update a Group in Groups
-func (g *Groups) Update(id uint, name string, config libscope.HeaderConf, filters map[string]interface{}) error {
+func (g *Groups) Update(id uint, obj interface{}) error {
 	g.Lock()
 	defer g.Unlock()
 
@@ -84,14 +87,18 @@ func (g *Groups) Update(id uint, name string, config libscope.HeaderConf, filter
 		return errors.New("Group not found")
 	}
 
-	if name != "" {
-		g.GroupsMap[id].Name = name
-	}
-	if config != (libscope.HeaderConf{}) {
-		g.GroupsMap[id].Config = config
-	}
-	if filters != nil {
-		g.GroupsMap[id].Filters = filters
+	switch o := obj.(type) {
+	// Update name
+	case string:
+		g.GroupsMap[id].Name = o
+	// Update Config
+	case libscope.HeaderConfCurrent:
+		g.GroupsMap[id].Config = o
+	// Update Filters
+	case Filters:
+		g.GroupsMap[id].Filters = o
+	default:
+		return errors.New("Invalid type passed to Update")
 	}
 
 	return nil

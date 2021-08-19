@@ -786,6 +786,10 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         const char *path = value + strlen("file://");
         cfgTransportTypeSet(cfg, t, CFG_FILE);
         cfgTransportPathSet(cfg, t, path);
+    } else if (value == strstr(value, "unix://")) {
+        const char *path = value + strlen("unix://");
+        cfgTransportTypeSet(cfg, t, CFG_UNIX);
+        cfgTransportPathSet(cfg, t, path);
     }
 }
 

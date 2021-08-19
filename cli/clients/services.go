@@ -1,10 +1,11 @@
 package clients
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 
 	"github.com/criblio/scope/libscope"
@@ -74,33 +75,29 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 		log.Info("Handling client ", client.Id)
 		defer log.Info("Stopped handling client ", client.Id)
 
-		received := make([]byte, 0)
-
 		for {
-			buf := make([]byte, 512)
-			count, err := client.Conn.Conn.Read(buf)
-			if err != nil && err != io.EOF {
+			reader := bufio.NewReader(client.Conn.Conn)
+			msg, err := ReadMessage(reader)
+			if err != nil {
 				return err
 			}
 
-			if count > 0 {
-				received = append(received, buf[:count]...)
+			if len(msg.Data) > 0 {
 
-				// push data to relay sender
-				// sq <- relay.Message(received)
+				// Push data to relay sender
+				// sq <- relay.Message(msg)
 
-				fmt.Println(string(received))
+				fmt.Println(msg.Data)
 
-				/*			if client.ProcessStart.Format == "" {
-								var header libscope.Header
-								if err := mapstructure.Decode(received, &header); err != nil {
-									return err
-								}
-								if err := c.Update(client.Id, UnixConnection{}, header); err != nil {
-									return err
-								}
-							}
-				*/
+				if client.ProcessStart.Format == "" {
+					var header libscope.Header
+					if err := json.Unmarshal([]byte(msg.Raw), &header); err != nil {
+						return err
+					}
+					if err := c.Update(client.Id, header); err != nil {
+						return err
+					}
+				}
 			}
 
 			// case client disconnect:

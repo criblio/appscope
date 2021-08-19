@@ -52,10 +52,7 @@ func (message Message) IsPayload() bool {
 func ReadMessage(reader *bufio.Reader) (*Message, error) {
 	// Read up to and including the first newline into a string
 	data, err := reader.ReadString('\n')
-	if err != nil {
-		if err != io.EOF {
-			return nil, err
-		}
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
 

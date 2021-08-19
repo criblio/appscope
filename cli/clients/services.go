@@ -59,12 +59,12 @@ func clientListener(l net.Listener, newConns chan net.Conn) {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			// you will need to handle error when received from newConns
-			newConns <- nil
+			log.WithFields(log.Fields{
+				"err": err,
+			}).Error("Accept failed")
 			return
 		}
 		newConns <- conn
-		break
 	}
 }
 
@@ -84,9 +84,9 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 				}).Warn("ReadMessage failed")
 				return err
 			}
-			log.WithFields(log.Fields{
-				"msg": msg,
-			}).Info("Got message")
+			//log.WithFields(log.Fields{
+			//	"msg": msg,
+			//}).Info("Got message")
 
 			if len(msg.Data) > 0 {
 
@@ -103,9 +103,9 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 						}).Warn("Unmarshal failed")
 						return err
 					}
-					log.WithFields(log.Fields{
-						"header": header,
-					}).Info("Got header")
+					//log.WithFields(log.Fields{
+					//	"header": header,
+					//}).Info("Got header")
 					if err := c.Update(client.Id, header); err != nil {
 						log.WithFields(log.Fields{
 							"err": err,

@@ -1,10 +1,14 @@
 package clients
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 	"sync"
 
 	"github.com/criblio/scope/libscope"
+	log "github.com/sirupsen/logrus"
 )
 
 // Client is an object model for our unix Clients
@@ -114,6 +118,58 @@ func (c *Clients) Delete(id uint) error {
 }
 
 // Push Config to one Client
-func (c *Clients) PushConfig(id uint, config libscope.HeaderConfCurrent) {
+func (c *Clients) PushConfig(id uint, config libscope.HeaderConfCurrent) error {
 
+	client, exists := c.ClientsMap[id]
+	if !exists {
+		return errors.New("Client not found")
+	}
+
+	if client.ProcessStart.Info.Process.Pid == 0 {
+		return errors.New("No Client PID saved")
+	}
+
+	reloadPath := "/tmp/scope." + fmt.Sprint(client.ProcessStart.Info.Process.Pid)
+	reloadEnv := "SCOPE_CONF_RELOAD=true"
+	confPathEnv := "SCOPE_CONF_PATH=/tmp/conf." + fmt.Sprint(client.ProcessStart.Info.Process.Pid)
+
+	// Marshal the config changes into a byte array
+	b, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+
+	// Create and open the new config file
+	cf, err := os.OpenFile(reloadPath, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+
+	// Write the new config
+	_, err = cf.Write([]byte(string(b)))
+	if err != nil {
+		cf.Close()
+		return err
+	}
+
+	cf.Close()
+
+	log.Info("Config change pushed to client " + fmt.Sprint(client.Id))
+
+	// Open the reload file. If the file doesn't exist, create it.
+	rf, err := os.OpenFile(reloadPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer rf.Close()
+
+	// Write the reload commands
+	_, err = rf.Write([]byte(confPathEnv + "\n" + reloadEnv))
+	if err != nil {
+		return err
+	}
+
+	log.Info("Config reload requested for client " + fmt.Sprint(client.Id))
+
+	return nil
 }

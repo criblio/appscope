@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+
 	//"fmt"
 	"net"
 
@@ -59,6 +61,9 @@ func clientListener(l net.Listener, newConns chan net.Conn) {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
+			if err.Error() == "accept unix @abstest: use of closed network connection" {
+				return
+			}
 			log.WithFields(log.Fields{
 				"err": err,
 			}).Error("Accept failed")
@@ -79,9 +84,9 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 		for {
 			msg, err := ReadMessage(reader)
 			if err != nil {
-				log.WithFields(log.Fields{
-					"err": err,
-				}).Warn("ReadMessage failed")
+				if err := c.Delete(client.Id); err != nil {
+					return err
+				}
 				return nil
 			}
 
@@ -96,7 +101,11 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 						log.WithFields(log.Fields{
 							"err": err,
 						}).Warn("Unmarshal failed")
-						return err
+						return nil
+					}
+					if header.Format == "" {
+						log.Warn("No connection header received")
+						return nil
 					}
 					if err := c.Update(client.Id, header); err != nil {
 						log.WithFields(log.Fields{
@@ -104,12 +113,16 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 						}).Warn("Update failed")
 						return nil
 					}
+
+					// temporary
+					fmt.Println(header)
+					c.PushConfig(client.Id, libscope.HeaderConfCurrent{
+						Event: libscope.HeaderConfEvent{
+							Enable: "false",
+						},
+					})
 				}
 			}
-
-			// case client disconnect:
-			// disconnect
-			// remove from clients
 
 			select {
 			case <-gctx.Done():

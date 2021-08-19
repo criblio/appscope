@@ -82,18 +82,13 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 				log.WithFields(log.Fields{
 					"err": err,
 				}).Warn("ReadMessage failed")
-				return err
+				return nil
 			}
-			//log.WithFields(log.Fields{
-			//	"msg": msg,
-			//}).Info("Got message")
 
 			if len(msg.Data) > 0 {
 
 				// Push data to relay sender
 				// sq <- relay.Message(msg)
-
-				//fmt.Println(msg.Data)
 
 				if client.ProcessStart.Format == "" {
 					var header libscope.Header
@@ -103,14 +98,11 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 						}).Warn("Unmarshal failed")
 						return err
 					}
-					//log.WithFields(log.Fields{
-					//	"header": header,
-					//}).Info("Got header")
 					if err := c.Update(client.Id, header); err != nil {
 						log.WithFields(log.Fields{
 							"err": err,
 						}).Warn("Update failed")
-						return err
+						return nil
 					}
 				}
 			}

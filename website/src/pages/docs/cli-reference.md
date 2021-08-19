@@ -181,7 +181,7 @@ Outputs metrics for a session.
 ### prune
 ----
 
-Deletes scope history for this session.
+Prunes (deletes) one or more sessions from the history.
 
 #### Usage
 
@@ -192,16 +192,19 @@ Deletes scope history for this session.
 ```
 scope prune -k 20
 scope prune -a
+scope delete -d 1
 ```
 
 #### Flags
 
+Negative arguments are not allowed.
+
 ```
   -a, --all          Delete all sessions
-  -d, --delete int   Delete last <delete> sessions (default -1)
+  -d, --delete int   Delete last <delete> sessions
   -f, --force        Do not prompt for confirmation
   -h, --help         help for prune
-  -k, --keep int     Keep last <keep> sessions (default -1)
+  -k, --keep int     Keep last <keep> sessions, delete all others
 ```
 
 ### run

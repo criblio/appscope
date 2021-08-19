@@ -848,6 +848,10 @@ reportPeriodicStuff(void)
     long long cpu = 0;
     static long long cpuState = 0;
 
+    // empty the event queues
+    doEvent();
+    doPayload();
+
     // We report CPU time for this period.
     cpu = doGetProcCPU();
     if (cpu != -1) {
@@ -901,11 +905,6 @@ reportPeriodicStuff(void)
     // report net and file by descriptor
     reportAllFds(PERIODIC);
 
-    // empty the event queues
-    doEvent();
-
-    doPayload();
-
     mtcFlush(g_mtc);
 }
 
@@ -915,23 +914,6 @@ handleExit(void)
     if (g_exitdone == TRUE) return;
     g_exitdone = TRUE;
 
-    struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
-
-    char *wait;
-    if ((wait = getenv("SCOPE_CONNECT_TIMEOUT_SECS")) != NULL) {
-        // wait for a connection to be established 
-        // before we call doEvent
-        int wait_time;
-        errno = 0;
-        wait_time = strtoul(wait, NULL, 10);
-        if (!errno && wait_time) {
-            for (int i = 0; i < 100000 * wait_time; i++) {
-                if (!ctlNeedsConnection(g_ctl, CFG_CTL)) break; 
-                sigSafeNanosleep(&ts);
-            }
-        }
-    }
-
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
         struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
 
@@ -939,10 +921,26 @@ handleExit(void)
         while (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
             sigSafeNanosleep(&ts);
         }
-        doEvent();
-    } else {
-        reportPeriodicStuff();
     }
+
+    struct timespec ts = {.tv_sec = 1, .tv_nsec = 0}; // 1 s
+
+    char *wait;
+    if ((wait = getenv("SCOPE_CONNECT_TIMEOUT_SECS")) != NULL) {
+        // wait for a connection to be established 
+        // before we emit data
+        int wait_time;
+        errno = 0;
+        wait_time = strtoul(wait, NULL, 10);
+        if (!errno && wait_time) {
+            for (int i = 0; i < wait_time; i++) {
+                if (doConnection() == TRUE) break;
+                sigSafeNanosleep(&ts);
+            }
+        }
+    }
+
+    reportPeriodicStuff();
 
     mtcFlush(g_mtc);
     mtcDisconnect(g_mtc);
@@ -1137,6 +1135,7 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
  */
 static ssize_t __write_libc(int, const void *, size_t);
 static ssize_t __write_pthread(int, const void *, size_t);
+static ssize_t scope_write(int, const void *, size_t);
 static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
 static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
@@ -1356,12 +1355,19 @@ initHook(int attachedFlag)
             stderr_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
         }
 
-        if (g_fn.__write_libc) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
-        }
+        if (g_ismusl == FALSE) {
+            if (g_fn.__write_libc) {
+                rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
+            }
 
-        if (g_fn.__write_pthread) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+            if (g_fn.__write_pthread) {
+                rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+            }
+
+            // We want to be able to use g_fn.write without
+            // accidentally interposing this function.  This resolves
+            // https://github.com/criblio/appscope/issues/472
+            g_fn.write = scope_write;
         }
 
         // hook 'em
@@ -2537,6 +2543,21 @@ __write_pthread(int fd, const void *buf, size_t size)
     return rc;
 }
 
+static int
+isAnAppScopeConnection(int fd)
+{
+    if (fd == -1) return FALSE;
+
+    if ((fd == ctlConnection(g_ctl, CFG_CTL)) ||
+        (fd == ctlConnection(g_ctl, CFG_LS)) ||
+        (fd == mtcConnection(g_mtc)) ||
+        (fd == logConnection(g_log))) {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 /*
  * Note:
  * The syscall function in libc is called from the loader for
@@ -2626,6 +2647,13 @@ scope_syscall(long number, ...)
     return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
                         fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
+
+static ssize_t
+scope_write(int fd, const void* buf, size_t size)
+{
+    return (ssize_t)syscall(SYS_write, fd, buf, size);
+}
+
 #endif // __FUNCHOOK__
 
 VAREXPORT size_t // EXPORTOFF because it's redundant with __write
@@ -3285,14 +3313,7 @@ close(int fd)
 {
     WRAP_CHECK(close, -1);
 
-    if (fd != -1) {
-        if ((fd == ctlConnection(g_ctl, CFG_CTL)) || 
-        (fd == ctlConnection(g_ctl, CFG_LS)) ||
-        (fd == mtcConnection(g_mtc)) ||
-        (fd == logConnection(g_log))) {
-            return 0;
-        }
-    }
+    if (isAnAppScopeConnection(fd)) return 0;
 
     int rc = g_fn.close(fd);
 
@@ -3306,6 +3327,8 @@ fclose(FILE *stream)
 {
     WRAP_CHECK(fclose, EOF);
     int fd = fileno(stream);
+
+    if (isAnAppScopeConnection(fd)) return 0;
 
     int rc = g_fn.fclose(stream);
 

@@ -16,7 +16,7 @@ When you attach AppScope to a process, its child processes are not automatically
 
 You cannot attach to a musl libc process or a static executable's process.
 
-No HTTP1 events and headers are emitted when AppScope attaches to a Go process that uses the `azure-sdk-for-go` package.
+No HTTP/1.1 events and headers are emitted when AppScope attaches to a Go process that uses the `azure-sdk-for-go` package.
 
 No events are emitted from files or sockets that exists before AppScope attaches to a process.
 

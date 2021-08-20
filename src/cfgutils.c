@@ -376,11 +376,14 @@ processReloadConfig(config_t *cfg, const char* value)
 {
     if (!cfg || !value) return;
     unsigned int enable = strToVal(boolMap, value);
-    if (enable != TRUE) return;
 
-    char *path = cfgPath();
-    cfgSetFromFile(cfg, path);
-    if (path) free(path);
+    if (enable == TRUE) {
+        char *path = cfgPath();
+        cfgSetFromFile(cfg, path);
+        if (path) free(path);
+    } else {
+        cfgSetFromFile(cfg, value);
+    }
 
     cfgProcessEnvironment(cfg);
 

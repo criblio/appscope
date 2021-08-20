@@ -261,7 +261,13 @@ transportNeedsConnection(transport_t *trans)
             }
             return (trans->file.stream == NULL);
         case CFG_UNIX:
-            return (trans->local.sock == -1);
+            if (trans->local.sock == -1) return TRUE;
+            if (osNeedsConnect(trans->local.sock)) {
+                DBG("fd: %d", trans->local.sock);
+                transportDisconnect(trans);
+                return TRUE;
+            }
+            return FALSE;
         case CFG_SYSLOG:
         case CFG_SHM:
             break;

@@ -30,7 +30,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "{{hostname}}:{{port}}/api/group/:id",
+					"raw": "{{hostname}}:{{port}}/api/scope/:id",
 					"host": [
 						"{{hostname}}"
 					],
@@ -60,7 +60,7 @@
 					"raw": "{\n    \"metric\": {\n        \"format\": {\n            \"verbosity\": 6\n        }\n    }\n}"
 				},
 				"url": {
-					"raw": "{{hostname}}:{{port}}/api/group/:id",
+					"raw": "{{hostname}}:{{port}}/api/scope/:id",
 					"host": [
 						"{{hostname}}"
 					],

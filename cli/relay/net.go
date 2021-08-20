@@ -21,7 +21,7 @@ func NewConnection() (*Connection, error) {
 	}
 
 	proto := "tcp"
-	if transport.Tls.Enable == true {
+	if transport.Tls.Enable == "true" {
 		proto = "tls"
 	}
 

@@ -4,15 +4,15 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/criblio/scope/libscope"
+	"github.com/criblio/scope/run"
 )
 
 // Group is an object model for our client groups
 type Group struct {
-	Id      uint                       `json:"id"`
-	Name    string                     `json:"name"`
-	Config  libscope.HeaderConfCurrent `json:"config"`
-	Filters Filters                    `json:"filters"`
+	Id     uint            `json:"id"`
+	Name   string          `json:"name"`
+	Config run.ScopeConfig `json:"config"`
+	Filter Filter          `json:"filter"`
 }
 
 // Groups is an object model for group storage
@@ -22,8 +22,12 @@ type Groups struct {
 	*sync.RWMutex
 }
 
-// Filters is an object model for filters
-type Filters map[string]interface{}
+// Filter is an object model for filter
+type Filter struct {
+	HostName string                 `json:"hostName,omitempty"`
+	ProcName string                 `json:"procName,omitempty"`
+	Tags     map[string]interface{} `json:"tags,omitempty"`
+}
 
 // NewGroups constructs and returns a new Groups object
 func NewGroups() Groups {
@@ -48,15 +52,15 @@ func (g *Groups) Search() []Group {
 }
 
 // Create a Group in Groups
-func (g *Groups) Create(name string, config libscope.HeaderConfCurrent, filters map[string]interface{}) *Group {
+func (g *Groups) Create(name string, config run.ScopeConfig, filter Filter) *Group {
 	g.Lock()
 	defer g.Unlock()
 
 	group := &Group{
-		Id:      g.Id,
-		Name:    name,
-		Config:  config,
-		Filters: filters,
+		Id:     g.Id,
+		Name:   name,
+		Config: config,
+		Filter: filter,
 	}
 
 	g.GroupsMap[g.Id] = group
@@ -92,11 +96,11 @@ func (g *Groups) Update(id uint, obj interface{}) error {
 	case string:
 		g.GroupsMap[id].Name = o
 	// Update Config
-	case libscope.HeaderConfCurrent:
+	case run.ScopeConfig:
 		g.GroupsMap[id].Config = o
-	// Update Filters
-	case Filters:
-		g.GroupsMap[id].Filters = o
+	// Update Filter
+	case Filter:
+		g.GroupsMap[id].Filter = o
 	default:
 		return errors.New("Invalid type passed to Update")
 	}

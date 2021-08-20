@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/criblio/scope/clients"
-	"github.com/criblio/scope/libscope"
+	"github.com/criblio/scope/run"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -125,7 +125,7 @@ func scopeConfigHandler(c *clients.Clients) gin.HandlerFunc {
 			return
 		}
 
-		var json libscope.HeaderConfCurrent
+		var json run.ScopeConfig
 		if err := ctx.ShouldBindJSON(&json); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
@@ -172,7 +172,7 @@ func groupCreateHandler(c *clients.Clients) gin.HandlerFunc {
 			return
 		}
 
-		item := c.Groups.Create(json.Name, json.Config, json.Filters)
+		item := c.Groups.Create(json.Name, json.Config, json.Filter)
 
 		// TODO: Add Location header to response
 
@@ -257,7 +257,7 @@ func groupUpdateHandler(c *clients.Clients) gin.HandlerFunc {
 			})
 			return
 		}
-		if err := c.Groups.Update(uint(id), json.Filters); err != nil {
+		if err := c.Groups.Update(uint(id), json.Filter); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
 				"error":   err.Error(),
@@ -329,15 +329,15 @@ func groupApplyHandler(c *clients.Clients) gin.HandlerFunc {
 			})
 			return
 		}
-		/*
-			if err := c.PushGroupConfig(id); err != nil {
-				ctx.JSON(http.StatusInternalServerError, gin.H{
-					"success": false,
-					"error": err.Error(),
-				})
-				return
-			}
-		*/
+
+		if err := c.PushGroupConfig(uint(id)); err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   err.Error(),
+			})
+			return
+		}
+
 		ctx.JSON(http.StatusOK, gin.H{
 			"success": true,
 			// TODO list scopes that were applied? The new config?

@@ -1,16 +1,43 @@
 package run
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v2"
 )
+
+type BoolString string
+
+func (b BoolString) MarshalYAML() (interface{}, error) {
+	switch BoolString(b) {
+	case "":
+		return nil, nil
+	case "false":
+		return false, nil
+	case "true":
+		return true, nil
+	default:
+		return nil, errors.New(fmt.Sprintf("Boolean Marshal error: invalid input %s", string(b)))
+	}
+}
+
+func (bit *BoolString) UnmarshalJSON(data []byte) error {
+	asString := string(data)
+	if asString == "1" || asString == "true" || asString == `"true"` {
+		*bit = "true"
+	} else if asString == "0" || asString == "false" || asString == `"false"` {
+		*bit = "false"
+	} else {
+		return errors.New(fmt.Sprintf("Boolean unmarshal error: invalid input %s", asString))
+	}
+	return nil
+}
 
 // ScopeConfig represents our current running configuration
 type ScopeConfig struct {
@@ -18,62 +45,62 @@ type ScopeConfig struct {
 	Metric   ScopeMetricConfig   `mapstructure:"metric,omitempty" json:"metric,omitempty" yaml:"metric,omitempty"`
 	Event    ScopeEventConfig    `mapstructure:"event,omitempty" json:"event,omitempty" yaml:"event,omitempty"`
 	Payload  ScopePayloadConfig  `mapstructure:"payload,omitempty" json:"payload,omitempty" yaml:"payload,omitempty"`
-	Libscope ScopeLibscopeConfig `mapstructure:"libscope" json:"libscope" yaml:"libscope"`
+	Libscope ScopeLibscopeConfig `mapstructure:"libscope" json:"libscope,omitempty" yaml:"libscope,omitempty"`
 }
 
 // ScopeCriblConfig represents how to output metrics
 type ScopeCriblConfig struct {
-	Enable    bool           `mapstructure:"enable" json:"enable" yaml:"enable"`
-	Transport ScopeTransport `mapstructure:"transport" json:"transport" yaml:"transport"`
-	AuthToken string         `mapstructure:"authtoken" json:"authtoken" yaml:"authtoken"`
+	Enable    BoolString     `mapstructure:"enable" json:"enable,omitempty" yaml:"enable,omitempty"`
+	Transport ScopeTransport `mapstructure:"transport" json:"transport,omitempty" yaml:"transport,omitempty"`
+	AuthToken string         `mapstructure:"authtoken" json:"authtoken,omitempty" yaml:"authtoken,omitempty"`
 }
 
 // ScopeMetricConfig represents how to output metrics
 type ScopeMetricConfig struct {
-	Enable    bool              `mapstructure:"enable" json:"enable" yaml:"enable"`
-	Format    ScopeOutputFormat `mapstructure:"format" json:"format" yaml:"format"`
+	Enable    BoolString        `mapstructure:"enable" json:"enable,omitempty" yaml:"enable,omitempty"`
+	Format    ScopeOutputFormat `mapstructure:"format" json:"format,omitempty" yaml:"format,omitempty"`
 	Transport ScopeTransport    `mapstructure:"transport,omitempty" json:"transport,omitempty" yaml:"transport,omitempty"`
 }
 
 // ScopeEventConfig represents how to output events
 type ScopeEventConfig struct {
-	Enable    bool               `mapstructure:"enable" json:"enable" yaml:"enable"`
-	Format    ScopeOutputFormat  `mapstructure:"format" json:"format" yaml:"format"`
+	Enable    BoolString         `mapstructure:"enable" json:"enable,omitempty" yaml:"enable,omitempty"`
+	Format    ScopeOutputFormat  `mapstructure:"format" json:"format,omitempty" yaml:"format,omitempty"`
 	Transport ScopeTransport     `mapstructure:"transport,omitempty" json:"transport,omitempty" yaml:"transport,omitempty"`
-	Watch     []ScopeWatchConfig `mapstructure:"watch" json:"watch" yaml:"watch"`
+	Watch     []ScopeWatchConfig `mapstructure:"watch" json:"watch,omitempty" yaml:"watch,omitempty"`
 }
 
 // ScopePayloadConfig represents how to capture payloads
 type ScopePayloadConfig struct {
-	Enable bool   `mapstructure:"enable" json:"enable" yaml:"enable"`
-	Dir    string `mapstructure:"dir" json:"dir" yaml:"dir"`
+	Enable BoolString `mapstructure:"enable" json:"enable,omitempty" yaml:"enable,omitempty"`
+	Dir    string     `mapstructure:"dir" json:"dir,omitempty" yaml:"dir,omitempty"`
 }
 
 // ScopeWatchConfig represents a watch configuration
 type ScopeWatchConfig struct {
-	WatchType string `mapstructure:"type" json:"type" yaml:"type"`
-	Name      string `mapstructure:"name" json:"name" yaml:"name"`
+	WatchType string `mapstructure:"type" json:"type,omitempty" yaml:"type,omitempty"`
+	Name      string `mapstructure:"name" json:"name,omitempty" yaml:"name,omitempty"`
 	Field     string `mapstructure:"field,omitempty" json:"field,omitempty" yaml:"field,omitempty"`
-	Value     string `mapstructure:"value" json:"value" yaml:"value"`
+	Value     string `mapstructure:"value" json:"value,omitempty" yaml:"value,omitempty"`
 }
 
 // ScopeLibscopeConfig represents how to configure libscope
 type ScopeLibscopeConfig struct {
-	ConfigEvent   bool           `mapstructure:"configevent" json:"configevent" yaml:"configevent"`
-	SummaryPeriod int            `mapstructure:"summaryperiod" jaon:"summaryperiod" yaml:"summaryperiod"`
-	CommandDir    string         `mapstructure:"commanddir" json:"commanddir" yaml:"commanddir"`
-	Log           ScopeLogConfig `mapstructure:"log" json:"log" yaml:"log"`
+	ConfigEvent   BoolString     `mapstructure:"configevent" json:"configevent,omitempty" yaml:"configevent,omitempty"`
+	SummaryPeriod int            `mapstructure:"summaryperiod" json:"summaryperiod,omitempty" yaml:"summaryperiod,omitempty"`
+	CommandDir    string         `mapstructure:"commanddir" json:"commanddir,omitempty" yaml:"commanddir,omitempty"`
+	Log           ScopeLogConfig `mapstructure:"log" json:"log,omitempty" yaml:"log,omitempty"`
 }
 
 // ScopeLogConfig represents how to configure libscope logs
 type ScopeLogConfig struct {
-	Level     string         `mapstructure:"level" json:"level" yaml:"level"`
-	Transport ScopeTransport `mapstructure:"transport" json:"transport" yaml:"transport"`
+	Level     string         `mapstructure:"level" json:"level,omitempty" yaml:"level,omitempty"`
+	Transport ScopeTransport `mapstructure:"transport" json:"transport,omitempty" yaml:"transport,omitempty"`
 }
 
 // ScopeOutputFormat represents how to output a data type
 type ScopeOutputFormat struct {
-	FormatType   string            `mapstructure:"type" json:"type" yaml:"type"`
+	FormatType   string            `mapstructure:"type" json:"type,omitempty" yaml:"type,omitempty"`
 	Statsdmaxlen int               `mapstructure:"statsdmaxlen,omitempty" json:"statsdmaxlen,omitempty" yaml:"statsdmaxlen,omitempty"`
 	Verbosity    int               `mapstructure:"verbosity,omitempty" json:"verbosity,omitempty" yaml:"verbosity,omitempty"`
 	Tags         map[string]string `mapstructure:"tags,omitempty" json:"tags,omitempty" yaml:"tags,omitempty"`
@@ -81,19 +108,19 @@ type ScopeOutputFormat struct {
 
 // ScopeTransport represents how we transport data
 type ScopeTransport struct {
-	TransportType string    `mapstructure:"type" json:"type" yaml:"type"`
+	TransportType string    `mapstructure:"type" json:"type,omitempty" yaml:"type,omitempty"`
 	Host          string    `mapstructure:"host,omitempty" json:"host,omitempty" yaml:"host,omitempty"`
-	Port          int       `mapstructure:"port,omitempty" json:"port,omitempty" yaml:"port,omitempty"`
+	Port          string    `mapstructure:"port,omitempty" json:"port,omitempty" yaml:"port,omitempty"`
 	Path          string    `mapstructure:"path,omitempty" json:"path,omitempty" yaml:"path,omitempty"`
 	Buffering     string    `mapstructure:"buffering,omitempty" json:"buffering,omitempty" yaml:"buffering,omitempty"`
-	Tls           TlsConfig `mapstructure:"tls" json:"tls" yaml:"tls"`
+	Tls           TlsConfig `mapstructure:"tls" json:"tls,omitempty" yaml:"tls,omitempty"`
 }
 
 // TlsConfig is a configuration object model for TLS connections
 type TlsConfig struct {
-	Enable         bool   `mapstructure:"enable" json:"enable" yaml:"enable"`
-	ValidateServer bool   `mapstructure:"validateserver" json:"validateserver" yaml:"validateserver"`
-	CaCertPath     string `mapstructure:"cacertpath" json:"cacertpath" yaml:"cacertpath"`
+	Enable         BoolString `mapstructure:"enable" json:"enable,omitempty" yaml:"enable,omitempty"`
+	ValidateServer BoolString `mapstructure:"validateserver" json:"validateserver,omitempty" yaml:"validateserver,omitempty"`
+	CaCertPath     string     `mapstructure:"cacertpath" json:"cacertpath,omitempty" yaml:"cacertpath,omitempty"`
 }
 
 // setDefault sets the default scope configuration as a struct
@@ -104,7 +131,7 @@ func (c *Config) setDefault() error {
 	c.sc = &ScopeConfig{
 		Cribl: ScopeCriblConfig{},
 		Metric: ScopeMetricConfig{
-			Enable: true,
+			Enable: "true",
 			Format: ScopeOutputFormat{
 				FormatType: "ndjson",
 				Verbosity:  4,
@@ -116,7 +143,7 @@ func (c *Config) setDefault() error {
 			},
 		},
 		Event: ScopeEventConfig{
-			Enable: true,
+			Enable: "true",
 			Format: ScopeOutputFormat{
 				FormatType: "ndjson",
 			},
@@ -164,7 +191,7 @@ func (c *Config) setDefault() error {
 		Libscope: ScopeLibscopeConfig{
 			SummaryPeriod: 10,
 			CommandDir:    filepath.Join(c.WorkDir, "cmd"),
-			ConfigEvent:   false,
+			ConfigEvent:   "false",
 			Log: ScopeLogConfig{
 				Level: "warning",
 				Transport: ScopeTransport{
@@ -201,7 +228,7 @@ func (c *Config) configFromRunOpts() error {
 
 	if c.Payloads {
 		c.sc.Payload = ScopePayloadConfig{
-			Enable: true,
+			Enable: "true",
 			Dir:    filepath.Join(c.WorkDir, "payloads"),
 		}
 	}
@@ -232,11 +259,11 @@ func (c *Config) configFromRunOpts() error {
 		if err != nil {
 			return err
 		}
-		c.sc.Cribl.Enable = true
+		c.sc.Cribl.Enable = "true"
 		// If we're outputting to Cribl, disable metrics and event outputs
 		c.sc.Metric.Transport = ScopeTransport{}
 		c.sc.Event.Transport = ScopeTransport{}
-		c.sc.Libscope.ConfigEvent = true
+		c.sc.Libscope.ConfigEvent = "true"
 		c.sc.Cribl.AuthToken = c.AuthToken
 	}
 
@@ -295,14 +322,10 @@ func ParseDest(dest string) (ScopeTransport, error) {
 			if m[0][3] == "" {
 				return t, fmt.Errorf("Missing :port at the end of %s", dest)
 			}
-			port, err := strconv.Atoi(m[0][3])
-			if err != nil {
-				return t, fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][3])
-			}
-			t.Port = port
+			t.Port = m[0][3]
 			t.Path = ""
-			t.Tls.Enable = false
-			t.Tls.ValidateServer = true
+			t.Tls.Enable = "false"
+			t.Tls.ValidateServer = "true"
 		} else if proto == "tls" {
 			// encrypted socket
 			t.TransportType = "tcp"
@@ -310,14 +333,10 @@ func ParseDest(dest string) (ScopeTransport, error) {
 			if m[0][3] == "" {
 				return t, fmt.Errorf("Missing :port at the end of %s", dest)
 			}
-			port, err := strconv.Atoi(m[0][3])
-			if err != nil {
-				return t, fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][3])
-			}
-			t.Port = port
+			t.Port = m[0][3]
 			t.Path = ""
-			t.Tls.Enable = true
-			t.Tls.ValidateServer = true
+			t.Tls.Enable = "true"
+			t.Tls.ValidateServer = "true"
 		} else if proto == "file" {
 			t.TransportType = proto
 			t.Path = m[0][2]
@@ -328,14 +347,10 @@ func ParseDest(dest string) (ScopeTransport, error) {
 		// got "something:port", assume tls://
 		t.TransportType = "tcp"
 		t.Host = m[0][2]
-		port, err := strconv.Atoi(m[0][3])
-		if err != nil {
-			return t, fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][3])
-		}
-		t.Port = port
+		t.Port = m[0][3]
 		t.Path = ""
-		t.Tls.Enable = true
-		t.Tls.ValidateServer = true
+		t.Tls.Enable = "true"
+		t.Tls.ValidateServer = "true"
 	} else {
 		// got "something", assume file://
 		t.TransportType = "file"

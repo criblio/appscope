@@ -1,14 +1,15 @@
 package clients
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"sync"
 
 	"github.com/criblio/scope/libscope"
+	"github.com/criblio/scope/run"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 )
 
 // Client is an object model for our unix Clients
@@ -118,7 +119,7 @@ func (c *Clients) Delete(id uint) error {
 }
 
 // Push Config to one Client
-func (c *Clients) PushConfig(id uint, config libscope.HeaderConfCurrent) error {
+func (c *Clients) PushConfig(id uint, config run.ScopeConfig) error {
 
 	client, exists := c.ClientsMap[id]
 	if !exists {
@@ -129,18 +130,18 @@ func (c *Clients) PushConfig(id uint, config libscope.HeaderConfCurrent) error {
 		return errors.New("No Client PID saved")
 	}
 
+	confPath := "/tmp/conf." + fmt.Sprint(client.ProcessStart.Info.Process.Pid)
 	reloadPath := "/tmp/scope." + fmt.Sprint(client.ProcessStart.Info.Process.Pid)
-	reloadEnv := "SCOPE_CONF_RELOAD=true"
-	confPathEnv := "SCOPE_CONF_PATH=/tmp/conf." + fmt.Sprint(client.ProcessStart.Info.Process.Pid)
+	reloadEnv := "SCOPE_CONF_RELOAD=" + confPath
 
 	// Marshal the config changes into a byte array
-	b, err := json.Marshal(config)
+	b, err := yaml.Marshal(config)
 	if err != nil {
 		return err
 	}
 
 	// Create and open the new config file
-	cf, err := os.OpenFile(reloadPath, os.O_CREATE|os.O_WRONLY, 0644)
+	cf, err := os.OpenFile(confPath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
@@ -164,7 +165,7 @@ func (c *Clients) PushConfig(id uint, config libscope.HeaderConfCurrent) error {
 	defer rf.Close()
 
 	// Write the reload commands
-	_, err = rf.Write([]byte(confPathEnv + "\n" + reloadEnv))
+	_, err = rf.Write([]byte(reloadEnv))
 	if err != nil {
 		return err
 	}
@@ -183,29 +184,16 @@ func (c *Clients) PushGroupConfig(id uint) error {
 	}
 	cfg := group.Config
 
-	// Marshal filters into json
-	f, err := json.Marshal(group.Filters)
-	if err != nil {
-		return err
-	}
-
-	// Unmarshal json filters into Header
-	var filters libscope.Header
-	if err = json.Unmarshal(f, &filters); err != nil {
-		return err
-	}
-
-	filterTags := filters.Info.Configuration.Current.Metric.Format.Tags
-	filterHost := filters.Info.Process.Hostname
-	filterProc := filters.Info.Process.ProcName
-
 	for _, client := range c.ClientsMap {
 
 		clientTags := client.ProcessStart.Info.Configuration.Current.Metric.Format.Tags
 		clientHost := client.ProcessStart.Info.Process.Hostname
 		clientProc := client.ProcessStart.Info.Process.ProcName
 
-		if filterHost != clientHost || filterProc != clientProc {
+		if group.Filter.HostName != "" && group.Filter.HostName != clientHost {
+			continue
+		}
+		if group.Filter.ProcName != "" && group.Filter.ProcName != clientProc {
 			continue
 		}
 
@@ -214,7 +202,7 @@ func (c *Clients) PushGroupConfig(id uint) error {
 		// Walk filterTags, looking for matching key value pairs in clientTags
 		// If a filterTags key does not exist (or it's value doesn't match) in
 		// clientTags, skip that client
-		for k, v := range filterTags {
+		for k, v := range group.Filter.Tags {
 			if val, exists := clientTags[k]; exists {
 				if v != val {
 					tagsSubset = false

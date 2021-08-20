@@ -173,3 +173,66 @@ func (c *Clients) PushConfig(id uint, config libscope.HeaderConfCurrent) error {
 
 	return nil
 }
+
+// Push Config to a group of clients
+func (c *Clients) PushGroupConfig(id uint) error {
+
+	group, err := c.Groups.Read(id)
+	if err != nil {
+		return err
+	}
+	cfg := group.Config
+
+	// Marshal filters into json
+	f, err := json.Marshal(group.Filters)
+	if err != nil {
+		return err
+	}
+
+	// Unmarshal json filters into Header
+	var filters libscope.Header
+	if err = json.Unmarshal(f, &filters); err != nil {
+		return err
+	}
+
+	filterTags := filters.Info.Configuration.Current.Metric.Format.Tags
+	filterHost := filters.Info.Process.Hostname
+	filterProc := filters.Info.Process.ProcName
+
+	for _, client := range c.ClientsMap {
+
+		clientTags := client.ProcessStart.Info.Configuration.Current.Metric.Format.Tags
+		clientHost := client.ProcessStart.Info.Process.Hostname
+		clientProc := client.ProcessStart.Info.Process.ProcName
+
+		if filterHost != clientHost || filterProc != clientProc {
+			continue
+		}
+
+		tagsSubset := true
+
+		// Walk filterTags, looking for matching key value pairs in clientTags
+		// If a filterTags key does not exist (or it's value doesn't match) in
+		// clientTags, skip that client
+		for k, v := range filterTags {
+			if val, exists := clientTags[k]; exists {
+				if v != val {
+					tagsSubset = false
+					break
+				}
+			} else {
+				tagsSubset = false
+				break
+			}
+		}
+		if !tagsSubset {
+			continue
+		}
+
+		if err := c.PushConfig(client.Id, cfg); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

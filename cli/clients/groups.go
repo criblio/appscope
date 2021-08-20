@@ -117,8 +117,3 @@ func (g *Groups) Delete(id uint) error {
 
 	return nil
 }
-
-// Push Config to a group of clients
-func (g *Groups) PushConfig(id uint) {
-
-}

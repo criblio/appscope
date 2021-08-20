@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/criblio/scope/clients"
+	"github.com/criblio/scope/libscope"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -106,9 +107,44 @@ func scopeReadHandler(c *clients.Clients) gin.HandlerFunc {
 
 func scopeConfigHandler(c *clients.Clients) gin.HandlerFunc {
     return func(ctx *gin.Context) {
-		ctx.JSON(http.StatusNotImplemented, gin.H{
-			"success": false,
-			"error": "Not implemented",
+		id, err := strconv.Atoi(ctx.Param("id"))
+		if err != nil || id < 0 {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error": "Invalid ID; " + err.Error(),
+			})
+			return
+		}
+
+		_, err = c.Read(uint(id))
+		if err != nil {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"error": err.Error(),
+			})
+			return
+		}
+
+		var json libscope.HeaderConfCurrent
+		if err := ctx.ShouldBindJSON(&json); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error": err.Error(),
+			})
+			return
+		}
+
+		if err := c.PushConfig(uint(id), json); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error": err.Error(),
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"success": true,
+			// TODO Anything else to return here?
 		})
 	}
 }

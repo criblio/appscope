@@ -5,8 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-
-	//"fmt"
 	"net"
 
 	"github.com/criblio/scope/libscope"

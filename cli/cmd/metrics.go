@@ -35,7 +35,7 @@ var metricsCmd = &cobra.Command{
 		sessions := sessionByID(id)
 
 		if graph && len(names) == 0 {
-			helpErrAndExit(cmd, "Must specify a metric names with --graph")
+			helpErrAndExit(cmd, "Must specify metric names with --graph")
 		} else if cols && len(names) == 0 {
 			helpErrAndExit(cmd, "Must specify metric names with --cols")
 		}
@@ -44,11 +44,23 @@ var metricsCmd = &cobra.Command{
 		if err != nil && strings.Contains(err.Error(), "metrics.json: no such file or directory") {
 			if util.CheckFileExists(sessions[0].MetricsDestPath) {
 				dest, _ := ioutil.ReadFile(sessions[0].MetricsDestPath)
-				fmt.Printf("metrics were output to %s\n", dest)
+				fmt.Printf("Metrics were output to %s\n", dest)
 				os.Exit(0)
 			}
 			promptClean(sessions[0:1])
 		}
+		defer file.Close()
+
+		// Check for empty metrics file
+		fstat, err := file.Stat()
+		if err != nil {
+			util.ErrAndExit("Couldn't stat file: %s", file.Name())
+		}
+		if fstat.Size() == 0 {
+			fmt.Println("No metrics available")
+			os.Exit(0)
+		}
+
 		in := make(chan metrics.Metric)
 		offsetChan := make(chan int)
 		filters := []util.MatchFunc{}
@@ -97,6 +109,10 @@ var metricsCmd = &cobra.Command{
 		}
 
 		if graph {
+			if len(values) == 0 {
+				util.ErrAndExit("Valid metric names required with --graph")
+			}
+
 			termWidth, _, err := terminal.GetSize(0)
 			if err != nil {
 				// If we cannot get the terminal size, we are dealing with redirected stdin

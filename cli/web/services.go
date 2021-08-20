@@ -23,16 +23,16 @@ func Server(gctx context.Context, g *errgroup.Group, c *clients.Clients) func() 
 
 		router := gin.Default()
 
-        router.GET("/api/scope",      scopeSearchHandler(c))
-        router.GET("/api/scope/:id",  scopeReadHandler(c))
-        router.POST("/api/scope/:id", scopeConfigHandler(c))
+		router.GET("/api/scope", scopeSearchHandler(c))
+		router.GET("/api/scope/:id", scopeReadHandler(c))
+		router.POST("/api/scope/:id", scopeConfigHandler(c))
 
-        router.GET("/api/group",           groupSearchHandler(c))
-        router.POST("/api/group",          groupCreateHandler(c))
-        router.GET("/api/group/:id",       groupReadHandler(c))
-        router.PUT("/api/group/:id",       groupUpdateHandler(c))
-        router.DELETE("/api/group/:id",    groupDeleteHandler(c))
-        router.GET("/api/group/:id/apply", groupApplyHandler(c))
+		router.GET("/api/group", groupSearchHandler(c))
+		router.POST("/api/group", groupCreateHandler(c))
+		router.GET("/api/group/:id", groupReadHandler(c))
+		router.PUT("/api/group/:id", groupUpdateHandler(c))
+		router.DELETE("/api/group/:id", groupDeleteHandler(c))
+		router.GET("/api/group/:id/apply", groupApplyHandler(c))
 
 		srv := &http.Server{
 			Addr:    ":8080",
@@ -66,24 +66,24 @@ func Server(gctx context.Context, g *errgroup.Group, c *clients.Clients) func() 
 }
 
 func scopeSearchHandler(c *clients.Clients) gin.HandlerFunc {
-    return func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
 		items := c.Search()
 
 		ctx.JSON(http.StatusOK, gin.H{
 			"success": true,
-			"len": len(items),
-			"items": items,
+			"len":     len(items),
+			"items":   items,
 		})
-    }
+	}
 }
 
 func scopeReadHandler(c *clients.Clients) gin.HandlerFunc {
-    return func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
 		id, err := strconv.Atoi(ctx.Param("id"))
 		if err != nil || id < 0 {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": "Invalid ID; " + err.Error(),
+				"error":   "Invalid ID; " + err.Error(),
 			})
 			return
 		}
@@ -92,26 +92,26 @@ func scopeReadHandler(c *clients.Clients) gin.HandlerFunc {
 		if err != nil {
 			ctx.JSON(http.StatusNotFound, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{
 			"success": true,
-			"len": 1,
-			"items": [1]clients.Client{item},
+			"len":     1,
+			"items":   [1]clients.Client{item},
 		})
 	}
 }
 
 func scopeConfigHandler(c *clients.Clients) gin.HandlerFunc {
-    return func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
 		id, err := strconv.Atoi(ctx.Param("id"))
 		if err != nil || id < 0 {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": "Invalid ID; " + err.Error(),
+				"error":   "Invalid ID; " + err.Error(),
 			})
 			return
 		}
@@ -120,7 +120,7 @@ func scopeConfigHandler(c *clients.Clients) gin.HandlerFunc {
 		if err != nil {
 			ctx.JSON(http.StatusNotFound, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
@@ -129,7 +129,7 @@ func scopeConfigHandler(c *clients.Clients) gin.HandlerFunc {
 		if err := ctx.ShouldBindJSON(&json); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
@@ -137,7 +137,7 @@ func scopeConfigHandler(c *clients.Clients) gin.HandlerFunc {
 		if err := c.PushConfig(uint(id), json); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
@@ -150,15 +150,15 @@ func scopeConfigHandler(c *clients.Clients) gin.HandlerFunc {
 }
 
 func groupSearchHandler(c *clients.Clients) gin.HandlerFunc {
-    return func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
 		items := c.Groups.Search()
 
 		ctx.JSON(http.StatusOK, gin.H{
 			"success": true,
-			"len": len(items),
-			"items": items,
+			"len":     len(items),
+			"items":   items,
 		})
-    }
+	}
 }
 
 func groupCreateHandler(c *clients.Clients) gin.HandlerFunc {
@@ -167,7 +167,7 @@ func groupCreateHandler(c *clients.Clients) gin.HandlerFunc {
 		if err := ctx.ShouldBindJSON(&json); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
@@ -178,19 +178,19 @@ func groupCreateHandler(c *clients.Clients) gin.HandlerFunc {
 
 		ctx.JSON(http.StatusCreated, gin.H{
 			"success": true,
-			"len": 1,
-			"items": [1]clients.Group{*item},
+			"len":     1,
+			"items":   [1]clients.Group{*item},
 		})
 	}
 }
 
 func groupReadHandler(c *clients.Clients) gin.HandlerFunc {
-    return func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
 		id, err := strconv.Atoi(ctx.Param("id"))
 		if err != nil || id < 0 {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": "Invalid ID; " + err.Error(),
+				"error":   "Invalid ID; " + err.Error(),
 			})
 			return
 		}
@@ -199,26 +199,26 @@ func groupReadHandler(c *clients.Clients) gin.HandlerFunc {
 		if err != nil {
 			ctx.JSON(http.StatusNotFound, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{
 			"success": true,
-			"len": 1,
-			"items": [1]clients.Group{*item},
+			"len":     1,
+			"items":   [1]clients.Group{*item},
 		})
 	}
 }
 
 func groupUpdateHandler(c *clients.Clients) gin.HandlerFunc {
-    return func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
 		id, err := strconv.Atoi(ctx.Param("id"))
 		if err != nil || id < 0 {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": "Invalid ID; " + err.Error(),
+				"error":   "Invalid ID; " + err.Error(),
 			})
 			return
 		}
@@ -227,7 +227,7 @@ func groupUpdateHandler(c *clients.Clients) gin.HandlerFunc {
 		if err != nil {
 			ctx.JSON(http.StatusNotFound, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
@@ -236,7 +236,7 @@ func groupUpdateHandler(c *clients.Clients) gin.HandlerFunc {
 		if err := ctx.ShouldBindJSON(&json); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
@@ -246,21 +246,21 @@ func groupUpdateHandler(c *clients.Clients) gin.HandlerFunc {
 		if err := c.Groups.Update(uint(id), json.Name); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
 		if err := c.Groups.Update(uint(id), json.Config); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
 		if err := c.Groups.Update(uint(id), json.Filters); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
@@ -268,19 +268,19 @@ func groupUpdateHandler(c *clients.Clients) gin.HandlerFunc {
 
 		ctx.JSON(http.StatusOK, gin.H{
 			"success": true,
-			"len": 1,
-			"items": [1]clients.Group{*item},
+			"len":     1,
+			"items":   [1]clients.Group{*item},
 		})
 	}
 }
 
 func groupDeleteHandler(c *clients.Clients) gin.HandlerFunc {
-    return func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
 		id, err := strconv.Atoi(ctx.Param("id"))
 		if err != nil || id < 0 {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": "Invalid ID; " + err.Error(),
+				"error":   "Invalid ID; " + err.Error(),
 			})
 			return
 		}
@@ -289,7 +289,7 @@ func groupDeleteHandler(c *clients.Clients) gin.HandlerFunc {
 		if err != nil {
 			ctx.JSON(http.StatusNotFound, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
@@ -297,26 +297,26 @@ func groupDeleteHandler(c *clients.Clients) gin.HandlerFunc {
 		if err := c.Groups.Delete(uint(id)); err != nil {
 			ctx.JSON(http.StatusNotFound, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{
 			"success": true,
-			"len": 1,
-			"items": [1]clients.Group{*item},
+			"len":     1,
+			"items":   [1]clients.Group{*item},
 		})
-    }
+	}
 }
 
 func groupApplyHandler(c *clients.Clients) gin.HandlerFunc {
-    return func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
 		id, err := strconv.Atoi(ctx.Param("id"))
 		if err != nil || id < 0 {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"success": false,
-				"error": "Invalid ID; " + err.Error(),
+				"error":   "Invalid ID; " + err.Error(),
 			})
 			return
 		}
@@ -325,23 +325,22 @@ func groupApplyHandler(c *clients.Clients) gin.HandlerFunc {
 		if err != nil {
 			ctx.JSON(http.StatusNotFound, gin.H{
 				"success": false,
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
-/*
-		if err := c.PushGroupConfig(id); err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"success": false,
-				"error": err.Error(),
-			})
-			return
-		}
-*/
+		/*
+			if err := c.PushGroupConfig(id); err != nil {
+				ctx.JSON(http.StatusInternalServerError, gin.H{
+					"success": false,
+					"error": err.Error(),
+				})
+				return
+			}
+		*/
 		ctx.JSON(http.StatusOK, gin.H{
 			"success": true,
 			// TODO list scopes that were applied? The new config?
 		})
 	}
 }
-

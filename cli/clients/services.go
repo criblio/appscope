@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	//"fmt"
 	"net"
@@ -114,13 +113,7 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 						return nil
 					}
 
-					// temporary
-					fmt.Println(header)
-					c.PushConfig(client.Id, libscope.HeaderConfCurrent{
-						Event: libscope.HeaderConfEvent{
-							Enable: "false",
-						},
-					})
+					log.Info("Process Start Message received: ", header)
 				}
 			}
 

@@ -29,7 +29,6 @@
 #define STATSDPREFIX_NODE            "statsdprefix"
 #define STATSDMAXLEN_NODE            "statsdmaxlen"
 #define VERBOSITY_NODE               "verbosity"
-#define TAGS_NODE                    "tags"
 #define TRANSPORT_NODE           "transport"
 #define TYPE_NODE                    "type"
 #define HOST_NODE                    "host"
@@ -62,14 +61,16 @@
 #define VALUE_NODE                   "value"
 #define EX_HEADERS                   "headers"
 
-#define PAYLOAD_NODE          "payload"
+#define PAYLOAD_NODE         "payload"
 #define ENABLE_NODE              "enable"
 #define DIR_NODE                 "dir"
 
-#define CRIBL_NODE          "cribl"
+#define CRIBL_NODE           "cribl"
 #define ENABLE_NODE              "enable"
 #define TRANSPORT_NODE           "transport"
 #define AUTHTOKEN_NODE           "authtoken"
+
+#define TAGS_NODE            "tags"
 
 
 enum_map_t formatMap[] = {
@@ -1160,7 +1161,6 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    STATSDPREFIX_NODE,    processStatsDPrefix},
         {YAML_SCALAR_NODE,    STATSDMAXLEN_NODE,    processStatsDMaxLen},
         {YAML_SCALAR_NODE,    VERBOSITY_NODE,       processVerbosity},
-        {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1485,6 +1485,7 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
         {YAML_MAPPING_NODE,   PAYLOAD_NODE,         processPayload},
         {YAML_MAPPING_NODE,   EVENT_NODE,           processEvent},
         {YAML_MAPPING_NODE,   CRIBL_NODE,           processCribl},
+        {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1691,7 +1692,6 @@ static cJSON*
 createMetricFormatJson(config_t* cfg)
 {
     cJSON* root = NULL;
-    cJSON* tags;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
@@ -1703,9 +1703,6 @@ createMetricFormatJson(config_t* cfg)
                                     cfgMtcStatsDMaxLen(cfg))) goto err;
     if (!cJSON_AddNumberToObjLN(root, VERBOSITY_NODE,
                                        cfgMtcVerbosity(cfg))) goto err;
-
-    if (!(tags = createTagsJson(cfg))) goto err;
-    cJSON_AddItemToObjectCS(root, TAGS_NODE, tags);
 
     return root;
 err:
@@ -1890,7 +1887,7 @@ cJSON*
 jsonObjectFromCfg(config_t* cfg)
 {
     cJSON* json_root = NULL;
-    cJSON* metric, *libscope, *event, *payload;
+    cJSON* metric, *libscope, *event, *payload, *tags;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
@@ -1905,6 +1902,9 @@ jsonObjectFromCfg(config_t* cfg)
 
     if (!(payload = createPayloadJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(json_root, PAYLOAD_NODE, payload);
+
+    if (!(tags = createTagsJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, TAGS_NODE, tags);
 
     return json_root;
 err:

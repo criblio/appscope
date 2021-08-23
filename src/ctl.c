@@ -783,7 +783,7 @@ ctlPostEvent(ctl_t *ctl, char *event)
     return 0;
 }
 
-log_event_t *
+static log_event_t *
 createInternalLogEvent(int fd, const char *path, const void *buf, size_t count, uint64_t uid, proc_id_t *proc, watch_t logType, regex_t *valfilter)
 {
     log_event_t *event = calloc(1, sizeof(*event));
@@ -815,7 +815,7 @@ createInternalLogEvent(int fd, const char *path, const void *buf, size_t count, 
     return event;
 }
 
-void
+static void
 destroyInternalLogEvent(log_event_t **eventptr)
 {
     if (!eventptr || !*eventptr) return;

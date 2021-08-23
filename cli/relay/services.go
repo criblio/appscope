@@ -36,6 +36,10 @@ func Sender(gctx context.Context, sq Queue) func() error {
 		*/
 
 		for {
+			if len(sq) >= Config.SenderQueueSize {
+				log.Warn("Relay Sender Queue is full")
+			}
+
 			select {
 			case msg := <-sq:
 				if err := c.Send(msg); err != nil {

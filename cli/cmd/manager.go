@@ -8,6 +8,7 @@ import (
 	"github.com/criblio/scope/relay"
 	"github.com/criblio/scope/util"
 	"github.com/criblio/scope/web"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -35,6 +36,7 @@ scope manager -c tls://127.0.0.1:10090`,
 		g.Go(web.Server(gctx, g, c))
 
 		if relay.Config.CriblDest != "" {
+			log.Info("Relay is ON")
 			g.Go(relay.Sender(gctx, sq))
 		}
 

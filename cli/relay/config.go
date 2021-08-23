@@ -12,5 +12,5 @@ type Configuration struct {
 
 // InitConfiguration initializes the global Configuration
 func InitConfiguration() {
-	Config.SenderQueueSize = 1024
+	Config.SenderQueueSize = 4096
 }

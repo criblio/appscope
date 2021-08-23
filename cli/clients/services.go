@@ -89,8 +89,10 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 
 			if len(msg.Data) > 0 {
 
-				// Push data to relay sender
-				// sq <- relay.Message(msg)
+				if relay.Config.CriblDest != "" {
+					// Push data to relay sender
+					sq <- relay.Message(msg.Raw)
+				}
 
 				if client.ProcessStart.Format == "" {
 					var header libscope.Header

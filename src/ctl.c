@@ -2,7 +2,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/timeb.h>
+#include <sys/time.h>
 
 #include "circbuf.h"
 #include "cfgutils.h"
@@ -800,11 +800,11 @@ createInternalLogEvent(int fd, const char *path, const void *buf, size_t count, 
 
     memcpy(data, buf, count);
 
-    struct timeb tb;
-    ftime(&tb);
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
     event->fd = fd;
     event->id.uid = uid;
-    event->id.timestamp = tb.time + (double)tb.millitm/1000;
+    event->id.timestamp = tv.tv_sec + tv.tv_usec/1e6;
     event->id.path = src;
     event->id.proc = proc;
     event->id.sourcetype = logType;

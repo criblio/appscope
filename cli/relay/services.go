@@ -7,37 +7,25 @@ import (
 )
 
 // Sender makes a connection to cribldest and sends aggregated data
-func Sender(gctx context.Context, sq Queue) func() error {
+func Sender(gctx context.Context, sq Queue, workerId int) func() error {
 	return func() error {
 
-		log.Info("Sender routine running")
-		defer log.Info("Sender routine exited")
+		log.Info("Sender routine running [Worker ", workerId, "]")
+		defer log.Info("Sender routine exited [Worker ", workerId, "]")
 
 		c, err := NewConnection()
 		if err != nil {
 			return err
 		}
 
-		log.Info("Connected to Cribl Destination")
+		log.Info("Connected to Cribl Destination [Worker ", workerId, "]")
 
-		/*
-			// send a connection header on connection to the cribl destination
-			header := libscope.NewHeader()
-			header.Format = "ndjson"
-			header.AuthToken = Config.AuthToken
-			headerJson, err := json.Marshal(header)
-			if err != nil {
-				return err
-			}
-			if err = c.Send(Message(headerJson) + "\n"); err != nil {
-				return err
-			}
-			log.Info("Sent Connection Header to Cribl Destination")
-		*/
+		maxDepth := 0
 
 		for {
-			if len(sq) >= Config.SenderQueueSize {
-				log.Warn("Relay Sender Queue is full")
+			if len(sq) > maxDepth {
+				maxDepth = len(sq)
+				log.Info("Max queue depth is now: ", maxDepth, "[Worker ", workerId, "]")
 			}
 
 			select {

@@ -36,8 +36,10 @@ scope manager -c tls://127.0.0.1:10090`,
 		g.Go(web.Server(gctx, g, c))
 
 		if relay.Config.CriblDest != "" {
-			log.Info("Relay is ON")
-			g.Go(relay.Sender(gctx, sq))
+			log.Info("Relay is ON with ", relay.Config.Workers, " workers and a queue size of ", relay.Config.SenderQueueSize)
+			for id := 0; id < relay.Config.Workers; id++ {
+				g.Go(relay.Sender(gctx, sq, id))
+			}
 		}
 
 		if err := g.Wait(); err != nil {
@@ -49,6 +51,8 @@ scope manager -c tls://127.0.0.1:10090`,
 func init() {
 	relay.InitConfiguration()
 	managerCmd.Flags().StringVarP(&relay.Config.CriblDest, "relay", "c", "", "Turn on Relay and set Cribl destination for metrics & events (host:port defaults to tls://)")
+	managerCmd.Flags().IntVarP(&relay.Config.Workers, "workers", "w", 1, "Set number of workers to connect and send messages to the Cribl destination")
+	managerCmd.Flags().IntVarP(&relay.Config.SenderQueueSize, "queuesize", "q", 1000000, "Set buffer size for the relay (number of messages to queue)")
 	managerCmd.Flags().StringVarP(&relay.Config.AuthToken, "authtoken", "a", "", "Set AuthToken for Cribl")
 	RootCmd.AddCommand(managerCmd)
 }

@@ -77,6 +77,8 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 		log.Info("Handling client ", client.Id)
 		defer log.Info("Stopped handling client ", client.Id)
 
+		dropped := 0
+
 		reader := bufio.NewReader(client.Conn.Conn)
 		for {
 			msg, err := ReadMessage(reader)
@@ -88,11 +90,6 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 			}
 
 			if len(msg.Data) > 0 {
-
-				if relay.Config.CriblDest != "" {
-					// Push data to relay sender
-					sq <- relay.Message(msg.Raw)
-				}
 
 				if client.ProcessStart.Format == "" {
 					var header libscope.Header
@@ -114,6 +111,17 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 					}
 
 					log.Info("Process Start Message received: ", header)
+				}
+
+				if relay.Config.CriblDest != "" {
+					// Push data to relay sender
+					select {
+					case sq <- relay.Message(msg.Raw):
+						// sent to queue
+					default:
+						dropped++
+						log.Warn("Sender Queue Full. Dropping Message. Messages Dropped: ", dropped)
+					}
 				}
 			}
 

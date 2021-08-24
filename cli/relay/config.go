@@ -8,9 +8,9 @@ type Configuration struct {
 	SenderQueueSize int
 	CriblDest       string
 	AuthToken       string
+	Workers         int
 }
 
 // InitConfiguration initializes the global Configuration
 func InitConfiguration() {
-	Config.SenderQueueSize = 4096
 }

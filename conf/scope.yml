@@ -186,7 +186,7 @@ metric:
     #   Default:  8125
     #   Override: the port token in the $SCOPE_METRIC_DEST URL
     #
-    # The default 8125 is for normal statsd servies.
+    # The default 8125 is for normal statsd services.
     #
     port: 8125
 
@@ -547,7 +547,7 @@ payload:
 
   # Directory for payload files
   #   Type:     string
-  #   Values:   (direcotry path)
+  #   Values:   (directory path)
   #   Default:  /tmp
   #   Override: $SCOPE_PAYLOAD_DIR
   #

@@ -16,7 +16,7 @@ import (
 var forceFlag bool
 var serviceUser string
 
-// servichCmd represents the service command
+// serviceCmd represents the service command
 var serviceCmd = &cobra.Command{
 	Use:   "service SERVICE [flags]",
 	Short: "Configure a systemd service to be scoped",

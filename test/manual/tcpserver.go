@@ -86,7 +86,7 @@ func getBusyInABurgerKingBathroom(c net.Conn) {
 func main() {
 
 	// command-line options
-	flag.IntVar(&port, "p", 9101, "TCP port to listen on")
+	flag.IntVar(&port, "p", 9109, "TCP port to listen on")
 	flag.BoolVar(&payloadsEnabled, "x", false, "Enable hexdumpsed payloads")
 	flag.BoolVar(&prettyEnabled, "j", false, "Enable pretty-printed JSON headers")
 	flag.BoolVar(&timestampsEnabled, "t", false, "Enabled relative-timestamped output")

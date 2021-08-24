@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/timeb.h>
+#include <sys/time.h>
 #include <inttypes.h>
 #include "cJSON.h"
 #include "dbg.h"
@@ -276,9 +276,9 @@ mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
         addCustomJsonFields(fmt, json);
 
         // Request is for this json, plus a _time field
-        struct timeb tb;
-        ftime(&tb);
-        double timestamp = tb.time + (double)tb.millitm/1000;
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        double timestamp = tv.tv_sec + tv.tv_usec/1e6;
         cJSON_AddNumberToObjLN(json, "_time", timestamp);
 
         // add envelope for metric events 

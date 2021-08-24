@@ -13,6 +13,7 @@
 #endif
 #include <sys/syscall.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <libgen.h>
 #include <sys/resource.h>
 #include <setjmp.h>
@@ -583,7 +584,9 @@ doConfig(config_t *cfg)
     g_thread.interval = cfgMtcPeriod(cfg);
     setReportingInterval(cfgMtcPeriod(cfg));
     if (!g_thread.startTime) {
-        g_thread.startTime = time(NULL) + g_thread.interval;
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        g_thread.startTime = tv.tv_sec + g_thread.interval;
     }
 
     setVerbosity(cfgMtcVerbosity(cfg));
@@ -756,7 +759,9 @@ doThread()
      * This is put in place to work around one of the Chrome sandbox limits.
      * Shouldn't hurt anything else.
      */
-    if (time(NULL) >= g_thread.startTime) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    if (tv.tv_sec >= g_thread.startTime) {
         threadNow(0);
     }
 }
@@ -824,8 +829,10 @@ doReset()
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
 
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
     g_thread.once = 0;
-    g_thread.startTime = time(NULL) + g_thread.interval;
+    g_thread.startTime = tv.tv_sec + g_thread.interval;
 
     resetState();
 
@@ -968,12 +975,15 @@ periodic(void *arg)
     bool perf;
     static time_t summaryTime;
 
-    summaryTime = time(NULL) + g_thread.interval;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    summaryTime = tv.tv_sec + g_thread.interval;
 
     perf = checkEnv(PRESERVE_PERF_REPORTING, "true");
 
     while (1) {
-        if (time(NULL) >= summaryTime) {
+        gettimeofday(&tv, NULL);
+        if (tv.tv_sec >= summaryTime) {
             // Process dynamic config changes, if any
             dynConfig();
 
@@ -994,7 +1004,8 @@ periodic(void *arg)
                 atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
             }
 
-            summaryTime = time(NULL) + g_thread.interval;
+            gettimeofday(&tv, NULL);
+            summaryTime = tv.tv_sec + g_thread.interval;
         } else if (perf == FALSE) {
             if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
                 doEvent();

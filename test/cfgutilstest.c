@@ -1133,9 +1133,6 @@ cfgReadGoodYaml(void** state)
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
         "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
         "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
-        "    tags:\n"
-        "      name1 : value1\n"
-        "      name2 : value2\n"
         "  transport:                        # defines how scope output is sent\n"
         "    type: file                      # udp, unix, file, syslog\n"
         "    path: '/var/log/scope.log'\n"
@@ -1175,6 +1172,9 @@ cfgReadGoodYaml(void** state)
         "    transport:\n"
         "      buffering: full\n"
         "      type: syslog\n"
+        "tags:\n"
+        "  name1 : value1\n"
+        "  name2 : value2\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -1404,12 +1404,7 @@ const char* jsonText =
     "      'type': 'ndjson',\n"
     "      'statsdprefix': 'cribl.scope',\n"
     "      'statsdmaxlen': '42',\n"
-    "      'verbosity': '0',\n"
-    "      'tags': {\n"
-    "        'tagA': 'val1',\n"
-    "        'tagB': 'val2',\n"
-    "        'tagC': 'val3'\n"
-    "      }\n"
+    "      'verbosity': '0'\n"
     "    },\n"
     "    'transport': {\n"
     "      'type': 'file',\n"
@@ -1451,6 +1446,11 @@ const char* jsonText =
     "        'type': 'shm'\n"
     "      }\n"
     "    }\n"
+    "  },\n"
+    "  'tags': {\n"
+    "    'tagA': 'val1',\n"
+    "    'tagB': 'val2',\n"
+    "    'tagC': 'val3'\n"
     "  }\n"
     "}\n";
 
@@ -1552,8 +1552,6 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "  format:\n"
         "    type: statsd\n"
         "    hey: yeahyou\n"
-        "    tags:\n"
-        "      brainfarts: 135\n"
         "  request: 'make it snappy'        # Extra.\n"
         "  transport:\n"
         "    type: unix\n"
@@ -1562,6 +1560,8 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "libscope:\n"
         "  log:\n"
         "    level: info\n"
+        "tags:\n"
+        "  brainfarts: 135\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -1621,13 +1621,13 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    path: '/var/run/scope.sock'\n"
         "    type: unix\n"
         "  format:\n"
-        "    tags:\n"
-        "      135: kittens\n"
         "    verbosity: 4294967295\n"
         "    statsdmaxlen: 4294967295\n"
         "    statsdprefix: 'cribl.scope'\n"
         "    type:  statsd\n"
         "  enable : false\n"
+        "tags:\n"
+        "  135: kittens\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -1697,10 +1697,6 @@ cfgReadEnvSubstitution(void** state)
         "    statsdprefix : $VAR1.$MY_ENV_VAR\n"
         "    statsdmaxlen : $MAXLEN\n"
         "    verbosity: $VERBOSITY\n"
-        "    tags:\n"
-        "      CUSTOM: $PERIOD\n"
-        "      whyyoumadbro: 'Bill owes me $5.00'\n"
-        "      undefined: $UNDEFINEDENV\n"
         "  transport:\n"
         "    type: file\n"
         "    path: /\\$VAR1/$MY_ENV_VAR/\n"
@@ -1735,6 +1731,10 @@ cfgReadEnvSubstitution(void** state)
         "      buffering: full\n"
         "      type: file\n"
         "      path: $DEST\n"
+        "tags:\n"
+        "  CUSTOM: $PERIOD\n"
+        "  whyyoumadbro: 'Bill owes me $5.00'\n"
+        "  undefined: $UNDEFINEDENV\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);

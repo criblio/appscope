@@ -2,7 +2,7 @@
 
 AppScope is an application-centric instrumentation and data collection mechanism. With one instrumentation approach for all runtimes, AppScope offers ubiquitous, unified instrumentation of any unmodified Linux executable. It&#39;s equally useful for single-user troubleshooting or monitoring distributed deployments.
 
-So how does it work? Fundamentally, AppScope uses an _interposition_ model. AppScope uses several interposition approaches; more on this [here](https://docs.google.com/document/d/163OvMjwXO5j4q7Q2hmhEnsESJesh2-nk6VkjNigRvWo/edit?usp=sharing). The design operates in user mode, with no kernel component.
+So how does it work? Fundamentally, AppScope uses an _interposition_ model. AppScope uses several interposition approaches; more on this [here](Interposition_Mechanisms.md). The design operates in user mode, with no kernel component.
 
 Specifically, AppScope is based on function interpositioning. It&#39;s not a new concept. An application consists of modules that are part of the application executable, modules from other application components, and modules from the underlying OS. Code in modules external to the executable are normally accessed as a library – a shared library or a dynamic library. The application makes calls to any number of functions within the library or within its own executable. Any of these function calls can be interposed.
 

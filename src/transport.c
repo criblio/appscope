@@ -606,7 +606,7 @@ err:
 }
 
 
-// This is expected to be called by child processses that
+// This is expected to be called by child processes that
 // may have inherited connected transports from their parent
 // processes.  i.e. fork()->doReset() path
 // As a caution, because of its use of g_cached_addr, it's

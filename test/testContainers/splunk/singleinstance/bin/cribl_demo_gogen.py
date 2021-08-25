@@ -278,7 +278,7 @@ if __name__ == '__main__':
                 break
             except Exception as e:
                 logger.error(
-                    'failed to dowload gogen, retry=%d, err=%s' % (i,  str(err)))
+                    'failed to download gogen, retry=%d, err=%s' % (i,  str(err)))
                 time.sleep(i+1)
                 pass
 

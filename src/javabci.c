@@ -111,7 +111,7 @@ javaAddNameAndTypeTag(java_class_t *info, const char *name, const char *desc)
 }
 
 /*
-Adds a method ref tag to the contant pool
+Adds a method ref tag to the constant pool
 see: https://docs.oracle.com/javase/specs/jvms/se14/html/jvms-4.html#jvms-4.4.2
 */
 uint16_t 

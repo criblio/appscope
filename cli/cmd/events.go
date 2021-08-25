@@ -255,11 +255,11 @@ func getEventText(e map[string]interface{}, width int, allFields bool) string {
 		switch orig.(type) {
 		case string:
 			ret = ansiStrip(strings.TrimSpace(fmt.Sprintf("%s", orig)))
-			ret = util.TruncWithElipsis(ret, truncLen)
+			ret = util.TruncWithEllipsis(ret, truncLen)
 		case map[string]interface{}:
 			if msg, ok := orig.(map[string]interface{})["message"]; ok {
 				ret = ansiStrip(strings.TrimSpace(fmt.Sprintf("%s", msg)))
-				ret = util.TruncWithElipsis(ret, truncLen)
+				ret = util.TruncWithEllipsis(ret, truncLen)
 			} else {
 				ret = colorMap(orig.(map[string]interface{}), sourceFields[source.(string)])
 			}

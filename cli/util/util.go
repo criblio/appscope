@@ -147,8 +147,8 @@ func GetHumanDuration(since time.Duration) string {
 	}
 }
 
-// TruncWithElipsis truncates a string to a specified length including the elipsis
-func TruncWithElipsis(s string, l int) string {
+// TruncWithEllipsis truncates a string to a specified length including the ellipsis
+func TruncWithEllipsis(s string, l int) string {
 	if len(s) > l {
 		return fmt.Sprintf("%."+strconv.Itoa(l-1)+"s…", s)
 	}

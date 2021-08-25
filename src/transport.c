@@ -1144,12 +1144,14 @@ transportCreateUnix(const char *path)
     transport_t *trans = newTransport();
     if (!trans) return NULL;
 
+    int pathlen = strlen(path);
+
     trans->type = CFG_UNIX;
     trans->local.sock = -1;
 
     // the string portion of the unix address includes one extra byte
     // for a leading \0 for an abstract socket.  (No trailing \0)
-    trans->local.addr_len = strlen(path) + 1;
+    trans->local.addr_len = pathlen + 1;
     if (trans->local.addr_len >= sizeof(trans->local.addr.sun_path)) {
         DBG("%s", path);
         transportDestroy(&trans);
@@ -1161,7 +1163,7 @@ transportCreateUnix(const char *path)
 
     memset((char *)&trans->local.addr, 0, sizeof(struct sockaddr_un));
     trans->local.addr.sun_family = AF_UNIX;
-    strncpy(&trans->local.addr.sun_path[1], path, strlen(path));
+    strncpy(&trans->local.addr.sun_path[1], path, pathlen);
 
     transportConnect(trans);
 

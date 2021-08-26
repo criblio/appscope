@@ -1,6 +1,6 @@
 # Interposition Mechanisms
 
-In a previous blog, we outlined how AppScope uses function interpositioning as a means to extract information from applications, in user mode, at run time. You can check it out [here](AppScope_Design.md). In this blog, we want to provide an overview of a few (among many available) interposition mechanisms that we&#39;ve found valuable in building AppScope. This blog delves into application development details, and will be of particular interest to developers who love to maximize their apps&#39; performance.
+In the document AppScope Design, we outlined how AppScope uses function interpositioning as a means to extract information from applications, in user mode, at run time. In this document, we want to provide an overview of a few (among many available) interposition mechanisms that we&#39;ve found valuable in building AppScope. This document delves into application development details, and will be of particular interest to developers interested in application performance.
 
 ## Library Preload
 
@@ -51,13 +51,13 @@ We noted that library preload is not useful for interposing functions in the app
 
 The most common examples of static executables (although certainly not the only examples) are Go applications. These are the places where function hooking comes into play.
 
-Function hooking is accomplished by modifying _code that implements_ the function to be interposed. Again, this approach is not new. And again at the risk of oversimplification, function hooking works by placing a `jmp` instruction in a function preamble. The destination of the `jmp` causes the interposed function to be called before the original function is called.It involves a lot of assembly language. It depends on the hardware architecture and instruction definition. When done right, it works rather well.
+Function hooking is accomplished by modifying _code that implements_ the function to be interposed. Again, this approach is not new. And again at the risk of oversimplification, function hooking works by placing a `jmp` instruction in a function preamble. The destination of the `jmp` causes the interposed function to be called before the original function is called. It involves some use of assembly language. It depends on the hardware architecture and instruction definition. When done right, it works rather well.
 
 In order to update code, function hooking must write to memory in executable space. This, of course, is not normally enabled. Therefore, a system call (such as `mprotect` in Unix/Linux systems) is required.
 
 Changing permissions in memory is accomplished on page boundaries. The page associated with the function to be interposed is given write permissions; the code is modified with the `jmp` instruction; and write permissions are removed. As long as functionality associated with `mprotect` is possible, function hooking can work well.
 
-Loading a static executable and ensuring that the library code we use is also loaded, sets up a topic for a different blog. There are cases where it is desirable to interpose internal application functions. These are relatively rare, but useful when needed.
+Loading a static executable and ensuring that the library code we use is also loaded, sets up a topic for a different document. There are cases where it is desirable to interpose internal application functions. These are relatively rare, but useful when needed.
 
 A few references:
 

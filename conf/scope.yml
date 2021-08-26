@@ -139,8 +139,9 @@ metric:
     #   file:///tmp/output.log  send to a file; note the triple slash
     #   file://stdout           send to standard out
     #   file://stderr           send to standard error
-    #   udp://host:port         send to a UDP server
-    #   tcp://host:port         send to a TCP server
+    #   udp://host:port         send to a network server (UDP protocol)
+    #   tcp://host:port         send to a network server (TCP protocol)
+    #   unix://socketpath       send to a local unix domain server (TCP)
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_METRIC_TLS_* variables.
@@ -171,13 +172,15 @@ metric:
     #
     port: 8125
 
-    # File path
+    # File path / unix domain socket path
     #   Type:     string
-    #   Values:   (directory path)
+    #   Values:   (directory path, or socket path)
     #   Default:  (none)
     #   Override: the path token in the $SCOPE_METRIC_DEST URL
     #
-    # Only applies when connection type is file.
+    # Applies when connection type is file or unix.  Socket paths
+    # are implemented as abstract sockets so the name chosen has no
+    # connection with filesystem pathnames.
     #
     #path:
 
@@ -413,8 +416,9 @@ event:
     #   file:///tmp/output.log  send to a file; note the triple slash
     #   file://stdout           send to standard out
     #   file://stderr           send to standard error
-    #   udp://host:port         send to a UDP server
-    #   tcp://host:port         send to a TCP server
+    #   udp://host:port         send to a network server (UDP protocol)
+    #   tcp://host:port         send to a network server (TCP protocol)
+    #   unix://socketpath       send to a local unix domain server (TCP)
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_EVENT_TLS_* variables.
@@ -443,13 +447,15 @@ event:
     #
     port: 9109
 
-    # File path
+    # File path / unix domain socket path
     #   Type:     string
-    #   Values:   (directory path)
+    #   Values:   (directory path, or socket path)
     #   Default:  (none)
     #   Override: the path token in the $SCOPE_EVENT_DEST URL
     #
-    # Only applies when connection type is file.
+    # Applies when connection type is file or unix.  Socket paths
+    # are implemented as abstract sockets so the name chosen has no
+    # connection with filesystem pathnames.
     #
     #path:
 
@@ -604,8 +610,9 @@ libscope:
       #   file:///tmp/output.log  send to a file; note the triple slash
       #   file://stdout           send to standard out
       #   file://stderr           send to standard error
-      #   udp://host:port         send to a UDP server
-      #   tcp://host:port         send to a TCP server
+      #   udp://host:port         send to a network server (UDP protocol)
+      #   tcp://host:port         send to a network server (TCP protocol)
+      #   unix://socketpath       send to a local unix domain server (TCP)
       #
       # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
       # set the $SCOPE_LOG_TLS_* variables.
@@ -634,13 +641,15 @@ libscope:
       #
       #port: 
 
-      # File path
+      # File path / unix domain socket path
       #   Type:     string
-      #   Values:   (directory path)
+      #   Values:   (directory path, or socket path)
       #   Default:  '/tmp/scope.log'
       #   Override: the path token in the $SCOPE_LOG_DEST URL
       #
-      # Only applies when connection type is file.
+      # Applies when connection type is file or unix.  Socket paths
+      # are implemented as abstract sockets so the name chosen has no
+      # connection with filesystem pathnames.
       #
       path: '/tmp/scope.log'
 

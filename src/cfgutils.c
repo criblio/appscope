@@ -249,7 +249,7 @@ processCustomTag(config_t* cfg, const char* e, const char* value)
     char name_buf[1024];
     strncpy(name_buf, e, sizeof(name_buf));
 
-    char* name = name_buf + strlen("SCOPE_TAG_");
+    char* name = name_buf + (sizeof("SCOPE_TAG_") - 1);
 
     // convert the "=" to a null delimiter for the name
     char* end = strchr(name, '=');
@@ -377,11 +377,14 @@ processReloadConfig(config_t *cfg, const char* value)
 {
     if (!cfg || !value) return;
     unsigned int enable = strToVal(boolMap, value);
-    if (enable != TRUE) return;
 
-    char *path = cfgPath();
-    cfgSetFromFile(cfg, path);
-    if (path) free(path);
+    if (enable == TRUE) {
+        char *path = cfgPath();
+        cfgSetFromFile(cfg, path);
+        if (path) free(path);
+    } else {
+        cfgSetFromFile(cfg, value);
+    }
 
     cfgProcessEnvironment(cfg);
 
@@ -751,7 +754,7 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         char value_cpy[1024];
         strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char *host = value_cpy + strlen("udp://");
+        char *host = value_cpy + (sizeof("udp://") - 1);
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -770,7 +773,7 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         char value_cpy[1024];
         strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char *host = value_cpy + strlen("tcp://");
+        char *host = value_cpy + (sizeof("tcp://") - 1);
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -784,8 +787,12 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         cfgTransportPortSet(cfg, t, port);
 
     } else if (value == strstr(value, "file://")) {
-        const char *path = value + strlen("file://");
+        const char *path = value + (sizeof("file://") - 1);
         cfgTransportTypeSet(cfg, t, CFG_FILE);
+        cfgTransportPathSet(cfg, t, path);
+    } else if (value == strstr(value, "unix://")) {
+        const char *path = value + (sizeof("unix://") - 1);
+        cfgTransportTypeSet(cfg, t, CFG_UNIX);
         cfgTransportPathSet(cfg, t, path);
     }
 }

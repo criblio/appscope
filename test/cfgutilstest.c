@@ -649,6 +649,12 @@ cfgProcessEnvironmentTransport(void** state)
     assert_int_equal(cfgTransportType(cfg, data->transport), CFG_FILE);
     assert_string_equal(cfgTransportPath(cfg, data->transport), "/some/path/somewhere");
 
+    // one more variant... unix://
+    assert_int_equal(setenv(data->env_name, "unix://theUnixAddress", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_UNIX);
+    assert_string_equal(cfgTransportPath(cfg, data->transport), "theUnixAddress");
+
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
     cfgProcessEnvironment(cfg);

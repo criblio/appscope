@@ -601,6 +601,13 @@ doConfig(config_t *cfg)
         singleChannelSet(g_ctl, g_mtc);
     }
 
+    // Send a process start message to report our *new* configuration.
+    // Only needed if we're connected.  If we're not connected, doConnection()
+    // will send the process start message when we ultimately connect.
+    if (!ctlNeedsConnection(g_ctl, CFG_CTL)) {
+        reportProcessStart(g_ctl, FALSE, CFG_WHICH_MAX);
+    }
+
     // Disconnect the old interfaces that were just replaced
     mtcDisconnect(g_prevmtc);
     logDisconnect(g_prevlog);

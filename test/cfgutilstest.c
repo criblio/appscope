@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "fn.h"
+#include "com.h"
 #include "cfgutils.h"
 #include "test.h"
 
@@ -1125,8 +1126,11 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
     assert_int_equal       (cfgPayEnable(config), DEFAULT_PAYLOAD_ENABLE);
     assert_string_equal    (cfgPayDir(config), DEFAULT_PAYLOAD_DIR);
-}
 
+    // the protocol list should be empty too
+    assert_non_null        (g_protlist);
+    assert_int_equal       (g_prot_sequence, 0);
+}
 
 static void
 cfgReadGoodYaml(void** state)
@@ -1240,75 +1244,12 @@ static void
 cfgReadStockYaml(void** state)
 {
     // The stock scope.yml file up in ../conf/ should parse to the defaults.
+    g_protlist = lstCreate(destroyProtEntry);
     config_t* config = cfgRead("./conf/scope.yml");
-
-    // This should duplicate the verifyDefaults() function in cfgtest.c
-    assert_int_equal       (cfgMtcEnable(config), DEFAULT_MTC_ENABLE);
-    assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
-    assert_string_equal    (cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
-    assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
-    assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
-    assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
-    assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
-    assert_int_equal       (cfgSendProcessStartMsg(config), DEFAULT_PROCESS_START_MSG);
-    assert_int_equal       (cfgEvtEnable(config), DEFAULT_EVT_ENABLE);
-    assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
-    assert_int_equal       (cfgEvtRateLimit(config), DEFAULT_MAXEVENTSPERSEC);
-    assert_int_equal       (cfgEnhanceFs(config), DEFAULT_ENHANCE_FS);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_VALUE);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_FIELD);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_NAME);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), DEFAULT_SRC_NET);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), DEFAULT_SRC_FS);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), DEFAULT_SRC_DNS);
-    assert_int_equal       (cfgTransportType(config, CFG_MTC), DEFAULT_MTC_TYPE);
-    assert_string_equal    (cfgTransportHost(config, CFG_MTC), DEFAULT_MTC_HOST);
-    assert_string_equal    (cfgTransportPort(config, CFG_MTC), DEFAULT_MTC_PORT);
-    assert_null            (cfgTransportPath(config, CFG_MTC));
-    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), DEFAULT_MTC_BUF);
-    assert_int_equal       (cfgTransportType(config, CFG_CTL), DEFAULT_CTL_TYPE);
-    assert_string_equal    (cfgTransportHost(config, CFG_CTL), DEFAULT_CTL_HOST);
-    assert_string_equal    (cfgTransportPort(config, CFG_CTL), DEFAULT_CTL_PORT);
-    assert_null            (cfgTransportPath(config, CFG_CTL));
-    assert_int_equal       (cfgTransportBuf(config, CFG_CTL), DEFAULT_CTL_BUF);
-    assert_int_equal       (cfgTransportType(config, CFG_LOG), DEFAULT_LOG_TYPE);
-    assert_null            (cfgTransportHost(config, CFG_LOG));
-    assert_null            (cfgTransportPort(config, CFG_LOG));
-    assert_string_equal    (cfgTransportPath(config, CFG_LOG), DEFAULT_LOG_PATH);
-    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), DEFAULT_LOG_BUF);
-    assert_null            (cfgCustomTags(config));
-    assert_null            (cfgCustomTagValue(config, "tagname"));
-    assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
-    assert_int_equal       (cfgPayEnable(config), DEFAULT_PAYLOAD_ENABLE);
-    assert_string_equal    (cfgPayDir(config), DEFAULT_PAYLOAD_DIR);
-
+    verifyDefaults(config);
     cfgDestroy(&config);
+    lstDestroy(&g_protlist);
+    g_prot_sequence = 0;
 }
 
 static void
@@ -1517,9 +1458,12 @@ cfgReadGoodJson(void** state)
 static void
 cfgReadNonExistentFileReturnsDefaults(void** state)
 {
+    g_protlist = lstCreate(destroyProtEntry);
     config_t* config = cfgRead("../thisFileNameWontBeFoundAnywhere.txt");
     verifyDefaults(config);
     cfgDestroy(&config);
+    lstDestroy(&g_protlist);
+    g_prot_sequence = 0;
 }
 
 static void
@@ -1542,10 +1486,13 @@ cfgReadBadYamlReturnsDefaults(void** state)
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
+    g_protlist = lstCreate(destroyProtEntry);
     config_t* config = cfgRead(path);
     verifyDefaults(config);
 
     cfgDestroy(&config);
+    lstDestroy(&g_protlist);
+    g_prot_sequence = 0;
     deleteFile(path);
 }
 
@@ -1910,13 +1857,11 @@ initCtlReturnsPtr(void** state)
     cfgDestroy(&cfg);
 }
 
-/*
 static void
 cfgReadProtocol(void **state)
 {
     // protocol config in yaml format
     const char *yamlText =
-        "---\n"
         "protocol:\n"
         "  - name: test1\n"
         "    binary: 'true'\n"
@@ -1934,7 +1879,18 @@ cfgReadProtocol(void **state)
         "    len: 333\n"
         "    detect: false\n"
         "    payload: true\n"
-        "...\n";
+        "\n"
+        // the 4th should fail to load, missing regex
+        "  - name: test4\n"
+        "    #regex: 'sup er?'\n"
+        "\n"
+        // the 5th should fail to load, missing name
+        "  #- name: test5\n"
+        "  - regex: 'sup er?'\n"
+        "\n"
+        // the 6th should fail to load, bad regex, unmatched paren
+        "  - name: test6\n"
+        "    regex: 'sup(er?'\n";
 
     char *name[3] = {"test1", "test2", "test3"};
     char *regex[3] = {"sup?", "sup up?", "sup er?"};
@@ -1942,36 +1898,37 @@ cfgReadProtocol(void **state)
     int len[3] = {111, 222, 333};
     int detect[3] = {1, 1, 0};
     int payload[3] = {0, 0, 1};
-    int i;
-    list_t *plist = lstCreate(destroyProtEntry);
-    char *ppath = PROTOCOL_FILE_NAME;
-    protocol_def_t *prot;
+
+    g_protlist = lstCreate(destroyProtEntry);
+    assert_non_null(g_protlist);
+
+    char *ppath = "/tmp/" CFG_FILE_NAME;
+    assert_non_null(ppath);
 
     writeFile(ppath, yamlText);
     
-    assert_non_null(ppath);
-    assert_non_null(plist);
+    config_t* config = cfgRead(ppath);
+    assert_non_null(config);
+    assert_int_equal(g_prot_sequence, 3);
 
-    protocolRead(ppath, plist);
-
-    for (i = 0; i < 3; i++) {
-        if ((prot = lstFind(plist, i)) != NULL) {
-            assert_non_null(prot);
-            assert_string_equal(prot->protname, name[i]);
-            assert_string_equal(prot->regex, regex[i]);
-            assert_int_equal(prot->binary, binary[i]);
-            assert_int_equal(prot->len, len[i]);
-            assert_int_equal(prot->detect, detect[i]);
-            assert_int_equal(prot->payload, payload[i]);
-        } else {
-            break;
-        }
+    for (unsigned key = 0; key < 3; ++key) {
+        protocol_def_t *prot = lstFind(g_protlist, key+1);
+        assert_non_null(prot);
+        assert_int_equal(prot->type, key+1);
+        assert_string_equal(prot->protname, name[key]);
+        assert_string_equal(prot->regex, regex[key]);
+        assert_non_null(prot->re);
+        assert_int_equal(prot->binary, binary[key]);
+        assert_int_equal(prot->len, len[key]);
+        assert_int_equal(prot->detect, detect[key]);
+        assert_int_equal(prot->payload, payload[key]);
     }
 
-    lstDestroy(&plist);
+    cfgDestroy(&config);
     deleteFile(ppath);
+    lstDestroy(&g_protlist);
+    g_prot_sequence = 0;
 }
-*/
 
 // Defined in src/cfgutils.c
 // This is not a proper test, it just exists to make valgrind output
@@ -2051,7 +2008,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(initEvtFormatReturnsPtr),
         cmocka_unit_test(initCtlReturnsPtr),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
-        //cmocka_unit_test(cfgReadProtocol),
+        cmocka_unit_test(cfgReadProtocol),
         cmocka_unit_test(envRegexFree),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

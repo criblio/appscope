@@ -15,7 +15,6 @@ char *protocolPath(void);
 
 // reads cfg from yaml file
 config_t * cfgRead(const char *);
-bool protocolRead(const char *, list_t *);
 void destroyProtEntry(void *);
 
 // reads cfg from a string (containing json or yaml)

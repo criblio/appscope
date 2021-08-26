@@ -246,12 +246,6 @@ cfgPath(void)
     return cfgPathSearch(CFG_FILE_NAME);
 }
 
-char *
-protocolPath(void)
-{
-    return cfgPathSearch(PROTOCOL_FILE_NAME);
-}
-
 static void
 processCustomTag(config_t* cfg, const char* e, const char* value)
 {
@@ -1493,6 +1487,7 @@ static void
 processProtocolName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    if (protocol_context->protname) free(protocol_context->protname);
     protocol_context->protname = stringVal(node);
 }
 
@@ -1500,7 +1495,8 @@ static void
 processProtocolRegex(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
-    protocol_context->protname = stringVal(node);
+    if (protocol_context->regex) free(protocol_context->regex);
+    protocol_context->regex = stringVal(node);
 }
 
 static void
@@ -1521,7 +1517,7 @@ processProtocolLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char *endInt = NULL;
     errno = 0;
     unsigned long iVal = strtoul(sVal, &endInt, 10);
-    if (!errno && !*endInt && iVal <= 1) protocol_context->detect = iVal;
+    if (!errno && !*endInt) protocol_context->len = iVal;
     if (sVal) free(sVal);
 }
 
@@ -1548,20 +1544,28 @@ processProtocolPayload(config_t* config, yaml_document_t* doc, yaml_node_t* node
 static void
 processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    // protocol entries are key/value maps
+    char logBuf[256];
+
+    // protocol entries must be key/value maps
     if (node->type != YAML_MAPPING_NODE) {
-        // TODO log error
+        scopeLog("WARN: ignoring non-map protocol entry\n", -1, CFG_LOG_WARN);
+        return;
+    }
+
+    // the protocol list should already be setup
+    if (!g_protlist) {
+        DBG(NULL);
         return;
     }
 
     // protocol object to populate
     protocol_context = calloc(1, sizeof(protocol_def_t));
     if (!protocol_context) {
-        // TODO log error
+        DBG(NULL);
         return;
     }
     protocol_context->detect = TRUE; // non-zero default
-    
+
     // process the entry
     parse_table_t t[] = {
         {YAML_SCALAR_NODE, NAME_NODE,    processProtocolName},
@@ -1581,7 +1585,7 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (!protocol_context->protname || !protocol_context->regex) {
         destroyProtEntry(protocol_context);
         protocol_context = NULL;
-        // TODO log error
+        scopeLog("WARN: ignoring protocol entry missing name or regex\n", -1, CFG_LOG_WARN);
         return;
     }
 
@@ -1593,9 +1597,12 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
             PCRE2_ZERO_TERMINATED, 0,
             &errornumber, &erroroffset, NULL);
     if (!protocol_context->re) {
+        snprintf(logBuf, sizeof(logBuf),
+                 "WARN: invalid regex for \"%s\" protocol entry; %s\n",
+                 protocol_context->protname, protocol_context->regex);
+        scopeLog(logBuf, -1, CFG_LOG_WARN);
         destroyProtEntry(protocol_context);
         protocol_context = NULL;
-        // TODO log error
         return;
     }
 
@@ -1604,8 +1611,12 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         protocol_def_t *found = lstFind(g_protlist, key);
         if (found && !strcmp(protocol_context->protname, found->protname)) {
             protocol_context->type = key;
-            lstDelete(g_protlist, key);
-            lstInsert(g_protlist, key, protocol_context);
+            if (!lstDelete(g_protlist, key)) {
+                DBG(NULL);
+            }
+            if (!lstInsert(g_protlist, key, protocol_context)) {
+                DBG(NULL);
+            }
             protocol_context = NULL;
             destroyProtEntry(found);
             break;
@@ -1618,7 +1629,7 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         if (!lstInsert(g_protlist, g_prot_sequence, protocol_context)) {
             --g_prot_sequence;
             destroyProtEntry(protocol_context);
-            // TODO log error
+            DBG(NULL);
         }
         protocol_context = NULL;
     }

@@ -64,6 +64,7 @@ cfgPathHonorsEnvVar(void** state)
     assert_int_equal(rmdir(newdir), 0);
 }
 
+/*
 static void
 cfgPathHonorsPriorityOrder(void** state)
 {
@@ -155,6 +156,7 @@ cfgPathHonorsPriorityOrder(void** state)
         assert_int_equal(rmdir(newdir[i]), 0);
     }
 }
+*/
 
 static void
 cfgProcessEnvironmentMtcEnable(void** state)
@@ -1902,6 +1904,7 @@ initCtlReturnsPtr(void** state)
     cfgDestroy(&cfg);
 }
 
+/*
 static void
 cfgReadProtocol(void **state)
 {
@@ -1962,6 +1965,7 @@ cfgReadProtocol(void **state)
     lstDestroy(&plist);
     deleteFile(ppath);
 }
+*/
 
 // Defined in src/cfgutils.c
 // This is not a proper test, it just exists to make valgrind output
@@ -2041,7 +2045,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(initEvtFormatReturnsPtr),
         cmocka_unit_test(initCtlReturnsPtr),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
-        cmocka_unit_test(cfgReadProtocol),
+        //cmocka_unit_test(cfgReadProtocol),
         cmocka_unit_test(envRegexFree),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

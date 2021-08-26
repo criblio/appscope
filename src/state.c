@@ -46,8 +46,6 @@ fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
 static search_t* g_http_redirect = NULL;
-static list_t *g_protlist;
-static unsigned int g_prot_sequence = 0;
 
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
@@ -234,41 +232,6 @@ error:
     g_http_protocol_def = NULL;
 }
 
-static void
-initProtocolDetect()
-{
-    int i;
-    list_t *plist = lstCreate(NULL);
-    char *ppath = protocolPath();
-    protocol_def_t *prot;
-
-    if (!plist) {
-        if (ppath) free(ppath);
-        return;
-    }
-
-    if (!ppath) {
-        if (plist) lstDestroy(&plist);
-        return;
-    }
-
-    protocolRead(ppath, plist);
-
-    for (i = 0; ; i++) {
-        if ((prot = lstFind(plist, i)) != NULL) {
-            request_t req;
-
-            req.protocol = prot;
-            addProtocol(&req);
-        } else {
-            break;
-        }
-    }
-
-    if (ppath) free(ppath);
-    lstDestroy(&plist);
-}
-
 void
 initState()
 {
@@ -306,7 +269,6 @@ initState()
     g_http_redirect = searchComp(REDIRECTURL);
 
     g_protlist = lstCreate(destroyProtEntry);
-    initProtocolDetect();
     initPayloadDetect();
 
     initReporting();

@@ -314,7 +314,7 @@ ctlParseRxMsg(const char *msg)
     req->cmd = REQ_MALFORMED;
 
     // grab reqId field first so we'll have it even if some other
-    // part of the json isn't useable for some reason.
+    // part of the json isn't usable for some reason.
     json = cJSON_GetObjectItem(json_root, "reqId");
     if (!json || !cJSON_IsNumber(json)) goto out;
     req->id = json->valuedouble;

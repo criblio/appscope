@@ -137,7 +137,7 @@ void            ctlPayEnableSet(ctl_t *, unsigned int);
 const char *    ctlPayDir(ctl_t *);
 void            ctlPayDirSet(ctl_t *, const char *);
 
-// Retreive events
+// Retrieve events
 uint64_t   ctlGetEvent(ctl_t *);
 void       ctlFlushLog(ctl_t *);
 bool       ctlCbufEmpty(ctl_t *);

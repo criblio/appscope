@@ -175,7 +175,7 @@ var metricsCmd = &cobra.Command{
 				if first {
 					line = util.Trunc(line, termWidth)
 				} else {
-					line = util.TruncWithElipsis(line, termWidth)
+					line = util.TruncWithEllipsis(line, termWidth)
 				}
 				fmt.Printf("%s\n", line)
 				first = false

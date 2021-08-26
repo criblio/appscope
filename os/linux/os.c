@@ -429,7 +429,7 @@ osInitTimer(platform_time_t *cfg)
 
 #ifdef __aarch64__
     /*
-     * This uses the General Purpose Timer definiton in an aarch64 instance.
+     * This uses the General Purpose Timer definition in an aarch64 instance.
      * The frequency is the lower 32 bits of the CNTFRQ_EL0 register and
      * is defined as HZ. The configured freq is defined in Mhz.
      */

@@ -353,7 +353,7 @@ tcp(int socket)
                     // print input to stdout
                     write(1, buf, rc);
 
-                    // Artifical delay...
+                    // Artificial delay...
                     // struct timespec ts = {.tv_sec=0, .tv_nsec=001000000}; // 1 ms
                     // nanosleep(&ts, NULL);
 

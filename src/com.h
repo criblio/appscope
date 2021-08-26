@@ -51,7 +51,7 @@ void sendProcessStartMetric();
 // Create a json object describing the current configuration
 cJSON *jsonConfigurationObject(config_t *);
 
-// Retreive messages
+// Retrieve messages
 uint64_t msgEventGet(ctl_t *);
 
 // wrappers

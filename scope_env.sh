@@ -144,7 +144,7 @@ install_sudo() {
                 if su -c "apt-get update && apt-get install -y sudo"; then
                     echo "Install of sudo was successful."
                 else
-                    echo "Install of sudo was unsuccesful.  Exiting."
+                    echo "Install of sudo was unsuccessful.  Exiting."
                     exit 1
                 fi
             fi
@@ -174,7 +174,7 @@ install_git() {
                 if sudo apt-get install -y git; then
                     echo "Install of git was successful."
                 else
-                    echo "Install of git was unsuccesful.  Exiting."
+                    echo "Install of git was unsuccessful.  Exiting."
                     exit 1
                 fi
             fi

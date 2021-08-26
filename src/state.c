@@ -972,7 +972,7 @@ static int
 extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     if (!buf || (len <= 0)) {
-        DBG(NULL); // why whould we ever get here?
+        DBG(NULL); // why would we ever get here?
         return -1;
     }
 
@@ -1069,7 +1069,7 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
     unsigned int ptype;
     protocol_def_t *tls_proto_def = g_tls_protocol_def; // use ours by default
 
-    // Look for an overriden TLS entry from the protocol detector configs
+    // Look for an overridden TLS entry from the protocol detector configs
     for (ptype = 0; ptype <= g_prot_sequence; ptype++)
     {
         protocol_def_t *tmp_proto_def;
@@ -2229,7 +2229,7 @@ doClose(int fd, const char *func)
         resetHttp(&ninfo->http);
     }
 
-    // Check both file desriptor tables
+    // Check both file descriptor tables
     if ((fsinfo = getFSEntry(fd)) != NULL) {
 
         doUpdateState(FS_CLOSE, fd, 0, func, NULL);

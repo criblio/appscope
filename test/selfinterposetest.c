@@ -14,7 +14,7 @@
 //      if we report what our library is doing this might confuse anyone
 //      who is trying to use this data to look at application behavior.
 //   2) Some functions we interpose could cause infinite loops or other
-//      similar undesireable behavior.  (To consider the infinte loop,
+//      similar undesirable behavior.  (To consider the infinite loop,
 //      consider if we were to intercept a send or write that our library
 //      is doing, and this intercept causes the library to do *another*
 //      send or write...)

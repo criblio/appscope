@@ -651,6 +651,12 @@ cfgProcessEnvironmentTransport(void** state)
     assert_int_equal(cfgTransportType(cfg, data->transport), CFG_FILE);
     assert_string_equal(cfgTransportPath(cfg, data->transport), "/some/path/somewhere");
 
+    // one more variant... unix://
+    assert_int_equal(setenv(data->env_name, "unix://theUnixAddress", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgTransportType(cfg, data->transport), CFG_UNIX);
+    assert_string_equal(cfgTransportPath(cfg, data->transport), "theUnixAddress");
+
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
     cfgProcessEnvironment(cfg);
@@ -989,7 +995,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     );
 
 
-    // Set env varibles to test indirect substitution
+    // Set env variables to test indirect substitution
     assert_int_equal(setenv("MASTER_ENABLE", "false", 1), 0);
     assert_int_equal(setenv("VAR1", "longer", 1), 0);
     assert_int_equal(setenv("MY_ENV_VAR", "shorter", 1), 0);
@@ -1011,7 +1017,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
     assert_string_equal(cfgCmdDir(cfg), "/home/mydir/scope/");
     assert_int_equal(cfgSendProcessStartMsg(cfg), FALSE);
     assert_int_equal(cfgMtcVerbosity(cfg), 1);
-    // test escaped substitution  (a match preceeded by '\')
+    // test escaped substitution  (a match preceded by '\')
     assert_string_equal(cfgTransportPath(cfg, CFG_MTC), "/$VAR1/shorter/");
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/file.tmp2");
     assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM"), "11");
@@ -1135,9 +1141,6 @@ cfgReadGoodYaml(void** state)
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
         "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
         "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
-        "    tags:\n"
-        "      name1 : value1\n"
-        "      name2 : value2\n"
         "  transport:                        # defines how scope output is sent\n"
         "    type: file                      # udp, unix, file, syslog\n"
         "    path: '/var/log/scope.log'\n"
@@ -1177,6 +1180,9 @@ cfgReadGoodYaml(void** state)
         "    transport:\n"
         "      buffering: full\n"
         "      type: syslog\n"
+        "tags:\n"
+        "  name1 : value1\n"
+        "  name2 : value2\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -1406,12 +1412,7 @@ const char* jsonText =
     "      'type': 'ndjson',\n"
     "      'statsdprefix': 'cribl.scope',\n"
     "      'statsdmaxlen': '42',\n"
-    "      'verbosity': '0',\n"
-    "      'tags': {\n"
-    "        'tagA': 'val1',\n"
-    "        'tagB': 'val2',\n"
-    "        'tagC': 'val3'\n"
-    "      }\n"
+    "      'verbosity': '0'\n"
     "    },\n"
     "    'transport': {\n"
     "      'type': 'file',\n"
@@ -1453,6 +1454,11 @@ const char* jsonText =
     "        'type': 'shm'\n"
     "      }\n"
     "    }\n"
+    "  },\n"
+    "  'tags': {\n"
+    "    'tagA': 'val1',\n"
+    "    'tagB': 'val2',\n"
+    "    'tagC': 'val3'\n"
     "  }\n"
     "}\n";
 
@@ -1554,8 +1560,6 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "  format:\n"
         "    type: statsd\n"
         "    hey: yeahyou\n"
-        "    tags:\n"
-        "      brainfarts: 135\n"
         "  request: 'make it snappy'        # Extra.\n"
         "  transport:\n"
         "    type: unix\n"
@@ -1564,6 +1568,8 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "libscope:\n"
         "  log:\n"
         "    level: info\n"
+        "tags:\n"
+        "  brainfarts: 135\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -1623,13 +1629,13 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    path: '/var/run/scope.sock'\n"
         "    type: unix\n"
         "  format:\n"
-        "    tags:\n"
-        "      135: kittens\n"
         "    verbosity: 4294967295\n"
         "    statsdmaxlen: 4294967295\n"
         "    statsdprefix: 'cribl.scope'\n"
         "    type:  statsd\n"
         "  enable : false\n"
+        "tags:\n"
+        "  135: kittens\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -1675,7 +1681,7 @@ static void
 cfgReadEnvSubstitution(void** state)
 {
 
-    // Set env varibles to test indirect substitution
+    // Set env variables to test indirect substitution
     assert_int_equal(setenv("MASTER_ENABLE", "true", 1), 0);
     assert_int_equal(setenv("VAR1", "longer", 1), 0);
     assert_int_equal(setenv("MY_ENV_VAR", "shorter", 1), 0);
@@ -1699,10 +1705,6 @@ cfgReadEnvSubstitution(void** state)
         "    statsdprefix : $VAR1.$MY_ENV_VAR\n"
         "    statsdmaxlen : $MAXLEN\n"
         "    verbosity: $VERBOSITY\n"
-        "    tags:\n"
-        "      CUSTOM: $PERIOD\n"
-        "      whyyoumadbro: 'Bill owes me $5.00'\n"
-        "      undefined: $UNDEFINEDENV\n"
         "  transport:\n"
         "    type: file\n"
         "    path: /\\$VAR1/$MY_ENV_VAR/\n"
@@ -1737,6 +1739,10 @@ cfgReadEnvSubstitution(void** state)
         "      buffering: full\n"
         "      type: file\n"
         "      path: $DEST\n"
+        "tags:\n"
+        "  CUSTOM: $PERIOD\n"
+        "  whyyoumadbro: 'Bill owes me $5.00'\n"
+        "  undefined: $UNDEFINEDENV\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -1750,7 +1756,7 @@ cfgReadEnvSubstitution(void** state)
     assert_string_equal(cfgCmdDir(cfg), "/home/mydir/scope/");
     assert_int_equal(cfgSendProcessStartMsg(cfg), TRUE);
     assert_int_equal(cfgMtcVerbosity(cfg), 1);
-    // test escaped substitution  (a match preceeded by '\')
+    // test escaped substitution  (a match preceded by '\')
     assert_string_equal(cfgTransportPath(cfg, CFG_MTC), "/$VAR1/shorter/");
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/file.tmp2");
     assert_string_equal(cfgCustomTagValue(cfg, "CUSTOM"), "11");

@@ -109,7 +109,7 @@
     <panel>
       <html>
         <p>
-          Now, let's look at some other events which have been enriched with <code>.csv</code> lookups. On the left panel below, we have orignal <code>access_combined</code> events. On the right, we have <code>access_combined</code> data that has been enriched with lookups done on their <code>status</code> field. The following additional index-time fields are added: <code>idx_http_status_description</code> and <code>idx_http_status_type</code>.
+          Now, let's look at some other events which have been enriched with <code>.csv</code> lookups. On the left panel below, we have original <code>access_combined</code> events. On the right, we have <code>access_combined</code> data that has been enriched with lookups done on their <code>status</code> field. The following additional index-time fields are added: <code>idx_http_status_description</code> and <code>idx_http_status_type</code>.
         </p>
       </html>
     </panel>

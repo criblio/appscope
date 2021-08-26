@@ -78,7 +78,7 @@ func_found_in_executable(const char *symbol, const char *exe)
     int func_found = FALSE;
     char *exe_with_preceeding_slash = NULL;
 
-    // open the exectuable (as opposed to a specific shared lib)
+    // open the executable (as opposed to a specific shared lib)
     void *exe_handle = g_fn.dlopen(NULL, RTLD_LAZY);
     if (!exe_handle) goto out;
 

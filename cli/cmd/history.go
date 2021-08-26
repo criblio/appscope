@@ -66,7 +66,7 @@ cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope hi
 			util.PrintObj([]util.ObjField{
 				{Name: "ID", Field: "id"},
 				{Name: "Command", Field: "cmd"},
-				{Name: "Cmdline", Field: "args", Transform: func(obj interface{}) string { return util.TruncWithElipsis(shellquote.Join(obj.([]string)...), 25) }},
+				{Name: "Cmdline", Field: "args", Transform: func(obj interface{}) string { return util.TruncWithEllipsis(shellquote.Join(obj.([]string)...), 25) }},
 				{Name: "PID", Field: "pid"},
 				{Name: "Timestamp", Field: "timestamp", Transform: func(obj interface{}) string { return time.Unix(int64(0), obj.(int64)).Format(time.Stamp) }},
 				{Name: "End Timestamp", Field: "endtimestamp", Transform: func(obj interface{}) string { return time.Unix(int64(0), obj.(int64)).Format(time.Stamp) }},
@@ -92,7 +92,7 @@ cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope hi
 			util.PrintObj([]util.ObjField{
 				{Name: "ID", Field: "id"},
 				{Name: "Command", Field: "cmd"},
-				{Name: "Cmdline", Field: "args", Transform: func(obj interface{}) string { return util.TruncWithElipsis(shellquote.Join(obj.([]string)...), 25) }},
+				{Name: "Cmdline", Field: "args", Transform: func(obj interface{}) string { return util.TruncWithEllipsis(shellquote.Join(obj.([]string)...), 25) }},
 				{Name: "PID", Field: "pid"},
 				{Name: "Age", Field: "timestamp", Transform: func(obj interface{}) string { return util.GetHumanDuration(time.Since(time.Unix(0, obj.(int64)))) }},
 				{Name: "Duration", Field: "duration", Transform: func(obj interface{}) string {

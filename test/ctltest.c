@@ -34,7 +34,7 @@ ctlParseRxMsgUnparseableReturnsParseError(void** state)
 {
     // We expect REQ_PARSE_ERR if any of the following are true:
     const char* test[] = {
-    //  o) The json is truely unparseable
+    //  o) The json is truly unparsable
         "{ \"type\": \"req\", \"re",
         "dude, seriously?",
         "",

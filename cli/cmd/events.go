@@ -130,7 +130,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		if err != nil && strings.Contains(err.Error(), "events.json: no such file or directory") {
 			if util.CheckFileExists(sessions[0].EventsDestPath) {
 				dest, _ := ioutil.ReadFile(sessions[0].EventsDestPath)
-				fmt.Printf("events were output to %s\n", dest)
+				fmt.Printf("Events were output to %s\n", dest)
 				os.Exit(0)
 			}
 			promptClean(sessions[0:1])
@@ -255,11 +255,11 @@ func getEventText(e map[string]interface{}, width int, allFields bool) string {
 		switch orig.(type) {
 		case string:
 			ret = ansiStrip(strings.TrimSpace(fmt.Sprintf("%s", orig)))
-			ret = util.TruncWithElipsis(ret, truncLen)
+			ret = util.TruncWithEllipsis(ret, truncLen)
 		case map[string]interface{}:
 			if msg, ok := orig.(map[string]interface{})["message"]; ok {
 				ret = ansiStrip(strings.TrimSpace(fmt.Sprintf("%s", msg)))
-				ret = util.TruncWithElipsis(ret, truncLen)
+				ret = util.TruncWithEllipsis(ret, truncLen)
 			} else {
 				ret = colorMap(orig.(map[string]interface{}), sourceFields[source.(string)])
 			}

@@ -29,7 +29,6 @@
 #define STATSDPREFIX_NODE            "statsdprefix"
 #define STATSDMAXLEN_NODE            "statsdmaxlen"
 #define VERBOSITY_NODE               "verbosity"
-#define TAGS_NODE                    "tags"
 #define TRANSPORT_NODE           "transport"
 #define TYPE_NODE                    "type"
 #define HOST_NODE                    "host"
@@ -62,14 +61,16 @@
 #define VALUE_NODE                   "value"
 #define EX_HEADERS                   "headers"
 
-#define PAYLOAD_NODE          "payload"
+#define PAYLOAD_NODE         "payload"
 #define ENABLE_NODE              "enable"
 #define DIR_NODE                 "dir"
 
-#define CRIBL_NODE          "cribl"
+#define CRIBL_NODE           "cribl"
 #define ENABLE_NODE              "enable"
 #define TRANSPORT_NODE           "transport"
 #define AUTHTOKEN_NODE           "authtoken"
+
+#define TAGS_NODE            "tags"
 
 
 enum_map_t formatMap[] = {
@@ -248,7 +249,7 @@ processCustomTag(config_t* cfg, const char* e, const char* value)
     char name_buf[1024];
     strncpy(name_buf, e, sizeof(name_buf));
 
-    char* name = name_buf + strlen("SCOPE_TAG_");
+    char* name = name_buf + (sizeof("SCOPE_TAG_") - 1);
 
     // convert the "=" to a null delimiter for the name
     char* end = strchr(name, '=');
@@ -376,11 +377,14 @@ processReloadConfig(config_t *cfg, const char* value)
 {
     if (!cfg || !value) return;
     unsigned int enable = strToVal(boolMap, value);
-    if (enable != TRUE) return;
 
-    char *path = cfgPath();
-    cfgSetFromFile(cfg, path);
-    if (path) free(path);
+    if (enable == TRUE) {
+        char *path = cfgPath();
+        cfgSetFromFile(cfg, path);
+        if (path) free(path);
+    } else {
+        cfgSetFromFile(cfg, value);
+    }
 
     cfgProcessEnvironment(cfg);
 
@@ -746,11 +750,11 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
     // see if value starts with udp:// or file://
     if (value == strstr(value, "udp://")) {
 
-        // copied to avoid directly modifing the process's env variable
+        // copied to avoid directly modifying the process's env variable
         char value_cpy[1024];
         strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char *host = value_cpy + strlen("udp://");
+        char *host = value_cpy + (sizeof("udp://") - 1);
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -765,11 +769,11 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
 
     } else if (value == strstr(value, "tcp://")) {
 
-        // copied to avoid directly modifing the process's env variable
+        // copied to avoid directly modifying the process's env variable
         char value_cpy[1024];
         strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char *host = value_cpy + strlen("tcp://");
+        char *host = value_cpy + (sizeof("tcp://") - 1);
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -783,8 +787,12 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         cfgTransportPortSet(cfg, t, port);
 
     } else if (value == strstr(value, "file://")) {
-        const char *path = value + strlen("file://");
+        const char *path = value + (sizeof("file://") - 1);
         cfgTransportTypeSet(cfg, t, CFG_FILE);
+        cfgTransportPathSet(cfg, t, path);
+    } else if (value == strstr(value, "unix://")) {
+        const char *path = value + (sizeof("unix://") - 1);
+        cfgTransportTypeSet(cfg, t, CFG_UNIX);
         cfgTransportPathSet(cfg, t, path);
     }
 }
@@ -1160,7 +1168,6 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    STATSDPREFIX_NODE,    processStatsDPrefix},
         {YAML_SCALAR_NODE,    STATSDMAXLEN_NODE,    processStatsDMaxLen},
         {YAML_SCALAR_NODE,    VERBOSITY_NODE,       processVerbosity},
-        {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1485,6 +1492,7 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
         {YAML_MAPPING_NODE,   PAYLOAD_NODE,         processPayload},
         {YAML_MAPPING_NODE,   EVENT_NODE,           processEvent},
         {YAML_MAPPING_NODE,   CRIBL_NODE,           processCribl},
+        {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1691,7 +1699,6 @@ static cJSON*
 createMetricFormatJson(config_t* cfg)
 {
     cJSON* root = NULL;
-    cJSON* tags;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
@@ -1703,9 +1710,6 @@ createMetricFormatJson(config_t* cfg)
                                     cfgMtcStatsDMaxLen(cfg))) goto err;
     if (!cJSON_AddNumberToObjLN(root, VERBOSITY_NODE,
                                        cfgMtcVerbosity(cfg))) goto err;
-
-    if (!(tags = createTagsJson(cfg))) goto err;
-    cJSON_AddItemToObjectCS(root, TAGS_NODE, tags);
 
     return root;
 err:
@@ -1890,7 +1894,7 @@ cJSON*
 jsonObjectFromCfg(config_t* cfg)
 {
     cJSON* json_root = NULL;
-    cJSON* metric, *libscope, *event, *payload;
+    cJSON* metric, *libscope, *event, *payload, *tags;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
@@ -1905,6 +1909,9 @@ jsonObjectFromCfg(config_t* cfg)
 
     if (!(payload = createPayloadJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(json_root, PAYLOAD_NODE, payload);
+
+    if (!(tags = createTagsJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, TAGS_NODE, tags);
 
     return json_root;
 err:
@@ -2149,6 +2156,11 @@ cfgLogStreamDefault(config_t *cfg)
         strncat(g_logmsg, "Send proc start msg, ", 25);
         cfgSendProcessStartMsgSet(cfg, TRUE);
     }
+
+    if (cfgEvtFormatSourceEnabled(cfg, CFG_SRC_HTTP)) {
+        strncat(g_logmsg, "HTTP watch disable, ", 25);
+    }
+    cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_HTTP, FALSE);
 
     return 0;
 }

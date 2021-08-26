@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) curl w/preload",
+            "name": "(gdb) curl x86_64 w/preload",
             "type": "cppdbg",
             "request": "launch",
             "program": "/usr/bin/curl",
@@ -13,11 +13,10 @@
             //"args": ["http://nghttp2.org/robots.txt"],
             "args": ["-s", "-o", "/dev/null", "--http1.1", "https://www.google.com/"],
             //"args": ["-s", "-o", "/dev/null", "http://www.google.com/"],
-            //"args": ["-s", "-o", "/dev/null", "https://www.google.com/"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
-                { "name":"LD_PRELOAD", "value":"lib/linux/libscope.so"}
+                { "name":"LD_PRELOAD", "value":"lib/linux/x86_64/libscope.so"}
             ],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -32,12 +31,55 @@
             ]
         },
         {
-            "name": "(gdb) ldscope curl",
+            "name": "(gdb) curl aarch64 w/preload",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/linux/ldscope",
+            "program": "/usr/bin/curl",
+            "args": ["-s", "-o", "/dev/null", "--http1.1", "https://www.google.com/"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                { "name":"LD_PRELOAD", "value":"lib/linux/aarch64/libscope.so"}
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                { "text": "-gdb-set follow-fork-mode child"},
+                { "text": "-gdb-set detach-on-fork on"}
+            ]
+        },
+        {
+            "name": "(gdb) ldscope curl x86_64",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/linux/x86_64/ldscope",
             "args": ["curl", "--http2-prior-knowledge", "nghttp2.org/robots.txt"],
-            //"args": ["curl", "nghttp2.org/robots.txt"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [ ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                { "text": "-gdb-set follow-fork-mode child"},
+                { "text": "-gdb-set detach-on-fork on"}
+            ]
+        },
+        {
+            "name": "(gdb) ldscope curl aarch64",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/linux/aarch64/ldscope",
+            "args": ["curl", "--http2-prior-knowledge", "nghttp2.org/robots.txt"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [ ],

@@ -14,7 +14,9 @@ SCOPE_CRIBL=tcp://ip:port
 
 ### Requirements
 
-You must supply a host name or IPv4 address, along with an optional port number. If you omit the port number, AppScope will attempt to connect on the default port `10090`. 
+You must supply a host name or IPv4 address, along with an optional port number. If you omit the port number, AppScope will attempt to connect on the default port `10090`.
+
+On the LogStream side, a built-in [AppScope Source](https://docs.cribl.io/docs/sources-appscope) receives data from AppScope by default. You can change its configuration or create additional AppScope Sources as needed.
 
 ### Parameter Overrides
 
@@ -34,13 +36,25 @@ The following configuration elements are enabled by default when a LogStream con
 - Console
 - FS
 - Net
-- HTTP
+- HTTP/1.1 and HTTP/2.0
 - DNS
 
 Other configuration elements are not modified by a LogStream connection.
+
+### HTTP Traffic
+
+The AppScope Source streams HTTP payloads to LogStream, whether the payloads originate as HTTP/1.1 or HTTP/2 traffic. LogStream then converts the payloads to HTTP events.
+
+Separately, the AppScope library can convert HTTP/1.1 (not HTTP/2) payloads to HTTP events. This is mainly useful for streaming HTTP events to destinations **other than** LogStream.
 
 ## Using TLS for Secure Connections
 
 AppScope supports TLS over TCP connections.
 
 See [Using TLS for Secure Connections](/docs/tls).
+
+## Scoping Short-lived Processes
+
+When scoping a short-lived process and sending events to LogStream or a remote destination, it may be useful to set `SCOPE_CONNECT_TIMEOUT_SECS` to `1` or higher. This gives AppScope time to make a connection and send events before the process exits. 
+
+When `SCOPE_CONNECT_TIMEOUT_SECS` remains at its default value of `0`, the destination might not receive any events when you scope a short-lived process.

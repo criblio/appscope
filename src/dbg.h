@@ -26,7 +26,7 @@ void                 dbgAddLine(const char* key, const char* fmt, ...);
 #define DBG_FILE_AND_LINE __FILE__ ":" TOSTRING(__LINE__)
 
 //
-//  The DBG macro is used to keep track of unexpected/undesireable
+//  The DBG macro is used to keep track of unexpected/undesirable
 //  conditions as instrumented with DBG in the source code.  This is done
 //  by storing the source file and line of every DBG macro that is executed.
 //
@@ -45,7 +45,7 @@ void                 dbgAddLine(const char* key, const char* fmt, ...);
 //  Dynamic commands allow this information to be output from an actively
 //  running process, with process ID <pid>.  It just runs dbgDumpAll(),
 //  outputting the results to the file specified by SCOPE_CMD_DBG_PATH.
-//  To do this with default configuation settings, run this command and
+//  To do this with default configuration settings, run this command and
 //  output should appear in /tmp/mydbg.txt within a SCOPE_SUMMARY_PERIOD:
 //
 //     echo "SCOPE_CMD_DBG_PATH=/tmp/mydbg.txt" >> /tmp/scope.<pid>

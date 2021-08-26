@@ -28,7 +28,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      # This defines a number of outputs based on the tage being built if there
+      # This defines a number of outputs based on the tag being built if there
       # is one. We'll use the outputs in other places.
       - name: Get Version
         id: version
@@ -39,7 +39,7 @@ jobs:
       - name: Get Tag
         id: tag
         run: |
-          if [ "true" = "${{ steps.version.outputs.is-semver }}" ]; then
+          if [ -z "${GITHUB_REF%%refs/tags/v*}" -a "true" = "${{ steps.version.outputs.is-semver }}" ]; then
               echo "::set-output name=tag::${{ steps.version.outputs.version-without-v }}"
               echo "::set-output name=push::true"
               if [ -z "${{ steps.version.outputs.prerelease }}" ]; then
@@ -166,7 +166,7 @@ jobs:
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v1
 
-      # Start a BuildX builder. We'll use the ouptuts later so give it an ID.
+      # Start a BuildX builder. We'll use the outputs later so give it an ID.
       - name: Setup Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v1

@@ -254,6 +254,10 @@ func (c *Config) configFromRunOpts() error {
 		}
 	}
 
+	// Add AuthToken to config regardless of cribldest being set
+	// To support mixing of config and environment variables
+	c.sc.Cribl.AuthToken = c.AuthToken
+
 	if c.CriblDest != "" {
 		c.sc.Metric.Transport, err = ParseDest(c.CriblDest)
 		if err != nil {
@@ -264,7 +268,6 @@ func (c *Config) configFromRunOpts() error {
 		c.sc.Metric.Transport = ScopeTransport{}
 		c.sc.Event.Transport = ScopeTransport{}
 		c.sc.Libscope.ConfigEvent = "true"
-		c.sc.Cribl.AuthToken = c.AuthToken
 	}
 
 	if c.Loglevel != "" {

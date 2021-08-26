@@ -13,6 +13,7 @@
 #endif
 #include <sys/syscall.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <libgen.h>
 #include <sys/resource.h>
 #include <setjmp.h>
@@ -583,7 +584,9 @@ doConfig(config_t *cfg)
     g_thread.interval = cfgMtcPeriod(cfg);
     setReportingInterval(cfgMtcPeriod(cfg));
     if (!g_thread.startTime) {
-        g_thread.startTime = time(NULL) + g_thread.interval;
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        g_thread.startTime = tv.tv_sec + g_thread.interval;
     }
 
     setVerbosity(cfgMtcVerbosity(cfg));
@@ -596,6 +599,13 @@ doConfig(config_t *cfg)
 
     if (cfgLogStream(cfg)) {
         singleChannelSet(g_ctl, g_mtc);
+    }
+
+    // Send a process start message to report our *new* configuration.
+    // Only needed if we're connected.  If we're not connected, doConnection()
+    // will send the process start message when we ultimately connect.
+    if (!ctlNeedsConnection(g_ctl, CFG_CTL)) {
+        reportProcessStart(g_ctl, FALSE, CFG_WHICH_MAX);
     }
 
     // Disconnect the old interfaces that were just replaced
@@ -756,7 +766,9 @@ doThread()
      * This is put in place to work around one of the Chrome sandbox limits.
      * Shouldn't hurt anything else.
      */
-    if (time(NULL) >= g_thread.startTime) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    if (tv.tv_sec >= g_thread.startTime) {
         threadNow(0);
     }
 }
@@ -824,8 +836,10 @@ doReset()
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
 
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
     g_thread.once = 0;
-    g_thread.startTime = time(NULL) + g_thread.interval;
+    g_thread.startTime = tv.tv_sec + g_thread.interval;
 
     resetState();
 
@@ -847,6 +861,10 @@ reportPeriodicStuff(void)
     int nthread, nfds, children;
     long long cpu = 0;
     static long long cpuState = 0;
+
+    // empty the event queues
+    doEvent();
+    doPayload();
 
     // We report CPU time for this period.
     cpu = doGetProcCPU();
@@ -901,11 +919,6 @@ reportPeriodicStuff(void)
     // report net and file by descriptor
     reportAllFds(PERIODIC);
 
-    // empty the event queues
-    doEvent();
-
-    doPayload();
-
     mtcFlush(g_mtc);
 }
 
@@ -915,23 +928,6 @@ handleExit(void)
     if (g_exitdone == TRUE) return;
     g_exitdone = TRUE;
 
-    struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
-
-    char *wait;
-    if ((wait = getenv("SCOPE_CONNECT_TIMEOUT_SECS")) != NULL) {
-        // wait for a connection to be established 
-        // before we call doEvent
-        int wait_time;
-        errno = 0;
-        wait_time = strtoul(wait, NULL, 10);
-        if (!errno && wait_time) {
-            for (int i = 0; i < 100000 * wait_time; i++) {
-                if (!ctlNeedsConnection(g_ctl, CFG_CTL)) break; 
-                sigSafeNanosleep(&ts);
-            }
-        }
-    }
-
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
         struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
 
@@ -939,10 +935,26 @@ handleExit(void)
         while (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
             sigSafeNanosleep(&ts);
         }
-        doEvent();
-    } else {
-        reportPeriodicStuff();
     }
+
+    struct timespec ts = {.tv_sec = 1, .tv_nsec = 0}; // 1 s
+
+    char *wait;
+    if ((wait = getenv("SCOPE_CONNECT_TIMEOUT_SECS")) != NULL) {
+        // wait for a connection to be established 
+        // before we emit data
+        int wait_time;
+        errno = 0;
+        wait_time = strtoul(wait, NULL, 10);
+        if (!errno && wait_time) {
+            for (int i = 0; i < wait_time; i++) {
+                if (doConnection() == TRUE) break;
+                sigSafeNanosleep(&ts);
+            }
+        }
+    }
+
+    reportPeriodicStuff();
 
     mtcFlush(g_mtc);
     mtcDisconnect(g_mtc);
@@ -970,12 +982,15 @@ periodic(void *arg)
     bool perf;
     static time_t summaryTime;
 
-    summaryTime = time(NULL) + g_thread.interval;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    summaryTime = tv.tv_sec + g_thread.interval;
 
     perf = checkEnv(PRESERVE_PERF_REPORTING, "true");
 
     while (1) {
-        if (time(NULL) >= summaryTime) {
+        gettimeofday(&tv, NULL);
+        if (tv.tv_sec >= summaryTime) {
             // Process dynamic config changes, if any
             dynConfig();
 
@@ -996,7 +1011,8 @@ periodic(void *arg)
                 atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
             }
 
-            summaryTime = time(NULL) + g_thread.interval;
+            gettimeofday(&tv, NULL);
+            summaryTime = tv.tv_sec + g_thread.interval;
         } else if (perf == FALSE) {
             if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
                 doEvent();
@@ -1137,6 +1153,7 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
  */
 static ssize_t __write_libc(int, const void *, size_t);
 static ssize_t __write_pthread(int, const void *, size_t);
+static ssize_t scope_write(int, const void *, size_t);
 static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
 static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
@@ -1356,12 +1373,19 @@ initHook(int attachedFlag)
             stderr_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
         }
 
-        if (g_fn.__write_libc) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
-        }
+        if (g_ismusl == FALSE) {
+            if (g_fn.__write_libc) {
+                rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
+            }
 
-        if (g_fn.__write_pthread) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+            if (g_fn.__write_pthread) {
+                rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+            }
+
+            // We want to be able to use g_fn.write without
+            // accidentally interposing this function.  This resolves
+            // https://github.com/criblio/appscope/issues/472
+            g_fn.write = scope_write;
         }
 
         // hook 'em
@@ -1384,7 +1408,7 @@ initEnv(int *attachedFlag)
     *attachedFlag = 0;
 
     if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose || !g_fn.setenv) {
-        // these log statements use debug level so they can be used with consturctor debug
+        // these log statements use debug level so they can be used with constructor debug
         scopeLog("ERROR: missing g_fn's for initEnv()", -1, CFG_LOG_DEBUG);
         return;
     }
@@ -2537,6 +2561,21 @@ __write_pthread(int fd, const void *buf, size_t size)
     return rc;
 }
 
+static int
+isAnAppScopeConnection(int fd)
+{
+    if (fd == -1) return FALSE;
+
+    if ((fd == ctlConnection(g_ctl, CFG_CTL)) ||
+        (fd == ctlConnection(g_ctl, CFG_LS)) ||
+        (fd == mtcConnection(g_mtc)) ||
+        (fd == logConnection(g_log))) {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 /*
  * Note:
  * The syscall function in libc is called from the loader for
@@ -2626,6 +2665,13 @@ scope_syscall(long number, ...)
     return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
                         fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
+
+static ssize_t
+scope_write(int fd, const void* buf, size_t size)
+{
+    return (ssize_t)syscall(SYS_write, fd, buf, size);
+}
+
 #endif // __FUNCHOOK__
 
 VAREXPORT size_t // EXPORTOFF because it's redundant with __write
@@ -3285,14 +3331,7 @@ close(int fd)
 {
     WRAP_CHECK(close, -1);
 
-    if (fd != -1) {
-        if ((fd == ctlConnection(g_ctl, CFG_CTL)) || 
-        (fd == ctlConnection(g_ctl, CFG_LS)) ||
-        (fd == mtcConnection(g_mtc)) ||
-        (fd == logConnection(g_log))) {
-            return 0;
-        }
-    }
+    if (isAnAppScopeConnection(fd)) return 0;
 
     int rc = g_fn.close(fd);
 
@@ -3306,6 +3345,8 @@ fclose(FILE *stream)
 {
     WRAP_CHECK(fclose, EOF);
     int fd = fileno(stream);
+
+    if (isAnAppScopeConnection(fd)) return 0;
 
     int rc = g_fn.fclose(stream);
 

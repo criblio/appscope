@@ -16,8 +16,8 @@ type Process struct {
 	ID      int    `json:"id"`
 	Pid     int    `json:"pid"`
 	User    string `json:"user"`
-	Command string `json:"command"`
 	Scoped  bool   `json:"scoped"`
+	Command string `json:"command"`
 }
 
 // Processes is an array of Process
@@ -58,8 +58,8 @@ func ProcessesByName(name string) Processes {
 				ID:      i,
 				Pid:     pid,
 				User:    PidUser(pid),
-				Command: PidCmdline(pid),
 				Scoped:  PidScoped(pid),
+				Command: PidCmdline(pid),
 			})
 			i++
 		}
@@ -102,8 +102,8 @@ func ProcessesScoped() Processes {
 				ID:      i,
 				Pid:     pid,
 				User:    PidUser(pid),
-				Command: PidCmdline(pid),
 				Scoped:  scoped,
+				Command: PidCmdline(pid),
 			})
 			i++
 		}

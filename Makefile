@@ -7,7 +7,7 @@
 #
 # Use `make build` to build (or `make run` to get a shell) in our builder container.
 #
-# Speciy the processor architecure by setting `ARCH` to `x86_64` or `aarch64`.
+# Specify the processor architecture by setting `ARCH` to `x86_64` or `aarch64`.
 # Set `DIST` to `ubuntu` or `alpine` for `make run`.
 #
 
@@ -30,7 +30,7 @@ VERSION ?= $(shell git describe --always --dirty --tag | sed -e 's/^v//')
 # cli expects us to write this file
 $(shell echo -n $(VERSION) > cli/VERSION)
 
-# github repostiory name; i.e. criblio/appscope
+# github repository name; i.e. criblio/appscope
 # set automatically in CI so don't overwrite that
 GITHUB_REPOSITORY ?= $(shell git config --get remote.origin.url | cut -d: -f2 | sed -e 's/^\/\///' -e 's/\.git$$//')
 

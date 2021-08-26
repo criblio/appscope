@@ -112,7 +112,7 @@ setEnvVariable(char *env, char *value)
     if (new_val) free(new_val);
 }
 
-// modify NEEDED entries in libscope.so to avoid dependecies
+// modify NEEDED entries in libscope.so to avoid dependencies
 static int
 set_library(void)
 {
@@ -521,6 +521,10 @@ static const char scope_help_configuration[] =
 "                tcp://host:port\n"
 "                    Send to a TCP or UDP server. \"host\" is the hostname or\n"
 "                    IP address and \"port\" is the port number of service name.\n"
+"                unix://socketpath\n"
+"                    Output to a unix domain server using TCP.  Socket paths\n"
+"                    are implemented as abstract sockets, so the name chosen\n"
+"                    has no connection with filesystem pathnames.\n"
 "        SCOPE_METRIC_TLS_ENABLE\n"
 "            Flag to enable Transport Layer Security (TLS). Only affects\n"
 "            tcp:// destinations. true,false  Default is false.\n"
@@ -884,7 +888,7 @@ showUsage(char *prog)
       "\n"
       "Cribl AppScope Static Loader %s\n" 
       "\n"
-      "AppScope is a general-purpose observable application telemtry system.\n"
+      "AppScope is a general-purpose observable application telemetry system.\n"
       "\n"
       "usage: %s [OPTIONS] [--] EXECUTABLE [ARGS...]\n"
       "       %s [OPTIONS] --attach PID\n"
@@ -893,7 +897,7 @@ showUsage(char *prog)
       "  -u, --usage           display this info\n"
       "  -h, --help [SECTION]  display all or the specified help section\n"
       "  -l, --libbasedir DIR  specify parent for the library directory (default: /tmp)\n"
-      "  -f DIR                alias for \"-l DIR\" for backward compatability\n"
+      "  -f DIR                alias for \"-l DIR\" for backward compatibility\n"
       "  -a, --attach PID      attach to the specified process ID\n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"

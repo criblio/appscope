@@ -79,9 +79,8 @@ if (DISASM_CAPSTONE)
 
   include(ExternalProject)
   ExternalProject_Add(capstone_src
-    GIT_REPOSITORY    https://github.com/aquynh/capstone.git
-    GIT_TAG           4.0.1
-    GIT_SHALLOW       TRUE
+    DOWNLOAD_COMMAND   ""
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/capstone_src
     CMAKE_ARGS        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                       -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
                       -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}

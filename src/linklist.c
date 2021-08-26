@@ -27,7 +27,7 @@ typedef struct _list_t {
 // It is a singly linked list, ordered by key, that prohibits
 // duplicate key values.
 //
-// This particular algorthm was chosen because it is known to
+// This particular algorithm was chosen because it is known to
 // handle 1) concurrent deletes and 2) concurrent inserts and deletes.
 //
 // The lstDestoy() function is something I added, and have tried to

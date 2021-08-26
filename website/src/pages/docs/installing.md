@@ -18,8 +18,8 @@ Next, use these commands to download the CLI binary and make it executable:
 
 ```
 LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
-curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/scope
-curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/scope.md5 | md5sum -c 
+curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope
+curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope.md5 | md5sum -c 
 chmod +x scope
 ```
 

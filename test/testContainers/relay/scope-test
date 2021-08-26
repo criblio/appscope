@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#set -x
+###################### Definitions ######################
 
 # LogStream will be configured to dump NDJSON output files here.
 DEST=/tmp/out/appscope:in_appscope
@@ -59,6 +59,8 @@ wait_for_files() {
     echo 1
 }
 
+###################### Setup ######################
+
 # Start LogStream
 # Logstream is setup to dump data sent to that source to NDJSON
 # files in ${DEST} named CriblOut-*.json.
@@ -71,46 +73,73 @@ if [ ! "$(wait_for_port 10090)" ]; then
     exit 1
 fi
 
-# Scope nginx
+
+###################### Tests ######################
+
+# Scope nginx with a variable worker count
+# Use custom scope configuration to send events to a Unix Domain Socket
 # Use apache ab to send requests to nginx
 # Use scope manager to relay events to logstream
-# Assert on number of events received
-starttest "Relay 1 Scope, 1 Sender, 100 Requests"
-rm -rf ${DEST}
-
-scope nginx
-scope manager -c tcp://localhost:5000 -w 1 -q 1000000
-ab -n 100 -c 1 http://127.0.0.1/
-
-
-scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $URL
-if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
-    if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-req found"
+# Assert on number of http events received
+relay() {
+    starttest "Relay $1 Scope $2 Senders $3 Requests"
+    rm -rf ${DEST}
+    sed -i "s/worker_processes\ auto/worker_processes\ $1/" /etc/nginx/nginx.conf
+    SCOPE_HOME=/opt/test/conf_1 ldscope nginx
+    sleep 2
+    scope manager -c tcp://localhost:10090 -w $2 -q 1000000 &
+    manager_pid=$!
+    sleep 2
+    ab -n $3 -c 1 http://127.0.0.1/ > /dev/null
+    if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
+        found=$(grep '"source":"http-req"' ${DEST}/CriblOut-*.json | wc -l)
+        if [ $found -eq $3 ] ; then 
+            echo "PASS: No missing http request events"
+        else
+            echo "FAIL: Missing http request events: expected: $3, got: $found, dropped: $(($3-found))"
+            ERR+=1
+        fi
+        found=$(grep '"source":"http-resp"' ${DEST}/CriblOut-*.json | wc -l)
+        if [ $found -eq $3 ] ; then 
+            echo "PASS: No missing http response events"
+        else
+            echo "FAIL: Missing http response events: expected: $3, got: $found, dropped: $(($3-found))"
+            ERR+=1
+        fi
     else
-        echo "FAIL: http-req not found"
+        echo "FAIL: no output files"
         ERR+=1
     fi
-    if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-resp found"
-    else
-        echo "FAIL: http-resp not found"
-        ERR+=1
-    fi
-else
-    echo "FAIL: no output files"
-    ERR+=1
-fi
-endtest
+    kill $manager_pid
+    nginx -s quit
+    endtest
+}
+
+relay 1 1 100
+relay 1 10 100
+relay 1 1 1000
+relay 1 10 1000
+relay 1 1 10000
+relay 1 10 10000
+relay 10 1 100
+relay 10 10 100
+relay 10 1 1000
+relay 10 10 1000
+relay 10 1 10000
+relay 10 10 10000
+
+
+###################### Summary ######################
 
 # Results
 echo ""
 if (( $FAILED_TEST_COUNT == 0 )); then
-    echo "************ ALL HTTP TESTS PASSED ************"
+    echo "************ ALL RELAY TESTS PASSED ************"
 else
-    echo "************ $FAILED_TEST_COUNT HTTP TESTS FAILED ************"
+    echo "************ $FAILED_TEST_COUNT RELAY TESTS FAILED ************"
     echo "Failed tests: $FAILED_TEST_LIST"
 fi
 echo ""
 
 exit ${FAILED_TEST_COUNT}
+

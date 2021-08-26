@@ -53,10 +53,10 @@ protocol:
 # Uncomment this and adjust as needed to override the defaults or to enable
 # HTTP detection when not using LogStream.
 #
-    - name: HTTP
-      regex: " HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
-      detect: true
-      payload: false
+#    - name: HTTP
+#      regex: " HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
+#      detect: true
+#      payload: false
 
 
 # AppScope uses another internally defined protocol detector for TLS like the

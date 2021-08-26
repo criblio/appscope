@@ -1,0 +1,116 @@
+#!/bin/bash
+
+#set -x
+
+# LogStream will be configured to dump NDJSON output files here.
+DEST=/tmp/out/appscope:in_appscope
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "=============================================="
+    echo "         Testing $CURRENT_TEST"
+    echo "=============================================="
+    ERR=0
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "******************* $RESULT *******************"
+    echo ""
+    echo ""
+}
+
+wait_for_port() {
+    TIMEOUT=${2:-60}
+    while ! netstat -an | grep -w ${1} >/dev/null 2>&1; do
+        sleep 1
+        ((TIMEOUT=TIMEOUT-1))
+        if [ $TIMEOUT -le 0 ]; then
+            echo >&2 "warn: timed out waiting for port ${1} listener"
+            netstat -an | grep -w LISTEN >&2
+            return
+        fi
+    done
+    echo 1
+}
+
+wait_for_files() {
+    TIMEOUT=${2:-60}
+    while ! compgen -G "${1}" > /dev/null; do
+        sleep 1
+        ((TIMEOUT=TIMEOUT-1))
+        if [ $TIMEOUT -le 0 ]; then
+            echo >&2 "warn: timed out waiting for port ${1} files"
+            ls -lRa /tmp/out >&2
+            return
+        fi
+    done
+    echo 1
+}
+
+# Start LogStream
+# Logstream is setup to dump data sent to that source to NDJSON
+# files in ${DEST} named CriblOut-*.json.
+[ -z "$(pgrep cribl)" ] || { /opt/cribl/bin/cribl stop; sleep 5; }
+[ -d /tmp/out ] && rm -rf /tmp/out
+[ -d /tmp/out ] || mkdir /tmp/out
+/opt/cribl/bin/cribl start
+if [ ! "$(wait_for_port 10090)" ]; then
+    echo >&2 "error: LogStream failed to start; aborting test"
+    exit 1
+fi
+
+# Scope nginx
+# Use apache ab to send requests to nginx
+# Use scope manager to relay events to logstream
+# Assert on number of events received
+starttest "Relay 1 Scope, 1 Sender, 100 Requests"
+rm -rf ${DEST}
+
+scope nginx
+scope manager -c tcp://localhost:5000 -w 1 -q 1000000
+ab -n 100 -c 1 http://127.0.0.1/
+
+
+scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $URL
+if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
+    if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http-req found"
+    else
+        echo "FAIL: http-req not found"
+        ERR+=1
+    fi
+    if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http-resp found"
+    else
+        echo "FAIL: http-resp not found"
+        ERR+=1
+    fi
+else
+    echo "FAIL: no output files"
+    ERR+=1
+fi
+endtest
+
+# Results
+echo ""
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo "************ ALL HTTP TESTS PASSED ************"
+else
+    echo "************ $FAILED_TEST_COUNT HTTP TESTS FAILED ************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+fi
+echo ""
+
+exit ${FAILED_TEST_COUNT}

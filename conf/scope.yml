@@ -818,6 +818,8 @@ protocol:
   #   binary   Boolean indicating whether the regex should be applied to a
   #            hex-string version of the payload instead of the binary payload
   #            (default: false)
+  #   len      The number of bytes to convert to hex when `binary` is true
+  #            (default: 256)
   #   detect   Boolean indicating whether protocol-detect events should be
   #            generated (default: true)
   #   payload  Boolean indicating whether payload-processing should be enabled

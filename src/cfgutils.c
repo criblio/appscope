@@ -2058,11 +2058,64 @@ err:
     return NULL;
 }
 
+static cJSON*
+createProtocolEntryJson(config_t* cfg, protocol_def_t* prot)
+{
+    cJSON *root = NULL;
+
+    if (!prot) goto err;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, NAME_NODE, prot->protname)) goto err;
+    if (!cJSON_AddStringToObjLN(root, REGEX_NODE, prot->regex)) goto err;
+
+    // only emit non-defaults
+    if (prot->binary) {
+        if (!cJSON_AddBoolToObjLN(root, BINARY_NODE, prot->binary)) goto err;
+    }
+    if (prot->binary && prot->len) {
+        if (!cJSON_AddNumberToObjLN(root, LEN_NODE, prot->len)) goto err;
+    }
+    if (!prot->detect) {
+        if (!cJSON_AddBoolToObjLN(root, DETECT_NODE, prot->detect)) goto err;
+    }
+    if (prot->payload) {
+        if (!cJSON_AddBoolToObjLN(root, PAYLOAD_NODE, prot->payload)) goto err;
+    }
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createProtocolJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+
+    if (!(root = cJSON_CreateArray())) goto err;
+
+    for (unsigned key = 1; key <= g_prot_sequence; ++key) {
+        protocol_def_t *prot = lstFind(g_protlist, key);
+        if (prot) {
+            cJSON *item = createProtocolEntryJson(cfg, prot);
+            cJSON_AddItemToArray(root, item);
+        }
+    }
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
 cJSON*
 jsonObjectFromCfg(config_t* cfg)
 {
     cJSON* json_root = NULL;
-    cJSON* metric, *libscope, *event, *payload, *tags;
+    cJSON* metric, *libscope, *event, *payload, *tags, *protocol;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
@@ -2080,6 +2133,9 @@ jsonObjectFromCfg(config_t* cfg)
 
     if (!(tags = createTagsJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(json_root, TAGS_NODE, tags);
+
+    if (!(protocol = createProtocolJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, PROTOCOL_NODE, protocol);
 
     return json_root;
 err:

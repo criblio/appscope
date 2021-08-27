@@ -1190,6 +1190,7 @@ cfgReadGoodYaml(void** state)
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
+    g_protlist = lstCreate(destroyProtEntry);
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), FALSE);
@@ -1237,6 +1238,8 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgPayEnable(config), FALSE);
     assert_string_equal(cfgPayDir(config), "/my/dir");
     cfgDestroy(&config);
+    lstDestroy(&g_protlist);
+    g_prot_sequence = 0;
     deleteFile(path);
 }
 
@@ -1297,6 +1300,7 @@ cfgReadEveryTransportType(void** state)
     for (i = 0; i<sizeof(transport_lines) / sizeof(transport_lines[0]); i++) {
 
         writeFileWithSubstitution(path, yamlText, transport_lines[i]);
+        g_protlist = lstCreate(destroyProtEntry);
         config_t* config = cfgRead(path);
 
         if (transport_lines[i] == udp_str) {
@@ -1317,6 +1321,8 @@ cfgReadEveryTransportType(void** state)
 
         deleteFile(path);
         cfgDestroy(&config);
+        lstDestroy(&g_protlist);
+        g_prot_sequence = 0;
     }
 
 }
@@ -1337,10 +1343,13 @@ cfgReadEveryProcessLevel(void** state)
     int i;
     for (i = 0; i< sizeof(level)/sizeof(level[0]); i++) {
         writeFileWithSubstitution(path, yamlText, level[i]);
+        g_protlist = lstCreate(destroyProtEntry);
         config_t* config = cfgRead(path);
         assert_int_equal(cfgLogLevel(config), value[i]);
         deleteFile(path);
         cfgDestroy(&config);
+        lstDestroy(&g_protlist);
+        g_prot_sequence = 0;
     }
 }
 
@@ -1400,7 +1409,10 @@ const char* jsonText =
     "    'tagA': 'val1',\n"
     "    'tagB': 'val2',\n"
     "    'tagC': 'val3'\n"
-    "  }\n"
+    "  },\n"
+    "  'protocol': [\n"
+    "    {'name':'eg1','regex':'.*'}\n"
+    "  ]\n"
     "}\n";
 
 static void
@@ -1408,6 +1420,7 @@ cfgReadGoodJson(void** state)
 {
     const char* path = CFG_FILE_NAME;
     writeFile(path, jsonText);
+    g_protlist = lstCreate(destroyProtEntry);
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), TRUE);
@@ -1451,7 +1464,16 @@ cfgReadGoodJson(void** state)
     assert_int_equal(cfgLogLevel(config), CFG_LOG_DEBUG);
     assert_int_equal(cfgPayEnable(config), TRUE);
     assert_string_equal(cfgPayDir(config), "/the/dir");
+
+    protocol_def_t *prot;
+    assert_non_null    (g_protlist);
+    assert_int_equal   (g_prot_sequence, 1);
+    assert_non_null    (prot = lstFind(g_protlist, 1));
+    assert_string_equal(prot->protname, "eg1");
+
     cfgDestroy(&config);
+    lstDestroy(&g_protlist);
+    g_prot_sequence = 0;
     deleteFile(path);
 }
 
@@ -1521,6 +1543,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
+    g_protlist = lstCreate(destroyProtEntry);
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
@@ -1532,6 +1555,8 @@ cfgReadExtraFieldsAreHarmless(void** state)
     assert_int_equal(cfgLogLevel(config), CFG_LOG_INFO);
 
     cfgDestroy(&config);
+    lstDestroy(&g_protlist);
+    g_prot_sequence = 0;
     deleteFile(path);
 }
 
@@ -1587,6 +1612,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
+    g_protlist = lstCreate(destroyProtEntry);
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), FALSE);
@@ -1621,6 +1647,8 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_string_equal(cfgPayDir(config), "/favorite");
 
     cfgDestroy(&config);
+    lstDestroy(&g_protlist);
+    g_prot_sequence = 0;
     deleteFile(path);
 }
 
@@ -1693,6 +1721,7 @@ cfgReadEnvSubstitution(void** state)
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
+    g_protlist = lstCreate(destroyProtEntry);
     config_t* cfg = cfgRead(path);
     assert_non_null(cfg);
 
@@ -1724,6 +1753,8 @@ cfgReadEnvSubstitution(void** state)
     assert_string_equal(cfgPayDir(cfg), "home/mydir");
 
     cfgDestroy(&cfg);
+    lstDestroy(&g_protlist);
+    g_prot_sequence = 0;
 
     unsetenv("MASTER_ENABLE");
     unsetenv("VAR1");

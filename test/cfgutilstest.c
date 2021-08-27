@@ -1191,6 +1191,7 @@ cfgReadGoodYaml(void** state)
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
     g_protlist = lstCreate(destroyProtEntry);
+    assert_non_null(g_protlist);
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), FALSE);
@@ -1248,6 +1249,7 @@ cfgReadStockYaml(void** state)
 {
     // The stock scope.yml file up in ../conf/ should parse to the defaults.
     g_protlist = lstCreate(destroyProtEntry);
+    assert_non_null(g_protlist);
     config_t* config = cfgRead("./conf/scope.yml");
     verifyDefaults(config);
     cfgDestroy(&config);
@@ -1301,6 +1303,7 @@ cfgReadEveryTransportType(void** state)
 
         writeFileWithSubstitution(path, yamlText, transport_lines[i]);
         g_protlist = lstCreate(destroyProtEntry);
+        assert_non_null(g_protlist);
         config_t* config = cfgRead(path);
 
         if (transport_lines[i] == udp_str) {
@@ -1344,6 +1347,7 @@ cfgReadEveryProcessLevel(void** state)
     for (i = 0; i< sizeof(level)/sizeof(level[0]); i++) {
         writeFileWithSubstitution(path, yamlText, level[i]);
         g_protlist = lstCreate(destroyProtEntry);
+        assert_non_null(g_protlist);
         config_t* config = cfgRead(path);
         assert_int_equal(cfgLogLevel(config), value[i]);
         deleteFile(path);
@@ -1421,6 +1425,7 @@ cfgReadGoodJson(void** state)
     const char* path = CFG_FILE_NAME;
     writeFile(path, jsonText);
     g_protlist = lstCreate(destroyProtEntry);
+    assert_non_null(g_protlist);
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), TRUE);
@@ -1481,6 +1486,7 @@ static void
 cfgReadNonExistentFileReturnsDefaults(void** state)
 {
     g_protlist = lstCreate(destroyProtEntry);
+    assert_non_null(g_protlist);
     config_t* config = cfgRead("../thisFileNameWontBeFoundAnywhere.txt");
     verifyDefaults(config);
     cfgDestroy(&config);
@@ -1509,6 +1515,7 @@ cfgReadBadYamlReturnsDefaults(void** state)
     writeFile(path, yamlText);
 
     g_protlist = lstCreate(destroyProtEntry);
+    assert_non_null(g_protlist);
     config_t* config = cfgRead(path);
     verifyDefaults(config);
 
@@ -1544,6 +1551,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
     writeFile(path, yamlText);
 
     g_protlist = lstCreate(destroyProtEntry);
+    assert_non_null(g_protlist);
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
@@ -1613,6 +1621,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     writeFile(path, yamlText);
 
     g_protlist = lstCreate(destroyProtEntry);
+    assert_non_null(g_protlist);
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), FALSE);
@@ -1722,6 +1731,7 @@ cfgReadEnvSubstitution(void** state)
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
     g_protlist = lstCreate(destroyProtEntry);
+    assert_non_null(g_protlist);
     config_t* cfg = cfgRead(path);
     assert_non_null(cfg);
 
@@ -1776,6 +1786,8 @@ static void
 jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void** state)
 {
     // Start with a string, just since it's already defined for another test
+    g_protlist = lstCreate(destroyProtEntry);
+    assert_non_null(g_protlist);
     config_t* cfg = cfgFromString(jsonText);
     assert_non_null(cfg);
 
@@ -1788,6 +1800,10 @@ jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void** state)
 
     // Do this again with the new string we output this time
     cfgDestroy(&cfg);
+    lstDestroy(&g_protlist);
+    g_prot_sequence = 0;
+    g_protlist = lstCreate(destroyProtEntry);
+    assert_non_null(g_protlist);
     cfg = cfgFromString(stringified_json1);
     assert_non_null(cfg);
 
@@ -1803,6 +1819,8 @@ jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void** state)
     //printf("%s\n", stringified_json1);
 
     cfgDestroy(&cfg);
+    lstDestroy(&g_protlist);
+    g_prot_sequence = 0;
     cJSON_Delete(json1);
     cJSON_Delete(json2);
     free(stringified_json1);

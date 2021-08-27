@@ -20,7 +20,7 @@ do
     mkdir -p ${TMPDIR}/scope
     cp ${DIR}/bin/linux/${ARCH}/{scope,ldscope} ${TMPDIR}/scope/
     cp ${DIR}/lib/linux/${ARCH}/libscope.so ${TMPDIR}/scope/
-    cp ${DIR}/conf/{scope.yml,scope_protocol.yml} ${TMPDIR}/scope/
+    cp ${DIR}/conf/scope.yml ${TMPDIR}/scope/
     cd ${TMPDIR} && tar cfz scope.tgz scope
     cd scope && md5sum scope > scope.md5 && cd -
     md5sum scope.tgz > scope.tgz.md5

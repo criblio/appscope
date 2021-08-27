@@ -22,7 +22,7 @@ echo "             Testing Redis                     "
 echo "==============================================="
 if [ "$(wait_for_port 6379)" ]; then
     # Looking for "source":"remote_protocol" events from scoped Redis client.
-    # Note thae the `detect` entry in scope_protocol.yml is `true` to start.
+    # Note thae the `protocol[*].detect` entry in scope.yml is `true` to start.
 
     # Should not get the event with SCOPE_EVENT_NET=false
     rm -f /opt/test-runner/logs/events.log
@@ -44,8 +44,8 @@ if [ "$(wait_for_port 6379)" ]; then
         ERR+=1
     fi
 
-    # Set detect:false in scope_protocol.yml
-    sed -i 's/detect: true/detect: false/' /opt/test-runner/bin/scope_protocol.yml
+    # Set detect:false in scope.yml
+    sed -i 's/detect: true/detect: false/' /opt/test-runner/bin/scope.yml
 
     # Should not get the event when SCOPE_EVENT_NET=false
     rm -f /opt/test-runner/logs/events.log

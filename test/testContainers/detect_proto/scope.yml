@@ -1,4 +1,3 @@
----
 protocol:
   - name: Redis
     binary: false

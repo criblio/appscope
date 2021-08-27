@@ -339,8 +339,7 @@ jobs:
           echo "::group::Prep Content"
           mkdir ${TMPDIR}/scope
 
-          cp conf/scope.yml          ${TMPDIR}/scope
-          cp conf/scope_protocol.yml ${TMPDIR}/scope
+          cp conf/scope.yml ${TMPDIR}/scope
           for ARCH in x86_64 aarch64; do
             cp bin/linux/${ARCH}/{scope,ldscope} ${TMPDIR}/scope
             cp lib/linux/${ARCH}/libscope.so ${TMPDIR}/scope

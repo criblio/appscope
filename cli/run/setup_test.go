@@ -55,8 +55,8 @@ func TestCreateLdscope(t *testing.T) {
 func TestCreateAll(t *testing.T) {
 	os.MkdirAll(".foo", 0755)
 	CreateAll(".foo")
-	files := []string{"ldscope", "libscope.so", "scope.yml", "scope_protocol.yml"}
-	perms := []os.FileMode{0755, 0755, 0644, 0644}
+	files := []string{"ldscope", "libscope.so", "scope.yml"}
+	perms := []os.FileMode{0755, 0755, 0644}
 	for i, f := range files {
 		path := fmt.Sprintf(".foo/%s", f)
 		stat, _ := os.Stat(path)

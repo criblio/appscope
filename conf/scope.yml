@@ -797,4 +797,61 @@ tags:
   #user: $USER
   #service: eg
 
+
+# Custom configs
+#
+custom:
+  # Entries here represent overrides of the settings defined above for
+  # processes that match a set of filters. The following `filter` entries are
+  # supported.
+  #
+  #   procname: process name
+  #   arg:      command-line argument substring
+  #   hostname: hostname
+  #   username: username in $USER or $USERNAME
+  #   env:      environment variable; Use `env: FOO` to match when $FOO is set
+  #             or `env: FOO=bar` to match when $FOO is set to `bar`
+  #   ancestor: process name of parent, parent's parent, etc.
+  #
+  # The `config` section in each entry contains the settings that should be
+  # overridden when all of the filter entries apply. Entries under `config` use
+  # the same schema as the top-level entries (without `custom`).
+  #
+  # All entries that match are applied in the order they appear here in this
+  # file.
+  #
+  
+  # Increase metric verbosity for processes owned by the "eg" user running on
+  # the "eg1" host.
+  #
+  #example:
+  #  filter:
+  #    user: eg
+  #    host: eg1
+  #  config:
+  #    metric:
+  #      format:
+  #        verbosity: 6
+  #    tags:
+  #      service: eg
+
+  # Adjust the verbosity and destination for the Nginx processes. Both this entry
+  # and the `example` entry above would apply if both filters match so the service
+  # tag here would override the one above.
+  #
+  #nginx:
+  #  filter:
+  #    proc: nginx
+  #  config:
+  #    tags:
+  #      service: nginx
+  #    cribl:
+  #      enable: true
+  #      transport:
+  #        type: tcp
+  #        host: in.my-instance.logstream.cribl.cloud
+  #        port: 10090
+  #        tls:
+  #          enable: true
+
 # EOF

@@ -2072,16 +2072,16 @@ createProtocolEntryJson(config_t* cfg, protocol_def_t* prot)
 
     // only emit non-defaults
     if (prot->binary) {
-        if (!cJSON_AddBoolToObjLN(root, BINARY_NODE, prot->binary)) goto err;
+        if (!cJSON_AddStringToObjLN(root, BINARY_NODE, "true")) goto err;
     }
     if (prot->binary && prot->len) {
         if (!cJSON_AddNumberToObjLN(root, LEN_NODE, prot->len)) goto err;
     }
     if (!prot->detect) {
-        if (!cJSON_AddBoolToObjLN(root, DETECT_NODE, prot->detect)) goto err;
+        if (!cJSON_AddStringToObjLN(root, DETECT_NODE, "false")) goto err;
     }
     if (prot->payload) {
-        if (!cJSON_AddBoolToObjLN(root, PAYLOAD_NODE, prot->payload)) goto err;
+        if (!cJSON_AddStringToObjLN(root, PAYLOAD_NODE, "true")) goto err;
     }
 
     return root;

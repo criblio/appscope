@@ -72,29 +72,7 @@ struct _transport_t
 // node.js processes.  See transportReconnect() below for details.
 static struct addrinfo *g_cached_addr = NULL;
 
-// This mutex avoids a race condition between:
-//    1) using the tls subsystem and
-//    2) destroying the tls subsystem
-static pthread_mutex_t g_tls_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-static int g_tls_calls_are_safe = TRUE;  // until handle_tls_destroy() is called
-
 static void (*handleExit_fn)(void) = NULL;
-
-static inline void
-enterCriticalSection(void)
-{
-    if (pthread_mutex_lock(&g_tls_lock)) {
-        DBG(NULL);
-    }
-}
-
-static inline void
-exitCriticalSection(void)
-{
-    if (pthread_mutex_unlock(&g_tls_lock)) {
-        DBG(NULL);
-    }
-}
 
 static transport_t*
 newTransport()
@@ -226,10 +204,6 @@ transportNeedsConnection(transport_t *trans)
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            // If g_tls_calls_are_safe is not true, that means that our process
-            // has been notified that it is being terminated.  It's too late to
-            // try to establish any new connections.
-            if (!g_tls_calls_are_safe) return FALSE;
             if ((trans->net.sock == -1) ||
                 (trans->net.tls.enable && !trans->net.tls.ssl)) return TRUE;
             if (osNeedsConnect(trans->net.sock)) {
@@ -291,58 +265,50 @@ rootCertFile(transport_t *trans)
 static void
 shutdownTlsSession(transport_t *trans)
 {
-    // Grab the lock to show that the tls subsystem is in use.
-    enterCriticalSection();
+    if (trans->net.tls.ssl) {
+        int ret = SSL_shutdown(trans->net.tls.ssl);
+        if (ret < 0) {
+            // protocol error occurred
+            int ssl_err = SSL_get_error(trans->net.tls.ssl, ret);
+            char *logmsg = NULL;
+            if (asprintf(&logmsg, "Client SSL_shutdown failed: ssl_err=%d\n",
+                     ssl_err)) {
+                scopeLog(logmsg, -1, CFG_LOG_INFO);
+                if (logmsg) free(logmsg);
+            }
 
-    if (g_tls_calls_are_safe) {
-        if (trans->net.tls.ssl) {
-            int ret = SSL_shutdown(trans->net.tls.ssl);
-            if (ret < 0) {
-                // protocol error occurred
+        } else if (ret == 0) {
+            // shutdown not complete, call again
+            char buf[4096];
+            while(1) {
+               ret = SCOPE_SSL_read(trans->net.tls.ssl, buf, sizeof(buf));
+               if (ret <= 0) {
+                   break;
+               }
+            }
+
+            ret = SSL_shutdown(trans->net.tls.ssl);
+            if (ret != 1) {
+                // second shutdown not successful
                 int ssl_err = SSL_get_error(trans->net.tls.ssl, ret);
                 char *logmsg = NULL;
-                if (asprintf(&logmsg, "Client SSL_shutdown failed: ssl_err=%d\n",
-                         ssl_err)) {
+                if (asprintf(&logmsg, "Waiting for server shutdown using SSL_shutdown failed: "
+                            "ssl_err=%d\n", ssl_err)) {
                     scopeLog(logmsg, -1, CFG_LOG_INFO);
                     if (logmsg) free(logmsg);
                 }
-
-            } else if (ret == 0) {
-                // shutdown not complete, call again
-                char buf[4096];
-                while(1) {
-                   ret = SCOPE_SSL_read(trans->net.tls.ssl, buf, sizeof(buf));
-                   if (ret <= 0) {
-                       break;
-                   }
-                }
-               
-                ret = SSL_shutdown(trans->net.tls.ssl);
-                if (ret != 1) {
-                    // second shutdown not successful
-                    int ssl_err = SSL_get_error(trans->net.tls.ssl, ret);
-                    char *logmsg = NULL;
-                    if (asprintf(&logmsg, "Waiting for server shutdown using SSL_shutdown failed: "
-                                "ssl_err=%d\n", ssl_err)) {
-                        scopeLog(logmsg, -1, CFG_LOG_INFO);
-                        if (logmsg) free(logmsg);
-                    }
-                }
             }
-        }
-
-        if (trans->net.tls.ssl) {
-            SSL_free(trans->net.tls.ssl);
-            trans->net.tls.ssl = NULL;
-        }
-        if (trans->net.tls.ctx) {
-            SSL_CTX_free(trans->net.tls.ctx);
-            trans->net.tls.ctx = NULL;
         }
     }
 
-    // Release the lock
-    exitCriticalSection();
+    if (trans->net.tls.ssl) {
+        SSL_free(trans->net.tls.ssl);
+        trans->net.tls.ssl = NULL;
+    }
+    if (trans->net.tls.ctx) {
+        SSL_CTX_free(trans->net.tls.ctx);
+        trans->net.tls.ctx = NULL;
+    }
 
     if (trans->net.sock != -1) {
         g_fn.close(trans->net.sock);
@@ -356,16 +322,6 @@ handle_tls_destroy(void)
     scopeLog("detected beginning of process exit sequence", -1, CFG_LOG_INFO);
 
     if (handleExit_fn) handleExit_fn();
-
-    // Spin to make sure we don't allow our tls subsystem to be destructed
-    // while the tls library is actively being used.
-    enterCriticalSection();
-
-    // this records that this function has been called.
-    g_tls_calls_are_safe = FALSE;
-
-    // Release the lock
-    exitCriticalSection();
 }
 
 void
@@ -389,10 +345,6 @@ establishTlsSession(transport_t *trans)
 {
     if (!trans || trans->net.sock == -1) return FALSE;
     scopeLog("establishing tls session", trans->net.sock, CFG_LOG_INFO);
-
-    // Grab the lock to show that the tls subsystem is in use.
-    enterCriticalSection();
-    if (!g_tls_calls_are_safe) goto err;
 
     static int init_called = FALSE;
     if (!init_called) {
@@ -484,15 +436,9 @@ establishTlsSession(transport_t *trans)
         }
     }
 
-    // free the lock
-    exitCriticalSection();
-
     scopeLog("tls session established", trans->net.sock, CFG_LOG_INFO);
     return TRUE;
 err:
-    // free the lock
-    exitCriticalSection();
-
     shutdownTlsSession(trans);
     return FALSE;
 }
@@ -632,12 +578,9 @@ transportReconnect(transport_t *trans)
             // want to send a close notification for the SSL session.  If we sent the
             // close notification, it has the side effect of closing our parent process's
             // ssl session.
-            enterCriticalSection();
-            if (g_tls_calls_are_safe && trans->net.tls.enable && trans->net.tls.ssl) {
+            if (trans->net.tls.enable && trans->net.tls.ssl) {
                 SSL_set_quiet_shutdown(trans->net.tls.ssl, TRUE);
             }
-            exitCriticalSection();
-
 
             transportDisconnect(trans);          // Never keep the parents connection.
             if (g_cached_addr) {
@@ -1223,23 +1166,16 @@ tcpSendTls(transport_t *trans, const char *msg, size_t len)
     int err = 0;
 
     while (bytes_to_send > 0) {
-        // Grab the lock to show that the tls subsystem is in use.
-        enterCriticalSection();
 
         rc = 0;
-        if (g_tls_calls_are_safe) {
-            ERR_clear_error(); // to make SSL_get_error reliable
-            rc = SCOPE_SSL_write(trans->net.tls.ssl, &msg[bytes_sent], bytes_to_send);
-            if (rc <= 0) {
-                err = SSL_get_error(trans->net.tls.ssl, rc);
-            }
+        ERR_clear_error(); // to make SSL_get_error reliable
+        rc = SCOPE_SSL_write(trans->net.tls.ssl, &msg[bytes_sent], bytes_to_send);
+        if (rc <= 0) {
+            err = SSL_get_error(trans->net.tls.ssl, rc);
         }
 
-        // free the lock
-        exitCriticalSection();
-
         if (rc <= 0) {
-            DBG("%d %d", err, g_tls_calls_are_safe);
+            DBG("%d", err);
             transportDisconnect(trans);
             transportConnect(trans);
             return -1;

@@ -690,7 +690,7 @@ cribl:
   # If set, the value is added as a top-level authToken property in the initial
   # config-event (header) sent to Cribl when the library connects.
   #
-  #authtoken: 
+  #authtoken:
 
   # Backend connection for cribl
   #

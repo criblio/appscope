@@ -2,9 +2,14 @@ package relay
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"sync/atomic"
 
 	log "github.com/sirupsen/logrus"
 )
+
+var count uint64
 
 // Sender makes a connection to cribldest and sends aggregated data
 func Sender(gctx context.Context, sq Queue, workerId int) func() error {
@@ -30,6 +35,9 @@ func Sender(gctx context.Context, sq Queue, workerId int) func() error {
 
 			select {
 			case msg := <-sq:
+				if strings.Contains(string(msg), "http-req") {
+					fmt.Println("Sent: ", atomic.AddUint64(&count, 1))
+				}
 				if err := c.Send(msg); err != nil {
 					return err
 				}

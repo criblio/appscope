@@ -429,7 +429,7 @@ event:
     #   Default:  tcp
     #   Override: the protocol token in the $SCOPE_EVENT_DEST URL
     #
-    type: unix
+    type: tcp
 
     # Connection host/address
     #   Type:     string

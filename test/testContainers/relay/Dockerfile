@@ -16,6 +16,10 @@ COPY relay/cribl/ /opt/cribl/local/cribl/
 RUN mkdir /opt/test
 COPY relay/conf_1 /opt/test/conf_1
 
+
+
+COPY relay/tcpserver /usr/bin/tcpserver
+
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit

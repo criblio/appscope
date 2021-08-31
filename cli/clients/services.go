@@ -5,13 +5,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
+	"strings"
+	"sync/atomic"
 
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/relay"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
+
+var received uint64
 
 // Receiver listens for new unix socket connections and manages clients
 // It creates a new goroutine for each client
@@ -111,6 +116,10 @@ func clientHandler(gctx context.Context, sq relay.Queue, client *Client, c *Clie
 					}
 
 					log.Info("Process Start Message received: ", header)
+				}
+
+				if strings.Contains(string(msg.Raw), "http-req") {
+					fmt.Println("Received: ", atomic.AddUint64(&received, 1))
 				}
 
 				if relay.Config.CriblDest != "" {

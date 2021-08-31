@@ -22,7 +22,7 @@ echo "             Testing Redis                     "
 echo "==============================================="
 if [ "$(wait_for_port 6379)" ]; then
     # Looking for "source":"remote_protocol" events from scoped Redis client.
-    # Note thae the `protocol[*].detect` entry in scope.yml is `true` to start.
+    # Note that the `protocol[*].detect` entry in scope.yml is `true` to start.
 
     # Should not get the event with SCOPE_EVENT_NET=false
     rm -f /opt/test-runner/logs/events.log

@@ -1912,16 +1912,17 @@ cfgReadProtocol(void **state)
     // protocol config in yaml format
     const char *yamlText =
         "protocol:\n"
+        // the 1st should load with non-default binary and len values
         "  - name: test1\n"
         "    binary: 'true'\n"
         "    regex: 'sup?'\n"
         "    len: 111\n"
         "\n"
+        // the 2rd should load with defaults for non-required values
         "  - name: test2\n"
-        "    binary: 'false'\n"
         "    regex: 'sup up?'\n"
-        "    len: 222\n"
         "\n"
+        // the 3rd should load with all values specified
         "  - name: test3\n"
         "    binary: false\n"
         "    regex: 'sup er?'\n"
@@ -1944,7 +1945,7 @@ cfgReadProtocol(void **state)
     char *name[3] = {"test1", "test2", "test3"};
     char *regex[3] = {"sup?", "sup up?", "sup er?"};
     int binary[3] = {1, 0, 0};
-    int len[3] = {111, 222, 333};
+    int len[3] = {111, 0, 333};
     int detect[3] = {1, 1, 0};
     int payload[3] = {0, 0, 1};
 

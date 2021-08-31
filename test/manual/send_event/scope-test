@@ -71,8 +71,8 @@ wait_for_files() {
 # $4 iterations of http request
 send_event_unix() {
     starttest "Send_Event_Unix:_$1_Scope_$2_Senders_$3_Requests/Sec_$4_Iterations"
-    requests = $2 * $3
-    rm ${DEST}
+    requests=$(($3*$4))
+    rm -f ${DEST}
     # start tcpserver
     tcpserver > ${DEST} &
     tcpserver_pid=$!
@@ -89,10 +89,10 @@ send_event_unix() {
     # sleep to allow scope manager to start
     sleep 2
     # start ab benchmark test
-    for i in {1..$4}
+    for ((i=0;i<$4;i++))
     do
-        ab -n $3 -c 1 http://127.0.0.1/ > /dev/null
-        sleep(1)
+        ab -n $3 -c 1 http://127.0.0.1/
+        sleep 1
     done
     # sleep to allow file write
     sleep 1
@@ -133,8 +133,8 @@ send_event_unix() {
 # $3 iterations of http request
 send_event_tcp() {
     starttest "Send_Event_TCP:_$1_Scope_$2_Requests/Sec_$3_Iterations"
-    requests = $2 * $3
-    rm ${DEST}
+    requests=$(($2*$3))
+    rm -f ${DEST}
     # start tcpserver
     tcpserver > ${DEST} &
     tcpserver_pid=$!
@@ -142,14 +142,14 @@ send_event_tcp() {
     sleep 1
     # start nginx with modified config
     sed -i "s/worker_processes\ auto/worker_processes\ $1/" /etc/nginx/nginx.conf
-    SCOPE_HOME=/opt/test/conf_1 ldscope nginx
+    SCOPE_HOME=/opt/test/conf_2 ldscope nginx
     # sleep to allow nginx to start up
     sleep 2
     # start ab benchmark test
-    for i in {1..$3}
+    for ((i=0;i<$3;i++))
     do
-        ab -n $2 -c 1 http://127.0.0.1/ > /dev/null
-        sleep(1)
+        ab -n $2 -c 1 http://127.0.0.1/
+        sleep 1
     done
     # sleep to allow file write
     sleep 1
@@ -180,21 +180,21 @@ send_event_tcp() {
     endtest
 }
 
-send_event_unix 1 1 100 60 
-send_event_unix 1 1 1000 60
-send_event_unix 1 1 10000 60 
-send_event_tcp 1 100 60
-send_event_tcp 1 1000 60
-send_event_tcp 1 10000 60
+send_event_unix 1 1 100 10 
+send_event_unix 1 1 1000 10
+send_event_unix 1 1 10000 10 
+send_event_tcp 1 100 10
+send_event_tcp 1 1000 10
+send_event_tcp 1 10000 10
 
 ###################### Summary ######################
 
 # Results
 echo ""
 if (( $FAILED_TEST_COUNT == 0 )); then
-    echo "************ ALL RELAY TESTS PASSED ************"
+    echo "************ ALL SEND EVENT TESTS PASSED ************"
 else
-    echo "************ $FAILED_TEST_COUNT RELAY TESTS FAILED ************"
+    echo "************ $FAILED_TEST_COUNT SEND EVENT TESTS FAILED ************"
     echo "Failed tests: $FAILED_TEST_LIST"
 fi
 echo ""

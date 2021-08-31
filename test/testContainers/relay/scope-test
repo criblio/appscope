@@ -84,15 +84,20 @@ fi
 relay() {
     starttest "Relay $1 Scope $2 Senders $3 Requests"
     rm -rf ${DEST}
+    # start nginx with modified config
     sed -i "s/worker_processes\ auto/worker_processes\ $1/" /etc/nginx/nginx.conf
     SCOPE_HOME=/opt/test/conf_1 ldscope nginx
     # sleep to allow nginx to start up
     sleep 2
+    # start scope manager
     scope manager -c tcp://localhost:10090 -w $2 -q 1000000 > /dev/null 2>&1 &
     manager_pid=$!
     # sleep to allow scope manager to start
     sleep 2
+    # run ab benchmark test
     ab -n $3 -c 1 http://127.0.0.1/ > /dev/null
+    # sleep to wait for file write
+    sleep 1
     if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
         found=$(grep '"source":"http-req"' ${DEST}/CriblOut-*.json | wc -l)
         if [ $found -eq $3 ] ; then 
@@ -112,9 +117,10 @@ relay() {
         echo "FAIL: no output files"
         ERR+=1
     fi
+    # kill processes
     kill $manager_pid
     nginx -s quit
-    # sleep to allow nginx to close or get errors
+    # sleep to allow nginx to close
     sleep 2
     endtest
 }

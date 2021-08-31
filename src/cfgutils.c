@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "cfgutils.h"
 #include "dbg.h"
@@ -1615,6 +1616,67 @@ processCustomFilterEnv(config_t* config, yaml_document_t* doc, yaml_node_t* node
 }
 
 static void
+processCustomFilterAncestor(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar ancestor value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    if (valueStr) {
+        pid_t ppid = g_proc.ppid;
+        while (ppid > 1) {
+            char buf[PATH_MAX];
+            if (snprintf(buf, sizeof(buf), "/proc/%d/exe", ppid) < 0) {
+                DBG(NULL);
+                break;
+            }
+
+            char exe[PATH_MAX];
+            size_t exeLen = readlink(buf, exe, sizeof(exe));
+            if (exeLen <= 0) {
+                DBG(NULL);
+                break;
+            }
+            exe[exeLen] = '\0';
+
+            char* name = exe;
+            name = basename(exe);
+            if (!strcmp(valueStr, name)) {
+                ++custom_match_count;
+                free(valueStr);
+                return;
+            }
+
+            if (snprintf(buf, sizeof(buf), "/proc/%d/stat", ppid) < 0) {
+                DBG(NULL);
+                break;
+            }
+            int fd = open(buf, O_RDONLY);
+            if (fd == -1) {
+                DBG(NULL);
+                break;
+            }
+            if (read(fd, buf, sizeof(buf)) <= 0) { 
+                DBG(NULL);
+                close(fd);
+                break;
+            }
+            strtok(buf,  " ");              // (1) pid   %d
+            strtok(NULL, " ");              // (2) comm  %s
+            strtok(NULL, " ");              // (3) state %s
+            ppid = atoi(strtok(NULL, " ")); // (4) ppid  %d
+            close(fd);
+        }
+    }
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
 processCustomFilter(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     custom_matched = TRUE;
@@ -1626,7 +1688,7 @@ processCustomFilter(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE, HOSTNAME_NODE, processCustomFilterHostname},
         {YAML_SCALAR_NODE, USERNAME_NODE, processCustomFilterUsername},
         {YAML_SCALAR_NODE, ENV_NODE,      processCustomFilterEnv},
-        //{YAML_SCALAR_NODE, ANCESTOR_NODE, processCustomFilterAncestor},
+        {YAML_SCALAR_NODE, ANCESTOR_NODE, processCustomFilterAncestor},
         {YAML_NO_NODE,     NULL,          NULL}
     };
 

@@ -2371,6 +2371,37 @@ cfgReadCustomOverride(void **state)
     cfgDestroy(&config);
 }
 
+static void
+cfgReadCustomOrder(void **state)
+{
+    const char *yamlText =
+        "custom:\n"
+        // this should match and re-enable metrics and
+        // it should work even though the filter isn't first
+        "  eg1:\n"
+        "    config:\n"
+        "      metric:\n"
+        "        enable: true\n"
+        "    filter:\n"
+        "      procname: test\n"
+        "\n"
+        // this should get processed first, before the custom entries
+        "# disable metrics\n"
+        "metric:\n"
+        "  enable: false\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), TRUE);
+
+    cfgDestroy(&config);
+}
+
 // Defined in src/cfgutils.c
 // This is not a proper test, it just exists to make valgrind output
 // more readable when analyzing this test, by deallocating the compiled
@@ -2459,6 +2490,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgReadCustomAncestorFilter),
         cmocka_unit_test(cfgReadCustomMultipleFilters),
         cmocka_unit_test(cfgReadCustomOverride),
+        cmocka_unit_test(cfgReadCustomOrder),
         cmocka_unit_test(envRegexFree),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

@@ -173,6 +173,8 @@ static void cfgSetFromFile(config_t *, const char *);
 static void cfgCriblEnableSetFromStrEnv(config_t *, cfg_logstream_t, const char *);
 static void cfgCriblEnableSetFromStrYaml(config_t *, const char *);
 
+static void processRoot(config_t *, yaml_document_t *, yaml_node_t *);
+
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
 static which_transport_t transport_context;
@@ -1881,20 +1883,7 @@ processCustomConfig(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         return;
     }
 
-    parse_table_t t[] = {
-        {YAML_MAPPING_NODE,   METRIC_NODE,          processMetric},
-        {YAML_MAPPING_NODE,   LIBSCOPE_NODE,        processLibscope},
-        {YAML_MAPPING_NODE,   PAYLOAD_NODE,         processPayload},
-        {YAML_MAPPING_NODE,   EVENT_NODE,           processEvent},
-        {YAML_MAPPING_NODE,   CRIBL_NODE,           processCribl},
-        {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
-
-    yaml_node_pair_t *pair;
-    foreach (pair, node->data.mapping.pairs) {
-        processKeyValuePair(t, pair, config, doc);
-    }
+    processRoot(config, doc, node);
 }
 
 static void
@@ -1910,12 +1899,19 @@ processCustomEntry(config_t* config, yaml_document_t* doc, yaml_node_pair_t* pai
 
     parse_table_t t[] = {
         {YAML_MAPPING_NODE, FILTER_NODE, processCustomFilter},
-        {YAML_MAPPING_NODE, CONFIG_NODE, processCustomConfig},
         {YAML_NO_NODE,      NULL,        NULL}
     };
     yaml_node_pair_t* nodePair;
     foreach(nodePair, node->data.mapping.pairs) {
         processKeyValuePair(t, nodePair, config, doc);
+    }
+
+    parse_table_t t2[] = {
+        {YAML_MAPPING_NODE, CONFIG_NODE, processCustomConfig},
+        {YAML_NO_NODE,      NULL,        NULL}
+    };
+    foreach(nodePair, node->data.mapping.pairs) {
+        processKeyValuePair(t2, nodePair, config, doc);
     }
 }
 
@@ -1929,33 +1925,40 @@ processCustom(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 }
 
 static void
-setConfigFromDoc(config_t* config, yaml_document_t* doc)
+processRoot(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    yaml_node_t *node = yaml_document_get_root_node(doc);
-    if (node->type != YAML_MAPPING_NODE) return;
-
     parse_table_t t[] = {
-        {YAML_MAPPING_NODE,   METRIC_NODE,          processMetric},
-        {YAML_MAPPING_NODE,   LIBSCOPE_NODE,        processLibscope},
-        {YAML_MAPPING_NODE,   PAYLOAD_NODE,         processPayload},
-        {YAML_MAPPING_NODE,   EVENT_NODE,           processEvent},
-        {YAML_MAPPING_NODE,   CRIBL_NODE,           processCribl},
-        {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
-        {YAML_SEQUENCE_NODE,  PROTOCOL_NODE,        processProtocol},
-        {YAML_NO_NODE,        NULL,                 NULL}
+        {YAML_MAPPING_NODE,  METRIC_NODE,   processMetric},
+        {YAML_MAPPING_NODE,  LIBSCOPE_NODE, processLibscope},
+        {YAML_MAPPING_NODE,  PAYLOAD_NODE,  processPayload},
+        {YAML_MAPPING_NODE,  EVENT_NODE,    processEvent},
+        {YAML_MAPPING_NODE,  CRIBL_NODE,    processCribl},
+        {YAML_MAPPING_NODE,  TAGS_NODE,     processTags},
+        {YAML_SEQUENCE_NODE, PROTOCOL_NODE, processProtocol},
+        {YAML_NO_NODE,       NULL,          NULL}
     };
 
     yaml_node_pair_t *pair;
     foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
+}
 
-    // ensure the custom entries are processed after the others
+static void
+setConfigFromDoc(config_t* config, yaml_document_t* doc)
+{
+    yaml_node_t *node = yaml_document_get_root_node(doc);
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    processRoot(config, doc, node);
+
+    // process custom entries after the others
     parse_table_t t2[] = {
-        {YAML_MAPPING_NODE,   CUSTOM_NODE,          processCustom},
-        {YAML_NO_NODE,        NULL,                 NULL}
+        {YAML_MAPPING_NODE, CUSTOM_NODE, processCustom},
+        {YAML_NO_NODE,      NULL,        NULL}
     };
 
+    yaml_node_pair_t *pair;
     foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t2, pair, config, doc);
     }

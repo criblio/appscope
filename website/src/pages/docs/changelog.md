@@ -10,8 +10,7 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 2021-09-01 - Maintenance/Hotfix Pre-Release
 
-- **Fix**: [#516](https://github.com/criblio/appscope/issues/516)
- Scoped processes that use TLS no longer experience a state where child processes can get stuck in the fork call.
+- **Fix**: [#516](https://github.com/criblio/appscope/issues/516) Where scope'd processes use TLS, child processes no longer get stuck in fork calls.
 
 - **Fix**: [#442](https://github.com/criblio/appscope/issues/442)
  Remove TLS exit handling code that is no longer needed.

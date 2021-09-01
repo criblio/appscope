@@ -937,7 +937,7 @@ custom:
   #  config:
   #    metric:
   #      format:
-  #        verbosity: 6
+  #        verbosity: 7
   #    tags:
   #      service: eg
 

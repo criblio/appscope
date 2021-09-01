@@ -82,6 +82,8 @@ C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c
 O_FILES:=$(C_FILES:.c=.o)
 CACHE_FILES:=$(shell find . -name CMakeCache.txt)
 
+# ensure $USER is available since some of the tests expect it
+coretest: export USER ?= $(shell id -u -n)
 coretest: $(C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
 	@echo "$${CI:+::group::}Building Tests"
 	$(CC) -c $(TEST_CFLAGS) $(C_FILES) $(INCLUDES) $(TEST_INCLUDES)

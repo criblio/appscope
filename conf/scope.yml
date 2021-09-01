@@ -801,7 +801,7 @@ tags:
 # Custom configs
 #
 custom:
-  # Entries here represent overrides of the settings defined above for
+  # Entries here represent overrides of the settings defined above for scoped
   # processes that match a set of filters. Each has a name and `filter` and
   # `config` entries as shown below.
   #
@@ -823,18 +823,18 @@ custom:
   #   arg: string
   #
   #     Matches if the given string value appears and a substring anywhere in
-  #     the scoped process' full command line including an options and
+  #     the scoped process's full command line including an options and
   #     arguments.
   #
   #   hostname: string
   #
   #     Matches if the given string value matches the hostname of the machine
-  #     where the scoped processes is running.
+  #     where the scoped process is running.
   #     
   #   username: string
   #
   #     Matches if the given string value matches the username for the scoped
-  #     process' UID.
+  #     process's UID.
   #     
   #   env: string
   #
@@ -844,7 +844,7 @@ custom:
   #
   #   ancestor: string
   #
-  #     Matches if given string matches the basename of the scoped process'
+  #     Matches if given string matches the basename of the scoped process's
   #     partent, parent's parent, etc.
   #
   # The `config` section specifies the settings that should be overridden when

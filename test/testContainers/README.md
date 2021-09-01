@@ -95,7 +95,7 @@ Tests Linux syscalls supported by Scope using executable syscall unit tests.
 Some unit tests provided by [LTP Project][LTP]; others are custom C tests
 located in [syscalls/altp folder](syscalls/altp).
 
-This test is explicity using `LD_PRELOAD` while other tests are using a mix of
+This test is explicitly using `LD_PRELOAD` while other tests are using a mix of
 `scope` and `ldscope` and `LD_PRELOAD`. We have been removing use of
 `LD_PRELOAD` from some other tests to speed them up but we'll keep it here to
 make sure that startup scheme is getting wrung out.

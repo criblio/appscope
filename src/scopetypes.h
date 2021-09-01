@@ -61,7 +61,6 @@ typedef unsigned int bool;
 
 #define CFG_MAX_VERBOSITY 9
 #define CFG_FILE_NAME "scope.yml"
-#define PROTOCOL_FILE_NAME "scope_protocol.yml"
 
 #define DEFAULT_MTC_ENABLE TRUE
 #define DEFAULT_MTC_FORMAT CFG_FMT_STATSD
@@ -108,7 +107,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_CONSOLE TRUE
 #define DEFAULT_SRC_SYSLOG FALSE
 #define DEFAULT_SRC_METRIC FALSE
-#define DEFAULT_SRC_HTTP FALSE
+#define DEFAULT_SRC_HTTP TRUE
 #define DEFAULT_SRC_NET TRUE
 #define DEFAULT_SRC_FS TRUE
 #define DEFAULT_SRC_DNS TRUE

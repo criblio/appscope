@@ -16,7 +16,7 @@ var excreteCmd = &cobra.Command{
 	Use:     "extract [flags] <dir>",
 	Aliases: []string{"excrete", "expunge", "extricate", "exorcise"},
 	Short:   "Output instrumentary library files to <dir>",
-	Long: `Extract outputs ldscope, libscope.so, scope.yml and scope_protocol.yml to the provided directory. These files can configured
+	Long: `Extract outputs ldscope, libscope.so, and scope.yml to the provided directory. These files can configured
 to instrument any application and output the data to any existing tool using simple TCP protocols. With --metricdest and --eventdest, 
 scope.yml can be preconfigured for outputting to specific destinations. 
 

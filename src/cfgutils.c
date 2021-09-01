@@ -17,6 +17,7 @@
 #include "com.h"
 #include "utils.h"
 #include "fn.h"
+#include "state.h"
 
 #ifndef NO_YAML
 #include "yaml.h"
@@ -29,7 +30,6 @@
 #define STATSDPREFIX_NODE            "statsdprefix"
 #define STATSDMAXLEN_NODE            "statsdmaxlen"
 #define VERBOSITY_NODE               "verbosity"
-#define TAGS_NODE                    "tags"
 #define TRANSPORT_NODE           "transport"
 #define TYPE_NODE                    "type"
 #define HOST_NODE                    "host"
@@ -62,15 +62,24 @@
 #define VALUE_NODE                   "value"
 #define EX_HEADERS                   "headers"
 
-#define PAYLOAD_NODE          "payload"
+#define PAYLOAD_NODE         "payload"
 #define ENABLE_NODE              "enable"
 #define DIR_NODE                 "dir"
 
-#define CRIBL_NODE          "cribl"
+#define CRIBL_NODE           "cribl"
 #define ENABLE_NODE              "enable"
 #define TRANSPORT_NODE           "transport"
 #define AUTHTOKEN_NODE           "authtoken"
 
+#define TAGS_NODE            "tags"
+
+#define PROTOCOL_NODE        "protocol"
+#define NAME_NODE                "name"
+#define REGEX_NODE               "regex"
+#define BINARY_NODE              "binary"
+#define LEN_NODE                 "len"
+#define DETECT_NODE              "detect"
+#define PAYLOAD_NODE             "payload"
 
 enum_map_t formatMap[] = {
     {"statsd",                CFG_FMT_STATSD},
@@ -157,6 +166,7 @@ static void cfgCriblEnableSetFromStrYaml(config_t *, const char *);
 // which seems fine for now, I guess.
 static which_transport_t transport_context;
 static watch_t watch_context;
+static protocol_def_t *protocol_context = NULL;
 static regex_t* g_regex = NULL;
 static char g_logmsg[1024] = {};
 
@@ -236,19 +246,13 @@ cfgPath(void)
     return cfgPathSearch(CFG_FILE_NAME);
 }
 
-char *
-protocolPath(void)
-{
-    return cfgPathSearch(PROTOCOL_FILE_NAME);
-}
-
 static void
 processCustomTag(config_t* cfg, const char* e, const char* value)
 {
     char name_buf[1024];
     strncpy(name_buf, e, sizeof(name_buf));
 
-    char* name = name_buf + strlen("SCOPE_TAG_");
+    char* name = name_buf + (sizeof("SCOPE_TAG_") - 1);
 
     // convert the "=" to a null delimiter for the name
     char* end = strchr(name, '=');
@@ -376,11 +380,14 @@ processReloadConfig(config_t *cfg, const char* value)
 {
     if (!cfg || !value) return;
     unsigned int enable = strToVal(boolMap, value);
-    if (enable != TRUE) return;
 
-    char *path = cfgPath();
-    cfgSetFromFile(cfg, path);
-    if (path) free(path);
+    if (enable == TRUE) {
+        char *path = cfgPath();
+        cfgSetFromFile(cfg, path);
+        if (path) free(path);
+    } else {
+        cfgSetFromFile(cfg, value);
+    }
 
     cfgProcessEnvironment(cfg);
 
@@ -746,11 +753,11 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
     // see if value starts with udp:// or file://
     if (value == strstr(value, "udp://")) {
 
-        // copied to avoid directly modifing the process's env variable
+        // copied to avoid directly modifying the process's env variable
         char value_cpy[1024];
         strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char *host = value_cpy + strlen("udp://");
+        char *host = value_cpy + (sizeof("udp://") - 1);
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -765,11 +772,11 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
 
     } else if (value == strstr(value, "tcp://")) {
 
-        // copied to avoid directly modifing the process's env variable
+        // copied to avoid directly modifying the process's env variable
         char value_cpy[1024];
         strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char *host = value_cpy + strlen("tcp://");
+        char *host = value_cpy + (sizeof("tcp://") - 1);
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -783,8 +790,12 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         cfgTransportPortSet(cfg, t, port);
 
     } else if (value == strstr(value, "file://")) {
-        const char *path = value + strlen("file://");
+        const char *path = value + (sizeof("file://") - 1);
         cfgTransportTypeSet(cfg, t, CFG_FILE);
+        cfgTransportPathSet(cfg, t, path);
+    } else if (value == strstr(value, "unix://")) {
+        const char *path = value + (sizeof("unix://") - 1);
+        cfgTransportTypeSet(cfg, t, CFG_UNIX);
         cfgTransportPathSet(cfg, t, path);
     }
 }
@@ -1160,7 +1171,6 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    STATSDPREFIX_NODE,    processStatsDPrefix},
         {YAML_SCALAR_NODE,    STATSDMAXLEN_NODE,    processStatsDMaxLen},
         {YAML_SCALAR_NODE,    VERBOSITY_NODE,       processVerbosity},
-        {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1474,6 +1484,170 @@ processCribl(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 }
 
 static void
+processProtocolName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    if (protocol_context->protname) free(protocol_context->protname);
+    protocol_context->protname = stringVal(node);
+}
+
+static void
+processProtocolRegex(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    if (protocol_context->regex) free(protocol_context->regex);
+    protocol_context->regex = stringVal(node);
+}
+
+static void
+processProtocolBinary(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    char* sVal = stringVal(node);
+    unsigned iVal = strToVal(boolMap, sVal);
+    if (iVal <= 1) protocol_context->binary = iVal;
+    if (sVal) free(sVal);
+}
+
+static void
+processProtocolLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    char *sVal = stringVal(node);
+    char *endInt = NULL;
+    errno = 0;
+    unsigned long iVal = strtoul(sVal, &endInt, 10);
+    if (!errno && !*endInt) protocol_context->len = iVal;
+    if (sVal) free(sVal);
+}
+
+static void
+processProtocolDetect(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    char* sVal = stringVal(node);
+    unsigned iVal = strToVal(boolMap, sVal);
+    if (iVal <= 1) protocol_context->detect = iVal;
+    if (sVal) free(sVal);
+}
+
+static void
+processProtocolPayload(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    char* sVal = stringVal(node);
+    unsigned iVal = strToVal(boolMap, sVal);
+    if (iVal <= 1) protocol_context->payload = iVal;
+    if (sVal) free(sVal);
+}
+
+static void
+processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char logBuf[256];
+
+    // protocol entries must be key/value maps
+    if (node->type != YAML_MAPPING_NODE) {
+        scopeLog("WARN: ignoring non-map protocol entry\n", -1, CFG_LOG_WARN);
+        return;
+    }
+
+    // the protocol list should already be setup
+    if (!g_protlist) {
+        DBG(NULL);
+        return;
+    }
+
+    // protocol object to populate
+    protocol_context = calloc(1, sizeof(protocol_def_t));
+    if (!protocol_context) {
+        DBG(NULL);
+        return;
+    }
+    protocol_context->detect = TRUE; // non-zero default
+
+    // process the entry
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE, NAME_NODE,    processProtocolName},
+        {YAML_SCALAR_NODE, REGEX_NODE,   processProtocolRegex},
+        {YAML_SCALAR_NODE, BINARY_NODE,  processProtocolBinary},
+        {YAML_SCALAR_NODE, LEN_NODE,     processProtocolLen},
+        {YAML_SCALAR_NODE, DETECT_NODE,  processProtocolDetect},
+        {YAML_SCALAR_NODE, PAYLOAD_NODE, processProtocolPayload},
+        {YAML_NO_NODE,     NULL,         NULL}
+    };
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+
+    // require at least the name and regex
+    if (!protocol_context->protname || !protocol_context->regex) {
+        destroyProtEntry(protocol_context);
+        protocol_context = NULL;
+        scopeLog("WARN: ignoring protocol entry missing name or regex\n", -1, CFG_LOG_WARN);
+        return;
+    }
+
+    // init the regex
+    int errornumber;
+    PCRE2_SIZE erroroffset;
+    protocol_context->re = pcre2_compile(
+            (PCRE2_SPTR)protocol_context->regex,
+            PCRE2_ZERO_TERMINATED, 0,
+            &errornumber, &erroroffset, NULL);
+    if (!protocol_context->re) {
+        snprintf(logBuf, sizeof(logBuf),
+                 "WARN: invalid regex for \"%s\" protocol entry; %s\n",
+                 protocol_context->protname, protocol_context->regex);
+        scopeLog(logBuf, -1, CFG_LOG_WARN);
+        destroyProtEntry(protocol_context);
+        protocol_context = NULL;
+        return;
+    }
+
+    // replace if name matches existing entry
+    for (list_key_t key = 0; key <= g_prot_sequence; ++key) {
+        protocol_def_t *found = lstFind(g_protlist, key);
+        if (found && !strcmp(protocol_context->protname, found->protname)) {
+            protocol_context->type = key;
+            if (!lstDelete(g_protlist, key)) {
+                DBG(NULL);
+            }
+            if (!lstInsert(g_protlist, key, protocol_context)) {
+                DBG(NULL);
+            }
+            protocol_context = NULL;
+            destroyProtEntry(found);
+            break;
+        }
+    }
+
+    // otherwise, add
+    if (protocol_context) {
+        protocol_context->type = ++g_prot_sequence;
+        if (!lstInsert(g_protlist, g_prot_sequence, protocol_context)) {
+            --g_prot_sequence;
+            destroyProtEntry(protocol_context);
+            DBG(NULL);
+        }
+        protocol_context = NULL;
+    }
+}
+
+static void
+processProtocol(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    if (node->type != YAML_SEQUENCE_NODE) return;
+
+    yaml_node_item_t* item;
+    foreach(item, node->data.sequence.items) {
+        yaml_node_t* node = yaml_document_get_node(doc, *item);
+        processProtocolEntry(config, doc, node);
+    }
+}
+
+static void
 setConfigFromDoc(config_t* config, yaml_document_t* doc)
 {
     yaml_node_t *node = yaml_document_get_root_node(doc);
@@ -1485,6 +1659,8 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
         {YAML_MAPPING_NODE,   PAYLOAD_NODE,         processPayload},
         {YAML_MAPPING_NODE,   EVENT_NODE,           processEvent},
         {YAML_MAPPING_NODE,   CRIBL_NODE,           processCribl},
+        {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
+        {YAML_SEQUENCE_NODE,  PROTOCOL_NODE,        processProtocol},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1691,7 +1867,6 @@ static cJSON*
 createMetricFormatJson(config_t* cfg)
 {
     cJSON* root = NULL;
-    cJSON* tags;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
@@ -1703,9 +1878,6 @@ createMetricFormatJson(config_t* cfg)
                                     cfgMtcStatsDMaxLen(cfg))) goto err;
     if (!cJSON_AddNumberToObjLN(root, VERBOSITY_NODE,
                                        cfgMtcVerbosity(cfg))) goto err;
-
-    if (!(tags = createTagsJson(cfg))) goto err;
-    cJSON_AddItemToObjectCS(root, TAGS_NODE, tags);
 
     return root;
 err:
@@ -1886,11 +2058,55 @@ err:
     return NULL;
 }
 
+static cJSON*
+createProtocolEntryJson(config_t* cfg, protocol_def_t* prot)
+{
+    cJSON *root = NULL;
+
+    if (!prot) goto err;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, NAME_NODE, prot->protname)) goto err;
+    if (!cJSON_AddStringToObjLN(root, REGEX_NODE, prot->regex)) goto err;
+    if (!cJSON_AddStringToObjLN(root, BINARY_NODE, valToStr(boolMap, prot->binary))) goto err;
+    if (!cJSON_AddNumberToObjLN(root, LEN_NODE, prot->len)) goto err;
+    if (!cJSON_AddStringToObjLN(root, DETECT_NODE, valToStr(boolMap, prot->detect))) goto err;
+    if (!cJSON_AddStringToObjLN(root, PAYLOAD_NODE, valToStr(boolMap, prot->payload))) goto err;
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createProtocolJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+
+    if (!(root = cJSON_CreateArray())) goto err;
+
+    for (unsigned key = 1; key <= g_prot_sequence; ++key) {
+        protocol_def_t *prot = lstFind(g_protlist, key);
+        if (prot) {
+            cJSON *item = createProtocolEntryJson(cfg, prot);
+            if (!item) goto err;
+            cJSON_AddItemToArray(root, item);
+        }
+    }
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
 cJSON*
 jsonObjectFromCfg(config_t* cfg)
 {
     cJSON* json_root = NULL;
-    cJSON* metric, *libscope, *event, *payload;
+    cJSON* metric, *libscope, *event, *payload, *tags, *protocol;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
@@ -1905,6 +2121,12 @@ jsonObjectFromCfg(config_t* cfg)
 
     if (!(payload = createPayloadJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(json_root, PAYLOAD_NODE, payload);
+
+    if (!(tags = createTagsJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, TAGS_NODE, tags);
+
+    if (!(protocol = createProtocolJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, PROTOCOL_NODE, protocol);
 
     return json_root;
 err:
@@ -2150,6 +2372,11 @@ cfgLogStreamDefault(config_t *cfg)
         cfgSendProcessStartMsgSet(cfg, TRUE);
     }
 
+    if (cfgEvtFormatSourceEnabled(cfg, CFG_SRC_HTTP)) {
+        strncat(g_logmsg, "HTTP watch disable, ", 25);
+    }
+    cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_HTTP, FALSE);
+
     return 0;
 }
 
@@ -2170,129 +2397,6 @@ singleChannelSet(ctl_t *ctl, mtc_t *mtc)
     }
 
     return -1;
-}
-
-/*
- * It goes like this:
- * the protocol config file is 3 levels deep
- *
- * the root node is "protocol:"
- * 2nd level is an array of protocols: a mapping node
- * 3rd level is the definition of a specific protocol
- *
- * a specific protocol contains:
- * name: a string, display name of the protocol
- * binary: a string, true or false
- * regex: a string, the regex pattern
- * len: an integer, len is optional, should be supplied for a binary protocol
- */
-bool
-protocolRead(const char *path, list_t *plist)
-{
-    FILE *protFile = NULL;
-    protocol_def_t *prot = NULL;
-    int parser_successful = 0;
-    int doc_successful = 0;
-    int num_found = 0;
-    bool name_found = FALSE;
-    yaml_parser_t parser;
-    yaml_document_t doc;
-    yaml_node_t *node;
-    yaml_node_pair_t *root_pair, *prot_pair;
-    yaml_node_t *root_value, *root_key, *plist_key, *prot_key, *prot_value;
-    yaml_node_item_t *pitem;
-
-    if (!g_fn.fopen || !g_fn.fclose || !path) goto cleanup;
-
-    protFile = g_fn.fopen(path, "r");
-    if (!protFile) goto cleanup;
-
-    parser_successful = yaml_parser_initialize(&parser);
-    if (!parser_successful) goto cleanup;
-
-    yaml_parser_set_input_file(&parser, protFile);
-
-    doc_successful = yaml_parser_load(&parser, &doc);
-    if (!doc_successful) goto cleanup;
-
-    node = yaml_document_get_root_node(&doc);
-    if (node->type != YAML_MAPPING_NODE) goto cleanup;
-
-    /*
-     * as defined, no need to loop on the root node
-     * in case we need to add more to the config doc...
-     * same for the 2nd level
-     */
-    foreach (root_pair, node->data.mapping.pairs) {
-        // 1st level
-        root_value = yaml_document_get_node(&doc, root_pair->value);
-        if (root_value->type != YAML_SEQUENCE_NODE) goto cleanup;
-
-        root_key = yaml_document_get_node(&doc, root_pair->key);
-        if (!root_key || (root_key->type != YAML_SCALAR_NODE)) goto cleanup;
-        if (strcmp((char *)root_key->data.scalar.value, "protocol") != 0) goto cleanup;
-
-        foreach(pitem, root_value->data.sequence.items) {
-            // 2nd level
-            // get an item here instead of a node for the array
-            // use the key because there is no value
-            plist_key = yaml_document_get_node(&doc, *pitem);
-            if (plist_key->type != YAML_MAPPING_NODE) goto cleanup;
-
-            if ((prot = calloc(1, sizeof(protocol_def_t))) == NULL) goto cleanup;
-            name_found = FALSE;
-
-            // set non-zero defaults
-            prot->detect = TRUE;
-
-            foreach (prot_pair, (yaml_node_pair_t *)plist_key->data.sequence.items) {
-                // 3rd level
-                prot_key = yaml_document_get_node(&doc, prot_pair->key);
-                if (!prot_key || (prot_key->type != YAML_SCALAR_NODE)) goto cleanup;
-
-                prot_value = yaml_document_get_node(&doc, prot_pair->value);
-                if (!prot_value) goto cleanup;
-
-                if (!strcmp((char *)prot_key->data.scalar.value, "name")) {
-                    if (prot->protname) free(prot->protname);
-                    prot->protname = strdup((char *)prot_value->data.scalar.value);
-                    name_found = TRUE; // at least need to have a name
-                } else if (!strcmp((char *)prot_key->data.scalar.value, "regex")) {
-                    if (prot->regex) free(prot->regex);
-                    prot->regex = strdup((char *)prot_value->data.scalar.value);
-                } else if (!strcmp((char *)prot_key->data.scalar.value, "binary")) {
-                    prot->binary = (!strcmp((char *)prot_value->data.scalar.value, "false")) ?
-                        FALSE : TRUE; // seems like it should default to true
-                } else if (!strcmp((char *)prot_key->data.scalar.value, "len")) {
-                    errno = 0;
-                    prot->len = strtoull((char *)prot_value->data.scalar.value, NULL, 0);
-                    if (errno != 0) prot->len = 0;
-                } else if (!strcmp((char *)prot_key->data.scalar.value, "detect")) {
-                    prot->detect = (!strcmp((char *)prot_value->data.scalar.value, "false")) ?
-                        FALSE : TRUE; // seems like it should default to true
-                } else if (!strcmp((char *)prot_key->data.scalar.value, "payload")) {
-                    prot->payload = (!strcmp((char *)prot_value->data.scalar.value, "false")) ?
-                        FALSE : TRUE; // seems like it should default to true
-                } else {
-                    continue;
-                }
-            }
-
-            if (!name_found  || (lstInsert(plist, num_found, prot) == FALSE)) {
-                destroyProtEntry(prot);
-            } else {
-                num_found++;
-            }
-            prot = NULL;
-        }
-    }
-
-cleanup:
-    if (prot) destroyProtEntry(prot);
-    if (doc_successful) yaml_document_delete(&doc);
-    if (parser_successful) yaml_parser_delete(&parser);
-    if (protFile) g_fn.fclose(protFile);
-    return TRUE;
 }
 
 void

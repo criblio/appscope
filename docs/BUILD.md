@@ -44,7 +44,7 @@ This uses the same builder container image as `make build` but drops into a shel
 
 This starts a build of the core (the library and loaders) and CLI. Use `make coreall` if you'd like to skip building the CLI. Use `make scope` for the opposite.
 
-These commands run the build in the local environment using locally installed dependencies. This is only suported on Ubuntu 18.04 and will generated a warning if it detects another local operating system. You are encoraged to use `make build` instead.
+These commands run the build in the local environment using locally installed dependencies. This is only supported on Ubuntu 18.04 and will generated a warning if it detects another local operating system. You are encoraged to use `make build` instead.
 
 ### `make test`
 
@@ -74,7 +74,7 @@ Some of the contrib libraries build into a separate folder and don't make any ch
 
 ### Go Modules
 
-The [`Makefile`](../cli/Makefile) for the CLI sents a few environment variables that cause Go to store downloaded modules, binary programs, and other cacheable content in `cli/.go*/` subdirectories. This was done initially so the cached content was accessible in our build containers and not lost when the container exits. It was also done to avoid breaking the user's `$HOME/.go/` setup when runing cross-architecture builds.
+The [`Makefile`](../cli/Makefile) for the CLI sents a few environment variables that cause Go to store downloaded modules, binary programs, and other cacheable content in `cli/.go*/` subdirectories. This was done initially so the cached content was accessible in our build containers and not lost when the container exits. It was also done to avoid breaking the user's `$HOME/.go/` setup when running cross-architecture builds.
 
 In CI, we are caching the contents of these subdirectories to speed up the build and unit-test stages.
 
@@ -91,7 +91,7 @@ Various aspects of the build system that didn't fit else where are listed below.
 
   > Note: We only really support building on Linux. The MacOS build support has essentially been abandoned.
 * The `os/linux/Makefile` includes architecture-specific `os/linux/x86_64.mk` or `os/linux/aarch64.mk` files.
-* The top-level `Makefile` has a `cli%` pattern rule and relays to coresponding targets in `cli/Makefile`. It `cd`'s into`/cli` to run those targets. We also have a `scope` target as a shortcut to build the CLI from the top-level directory.
+* The top-level `Makefile` has a `cli%` pattern rule and relays to corresponding targets in `cli/Makefile`. It `cd`'s into`/cli` to run those targets. We also have a `scope` target as a shortcut to build the CLI from the top-level directory.
 
 [QEMU]: https://www.qemu.org/
 [`binfmt`]: https://www.kernel.org/doc/html/latest/admin-guide/binfmt-misc.html

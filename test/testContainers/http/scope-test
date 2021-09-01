@@ -174,8 +174,8 @@ else
 fi
 endtest
 
-# The HTTP entry in /opt/test/conf_1/scope_protocol.yml has payload:false which
-# should override the logic that automatically enables HTTP payloads when we're
+# The HTTP entry in /opt/test/conf_1/scope.yml has payload:false which should
+# override the logic that automatically enables HTTP payloads when we're
 # connected to LogStream.
 starttest "HTTP/2, payload:false"
 rm -rf ${DEST}
@@ -201,8 +201,8 @@ else
 fi
 endtest
 
-# The HTTP entry in /opt/test/conf_2/scope_protocol.yml has an alternative
-# RegEx that won't match HTTP.
+# The HTTP entry in /opt/test/conf_2/scope.yml has an alternative RegEx that
+# won't match HTTP.
 starttest "HTTP/2, busted regex"
 rm -rf ${DEST}
 SCOPE_HOME=/opt/test/conf_2 \

@@ -18,7 +18,7 @@ CONFDIR := ../conf
 SCOPE := $(BINDIR)/scope
 LDSCOPE := $(BINDIR)/ldscope
 LIBSCOPE := $(LIBDIR)/libscope.so
-CONF_YML := $(wildcard $(CONFDIR)/*.yml)
+CONF_YML := $(CONFDIR)/scope.yml
 
 GO_BINDATA := $(GOBIN)/go-bindata
 GOVVV := $(GOBIN)/govvv

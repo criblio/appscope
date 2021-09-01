@@ -13,6 +13,9 @@ bool g_exitdone = FALSE;
 mtc_t *g_mtc = NULL;
 ctl_t *g_ctl = NULL;
 
+list_t *g_protlist;
+unsigned int g_prot_sequence = 0;
+
 // Add a newline delimiter to a msg
 char *
 msgAddNewLine(char *msg)

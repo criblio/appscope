@@ -162,7 +162,7 @@ lstDeleteNonExistingElementReturnsFalse(void **state)
 static void
 test_delete_fn(void* arg)
 {
-    // Completly contrived example.  Assume arg is a pointer to an uint64_t.
+    // Completely contrived example.  Assume arg is a pointer to an uint64_t.
     // Increment the value at that location just so something can be
     // observed in the following test.
     uint64_t* int_ptr = arg;

@@ -46,8 +46,6 @@ fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
 static search_t* g_http_redirect = NULL;
-static list_t *g_protlist;
-static unsigned int g_prot_sequence = 0;
 
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
@@ -234,41 +232,6 @@ error:
     g_http_protocol_def = NULL;
 }
 
-static void
-initProtocolDetect()
-{
-    int i;
-    list_t *plist = lstCreate(NULL);
-    char *ppath = protocolPath();
-    protocol_def_t *prot;
-
-    if (!plist) {
-        if (ppath) free(ppath);
-        return;
-    }
-
-    if (!ppath) {
-        if (plist) lstDestroy(&plist);
-        return;
-    }
-
-    protocolRead(ppath, plist);
-
-    for (i = 0; ; i++) {
-        if ((prot = lstFind(plist, i)) != NULL) {
-            request_t req;
-
-            req.protocol = prot;
-            addProtocol(&req);
-        } else {
-            break;
-        }
-    }
-
-    if (ppath) free(ppath);
-    lstDestroy(&plist);
-}
-
 void
 initState()
 {
@@ -306,7 +269,6 @@ initState()
     g_http_redirect = searchComp(REDIRECTURL);
 
     g_protlist = lstCreate(destroyProtEntry);
-    initProtocolDetect();
     initPayloadDetect();
 
     initReporting();
@@ -1010,7 +972,7 @@ static int
 extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     if (!buf || (len <= 0)) {
-        DBG(NULL); // why whould we ever get here?
+        DBG(NULL); // why would we ever get here?
         return -1;
     }
 
@@ -1107,7 +1069,7 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
     unsigned int ptype;
     protocol_def_t *tls_proto_def = g_tls_protocol_def; // use ours by default
 
-    // Look for an overriden TLS entry from the protocol detector configs
+    // Look for an overridden TLS entry from the protocol detector configs
     for (ptype = 0; ptype <= g_prot_sequence; ptype++)
     {
         protocol_def_t *tmp_proto_def;
@@ -2267,7 +2229,7 @@ doClose(int fd, const char *func)
         resetHttp(&ninfo->http);
     }
 
-    // Check both file desriptor tables
+    // Check both file descriptor tables
     if ((fsinfo = getFSEntry(fd)) != NULL) {
 
         doUpdateState(FS_CLOSE, fd, 0, func, NULL);

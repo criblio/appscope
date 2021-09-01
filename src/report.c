@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <fcntl.h>
+#include <sys/time.h>
 
 #include "atomic.h"
 #include "com.h"
@@ -420,7 +421,7 @@ static bool
 httpFieldsInternal(event_field_t *fields, http_report *hreport, protocol_info *proto)
 {
     /*
-    Compression and getting to an attribute with compressed and uncompressed lenghts.
+    Compression and getting to an attribute with compressed and uncompressed lengths.
     https://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html
     https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.11
     https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.13
@@ -478,8 +479,11 @@ doHttpHeader(protocol_info *proto)
             return;
         }
 
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+
         map->id = post->id;
-        map->first_time = time(NULL);
+        map->first_time = tv.tv_sec;
         map->req = NULL;
         map->req_len = 0;
     }
@@ -592,8 +596,11 @@ doHttpHeader(protocol_info *proto)
             return;
         }
 
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+
         int rps = map->frequency;
-        int sec = (map->first_time > 0) ? (int)time(NULL) - map->first_time : 1;
+        int sec = (map->first_time > 0) ? (int)tv.tv_sec - map->first_time : 1;
         if (sec > 0) {
             rps = map->frequency / sec;
         }
@@ -1275,7 +1282,7 @@ getNetPtotocol(net_info *net, event_field_t *nevent, int *ix)
     "net.peer.name": wttr.in,
     "net.host.ip": "172.17.0.2",
     "net.host.port": 49202,
-    "net.host.name": "scope-vm", (removed as redunant with host)
+    "net.host.name": "scope-vm", (removed as redundant with host)
     "net.protocol": "http",
   },
   "_time": timestamp
@@ -1326,7 +1333,7 @@ doNetOpenEvent(net_info *net)
     "net.peer.name": wttr.in,
     "net.host.ip": "172.17.0.2",
     "net.host.port": 49202,
-    "net.host.name": "scope-vm", (removed as redunant with host)
+    "net.host.name": "scope-vm", (removed as redundant with host)
     "net.protocol": "http",
     "duration": 243,
     "net.close.reason": "normal",
@@ -2575,11 +2582,14 @@ doPayload()
                 : (pinfo->net.tlsProtoDef
                    ? pinfo->net.tlsProtoDef->protname 
                    : "");
+            struct timeval tv;
+            gettimeofday(&tv, NULL);
+            double timestamp = tv.tv_sec + tv.tv_usec/1e6;
             int rc = snprintf(pay, hlen,
-                              "{\"type\":\"payload\",\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s,\"protocol\":\"%s\"}",
-                              g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport, protoName);
+                              "{\"type\":\"payload\",\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s,\"protocol\":\"%s\",\"_time\":%.3f}",
+                              g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport, protoName, timestamp);
             if (rc < 0) {
-                // unlikley
+                // unlikely
                 if (pinfo->data) free(pinfo->data);
                 if (pinfo) free(pinfo);
                 DBG(NULL);

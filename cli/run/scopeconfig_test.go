@@ -111,7 +111,7 @@ func TestConfigFromRunOpts(t *testing.T) {
 	err = c.configFromRunOpts()
 	assert.Equal(t, fmt.Errorf("Missing :port at the end of tls://bar"), err)
 
-	// invlaid port
+	// invalid port
 	c.MetricsDest = "tcp://bar:foo"
 	err = c.configFromRunOpts()
 	assert.Equal(t, fmt.Errorf("Invalid dest: tcp://bar:foo"), err)

@@ -112,7 +112,7 @@ setEnvVariable(char *env, char *value)
     if (new_val) free(new_val);
 }
 
-// modify NEEDED entries in libscope.so to avoid dependecies
+// modify NEEDED entries in libscope.so to avoid dependencies
 static int
 set_library(void)
 {
@@ -521,6 +521,10 @@ static const char scope_help_configuration[] =
 "                tcp://host:port\n"
 "                    Send to a TCP or UDP server. \"host\" is the hostname or\n"
 "                    IP address and \"port\" is the port number of service name.\n"
+"                unix://socketpath\n"
+"                    Output to a unix domain server using TCP.  Socket paths\n"
+"                    are implemented as abstract sockets, so the name chosen\n"
+"                    has no connection with filesystem pathnames.\n"
 "        SCOPE_METRIC_TLS_ENABLE\n"
 "            Flag to enable Transport Layer Security (TLS). Only affects\n"
 "            tcp:// destinations. true,false  Default is false.\n"
@@ -820,21 +824,13 @@ static const char scope_help_events[] =
 static const char scope_help_protocol[] =
 "  PROTOCOL DETECTION:\n"
 "    Scope can detect any defined network protocol. You provide protocol\n"
-"    definitions in a separate YAML config file (which should be named \n"
-"    scope_protocol.yml). You describe protocol specifics in one or more regex \n"
-"    definitions. PCRE2 regular expressions are supported. You can find a \n"
-"    sample config file at\n"
-"    https://github.com/criblio/appscope/blob/master/conf/scope_protocol.yml.\n"
+"    definitions in the \"protocol\" section of the config file. You describe \n"
+"    protocol specifics in one or more regex definitions. PCRE2 regular \n"
+"    expressions are supported. The stock scope.yml file for examples.\n"
 "\n"
 "    Scope detects binary and string protocols. Detection events, \n"
-"    formatted in JSON, are emitted over the event channel. Enable the \n"
-"    event metric watch type to allow protocol detection.\n"
-"\n"
-"    The protocol detection config file should be named scope_protocol.yml.\n"
-"    Place the protocol definitions config file (scope_protocol.yml) in the \n"
-"    directory defined by the SCOPE_HOME environment variable. If Scope \n"
-"    does not find the protocol definitions file in that directory, it will\n"
-"    search for it, in the same search order as described for config files.\n"
+"    formatted in JSON, are emitted over the event channel unless the \"detect\"\n"
+"    property is set to \"false\".\n"
 "\n"
 "  PAYLOAD EXTRACTION:\n"
 "    When enabled, libscope extracts payload data from network operations.\n"
@@ -884,7 +880,7 @@ showUsage(char *prog)
       "\n"
       "Cribl AppScope Static Loader %s\n" 
       "\n"
-      "AppScope is a general-purpose observable application telemtry system.\n"
+      "AppScope is a general-purpose observable application telemetry system.\n"
       "\n"
       "usage: %s [OPTIONS] [--] EXECUTABLE [ARGS...]\n"
       "       %s [OPTIONS] --attach PID\n"
@@ -893,7 +889,7 @@ showUsage(char *prog)
       "  -u, --usage           display this info\n"
       "  -h, --help [SECTION]  display all or the specified help section\n"
       "  -l, --libbasedir DIR  specify parent for the library directory (default: /tmp)\n"
-      "  -f DIR                alias for \"-l DIR\" for backward compatability\n"
+      "  -f DIR                alias for \"-l DIR\" for backward compatibility\n"
       "  -a, --attach PID      attach to the specified process ID\n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"

@@ -1,7 +1,7 @@
 /*
  * envloop - Event Loop Tool
  *
- * A simple program to display any `SCOPE_*` enviroment variables in a loop so
+ * A simple program to display any `SCOPE_*` environment variables in a loop so
  * we can test setting them when we "attach".
  */
 

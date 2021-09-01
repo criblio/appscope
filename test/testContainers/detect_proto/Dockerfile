@@ -11,7 +11,7 @@ RUN mkdir /opt/test-runner/logs/
 RUN mkdir /opt/test-runner/bin
 
 COPY detect_proto/mongod.conf /etc/.
-COPY detect_proto/scope_protocol.yml /opt/test-runner/bin/.
+COPY detect_proto/scope.yml /opt/test-runner/bin/.
 COPY detect_proto/mongo.js /opt/test-runner/bin/.
 
 COPY detect_proto/test_protocols.sh /opt/test-runner/bin/test_protocols.sh

@@ -61,7 +61,6 @@ typedef unsigned int bool;
 
 #define CFG_MAX_VERBOSITY 9
 #define CFG_FILE_NAME "scope.yml"
-#define PROTOCOL_FILE_NAME "scope_protocol.yml"
 
 #define DEFAULT_MTC_ENABLE TRUE
 #define DEFAULT_MTC_FORMAT CFG_FMT_STATSD

@@ -140,4 +140,10 @@ cribl:
           # cacertpath can be used to specify a private CA.
           # If left empty, AppScope will try to use public root certs
           # that are provided by the linux distro.
-...
+
+
+protocol:
+  - name: HTTP
+    regex: " HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
+    detect: true
+    payload: false

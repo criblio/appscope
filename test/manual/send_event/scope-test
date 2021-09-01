@@ -94,8 +94,8 @@ send_event_unix() {
         ab -n $3 -c 1 http://127.0.0.1/ > /dev/null 2>&1
         sleep 1
     done
-    # sleep to allow file write
-    sleep 1
+    # sleep to allow ab to complete
+    sleep 10
     if [ "$(wait_for_files "${DEST}")" ]; then
         found=$(grep '"source":"http-req"' ${DEST} | wc -l)
         if [ $found -eq $requests ] ; then 
@@ -151,8 +151,8 @@ send_event_tcp() {
         ab -n $2 -c 1 http://127.0.0.1/ > /dev/null 2>&1
         sleep 1
     done
-    # sleep to allow file write
-    sleep 1
+    # sleep to allow ab to complete
+    sleep 10
     if [ "$(wait_for_files "${DEST}")" ]; then
         found=$(grep '"source":"http-req"' ${DEST} | wc -l)
         if [ $found -eq $requests ] ; then 

@@ -96,8 +96,8 @@ relay() {
     sleep 2
     # run ab benchmark test
     ab -n $3 -c 1 http://127.0.0.1/ > /dev/null 2>&1
-    # sleep to wait for file write
-    sleep 5
+    # sleep to wait for ab to complete
+    sleep 10
     if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
         found=$(grep '"source":"http-req"' ${DEST}/CriblOut-*.json | wc -l)
         if [ $found -eq $3 ] ; then 

@@ -6,6 +6,19 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 0.7.3
+
+2021-09-01 - Maintenance/Hotfix Pre-Release
+
+- **Fix**: [#516](https://github.com/criblio/appscope/issues/516)
+ Scoped processes that use TLS no longer experience a state where child processes can get stuck in the fork call.
+
+- **Fix**: [#442](https://github.com/criblio/appscope/issues/442)
+ Remove TLS exit handling code that is no longer needed.
+
+- **Fix**: [#518](https://github.com/criblio/appscope/issues/518)
+ Fix a build caching issue.
+
 ## AppScope 0.7.2
 
 2021-08-17 - Maintenance Pre-Release

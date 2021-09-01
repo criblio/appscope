@@ -11,14 +11,14 @@ RUN apt update && apt install -y \
 && rm -rf /var/lib/apt/lists/*
 
 ENV CRIBL_NOAUTH=1
-COPY relay/cribl/ /opt/cribl/local/cribl/
+COPY cli_manager/cribl/ /opt/cribl/local/cribl/
 
 RUN mkdir /opt/test
-COPY relay/conf_1 /opt/test/conf_1
+COPY cli_manager/conf_1 /opt/test/conf_1
 
 
 
-COPY relay/tcpserver /usr/bin/tcpserver
+COPY cli_manager/tcpserver /usr/bin/tcpserver
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh
@@ -31,7 +31,7 @@ RUN  mkdir /usr/local/scope && \
      ln -s /opt/appscope/bin/linux/$(uname -m)/ldscope /usr/local/scope/bin/ldscope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
-COPY relay/scope-test /usr/local/scope/
+COPY cli_manager/scope-test /usr/local/scope/
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]

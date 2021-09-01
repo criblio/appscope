@@ -28,4 +28,4 @@ ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["test"]
+#CMD ["test"]

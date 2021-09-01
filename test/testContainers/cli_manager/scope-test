@@ -95,9 +95,9 @@ relay() {
     # sleep to allow scope manager to start
     sleep 2
     # run ab benchmark test
-    ab -n $3 -c 1 http://127.0.0.1/ > /dev/null
+    ab -n $3 -c 1 http://127.0.0.1/ > /dev/null 2>&1
     # sleep to wait for file write
-    sleep 1
+    sleep 5
     if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
         found=$(grep '"source":"http-req"' ${DEST}/CriblOut-*.json | wc -l)
         if [ $found -eq $3 ] ; then 
@@ -144,9 +144,9 @@ relay 10 10 10000
 # Results
 echo ""
 if (( $FAILED_TEST_COUNT == 0 )); then
-    echo "************ ALL RELAY TESTS PASSED ************"
+    echo "************ ALL CLI MANAGER TESTS PASSED ************"
 else
-    echo "************ $FAILED_TEST_COUNT RELAY TESTS FAILED ************"
+    echo "************ $FAILED_TEST_COUNT CLI MANAGER TESTS FAILED ************"
     echo "Failed tests: $FAILED_TEST_LIST"
 fi
 echo ""

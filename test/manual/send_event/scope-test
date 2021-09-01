@@ -91,7 +91,7 @@ send_event_unix() {
     # start ab benchmark test
     for ((i=0;i<$4;i++))
     do
-        ab -n $3 -c 1 http://127.0.0.1/ > /dev/null
+        ab -n $3 -c 1 http://127.0.0.1/ > /dev/null 2>&1
         sleep 1
     done
     # sleep to allow file write
@@ -148,7 +148,7 @@ send_event_tcp() {
     # start ab benchmark test
     for ((i=0;i<$3;i++))
     do
-        ab -n $2 -c 1 http://127.0.0.1/ > /dev/null
+        ab -n $2 -c 1 http://127.0.0.1/ > /dev/null 2>&1
         sleep 1
     done
     # sleep to allow file write
@@ -184,14 +184,15 @@ send_event_unix 1 1 100 60
 send_event_unix 1 1 1000 60
 send_event_unix 1 1 2000 60
 send_event_unix 1 1 3000 60
+send_event_unix 1 1 4000 60
 send_event_unix 1 1 5000 60
 send_event_unix 1 1 8000 60
-send_event_unix 1 1 1000 60
 send_event_unix 1 1 10000 60 
 send_event_tcp 1 100 60
 send_event_tcp 1 1000 60
 send_event_tcp 1 2000 60
 send_event_tcp 1 3000 60
+send_event_tcp 1 4000 60
 send_event_tcp 1 5000 60
 send_event_tcp 1 8000 60
 send_event_tcp 1 10000 60

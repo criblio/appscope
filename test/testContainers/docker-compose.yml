@@ -125,13 +125,13 @@ services:
       - "9000:9000"
     <<: *scope-common
 
-  relay:
-    image: scopeci/scope-relay
+  cli_manager:
+    image: scopeci/scope-cli_manager
     build:
       cache_from:
-        - scopeci/scope-relay
+        - scopeci/scope-cli_manager
       context: .
-      dockerfile: ./relay/Dockerfile
+      dockerfile: ./cli_manager/Dockerfile
     ports:
       - "9000:9000"
     <<: *scope-common

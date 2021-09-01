@@ -1888,8 +1888,6 @@ processCustomConfig(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_MAPPING_NODE,   EVENT_NODE,           processEvent},
         {YAML_MAPPING_NODE,   CRIBL_NODE,           processCribl},
         {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
-        // don't allow nested custom entries
-        //{YAML_MAPPING_NODE,   CUSTOM_NODE,          processCustom},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1944,13 +1942,22 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
         {YAML_MAPPING_NODE,   CRIBL_NODE,           processCribl},
         {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
         {YAML_SEQUENCE_NODE,  PROTOCOL_NODE,        processProtocol},
-        {YAML_MAPPING_NODE,   CUSTOM_NODE,          processCustom},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
     yaml_node_pair_t *pair;
     foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
+    }
+
+    // ensure the custom entries are processed after the others
+    parse_table_t t2[] = {
+        {YAML_MAPPING_NODE,   CUSTOM_NODE,          processCustom},
+        {YAML_NO_NODE,        NULL,                 NULL}
+    };
+
+    foreach (pair, node->data.mapping.pairs) {
+        processKeyValuePair(t2, pair, config, doc);
     }
 }
 

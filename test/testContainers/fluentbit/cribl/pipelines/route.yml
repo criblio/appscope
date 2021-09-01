@@ -1,0 +1,32 @@
+id: default
+groups: {}
+routes:
+  - id: BQMNRB
+    name: tcpjson_to_tmp
+    final: false
+    disabled: false
+    pipeline: passthru
+    description: ""
+    clones:
+      - {}
+    filter: __inputId=='tcpjson:in_tcp_json'
+    output: tmp
+   - id: AQMNRB
+    name: appscope_to_tmp
+    final: false
+    disabled: false
+    pipeline: passthru
+    description: ""
+    clones:
+      - {}
+    filter: __inputId=='appscope:in_appscope'
+    output: tmp
+  - id: default
+    name: default
+    final: true
+    disabled: false
+    pipeline: main
+    description: ""
+    clones: []
+    filter: "true"
+    output: default

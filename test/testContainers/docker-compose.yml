@@ -125,6 +125,17 @@ services:
       - "9000:9000"
     <<: *scope-common
 
+  fluentbit:
+    image: scopeci/scope-fluentbit
+    build:
+      cache_from:
+        - scopeci/scope-fluentbit
+      context: .
+      dockerfile: ./fluentbit/Dockerfile
+    ports:
+      - "9000:9000"
+    <<: *scope-common
+
   http:
     image: scopeci/scope-http-it
     build:

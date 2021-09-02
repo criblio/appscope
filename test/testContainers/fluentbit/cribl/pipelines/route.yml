@@ -1,8 +1,8 @@
 id: default
 groups: {}
 routes:
-  - id: BQMNRB
-    name: tcpjson_to_tmp
+  - id: hrn4bd
+    name: tcpjson
     final: false
     disabled: false
     pipeline: passthru
@@ -10,16 +10,6 @@ routes:
     clones:
       - {}
     filter: __inputId=='tcpjson:in_tcp_json'
-    output: tmp
-   - id: AQMNRB
-    name: appscope_to_tmp
-    final: false
-    disabled: false
-    pipeline: passthru
-    description: ""
-    clones:
-      - {}
-    filter: __inputId=='appscope:in_appscope'
     output: tmp
   - id: default
     name: default
@@ -30,3 +20,5 @@ routes:
     clones: []
     filter: "true"
     output: default
+
+

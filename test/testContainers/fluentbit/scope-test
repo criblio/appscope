@@ -79,7 +79,7 @@ fi
 # Use fluentbit to relay events to a file
 # Assert on number of http events received
 fluentbit_file() {
-    starttest "Fluentbit_$1_Scope_$2_Requests"
+    starttest "Fluentbit->File_$1_Scope_$2_Requests"
     DEST=/tmp/fluent.out_file
     rm -rf ${DEST}
     # start nginx with modified config
@@ -88,8 +88,7 @@ fluentbit_file() {
     # sleep to allow nginx to start up
     sleep 2
     # start fluentbit
-    /opt/td-agent-bit/bin/td-agent-bit -i tcp -p "Port=9109" -p "Format=none" -o file -p "Format=plain" -p "Path=/tmp" -p "File=fluent.out_file" &
-    fluentbit_pid=$!
+    /opt/td-agent-bit/bin/td-agent-bit -i tcp -p "Port=9109" -p "Format=none" -o file -p "Format=plain" -p "Path=/tmp" -p "File=fluent.out_file" -d
     # sleep to allow fluentbit to start
     sleep 2
     # run ab benchmark test
@@ -116,7 +115,7 @@ fluentbit_file() {
         ERR+=1
     fi
     # kill processes
-    kill $fluentbit_pid
+    kill `pidof td-agent-bit`
     nginx -s quit
     # sleep to allow nginx and fluentbit to close (2+6 secs)
     sleep 8
@@ -130,7 +129,7 @@ fluentbit_file() {
 # Assert on number of http events received
 fluentbit_logstream() {
     starttest "Fluentbit->Logstream_$1_Scope_$2_Requests"
-    DEST=/tmp/out/appscope:in_appscope
+    DEST=/tmp/out/tcpjson:in_tcp_json
     rm -rf ${DEST}
     # start nginx with modified config
     sed -i "s/worker_processes\ auto/worker_processes\ $1/" /etc/nginx/nginx.conf
@@ -138,27 +137,26 @@ fluentbit_logstream() {
     # sleep to allow nginx to start up
     sleep 2
     # start fluentbit
-    /opt/td-agent-bit/bin/td-agent-bit -i tcp -p "Port=9109" -p "Format=none" -o tcp -p "tls=On" -p "Port=10070" -p "Format=json_lines" -p "json_date_key=false"
-    fluentbit_pid=$!
+    /opt/td-agent-bit/bin/td-agent-bit -i tcp -p "Port=9109" -p "Format=none" -o tcp -p "Port=10070" -p "Format=json_lines" -p "json_date_key=false" -d
     # sleep to allow fluentbit to start
     sleep 2
     # run ab benchmark test
     ab -n $2 -c 1 http://127.0.0.1/ > /dev/null 2>&1
     # sleep to wait for ab to complete
-    sleep 10
+    sleep 15
     if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
-        found=$(grep '"source":"http-req"' ${DEST}/CriblOut-*.json | wc -l)
-        if [ $found -eq $3 ] ; then 
+        found=$(grep '\\"source\\":\\"http-req\\"' ${DEST}/CriblOut-*.json | wc -l)
+        if [ $found -eq $2 ] ; then 
             echo "PASS: No missing http request events"
         else
-            echo "FAIL: Missing http request events: expected: $3, got: $found, dropped: $(($3-found))"
+            echo "FAIL: Missing http request events: expected: $2, got: $found, dropped: $(($2-found))"
             ERR+=1
         fi
-        found=$(grep '"source":"http-resp"' ${DEST}/CriblOut-*.json | wc -l)
-        if [ $found -eq $3 ] ; then 
+        found=$(grep '\\"source\\":\\"http-resp\\"' ${DEST}/CriblOut-*.json | wc -l)
+        if [ $found -eq $2 ] ; then 
             echo "PASS: No missing http response events"
         else
-            echo "FAIL: Missing http response events: expected: $3, got: $found, dropped: $(($3-found))"
+            echo "FAIL: Missing http response events: expected: $2, got: $found, dropped: $(($2-found))"
             ERR+=1
         fi
     else
@@ -166,22 +164,22 @@ fluentbit_logstream() {
         ERR+=1
     fi
     # kill processes
-    kill $fluentbit_pid
+    kill `pidof td-agent-bit`
     nginx -s quit
     # sleep to allow nginx and fluentbit to close (2+6 secs)
     sleep 8
     endtest
 }
 
-fluentbit_file 1 100
-fluentbit_file 1 1000
-fluentbit_file 1 10000
-fluentbit_file 10 100
-fluentbit_file 10 1000
-fluentbit_file 10 10000
-fluentbit_logstream 1 100
-fluentbit_logstream 1 1000
-fluentbit_logstream 1 10000
+#fluentbit_file 1 100
+#fluentbit_file 1 1000
+#fluentbit_file 1 10000
+#fluentbit_file 10 100
+#fluentbit_file 10 1000
+#fluentbit_file 10 10000
+#fluentbit_logstream 1 100
+#fluentbit_logstream 1 1000
+#fluentbit_logstream 1 10000
 fluentbit_logstream 10 100
 fluentbit_logstream 10 1000
 fluentbit_logstream 10 10000

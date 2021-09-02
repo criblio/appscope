@@ -28,6 +28,8 @@ RUN  mkdir /opt/test && \
 
 COPY fluentbit/cribl/ /opt/cribl/local/cribl/
 COPY fluentbit/conf_1 /opt/test/conf_1
+COPY fluentbit/conf_2 /opt/test/conf_2
+COPY fluentbit/fluentbit /opt/test/fluentbit
 COPY fluentbit/tcpserver /usr/bin/tcpserver
 COPY fluentbit/scope-test /usr/local/scope/
 COPY scope-profile.sh /etc/profile.d/scope.sh

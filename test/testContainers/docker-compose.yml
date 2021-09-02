@@ -136,13 +136,22 @@ services:
       - "9000:9000"
     <<: *scope-common
 
-  service:
-    image: ghcr.io/criblio/appscope-test-service:${TAG:?Missing TAG environment variable}
+  service-initd:
+    image: ghcr.io/criblio/appscope-test-service-initd:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - ghcr.io/criblio/appscope-test-service:${TAG:?Missing TAG environment variable}
+        - ghcr.io/criblio/appscope-test-service-initd:${TAG:?Missing TAG environment variable}
       context: .
-      dockerfile: ./service/Dockerfile
+      dockerfile: ./service/Dockerfile.initd
+    <<: *scope-common
+
+  service-systemd:
+    image: ghcr.io/criblio/appscope-test-service-systemd:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-service-systemd:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./service/Dockerfile.systemd
     <<: *scope-common
 
 # vim: ts=2 sw=2 et :

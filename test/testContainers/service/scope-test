@@ -1,4 +1,3 @@
 #!/bin/bash
 
-# TODO...
-scope service cribl
+scope service --force cribl 

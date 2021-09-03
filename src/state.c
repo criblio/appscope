@@ -1288,6 +1288,28 @@ setRemoteClose(int sd, int err)
     }
 }
 
+bool
+getFSBinaryDataState(int fd)
+{
+    struct fs_info_t *fs = getFSEntry(fd);
+    if (fs) {
+       return fs->binary_data;
+    }
+    DBG(NULL);
+    return FALSE;
+}
+
+void
+setFSBinaryDataState(int fd, bool state)
+{
+    struct fs_info_t *fs = getFSEntry(fd);
+    if (fs) {
+        fs->binary_data = state;
+    } else {
+        DBG(NULL);
+    }
+}
+
 void
 addSock(int fd, int type, int family)
 {

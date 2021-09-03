@@ -5,10 +5,53 @@
 #include <string.h>
 #include <unistd.h>
 #include "ctl.h"
+#include "circbuf.h"
 #include "dbg.h"
 #include "cfgutils.h"
+#include "state.h"
 #include "fn.h"
 #include "test.h"
+
+#define BUFSIZE 500
+static char cbuf_data[BUFSIZE];
+static bool enable_cbuf_data;
+
+static
+void allow_copy_buf_data(bool enable)
+{
+  enable_cbuf_data = enable;
+}
+
+static
+char* get_cbuf_data(void)
+{
+  return cbuf_data;
+}
+
+static
+void set_cbuf_data(char* val, unsigned long long new_size)
+{
+  if (new_size > BUFSIZE) fail();
+  memcpy(cbuf_data, val, new_size);
+}
+
+// These signatures satisfy --wrap=cbufGet in the Makefile
+#ifdef __LINUX__
+int __real_cbufGet(cbuf_handle_t, uint64_t*);
+int __wrap_cbufGet(cbuf_handle_t cbuf, uint64_t *data)
+#endif // __LINUX__
+#ifdef __MACOS__
+int cbufGet(cbuf_handle_t cbuf, uint64_t *data)
+#endif // __MACOS__
+{
+    int res = __real_cbufGet(cbuf, data);
+    if (enable_cbuf_data && res == 0) {
+      log_event_t *event = (log_event_t*) *data;
+      set_cbuf_data(event->data, event->datalen);
+    }
+
+    return res;
+}
 
 static void
 ctlParseRxMsgNullReturnsParseError(void** state)
@@ -681,6 +724,66 @@ ctlDelProtocol(void** state)
     destroyReq(&req);
 }
 
+static void
+ctlSendLogConsoleAsciiData(void **state)
+{
+    initState();
+    const char* console_path = "stdout";
+    const char* ascii_text = "hello world<>?% _";
+    proc_id_t proc = {.pid = 1,
+                      .ppid = 1,
+                      .hostname = "foo",
+                      .procname = "foo",
+                      .cmd = "foo",
+                      .id = "foo"};
+    ctl_t* ctl = ctlCreate();
+    assert_non_null(ctl);
+    bool b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
+    assert_true(b_res);
+    allow_copy_buf_data(TRUE);
+
+    ctlSendLog(ctl, STDOUT_FILENO, console_path, ascii_text, strlen(ascii_text), 0, &proc);
+    ctlFlushLog(ctl);
+    const char *val = get_cbuf_data();
+    assert_string_equal(ascii_text, val);
+    ctlDestroy(&ctl);
+    allow_copy_buf_data(FALSE);
+}
+
+static void
+ctlSendLogConsoleNoneAsciiData(void **state)
+{
+    initState();
+    const char* console_path = "stdout";
+    char* non_basic_ascii_text = malloc(sizeof(char)*4);
+    assert_true(non_basic_ascii_text);
+    non_basic_ascii_text[0] = 128;
+    non_basic_ascii_text[1] = 157;
+    non_basic_ascii_text[2] = 234;
+    non_basic_ascii_text[3] = '0';
+
+    const char* binary_data_event_msg = "Binary data detected--- message";
+    proc_id_t proc = {.pid = 1,
+                      .ppid = 1,
+                      .hostname = "foo",
+                      .procname = "foo",
+                      .cmd = "foo",
+                      .id = "foo"};
+    ctl_t* ctl = ctlCreate();
+    assert_non_null(ctl);
+    bool b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
+    assert_true(b_res);
+    allow_copy_buf_data(TRUE);
+
+    ctlSendLog(ctl, STDOUT_FILENO, console_path, non_basic_ascii_text, strlen(non_basic_ascii_text), 0, &proc);
+    ctlFlushLog(ctl);
+    const char *val = get_cbuf_data();
+    assert_string_equal(binary_data_event_msg, val);
+    free(non_basic_ascii_text);
+    ctlDestroy(&ctl);
+    allow_copy_buf_data(FALSE);
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -707,6 +810,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(ctlTransportSetAndMtcSend),
         cmocka_unit_test(ctlAddProtocol),
         cmocka_unit_test(ctlDelProtocol),
+        cmocka_unit_test(ctlSendLogConsoleAsciiData),
+        cmocka_unit_test(ctlSendLogConsoleNoneAsciiData),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
 

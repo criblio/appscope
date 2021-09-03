@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "cfgutils.h"
 #include "dbg.h"
@@ -80,6 +81,16 @@
 #define LEN_NODE                 "len"
 #define DETECT_NODE              "detect"
 #define PAYLOAD_NODE             "payload"
+
+#define CUSTOM_NODE          "custom"
+#define FILTER_NODE              "filter"
+#define PROCNAME_NODE                "procname"
+#define ARG_NODE                     "arg"
+#define HOSTNAME_NODE                "hostname"
+#define USERNAME_NODE                "username"
+#define ENV_NODE                     "env"
+#define ANCESTOR_NODE                "ancestor"
+#define CONFIG_NODE              "config"
 
 enum_map_t formatMap[] = {
     {"statsd",                CFG_FMT_STATSD},
@@ -162,6 +173,8 @@ static void cfgSetFromFile(config_t *, const char *);
 static void cfgCriblEnableSetFromStrEnv(config_t *, cfg_logstream_t, const char *);
 static void cfgCriblEnableSetFromStrYaml(config_t *, const char *);
 
+static void processRoot(config_t *, yaml_document_t *, yaml_node_t *);
+
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
 static which_transport_t transport_context;
@@ -169,6 +182,13 @@ static watch_t watch_context;
 static protocol_def_t *protocol_context = NULL;
 static regex_t* g_regex = NULL;
 static char g_logmsg[1024] = {};
+
+// needed for custom filtering
+extern proc_id_t g_proc;
+
+// "state" of custom filtering
+static unsigned custom_matched = FALSE;
+static unsigned custom_match_count = 0;
 
 static char *
 cfgPathSearch(const char* cfgname)
@@ -1648,25 +1668,299 @@ processProtocol(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 }
 
 static void
-setConfigFromDoc(config_t* config, yaml_document_t* doc)
+processCustomFilterProcname(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    yaml_node_t *node = yaml_document_get_root_node(doc);
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar procname value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    if (valueStr && !strcmp(valueStr, g_proc.procname)) {
+        ++custom_match_count;
+        free(valueStr);
+        return;
+    }
+
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
+processCustomFilterArg(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar arg value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    if (valueStr && strstr(g_proc.cmd, valueStr)) {
+        ++custom_match_count;
+        free(valueStr);
+        return;
+    }
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
+processCustomFilterHostname(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar hostname value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    if (valueStr && !strcmp(valueStr, g_proc.hostname)) {
+        ++custom_match_count;
+        free(valueStr);
+        return;
+    }
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
+processCustomFilterUsername(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar username value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    struct passwd *pw = getpwuid(g_proc.uid);
+    if (valueStr && pw && !strcmp(valueStr, pw->pw_name)) {
+        ++custom_match_count;
+        free(valueStr);
+        return;
+    }
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
+processCustomFilterEnv(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar env value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    if (valueStr) {
+        char *equal = strchr(valueStr, '=');
+        if (equal) *equal = '\0';
+        char *envName = valueStr;
+        char *envVal = equal ? equal+1 : NULL;
+        char *env = getenv(envName);
+        if (env) {
+            if (envVal) {
+                if (!strcmp(env, envVal)) {
+                    ++custom_match_count;
+                    free(valueStr);
+                    return;
+                }
+            } else {
+                ++custom_match_count;
+                free(valueStr);
+                return;
+            }
+        }
+    }
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
+processCustomFilterAncestor(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar ancestor value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    if (!g_fn.open || !g_fn.close || !g_fn.read) {
+        DBG(NULL);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    if (valueStr) {
+        pid_t ppid = g_proc.ppid;
+        while (ppid > 1) {
+            char buf[PATH_MAX];
+            if (snprintf(buf, sizeof(buf), "/proc/%d/exe", ppid) < 0) {
+                DBG(NULL);
+                break;
+            }
+
+            char exe[PATH_MAX];
+            size_t exeLen = readlink(buf, exe, sizeof(exe));
+            if (exeLen <= 0) {
+                DBG(NULL);
+                break;
+            }
+            exe[exeLen] = '\0';
+
+            char* name = exe;
+            name = basename(exe);
+            if (!strcmp(valueStr, name)) {
+                ++custom_match_count;
+                free(valueStr);
+                return;
+            }
+
+            if (snprintf(buf, sizeof(buf), "/proc/%d/stat", ppid) < 0) {
+                DBG(NULL);
+                break;
+            }
+            int fd = g_fn.open(buf, O_RDONLY);
+            if (fd == -1) {
+                DBG(NULL);
+                break;
+            }
+            if (g_fn.read(fd, buf, sizeof(buf)) <= 0) { 
+                DBG(NULL);
+                g_fn.close(fd);
+                break;
+            }
+            strtok(buf,  " ");              // (1) pid   %d
+            strtok(NULL, " ");              // (2) comm  %s
+            strtok(NULL, " ");              // (3) state %s
+            ppid = atoi(strtok(NULL, " ")); // (4) ppid  %d
+            g_fn.close(fd);
+        }
+    }
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
+processCustomFilter(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    custom_matched = TRUE;
+    custom_match_count = 0;
 
     parse_table_t t[] = {
-        {YAML_MAPPING_NODE,   METRIC_NODE,          processMetric},
-        {YAML_MAPPING_NODE,   LIBSCOPE_NODE,        processLibscope},
-        {YAML_MAPPING_NODE,   PAYLOAD_NODE,         processPayload},
-        {YAML_MAPPING_NODE,   EVENT_NODE,           processEvent},
-        {YAML_MAPPING_NODE,   CRIBL_NODE,           processCribl},
-        {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
-        {YAML_SEQUENCE_NODE,  PROTOCOL_NODE,        processProtocol},
-        {YAML_NO_NODE,        NULL,                 NULL}
+        {YAML_SCALAR_NODE, PROCNAME_NODE, processCustomFilterProcname},
+        {YAML_SCALAR_NODE, ARG_NODE,      processCustomFilterArg},
+        {YAML_SCALAR_NODE, HOSTNAME_NODE, processCustomFilterHostname},
+        {YAML_SCALAR_NODE, USERNAME_NODE, processCustomFilterUsername},
+        {YAML_SCALAR_NODE, ENV_NODE,      processCustomFilterEnv},
+        {YAML_SCALAR_NODE, ANCESTOR_NODE, processCustomFilterAncestor},
+        {YAML_NO_NODE,     NULL,          NULL}
     };
 
     yaml_node_pair_t *pair;
     foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
+        if (!custom_matched) break;
+    }
+}
+
+static void
+processCustomConfig(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    // All filters have to match and there must be more than one filter
+    if (!custom_matched || !custom_match_count) {
+        scopeLog("INFO: skipping custom config\n", -1, CFG_LOG_INFO);
+        return;
+    }
+
+    processRoot(config, doc, node);
+}
+
+static void
+processCustomEntry(config_t* config, yaml_document_t* doc, yaml_node_pair_t* pair)
+{
+    //yaml_node_t* name = yaml_document_get_node(doc, pair->key);
+    yaml_node_t* node = yaml_document_get_node(doc, pair->value);
+
+    if (node->type != YAML_MAPPING_NODE) {
+        scopeLog("WARN: ignoring non-map custom entry\n", -1, CFG_LOG_WARN);
+        return;
+    }
+
+    parse_table_t t[] = {
+        {YAML_MAPPING_NODE, FILTER_NODE, processCustomFilter},
+        {YAML_NO_NODE,      NULL,        NULL}
+    };
+    yaml_node_pair_t* nodePair;
+    foreach(nodePair, node->data.mapping.pairs) {
+        processKeyValuePair(t, nodePair, config, doc);
+    }
+
+    parse_table_t t2[] = {
+        {YAML_MAPPING_NODE, CONFIG_NODE, processCustomConfig},
+        {YAML_NO_NODE,      NULL,        NULL}
+    };
+    foreach(nodePair, node->data.mapping.pairs) {
+        processKeyValuePair(t2, nodePair, config, doc);
+    }
+}
+
+static void
+processCustom(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processCustomEntry(config, doc, pair);
+    }
+}
+
+static void
+processRoot(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    parse_table_t t[] = {
+        {YAML_MAPPING_NODE,  METRIC_NODE,   processMetric},
+        {YAML_MAPPING_NODE,  LIBSCOPE_NODE, processLibscope},
+        {YAML_MAPPING_NODE,  PAYLOAD_NODE,  processPayload},
+        {YAML_MAPPING_NODE,  EVENT_NODE,    processEvent},
+        {YAML_MAPPING_NODE,  CRIBL_NODE,    processCribl},
+        {YAML_MAPPING_NODE,  TAGS_NODE,     processTags},
+        {YAML_SEQUENCE_NODE, PROTOCOL_NODE, processProtocol},
+        {YAML_NO_NODE,       NULL,          NULL}
+    };
+
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
+static void
+setConfigFromDoc(config_t* config, yaml_document_t* doc)
+{
+    yaml_node_t *node = yaml_document_get_root_node(doc);
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    processRoot(config, doc, node);
+
+    // process custom entries after the others
+    parse_table_t t2[] = {
+        {YAML_MAPPING_NODE, CUSTOM_NODE, processCustom},
+        {YAML_NO_NODE,      NULL,        NULL}
+    };
+
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
+        processKeyValuePair(t2, pair, config, doc);
     }
 }
 

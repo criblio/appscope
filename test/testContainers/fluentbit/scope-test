@@ -94,7 +94,7 @@ fluentbit_tcp_file() {
     # run ab benchmark test
     ab -n $2 -c 1 http://127.0.0.1/ > /dev/null 2>&1
     # sleep to wait for ab to complete
-    sleep 10
+    sleep 15
     if [ "$(wait_for_files "${DEST}")" ]; then
         found=$(grep '\\"source\\":\\"http-req\\"' ${DEST} | wc -l)
         if [ $found -eq $2 ] ; then 
@@ -189,19 +189,21 @@ fluentbit_unix_file() {
     /opt/td-agent-bit/bin/td-agent-bit -R /opt/test/fluentbit/parsers.conf -i syslog -p "Mode=unix_tcp" -p "Path=/tmp/abstest" -p "Parser=json" -o file -p "Format=plain" -p "Path=/tmp" -p "File=fluent.out_file" -d
     # sleep to allow fluentbit to start
     sleep 2
+    # change perms on unix socket file to allow non-root to write to it
+    chmod 666 /tmp/abstest
     # run ab benchmark test
     ab -n $2 -c 1 http://127.0.0.1/ > /dev/null 2>&1
     # sleep to wait for ab to complete
-    sleep 10
+    sleep 15
     if [ "$(wait_for_files "${DEST}")" ]; then
-        found=$(grep '\\"source\\":\\"http-req\\"' ${DEST} | wc -l)
+        found=$(grep '"source":"http-req"' ${DEST} | wc -l)
         if [ $found -eq $2 ] ; then 
             echo "PASS: No missing http request events"
         else
             echo "FAIL: Missing http request events: expected: $2, got: $found, dropped: $(($2-found))"
             ERR+=1
         fi
-        found=$(grep '\\"source\\":\\"http-resp\\"' ${DEST} | wc -l)
+        found=$(grep '"source":"http-resp"' ${DEST} | wc -l)
         if [ $found -eq $2 ] ; then 
             echo "PASS: No missing http response events"
         else
@@ -220,19 +222,82 @@ fluentbit_unix_file() {
     endtest
 }
 
-#fluentbit_tcp_file 1 100
-#fluentbit_tcp_file 1 1000
-#fluentbit_tcp_file 1 10000
-#fluentbit_tcp_file 10 100
-#fluentbit_tcp_file 10 1000
-#fluentbit_tcp_file 10 10000
-#fluentbit_tcp_logstream 1 100
-#fluentbit_tcp_logstream 1 1000
-#fluentbit_tcp_logstream 1 10000
-#fluentbit_tcp_logstream 10 100
-#fluentbit_tcp_logstream 10 1000
-#fluentbit_tcp_logstream 10 10000
+# Scope nginx with a variable nginx worker count
+# Use custom scope configuration to send only http events to a Unix Domain socket
+# Use apache ab to send requests to nginx
+# Use fluentbit to relay events to logstream
+# Assert on number of http events received
+fluentbit_unix_logstream() {
+    starttest "Fluentbit_unix->Logstream_$1_Scope_$2_Requests"
+    DEST=/tmp/out/tcpjson:in_tcp_json
+    rm -rf ${DEST}
+    # start nginx with modified config
+    sed -i "s/worker_processes\ auto/worker_processes\ $1/" /etc/nginx/nginx.conf
+    SCOPE_HOME=/opt/test/conf_2 ldscope nginx
+    # sleep to allow nginx to start up
+    sleep 2
+    # start fluentbit
+    /opt/td-agent-bit/bin/td-agent-bit -R /opt/test/fluentbit/parsers.conf -i syslog -p "Mode=unix_tcp" -p "Path=/tmp/abstest" -p "Parser=json" -o tcp -p "Port=10070" -p "Format=json_lines" -p "json_date_key=false" -d
+    # sleep to allow fluentbit to start
+    sleep 2
+    # change perms on unix socket file to allow non-root to write to it
+    chmod 666 /tmp/abstest
+    # run ab benchmark test
+    ab -n $2 -c 1 http://127.0.0.1/ > /dev/null 2>&1
+    # sleep to wait for ab to complete
+    sleep 15
+    if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
+        found=$(grep '"source":"http-req"' ${DEST}/CriblOut-*.json | wc -l)
+        if [ $found -eq $2 ] ; then 
+            echo "PASS: No missing http request events"
+        else
+            echo "FAIL: Missing http request events: expected: $2, got: $found, dropped: $(($2-found))"
+            ERR+=1
+        fi
+        found=$(grep '"source":"http-resp"' ${DEST}/CriblOut-*.json | wc -l)
+        if [ $found -eq $2 ] ; then 
+            echo "PASS: No missing http response events"
+        else
+            echo "FAIL: Missing http response events: expected: $2, got: $found, dropped: $(($2-found))"
+            ERR+=1
+        fi
+    else
+        echo "FAIL: no output files"
+        ERR+=1
+    fi
+    # kill processes
+    kill `pidof td-agent-bit`
+    nginx -s quit
+    # sleep to allow nginx and fluentbit to close (2+6 secs)
+    sleep 8
+    endtest
+}
+
+
+fluentbit_tcp_file 1 100
+fluentbit_tcp_file 1 1000
+fluentbit_tcp_file 1 10000
+fluentbit_tcp_file 10 100
+fluentbit_tcp_file 10 1000
+fluentbit_tcp_file 10 10000
+fluentbit_tcp_logstream 1 100
+fluentbit_tcp_logstream 1 1000
+fluentbit_tcp_logstream 1 10000
+fluentbit_tcp_logstream 10 100
+fluentbit_tcp_logstream 10 1000
+fluentbit_tcp_logstream 10 10000
 fluentbit_unix_file 1 100
+fluentbit_unix_file 1 1000
+fluentbit_unix_file 1 10000
+fluentbit_unix_file 10 100
+fluentbit_unix_file 10 1000
+fluentbit_unix_file 10 10000
+fluentbit_unix_logstream 1 100
+fluentbit_unix_logstream 1 1000
+fluentbit_unix_logstream 1 10000
+fluentbit_unix_logstream 10 100
+fluentbit_unix_logstream 10 1000
+fluentbit_unix_logstream 10 10000
 
 
 ###################### Summary ######################

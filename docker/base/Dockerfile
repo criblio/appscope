@@ -16,6 +16,8 @@ RUN mkdir /usr/local/scope /usr/local/scope/x86_64 /usr/local/scope/aarch64 \
    
 COPY bin/linux/x86_64/* /usr/local/scope/x86_64/
 COPY conf/scope.yml     /usr/local/scope/x86_64/scope.yml
-   
+
 COPY bin/linux/aarch64/* /usr/local/scope/aarch64/
 COPY conf/scope.yml      /usr/local/scope/aarch64/scope.yml
+
+RUN rm -f /usr/local/scope/*/.gitignore

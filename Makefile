@@ -170,6 +170,15 @@ builder: require-docker-buildx-builder
 		--file docker/builder/Dockerfile.$(DIST) \
 		.
 
+image: TAG := cribl/scope:dev-$(ARCH)
+image: require-qemu-binfmt
+	@docker buildx build \
+		--tag $(TAG) \
+		--platform linux/$(PLATFORM_$(ARCH)) \
+		--file docker/base/Dockerfile \
+		--load \
+                .
+
 # setup the buildx builder if it's not running already
 require-docker-buildx-builder: require-docker-buildx require-qemu-binfmt
 	@if ! docker buildx inspect $(BUILDER) >/dev/null 2>&1; then \

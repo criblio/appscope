@@ -476,7 +476,7 @@ initGoHook(elf_buf_t *ebuf)
             return; // don't install our hooks
         }
         Elf64_Shdr* textSec = getElfSection(ebuf->buf, ".text");
-        sysprint("base %lx %lx %x\n", base, (uint64_t)ebuf->text_addr, textSec->sh_offset);
+        sysprint("base %lx %lx %lx\n", base, (uint64_t)ebuf->text_addr, textSec->sh_offset);
         base = base - (uint64_t)ebuf->text_addr + textSec->sh_offset;
     }
     
@@ -559,7 +559,7 @@ initGoHook(elf_buf_t *ebuf)
         asm_count = cs_disasm(disass_handle, orig_func, size,
                                  (uint64_t)orig_func, 0, &asm_inst);
         if (asm_count <= 0) {
-            sysprint("ERROR: disassembler fails: %s\n\tlen %d code %p result %d\n\ttext addr %p text len %d oinfotext %p\n",
+            sysprint("ERROR: disassembler fails: %s\n\tlen %" PRIu64 " code %p result %lu\n\ttext addr %p text len %zu oinfotext 0x%" PRIx64 "\n",
                      tap->func_name, size,
                      orig_func, sizeof(asm_inst), ebuf->text_addr, ebuf->text_len, offset_into_txt);
             continue;
@@ -1152,7 +1152,7 @@ c_http_server_read(char *stackaddr)
                 fd = *(int *)(pfd + g_go.pd_to_fd);
             }
 
-            funcprint("Scope: go_http_server_read of %ld\n", fd);
+            funcprint("Scope: go_http_server_read of %d\n", fd);
             doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
         }
     }
@@ -1200,7 +1200,7 @@ c_http_server_write(char *stackaddr)
                 fd = *(int *)(pfd + g_go.pd_to_fd);
             }
 
-            funcprint("Scope: c_http_server_write of %ld\n", fd);
+            funcprint("Scope: c_http_server_write of %d\n", fd);
             doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF);
         }
     }

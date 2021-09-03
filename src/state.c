@@ -46,8 +46,6 @@ fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
 static search_t* g_http_redirect = NULL;
-static list_t *g_protlist;
-static unsigned int g_prot_sequence = 0;
 
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
@@ -234,63 +232,18 @@ error:
     g_http_protocol_def = NULL;
 }
 
-static void
-initProtocolDetect()
-{
-    int i;
-    list_t *plist = lstCreate(NULL);
-    char *ppath = protocolPath();
-    protocol_def_t *prot;
-
-    if (!plist) {
-        if (ppath) free(ppath);
-        return;
-    }
-
-    if (!ppath) {
-        if (plist) lstDestroy(&plist);
-        return;
-    }
-
-    protocolRead(ppath, plist);
-
-    for (i = 0; ; i++) {
-        if ((prot = lstFind(plist, i)) != NULL) {
-            request_t req;
-
-            req.protocol = prot;
-            addProtocol(&req);
-        } else {
-            break;
-        }
-    }
-
-    if (ppath) free(ppath);
-    lstDestroy(&plist);
-}
-
 void
 initState()
 {
-    net_info *netinfoLocal;
-    fs_info *fsinfoLocal;
-    if ((netinfoLocal = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
-        scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
-    }
-
-    if (netinfoLocal) memset(netinfoLocal, 0, sizeof(struct net_info_t) * NET_ENTRIES);
-
     // Per a Read Update & Change (RUC) model; now that the object is ready assign the global
-    g_netinfo = netinfoLocal;
-
-    if ((fsinfoLocal = (fs_info *)malloc(sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
-        scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
+    if ((g_netinfo = (net_info *)calloc(1, sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
+        scopeLog("ERROR: Constructor:Calloc", -1, CFG_LOG_ERROR);
     }
-
-    if (fsinfoLocal) memset(fsinfoLocal, 0, sizeof(struct fs_info_t) * FS_ENTRIES);
 
     // Per RUC...
-    g_fsinfo = fsinfoLocal;
+    if ((g_fsinfo = (fs_info *)calloc(1, sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
+        scopeLog("ERROR: Constructor:Calloc", -1, CFG_LOG_ERROR);
+    }
 
     initHttpState();
     // the http guard array is static while the net fs array is dynamically allocated
@@ -306,7 +259,6 @@ initState()
     g_http_redirect = searchComp(REDIRECTURL);
 
     g_protlist = lstCreate(destroyProtEntry);
-    initProtocolDetect();
     initPayloadDetect();
 
     initReporting();

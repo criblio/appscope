@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "cfgutils.h"
 #include "dbg.h"
@@ -17,6 +18,7 @@
 #include "com.h"
 #include "utils.h"
 #include "fn.h"
+#include "state.h"
 
 #ifndef NO_YAML
 #include "yaml.h"
@@ -72,6 +74,23 @@
 
 #define TAGS_NODE            "tags"
 
+#define PROTOCOL_NODE        "protocol"
+#define NAME_NODE                "name"
+#define REGEX_NODE               "regex"
+#define BINARY_NODE              "binary"
+#define LEN_NODE                 "len"
+#define DETECT_NODE              "detect"
+#define PAYLOAD_NODE             "payload"
+
+#define CUSTOM_NODE          "custom"
+#define FILTER_NODE              "filter"
+#define PROCNAME_NODE                "procname"
+#define ARG_NODE                     "arg"
+#define HOSTNAME_NODE                "hostname"
+#define USERNAME_NODE                "username"
+#define ENV_NODE                     "env"
+#define ANCESTOR_NODE                "ancestor"
+#define CONFIG_NODE              "config"
 
 enum_map_t formatMap[] = {
     {"statsd",                CFG_FMT_STATSD},
@@ -154,12 +173,22 @@ static void cfgSetFromFile(config_t *, const char *);
 static void cfgCriblEnableSetFromStrEnv(config_t *, cfg_logstream_t, const char *);
 static void cfgCriblEnableSetFromStrYaml(config_t *, const char *);
 
+static void processRoot(config_t *, yaml_document_t *, yaml_node_t *);
+
 // These global variables limits us to only reading one config file at a time...
 // which seems fine for now, I guess.
 static which_transport_t transport_context;
 static watch_t watch_context;
+static protocol_def_t *protocol_context = NULL;
 static regex_t* g_regex = NULL;
 static char g_logmsg[1024] = {};
+
+// needed for custom filtering
+extern proc_id_t g_proc;
+
+// "state" of custom filtering
+static unsigned custom_matched = FALSE;
+static unsigned custom_match_count = 0;
 
 static char *
 cfgPathSearch(const char* cfgname)
@@ -235,12 +264,6 @@ cfgPath(void)
 
     // Otherwise, search for scope.yml
     return cfgPathSearch(CFG_FILE_NAME);
-}
-
-char *
-protocolPath(void)
-{
-    return cfgPathSearch(PROTOCOL_FILE_NAME);
 }
 
 static void
@@ -1481,24 +1504,463 @@ processCribl(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 }
 
 static void
-setConfigFromDoc(config_t* config, yaml_document_t* doc)
+processProtocolName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    yaml_node_t *node = yaml_document_get_root_node(doc);
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    if (protocol_context->protname) free(protocol_context->protname);
+    protocol_context->protname = stringVal(node);
+}
+
+static void
+processProtocolRegex(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    if (protocol_context->regex) free(protocol_context->regex);
+    protocol_context->regex = stringVal(node);
+}
+
+static void
+processProtocolBinary(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    char* sVal = stringVal(node);
+    unsigned iVal = strToVal(boolMap, sVal);
+    if (iVal <= 1) protocol_context->binary = iVal;
+    if (sVal) free(sVal);
+}
+
+static void
+processProtocolLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    char *sVal = stringVal(node);
+    char *endInt = NULL;
+    errno = 0;
+    unsigned long iVal = strtoul(sVal, &endInt, 10);
+    if (!errno && !*endInt) protocol_context->len = iVal;
+    if (sVal) free(sVal);
+}
+
+static void
+processProtocolDetect(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    char* sVal = stringVal(node);
+    unsigned iVal = strToVal(boolMap, sVal);
+    if (iVal <= 1) protocol_context->detect = iVal;
+    if (sVal) free(sVal);
+}
+
+static void
+processProtocolPayload(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    char* sVal = stringVal(node);
+    unsigned iVal = strToVal(boolMap, sVal);
+    if (iVal <= 1) protocol_context->payload = iVal;
+    if (sVal) free(sVal);
+}
+
+static void
+processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char logBuf[256];
+
+    // protocol entries must be key/value maps
+    if (node->type != YAML_MAPPING_NODE) {
+        scopeLog("WARN: ignoring non-map protocol entry\n", -1, CFG_LOG_WARN);
+        return;
+    }
+
+    // the protocol list should already be setup
+    if (!g_protlist) {
+        DBG(NULL);
+        return;
+    }
+
+    // protocol object to populate
+    protocol_context = calloc(1, sizeof(protocol_def_t));
+    if (!protocol_context) {
+        DBG(NULL);
+        return;
+    }
+    protocol_context->detect = TRUE; // non-zero default
+
+    // process the entry
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE, NAME_NODE,    processProtocolName},
+        {YAML_SCALAR_NODE, REGEX_NODE,   processProtocolRegex},
+        {YAML_SCALAR_NODE, BINARY_NODE,  processProtocolBinary},
+        {YAML_SCALAR_NODE, LEN_NODE,     processProtocolLen},
+        {YAML_SCALAR_NODE, DETECT_NODE,  processProtocolDetect},
+        {YAML_SCALAR_NODE, PAYLOAD_NODE, processProtocolPayload},
+        {YAML_NO_NODE,     NULL,         NULL}
+    };
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+
+    // require at least the name and regex
+    if (!protocol_context->protname || !protocol_context->regex) {
+        destroyProtEntry(protocol_context);
+        protocol_context = NULL;
+        scopeLog("WARN: ignoring protocol entry missing name or regex\n", -1, CFG_LOG_WARN);
+        return;
+    }
+
+    // init the regex
+    int errornumber;
+    PCRE2_SIZE erroroffset;
+    protocol_context->re = pcre2_compile(
+            (PCRE2_SPTR)protocol_context->regex,
+            PCRE2_ZERO_TERMINATED, 0,
+            &errornumber, &erroroffset, NULL);
+    if (!protocol_context->re) {
+        snprintf(logBuf, sizeof(logBuf),
+                 "WARN: invalid regex for \"%s\" protocol entry; %s\n",
+                 protocol_context->protname, protocol_context->regex);
+        scopeLog(logBuf, -1, CFG_LOG_WARN);
+        destroyProtEntry(protocol_context);
+        protocol_context = NULL;
+        return;
+    }
+
+    // replace if name matches existing entry
+    for (list_key_t key = 0; key <= g_prot_sequence; ++key) {
+        protocol_def_t *found = lstFind(g_protlist, key);
+        if (found && !strcmp(protocol_context->protname, found->protname)) {
+            protocol_context->type = key;
+            if (!lstDelete(g_protlist, key)) {
+                DBG(NULL);
+            }
+            if (!lstInsert(g_protlist, key, protocol_context)) {
+                DBG(NULL);
+            }
+            protocol_context = NULL;
+            destroyProtEntry(found);
+            break;
+        }
+    }
+
+    // otherwise, add
+    if (protocol_context) {
+        protocol_context->type = ++g_prot_sequence;
+        if (!lstInsert(g_protlist, g_prot_sequence, protocol_context)) {
+            --g_prot_sequence;
+            destroyProtEntry(protocol_context);
+            DBG(NULL);
+        }
+        protocol_context = NULL;
+    }
+}
+
+static void
+processProtocol(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    if (node->type != YAML_SEQUENCE_NODE) return;
+
+    yaml_node_item_t* item;
+    foreach(item, node->data.sequence.items) {
+        yaml_node_t* node = yaml_document_get_node(doc, *item);
+        processProtocolEntry(config, doc, node);
+    }
+}
+
+static void
+processCustomFilterProcname(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar procname value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    if (valueStr && !strcmp(valueStr, g_proc.procname)) {
+        ++custom_match_count;
+        free(valueStr);
+        return;
+    }
+
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
+processCustomFilterArg(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar arg value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    if (valueStr && strstr(g_proc.cmd, valueStr)) {
+        ++custom_match_count;
+        free(valueStr);
+        return;
+    }
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
+processCustomFilterHostname(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar hostname value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    if (valueStr && !strcmp(valueStr, g_proc.hostname)) {
+        ++custom_match_count;
+        free(valueStr);
+        return;
+    }
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
+processCustomFilterUsername(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar username value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    struct passwd *pw = getpwuid(g_proc.uid);
+    if (valueStr && pw && !strcmp(valueStr, pw->pw_name)) {
+        ++custom_match_count;
+        free(valueStr);
+        return;
+    }
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
+processCustomFilterEnv(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar env value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    if (valueStr) {
+        char *equal = strchr(valueStr, '=');
+        if (equal) *equal = '\0';
+        char *envName = valueStr;
+        char *envVal = equal ? equal+1 : NULL;
+        char *env = getenv(envName);
+        if (env) {
+            if (envVal) {
+                if (!strcmp(env, envVal)) {
+                    ++custom_match_count;
+                    free(valueStr);
+                    return;
+                }
+            } else {
+                ++custom_match_count;
+                free(valueStr);
+                return;
+            }
+        }
+    }
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
+processCustomFilterAncestor(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) {
+        scopeLog("WARN: non-scalar ancestor value\n", -1, CFG_LOG_WARN);
+        custom_matched = FALSE;
+        return;
+    }
+
+    if (!g_fn.open || !g_fn.close || !g_fn.read) {
+        DBG(NULL);
+        custom_matched = FALSE;
+        return;
+    }
+
+    char *valueStr = stringVal(node);
+    if (valueStr) {
+        pid_t ppid = g_proc.ppid;
+        while (ppid > 1) {
+            char buf[PATH_MAX];
+            if (snprintf(buf, sizeof(buf), "/proc/%d/exe", ppid) < 0) {
+                DBG(NULL);
+                break;
+            }
+
+            char exe[PATH_MAX];
+            size_t exeLen = readlink(buf, exe, sizeof(exe));
+            if (exeLen <= 0) {
+                DBG(NULL);
+                break;
+            }
+            exe[exeLen] = '\0';
+
+            char* name = exe;
+            name = basename(exe);
+            if (!strcmp(valueStr, name)) {
+                ++custom_match_count;
+                free(valueStr);
+                return;
+            }
+
+            if (snprintf(buf, sizeof(buf), "/proc/%d/stat", ppid) < 0) {
+                DBG(NULL);
+                break;
+            }
+            int fd = g_fn.open(buf, O_RDONLY);
+            if (fd == -1) {
+                DBG(NULL);
+                break;
+            }
+            if (g_fn.read(fd, buf, sizeof(buf)) <= 0) { 
+                DBG(NULL);
+                g_fn.close(fd);
+                break;
+            }
+            strtok(buf,  " ");              // (1) pid   %d
+            strtok(NULL, " ");              // (2) comm  %s
+            strtok(NULL, " ");              // (3) state %s
+            ppid = atoi(strtok(NULL, " ")); // (4) ppid  %d
+            g_fn.close(fd);
+        }
+    }
+
+    custom_matched = FALSE;
+    if (valueStr) free(valueStr);
+}
+
+static void
+processCustomFilter(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    custom_matched = TRUE;
+    custom_match_count = 0;
 
     parse_table_t t[] = {
-        {YAML_MAPPING_NODE,   METRIC_NODE,          processMetric},
-        {YAML_MAPPING_NODE,   LIBSCOPE_NODE,        processLibscope},
-        {YAML_MAPPING_NODE,   PAYLOAD_NODE,         processPayload},
-        {YAML_MAPPING_NODE,   EVENT_NODE,           processEvent},
-        {YAML_MAPPING_NODE,   CRIBL_NODE,           processCribl},
-        {YAML_MAPPING_NODE,   TAGS_NODE,            processTags},
-        {YAML_NO_NODE,        NULL,                 NULL}
+        {YAML_SCALAR_NODE, PROCNAME_NODE, processCustomFilterProcname},
+        {YAML_SCALAR_NODE, ARG_NODE,      processCustomFilterArg},
+        {YAML_SCALAR_NODE, HOSTNAME_NODE, processCustomFilterHostname},
+        {YAML_SCALAR_NODE, USERNAME_NODE, processCustomFilterUsername},
+        {YAML_SCALAR_NODE, ENV_NODE,      processCustomFilterEnv},
+        {YAML_SCALAR_NODE, ANCESTOR_NODE, processCustomFilterAncestor},
+        {YAML_NO_NODE,     NULL,          NULL}
     };
 
     yaml_node_pair_t *pair;
     foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
+        if (!custom_matched) break;
+    }
+}
+
+static void
+processCustomConfig(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    // All filters have to match and there must be more than one filter
+    if (!custom_matched || !custom_match_count) {
+        scopeLog("INFO: skipping custom config\n", -1, CFG_LOG_INFO);
+        return;
+    }
+
+    processRoot(config, doc, node);
+}
+
+static void
+processCustomEntry(config_t* config, yaml_document_t* doc, yaml_node_pair_t* pair)
+{
+    //yaml_node_t* name = yaml_document_get_node(doc, pair->key);
+    yaml_node_t* node = yaml_document_get_node(doc, pair->value);
+
+    if (node->type != YAML_MAPPING_NODE) {
+        scopeLog("WARN: ignoring non-map custom entry\n", -1, CFG_LOG_WARN);
+        return;
+    }
+
+    parse_table_t t[] = {
+        {YAML_MAPPING_NODE, FILTER_NODE, processCustomFilter},
+        {YAML_NO_NODE,      NULL,        NULL}
+    };
+    yaml_node_pair_t* nodePair;
+    foreach(nodePair, node->data.mapping.pairs) {
+        processKeyValuePair(t, nodePair, config, doc);
+    }
+
+    parse_table_t t2[] = {
+        {YAML_MAPPING_NODE, CONFIG_NODE, processCustomConfig},
+        {YAML_NO_NODE,      NULL,        NULL}
+    };
+    foreach(nodePair, node->data.mapping.pairs) {
+        processKeyValuePair(t2, nodePair, config, doc);
+    }
+}
+
+static void
+processCustom(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processCustomEntry(config, doc, pair);
+    }
+}
+
+static void
+processRoot(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    parse_table_t t[] = {
+        {YAML_MAPPING_NODE,  METRIC_NODE,   processMetric},
+        {YAML_MAPPING_NODE,  LIBSCOPE_NODE, processLibscope},
+        {YAML_MAPPING_NODE,  PAYLOAD_NODE,  processPayload},
+        {YAML_MAPPING_NODE,  EVENT_NODE,    processEvent},
+        {YAML_MAPPING_NODE,  CRIBL_NODE,    processCribl},
+        {YAML_MAPPING_NODE,  TAGS_NODE,     processTags},
+        {YAML_SEQUENCE_NODE, PROTOCOL_NODE, processProtocol},
+        {YAML_NO_NODE,       NULL,          NULL}
+    };
+
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
+static void
+setConfigFromDoc(config_t* config, yaml_document_t* doc)
+{
+    yaml_node_t *node = yaml_document_get_root_node(doc);
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    processRoot(config, doc, node);
+
+    // process custom entries after the others
+    parse_table_t t2[] = {
+        {YAML_MAPPING_NODE, CUSTOM_NODE, processCustom},
+        {YAML_NO_NODE,      NULL,        NULL}
+    };
+
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
+        processKeyValuePair(t2, pair, config, doc);
     }
 }
 
@@ -1890,11 +2352,55 @@ err:
     return NULL;
 }
 
+static cJSON*
+createProtocolEntryJson(config_t* cfg, protocol_def_t* prot)
+{
+    cJSON *root = NULL;
+
+    if (!prot) goto err;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, NAME_NODE, prot->protname)) goto err;
+    if (!cJSON_AddStringToObjLN(root, REGEX_NODE, prot->regex)) goto err;
+    if (!cJSON_AddStringToObjLN(root, BINARY_NODE, valToStr(boolMap, prot->binary))) goto err;
+    if (!cJSON_AddNumberToObjLN(root, LEN_NODE, prot->len)) goto err;
+    if (!cJSON_AddStringToObjLN(root, DETECT_NODE, valToStr(boolMap, prot->detect))) goto err;
+    if (!cJSON_AddStringToObjLN(root, PAYLOAD_NODE, valToStr(boolMap, prot->payload))) goto err;
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createProtocolJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+
+    if (!(root = cJSON_CreateArray())) goto err;
+
+    for (unsigned key = 1; key <= g_prot_sequence; ++key) {
+        protocol_def_t *prot = lstFind(g_protlist, key);
+        if (prot) {
+            cJSON *item = createProtocolEntryJson(cfg, prot);
+            if (!item) goto err;
+            cJSON_AddItemToArray(root, item);
+        }
+    }
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
 cJSON*
 jsonObjectFromCfg(config_t* cfg)
 {
     cJSON* json_root = NULL;
-    cJSON* metric, *libscope, *event, *payload, *tags;
+    cJSON* metric, *libscope, *event, *payload, *tags, *protocol;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
@@ -1912,6 +2418,9 @@ jsonObjectFromCfg(config_t* cfg)
 
     if (!(tags = createTagsJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(json_root, TAGS_NODE, tags);
+
+    if (!(protocol = createProtocolJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, PROTOCOL_NODE, protocol);
 
     return json_root;
 err:
@@ -2182,129 +2691,6 @@ singleChannelSet(ctl_t *ctl, mtc_t *mtc)
     }
 
     return -1;
-}
-
-/*
- * It goes like this:
- * the protocol config file is 3 levels deep
- *
- * the root node is "protocol:"
- * 2nd level is an array of protocols: a mapping node
- * 3rd level is the definition of a specific protocol
- *
- * a specific protocol contains:
- * name: a string, display name of the protocol
- * binary: a string, true or false
- * regex: a string, the regex pattern
- * len: an integer, len is optional, should be supplied for a binary protocol
- */
-bool
-protocolRead(const char *path, list_t *plist)
-{
-    FILE *protFile = NULL;
-    protocol_def_t *prot = NULL;
-    int parser_successful = 0;
-    int doc_successful = 0;
-    int num_found = 0;
-    bool name_found = FALSE;
-    yaml_parser_t parser;
-    yaml_document_t doc;
-    yaml_node_t *node;
-    yaml_node_pair_t *root_pair, *prot_pair;
-    yaml_node_t *root_value, *root_key, *plist_key, *prot_key, *prot_value;
-    yaml_node_item_t *pitem;
-
-    if (!g_fn.fopen || !g_fn.fclose || !path) goto cleanup;
-
-    protFile = g_fn.fopen(path, "r");
-    if (!protFile) goto cleanup;
-
-    parser_successful = yaml_parser_initialize(&parser);
-    if (!parser_successful) goto cleanup;
-
-    yaml_parser_set_input_file(&parser, protFile);
-
-    doc_successful = yaml_parser_load(&parser, &doc);
-    if (!doc_successful) goto cleanup;
-
-    node = yaml_document_get_root_node(&doc);
-    if (node->type != YAML_MAPPING_NODE) goto cleanup;
-
-    /*
-     * as defined, no need to loop on the root node
-     * in case we need to add more to the config doc...
-     * same for the 2nd level
-     */
-    foreach (root_pair, node->data.mapping.pairs) {
-        // 1st level
-        root_value = yaml_document_get_node(&doc, root_pair->value);
-        if (root_value->type != YAML_SEQUENCE_NODE) goto cleanup;
-
-        root_key = yaml_document_get_node(&doc, root_pair->key);
-        if (!root_key || (root_key->type != YAML_SCALAR_NODE)) goto cleanup;
-        if (strcmp((char *)root_key->data.scalar.value, "protocol") != 0) goto cleanup;
-
-        foreach(pitem, root_value->data.sequence.items) {
-            // 2nd level
-            // get an item here instead of a node for the array
-            // use the key because there is no value
-            plist_key = yaml_document_get_node(&doc, *pitem);
-            if (plist_key->type != YAML_MAPPING_NODE) goto cleanup;
-
-            if ((prot = calloc(1, sizeof(protocol_def_t))) == NULL) goto cleanup;
-            name_found = FALSE;
-
-            // set non-zero defaults
-            prot->detect = TRUE;
-
-            foreach (prot_pair, (yaml_node_pair_t *)plist_key->data.sequence.items) {
-                // 3rd level
-                prot_key = yaml_document_get_node(&doc, prot_pair->key);
-                if (!prot_key || (prot_key->type != YAML_SCALAR_NODE)) goto cleanup;
-
-                prot_value = yaml_document_get_node(&doc, prot_pair->value);
-                if (!prot_value) goto cleanup;
-
-                if (!strcmp((char *)prot_key->data.scalar.value, "name")) {
-                    if (prot->protname) free(prot->protname);
-                    prot->protname = strdup((char *)prot_value->data.scalar.value);
-                    name_found = TRUE; // at least need to have a name
-                } else if (!strcmp((char *)prot_key->data.scalar.value, "regex")) {
-                    if (prot->regex) free(prot->regex);
-                    prot->regex = strdup((char *)prot_value->data.scalar.value);
-                } else if (!strcmp((char *)prot_key->data.scalar.value, "binary")) {
-                    prot->binary = (!strcmp((char *)prot_value->data.scalar.value, "false")) ?
-                        FALSE : TRUE; // seems like it should default to true
-                } else if (!strcmp((char *)prot_key->data.scalar.value, "len")) {
-                    errno = 0;
-                    prot->len = strtoull((char *)prot_value->data.scalar.value, NULL, 0);
-                    if (errno != 0) prot->len = 0;
-                } else if (!strcmp((char *)prot_key->data.scalar.value, "detect")) {
-                    prot->detect = (!strcmp((char *)prot_value->data.scalar.value, "false")) ?
-                        FALSE : TRUE; // seems like it should default to true
-                } else if (!strcmp((char *)prot_key->data.scalar.value, "payload")) {
-                    prot->payload = (!strcmp((char *)prot_value->data.scalar.value, "false")) ?
-                        FALSE : TRUE; // seems like it should default to true
-                } else {
-                    continue;
-                }
-            }
-
-            if (!name_found  || (lstInsert(plist, num_found, prot) == FALSE)) {
-                destroyProtEntry(prot);
-            } else {
-                num_found++;
-            }
-            prot = NULL;
-        }
-    }
-
-cleanup:
-    if (prot) destroyProtEntry(prot);
-    if (doc_successful) yaml_document_delete(&doc);
-    if (parser_successful) yaml_parser_delete(&parser);
-    if (protFile) g_fn.fclose(protFile);
-    return TRUE;
 }
 
 void

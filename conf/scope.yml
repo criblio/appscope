@@ -148,7 +148,7 @@ metric:
 
     # Connection type
     #   Type:     string
-    #   Values:   udp, tcp, and file
+    #   Values:   udp, tcp, unix, and file
     #   Default:  udp
     #   Override: the protocol token in the $SCOPE_METRIC_DEST URL
     #
@@ -425,7 +425,7 @@ event:
 
     # Connection type
     #   Type:     string
-    #   Values:   udp, tcp, and file
+    #   Values:   udp, tcp, unix, and file
     #   Default:  tcp
     #   Override: the protocol token in the $SCOPE_EVENT_DEST URL
     #
@@ -527,8 +527,8 @@ payload:
   # This can produce large amounts of data from I/O-intensive programs and
   # should be considered carefully before being enabled.
   #
-  # See scope_protocol.yml for a way to enable this for specific protocols
-  # instead of all traffic.
+  # See `protocol` for a way to enable this for specific protocols instead of
+  # all traffic.
   #
   enable: false
 
@@ -619,7 +619,7 @@ libscope:
   
       # Connection type
       #   Type:     string
-      #   Values:   udp, tcp, and file
+      #   Values:   udp, tcp, unix, and file
       #   Default:  file
       #   Override: the protocol token in the $SCOPE_LOG_DEST URL
       #
@@ -783,7 +783,7 @@ cribl:
       #
       cacertpath: ''
 
-# Tags for events and metrics.
+# Tags for events and metrics
 #
 tags:
   # `key: value` entries here become fields in generated events and metrics.
@@ -794,7 +794,170 @@ tags:
   # corresponding environment variable is not set, the variable is left in the
   # value.
   #
+  # Tags can also be added with environment variables prefixed with SCOPE_TAG_.
+  # For example, SCOPE_TAG_service=eg is equivalent to the "service" example
+  # below. The value of the environment variable may contain other variables
+  # as described above too; i.e. SCOPE_TAG_user=\$USER.
+  #
   #user: $USER
   #service: eg
+  
+# Protocol detection and handling
+#
+protocol:
+  # Entries in this list define protocols that AppScope should detect in network
+  # payloads and how to handle matches. The first packet seen on a channel is
+  # checked against the regular expression in each entry in the order they
+  # appear in this file. When one matches, later entries are skipped.
+  #
+  # Entries have the following properties:
+  #
+  #   name     String protocol name used in protocol-detect events and payload
+  #            headers sent to LogStream (required)
+  #   regex    The regular expression to use (required)
+  #   binary   Boolean indicating whether the regex should be applied to a
+  #            hex-string version of the payload instead of the binary payload
+  #            (default: false)
+  #   len      The number of bytes to convert to hex when `binary` is true
+  #            (default: 256)
+  #   detect   Boolean indicating whether protocol-detect events should be
+  #            generated (default: true)
+  #   payload  Boolean indicating whether payload-processing should be enabled
+  #            for matching streams (default: false)
+  #
+  # When payloads are enabled globally (`payload > enable`), the payload
+  # options here are ignored.
+  #
+  # Warning: The `name` value is currently inserted into the JSON header for
+  # payloads sent to LogStream so it cannot contain double quotes or
+  # back-slashes without breaking the JSON. It needs to be kept fairly short
+  # too so the header doesn't exceed the 1k limit. If this becomes a problem,
+  # we'll consider adding logging and validation.
+  #
+
+  # Example for the plain-text Redis protocol using the default detect and
+  # payload settings
+  #
+  #- name: Redis
+  #  regex: "^[*]\\d+|^[+]\\w+|^[$]\\d+"
+
+  # Example for the MongoDB protocol showing how to detect a binary protocol
+  #
+  #- name: Mongo
+  #  regex: "^240100000000000000000000d407"
+  #  binary: true
+  #  len: 14
+
+  # AppScope uses an internally defined protocol detector for HTTP like the
+  # example below automatically when the LogStream backend is enabled.
+  #
+  # Uncomment this and adjust as needed to override the defaults or to enable
+  # HTTP detection when not using LogStream.
+  #
+  #- name: HTTP
+  #  regex: " HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
+  #  detect: true
+  #  payload: true
+
+  # AppScope uses another internally defined protocol detector for TLS like the
+  # example below by default.
+  #
+  # Uncomment this entry to override the regex details or to set detect to
+  # false.  The payload setting here is never used. AppScope never sends
+  # encrypted payloads to disk and only sends payloads to LogSteam during TLS
+  # negotiation.
+  #
+  #- name: TLS
+  #  regex: "^16030[0-3].{4}0[12]"
+  #  binary: true
+  #  len: 6
+
+
+# Custom configs
+#
+custom:
+  # Entries here represent overrides of the settings defined above for scoped
+  # processes that match a set of filters. Each has a name and `filter` and
+  # `config` entries as shown below.
+  #
+  #   name:
+  #     filter:
+  #       ...
+  #     config:
+  #       ...
+  #
+  # Entries under `filter` are used to match aspects of a scoped process. There
+  # must be at least one of them and all of them must match for the filter to
+  # succeed. The following filters are supported.
+  #
+  #   procname: string
+  #
+  #     Matches if the given string value matches the basename of the scoped
+  #     process.
+  #
+  #   arg: string
+  #
+  #     Matches if the given string value appears and a substring anywhere in
+  #     the scoped process's full command line including an options and
+  #     arguments.
+  #
+  #   hostname: string
+  #
+  #     Matches if the given string value matches the hostname of the machine
+  #     where the scoped process is running.
+  #     
+  #   username: string
+  #
+  #     Matches if the given string value matches the username for the scoped
+  #     process's UID.
+  #     
+  #   env: string
+  #
+  #     The string value is the name of an environment variable alone (i.e.
+  #     "FOO") or with a value (i.e. "FOO=bar"). The filter matches if the
+  #     environment variable is set and, in the later case, the value matches.
+  #
+  #   ancestor: string
+  #
+  #     Matches if given string matches the basename of the scoped process's
+  #     partent, parent's parent, etc.
+  #
+  # The `config` section specifies the settings that should be overridden when
+  # the filter matches. Entries under `config` use the same schema as the
+  # top-level entries (without `custom`).
+  #
+  
+  # Increase metric verbosity for processes owned by the "eg" user and running
+  # on the "eg1" host.
+  #
+  #example:
+  #  filter:
+  #    username: eg
+  #    hostname: eg1
+  #  config:
+  #    metric:
+  #      format:
+  #        verbosity: 7
+  #    tags:
+  #      service: eg
+
+  # Enable the Cribl/Logstream destination for Nginx processes. Both this entry
+  # and the `example` entry above would apply if both filters match so the
+  # service tag here would override the one above.
+  #
+  #nginx:
+  #  filter:
+  #    procname: nginx
+  #  config:
+  #    tags:
+  #      service: nginx
+  #    cribl:
+  #      enable: true
+  #      transport:
+  #        type: tcp
+  #        host: in.my-instance.logstream.cribl.cloud
+  #        port: 10090
+  #        tls:
+  #          enable: true
 
 # EOF

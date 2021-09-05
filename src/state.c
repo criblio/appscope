@@ -1288,23 +1288,23 @@ setRemoteClose(int sd, int err)
     }
 }
 
-bool
-getFSBinaryDataState(int fd)
+fs_content_type_t
+getFSContentType(int fd)
 {
     struct fs_info_t *fs = getFSEntry(fd);
     if (fs) {
-       return fs->binary_data;
+       return fs->content_type;
     }
     DBG(NULL);
-    return FALSE;
+    return FS_CONTENT_UNKNOWN;
 }
 
 void
-setFSBinaryDataState(int fd, bool state)
+setFSContentType(int fd, fs_content_type_t type)
 {
     struct fs_info_t *fs = getFSEntry(fd);
     if (fs) {
-        fs->binary_data = state;
+        fs->content_type = type;
     } else {
         DBG(NULL);
     }

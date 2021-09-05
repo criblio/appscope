@@ -26,6 +26,15 @@ typedef enum {
     NONE // `buf` is unavailable, typically NULL but `len` is what?
 } src_data_t;
 
+/**
+ * File content type
+ */
+typedef enum {
+    FS_CONTENT_UNKNOWN, // File content type undetermined
+    FS_CONTENT_BINARY,  // File content type binary
+    FS_CONTENT_TEXT     // File content type text
+} fs_content_type_t;
+
 void initState();
 void resetState();
 
@@ -65,7 +74,7 @@ int doSSL(uint64_t, int, void *, size_t, metric_t, src_data_t, char *);
 bool addProtocol(request_t *);
 bool delProtocol(request_t *);
 void setRemoteClose(int, int);
-void setFSBinaryDataState(int, bool);
-bool getFSBinaryDataState(int);
+void setFSContentType(int, fs_content_type_t);
+fs_content_type_t getFSContentType(int);
 
 #endif // __STATE_H__

@@ -25,7 +25,7 @@ endif
 
 # version number without the leading `v` from release tags
 # this is set in CI so don't overwrite
-VERSION ?= $(shell git describe --always --dirty --tag | sed -e 's/^v//')
+VERSION ?= $(shell git describe --abbrev=0 --tags | tr -d v)
 
 # cli expects us to write this file
 $(shell echo -n $(VERSION) > cli/VERSION)
@@ -178,6 +178,18 @@ image: require-qemu-binfmt
 		--file docker/base/Dockerfile \
 		--load \
                 .
+
+k8s-test: image
+	docker tag cribl/scope:dev-x86_64 cribl/scope:$(VERSION)
+	kind delete cluster
+	kind create cluster
+	kind load docker-image cribl/scope:$(VERSION)
+	kubectl create namespace test
+	kubectl create namespace scope
+	docker run -it cribl/scope:$(VERSION) scope k8s -m /tmp/metrics.log -e /tmp/events.log --namespace scope --debug | kubectl apply -f -
+	kubectl label namespace test scope=enabled
+	kubectl wait --for=condition=available deployment/scope -n scope
+	kubectl run ubuntu --image=ubuntu:20.04 -n test --restart=Never --command -- sleep infinity
 
 # setup the buildx builder if it's not running already
 require-docker-buildx-builder: require-docker-buildx require-qemu-binfmt

@@ -1478,6 +1478,8 @@ init(void)
     // process.
     int attachedFlag = 0;
     initEnv(&attachedFlag);
+    // logging inside constructor start from this line
+    g_constructor_debug_enabled = checkEnv("SCOPE_ALLOW_CONSTRUCT_DBG", "true");
 
     initState();
 
@@ -2671,6 +2673,18 @@ scope_write(int fd, const void* buf, size_t size)
 {
     return (ssize_t)syscall(SYS_write, fd, buf, size);
 }
+
+static int
+scope_open(const char* pathname)
+{
+    int fd = g_fn.open(pathname, O_WRONLY | O_APPEND);
+    if (fd == -1) {
+        fd = g_fn.open(pathname, O_CREAT | O_WRONLY, 0666);
+    }
+    return fd;
+}
+
+#define scope_close(fd) g_fn.close(fd)
 
 #endif // __FUNCHOOK__
 
@@ -4692,69 +4706,74 @@ getentropy(void *buffer, size_t length)
 #endif
 }
 
-/*
- * Debug in the constructor.
- * The constructor is run in the context of ld.so.
- * In this context we can't use the debugger, write to stdout or
- * log to files. Note that when we attach to a running process,
- * the attach code is executed in the constructor context.
- *
- * To debug:
- * 1) ensure that the value of CDBG_ADDR + CDBG_SIZE represents a
- * viable unused address space. Adjust as ncessary.
- * 2) set g_cdbg to CDBG_ENABLE
- * 3) adjust the (level == CFG_LOG_DEBUG) clause as desired
- * 4) build libscope & run your test
- * 5) examine messages in gdb using 'x/32s 0x00100000'
- *    or whatever variation works. Note that 0x00100000
- *    should be the value of CDBG_ADDR.
- */
-#define CDBG_DISABLE NULL
-#define CDBG_ENABLE (char *)-1
-#define CDBG_ADDR (void *)0x00100000
-#define CDBG_SIZE (1024 * 16)
-static char *g_cdbg = CDBG_DISABLE;
+#define LOG_BUF_SIZE 4096
 
 // This overrides a weak definition in src/dbg.c
 void
-scopeLog(const char *msg, int fd, cfg_log_level_t level)
+scopeLog(cfg_log_level_t level, const char *format, ...)
 {
-    if (g_cdbg == CDBG_ENABLE) {
-        if ((g_cdbg = mmap(CDBG_ADDR, CDBG_SIZE,
-                           PROT_READ | PROT_WRITE,
-                           MAP_PRIVATE | MAP_ANONYMOUS,
-                           -1, (off_t)NULL)) == MAP_FAILED) {
-            g_cdbg = NULL;
+    char scope_log_var_buf[LOG_BUF_SIZE];
+    const char overflow_msg[] = "WARN: scopeLog msg truncated.\n";
+    char *local_buf;
+
+    if (!g_log) {
+        if (!g_constructor_debug_enabled) return;
+        local_buf = scope_log_var_buf + snprintf(scope_log_var_buf, LOG_BUF_SIZE, "Constructor: (pid:%d): ", getpid());
+        size_t local_buf_len = sizeof(scope_log_var_buf) + (scope_log_var_buf - local_buf) - 1;
+
+        va_list args;
+        va_start(args, format);
+        int msg_len = vsnprintf(local_buf, local_buf_len, format, args);
+        va_end(args);
+        if (msg_len == -1) {
+            DBG(NULL);
             return;
         }
 
-        *g_cdbg++ = '!';
-        *g_cdbg++ = '@';
-        *g_cdbg++ = '#';
-        *g_cdbg++ = '$';
-        *g_cdbg += 1;
-        g_cdbg += 1;
-    }
+        sprintf(local_buf + msg_len, "\n");
+        local_buf += msg_len + 1;
 
-    if ((g_cdbg != CDBG_ENABLE) && (g_cdbg != CDBG_DISABLE) &&
-        ((g_cdbg + (strlen(msg) + 2)) < (char *)(CDBG_ADDR + CDBG_SIZE)) &&
-        (level == CFG_LOG_DEBUG)) {
-        snprintf(g_cdbg, strlen(msg) + 2, "%s\n", msg);
-        g_cdbg += strlen(g_cdbg) + 1;
+        if (DEFAULT_LOG_LEVEL > level) return;
+
+        int fd = scope_open(DEFAULT_LOG_PATH);
+        if (fd == -1) {
+            DBG(NULL);
+            return;
+        }
+
+        if (msg_len >= local_buf_len) {
+            DBG(NULL);
+            scope_write(fd, overflow_msg, sizeof(overflow_msg));
+        } else {
+            scope_write(fd, scope_log_var_buf, local_buf - scope_log_var_buf);
+        }
+        scope_close(fd);
         return;
     }
 
     cfg_log_level_t cfg_level = logLevel(g_log);
     if ((cfg_level == CFG_LOG_NONE) || (cfg_level > level)) return;
-    if (!g_log || !msg || !g_proc.procname[0]) return;
 
-    char buf[strlen(msg) + 128];
-    if (fd != -1) {
-        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): fd:%d %s\n", g_proc.procname, g_proc.pid, fd, msg);
-    } else {
-        snprintf(buf, sizeof(buf), "Scope: %s(pid:%d): %s\n", g_proc.procname, g_proc.pid, msg);
+    local_buf = scope_log_var_buf + snprintf(scope_log_var_buf, LOG_BUF_SIZE, "Scope: %s(pid:%d): ", g_proc.procname, g_proc.pid);
+    size_t local_buf_len = sizeof(scope_log_var_buf) + (scope_log_var_buf - local_buf) - 1;
+
+    va_list args;
+    va_start(args, format);
+    int msg_len = vsnprintf(local_buf, local_buf_len, format, args);
+    va_end(args);
+    if (msg_len == -1) {
+        DBG(NULL);
+        return;
     }
-    logSend(g_log, buf, level);
+    sprintf(local_buf + msg_len, "\n");
+    local_buf += msg_len + 1;
+
+    if (msg_len >= local_buf_len) {
+        DBG(NULL);
+        logSend(g_log, overflow_msg, level);
+    } else {
+        logSend(g_log, scope_log_var_buf, level);
+    }
 }
 
 /*

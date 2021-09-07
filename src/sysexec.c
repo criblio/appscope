@@ -204,7 +204,6 @@ load_elf(char *buf)
 static int
 unmap_all(char *buf, const char **argv)
 {
-
     int flen;
     if ((flen = get_file_size(argv[1])) == -1) {
         scopeLog("ERROR:unmap_all: file size", -1, CFG_LOG_ERROR);
@@ -325,7 +324,9 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
     AUX_ENT(0, 0);
     return 0;
 }
-   
+
+const char **g_argv = NULL;
+
 //The first six integer or pointer arguments are passed in registers RDI, RSI, RDX, RCX, R8, R9
 static int
 set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phaddr)
@@ -347,6 +348,7 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phad
 
     // build the stack
     copy_strings(buf, (uint64_t)sp, argc, argv, env, phaddr);
+    g_argv = argv;
     start = ehdr->e_entry;
 
     if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {

@@ -1,7 +1,6 @@
 
-// The macro interpose takes 3 params
+// The macro interpose takes 2 params
 // the name of the global variable as defined above ex: go_hook_write
-// the name of the Go function that will be called
 // the name of the C function interposed handler
 .macro interpose a_func, c_func
 .global \a_func

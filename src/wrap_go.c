@@ -4,6 +4,7 @@
 #include <sys/prctl.h>
 #include <signal.h>
 #include <pthread.h>
+#include <syscall.h>
 
 #include "com.h"
 #include "dbg.h"
@@ -40,6 +41,11 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 //#define funcprint devnull
 //#define patchprint sysprint
 #define patchprint devnull
+#define RAW_PREV_FRAME 0x50
+
+extern char **g_argv;
+
+static void c_RawSyscall(void);
 
 #define UNDEF_OFFSET (-1)
 go_offsets_t g_go = {.g_to_m=48,                   // 0x30
@@ -69,6 +75,7 @@ tap_t g_go_tap[] = {
     {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
     {"runtime.exit",                         go_hook_exit,         NULL, 0},
     {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
+    {"syscall.RawSyscall",                   c_RawSyscall,         NULL, 0},
     {"TAP_TABLE_END", NULL, NULL, 0}
 };
 
@@ -139,6 +146,24 @@ add_argument(cs_insn* asm_inst)
               (inst_addr[6] << 24);
     }
 
+    return 0;
+}
+
+static int
+patch_raw_func(funchook_t *funchook, void *orig_func, tap_t *tap)
+{
+    if (!funchook || !orig_func || !tap) return -1;
+
+    if (funchook_prepare(funchook, (void**)&orig_func, tap->assembly_fn)) {
+        patchprint("failed to patch %s at %p\n", tap->func_name, orig_func);
+        return -1;
+    }
+
+    tap->return_addr = orig_func;
+
+    // This is based on number of local args in the raw syscalls.
+    // Refer to the comment above c_RawSyscall().
+    tap->frame_size = RAW_PREV_FRAME;
     return 0;
 }
 
@@ -549,6 +574,13 @@ initGoHook(elf_buf_t *ebuf)
             continue;
         }
 
+        funcprint("%s", tap->func_name);
+
+        if (tap->assembly_fn == c_RawSyscall) {
+            patch_raw_func(funchook, orig_func, tap);
+            continue;
+        }
+
         uint64_t offset_into_txt = (uint64_t)orig_func - (uint64_t)ebuf->text_addr;
         uint64_t text_len_left = ebuf->text_len - offset_into_txt;
         uint64_t max_bytes = 4096;  // somewhat arbitrary limit.  Allows for
@@ -692,16 +724,27 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
             }
         }
 
+        /*
+         * We've seen a case where on process exit static cgo
+         * apps do not have a go_g while they're exiting.
+         * We've also seen a case on libmusl where this same
+         * behavior occurs, not just on exit.
+         *
+         * It appears as though our handler is called from a
+         * function in the Go runtime as opposed to from a
+         * Go routine with a valid 'g'.
+         *
+         * An option is to pull the fs value from the kernel.
+         * This works in some cases, but not all. That is, the
+         * fs value we get from the kernel can, in some cases,
+         * result in a bad 'g' error. Presumably when we are
+         * called from a function that is not an actual Go routine.
+         *
+         * The safest resopnse to no 'g' found is to just return
+         * and not call an interposed handler.
+        */
         if (fs_valid == 0) {
-            // We've seen a case where on process exit static cgo
-            // apps do not have a go_g while they're exiting.
-            // In this case we need to pull the TLS from the kernel
-            // Also seen a case on libmusl where TLS is not set.
-            // Therefore, get fs from the kernel.
-            if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
-                scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
-                goto out;
-            }
+            return return_addr(gfunc);
         }
 
         void *thread_fs = NULL;
@@ -750,6 +793,7 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
                 scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
                 goto out;
             }
+            sysprint("GO switch start TLS = 0x%08lx cfunc 0x%08lx\n", go_fs, cfunc);
         }
     }
 
@@ -757,6 +801,7 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
     if (!frame_offset) goto out;
     stackptr += frame_offset;
 
+    sysprint("GO switch C handler TLS = 0x%08lx cfunc 0x%08lx\n", go_fs, cfunc);
     // call the C handler
     __asm__ volatile (
         "mov %1, %%rdi  \n"
@@ -768,10 +813,12 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 out:
     if (g_go_static && go_fs) {
         // Switch back to the 'm' TLS
+        sysprint("GO switch end TLS = 0x%08lx\n", go_fs);
         if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
             scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
         }
     }
+
     return return_addr(gfunc);
 }
 
@@ -1357,3 +1404,146 @@ go_die(char *stackptr)
 {
     return go_switch(stackptr, c_exit, go_hook_die);
 }
+
+/*
+ * We execute this function with a stack frame built for this function by the compiler.
+ * We point back to the stack frame of the calling Go function. We need to jump to the
+ * Go function being interposed with a stack frame of the calling Go function.
+ *
+ * If local vars change, then update the constant RAW_PREV_FRAME.
+ *
+ * We should probably disass in order to calculate this.
+ * Getting the start of the stack frame for the previous Go function.
+ * Not exact:
+ * ((# 64 bit local vars * 8) + (# of 32 bit vars * 4)) + 0x18
+ * int's are 32 bit. Others are treated as 64 bit vars on the stack.
+ * ex: uint32_t and size_t are calculated as 64 bit vars on the stack.
+ *
+ * original return addr @ - 0x8
+ *
+ * Apparently backtrace() doesn't work here with Go runtime stacks, or
+ * a C stack combined with a Go stack.
+ *
+ * trap = *(uint64_t *)(stackaddr + 0x0);
+ * argv[0] = *(uint64_t *)(stackaddr + 0x08);
+ * argv = *(uint64_t *)(stackaddr + 0x10);
+ * envp = *(uint64_t *)(stackaddr + 0x18);
+ *
+ */
+static void
+c_RawSyscall(void)
+{
+    int (*raw_syscall)(uint64_t, uint64_t, uint64_t, uint64_t);
+    char *stackaddr;
+    uint64_t trap;
+    int i, nargs;
+    uint32_t frame_offset;
+    size_t plen;
+    char **argv;
+
+    __asm__ volatile (
+        "mov %%rsp, %0 \n"
+        : "=r"(stackaddr)            // output
+        :                            // input
+        :                            // clobbered register
+        );
+
+    frame_offset = frame_size(c_RawSyscall);
+    stackaddr += frame_offset;
+    raw_syscall = (int (*)(uint64_t, uint64_t, uint64_t, uint64_t))return_addr((assembly_fn)c_RawSyscall);
+    trap = *(uint64_t *)(stackaddr + 0x0);
+
+    if ((g_go_static == TRUE) && (trap == SYS_execve)) {
+        while ((g_argv[nargs] != NULL)) nargs++;
+        nargs += 1; // ldscope + the original args
+
+        plen = sizeof(char *);
+        // no need to free this as we are doing an execve
+        if ((nargs == 0) || (argv = calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
+            return;
+        }
+
+        argv[0] = (char *)(*(uint64_t *)(stackaddr + 0x08));
+        for (i = 1; i < nargs; i++) {
+            argv[i] = g_argv[i - 1];
+        }
+
+        *(uint64_t *)(stackaddr + 0x10) = (uint64_t)argv;
+    }
+
+    // point past the return address
+    stackaddr -= 0x08;
+    __asm__ volatile (
+        "lea %1, %%r11 \n"
+        "mov (%%r11), %%rsp \n"
+        "lea %2, %%r11 \n"
+        "mov (%%r11), %%r11\n"
+        "jmp *%%r11 \n"
+        : "=r"(trap)                   // output
+        : "m" (stackaddr), "m" (raw_syscall) // input
+        :                            // clobbered register
+        );
+}
+
+EXPORTON void *
+go_RawSyscall(char *stackptr)
+{
+    return go_switch(stackptr, c_RawSyscall, c_RawSyscall);
+}
+
+/*
+ * Leaving this interposed function here, in case we need to
+ * come back to the vfork functionality. This is a raw syscall
+ * interposition that has the ability to manipulate clone flags
+ * when the Go runtime does a vfork.
+ * vfork flags: 0x4111 CLONE_VFORK | CLONE_VM | SIGHAND
+ * fork flags: 0x1200011 CLONE_SETTID | CLONE_CLEARTID
+ */
+#if 0
+static void
+c_rawVforkSyscall(void)
+{
+    int (*raw_vfork)(uint64_t, uint64_t);
+    char *stackaddr;
+    uint64_t trap, v1;
+
+    __asm__ volatile (
+        "mov %%rsp, %0 \n"
+        : "=r"(stackaddr)            // output
+        :                            // input
+        :                            // clobbered register
+        );
+
+    stackaddr += 0x30;
+    raw_vfork = (int (*)(uint64_t, uint64_t))return_addr((assembly_fn)c_rawVforkSyscall);
+
+    trap = *(uint64_t *)(stackaddr + 0x0);
+    v1 = *(uint64_t *)(stackaddr + 0x08);
+    if ((g_go_static == TRUE) && (trap == SYS_clone) && (v1 & CLONE_VM)) {
+        v1 &= ~CLONE_VM;
+        *(uint64_t *)(stackaddr + 0x08) = v1;
+        //*(uint64_t *)(stackaddr + 0x08) = (uint64_t)0x1200011;
+    }
+
+    // point past the return addr on the original stack
+    stackaddr -= 0x08;
+    __asm__ volatile (
+        "lea %1, %%r11 \n"
+        "mov (%%r11), %%rsp \n"
+        "lea %2, %%r11 \n"
+        "mov (%%r11), %%r11\n"
+        "jmp *%%r11 \n"
+        : "=r"(v1)                   // output
+        : "m" (stackaddr), "m" (raw_vfork) // input
+        :                            // clobbered register
+        );
+
+    return;
+}
+
+EXPORTON void *
+go_rawVforkSyscall(char *stackptr)
+{
+    return go_switch(stackptr, c_rawVforkSyscall, c_rawVforkSyscall);
+}
+#endif

@@ -724,7 +724,7 @@ cribl:
     #   Default:  127.0.0.1
     #   Override: the host token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
     #
-    host: in.logstream.practical-leavitt.cribl.cloud
+    host: in.logstream.brave-archimedes.cribl.cloud
 
     # Connection port
     #   Type:     integer or string

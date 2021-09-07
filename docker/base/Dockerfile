@@ -1,7 +1,7 @@
 FROM ubuntu:20.04
 
 RUN apt update -y && \
-    apt install -y ca-certificates && \
+    apt install -y bash-completion ca-certificates && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -21,3 +21,5 @@ COPY bin/linux/aarch64/* /usr/local/scope/aarch64/
 COPY conf/scope.yml      /usr/local/scope/aarch64/scope.yml
 
 RUN rm -f /usr/local/scope/*/.gitignore
+RUN echo "source /etc/profile.d/bash_completion.sh" >> ~/.bashrc && \
+    echo "source <(/usr/local/bin/scope completion bash)" >> ~/.bashrc

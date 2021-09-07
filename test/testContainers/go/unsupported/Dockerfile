@@ -56,7 +56,8 @@ ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
 ENV SCOPE_EVENT_DEST=file:///go/events.log
 ENV SCOPE_LOG_LEVEL=warning
-ENV SCOPE_LOG_DEST=file:///go/logs.txt
+ENV SCOPE_LOG_DEST=file:///tmp/scope.log
+ENV SCOPE_ALLOW_CONSTRUCT_DBG=true
 
 RUN echo "export PATH=/usr/local/scope:/usr/local/scope/bin:${PATH}" >/etc/profile.d/path.sh
 COPY scope-profile.sh /etc/profile.d/scope.sh

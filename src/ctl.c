@@ -871,15 +871,16 @@ ctlSendLog(ctl_t *ctl, int fd, const char *path, const void *buf, size_t count, 
 
     log_event_t *logevent = NULL;
     if (logType == CFG_SRC_CONSOLE) {
-        bool binary_state = getFSBinaryDataState(fd);
-        if (binary_state) {
+        fs_content_type_t data_content = getFSContentType(fd);
+        if (data_content == FS_CONTENT_BINARY) {
             // Handle only first event of binary data, drop and ignore rest
             return -1;
-        }
-        binary_state = is_data_binary(buf, count);
-        setFSBinaryDataState(fd, binary_state);
-        if (binary_state) {
-            logevent = createInternalLogEvent(fd, path, BINARY_DATA_MSG, sizeof(BINARY_DATA_MSG) - 1, uid, proc, logType, filter);
+        } else if (data_content == FS_CONTENT_UNKNOWN) {
+            data_content = is_data_binary(buf, count) ? FS_CONTENT_BINARY : FS_CONTENT_TEXT;
+            setFSContentType(fd, data_content);
+            if (data_content == FS_CONTENT_BINARY) {
+                logevent = createInternalLogEvent(fd, path, BINARY_DATA_MSG, sizeof(BINARY_DATA_MSG) - 1, uid, proc, logType, filter);
+            }
         }
     }
 

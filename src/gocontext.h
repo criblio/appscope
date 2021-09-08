@@ -46,7 +46,7 @@ extern uint64_t scope_stack;
 
 extern int arch_prctl(int, unsigned long);
 extern void initGoHook(elf_buf_t*);
-extern void sysprint(const char *, ...);
+extern void sysprint(const char *, ...) PRINTF_FORMAT(1, 2);
 extern void *getSymbol(const char *, char *);
 
 extern void go_hook_write(void);

@@ -12,6 +12,7 @@
 #include "com.h"
 #include "cfgutils.h"
 #include "test.h"
+#include "dbg.h"
 
 #define MAX_PATH 1024
 
@@ -1980,6 +1981,427 @@ cfgReadProtocol(void **state)
     g_prot_sequence = 0;
 }
 
+static void
+initProc(const char *procname, const char *cmdline, const char *hostname)
+{
+    g_proc.pid = getpid();
+    g_proc.ppid = getppid();
+
+    g_proc.uid = getuid();
+    g_proc.gid = getgid();
+
+
+    strncpy(g_proc.hostname, hostname, sizeof(g_proc.hostname));
+    strncpy(g_proc.procname, procname, sizeof(g_proc.procname));
+
+    if (g_proc.cmd) { free(g_proc.cmd); g_proc.cmd = NULL; }
+    if (cmdline) g_proc.cmd = strdup(cmdline);
+}
+
+static void
+cfgReadCustomEmptyFilter(void **state)
+{
+    const char *yamlText =
+        "# use default configs to start then these overrides\n"
+        "custom:\n"
+        // an empty filter should not match anything
+        "  eg1:\n"
+        "    filter:\n"
+        "    config:\n"
+        "      metric:\n"
+        "        enable: false\n"
+        // an invalid filter should not match anything
+        "  eg2:\n"
+        "    filter:\n"
+        "      bogus: ...\n"
+        "    config:\n"
+        "      event:\n"
+        "        enable: false\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), TRUE);
+    assert_int_equal(cfgEvtEnable(config), TRUE);
+
+    cfgDestroy(&config);
+}
+
+static void
+cfgReadCustomProcnameFilter(void **state)
+{
+    const char *yamlText =
+        "# use default configs to start then these overrides\n"
+        "custom:\n"
+        // this should match and disable metrics
+        "  eg1:\n"
+        "    filter:\n"
+        "      procname: test\n"
+        "    config:\n"
+        "      metric:\n"
+        "        enable: false\n"
+        // this should NOT match and leave events enabled
+        "  eg2:\n"
+        "    filter:\n"
+        "      procname: not-test\n"
+        "    config:\n"
+        "      event:\n"
+        "        enable: false\n"
+        // this should match and enable payloads
+        "  eg2:\n"
+        "    filter:\n"
+        "      procname: test\n"
+        "    config:\n"
+        "      payload:\n"
+        "        enable: true\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), FALSE);
+    assert_int_equal(cfgEvtEnable(config), TRUE);
+    assert_int_equal(cfgPayEnable(config), TRUE);
+
+    cfgDestroy(&config);
+}
+
+static void
+cfgReadCustomArgFilter(void **state)
+{
+    const char *yamlText =
+        "# use default configs to start then these overrides\n"
+        "custom:\n"
+        // this should match and disable metrics
+        "  eg1:\n"
+        "    filter:\n"
+        "      arg: with\n"
+        "    config:\n"
+        "      metric:\n"
+        "        enable: false\n"
+        // this should NOT match and leave events enabled
+        "  eg2:\n"
+        "    filter:\n"
+        "      arg: foo\n"
+        "    config:\n"
+        "      event:\n"
+        "        enable: false\n"
+        // this should match and enable payloads
+        "  eg2:\n"
+        "    filter:\n"
+        "      arg: args\n"
+        "    config:\n"
+        "      payload:\n"
+        "        enable: true\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), FALSE);
+    assert_int_equal(cfgEvtEnable(config), TRUE);
+    assert_int_equal(cfgPayEnable(config), TRUE);
+
+    cfgDestroy(&config);
+}
+
+static void
+cfgReadCustomHostnameFilter(void **state)
+{
+    const char *yamlText =
+        "# use default configs to start then these overrides\n"
+        "custom:\n"
+        // this should match and disable metrics
+        "  eg1:\n"
+        "    filter:\n"
+        "      hostname: myhost\n"
+        "    config:\n"
+        "      metric:\n"
+        "        enable: false\n"
+        // this should NOT match and leave events enabled
+        "  eg2:\n"
+        "    filter:\n"
+        "      hostname: not_myhost\n"
+        "    config:\n"
+        "      event:\n"
+        "        enable: false\n"
+        // this should match and enable payloads
+        "  eg2:\n"
+        "    filter:\n"
+        "      hostname: myhost\n"
+        "    config:\n"
+        "      payload:\n"
+        "        enable: true\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), FALSE);
+    assert_int_equal(cfgEvtEnable(config), TRUE);
+    assert_int_equal(cfgPayEnable(config), TRUE);
+
+    cfgDestroy(&config);
+}
+
+static void
+cfgReadCustomUsernameFilter(void **state)
+{
+    const char *yamlText =
+        "# use default configs to start then these overrides\n"
+        "custom:\n"
+        // this should match and disable metrics
+        "  eg1:\n"
+        "    filter:\n"
+        "      username: $USER\n"
+        "    config:\n"
+        "      metric:\n"
+        "        enable: false\n"
+        // this should NOT match and leave events enabled
+        "  eg2:\n"
+        "    filter:\n"
+        "      username: not_$USER\n"
+        "    config:\n"
+        "      event:\n"
+        "        enable: false\n"
+        // this should match and enable payloads
+        "  eg2:\n"
+        "    filter:\n"
+        "      username: $USER\n"
+        "    config:\n"
+        "      payload:\n"
+        "        enable: true\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), FALSE);
+    assert_int_equal(cfgEvtEnable(config), TRUE);
+    assert_int_equal(cfgPayEnable(config), TRUE);
+
+    cfgDestroy(&config);
+}
+
+static void
+cfgReadCustomEnvFilter(void **state)
+{
+    const char *yamlText =
+        "# use default configs to start then these overrides\n"
+        "custom:\n"
+        // this should match and disable metrics
+        "  eg1:\n"
+        "    filter:\n"
+        "      env: USER\n"
+        "    config:\n"
+        "      metric:\n"
+        "        enable: false\n"
+        // this should NOT match and leave events enabled
+        "  eg2:\n"
+        "    filter:\n"
+        "      env: ___BOGUS_ENV_VAR_WE_EXPECT_IS_NOT_SET___\n"
+        "    config:\n"
+        "      event:\n"
+        "        enable: false\n"
+        // this should NOT match and leave payloads disabled
+        "  eg2:\n"
+        "    filter:\n"
+        "      env: USER=not_$USER\n"
+        "    config:\n"
+        "      payload:\n"
+        "        enable: true\n"
+        // this should match and set the authToken
+        "  eg2:\n"
+        "    filter:\n"
+        "      env: USER=$USER\n"
+        "    config:\n"
+        "      cribl:\n"
+        "        authtoken: secret\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), FALSE);
+    assert_int_equal(cfgEvtEnable(config), TRUE);
+    assert_int_equal(cfgPayEnable(config), FALSE);
+    assert_non_null(cfgAuthToken(config));
+    assert_string_equal(cfgAuthToken(config), "secret");
+
+    cfgDestroy(&config);
+}
+
+static void
+cfgReadCustomAncestorFilter(void **state)
+{
+    const char *yamlText =
+        "# use default configs to start then these overrides\n"
+        "custom:\n"
+        // this should match and disable metrics
+        "  eg1:\n"
+        "    filter:\n"
+        "      ancestor: make\n"
+        "    config:\n"
+        "      metric:\n"
+        "        enable: false\n"
+        // this should NOT match and leave events enabled
+        "  eg2:\n"
+        "    filter:\n"
+        "      ancestor: bogus\n"
+        "    config:\n"
+        "      event:\n"
+        "        enable: false\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), FALSE);
+    assert_int_equal(cfgEvtEnable(config), TRUE);
+
+    cfgDestroy(&config);
+}
+
+static void
+cfgReadCustomMultipleFilters(void **state)
+{
+    const char *yamlText =
+        "# use default configs to start then these overrides\n"
+        "custom:\n"
+        // this should match and disable metrics
+        "  eg1:\n"
+        "    filter:\n"
+        "      procname: test\n"
+        "      arg: args\n"
+        "      hostname: myhost\n"
+        "      username: $USER\n"
+        "      env: USER\n"
+        "      env: USER=$USER\n"
+        "      ancestor: make\n"
+        "    config:\n"
+        "      metric:\n"
+        "        enable: false\n"
+        // this should NOT match and leave events enabled
+        "  eg2:\n"
+        "    filter:\n"
+        "      procname: not_test\n"  // only this changed from above
+        "      arg: args\n"
+        "      hostname: myhost\n"
+        "      username: $USER\n"
+        "      env: USER\n"
+        "      env: USER=$USER\n"
+        "      ancestor: make\n"
+        "    config:\n"
+        "      event:\n"
+        "        enable: false\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), FALSE);
+    assert_int_equal(cfgEvtEnable(config), TRUE);
+
+    cfgDestroy(&config);
+}
+
+static void
+cfgReadCustomOverride(void **state)
+{
+    const char *yamlText =
+        "# use default configs to start then these overrides\n"
+        "custom:\n"
+        // this should match and disable metrics
+        "  eg1:\n"
+        "    filter:\n"
+        "      procname: test\n"
+        "    config:\n"
+        "      metric:\n"
+        "        enable: false\n"
+        // this should also match and disable events too
+        "  eg2:\n"
+        "    filter:\n"
+        "      procname: test\n"
+        "    config:\n"
+        "      event:\n"
+        "        enable: false\n"
+        // this should also match and re-enable events
+        "  eg3:\n"
+        "    filter:\n"
+        "      procname: test\n"
+        "    config:\n"
+        "      event:\n"
+        "        enable: true\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), FALSE);
+    assert_int_equal(cfgEvtEnable(config), TRUE);
+
+    cfgDestroy(&config);
+}
+
+static void
+cfgReadCustomOrder(void **state)
+{
+    const char *yamlText =
+        "custom:\n"
+        // this should match and re-enable metrics and
+        // it should work even though the filter isn't first
+        "  eg1:\n"
+        "    config:\n"
+        "      metric:\n"
+        "        enable: true\n"
+        "    filter:\n"
+        "      procname: test\n"
+        "\n"
+        // this should get processed first, before the custom entries
+        "# disable metrics\n"
+        "metric:\n"
+        "  enable: false\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), TRUE);
+
+    cfgDestroy(&config);
+}
+
 // Defined in src/cfgutils.c
 // This is not a proper test, it just exists to make valgrind output
 // more readable when analyzing this test, by deallocating the compiled
@@ -2059,6 +2481,16 @@ main(int argc, char* argv[])
         cmocka_unit_test(initCtlReturnsPtr),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(cfgReadProtocol),
+        cmocka_unit_test(cfgReadCustomEmptyFilter),
+        cmocka_unit_test(cfgReadCustomProcnameFilter),
+        cmocka_unit_test(cfgReadCustomArgFilter),
+        cmocka_unit_test(cfgReadCustomHostnameFilter),
+        cmocka_unit_test(cfgReadCustomUsernameFilter),
+        cmocka_unit_test(cfgReadCustomEnvFilter),
+        cmocka_unit_test(cfgReadCustomAncestorFilter),
+        cmocka_unit_test(cfgReadCustomMultipleFilters),
+        cmocka_unit_test(cfgReadCustomOverride),
+        cmocka_unit_test(cfgReadCustomOrder),
         cmocka_unit_test(envRegexFree),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

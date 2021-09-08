@@ -11,6 +11,7 @@
 #include "dbg.h"
 #include "com.h"
 #include "fn.h"
+#include "state.h"
 
 #define FS_ENTRIES 1024
 #define DEFAULT_LOG_MAX_AGG_BYTES 32768
@@ -18,6 +19,9 @@
 
 #define CHANNEL "_channel"
 #define ID "id"
+
+#define BINARY_DATA_MSG "Binary data detected--- message"
+#define DEFAULT_BINARY_DATA_SAMPLE_SIZE (256U)
 
 typedef struct {
     char *buf;
@@ -783,7 +787,7 @@ ctlPostEvent(ctl_t *ctl, char *event)
     return 0;
 }
 
-log_event_t *
+static log_event_t *
 createInternalLogEvent(int fd, const char *path, const void *buf, size_t count, uint64_t uid, proc_id_t *proc, watch_t logType, regex_t *valfilter)
 {
     log_event_t *event = calloc(1, sizeof(*event));
@@ -815,7 +819,7 @@ createInternalLogEvent(int fd, const char *path, const void *buf, size_t count, 
     return event;
 }
 
-void
+static void
 destroyInternalLogEvent(log_event_t **eventptr)
 {
     if (!eventptr || !*eventptr) return;
@@ -825,6 +829,20 @@ destroyInternalLogEvent(log_event_t **eventptr)
     if (event->data)    free(event->data);
     if (event)          free(event);
     *eventptr = NULL;
+}
+
+static bool
+is_data_binary(const void *buf, size_t count)
+{
+    const char* b_buf = (const char *)buf;
+    size_t min_len = (count < DEFAULT_BINARY_DATA_SAMPLE_SIZE) ? count : DEFAULT_BINARY_DATA_SAMPLE_SIZE;
+    size_t i;
+    for (i = 0; i < min_len; i++) {
+        if (!isprint(b_buf[i]) && (!isspace(b_buf[i]))) {
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 int
@@ -851,8 +869,25 @@ ctlSendLog(ctl_t *ctl, int fd, const char *path, const void *buf, size_t count, 
     // it to be used later, after we've created a string from the data.
     filter = evtFormatValueFilter(ctl->evt, logType);
 
-    log_event_t *logevent;
-    logevent = createInternalLogEvent(fd, path, buf, count, uid, proc, logType, filter);
+    log_event_t *logevent = NULL;
+    if (logType == CFG_SRC_CONSOLE) {
+        fs_content_type_t data_content = getFSContentType(fd);
+        if (data_content == FS_CONTENT_BINARY) {
+            // Handle only first event of binary data, drop and ignore rest
+            return -1;
+        } else if (data_content == FS_CONTENT_UNKNOWN) {
+            data_content = is_data_binary(buf, count) ? FS_CONTENT_BINARY : FS_CONTENT_TEXT;
+            setFSContentType(fd, data_content);
+            if (data_content == FS_CONTENT_BINARY) {
+                logevent = createInternalLogEvent(fd, path, BINARY_DATA_MSG, sizeof(BINARY_DATA_MSG) - 1, uid, proc, logType, filter);
+            }
+        }
+    }
+
+    // This will be true for CFG_SRC_FILE, or if CFG_SRC_CONSOLE is TEXT.
+    if (!logevent) {
+        logevent = createInternalLogEvent(fd, path, buf, count, uid, proc, logType, filter);
+    }
 
     if (cbufPut(ctl->log.ringbuf, (uint64_t)logevent) == -1) {
         // Full; drop and ignore

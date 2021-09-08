@@ -25,6 +25,8 @@ void                 dbgAddLine(const char* key, const char* fmt, ...);
 #define TOSTRING(x) STRINGIFY(x)
 #define DBG_FILE_AND_LINE __FILE__ ":" TOSTRING(__LINE__)
 
+#define PRINTF_FORMAT(fmt_id, arg_id) __attribute__((format(printf, (fmt_id), (arg_id))))
+
 //
 //  The DBG macro is used to keep track of unexpected/undesirable
 //  conditions as instrumented with DBG in the source code.  This is done

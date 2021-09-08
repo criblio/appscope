@@ -154,4 +154,13 @@ services:
       dockerfile: ./service/Dockerfile.systemd
     <<: *scope-common
 
+  console:
+    image: ghcr.io/criblio/appscope-test-console:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-console:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./console/Dockerfile
+    <<: *scope-common
+
 # vim: ts=2 sw=2 et :

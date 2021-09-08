@@ -235,25 +235,15 @@ error:
 void
 initState()
 {
-    net_info *netinfoLocal;
-    fs_info *fsinfoLocal;
-    if ((netinfoLocal = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
-        scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
-    }
-
-    if (netinfoLocal) memset(netinfoLocal, 0, sizeof(struct net_info_t) * NET_ENTRIES);
-
     // Per a Read Update & Change (RUC) model; now that the object is ready assign the global
-    g_netinfo = netinfoLocal;
-
-    if ((fsinfoLocal = (fs_info *)malloc(sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
-        scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
+    if ((g_netinfo = (net_info *)calloc(1, sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
+        scopeLog("ERROR: Constructor:Calloc", -1, CFG_LOG_ERROR);
     }
-
-    if (fsinfoLocal) memset(fsinfoLocal, 0, sizeof(struct fs_info_t) * FS_ENTRIES);
 
     // Per RUC...
-    g_fsinfo = fsinfoLocal;
+    if ((g_fsinfo = (fs_info *)calloc(1, sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
+        scopeLog("ERROR: Constructor:Calloc", -1, CFG_LOG_ERROR);
+    }
 
     initHttpState();
     // the http guard array is static while the net fs array is dynamically allocated
@@ -1295,6 +1285,28 @@ setRemoteClose(int sd, int err)
 
     if ((err == EPIPE) && ((net = getNetEntry(sd)))) {
         net->remoteClose = TRUE;
+    }
+}
+
+fs_content_type_t
+getFSContentType(int fd)
+{
+    struct fs_info_t *fs = getFSEntry(fd);
+    if (fs) {
+       return fs->content_type;
+    }
+    DBG(NULL);
+    return FS_CONTENT_UNKNOWN;
+}
+
+void
+setFSContentType(int fd, fs_content_type_t type)
+{
+    struct fs_info_t *fs = getFSEntry(fd);
+    if (fs) {
+        fs->content_type = type;
+    } else {
+        DBG(NULL);
     }
 }
 

@@ -63,7 +63,8 @@ void                 dbgAddLine(const char* key, const char* fmt, ...);
 
 extern log_t *g_log;
 extern proc_id_t g_proc;
+extern bool g_constructor_debug_enabled;
 
-void scopeLog(const char *, int, cfg_log_level_t);
+void scopeLog(cfg_log_level_t, const char *, ...) PRINTF_FORMAT(2,3);
 
 #endif // __DBG_H__

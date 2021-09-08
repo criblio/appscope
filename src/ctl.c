@@ -525,7 +525,7 @@ prepMessage(upload_t *upld)
     char *temp = realloc(streamMsg, strsize+2); // room for "\n\0"
     if (!temp) {
         DBG(NULL);
-        scopeLog("CTL realloc error", -1, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "CTL realloc error");
         free(streamMsg);
         return NULL;
     }

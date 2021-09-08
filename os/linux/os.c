@@ -54,7 +54,7 @@ sendNL(int sd, ino_t node)
 
     // should we check for a partial send?
     if (g_fn.sendmsg(sd, &msg, 0) < 0) {
-        scopeLog("ERROR:sendNL:sendmsg", sd, LOG_LEVEL);
+        scopeLog(LOG_LEVEL, "fd:%d ERROR:sendNL:sendmsg", sd);
         return -1;
     }
 
@@ -87,20 +87,20 @@ getNL(int sd)
     };
 
     if ((rc = g_fn.recvmsg(sd, &msg, 0)) <= 0) {
-        scopeLog("ERROR:getNL:recvmsg", sd, LOG_LEVEL);
+        scopeLog(LOG_LEVEL, "fd:%d ERROR:getNL:recvmsg", sd);
         return (ino_t)-1;
     }
 
     const struct nlmsghdr *nlhdr = (struct nlmsghdr *)buf;
 
     if (!NLMSG_OK(nlhdr, rc)) {
-        scopeLog("ERROR:getNL:!NLMSG_OK", sd, LOG_LEVEL);
+        scopeLog(LOG_LEVEL, "fd:%d ERROR:getNL:!NLMSG_OK", sd);
         return (ino_t)-1;
     }
 
     for (; NLMSG_OK(nlhdr, rc); nlhdr = NLMSG_NEXT(nlhdr, rc)) {
         if (nlhdr->nlmsg_type == NLMSG_DONE) {
-            scopeLog("ERROR:getNL:no message", sd, LOG_LEVEL);
+            scopeLog(LOG_LEVEL, "fd:%d ERROR:getNL:no message", sd);
             return (ino_t)-1;
         }
 
@@ -108,29 +108,27 @@ getNL(int sd)
             const struct nlmsgerr *err = NLMSG_DATA(nlhdr);
 
             if (nlhdr->nlmsg_len < NLMSG_LENGTH(sizeof(*err))) {
-                scopeLog("ERROR:getNL:message error", sd, LOG_LEVEL);
+                scopeLog(LOG_LEVEL, "fd:%d ERROR:getNL:message error", sd);
             } else {
-                char buf[64];
-                snprintf(buf, sizeof(buf), "ERROR:getNL:message errno %d", -err->error);
-                scopeLog(buf, sd, LOG_LEVEL);
+                scopeLog(LOG_LEVEL, "fd:%d ERROR:getNL:message errno %d", sd, -err->error);
             }
 
             return (ino_t)-1;
         }
 
         if (nlhdr->nlmsg_type != SOCK_DIAG_BY_FAMILY) {
-            scopeLog("ERROR:getNL:unexpected nlmsg_type", sd, LOG_LEVEL);
+            scopeLog(LOG_LEVEL, "fd:%d ERROR:getNL:unexpected nlmsg_type", sd);
             return (ino_t)-1;
         }
 
         if ((diag = NLMSG_DATA(nlhdr)) != NULL) {
             if (nlhdr->nlmsg_len < NLMSG_LENGTH(sizeof(*diag))) {
-                scopeLog("ERROR:getNL:short response", sd, LOG_LEVEL);
+                scopeLog(LOG_LEVEL, "fd:%d ERROR:getNL:short response", sd);
                 return (ino_t)-1;
             }
 
             if (diag->udiag_family != AF_UNIX) {
-                scopeLog("ERROR:getNL:unexpected family", sd, LOG_LEVEL);
+                scopeLog(LOG_LEVEL, "fd:%d ERROR:getNL:unexpected family", sd);
                 return (ino_t)-1;
             }
 
@@ -204,12 +202,12 @@ osGetExePath(char **path)
     char *buf = *path;
 
     if (!(buf = calloc(1, PATH_MAX))) {
-        scopeLog("ERROR:calloc in osGetExePath", -1, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "ERROR:calloc in osGetExePath");
         return -1;
     }
 
     if (readlink("/proc/self/exe", buf, PATH_MAX - 1) == -1) {
-        scopeLog("osGetPath: can't get path to self exe", -1, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "osGetPath: can't get path to self exe");
         free(buf);
         return -1;
     }
@@ -614,7 +612,6 @@ osGetPageProt(uint64_t addr)
     int prot = -1;
     size_t len = 0;
     char *buf = NULL;
-    char log[128];
 
     if (!g_fn.fopen || !g_fn.getline || !g_fn.fclose) {
         return -1;
@@ -644,14 +641,11 @@ osGetPageProt(uint64_t addr)
             return -1;
         }
 
-        snprintf(log, sizeof(log), "addr 0x%lux addr1 0x%lux addr2 0x%lux\n", addr, addr1, addr2);
-        scopeLog(log, -1, CFG_LOG_TRACE);
+        scopeLog(CFG_LOG_TRACE, "addr 0x%lux addr1 0x%lux addr2 0x%lux\n", addr, addr1, addr2);
 
         if ((addr >= addr1) && (addr <= addr2)) {
             char *perms = end + 1;
-            snprintf(log, sizeof(log), "matched 0x%lx to 0x%lx-0x%lx\n\t%c%c%c",
-                     addr, addr1, addr2, perms[0], perms[1], perms[2]);
-            scopeLog(log, -1, CFG_LOG_DEBUG);
+            scopeLog(CFG_LOG_DEBUG, "matched 0x%lx to 0x%lx-0x%lx\n\t%c%c%c", addr, addr1, addr2, perms[0], perms[1], perms[2]);
             prot = 0;
             prot |= perms[0] == 'r' ? PROT_READ : 0;
             prot |= perms[1] == 'w' ? PROT_WRITE : 0;

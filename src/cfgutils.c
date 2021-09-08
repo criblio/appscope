@@ -1564,11 +1564,9 @@ processProtocolPayload(config_t* config, yaml_document_t* doc, yaml_node_t* node
 static void
 processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
-    char logBuf[256];
-
     // protocol entries must be key/value maps
     if (node->type != YAML_MAPPING_NODE) {
-        scopeLog("WARN: ignoring non-map protocol entry\n", -1, CFG_LOG_WARN);
+        scopeLog(CFG_LOG_WARN, "WARN: ignoring non-map protocol entry\n");
         return;
     }
 
@@ -1605,7 +1603,7 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (!protocol_context->protname || !protocol_context->regex) {
         destroyProtEntry(protocol_context);
         protocol_context = NULL;
-        scopeLog("WARN: ignoring protocol entry missing name or regex\n", -1, CFG_LOG_WARN);
+        scopeLog(CFG_LOG_WARN, "WARN: ignoring protocol entry missing name or regex\n");
         return;
     }
 
@@ -1617,10 +1615,8 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
             PCRE2_ZERO_TERMINATED, 0,
             &errornumber, &erroroffset, NULL);
     if (!protocol_context->re) {
-        snprintf(logBuf, sizeof(logBuf),
-                 "WARN: invalid regex for \"%s\" protocol entry; %s\n",
+        scopeLog(CFG_LOG_WARN, "WARN: invalid regex for \"%s\" protocol entry; %s\n",
                  protocol_context->protname, protocol_context->regex);
-        scopeLog(logBuf, -1, CFG_LOG_WARN);
         destroyProtEntry(protocol_context);
         protocol_context = NULL;
         return;
@@ -1671,7 +1667,7 @@ static void
 processCustomFilterProcname(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) {
-        scopeLog("WARN: non-scalar procname value\n", -1, CFG_LOG_WARN);
+        scopeLog(CFG_LOG_WARN, "WARN: non-scalar procname value\n");
         custom_matched = FALSE;
         return;
     }
@@ -1692,7 +1688,7 @@ static void
 processCustomFilterArg(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) {
-        scopeLog("WARN: non-scalar arg value\n", -1, CFG_LOG_WARN);
+        scopeLog(CFG_LOG_WARN, "WARN: non-scalar arg value\n");
         custom_matched = FALSE;
         return;
     }
@@ -1712,7 +1708,7 @@ static void
 processCustomFilterHostname(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) {
-        scopeLog("WARN: non-scalar hostname value\n", -1, CFG_LOG_WARN);
+        scopeLog(CFG_LOG_WARN, "WARN: non-scalar hostname value\n");
         custom_matched = FALSE;
         return;
     }
@@ -1732,7 +1728,7 @@ static void
 processCustomFilterUsername(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) {
-        scopeLog("WARN: non-scalar username value\n", -1, CFG_LOG_WARN);
+        scopeLog(CFG_LOG_WARN, "WARN: non-scalar username value\n");
         custom_matched = FALSE;
         return;
     }
@@ -1753,7 +1749,7 @@ static void
 processCustomFilterEnv(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) {
-        scopeLog("WARN: non-scalar env value\n", -1, CFG_LOG_WARN);
+        scopeLog(CFG_LOG_WARN, "WARN: non-scalar env value\n");
         custom_matched = FALSE;
         return;
     }
@@ -1788,7 +1784,7 @@ static void
 processCustomFilterAncestor(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) {
-        scopeLog("WARN: non-scalar ancestor value\n", -1, CFG_LOG_WARN);
+        scopeLog(CFG_LOG_WARN, "WARN: non-scalar ancestor value\n");
         custom_matched = FALSE;
         return;
     }
@@ -1879,7 +1875,7 @@ processCustomConfig(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     // All filters have to match and there must be more than one filter
     if (!custom_matched || !custom_match_count) {
-        scopeLog("INFO: skipping custom config\n", -1, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "INFO: skipping custom config\n");
         return;
     }
 
@@ -1893,7 +1889,7 @@ processCustomEntry(config_t* config, yaml_document_t* doc, yaml_node_pair_t* pai
     yaml_node_t* node = yaml_document_get_node(doc, pair->value);
 
     if (node->type != YAML_MAPPING_NODE) {
-        scopeLog("WARN: ignoring non-map custom entry\n", -1, CFG_LOG_WARN);
+        scopeLog(CFG_LOG_WARN, "WARN: ignoring non-map custom entry\n");
         return;
     }
 
@@ -2681,7 +2677,7 @@ singleChannelSet(ctl_t *ctl, mtc_t *mtc)
 
     // if any logs created during cfg send now
     if (g_logmsg[0] != '\0') {
-        scopeLog(g_logmsg, -1, CFG_LOG_WARN);
+        scopeLog(CFG_LOG_WARN, "%s", g_logmsg);
     }
 
     transport_t *trans = ctlTransport(ctl, CFG_CTL);

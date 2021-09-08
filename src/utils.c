@@ -76,9 +76,7 @@ setPidEnv(int pid)
     }
 
     if (fullSetenv(SCOPE_PID_ENV, val, 1) == -1) {
-        char dbmsg[PATH_MAX];
-        snprintf(dbmsg, sizeof(dbmsg), "setPidEnv: %s:%s", SCOPE_PID_ENV, val);
-        scopeLog(dbmsg, -1, CFG_LOG_DEBUG);
+        scopeLog(CFG_LOG_DEBUG, "setPidEnv: %s:%s", SCOPE_PID_ENV, val);
     }
 }
 

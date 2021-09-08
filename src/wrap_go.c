@@ -576,11 +576,6 @@ initGoHook(elf_buf_t *ebuf)
 
         funcprint("%s", tap->func_name);
 
-        if (tap->assembly_fn == c_RawSyscall) {
-            patch_raw_func(funchook, orig_func, tap);
-            continue;
-        }
-
         uint64_t offset_into_txt = (uint64_t)orig_func - (uint64_t)ebuf->text_addr;
         uint64_t text_len_left = ebuf->text_len - offset_into_txt;
         uint64_t max_bytes = 4096;  // somewhat arbitrary limit.  Allows for
@@ -588,6 +583,12 @@ initGoHook(elf_buf_t *ebuf)
         uint64_t size = MIN(text_len_left, max_bytes); // limit size
 
         orig_func = (void *) ((uint64_t)orig_func + base);
+
+        if (tap->assembly_fn == c_RawSyscall) {
+            patch_raw_func(funchook, orig_func, tap);
+            continue;
+        }
+
         asm_count = cs_disasm(disass_handle, orig_func, size,
                                  (uint64_t)orig_func, 0, &asm_inst);
         if (asm_count <= 0) {
@@ -714,7 +715,7 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 
                 // is tls set?
                 if (go_v && (*go_v != 0)) { // continue
-                    go_fs = go_tls + 8; //go compiler uses -8(FS)
+                    go_fs = go_tls + (sizeof(unsigned long) * 7); //go compiler uses -8(FS)
                     go_v = (unsigned long *)go_fs;
 
                     if (go_v && (*go_v != 0)) { // continue

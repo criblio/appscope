@@ -64,7 +64,6 @@ $(LDSCOPE):
 $(LIBSCOPE):
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libscope.so
 
-# shortcut "easy button"
 scope: $(SCOPE)
 
 $(SCOPE): export GOOS=linux

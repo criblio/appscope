@@ -1,0 +1,21 @@
+#!/bin/bash
+
+ERR=0
+
+fail() { ERR+=1; echo >&2 "fail:" $@; }
+
+scope service --force cribl 
+
+echo
+[ -f /etc/scope/cribl/scope.yml ] || fail "missing scope.yml"
+[ -d /etc/systemd/system/cribl.service.d ] || fail "missing /etc/systemd/system/cribl.service.d/"
+[ -f /etc/systemd/system/cribl.service.d/env.conf ] || fail "missing /etc/systemd/system/cribl.service.d/env.conf"
+grep LD_PRELOAD /etc/systemd/system/cribl.service.d/env.conf >/dev/null 2>&1 || fail "missing LD_PRELOAD in env.conf"
+grep SCOPE_HOME /etc/systemd/system/cribl.service.d/env.conf >/dev/null 2>&1 || fail "missing SCOPE_HOME in env.conf"
+
+if [ $ERR -gt 0 ]; then
+    echo "$ERR test(s) failed"
+    exit $ERR
+else
+    echo "All test passed"
+fi

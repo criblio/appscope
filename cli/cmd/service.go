@@ -21,7 +21,7 @@ var serviceCmd = &cobra.Command{
 	Short: "Configure a systemd service to be scoped",
 	Long: `the "scope service" command adjusts the configuration for the named systemd service so it is scoped when it starts.`,
 Example: `scope service  cribl -c tls://in.my-instance.cribl.cloud:10090`,
-	Args: cobra.MinimumNArgs(1),
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		// must be root
 		if 0 != os.Getuid() {
@@ -29,12 +29,6 @@ Example: `scope service  cribl -c tls://in.my-instance.cribl.cloud:10090`,
 		}
 
 		// service name is the first and only argument
-		if len(args) < 1 {
-			util.ErrAndExit("error: missing required SERVICE argument")
-		}
-		if len(args) > 1 {
-			os.Stderr.WriteString("warn: ignoring extra arguments\n")
-		}
 		serviceName := args[0]
 
 		// get uname pieces
@@ -70,8 +64,7 @@ Example: `scope service  cribl -c tls://in.my-instance.cribl.cloud:10090`,
 		}
 
 		// Unknown
-		os.Stderr.WriteString("error: unknown boot system\n")
-		os.Exit(1);
+		util.ErrAndExit("error: unknown boot system\n")
 	},
 }
 

@@ -2667,9 +2667,16 @@ scope_write(int fd, const void* buf, size_t size)
 static int
 scope_open(const char* pathname)
 {
-    int fd = g_fn.open(pathname, O_WRONLY | O_APPEND);
+    // This implementation is largely based on transportConnectFile().
+    int fd = g_fn.open(pathname, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
     if (fd == -1) {
-        fd = g_fn.open(pathname, O_CREAT | O_WRONLY, 0666);
+        DBG("%s", pathname);
+        return fd;
+    }
+
+    // Since umask affects open permissions above...
+    if (fchmod(fd, 0666) == -1) {
+        DBG("%d %s", fd, pathname);
     }
     return fd;
 }

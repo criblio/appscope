@@ -1163,7 +1163,7 @@ transportCreateUnix(const char *path)
 
     memset((char *)&trans->local.addr, 0, sizeof(struct sockaddr_un));
     trans->local.addr.sun_family = AF_UNIX;
-    strncpy(&trans->local.addr.sun_path[0], path, pathlen);
+    strncpy(&trans->local.addr.sun_path[1], path, pathlen);
 
     transportConnect(trans);
 

@@ -2402,6 +2402,68 @@ cfgReadCustomOrder(void **state)
     cfgDestroy(&config);
 }
 
+static void
+cfgReadCustomAnchor(void **state)
+{
+    const char *yamlText =
+        // define a config using an anchor
+        "disable-metrics: &disable-metrics\n"
+        "  metric:\n"
+        "    enable: false\n"
+        "custom:\n"
+        "  eg1:\n"
+        "    filter:\n"
+        "      procname: test\n"
+        // use that config as a custom config
+        "    config: *disable-metrics\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), FALSE);
+
+    cfgDestroy(&config);
+}
+
+static void
+cfgReadCustomAnchorExtend(void **state)
+{
+    // We're skipping this test right now because the << extend syntax is not
+    // supported OOB by libyaml. We would need to add support for this ourself.
+    skip();
+
+    const char *yamlText =
+        // define a config using an anchor
+        "disable-metrics: &disable-metrics\n"
+        "  metric:\n"
+        "    enable: false\n"
+        "custom:\n"
+        "  eg1:\n"
+        "    filter:\n"
+        "      procname: test\n"
+        "    config:\n"
+        // include that config and extend it in a custom config
+        "      <<: *disable-metrics\n"
+        "      payload:\n"
+        "        enable: true\n"
+        "# EOF\n";
+    const char *yamlFilename = "/tmp/eg-scope.yml";
+    writeFile(yamlFilename, yamlText);
+    initProc("test", "test --with args", "myhost");
+    config_t* config = cfgRead(yamlFilename);
+    deleteFile(yamlFilename);
+    assert_non_null(config);
+
+    assert_int_equal(cfgMtcEnable(config), FALSE);
+    assert_int_equal(cfgPayEnable(config), TRUE);
+
+    cfgDestroy(&config);
+}
+
 // Defined in src/cfgutils.c
 // This is not a proper test, it just exists to make valgrind output
 // more readable when analyzing this test, by deallocating the compiled
@@ -2491,6 +2553,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgReadCustomMultipleFilters),
         cmocka_unit_test(cfgReadCustomOverride),
         cmocka_unit_test(cfgReadCustomOrder),
+        cmocka_unit_test(cfgReadCustomAnchor),
+        cmocka_unit_test(cfgReadCustomAnchorExtend),
         cmocka_unit_test(envRegexFree),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

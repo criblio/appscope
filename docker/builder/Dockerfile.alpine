@@ -27,7 +27,9 @@ RUN apk add --no-cache \
     strace \
     sudo \
     tcpdump \
-    vim
+    ucl-dev \
+    vim \
+    zlib-dev
 
 # ---
 # Add the "builder" user

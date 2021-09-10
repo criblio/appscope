@@ -51,6 +51,8 @@ RUN apt-get update && \
         git \
         lcov \
         libtool \
+        libucl-dev \
+        libz-dev \
         lsof \
         make \
         strace \

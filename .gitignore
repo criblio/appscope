@@ -31,7 +31,3 @@ scope.log
 /website/public/
 /website/node_modules/
 /website/.cache/
-
-# Build Dirs
-contrib/funchook/build
-contrib/pcre2/build

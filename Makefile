@@ -179,7 +179,7 @@ image: require-qemu-binfmt
 		--load \
                 .
 
-k8s-test: image
+k8s-test: require-kind require-kubectl image
 	docker tag cribl/scope:dev-x86_64 cribl/scope:$(VERSION)
 	kind delete cluster
 	kind create cluster
@@ -215,9 +215,19 @@ require-qemu-binfmt: require-docker
 	@[ -n "$(wildcard /proc/sys/fs/binfmt_misc/qemu-*)" ] || \
 		docker run --rm --privileged tonistiigi/binfmt:latest --install all
 
+# fail of kind not in $PATH
+require-kind:
+	@[ -n "$(shell which kind)" ] || \
+		{ echo >&2 "error: kind required"; exit 1; }
+
+# fail of kubectl not in $PATH
+require-kubectl:
+	@[ -n "$(shell which kubectl)" ] || \
+		{ echo >&2 "error: kubectl required"; exit 1; }
+
 .PHONY: all test clean
 .PHONY: cli% scope
 .PHONY: docker-build docker-run 
 .PHONY: build-arch builder-arch 
 .PHONY: image
-.PHONY: require-docker-buildx-builder require-docker require-docker-buildx require-qemu-binfmt
+.PHONY: require-docker-buildx-builder require-docker require-docker-buildx require-qemu-binfmt require-kind require-kubectl

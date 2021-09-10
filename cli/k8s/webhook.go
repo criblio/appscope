@@ -56,7 +56,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 		config, err := rest.InClusterConfig()
 		if err != nil {
 			// Don't error out if we're in a unit test
-			if !strings.HasSuffix(os.Args[0], ".test") {
+			if err == rest.ErrNotInCluster && !strings.HasSuffix(os.Args[0], ".test") {
 				app.HandleError(w, r, err)
 				return
 			}

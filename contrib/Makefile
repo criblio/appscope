@@ -15,6 +15,8 @@ ARCH ?= $(shell uname -m)
 all: cJSON cmocka funchook libyaml openssl pcre2 upx
 clean:
 	-@$(MAKE) -C cJSON clean
+	-@$(MAKE) -C libyaml clean
+	-@$(MAKE) -C upx clean
 	-@$(RM) -r build/*
 .PHONY: all clean
 

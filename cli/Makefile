@@ -5,6 +5,10 @@ ifeq (,$(GO))
 $(error "error: \`go\` not in PATH; install or set GO to it's path")
 endif
 
+# When UPX 4.x gets released, we can switch to using that but until then, 
+# we're using the version in our contribs.
+UPXBIN := ../contrib/upx/src/upx.out
+
 # cache downloaded modules and binaries locally
 export GOBIN := $(shell pwd)/.gobin/$(ARCH)
 export GOCACHE := $(shell pwd)/.gocache
@@ -73,9 +77,11 @@ $(SCOPE): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
 
-compress: UPXBIN := ../contrib/upx/src/upx.out
-compress: $(SCOPE)
+compress: $(SCOPE) $(UPXBIN)
 	$(UPXBIN) -l $(SCOPE) >/dev/null 2>&1 || $(UPXBIN) -9 $(SCOPE)
+
+$(UPXBIN):
+	@$(MAKE) -C ../contrib upx
 
 ## test: run unit tests
 test:

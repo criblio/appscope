@@ -1,0 +1,259 @@
+# Support for GitHub Actions -- https://github.com/features/actions
+# Copyright (C) Markus Franz Xaver Johannes Oberhumer
+
+name: 'CI'
+
+on:
+  push:
+    branches:
+      - '*'
+      - '!appveyor*'
+      - '!gitlab*'
+      - '!travis*'
+
+  workflow_dispatch:
+
+jobs:
+  job-rebuild-and-verify-stubs:
+    name: 'Rebuild stubs'
+    runs-on: ubuntu-20.04
+    steps:
+      - name: 'Install extra packages'
+        run: |
+          uname -a; pwd; id; umask
+          cd ..; mkdir -p deps; cd deps; mkdir packages
+          # manually install compat libs from Ubuntu 16.04
+          wget -q 'http://mirror.enzu.com/ubuntu/pool/main/g/gmp/libgmp10_6.1.0+dfsg-2_amd64.deb'
+          wget -q 'http://mirror.enzu.com/ubuntu/pool/main/m/mpfr4/libmpfr4_3.1.4-1_amd64.deb'
+          for f in *.deb; do dpkg -x $f ./packages; done
+          sudo mv -v -n ./packages/usr/lib/x86_64-linux-gnu/lib* /usr/lib/x86_64-linux-gnu/
+          sudo ldconfig
+          wget -q -O - https://github.com/upx/upx-stubtools/releases/download/v20210104/bin-upx-20210104.tar.xz | tar -xJ
+      - name: 'Check out code'
+        uses: actions/checkout@v2
+        with: { submodules: true }
+      - name: 'Rebuild and verify stubs'
+        run: |
+          env C=gcc X=rebuild-stubs TRAVIS_OS_NAME=linux bash ./.github/travis_build.sh
+
+  job-linux-toolchains:
+    needs: [ job-rebuild-and-verify-stubs ]
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: amd64-linux-clang-10, os: ubuntu-20.04, C: clang-10-m64 }
+          - { name: amd64-linux-gcc-10,   os: ubuntu-20.04, C: gcc-10-m64 }
+          - { name: i386-linux-clang-10,  os: ubuntu-20.04, C: clang-10-m32 }
+          - { name: i386-linux-gcc-10,    os: ubuntu-20.04, C: gcc-10-m32 }
+          - { name: amd64-linux-clang-10-sanitize, os: ubuntu-20.04, C: clang-10-m64, B: sanitize }
+          - { name: amd64-linux-gcc-10-sanitize,   os: ubuntu-20.04, C: gcc-10-m64,   B: sanitize }
+
+    steps:
+      - name: 'Install extra packages'
+        run: |
+          uname -a; pwd; id; umask
+          #cat /etc/os-release || true
+          #env
+          if [[ ${{ matrix.os }} =~ ^ubuntu ]]; then
+            export DEBIAN_FRONTEND=noninteractive
+            if [[ ${{ matrix.C }} =~ ^(clang|gcc).*-m32$ ]]; then
+              sudo dpkg --add-architecture i386
+              sudo apt-get update
+              sudo apt-get install --only-upgrade apt
+              sudo apt-get install -y g++-9-multilib g++-10-multilib zlib1g-dev:i386
+            fi
+          fi
+
+      - name: 'Check out code'
+        uses: actions/checkout@v2
+        with: { submodules: true }
+
+      - name: 'Prepare sources'
+        run: |
+          cd ..; mkdir -p deps build/github; cd deps
+          wget -q -O - https://github.com/upx/upx/releases/download/v3.00/ucl-1.03.tar.xz | tar -xJ
+          git clone --depth=1 --single-branch https://github.com/upx/upx-testsuite
+
+      - name: 'Build'
+        run: |
+          export C=${{matrix.C}} B=${{matrix.B}} T=${{matrix.T}} X=${{matrix.X}} TRAVIS_OS_NAME=linux
+          export BUILD_LOCAL_UCL=1
+          bash ./.github/travis_build.sh
+
+      - name: 'Run test suite'
+        run: |
+          export C=${{matrix.C}} B=${{matrix.B}} T=${{matrix.T}} X=${{matrix.X}} TRAVIS_OS_NAME=linux
+          bash ./.github/travis_testsuite_1.sh
+
+      - name: 'Make artifact'
+        run: |
+          export C=${{matrix.C}} B=${{matrix.B}}; [ -n "$B" ] || B="release"
+          mkdir tmp
+          cp ../build/github/$C/$B/upx/upx.out tmp/upx
+
+      - name: 'Upload artifact'
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.name }}
+          path: tmp
+
+  job-windows-cross-toolchains:
+    needs: [ job-rebuild-and-verify-stubs ]
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: amd64-win64-gcc-9, os: ubuntu-20.04, CROSS: x86_64-w64-mingw32, C: gcc-9, T: wine }
+
+    steps:
+      - name: 'Install extra packages'
+        run: |
+          uname -a; pwd; id; umask
+          export DEBIAN_FRONTEND=noninteractive
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y binutils-mingw-w64-x86-64 g++-mingw-w64-x86-64 wine wine64
+
+      - name: 'Check out code'
+        uses: actions/checkout@v2
+        with: { submodules: true }
+
+      - name: 'Prepare sources'
+        run: |
+          cd ..; mkdir -p deps build/github; cd deps
+          wget -q -O - https://github.com/upx/upx/releases/download/v3.00/ucl-1.03.tar.xz | tar -xJ
+          wget -q -O - https://github.com/upx/upx/releases/download/v3.00/zlib-1.2.11.tar.xz | tar -xJ
+          git clone --depth=1 --single-branch https://github.com/upx/upx-testsuite
+
+      - name: 'Build'
+        run: |
+          export C=${{matrix.C}} B=${{matrix.B}} T=${{matrix.T}} X=${{matrix.X}} TRAVIS_OS_NAME=linux
+          export CROSS=${{matrix.CROSS}}
+          export BUILD_LOCAL_UCL=1
+          bash ./.github/travis_build.sh
+
+      - name: 'Run test suite using Wine'
+        run: |
+          export C=${{matrix.C}} B=${{matrix.B}} T=${{matrix.T}} X=${{matrix.X}} TRAVIS_OS_NAME=linux
+          export CROSS=${{matrix.CROSS}}
+          bash ./.github/travis_testsuite_1.sh
+
+      - name: 'Make artifact'
+        run: |
+          export C=${{matrix.C}} B=${{matrix.B}}; [ -n "$B" ] || B="release"
+          export CROSS=${{matrix.CROSS}}
+          mkdir tmp
+          cp ../build/github/$CROSS-$C/$B/upx/upx.exe tmp/upx.exe
+
+      - name: 'Upload artifact'
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.name }}
+          path: tmp
+
+  job-windows-toolchains:
+    needs: [ job-rebuild-and-verify-stubs ]
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    env:
+      C: ${{ matrix.C }}
+      B: release
+      H: 'd:\a\upx'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: amd64-win64-msvc-14.2, os: windows-2019, C: msvc-14.2-x64, A: x64 }
+          - { name: i386-win32-msvc-14.2,  os: windows-2019, C: msvc-14.2-x86, A: x86 }
+
+    steps:
+      - name: 'Check out code'
+        uses: actions/checkout@v2
+        with: { submodules: true }
+
+      - name: 'Prepare sources'
+        shell: cmd
+        run: |
+          where bash & where cat & where chmod & where cmp & where cp & where curl & where date & where file & where git & where gzip & where mkdir & where mv & where openssl & where readlink & where rm & where rmdir & where sed & where sha256sum & where sort & where ssh & where ssh-add & where ssh-agent & where ssh-keyscan & where tar & where touch
+          git config --global core.autocrlf input
+          git --version & bash --version
+          cd %H%
+          md build build\%C% deps
+          cd deps
+          curl -sS -L --retry 5 -o ucl-1.03.tar.gz   "https://github.com/upx/upx/releases/download/v3.00/ucl-1.03.tar.gz"
+          curl -sS -L --retry 5 -o zlib-1.2.11.tar.gz "https://github.com/upx/upx/releases/download/v3.00/zlib-1.2.11.tar.gz"
+          git clone --depth=1 https://github.com/upx/upx-testsuite
+          tar -xzf ucl-1.03.tar.gz
+          tar -xzf zlib-1.2.11.tar.gz
+          @REM patch UCL for newer msvc (vsnprintf issue)
+          sed -i '/# *define.*snprintf  *_v*snprintf$/d' ucl-1.03/acc/acc_auto.h
+
+      - name: 'Set up Developer Command Prompt'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.A }}
+
+      - name: 'Build'
+        shell: cmd
+        run: |
+          @REM setup directories following the VPATH build in travis_build.sh
+          where cl & where link
+          set BDIR=%H%\build\%C%\%B%
+          md %BDIR% %BDIR%\ucl-1.03 %BDIR%\upx %BDIR%\upx-testsuite %BDIR%\zlib-1.2.11
+          set DEFS=-D_CRT_SECURE_NO_WARNINGS
+          git rev-parse --short=12 HEAD > %BDIR%\upx\.GITREV.txt
+          @REM build UCL
+          cd %BDIR%\ucl-1.03
+          set s=%H%\deps\ucl-1.03
+          cl -MT -O2 -W4 %DEFS% -I%s%\include -I%s% -c %s%\src\*.c
+          link -lib -out:ucl.lib *.obj
+          @REM build zlib
+          cd %BDIR%\zlib-1.2.11
+          cl -MT -O2 -W2 %DEFS% -c %H%\deps\zlib-1.2.11\*.c
+          link -lib -out:zlib.lib *.obj
+          @REM build UPX
+          cd %BDIR%\upx
+          set s=%H%\upx\src
+          cat .GITREV.txt
+          set /p GITREV=<.GITREV.txt
+          cl -MT -EHsc -J -O2 -W4 -WX -DUPX_VERSION_GITREV="""%GITREV%""" %DEFS% -I%s%\lzma-sdk -I%H%\deps\ucl-1.03\include -I%H%\deps\zlib-1.2.11 -Feupx.exe %s%\*.cpp %BDIR%\ucl-1.03\ucl.lib %BDIR%\zlib-1.2.11\zlib.lib /link setargv.obj
+
+      - name: 'Basic tests'
+        shell: cmd
+        run: |
+          cd %H%\build\%C%\%B%\upx
+          set UPX=--no-color --no-progress
+          .\upx.exe --version
+          .\upx.exe upx.exe -o upx_packed.exe
+          dir *.exe
+          .\upx.exe -l upx_packed.exe
+          .\upx.exe -t upx_packed.exe
+          .\upx_packed.exe --version
+
+      - name: 'Run test suite'
+        shell: cmd
+        run: |
+          bash ./.github/travis_testsuite_1.sh
+
+      - name: 'Make artifact'
+        shell: cmd
+        run: |
+          mkdir tmp
+          copy %H%\build\%C%\%B%\upx\upx_packed.exe tmp\upx.exe
+
+      - name: 'Upload artifact'
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.name }}
+          path: tmp
+
+# vim:set ts=2 sw=2 et:

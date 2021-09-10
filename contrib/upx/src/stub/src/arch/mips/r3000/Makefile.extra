@@ -1,0 +1,110 @@
+MAKEFLAGS += -rR
+.SUFFIXES:
+.SECONDEXPANSION:
+
+ifndef top_srcdir
+__dir_list   = . .. ../.. ../../.. ../../../.. ../../../../..
+__dir_list  += ../../../../../.. ../../../../../../.. ../../../../../../../..
+__dir_search = $(firstword $(foreach v,$1,$(if $(wildcard $v/$2),$v)) $3)
+top_srcdir := $(call __dir_search,$(__dir_list),src/bele.h,NOT_FOUND)
+endif
+include $(wildcard $(top_srcdir)/Makevars.global ./Makevars.local)
+vpath %.c $(top_srcdir)/src/stub/src/c
+
+STUBS =
+include $(top_srcdir)/src/stub/src/c/Makevars.lzma
+ifneq ($(UPX_LZMA_VERSION),)
+STUBS += lzma_d_cf.S lzma_d_cs.S
+endif
+
+default.targets = all
+ifeq ($(strip $(STUBS)),)
+STUBS = NO_STUBS
+all.targets =
+endif
+include $(top_srcdir)/src/stub/Makefile
+
+
+# /***********************************************************************
+# // method-lzma
+# ************************************************************************/
+
+lzma_d_c%.S : tc_list = method-lzma mipsel.r3000-ps1 default
+lzma_d_c%.S : tc_bfdname = elf32-littlemips
+
+c := tc.method-lzma.gcc
+$c  = $(tc.mipsel.r3000-ps1.gcc)
+$c += -pie -fPIC
+$c += -Os -fomit-frame-pointer
+$c += -fno-unit-at-a-time
+$c += -ffunction-sections
+$c += -fwrapv
+# Important note: these settings are tuned for size so that the
+#   resulting code can get compressed efficiently with NRV2B.
+# Also see test-stub-compression below.
+ifneq ($(findstring -gcc-3.4.4,$(firstword $($c))),)
+$c += -mtune=r3000
+$c += -fno-schedule-insns
+$c += -fno-schedule-insns2
+else ifneq ($(findstring -gcc-4.1.1,$(firstword $($c))),)
+$c += -mtune=r4000
+$c += -fno-regmove
+$c += -fno-sched-spec
+$c += -fno-schedule-insns
+$c += -fno-schedule-insns2
+$c += -fno-guess-branch-probability
+$c += -fmodulo-sched
+$c += -floop-optimize2
+$c += -ffixed-30
+else ifneq ($(findstring -gcc-4.2.0,$(firstword $($c))),)
+# gcc-4.2.0-20060826.tar.bz2 snapshot
+$c += -fno-wrapv
+$c += -mtune=r4000
+$c += -fno-regmove
+$c += -fno-sched-spec
+$c += -fno-schedule-insns
+$c += -fno-schedule-insns2
+$c += -fno-guess-branch-probability
+$c += -fmodulo-sched
+$c += -ffixed-30
+else
+$(error unknown gcc version: $(firstword $($c)))
+endif
+ifneq ($(UPX_LZMA_VERSION),)
+$c += -DWITH_LZMA=$(UPX_LZMA_VERSION)
+$c += -I$(UPX_LZMADIR)
+endif
+$c += -I$(top_srcdir)/src
+
+lzma_d_c%.S : lzma_d_c.c
+	$(call tc,gcc) $(PP_FLAGS) -c $< -o tmp/$T.o
+	$(call tc,f-objstrip,tmp/$T.o)
+	$(call tc,objcopy) -O binary --only-section .text.LzmaDecode tmp/$T.o tmp/$T.bin
+	head -c-0 tmp/$T.bin > tmp/$T.out
+	$(call tc,objdump) -b binary -m mips:3000 -D tmp/$T.out | $(RTRIM) > tmp/$T.out.disasm
+	$(call tc,bin2h) --mode=gas-le32 tmp/$T.out $@
+
+lzma_d_cf.% : PP_FLAGS = -DFAST
+lzma_d_cs.% : PP_FLAGS = -DSMALL
+
+
+# /***********************************************************************
+# // test-stub-compression (needs UPX_UCL_UCLPACK)
+# ************************************************************************/
+
+define __test_stub_compression
+	@md5sum $1
+	$(if $2,$(call tc,readelf) -S $2 | egrep 'LzmaDecode ')
+	@rm -f $1.tmp.*
+	@bzip2 -9  < $1 > $1.tmp.bz2
+	@gzip -9mn < $1 > $1.tmp.gz
+	$(if $(UPX_UCL_UCLPACK),@$(UPX_UCL_UCLPACK) --nrv2b --10 $1 $1.tmp.uclpack-nrv2b | egrep ' into ')
+	@ls -l $1.tmp.*
+endef
+
+ifneq ($(UPX_LZMA_VERSION),)
+test-stub-compression: tc_list = mipsel.r3000-ps1 default
+test-stub-compression: lzma_d_cf.S lzma_d_cs.S
+	$(call __test_stub_compression,tmp/lzma_d_cs.out,tmp/lzma_d_cs.o)
+.PHONY: test-stub-compression
+endif

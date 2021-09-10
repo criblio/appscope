@@ -1,0 +1,8 @@
+This folder contains a copy of UPX's `devel` branch from 2021-09-10. We found
+the released version at that time (3.96) was causing issues on ARM. The
+compressed version of our `scope` binary was crashing when running even simple
+commands like `scope version`. The problem goes away when we use this version
+instead.
+
+Project: <https://github.com/upx/upx>
+Release: devel branch f75ad8b 2021-09-10

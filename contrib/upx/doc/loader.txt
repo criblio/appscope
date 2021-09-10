@@ -1,0 +1,50 @@
+This documentation is written for those brave souls who want to
+understand and/or modify the UPX assembly stubs - the small snippets
+that do the runtime decompression when a compressed program is started.
+
+If you look at the C++ source files, you can find code fragments like
+this:
+
+    addLoader("PEMAIN20",
+              ih.entry ? "PEDOJUMP" : "PERETURN",
+              "IDENTSTR""UPX1HEAD",
+              NULL
+             );
+
+    linker->defineSymbol("original_entry", ih.entry);
+
+and in the assembly files fragments like this:
+
+    section         PEISDLL1
+                    cmpb    [esp + 8], 1
+                    jnz     reloc_end_jmp
+
+    section         PEMAIN21
+    reloc_end_jmp:
+
+    section         PERETURN
+                    xor     eax, eax
+                    inc     eax
+                    ret     0x0C
+    section         PEDOJUMP
+                    jmp    original_entry
+
+Everything works as you would expect. If you want to add the code
+fragment which is in `section PERETURN' to the runtime stub, then
+simply use `addLoader("PERETURN")' in the C++ source.
+
+That's nice, you could say, but how cross section jumps and calls are
+handled? Well, that is the nicest part of this stuff - they are handled
+automatically. All you have to do is to add the required sections to the
+loader using `addLoader()' and the rest is done by upx. It will resolve
+every conditional or unconditional jumps or subroutine calls for you.
+
+You can also use (undefined) symbols in the assembly for values that
+can only be computed during compression time (like `original_entry').
+These symbols can be defined later in C++ using
+
+        linker->defineSymbol("xx", yy)
+
+This functionality (we could say it's a simple linker) is achieved by
+compiling the assembly into an ELF object file which a little C++
+module (src/linker.cpp) can interpret and work with.

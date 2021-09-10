@@ -12,7 +12,7 @@
 
 ARCH ?= $(shell uname -m)
 
-all: cJSON cmocka funchook libyaml openssl pcre2
+all: cJSON cmocka funchook libyaml openssl pcre2 upx
 clean:
 	-@$(MAKE) -C cJSON clean
 	-@$(RM) -r build/*
@@ -24,7 +24,8 @@ funchook: build/funchook/libfunchook.a
 libyaml: build/libyaml/src/.libs/libyaml.a
 openssl: build/openssl/libssl.a build/openssl/libcrypto.a
 pcre2: build/pcre2/libpcre2-posix.a build/pcre2/libpcre2-8.a
-.PHONY: cJSON cmocka funchook libyaml openssl pcre2
+upx: upx/src/upx.out
+.PHONY: cJSON cmocka funchook libyaml openssl pcre2 upx
 
 # Can't be cached because the build is in the source folder.
 cJSON/libcjson.a:
@@ -77,5 +78,11 @@ build/pcre2/libpcre2-posix.a build/pcre2/libpcre2-8.a:
 	@$(RM) -r build/pcre2
 	@mkdir build/pcre2
 	cd build/pcre2 && cmake ../../pcre2 && $(MAKE)
+	@[ -z "$(CI)" ] || echo "::endgroup::"
+
+# Can't be cached because it's a simple Makefile
+upx/src/upx.out:
+	@echo "$${CI:+::group::}Building upx"
+	cd upx && $(MAKE)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

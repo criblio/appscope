@@ -32,8 +32,7 @@ debug:
 	$(MAKE) scope BUILD_OPTS="-gcflags=all=\"-N -l\""
 
 ## all: build and compress \`scope\`
-all: scope
-	@[ -z "$(COMPRESS)" ] || $(MAKE) -s compressscope
+all: scope compress
 
 ## clean: remove the built binary
 clean:
@@ -74,8 +73,9 @@ $(SCOPE): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
 
-compressscope: $(SCOPE)
-	upx -l $(SCOPE) >/dev/null 2>&1 || upx -9 $(SCOPE)
+compress: UPXBIN := ../contrib/upx/src/upx.out
+compress: $(SCOPE)
+	$(UPXBIN) -l $(SCOPE) >/dev/null 2>&1 || $(UPXBIN) -9 $(SCOPE)
 
 ## test: run unit tests
 test:
@@ -107,4 +107,4 @@ help: Makefile
 	@sed -n 's/^##//p' $< | column -t -s ':' |  sed -e 's/^/ /'
 	@echo
 
-.PHONY: build debug all clean deps rebuild scope compressscope test fmt lint vet cover check help
+.PHONY: build debug all clean deps rebuild scope compress test fmt lint vet cover check help

@@ -5,4 +5,12 @@ commands like `scope version`. The problem goes away when we use this version
 instead.
 
 Project: <https://github.com/upx/upx>
-Release: devel branch f75ad8b 2021-09-10
+Release: devel f75ad8b 2021-09-10
+
+In addition to downloading the source package for UPX, we needed to also
+download the source for their LZMA package too. It gets unpacked into
+src/lcma-sdk.
+
+Project: https://github.com/upx/upx-lzma-sdk
+Release: master c6c2fc4 2021-09-10
+

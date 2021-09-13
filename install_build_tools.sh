@@ -418,6 +418,27 @@ yum_upx_install() {
     fi
 }
 
+yum_libucl_exists() {
+    if [ -f /usr/include/ucl/ucl.h ]; then
+        echo "libucl is already installed; doing nothing for libucl."
+    else
+        echo "libucl is not already installed."
+        return 1
+    fi
+}
+
+yum_libucl_install() {
+    echo "Installing libucl."
+    sudo yum -y install epel-release
+    sudo yum -y install libucl-devel
+    if [ $? = 0 ]; then
+        echo "Installation of libucl successful."
+    else
+        echo "Installation of libucl failed."
+        FAILED=1
+    fi
+}
+
 
 
 
@@ -471,6 +492,9 @@ yum_install() {
     fi
     if ! yum_upx_exists; then
         yum_upx_install
+    fi
+    if ! yum_libucl_exists; then
+        yum_libucl_install
     fi
 
 
@@ -663,6 +687,26 @@ apt_upx_install() {
     fi
 }
 
+apt_libucl_exists() {
+    if [ -f /usr/include/ucl/ucl.h ]; then
+        echo "libucl is already installed; doing nothing for libucl."
+    else
+        echo "libucl is not already installed."
+        return 1
+    fi
+}
+
+apt_libucl_install() {
+    echo "Installing libucl."
+    sudo apt-get install -y libucl-dev
+    if [ $? = 0 ]; then
+        echo "Installation of libucl successful."
+    else
+        echo "Installation of libucl failed."
+        FAILED=1
+    fi
+}
+
 apt_dump_versions() {
     # The crazy sed stuff at the end of each just provides indention.
     if lsb_release -d &>/dev/null; then
@@ -707,6 +751,9 @@ apt_install() {
     fi
     if ! apt_upx_exists; then
         apt_upx_install
+    fi
+    if ! apt_libucl_exists; then
+        apt_libucl_install
     fi
 
 

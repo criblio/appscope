@@ -6,6 +6,15 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 0.7.4
+
+2021-09-14 - Maintenance Pre-Release
+
+- **Fix**: [#264](https://github.com/criblio/appscope/issues/264),[#565](https://github.com/criblio/appscope/issues/565) `scope k8s` now (1) supports specifying the namespace to install into, and (2) when the [ConfigMap](https://kubernetes.io/docs/concepts/configuration/configmap/) in that namespace is edited, automatically propagates edits the changes to all namespaces instrumented with the label `scope=enabled`.
+
+- **Fix**: [#531](https://github.com/criblio/appscope/issues/531) The AppScope build system now uses UPX for compression, reducing the binary size to about 20 MB.
+
+
 ## AppScope 0.7.3
 
 2021-09-01 - Maintenance/Hotfix Pre-Release

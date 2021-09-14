@@ -34,6 +34,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: webhook-cert-setup
+  namespace: {{ .Namespace }}
 spec:
   template:
     spec:
@@ -91,19 +92,53 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: webhook-cert-sa
-    namespace: default
+    namespace: {{ .Namespace }}
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: webhook-cert-sa
+  namespace: {{ .Namespace }}
 `
 
 var webhookDeployment string = `---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: scope-cluster-role
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["scope"]
+    verbs: ["get", "patch", "put", "update"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: scope-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: scope-cluster-role
+subjects:
+  - kind: ServiceAccount
+    name: scope-cert-sa
+    namespace: {{ .Namespace }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: scope-cert-sa
+  namespace: {{ .Namespace }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .App }}
+  namespace: {{ .Namespace }}
   labels:
     app: {{ .App }}
 spec:
@@ -118,6 +153,7 @@ spec:
       labels:
         app: {{ .App }}
     spec:
+      serviceAccountName: scope-cert-sa
       containers:
         - name: {{ .App }}
           image: cribl/scope:{{ .Version }}
@@ -142,6 +178,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ .App }}
+  namespace: {{ .Namespace }}
 spec:
   type: ClusterIP
   ports:
@@ -156,6 +193,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .App }}
+  namespace: {{ .Namespace }}
 data:
   scope.yml: |
 {{ .ScopeConfigYaml | toString | indent 4 }}

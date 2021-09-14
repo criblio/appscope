@@ -490,9 +490,10 @@ yum_install() {
     if ! yum_go_exists; then
         yum_go_install
     fi
-    if ! yum_upx_exists; then
-        yum_upx_install
-    fi
+#    We're currently building upx ourselves because version 3.96 has issues on arm64
+#    if ! yum_upx_exists; then
+#        yum_upx_install
+#    fi
     if ! yum_libucl_exists; then
         yum_libucl_install
     fi
@@ -520,6 +521,7 @@ yum_install() {
 #      libtool (GNU libtool) 2.4.6
 #      cmake version 3.10.2
 #      lcov: LCOV version 1.13
+#      upx 3.94
 #
 
 apt_sudo_exists() {
@@ -687,6 +689,26 @@ apt_upx_install() {
     fi
 }
 
+apt_zlib_exists() {
+    if [ -f /usr/include/zlib.h ]; then
+        echo "zlib is already installed; doing nothing for zlib."
+    else
+        echo "zlib is not already installed."
+        return 1
+    fi
+}
+
+apt_zlib_install() {
+    echo "Installing zlib."
+    sudo apt-get install -y zlib1g-dev
+    if [ $? = 0 ]; then
+        echo "Installation of zlib successful."
+    else
+        echo "Installation of zlib failed."
+        FAILED=1
+    fi
+}
+
 apt_libucl_exists() {
     if [ -f /usr/include/ucl/ucl.h ]; then
         echo "libucl is already installed; doing nothing for libucl."
@@ -749,8 +771,12 @@ apt_install() {
     if ! apt_go_exists; then
         apt_go_install
     fi
-    if ! apt_upx_exists; then
-        apt_upx_install
+#    We're currently building upx ourselves because version 3.94 has issues on arm64
+#    if ! apt_upx_exists; then
+#        apt_upx_install
+#    fi
+    if ! apt_zlib_exists; then
+        apt_zlib_install
     fi
     if ! apt_libucl_exists; then
         apt_libucl_install

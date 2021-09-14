@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/rs/zerolog/log"
 )
 
 // http helpers
 
 // HandleError depending on error type
 func (app *App) HandleError(w http.ResponseWriter, r *http.Request, err error) {
+	log.Error().Err(err).Msg("in HandleError")
 	jsonError(w, err.Error(), http.StatusBadRequest)
 }
 

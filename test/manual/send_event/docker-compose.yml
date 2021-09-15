@@ -1,0 +1,22 @@
+version: '3.5'
+
+x-scope-common: &scope-common
+  volumes:
+    - ../../..:/opt/appscope
+  working_dir: /opt/appscope
+  privileged: true
+
+services:
+
+  # These tests run on all platforms; x86_64 and aarch64
+  
+  send-event:
+    image: scopemanual/send-event
+    build:
+      cache_from:
+        - scopemanual/send-event
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+    <<: *scope-common

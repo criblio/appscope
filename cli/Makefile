@@ -49,7 +49,7 @@ $(GOVVV):
 	$(GO) get github.com/ahmetb/govvv
 $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
-		sh -s -- -b $(GO_BINDIR) v1.40.1
+		sh -s -- -b $(GOBIN) v1.42.1
 
 rebuild: clean build 
 

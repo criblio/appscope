@@ -1051,21 +1051,21 @@ transportCreateUnix(const char *path)
     trans->type = CFG_UNIX;
     trans->local.sock = -1;
 
-    // the string portion of the unix address includes one extra byte
-    // for a leading \0 for an abstract socket.  (No trailing \0)
-    trans->local.addr_len = pathlen + 1;
-    if (trans->local.addr_len >= sizeof(trans->local.addr.sun_path)) {
+    if (pathlen >= sizeof(trans->local.addr.sun_path)) {
         DBG("%s", path);
         transportDestroy(&trans);
         return trans;
     }
-
-    // The whole address includes 2 bytes for the address family type too
-    trans->local.addr_len += sizeof(sa_family_t);
-
-    memset((char *)&trans->local.addr, 0, sizeof(struct sockaddr_un));
+    memset(&trans->local.addr, 0, sizeof(trans->local.addr));
     trans->local.addr.sun_family = AF_UNIX;
-    strncpy(&trans->local.addr.sun_path[1], path, pathlen);
+    strncpy(trans->local.addr.sun_path, path, pathlen);
+    trans->local.addr_len = pathlen + sizeof(sa_family_t);
+    if (path[0] == '@') {
+        // The socket is abstract
+        trans->local.addr.sun_path[0] = 0;
+    } else {
+        trans->local.addr_len += 1; 
+    }
 
     transportConnect(trans);
 

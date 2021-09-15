@@ -307,16 +307,17 @@ transportSendForUdpTransmitsMsg(void** state)
 }
 
 static void
-transportSendForUnixTransmitsMsg(void** state)
+transportSendForAbstractUnixTransmitsMsg(void** state)
 {
-    const char* path = "mytestsockname";
+    const char* path = "@mytestsockname";
 
     // Create a unix address for a test socket
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
     memset(addr.sun_path, 0, sizeof(addr.sun_path));
-    strncpy(&addr.sun_path[1], path, strlen(path));
-    int addr_len = sizeof(sa_family_t) + strlen(path) + 1; // leading null
+    strncpy(addr.sun_path, path, strlen(path));
+    addr.sun_path[0] = 0;
+    int addr_len = sizeof(sa_family_t) + strlen(path);
 
     // Create a test socket that our transport can send to
     int sd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -353,6 +354,56 @@ transportSendForUnixTransmitsMsg(void** state)
 
     close(rx_sock);
     close(sd);
+}
+
+static void
+transportSendForFilepathUnixTransmitsMsg(void** state)
+{
+    const char* path = "/tmp/mysocket_file";
+
+    // Create a unix address for a test socket
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+    memset(addr.sun_path, 0, sizeof(addr.sun_path));
+    strncpy(addr.sun_path, path, strlen(path));
+    int addr_len = sizeof(sa_family_t) + strlen(path) + 1;
+
+    // Create a test socket that our transport can send to
+    int sd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sd == -1) {
+        fail_msg("Couldn't create socket");
+    }
+    if (bind(sd, &addr, addr_len) == -1) {
+        fail_msg("Couldn't bind socket");
+    }
+    if (listen(sd, 10) == -1) {
+        fail_msg("Couldn't listen on socket");
+    }
+
+    // Verify that the transport can be created, connected, and used for a tx
+    transport_t* t = transportCreateUnix(path);
+    assert_non_null(t);
+    assert_false(transportNeedsConnection(t));
+    const char msg[] = "This is the payload message to transfer.\n";
+    char buf[sizeof(msg)] = {0};  // Has room for a null at the end
+    assert_int_equal(transportSend(t, msg, strlen(msg)), 0);
+
+    // Verify that our test sockets can rx the stuff sent with the transport
+    struct sockaddr_storage from = {0};
+    socklen_t from_len = sizeof(from);
+    int rx_sock = accept(sd, (struct sockaddr *)&from, &from_len);
+    assert_true(rx_sock != -1);
+    int byteCount = recv(rx_sock, buf, sizeof(buf), 0);
+    if (byteCount != strlen(msg)) {
+        fail_msg("Couldn't recv properly");
+    }
+    assert_string_equal(msg, buf);
+
+    transportDestroy(&t);
+
+    close(rx_sock);
+    close(sd);
+    unlink(path);
 }
 
 static void
@@ -471,7 +522,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportSendForNullMessageDoesNothing),
         cmocka_unit_test(transportSendForUnimplementedTransportTypesIsHarmless),
         cmocka_unit_test(transportSendForUdpTransmitsMsg),
-        cmocka_unit_test(transportSendForUnixTransmitsMsg),
+        cmocka_unit_test(transportSendForAbstractUnixTransmitsMsg),
+        cmocka_unit_test(transportSendForFilepathUnixTransmitsMsg),
         cmocka_unit_test(transportSendForFileWritesToFileAfterFlushWhenFullyBuffered),
         cmocka_unit_test(transportSendForFileWritesToFileImmediatelyWhenLineBuffered),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),

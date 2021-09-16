@@ -63,8 +63,7 @@ AppScope Integration Test Runner
   `make (test)` - run a single test
   `make (test)-shell` - run a shell in the test's container
   `make (test)-build` - build the test's image
-Tests: alpine bash console cribl detect-proto elastic gogen go-1.2 go-1.3 go-1.4 go-1.5 go-1.6 go-1.7 go-1.8 go-1.9 go-1.10 go-1.11 go-1.12 go-1.13 go-1.14 go-1.15 go-1.16 java6 java7 java8 java9 java10 java11 java12 java13 java14 kafka nginx oracle-java6 oracle-java7 oracle-java8 oracle-java9 oracle-java10 oracle-java11 oracle-java12 oracle-java13 oracle-java14 splunk syscalls tls
-$
+Tests: alpine bash cli console detect_proto elastic gogen go_2 go_3 go_4 go_5 go_6 go_7 go_8 go_9 go_10 go_11 go_12 go_13 go_14 go_15 go_16 http java7 java8 java9 java10 java11 java12 java13 java14 kafka logstream nginx oracle-java6 oracle-java7 oracle-java8 oracle-java9 oracle-java10 oracle-java11 oracle-java12 oracle-java13 oracle-java14 service-initd service-systemd splunk syscalls tls transport
 ```
 
 Developers can run tests locally pretty easily with this setup. We use it for

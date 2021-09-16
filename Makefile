@@ -63,6 +63,11 @@ REGISTRY_docker := docker.io
 DIST_IMAGE ?= $(GITHUB_REPOSITORY)
 BUILD_IMAGE ?= $(REGISTRY_github)/$(GITHUB_REPOSITORY)-builder
 
+CLANG_FORMAT_BIN := $(shell which clang-format-12 2> /dev/null)
+CLANG_FORMAT ?= $(CLANG_FORMAT_BIN) --style=file -i
+CLANG_FORMAT_FILES ?= . -path "./contrib" -prune -false -o \
+						-iname "*.h" -o -iname "*.hpp" -o -iname "*.c" -o -iname "*.cpp"
+
 # default target builds everything
 all:
 	@[ "ubuntu-18.04" = "$(OS_ID)-$(OS_VER)" ] || \
@@ -156,6 +161,11 @@ exec:
 
 # format source code
 format:
+ifndef CLANG_FORMAT_BIN
+	@echo Warning: clang-format-12 not found - skip formatting
+else
+	find $(CLANG_FORMAT_FILES) | xargs $(CLANG_FORMAT)
+endif
 	@$(MAKE) -C cli fmt
 
 # build the builder image for the given ARCH

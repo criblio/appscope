@@ -154,6 +154,10 @@ exec:
 	@echo "Exec'ing into the AppScope $(DIST)/$(ARCH) Builder Container"
 	@docker exec -it $(shell docker ps -q -f "name=appscope-builder-$(DIST)-$(ARCH)") $(CMD)
 
+# format source code
+format:
+	@$(MAKE) -C cli fmt
+
 # build the builder image for the given ARCH
 builder: DIST ?= ubuntu
 builder: TAG := $(BUILD_IMAGE):$(DIST)-$(ARCH)
@@ -227,7 +231,8 @@ require-kubectl:
 
 .PHONY: all test clean
 .PHONY: cli% scope
-.PHONY: docker-build docker-run 
-.PHONY: build-arch builder-arch 
+.PHONY: docker-build docker-run
+.PHONY: build-arch builder-arch
+.PHONY: format
 .PHONY: image
 .PHONY: require-docker-buildx-builder require-docker require-docker-buildx require-qemu-binfmt require-kind require-kubectl

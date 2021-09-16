@@ -407,6 +407,50 @@ transportSendForFilepathUnixTransmitsMsg(void** state)
 }
 
 static void
+transportSendForFilepathUnixFailedTransmitsMsg(void** state)
+{
+    const char* path = "/tmp/mysocket_file";
+
+    // Create a unix address for a test socket
+    struct sockaddr_un addr;
+    struct stat socket_stat;
+    addr.sun_family = AF_UNIX;
+    memset(addr.sun_path, 0, sizeof(addr.sun_path));
+    strncpy(addr.sun_path, path, strlen(path));
+    int addr_len = sizeof(sa_family_t) + strlen(path) + 1;
+
+    // Create a test socket that our transport can send to
+    int sd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sd == -1) {
+        fail_msg("Couldn't create socket");
+    }
+    if (bind(sd, &addr, addr_len) == -1) {
+        fail_msg("Couldn't bind socket");
+    }
+    if (listen(sd, 10) == -1) {
+        fail_msg("Couldn't listen on socket");
+    }
+
+    if (stat(path, &socket_stat) != 0) {
+        fail_msg("Couldn't stat socket");
+    }
+
+    // Take the write permission 
+    if (chmod(path, socket_stat.st_mode & ~(S_IWUSR | S_IWGRP | S_IWOTH)) != 0 ){
+        fail_msg("Couldn't take the write permission");
+    }
+
+    // Verify that the transport can be created, but is not connected
+    transport_t* t = transportCreateUnix(path);
+    assert_non_null(t);
+    assert_true(transportNeedsConnection(t));
+    transportDestroy(&t);
+
+    close(sd);
+    unlink(path);
+}
+
+static void
 transportSendForFileWritesToFileAfterFlushWhenFullyBuffered(void** state)
 {
     const char* path = "/tmp/mypath";
@@ -524,6 +568,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportSendForUdpTransmitsMsg),
         cmocka_unit_test(transportSendForAbstractUnixTransmitsMsg),
         cmocka_unit_test(transportSendForFilepathUnixTransmitsMsg),
+        cmocka_unit_test(transportSendForFilepathUnixFailedTransmitsMsg),
         cmocka_unit_test(transportSendForFileWritesToFileAfterFlushWhenFullyBuffered),
         cmocka_unit_test(transportSendForFileWritesToFileImmediatelyWhenLineBuffered),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),

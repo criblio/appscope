@@ -212,6 +212,7 @@ fi
 #      lcov: LCOV version 1.13
 #      go1.15.5
 #      upx 3.96
+#      clang-format-12
 #
 
 PKG_MGR="unknown"
@@ -418,7 +419,25 @@ yum_upx_install() {
     fi
 }
 
+yum_clang_format_exists() {
+    if clang-format-12 --version &>/dev/null; then
+        echo "clang-format-12 is already installed; doing nothing for clang-format-12."
+    else
+        echo "clang-format-12 is not already installed."
+        return 1
+    fi
+}
 
+yum_clang_format_install() {
+    echo "Installing clang-format-12."
+    sudo yum -y install clang-format-12
+    if [ $? = 0 ]; then
+        echo "Installation of clang-format-12 successful."
+    else
+        echo "Installation of clang-format-12 failed."
+        FAILED=1
+    fi
+}
 
 
 yum_dump_versions() {
@@ -440,6 +459,7 @@ yum_dump_versions() {
     lcov --version | head -n1 | sed 's/^/      /'
     go version | head -n1 | sed 's/^/      /'
     upx --version | head -n1 | sed 's/^/      /'
+    clang-format-12 --version | head -n1 | sed 's/^/      /'
 }
 
 yum_install() {
@@ -472,7 +492,9 @@ yum_install() {
     if ! yum_upx_exists; then
         yum_upx_install
     fi
-
+    if ! yum_clang_format_exists; then
+        yum_clang_format_install
+    fi
 
     if (( FAILED )); then
         echo "Installation failure detected."
@@ -496,6 +518,7 @@ yum_install() {
 #      libtool (GNU libtool) 2.4.6
 #      cmake version 3.10.2
 #      lcov: LCOV version 1.13
+#      clang-format-12
 #
 
 apt_sudo_exists() {
@@ -663,6 +686,26 @@ apt_upx_install() {
     fi
 }
 
+apt_clang_format_exists() {
+    if clang-format-12 --version &>/dev/null; then
+        echo "clang-format-12  is already installed; doing nothing for clang-format-12."
+    else
+        echo "clang-format-12 is not already installed."
+        return 1
+    fi
+}
+
+apt_clang_format_install() {
+    echo "Installing clang-format-12."
+    sudo apt-get install -y clang-format-12 
+    if [ $? = 0 ]; then
+        echo "Installation of clang-format-12 successful."
+    else
+        echo "Installation of clang-format-12 failed."
+        FAILED=1
+    fi
+}
+
 apt_dump_versions() {
     # The crazy sed stuff at the end of each just provides indention.
     if lsb_release -d &>/dev/null; then
@@ -679,6 +722,7 @@ apt_dump_versions() {
     lcov --version | head -n1 | sed 's/^/      /'
     go version | head -n1 | sed 's/^/      /'
     upx --version | head -n1 | sed 's/^/      /'
+    clang-format-12 --version | head -n1 | sed 's/^/      /'
 }
 
 apt_install() {
@@ -707,6 +751,9 @@ apt_install() {
     fi
     if ! apt_upx_exists; then
         apt_upx_install
+    fi
+    if ! apt_clang_format_exists; then
+        apt_clang_format_install
     fi
 
 

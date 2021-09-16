@@ -235,25 +235,15 @@ error:
 void
 initState()
 {
-    net_info *netinfoLocal;
-    fs_info *fsinfoLocal;
-    if ((netinfoLocal = (net_info *)malloc(sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
-        scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
-    }
-
-    if (netinfoLocal) memset(netinfoLocal, 0, sizeof(struct net_info_t) * NET_ENTRIES);
-
     // Per a Read Update & Change (RUC) model; now that the object is ready assign the global
-    g_netinfo = netinfoLocal;
-
-    if ((fsinfoLocal = (fs_info *)malloc(sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
-        scopeLog("ERROR: Constructor:Malloc", -1, CFG_LOG_ERROR);
+    if ((g_netinfo = (net_info *)calloc(1, sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
+        scopeLog(CFG_LOG_ERROR, "ERROR: Constructor:Calloc");
     }
-
-    if (fsinfoLocal) memset(fsinfoLocal, 0, sizeof(struct fs_info_t) * FS_ENTRIES);
 
     // Per RUC...
-    g_fsinfo = fsinfoLocal;
+    if ((g_fsinfo = (fs_info *)calloc(1, sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
+        scopeLog(CFG_LOG_ERROR, "ERROR: Constructor:Calloc");
+    }
 
     initHttpState();
     // the http guard array is static while the net fs array is dynamically allocated
@@ -287,24 +277,21 @@ dumpAddrs(int sd)
 {
     in_port_t port;
     char ip[INET6_ADDRSTRLEN];
-    char buf[1024];
 
     inet_ntop(AF_INET,
               &((struct sockaddr_in *)&g_netinfo[sd].localConn)->sin_addr,
               ip, sizeof(ip));
     port = get_port(sd, g_netinfo[sd].localConn.ss_family, LOCAL);
-    snprintf(buf, sizeof(buf), "%s:%d LOCAL: %s:%d", __FUNCTION__, __LINE__, ip, port);
-    scopeLog(buf, sd, CFG_LOG_DEBUG);
+    scopeLog(CFG_LOG_DEBUG, "fd:%d %s:%d LOCAL: %s:%d", sd, __FUNCTION__, __LINE__, ip, port);
 
     inet_ntop(AF_INET,
               &((struct sockaddr_in *)&g_netinfo[sd].remoteConn)->sin_addr,
               ip, sizeof(ip));
     port = get_port(sd, g_netinfo[sd].remoteConn.ss_family, REMOTE);
-    snprintf(buf, sizeof(buf), "%s:%d REMOTE:%s:%d", __FUNCTION__, __LINE__, ip, port);
-    scopeLog(buf, sd, CFG_LOG_DEBUG);
+    scopeLog(CFG_LOG_DEBUG, "fd:%d %s:%d REMOTE:%s:%d", sd, __FUNCTION__, __LINE__, ip, port);
 
     if (get_port(sd, g_netinfo[sd].localConn.ss_family, REMOTE) == DNS_PORT) {
-        scopeLog("DNS", sd, CFG_LOG_DEBUG);
+        scopeLog(CFG_LOG_DEBUG, "fd:%d DNS", sd);
     }
 }
 #endif
@@ -893,7 +880,7 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
     match_data = pcre2_match_data_create_from_pattern(protoDef->re, NULL);
     if (pcre2_match_wrapper(protoDef->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0,
                             match_data, NULL) > 0) {
-        scopeLog("protocol detected", sockfd, CFG_LOG_DEBUG);
+        scopeLog(CFG_LOG_DEBUG, "fd:%d protocol detected", sockfd);
 
         if (net) {
             net->protoDetect = DETECT_TRUE;
@@ -1045,7 +1032,7 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     pinfo->sockfd = sockfd;
     pinfo->len = len;
 
-    scopeLog("posting payload", sockfd, CFG_LOG_DEBUG);
+    scopeLog(CFG_LOG_DEBUG, "fd:%d posting payload", sockfd);
 
     if (cmdPostPayload(g_ctl, (char *)pinfo) == -1) {
         if (pinfo->data) free(pinfo->data);
@@ -1100,8 +1087,7 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
         // matched, set the detect-state to TRUE
         net->tlsDetect = DETECT_TRUE;
         net->tlsProtoDef = tls_proto_def;
-
-        scopeLog("detected TLS", sockfd, CFG_LOG_DEBUG);
+        scopeLog(CFG_LOG_DEBUG, "fd:%d detected TLS", sockfd);
         if (tls_proto_def->detect) {
             // TODO send TLS protocol-detect event
         }
@@ -1113,7 +1099,7 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
         if (rc != PCRE2_ERROR_NOMATCH)
         {
             DBG(NULL);
-            scopeLog("doProtocol: TLS regex failed", sockfd, CFG_LOG_DEBUG);
+            scopeLog(CFG_LOG_DEBUG, "fd:%d doProtocol: TLS regex failed", sockfd);
         }
     }
     pcre2_match_data_free(match_data);
@@ -1298,6 +1284,28 @@ setRemoteClose(int sd, int err)
     }
 }
 
+fs_content_type_t
+getFSContentType(int fd)
+{
+    struct fs_info_t *fs = getFSEntry(fd);
+    if (fs) {
+       return fs->content_type;
+    }
+    DBG(NULL);
+    return FS_CONTENT_UNKNOWN;
+}
+
+void
+setFSContentType(int fd, fs_content_type_t type)
+{
+    struct fs_info_t *fs = getFSEntry(fd);
+    if (fs) {
+        fs->content_type = type;
+    } else {
+        DBG(NULL);
+    }
+}
+
 void
 addSock(int fd, int type, int family)
 {
@@ -1325,7 +1333,7 @@ addSock(int fd, int type, int family)
 
             // Need to realloc
             if ((temp = realloc(g_netinfo, sizeof(struct net_info_t) * increase)) == NULL) {
-                scopeLog("ERROR: addSock:realloc", fd, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: addSock:realloc", fd);
                 DBG("re-alloc on Net table failed");
             } else {
                 memset(&temp[g_numNinfo], 0, sizeof(struct net_info_t) * (increase - g_numNinfo));
@@ -1376,7 +1384,7 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
     }
 
     if (g_cfg.blockconn == htons(port)) {
-        scopeLog("doBlockConnection: blocked connection", fd, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "fd:%d doBlockConnection: blocked connection", fd);
         return 1;
     }
 
@@ -1480,7 +1488,7 @@ doAddNewSock(int sockfd)
                 addSock(sockfd, type, addr.ss_family);
             } else {
                 // Really can't add the socket at this point
-                scopeLog("ERROR: doAddNewSock:getsockopt", sockfd, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doAddNewSock:getsockopt", sockfd);
             }
         } else {
             // is RAW a viable default?
@@ -1664,8 +1672,8 @@ getNSFuncs(void)
 
     void *handle = g_fn.dlopen("libresolv.so", RTLD_LAZY | RTLD_NODELETE);
     if (handle == NULL) {
-        scopeLog("WARNING: could not locate libresolv, DNS events will be affected",
-                 -1, CFG_LOG_WARN);
+        scopeLog(CFG_LOG_WARN,
+                    "WARNING: could not locate libresolv, DNS events will be affected");
         return FALSE;
     }
 
@@ -1674,8 +1682,8 @@ getNSFuncs(void)
     dlclose(handle);
 
     if (!g_fn.ns_initparse || !g_fn.ns_parserr) {
-        scopeLog("WARNING: could not locate name server functions, DNS events will be affected",
-                 -1, CFG_LOG_WARN);
+        scopeLog(CFG_LOG_WARN,
+                    "WARNING: could not locate name server functions, DNS events will be affected");
         return FALSE;
     }
 
@@ -1697,7 +1705,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
 
     // init ns lib
     if (g_fn.ns_initparse((const unsigned char *)buf, len, &handle) == -1) {
-        scopeLog("ERROR:init parse", -1, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "ERROR:init parse");
         return FALSE;
     }
 
@@ -1709,7 +1717,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
             //char dispbuf[4096];
 
             if (g_fn.ns_parserr(&handle, ns_s_an, i, &rr) == -1) {
-                scopeLog("ERROR:parse rr", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "ERROR:parse rr");
                 return FALSE;
             }
 
@@ -1722,7 +1730,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
             }
 
             //ns_sprintrr(&handle, &rr, NULL, NULL, dispbuf, sizeof (dispbuf));
-            //scopeLog(dispbuf, -1, CFG_LOG_DEBUG);
+            //scopeLog(CFG_LOG_DEBUG, "%s", dispbuf);
 
             // type A is IPv4, AAA is IPv6
             if (ns_rr_type(rr) == ns_t_a) {
@@ -1741,7 +1749,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
             }
 
             //snprintf(dispbuf, sizeof(dispbuf), "resolved addr is %s\n", ipaddr);
-            //scopeLog(dispbuf, -1, CFG_LOG_DEBUG);
+            //scopeLog(CFG_LOG_DEBUG, "%s", dispbuf);
 
             if (!cJSON_AddStringToObjLN(addrs, "addr", ipaddr)) {
                 continue;
@@ -1934,7 +1942,7 @@ doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
 void
 doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 {
-    scopeLog(func, sd, CFG_LOG_DEBUG);
+    scopeLog(CFG_LOG_DEBUG, "fd:%d %s", sd, func);
     if (addr) {
         addSock(sd, SOCK_STREAM, addr->sa_family);
     } else {
@@ -2004,7 +2012,7 @@ doRead(int fd, uint64_t initialTime, int success, const void *buf, ssize_t bytes
     struct net_info_t *net = getNetEntry(fd);
 
     if (success) {
-        scopeLog(func, fd, CFG_LOG_TRACE);
+        scopeLog(CFG_LOG_TRACE, "fd:%d %s", fd, func);
         if (net) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -2038,7 +2046,7 @@ doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t byte
     struct net_info_t *net = getNetEntry(fd);
 
     if (success) {
-        scopeLog(func, fd, CFG_LOG_TRACE);
+        scopeLog(CFG_LOG_TRACE, "fd:%d %s", fd, func);
         if (net) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -2084,7 +2092,7 @@ doSeek(int fd, int success, const char *func)
 {
     struct fs_info_t *fs = getFSEntry(fd);
     if (success) {
-        scopeLog(func, fd, CFG_LOG_DEBUG);
+        scopeLog(CFG_LOG_DEBUG, "fd:%d %s", fd, func);
         if (fs) {
             doUpdateState(FS_SEEK, fd, 0, func, NULL);
         }
@@ -2100,7 +2108,7 @@ void
 doStatPath(const char *path, int rc, const char *func)
 {
     if (rc != -1) {
-        scopeLog(func, -1, CFG_LOG_DEBUG);
+        scopeLog(CFG_LOG_DEBUG, "%s", func);
         doUpdateState(FS_STAT, -1, 0, func, path);
     } else {
         doUpdateState(FS_ERR_STAT, -1, (size_t)0, func, path);
@@ -2113,7 +2121,7 @@ doStatFd(int fd, int rc, const char* func)
     struct fs_info_t *fs = getFSEntry(fd);
 
     if (rc != -1) {
-        scopeLog(func, fd, CFG_LOG_DEBUG);
+        scopeLog(CFG_LOG_DEBUG, "fd:%d %s", fd, func);
         if (fs) {
             doUpdateState(FS_STAT, fd, 0, func, fs->path);
         }
@@ -2165,7 +2173,7 @@ doDup(int fd, int rc, const char *func, int copyNet)
     if (rc != -1) {
         if (net) {
             // This is a network descriptor
-            scopeLog(func, rc, CFG_LOG_DEBUG);
+            scopeLog(CFG_LOG_DEBUG, "fd:%d %s", rc, func);
             if (copyNet) {
                 doDupSock(fd, rc);
             } else {
@@ -2190,7 +2198,7 @@ doDup2(int oldfd, int newfd, int rc, const char *func)
     struct net_info_t *net = getNetEntry(oldfd);
 
     if ((rc != -1) && (oldfd != newfd)) {
-        scopeLog(func, rc, CFG_LOG_DEBUG);
+        scopeLog(CFG_LOG_DEBUG, "fd:%d %s", rc, func);
         if (net) {
             if (getNetEntry(newfd)) {
                 doClose(newfd, func);
@@ -2249,7 +2257,7 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
 {
     if (checkFSEntry(fd) == TRUE) {
         if (g_fsinfo[fd].active) {
-            scopeLog("doOpen: duplicate", fd, CFG_LOG_DEBUG);
+            scopeLog(CFG_LOG_DEBUG, "fd:%d doOpen: duplicate", fd);
             DBG(NULL);
             doClose(fd, func);
         }
@@ -2272,7 +2280,7 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
 
             // Need to realloc
             if ((temp = realloc(g_fsinfo, sizeof(struct fs_info_t) * increase)) == NULL) {
-                scopeLog("ERROR: doOpen:realloc", fd, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doOpen:realloc", fd);
                 DBG("re-alloc on FS table failed");
             } else {
                 memset(&temp[g_numFSinfo], 0, sizeof(struct fs_info_t) * (increase - g_numFSinfo));
@@ -2300,7 +2308,7 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
         }
 
         doUpdateState(FS_OPEN, fd, 0, func, path);
-        scopeLog(func, fd, CFG_LOG_TRACE);
+        scopeLog(CFG_LOG_TRACE, "fd:%d %s", fd, func);
     }
 }
 
@@ -2311,7 +2319,7 @@ doSendFile(int out_fd, int in_fd, uint64_t initialTime, int rc, const char *func
     struct net_info_t *nettx = getNetEntry(out_fd);
 
     if (rc != -1) {
-        scopeLog(func, in_fd, CFG_LOG_TRACE);
+        scopeLog(CFG_LOG_TRACE, "fd:%d %s", in_fd, func);
         if (nettx) {
             doSetAddrs(out_fd);
             doSend(out_fd, rc, NULL, 0, NONE);

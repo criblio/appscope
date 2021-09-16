@@ -32,7 +32,7 @@ struct _dbg_t {
 dbg_t *g_dbg = NULL;
 log_t *g_log = NULL;
 proc_id_t g_proc = {0};
-
+bool g_constructor_debug_enabled;
 
 void
 dbgInit()
@@ -260,8 +260,7 @@ dbgAddLine(const char *key, const char *fmt, ...)
 // for unit tests and allows for a different definition for the
 // scope executable.
 void __attribute__((weak))
-scopeLog(const char *msg, int fd, cfg_log_level_t level)
+scopeLog(cfg_log_level_t level, const char *format, ...)
 {
     return;
 }
-

@@ -173,6 +173,7 @@ typedef unsigned int bool;
 //    SCOPE_PID                      provided by library
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
 //    SCOPE_ALLOW_MUSL_ATTACH        allows attach for musl processes
+//    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
 
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"

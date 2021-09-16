@@ -5,7 +5,7 @@ DEBUG=0  # set this to 1 to capture the LOG_FILE for each test
 FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
-LOG_FILE="/go/logs.txt"
+LOG_FILE="/tmp/scope.log"
 touch $LOG_FILE
 
 starttest(){

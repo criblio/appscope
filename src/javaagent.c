@@ -49,11 +49,9 @@ static java_global_t g_java = {0};
 static void 
 logJvmtiError(jvmtiEnv *jvmti, jvmtiError errnum, const char *str) 
 {
-    char buf[1024];
     char *errnum_str = NULL;
     (*jvmti)->GetErrorName(jvmti, errnum, &errnum_str);
-    snprintf(buf, sizeof(buf), "ERROR: JVMTI: [%d] %s - %s\n", errnum, (errnum_str == NULL ? "Unknown": errnum_str), (str == NULL? "" : str));
-    scopeLog(buf, -1, CFG_LOG_ERROR);
+    scopeLog(CFG_LOG_ERROR, "ERROR: JVMTI: [%d] %s - %s\n", errnum, (errnum_str == NULL ? "Unknown": errnum_str), (str == NULL? "" : str));
 }
 
 static void 
@@ -140,7 +138,7 @@ initAppOutputStreamGlobals(JNIEnv *jni)
         g_java.fid_AppOutputStream_socket = (*jni)->GetFieldID(jni, appOutputStreamClass, "this$0", "Lsun/security/ssl/SSLSocketImpl;");
     }
     if (g_java.fid_AppOutputStream_socket == NULL) {
-        scopeLog("unable to find an SSLSocket field in AppOutputStream class", -1, CFG_LOG_DEBUG);
+        scopeLog(CFG_LOG_DEBUG, "unable to find an SSLSocket field in AppOutputStream class");
     }
     clearJniException(jni);
 }
@@ -180,7 +178,7 @@ initAppInputStreamGlobals(JNIEnv *jni)
         g_java.fid_AppInputStream_socket = (*jni)->GetFieldID(jni, appInputStreamClass, "this$0", "Lsun/security/ssl/SSLSocketImpl;");
     }
     if (g_java.fid_AppInputStream_socket == NULL) {
-        scopeLog("unable to find an SSLSocket field in AppInputStream class", -1, CFG_LOG_DEBUG);
+        scopeLog(CFG_LOG_DEBUG, "unable to find an SSLSocket field in AppInputStream class");
     }
     clearJniException(jni);
 }
@@ -244,14 +242,14 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         strcmp(name, "com/sun/net/ssl/internal/ssl/AppOutputStream") == 0 ||
         strcmp(name, "sun/security/ssl/SSLSocketImpl$AppOutputStream") == 0) {
 
-        scopeLog("installing Java SSL hooks for AppOutputStream class...", -1, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for AppOutputStream class...");
 
         java_class_t *classInfo = javaReadClass(class_data);
 
         int methodIndex = javaFindMethodIndex(classInfo, "write", "([BII)V");
         if (methodIndex == -1) {
             javaDestroy(&classInfo);
-            scopeLog("ERROR: 'write' method not found in AppOutputStream class\n", -1, CFG_LOG_ERROR);
+            scopeLog(CFG_LOG_ERROR, "ERROR: 'write' method not found in AppOutputStream class\n");
             return;
         }
         javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__write");
@@ -270,14 +268,14 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         strcmp(name, "com/sun/net/ssl/internal/ssl/AppInputStream") == 0 ||
         strcmp(name, "sun/security/ssl/SSLSocketImpl$AppInputStream") == 0) {
 
-        scopeLog("installing Java SSL hooks for AppInputStream class...", -1, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for AppInputStream class...");
 
         java_class_t *classInfo = javaReadClass(class_data);
 
         int methodIndex = javaFindMethodIndex(classInfo, "read", "([BII)I");
         if (methodIndex == -1) {
             javaDestroy(&classInfo);
-            scopeLog("ERROR: 'read' method not found in AppInputStream class\n", -1, CFG_LOG_ERROR);
+            scopeLog(CFG_LOG_ERROR, "ERROR: 'read' method not found in AppInputStream class\n");
             return;
         }
         javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__read");
@@ -295,14 +293,14 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     if (strcmp(name, "sun/security/ssl/SSLEngineImpl") == 0 || 
         strcmp(name, "com/sun/net/ssl/internal/ssl/SSLEngineImpl") == 0) {
         
-        scopeLog("installing Java SSL hooks for SSLEngineImpl class...", -1, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for SSLEngineImpl class...");
 
         java_class_t *classInfo = javaReadClass(class_data);
 
         int methodIndex = javaFindMethodIndex(classInfo, "wrap", "([Ljava/nio/ByteBuffer;IILjava/nio/ByteBuffer;)Ljavax/net/ssl/SSLEngineResult;");
         if (methodIndex == -1) {
             javaDestroy(&classInfo);
-            scopeLog("ERROR: 'wrap' method not found in SSLEngineImpl class\n", -1, CFG_LOG_ERROR);
+            scopeLog(CFG_LOG_ERROR, "ERROR: 'wrap' method not found in SSLEngineImpl class\n");
             return;
         }
         javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__wrap");
@@ -311,7 +309,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         methodIndex = javaFindMethodIndex(classInfo, "unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
          if (methodIndex == -1) {
             javaDestroy(&classInfo);
-            scopeLog("ERROR: 'unwrap' method not found in SSLEngineImpl class\n", -1, CFG_LOG_ERROR);
+            scopeLog(CFG_LOG_ERROR, "ERROR: 'unwrap' method not found in SSLEngineImpl class\n");
             return;
         }
         javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__unwrap");
@@ -328,13 +326,13 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
 
     if (strcmp(name, "sun/nio/ch/SocketChannelImpl") == 0) {
 
-        scopeLog("installing Java SSL hooks for SocketChannelImpl class...", -1, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for SocketChannelImpl class...");
         java_class_t *classInfo = javaReadClass(class_data);
 
         int methodIndex = javaFindMethodIndex(classInfo, "read", "(Ljava/nio/ByteBuffer;)I");
         if (methodIndex == -1) {
             javaDestroy(&classInfo);
-            scopeLog("ERROR: 'read' method not found in SocketChannelImpl class\n", -1, CFG_LOG_ERROR);
+            scopeLog(CFG_LOG_ERROR, "ERROR: 'read' method not found in SocketChannelImpl class\n");
             return;
         }
         javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__read");
@@ -343,7 +341,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         methodIndex = javaFindMethodIndex(classInfo, "write", "(Ljava/nio/ByteBuffer;)I");
         if (methodIndex == -1) {
             javaDestroy(&classInfo);
-            scopeLog("ERROR: 'write' method not found in SocketChannelImpl class\n", -1, CFG_LOG_ERROR);
+            scopeLog(CFG_LOG_ERROR, "ERROR: 'write' method not found in SocketChannelImpl class\n");
             return;
         }
         javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__write");
@@ -361,7 +359,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     if (strcmp(name, "java/nio/DirectByteBuffer") == 0 ||
         strcmp(name, "java/nio/DirectByteBufferR") == 0) {
 
-        scopeLog("installing Java SSL hooks for java.nio.DirectByteBuffer class...", -1, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for java.nio.DirectByteBuffer class...");
         java_class_t *classInfo = javaReadClass(class_data);
 
         // add a private field which will hold the fd used to read/write data for that buffer
@@ -565,11 +563,11 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
     jvmtiError error;
     jvmtiEnv *env;
 
-    scopeLog("Initializing Java agent", -1, CFG_LOG_INFO);
+    scopeLog(CFG_LOG_INFO, "Initializing Java agent");
 
     jint result = (*jvm)->GetEnv(jvm, (void **) &env, JVMTI_VERSION_1_0);
     if (result != 0) {
-        scopeLog("ERROR: GetEnv failed\n", -1, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "ERROR: GetEnv failed\n");
         return JNI_ERR;
     }
 
@@ -629,7 +627,7 @@ initJavaAgent() {
 
         int result = fullSetenv("JAVA_TOOL_OPTIONS", buf, 1);
         if (result) {
-            scopeLog("ERROR: Could not set JAVA_TOOL_OPTIONS failed\n", -1, CFG_LOG_ERROR);
+            scopeLog(CFG_LOG_ERROR, "ERROR: Could not set JAVA_TOOL_OPTIONS failed\n");
         }
         free(buf);
     }

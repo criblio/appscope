@@ -6,6 +6,24 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 0.7.4
+
+2021-09-14 - Maintenance Pre-Release
+
+- **Fix**: [#264](https://github.com/criblio/appscope/issues/264),[#525](https://github.com/criblio/appscope/issues/525) `scope k8s` now (1) supports specifying the namespace to install into, and (2) when the [ConfigMap](https://kubernetes.io/docs/concepts/configuration/configmap/) in that namespace is edited, automatically propagates the changes to all namespaces instrumented with the label `scope=enabled`.
+
+## AppScope 0.7.3
+
+2021-09-01 - Maintenance/Hotfix Pre-Release
+
+- **Fix**: [#516](https://github.com/criblio/appscope/issues/516) Where scope'd processes use TLS, child processes no longer get stuck in fork calls.
+
+- **Fix**: [#442](https://github.com/criblio/appscope/issues/442)
+ Remove TLS exit handling code that is no longer needed.
+
+- **Fix**: [#518](https://github.com/criblio/appscope/issues/518)
+ Fix a build caching issue.
+
 ## AppScope 0.7.2
 
 2021-08-17 - Maintenance Pre-Release

@@ -65,3 +65,8 @@ func (rc *Config) Run(args []string) {
 	cmd.Stderr = os.Stderr
 	cmd.Run()
 }
+
+// GetScopeConfig returns the ScopeConfig pointer
+func (rc *Config) GetScopeConfig() *ScopeConfig {
+	return rc.sc
+}

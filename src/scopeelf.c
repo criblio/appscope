@@ -19,7 +19,7 @@ freeElf(char *buf, size_t len)
     if (!buf) return;
 
     if (munmap(buf, len) == -1) {
-        scopeLog("freeElf: munmap failed", -1, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "freeElf: munmap failed");
     }
 }
 
@@ -41,10 +41,8 @@ setTextSizeAndLenFromElf(elf_buf_t *ebuf)
         if (!strcmp(sec_name, ".text")) {
             ebuf->text_addr = (unsigned char *)sections[i].sh_addr;
             ebuf->text_len = sections[i].sh_size;
-            char msg[128];
-            snprintf(msg, sizeof(msg), "%s:%d %s addr %p - %p\n",
-                     __FUNCTION__, __LINE__, sec_name, ebuf->text_addr, ebuf->text_addr + ebuf->text_len);
-            scopeLog(msg, -1, CFG_LOG_DEBUG);
+            scopeLog(CFG_LOG_DEBUG, "%s:%d %s addr %p - %p\n", __FUNCTION__, __LINE__,
+                        sec_name, ebuf->text_addr, ebuf->text_addr + ebuf->text_len);
         }
     }
 }
@@ -102,22 +100,22 @@ getElf(char *path)
     int get_elf_successful = FALSE;
 
     if (!g_fn.open || !g_fn.close) {
-        scopeLog("getElf: open/close can't be found", -1, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "getElf: open/close can't be found");
         goto out;
     }
 
     if ((ebuf = calloc(1, sizeof(elf_buf_t))) == NULL) {
-        scopeLog("getElf: memory alloc failed", -1, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "getElf: memory alloc failed");
         goto out;
     }
 
     if ((fd = g_fn.open(path, O_RDONLY)) == -1) {
-        scopeLog("getElf: open failed", -1, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "getElf: open failed");
         goto out;
     }
 
     if (fstat(fd, &sbuf) == -1) {
-        scopeLog("getElf: fstat failed", fd, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "fd:%d getElf: fstat failed", fd);
         goto out;
     }
 
@@ -125,7 +123,7 @@ getElf(char *path)
     char * mmap_rv = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
                           PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
     if (mmap_rv == MAP_FAILED) {
-        scopeLog("getElf: mmap failed", fd, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "fd:%d getElf: mmap failed", fd);
         goto out;
     }
 
@@ -139,18 +137,14 @@ getElf(char *path)
        (elf->e_ident[EI_CLASS] != ELFCLASS64) ||
        (elf->e_ident[EI_DATA] != ELFDATA2LSB) ||
        (elf->e_machine != EM_X86_64)) {
-        char emsg[64];
-        snprintf(emsg, sizeof(emsg), "%s:%d ERROR: %s is not a viable ELF file\n",
-                 __FUNCTION__, __LINE__, path);
-        scopeLog(emsg, fd, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "fd:%d %s:%d ERROR: %s is not a viable ELF file\n",
+                    fd, __FUNCTION__, __LINE__, path);
         goto out;
     }
 
     if ((elf->e_type != ET_EXEC) && (elf->e_type != ET_DYN)) {
-        char emsg[128];
-        snprintf(emsg, sizeof(emsg), "%s:%d %s with type %d is not an executable\n",
-                 __FUNCTION__, __LINE__, path, elf->e_type);
-        scopeLog(emsg, fd, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "fd:%d %s:%d %s with type %d is not an executable\n",
+                    fd, __FUNCTION__, __LINE__, path, elf->e_type);
         goto out;
     }
 
@@ -178,7 +172,6 @@ int
 doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym, char *str, int rsz, int attach)
 {
     int i, match = -1;
-    char buf[128];
 
     for (i = 0; i < rsz / sizeof(Elf64_Rela); i++) {
         /*
@@ -206,7 +199,7 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
                 if ((prot & PROT_WRITE) == 0) {
                     // mprotect if write perms are not set
                     if (mprotect((void *)saddr, (size_t)16, PROT_WRITE | prot) == -1) {
-                        scopeLog("doGotcha: mprotect failed", -1, CFG_LOG_DEBUG);
+                        scopeLog(CFG_LOG_DEBUG, "doGotcha: mprotect failed");
                         return -1;
                     }
                 }
@@ -230,14 +223,13 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
             if (!attach) *gfn = *gaddr;
             uint64_t prev = *gaddr;
             *gaddr = (uint64_t)hook->func;
-            snprintf(buf, sizeof(buf), "%s:%d sym=%s offset 0x%lx GOT entry %p saddr 0x%lx, prev=0x%lx, curr=%p",
-                     __FUNCTION__, __LINE__, hook->symbol, rel[i].r_offset, gaddr, saddr, prev, hook->func);
-            scopeLog(buf, -1, CFG_LOG_DEBUG);
+            scopeLog(CFG_LOG_DEBUG, "%s:%d sym=%s offset 0x%lx GOT entry %p saddr 0x%lx, prev=0x%lx, curr=%p",
+                        __FUNCTION__, __LINE__, hook->symbol, rel[i].r_offset, gaddr, saddr, prev, hook->func);
 
             if ((prot & PROT_WRITE) == 0) {
                 // if we didn't mod above leave prot settings as is
                 if (mprotect((void *)saddr, (size_t)16, prot) == -1) {
-                    scopeLog("doGotcha: mprotect failed", -1, CFG_LOG_DEBUG);
+                    scopeLog(CFG_LOG_DEBUG, "doGotcha: mprotect failed");
                     return -1;
                 }
             }
@@ -255,7 +247,6 @@ getElfEntries(struct link_map *lm, Elf64_Rela **rel, Elf64_Sym **sym, char **str
 {
     Elf64_Dyn *dyn = NULL;
     char *got = NULL; // TODO; got is not needed, debug, remove
-    char buf[256];
 
     for (dyn = lm->l_ld; dyn->d_tag != DT_NULL; dyn++) {
         if (dyn->d_tag == DT_SYMTAB) {
@@ -289,9 +280,8 @@ getElfEntries(struct link_map *lm, Elf64_Rela **rel, Elf64_Sym **sym, char **str
         }
     }
 
-    snprintf(buf, sizeof(buf), "%s:%d name: %s dyn %p sym %p rel %p str %p rsz %d got %p laddr 0x%lx\n",
-             __FUNCTION__, __LINE__, lm->l_name, dyn, *sym, *rel, *str, *rsz, got, lm->l_addr);
-    scopeLog(buf, -1, CFG_LOG_TRACE);
+    scopeLog(CFG_LOG_TRACE, "%s:%d name: %s dyn %p sym %p rel %p str %p rsz %d got %p laddr 0x%lx\n",
+                __FUNCTION__, __LINE__, lm->l_name, dyn, *sym, *rel, *str, *rsz, got, lm->l_addr);
 
     if (*sym == NULL || *rel == NULL || (*rsz < sizeof(Elf64_Rela))) {
         return -1;
@@ -342,9 +332,7 @@ getSymbol(const char *buf, char *sname)
     for (i=0; i < nsyms; i++) {
         if (strcmp(sname, strtab + symtab[i].st_name) == 0) {
             symaddr = symtab[i].st_value;
-            char buf[256];
-            snprintf(buf, sizeof(buf), "symbol found %s = 0x%08lx\n", strtab + symtab[i].st_name, symtab[i].st_value);
-            scopeLog(buf, -1, CFG_LOG_TRACE);
+            scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", strtab + symtab[i].st_name, symtab[i].st_value);
             break;
         }
     }
@@ -389,9 +377,7 @@ getGoSymbol(const char *buf, char *sname)
 
                     if (strcmp(sname, func_name) == 0) {
                         symaddr = sym_addr;
-                        char buf[512];
-                        snprintf(buf, sizeof(buf), "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        scopeLog(buf, -1, CFG_LOG_TRACE);
+                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
                         break;
                     }
                     symtab_addr += 16;
@@ -408,15 +394,13 @@ getGoSymbol(const char *buf, char *sname)
                     const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
                     if (strcmp(sname, func_name) == 0) {
                         symaddr = sym_addr;
-                        char buf[512];
-                        snprintf(buf, sizeof(buf), "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        scopeLog(buf, -1, CFG_LOG_TRACE);
+                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
                         break;
                     }
                     symtab_addr += 16;
                 }
             } else {
-                scopeLog("Invalid header in .gopclntab", -1, CFG_LOG_DEBUG);
+                scopeLog(CFG_LOG_DEBUG, "Invalid header in .gopclntab");
                 break;
             }
             break;

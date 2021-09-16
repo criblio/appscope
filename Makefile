@@ -25,7 +25,7 @@ endif
 
 # version number without the leading `v` from release tags
 # this is set in CI so don't overwrite
-VERSION ?= $(shell git describe --always --dirty --tag | sed -e 's/^v//')
+VERSION ?= $(shell git describe --abbrev=0 --tags | tr -d v)
 
 # cli expects us to write this file
 $(shell echo -n $(VERSION) > cli/VERSION)
@@ -170,6 +170,27 @@ builder: require-docker-buildx-builder
 		--file docker/builder/Dockerfile.$(DIST) \
 		.
 
+image: TAG := cribl/scope:dev-$(ARCH)
+image: require-qemu-binfmt
+	@docker buildx build \
+		--tag $(TAG) \
+		--platform linux/$(PLATFORM_$(ARCH)) \
+		--file docker/base/Dockerfile \
+		--load \
+                .
+
+k8s-test: require-kind require-kubectl image
+	docker tag cribl/scope:dev-x86_64 cribl/scope:$(VERSION)
+	kind delete cluster
+	kind create cluster
+	kind load docker-image cribl/scope:$(VERSION)
+	kubectl create namespace test
+	kubectl create namespace scope
+	docker run -it cribl/scope:$(VERSION) scope k8s -m /tmp/metrics.log -e /tmp/events.log --namespace scope --debug | kubectl apply -f -
+	kubectl label namespace test scope=enabled
+	kubectl wait --for=condition=available deployment/scope -n scope
+	kubectl run ubuntu --image=ubuntu:20.04 -n test --restart=Never --command -- sleep infinity
+
 # setup the buildx builder if it's not running already
 require-docker-buildx-builder: require-docker-buildx require-qemu-binfmt
 	@if ! docker buildx inspect $(BUILDER) >/dev/null 2>&1; then \
@@ -194,9 +215,19 @@ require-qemu-binfmt: require-docker
 	@[ -n "$(wildcard /proc/sys/fs/binfmt_misc/qemu-*)" ] || \
 		docker run --rm --privileged tonistiigi/binfmt:latest --install all
 
+# fail of kind not in $PATH
+require-kind:
+	@[ -n "$(shell which kind)" ] || \
+		{ echo >&2 "error: kind required"; exit 1; }
+
+# fail of kubectl not in $PATH
+require-kubectl:
+	@[ -n "$(shell which kubectl)" ] || \
+		{ echo >&2 "error: kubectl required"; exit 1; }
+
 .PHONY: all test clean
 .PHONY: cli% scope
 .PHONY: docker-build docker-run 
 .PHONY: build-arch builder-arch 
 .PHONY: image
-.PHONY: require-docker-buildx-builder require-docker require-docker-buildx require-qemu-binfmt
+.PHONY: require-docker-buildx-builder require-docker require-docker-buildx require-qemu-binfmt require-kind require-kubectl

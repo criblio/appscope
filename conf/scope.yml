@@ -872,4 +872,92 @@ protocol:
   #  binary: true
   #  len: 6
 
+
+# Custom configs
+#
+custom:
+  # Entries here represent overrides of the settings defined above for scoped
+  # processes that match a set of filters. Each has a name and `filter` and
+  # `config` entries as shown below.
+  #
+  #   name:
+  #     filter:
+  #       ...
+  #     config:
+  #       ...
+  #
+  # Entries under `filter` are used to match aspects of a scoped process. There
+  # must be at least one of them and all of them must match for the filter to
+  # succeed. The following filters are supported.
+  #
+  #   procname: string
+  #
+  #     Matches if the given string value matches the basename of the scoped
+  #     process.
+  #
+  #   arg: string
+  #
+  #     Matches if the given string value appears and a substring anywhere in
+  #     the scoped process's full command line including an options and
+  #     arguments.
+  #
+  #   hostname: string
+  #
+  #     Matches if the given string value matches the hostname of the machine
+  #     where the scoped process is running.
+  #     
+  #   username: string
+  #
+  #     Matches if the given string value matches the username for the scoped
+  #     process's UID.
+  #     
+  #   env: string
+  #
+  #     The string value is the name of an environment variable alone (i.e.
+  #     "FOO") or with a value (i.e. "FOO=bar"). The filter matches if the
+  #     environment variable is set and, in the later case, the value matches.
+  #
+  #   ancestor: string
+  #
+  #     Matches if given string matches the basename of the scoped process's
+  #     partent, parent's parent, etc.
+  #
+  # The `config` section specifies the settings that should be overridden when
+  # the filter matches. Entries under `config` use the same schema as the
+  # top-level entries (without `custom`).
+  #
+  
+  # Increase metric verbosity for processes owned by the "eg" user and running
+  # on the "eg1" host.
+  #
+  #example:
+  #  filter:
+  #    username: eg
+  #    hostname: eg1
+  #  config:
+  #    metric:
+  #      format:
+  #        verbosity: 7
+  #    tags:
+  #      service: eg
+
+  # Enable the Cribl/Logstream destination for Nginx processes. Both this entry
+  # and the `example` entry above would apply if both filters match so the
+  # service tag here would override the one above.
+  #
+  #nginx:
+  #  filter:
+  #    procname: nginx
+  #  config:
+  #    tags:
+  #      service: nginx
+  #    cribl:
+  #      enable: true
+  #      transport:
+  #        type: tcp
+  #        host: in.my-instance.logstream.cribl.cloud
+  #        port: 10090
+  #        tls:
+  #          enable: true
+
 # EOF

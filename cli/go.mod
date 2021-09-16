@@ -30,11 +30,12 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 	github.com/yuin/gopher-lua v0.0.0-20210529063254-f4c35e4016d9 // indirect
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
 	golang.org/x/sys v0.0.0-20201223074533-0d417f636930 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.20.2
 	k8s.io/apimachinery v0.20.2
+	k8s.io/client-go v0.20.2
 )
 
 replace github.com/olekukonko/tablewriter => github.com/cockroachdb/tablewriter v0.0.5-0.20200105123400-bd15540e8847

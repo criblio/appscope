@@ -3,8 +3,15 @@ version: '3.5'
 x-scope-common: &scope-common
   volumes:
     - ../..:/opt/appscope
+    - /var/run/docker.sock:/var/run/docker.sock
   working_dir: /opt/appscope
   privileged: true
+
+networks:
+  fluentbit-net:
+
+volumes:
+  test_output:
 
 services:
 
@@ -125,16 +132,21 @@ services:
       - "9000:9000"
     <<: *scope-common
 
-      #  fluentbit:
-      #    image: scopeci/scope-fluentbit
-      #    build:
-      #      cache_from:
-      #        - scopeci/scope-fluentbit
-      #      context: .
-      #      dockerfile: ./fluentbit/Dockerfile
-      #    ports:
-      #      - "9000:9000"
-      #    <<: *scope-common
+  fluentbit:
+    image: scopeci/scope-fluentbit
+    networks:
+      - fluentbit-net
+    build:
+      cache_from:
+        - scopeci/scope-fluentbit
+      context: .
+      dockerfile: ./fluentbit/Dockerfile
+    <<: *scope-common
+    working_dir: /opt/test/fluentbit
+    volumes:
+      - ../..:/opt/appscope
+      - /var/run/docker.sock:/var/run/docker.sock
+      - test_output:/test_output
 
   http:
     image: ghcr.io/criblio/appscope-test-http:${TAG:?Missing TAG environment variable}

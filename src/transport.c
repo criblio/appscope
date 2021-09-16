@@ -936,6 +936,7 @@ transportConnect(transport_t *trans)
 
             if (g_fn.connect(trans->local.sock, (const struct sockaddr *)&trans->local.addr,
                              trans->local.addr_len) == -1) {
+                scopeLog(CFG_LOG_INFO, "fd:%d (%s) connect failed", trans->local.sock, trans->local.addr.sun_path);
                 g_fn.close(trans->local.sock);
                 trans->local.sock = -1;
                 return 0;

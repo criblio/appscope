@@ -141,7 +141,8 @@ metric:
     #   file://stderr           send to standard error
     #   udp://host:port         send to a network server (UDP protocol)
     #   tcp://host:port         send to a network server (TCP protocol)
-    #   unix://socketpath       send to a local unix domain server (TCP)
+    #   unix://@abstractname    send to a unix domain server w/abstract addr
+    #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_METRIC_TLS_* variables.
@@ -178,9 +179,7 @@ metric:
     #   Default:  (none)
     #   Override: the path token in the $SCOPE_METRIC_DEST URL
     #
-    # Applies when connection type is file or unix.  Socket paths
-    # are implemented as abstract sockets so the name chosen has no
-    # connection with filesystem pathnames.
+    # Applies when connection type is file or unix.
     #
     #path:
 
@@ -418,7 +417,8 @@ event:
     #   file://stderr           send to standard error
     #   udp://host:port         send to a network server (UDP protocol)
     #   tcp://host:port         send to a network server (TCP protocol)
-    #   unix://socketpath       send to a local unix domain server (TCP)
+    #   unix://@abstractname    send to a unix domain server w/abstract addr
+    #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_EVENT_TLS_* variables.
@@ -453,9 +453,7 @@ event:
     #   Default:  (none)
     #   Override: the path token in the $SCOPE_EVENT_DEST URL
     #
-    # Applies when connection type is file or unix.  Socket paths
-    # are implemented as abstract sockets so the name chosen has no
-    # connection with filesystem pathnames.
+    # Applies when connection type is file or unix.
     #
     #path:
 
@@ -612,7 +610,8 @@ libscope:
       #   file://stderr           send to standard error
       #   udp://host:port         send to a network server (UDP protocol)
       #   tcp://host:port         send to a network server (TCP protocol)
-      #   unix://socketpath       send to a local unix domain server (TCP)
+      #   unix://@abstractname    send to a unix domain server w/abstract addr
+      #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
       #
       # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
       # set the $SCOPE_LOG_TLS_* variables.
@@ -647,9 +646,7 @@ libscope:
       #   Default:  '/tmp/scope.log'
       #   Override: the path token in the $SCOPE_LOG_DEST URL
       #
-      # Applies when connection type is file or unix.  Socket paths
-      # are implemented as abstract sockets so the name chosen has no
-      # connection with filesystem pathnames.
+      # Applies when connection type is file or unix.
       #
       path: '/tmp/scope.log'
 

@@ -654,10 +654,10 @@ cfgProcessEnvironmentTransport(void** state)
     assert_string_equal(cfgTransportPath(cfg, data->transport), "/some/path/somewhere");
 
     // one more variant... unix://
-    assert_int_equal(setenv(data->env_name, "unix://theUnixAddress", 1), 0);
+    assert_int_equal(setenv(data->env_name, "unix://@theUnixAddress", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgTransportType(cfg, data->transport), CFG_UNIX);
-    assert_string_equal(cfgTransportPath(cfg, data->transport), "theUnixAddress");
+    assert_string_equal(cfgTransportPath(cfg, data->transport), "@theUnixAddress");
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -1287,7 +1287,7 @@ cfgReadEveryTransportType(void** state)
         "    port: 'ntp'\n";
     const char* unix_str =
         "    type: unix\n"
-        "    path: '/var/run/scope.sock'\n";
+        "    path: '@scope.sock'\n";
     const char* file_str =
         "    type: file\n"
         "    path: '/var/log/scope.log'\n";
@@ -1313,7 +1313,7 @@ cfgReadEveryTransportType(void** state)
                 assert_string_equal(cfgTransportPort(config, CFG_MTC), "ntp");
         } else if (transport_lines[i] == unix_str) {
                 assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UNIX);
-                assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/run/scope.sock");
+                assert_string_equal(cfgTransportPath(config, CFG_MTC), "@scope.sock");
         } else if (transport_lines[i] == file_str) {
                 assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_FILE);
                 assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/log/scope.log");
@@ -1540,7 +1540,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "  request: 'make it snappy'        # Extra.\n"
         "  transport:\n"
         "    type: unix\n"
-        "    path: '/var/run/scope.sock'\n"
+        "    path: '@scope.sock'\n"
         "    color: 'puce'                  # Extra.\n"
         "libscope:\n"
         "  log:\n"
@@ -1558,7 +1558,7 @@ cfgReadExtraFieldsAreHarmless(void** state)
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
     assert_string_equal(cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
     assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UNIX);
-    assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/run/scope.sock");
+    assert_string_equal(cfgTransportPath(config, CFG_MTC), "@scope.sock");
     assert_non_null(cfgCustomTags(config));
     assert_string_equal(cfgCustomTagValue(config, "brainfarts"), "135");
     assert_int_equal(cfgLogLevel(config), CFG_LOG_INFO);
@@ -1607,7 +1607,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "  configevent: false\n"
         "metric:\n"
         "  transport:\n"
-        "    path: '/var/run/scope.sock'\n"
+        "    path: '@scope.sock'\n"
         "    type: unix\n"
         "  format:\n"
         "    verbosity: 4294967295\n"
@@ -1649,7 +1649,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), 1);
     assert_int_equal(cfgTransportType(config, CFG_CTL), CFG_SYSLOG);
     assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UNIX);
-    assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/run/scope.sock");
+    assert_string_equal(cfgTransportPath(config, CFG_MTC), "@scope.sock");
     assert_non_null(cfgCustomTags(config));
     assert_string_equal(cfgCustomTagValue(config, "135"), "kittens");
     assert_int_equal(cfgLogLevel(config), CFG_LOG_INFO);
@@ -1844,7 +1844,7 @@ initLogReturnsPtr(void** state)
                 cfgTransportPortSet(cfg, CFG_LOG, "4444");
                 break;
             case CFG_UNIX:
-				cfgTransportPathSet(cfg, CFG_LOG, "/var/run/scope.sock");
+				cfgTransportPathSet(cfg, CFG_LOG, "@scope.sock");
                 break;
             case CFG_FILE:
 				cfgTransportPathSet(cfg, CFG_LOG, "/tmp/scope.log");
@@ -1871,7 +1871,9 @@ initMtcReturnsPtr(void** state)
     cfg_transport_t t;
     for (t=CFG_UDP; t<=CFG_SHM; t++) {
         cfgTransportTypeSet(cfg, CFG_MTC, t);
-        if (t==CFG_UNIX || t==CFG_FILE) {
+        if (t == CFG_UNIX) {
+            cfgTransportPathSet(cfg, CFG_MTC, "@scope.sock");
+        } else if (t == CFG_FILE) {
             cfgTransportPathSet(cfg, CFG_MTC, "/tmp/scope.log");
         }
         mtc_t* mtc = initMtc(cfg);

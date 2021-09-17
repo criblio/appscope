@@ -194,8 +194,13 @@ transportCreateUnixReturnsValidPtrInHappyPath(void** state)
 static void
 transportCreateUnixReturnsNullForInvalidPath(void** state)
 {
+    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 0);
+
     transport_t* t = transportCreateUnix(NULL);
     assert_null(t);
+
+    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
 }
 
 

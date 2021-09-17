@@ -1158,17 +1158,69 @@ static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t
 static long scope_syscall(long, ...);
 #endif
 
+static inline bool
+is_lib_in_full_path(const char* path_name, const char* lib_name, size_t lib_name_length)
+{
+    size_t path_length = strlen(path_name);
+    if (path_length > lib_name_length && !strcmp(path_name + path_length - lib_name_length, lib_name)) {
+        return TRUE;
+    }
+    return FALSE;
+}
+
 static int 
 findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
 {
-    int len = strlen(info->dlpi_name);
-    int libscope_so_len = 11;
-
-    if(len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
+    if (is_lib_in_full_path(info->dlpi_name, "libscope.so", sizeof("libscope.so") - 1)) {
         *(char **)data = (char *) info->dlpi_name;
         return 1;
     }
     return 0;
+}
+
+static int 
+findLibJvmPath(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (is_lib_in_full_path(info->dlpi_name, "libjvm.so", sizeof("libjvm.so") - 1)) {
+        *(char **)data = (char *) info->dlpi_name;
+        return 1;
+    }
+    return 0;
+}
+
+static bool
+hookInjectLibrary(int (*find_lib) (struct dl_phdr_info *info, size_t size, void *data), void* libscopeHandle)
+{
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char* full_lib_path = NULL;
+    struct link_map *lm;
+    void *addr = NULL;
+    char *str = NULL;
+    int rsz = 0;
+
+    if (find_lib && !dl_iterate_phdr(find_lib, &full_lib_path)) {
+        return FALSE;
+    }
+
+    void *handle = g_fn.dlopen(full_lib_path, RTLD_LAZY);
+    if (handle == NULL) {
+        return FALSE;
+    }
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            addr = dlsym(libscopeHandle, inject_hook_list[i].symbol);
+
+            inject_hook_list[i].func = addr;
+            if ((dlsym(handle, inject_hook_list[i].symbol)) &&
+                (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
+                scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s", inject_hook_list[i].symbol);
+            }
+        }
+    }
+    dlclose(handle);
+    return TRUE;
 }
 
 /**
@@ -1178,12 +1230,6 @@ static bool
 hookInject()
 {
     char *full_path;
-    void *addr = NULL;
-    Elf64_Sym *sym = NULL;
-    Elf64_Rela *rel = NULL;
-    char *str = NULL;
-    int rsz = 0;
-    struct link_map *lm;
 
     if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *libscopeHandle = g_fn.dlopen(full_path, RTLD_NOW);
@@ -1191,27 +1237,15 @@ hookInject()
             return FALSE;
         }
 
-        void *handle = g_fn.dlopen(0, RTLD_LAZY);
-        if (handle == NULL) {
+        // Main program - mandatory inject
+        if (!hookInjectLibrary(NULL, libscopeHandle)) {
             dlclose(libscopeHandle);
             return FALSE;
         }
 
-        // Get the link map and ELF sections in advance of something matching
-        if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) &&
-            (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
-
-            for (int i=0; inject_hook_list[i].symbol; i++) {
-                addr = dlsym(libscopeHandle, inject_hook_list[i].symbol);
-                
-                inject_hook_list[i].func = addr;
-                if ((dlsym(handle, inject_hook_list[i].symbol)) &&
-                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
-                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s", inject_hook_list[i].symbol);
-                }
-            }
-        }
-        dlclose(handle);
+        // Optional Java Libraries
+        hookInjectLibrary(findLibJvmPath, libscopeHandle);
+        
         dlclose(libscopeHandle);
         return TRUE;
     }

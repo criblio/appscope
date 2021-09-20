@@ -66,5 +66,18 @@ extern proc_id_t g_proc;
 extern bool g_constructor_debug_enabled;
 
 void scopeLog(cfg_log_level_t, const char *, ...) PRINTF_FORMAT(2,3);
+void scopeLogHex(cfg_log_level_t, const void *, size_t, const char *, ...) PRINTF_FORMAT(4,5);
+
+#define scopeLogError(...) scopeLog(CFG_LOG_ERROR, __VA_ARGS__)
+#define scopeLogWarn(...)  scopeLog(CFG_LOG_WARN,  __VA_ARGS__)
+#define scopeLogInfo(...)  scopeLog(CFG_LOG_INFO,  __VA_ARGS__)
+#define scopeLogDebug(...) scopeLog(CFG_LOG_DEBUG, __VA_ARGS__)
+#define scopeLogTrace(...) scopeLog(CFG_LOG_TRACE, __VA_ARGS__)
+
+#define scopeLogHexError(...) scopeLogHex(CFG_LOG_ERROR, __VA_ARGS__)
+#define scopeLogHexWarn(...)  scopeLogHex(CFG_LOG_WARN,  __VA_ARGS__)
+#define scopeLogHexInfo(...)  scopeLogHex(CFG_LOG_INFO,  __VA_ARGS__)
+#define scopeLogHexDebug(...) scopeLogHex(CFG_LOG_DEBUG, __VA_ARGS__)
+#define scopeLogHexTrace(...) scopeLogHex(CFG_LOG_TRACE, __VA_ARGS__)
 
 #endif // __DBG_H__

@@ -12,7 +12,7 @@
 
 ARCH ?= $(shell uname -m)
 
-all: cJSON cmocka funchook libyaml openssl pcre2
+all: cJSON cmocka funchook libyaml openssl pcre2 ls-hpack
 clean:
 	-@$(MAKE) -C cJSON clean
 	-@$(RM) -r build/*
@@ -24,7 +24,12 @@ funchook: build/funchook/libfunchook.a
 libyaml: build/libyaml/src/.libs/libyaml.a
 openssl: build/openssl/libssl.a build/openssl/libcrypto.a
 pcre2: build/pcre2/libpcre2-posix.a build/pcre2/libpcre2-8.a
-.PHONY: cJSON cmocka funchook libyaml openssl pcre2
+ls-hpack: build/ls-hpack/libls-hpack.a
+.PHONY: cJSON cmocka funchook libyaml openssl pcre2 ls-hpack
+
+# Pro Tip: add these to `cmake` commands to be able to debug the resulting libraries
+#
+#CMAKE_DEBUG_OPTS = -DCMAKE_BUILD_TYPE=DEBUG -DCMAKE_C_FLAGS_DEBUG="-g -O0" -DCMAKE_CXX_FLAGS_DEBUG="-g -O0"
 
 # Can't be cached because the build is in the source folder.
 cJSON/libcjson.a:
@@ -77,5 +82,12 @@ build/pcre2/libpcre2-posix.a build/pcre2/libpcre2-8.a:
 	@$(RM) -r build/pcre2
 	@mkdir build/pcre2
 	cd build/pcre2 && cmake ../../pcre2 && $(MAKE)
+	@[ -z "$(CI)" ] || echo "::endgroup::"
+
+build/ls-hpack/libls-hpack.a:
+	@echo "$${CI:+::group::}Building ls-hpack"
+	@$(RM) -r build/ls-hpack
+	@mkdir build/ls-hpack
+	cd build/ls-hpack && cmake ../../ls-hpack -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_BUILD_TYPE=Release -DLSHPACK_XXH=ON && $(MAKE)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

@@ -213,7 +213,6 @@ initPayloadDetect()
     g_http_protocol_def->protname = "HTTP";
     g_http_protocol_def->regex = "(?: HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n)";
     g_http_protocol_def->detect = TRUE;
-    g_http_protocol_def->payload = TRUE;
     g_http_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_http_protocol_def->regex,
                                             PCRE2_ZERO_TERMINATED, 0,
                                             &errornumber, &erroroffset, NULL);

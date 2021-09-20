@@ -140,10 +140,10 @@ if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
         ERR+=1
     fi
     if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-resp found"
-    else
         echo "FAIL: http-resp not found"
         ERR+=1
+    else
+        echo "PASS: http-resp found"
     fi
 else
     echo "FAIL: no output files"
@@ -184,10 +184,10 @@ LD_PRELOAD=/usr/local/scope/lib/libscope.so \
 curl -Lso /dev/null --http2-prior-knowledge $URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
     if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http-req not found"
+    else
         echo "FAIL: http-req found"
         ERR+=1
-    else
-        echo "PASS: http-req not found"
     fi
     if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
         echo "FAIL: http-resp found"
@@ -210,10 +210,10 @@ LD_PRELOAD=/usr/local/scope/lib/libscope.so \
 curl -Lso /dev/null --http2-prior-knowledge $URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
     if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http-req not found"
+    else
         echo "FAIL: http-req found"
         ERR+=1
-    else
-        echo "PASS: http-req not found"
     fi
     if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
         echo "FAIL: http-resp found"
@@ -262,10 +262,10 @@ if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
         ERR+=1
     fi
     if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-resp found"
-    else
         echo "FAIL: http-resp not found"
         ERR+=1
+    else
+        echo "PASS: http-resp found"
     fi
 else
     echo "FAIL: no output files"

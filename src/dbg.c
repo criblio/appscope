@@ -264,3 +264,9 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
 {
     return;
 }
+
+void __attribute__((weak))
+scopeBacktrace(cfg_log_level_t level)
+{
+    return;
+}

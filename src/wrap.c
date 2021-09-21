@@ -4,6 +4,10 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/poll.h>
+#include <execinfo.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #ifdef __LINUX__
 #include <sys/prctl.h>
@@ -4734,7 +4738,7 @@ getentropy(void *buffer, size_t length)
 }
 
 #define LOG_BUF_SIZE 4096
-
+#define STACK_DEPTH 10
 // This overrides a weak definition in src/dbg.c
 void
 scopeLog(cfg_log_level_t level, const char *format, ...)
@@ -4801,6 +4805,26 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
     } else {
         logSend(g_log, scope_log_var_buf, level);
     }
+}
+
+void
+scopeBacktrace(cfg_log_level_t level) {
+
+    if (!g_log) {
+        //TODO add support
+        DBG(NULL);
+        return;
+    }
+    cfg_log_level_t cfg_level = logLevel(g_log);
+    if ((cfg_level == CFG_LOG_NONE) || (cfg_level > level)) return;
+    int fd = logConnection(g_log);
+    if (fd == -1) {
+        DBG(NULL);
+        return;
+    }
+    void *array[STACK_DEPTH];
+    int size = backtrace(array, STACK_DEPTH);
+    backtrace_symbols_fd(array, size, fd);
 }
 
 /*

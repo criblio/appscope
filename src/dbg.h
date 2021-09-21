@@ -66,5 +66,6 @@ extern proc_id_t g_proc;
 extern bool g_constructor_debug_enabled;
 
 void scopeLog(cfg_log_level_t, const char *, ...) PRINTF_FORMAT(2,3);
+void scopeBacktrace(cfg_log_level_t);
 
 #endif // __DBG_H__

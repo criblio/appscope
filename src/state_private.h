@@ -129,6 +129,13 @@ typedef struct
     metric_t src;
 } httpId_t;
 
+// storage for partial HTTP/2 frames
+typedef struct {
+    uint8_t *buf;  // bytes array pointer
+    size_t   len;  // num bytes used
+    size_t   size; // num bytes allocated
+} http_buf_t;
+
 typedef struct protocol_info_t {
     metric_t evtype;
     metric_t ptype;
@@ -149,6 +156,18 @@ typedef struct {
     size_t hdralloc;
     size_t clen;        // Used if state==HTTP_DATA
     httpId_t id;
+
+    // HTTP version detected (0=unknown, 1=HTTP/1.x, 2=HTTP/2.0)
+    size_t version[2]; // rx=[0] and tx=[1]
+
+    // These will be TRUE if `hdr` ...
+    bool isRequest;            // ... contains a complete request header
+    bool isResponse;           // ... contains a complete response header
+    bool hasUpgrade;           // ... has `Upgrade: h2c` header
+    bool hasConnectionUpgrade; // ... has `Connection: upgrade` header
+
+    // HTTP/2 state
+    http_buf_t http2Buf[2]; // buffers for partial frames; rx=[0] and tx=[1]
 } http_state_t;
 
 typedef struct net_info_t {

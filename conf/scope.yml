@@ -31,7 +31,6 @@
 #   - `metric > format` is set to ndjson
 #   - `event > transport` is redirected to the `cribl` backend
 #   - `event > enable` is set to true
-#   - `event > watch[]` with `name: http` is disabled
 #   - `libscope > log > level` is set to warn
 #   - `libscope > configevent` is set to true
 #
@@ -289,9 +288,22 @@ event:
     enhancefs: true
 
   # The `event > watch[*]` array contains objects that enable different
-  # categories of events. Their type property specifies the category. The
+  # categories of events. Their `type` property specifies the category. The
   # rest are filters, so only matching events are generated. Comment out an
   # array entry to disable the category.
+  #
+  # Generally, the `name` filters are applied against the event's `source`
+  # field. The `type: file` and `type: console` categories are exceptions in
+  # that their `name` filters are applied against filenames instead.
+  #
+  # The `field` filters are applied against the named of the properties in the
+  # event's `body.data` object.
+  #
+  # Again generally, the `value` filters are applied against the string values
+  # of properties in the event's `body.data` object. The `type: file` and
+  # `type: console` categories instead match the `vailue` filter against the
+  # data read or written.
+  #
   watch:
 
     # The file category includes writes to files. It's intended primarily for
@@ -363,23 +375,29 @@ event:
       field: .*
       value: .*
 
-    # The http category includes HTTP request and response events. It currently
-    # only supports HTTP/1.x, not HTTP/2. The name, field, value, and headers
-    # properties are regular expressions applied to the corresponding event
-    # properties. Events will be generated when all match.
+    # The http category includes HTTP request, response, and metrics events.
+    # The `name`, `field`, and `value` entries are regular expressions applied
+    # to the event name, field names, and field values, respectively.  Events
+    # will be generated when all match.
+    #
+    # The `headers` entry is a list of regular expressions that are applied to
+    # the names of HTTP headers in request and response events. Headers that
+    # match are included in the generated events. Note that headers named
+    # `Host`, `User-Agent`, `X-Forwarded-For`, and `X-AppScope` are included by
+    # default.
     #
     # Set $SCOPE_EVENT_HTTP to true or false to enable or disable this
     # category. The regular expressions can be set with $SCOPE_EVENT_HTTP_NAME,
     # $SCOPE_EVENT_HTTP_FIELD, $SCOPE_EVENT_HTTP_VALUE, and
-    # $SCOPE_EVENT_HTTP_HEADER.
-    #
-    # When the `cribl` backend is enabled, this is disabled.
+    # $SCOPE_EVENT_HTTP_HEADER. Note that $SCOPE_EVENT_HTTP_HEADER only sets
+    # a single entry in the `headers` array.
     #
     - type: http
-      name: .*
-      field: .*
-      value: .*
-      headers: .*                 # yes, this should be singular but it's not.
+      name: .*         # event name; http-req, http-resp, or http-metrics
+      field: .*        # matches field names; duration, http_status, etc
+      value: .*        # matches field values
+      headers:         # list of filters matched against header names
+        #- (?i)Accept  # example showing case-insensitive filter
 
     # The metric category is very seldom used. It includes events for
     # operations that are included in the metric aggregation described earlier
@@ -849,21 +867,18 @@ protocol:
   #  len: 14
 
   # AppScope uses an internally defined protocol detector for HTTP like the
-  # example below automatically when the LogStream backend is enabled.
+  # example below by default.
   #
-  # Uncomment this and adjust as needed to override the defaults or to enable
-  # HTTP detection when not using LogStream.
+  # Uncomment this and adjust as needed to override the defaults.
   #
   #- name: HTTP
   #  regex: " HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
-  #  detect: true
-  #  payload: true
 
   # AppScope uses another internally defined protocol detector for TLS like the
   # example below by default.
   #
   # Uncomment this entry to override the regex details or to set detect to
-  # false.  The payload setting here is never used. AppScope never sends
+  # false. The payload setting here is never used. AppScope never sends
   # encrypted payloads to disk and only sends payloads to LogSteam during TLS
   # negotiation.
   #
@@ -871,7 +886,6 @@ protocol:
   #  regex: "^16030[0-3].{4}0[12]"
   #  binary: true
   #  len: 6
-
 
 # Custom configs
 #

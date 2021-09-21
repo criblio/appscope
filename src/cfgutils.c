@@ -2662,11 +2662,6 @@ cfgLogStreamDefault(config_t *cfg)
         cfgSendProcessStartMsgSet(cfg, TRUE);
     }
 
-    if (cfgEvtFormatSourceEnabled(cfg, CFG_SRC_HTTP)) {
-        strncat(g_logmsg, "HTTP watch disable, ", 25);
-    }
-    cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_HTTP, FALSE);
-
     return 0;
 }
 

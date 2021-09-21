@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <string.h>
+//#include <lshpack.h>
+
 #include "com.h"
 #include "dbg.h"
 #include "httpstate.h"
@@ -8,24 +10,31 @@
 #include "search.h"
 #include "atomic.h"
 
-
 #define MIN_HDR_ALLOC (4  * 1024)
 #define MAX_HDR_ALLOC (16 * 1024)
 
+#define HTTP2_MAGIC "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+#define HTTP2_MAGIC_LEN 24
+
 #define HTTP_START "HTTP/"
 #define HTTP_END "\r\n"
+// XXX these header searches need to be case insensitive
 #define CONTENT_LENGTH "Content-Length:"
+#define UPGRADE "\r\nUpgrade: h2"
+#define CONNECTION_UPGRADE "\r\nConnection: Upgrade"
 static search_t* g_http_start = NULL;
 static search_t* g_http_end = NULL;
 static search_t* g_http_clen = NULL;
+static search_t* g_http_upgrade = NULL;
+static search_t* g_http_connection_upgrade = NULL;
 
 static void setHttpState(http_state_t *httpstate, http_enum_t toState);
 static void appendHeader(http_state_t *httpstate, char* buf, size_t len);
 static size_t getContentLength(char *header, size_t len);
 static size_t bytesToSkipForContentLength(http_state_t *httpstate, size_t len);
 static bool setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src);
-static int reportHttp(http_state_t *httpstate);
-static bool scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId);
+static int reportHttp1(http_state_t *httpstate);
+static bool parseHttp1(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId);
 
 extern int      g_http_guard_enabled;
 extern uint64_t g_http_guard[];
@@ -36,8 +45,13 @@ setHttpState(http_state_t *httpstate, http_enum_t toState)
     if (!httpstate) return;
     switch (toState) {
         case HTTP_NONE:
-            if (httpstate->hdr) free(httpstate->hdr);
-            memset(httpstate, 0, sizeof(*httpstate));
+            if (httpstate->hdr)
+                free(httpstate->hdr);
+            httpstate->hdr = NULL;
+            httpstate->hdrlen = 0;
+            httpstate->hdralloc = 0;
+            httpstate->clen = 0;
+            memset(&(httpstate->id), 0, sizeof(httpId_t));
             break;
         case HTTP_HDR:
         case HTTP_HDREND:
@@ -158,7 +172,7 @@ setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src
 
 // For now, only doing HTTP/1.X headers
 static int
-reportHttp(http_state_t *httpstate)
+reportHttp1(http_state_t *httpstate)
 {
     if (!httpstate || !httpstate->hdr || !httpstate->hdrlen) return -1;
 
@@ -173,15 +187,13 @@ reportHttp(http_state_t *httpstate)
     }
 
     // If the first 5 chars are HTTP/, it's a response header
-    int isResponse =
-      (searchExec(g_http_start, httpstate->hdr, searchLen(g_http_start)) != -1);
     int isSend = (httpstate->id.src == NETTX) || (httpstate->id.src == TLSTX);
 
     // Set proto info
     proto->evtype = EVT_PROTO;
-    proto->ptype = (isResponse) ? EVT_HRES : EVT_HREQ;
+    proto->ptype = (httpstate->isResponse) ? EVT_HRES : EVT_HREQ;
     // We're a server if we 1) sent a response or 2) received a request
-    proto->isServer = (isSend && isResponse) || (!isSend && !isResponse);
+    proto->isServer = (isSend && httpstate->isResponse) || (!isSend && !httpstate->isResponse);
     proto->len = httpstate->hdrlen;
     proto->fd = httpstate->id.sockfd;
     proto->uid = httpstate->id.uid;
@@ -222,6 +234,66 @@ reportHttp(http_state_t *httpstate)
     return 0;
 }
 
+static bool
+reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
+        const uint8_t *buf, uint32_t frameLen, httpId_t *httpId)
+{
+    if (!state) return FALSE;
+
+    protocol_info *proto = calloc(1, sizeof(struct protocol_info_t));
+    if (!proto) {
+        scopeLogError("ERROR: failed to allocate protocol event");
+        DBG(NULL);
+        return FALSE;
+    }
+
+    proto->evtype = EVT_PROTO;
+    proto->ptype = EVT_H2FRAME;
+
+    //proto->isServer = ?; // will determine this when we parse on the other side
+
+    proto->len = frameLen;
+
+    proto->fd = httpId->sockfd;
+    proto->uid = httpId->uid;
+
+    proto->data = malloc(frameLen);
+    if (!proto->data) {
+        scopeLogError("ERROR: failed to allocate protocol event data");
+        DBG(NULL);
+        free(proto);
+        return FALSE;
+    }
+    if (stash->len) {
+        memcpy(proto->data, stash->buf, stash->len);
+        memcpy(proto->data + stash->len, buf, frameLen - stash->len);
+    } else {
+        memcpy(proto->data, buf, frameLen);
+    }
+
+    if (net) {
+        proto->sock_type = net->type;
+        if (net->addrSetLocal) {
+            memcpy(&proto->localConn, &net->localConn, sizeof(struct sockaddr_storage));
+        } else {
+            proto->localConn.ss_family = -1;
+        }
+        if (net->addrSetRemote) {
+            memcpy(&proto->remoteConn, &net->remoteConn, sizeof(struct sockaddr_storage));
+        } else {
+            proto->remoteConn.ss_family = -1;
+        }
+    } else {
+        proto->sock_type = -1;
+        proto->localConn.ss_family = -1;
+        proto->remoteConn.ss_family = -1;
+    }
+
+    cmdPostEvent(g_ctl, (char *)proto);
+
+    return (uint8_t)(proto->data[4]) & 0x04; // TRUE if END_HEADERS flag set
+}
+
 
 /*
  * If we have an fd check for TCP
@@ -237,7 +309,7 @@ reportHttp(http_state_t *httpstate)
  * that is usable
 */
 static bool
-scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId)
+parseHttp1(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId)
 {
     if (!buf) return FALSE;
 
@@ -309,8 +381,17 @@ scanForHttpHeader(http_state_t *httpstate, char *buf, size_t len, httpId_t *http
         size_t clen = getContentLength(httpstate->hdr, httpstate->hdrlen);
         size_t content_in_this_buf = len - header_end;
 
+        httpstate->isResponse =
+            (searchExec(g_http_start, httpstate->hdr, searchLen(g_http_start)) != -1);
+        httpstate->isRequest = !httpstate->isResponse &&
+            (searchExec(g_http_start, httpstate->hdr, httpstate->hdrlen) != -1);
+        httpstate->hasUpgrade =
+            (searchExec(g_http_upgrade, httpstate->hdr, httpstate->hdrlen) != -1);
+        httpstate->hasConnectionUpgrade =
+            (searchExec(g_http_connection_upgrade, httpstate->hdr, httpstate->hdrlen) != -1);
+
         // post and event containing the header we found
-        reportHttp(httpstate);
+        reportHttp1(httpstate);
 
         // change httpstate to HTTP_DATA per Content-Length or HTTP_NONE
         if ((clen != -1) && (clen >= content_in_this_buf)) {
@@ -330,15 +411,225 @@ initHttpState(void)
     g_http_start = searchComp(HTTP_START);
     g_http_end = searchComp(HTTP_END);
     g_http_clen = searchComp(CONTENT_LENGTH);
+    g_http_upgrade = searchComp(UPGRADE);
+    g_http_connection_upgrade = searchComp(CONNECTION_UPGRADE);
 }
 
-// allow all ports if they appear to have an HTTP header
+static void
+http2StashFrame(http_buf_t *stash, const uint8_t *buf, size_t len)
+{
+    // need to store the `len` we're given plus whatever's already stashed
+    size_t need = len + stash->len;
+    if (need > stash->size) {
+        // round up to the next 1k boundary and realloc
+        need = ((need + 1023) / 1024) * 1024;
+        uint8_t *newBuf = realloc(stash->buf, need);
+        if (!newBuf) {
+            scopeLogError("ERROR: failed to (re)allocate frame buffer");
+            DBG(NULL);
+            return;
+        }
+        stash->buf = newBuf;
+        stash->size = need;
+    }
+
+    // append what we're given to the stash
+    memcpy(stash->buf + stash->len, buf, len);
+    stash->len += len;
+}
+
+static uint32_t
+http2GetFrameLength(http_buf_t *stash, const uint8_t *buf, size_t len)
+{
+    uint32_t ret = 0;
+
+    // The first three bytes (MSB first) of the frame header are the length but
+    // some of the frame may already be stashed so this looks weird to deal
+    // with the potential split.
+
+    if (stash->len > 0) {
+        ret += stash->buf[0] << 16;
+    } else {
+        ret += buf[0 - stash->len] << 16;
+    }
+
+    if (stash->len > 1) {
+        ret += stash->buf[1] << 8;
+    } else {
+        ret += buf[1 - stash->len] << 8;
+    }
+
+    if (stash->len > 2) {
+        ret += stash->buf[2];
+    } else {
+        ret += buf[2 - stash->len];
+    }
+
+    return ret;
+}
+
+static uint32_t
+http2GetFrameType(http_buf_t *stash, const uint8_t *buf, size_t len)
+{
+    uint8_t ret = 0;
+
+    // The fourth byte of the frame header is the type but some of the frame
+    // may already be stashed so this looks weird to deal with the potential
+    // split.
+
+    if (stash->len > 3) {
+        ret += stash->buf[3];
+    } else {
+        ret += buf[3 - stash->len];
+    }
+
+    return ret;
+}
+
+static bool
+parseHttp2(http_state_t* state, net_info *net, int isTx,
+        const uint8_t *buf, size_t len, httpId_t *httpId)
+{
+    if (!buf || !len) {
+        scopeLogError("ERROR: empty HTTP/2 buffer");
+        DBG(NULL);
+        return FALSE;
+    }
+
+    bool ret = FALSE; // TRUE if we saw the end of a header like parseHttp1()
+
+    const uint8_t *bufPos = buf;                   // current position in buf
+    size_t         bufLen = len;                   // number of buf bytes left
+    http_buf_t     stash  = state->http2Buf[isTx]; // stash for partial frames
+    while (bufLen > 0) {
+        // skip over MAGIC
+        if (bufLen >= HTTP2_MAGIC_LEN && !strncmp((char*)buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
+            bufPos += HTTP2_MAGIC_LEN;
+            bufLen -= HTTP2_MAGIC_LEN;
+            if (!bufLen) return FALSE;
+        }
+
+        // stash the buffer if we don't have enough for a frame header
+        if (stash.len + bufLen < 9) {
+            http2StashFrame(&stash, bufPos, bufLen);
+            return FALSE;
+        }
+
+        // get the header values
+        uint32_t fLen  = http2GetFrameLength(&stash, bufPos, bufLen);
+        uint8_t  fType = http2GetFrameType(&stash, bufPos, bufLen);
+
+        // stash the buffer if we don't have enough for the whole frame
+        if (stash.len + bufLen < (9 + fLen)) {
+            http2StashFrame(&stash, bufPos, bufLen);
+            return FALSE;
+        }
+
+        // process interesting frames
+        switch (fType) {
+            case 0x01:
+                // process HEADERS frames
+                ret |= reportHttp2(state, net, &stash, bufPos, fLen+9, httpId);
+                break;
+            case 0x09:
+                // process CONTINUATION frames (additional HEADERS)
+                ret |= reportHttp2(state, net, &stash, bufPos, fLen+9, httpId);
+                break;
+            default:
+                // not interested in other frames
+                break;
+        }
+
+        // skip over what we parsed in the buffer and clear the stash
+        size_t bytesParsed = fLen + 9 - stash.len;
+        bufPos += bytesParsed;
+        bufLen -= bytesParsed;
+        stash.len = 0; // the stash was parsed too
+    }
+
+    return ret;
+}
+
+static bool
+doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
+        metric_t src, httpId_t *httpId)
+{
+    int isTx  = (src == NETTX || src == TLSTX) ? 1 : 0;
+
+    // detect HTTP version
+    if (state->version[isTx] == 0) {
+        // Detect HTTP/2 by looking for the "magic" string at the start
+        if (len >= HTTP2_MAGIC_LEN && !strncmp(buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
+            state->version[isTx] = 2;
+            state->version[!isTx] = 2;
+
+            // is there anything after the MAGIC?
+            if (len > HTTP2_MAGIC_LEN) {
+                // continue processing the remainder of the payload
+                buf += HTTP2_MAGIC_LEN;
+                len -= HTTP2_MAGIC_LEN;
+            } else {
+                // otherwise, done
+                return FALSE;
+            }
+        }
+
+        // Detect HTTP/1.x by looking for "HTTP/" which appears as the start
+        // of a response and after method and URI in a request.
+        else if (strstr(buf, HTTP_START)) {
+            state->version[isTx] = 1;
+            // fall through to continue processing
+        }
+
+        // Detection didn't work?
+        else {
+            scopeLogError("ERROR: HTTP detection failed on %s", isTx ? "TX" : "RX");
+            DBG(NULL);
+            return FALSE;
+        }
+    }
+
+    if (state->version[isTx] == 1) {
+        // process the HTTP/1.x payload
+        int ret = parseHttp1(state, buf, len, httpId);
+
+        // if we saw a successful upgrade response...
+        if (state->isResponse && state->hasUpgrade && state->hasConnectionUpgrade) {
+            // upgrade the versions on both sides, TX and RX
+            state->version[isTx] = 2;
+            state->version[!isTx] = 2;
+
+            // clear state
+            state->isRequest = FALSE;
+            state->isResponse = FALSE;
+            state->hasUpgrade = FALSE;
+            state->hasConnectionUpgrade = FALSE;
+
+            // XXX We're ignoring the posibility that there is an HTTP/2 frame
+            //     tacked to the end of the HTTP/1.x response here. It happens!
+        }
+
+        return ret;
+    }
+
+    if (state->version[isTx] == 2) {
+        // process the HTTP/2 payload
+        return parseHttp2(state, net, isTx, (uint8_t*)buf, len, httpId);
+    }
+
+    // invalid HTTP version
+    scopeLogError("ERROR: HTTP/? unexpected version on %s; version=%ld",
+            isTx ? "TX" : "RX", state->version[isTx]);
+    DBG(NULL);
+    return FALSE;
+}
+
 bool
 doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
 {
     if (!buf || !len) return FALSE;
 
-    // If we know it's we're not looking at a stream, bail.
+    // If we know we're not looking at a stream, bail.
     if (net && net->type != SOCK_STREAM) return FALSE;
 
     httpId_t httpId = {0};
@@ -356,12 +647,11 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
     http_state_t tempstate = {0};
     http_state_t *httpstate = (net) ? &net->http : &tempstate;
 
-
-    // Handle the data in it's various format
+    // Handle the data in it's various formats
     switch (dtype) {
         case BUF:
         {
-            http_header_found = scanForHttpHeader(httpstate, buf, len, &httpId);
+            http_header_found = doHttpBuffer(httpstate, net, buf, len, src, &httpId);
             break;
         }
 
@@ -374,7 +664,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
             for (i = 0; i < msg->msg_iovlen; i++) {
                 iov = &msg->msg_iov[i];
                 if (iov && iov->iov_base) {
-                    if (scanForHttpHeader(httpstate, iov->iov_base, iov->iov_len, &httpId)) {
+                    if (doHttpBuffer(httpstate, net, iov->iov_base, iov->iov_len, src, &httpId)) {
                         http_header_found = TRUE;
                         // stay in loop to count down content length
                     }
@@ -392,7 +682,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
 
             for (i = 0; i < iovcnt; i++) {
                 if (iov[i].iov_base) {
-                    if (scanForHttpHeader(httpstate, iov[i].iov_base, iov[i].iov_len, &httpId)) {
+                    if (doHttpBuffer(httpstate, net, iov[i].iov_base, iov[i].iov_len, src, &httpId)) {
                         http_header_found = TRUE;
                         // stay in loop to count down content length
                     }
@@ -419,6 +709,16 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
 void
 resetHttp(http_state_t *httpstate)
 {
+    // cleanup the stash for the RX and TX sides
+    for (int i = 0; i < 2; ++i) {
+        if (httpstate->http2Buf[0].buf) {
+            free(httpstate->http2Buf[i].buf);
+            httpstate->http2Buf[i].buf = 0;
+        }
+        httpstate->http2Buf[i].len = 0;
+        httpstate->http2Buf[i].size = 0;
+    }
+
     setHttpState(httpstate, HTTP_NONE);
 }
 

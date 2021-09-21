@@ -211,7 +211,6 @@ initPayloadDetect()
     g_http_protocol_def->protname = "HTTP";
     g_http_protocol_def->regex = "(?: HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n)";
     g_http_protocol_def->detect = TRUE;
-    g_http_protocol_def->payload = TRUE;
     g_http_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_http_protocol_def->regex,
                                             PCRE2_ZERO_TERMINATED, 0,
                                             &errornumber, &erroroffset, NULL);
@@ -880,7 +879,7 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
     match_data = pcre2_match_data_create_from_pattern(protoDef->re, NULL);
     if (pcre2_match_wrapper(protoDef->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0,
                             match_data, NULL) > 0) {
-        scopeLog(CFG_LOG_DEBUG, "fd:%d protocol detected", sockfd);
+        scopeLog(CFG_LOG_DEBUG, "fd:%d detected %s", sockfd, protoDef->protname);
 
         if (net) {
             net->protoDetect = DETECT_TRUE;
@@ -1121,7 +1120,7 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     // Check first against the protocol entries in the configs.
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((protoDef = lstFind(g_protlist, ptype)) != NULL) {
-            if (strcmp(protoDef->protname, "HTTP") == 0) {
+            if (strcasecmp(protoDef->protname, "HTTP") == 0) {
                 // Remember we saw an HTTP entry in the configs.
                 sawHTTP = TRUE;
             }
@@ -1132,8 +1131,8 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         }
     }
 
-    // Try our HTTP detection if we've not seen one and LogStream is enabled
-    if (!sawHTTP && cfgLogStream(g_cfg.staticfg)) {
+    // Try our HTTP detection if we've not seen one 
+    if (!sawHTTP) {
         setProtocolByType(sockfd, g_http_protocol_def, net, buf, len, dtype);
     }
 }
@@ -1180,9 +1179,16 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
         }
     }
 
-    // Crack HTTP/1.x into events if HTTP source/watch is enabled
-    if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
-        doHttp(id, sockfd, net, buf, len, src, dtype);
+    // if HTTP detected ...
+    if (net && net->protoProtoDef && !strcasecmp(net->protoProtoDef->protname, "HTTP")) {
+        // and, HTTP events are enabled ...
+        if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
+            // and, it's not and encrypted payload ...
+            if (net->tlsDetect == DETECT_FALSE || (src == TLSTX || src == TLSRX)) {
+                // then, process the HTTP payload
+                doHttp(id, sockfd, net, buf, len, src, dtype);
+            }
+        }
     }
 
     return 0;

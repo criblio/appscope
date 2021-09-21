@@ -21,8 +21,8 @@ RUN mkdir /kafka /data /logs
 # Download Kafka binary distribution
 #COPY ./kafka/kafka_2.13-2.5.0.tgz /tmp/kafka_2.13-2.5.0.tgz
 
-ADD https://downloads.apache.org/kafka/${KAFKA_VERSION}/${KAFKA_RELEASE_ARCHIVE} /tmp/
-ADD https://downloads.apache.org/kafka/${KAFKA_VERSION}/${KAFKA_RELEASE_ARCHIVE}.md5 /tmp/
+ADD https://archive.apache.org/dist/kafka/${KAFKA_VERSION}/${KAFKA_RELEASE_ARCHIVE} /tmp/
+ADD https://archive.apache.org/dist/kafka/${KAFKA_VERSION}/${KAFKA_RELEASE_ARCHIVE}.md5 /tmp/
 
 WORKDIR /tmp
 

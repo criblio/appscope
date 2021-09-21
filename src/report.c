@@ -122,6 +122,10 @@ typedef struct http2StreamInfo {
     struct lshpack_dec  decoder;
     int                 msgType; // 0=unset, 1=request, 2=response
     cJSON              *jsonData;
+    char                lastHost[1024];
+    char                lastMethod[1024];
+    char                lastTarget[1024];
+    char                lastUserAgent[1024];
 } http2StreamInfo_t;
 
 // list (by channel ID) of lists (by stream ID) of http2StreamInfo
@@ -751,6 +755,133 @@ doHttp1Header(protocol_info *proto)
     destroyProto(proto);
 }
 
+static const char *
+httpStatusCode2Text(const char *code)
+{
+    switch (atoi(code)) {
+        case 100:
+            return "Continue";
+        case 101:
+            return "Switching Protocols";
+        case 102:
+            return "Processing";
+        case 200:
+            return "OK";
+        case 201:
+            return "Created";
+        case 202:
+            return "Accepted";
+        case 203:
+            return "Non-authoritative Information";
+        case 204:
+            return "No Content";
+        case 205:
+            return "Reset Content";
+        case 206:
+            return "Partial Content";
+        case 207:
+            return "Multi-Status";
+        case 208:
+            return "Already Reported";
+        case 226:
+            return "IM Used";
+        case 300:
+            return "Multiple Choices";
+        case 301:
+            return "Moved Permanently";
+        case 302:
+            return "Found";
+        case 303:
+            return "See Other";
+        case 304:
+            return "Not Modified";
+        case 305:
+            return "Use Proxy";
+        case 307:
+            return "Temporary Redirect";
+        case 308:
+            return "Permanent Redirect";
+        case 400:
+            return "Bad Request";
+        case 401:
+            return "Unauthorized";
+        case 402:
+            return "Payment Required";
+        case 403:
+            return "Forbidden";
+        case 404:
+            return "Not Found";
+        case 405:
+            return "Method Not Allowed";
+        case 406:
+            return "Not Acceptable";
+        case 407:
+            return "Proxy Authentication Required";
+        case 408:
+            return "Request Timeout";
+        case 409:
+            return "Conflict";
+        case 410:
+            return "Gone";
+        case 411:
+            return "Length Required";
+        case 412:
+            return "Precondition Failed";
+        case 413:
+            return "Payload Too Large";
+        case 414:
+            return "Request-URI Too Long";
+        case 415:
+            return "Unsupported Media Type";
+        case 416:
+            return "Requested Range Not Satisfiable";
+        case 417:
+            return "Expectation Failed";
+        case 418:
+            return "I'm a teapot";
+        case 421:
+            return "Misdirected Request";
+        case 422:
+            return "Unprocessable Entity";
+        case 423:
+            return "Locked";
+        case 424:
+            return "Failed Dependency";
+        case 426:
+            return "Upgrade Required";
+        case 428:
+            return "Precondition Required";
+        case 429:
+            return "Too Many Requests";
+        case 431:
+            return "Request Header Fields Too Large";
+        case 444:
+            return "Connection Closed Without Response";
+        case 451:
+            return "Unavailable For Legal Reasons";
+        case 499:
+            return "Client Closed Request";
+        case 500:
+            return "Internal Server Error";
+        case 501:
+            return "Not Implemented";
+        case 502:
+            return "Bad Gateway";
+        case 503:
+            return "Service Unavailable";
+        case 504:
+            return "Gateway Timeout";
+        case 505:
+            return "HTTP Version Not Supported";
+        case 506:
+            return "Variant Also Negotiates";
+        case 507:
+            return "Insufficient Storage";
+    }
+
+    return "UNKNOWN";
+}
+
 static void
 doHttp2Frame(protocol_info *proto)
 {
@@ -863,21 +994,33 @@ doHttp2Frame(protocol_info *proto)
             if (!strcasecmp(":method", name)) {
                 streamInfo->msgType = 1; // request
                 cJSON_AddStringToObject(streamInfo->jsonData, "http_method", val);
+                strncpy(streamInfo->lastMethod, val, sizeof(streamInfo->lastMethod));
             } else if (!strcasecmp(":status", name)) {
                 streamInfo->msgType = 2; // response
                 cJSON_AddStringToObject(streamInfo->jsonData, "http_status_code", val);
-                // TODO add http_status_text ?
+                cJSON_AddStringToObjLN(streamInfo->jsonData, "http_status_text", httpStatusCode2Text(val));
             } else if (!strcasecmp(":authority", name)) {
                 cJSON_AddStringToObject(streamInfo->jsonData, "http_host", val);
+                strncpy(streamInfo->lastHost, val, sizeof(streamInfo->lastHost));
             } else if (!strcasecmp(":path", name)) {
                 cJSON_AddStringToObject(streamInfo->jsonData, "http_target", val);
+                strncpy(streamInfo->lastTarget, val, sizeof(streamInfo->lastTarget));
             } else if (!strcasecmp(":scheme", name)) {
                 cJSON_AddStringToObject(streamInfo->jsonData, "http_scheme", val);
             } else if (!strcasecmp("user-agent", name)) {
                 cJSON_AddStringToObject(streamInfo->jsonData, "http_user_agent", val);
+                strncpy(streamInfo->lastUserAgent, val, sizeof(streamInfo->lastUserAgent));
             } else if (!strcasecmp("x-forwarded-for", name)) {
                 cJSON_AddStringToObject(streamInfo->jsonData, "http_client_ip", val);
             } else if (!strcasecmp("content-length", name)) {
+                if (streamInfo->msgType == 1) {
+                    cJSON_AddStringToObject(streamInfo->jsonData, "http_request_content_length", val);
+                } else if (streamInfo->msgType == 2) {
+                    cJSON_AddStringToObject(streamInfo->jsonData, "http_response_content_length", val);
+                } else {
+                    scopeLogError("ERROR: invalid msgType; %d", streamInfo->msgType);
+                    DBG(NULL);
+                }
                 cJSON_AddStringToObject(streamInfo->jsonData, "http_content_len", val);
             } else {
                 size_t i;
@@ -936,31 +1079,59 @@ doHttp2Frame(protocol_info *proto)
                 cJSON_AddStringToObject(streamInfo->jsonData, "net_host_port", port);
             }
 
+            // it's a request...
             if (streamInfo->msgType == 1) {
                 event_t event = INT_EVENT("http-req", proto->len, SET, NULL);
                 event.data = streamInfo->jsonData;
                 cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
-            } else if (streamInfo->msgType == 2) {
-                // TODO add fields from request; method, host, target/path, duration, etc.
+            } 
 
+            // if it's a response...
+            else if (streamInfo->msgType == 2) {
+                // TODO add fields from request
+                //   - http_server_duration
+                //
+                if (streamInfo->lastHost[0]) {
+                    cJSON_AddStringToObject(streamInfo->jsonData, "http_host", streamInfo->lastHost);
+                }
+                if (streamInfo->lastMethod[0]) {
+                    cJSON_AddStringToObject(streamInfo->jsonData, "http_method", streamInfo->lastMethod);
+                }
+                if (streamInfo->lastTarget[0]) {
+                    cJSON_AddStringToObject(streamInfo->jsonData, "http_target", streamInfo->lastTarget);
+                }
+                if (streamInfo->lastUserAgent[0]) {
+                    cJSON_AddStringToObject(streamInfo->jsonData, "http_user_agent", streamInfo->lastUserAgent);
+                }
 
                 event_t event = INT_EVENT("http-resp", proto->len, SET, NULL);
                 event.data = streamInfo->jsonData;
                 cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
-            } else {
+            }
+
+            // not a request or response?
+            else {
                 scopeLogError("ERROR: HTTP/2 invalid msgType; %d", streamInfo->msgType);
+                DBG(NULL);
             }
 
             // cleanup the stream info
+            if (streamInfo->msgType == 2) {
+                streamInfo->lastHost[0]      = '\0';
+                streamInfo->lastMethod[0]    = '\0';
+                streamInfo->lastTarget[0]    = '\0';
+                streamInfo->lastUserAgent[0] = '\0';
+            }
             streamInfo->msgType = 0;
             if (streamInfo->jsonData) {
-                // This was deleted for us down in cmdSendHttp()
+                // jsonData was deleted for us down in cmdSendHttp()
                 //cJSON_Delete(streamInfo->jsonData);
                 streamInfo->jsonData = NULL;
             }
         }
     } else {
         scopeLogDebug("DEBUG: HTTP/2 unexpected frame type; type=0x%02d", fType);
+        DBG(NULL);
     }
 
 cleanup:

@@ -4,6 +4,10 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/poll.h>
+#include <execinfo.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #ifdef __linux__
 #include <sys/prctl.h>
@@ -5157,6 +5161,24 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
         logSend(g_log, overflow_msg, level);
     } else {
         logSend(g_log, scope_log_var_buf, level);
+    }
+}
+
+#define STACK_DEPTH 10
+void
+scopeBacktrace(cfg_log_level_t level) {
+    if (!g_log) {
+        return;
+    }
+    cfg_log_level_t cfg_level = logLevel(g_log);
+    if ((cfg_level == CFG_LOG_NONE) || (cfg_level > level)) return;
+    int fd = logConnection(g_log);
+    void *array[STACK_DEPTH];
+    int size = backtrace(array, STACK_DEPTH);
+    if (fd != -1) {
+        backtrace_symbols_fd(array, size, fd);
+    } else {
+        backtrace_symbols_fd(array, size, STDERR_FILENO);
     }
 }
 

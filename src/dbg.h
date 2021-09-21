@@ -95,4 +95,6 @@ void scopeLogHex(cfg_log_level_t, const void *, size_t, const char *, ...) PRINT
 #define scopeLogHexTrace(...)
 #endif
 
+void scopeBacktrace(cfg_log_level_t);
+
 #endif // __DBG_H__

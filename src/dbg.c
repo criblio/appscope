@@ -322,3 +322,9 @@ scopeLogHex(cfg_log_level_t level, const void *data, size_t size, const char *fo
     }
     scopeLog(level, "  %04x: %s %s", i-16, hex, txt);
 }
+
+void __attribute__((weak))
+scopeBacktrace(cfg_log_level_t level)
+{
+    return;
+}

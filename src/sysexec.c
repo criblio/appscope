@@ -20,6 +20,7 @@
 #include "com.h"
 #include "state.h"
 #include "gocontext.h"
+#include "utils.h"
 
 #define SYSPRINT_CONSOLE 0
 #define PRINT_BUF_SIZE 1024
@@ -373,6 +374,8 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phad
     return 0;
 }
 
+extern int g_forkd;
+
 EXPORTON int
 sys_exec(elf_buf_t *ebuf, const char *path, int argc, const char **argv, const char **env)
 {
@@ -387,6 +390,13 @@ sys_exec(elf_buf_t *ebuf, const char *path, int argc, const char **argv, const c
 
     // TODO: are we loading a Go app or a glibc app?
     initGoHook(ebuf);
+
+    if (!checkEnv("SCOPE_STATE", "set")) {
+        g_forkd = getpid();
+        setenv("SCOPE_STATE", "set", 1);
+    } else {
+        g_forkd = -1;
+    }
 
     set_go((char *)ebuf->buf, argc, argv, env, phaddr);
 

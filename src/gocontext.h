@@ -61,5 +61,6 @@ extern void go_hook_readResponse(void);
 extern void go_hook_pc_write(void);
 extern void go_hook_exit(void);
 extern void go_hook_die(void);
+extern void go_hook_rawsyscall(void);
 
 #endif // __GOTCONTEXT_H__

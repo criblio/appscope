@@ -37,15 +37,18 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 
 // compile-time control for debugging
 #define NEEDEVNULL 1
-#define funcprint sysprint
-//#define funcprint devnull
+//#define funcprint sysprint
+#define funcprint devnull
 //#define patchprint sysprint
 #define patchprint devnull
+//#define sysprint devnull
 #define RAW_PREV_FRAME 0x50
 
 extern char **g_argv;
 
 static void c_RawSyscall(void);
+static void c_rawVforkSyscall(void);
+static void c_sigtrampgo(uint32_t, uint64_t, uint64_t);
 
 #define UNDEF_OFFSET (-1)
 go_offsets_t g_go = {.g_to_m=48,                   // 0x30
@@ -75,13 +78,17 @@ tap_t g_go_tap[] = {
     {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
     {"runtime.exit",                         go_hook_exit,         NULL, 0},
     {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
-    {"syscall.RawSyscall",                   c_RawSyscall,         NULL, 0},
+    //{"syscall.RawSyscall",                   go_hook_rawsyscall,   NULL, 0},
+    //{"syscall.RawSyscall",                   c_RawSyscall,         NULL, 0},
+    //{"runtime.sigtramp",                     c_sigtrampgo,         NULL, 0},
+    //{"syscall.rawVforkSyscall",              c_rawVforkSyscall,    NULL, 0},
     {"TAP_TABLE_END", NULL, NULL, 0}
 };
 
 uint64_t g_glibc_guard = 0LL;
 uint64_t g_go_static = 0LL;
 static list_t *g_threadlist;
+static list_t *g_golist;
 static void *g_stack;
 static bool g_switch_thread;
 
@@ -223,6 +230,7 @@ patch_return_addrs(funchook_t *funchook,
     // since the go folks wrote them in assembly, they don't follow
     // conventions that other go functions do.
     if ((tap->assembly_fn == go_hook_exit) ||
+        (tap->assembly_fn == go_hook_rawsyscall)  ||
         (tap->assembly_fn == go_hook_die)) {
         patch_first_instruction(funchook, asm_inst, asm_count, tap);
         return;
@@ -446,13 +454,14 @@ initGoHook(elf_buf_t *ebuf)
 
     g_stack = malloc(32 * 1024);
     g_threadlist = lstCreate(NULL);
+    g_golist = lstCreate(NULL);
 
     // A go app may need to expand stacks for some C functions
     g_need_stack_expand = TRUE;
 
     funchook = funchook_create();
 
-    if (logLevel(g_log) <= CFG_LOG_DEBUG) {
+    if (logLevel(g_log) <= CFG_LOG_TRACE) {
         // TODO: add some mechanism to get the config'd log file path
         funchook_set_debug_file(DEFAULT_LOG_PATH);
     }
@@ -584,7 +593,9 @@ initGoHook(elf_buf_t *ebuf)
 
         orig_func = (void *) ((uint64_t)orig_func + base);
 
-        if (tap->assembly_fn == c_RawSyscall) {
+        //if ((tap->assembly_fn == c_RawSyscall) ||
+        if ((tap->assembly_fn == c_sigtrampgo) ||
+            (tap->assembly_fn == c_rawVforkSyscall)) {
             patch_raw_func(funchook, orig_func, tap);
             continue;
         }
@@ -650,6 +661,7 @@ dumb_thread(void *arg)
     sigset_t mask;
 
     sigfillset(&mask);
+
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
     void *dummy = calloc(1, 32);
@@ -682,19 +694,31 @@ dumb_thread(void *arg)
 * for each 'm'. It then syncs with that thread
 * after the newly created thread inits memory
 * allocation.
+*
+* Refer to go/src/runtime/runtime2.go type g struct
 */
+static unsigned long g_gofs = -1;
+//static unsigned long g_libcfs = -1;
+static uint64_t serialize = 0ULL;
+int g_forkd = 0;
+
 inline static void *
 go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 {
     int fs_valid = 0;
+    //bool switched = FALSE;
     uint64_t rc;
     unsigned long go_tls = 0;
     unsigned long go_fs = 0;
     unsigned long go_m = 0;
     unsigned long *go_v;
     char *go_g = NULL;
+    //char *fp;
+    void *thread_fs = NULL;
 
     if (g_go_static) {
+        if (g_forkd == g_proc.pid) return return_addr(gfunc);
+
         // Get the Go routine's struct g
         __asm__ volatile (
             "mov %%fs:-8, %0"
@@ -745,16 +769,25 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
          * and not call an interposed handler.
         */
         if (fs_valid == 0) {
+            //atomicCasU64(&serialize, 1ULL, 0ULL);
             return return_addr(gfunc);
         }
 
-        void *thread_fs = NULL;
+        //atomicSwapU64(&g_gofs, (uint64_t)go_g);
+        //fp = (char *)scope_fs;
+        //*(unsigned long *)(fp - 8) = (unsigned long)go_g;
+
         if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
             // Switch to the main thread TCB
+            //fp = (char *)scope_fs;
+            //*(unsigned long *)(fp - 8) = (unsigned long)go_g;
+
             if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
                 scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
                 goto out;
             }
+            //atomicSwapU64(&g_gofs, go_m);
+
             pthread_t thread;
             pthread_barrier_t barrier;
             if (pthread_barrier_init(&barrier, NULL, 2) != 0) {
@@ -773,6 +806,16 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 
             thread_fs = (void *)thread;
 
+            if (lstInsert(g_golist, (unsigned long)thread_fs, &go_fs) == FALSE) {
+                scopeLog("lstInsert failed", -1, CFG_LOG_ERROR);
+                goto out;
+            }
+
+            //atomicSwapU64(&g_gofs, go_m);
+            //atomicSwapU64(&g_libcfs, (uint64_t)thread_fs);
+            //fp = (char *)thread_fs;
+            //*(unsigned long *)(fp - 8) = (unsigned long)go_g;
+
             if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
                 scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
                 goto out;
@@ -790,11 +833,20 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 
             sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
         } else {
+            //fp = (char *)thread_fs;
+            //*(unsigned long *)(fp - 8) = (unsigned long)go_g;
+
             if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
                 scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
                 goto out;
             }
-            sysprint("GO switch start TLS = 0x%08lx cfunc 0x%08lx\n", go_fs, cfunc);
+            //atomicSwapU64(&g_gofs, go_m);
+
+            if (lstFind(g_golist, (unsigned long)thread_fs) == NULL) {
+                sysprint("ERROR; can't find go fs from thread fs");
+            }
+
+            sysprint("GO switch start TLS = 0x%08lx glob = 0x%08lx cfunc 0x%08lx\n", go_fs, g_gofs, cfunc);
         }
     }
 
@@ -803,6 +855,7 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
     stackptr += frame_offset;
 
     sysprint("GO switch C handler TLS = 0x%08lx cfunc 0x%08lx\n", go_fs, cfunc);
+
     // call the C handler
     __asm__ volatile (
         "mov %1, %%rdi  \n"
@@ -811,15 +864,20 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
         : "r"(stackptr), "r"(cfunc)   // inputs
         :                             // clobbered register
         );
+
 out:
     if (g_go_static && go_fs) {
         // Switch back to the 'm' TLS
         sysprint("GO switch end TLS = 0x%08lx\n", go_fs);
+
         if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
             scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
         }
     }
 
+    //atomicSwapU64(&g_gofs, -1);
+    //atomicSwapU64(&g_libcfs, -1);
+    //atomicCasU64(&serialize, 1ULL, 0ULL);
     return return_addr(gfunc);
 }
 
@@ -1406,6 +1464,48 @@ go_die(char *stackptr)
     return go_switch(stackptr, c_exit, go_hook_die);
 }
 
+static char *largv[32];
+static void
+c_rawsyscall(char *stackaddr)
+{
+    uint64_t trap;
+    int i, nargs;
+    //size_t plen;
+    char **argv;
+    uint64_t v1, v2, v3, v4;
+
+    v1 = v2 = v3 = v4 = 0;
+    sysprint("%ld $ld %ld %ld", v1, v2, v3, v4); // compiler warning
+
+    //stackaddr += 0x50;
+    trap = *(uint64_t *)(stackaddr + 0x0);
+    if ((g_go_static == TRUE) && (trap == SYS_execve)) {
+        nargs = 0;
+        while ((g_argv[nargs] != NULL)) nargs++;
+        nargs += 1; // ldscope + the original args
+
+        //plen = sizeof(char *);
+        // no need to free this as we are doing an execve
+        //if ((nargs == 0) || (argv = calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
+        //    return;
+        //}
+        argv = largv;
+
+        argv[0] = (char *)(*(uint64_t *)(stackaddr + 0x08));
+        for (i = 1; i < nargs; i++) {
+            argv[i] = g_argv[i - 1];
+        }
+
+        *(uint64_t *)(stackaddr + 0x10) = (uint64_t)argv;
+    }
+}
+
+EXPORTON void *
+go_rawsyscall(char *stackptr)
+{
+    return go_switch(stackptr, c_rawsyscall, go_hook_rawsyscall);
+}
+
 /*
  * We execute this function with a stack frame built for this function by the compiler.
  * We point back to the stack frame of the calling Go function. We need to jump to the
@@ -1455,14 +1555,18 @@ c_RawSyscall(void)
     trap = *(uint64_t *)(stackaddr + 0x0);
 
     if ((g_go_static == TRUE) && (trap == SYS_execve)) {
+        nargs = 0;
         while ((g_argv[nargs] != NULL)) nargs++;
         nargs += 1; // ldscope + the original args
 
         plen = sizeof(char *);
+        sysprint("%d", plen); // compiler warning
+
         // no need to free this as we are doing an execve
-        if ((nargs == 0) || (argv = calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
-            return;
-        }
+        //if ((nargs == 0) || (argv = calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
+        //    return;
+        //}
+        argv = largv;
 
         argv[0] = (char *)(*(uint64_t *)(stackaddr + 0x08));
         for (i = 1; i < nargs; i++) {
@@ -1486,12 +1590,6 @@ c_RawSyscall(void)
         );
 }
 
-EXPORTON void *
-go_RawSyscall(char *stackptr)
-{
-    return go_switch(stackptr, c_RawSyscall, c_RawSyscall);
-}
-
 /*
  * Leaving this interposed function here, in case we need to
  * come back to the vfork functionality. This is a raw syscall
@@ -1500,11 +1598,11 @@ go_RawSyscall(char *stackptr)
  * vfork flags: 0x4111 CLONE_VFORK | CLONE_VM | SIGHAND
  * fork flags: 0x1200011 CLONE_SETTID | CLONE_CLEARTID
  */
-#if 0
 static void
-c_rawVforkSyscall(void)
+c_rawVforkSyscall()
 {
     int (*raw_vfork)(uint64_t, uint64_t);
+    uint64_t rc, sret;
     char *stackaddr;
     uint64_t trap, v1;
 
@@ -1515,36 +1613,132 @@ c_rawVforkSyscall(void)
         :                            // clobbered register
         );
 
-    stackaddr += 0x30;
+    //stackaddr += 0x30;
+    stackaddr += 0x40;
     raw_vfork = (int (*)(uint64_t, uint64_t))return_addr((assembly_fn)c_rawVforkSyscall);
 
     trap = *(uint64_t *)(stackaddr + 0x0);
     v1 = *(uint64_t *)(stackaddr + 0x08);
+
     if ((g_go_static == TRUE) && (trap == SYS_clone) && (v1 & CLONE_VM)) {
-        v1 &= ~CLONE_VM;
-        *(uint64_t *)(stackaddr + 0x08) = v1;
-        //*(uint64_t *)(stackaddr + 0x08) = (uint64_t)0x1200011;
+        //v1 &= ~CLONE_VM;
+        //*(uint64_t *)(stackaddr + 0x08) = v1;
+        *(uint64_t *)(stackaddr + 0x08) = (uint64_t)0x1200011;
     }
 
     // point past the return addr on the original stack
-    stackaddr -= 0x08;
+    //stackaddr -= 0x08;
+    sret = *(uint64_t *)(stackaddr - 0x08);
+    g_forkd = g_proc.pid;
     __asm__ volatile (
         "lea %1, %%r11 \n"
         "mov (%%r11), %%rsp \n"
         "lea %2, %%r11 \n"
-        "mov (%%r11), %%r11\n"
-        "jmp *%%r11 \n"
-        : "=r"(v1)                   // output
+        "mov (%%r11), %%r11 \n"
+        //"jmp *%%r11 \n"
+        "callq *%%r11 \n"
+        "mov 0x10(%%rsp), %%r11 \n"
+        "mov %%r11, %0 \n"
+        : "=r"(rc)                   // output
         : "m" (stackaddr), "m" (raw_vfork) // input
-        :                            // clobbered register
+        : "%r11"                     // clobbered register
+        );
+
+    if (rc != 0) {
+        g_forkd = g_proc.pid;
+    }
+
+    __asm__ volatile (
+        "lea %1, %%r11 \n"
+        "mov (%%r11), %%r11 \n"
+        "mov %%r11, -8(%%rsp) \n"
+        : "=r"(rc)                   // output
+        : "m" (sret)                 // input
+        : "%r11"                     // clobbered register
         );
 
     return;
 }
 
-EXPORTON void *
-go_rawVforkSyscall(char *stackptr)
+static void
+c_sigtrampgo(uint32_t sig, uint64_t info, uint64_t ctx)
 {
-    return go_switch(stackptr, c_rawVforkSyscall, c_rawVforkSyscall);
-}
+    void (*siggo)(uint32_t, uint64_t, uint64_t);
+    //unsigned long this_fs = 0, go_fs = 0;
+    //void *thread_fs = NULL;
+    //unsigned long g0, m;
+    //char *mptr;
+    unsigned long ggofs = g_gofs;
+    unsigned long fs;
+
+    siggo = (void (*)(uint32_t, uint64_t, uint64_t))return_addr((assembly_fn)c_sigtrampgo);
+
+#if 0
+    if (arch_prctl(ARCH_GET_FS, (unsigned long) &this_fs) == -1) {
+        //DBG("arch_prctl get fs");
+        while (1);
+        return;
+    }
+
+    if (this_fs == scope_fs) {
+        go_fs = 1;
+        //m = ggofs
+        //g = *m
+        //fs = getgotls(g)
+        m = ggofs;
+        mptr = (unsigned long *)m;
+        g0 = (unsigned long)*mptr;
+        //mov    %rbx,%fs:0xfffffffffffffff8
+        fs = getgofs((char *)g0);
+        sysprint("8888888 0x%08lx 0x%08lx 0x%08lx", m, g0, fs);
+
+        if (arch_prctl(ARCH_SET_FS, ggofs) == -1) {
+            //DBG("arch_prctl set fs");
+            while (1);
+            return;
+        }
+    } else if ((thread_fs = lstFind(g_threadlist, this_fs)) == NULL) {
+        // the current fs is a libc fs; find the go fs and update
+        if ((go_fs = (unsigned long)lstFind(g_golist, this_fs)) != 0) {
+            m = ggofs;
+            mptr = (unsigned long *)m;
+            g0 = (unsigned long)*mptr;
+            fs = getgofs((char *)g0);
+            sysprint("999999 0x%08lx 0x%08lx 0x%08lx", m, g0, fs);
+            if (arch_prctl(ARCH_SET_FS, (unsigned long)fs) == -1) {
+                //DBG("arch_prctl set fs");
+                while (1);
+                return;
+            }
+        }
+    }
 #endif
+
+    if (ggofs != -1) {
+        while (!atomicCasU64(&serialize, 0ULL, 1ULL));
+        //m = ggofs;
+        //mptr = (char *)m;
+        //g0 = *(unsigned long *)(mptr + 0x20);
+        __asm__ volatile (
+            "mov %1, %%r11 \n"
+            //"mov (%%r11), %%r11 \n"
+            "mov %%r11, %%fs:-8 \n"
+            : "=r"(fs)                        // output
+            : "m" (ggofs)                     // inputs
+            : "%r11"                          // clobbered register
+            );
+        atomicCasU64(&serialize, 1ULL, 0ULL);
+    }
+
+
+    siggo(sig, info, ctx);
+
+#if 0
+    if ((go_fs != 0) && (arch_prctl(ARCH_SET_FS, (unsigned long)this_fs) == -1)) {
+        //DBG("arch_prctl set scope on the way out");
+        while (1);
+    }
+#endif
+
+    return;
+}

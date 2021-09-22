@@ -63,6 +63,7 @@
     interpose go_hook_pc_write, go_pc_write
     interpose go_hook_exit, go_exit
     interpose go_hook_die, go_die
+    interpose go_hook_rawsyscall, go_rawsyscall
 
 /*
     Debug hint:

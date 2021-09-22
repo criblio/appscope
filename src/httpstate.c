@@ -238,39 +238,55 @@ static bool
 reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
         const uint8_t *buf, uint32_t frameLen, httpId_t *httpId)
 {
-    if (!state) return FALSE;
-
-    protocol_info *proto = calloc(1, sizeof(struct protocol_info_t));
-    if (!proto) {
-        scopeLogError("ERROR: failed to allocate protocol event");
+    if (!state || !stash || !buf || !frameLen || !httpId) {
+        scopeLogError("ERROR: NULL reportHttp2() parameter");
         DBG(NULL);
         return FALSE;
     }
 
-    proto->evtype = EVT_PROTO;
-    proto->ptype = EVT_H2FRAME;
-
-    //proto->isServer = ?; // will determine this when we parse on the other side
-
-    proto->len = frameLen;
-
-    proto->fd = httpId->sockfd;
-    proto->uid = httpId->uid;
-
-    proto->data = malloc(frameLen);
-    if (!proto->data) {
-        scopeLogError("ERROR: failed to allocate protocol event data");
+    http_post *post = calloc(1, sizeof(struct http_post_t));
+    if (!post) {
+        scopeLogError("ERROR: failed to allocate post object");
         DBG(NULL);
-        free(proto);
+        return FALSE;
+    }
+    post->ssl            = state->id.isSsl;
+    post->start_duration = getTime();
+    post->id             = state->id.uid;
+    post->hdr            = malloc(frameLen);
+    if (!post->hdr) {
+        free(post);
+        scopeLogError("ERROR: failed to allocate post data");
+        DBG(NULL);
         return FALSE;
     }
     if (stash->len) {
-        memcpy(proto->data, stash->buf, stash->len);
-        memcpy(proto->data + stash->len, buf, frameLen - stash->len);
+        memcpy(post->hdr, stash->buf, stash->len);
+        memcpy(post->hdr + stash->len, buf, frameLen - stash->len);
     } else {
-        memcpy(proto->data, buf, frameLen);
+        memcpy(post->hdr, buf, frameLen);
     }
 
+    protocol_info *proto = calloc(1, sizeof(struct protocol_info_t));
+    if (!proto) {
+        free(post->hdr);
+        free(post);
+        scopeLogError("ERROR: failed to allocate protocol object");
+        DBG(NULL);
+        return FALSE;
+    }
+
+    proto->evtype   = EVT_PROTO;
+    proto->ptype    = EVT_H2FRAME;
+    // Unlike in the HTTP/1 case, we're sending TRUE here if the frame was
+    // sent, not if we're the server. We haven't parsed the frame to know if
+    // it's a request or response yet so we're sending half of the isServer
+    // answer here and will finish the logic on the reporting side.
+    proto->isServer = (state->id.src == NETTX) || (state->id.src == TLSTX);
+    proto->len      = frameLen;
+    proto->fd       = httpId->sockfd;
+    proto->uid      = httpId->uid;
+    proto->data     = (char *)post;
     if (net) {
         proto->sock_type = net->type;
         if (net->addrSetLocal) {
@@ -284,14 +300,16 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
             proto->remoteConn.ss_family = -1;
         }
     } else {
-        proto->sock_type = -1;
-        proto->localConn.ss_family = -1;
+        proto->sock_type            = -1;
+        proto->localConn.ss_family  = -1;
         proto->remoteConn.ss_family = -1;
     }
 
+    bool ret = (uint8_t)(post->hdr[4]) & 0x04; // TRUE if END_HEADERS flag set
+
     cmdPostEvent(g_ctl, (char *)proto);
 
-    return (uint8_t)(proto->data[4]) & 0x04; // TRUE if END_HEADERS flag set
+    return ret;
 }
 
 

@@ -122,6 +122,7 @@ typedef struct http2StreamInfo {
     struct lshpack_dec  decoder;
     int                 msgType; // 0=unset, 1=request, 2=response
     cJSON              *jsonData;
+    uint64_t            lastRequestAt;
     char                lastHost[1024];
     char                lastMethod[1024];
     char                lastTarget[1024];
@@ -200,7 +201,14 @@ destroyProto(protocol_info *proto)
      * post->data is the http header and is freed in destroyHttpMap()
      * when the list entry is deleted.
      */
-    if (proto->data) free (proto->data);
+    if (proto->data) {
+        // comment above doesn't apply to HTTP/2 protocol events
+        if (proto->ptype == EVT_H2FRAME) {
+            http_post *post = (http_post *)proto->data;
+            free(post->hdr);
+        }
+        free(proto->data);
+    }
 }
 
 static int
@@ -885,24 +893,30 @@ httpStatusCode2Text(const char *code)
 static void
 doHttp2Frame(protocol_info *proto)
 {
+    // require the protocol object and it's data pointer
     if (!proto || !proto->data) {
         destroyProto(proto);
         return;
     }
 
-    // unsigned version of data
-    const uint8_t *data = (uint8_t *)proto->data;
+    // require the frame in the post's hdr pointer
+    http_post *post = (http_post *)proto->data;
+    if (!post->hdr) {
+        destroyProto(proto);
+        return;
+    }
 
     // frame header
+    const uint8_t *frame = (uint8_t *)post->hdr;
     if (proto->len < 9) {
         scopeLogError("ERROR: runt HTTP/2 frame; only %ld bytes long", proto->len);
         DBG(NULL);
         goto cleanup;
     }
-    uint32_t fLen    = (data[0]<<16) + (data[1]<<8) + (data[2]);
-    uint8_t  fType   = data[3];
-    uint8_t  fFlags  = data[4];
-    uint32_t fStream = ((data[5]&0x7F)<<24) + (data[6]<<16) + (data[7]<<8) + (data[8]);
+    uint32_t fLen    = (frame[0]<<16) + (frame[1]<<8) + (frame[2]);
+    uint8_t  fType   = frame[3];
+    uint8_t  fFlags  = frame[4];
+    uint32_t fStream = ((frame[5]&0x7F)<<24) + (frame[6]<<16) + (frame[7]<<8) + (frame[8]);
     if (proto->len != 9 + fLen) {
         scopeLogError("ERROR: bad HTTP/2 frame size; got %ld/%d bytes", proto->len, 9+fLen);
         DBG(NULL);
@@ -913,7 +927,8 @@ doHttp2Frame(protocol_info *proto)
     if (fType == 0x01 || fType == 0x09) // HEADERS or CONTINUATION
     {
         if (!g_http2StreamLists) {
-            g_http2StreamLists = lstCreate(destroyHttp2StreamList); // LEAKED!!!
+            // TODO: This list is leaked. Need to cleanup on when the thread exits.
+            g_http2StreamLists = lstCreate(destroyHttp2StreamList);
             if (!g_http2StreamLists) {
                 scopeLogError("ERROR: failed to create decoder lists");
                 DBG(NULL);
@@ -968,9 +983,9 @@ doHttp2Frame(protocol_info *proto)
         size_t hdrBlockPos = 9         // skip frame header
             + (fFlags & 0x08 ? 1 : 0)  // padded set? skip pad length byte
             + (fFlags & 0x20 ? 5 : 0); // priority set? skip stream and weight
-        const uint8_t *decPos = data + hdrBlockPos;
+        const uint8_t *decPos = frame + hdrBlockPos;
         const uint8_t *decEnd = decPos + fLen;
-        if (fFlags & 0x08) { decEnd -= data[9]; } // padding
+        if (fFlags & 0x08) { decEnd -= frame[9]; } // padding
 
         char out[2048];
         lsxpack_header_t hdr;
@@ -995,6 +1010,7 @@ doHttp2Frame(protocol_info *proto)
                 streamInfo->msgType = 1; // request
                 cJSON_AddStringToObject(streamInfo->jsonData, "http_method", val);
                 strncpy(streamInfo->lastMethod, val, sizeof(streamInfo->lastMethod));
+                streamInfo->lastRequestAt = post->start_duration;
             } else if (!strcasecmp(":status", name)) {
                 streamInfo->msgType = 2; // response
                 cJSON_AddStringToObject(streamInfo->jsonData, "http_status_code", val);
@@ -1041,6 +1057,14 @@ doHttp2Frame(protocol_info *proto)
         if (fFlags & 0x04) {
             // TODO skip type doesn't match event > watch[type=http] > name`
 
+            // The isServer value in the protocol object is half of the answer
+            // here. See reportHttp2() in httpstate.c for details. We recreate
+            // the isServer value that the HTTP/1 logic produces here.
+            bool isSend     = proto->isServer;
+            bool isResponse = streamInfo->msgType == 2;
+            bool isServer   = (isSend && isResponse) || (!isSend && !isResponse);
+
+            // Add the socket info fields
             if (addrIsNetDomain(&proto->localConn)) {
                 switch (proto->sock_type) {
                     case SOCK_STREAM:
@@ -1088,20 +1112,28 @@ doHttp2Frame(protocol_info *proto)
 
             // if it's a response...
             else if (streamInfo->msgType == 2) {
-                // TODO add fields from request
-                //   - http_server_duration
-                //
+                if (streamInfo->lastRequestAt) {
+                    unsigned msec = (post->start_duration - streamInfo->lastRequestAt) / 1000000;
+                    cJSON_AddNumberToObject(streamInfo->jsonData,
+                            isServer ?  "http_server_duration" : "http_client_duration", msec);
+                } else {
+                    // TODO see if we saw an HTTP/1 request
+                }
                 if (streamInfo->lastHost[0]) {
-                    cJSON_AddStringToObject(streamInfo->jsonData, "http_host", streamInfo->lastHost);
+                    cJSON_AddStringToObject(streamInfo->jsonData,
+                            "http_host", streamInfo->lastHost);
                 }
                 if (streamInfo->lastMethod[0]) {
-                    cJSON_AddStringToObject(streamInfo->jsonData, "http_method", streamInfo->lastMethod);
+                    cJSON_AddStringToObject(streamInfo->jsonData,
+                            "http_method", streamInfo->lastMethod);
                 }
                 if (streamInfo->lastTarget[0]) {
-                    cJSON_AddStringToObject(streamInfo->jsonData, "http_target", streamInfo->lastTarget);
+                    cJSON_AddStringToObject(streamInfo->jsonData,
+                            "http_target", streamInfo->lastTarget);
                 }
                 if (streamInfo->lastUserAgent[0]) {
-                    cJSON_AddStringToObject(streamInfo->jsonData, "http_user_agent", streamInfo->lastUserAgent);
+                    cJSON_AddStringToObject(streamInfo->jsonData,
+                            "http_user_agent", streamInfo->lastUserAgent);
                 }
 
                 event_t event = INT_EVENT("http-resp", proto->len, SET, NULL);

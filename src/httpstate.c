@@ -643,6 +643,10 @@ parseHttp2(http_state_t* state, net_info *net, int isTx,
                 // process HEADERS frames
                 ret |= reportHttp2(state, net, stash, bufPos, fLen+9, httpId);
                 break;
+            case 0x05:
+                // process PUSH_PROMISE frames (unsolicited requests)
+                ret |= reportHttp2(state, net, stash, bufPos, fLen+9, httpId);
+                break;
             case 0x09:
                 // process CONTINUATION frames (additional HEADERS)
                 ret |= reportHttp2(state, net, stash, bufPos, fLen+9, httpId);

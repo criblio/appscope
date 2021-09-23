@@ -911,14 +911,14 @@ httpStatusCode2Text(const char *code)
 static void
 doHttp2Frame(protocol_info *proto)
 {
-    // require the protocol object and it's data pointer
+    // require the protocol object and it's data pointer to be set
     if (!proto || !proto->data) {
         scopeLogError("ERROR: null proto or proto->data");
         destroyProto(proto);
         return;
     }
 
-    // require the frame in the post's hdr pointer
+    // require the post's hdr pointer to be set
     http_post *post = (http_post *)proto->data;
     if (!post->hdr) {
         scopeLogError("ERROR: null post->hdr");
@@ -926,10 +926,11 @@ doHttp2Frame(protocol_info *proto)
         return;
     }
 
-    // frame header
+    // extract the HTTP/2 frame header
     const uint8_t *frame = (uint8_t *)post->hdr;
     if (proto->len < 9) {
-        scopeLogError("ERROR: runt HTTP/2 frame; only %ld bytes long", proto->len);
+        scopeLogHexError(frame, proto->len,
+                "ERROR: runt HTTP/2 frame; only %ld bytes long", proto->len);
         DBG(NULL);
         goto cleanup;
     }
@@ -938,7 +939,8 @@ doHttp2Frame(protocol_info *proto)
     uint8_t  fFlags  = frame[4];
     uint32_t fStream = ((frame[5]&0x7F)<<24) + (frame[6]<<16) + (frame[7]<<8) + (frame[8]);
     if (proto->len != 9 + fLen) {
-        scopeLogError("ERROR: bad HTTP/2 frame size; got %ld/%d bytes", proto->len, 9+fLen);
+        scopeLogHexError(frame, proto->len,
+                "ERROR: bad HTTP/2 frame size; got %ld/%d bytes", proto->len, 9+fLen);
         DBG(NULL);
         goto cleanup;
     }
@@ -947,9 +949,47 @@ doHttp2Frame(protocol_info *proto)
     //        "DEBUG: HTTP/2 frame; chan=0x%lx, stream=%d, type=0x%02x, flags=0x%02x",
     //        proto->uid, fStream, fType, fFlags);
 
-    // process frame
-    if (fType == 0x01 || fType == 0x09) // HEADERS or CONTINUATION
-    {
+    if (fType == 0x05) {
+        // PUSH_PROMISE frames are analgous to unsolicited request messages for
+        // future responses the client didn't directly ask for. They are
+        // typically sent by the server when it's smart enough to identify
+        // assets the client will need or for async messaging.
+        //
+        // They will be sent in the stream that triggered them but the HEADERS
+        // and DATA frames for the pushed response will be on a separate stream
+        // identified in the PUSH_PROMISE frame. We're overriding fStream here
+        // so the header block in the PUSH_PROMISE are processed as if it were
+        // a request on the stream where the response will come later.
+        //
+        // The stream ID to use is right after the headers or one byte further if
+        // the PADDED flag is set.
+        size_t offset = (fFlags & 0x08) ? 10 : 9;
+        fStream = ((frame[offset+0]&0x7F) << 24) // first bit is reserved
+                + ( frame[offset+1]       << 16)
+                + ( frame[offset+2]       <<  8)
+                + ( frame[offset+3]            );
+    }
+
+    if (fType == 0x01 || fType == 0x05 || fType == 0x09) {
+        // Process HEADERS(1), PUSH_PROMISE(5), or CONTINUATION(9) frames. All
+        // three contain a header block; an HPACK-encoded lists of key/value
+        // headers.
+        //
+        // HEADERS frames correspond to a request or response depending on the
+        // fields in the header block; ":method" indicates request, ":status"
+        // indicates a response.
+        //
+        // PUSH_PROMISE frames are like request message headers except they are
+        // sent by the server when it decides to push a message without a
+        // request from the client. See the notes earlier about how the stream
+        // ID in the frame header and the one in the body differ.
+        //
+        // If the END_HEADERS flag in any of these three frame types IS NOT
+        // set, they are followied immediately but a CONTINUATION frame that
+        // contains additional headers. These are used when the headers don't
+        // fit in the earlier frame(s). When the flag is set, it's the end of 
+        // the message.
+
         // get/create the channel info
         http2Channel_t *channel = lstFind(g_http2_channels, proto->uid);
         if (!channel) {
@@ -972,6 +1012,7 @@ doHttp2Frame(protocol_info *proto)
             }
         }
 
+        // get/create the stream info
         http2Stream_t *stream = lstFind(channel->streams, fStream);
         if (!stream) {
             stream = calloc(1, sizeof(http2Stream_t));
@@ -989,6 +1030,12 @@ doHttp2Frame(protocol_info *proto)
             }
         }
 
+        // Rather than keep an event_field_t array like the HTTP/1 logic does,
+        // we're building the cJSON object for the event directly. The way the
+        // headers are unpacked one at a time here makes it combersome to save
+        // off the results so we're skipping the extra layer. It means we need
+        // to reproduce the watch filter logic and the http.* metrics updates
+        // ourselves though. This is the cJSON object we're building.
         if (!stream->jsonData) {
             stream->jsonData = cJSON_CreateObject();
             if (!stream->jsonData) {
@@ -996,51 +1043,81 @@ doHttp2Frame(protocol_info *proto)
                 DBG(NULL);
                 goto cleanup;
             }
+
+            // Hard coding 2.0 for now
             cJSON_AddStringToObjLN(stream->jsonData, "http_flavor", "2.0");
         }
 
-        const uint8_t *decPos = frame + 9;     // start after the frame header
-        const uint8_t *decEnd = decPos + fLen; // end at the end of the frame
-        if (fFlags & 0x08) { // PADDED flag
+        // The position in the frame where the header data is depends on the
+        // type and flags. Initially, we start just after the frame header and
+        // end at the end of the frame then adjust. See below.
+        const uint8_t *decPos = frame + 9;
+        const uint8_t *decEnd = decPos + fLen;
+        if (fFlags & 0x08) {
+            // When the PADDED flag is set, we need to skip over one byte at
+            // the start. The value of that byte is the number at the end to
+            // skip too.
             decPos += 1;
             decEnd -= frame[9];
         }
-        if (fFlags & 0x20) { // PRIORITY flag
+        if (fFlags & 0x20) {
+            // When the PRIORITY flag is set, we need to skip over 5 bytes
+            // at the start.
             decPos += 5;
         }
+        if (fType == 0x05) {
+            // We skip the stream ID at the start of PUSH_PROMISE frames.
+            decPos += 4;
+        }
 
+        // Now loop through the header data letting the HPACK decoder put the
+        // field name and value into the buffer we provide. The size of the
+        // buffer is taken from examples in the lshpack package. Not sure
+        // exactly what it should be.
         char out[2048];
         lsxpack_header_t hdr;
         while (decPos < decEnd) {
-            //scopeLogHexDebug(decPos, decEnd-decPos, 
-            //        "DEBUG: HTTP/2 decoding header; stream=%d", fStream);
             lsxpack_header_prepare_decode(&hdr, out, 0, sizeof(out));
             int rc = lshpack_dec_decode(&channel->decoder, &decPos, decEnd, &hdr);
             if (rc != 0) {
                 scopeLogError("ERROR: HTTP/2 decoder failed; err=%d", rc);
+                scopeLogHexError(frame, proto->len,
+                        "  chan=0x%lx, stream=%d, type=0x%02x, flags=0x%02x",
+                        proto->uid, fStream, fType, fFlags);
+                scopeLogHexError(decPos, decEnd-decPos,
+                        "  decoder failed here");
                 DBG(NULL);
                 break;
             }
 
+            // get the field name and value as null-terminated strings
             out[hdr.name_offset + hdr.name_len] = '\0';
             out[hdr.val_offset  + hdr.val_len ] = '\0';
             char *name = out + hdr.name_offset;
             char *val  = out + hdr.val_offset;
-
             //scopeLogDebug("DEBUG: HTTP/2 decoded header: name=\"%s\", value=\"%s\"", name, val);
 
             // TODO skip if field name doesn't match `event > watch[type=http] > field`
             // TODO skip if val doesn't match `event > watch[type=http] > value`
 
+            // Update the state of the stream for the given header field. Most
+            // of these become entries in the cJSON object that will eventually
+            // become the body.data element in the JSON event. Some are stashed
+            // into the state object for use later.
             if (!strcasecmp(":method", name)) {
-                stream->msgType = 1; // request
+                // We use the presense of the :method header to indicate we're
+                // processing a request message.
+                stream->msgType = 1;
                 cJSON_AddStringToObject(stream->jsonData, "http_method", val);
                 strncpy(stream->lastMethod, val, sizeof(stream->lastMethod));
                 stream->lastRequestAt = post->start_duration;
             } else if (!strcasecmp(":status", name)) {
+                // We use the presense of the :status header to indicate we're
+                // processing a response message.
                 stream->msgType = 2; // response
                 cJSON_AddStringToObject(stream->jsonData, "http_status_code", val);
-                cJSON_AddStringToObjLN(stream->jsonData, "http_status_text", httpStatusCode2Text(val));
+                cJSON_AddStringToObjLN(stream->jsonData, "http_status_text",
+                        httpStatusCode2Text(val));
             } else if (!strcasecmp(":authority", name)) {
                 cJSON_AddStringToObject(stream->jsonData, "http_host", val);
                 strncpy(stream->lastHost, val, sizeof(stream->lastHost));
@@ -1064,12 +1141,15 @@ doHttp2Frame(protocol_info *proto)
                     DBG(NULL);
                 }
             } else {
+                // All other header fields need to match a regex in the
+                // event.watch[name=http].headers array in the runtime config.
                 size_t i;
-                size_t numFilters = cfgEvtFormatNumHeaders(g_cfg.staticfg);
-                for (i = 0; i < numFilters; ++i) {
+                size_t numHeaders = cfgEvtFormatNumHeaders(g_cfg.staticfg);
+                for (i = 0; i < numHeaders; ++i) {
                     regex_t *re = cfgEvtFormatHeaderRe(g_cfg.staticfg, i);
                     if (re) {
                         if (!regexec_wrapper(re, name, 0, NULL, 0)) {
+                            // matched, add it and skip the rest of the filters
                             cJSON_AddStringToObject(stream->jsonData, name, val);
                             break;
                         }
@@ -1078,13 +1158,17 @@ doHttp2Frame(protocol_info *proto)
             }
         }
 
-        // if the END_HEADERS flag is set...
+        // The END_HEADERS flag is set when there are no (more) CONTINUATION
+        // frames coming. It indicates to us that we've got the whole message
+        // so now we need to generate the event.
         if (fFlags & 0x04) {
             // TODO skip type doesn't match event > watch[type=http] > name`
 
             // The isServer value in the protocol object is only half of the
             // answer here. See reportHttp2() in httpstate.c for details. We're
-            // recreating the isServer value that the HTTP/1 logic produces.
+            // recreating the isServer value that the HTTP/1 logic produces
+            // because we don't crack the headers on the data side and
+            // therefore don't know if it's a request or response.
             bool isSend     = proto->isServer;
             bool isResponse = stream->msgType == 2;
             bool isServer   = (isSend && isResponse) || (!isSend && !isResponse);
@@ -1128,14 +1212,14 @@ doHttp2Frame(protocol_info *proto)
                 cJSON_AddStringToObject(stream->jsonData, "net_host_port", port);
             }
 
-            // it's a request...
+            // If it's a request message...
             if (stream->msgType == 1) {
                 event_t event = INT_EVENT("http-req", proto->len, SET, NULL);
                 event.data = stream->jsonData;
                 cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
             } 
 
-            // if it's a response...
+            // if it's a response message...
             else if (stream->msgType == 2) {
                 // we may need the HTTP/1 state 
                 http_map *map = lstFind(g_maplist, post->id);
@@ -1189,7 +1273,7 @@ doHttp2Frame(protocol_info *proto)
                 cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
             }
 
-            // not a request or response?
+            // otherwise, the message type is invalid
             else {
                 scopeLogError("ERROR: HTTP/2 invalid msgType; %d", stream->msgType);
                 DBG(NULL);

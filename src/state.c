@@ -1031,7 +1031,13 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     pinfo->sockfd = sockfd;
     pinfo->len = len;
 
-    scopeLog(CFG_LOG_DEBUG, "fd:%d posting payload", sockfd);
+    if (net && net->tlsDetect) {
+        scopeLog(CFG_LOG_DEBUG, "fd:%d posting TLS payload", sockfd);
+    } else if (net && net->protoProtoDef) {
+        scopeLog(CFG_LOG_DEBUG, "fd:%d posting %s payload", sockfd, net->protoProtoDef->protname);
+    } else {
+        scopeLog(CFG_LOG_DEBUG, "fd:%d posting payload", sockfd);
+    }
 
     if (cmdPostPayload(g_ctl, (char *)pinfo) == -1) {
         if (pinfo->data) free(pinfo->data);

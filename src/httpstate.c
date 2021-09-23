@@ -307,6 +307,7 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
 
     bool ret = (uint8_t)(post->hdr[4]) & 0x04; // TRUE if END_HEADERS flag set
 
+    //scopeLogDebug("DEBUG: posting HTTP/2 frame");
     cmdPostEvent(g_ctl, (char *)proto);
 
     return ret;
@@ -436,6 +437,12 @@ initHttpState(void)
 static void
 http2StashFrame(http_buf_t *stash, const uint8_t *buf, size_t len)
 {
+    if (!stash) {
+        scopeLogError("ERROR: null stash");
+        DBG(NULL);
+        return;
+    }
+
     // need to store the `len` we're given plus whatever's already stashed
     size_t need = len + stash->len;
     if (need > stash->size) {
@@ -459,6 +466,12 @@ http2StashFrame(http_buf_t *stash, const uint8_t *buf, size_t len)
 static uint32_t
 http2GetFrameLength(http_buf_t *stash, const uint8_t *buf, size_t len)
 {
+    if (!stash) {
+        scopeLogError("ERROR: null stash");
+        DBG(NULL);
+        return -1;
+    }
+
     uint32_t ret = 0;
 
     // The first three bytes (MSB first) of the frame header are the length but
@@ -486,9 +499,15 @@ http2GetFrameLength(http_buf_t *stash, const uint8_t *buf, size_t len)
     return ret;
 }
 
-static uint32_t
+static uint8_t
 http2GetFrameType(http_buf_t *stash, const uint8_t *buf, size_t len)
 {
+    if (!stash) {
+        scopeLogError("ERROR: null stash");
+        DBG(NULL);
+        return -1;
+    }
+
     uint8_t ret = 0;
 
     // The fourth byte of the frame header is the type but some of the frame
@@ -504,6 +523,76 @@ http2GetFrameType(http_buf_t *stash, const uint8_t *buf, size_t len)
     return ret;
 }
 
+/*
+static uint8_t
+http2GetFrameFlags(http_buf_t *stash, const uint8_t *buf, size_t len)
+{
+    if (!stash) {
+        scopeLogError("ERROR: null stash");
+        DBG(NULL);
+        return -1;
+    }
+
+    uint8_t ret = 0;
+
+    // The fifth byte of the frame header is the flags but some of the frame
+    // may already be stashed so this looks weird to deal with the potential
+    // split.
+
+    if (stash->len > 4) {
+        ret += stash->buf[4];
+    } else {
+        ret += buf[4 - stash->len];
+    }
+
+    return ret;
+}
+*/
+
+/*
+static uint32_t
+http2GetFrameStream(http_buf_t *stash, const uint8_t *buf, size_t len)
+{
+    if (!stash) {
+        scopeLogError("ERROR: null stash");
+        DBG(NULL);
+        return -1;
+    }
+
+    uint32_t ret = 0;
+
+    // The sixth thru ninth bytes (MSB first) of the frame header are the
+    // stream ID but some of the frame may already be stashed so this looks
+    // weird to deal with the potential split.
+
+    if (stash->len > 5) {
+        ret += (stash->buf[5]&0x7F) << 24;
+    } else {
+        ret += (buf[5 - stash->len]&0x7F) << 24;
+    }
+
+    if (stash->len > 6) {
+        ret += stash->buf[6] << 16;
+    } else {
+        ret += buf[6 - stash->len] << 16;
+    }
+
+    if (stash->len > 7) {
+        ret += stash->buf[7] << 8;
+    } else {
+        ret += buf[7 - stash->len] << 8;
+    }
+
+    if (stash->len > 8) {
+        ret += stash->buf[8];
+    } else {
+        ret += buf[8 - stash->len];
+    }
+
+    return ret;
+}
+*/
+
 static bool
 parseHttp2(http_state_t* state, net_info *net, int isTx,
         const uint8_t *buf, size_t len, httpId_t *httpId)
@@ -516,9 +605,9 @@ parseHttp2(http_state_t* state, net_info *net, int isTx,
 
     bool ret = FALSE; // TRUE if we saw the end of a header like parseHttp1()
 
-    const uint8_t *bufPos = buf;                   // current position in buf
-    size_t         bufLen = len;                   // number of buf bytes left
-    http_buf_t     stash  = state->http2Buf[isTx]; // stash for partial frames
+    const uint8_t *bufPos = buf;                    // current position in buf
+    size_t         bufLen = len;                    // number of buf bytes left
+    http_buf_t    *stash  = &state->http2Buf[isTx]; // stash for partial frames
     while (bufLen > 0) {
         // skip over MAGIC
         if (bufLen >= HTTP2_MAGIC_LEN && !strncmp((char*)buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
@@ -528,30 +617,35 @@ parseHttp2(http_state_t* state, net_info *net, int isTx,
         }
 
         // stash the buffer if we don't have enough for a frame header
-        if (stash.len + bufLen < 9) {
-            http2StashFrame(&stash, bufPos, bufLen);
+        if (stash->len + bufLen < 9) {
+            http2StashFrame(stash, bufPos, bufLen);
             return FALSE;
         }
 
         // get the header values
-        uint32_t fLen  = http2GetFrameLength(&stash, bufPos, bufLen);
-        uint8_t  fType = http2GetFrameType(&stash, bufPos, bufLen);
+        uint32_t fLen    = http2GetFrameLength(stash, bufPos, bufLen);
+        uint8_t  fType   = http2GetFrameType(stash, bufPos, bufLen);
+        //uint8_t  fFlags  = http2GetFrameFlags(stash, bufPos, bufLen);
+        //uint32_t fStream = http2GetFrameStream(stash, bufPos, bufLen);
 
         // stash the buffer if we don't have enough for the whole frame
-        if (stash.len + bufLen < (9 + fLen)) {
-            http2StashFrame(&stash, bufPos, bufLen);
+        if (stash->len + bufLen < (9 + fLen)) {
+            http2StashFrame(stash, bufPos, bufLen);
             return FALSE;
         }
+
+        //scopeLogDebug("DEBUG: HTTP/2 %s frame found; type=0x%02x, flags=0x%02x, stream=%d",
+        //        isTx ? "TX" : "RX", fType, fFlags, fStream);
 
         // process interesting frames
         switch (fType) {
             case 0x01:
                 // process HEADERS frames
-                ret |= reportHttp2(state, net, &stash, bufPos, fLen+9, httpId);
+                ret |= reportHttp2(state, net, stash, bufPos, fLen+9, httpId);
                 break;
             case 0x09:
                 // process CONTINUATION frames (additional HEADERS)
-                ret |= reportHttp2(state, net, &stash, bufPos, fLen+9, httpId);
+                ret |= reportHttp2(state, net, stash, bufPos, fLen+9, httpId);
                 break;
             default:
                 // not interested in other frames
@@ -559,10 +653,10 @@ parseHttp2(http_state_t* state, net_info *net, int isTx,
         }
 
         // skip over what we parsed in the buffer and clear the stash
-        size_t bytesParsed = fLen + 9 - stash.len;
+        size_t bytesParsed = fLen + 9 - stash->len;
         bufPos += bytesParsed;
         bufLen -= bytesParsed;
-        stash.len = 0; // the stash was parsed too
+        stash->len = 0; // the stash was parsed too
     }
 
     return ret;
@@ -573,6 +667,9 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
         metric_t src, httpId_t *httpId)
 {
     int isTx  = (src == NETTX || src == TLSTX) ? 1 : 0;
+
+    //scopeLogHexDebug(buf, len, "DEBUG: HTTP %s payload; ver=%d",
+    //        isTx ? "TX" : "RX", (int)state->version[isTx]);
 
     // detect HTTP version
     if (state->version[isTx] == 0) {
@@ -645,10 +742,16 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
 bool
 doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
 {
-    if (!buf || !len) return FALSE;
+    if (!buf || !len) {
+        scopeLogWarn("WARN: doHttp() got no buffer");
+        return FALSE;
+    }
 
     // If we know we're not looking at a stream, bail.
-    if (net && net->type != SOCK_STREAM) return FALSE;
+    if (net && net->type != SOCK_STREAM) {
+        scopeLogWarn("WARN: doHttp() not on SOCK_STREAM");
+        return FALSE;
+    }
 
     httpId_t httpId = {0};
     if (!setHttpId(&httpId, net, sockfd, id, src)) return FALSE;
@@ -710,6 +813,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
         }
 
         default:
+            scopeLogWarn("WARN: doHttp() got unknown data type; %d", dtype);
             DBG("%d", dtype);
             break;
     }

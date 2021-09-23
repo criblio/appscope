@@ -117,20 +117,33 @@ static list_t *g_maplist;
 static search_t *g_http_status = NULL;
 static http_agg_t *g_http_agg;
 
-// saved state data we keep for each HTTP/2 stream
-typedef struct http2StreamInfo {
-    struct lshpack_dec  decoder;
-    int                 msgType; // 0=unset, 1=request, 2=response
-    cJSON              *jsonData;
-    uint64_t            lastRequestAt;
-    char                lastHost[1024];
-    char                lastMethod[1024];
-    char                lastTarget[1024];
-    char                lastUserAgent[1024];
-} http2StreamInfo_t;
+// saved state for an HTTP/2 channel
+typedef struct http2Channel {
+    // HPAC decoder
+    struct lshpack_dec decoder;
 
-// list (by channel ID) of lists (by stream ID) of http2StreamInfo
-static list_t *g_http2StreamLists = NULL;
+    // list of http2Stream_t indexed by stream
+    list_t *streams;
+} http2Channel_t;
+
+// saved state for an HTTP/2 stream within a channel
+typedef struct http2Stream {
+    // type of the current message being processed
+    uint8_t msgType; // 0=unset, 1=request, 2=response
+
+    // content for the body.data object in the event to be generated
+    cJSON *jsonData;
+
+    // data from the last HTTP/2 request on the stream
+    uint64_t lastRequestAt;
+    char     lastHost[1024];
+    char     lastMethod[1024];
+    char     lastTarget[1024];
+    char     lastUserAgent[1024];
+} http2Stream_t;
+
+// list of http2Channel_t indexed by channel
+static list_t *g_http2_channels = NULL;
 
 static void
 destroyHttpMap(void *data)
@@ -144,32 +157,37 @@ destroyHttpMap(void *data)
 }
 
 static void
-destroyHttp2StreamList(void *data)
+destroyHttp2Channel(void *data)
 {
     if (!data) return;
-    list_t *lst = (list_t *)data;
+    http2Channel_t *info = (http2Channel_t *)data;
 
-    lstDestroy(&lst);
+    lshpack_dec_cleanup(&info->decoder);
+    if (info->streams) {
+        lstDestroy(&info->streams);
+    }
+
+    free(info);
 }
 
 static void
-destroyHttp2StreamInfo(void *data)
+destroyHttp2Stream(void *data)
 {
     if (!data) return;
-    http2StreamInfo_t *streamInfo = (http2StreamInfo_t *)data;
+    http2Stream_t *info = (http2Stream_t *)data;
 
-    lshpack_dec_cleanup(&streamInfo->decoder);
-    if (streamInfo->jsonData) {
-        cJSON_Delete(streamInfo->jsonData);
+    if (info->jsonData) {
+        cJSON_Delete(info->jsonData);
     }
 
-    free(streamInfo);
+    free(info);
 }
 
 void
 initReporting()
 {
     g_maplist = lstCreate(destroyHttpMap);
+    g_http2_channels = lstCreate(destroyHttp2Channel);
     g_http_status = searchComp(HTTP_STATUS);
     g_http_agg = httpAggCreate();
 }
@@ -895,6 +913,7 @@ doHttp2Frame(protocol_info *proto)
 {
     // require the protocol object and it's data pointer
     if (!proto || !proto->data) {
+        scopeLogError("ERROR: null proto or proto->data");
         destroyProto(proto);
         return;
     }
@@ -902,6 +921,7 @@ doHttp2Frame(protocol_info *proto)
     // require the frame in the post's hdr pointer
     http_post *post = (http_post *)proto->data;
     if (!post->hdr) {
+        scopeLogError("ERROR: null post->hdr");
         destroyProto(proto);
         return;
     }
@@ -923,75 +943,79 @@ doHttp2Frame(protocol_info *proto)
         goto cleanup;
     }
 
+    //scopeLogHexDebug(frame, proto->len,
+    //        "DEBUG: HTTP/2 frame; chan=0x%lx, stream=%d, type=0x%02x, flags=0x%02x",
+    //        proto->uid, fStream, fType, fFlags);
+
     // process frame
     if (fType == 0x01 || fType == 0x09) // HEADERS or CONTINUATION
     {
-        if (!g_http2StreamLists) {
-            // TODO: This list is leaked. Need to cleanup on when the thread exits.
-            g_http2StreamLists = lstCreate(destroyHttp2StreamList);
-            if (!g_http2StreamLists) {
-                scopeLogError("ERROR: failed to create decoder lists");
+        // get/create the channel info
+        http2Channel_t *channel = lstFind(g_http2_channels, proto->uid);
+        if (!channel) {
+            channel = calloc(1, sizeof(http2Channel_t));
+            if (!channel) {
+                scopeLogError("ERROR: failed to create channel info");
+                DBG(NULL);
+                goto cleanup;
+            }
+
+            lshpack_dec_init(&channel->decoder);
+            lshpack_dec_set_max_capacity(&channel->decoder, 0x4000);
+            channel->streams = lstCreate(destroyHttp2Stream);
+
+            if (lstInsert(g_http2_channels, proto->uid, channel) != TRUE) {
+                destroyHttp2Channel(channel);
+                scopeLogError("ERROR: failed to insert channel");
                 DBG(NULL);
                 goto cleanup;
             }
         }
 
-        list_t *http2StreamList = lstFind(g_http2StreamLists, proto->uid);
-        if (!http2StreamList) {
-            http2StreamList = lstCreate(destroyHttp2StreamInfo);
-            if (!http2StreamList) {
-                scopeLogError("ERROR: failed to create http2StreamList");
+        http2Stream_t *stream = lstFind(channel->streams, fStream);
+        if (!stream) {
+            stream = calloc(1, sizeof(http2Stream_t));
+            if (!stream) {
+                scopeLogError("ERROR: failed to create http2Stream");
                 DBG(NULL);
                 goto cleanup;
             }
-            if (lstInsert(g_http2StreamLists, proto->uid, http2StreamList) != TRUE) {
-                lstDestroy(&http2StreamList);
-                scopeLogError("ERROR: failed to insert http2StreamList");
-                DBG(NULL);
-                goto cleanup;
-            }
-        }
 
-        http2StreamInfo_t *streamInfo = lstFind(http2StreamList, fStream);
-        if (!streamInfo) {
-            streamInfo = calloc(1, sizeof(http2StreamInfo_t));
-            if (!streamInfo) {
-                scopeLogError("ERROR: failed to create http2StreamInfo");
-                DBG(NULL);
-                goto cleanup;
-            }
-            lshpack_dec_init(&streamInfo->decoder);
-            if (lstInsert(http2StreamList, fStream, streamInfo) != TRUE) {
-                lshpack_dec_cleanup(&streamInfo->decoder);
-                free(streamInfo);
+            if (lstInsert(channel->streams, fStream, stream) != TRUE) {
+                destroyHttp2Stream(stream);
                 scopeLogError("ERROR: failed to insert decoder");
                 DBG(NULL);
                 goto cleanup;
             }
         }
 
-        if (!streamInfo->jsonData) {
-            streamInfo->jsonData = cJSON_CreateObject();
-            if (!streamInfo->jsonData) {
+        if (!stream->jsonData) {
+            stream->jsonData = cJSON_CreateObject();
+            if (!stream->jsonData) {
                 scopeLogError("ERROR: failed to create jsonData");
                 DBG(NULL);
                 goto cleanup;
             }
-            cJSON_AddStringToObjLN(streamInfo->jsonData, "http_flavor", "2");
+            cJSON_AddStringToObjLN(stream->jsonData, "http_flavor", "2.0");
         }
 
-        size_t hdrBlockPos = 9         // skip frame header
-            + (fFlags & 0x08 ? 1 : 0)  // padded set? skip pad length byte
-            + (fFlags & 0x20 ? 5 : 0); // priority set? skip stream and weight
-        const uint8_t *decPos = frame + hdrBlockPos;
-        const uint8_t *decEnd = decPos + fLen;
-        if (fFlags & 0x08) { decEnd -= frame[9]; } // padding
+        const uint8_t *decPos = frame + 9;     // start after the frame header
+        const uint8_t *decEnd = decPos + fLen; // end at the end of the frame
+        if (fFlags & 0x08) { // PADDED flag
+            decPos += 1;
+            decEnd -= frame[9];
+        }
+        if (fFlags & 0x20) { // PRIORITY flag
+            decPos += 5;
+        }
 
         char out[2048];
         lsxpack_header_t hdr;
         while (decPos < decEnd) {
+            //scopeLogHexDebug(decPos, decEnd-decPos, 
+            //        "DEBUG: HTTP/2 decoding header; stream=%d", fStream);
             lsxpack_header_prepare_decode(&hdr, out, 0, sizeof(out));
-            int rc = lshpack_dec_decode(&streamInfo->decoder, &decPos, decEnd, &hdr);
+            int rc = lshpack_dec_decode(&channel->decoder, &decPos, decEnd, &hdr);
             if (rc != 0) {
                 scopeLogError("ERROR: HTTP/2 decoder failed; err=%d", rc);
                 DBG(NULL);
@@ -1003,41 +1027,42 @@ doHttp2Frame(protocol_info *proto)
             char *name = out + hdr.name_offset;
             char *val  = out + hdr.val_offset;
 
+            //scopeLogDebug("DEBUG: HTTP/2 decoded header: name=\"%s\", value=\"%s\"", name, val);
+
             // TODO skip if field name doesn't match `event > watch[type=http] > field`
             // TODO skip if val doesn't match `event > watch[type=http] > value`
 
             if (!strcasecmp(":method", name)) {
-                streamInfo->msgType = 1; // request
-                cJSON_AddStringToObject(streamInfo->jsonData, "http_method", val);
-                strncpy(streamInfo->lastMethod, val, sizeof(streamInfo->lastMethod));
-                streamInfo->lastRequestAt = post->start_duration;
+                stream->msgType = 1; // request
+                cJSON_AddStringToObject(stream->jsonData, "http_method", val);
+                strncpy(stream->lastMethod, val, sizeof(stream->lastMethod));
+                stream->lastRequestAt = post->start_duration;
             } else if (!strcasecmp(":status", name)) {
-                streamInfo->msgType = 2; // response
-                cJSON_AddStringToObject(streamInfo->jsonData, "http_status_code", val);
-                cJSON_AddStringToObjLN(streamInfo->jsonData, "http_status_text", httpStatusCode2Text(val));
+                stream->msgType = 2; // response
+                cJSON_AddStringToObject(stream->jsonData, "http_status_code", val);
+                cJSON_AddStringToObjLN(stream->jsonData, "http_status_text", httpStatusCode2Text(val));
             } else if (!strcasecmp(":authority", name)) {
-                cJSON_AddStringToObject(streamInfo->jsonData, "http_host", val);
-                strncpy(streamInfo->lastHost, val, sizeof(streamInfo->lastHost));
+                cJSON_AddStringToObject(stream->jsonData, "http_host", val);
+                strncpy(stream->lastHost, val, sizeof(stream->lastHost));
             } else if (!strcasecmp(":path", name)) {
-                cJSON_AddStringToObject(streamInfo->jsonData, "http_target", val);
-                strncpy(streamInfo->lastTarget, val, sizeof(streamInfo->lastTarget));
+                cJSON_AddStringToObject(stream->jsonData, "http_target", val);
+                strncpy(stream->lastTarget, val, sizeof(stream->lastTarget));
             } else if (!strcasecmp(":scheme", name)) {
-                cJSON_AddStringToObject(streamInfo->jsonData, "http_scheme", val);
+                cJSON_AddStringToObject(stream->jsonData, "http_scheme", val);
             } else if (!strcasecmp("user-agent", name)) {
-                cJSON_AddStringToObject(streamInfo->jsonData, "http_user_agent", val);
-                strncpy(streamInfo->lastUserAgent, val, sizeof(streamInfo->lastUserAgent));
+                cJSON_AddStringToObject(stream->jsonData, "http_user_agent", val);
+                strncpy(stream->lastUserAgent, val, sizeof(stream->lastUserAgent));
             } else if (!strcasecmp("x-forwarded-for", name)) {
-                cJSON_AddStringToObject(streamInfo->jsonData, "http_client_ip", val);
+                cJSON_AddStringToObject(stream->jsonData, "http_client_ip", val);
             } else if (!strcasecmp("content-length", name)) {
-                if (streamInfo->msgType == 1) {
-                    cJSON_AddStringToObject(streamInfo->jsonData, "http_request_content_length", val);
-                } else if (streamInfo->msgType == 2) {
-                    cJSON_AddStringToObject(streamInfo->jsonData, "http_response_content_length", val);
+                if (stream->msgType == 1) {
+                    cJSON_AddStringToObject(stream->jsonData, "http_request_content_length", val);
+                } else if (stream->msgType == 2) {
+                    cJSON_AddStringToObject(stream->jsonData, "http_response_content_length", val);
                 } else {
-                    scopeLogError("ERROR: invalid msgType; %d", streamInfo->msgType);
+                    scopeLogError("ERROR: invalid msgType; %d", stream->msgType);
                     DBG(NULL);
                 }
-                cJSON_AddStringToObject(streamInfo->jsonData, "http_content_len", val);
             } else {
                 size_t i;
                 size_t numFilters = cfgEvtFormatNumHeaders(g_cfg.staticfg);
@@ -1045,7 +1070,7 @@ doHttp2Frame(protocol_info *proto)
                     regex_t *re = cfgEvtFormatHeaderRe(g_cfg.staticfg, i);
                     if (re) {
                         if (!regexec_wrapper(re, name, 0, NULL, 0)) {
-                            cJSON_AddStringToObject(streamInfo->jsonData, name, val);
+                            cJSON_AddStringToObject(stream->jsonData, name, val);
                             break;
                         }
                     }
@@ -1057,112 +1082,129 @@ doHttp2Frame(protocol_info *proto)
         if (fFlags & 0x04) {
             // TODO skip type doesn't match event > watch[type=http] > name`
 
-            // The isServer value in the protocol object is half of the answer
-            // here. See reportHttp2() in httpstate.c for details. We recreate
-            // the isServer value that the HTTP/1 logic produces here.
+            // The isServer value in the protocol object is only half of the
+            // answer here. See reportHttp2() in httpstate.c for details. We're
+            // recreating the isServer value that the HTTP/1 logic produces.
             bool isSend     = proto->isServer;
-            bool isResponse = streamInfo->msgType == 2;
+            bool isResponse = stream->msgType == 2;
             bool isServer   = (isSend && isResponse) || (!isSend && !isResponse);
 
             // Add the socket info fields
             if (addrIsNetDomain(&proto->localConn)) {
                 switch (proto->sock_type) {
                     case SOCK_STREAM:
-                        cJSON_AddStringToObjLN(streamInfo->jsonData, "net_transport", "IP.TCP");
+                        cJSON_AddStringToObjLN(stream->jsonData, "net_transport", "IP.TCP");
                         break;
                     case SOCK_DGRAM:
-                        cJSON_AddStringToObjLN(streamInfo->jsonData, "net_transport", "IP.UDP");
+                        cJSON_AddStringToObjLN(stream->jsonData, "net_transport", "IP.UDP");
                         break;
                     case SOCK_RAW:
-                        cJSON_AddStringToObjLN(streamInfo->jsonData, "net_transport", "IP.RAW");
+                        cJSON_AddStringToObjLN(stream->jsonData, "net_transport", "IP.RAW");
                         break;
                     case SOCK_RDM:
-                        cJSON_AddStringToObjLN(streamInfo->jsonData, "net_transport", "IP.RDM");
+                        cJSON_AddStringToObjLN(stream->jsonData, "net_transport", "IP.RDM");
                         break;
                     case SOCK_SEQPACKET:
-                        cJSON_AddStringToObjLN(streamInfo->jsonData, "net_transport", "IP.SEQPACKET");
+                        cJSON_AddStringToObjLN(stream->jsonData, "net_transport", "IP.SEQPACKET");
                         break;
                 }
 
                 char addr[INET6_ADDRSTRLEN];
                 if (inet_ntop(proto->remoteConn.ss_family,
                             &((struct sockaddr_in*)&proto->remoteConn)->sin_addr, addr, sizeof(addr))) {
-                    cJSON_AddStringToObject(streamInfo->jsonData, "net_peer_ip", addr);
+                    cJSON_AddStringToObject(stream->jsonData, "net_peer_ip", addr);
                 }
                 if (inet_ntop(proto->localConn.ss_family,
                             &((struct sockaddr_in*)&proto->localConn)->sin_addr, addr, sizeof(addr))) {
-                    cJSON_AddStringToObject(streamInfo->jsonData, "net_host_ip", addr);
+                    cJSON_AddStringToObject(stream->jsonData, "net_host_ip", addr);
                 }
 
                 char port[8];
                 snprintf(port, sizeof(port), "%d",
                         htons(((struct sockaddr_in*)&proto->remoteConn)->sin_port));
-                cJSON_AddStringToObject(streamInfo->jsonData, "net_peer_port", port);
+                cJSON_AddStringToObject(stream->jsonData, "net_peer_port", port);
                 snprintf(port, sizeof(port), "%d",
                         htons(((struct sockaddr_in*)&proto->localConn)->sin_port));
-                cJSON_AddStringToObject(streamInfo->jsonData, "net_host_port", port);
+                cJSON_AddStringToObject(stream->jsonData, "net_host_port", port);
             }
 
             // it's a request...
-            if (streamInfo->msgType == 1) {
+            if (stream->msgType == 1) {
                 event_t event = INT_EVENT("http-req", proto->len, SET, NULL);
-                event.data = streamInfo->jsonData;
+                event.data = stream->jsonData;
                 cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
             } 
 
             // if it's a response...
-            else if (streamInfo->msgType == 2) {
-                if (streamInfo->lastRequestAt) {
-                    unsigned msec = (post->start_duration - streamInfo->lastRequestAt) / 1000000;
-                    cJSON_AddNumberToObject(streamInfo->jsonData,
+            else if (stream->msgType == 2) {
+                // we may need the HTTP/1 state 
+                http_map *map = lstFind(g_maplist, post->id);
+
+                // add duration from request
+                if (stream->lastRequestAt) {
+                    unsigned msec = (post->start_duration - stream->lastRequestAt) / 1000000;
+                    cJSON_AddNumberToObject(stream->jsonData,
                             isServer ?  "http_server_duration" : "http_client_duration", msec);
-                } else {
-                    // TODO see if we saw an HTTP/1 request
-                }
-                if (streamInfo->lastHost[0]) {
-                    cJSON_AddStringToObject(streamInfo->jsonData,
-                            "http_host", streamInfo->lastHost);
-                }
-                if (streamInfo->lastMethod[0]) {
-                    cJSON_AddStringToObject(streamInfo->jsonData,
-                            "http_method", streamInfo->lastMethod);
-                }
-                if (streamInfo->lastTarget[0]) {
-                    cJSON_AddStringToObject(streamInfo->jsonData,
-                            "http_target", streamInfo->lastTarget);
-                }
-                if (streamInfo->lastUserAgent[0]) {
-                    cJSON_AddStringToObject(streamInfo->jsonData,
-                            "http_user_agent", streamInfo->lastUserAgent);
+                } else if (map && map->start_time) {
+                    unsigned msec = (post->start_duration - map->start_time) / 1000000;
+                    cJSON_AddNumberToObject(stream->jsonData,
+                            isServer ?  "http_server_duration" : "http_client_duration", msec);
                 }
 
+                // add host from request
+                if (stream->lastHost[0]) {
+                    cJSON_AddStringToObject(stream->jsonData,
+                            "http_host", stream->lastHost);
+                } else if (map) {
+                    // TODO: get host from HTTP/1 request
+                }
+
+                // add method from request
+                if (stream->lastMethod[0]) {
+                    cJSON_AddStringToObject(stream->jsonData,
+                            "http_method", stream->lastMethod);
+                } else if (map) {
+                    // TODO: get method from HTTP/1 request
+                }
+
+                // add target URL from request
+                if (stream->lastTarget[0]) {
+                    cJSON_AddStringToObject(stream->jsonData,
+                            "http_target", stream->lastTarget);
+                } else if (map) {
+                    // TODO: get target from HTTP/1 request
+                }
+
+                // add user-agent from request
+                if (stream->lastUserAgent[0]) {
+                    cJSON_AddStringToObject(stream->jsonData,
+                            "http_user_agent", stream->lastUserAgent);
+                } else if (map) {
+                    // TODO: get user-agent from HTTP/1 request
+                }
+
+                // send the event
                 event_t event = INT_EVENT("http-resp", proto->len, SET, NULL);
-                event.data = streamInfo->jsonData;
+                event.data = stream->jsonData;
                 cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
             }
 
             // not a request or response?
             else {
-                scopeLogError("ERROR: HTTP/2 invalid msgType; %d", streamInfo->msgType);
+                scopeLogError("ERROR: HTTP/2 invalid msgType; %d", stream->msgType);
                 DBG(NULL);
             }
 
-            // cleanup the stream info
-            if (streamInfo->msgType == 2) {
-                streamInfo->lastHost[0]      = '\0';
-                streamInfo->lastMethod[0]    = '\0';
-                streamInfo->lastTarget[0]    = '\0';
-                streamInfo->lastUserAgent[0] = '\0';
-            }
-            streamInfo->msgType = 0;
-            if (streamInfo->jsonData) {
+            // reset the stream state
+            stream->msgType = 0;
+            if (stream->jsonData) {
                 // jsonData was deleted for us down in cmdSendHttp()
-                //cJSON_Delete(streamInfo->jsonData);
-                streamInfo->jsonData = NULL;
+                //cJSON_Delete(stream->jsonData);
+                stream->jsonData = NULL;
             }
         }
     } else {
-        scopeLogDebug("DEBUG: HTTP/2 unexpected frame type; type=0x%02d", fType);
+        scopeLogError("ERROR: HTTP/2 unexpected frame type; type=0x%02d", fType);
         DBG(NULL);
     }
 

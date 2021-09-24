@@ -203,9 +203,10 @@ blocked.
   the library includes details from requests. What is the purpose of the
   metrics event?
 
-* The `rps` value appears to be invalid. I assume it's supposed to represent
-  the rate at which request/responses are occuring, right? The code that
-  procuces the value for HTTP/1 is below.
+* The `req_per_sec` value appears to be invalid. I assume it's supposed to
+  represent the rate at which request are occuring over more than one cycle but
+  that's not what's happening currently. The code that produces the value for
+  HTTP/1 is below.
 
   ```C
         int rps = map->frequency;
@@ -217,18 +218,22 @@ blocked.
   
   The `frequency` value is incremented with each request or response header
   found but the `map` pointer is `free()`'d after every response so it will only
-  ever be `2`.
+  ever be `2`. It includes responses, not just requests.
   
   The `sec` calculation is done with integer seconds so it will almost always
-  end up set to `1` unless the duration exceeds 2 seconds.
+  end up set to `1` unless the duration is >= 2 seconds.
 
-  So, the `rps` value is almost always `2` which doesn't seem useful.
+  The `rps` value is the result if integer division and is almost always `2`
+  which doesn't seem useful. That values ends up in the `req_per_sec`
 
 * The `unit` field is set to `byte` but none of the other fields are bytes.
 
+* The `proc` , `pid`, and `fd` fields are redundant with fields up in `body`
+  but that pattern appears elsewhere in other events so this may be by design.
+
 ## HTTP Metrics
 
-> Note: these are **metrics*, not the `http-metrics` **event**.
+> Note: these are **metrics**, not the `http-metrics` **event**.
 
 > TODO...
 

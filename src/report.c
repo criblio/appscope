@@ -1108,13 +1108,26 @@ doHttp2Frame(protocol_info *proto)
                 // We use the presense of the :method header to indicate we're
                 // processing a request message.
                 stream->msgType = 1;
+                cJSON_AddNumberToObject(stream->jsonData, "http_stream", fStream);
+
                 cJSON_AddStringToObject(stream->jsonData, "http_method", val);
                 strncpy(stream->lastMethod, val, sizeof(stream->lastMethod));
+
+                // record the start timestamp for duration calculations
                 stream->lastRequestAt = post->start_duration;
+
+                // record the frame type in request events so we can see Server Push
+                if (fType == 0x01) {
+                    cJSON_AddStringToObjLN(stream->jsonData, "http_frame", "HEADERS");
+                } else if (fType == 0x05) {
+                    cJSON_AddStringToObjLN(stream->jsonData, "http_frame", "PUSH_PROMISE");
+                }
             } else if (!strcasecmp(":status", name)) {
                 // We use the presense of the :status header to indicate we're
                 // processing a response message.
                 stream->msgType = 2; // response
+                cJSON_AddNumberToObject(stream->jsonData, "http_stream", fStream);
+
                 cJSON_AddStringToObject(stream->jsonData, "http_status_code", val);
                 cJSON_AddStringToObjLN(stream->jsonData, "http_status_text",
                         httpStatusCode2Text(val));
@@ -1129,6 +1142,8 @@ doHttp2Frame(protocol_info *proto)
             } else if (!strcasecmp("user-agent", name)) {
                 cJSON_AddStringToObject(stream->jsonData, "http_user_agent", val);
                 strncpy(stream->lastUserAgent, val, sizeof(stream->lastUserAgent));
+            } else if (!strcasecmp("x-appscope", name)) {
+                cJSON_AddStringToObject(stream->jsonData, "x-appscope", val);
             } else if (!strcasecmp("x-forwarded-for", name)) {
                 cJSON_AddStringToObject(stream->jsonData, "http_client_ip", val);
             } else if (!strcasecmp("content-length", name)) {
@@ -1214,6 +1229,7 @@ doHttp2Frame(protocol_info *proto)
 
             // If it's a request message...
             if (stream->msgType == 1) {
+                // send the request event
                 event_t event = INT_EVENT("http-req", proto->len, SET, NULL);
                 event.data = stream->jsonData;
                 cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
@@ -1225,22 +1241,21 @@ doHttp2Frame(protocol_info *proto)
                 http_map *map = lstFind(g_maplist, post->id);
 
                 // add duration from request
+                unsigned duration; // msecs
                 if (stream->lastRequestAt) {
-                    unsigned msec = (post->start_duration - stream->lastRequestAt) / 1000000;
-                    cJSON_AddNumberToObject(stream->jsonData,
-                            isServer ?  "http_server_duration" : "http_client_duration", msec);
+                    duration = (post->start_duration - stream->lastRequestAt) / 1000000;
                 } else if (map && map->start_time) {
-                    unsigned msec = (post->start_duration - map->start_time) / 1000000;
-                    cJSON_AddNumberToObject(stream->jsonData,
-                            isServer ?  "http_server_duration" : "http_client_duration", msec);
+                    duration = (post->start_duration - map->start_time) / 1000000;
                 }
+                cJSON_AddNumberToObject(stream->jsonData,
+                        isServer ?  "http_server_duration" : "http_client_duration", duration);
 
                 // add host from request
                 if (stream->lastHost[0]) {
                     cJSON_AddStringToObject(stream->jsonData,
                             "http_host", stream->lastHost);
                 } else if (map) {
-                    // TODO: get host from HTTP/1 request
+                    // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
                 }
 
                 // add method from request
@@ -1248,7 +1263,7 @@ doHttp2Frame(protocol_info *proto)
                     cJSON_AddStringToObject(stream->jsonData,
                             "http_method", stream->lastMethod);
                 } else if (map) {
-                    // TODO: get method from HTTP/1 request
+                    // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
                 }
 
                 // add target URL from request
@@ -1256,7 +1271,7 @@ doHttp2Frame(protocol_info *proto)
                     cJSON_AddStringToObject(stream->jsonData,
                             "http_target", stream->lastTarget);
                 } else if (map) {
-                    // TODO: get target from HTTP/1 request
+                    // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
                 }
 
                 // add user-agent from request
@@ -1264,13 +1279,27 @@ doHttp2Frame(protocol_info *proto)
                     cJSON_AddStringToObject(stream->jsonData,
                             "http_user_agent", stream->lastUserAgent);
                 } else if (map) {
-                    // TODO: get user-agent from HTTP/1 request
+                    // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
                 }
 
-                // send the event
+                // send the response event
                 event_t event = INT_EVENT("http-resp", proto->len, SET, NULL);
                 event.data = stream->jsonData;
                 cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
+
+                // build and send the `http-metrics` event
+                event_field_t mfields[] = {
+                    DURATION_FIELD(duration),
+                    //RATE_FIELD(rps), // XXX the HTTP/1 math for this value is curious...
+                    //HTTPSTAT_FIELD(status), // TODO
+                    PROC_FIELD(g_proc.procname),
+                    FD_FIELD(proto->fd),
+                    PID_FIELD(g_proc.pid),
+                    UNIT_FIELD("byte"), // XXX this seems incorrect...
+                    FIELDEND
+                };
+                event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
+                cmdSendHttp(g_ctl, &mevent, proto->uid, &g_proc);
             }
 
             // otherwise, the message type is invalid

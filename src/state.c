@@ -484,8 +484,13 @@ postNetState(int fd, metric_t type, net_info *net)
     // Bail if we don't need to post
     int mtc_needs_reporting = summarize && !*summarize;
     int need_to_post =
+        // if raw metrics are enabled
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        // if NET events are enabled
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
+        // if it's a closed HTTP channel (so we can cleanup)
+        (type==CONNECTION_DURATION && net && (net->http.version[0] || net->http.version[1])) ||
+        // if metrics are enabled and it's one we report
         (mtcEnabled(g_mtc) && mtc_needs_reporting);
     if (!need_to_post) return FALSE;
 

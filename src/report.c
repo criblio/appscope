@@ -2692,6 +2692,23 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
 
     case CONNECTION_DURATION:
     {
+        // Cleanup the per-channel state data for HTTP processing when the
+        // channel is closed. We're not checking the results here because it's
+        // possible, even likely, these operatons will fail to find an entry
+        // for the channel. Instead of searching first and then deleteing, just
+        // delete and let it fail if it's not there.
+        lstDelete(g_maplist, net->uid);        // HTTP/1 saved state
+        lstDelete(g_http2_channels, net->uid); // HTTP/2 saved state
+
+        // Most NET events get blocked on the data side when the watch/source
+        // is disabled but logic added in postNetState() will send this one
+        // when it occurs on an HTTP channel even when the events are disabled
+        // so we can cleanup on the reporting side. So, we still need to check
+        // the config here.
+        if (!ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
+            return;
+        }
+
         uint64_t dur = 0ULL;
         int cachedDurationNum = net->numDuration.evt; // avoid div by zero
         if (cachedDurationNum >= 1 ) {
@@ -2716,13 +2733,12 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             cmdSendEvent(g_ctl, &evt, net->uid, &g_proc);
             atomicSwapU64(&net->numDuration.evt, 0);
             atomicSwapU64(&net->totalDuration.evt, 0);
-         }
-
-        if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
-            doNetCloseEvent(net, dur);
         }
 
-        // Only report if enabled
+        // report the close
+        doNetCloseEvent(net, dur);
+
+        // Only report metric if enabled
         if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
             return;
         }

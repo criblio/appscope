@@ -131,15 +131,20 @@ typedef struct http2Stream {
     // type of the current message being processed
     uint8_t msgType; // 0=unset, 1=request, 2=response
 
-    // content for the body.data object in the event to be generated
+    // cJSON node for the content for the event's body.data
     cJSON *jsonData;
 
     // data from the last HTTP/2 request on the stream
-    uint64_t lastRequestAt;
-    char     lastHost[1024];
-    char     lastMethod[1024];
-    char     lastTarget[1024];
-    char     lastUserAgent[1024];
+    uint64_t lastRequestAt;       // hi-res timer value (nsecs)
+    int      lastStatus;          // ":status" integer value; 200, 404
+    char     lastHost[256];       // ":authority" value; server's hostname
+    char     lastMethod[8];       // ":method" value; GET, POST, etc.
+    char     lastTarget[2048];    // ":target" value; the URI
+    char     lastUserAgent[1024]; // "user-agent" value"; mozilla
+
+    // req/resp content-length values
+    int lastReqLen;
+    int lastRespLen;
 } http2Stream_t;
 
 // list of http2Channel_t indexed by channel
@@ -186,6 +191,9 @@ destroyHttp2Stream(void *data)
 void
 initReporting()
 {
+    // NB: Each of these does a dynamic allocation that we are not releasing.
+    //     They don't grow and would ideally be released when the reporting
+    //     thread exits but we've not gotten to it yet. 
     g_maplist = lstCreate(destroyHttpMap);
     g_http2_channels = lstCreate(destroyHttp2Channel);
     g_http_status = searchComp(HTTP_STATUS);
@@ -782,9 +790,9 @@ doHttp1Header(protocol_info *proto)
 }
 
 static const char *
-httpStatusCode2Text(const char *code)
+httpStatusCode2Text(int code)
 {
-    switch (atoi(code)) {
+    switch (code) {
         case 100:
             return "Continue";
         case 101:
@@ -1128,9 +1136,10 @@ doHttp2Frame(protocol_info *proto)
                 stream->msgType = 2; // response
                 cJSON_AddNumberToObject(stream->jsonData, "http_stream", fStream);
 
+                stream->lastStatus = atoi(val);
                 cJSON_AddStringToObject(stream->jsonData, "http_status_code", val);
                 cJSON_AddStringToObjLN(stream->jsonData, "http_status_text",
-                        httpStatusCode2Text(val));
+                        httpStatusCode2Text(stream->lastStatus));
             } else if (!strcasecmp(":authority", name)) {
                 cJSON_AddStringToObject(stream->jsonData, "http_host", val);
                 strncpy(stream->lastHost, val, sizeof(stream->lastHost));
@@ -1148,9 +1157,13 @@ doHttp2Frame(protocol_info *proto)
                 cJSON_AddStringToObject(stream->jsonData, "http_client_ip", val);
             } else if (!strcasecmp("content-length", name)) {
                 if (stream->msgType == 1) {
-                    cJSON_AddStringToObject(stream->jsonData, "http_request_content_length", val);
+                    stream->lastReqLen = atoi(val);
+                    cJSON_AddNumberToObject(stream->jsonData,
+                            "http_request_content_length", stream->lastReqLen);
                 } else if (stream->msgType == 2) {
-                    cJSON_AddStringToObject(stream->jsonData, "http_response_content_length", val);
+                    stream->lastRespLen = atoi(val);
+                    cJSON_AddNumberToObject(stream->jsonData,
+                            "http_response_content_length", stream->lastRespLen);
                 } else {
                     scopeLogError("ERROR: invalid msgType; %d", stream->msgType);
                     DBG(NULL);
@@ -1300,6 +1313,22 @@ doHttp2Frame(protocol_info *proto)
                 };
                 event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
                 cmdSendHttp(g_ctl, &mevent, proto->uid, &g_proc);
+
+                // if metrics are enabled...
+                if (mtcEnabled(g_mtc)) {
+                    // update HTTP metrics
+                    event_field_t fields[] = {
+                        STRFIELD("http_target", stream->lastTarget, 4, TRUE),
+                        NUMFIELD("http_status_code", stream->lastStatus, 1, TRUE),
+                        FIELDEND
+                    };
+                    event_t httpMetric = INT_EVENT(
+                            isServer ? "http_server_duration" : "http_client_duration",
+                            duration, DELTA_MS, fields);
+                    httpAggAddMetric(g_http_agg, &httpMetric, 
+                            (stream->lastReqLen > 0) ? stream->lastReqLen : -1,
+                            (stream->lastRespLen > 0) ? stream->lastRespLen : -1);
+                }
             }
 
             // otherwise, the message type is invalid
@@ -1308,7 +1337,7 @@ doHttp2Frame(protocol_info *proto)
                 DBG(NULL);
             }
 
-            // reset the stream state
+            // reset
             stream->msgType = 0;
             if (stream->jsonData) {
                 // jsonData was deleted for us down in cmdSendHttp()

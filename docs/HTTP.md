@@ -50,7 +50,7 @@ the circular buffer in a `protocol_info` object by `reportHttp1()` with `evtype`
 set to `EVT_PROTO` and `ptype` set to `EVT_REQ` (request) or `EVT_RESP`
 (response).
 
-For HTTP/2, `parseHttp2()` posts HEADERS, PUSH_PROMISE, and CONTINUATION frames
+For HTTP/2, `parseHttp2()` posts HEADERS, PUSH\_PROMISE, and CONTINUATION frames
 using `reportHttp2()`. It uses the same `protocol_info` but sets `ptype` to
 `EVT_H2FRAME`.
 
@@ -164,7 +164,7 @@ and how additional headers can be included.
 
 ### HTTP Metrics Events
 
-> Note: these are **events** named `http-metrics`, not **metrics**.
+> Note: these are **events** named `http-metrics`, not [**metrics**](#http-metrics).
 
 The library emits an event like the example below after each `http-resp` event.
 
@@ -233,9 +233,38 @@ blocked.
 
 ## HTTP Metrics
 
-> Note: these are **metrics**, not the `http-metrics` **event**.
+> Note: these are **metrics**, not the `http-metrics` [**event**](#http-metrics-events).
 
-> TODO...
+The library emits metrics like the example below for HTTP activity.
+
+```text
+{
+  "type": "metric",
+  "body": {
+    "_metric": "http.requests",
+    "_metric_type": "counter",
+    "_time": 1632776110.8551781,
+    "_value": 1,
+    "host": "dev01",
+    "http_status_code": 200,
+    "http_target": "/robots.txt",
+    "pid": 2453848,
+    "proc": "curl",
+    "unit": "request"
+  }
+}
+```
+
+There are three HTTP metrics:
+* `http.requests` counts request messages.
+* `http.client.duration` and `http.server.duration` report the time (in
+  miliseconds) between a request and its corresponding response message.
+* `http.request.content_length` and `http.response.content_length` report
+  the size (in bytes) of the message content.
+
+> Note: The fault described in #232 causes these metrics to be emitted and
+> reset immediately after each response instead of over the  normal aggregation
+> period.
 
 ## HTTP Runtime Configuration
 

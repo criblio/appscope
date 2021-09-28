@@ -916,6 +916,66 @@ httpStatusCode2Text(int code)
     return "UNKNOWN";
 }
 
+static bool
+isHttp2NameEnabled(const char* name)
+{
+    regex_t *nameRe = evtFormatNameFilter(ctlEvtGet(g_ctl), CFG_SRC_HTTP);
+    if (!nameRe) {
+        scopeLogError("ERROR: missing name filter for HTTP watch");
+        DBG("Missing name filter for HTTP watch");
+        return FALSE;
+    }
+    return headerMatch(nameRe, name);
+}
+
+static bool
+isHttp2FieldEnabled(const char* field, const char *value)
+{
+    regex_t *fieldRe = evtFormatFieldFilter(ctlEvtGet(g_ctl), CFG_SRC_HTTP);
+    if (!fieldRe) {
+        scopeLogError("ERROR: missing field filter for HTTP watch");
+        DBG("Missing field filter for HTTP watch");
+        return FALSE;
+    }
+    regex_t *valueRe = evtFormatValueFilter(ctlEvtGet(g_ctl), CFG_SRC_HTTP);
+    if (!valueRe) {
+        scopeLogError("ERROR: missing value filter for HTTP watch");
+        DBG("Missing value filter for HTTP watch");
+        return FALSE;
+    }
+    return headerMatch(fieldRe, field) && headerMatch(valueRe, value);
+}
+
+static void
+addHttp2NumField(cJSON *jsonData, const char* field, uint32_t value)
+{
+    char buf[16];
+    if (snprintf(buf, sizeof(buf), "%d", value) >= sizeof(buf)) {
+        scopeLogError("ERROR: failed to convert int to string");
+        DBG("buf too small for uint32");
+        return;
+    }
+    if (isHttp2FieldEnabled(field, buf)) {
+        cJSON_AddNumberToObject(jsonData, field, value);
+    }
+}
+
+static void
+addHttp2StrField(cJSON *jsonData, const char* field, const char *value)
+{
+    if (isHttp2FieldEnabled(field, value)) {
+        cJSON_AddStringToObject(jsonData, field, value);
+    }
+}
+
+static void
+addHttp2StrFieldLN(cJSON *jsonData, const char* field, const char *value)
+{
+    if (isHttp2FieldEnabled(field, value)) {
+        cJSON_AddStringToObjLN(jsonData, field, value);
+    }
+}
+
 static void
 doHttp2Frame(protocol_info *proto)
 {
@@ -1116,9 +1176,9 @@ doHttp2Frame(protocol_info *proto)
                 // We use the presense of the :method header to indicate we're
                 // processing a request message.
                 stream->msgType = 1;
-                cJSON_AddNumberToObject(stream->jsonData, "http_stream", fStream);
+                addHttp2NumField(stream->jsonData, "http_stream", fStream);
 
-                cJSON_AddStringToObject(stream->jsonData, "http_method", val);
+                addHttp2StrField(stream->jsonData, "http_method", val);
                 strncpy(stream->lastMethod, val, sizeof(stream->lastMethod));
 
                 // record the start timestamp for duration calculations
@@ -1126,44 +1186,41 @@ doHttp2Frame(protocol_info *proto)
 
                 // record the frame type in request events so we can see Server Push
                 if (fType == 0x01) {
-                    cJSON_AddStringToObjLN(stream->jsonData, "http_frame", "HEADERS");
+                    addHttp2StrFieldLN(stream->jsonData, "http_frame", "HEADERS");
                 } else if (fType == 0x05) {
-                    cJSON_AddStringToObjLN(stream->jsonData, "http_frame", "PUSH_PROMISE");
+                    addHttp2StrFieldLN(stream->jsonData, "http_frame", "PUSH_PROMISE");
                 }
             } else if (!strcasecmp(":status", name)) {
                 // We use the presense of the :status header to indicate we're
                 // processing a response message.
                 stream->msgType = 2; // response
-                cJSON_AddNumberToObject(stream->jsonData, "http_stream", fStream);
+                addHttp2NumField(stream->jsonData, "http_stream", fStream);
 
                 stream->lastStatus = atoi(val);
-                cJSON_AddStringToObject(stream->jsonData, "http_status_code", val);
-                cJSON_AddStringToObjLN(stream->jsonData, "http_status_text",
-                        httpStatusCode2Text(stream->lastStatus));
+                addHttp2StrField(stream->jsonData, "http_status_code", val);
+                addHttp2StrField(stream->jsonData, "http_status_text", httpStatusCode2Text(stream->lastStatus));
             } else if (!strcasecmp(":authority", name)) {
-                cJSON_AddStringToObject(stream->jsonData, "http_host", val);
+                addHttp2StrField(stream->jsonData, "http_host", val);
                 strncpy(stream->lastHost, val, sizeof(stream->lastHost));
             } else if (!strcasecmp(":path", name)) {
-                cJSON_AddStringToObject(stream->jsonData, "http_target", val);
+                addHttp2StrField(stream->jsonData, "http_target", val);
                 strncpy(stream->lastTarget, val, sizeof(stream->lastTarget));
             } else if (!strcasecmp(":scheme", name)) {
-                cJSON_AddStringToObject(stream->jsonData, "http_scheme", val);
+                addHttp2StrField(stream->jsonData, "http_scheme", val);
             } else if (!strcasecmp("user-agent", name)) {
-                cJSON_AddStringToObject(stream->jsonData, "http_user_agent", val);
+                addHttp2StrField(stream->jsonData, "http_user_agent", val);
                 strncpy(stream->lastUserAgent, val, sizeof(stream->lastUserAgent));
             } else if (!strcasecmp("x-appscope", name)) {
-                cJSON_AddStringToObject(stream->jsonData, "x-appscope", val);
+                addHttp2StrField(stream->jsonData, "x-appscope", val);
             } else if (!strcasecmp("x-forwarded-for", name)) {
-                cJSON_AddStringToObject(stream->jsonData, "http_client_ip", val);
+                addHttp2StrField(stream->jsonData, "http_client_ip", val);
             } else if (!strcasecmp("content-length", name)) {
                 if (stream->msgType == 1) {
                     stream->lastReqLen = atoi(val);
-                    cJSON_AddNumberToObject(stream->jsonData,
-                            "http_request_content_length", stream->lastReqLen);
+                    addHttp2NumField(stream->jsonData, "http_request_content_length", stream->lastReqLen);
                 } else if (stream->msgType == 2) {
                     stream->lastRespLen = atoi(val);
-                    cJSON_AddNumberToObject(stream->jsonData,
-                            "http_response_content_length", stream->lastRespLen);
+                    addHttp2NumField(stream->jsonData, "http_response_content_length", stream->lastRespLen);
                 } else {
                     scopeLogError("ERROR: invalid msgType; %d", stream->msgType);
                     DBG(NULL);
@@ -1190,7 +1247,6 @@ doHttp2Frame(protocol_info *proto)
         // frames coming. It indicates to us that we've got the whole message
         // so now we need to generate the event.
         if (fFlags & 0x04) {
-            // TODO skip type doesn't match event > watch[type=http] > name`
 
             // The isServer value in the protocol object is only half of the
             // answer here. See reportHttp2() in httpstate.c for details. We're
@@ -1205,47 +1261,49 @@ doHttp2Frame(protocol_info *proto)
             if (addrIsNetDomain(&proto->localConn)) {
                 switch (proto->sock_type) {
                     case SOCK_STREAM:
-                        cJSON_AddStringToObjLN(stream->jsonData, "net_transport", "IP.TCP");
+                        addHttp2StrFieldLN(stream->jsonData, "net_transport", "IP.TCP");
                         break;
                     case SOCK_DGRAM:
-                        cJSON_AddStringToObjLN(stream->jsonData, "net_transport", "IP.UDP");
+                        addHttp2StrFieldLN(stream->jsonData, "net_transport", "IP.UDP");
                         break;
                     case SOCK_RAW:
-                        cJSON_AddStringToObjLN(stream->jsonData, "net_transport", "IP.RAW");
+                        addHttp2StrFieldLN(stream->jsonData, "net_transport", "IP.RAW");
                         break;
                     case SOCK_RDM:
-                        cJSON_AddStringToObjLN(stream->jsonData, "net_transport", "IP.RDM");
+                        addHttp2StrFieldLN(stream->jsonData, "net_transport", "IP.RDM");
                         break;
                     case SOCK_SEQPACKET:
-                        cJSON_AddStringToObjLN(stream->jsonData, "net_transport", "IP.SEQPACKET");
+                        addHttp2StrFieldLN(stream->jsonData, "net_transport", "IP.SEQPACKET");
                         break;
                 }
 
                 char addr[INET6_ADDRSTRLEN];
                 if (inet_ntop(proto->remoteConn.ss_family,
                             &((struct sockaddr_in*)&proto->remoteConn)->sin_addr, addr, sizeof(addr))) {
-                    cJSON_AddStringToObject(stream->jsonData, "net_peer_ip", addr);
+                    addHttp2StrField(stream->jsonData, "net_peer_ip", addr);
                 }
                 if (inet_ntop(proto->localConn.ss_family,
                             &((struct sockaddr_in*)&proto->localConn)->sin_addr, addr, sizeof(addr))) {
-                    cJSON_AddStringToObject(stream->jsonData, "net_host_ip", addr);
+                    addHttp2StrField(stream->jsonData, "net_host_ip", addr);
                 }
 
                 char port[8];
                 snprintf(port, sizeof(port), "%d",
                         htons(((struct sockaddr_in*)&proto->remoteConn)->sin_port));
-                cJSON_AddStringToObject(stream->jsonData, "net_peer_port", port);
+                addHttp2StrField(stream->jsonData, "net_peer_port", port);
                 snprintf(port, sizeof(port), "%d",
                         htons(((struct sockaddr_in*)&proto->localConn)->sin_port));
-                cJSON_AddStringToObject(stream->jsonData, "net_host_port", port);
+                addHttp2StrField(stream->jsonData, "net_host_port", port);
             }
 
             // If it's a request message...
             if (stream->msgType == 1) {
-                // send the request event
-                event_t event = INT_EVENT("http-req", proto->len, SET, NULL);
-                event.data = stream->jsonData;
-                cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
+                if (isHttp2NameEnabled("http-req")) {
+                    // send the request event
+                    event_t event = INT_EVENT("http-req", proto->len, SET, NULL);
+                    event.data = stream->jsonData;
+                    cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
+                }
             } 
 
             // if it's a response message...
@@ -1260,63 +1318,62 @@ doHttp2Frame(protocol_info *proto)
                 } else if (map && map->start_time) {
                     duration = (post->start_duration - map->start_time) / 1000000;
                 }
-                cJSON_AddNumberToObject(stream->jsonData,
-                        isServer ?  "http_server_duration" : "http_client_duration", duration);
+                addHttp2NumField(stream->jsonData, isServer ?  "http_server_duration" : "http_client_duration", duration);
 
                 // add host from request
                 if (stream->lastHost[0]) {
-                    cJSON_AddStringToObject(stream->jsonData,
-                            "http_host", stream->lastHost);
+                    addHttp2StrField(stream->jsonData, "http_host", stream->lastHost);
                 } else if (map) {
                     // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
                 }
 
                 // add method from request
                 if (stream->lastMethod[0]) {
-                    cJSON_AddStringToObject(stream->jsonData,
-                            "http_method", stream->lastMethod);
+                    addHttp2StrField(stream->jsonData, "http_method", stream->lastMethod);
                 } else if (map) {
                     // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
                 }
 
                 // add target URL from request
                 if (stream->lastTarget[0]) {
-                    cJSON_AddStringToObject(stream->jsonData,
-                            "http_target", stream->lastTarget);
+                    addHttp2StrField(stream->jsonData, "http_target", stream->lastTarget);
                 } else if (map) {
                     // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
                 }
 
                 // add user-agent from request
                 if (stream->lastUserAgent[0]) {
-                    cJSON_AddStringToObject(stream->jsonData,
-                            "http_user_agent", stream->lastUserAgent);
+                    addHttp2StrField(stream->jsonData, "http_user_agent", stream->lastUserAgent);
                 } else if (map) {
                     // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
                 }
 
-                // send the response event
-                event_t event = INT_EVENT("http-resp", proto->len, SET, NULL);
-                event.data = stream->jsonData;
-                cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
+                if (isHttp2NameEnabled("http-resp")) {
+                    // send the response event
+                    event_t event = INT_EVENT("http-resp", proto->len, SET, NULL);
+                    event.data = stream->jsonData;
+                    cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
+                }
 
-                // build and send the `http-metrics` event
-                event_field_t mfields[] = {
-                    DURATION_FIELD(duration),
-                    // TODO RPS is hard coded for now
-                    // see docs/HTTP.md#questions-on-metris-events`
-                    RATE_FIELD(2),
-                    HTTPSTAT_FIELD(stream->lastStatus),
-                    PROC_FIELD(g_proc.procname),
-                    FD_FIELD(proto->fd),
-                    PID_FIELD(g_proc.pid),
-                    // TODO this seems incorrect
-                    // see docs/HTTP.md#questions-on-metris-events`
-                    UNIT_FIELD("byte"),
-                    FIELDEND
-                };
-                event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
-                cmdSendHttp(g_ctl, &mevent, proto->uid, &g_proc);
+                if (isHttp2NameEnabled("http-metrics")) {
+                    // build and send the `http-metrics` event
+                    event_field_t mfields[] = {
+                        DURATION_FIELD(duration),
+                        // TODO RPS is hard coded for now
+                        // see docs/HTTP.md#questions-on-metris-events`
+                        RATE_FIELD(2),
+                        HTTPSTAT_FIELD(stream->lastStatus),
+                        PROC_FIELD(g_proc.procname),
+                        FD_FIELD(proto->fd),
+                        PID_FIELD(g_proc.pid),
+                        // TODO this seems incorrect
+                        // see docs/HTTP.md#questions-on-metris-events`
+                        UNIT_FIELD("byte"),
+                        FIELDEND
+                    };
+                    event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
+                    cmdSendHttp(g_ctl, &mevent, proto->uid, &g_proc);
+                }
 
                 // if metrics are enabled...
                 if (mtcEnabled(g_mtc)) {
@@ -1397,8 +1454,6 @@ doProtocolMetric(protocol_info *proto)
     } else if (proto->ptype == EVT_DETECT) {
         doDetection(proto);
     }
-    // XXX I had an else here with a DBG(NULL) but it was getting hit and
-    // breaking some of the teardown logic in the unit tests for HTTP headers.
 }
 
 void

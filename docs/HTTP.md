@@ -299,14 +299,17 @@ event:
       headers:
 ```
 
-The HTTP watch entry can be used to prevent the library from emitting matching
-events. The `name`, `field`, and `value` regexes default to `.*` so they match
-anything and the events are sent. If these regexes are adjusted and any of them
-don't match, the event is not sent.
+The HTTP watch entry contros whether and how the library emits HTTP events.
+Omit the entry uder `event > watch` to disable the HTTP events entirely.
 
-The `name` regex is applied against the `body.source` property value in
-generated events. The `field` regex is applied against the property names under
-`body.data` and the `value` regex is applied against their values.
+The `name` regex is applied against the `source` value and only events that
+match are emitted. Using something like `http-resp` would cause the library
+to only emit the response events and block the request and metrics events.
+The default is `.*` with matches everything thus not blocking anything.
+
+The `field` and `value` regexes are applied against the event's body.data
+object and only properties that match are included in emitted events.
+The defaults are `.*` with matches everything thus not filtering anything out.
 
 By default emitted request and response events include `body.data` properties
 derived from the following message fields and headers:
@@ -322,9 +325,10 @@ derived from the following message fields and headers:
 * x-appscope
 * x-forwarded-for
 
-Additional headers from requests and responses will be included if their names
-match any of the `headers` regexes in the watch. Note headers is a list
-containing zero or more regex strings.
+Additional headers from requests and responses will be included if their `name:
+value` match any of the `headers` regexes in the watch. Note headers is a list
+containing zero or more regex strings and match the whole header, not just the
+name or value.
 
 In the example below, the `name` regex blocks the `http-req` and `http-metrics`
 events and the `headers` entries add the matching headers.
@@ -337,6 +341,6 @@ event:
       field: .*
       value: .*
       headers:
-        - (?i)x-forwarded.* # include forwarding headers (case insensitive)
-        - service           # include "service: ..." headers
+        - (?i)X-Forwarded.*  # include forwarding headers (case insensitive)
+        - service: cribl.* # include "service" headers starting with "cribl"
 ```

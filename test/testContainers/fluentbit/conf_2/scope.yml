@@ -31,6 +31,7 @@
 #   - `metric > format` is set to ndjson
 #   - `event > transport` is redirected to the `cribl` backend
 #   - `event > enable` is set to true
+#   - `event > watch[]` with `name: http` is disabled
 #   - `libscope > log > level` is set to warn
 #   - `libscope > configevent` is set to true
 #
@@ -148,7 +149,7 @@ metric:
 
     # Connection type
     #   Type:     string
-    #   Values:   udp, tcp, unix, and file
+    #   Values:   udp, tcp, and file
     #   Default:  udp
     #   Override: the protocol token in the $SCOPE_METRIC_DEST URL
     #
@@ -287,12 +288,9 @@ event:
     enhancefs: true
 
   # The `event > watch[*]` array contains objects that enable different
-  # categories of events. Their `type` property specifies the category. The
-  # rest are regular expression strings. Comment out an array entry to disable
-  # the category. if you comment out `event > watch` entirely, the default
-  # watch list will be used which has all of them (except `type: metric`)
-  # enabled.
-  #
+  # categories of events. Their type property specifies the category. The
+  # rest are filters, so only matching events are generated. Comment out an
+  # array entry to disable the category.
   watch:
 
     # The file category includes writes to files. It's intended primarily for
@@ -305,10 +303,10 @@ event:
     # category. The regular expressions can be set with
     # $SCOPE_EVENT_LOGFILE_NAME and $SCOPE_EVENT_LOGFILE_VALUE.
     #
-    - type: file
-      name: (\/logs?\/)|(\.log$)|(\.log[.\d]) # matches the filename
-      value: .*                               # matches data read or written
-
+    #    - type: file
+    #      name: (\/logs?\/)|(\.log$)|(\.log[.\d])
+    #      value: .*
+    #
     # The console category includes writes to standard out and error and is
     # intended for monitoring console output, especially in containerized
     # environments where logging to files isn't commonly done. The name and
@@ -319,80 +317,68 @@ event:
     # category. The regular expressions can be set with
     # $SCOPE_EVENT_CONSOLE_NAME and $SCOPE_EVENT_CONSOLE_VALUE.
     #
-    - type: console
-      name: (stdout)|(stderr) # matches the output stream
-      value: .*               # matches data written
-
+    #    - type: console
+    #      name: (stdout)|(stderr)
+    #      value: .*
+    #
     # The net category includes network operations like listen, connect, close,
-    # send, recv, etc. The name filter is applied to the sourcetype in the
-    # event which are only emitted if the name matches. The field and value
-    # properties are matched against properties in the events body.data object
-    # and only matching properties are included in the event.
+    # send, recv, etc. The name, field, and value properties are regular
+    # expressions applied to the corresponding event properties. Events will be
+    # generated when all match.
     #
     # Set $SCOPE_EVENT_NET to true or false to enable or disable this
     # category. The regular expressions can be set with
     # $SCOPE_EVENT_NET_NAME, $SCOPE_EVENT_NET_FIELD, and $SCOPE_EVENT_NET_VALUE.
     #
-    - type: net
-      name: .*
-      field: .*
-      value: .*
-
+    #     - type: net
+    #       name: .*
+    #       field: .*
+    #       value: .*
+    # 
     # The fs category includes filesystem operations like open, close, stat,
-    # read, write, etc.  The name filter is applied to the sourcetype in the
-    # event which are only emitted if the name matches. The field and value
-    # properties are matched against properties in the events body.data object
-    # and only matching properties are included in the event.
+    # read, write, etc. The name, field, and value properties are regular
+    # expressions applied to the corresponding event properties. Events will be
+    # generated when all match.
     #
     # Set $SCOPE_EVENT_FS to true or false to enable or disable this
     # category. The regular expressions can be set with
     # $SCOPE_EVENT_FS_NAME, $SCOPE_EVENT_FS_FIELD, and $SCOPE_EVENT_FS_VALUE.
     #
-    - type: fs
-      name: .*
-      field: .*
-      value: .*
-
-    # The dns category includes DNS request and response events. The name
-    # filter is applied to the sourcetype in the event which are only emitted
-    # if the name matches. The field and value properties are matched against
-    # properties in the events body.data object and only matching properties
-    # are included in the event.
+    #    - type: fs
+    #      name: .*
+    #      field: .*
+    #      value: .*
+    #
+    # The dns category includes DNS request and response events. The name, field,
+    # and value properties are regular expressions applied to the corresponding
+    # event properties. Events will be generated when all match.
     #
     # Set $SCOPE_EVENT_DNS to true or false to enable or disable this
     # category. The regular expressions can be set with
     # $SCOPE_EVENT_DNS_NAME, $SCOPE_EVENT_DNS_FIELD, and $SCOPE_EVENT_DNS_VALUE.
     #
-    - type: dns
-      name: .*
-      field: .*
-      value: .*
-
-    # The http category includes HTTP request, response, and metrics events.
-    # The name filter is applied to the sourcetype in the event which are only
-    # emitted if the name matches. The field and value properties are matched
-    # against properties in the events body.data object and only matching
-    # properties are included in the event.
+    #    - type: dns
+    #      name: .*
+    #      field: .*
+    #      value: .*
     #
-    # The headers entry is a list of regular expressions that are applied to
-    # the names of HTTP headers in request and response events. Headers that
-    # match are included in the generated events. Note that headers named
-    # `host`, `user-agent`, `x-forwarded-for`, and `x-appscope` are included by
-    # default.
+    # The http category includes HTTP request and response events. It currently
+    # only supports HTTP/1.x, not HTTP/2. The name, field, value, and headers
+    # properties are regular expressions applied to the corresponding event
+    # properties. Events will be generated when all match.
     #
     # Set $SCOPE_EVENT_HTTP to true or false to enable or disable this
     # category. The regular expressions can be set with $SCOPE_EVENT_HTTP_NAME,
     # $SCOPE_EVENT_HTTP_FIELD, $SCOPE_EVENT_HTTP_VALUE, and
-    # $SCOPE_EVENT_HTTP_HEADER. Note that $SCOPE_EVENT_HTTP_HEADER only sets
-    # a single entry in the `headers` array.
+    # $SCOPE_EVENT_HTTP_HEADER.
+    #
+    # When the `cribl` backend is enabled, this is disabled.
     #
     - type: http
-      name: .*         # event name; http-req, http-resp, or http-metrics
-      field: .*        # matches field names; duration, http_status, etc
-      value: .*        # matches field values
-      headers:         # list of filters matched against header names
-        #- (?i)Accept                # example of case-insensitive filter
-        #- "x-content-type-.*: no.*" # example of required quotes
+      name: .*
+      field: .*
+      value: .*
+      headers: .*                 # yes, this should be singular but it's not.
 
     # The metric category is very seldom used. It includes events for
     # operations that are included in the metric aggregation described earlier
@@ -401,10 +387,8 @@ event:
     # as a last resort when tracking down a problem and should rarely, if ever,
     # be enabled. Fraught with peril!
     #
-    # The name filter is applied to the sourcetype in the event which are only
-    # emitted if the name matches. The field and value properties are matched
-    # against properties in the events body.data object and only matching
-    # properties are included in the event.
+    # The name, field, and value properties are all regular expressions. Only
+    # matching events will be generated.
     #
     # Warning: Enabling this may interfere with proper metric aggregation.
     #
@@ -441,11 +425,11 @@ event:
 
     # Connection type
     #   Type:     string
-    #   Values:   udp, tcp, unix, and file
+    #   Values:   udp, tcp, and file
     #   Default:  tcp
     #   Override: the protocol token in the $SCOPE_EVENT_DEST URL
     #
-    type: tcp
+    type: unix
 
     # Connection host/address
     #   Type:     string
@@ -471,7 +455,7 @@ event:
     #
     # Applies when connection type is file or unix.
     #
-    #path:
+    path: /tmp/abstest
 
     # File buffering
     #   Type:     string
@@ -541,8 +525,8 @@ payload:
   # This can produce large amounts of data from I/O-intensive programs and
   # should be considered carefully before being enabled.
   #
-  # See `protocol` for a way to enable this for specific protocols instead of
-  # all traffic.
+  # See scope_protocol.yml for a way to enable this for specific protocols
+  # instead of all traffic.
   #
   enable: false
 
@@ -634,7 +618,7 @@ libscope:
   
       # Connection type
       #   Type:     string
-      #   Values:   udp, tcp, unix, and file
+      #   Values:   udp, tcp, and file
       #   Default:  file
       #   Override: the protocol token in the $SCOPE_LOG_DEST URL
       #
@@ -796,7 +780,7 @@ cribl:
       #
       cacertpath: ''
 
-# Tags for events and metrics
+# Tags for events and metrics.
 #
 tags:
   # `key: value` entries here become fields in generated events and metrics.
@@ -807,166 +791,7 @@ tags:
   # corresponding environment variable is not set, the variable is left in the
   # value.
   #
-  # Tags can also be added with environment variables prefixed with SCOPE_TAG_.
-  # For example, SCOPE_TAG_service=eg is equivalent to the "service" example
-  # below. The value of the environment variable may contain other variables
-  # as described above too; i.e. SCOPE_TAG_user=\$USER.
-  #
   #user: $USER
   #service: eg
-  
-# Protocol detection and handling
-#
-protocol:
-  # Entries in this list define protocols that AppScope should detect in network
-  # payloads and how to handle matches. The first packet seen on a channel is
-  # checked against the regular expression in each entry in the order they
-  # appear in this file. When one matches, later entries are skipped.
-  #
-  # Entries have the following properties:
-  #
-  #   name     String protocol name used in protocol-detect events and payload
-  #            headers sent to LogStream (required)
-  #   regex    The regular expression to use (required)
-  #   binary   Boolean indicating whether the regex should be applied to a
-  #            hex-string version of the payload instead of the binary payload
-  #            (default: false)
-  #   len      The number of bytes to convert to hex when `binary` is true
-  #            (default: 256)
-  #   detect   Boolean indicating whether protocol-detect events should be
-  #            generated (default: true)
-  #   payload  Boolean indicating whether payload-processing should be enabled
-  #            for matching streams (default: false)
-  #
-  # When payloads are enabled globally (`payload > enable`), the payload
-  # options here are ignored.
-  #
-  # Warning: The `name` value is currently inserted into the JSON header for
-  # payloads sent to LogStream so it cannot contain double quotes or
-  # back-slashes without breaking the JSON. It needs to be kept fairly short
-  # too so the header doesn't exceed the 1k limit. If this becomes a problem,
-  # we'll consider adding logging and validation.
-  #
-
-  # Example for the plain-text Redis protocol using the default detect and
-  # payload settings
-  #
-  #- name: Redis
-  #  regex: "^[*]\\d+|^[+]\\w+|^[$]\\d+"
-
-  # Example for the MongoDB protocol showing how to detect a binary protocol
-  #
-  #- name: Mongo
-  #  regex: "^240100000000000000000000d407"
-  #  binary: true
-  #  len: 14
-
-  # AppScope uses an internally defined protocol detector for HTTP like the
-  # example below by default.
-  #
-  # Uncomment this and adjust as needed to override the defaults.
-  #
-  #- name: HTTP
-  #  regex: " HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
-
-  # AppScope uses another internally defined protocol detector for TLS like the
-  # example below by default.
-  #
-  # Uncomment this entry to override the regex details or to set detect to
-  # false. The payload setting here is never used. AppScope never sends
-  # encrypted payloads to disk and only sends payloads to LogSteam during TLS
-  # negotiation.
-  #
-  #- name: TLS
-  #  regex: "^16030[0-3].{4}0[12]"
-  #  binary: true
-  #  len: 6
-
-# Custom configs
-#
-custom:
-  # Entries here represent overrides of the settings defined above for scoped
-  # processes that match a set of filters. Each has a name and `filter` and
-  # `config` entries as shown below.
-  #
-  #   name:
-  #     filter:
-  #       ...
-  #     config:
-  #       ...
-  #
-  # Entries under `filter` are used to match aspects of a scoped process. There
-  # must be at least one of them and all of them must match for the filter to
-  # succeed. The following filters are supported.
-  #
-  #   procname: string
-  #
-  #     Matches if the given string value matches the basename of the scoped
-  #     process.
-  #
-  #   arg: string
-  #
-  #     Matches if the given string value appears and a substring anywhere in
-  #     the scoped process's full command line including an options and
-  #     arguments.
-  #
-  #   hostname: string
-  #
-  #     Matches if the given string value matches the hostname of the machine
-  #     where the scoped process is running.
-  #     
-  #   username: string
-  #
-  #     Matches if the given string value matches the username for the scoped
-  #     process's UID.
-  #     
-  #   env: string
-  #
-  #     The string value is the name of an environment variable alone (i.e.
-  #     "FOO") or with a value (i.e. "FOO=bar"). The filter matches if the
-  #     environment variable is set and, in the later case, the value matches.
-  #
-  #   ancestor: string
-  #
-  #     Matches if given string matches the basename of the scoped process's
-  #     partent, parent's parent, etc.
-  #
-  # The `config` section specifies the settings that should be overridden when
-  # the filter matches. Entries under `config` use the same schema as the
-  # top-level entries (without `custom`).
-  #
-  
-  # Increase metric verbosity for processes owned by the "eg" user and running
-  # on the "eg1" host.
-  #
-  #example:
-  #  filter:
-  #    username: eg
-  #    hostname: eg1
-  #  config:
-  #    metric:
-  #      format:
-  #        verbosity: 7
-  #    tags:
-  #      service: eg
-
-  # Enable the Cribl/Logstream destination for Nginx processes. Both this entry
-  # and the `example` entry above would apply if both filters match so the
-  # service tag here would override the one above.
-  #
-  #nginx:
-  #  filter:
-  #    procname: nginx
-  #  config:
-  #    tags:
-  #      service: nginx
-  #    cribl:
-  #      enable: true
-  #      transport:
-  #        type: tcp
-  #        host: in.my-instance.logstream.cribl.cloud
-  #        port: 10090
-  #        tls:
-  #          enable: true
 
 # EOF

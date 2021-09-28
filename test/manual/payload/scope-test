@@ -1,0 +1,189 @@
+#!/bin/bash
+
+###################### Definitions ######################
+
+DEST=/tmp/request.log
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "=============================================="
+    echo "         Testing $CURRENT_TEST"
+    echo "=============================================="
+    ERR=0
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "******************* $RESULT *******************"
+    echo ""
+    echo ""
+}
+
+wait_for_port() {
+    TIMEOUT=${2:-60}
+    while ! netstat -an | grep -w ${1} >/dev/null 2>&1; do
+        sleep 1
+        ((TIMEOUT=TIMEOUT-1))
+        if [ $TIMEOUT -le 0 ]; then
+            echo >&2 "warn: timed out waiting for port ${1} listener"
+            netstat -an | grep -w LISTEN >&2
+            return
+        fi
+    done
+    echo 1
+}
+
+wait_for_files() {
+    TIMEOUT=${2:-60}
+    while ! compgen -G "${1}" > /dev/null; do
+        sleep 1
+        ((TIMEOUT=TIMEOUT-1))
+        if [ $TIMEOUT -le 0 ]; then
+            echo >&2 "warn: timed out waiting for port ${1} files"
+            ls -lRa /tmp/out >&2
+            return
+        fi
+    done
+    echo 1
+}
+
+###################### Tests ######################
+
+# Start nginx
+# Use apache ab to send requests to nginx
+# Report performance of ab requests to nginx
+# $1 http request count
+ab_nginx() {
+    starttest "ab_nginx:_$1_Requests"
+    requests=$(($1))
+    rm -f ${DEST}
+    # start nginx
+    nginx
+    # sleep to allow nginx to start up
+    sleep 2
+    # start ab benchmark test
+    ab -n $1 -c 1 http://127.0.0.1/ > /tmp/ab_out_1.txt 2>&1
+    perf=$(grep 'Time per request' /tmp/ab_out_1.txt)
+    echo $perf
+    # kill processes
+    nginx -s quit
+    # sleep to allow nginx to close
+    sleep 2
+    endtest
+}
+
+# Scope nginx
+# Use custom scope configuration to send non-http events to a tcp socket
+# Use apache ab to send requests to nginx
+# Report performance of ab requests to nginx
+# $1 http request count
+ab_scoped_nginx_tcpserver_nohttp() {
+    starttest "ab_scoped_nginx_tcpserver_nohttp:_$1_Requests"
+    requests=$(($1))
+    rm -f ${DEST}
+    # start tcpserver
+    tcpserver > /dev/null &
+    tcpserver_pid=$!
+    # sleep to allow tcpserver to start up
+    sleep 1
+    # start nginx
+    SCOPE_HOME=/opt/test/conf_1 ldscope nginx
+    # sleep to allow nginx to start up
+    sleep 2
+    # start ab benchmark test
+    ab -n $1 -c 1 http://127.0.0.1/ > /tmp/ab_out_2.txt 2>&1
+    perf=$(grep 'Time per request' /tmp/ab_out_2.txt)
+    echo $perf
+    # kill processes
+    kill $tcpserver_pid
+    nginx -s quit
+    # sleep to allow nginx to close
+    sleep 2
+    endtest
+}
+
+# Scope nginx
+# Use custom scope configuration to send all (including http)  events to a tcp socket
+# Use apache ab to send requests to nginx
+# Report performance of ab requests to nginx
+# $1 http request count
+ab_scoped_nginx_tcpserver() {
+    starttest "ab_scoped_nginx_tcpserver:_$1_Requests"
+    requests=$(($1))
+    rm -f ${DEST}
+    # start tcpserver
+    tcpserver > /dev/null &
+    tcpserver_pid=$!
+    # sleep to allow tcpserver to start up
+    sleep 1
+    # start nginx
+    SCOPE_HOME=/opt/test/conf_2 ldscope nginx
+    # sleep to allow nginx to start up
+    sleep 2
+    # start ab benchmark test
+    ab -n $1 -c 1 http://127.0.0.1/ > /tmp/ab_out_3.txt 2>&1
+    perf=$(grep 'Time per request' /tmp/ab_out_3.txt)
+    echo $perf
+    # kill processes
+    kill $tcpserver_pid
+    nginx -s quit
+    # sleep to allow nginx to close
+    sleep 2
+    endtest
+}
+
+# Scope nginx
+# Use custom scope configuration to send non-http events to a cloud tcp socket
+# Use apache ab to send requests to nginx
+# Report performance of ab requests to nginx
+# $1 http request count
+ab_scoped_nginx_cloud_nohttp() {
+    starttest "ab_scoped_nginx_cloud_nohttp:_$1_Requests"
+    requests=$(($1))
+    rm -f ${DEST}
+    # start nginx
+    SCOPE_HOME=/opt/test/conf_3 ldscope nginx
+    # sleep to allow nginx to start up
+    sleep 2
+    # start ab benchmark test
+    ab -n $1 -c 1 http://127.0.0.1/ > /tmp/ab_out_4.txt 2>&1
+    perf=$(grep 'Time per request' /tmp/ab_out_4.txt)
+    echo $perf
+    # kill processes
+    nginx -s quit
+    # sleep to allow nginx to close
+    sleep 2
+    endtest
+}
+
+ab_nginx 10000
+ab_scoped_nginx_tcpserver_nohttp 10000
+ab_scoped_nginx_tcpserver 10000
+ab_scoped_nginx_cloud_nohttp 10000
+
+
+###################### Summary ######################
+
+# Results
+echo ""
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo "************ ALL PAYLOAD TESTS PASSED ************"
+else
+    echo "************ $FAILED_TEST_COUNT SEND EVENT TESTS FAILED ************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+fi
+echo ""
+
+exit ${FAILED_TEST_COUNT}
+

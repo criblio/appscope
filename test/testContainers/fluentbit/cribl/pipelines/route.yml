@@ -1,0 +1,24 @@
+id: default
+groups: {}
+routes:
+  - id: hrn4bd
+    name: tcpjson
+    final: false
+    disabled: false
+    pipeline: passthru
+    description: ""
+    clones:
+      - {}
+    filter: __inputId=='tcpjson:in_tcp_json'
+    output: tmp
+  - id: default
+    name: default
+    final: true
+    disabled: false
+    pipeline: main
+    description: ""
+    clones: []
+    filter: "true"
+    output: default
+
+

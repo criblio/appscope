@@ -60,6 +60,7 @@ struct _transport_t
         } net;
         struct {
             int sock;
+            char *path; // original configured path... for error reporting
             struct sockaddr_un addr;
             int addr_len;
         } local; // aka "unix".  Can't use "unix" because it's a macro name
@@ -237,7 +238,7 @@ transportNeedsConnection(transport_t *trans)
         case CFG_UNIX:
             if (trans->local.sock == -1) return TRUE;
             if (osNeedsConnect(trans->local.sock)) {
-                DBG("fd:%d", trans->local.sock);
+                DBG("fd:%d %s", trans->local.sock, trans->local.path);
                 transportDisconnect(trans);
                 return TRUE;
             }
@@ -442,7 +443,7 @@ transportDisconnect(transport_t *trans)
         case CFG_TCP:
             // appropriate for both tls and non-tls connections...
             shutdownTlsSession(trans);
-            if (trans->net.pending_connect) {
+            if (trans->net.pending_connect != -1) {
                 g_fn.close(trans->net.pending_connect);
                 trans->net.pending_connect = -1;
             }
@@ -924,18 +925,19 @@ transportConnect(transport_t *trans)
             return transportConnectFile(trans);
         case CFG_UNIX:
             if ((trans->local.sock = g_fn.socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
-                DBG("%d %s", trans->local.sock, trans->local.addr.sun_path[1]);
+                DBG("%d %s", trans->local.sock, trans->local.path);
                 return 0;
             }
 
             // Set close on exec
             int flags = g_fn.fcntl(trans->local.sock, F_GETFD, 0);
             if (g_fn.fcntl(trans->local.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
-                DBG("%d %s", trans->local.sock, trans->local.addr.sun_path[1]);
+                DBG("%d %s", trans->local.sock, trans->local.path);
             }
 
             if (g_fn.connect(trans->local.sock, (const struct sockaddr *)&trans->local.addr,
                              trans->local.addr_len) == -1) {
+                scopeLog(CFG_LOG_INFO, "fd:%d (%s) connect failed", trans->local.sock, trans->local.path);
                 g_fn.close(trans->local.sock);
                 trans->local.sock = -1;
                 return 0;
@@ -1042,33 +1044,39 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
 transport_t *
 transportCreateUnix(const char *path)
 {
-    if (!path) return NULL;
-    transport_t *trans = newTransport();
-    if (!trans) return NULL;
+    transport_t *trans = NULL;
+
+    if (!path) goto err;
 
     int pathlen = strlen(path);
+    if (pathlen >= sizeof(trans->local.addr.sun_path)) goto err;
+
+    if (!(trans = newTransport())) goto err;
 
     trans->type = CFG_UNIX;
     trans->local.sock = -1;
+    if (!(trans->local.path = strdup(path))) goto err;
 
-    // the string portion of the unix address includes one extra byte
-    // for a leading \0 for an abstract socket.  (No trailing \0)
-    trans->local.addr_len = pathlen + 1;
-    if (trans->local.addr_len >= sizeof(trans->local.addr.sun_path)) {
-        DBG("%s", path);
-        transportDestroy(&trans);
-        return trans;
-    }
-
-    // The whole address includes 2 bytes for the address family type too
-    trans->local.addr_len += sizeof(sa_family_t);
-
-    memset((char *)&trans->local.addr, 0, sizeof(struct sockaddr_un));
+    memset(&trans->local.addr, 0, sizeof(trans->local.addr));
     trans->local.addr.sun_family = AF_UNIX;
-    strncpy(&trans->local.addr.sun_path[1], path, pathlen);
+    strncpy(trans->local.addr.sun_path, path, pathlen);
+    trans->local.addr_len = pathlen + sizeof(sa_family_t);
+    if (path[0] == '@') {
+        // The socket is abstract
+        trans->local.addr.sun_path[0] = 0;
+    } else {
+        // Abstract socket addresses don't include a trailing null
+        // delimiter but filesystem sockets do.
+        trans->local.addr_len += 1; 
+    }
 
     transportConnect(trans);
 
+    return trans;
+
+err:
+    DBG("%s %p", path, trans);
+    transportDestroy(&trans);
     return trans;
 }
 
@@ -1116,6 +1124,7 @@ transportDestroy(transport_t **transport)
             freeAddressList(trans);
             break;
         case CFG_UNIX:
+            if (trans->local.path) free(trans->local.path);
             transportDisconnect(trans);
             break;
         case CFG_FILE:

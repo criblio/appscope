@@ -1,0 +1,316 @@
+#!/bin/bash
+
+###################### Definitions ######################
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "=============================================="
+    echo "         Testing $CURRENT_TEST"
+    echo "=============================================="
+    ERR=0
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "******************* $RESULT *******************"
+    echo ""
+    echo ""
+}
+
+wait_for_port() {
+    TIMEOUT=${2:-60}
+    while ! netstat -an | grep -w ${1} >/dev/null 2>&1; do
+        sleep 1
+        ((TIMEOUT=TIMEOUT-1))
+        if [ $TIMEOUT -le 0 ]; then
+            echo >&2 "warn: timed out waiting for port ${1} listener"
+            netstat -an | grep -w LISTEN >&2
+            return
+        fi
+    done
+    echo 1
+}
+
+wait_for_files() {
+    TIMEOUT=${2:-60}
+    while ! compgen -G "${1}" > /dev/null; do
+        sleep 1
+        ((TIMEOUT=TIMEOUT-1))
+        if [ $TIMEOUT -le 0 ]; then
+            echo >&2 "warn: timed out waiting for port ${1} files"
+            ls -lRa /tmp/out >&2
+            return
+        fi
+    done
+    echo 1
+}
+
+###################### Setup ######################
+
+# Start LogStream
+# Logstream is setup to dump data sent to that source to NDJSON
+# files in ${DEST} named CriblOut-*.json.
+[ -z "$(pgrep cribl)" ] || { /opt/cribl/bin/cribl stop; sleep 5; }
+[ -d /tmp/out ] && rm -rf /tmp/out
+[ -d /tmp/out ] || mkdir /tmp/out
+/opt/cribl/bin/cribl start
+if [ ! "$(wait_for_port 10070)" ]; then
+    echo >&2 "error: LogStream failed to start; aborting test"
+    exit 1
+fi
+
+
+###################### Tests ######################
+
+# Scope nginx with a variable nginx worker count
+# Use custom scope configuration to send only http events to a TCP socket
+# Use apache ab to send requests to nginx
+# Use fluentbit to relay events to a file
+# Assert on number of http events received
+fluentbit_tcp_file() {
+    starttest "Fluentbit_tcp->File_$1_Scope_$2_Requests"
+    DEST=/tmp/fluent.out_file
+    rm -rf ${DEST}
+    # start nginx with modified config
+    sed -i "s/worker_processes\ auto/worker_processes\ $1/" /etc/nginx/nginx.conf
+    SCOPE_HOME=/opt/test/conf_1 ldscope nginx
+    # sleep to allow nginx to start up
+    sleep 2
+    # start fluentbit
+    /opt/td-agent-bit/bin/td-agent-bit -i tcp -p "Port=9109" -p "Format=none" -o file -p "Format=plain" -p "Path=/tmp" -p "File=fluent.out_file" -d
+    # sleep to allow fluentbit to start
+    sleep 2
+    # run ab benchmark test
+    ab -n $2 -c 1 http://127.0.0.1/ > /dev/null 2>&1
+    # sleep to wait for ab to complete
+    sleep 15
+    if [ "$(wait_for_files "${DEST}")" ]; then
+        found=$(grep '\\"source\\":\\"http-req\\"' ${DEST} | wc -l)
+        if [ $found -eq $2 ] ; then 
+            echo "PASS: No missing http request events"
+        else
+            echo "FAIL: Missing http request events: expected: $2, got: $found, dropped: $(($2-found))"
+            ERR+=1
+        fi
+        found=$(grep '\\"source\\":\\"http-resp\\"' ${DEST} | wc -l)
+        if [ $found -eq $2 ] ; then 
+            echo "PASS: No missing http response events"
+        else
+            echo "FAIL: Missing http response events: expected: $2, got: $found, dropped: $(($2-found))"
+            ERR+=1
+        fi
+    else
+        echo "FAIL: no output files"
+        ERR+=1
+    fi
+    # kill processes
+    kill `pidof td-agent-bit`
+    nginx -s quit
+    # sleep to allow nginx and fluentbit to close (2+6 secs)
+    sleep 8
+    endtest
+}
+
+# Scope nginx with a variable nginx worker count
+# Use custom scope configuration to send only http events to a TCP socket
+# Use apache ab to send requests to nginx
+# Use fluentbit to relay events to logstream 
+# Assert on number of http events received
+fluentbit_tcp_logstream() {
+    starttest "Fluentbit_tcp->Logstream_$1_Scope_$2_Requests"
+    DEST=/tmp/out/tcpjson:in_tcp_json
+    rm -rf ${DEST}
+    # start nginx with modified config
+    sed -i "s/worker_processes\ auto/worker_processes\ $1/" /etc/nginx/nginx.conf
+    SCOPE_HOME=/opt/test/conf_1 ldscope nginx
+    # sleep to allow nginx to start up
+    sleep 2
+    # start fluentbit
+    /opt/td-agent-bit/bin/td-agent-bit -i tcp -p "Port=9109" -p "Format=none" -o tcp -p "Port=10070" -p "Format=json_lines" -p "json_date_key=false" -d
+    # sleep to allow fluentbit to start
+    sleep 2
+    # run ab benchmark test
+    ab -n $2 -c 1 http://127.0.0.1/ > /dev/null 2>&1
+    # sleep to wait for ab to complete
+    sleep 15
+    if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
+        found=$(grep '\\"source\\":\\"http-req\\"' ${DEST}/CriblOut-*.json | wc -l)
+        if [ $found -eq $2 ] ; then 
+            echo "PASS: No missing http request events"
+        else
+            echo "FAIL: Missing http request events: expected: $2, got: $found, dropped: $(($2-found))"
+            ERR+=1
+        fi
+        found=$(grep '\\"source\\":\\"http-resp\\"' ${DEST}/CriblOut-*.json | wc -l)
+        if [ $found -eq $2 ] ; then 
+            echo "PASS: No missing http response events"
+        else
+            echo "FAIL: Missing http response events: expected: $2, got: $found, dropped: $(($2-found))"
+            ERR+=1
+        fi
+    else
+        echo "FAIL: no output files"
+        ERR+=1
+    fi
+    # kill processes
+    kill `pidof td-agent-bit`
+    nginx -s quit
+    # sleep to allow nginx and fluentbit to close (2+6 secs)
+    sleep 8
+    endtest
+}
+
+# Scope nginx with a variable nginx worker count
+# Use custom scope configuration to send only http events to a Unix Domain socket
+# Use apache ab to send requests to nginx
+# Use fluentbit to relay events to a file
+# Assert on number of http events received
+fluentbit_unix_file() {
+    starttest "Fluentbit_unix->File_$1_Scope_$2_Requests"
+    DEST=/tmp/fluent.out_file
+    rm -rf ${DEST}
+    # start nginx with modified config
+    sed -i "s/worker_processes\ auto/worker_processes\ $1/" /etc/nginx/nginx.conf
+    SCOPE_HOME=/opt/test/conf_2 ldscope nginx
+    # sleep to allow nginx to start up
+    sleep 2
+    # start fluentbit
+    /opt/td-agent-bit/bin/td-agent-bit -R /opt/test/fluentbit/parsers.conf -i syslog -p "Mode=unix_tcp" -p "Path=/tmp/abstest" -p "Parser=json" -o file -p "Format=plain" -p "Path=/tmp" -p "File=fluent.out_file" -d
+    # sleep to allow fluentbit to start
+    sleep 2
+    # change perms on unix socket file to allow non-root to write to it
+    chmod 666 /tmp/abstest
+    # run ab benchmark test
+    ab -n $2 -c 1 http://127.0.0.1/ > /dev/null 2>&1
+    # sleep to wait for ab to complete
+    sleep 15
+    if [ "$(wait_for_files "${DEST}")" ]; then
+        found=$(grep '"source":"http-req"' ${DEST} | wc -l)
+        if [ $found -eq $2 ] ; then 
+            echo "PASS: No missing http request events"
+        else
+            echo "FAIL: Missing http request events: expected: $2, got: $found, dropped: $(($2-found))"
+            ERR+=1
+        fi
+        found=$(grep '"source":"http-resp"' ${DEST} | wc -l)
+        if [ $found -eq $2 ] ; then 
+            echo "PASS: No missing http response events"
+        else
+            echo "FAIL: Missing http response events: expected: $2, got: $found, dropped: $(($2-found))"
+            ERR+=1
+        fi
+    else
+        echo "FAIL: no output files"
+        ERR+=1
+    fi
+    # kill processes
+    kill `pidof td-agent-bit`
+    nginx -s quit
+    # sleep to allow nginx and fluentbit to close (2+6 secs)
+    sleep 8
+    endtest
+}
+
+# Scope nginx with a variable nginx worker count
+# Use custom scope configuration to send only http events to a Unix Domain socket
+# Use apache ab to send requests to nginx
+# Use fluentbit to relay events to logstream
+# Assert on number of http events received
+fluentbit_unix_logstream() {
+    starttest "Fluentbit_unix->Logstream_$1_Scope_$2_Requests"
+    DEST=/tmp/out/tcpjson:in_tcp_json
+    rm -rf ${DEST}
+    # start nginx with modified config
+    sed -i "s/worker_processes\ auto/worker_processes\ $1/" /etc/nginx/nginx.conf
+    SCOPE_HOME=/opt/test/conf_2 ldscope nginx
+    # sleep to allow nginx to start up
+    sleep 2
+    # start fluentbit
+    /opt/td-agent-bit/bin/td-agent-bit -R /opt/test/fluentbit/parsers.conf -i syslog -p "Mode=unix_tcp" -p "Path=/tmp/abstest" -p "Parser=json" -o tcp -p "Port=10070" -p "Format=json_lines" -p "json_date_key=false" -d
+    # sleep to allow fluentbit to start
+    sleep 2
+    # change perms on unix socket file to allow non-root to write to it
+    chmod 666 /tmp/abstest
+    # run ab benchmark test
+    ab -n $2 -c 1 http://127.0.0.1/ > /dev/null 2>&1
+    # sleep to wait for ab to complete
+    sleep 15
+    if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
+        found=$(grep '"source":"http-req"' ${DEST}/CriblOut-*.json | wc -l)
+        if [ $found -eq $2 ] ; then 
+            echo "PASS: No missing http request events"
+        else
+            echo "FAIL: Missing http request events: expected: $2, got: $found, dropped: $(($2-found))"
+            ERR+=1
+        fi
+        found=$(grep '"source":"http-resp"' ${DEST}/CriblOut-*.json | wc -l)
+        if [ $found -eq $2 ] ; then 
+            echo "PASS: No missing http response events"
+        else
+            echo "FAIL: Missing http response events: expected: $2, got: $found, dropped: $(($2-found))"
+            ERR+=1
+        fi
+    else
+        echo "FAIL: no output files"
+        ERR+=1
+    fi
+    # kill processes
+    kill `pidof td-agent-bit`
+    nginx -s quit
+    # sleep to allow nginx and fluentbit to close (2+6 secs)
+    sleep 8
+    endtest
+}
+
+
+fluentbit_tcp_file 1 100
+fluentbit_tcp_file 1 1000
+fluentbit_tcp_file 1 10000
+fluentbit_tcp_file 10 100
+fluentbit_tcp_file 10 1000
+fluentbit_tcp_file 10 10000
+fluentbit_tcp_logstream 1 100
+fluentbit_tcp_logstream 1 1000
+fluentbit_tcp_logstream 1 10000
+fluentbit_tcp_logstream 10 100
+fluentbit_tcp_logstream 10 1000
+fluentbit_tcp_logstream 10 10000
+fluentbit_unix_file 1 100
+fluentbit_unix_file 1 1000
+fluentbit_unix_file 1 10000
+fluentbit_unix_file 10 100
+fluentbit_unix_file 10 1000
+fluentbit_unix_file 10 10000
+fluentbit_unix_logstream 1 100
+fluentbit_unix_logstream 1 1000
+fluentbit_unix_logstream 1 10000
+fluentbit_unix_logstream 10 100
+fluentbit_unix_logstream 10 1000
+fluentbit_unix_logstream 10 10000
+
+
+###################### Summary ######################
+
+# Results
+echo ""
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo "************ ALL FLUENTBIT TESTS PASSED ************"
+else
+    echo "************ $FAILED_TEST_COUNT FLUENTBIT TESTS FAILED ************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+fi
+echo ""
+
+exit ${FAILED_TEST_COUNT}
+

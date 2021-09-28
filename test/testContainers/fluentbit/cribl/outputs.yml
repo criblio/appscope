@@ -1,0 +1,18 @@
+outputs:
+  tmp:
+    systemFields:
+      - cribl_pipe
+    addIdToStagePath: true
+    removeEmptyDirs: false
+    partitionExpr: "`${__inputId}`"
+    format: json
+    baseFileName: "`CriblOut`"
+    compress: none
+    maxFileSizeMB: 32
+    maxFileOpenTimeSec: 300
+    maxFileIdleTimeSec: 5
+    maxOpenFiles: 100
+    onBackpressure: block
+    type: filesystem
+    destPath: /tmp/out
+    stagePath: /tmp/out/.staging

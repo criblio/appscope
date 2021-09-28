@@ -1303,12 +1303,16 @@ doHttp2Frame(protocol_info *proto)
                 // build and send the `http-metrics` event
                 event_field_t mfields[] = {
                     DURATION_FIELD(duration),
-                    //RATE_FIELD(rps), // XXX the HTTP/1 math for this value is curious...
-                    //HTTPSTAT_FIELD(status), // TODO
+                    // TODO RPS is hard coded for now
+                    // see docs/HTTP.md#questions-on-metris-events`
+                    RATE_FIELD(2),
+                    HTTPSTAT_FIELD(stream->lastStatus),
                     PROC_FIELD(g_proc.procname),
                     FD_FIELD(proto->fd),
                     PID_FIELD(g_proc.pid),
-                    UNIT_FIELD("byte"), // XXX this seems incorrect...
+                    // TODO this seems incorrect
+                    // see docs/HTTP.md#questions-on-metris-events`
+                    UNIT_FIELD("byte"),
                     FIELDEND
                 };
                 event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);

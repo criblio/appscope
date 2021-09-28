@@ -392,7 +392,8 @@ event:
       field: .*        # matches field names; duration, http_status, etc
       value: .*        # matches field values
       headers:         # list of filters matched against header names
-        #- (?i)Accept  # example showing case-insensitive filter
+        #- (?i)Accept                # example of case-insensitive filter
+        #- "x-content-type-.*: no.*" # example of required quotes
 
     # The metric category is very seldom used. It includes events for
     # operations that are included in the metric aggregation described earlier

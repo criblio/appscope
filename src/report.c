@@ -1228,18 +1228,25 @@ doHttp2Frame(protocol_info *proto)
             } else {
                 // All other header fields need to match a regex in the
                 // event.watch[name=http].headers array in the runtime config.
+                //
+                // Note that the filter is applied to the header's `name:
+                // value` form, not the name and value separately. We're munging the
+                // buffer temporarily here.
+                out[hdr.name_offset + hdr.name_len] = ':';
                 size_t i;
                 size_t numHeaders = cfgEvtFormatNumHeaders(g_cfg.staticfg);
                 for (i = 0; i < numHeaders; ++i) {
                     regex_t *re = cfgEvtFormatHeaderRe(g_cfg.staticfg, i);
                     if (re) {
-                        if (!regexec_wrapper(re, name, 0, NULL, 0)) {
+                        if (!regexec_wrapper(re, out, 0, NULL, 0)) {
                             // matched, add it and skip the rest of the filters
+                            out[hdr.name_offset + hdr.name_len] = '\0';
                             cJSON_AddStringToObject(stream->jsonData, name, val);
                             break;
                         }
                     }
                 }
+                out[hdr.name_offset + hdr.name_len] = '\0';
             }
         }
 

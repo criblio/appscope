@@ -44,11 +44,11 @@ import (
 func TestSetDefault(t *testing.T) {
 	opt := Config{}
 	// No workdir set, should error
-	err := opt.setDefault()
+	err := opt.SetDefault()
 	assert.Error(t, err)
 
 	opt.WorkDir = "/foo"
-	err = opt.setDefault()
+	err = opt.SetDefault()
 	sc := opt.sc
 
 	testYaml := testDefaultScopeConfigYaml("/foo", 4)

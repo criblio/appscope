@@ -96,8 +96,8 @@ type TlsConfig struct {
 	CaCertPath     string `mapstructure:"cacertpath" json:"cacertpath" yaml:"cacertpath"`
 }
 
-// setDefault sets the default scope configuration as a struct
-func (c *Config) setDefault() error {
+// SetDefault sets the default scope configuration as a struct
+func (c *Config) SetDefault() error {
 	if c.WorkDir == "" {
 		return fmt.Errorf("workDir not set")
 	}
@@ -190,7 +190,7 @@ func (c *Config) setDefault() error {
 
 // configFromRunOpts writes the scope configuration to the workdir
 func (c *Config) configFromRunOpts() error {
-	err := c.setDefault()
+	err := c.SetDefault()
 	if err != nil {
 		return err
 	}

@@ -188,7 +188,22 @@ func (c *Config) SetDefault() error {
 	return nil
 }
 
-// configFromRunOpts writes the scope configuration to the workdir
+// configFromFile loads a configuration from a yml file
+func (c *Config) configFromFile() error {
+	c.sc = &ScopeConfig{}
+	/*
+		yamlFile, err := ioutil.ReadFile(c.UserConfig)
+		if err != nil {
+			return err
+		}
+		if err = yaml.Unmarshal(yamlFile, c.sc); err != nil {
+				return err
+			}
+	*/
+	return nil
+}
+
+// configFromRunOpts creates a configuration from run options
 func (c *Config) configFromRunOpts() error {
 	err := c.SetDefault()
 	if err != nil {

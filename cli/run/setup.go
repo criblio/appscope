@@ -214,8 +214,13 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	cmd := path.Base(args[0])
 	rc.createWorkDir(cmd, attach)
 
-	err := rc.configFromRunOpts()
-	util.CheckErrSprintf(err, "%v", err)
+	if rc.UserConfig == "" {
+		err := rc.configFromRunOpts()
+		util.CheckErrSprintf(err, "%v", err)
+	} else {
+		err := rc.configFromFile()
+		util.CheckErrSprintf(err, "%v", err)
+	}
 
 	if rc.sc.Metric.Transport.TransportType == "file" {
 		newPath, err := filepath.Abs(rc.sc.Metric.Transport.Path)
@@ -240,8 +245,18 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	}
 
 	scYamlPath := filepath.Join(rc.WorkDir, "scope.yml")
-	err = rc.WriteScopeConfig(scYamlPath, filePerms)
-	util.CheckErrSprintf(err, "%v", err)
+	if rc.UserConfig == "" {
+		err := rc.WriteScopeConfig(scYamlPath, filePerms)
+		util.CheckErrSprintf(err, "%v", err)
+	} else {
+		input, err := ioutil.ReadFile(rc.UserConfig)
+		if err != nil {
+			util.ErrAndExit("cannot read file %s: %v", rc.UserConfig, err)
+		}
+		if err = ioutil.WriteFile(scYamlPath, input, 0644); err != nil {
+			util.ErrAndExit("failed to write file to %s: %v", scYamlPath, err)
+		}
+	}
 
 	argsJSONPath := filepath.Join(rc.WorkDir, "args.json")
 	argsBytes, err := json.Marshal(args)

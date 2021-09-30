@@ -140,7 +140,7 @@ func installScope(serviceName string, unameMachine string, unameSysname string, 
 
 	// create the run directory
 	runDir := fmt.Sprintf("/var/run/scope")
-	if _, err := os.Stat(logDir); err != nil {
+	if _, err := os.Stat(runDir); err != nil {
 		err := os.Mkdir(runDir, 0755) // TODO chown/chgrp to who?
 		util.CheckErrSprintf(err, "error: failed to create run directory; %v", err)
 	}

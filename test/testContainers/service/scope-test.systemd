@@ -10,6 +10,8 @@ echo
 [ -f /etc/scope/cribl/scope.yml ] || fail "missing scope.yml"
 [ -d /etc/systemd/system/cribl.service.d ] || fail "missing /etc/systemd/system/cribl.service.d/"
 [ -f /etc/systemd/system/cribl.service.d/env.conf ] || fail "missing /etc/systemd/system/cribl.service.d/env.conf"
+[ -d /var/log/scope ] || fail "missing /var/log/scope/"
+[ -d /var/run/scope ] || fail "missing /var/run/scope/"
 grep LD_PRELOAD /etc/systemd/system/cribl.service.d/env.conf >/dev/null 2>&1 || fail "missing LD_PRELOAD in env.conf"
 grep SCOPE_HOME /etc/systemd/system/cribl.service.d/env.conf >/dev/null 2>&1 || fail "missing SCOPE_HOME in env.conf"
 

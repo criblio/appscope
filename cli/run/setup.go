@@ -154,7 +154,7 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 	internal.CreateLogFile(filepath.Join(rc.WorkDir, "scope.log"), filePerms)
 
 	// Metrics file
-	if rc.MetricsDest != "" || rc.CriblDest != "" {
+	if rc.UserConfig == "" && (rc.MetricsDest != "" || rc.CriblDest != "") {
 		metricsDest := rc.MetricsDest
 		if metricsDest == "" {
 			metricsDest = rc.CriblDest
@@ -162,13 +162,13 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_dest"), []byte(metricsDest), filePerms)
 		util.CheckErrSprintf(err, "error writing metric_dest: %v", err)
 	}
-	if rc.MetricsFormat != "" {
+	if rc.UserConfig == "" && rc.MetricsFormat != "" {
 		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_format"), []byte(rc.MetricsFormat), filePerms)
 		util.CheckErrSprintf(err, "error writing metric_format: %v", err)
 	}
 
 	// Events file
-	if rc.EventsDest != "" || rc.CriblDest != "" {
+	if rc.UserConfig == "" && (rc.EventsDest != "" || rc.CriblDest != "") {
 		eventsDest := rc.EventsDest
 		if eventsDest == "" {
 			eventsDest = rc.CriblDest

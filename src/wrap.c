@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <sys/poll.h>
 
-#ifdef __LINUX__
+#ifdef __linux__
 #include <sys/prctl.h>
 #ifdef __GO__
 #include <asm/prctl.h>
@@ -64,7 +64,7 @@ static void *periodic(void *);
 static void doConfig(config_t *);
 static void threadNow(int);
 
-#ifdef __LINUX__
+#ifdef __linux__
 extern int arch_prctl(int, unsigned long);
 extern unsigned long scope_fs;
 
@@ -346,7 +346,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
     retval;                                                            \
 })
 
-#endif // __LINUX__
+#endif // __linux__
 
 
 static void
@@ -1628,7 +1628,7 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
     return stream;
 }
 
-#ifdef __LINUX__
+#ifdef __linux__
 EXPORTON int
 nanosleep(const struct timespec *req, struct timespec *rem)
 {
@@ -3331,7 +3331,7 @@ _exit(int status)
     __builtin_unreachable();
 }
 
-#endif // __LINUX__
+#endif // __linux__
 
 EXPORTON int
 close(int fd)
@@ -3377,7 +3377,7 @@ fcloseall(void)
     return rc;
 }
 
-#ifdef __MACOS__
+#ifdef __APPLE__
 EXPORTON int
 close$NOCANCEL(int fd)
 {
@@ -3486,7 +3486,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
     return rc;
 }
 
-#endif // __MACOS__
+#endif // __APPLE__
 
 EXPORTON off_t
 lseek(int fd, off_t offset, int whence)
@@ -4369,7 +4369,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
     return rc;
 }
 
-#ifdef __LINUX__
+#ifdef __linux__
 static int
 internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
 {
@@ -4410,7 +4410,7 @@ sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
 {
     return internal_sendmmsg(sockfd, msgvec, vlen, flags);
 }
-#endif // __LINUX__
+#endif // __linux__
 
 EXPORTON ssize_t
 recv(int sockfd, void *buf, size_t len, int flags)
@@ -4538,7 +4538,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     return rc;
 }
 
-#ifdef __LINUX__
+#ifdef __linux__
 EXPORTON int
 recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
          int flags, struct timespec *timeout)
@@ -4573,7 +4573,7 @@ recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
 
     return rc;
 }
-#endif //__LINUX__
+#endif //__linux__
 
 EXPORTOFF struct hostent *
 gethostbyname(const char *name)

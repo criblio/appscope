@@ -4,14 +4,14 @@
 #include <wchar.h>
 #include <sys/statvfs.h>
 #include <netdb.h>
-#ifdef __LINUX__
+#ifdef __linux__
 #include <sys/epoll.h>
 #include <poll.h>
 #include <sys/vfs.h>
 #include <linux/aio_abi.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
-#endif // __LINUX__
+#endif // __linux__
 #include <signal.h>
 #include "../contrib/tls/tls.h"
 #include <stdarg.h>
@@ -20,13 +20,13 @@
 #include <unistd.h>
 #include <arpa/nameser.h>
 
-#ifdef __LINUX__
+#ifdef __linux__
 #ifndef io_context_t
 #define io_context_t unsigned long
 #endif
 #endif
 
-#ifdef __MACOS__
+#ifdef __APPLE__
 #include <sys/mount.h>
 
 #ifndef off64_t
@@ -39,7 +39,7 @@ typedef uint64_t fpos64_t;
 #ifndef nfds_t
 typedef unsigned int nfds_t;
 #endif
-#endif // __MACOS__
+#endif // __APPLE__
 
 
 typedef struct {
@@ -204,7 +204,7 @@ typedef struct {
     void *(*__memcpy_chk)(void *, const void *, size_t, size_t);
     int (*__sprintf_chk)(char *, int, size_t, const char *, ...);
     long int (*__fdelt_chk)(long int);
-#ifdef __LINUX__
+#ifdef __linux__
     // Couldn't easily get struct definitions for these on mac
     int (*statvfs64)(const char *, struct statvfs64 *);
     int (*fstatvfs64)(int, struct statvfs64 *);
@@ -233,13 +233,13 @@ typedef struct {
     int (*getentropy)(void *, size_t);
     void (*__ctype_init)(void);
     int (*__register_atfork)(void (*) (void), void (*) (void), void (*) (void), void *);
-#endif // __LINUX__
+#endif // __linux__
 
-#if defined(__LINUX__) && defined(__STATX__)
+#if defined(__linux__) && defined(__STATX__)
     int (*statx)(int, const char *, int, unsigned int, struct statx *);
-#endif // __LINUX__ && __STATX__
+#endif // __linux__ && __STATX__
 
-#ifdef __MACOS__
+#ifdef __APPLE__
     int (*accept$NOCANCEL)(int, struct sockaddr *, socklen_t *);
     int (*close$NOCANCEL)(int);
     int (*close_nocancel)(int);
@@ -248,7 +248,7 @@ typedef struct {
                                  const struct sockaddr *, socklen_t);
     int32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
                                       uint16_t, uint16_t, void *, void *);
-#endif // __MACOS__
+#endif // __APPLE__
 
     // These functions are not interposed.  They're here because
     // we've seen applications override the weak glibc implementation,

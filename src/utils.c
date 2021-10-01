@@ -80,7 +80,7 @@ setPidEnv(int pid)
     }
 }
 
-#ifdef __MACOS__
+#ifdef __APPLE__
 char *
 getpath(const char *cmd)
 {
@@ -172,7 +172,7 @@ out:
     if (path_env) free(path_env);
     return ret_val;
 }
-#endif //__MACOS__
+#endif //__APPLE__
 
 
 int

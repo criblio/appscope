@@ -205,9 +205,9 @@ testNoInterposedSymbolIsUsed(void** state)
     // Get a list of all interposed functions
     char cmdbuf[1024];
     const char* os = "linux";
-#ifdef __MACOS__
+#ifdef __APPLE__
     os = "macOS";
-#endif // __MACOS__
+#endif // __APPLE__
 #if defined(__x86_64__)
     snprintf(cmdbuf, sizeof(cmdbuf), "nm ./lib/%s/x86_64/libscope.so", os);
 #elif defined(__aarch64__)

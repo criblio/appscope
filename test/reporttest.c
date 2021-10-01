@@ -21,13 +21,13 @@ event_t mtcBuf[BUFSIZE] = {{0}};
 int mtcBufNext = 0;
 
 // These signatures satisfy --wrap=cmdSendEvent in the Makefile
-#ifdef __LINUX__
+#ifdef __linux__
 int __real_cmdSendEvent(ctl_t*, event_t*, uint64_t, proc_id_t*);
 int __wrap_cmdSendEvent(ctl_t* ctl, event_t* event, uint64_t uid, proc_id_t* proc)
-#endif // __LINUX__
-#ifdef __MACOS__
+#endif // __linux__
+#ifdef __APPLE__
 int cmdSendEvent(ctl_t* ctl, event_t* event, uint64_t uit, proc_id_t* proc)
-#endif // __MACOS__
+#endif // __APPLE__
 {
     // Store event for later inspection
     memcpy(&evtBuf[evtBufNext++], event, sizeof(*event));
@@ -37,13 +37,13 @@ int cmdSendEvent(ctl_t* ctl, event_t* event, uint64_t uit, proc_id_t* proc)
 }
 
 // These signatures satisfy --wrap=cmdSendMetric in the Makefile
-#ifdef __LINUX__
+#ifdef __linux__
 int __real_cmdSendMetric(mtc_t*, event_t*);
 int __wrap_cmdSendMetric(mtc_t* mtc, event_t* metric)
-#endif // __LINUX__
-#ifdef __MACOS__
+#endif // __linux__
+#ifdef __APPLE__
 int cmdSendMetric(mtc_t* mtc, event_t* metric)
-#endif // __MACOS__
+#endif // __APPLE__
 {
     // Store metric for later inspection
     memcpy(&mtcBuf[mtcBufNext++], metric, sizeof(*metric));
@@ -206,10 +206,10 @@ nothingCrashesBeforeAnyInit(void** state)
     doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
     doWrite(17, 876, 1, NULL, 0, "writeFunc", BUF, 0);
     doSeek(18, 1, "seekymcseekface");
-#ifdef __LINUX__
+#ifdef __linux__
     doStatPath("/pathy/path", 0, "statymcstatface");
     doStatFd(19, 0, "toomuchstat4u");
-#endif // __LINUX__
+#endif // __linux__
     doDupFile(20, 21, "dup");
     doDupSock(22, 23);
     doDup(24, 0, "dupFunc", 1);
@@ -975,7 +975,7 @@ doSeekSummarization(void** state)
     assert_int_equal(eventCalls(NULL), 0);
 }
 
-#ifdef __LINUX__
+#ifdef __linux__
 static void
 doStatPathNoSummarization(void** state)
 {
@@ -1111,7 +1111,7 @@ doStatFdSummarization(void** state)
      assert_int_equal(metricValues("fs.stat"), 2);
      assert_int_equal(eventCalls(NULL), 0);
 }
-#endif // __LINUX__
+#endif // __linux__
 
 static void
 doDNSSendNoDNSSummarization(void** state)
@@ -1521,7 +1521,7 @@ doNetRxTxErrorSummarization(void** state)
     doClose(16, "closeFunc");
 }
 
-#ifdef __LINUX__
+#ifdef __linux__
 static void
 doStatErrNoSummarization(void** state)
 {
@@ -1575,7 +1575,7 @@ doStatErrSummarization(void** state)
     assert_int_equal(metricValues("fs.error"), 2);
     assert_int_equal(eventCalls(NULL), 0);
 }
-#endif // __LINUX__
+#endif // __linux__
 
 static void
 doDNSErrNoSummarization(void** state)
@@ -1660,12 +1660,12 @@ main(int argc, char* argv[])
         cmocka_unit_test(doSendFullSummarization),
         cmocka_unit_test(doSeekNoSummarization),
         cmocka_unit_test(doSeekSummarization),
-#ifdef __LINUX__
+#ifdef __linux__
         cmocka_unit_test(doStatPathNoSummarization),
         cmocka_unit_test(doStatPathSummarization),
         cmocka_unit_test(doStatFdNoSummarization),
         cmocka_unit_test(doStatFdSummarization),
-#endif // __LINUX__
+#endif // __linux__
         cmocka_unit_test(doDNSSendNoDNSSummarization),
         cmocka_unit_test(doDNSSendDNSSummarization),
         cmocka_unit_test(doFSConnectionErrorNoSummarization),
@@ -1676,10 +1676,10 @@ main(int argc, char* argv[])
         cmocka_unit_test(doFSReadWriteErrorSummarization),
         cmocka_unit_test(doNetRxTxErrorNoSummarization),
         cmocka_unit_test(doNetRxTxErrorSummarization),
-#ifdef __LINUX__
+#ifdef __linux__
         cmocka_unit_test(doStatErrNoSummarization),
         cmocka_unit_test(doStatErrSummarization),
-#endif // __LINUX__
+#endif // __linux__
         cmocka_unit_test(doDNSErrNoSummarization),
         cmocka_unit_test(doDNSErrSummarization),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),

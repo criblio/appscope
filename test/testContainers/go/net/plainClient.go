@@ -8,7 +8,7 @@ import (
 
 func main() {
 
-    resp, err := http.Get("http://cribl.com")
+    resp, err := http.Get("http://cribl.io")
     if err != nil {
         panic(err)
     }

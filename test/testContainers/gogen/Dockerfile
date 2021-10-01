@@ -37,6 +37,7 @@ RUN  mkdir /usr/local/scope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
 COPY gogen/scope-test /usr/local/scope/scope-test
+COPY gogen/weblog.yml /gogen/weblog.yml
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]

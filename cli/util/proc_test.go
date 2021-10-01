@@ -34,12 +34,12 @@ func TestProcessesByName(t *testing.T) {
 // - The expected user value is returned
 func TestPidUser(t *testing.T) {
 	/*
-	 * Disabled since we run as "builder" for `make docker-build`.
-	 * 
-	// Process 1 owner
-	pid := 1
-	result := PidUser(pid)
-	assert.Equal(t, "root", result)
+		 * Disabled since we run as "builder" for `make docker-build`.
+		 *
+		// Process 1 owner
+		pid := 1
+		result := PidUser(pid)
+		assert.Equal(t, "root", result)
 	*/
 
 	// Current process owner

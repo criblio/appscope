@@ -10,7 +10,7 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 2021-10-05 - Maintenance Pre-Release
 
-- **Improvement**: [#462](https://github.com/criblio/appscope/issues/462) Add support for sending event/metric output to a Unix domain socket.
+- **Improvement**: [#462](https://github.com/criblio/appscope/issues/462), [#540](https://github.com/criblio/appscope/issues/540) Add support for sending event/metric output to a Unix domain socket.
 
 - **Improvement**: [#492](https://github.com/criblio/appscope/issues/492) Add support for custom configuration with new `custom` section in `scope.yml`.  
 

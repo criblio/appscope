@@ -11,7 +11,7 @@ Run `scope --help` or `scope -h` to view CLI options. Also see the complete [CLI
 
 ### Let's scope some commands/applications
 
-Test-run a well-known Linux commands, and view the results. E.g.:
+Test-run a well-known Linux command, and view the results. E.g.:
 
 ```
 scope ps -ef
@@ -27,7 +27,7 @@ scope curl https://google.com
 
 ### Let's explore captured data
 
-To see the monitoring and visualization features AppScope offers, exercise some of its options. E.g.:
+To see the monitoring and visualization features AppScope offers, exercise some of its subcommands and options. E.g.:
 
 - Show last session's captured metrics with `scope metrics`:
 
@@ -103,7 +103,7 @@ fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60
 [Bh9] Jan 31 21:38:53 ps console stdout /usr/bin/ps -ef
 ```
 
-- Filter out the last session's events, for just `http` with `scope events -t http`:
+- Filter out everything but `http` from the last session's events, with `scope events -t http`:
 
 ```
 [MJ33] Jan 31 19:55:22 cribl http http-resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
@@ -120,7 +120,7 @@ fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60
 ```
 
 
-- List this AppScope session's history with `scope history`:
+- View the history of the current AppScope session with `scope history`:
 
 ```
 Displaying last 20 sessions
@@ -134,5 +134,7 @@ ID	COMMAND	CMDLINE                  	PID	AGE   	DURATION	TOTAL EVENTS
 
 ### Next Steps
 
+- Try [scoping a running process](/docs/attach-running).
+- Learn how to use [TLS](/docs/tls) with AppScope.
 - Explore the [Loader, Library, and .yml files](/docs/loader-library).
 - View the complete [CLI Reference](/docs/cli-reference).

@@ -55,7 +55,8 @@ event:
     type: tcp
     host: myHost.example.com
     port: 8083
------
+...
+  watch:
     - type: http
       name: .*
       field: .*
@@ -83,8 +84,8 @@ metric:
   enable: true
   format:
     type : statsd
------
-transport:
+...
+  transport:
     type: udp
     host: ddog
     port: 5000

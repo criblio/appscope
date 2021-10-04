@@ -232,6 +232,13 @@ testNoInterposedSymbolIsUsed(void** state)
                    glob_obj.gl_pathv[i]);
             continue;
         }
+
+        if (strstr(glob_obj.gl_pathv[i], "api.o")) {
+            printf("Skipping %s because we are using g_fn functions and need to support the error case.\n",
+                   glob_obj.gl_pathv[i]);
+            continue;
+        }
+
         checkObjectFile(interpose_list, glob_obj.gl_pathv[i], &s);
     }
     globfree(&glob_obj);

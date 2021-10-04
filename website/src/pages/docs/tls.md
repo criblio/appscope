@@ -17,27 +17,26 @@ To see the TLS-related environment variables, run the command:
 ldscope --help configuration | grep TLS
 ```
 
-
 ## Using TLS in Cribl.Cloud
 
 AppScope uses TLS by default to communicate with LogStream in Cribl.Cloud. LogStream has an AppScope Source ready to use out-of-the-box.
 
 Within Cribl.Cloud, a front-end load balancer (reverse proxy) handles the encrypted TLS traffic and relays it to the AppScope Source port in LogStream. The connection from the load balancer to LogStream does **not** use TLS, and you should not enable TLS on the [AppScope Source](https://docs.cribl.io/docs/sources-appscope) in LogStream. No changes in LogStream configuration are needed.
 
-AppScope connects to your Cribl.Cloud Ingest Endpoint on port 10091. The Ingest Endpoint URL is always the same except for the Cribl.Cloud Organization ID, which LogStream uses in the hostname portion, in the following way:
+AppScope connects to your Cribl.Cloud Ingest Endpoint on port 10090. The Ingest Endpoint URL is always the same except for the Cribl.Cloud Organization ID, which LogStream uses in the hostname portion, in the following way:
 
 ```
 https://in.logstream.<organization-ID>.cribl.cloud:10091
 ```
 
-If you **disable** TLS, the port is 10090.
+If you **disable** TLS, the port is 10091.
 
 ### CLI usage
 
 Use scope with the `-c` option:
 
 ```
-scope -c tls://host:10091
+scope -c tls://host:10090
 ```
 
 ### Configuration for `LD_PRELOAD` or `ldscope`
@@ -45,7 +44,7 @@ scope -c tls://host:10091
 To connect AppScope to a LogStream Cloud instance using TLS: 
 
 1. Enable the `transport : tls` element in `scope.yml`.
-1. Connect to port 10091 on your Cribl.Cloud Ingest Endpoint.
+1. Connect to port 10090 on your Cribl.Cloud Ingest Endpoint.
 
 To enable TLS in `scope.yml`, adapt the example below to your environment:
 
@@ -55,20 +54,12 @@ cribl:
   transport:
     type: tcp  # don't use tls here, use tcp and enable tls below
     host: in.logstream.example-organization.cribl.cloud
-    port: 10091 # cribl.cloud's port for the TLS AppScope Source
+    port: 10090 # cribl.cloud's port for the TLS AppScope Source
     tls:
       enable: true
       validateserver: true
       cacertpath: ''
 ```
-
-## Adapting to Network Latency
-
-When you connect AppScope to LogStream or another application, you can usually assume that the process you are scoping will last long enough for AppScope to make the network connection and stream the data to the destination.
-
-This might not hold true if the command or application being scoped exits quickly and network connection latency is relatively high. Under these conditions, events and metrics can be dropped and never reach the destination.
-
-To mitigate this problem, you can set the `SCOPE_CONNECT_TIMEOUT_SECS` environment variable (which is unset by default) to `N`, where `N` is an integer, usually `1`. Then, the AppScope library will keep the scoped process open for `N` seconds, giving AppScope that amount of time to connect and stream data over the network.
 
 ## Scoping Without TLS
 

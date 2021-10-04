@@ -338,8 +338,8 @@ adjustGoStructOffsetsForVersion(int go_ver)
     }
 
 
-    // This creates a file specified by test/testContainers/go/test_go.sh
-    // and used by test/testContainers/go/test_go_struct.sh.
+    // This creates a file specified by test/integration/go/test_go.sh
+    // and used by test/integration/go/test_go_struct.sh.
     //
     // Why?  To test structure offsets in go that can vary. (above)
     //

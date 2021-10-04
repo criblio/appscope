@@ -3,5 +3,5 @@
 .cache/
 coverage/
 go/
-test/testContainers
+test/integration
 website/

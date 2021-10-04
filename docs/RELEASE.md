@@ -69,7 +69,7 @@ additional steps are taken depending on the trigger.
 * We build [container images](#container-images) and push them to Docker Hub
   for release tags.
 
-* We run our [integration tests](../test/testContainers/) for pull requests to
+* We run our [integration tests](../test/integration/) for pull requests to
   the default and release branches. We build and push the container images
   these tests use up to Docker Hub on pushes to the default branch.
 

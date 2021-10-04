@@ -77,7 +77,7 @@ jobs:
       # later.
       - name: Create Release
         id: release
-        if: ${{ steps.tag.outputs.tag != "unreleased" }}
+        if: ${{ steps.tag.outputs.tag != "unreleased" && steps.tag.outputs.tag != "next" }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -358,7 +358,7 @@ jobs:
           aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*'
           echo "::endgroup::"
 
-          if [ "unreleased" != "${{ needs.info.outputs.tag }}" ]; then
+          if [ "unreleased" != "${{ needs.info.outputs.tag }}" -a "next" != "${{ needs.info.outputs.tag }}" ]; then
             echo "::group::Attach Release Assets to https://github.com/criblio/appscope/releases/tag/${{ needs.info.outputs.version }}"
             for ARCH in x86_64 aarch64; do
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}"

@@ -1171,19 +1171,66 @@ findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
     return 0;
 }
 
-/**
+/*
+ * Iterate all shared objects and GOT hook as necessary.
+ * Return FALSE in all cases in order to interate all objects.
+ * Ignore a set of objects we know we don't want to hook.
+ */
+static int
+hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (!info || !data || !info->dlpi_name) return FALSE;
+
+    struct link_map *lm;
+    void *addr = NULL;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+    void *libscopeHandle = data;
+    const char *libname = NULL;
+
+    // don't attempt to hook libscope.so, libc*.so, ld-*.so
+    // where libc*.so is for example libc.so.6 or libc.musl-x86_64.so.1
+    // where ld-*.so is for example ld-linux-x86-64.so.2 or ld-musl-x86_64.so.1
+    // if opening the main exec, name is NULL, else use the full lib name
+    if (strstr(info->dlpi_name, ".so")) {
+        if (strstr(info->dlpi_name, "libc") ||
+            strstr(info->dlpi_name, "ld-") ||
+            strstr(info->dlpi_name, "libscope")) {
+            return FALSE;
+        }
+        libname = info->dlpi_name;
+    }
+
+    void *handle = g_fn.dlopen(libname, RTLD_LAZY);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            addr = dlsym(libscopeHandle, inject_hook_list[i].symbol);
+            inject_hook_list[i].func = addr;
+
+            if ((dlsym(handle, inject_hook_list[i].symbol)) &&
+                (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
+                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
+                             inject_hook_list[i].symbol, info->dlpi_name);
+            }
+        }
+    }
+
+    dlclose(handle);
+    return FALSE;
+}
+
+/*
  * Called when injected to perform GOT hooking.
  */ 
 static bool
 hookInject()
 {
     char *full_path;
-    void *addr = NULL;
-    Elf64_Sym *sym = NULL;
-    Elf64_Rela *rel = NULL;
-    char *str = NULL;
-    int rsz = 0;
-    struct link_map *lm;
 
     if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *libscopeHandle = g_fn.dlopen(full_path, RTLD_NOW);
@@ -1191,27 +1238,7 @@ hookInject()
             return FALSE;
         }
 
-        void *handle = g_fn.dlopen(0, RTLD_LAZY);
-        if (handle == NULL) {
-            dlclose(libscopeHandle);
-            return FALSE;
-        }
-
-        // Get the link map and ELF sections in advance of something matching
-        if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) &&
-            (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
-
-            for (int i=0; inject_hook_list[i].symbol; i++) {
-                addr = dlsym(libscopeHandle, inject_hook_list[i].symbol);
-                
-                inject_hook_list[i].func = addr;
-                if ((dlsym(handle, inject_hook_list[i].symbol)) &&
-                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
-                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s", inject_hook_list[i].symbol);
-                }
-            }
-        }
-        dlclose(handle);
+        dl_iterate_phdr(hookSharedObjs, libscopeHandle);
         dlclose(libscopeHandle);
         return TRUE;
     }

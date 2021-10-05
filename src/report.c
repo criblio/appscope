@@ -1143,9 +1143,6 @@ doHttp2Frame(protocol_info *proto)
             char *val  = out + hdr.val_offset;
             //scopeLogDebug("DEBUG: HTTP/2 decoded header: name=\"%s\", value=\"%s\"", name, val);
 
-            // TODO skip if field name doesn't match `event > watch[type=http] > field`
-            // TODO skip if val doesn't match `event > watch[type=http] > value`
-
             // Update the state of the stream for the given header field. Most
             // of these become entries in the cJSON object that will eventually
             // become the body.data element in the JSON event. Some are stashed

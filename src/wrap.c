@@ -1337,7 +1337,7 @@ initHook(int attachedFlag)
         ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
         funchook = funchook_create();
 
-        if (logLevel(g_log) <= CFG_LOG_DEBUG) {
+        if (logLevel(g_log) <= CFG_LOG_TRACE) {
             // TODO: add some mechanism to get the config'd log file path
             funchook_set_debug_file(DEFAULT_LOG_PATH);
         }

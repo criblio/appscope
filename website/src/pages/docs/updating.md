@@ -11,9 +11,7 @@ cd <your-appscope-directory>
 curl -Lo scope https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linux/scope && chmod 755 ./scope
 ```
 
-Next, confirm the overwrite.
-
-After updating, verify AppScope's version and build date:
+Then, to confirm the overwrite, verify AppScope's version and build date:
 
 ```
 scope version

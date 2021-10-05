@@ -8,6 +8,7 @@ To learn more about AppScope, see these resources from Cribl:
 
 We have a growing number of AppScope-related [blog posts](https://cribl.io/blog/?s=appscope):
 
+- [AppScope from an AppDynamics Perspective](https://cribl.io/blog/appscope-from-an-appdynamics-perspective/)
 - [Latest AppScope Updates: version 0.7 adds ability to attach to a running process, TLS support, and Alpine Linux support](https://cribl.io/blog/latest-appscope-updates-version-0-7-adds-ability-to-attach-to-a-running-process-tls-support-and-alpine-linux-support/)
 - [Introducing AppScope: Easy Black Box Instrumentation for Everything](https://cribl.io/blog/introducing-appscope-easy-black-box-instrumentation-for-everything/)
 - [AppScope Design](https://cribl.io/blog/appscope-design/)

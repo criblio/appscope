@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 #include "atomic.h"
 #include "dbg.h"
 
@@ -31,7 +32,7 @@ struct _dbg_t {
 dbg_t *g_dbg = NULL;
 log_t *g_log = NULL;
 proc_id_t g_proc = {0};
-
+bool g_constructor_debug_enabled;
 
 void
 dbgInit()
@@ -72,7 +73,9 @@ updateLine(line_t *line, char *str)
             ? orig_count
             : MAX_INSTANCES_PER_LINE - 1;
 
-    line->instance[i].time = time(NULL);
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    line->instance[i].time = tv.tv_sec;
     line->instance[i].err = errno;
 
     // The atomic swap allows us to free previous strings without leaking
@@ -140,11 +143,11 @@ dbgOutputHeaderLine(FILE *f)
 {
     if (!f) return;
 
-    time_t t;
-    time(&t);
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
 
     char buf[128] = {0};
-    strftime(buf, sizeof(buf), "%FT%TZ", gmtime(&t));
+    strftime(buf, sizeof(buf), "%FT%TZ", gmtime(&tv.tv_sec));
     fprintf(f, "Scope Version: %s   Dump From: %s\n", SCOPE_VER, buf);
 }
 
@@ -257,8 +260,7 @@ dbgAddLine(const char *key, const char *fmt, ...)
 // for unit tests and allows for a different definition for the
 // scope executable.
 void __attribute__((weak))
-scopeLog(const char *msg, int fd, cfg_log_level_t level)
+scopeLog(cfg_log_level_t level, const char *format, ...)
 {
     return;
 }
-

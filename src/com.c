@@ -13,6 +13,9 @@ bool g_exitdone = FALSE;
 mtc_t *g_mtc = NULL;
 ctl_t *g_ctl = NULL;
 
+list_t *g_protlist;
+unsigned int g_prot_sequence = 0;
+
 // Add a newline delimiter to a msg
 char *
 msgAddNewLine(char *msg)
@@ -90,12 +93,8 @@ reportProcessStart(ctl_t *ctl, bool init, which_transport_t who)
     // only emit metric and log msgs at init time
     if (init) {
         // 3) Log it at startup, provided the loglevel is set to allow it
-        scopeLog("Constructor (Scope Version: " SCOPE_VER ")", -1, CFG_LOG_INFO);
-        char *cmd_w_args = NULL;
-        if (asprintf(&cmd_w_args, "command w/args: %s", g_proc.cmd) != -1) {
-            scopeLog(cmd_w_args, -1, CFG_LOG_INFO);
-            if (cmd_w_args) free(cmd_w_args);
-        }
+        scopeLog(CFG_LOG_INFO, "Constructor (Scope Version: " SCOPE_VER ")");
+        scopeLog(CFG_LOG_INFO, "command w/args: %s", g_proc.cmd);
 
         msgLogConfig(g_cfg.staticfg);
 
@@ -239,7 +238,7 @@ msgLogConfig(config_t *cfg)
     char *cfg_text = cJSON_PrintUnformatted(json);
 
     if (cfg_text) {
-        scopeLog(cfg_text, -1, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "%s", cfg_text);
         free(cfg_text);
     }
 
@@ -308,7 +307,7 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
     int rc, arc;
     char *pcre_stack, *tstack, *gstack;
     if ((pcre_stack = malloc(PCRE_STACK_SIZE)) == NULL) {
-        scopeLog("ERROR; pcre2_match_wrapper: malloc", -1, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "ERROR; pcre2_match_wrapper: malloc");
         return -1;
     }
 
@@ -354,7 +353,7 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
     char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
 
      if ((pcre_stack = malloc(PCRE_STACK_SIZE)) == NULL) {
-        scopeLog("ERROR; regexec_wrapper: malloc", -1, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "ERROR; regexec_wrapper: malloc");
         return -1;
     }
 

@@ -44,11 +44,11 @@ import (
 func TestSetDefault(t *testing.T) {
 	opt := Config{}
 	// No workdir set, should error
-	err := opt.setDefault()
+	err := opt.SetDefault()
 	assert.Error(t, err)
 
 	opt.WorkDir = "/foo"
-	err = opt.setDefault()
+	err = opt.SetDefault()
 	sc := opt.sc
 
 	testYaml := testDefaultScopeConfigYaml("/foo", 4)
@@ -111,7 +111,7 @@ func TestConfigFromRunOpts(t *testing.T) {
 	err = c.configFromRunOpts()
 	assert.Equal(t, fmt.Errorf("Missing :port at the end of tls://bar"), err)
 
-	// invlaid port
+	// invalid port
 	c.MetricsDest = "tcp://bar:foo"
 	err = c.configFromRunOpts()
 	assert.Equal(t, fmt.Errorf("Invalid dest: tcp://bar:foo"), err)

@@ -11,17 +11,15 @@
 // cfgPath returns a pointer to a malloc()'d buffer.
 // The caller is responsible for deallocating with free().
 char * cfgPath(void);
-char *protocolPath(void);
 
 // reads cfg from yaml file
 config_t * cfgRead(const char *);
-bool protocolRead(const char *, list_t *);
 void destroyProtEntry(void *);
 
 // reads cfg from a string (containing json or yaml)
 config_t * cfgFromString(const char *);
 
-// constructs a cJSON object heirarchy or json string
+// constructs a cJSON object hierarchy or json string
 cJSON * jsonObjectFromCfg(config_t *);
 char * jsonStringFromCfg(config_t *);
 

@@ -19,15 +19,15 @@ import (
 	"time"
 )
 
-var port              int
-var payloadsEnabled   bool
-var prettyEnabled     bool
+var port int
+var payloadsEnabled bool
+var prettyEnabled bool
 var timestampsEnabled bool
 
 var start time.Time
 
 func log(c net.Conn, format string, args ...interface{}) {
-	if (timestampsEnabled) {
+	if timestampsEnabled {
 		fmt.Printf(fmt.Sprintf("%8s %s ", time.Since(start).Truncate(time.Millisecond).String(), c.RemoteAddr().String())+format, args...)
 	} else {
 		fmt.Printf(c.RemoteAddr().String()+" "+format, args...)
@@ -55,7 +55,7 @@ func getBusyInABurgerKingBathroom(c net.Conn) {
 			return
 		}
 
-		if (prettyEnabled) {
+		if prettyEnabled {
 			headerJSON, _ := json.MarshalIndent(header, "", "  ")
 			log(c, "%s\n", string(headerJSON))
 		} else {
@@ -76,7 +76,7 @@ func getBusyInABurgerKingBathroom(c net.Conn) {
 				got += n
 				bin = append(bin, chunk...)
 			}
-			if (payloadsEnabled) {
+			if payloadsEnabled {
 				log(c, "%d-byte payload\n%s", need-1, hex.Dump(bin[:need]))
 			}
 		}
@@ -86,7 +86,7 @@ func getBusyInABurgerKingBathroom(c net.Conn) {
 func main() {
 
 	// command-line options
-	flag.IntVar(&port, "p", 9101, "TCP port to listen on")
+	flag.IntVar(&port, "p", 9109, "TCP port to listen on")
 	flag.BoolVar(&payloadsEnabled, "x", false, "Enable hexdumpsed payloads")
 	flag.BoolVar(&prettyEnabled, "j", false, "Enable pretty-printed JSON headers")
 	flag.BoolVar(&timestampsEnabled, "t", false, "Enabled relative-timestamped output")
@@ -94,7 +94,7 @@ func main() {
 
 	start = time.Now()
 
-	l, err := net.Listen("tcp4", ":" + strconv.Itoa(port))
+	l, err := net.Listen("tcp4", ":"+strconv.Itoa(port))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: listen failed; %v\n", err)
 		os.Exit(1)

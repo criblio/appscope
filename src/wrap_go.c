@@ -265,7 +265,7 @@ patchClone()
 
         // set write perms on the page
         if (mprotect(addr, pageSize, PROT_WRITE | PROT_READ | PROT_EXEC)) {
-            scopeLog("ERROR: patchCLone: mprotect failed\n", -1, CFG_LOG_ERROR);
+            scopeLog(CFG_LOG_ERROR, "ERROR: patchCLone: mprotect failed\n");
             return;
         }
 
@@ -275,11 +275,11 @@ patchClone()
         };
         memcpy(clone, ass, sizeof(ass));
 
-        scopeLog("patchClone: CLONE PATCHED\n", -1, CFG_LOG_DEBUG);
+        scopeLog(CFG_LOG_DEBUG, "patchClone: CLONE PATCHED\n");
 
         // restore perms to the page
         if (mprotect(addr, pageSize, PROT_READ | PROT_EXEC)) {
-            scopeLog("ERROR: patchCLone: mprotect restore failed\n", -1, CFG_LOG_ERROR);
+            scopeLog(CFG_LOG_ERROR, "ERROR: patchCLone: mprotect restore failed\n");
             return;
         }
     }
@@ -462,7 +462,7 @@ initGoHook(elf_buf_t *ebuf)
     int go_major_ver = UNKNOWN_GO_VER;
     go_ver = getSymbol(ebuf->buf, "runtime.buildVersion");
     if (!go_ver) {
-        //runtime.buildVersion symbol not found, probabaly dealing with a stripped binary
+        //runtime.buildVersion symbol not found, probably dealing with a stripped binary
         //try to retrieve the version symbol address from the .go.buildinfo section
         go_ver = getGoVersionAddr(ebuf->buf);
     }
@@ -476,7 +476,7 @@ initGoHook(elf_buf_t *ebuf)
             return; // don't install our hooks
         }
         Elf64_Shdr* textSec = getElfSection(ebuf->buf, ".text");
-        sysprint("base %lx %lx %x\n", base, (uint64_t)ebuf->text_addr, textSec->sh_offset);
+        sysprint("base %lx %lx %lx\n", base, (uint64_t)ebuf->text_addr, textSec->sh_offset);
         base = base - (uint64_t)ebuf->text_addr + textSec->sh_offset;
     }
     
@@ -489,22 +489,20 @@ initGoHook(elf_buf_t *ebuf)
         go_major_ver = go_major_version(go_runtime_version);
     }
     if (go_major_ver < MIN_SUPPORTED_GO_VER) {
-        char buf[1024];
         if (!is_go(ebuf->buf)) {
             // Don't expect to get here, but try to be clear if we do.
-            snprintf(buf, sizeof(buf), "%s is not a go application.  Continuing without AppScope.", ebuf->cmd);
+            scopeLog(CFG_LOG_WARN, "%s is not a go application.  Continuing without AppScope.", ebuf->cmd);
         } else if (go_runtime_version) {
-            snprintf(buf, sizeof(buf), "%s was compiled with go version `%s`.  AppScope can only instrument go1.8 or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version);
+            scopeLog(CFG_LOG_WARN, "%s was compiled with go version `%s`.  AppScope can only instrument go1.8 or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version);
         } else {
-            snprintf(buf, sizeof(buf), "%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
+            scopeLog(CFG_LOG_WARN, "%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
         }
-        scopeLog(buf, -1, CFG_LOG_WARN);
         return; // don't install our hooks
     }
     /*
      * Note: calling runtime.cgocall results in the Go error
      *       "fatal error: cgocall unavailable"
-     * Calling runtime.asmcgocall does work. Possibly becasue we
+     * Calling runtime.asmcgocall does work. Possibly because we
      * are entering the Go func past the runtime stack check?
      * Need to investigate later.
      */
@@ -559,7 +557,7 @@ initGoHook(elf_buf_t *ebuf)
         asm_count = cs_disasm(disass_handle, orig_func, size,
                                  (uint64_t)orig_func, 0, &asm_inst);
         if (asm_count <= 0) {
-            sysprint("ERROR: disassembler fails: %s\n\tlen %d code %p result %d\n\ttext addr %p text len %d oinfotext %p\n",
+            sysprint("ERROR: disassembler fails: %s\n\tlen %" PRIu64 " code %p result %lu\n\ttext addr %p text len %zu oinfotext 0x%" PRIx64 "\n",
                      tap->func_name, size,
                      orig_func, sizeof(asm_inst), ebuf->text_addr, ebuf->text_len, offset_into_txt);
             continue;
@@ -594,7 +592,7 @@ return_addr(assembly_fn fn)
         if (tap->assembly_fn == fn) return tap->return_addr;
     }
 
-    scopeLog("FATAL ERROR: no return addr", -1, CFG_LOG_ERROR);
+    scopeLog(CFG_LOG_ERROR, "FATAL ERROR: no return addr");
     exit(-1);
 }
 
@@ -606,7 +604,7 @@ frame_size(assembly_fn fn)
         if (tap->assembly_fn == fn) return tap->frame_size;
     }
 
-    scopeLog("FATAL ERROR: no frame size", -1, CFG_LOG_ERROR);
+    scopeLog(CFG_LOG_ERROR, "FATAL ERROR: no frame size");
     exit(-1);
 }
 
@@ -641,7 +639,7 @@ dumb_thread(void *arg)
  * env var and set the variable g_go_static.
  * If not 0 the executable is static.
  *
- * In the static case we swtich TLS/TCB.
+ * In the static case we switch TLS/TCB.
  * In the dynamic case we do not switch TLS/TCB.
  */
 /*
@@ -699,7 +697,7 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
             // Also seen a case on libmusl where TLS is not set.
             // Therefore, get fs from the kernel.
             if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
-                scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "arch_prctl get go");
                 goto out;
             }
         }
@@ -708,19 +706,19 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
         if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
             // Switch to the main thread TCB
             if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "arch_prctl set scope");
                 goto out;
             }
             pthread_t thread;
             pthread_barrier_t barrier;
             if (pthread_barrier_init(&barrier, NULL, 2) != 0) {
-                scopeLog("pthread_barrier_init failed", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "pthread_barrier_init failed");
                 goto out;
             }
 
             if (!g_fn.pthread_create ||
                 (g_fn.pthread_create(&thread, NULL, dumb_thread, &barrier) != 0)) {
-                scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "pthread_create failed");
                 goto out;
             }
 
@@ -730,24 +728,24 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
             thread_fs = (void *)thread;
 
             if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "arch_prctl set scope");
                 goto out;
             }
 
             if (pthread_barrier_destroy(&barrier) != 0) {
-                scopeLog("pthread_barrier_destroy failed", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "pthread_barrier_destroy failed");
                 goto out;
             }
 
             if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
-                scopeLog("lstInsert failed", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "lstInsert failed");
                 goto out;
             }
 
             sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
         } else {
             if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "arch_prctl set scope");
                 goto out;
             }
         }
@@ -769,7 +767,7 @@ out:
     if (g_go_static && go_fs) {
         // Switch back to the 'm' TLS
         if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-            scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
+            scopeLog(CFG_LOG_ERROR, "arch_prctl restore go ");
         }
     }
     return return_addr(gfunc);
@@ -843,7 +841,7 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
             // Also seen a case on libmusl where TLS is not set.
             // Therefore, get fs from the kernel.
             if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
-                scopeLog("arch_prctl get go", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "arch_prctl get go");
                 goto out;
             }
         }
@@ -852,13 +850,13 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
         if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
             // Switch to the main thread TCB
             if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-                scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "arch_prctl set scope");
                 goto out;
             }
             pthread_t thread;
             if (!g_fn.pthread_create ||
                 (g_fn.pthread_create(&thread, NULL, dumb_thread, NULL) != 0)) {
-                scopeLog("pthread_create failed", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "pthread_create failed");
                 goto out;
             }
             thread_fs = (void *)thread;
@@ -866,7 +864,7 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
         } 
 
         if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-            scopeLog("arch_prctl set scope", -1, CFG_LOG_ERROR);
+            scopeLog(CFG_LOG_ERROR, "arch_prctl set scope");
             goto out;
         }
 
@@ -900,7 +898,7 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
             atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
 
             if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
-                scopeLog("lstInsert failed", -1, CFG_LOG_ERROR);
+                scopeLog(CFG_LOG_ERROR, "lstInsert failed");
                 goto out;
             }
         }
@@ -922,7 +920,7 @@ out:
     if (g_go_static && go_fs) {
         // Switch back to the 'm' TLS
         if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-            scopeLog("arch_prctl restore go ", -1, CFG_LOG_ERROR);
+            scopeLog(CFG_LOG_ERROR, "arch_prctl restore go ");
         }
     }
     return return_addr(gfunc);
@@ -998,7 +996,7 @@ c_open(char *stackaddr)
     char *path = c_str((gostring_t*)(stackaddr + 0x10));
 
     if (!path) {
-        scopeLog("ERROR:go_open: null pathname", -1, CFG_LOG_ERROR);
+        scopeLog(CFG_LOG_ERROR, "ERROR:go_open: null pathname");
         puts("Scope:ERROR:open:no path");
         return;
     }
@@ -1138,7 +1136,7 @@ c_http_server_read(char *stackaddr)
      *
      * For reference, we were looking at the I/F type from go.itab.*crypto/tls.Conn,net.Conn
      * and checking the type to determine TLS. This doesn't work on stripped
-     * executeables and should no longer be needed.
+     * executables and should no longer be needed.
      */
     if (cr_conn_rwc_if && tls) {
         cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go.iface_data);
@@ -1152,7 +1150,7 @@ c_http_server_read(char *stackaddr)
                 fd = *(int *)(pfd + g_go.pd_to_fd);
             }
 
-            funcprint("Scope: go_http_server_read of %ld\n", fd);
+            funcprint("Scope: go_http_server_read of %d\n", fd);
             doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
         }
     }
@@ -1200,7 +1198,7 @@ c_http_server_write(char *stackaddr)
                 fd = *(int *)(pfd + g_go.pd_to_fd);
             }
 
-            funcprint("Scope: c_http_server_write of %ld\n", fd);
+            funcprint("Scope: c_http_server_write of %d\n", fd);
             doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF);
         }
     }
@@ -1329,7 +1327,7 @@ static void
 c_exit(char *stackaddr)
 {
     // don't use stackaddr; patch_first_instruction() does not provide
-    // frame_size, so stackaddr isn't useable
+    // frame_size, so stackaddr isn't usable
     funcprint("c_exit");
 
     int i;

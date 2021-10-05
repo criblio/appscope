@@ -194,6 +194,7 @@ typedef struct fs_info_t {
     metric_t data_type;
     int fd;
     int active;
+    fs_content_type_t content_type;
     fs_type_t type;
     counters_element_t numOpen;
     counters_element_t numClose;

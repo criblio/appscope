@@ -98,7 +98,7 @@ void                mtcFormatVerbositySet(mtc_fmt_t*, unsigned);
 void                mtcFormatCustomTagsSet(mtc_fmt_t*, custom_tag_t**);
 
 // Helper functions - returns a pointer to a malloc'd buffer.
-// The caller is reponsible for deallocating with free().
+// The caller is responsible for deallocating with free().
 char* fmtUrlEncode(const char*);
 char* fmtUrlDecode(const char*);
 

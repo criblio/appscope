@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/un.h>
 
 #include "dbg.h"
 #include "scopetypes.h"
@@ -57,6 +58,12 @@ struct _transport_t
                 struct addrinfo *list;
             } addr;
         } net;
+        struct {
+            int sock;
+            char *path; // original configured path... for error reporting
+            struct sockaddr_un addr;
+            int addr_len;
+        } local; // aka "unix".  Can't use "unix" because it's a macro name
         struct {
             char *path;
             FILE *stream;
@@ -180,13 +187,14 @@ transportConnection(transport_t *trans)
                 return trans->net.sock;
             }
             return trans->net.pending_connect;
+        case CFG_UNIX:
+            return trans->local.sock;
         case CFG_FILE:
             if (trans->file.stream) {
                 return fileno(trans->file.stream);
             } else {
                 return -1;
             }
-        case CFG_UNIX:
         case CFG_SYSLOG:
         case CFG_SHM:
             break;
@@ -207,11 +215,11 @@ transportNeedsConnection(transport_t *trans)
             if ((trans->net.sock == -1) ||
                 (trans->net.tls.enable && !trans->net.tls.ssl)) return TRUE;
             if (osNeedsConnect(trans->net.sock)) {
-                DBG("fd: %d, tls:%d", trans->net.sock, trans->net.tls.enable);
+                DBG("fd:%d, tls:%d", trans->net.sock, trans->net.tls.enable);
                 if (trans->net.tls.enable) {
-                    scopeLog("tls session closed remotely", trans->net.sock, CFG_LOG_INFO);
+                    scopeLog(CFG_LOG_INFO, "fd:%d tls session closed remotely", trans->net.sock);
                 } else {
-                    scopeLog("tcp connection closed remotely", trans->net.sock, CFG_LOG_INFO);
+                    scopeLog(CFG_LOG_INFO, "fd:%d tcp connection closed remotely", trans->net.sock);
                 }
                 transportDisconnect(trans);
                 return TRUE;
@@ -228,6 +236,13 @@ transportNeedsConnection(transport_t *trans)
             }
             return (trans->file.stream == NULL);
         case CFG_UNIX:
+            if (trans->local.sock == -1) return TRUE;
+            if (osNeedsConnect(trans->local.sock)) {
+                DBG("fd:%d %s", trans->local.sock, trans->local.path);
+                transportDisconnect(trans);
+                return TRUE;
+            }
+            return FALSE;
         case CFG_SYSLOG:
         case CFG_SHM:
             break;
@@ -270,13 +285,7 @@ shutdownTlsSession(transport_t *trans)
         if (ret < 0) {
             // protocol error occurred
             int ssl_err = SSL_get_error(trans->net.tls.ssl, ret);
-            char *logmsg = NULL;
-            if (asprintf(&logmsg, "Client SSL_shutdown failed: ssl_err=%d\n",
-                     ssl_err)) {
-                scopeLog(logmsg, -1, CFG_LOG_INFO);
-                if (logmsg) free(logmsg);
-            }
-
+            scopeLog(CFG_LOG_INFO, "Client SSL_shutdown failed: ssl_err=%d\n", ssl_err);
         } else if (ret == 0) {
             // shutdown not complete, call again
             char buf[4096];
@@ -291,12 +300,7 @@ shutdownTlsSession(transport_t *trans)
             if (ret != 1) {
                 // second shutdown not successful
                 int ssl_err = SSL_get_error(trans->net.tls.ssl, ret);
-                char *logmsg = NULL;
-                if (asprintf(&logmsg, "Waiting for server shutdown using SSL_shutdown failed: "
-                            "ssl_err=%d\n", ssl_err)) {
-                    scopeLog(logmsg, -1, CFG_LOG_INFO);
-                    if (logmsg) free(logmsg);
-                }
+                scopeLog(CFG_LOG_INFO, "Waiting for server shutdown using SSL_shutdown failed: ssl_err=%d\n", ssl_err);
             }
         }
     }
@@ -319,7 +323,7 @@ shutdownTlsSession(transport_t *trans)
 static void
 handle_tls_destroy(void)
 {
-    scopeLog("detected beginning of process exit sequence", -1, CFG_LOG_INFO);
+    scopeLog(CFG_LOG_INFO, "detected beginning of process exit sequence");
 
     if (handleExit_fn) handleExit_fn();
 }
@@ -344,7 +348,7 @@ static int
 establishTlsSession(transport_t *trans)
 {
     if (!trans || trans->net.sock == -1) return FALSE;
-    scopeLog("establishing tls session", trans->net.sock, CFG_LOG_INFO);
+    scopeLog(CFG_LOG_INFO, "fd:%d establishing tls session", trans->net.sock);
 
     static int init_called = FALSE;
     if (!init_called) {
@@ -354,11 +358,9 @@ establishTlsSession(transport_t *trans)
 
     trans->net.tls.ctx = SSL_CTX_new(TLS_method());
     if (!trans->net.tls.ctx) {
-        char msg[512] = {0};
         char err[256] = {0};
         ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
-        snprintf(msg, sizeof(msg), "error creating tls context: %s", err);
-        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "fd:%d error creating tls context: %s", trans->net.sock, err);
         goto err;
     }
 
@@ -369,11 +371,9 @@ establishTlsSession(transport_t *trans)
 
     long loc_rv = SSL_CTX_load_verify_locations(trans->net.tls.ctx, cafile, NULL);
     if (trans->net.tls.validateserver && !loc_rv) {
-        char msg[512] = {0};
         char err[256] = {0};
         ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
-        snprintf(msg, sizeof(msg), "error setting tls cacertpath: \"%s\" : %s", cafile, err);
-        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "fd:%d error setting tls cacertpath: \"%s\" : %s", trans->net.sock, cafile, err);
         // We're not treating this as a hard error at this point.
         // Let the process proceed; validation below will likely fail
         // and might provide more meaningful info.
@@ -381,36 +381,29 @@ establishTlsSession(transport_t *trans)
 
     trans->net.tls.ssl = SSL_new(trans->net.tls.ctx);
     if (!trans->net.tls.ssl) {
-        char msg[512] = {0};
         char err[256] = {0};
         ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
-        snprintf(msg, sizeof(msg), "error creating tls session: %s", err);
-        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "fd:%d error creating tls session: %s", trans->net.sock, err);
         goto err;
     }
 
     if (!SSL_set_fd(trans->net.tls.ssl, trans->net.sock)) {
-        char msg[512] = {0};
         char err[256] = {0};
         ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
-        snprintf(msg, sizeof(msg), "error setting tls on socket: %d : %s", trans->net.sock, err);
-        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "fd:%d error setting tls on socket: %d : %s", trans->net.sock, trans->net.sock, err);
         goto err;
     }
 
     ERR_clear_error(); // to make SSL_get_error reliable
     int con_rv = SSL_connect(trans->net.tls.ssl);
     if (con_rv != 1) {
-        char msg[512] = {0};
         char err[256] = {0};
         int ssl_err = SSL_get_error(trans->net.tls.ssl, con_rv);
         ERR_error_string_n(ssl_err, err, sizeof(err));
-        snprintf(msg, sizeof(msg), "error establishing tls connection: %s", err);
-        scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "fd:%d error establishing tls connection: %s", trans->net.sock, err);
         if (ssl_err == SSL_ERROR_SSL || ssl_err == SSL_ERROR_SYSCALL) {
             ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
-            snprintf(msg, sizeof(msg), "error establishing tls connection: %s %d", err, errno);
-            scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+            scopeLog(CFG_LOG_INFO, "fd:%d error establishing tls connection: %s %d", trans->net.sock, err, errno);
         }
         goto err;
     }
@@ -421,22 +414,20 @@ establishTlsSession(transport_t *trans)
         if (cert) {
             X509_free(cert);  // Looks good.  Free it immediately
         } else {
-            scopeLog("error accessing peer certificate for tls server validation",
-                                                  trans->net.sock, CFG_LOG_INFO);
+            scopeLog(CFG_LOG_INFO, "fd:%d error accessing peer certificate for tls server validation",
+                                                  trans->net.sock);
             goto err;
         }
 
         long ver_rc = SSL_get_verify_result(trans->net.tls.ssl);
         if (ver_rc != X509_V_OK) {
-            char msg[512] = {0};
             const char *err = X509_verify_cert_error_string(ver_rc);
-            snprintf(msg, sizeof(msg), "tls server validation failed : \"%s\"", err);
-            scopeLog(msg, trans->net.sock, CFG_LOG_INFO);
+            scopeLog(CFG_LOG_INFO, "fd:%d tls server validation failed : \"%s\"", trans->net.sock, err);
             goto err;
         }
     }
 
-    scopeLog("tls session established", trans->net.sock, CFG_LOG_INFO);
+    scopeLog(CFG_LOG_INFO, "fd:%d tls session established", trans->net.sock);
     return TRUE;
 err:
     shutdownTlsSession(trans);
@@ -452,7 +443,7 @@ transportDisconnect(transport_t *trans)
         case CFG_TCP:
             // appropriate for both tls and non-tls connections...
             shutdownTlsSession(trans);
-            if (trans->net.pending_connect) {
+            if (trans->net.pending_connect != -1) {
                 g_fn.close(trans->net.pending_connect);
                 trans->net.pending_connect = -1;
             }
@@ -464,6 +455,11 @@ transportDisconnect(transport_t *trans)
             trans->file.stream = NULL;
             break;
         case CFG_UNIX:
+            if (trans->local.sock != -1) {
+                g_fn.close(trans->local.sock);
+                trans->local.sock = -1;
+            }
+            break;
         case CFG_SYSLOG:
         case CFG_SHM:
             break;
@@ -552,7 +548,7 @@ err:
 }
 
 
-// This is expected to be called by child processses that
+// This is expected to be called by child processes that
 // may have inherited connected transports from their parent
 // processes.  i.e. fork()->doReset() path
 // As a caution, because of its use of g_cached_addr, it's
@@ -660,7 +656,7 @@ checkPendingSocketStatus(transport_t *trans)
     socklen_t optlen = sizeof(opt);
     if ((getsockopt(trans->net.pending_connect, SOL_SOCKET, SO_ERROR, (void*)(&opt), &optlen) < 0)
             || opt) {
-        scopeLog("connect failed", trans->net.pending_connect, CFG_LOG_INFO);
+        scopeLog(CFG_LOG_INFO, "fd:%d connect failed", trans->net.pending_connect);
 
         g_fn.close(trans->net.pending_connect);
         trans->net.pending_connect = -1;
@@ -668,7 +664,7 @@ checkPendingSocketStatus(transport_t *trans)
     }
 
     // We have a connection
-    scopeLog("connect successful", trans->net.pending_connect, CFG_LOG_INFO);
+    scopeLog(CFG_LOG_INFO, "fd:%d connect successful", trans->net.pending_connect);
 
     // Move this descriptor up out of the way
     trans->net.sock = placeDescriptor(trans->net.pending_connect, trans);
@@ -730,13 +726,8 @@ getAddressList(transport_t *trans)
             return 0;
     }
 
-    char *logmsg = NULL;
     char *type = (trans->type == CFG_UDP) ? "udp" : "tcp";
-    if (asprintf(&logmsg, "getting DNS info for %s %s:%s",
-             type, trans->net.host, trans->net.port) != -1) {
-        scopeLog(logmsg, -1, CFG_LOG_INFO);
-        if (logmsg) free(logmsg);
-    }
+    scopeLog(CFG_LOG_INFO, "getting DNS info for %s %s:%s", type, trans->net.host, trans->net.port);
 
     if (trans->getaddrinfo(trans->net.host,
                            trans->net.port,
@@ -825,22 +816,14 @@ socketConnectionStart(transport_t *trans)
                          addr->ai_addrlen) == -1) {
 
             if (errno != EINPROGRESS) {
-                char *logmsg = NULL;
-                if (asprintf(&logmsg, "connect to %s:%d failed", addrstr, port) != -1) {
-                    scopeLog(logmsg, sock, CFG_LOG_INFO);
-                    if (logmsg) free(logmsg);
-                }
+                scopeLog(CFG_LOG_INFO, "fd:%d connect to %s:%d failed", sock, addrstr, port);
 
                 // We could create a sock, but not connect.  Clean up.
                 g_fn.close(sock);
                 continue;
             }
 
-            char *logmsg = NULL;
-            if (asprintf(&logmsg, "connect to %s:%d is pending", addrstr, port) != -1) {
-                scopeLog(logmsg, sock, CFG_LOG_INFO);
-                if (logmsg) free(logmsg);
-            }
+            scopeLog(CFG_LOG_INFO, "fd:%d connect to %s:%d is pending", sock, addrstr, port);
 
             trans->net.pending_connect = sock;
             break;  // replace w/continue for a shotgun start.
@@ -848,11 +831,7 @@ socketConnectionStart(transport_t *trans)
 
 
         if (trans->type == CFG_UDP) {
-            char *logmsg = NULL;
-            if (asprintf(&logmsg, "connect to %s:%d was successful", addrstr, port) != -1) {
-                scopeLog(logmsg, sock, CFG_LOG_INFO);
-                if (logmsg) free(logmsg);
-            }
+            scopeLog(CFG_LOG_INFO, "fd:%d connect to %s:%d was successful", sock, addrstr, port);
 
             // connect on udp sockets normally succeeds immediately.
             trans->net.sock = placeDescriptor(sock, trans);
@@ -944,6 +923,32 @@ transportConnect(transport_t *trans)
             return checkPendingSocketStatus(trans);
         case CFG_FILE:
             return transportConnectFile(trans);
+        case CFG_UNIX:
+            if ((trans->local.sock = g_fn.socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+                DBG("%d %s", trans->local.sock, trans->local.path);
+                return 0;
+            }
+
+            // Set close on exec
+            int flags = g_fn.fcntl(trans->local.sock, F_GETFD, 0);
+            if (g_fn.fcntl(trans->local.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
+                DBG("%d %s", trans->local.sock, trans->local.path);
+            }
+
+            if (g_fn.connect(trans->local.sock, (const struct sockaddr *)&trans->local.addr,
+                             trans->local.addr_len) == -1) {
+                scopeLog(CFG_LOG_INFO, "fd:%d (%s) connect failed", trans->local.sock, trans->local.path);
+                g_fn.close(trans->local.sock);
+                trans->local.sock = -1;
+                return 0;
+            }
+
+            // We have a connection
+            scopeLog(CFG_LOG_INFO, "fd:%d connect successful", trans->local.sock);
+
+            // Move this descriptor up out of the way
+            trans->local.sock = placeDescriptor(trans->local.sock, trans);
+            break;
         default:
             DBG(NULL);
     }
@@ -1036,19 +1041,43 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
     return t;
 }
 
-transport_t*
-transportCreateUnix(const char* path)
+transport_t *
+transportCreateUnix(const char *path)
 {
-    if (!path) return NULL;
-    transport_t* t = calloc(1, sizeof(transport_t));
-    if (!t) {
-        DBG(NULL);
-        return NULL;
+    transport_t *trans = NULL;
+
+    if (!path) goto err;
+
+    int pathlen = strlen(path);
+    if (pathlen >= sizeof(trans->local.addr.sun_path)) goto err;
+
+    if (!(trans = newTransport())) goto err;
+
+    trans->type = CFG_UNIX;
+    trans->local.sock = -1;
+    if (!(trans->local.path = strdup(path))) goto err;
+
+    memset(&trans->local.addr, 0, sizeof(trans->local.addr));
+    trans->local.addr.sun_family = AF_UNIX;
+    strncpy(trans->local.addr.sun_path, path, pathlen);
+    trans->local.addr_len = pathlen + sizeof(sa_family_t);
+    if (path[0] == '@') {
+        // The socket is abstract
+        trans->local.addr.sun_path[0] = 0;
+    } else {
+        // Abstract socket addresses don't include a trailing null
+        // delimiter but filesystem sockets do.
+        trans->local.addr_len += 1; 
     }
 
-    t->type = CFG_UNIX;
+    transportConnect(trans);
 
-    return t;
+    return trans;
+
+err:
+    DBG("%s %p", path, trans);
+    transportDestroy(&trans);
+    return trans;
 }
 
 transport_t*
@@ -1080,27 +1109,29 @@ transportCreateShm()
 }
 
 void
-transportDestroy(transport_t** transport)
+transportDestroy(transport_t **transport)
 {
     if (!transport || !*transport) return;
 
-    transport_t* t = *transport;
-    switch (t->type) {
+    transport_t *trans = *transport;
+    switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            transportDisconnect(t);
-            if (t->net.host) free (t->net.host);
-            if (t->net.port) free (t->net.port);
-            if (t->net.tls.cacertpath) free(t->net.tls.cacertpath);
-            freeAddressList(t);
+            transportDisconnect(trans);
+            if (trans->net.host) free (trans->net.host);
+            if (trans->net.port) free (trans->net.port);
+            if (trans->net.tls.cacertpath) free(trans->net.tls.cacertpath);
+            freeAddressList(trans);
             break;
         case CFG_UNIX:
+            if (trans->local.path) free(trans->local.path);
+            transportDisconnect(trans);
             break;
         case CFG_FILE:
-            if (t->file.path) free(t->file.path);
-            if (!t->file.stdout && !t->file.stderr) {
+            if (trans->file.path) free(trans->file.path);
+            if (!trans->file.stdout && !trans->file.stderr) {
                 // if stdout/stderr, we didn't open stream, so don't close it
-                if (t->file.stream) g_fn.fclose(t->file.stream);
+                if (trans->file.stream) g_fn.fclose(trans->file.stream);
             }
             break;
         case CFG_SYSLOG:
@@ -1108,9 +1139,9 @@ transportDestroy(transport_t** transport)
         case CFG_SHM:
             break;
         default:
-            DBG("%d", t->type);
+            DBG("%d", trans->type);
     }
-    free(t);
+    free(trans);
     *transport = NULL;
 }
 
@@ -1242,6 +1273,30 @@ transportSend(transport_t *trans, const char *msg, size_t len)
             }
             break;
         case CFG_UNIX:
+            if (trans->local.sock != -1) {
+                int flags = 0;
+#ifdef __LINUX__
+                flags |= MSG_NOSIGNAL;
+#endif
+                int rc = g_fn.send(trans->local.sock, msg, len, flags);
+
+                if (rc < 0) {
+                    switch (errno) {
+                    case EBADF:
+                    case EPIPE:
+                        DBG(NULL);
+                        transportDisconnect(trans);
+                        transportConnect(trans);
+                        return -1;
+                    case EWOULDBLOCK:
+                        DBG(NULL);
+                        break;
+                    default:
+                        DBG(NULL);
+                    }
+                }
+            }
+            break;
         case CFG_SYSLOG:
         case CFG_SHM:
             return -1;

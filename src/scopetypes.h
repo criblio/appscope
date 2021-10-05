@@ -61,7 +61,6 @@ typedef unsigned int bool;
 
 #define CFG_MAX_VERBOSITY 9
 #define CFG_FILE_NAME "scope.yml"
-#define PROTOCOL_FILE_NAME "scope_protocol.yml"
 
 #define DEFAULT_MTC_ENABLE TRUE
 #define DEFAULT_MTC_FORMAT CFG_FMT_STATSD
@@ -108,7 +107,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_CONSOLE TRUE
 #define DEFAULT_SRC_SYSLOG FALSE
 #define DEFAULT_SRC_METRIC FALSE
-#define DEFAULT_SRC_HTTP FALSE
+#define DEFAULT_SRC_HTTP TRUE
 #define DEFAULT_SRC_NET TRUE
 #define DEFAULT_SRC_FS TRUE
 #define DEFAULT_SRC_DNS TRUE
@@ -174,6 +173,7 @@ typedef unsigned int bool;
 //    SCOPE_PID                      provided by library
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
 //    SCOPE_ALLOW_MUSL_ATTACH        allows attach for musl processes
+//    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
 
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"

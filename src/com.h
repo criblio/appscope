@@ -22,6 +22,9 @@ extern bool g_need_stack_expand;
 extern unsigned g_sendprocessstart;
 extern bool g_exitdone;
 
+extern list_t *g_protlist;
+extern unsigned int g_prot_sequence;
+
 // Post a message from report to the command buffer
 int cmdSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);
 int cmdSendMetric(mtc_t *, event_t* );
@@ -48,7 +51,7 @@ void sendProcessStartMetric();
 // Create a json object describing the current configuration
 cJSON *jsonConfigurationObject(config_t *);
 
-// Retreive messages
+// Retrieve messages
 uint64_t msgEventGet(ctl_t *);
 
 // wrappers

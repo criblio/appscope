@@ -20,12 +20,18 @@ var logsCmd = &cobra.Command{
 		id, _ := cmd.Flags().GetInt("id")
 		lastN, _ := cmd.Flags().GetInt("last")
 		scopeLog, _ := cmd.Flags().GetBool("scope")
+		serviceLog, _ := cmd.Flags().GetString("service")
 
-		sessions := sessionByID(id)
-
-		logPath := sessions[0].LdscopeLogPath
-		if scopeLog {
-			logPath = sessions[0].ScopeLogPath
+		var logPath string
+		if len(serviceLog) > 0 {
+			logPath = fmt.Sprintf("/var/log/scope/%s.log", serviceLog)
+		} else {
+			sessions := sessionByID(id)
+			if scopeLog {
+				logPath = sessions[0].ScopeLogPath
+			} else {
+				logPath = sessions[0].LdscopeLogPath
+			}
 		}
 
 		// Open log file
@@ -53,5 +59,6 @@ func init() {
 	logsCmd.Flags().IntP("id", "i", -1, "Display logs from specific from session ID")
 	logsCmd.Flags().IntP("last", "n", 20, "Show last <n> lines")
 	logsCmd.Flags().BoolP("scope", "s", false, "Show scope.log (from CLI) instead of ldscope.log (from library)")
+	logsCmd.Flags().StringP("service", "S", "", "Display logs from a Systemd service instead of a session)")
 	RootCmd.AddCommand(logsCmd)
 }

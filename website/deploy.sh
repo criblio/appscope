@@ -10,7 +10,7 @@ npx gatsby build
 BUCKET=io.appscope.staging
 DISTRIBUTION_ID=E2O0IS8RABQ4AT
 
-if [ $GITHUB_REF == "refs/heads/master" ]; then
+if [[ $GITHUB_REF == refs/tags/web* ]]; then
     BUCKET=io.appscope
     DISTRIBUTION_ID=E3CI6UPKUT68NJ
 fi

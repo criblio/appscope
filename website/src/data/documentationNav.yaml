@@ -14,9 +14,6 @@
     - name: Requirements 
       path: /docs/requirements
 
-    - name: Using TLS for Secure Connections 
-      path: /docs/tls
-
     - name: Installing
       path: /docs/installing
 
@@ -33,6 +30,9 @@
 
     - name: Scoping a Running Process
       path: /docs/attach-running
+
+    - name: Using TLS for Secure Connections 
+      path: /docs/tls
 
     - name: Loader and Library
       path: /docs/loader-library

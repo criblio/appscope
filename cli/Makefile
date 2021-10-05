@@ -18,7 +18,7 @@ CONFDIR := ../conf
 SCOPE := $(BINDIR)/scope
 LDSCOPE := $(BINDIR)/ldscope
 LIBSCOPE := $(LIBDIR)/libscope.so
-CONF_YML := $(wildcard $(CONFDIR)/*.yml)
+CONF_YML := $(CONFDIR)/scope.yml
 
 GO_BINDATA := $(GOBIN)/go-bindata
 GOVVV := $(GOBIN)/govvv
@@ -32,8 +32,7 @@ debug:
 	$(MAKE) scope BUILD_OPTS="-gcflags=all=\"-N -l\""
 
 ## all: build and compress \`scope\`
-all: scope
-	@[ -z "$(COMPRESS)" ] || $(MAKE) -s compressscope
+all: scope compressscope
 
 ## clean: remove the built binary
 clean:
@@ -49,7 +48,7 @@ $(GOVVV):
 	$(GO) get github.com/ahmetb/govvv
 $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
-		sh -s -- -b $(GO_BINDIR) v1.40.1
+		sh -s -- -b $(GOBIN) v1.42.1
 
 rebuild: clean build 
 
@@ -64,7 +63,6 @@ $(LDSCOPE):
 $(LIBSCOPE):
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libscope.so
 
-# shortcut "easy button"
 scope: $(SCOPE)
 
 $(SCOPE): export GOOS=linux
@@ -75,8 +73,10 @@ $(SCOPE): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
 
-compressscope: $(SCOPE)
-	upx -l $(SCOPE) >/dev/null 2>&1 || upx -9 $(SCOPE)
+compressscope: $(SCOPE) require-upx
+	if [ "$(ARCH)" = "x86_64" ]; then \
+	  upx -l $(SCOPE) >/dev/null 2>&1 || upx -9 $(SCOPE); \
+	fi
 
 ## test: run unit tests
 test:
@@ -108,4 +108,9 @@ help: Makefile
 	@sed -n 's/^##//p' $< | column -t -s ':' |  sed -e 's/^/ /'
 	@echo
 
-.PHONY: build debug all clean deps rebuild scope compressscope test fmt lint vet cover check help
+# fail of upx not in $PATH
+require-upx:
+	@[ -n "$(shell which upx)" ] || \
+	  { echo >&2 "error: upx required"; exit 1; }
+
+.PHONY: build debug all clean deps rebuild scope compressscope test fmt lint vet cover check help require-upx

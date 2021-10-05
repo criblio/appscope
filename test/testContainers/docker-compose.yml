@@ -125,15 +125,53 @@ services:
       - "9000:9000"
     <<: *scope-common
 
+      #  fluentbit:
+      #    image: scopeci/scope-fluentbit
+      #    build:
+      #      cache_from:
+      #        - scopeci/scope-fluentbit
+      #      context: .
+      #      dockerfile: ./fluentbit/Dockerfile
+      #    ports:
+      #      - "9000:9000"
+      #    <<: *scope-common
+
   http:
-    image: scopeci/scope-http-it
+    image: ghcr.io/criblio/appscope-test-http:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - scopeci/scope-http-it
+        - ghcr.io/criblio/appscope-test-http:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./http/Dockerfile
     ports:
       - "9000:9000"
+    <<: *scope-common
+
+  service-initd:
+    image: ghcr.io/criblio/appscope-test-service-initd:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-service-initd:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./service/Dockerfile.initd
+    <<: *scope-common
+
+  service-systemd:
+    image: ghcr.io/criblio/appscope-test-service-systemd:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-service-systemd:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./service/Dockerfile.systemd
+    <<: *scope-common
+
+  console:
+    image: ghcr.io/criblio/appscope-test-console:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-console:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./console/Dockerfile
     <<: *scope-common
 
 # vim: ts=2 sw=2 et :

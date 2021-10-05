@@ -1,0 +1,20 @@
+version: '3.5'
+
+x-scope-common: &scope-common
+  volumes:
+    - ../../..:/opt/appscope
+  working_dir: /opt/appscope
+  privileged: true
+
+services:
+  payload:
+    image: scopemanual/payload
+    build:
+      cache_from:
+        - scopemanual/payload
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+      - "10091:10091"
+    <<: *scope-common

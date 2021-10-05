@@ -1,0 +1,26 @@
+inputs:
+  in_tcp_json:
+    disabled: false
+    host: 0.0.0.0
+    tls:
+      disabled: true
+      requestCert: false
+    ipWhitelistRegex: /.*/
+    maxActiveCxn: 1000
+    enableProxyHeader: false
+    authType: manual
+    authToken: ""
+    type: tcpjson
+    port: 10070
+  in_appscope:
+    disabled: false
+    host: 0.0.0.0
+    tls:
+      disabled: true
+    ipWhitelistRegex: /.*/
+    maxActiveCxn: 1000
+    enableProxyHeader: false
+    staleChannelFlushMs: 10000
+    authToken: ""
+    type: appscope
+    port: 10090

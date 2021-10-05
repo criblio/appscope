@@ -28,7 +28,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
-      # This defines a number of outputs based on the tage being built if there
+      # This defines a number of outputs based on the tag being built if there
       # is one. We'll use the outputs in other places.
       - name: Get Version
         id: version
@@ -77,7 +77,7 @@ jobs:
       # later.
       - name: Create Release
         id: release
-        if: ${{ steps.version.outputs.is-semver == 'true' }}
+        if: ${{ steps.tag.outputs.tag != 'unreleased' && steps.tag.outputs.tag != 'next' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -166,7 +166,7 @@ jobs:
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v1
 
-      # Start a BuildX builder. We'll use the ouptuts later so give it an ID.
+      # Start a BuildX builder. We'll use the outputs later so give it an ID.
       - name: Setup Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v1
@@ -327,8 +327,7 @@ jobs:
           echo "::group::Prep Content"
           mkdir ${TMPDIR}/scope
 
-          cp conf/scope.yml          ${TMPDIR}/scope
-          cp conf/scope_protocol.yml ${TMPDIR}/scope
+          cp conf/scope.yml ${TMPDIR}/scope
           for ARCH in x86_64 aarch64; do
             cp bin/linux/${ARCH}/{scope,ldscope} ${TMPDIR}/scope
             cp lib/linux/${ARCH}/libscope.so ${TMPDIR}/scope
@@ -359,7 +358,7 @@ jobs:
           aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*'
           echo "::endgroup::"
 
-          if [ "true" = "${{ needs.info.outputs.is-semver }}" ]; then
+          if [ "unreleased" != "${{ needs.info.outputs.tag }}" -a "next" != "${{ needs.info.outputs.tag }}" ]; then
             echo "::group::Attach Release Assets to https://github.com/criblio/appscope/releases/tag/${{ needs.info.outputs.version }}"
             for ARCH in x86_64 aarch64; do
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}"

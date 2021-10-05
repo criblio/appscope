@@ -13,6 +13,8 @@ on:
   push:
     branches:
       - master
+    tags:
+      - 'web*'
     paths:
       - 'website/**'
 jobs:

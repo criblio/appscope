@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 #include "atomic.h"
 #include "com.h"
@@ -50,6 +51,10 @@ static search_t* g_http_redirect = NULL;
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
 
+// Linked list, indexed by channel ID, of net_info pointers used in
+// doProtocol() when it's not provided with a valid file descriptor.
+static list_t *g_extra_net_info_list = NULL;
+
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
 
@@ -74,6 +79,18 @@ static protocol_def_t *g_http_protocol_def = NULL;
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
+
+static void
+destroyNetInfo(void *data)
+{
+    if (!data) return;
+    net_info *net = (net_info *)data;
+
+    free(net->http.http2Buf[0].buf);
+    free(net->http.http2Buf[1].buf);
+
+    free(net);
+}
 
 int
 get_port(int fd, int type, control_type_t which) {
@@ -259,6 +276,8 @@ initState()
 
     g_protlist = lstCreate(destroyProtEntry);
     initPayloadDetect();
+
+    g_extra_net_info_list = lstCreate(destroyNetInfo);
 
     initReporting();
 }
@@ -1153,52 +1172,65 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
 {
     net_info *net = getNetEntry(sockfd);
 
+    // When the SSL/TLS implementation can't provide the socket's file
+    // descriptor, we get -1 and net is NULL. It happens when an OpenSSL
+    // connection is given callback functions instead of the actual file
+    // descriptor. NodeJS works this way so it can use libuv for the IO
+    // instead of letting OpenSSL handle it.
+    if (!net) {
+        // In these cases, we still need a net_info to track the state of
+        // protocol detection or our HTTP/2 processing won't work. We're
+        // keeping a linked-list, indexed by channel ID, of pointers to
+        // "extra" net_info objects to use instead.
+        net = lstFind(g_extra_net_info_list, id);
+        if (!net) {
+            net = calloc(1, sizeof(net_info));
+            if (!net) {
+                scopeLogError("ERROR: failed to allocate an extra net_info");
+                DBG(NULL);
+                // continue with net==NULL
+            } else {
+                if (lstInsert(g_extra_net_info_list, id, net) != TRUE) {
+                    free(net);
+                    net = NULL;
+                    scopeLogError("ERROR: failed to save an extra net_info");
+                    DBG(NULL);
+                    // continue with net==NULL
+                } else {
+                    // populate the new net_info
+                    net->active = TRUE;
+                    net->type = SOCK_STREAM; // assumption needed for doHttp()
+                    //net->localConn.ss_family = ???;
+                    net->uid = id;
+                }
+            }
+        }
+    }
+
     // Do TLS detection if not already done
     if (net && net->tlsDetect == DETECT_PENDING) {
         detectTLS(sockfd, net, buf, len, src, dtype);
     }
 
-    // Do protocol-detection if not already done on the channel
-    if (net && net->protoDetect == DETECT_PENDING) {
-        detectProtocol(sockfd, net, buf, len, src, dtype);
-    }
+    // Only process non-TLS payloads
+    if (net->tlsDetect == DETECT_FALSE || (src == TLSTX || src == TLSRX)) {
 
-    // Payload handling depends first on whether it's encrypted or not.
-    if (net && net->tlsDetect == DETECT_TRUE && (src == NETTX || src == NETRX)) {
-        // It's an encrypted TLS payload so we only want to process it if 
-        // LogStream is enabled and TLS negotiation is still in progress.
-        // 
-        // This addresses a couple requirements. First, never send encrypted
-        // payloads to disk. Second, only send encrypted payloads to LogStream
-        // during the TLS negotiation.
-        if (cfgLogStream(g_cfg.staticfg) && net->protoDetect == DETECT_PENDING) {
-            extractPayload(sockfd, net, buf, len, src, dtype);
+        // Do protocol-detection if not already done
+        if (net && net->protoDetect == DETECT_PENDING) {
+            detectProtocol(sockfd, net, buf, len, src, dtype);
         }
-    } else {
-        // This is NOT an encrypted TLS payload so we only process it if
-        // payloads are enabled globally, or for the detected protocol.
-        //
-        // We have a requirement that HTTP payloads be sent when LogStream is
-        // enabled but we don't need to explicitly check for that here. If this
-        // has been detected as HTTP then net->protoProtoDef will point either
-        // to our g_http_protocol_def (which has payload set) or to another one
-        // that came from the config file and the user will have set it as they
-        // wanted. Either way, we can just use that flag here.
+
+        // Send payloads if configured
         if (cfgPayEnable(g_cfg.staticfg)
             || (net && net->protoProtoDef && net->protoProtoDef->payload)) {
             extractPayload(sockfd, net, buf, len, src, dtype);
         }
-    }
 
-    // if HTTP detected ...
-    if (net && net->protoProtoDef && !strcasecmp(net->protoProtoDef->protname, "HTTP")) {
-        // and, HTTP events are enabled ...
-        if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
-            // and, it's not and encrypted payload ...
-            if (net->tlsDetect == DETECT_FALSE || (src == TLSTX || src == TLSRX)) {
-                // then, process the HTTP payload
-                doHttp(id, sockfd, net, buf, len, src, dtype);
-            }
+        // Process HTTP if detected and events are enabled
+        if (net && net->protoProtoDef
+                && !strcasecmp(net->protoProtoDef->protname, "HTTP")
+                && cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
+            doHttp(id, sockfd, net, buf, len, src, dtype);
         }
     }
 
@@ -1359,6 +1391,11 @@ addSock(int fd, int type, int family)
             }
         }
 */
+
+        // Release the HTTP/2 frame stashes
+        free(g_netinfo[fd].http.http2Buf[0].buf);
+        free(g_netinfo[fd].http.http2Buf[1].buf);
+
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].active = TRUE;
         g_netinfo[fd].type = type;
@@ -2177,6 +2214,10 @@ doDupSock(int oldfd, int newfd)
     g_netinfo[newfd].startTime = 0ULL;
     g_netinfo[newfd].totalDuration = (counters_element_t){.mtc=0, .evt=0};
     g_netinfo[newfd].numDuration = (counters_element_t){.mtc=0, .evt=0};
+
+    // don't dup the HTTP/2 frame stashes
+    memset(&g_netinfo[newfd].http.http2Buf[0], 0, sizeof(http_buf_t));
+    memset(&g_netinfo[newfd].http.http2Buf[1], 0, sizeof(http_buf_t));
 
     doUpdateState(CONNECTION_OPEN, newfd, 1, "dup", NULL);
     return 0;

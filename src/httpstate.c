@@ -672,8 +672,8 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
 {
     int isTx  = (src == NETTX || src == TLSTX) ? 1 : 0;
 
-    //scopeLogHexDebug(buf, len, "DEBUG: HTTP %s payload; ver=%d",
-    //        isTx ? "TX" : "RX", (int)state->version[isTx]);
+    //scopeLogHexDebug(buf, len>64 ? 64 : len, "DEBUG: HTTP %s payload; ver=%d, len=%ld",
+    //        isTx ? "TX" : "RX", (int)state->version[isTx], len);
 
     // detect HTTP version
     if (state->version[isTx] == 0) {
@@ -700,9 +700,8 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
             // fall through to continue processing
         }
 
-        // Detection didn't work?
         else {
-            scopeLogError("ERROR: HTTP detection failed on %s", isTx ? "TX" : "RX");
+            scopeLogError("ERROR: HTTP version detection failed");
             DBG(NULL);
             return FALSE;
         }

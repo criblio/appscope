@@ -168,78 +168,7 @@ example above.
 See the [Event Watch](#event-watch) for details on how this event can be blocked
 and how additional headers can be included.
 
-### HTTP Metrics Events
-
-> Note: these are **events** named `http-metrics`, not [**metrics**](#http-metrics).
-
-The library emits an event like the example below after each `http-resp` event.
-
-```text
-{
-  "type": "evt",
-  "id": "dev01-curl-1 https://nghttp2.org/robots.txt",
-  "_channel": "867516817554230",
-  "body": {
-    "sourcetype": "http",
-    "_time": 1632490880.010622,
-    "source": "http-metrics",
-    "host": "dev01",
-    "proc": "curl",
-    "cmd": "curl --http1.1 https://nghttp2.org/robots.txt",
-    "pid": 1730496,
-    "data": {
-      "duration": 169,
-      "req_per_sec": 2,
-      "http_status": 200,
-      "proc": "curl",
-      "fd": 6,
-      "pid": 1730496,
-      "unit": "byte"
-    }
-  }
-}
-```
-
-See the [Event Watch](#event-watch) for details on how this event can be
-blocked.
-
-#### Questions on Metrics Events
-
-* They seem to be almost entirely redundant with the response events given how
-  the library includes details from requests. What is the purpose of the
-  metrics event?
-
-* The `req_per_sec` value appears to be invalid. I assume it's supposed to
-  represent the rate at which request are occuring over more than one cycle but
-  that's not what's happening currently. The code that produces the value for
-  HTTP/1 is below.
-
-  ```C
-        int rps = map->frequency;
-        int sec = (map->first_time > 0) ? (int)tv.tv_sec - map->first_time : 1;
-        if (sec > 0) {
-            rps = map->frequency / sec;
-        }
-  ```
-  
-  The `frequency` value is incremented with each request or response header
-  found but the `map` pointer is `free()`'d after every response so it will only
-  ever be `2`. It includes responses, not just requests.
-  
-  The `sec` calculation is done with integer seconds so it will almost always
-  end up set to `1` unless the duration is >= 2 seconds.
-
-  The `rps` value is the result if integer division and is almost always `2`
-  which doesn't seem useful. That values ends up in the `req_per_sec`
-
-* The `unit` field is set to `byte` but none of the other fields are bytes.
-
-* The `proc` , `pid`, and `fd` fields are redundant with fields up in `body`
-  but that pattern appears elsewhere in other events so this may be by design.
-
 ## HTTP Metrics
-
-> Note: these are **metrics**, not the `http-metrics` [**event**](#http-metrics-events).
 
 The library emits metrics like the example below for HTTP activity.
 
@@ -310,8 +239,8 @@ Omit the entry uder `event > watch` to disable the HTTP events entirely.
 
 The `name` regex is applied against the `source` value and only events that
 match are emitted. Using something like `http-resp` would cause the library
-to only emit the response events and block the request and metrics events.
-The default is `.*` with matches everything thus not blocking anything.
+to only emit the response events and block the request events.  The default is
+`.*` with matches everything thus not blocking anything.
 
 The `field` and `value` regexes are applied against the event's body.data
 object and only properties that match are included in emitted events.
@@ -336,8 +265,8 @@ value` match any of the `headers` regexes in the watch. Note headers is a list
 containing zero or more regex strings and match the whole header, not just the
 name or value.
 
-In the example below, the `name` regex blocks the `http-req` and `http-metrics`
-events and the `headers` entries add the matching headers.
+In the example below, the `name` regex blocks the `http-req` events and the
+`headers` entries add the matching headers.
 
 ```text
 event:

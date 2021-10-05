@@ -94,7 +94,6 @@ typedef struct http_post_t {
 
 typedef struct http_map_t {
     time_t first_time;
-    uint64_t frequency;
     uint64_t start_time;
     uint64_t duration;
     uint64_t id;

@@ -561,7 +561,6 @@ doHttp1Header(protocol_info *proto)
         map->req_len = 0;
     }
 
-    map->frequency++;
     ssl = (post->ssl) ? "https" : "http";
     hreport.ix = 0;
     hreport.hreq = NULL;
@@ -672,12 +671,6 @@ doHttp1Header(protocol_info *proto)
         struct timeval tv;
         gettimeofday(&tv, NULL);
 
-        int rps = map->frequency;
-        int sec = (map->first_time > 0) ? (int)tv.tv_sec - map->first_time : 1;
-        if (sec > 0) {
-            rps = map->frequency / sec;
-        }
-
         map->resp = (char *)post->hdr;
 
         if (!map->req) {
@@ -742,21 +735,6 @@ doHttp1Header(protocol_info *proto)
 
         event_t hevent = INT_EVENT("http-resp", proto->len, SET, fields);
         cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
-
-        // Are we doing a metric event?
-        event_field_t mfields[] = {
-            DURATION_FIELD(map->duration),
-            RATE_FIELD(rps),
-            HTTPSTAT_FIELD(status),
-            PROC_FIELD(g_proc.procname),
-            FD_FIELD(proto->fd),
-            PID_FIELD(g_proc.pid),
-            UNIT_FIELD("byte"),
-            FIELDEND
-        };
-
-        event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
-        cmdSendHttp(g_ctl, &mevent, map->id, &g_proc);
 
         // emit statsd metrics, if enabled.
         if (mtcEnabled(g_mtc)) {
@@ -1360,26 +1338,6 @@ doHttp2Frame(protocol_info *proto)
                     event_t event = INT_EVENT("http-resp", proto->len, SET, NULL);
                     event.data = stream->jsonData;
                     cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
-                }
-
-                if (isHttp2NameEnabled("http-metrics")) {
-                    // build and send the `http-metrics` event
-                    event_field_t mfields[] = {
-                        DURATION_FIELD(duration),
-                        // TODO RPS is hard coded for now
-                        // see docs/HTTP.md#questions-on-metris-events`
-                        RATE_FIELD(2),
-                        HTTPSTAT_FIELD(stream->lastStatus),
-                        PROC_FIELD(g_proc.procname),
-                        FD_FIELD(proto->fd),
-                        PID_FIELD(g_proc.pid),
-                        // TODO this seems incorrect
-                        // see docs/HTTP.md#questions-on-metris-events`
-                        UNIT_FIELD("byte"),
-                        FIELDEND
-                    };
-                    event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
-                    cmdSendHttp(g_ctl, &mevent, proto->uid, &g_proc);
                 }
 
                 // if metrics are enabled...

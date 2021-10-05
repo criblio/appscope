@@ -1212,7 +1212,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
         detectTLS(sockfd, net, buf, len, src, dtype);
     }
 
-    // Only process non-TLS payloads
+    // Only process unencrypted payloads
     if (net->tlsDetect == DETECT_FALSE || (src == TLSTX || src == TLSRX)) {
 
         // Do protocol-detection if not already done

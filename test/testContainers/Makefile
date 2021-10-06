@@ -28,6 +28,7 @@ help:
 	@echo "  \`make (test)\` - run a single test"
 	@echo "  \`make (test)-build\` - build the test's image"
 	@echo "  \`make (test)-shell\` - run a shell in the test's container"
+	@echo "  \`make (test)-exec\` - run a shell in the existing test's container"
 	@echo "Tests: $(TESTS)"
 
 tests:

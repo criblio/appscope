@@ -216,7 +216,7 @@ testTSCValue(void** state)
 
 /*
 
-This applies to __LINUX__ only.  And isn't like other tests in this file.
+This applies to __linux__ only.  And isn't like other tests in this file.
 Think about whether this adds enough value to run in conditionally only 
 for linux.
 

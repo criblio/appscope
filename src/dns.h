@@ -79,10 +79,10 @@ typedef struct dns_query_t {
     unsigned char name[];
 } dns_query;
 
-#ifdef __LINUX__
+#ifdef __linux__
 struct response {
     HEADER hdr;
     u_char buf[NS_PACKETSZ];      /* defined in arpa/nameser.h */
 };
-#endif // __LINUX__
+#endif // __linux__
 #endif // _DNS_H_

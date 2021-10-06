@@ -17,7 +17,7 @@
 // This voodoo avoids creating binaries which would require a glibc
 // that's 2.31 or newer, even if built on new ubuntu 20.04.
 // This is tested by test/glibcvertest.c.
-//#ifdef __LINUX__
+//#ifdef __linux__
 //__asm__(".symver clock_gettime,clock_gettime@GLIBC_2.2.5");
 //#endif
 

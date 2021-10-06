@@ -1151,7 +1151,7 @@ tcpSendPlain(transport_t *trans, const char *msg, size_t len)
     if (!trans || transportNeedsConnection(trans)) return -1;
 
     int flags = 0;
-#ifdef __LINUX__
+#ifdef __linux__
     flags |= MSG_NOSIGNAL;
 #endif
 
@@ -1275,7 +1275,7 @@ transportSend(transport_t *trans, const char *msg, size_t len)
         case CFG_UNIX:
             if (trans->local.sock != -1) {
                 int flags = 0;
-#ifdef __LINUX__
+#ifdef __linux__
                 flags |= MSG_NOSIGNAL;
 #endif
                 int rc = g_fn.send(trans->local.sock, msg, len, flags);

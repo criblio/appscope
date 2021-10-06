@@ -1347,11 +1347,11 @@ addSock(int fd, int type, int family)
         g_netinfo[fd].type = type;
         g_netinfo[fd].localConn.ss_family = family;
         g_netinfo[fd].uid = getTime();
-#ifdef __LINUX__
+#ifdef __linux__
         // Clear these bits so comparisons of type will work
         g_netinfo[fd].type &= ~SOCK_CLOEXEC;
         g_netinfo[fd].type &= ~SOCK_NONBLOCK;
-#endif // __LINUX__
+#endif // __linux__
     }
 }
 
@@ -2103,7 +2103,7 @@ doSeek(int fd, int success, const char *func)
     }
 }
 
-#ifdef __LINUX__
+#ifdef __linux__
 void
 doStatPath(const char *path, int rc, const char *func)
 {
@@ -2131,7 +2131,7 @@ doStatFd(int fd, int rc, const char* func)
         }
     }
 }
-#endif // __LINUX__
+#endif // __linux__
 
 int
 doDupFile(int oldfd, int newfd, const char *func)

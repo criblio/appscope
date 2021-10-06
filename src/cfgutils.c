@@ -1713,8 +1713,10 @@ processCustomFilterHostname(config_t* config, yaml_document_t* doc, yaml_node_t*
         return;
     }
 
+    // Note hostname are not case sensitive so unlike other filters, this is a
+    // case-insensitive comparison.
     char *valueStr = stringVal(node);
-    if (valueStr && !strcmp(valueStr, g_proc.hostname)) {
+    if (valueStr && !strcasecmp(valueStr, g_proc.hostname)) {
         ++custom_match_count;
         free(valueStr);
         return;

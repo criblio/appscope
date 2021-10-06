@@ -9,6 +9,8 @@ scope service --force cribl
 echo
 [ -f /etc/scope/cribl/scope.yml ] || fail "missing scope.yml"
 [ -f /etc/sysconfig/cribl ] || fail "missing /etc/sysconfig/cribl"
+[ -d /var/log/scope ] || fail "missing /var/log/scope/"
+[ -d /var/run/scope ] || fail "missing /var/run/scope/"
 grep LD_PRELOAD /etc/sysconfig/cribl >/dev/null 2>&1 || fail "missing LD_PRELOAD in /etc/sysconfig/cribl"
 grep SCOPE_HOME /etc/sysconfig/cribl >/dev/null 2>&1 || fail "missing SCOPE_HOME in /etc/sysconfig/cribl"
 

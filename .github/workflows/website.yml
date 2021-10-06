@@ -1,9 +1,20 @@
+# 
+# AppScope Website CI Workflow
+#
+# This is the GitHub workflow for AppScope's production website at
+# https://appscope.dev/ and the staging site at
+# https://staging.appscope.dev/.
+#
+# We publish `web*` tags to the production site. Other pushes to the
+# master branch get published to the staging site.
+#
 name: Deploy Website
 on:
   push:
     branches:
       - master
-      - staging
+    tags:
+      - 'web*'
     paths:
       - 'website/**'
 jobs:

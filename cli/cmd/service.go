@@ -7,8 +7,9 @@ import (
 	"os"
 	"strings"
 	"syscall"
-	"github.com/criblio/scope/util"
+
 	"github.com/criblio/scope/run"
+	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
 
@@ -17,11 +18,11 @@ var serviceUser string
 
 // serviceCmd represents the service command
 var serviceCmd = &cobra.Command{
-	Use:   "service SERVICE [flags]",
-	Short: "Configure a systemd service to be scoped",
-	Long: `the "scope service" command adjusts the configuration for the named systemd service so it is scoped when it starts.`,
-Example: `scope service  cribl -c tls://in.my-instance.cribl.cloud:10090`,
-	Args: cobra.ExactArgs(1),
+	Use:     "service SERVICE [flags]",
+	Short:   "Configure a systemd service to be scoped",
+	Long:    `the "scope service" command adjusts the configuration for the named systemd service so it is scoped when it starts.`,
+	Example: `scope service  cribl -c tls://in.my-instance.cribl.cloud:10090`,
+	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		// must be root
 		if 0 != os.Getuid() {
@@ -35,15 +36,19 @@ Example: `scope service  cribl -c tls://in.my-instance.cribl.cloud:10090`,
 		utsname := syscall.Utsname{}
 		err := syscall.Uname(&utsname)
 		util.CheckErrSprintf(err, "error: syscall.Uname failed; %v", err)
-		buf := make ([]byte,0,64)
+		buf := make([]byte, 0, 64)
 		for _, v := range utsname.Machine[:] {
-			if v == 0 { break }
+			if v == 0 {
+				break
+			}
 			buf = append(buf, uint8(v))
 		}
 		unameMachine := string(buf)
-		buf = make ([]byte,0,64)
+		buf = make([]byte, 0, 64)
 		for _, v := range utsname.Sysname[:] {
-			if v == 0 { break }
+			if v == 0 {
+				break
+			}
 			buf = append(buf, uint8(v))
 		}
 		unameSysname := strings.ToLower(string(buf))
@@ -135,7 +140,7 @@ func installScope(serviceName string, unameMachine string, unameSysname string, 
 
 	// create the run directory
 	runDir := fmt.Sprintf("/var/run/scope")
-	if _, err := os.Stat(logDir); err != nil {
+	if _, err := os.Stat(runDir); err != nil {
 		err := os.Mkdir(runDir, 0755) // TODO chown/chgrp to who?
 		util.CheckErrSprintf(err, "error: failed to create run directory; %v", err)
 	}
@@ -152,8 +157,10 @@ func installScope(serviceName string, unameMachine string, unameSysname string, 
 			err = os.Rename(configPath, examplePath)
 			util.CheckErrSprintf(err, "error: failed to move scope.yml to scope_example.yml; %v", err)
 			rc.WorkDir = configDir
-			rc.GetScopeConfig().Libscope.Log.Transport.Path = logDir + "/cribl.log"
-			rc.GetScopeConfig().Libscope.CommandDir = runDir
+			rc.SetDefault()
+			sc := rc.GetScopeConfig()
+			sc.Libscope.Log.Transport.Path = logDir + "/cribl.log"
+			sc.Libscope.CommandDir = runDir
 			err = rc.WriteScopeConfig(configPath, 0644)
 			util.CheckErrSprintf(err, "error: failed to create scope.yml: %v", err)
 		}
@@ -187,7 +194,7 @@ func installSystemd(serviceName string, unameMachine string, unameSysname string
 		}
 	}
 
-	libraryPath := installScope(serviceName, unameMachine, unameSysname, libcName);
+	libraryPath := installScope(serviceName, unameMachine, unameSysname, libcName)
 
 	overrideDir := fmt.Sprintf("%s.d", serviceFile)
 	if _, err := os.Stat(overrideDir); err != nil {
@@ -197,7 +204,7 @@ func installSystemd(serviceName string, unameMachine string, unameSysname string
 	overridePath := fmt.Sprintf("%s.d/env.conf", serviceFile)
 	if _, err := os.Stat(overridePath); err != nil {
 		content := fmt.Sprintf("[Service]\nEnvironment=LD_PRELOAD=%s\nEnvironment=SCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
-		err := os.WriteFile(overridePath, []byte(content), 0644)
+		err := ioutil.WriteFile(overridePath, []byte(content), 0644)
 		util.CheckErrSprintf(err, "error: failed to create override file; %v", err)
 	}
 
@@ -226,12 +233,12 @@ func installInitd(serviceName string, unameMachine string, unameSysname string, 
 		}
 	}
 
-	libraryPath := installScope(serviceName, unameMachine, unameSysname, libcName);
+	libraryPath := installScope(serviceName, unameMachine, unameSysname, libcName)
 
 	sysconfigFile := "/etc/sysconfig/" + serviceName
 	if _, err := os.Stat(sysconfigFile); err != nil {
 		content := fmt.Sprintf("LD_PRELOAD=%s\nSCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
-		err := os.WriteFile(sysconfigFile, []byte(content), 0644)
+		err := ioutil.WriteFile(sysconfigFile, []byte(content), 0644)
 		util.CheckErrSprintf(err, "error: failed to create sysconfig file; %v", err)
 	}
 

@@ -2140,7 +2140,7 @@ cfgReadCustomHostnameFilter(void **state)
         // this should match and enable payloads
         "  eg2:\n"
         "    filter:\n"
-        "      hostname: myhost\n"
+        "      hostname: MyHost\n" // note case change
         "    config:\n"
         "      payload:\n"
         "        enable: true\n"

@@ -6,6 +6,18 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 0.7.5
+
+2021-10-05 - Maintenance Pre-Release
+
+- **Improvement**: [#462](https://github.com/criblio/appscope/issues/462), [#540](https://github.com/criblio/appscope/issues/540) Add support for sending event/metric output to a Unix domain socket.
+
+- **Improvement**: [#492](https://github.com/criblio/appscope/issues/492) Add support for custom configuration with new `custom` section in `scope.yml`.  
+
+- **Improvement**: [#489](https://github.com/criblio/appscope/issues/489) Streamline configuration file structure by eliminating `scope_protocol.yml` and merging its content into `scope.yml`.
+
+- **Improvement**: [#503](https://github.com/criblio/appscope/issues/503) Promote the `tags` section of `config.yml` to top level, removing it from the `metric` > `format` section.  
+
 ## AppScope 0.7.4
 
 2021-09-14 - Maintenance Pre-Release

@@ -4,12 +4,12 @@ title: Integrating with LogStream
 
 ## Integrating with LogStream
 
-AppScope can easily connect to Cribl LogStream ([overview](https://cribl.io/product/) | [download](https://cribl.io/download/) | [docs](https://docs.cribl.io/docs/welcome)).
+AppScope can easily connect to Cribl LogStream ([overview](https://cribl.io/product/) | [cloud](https://cribl.cloud/) | [download](https://cribl.io/download/) | [docs](https://docs.cribl.io/docs/welcome)).
 
-To define a LogStream connection, the only configuration element needed is setting the `SCOPE_CRIBL` environment variable. For example:
+To define a LogStream connection, simply set the `SCOPE_CRIBL` environment variable specifying a transport type, IP address, and port. For example:
 
 ```
-SCOPE_CRIBL=tcp://ip:port
+SCOPE_CRIBL=tcp://127.0.0.1:9109
 ```
 
 ### Requirements
@@ -29,15 +29,16 @@ Configuration settings that are potentially overridden include:
 - Events are enabled.
 - Transport for events, metrics, and payloads use the LogStream connection.
 
-The following configuration elements are enabled by default when a LogStream connection is defined, but these can be overridden by a configuration file or by environment variables:
+The following configuration elements are event watch types which are enabled by default when a LogStream connection is defined:
 
-- Event watch types
-- File
-- Console
-- FS
-- Net
-- HTTP/1.1 and HTTP/2.0
-- DNS
+- `console`
+- `dns`      
+- `file`
+- `fs`
+- `http`
+- `net`
+
+These event watch types can be overridden by a configuration file or by environment variables.
 
 Other configuration elements are not modified by a LogStream connection.
 
@@ -52,9 +53,3 @@ Separately, the AppScope library can convert HTTP/1.1 (not HTTP/2) payloads to H
 AppScope supports TLS over TCP connections.
 
 See [Using TLS for Secure Connections](/docs/tls).
-
-## Scoping Short-lived Processes
-
-When scoping a short-lived process and sending events to LogStream or a remote destination, it may be useful to set `SCOPE_CONNECT_TIMEOUT_SECS` to `1` or higher. This gives AppScope time to make a connection and send events before the process exits. 
-
-When `SCOPE_CONNECT_TIMEOUT_SECS` remains at its default value of `0`, the destination might not receive any events when you scope a short-lived process.

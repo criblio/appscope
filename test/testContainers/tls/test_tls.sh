@@ -89,9 +89,6 @@ ERR+=$?
 grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-metric $EVT_FILE > /dev/null
-ERR+=$?
-
 evalPayload
 ERR+=$?
 
@@ -109,9 +106,6 @@ grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
 grep http-resp $EVT_FILE > /dev/null
-ERR+=$?
-
-grep http-metric $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -133,9 +127,6 @@ ERR+=$?
 grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-metric $EVT_FILE > /dev/null
-ERR+=$?
-
 evalPayload
 ERR+=$?
 
@@ -153,9 +144,6 @@ grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
 grep http-resp $EVT_FILE > /dev/null
-ERR+=$?
-
-grep http-metric $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -178,7 +166,7 @@ sleep 1
 evaltest
 RUBY_HTTP_END=$(grep http- $EVT_FILE 2>/dev/null | grep -c 10101)
 
-if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 3 )); then
+if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 2 )); then
     ERR+=1
 fi
 
@@ -200,7 +188,7 @@ sleep 1
 evaltest
 
 COUNT=$(grep -c http- $EVT_FILE)
-if (( $COUNT < 3 )); then
+if (( $COUNT < 2 )); then
     ERR+=1
 fi
 
@@ -226,9 +214,6 @@ if [ "aarch64" != "$(uname -m)" ]; then
 	grep http-resp $EVT_FILE > /dev/null
 	ERR+=$?
 
-	grep http-metric $EVT_FILE > /dev/null
-	ERR+=$?
-
 	evalPayload
 	ERR+=$?
 
@@ -246,7 +231,7 @@ evaltest
 
 PHP_HTTP_END=$(grep http- $EVT_FILE | grep -c sslclient.php)
 
-if (( $PHP_HTTP_END - $PHP_HTTP_START < 3 )); then
+if (( $PHP_HTTP_END - $PHP_HTTP_START < 2 )); then
     ERR+=1
 fi
 
@@ -267,7 +252,7 @@ ldscope httpd -k stop
 evaltest
 APACHE_HTTP_END=$(grep http- $EVT_FILE | grep -c httpd)
 
-if (( $APACHE_HTTP_END - $APACHE_HTTP_START < 3 )); then
+if (( $APACHE_HTTP_END - $APACHE_HTTP_START < 2 )); then
     ERR+=1
 fi
 

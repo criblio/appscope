@@ -9,7 +9,7 @@ AppScope supports TLS over TCP connections:
 - AppScope can use TLS when connecting to LogStream or another application (including its events and metrics destinations).
 - LogStream can use TLS when connecting to AppScope over TCP.
 
-In the `scope.yml` config file, set the `transport : tls` element to `true` to enable TLS. See [Config Files](/docs/config-file).
+In the `scope.yml` config file, set the `transport : tls` element to `true` to enable TLS. See [Config File](/docs/config-file).
 
 To see the TLS-related environment variables, run the command: 
 

@@ -51,8 +51,8 @@
     - name: CLI Reference
       path: /docs/cli-reference
 
-    - name: Config Files
-      path: /docs/config-files
+    - name: Config File
+      path: /docs/config-file
 
     - name: Other Resources
       path: /docs/other-resources

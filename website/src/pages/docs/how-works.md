@@ -35,7 +35,7 @@ scope attach 12345
 
 Linux, like many other operating systems, provides a loader capable of loading and linking dynamic and static executables as needed. AppScope [provides](/docs/loader-library) a very simple component (`ldscope`) that supports loading static executables. This allows AppScope to interpose functions, and to thereby expose the same data that is exposed from dynamic executables. While the AppScope loader is optional for use with dynamic executables, it is required in order to extract details from a static executable.
 
-<span>&#x2605;&#x2605;&#x2605;</span> **WHEN TO USE**: As you get more interested in obtaining details from  applications, explore using the AppScope library apart from the CLI. This allows for full configurability via the `scope.yml` configuration file, detailed [here](/docs/config-files). You can forward captured data details over UDP, TCP, and local or remote connections, and you can define specific events and metrics for export. You can use the AppScope loader to start applications that include the library.
+<span>&#x2605;&#x2605;&#x2605;</span> **WHEN TO USE**: As you get more interested in obtaining details from  applications, explore using the AppScope library apart from the CLI. This allows for full configurability via the `scope.yml` configuration file, detailed [here](/docs/config-file). You can forward captured data details over UDP, TCP, and local or remote connections, and you can define specific events and metrics for export. You can use the AppScope loader to start applications that include the library.
 
 ### The Library
 
@@ -48,7 +48,7 @@ The library is loaded using a number of mechanisms, depending on the type of exe
 Child processes are created with the library present, if the library was present in the parent. In this manner, a single executable is able to start, daemonize, and create any number of children, all of which include interposed functions.
 
 
-<span>&#x2605;&#x2605;&#x2605;</span> **WHEN TO USE**: As with the loader above, you can use the library independently, using the same configuration [file](/docs/config-files) and/or environment variables. Environment variables take precedence over the default configuration, as well as over details in any configuration file. You use an environment variable to load the library independent of any executable. Whether you use this option or the AppScope loader, you get full control of the data source, formats, and transports.
+<span>&#x2605;&#x2605;&#x2605;</span> **WHEN TO USE**: As with the loader above, you can use the library independently, using the same configuration [file](/docs/config-file) and/or environment variables. Environment variables take precedence over the default configuration, as well as over details in any configuration file. You use an environment variable to load the library independent of any executable. Whether you use this option or the AppScope loader, you get full control of the data source, formats, and transports.
 
 
 ## System-Level Design 

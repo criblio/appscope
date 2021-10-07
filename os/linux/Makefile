@@ -3,7 +3,7 @@
 CWD = $(shell pwd)
 OS=linux
 CC=gcc
-CFLAGS=-fPIC -g -Wall -Werror=implicit-function-declaration -Wno-nonnull -Wno-deprecated-declarations -D__LINUX__ -I contrib/ls-hpack
+CFLAGS=-fPIC -g -Wall -Werror=implicit-function-declaration -Wno-nonnull -Wno-deprecated-declarations -D__LINUX__ -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG)
 SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -D__LINUX__
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"

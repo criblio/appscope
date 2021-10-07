@@ -106,17 +106,11 @@ ERR+=$?
 grep -q http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-# TODO check why these events are missed in musl
-# https://github.com/criblio/appscope/issues/575
-# After fixing issue above remove the if condition below
-if [[ $(grep Ubuntu /etc/os-release) ]]; then 
-
 grep -q http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
 grep -q http-metric $EVT_FILE > /dev/null
 ERR+=$?
-fi
 
 grep -q fs.open $EVT_FILE > /dev/null
 ERR+=$?

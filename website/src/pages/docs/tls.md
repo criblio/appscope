@@ -26,7 +26,7 @@ Within Cribl.Cloud, a front-end load balancer (reverse proxy) handles the encryp
 AppScope connects to your Cribl.Cloud Ingest Endpoint on port 10090. The Ingest Endpoint URL is always the same except for the Cribl.Cloud Organization ID, which LogStream uses in the hostname portion, in the following way:
 
 ```
-https://in.logstream.<organization-ID>.cribl.cloud:10091
+https://in.logstream.<organization-ID>.cribl.cloud:10090
 ```
 
 If you **disable** TLS, the port is 10091.

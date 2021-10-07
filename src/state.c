@@ -46,9 +46,9 @@ fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
 static search_t* g_http_redirect = NULL;
-
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
+static uint64_t serial_ssl_mapping = 0ULL;
 
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
@@ -1099,7 +1099,7 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
         if (rc != PCRE2_ERROR_NOMATCH)
         {
             DBG(NULL);
-            scopeLog(CFG_LOG_DEBUG, "fd:%d doProtocol: TLS regex failed", sockfd);
+            scopeLog(CFG_LOG_DEBUG, "%s: fd:%d TLS regex failed", __FUNCTION__, sockfd);
         }
     }
     pcre2_match_data_free(match_data);
@@ -1138,10 +1138,59 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     }
 }
 
+/*
+ * 3 cases:
+ * 1) we find a net entry that is already mapped (id matches sslid)
+ * 2) we find more than one socket using tls and not mapped; no match
+ * 3) we find a single socket using tls and not yet mapped; matched
+ */
+static net_info *
+mapSslToFd(uint64_t id)
+{
+    int i;
+    net_info *found = NULL;
+
+    for (i = 0; i < g_numNinfo; i++) {
+        if (g_netinfo[i].active &&
+            (g_netinfo[i].tlsDetect == DETECT_TRUE)) {
+            if (g_netinfo[i].sslid == id) {
+                scopeLog(CFG_LOG_DEBUG, "%s: found mapped ssl ID %ld at fd %d", __FUNCTION__, id, i);
+                return &g_netinfo[i];
+            }
+
+            if (g_netinfo[i].sslid == 0) {
+                // we found more than one, bail
+                if (found) return NULL;
+                found = &g_netinfo[i];
+                // we don't need to set fd anywhere else, we need it here
+                if (g_netinfo[i].fd == 0) g_netinfo[i].fd = i;
+                scopeLog(CFG_LOG_DEBUG, "%s: new map of ssl ID %ld to fd %d", __FUNCTION__, id, i);
+            }
+        }
+    }
+
+    return found;
+}
+
 int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     net_info *net = getNetEntry(sockfd);
+
+    if ((!net) && (id != 0) && (id != -1) && (sockfd == -1)) {
+        struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
+        while (!atomicCasU64(&serial_ssl_mapping, 0ULL, 1ULL)) {
+            sigSafeNanosleep(&ts);
+        }
+
+        if ((net = mapSslToFd(id))) {
+            if (net->sslid == 0) net->sslid = id;
+            sockfd = net->fd;
+        }
+
+        atomicCasU64(&serial_ssl_mapping, 1ULL, 0ULL);
+        //if (net) scopeLog(CFG_LOG_DEBUG, "%s: mapped ssl ID %ld to fd %d", __FUNCTION__, id, sockfd);
+    }
 
     // Do TLS detection if not already done
     if (net && net->tlsDetect == DETECT_PENDING) {

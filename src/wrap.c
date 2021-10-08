@@ -1033,7 +1033,6 @@ memcpy(void *dest, const void *src, size_t n)
     return memmove(dest, src, n);
 }
 
-#ifdef __FUNCHOOK__
 static int
 ssl_read_hook(SSL *ssl, void *buf, int num)
 {
@@ -1127,7 +1126,6 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
     }
     return 0;
 }
-#endif // __FUNCHOOK__
 
 /*
  * There are 3x SSL_read functions to consider:
@@ -1154,9 +1152,7 @@ static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
 static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
 static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
-#ifdef __FUNCHOOK__  // TODO: remove when funchook is working with ARM64, just keeping warnings at bay
 static long scope_syscall(long, ...);
-#endif
 
 static int 
 findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
@@ -1248,11 +1244,9 @@ hookInject()
 static void
 initHook(int attachedFlag)
 {
-#ifdef __FUNCHOOK__
     int rc;
     funchook_t *funchook;
     bool should_we_patch = FALSE;
-#endif
     char *full_path = NULL;
     elf_buf_t *ebuf = NULL;
 
@@ -1293,7 +1287,6 @@ initHook(int attachedFlag)
         hookInject();
     }
 
-#ifdef __FUNCHOOK__
     if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
         if (handle == NULL) {
@@ -1417,7 +1410,6 @@ initHook(int attachedFlag)
             return;
         }
     }
-#endif  // __FUNCHOOK__
 }
 
 static void
@@ -2605,7 +2597,6 @@ isAnAppScopeConnection(int fd)
  * do any dynamic memory allocation while this executes. Be careful.
  * The DBG() output is ignored until after the constructor runs.
  */
-#ifdef __FUNCHOOK__  // TODO: remove when funchook is working with ARM64, just keeping warnings at bay
 static long
 scope_syscall(long number, ...)
 {
@@ -2712,8 +2703,6 @@ scope_open(const char* pathname)
 }
 
 #define scope_close(fd) g_fn.close(fd)
-
-#endif // __FUNCHOOK__
 
 EXPORTON size_t
 fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)

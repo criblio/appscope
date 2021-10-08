@@ -188,8 +188,8 @@ func (c *Config) SetDefault() error {
 	return nil
 }
 
-// configFromFile loads a configuration from a yml file
-func (c *Config) configFromFile() error {
+// ConfigFromFile loads a configuration from a yml file
+func (c *Config) ConfigFromFile() error {
 	c.sc = &ScopeConfig{}
 
 	yamlFile, err := ioutil.ReadFile(c.UserConfig)

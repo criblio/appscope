@@ -153,8 +153,8 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 	// Log file
 	internal.CreateLogFile(filepath.Join(rc.WorkDir, "scope.log"), filePerms)
 
-	// Metrics file
-	if rc.UserConfig == "" && (rc.MetricsDest != "" || rc.CriblDest != "") {
+	// Create metrics_dest file
+	if rc.MetricsDest != "" || rc.CriblDest != "" {
 		metricsDest := rc.MetricsDest
 		if metricsDest == "" {
 			metricsDest = rc.CriblDest
@@ -162,13 +162,15 @@ func (rc *Config) createWorkDir(cmd string, attach bool) {
 		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_dest"), []byte(metricsDest), filePerms)
 		util.CheckErrSprintf(err, "error writing metric_dest: %v", err)
 	}
-	if rc.UserConfig == "" && rc.MetricsFormat != "" {
+
+	// Create metrics_format file
+	if rc.MetricsFormat != "" {
 		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_format"), []byte(rc.MetricsFormat), filePerms)
 		util.CheckErrSprintf(err, "error writing metric_format: %v", err)
 	}
 
-	// Events file
-	if rc.UserConfig == "" && (rc.EventsDest != "" || rc.CriblDest != "") {
+	// Create event_dest file
+	if rc.EventsDest != "" || rc.CriblDest != "" {
 		eventsDest := rc.EventsDest
 		if eventsDest == "" {
 			eventsDest = rc.CriblDest
@@ -211,14 +213,11 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 		defer syscall.Umask(oldmask)
 	}
 
-	cmd := path.Base(args[0])
-	rc.createWorkDir(cmd, attach)
-
 	if rc.UserConfig == "" {
 		err := rc.configFromRunOpts()
 		util.CheckErrSprintf(err, "%v", err)
 	} else {
-		err := rc.configFromFile()
+		err := rc.ConfigFromFile()
 		util.CheckErrSprintf(err, "%v", err)
 	}
 
@@ -226,6 +225,7 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 		newPath, err := filepath.Abs(rc.sc.Metric.Transport.Path)
 		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Metric.Transport.Path, err)
 		rc.sc.Metric.Transport.Path = newPath
+		rc.MetricsDest = newPath
 		f, err := os.OpenFile(rc.sc.Metric.Transport.Path, os.O_CREATE, filePerms)
 		if err != nil && !os.IsExist(err) {
 			util.ErrAndExit("cannot create metric file %s: %v", rc.sc.Metric.Transport.Path, err)
@@ -237,12 +237,16 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 		newPath, err := filepath.Abs(rc.sc.Event.Transport.Path)
 		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Event.Transport.Path, err)
 		rc.sc.Event.Transport.Path = newPath
+		rc.EventsDest = newPath
 		f, err := os.OpenFile(rc.sc.Event.Transport.Path, os.O_CREATE, filePerms)
 		if err != nil && !os.IsExist(err) {
 			util.ErrAndExit("cannot create metric file %s: %v", rc.sc.Event.Transport.Path, err)
 		}
 		f.Close()
 	}
+
+	cmd := path.Base(args[0])
+	rc.createWorkDir(cmd, attach)
 
 	scYamlPath := filepath.Join(rc.WorkDir, "scope.yml")
 	if rc.UserConfig == "" {

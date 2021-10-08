@@ -599,6 +599,70 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
     return JNI_OK;
 }
 
+JNIEXPORT jint JNICALL 
+Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) 
+{
+    return Agent_OnLoad(jvm, options, reserved);
+}
+
+static void
+JavaAgentLoadPath(JNIEnv *jni, pid_t pid)
+{
+    char str[52];
+    sprintf(str, "%d", pid);
+    scopeLog(CFG_LOG_ERROR, "Before NewStringUTF %s", str);
+    // jstring pid_str = (*jni)->NewStringUTF(jni, (const char*)str);
+    // jstring pid_str = (*jni)->NewStringUTF(jni, "10");
+
+    scopeLog(CFG_LOG_ERROR, "After NewStringUTF");
+
+    jclass VirtualMachineClass  = (*jni)->FindClass(jni, "com/sun/tools/attach/VirtualMachine");
+    if (VirtualMachineClass == NULL) {
+        scopeLog(CFG_LOG_ERROR, "VirtualMachineClass NULL");
+    }
+
+    jmethodID mid_VmAttach = (*jni)->GetStaticMethodID(jni, VirtualMachineClass, "attach", "(Ljava/lang/String;)Lcom/sun/tools/attach/VirtualMachine;"); 
+    if (mid_VmAttach == NULL) {
+        scopeLog(CFG_LOG_ERROR, "mid_SVmAttach NULL");
+    }
+
+    jmethodID mid_VmDetach = (*jni)->GetMethodID(jni, VirtualMachineClass, "detach", "()V"); 
+    if (mid_VmDetach == NULL) {
+        scopeLog(CFG_LOG_ERROR, "mid_VmDetach NULL");
+    }
+
+    jmethodID mid_loadAgentPath = (*jni)->GetMethodID(jni, VirtualMachineClass, "loadAgentPath", "(Ljava/lang/String;)V");
+    if (mid_loadAgentPath == NULL) {
+        scopeLog(CFG_LOG_ERROR, "mid_loadAgentPath NULL");
+    }
+
+    scopeLog(CFG_LOG_ERROR, "All methods were found");
+
+    // FIX ME - Our goal is to inform existing process Java Virtual Machine - that our native library have Agent_OnAttach method
+    // With AgentRunner.java we call loadAgentPath to do this. But since we are connected to Java Virtual Machine we cannot
+    // use JNI_CreateJavaVM or create object
+    // or using VirtualMachineClass constructor attach to existing PID - and for calling loadAgentPath we need instance of this
+    // object. Possible point is to check the implementation fo loadAgentPath and check if we can omit some of jni calls
+
+    // jobject obj_Vm = (*jni)->CallStaticObjectMethod(jni, VirtualMachineClass, mid_VmAttach, pid_str); 
+    // if (obj_Vm == NULL) {
+    //     scopeLog(CFG_LOG_ERROR, "CallStaticObjectMethod failed");
+    // }
+
+    // just for debug remove this
+    // if ((*jni)->ExceptionOccurred(jni)) // check if an exception occurred
+    // {
+    //     (*jni)->ExceptionDescribe(jni); // print the stack trace
+    // }
+    // // javap -s com.sun.tools.attach.VirtualMachine
+   
+
+    // object ??
+    // (*jni)->CallVoidMethod(jni, obj, VirtualMachineClass, mid_loadAgentPath, "/usr/local/scope/lib/libscope.so");
+
+    clearJniException(jni);
+}
+
 // This overrides a weak definition in src/linux/os.c
 void
 initJavaAgent() {
@@ -630,5 +694,46 @@ initJavaAgent() {
             scopeLog(CFG_LOG_ERROR, "ERROR: Could not set JAVA_TOOL_OPTIONS failed\n");
         }
         free(buf);
+    } else {
+        pid_t pid = getpid();
+        JavaVM *jniVM;
+        jsize nVMs;
+        jint resEnv;
+        JNIEnv* jniEnv;
+
+        scopeLog(CFG_LOG_ERROR, "initJavaAgent method attach variant start");
+
+        if (JNI_GetCreatedJavaVMs((JavaVM * *)& jniVM, 1, &nVMs) != JNI_OK || nVMs == 0) {
+            scopeLog(CFG_LOG_ERROR, "JNI_GetCreatedJavaVMs failed \n");
+            return;
+        }
+        scopeLog(CFG_LOG_ERROR, "initJavaAgent start GetEnv");
+        resEnv = (*jniVM)->GetEnv(jniVM, (void **) &jniEnv, JNI_VERSION_1_6);
+        if (resEnv == JNI_EDETACHED) {
+            scopeLog(CFG_LOG_ERROR, "initJavaAgent start AttachCurrentThread");
+            if ((*jniVM)->AttachCurrentThread(jniVM, (void **)&jniEnv, NULL) != JNI_OK) {
+                scopeLog(CFG_LOG_ERROR, "initJavaAgent failed AttachCurrentThread");
+                return;
+            }
+        }
+        scopeLog(CFG_LOG_ERROR, "initJavaAgent start JavaAgentLoadPath");
+        JavaAgentLoadPath(jniEnv, pid);
+
+        scopeLog(CFG_LOG_ERROR, "initJavaAgent start DetachCurrentThread");
+        if (resEnv == JNI_EDETACHED) {
+            if ((*jniVM)->DetachCurrentThread(jniVM) != JNI_OK) {
+                scopeLog(CFG_LOG_ERROR, "initJavaAgent failed DetachCurrentThread");
+                return;
+            }
+        }
+
+        scopeLog(CFG_LOG_ERROR, "initJavaAgent start DestroyJavaVM");
+        if (DestroyJavaVM(jniVM) != JNI_OK) {
+            scopeLog(CFG_LOG_ERROR, "initJavaAgent failed DestroyJavaVM");
+        }
+
+
+        scopeLog(CFG_LOG_ERROR, "initJavaAgent method attach variant ended");
+
     }
 }

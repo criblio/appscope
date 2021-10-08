@@ -31,6 +31,8 @@ RUN chmod +x /opt/test-runner/bin/test-ssl.sh
 RUN mkdir -p /opt/javassl
 COPY ./java/SSLSocketClient.java /opt/javassl/SSLSocketClient.java
 RUN javac -d /opt/javassl/ /opt/javassl/SSLSocketClient.java
+COPY ./java/AgentRunner.java /opt/javassl/AgentRunner.java
+RUN javac -d /opt/javassl/ /opt/javassl/AgentRunner.java
 
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_METRIC_VERBOSITY=4

@@ -863,6 +863,33 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
     protocol_info *proto;
     bool ret = FALSE;
 
+    // HACK: See issue #600.
+    //   We see what appear to be invalid "runt" payloads sometimes from our
+    //   interpositions of Java's SSL/TLS routines. In the example log below,
+    //   notice the first payload is a single `H` byte while the second is the
+    //   actual request.
+    //
+    //   DEBUG: Java_sun_security_ssl_SSLEngineImpl_unwrap
+    //   DEBUG: doProtocol(id=-63, fd=93, len=1, src=TLSRX, dtyp=BUF) TLS=TRUE PROTO=PENDING (1 bytes)
+    //     0000:  48                                                H
+    //   DEBUG: fd:93 Protocol detection result is FALSE
+    //   DEBUG: Java_sun_security_ssl_SSLEngineImpl_unwrap
+    //   DEBUG: doProtocol(id=-63, fd=93, len=79, src=TLSRX, dtyp=BUF) TLS=TRUE PROTO=FALSE (64 bytes)
+    //     0000:  48 45 41 44 20 2f 20 48  54 54 50 2f 31 2e 31 0d  HEAD / HTTP/1.1.
+    //     0010:  0a 55 73 65 72 2d 41 67  65 6e 74 3a 20 63 75 72  .User-Agent: cur
+    //     0020:  6c 2f 37 2e 32 39 2e 30  0d 0a 48 6f 73 74 3a 20  l/7.29.0..Host:
+    //     0030:  6c 6f 63 61 6c 68 6f 73  74 3a 38 34 34 33 0d 0a  localhost:8443..
+    //
+    // In this case, as a temporary hack until we can fix the Java
+    // interpositions, we're leaving protocol detection PENDING if we don't get
+    // enough buffer to match. If we're not doing binary matching (as is the
+    // case with HTTP) then we don't get a length to use here. As a complete
+    // hack, we simply require more than one byte. Ugly...
+    if ((protoDef->len > 0 && protoDef->len > len) || (protoDef->len <= 0 && len < 2)) {
+        scopeLogDebug("DEBUG: skipping protocol detection on runt payload");
+        return FALSE;
+    }
+
     // nothing we can do; don't risk reading past end of a buffer
     size_t cvlen = (len < MAX_CONVERT) ? len : MAX_CONVERT;
     if (((len <= 0) && (protoDef->len <= 0)) ||   // no len
@@ -1167,43 +1194,91 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     }
 }
 
+// Alternative to getNetEntry() that returns a net_info for the given channel
+// ID instead of for a socket descriptor. We fallback to using this when we
+// can't get the descriptor in TLS/SSL read/write operations.
+static net_info *
+getChannelNetEntry(uint64_t id)
+{
+    net_info *net = lstFind(g_extra_net_info_list, id);
+    if (!net) {
+        net = calloc(1, sizeof(net_info));
+        if (!net) {
+            scopeLogError("ERROR: failed to allocate channel's net_info");
+            DBG(NULL);
+        } else {
+            if (lstInsert(g_extra_net_info_list, id, net) != TRUE) {
+                free(net);
+                net = NULL;
+                scopeLogError("ERROR: failed to save channel's net_info");
+                DBG(NULL);
+            } else {
+                // populate the new net_info
+                net->active = TRUE;
+                net->type = SOCK_STREAM; // assumption needed for doHttp()
+                //net->localConn.ss_family = ???;
+                net->uid = id;
+            }
+        }
+    }
+    return net;
+}
+
 int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
-    net_info *net = getNetEntry(sockfd);
+    // HACK: See issue #600
+    //   We're ignoring payloads where we don't get a reasonable ID or FD which
+    //   seems to happen with the interpositions of Java's SSL operations.
+    if ((int64_t)id <= 0 && sockfd < 0) {
+        return 0;
+    }
 
-    // When the SSL/TLS implementation can't provide the socket's file
-    // descriptor, we get -1 and net is NULL. It happens when an OpenSSL
-    // connection is given callback functions instead of the actual file
-    // descriptor. NodeJS works this way so it can use libuv for the IO
-    // instead of letting OpenSSL handle it.
-    if (!net) {
-        // In these cases, we still need a net_info to track the state of
-        // protocol detection or our HTTP/2 processing won't work. We're
-        // keeping a linked-list, indexed by channel ID, of pointers to
-        // "extra" net_info objects to use instead.
-        net = lstFind(g_extra_net_info_list, id);
-        if (!net) {
-            net = calloc(1, sizeof(net_info));
-            if (!net) {
-                scopeLogError("ERROR: failed to allocate an extra net_info");
-                DBG(NULL);
-                // continue with net==NULL
-            } else {
-                if (lstInsert(g_extra_net_info_list, id, net) != TRUE) {
-                    free(net);
-                    net = NULL;
-                    scopeLogError("ERROR: failed to save an extra net_info");
-                    DBG(NULL);
-                    // continue with net==NULL
-                } else {
-                    // populate the new net_info
-                    net->active = TRUE;
-                    net->type = SOCK_STREAM; // assumption needed for doHttp()
-                    //net->localConn.ss_family = ???;
-                    net->uid = id;
-                }
+    // Find the net_info for the channel
+    net_info *net = getNetEntry(sockfd);    // first try by descriptor
+    if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
+
+    scopeLogHexDebug(buf, len > 64 ? 64 : len, // limit hexdump to 64
+            "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s",
+            id, sockfd, len,
+            src == NETRX ? "NETRX" :
+            src == NETTX ? "NETTX" :
+            src == TLSRX ? "TLSRX" :
+            src == TLSTX ? "TLSTX" : "?",
+            dtype == BUF  ? "BUF" :
+            dtype == MSG  ? "MSG" :
+            dtype == IOV  ? "IOV" :
+            dtype == NONE ? "NONE" : "?",
+            net == NULL ? "NULL" :
+            net->tlsDetect == DETECT_PENDING ? "PENDING" :
+            net->tlsDetect == DETECT_TRUE    ? "TRUE" :
+            net->tlsDetect == DETECT_FALSE   ? "FALSE" : "INVALID",
+            net == NULL ? "NULL" :
+            net->protoDetect == DETECT_PENDING ? "PENDING" :
+            net->protoDetect == DETECT_TRUE    ? "TRUE" :
+            net->protoDetect == DETECT_FALSE   ? "FALSE" : "INVALID"
+            );
+
+    // Ignore empty payloads that should have been blocked by our interpositions
+    if (!len) {
+        scopeLogDebug("DEBUG: fd:%d ignoring empty payload", sockfd);
+        return 0;
+    }
+
+    // HACK: See issue #600
+    //   We ignore all-zeros payloads we get from our intepositions of Java's
+    //   SSL operations.
+    if (net && net->protoDetect == DETECT_PENDING) {
+        bool foundNonZero = FALSE;
+        for (size_t n = 0; n < len; ++n) {
+            if (((char*)buf)[n] != 0) {
+                foundNonZero = TRUE;
+                break;
             }
+        }
+        if (!foundNonZero) {
+            scopeLogDebug("DEBUG: fd:%d ignoring all-zero payload", sockfd);
+            return 0;
         }
     }
 
@@ -1213,14 +1288,14 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     }
 
     // Only process unencrypted payloads
-    if (net->tlsDetect == DETECT_FALSE || (src == TLSTX || src == TLSRX)) {
+    if ((net && net->tlsDetect == DETECT_FALSE) || (src == TLSTX || src == TLSRX)) {
 
         // Do protocol-detection if not already done
         if (net && net->protoDetect == DETECT_PENDING) {
             detectProtocol(sockfd, net, buf, len, src, dtype);
         }
 
-        // Send payloads if configured
+        // Send payloads if enabled globally or by the detected protocol
         if (cfgPayEnable(g_cfg.staticfg)
             || (net && net->protoProtoDef && net->protoProtoDef->payload)) {
             extractPayload(sockfd, net, buf, len, src, dtype);

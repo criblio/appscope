@@ -3,10 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/criblio/scope/events"
@@ -62,7 +64,16 @@ func init() {
 func readMetrics(workDir string, w *widgets) {
 	metricsPath := filepath.Join(workDir, "metrics.json")
 	file, err := os.Open(metricsPath)
-	util.CheckErrSprintf(err, "%v", err)
+	if err != nil && strings.Contains(err.Error(), "metrics.json: no such file or directory") {
+		if util.CheckFileExists(metricsPath) {
+			dest, _ := ioutil.ReadFile(metricsPath)
+			fmt.Printf("Cannot run dash: Metrics were output to %s\n", dest)
+			os.Exit(0)
+		}
+	} else {
+		util.CheckErrSprintf(err, "%v", err)
+	}
+
 	tr := util.NewTailReader(file)
 	in := make(chan metrics.Metric)
 	go metrics.Reader(tr, util.MatchAlways, in)

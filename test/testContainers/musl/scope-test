@@ -55,6 +55,11 @@ if [ $count -ne 1 ] ; then
     ERR+=1
 fi
 
+count=$(grep '"source":"fs.duration"' $EVT_FILE | wc -l)
+if [ $count -ne 1 ] ; then 
+    ERR+=1
+fi
+
 count=$(grep '"source":"fs.write"' $EVT_FILE | wc -l)
 if [ $count -ne 1 ] ; then 
     ERR+=1

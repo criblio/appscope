@@ -71,13 +71,23 @@ void scopeLogHex(cfg_log_level_t, const void *, size_t, const char *, ...) PRINT
 #define scopeLogError(...) scopeLog(CFG_LOG_ERROR, __VA_ARGS__)
 #define scopeLogWarn(...)  scopeLog(CFG_LOG_WARN,  __VA_ARGS__)
 #define scopeLogInfo(...)  scopeLog(CFG_LOG_INFO,  __VA_ARGS__)
+#ifdef DEBUG
 #define scopeLogDebug(...) scopeLog(CFG_LOG_DEBUG, __VA_ARGS__)
 #define scopeLogTrace(...) scopeLog(CFG_LOG_TRACE, __VA_ARGS__)
+#else
+#define scopeLogDebug(...)
+#define scopeLogTrace(...)
+#endif
 
 #define scopeLogHexError(...) scopeLogHex(CFG_LOG_ERROR, __VA_ARGS__)
 #define scopeLogHexWarn(...)  scopeLogHex(CFG_LOG_WARN,  __VA_ARGS__)
 #define scopeLogHexInfo(...)  scopeLogHex(CFG_LOG_INFO,  __VA_ARGS__)
+#ifdef DEBUG
 #define scopeLogHexDebug(...) scopeLogHex(CFG_LOG_DEBUG, __VA_ARGS__)
 #define scopeLogHexTrace(...) scopeLogHex(CFG_LOG_TRACE, __VA_ARGS__)
+#else
+#define scopeLogHexDebug(...)
+#define scopeLogHexTrace(...)
+#endif
 
 #endif // __DBG_H__

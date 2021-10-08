@@ -2,6 +2,10 @@
 #include <dlfcn.h>
 #include "yaml_private.h"
 
+#ifdef SCOPE_VER
+#include "../../../src/fn.h"
+#endif
+
 /*
  * Get the library version.
  */
@@ -270,6 +274,13 @@ yaml_string_read_handler(void *data, unsigned char *buffer, size_t size,
 
 /*
  * File read handler.
+ * AppScope Note:
+ * We are calling fread/fwrite through a g_fn function pointer in order that
+ * the operation is not tracked by interposed functions. It was requested that
+ * this activity not be emitted along with appliction file events.
+ * The previous use of dlsym in order to locate fread/fwrite in libc is not
+ * sufficient in several use cases. The population of g_fn functions has
+ * been updated to support known cases. Therefore, don't resolve symbols here.
  */
 
 static int
@@ -277,11 +288,16 @@ yaml_file_read_handler(void *data, unsigned char *buffer, size_t size,
         size_t *size_read)
 {
     yaml_parser_t *parser = (yaml_parser_t *)data;
-    static size_t (*ni_fread)(void *, size_t, size_t, FILE *);
-    if (!ni_fread) ni_fread = dlsym(RTLD_NEXT, "fread");
-    if (!ni_fread) return 0;
+#ifdef SCOPE_VER
+    if (g_fn.fread) {
+        *size_read = g_fn.fread(buffer, 1, size, parser->input.file);
+    } else {
+        *size_read = fread(buffer, 1, size, parser->input.file);
+    }
+#else
+    *size_read = fread(buffer, 1, size, parser->input.file);
+#endif
 
-    *size_read = ni_fread(buffer, 1, size, parser->input.file);
     return !ferror(parser->input.file);
 }
 
@@ -444,17 +460,25 @@ yaml_string_write_handler(void *data, unsigned char *buffer, size_t size)
 
 /*
  * File write handler.
+ * AppScope Note:
+ * We are calling fread/fwrite through a g_fn function pointer in order that
+ * the operation is not tracked by interposed functions. It was requested that
+ * this activity not be emitted along with appliction file events.
+ * The previous use of dlsym in order to locate fread/fwrite in libc is not
+ * sufficient in several use cases. The population of g_fn functions has
+ * been updated to support known cases. Therefore, don't resolve symbols here.
  */
 
 static int
 yaml_file_write_handler(void *data, unsigned char *buffer, size_t size)
 {
     yaml_emitter_t *emitter = (yaml_emitter_t *)data;
-    static size_t (*ni_fwrite)(const void *, size_t, size_t, FILE *);
-    if (!ni_fwrite) ni_fwrite = dlsym(RTLD_NEXT, "fwrite");
-    if (!ni_fwrite) return 0;
-
-    return (ni_fwrite(buffer, 1, size, emitter->output.file) == size);
+#ifdef SCOPE_VER
+    if (g_fn.fwrite) {
+        return (g_fn.fwrite(buffer, 1, size, emitter->output.file) == size);
+    }
+#endif
+    return (fwrite(buffer, 1, size, emitter->output.file) == size);
 }
 /*
  * Set a string output.

@@ -84,9 +84,14 @@
     ares.in_symbol = sym;                                \
     if (checkEnv("SCOPE_EXEC_TYPE", "static") == TRUE) { \
         val = dlsym(RTLD_DEFAULT, sym);                  \
+        /* GNU ld.so */                                  \
     } else if (dl_iterate_phdr(getAddr, &ares)) {        \
         val = ares.out_addr;                             \
+        /* musl ld.so when loading an app from exec */   \
     } else if ((val = dlsym(RTLD_NEXT, sym))) {          \
+        DBG(NULL);                                       \
+        /* musl ld.so when attaching */                  \
+    } else if ((val = dlsym(RTLD_DEFAULT, sym))) {       \
         DBG(NULL);                                       \
     } else {                                             \
         val = NULL;                                      \

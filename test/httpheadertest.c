@@ -38,13 +38,13 @@ needleTestSetup(void** state)
     return groupSetup(state);
 }
 
-#ifdef __LINUX__
+#ifdef __linux__
 int __real_cmdSendHttp(ctl_t *, event_t *, uint64_t, proc_id_t *);
 int __wrap_cmdSendHttp(ctl_t *ctl, event_t *event, uint64_t id, proc_id_t *proc)
-#endif // __LINUX__
-#ifdef __MACOS__
+#endif // __linux__
+#ifdef __APPLE__
 int cmdSendHttp(ctl_t *ctl, event_t *event, uint64_t id, proc_id_t *proc)
-#endif // __MACOS__
+#endif // __APPLE__
 {
     //printf("%s: %s\n", __FUNCTION__, event->name);
     if (!event || !proc) return -1;
@@ -58,13 +58,13 @@ int cmdSendHttp(ctl_t *ctl, event_t *event, uint64_t id, proc_id_t *proc)
     return 0;
 }
 
-#ifdef __LINUX__
+#ifdef __linux__
 int __real_cmdPostEvent(ctl_t *, char *);
 int __wrap_cmdPostEvent(ctl_t *ctl, char *event)
-#endif // __LINUX__
-#ifdef __MACOS__
+#endif // __linux__
+#ifdef __APPLE__
 int cmdPostEvent(ctl_t *ctl, char *event)
-#endif // __MACOS__
+#endif // __APPLE__
 {
     //printf("%s: data at: %p\n", __FUNCTION__, event);
     doProtocolMetric((protocol_info *)event);

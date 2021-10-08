@@ -8,10 +8,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/rs/zerolog"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHandleMutate(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.Disabled)
 	app := App{&Options{}}
 
 	mux := http.NewServeMux()

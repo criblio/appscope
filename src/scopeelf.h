@@ -1,7 +1,7 @@
 #ifndef __SCOPEELF_H__
 #define __SCOPEELF_H__
 
-#ifdef __LINUX__
+#ifdef __linux__
 
 #include <elf.h>
 #include <link.h>
@@ -32,6 +32,6 @@ bool is_static(char *);
 bool is_go(char *);
 bool is_musl(char *);
 
-#endif // __LINUX__
+#endif // __linux__
 
 #endif // __SCOPEELF_H__

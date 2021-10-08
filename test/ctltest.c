@@ -36,13 +36,13 @@ void set_cbuf_data(char* val, unsigned long long new_size)
 }
 
 // These signatures satisfy --wrap=cbufGet in the Makefile
-#ifdef __LINUX__
+#ifdef __linux__
 int __real_cbufGet(cbuf_handle_t, uint64_t*);
 int __wrap_cbufGet(cbuf_handle_t cbuf, uint64_t *data)
-#endif // __LINUX__
-#ifdef __MACOS__
+#endif // __linux__
+#ifdef __APPLE__
 int cbufGet(cbuf_handle_t cbuf, uint64_t *data)
-#endif // __MACOS__
+#endif // __APPLE__
 {
     int res = __real_cbufGet(cbuf, data);
     if (enable_cbuf_data && res == 0) {

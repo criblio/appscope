@@ -1,7 +1,7 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
-#ifdef __MACOS__                                                                                                                                                                
+#ifdef __APPLE__                                                                                                                                                                
 #ifndef off64_t                                                                                                                                                                 
 typedef uint64_t off64_t;                                                                                                                                                       
 #endif                                                                                                                                                                          
@@ -13,7 +13,7 @@ struct statvfs64 {
     uint64_t x;                                                                                                                                                                 
 };                                                                                                                                                                              
 #endif                                                                                                                                                                          
-#endif // __MACOS__  
+#endif // __APPLE__  
 
 #define TEST_MSG "test"
 #define TEST_MSGW L"test"

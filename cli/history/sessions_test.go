@@ -1,6 +1,7 @@
 package history
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -33,7 +34,50 @@ func TestMain(m *testing.M) {
 	}
 }
 
+func waitSessions(expected int) (SessionList, error) {
+	var sessions SessionList
+	c := make(chan int, 0)
+
+	go func() {
+		for {
+			lastHome := os.Getenv("SCOPE_HOME")
+			os.Setenv("SCOPE_HOME", ".test")
+			sessions = GetSessions()
+			os.Setenv("SCOPE_HOME", lastHome)
+			if len(sessions) >= expected {
+				c <- 1
+				break
+			}
+			time.Sleep(1)
+		}
+	}()
+
+	select {
+	case <-time.After(60 * time.Second):
+		return nil, errors.New("Sessions not created in 60 seconds")
+	case <-c:
+		break
+	}
+
+	return sessions, nil
+}
+
+func runThree(t *testing.T) []int {
+	pids := []int{}
+	for i := 0; i < 3; i++ {
+		cmd := exec.Command(os.Args[0])
+		cmd.Env = append(os.Environ(), "TEST_MAIN=run", "SCOPE_HOME=.test")
+		err := cmd.Run()
+		assert.NoError(t, err)
+		pids = append(pids, cmd.Process.Pid)
+	}
+	return pids
+}
+
 func TestGetSessions(t *testing.T) {
+	os.RemoveAll(".test")
+	defer os.RemoveAll(".test")
+
 	cmd := exec.Command(os.Args[0])
 	cmd.Env = append(os.Environ(), "TEST_MAIN=run", "SCOPE_HOME=.test", "SCOPE_TEST=true")
 	err := cmd.Run()
@@ -69,24 +113,12 @@ func TestGetSessions(t *testing.T) {
 	assert.Equal(t, 1, sessions[0].ID)
 	assert.Equal(t, cmd.Process.Pid, sessions[0].Pid)
 	assert.Equal(t, int64(ts), sessions[0].Timestamp)
-
-	// assert.True(t, util.CheckFileExists(".test"))
-	os.RemoveAll(".test")
-}
-
-func runThree(t *testing.T) []int {
-	pids := []int{}
-	for i := 0; i < 3; i++ {
-		cmd := exec.Command(os.Args[0])
-		cmd.Env = append(os.Environ(), "TEST_MAIN=run", "SCOPE_HOME=.test")
-		err := cmd.Run()
-		assert.NoError(t, err)
-		pids = append(pids, cmd.Process.Pid)
-	}
-	return pids
 }
 
 func TestGetSessionLast(t *testing.T) {
+	os.RemoveAll(".test")
+	defer os.RemoveAll(".test")
+
 	pids := runThree(t)
 
 	time.Sleep(100 * time.Millisecond)
@@ -104,12 +136,12 @@ func TestGetSessionLast(t *testing.T) {
 
 	l2 := sessions.Last(2)
 	assert.Greater(t, l2[1].Timestamp, l2[0].Timestamp)
-
-	// assert.True(t, util.CheckFileExists(".test"))
-	os.RemoveAll(".test")
 }
 
 func TestGetSessionFirst(t *testing.T) {
+	os.RemoveAll(".test")
+	defer os.RemoveAll(".test")
+
 	pids := runThree(t)
 
 	time.Sleep(100 * time.Millisecond)
@@ -127,12 +159,12 @@ func TestGetSessionFirst(t *testing.T) {
 
 	l2 := sessions.First(2)
 	assert.Greater(t, l2[1].Timestamp, l2[0].Timestamp)
-
-	// assert.True(t, util.CheckFileExists(".test"))
-	os.RemoveAll(".test")
 }
 
 func TestSessionRemove(t *testing.T) {
+	os.RemoveAll(".test")
+	defer os.RemoveAll(".test")
+
 	_ = runThree(t)
 	time.Sleep(100 * time.Millisecond)
 
@@ -150,12 +182,12 @@ func TestSessionRemove(t *testing.T) {
 	for _, s := range sessionsBak {
 		assert.False(t, util.CheckFileExists(s.WorkDir))
 	}
-
-	// assert.True(t, util.CheckFileExists(".test"))
-	os.RemoveAll(".test")
 }
 
 func TestGetSessionRun(t *testing.T) {
+	os.RemoveAll(".test")
+	defer os.RemoveAll(".test")
+
 	cmd := exec.Command(os.Args[0])
 	cmd.Env = append(os.Environ(), "TEST_MAIN=run", "SCOPE_HOME=.test")
 	err := cmd.Run()
@@ -166,21 +198,18 @@ func TestGetSessionRun(t *testing.T) {
 	err = cmd.Start()
 	assert.NoError(t, err)
 
-	time.Sleep(5000 * time.Millisecond)
+	sessions, err := waitSessions(2)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	lastHome := os.Getenv("SCOPE_HOME")
-	os.Setenv("SCOPE_HOME", ".test")
-	sessions := GetSessions()
-	os.Setenv("SCOPE_HOME", lastHome)
-	assert.Len(t, sessions, 2)
-
-	r := sessions.Running()
-	assert.Len(t, r, 1)
-
-	os.RemoveAll(".test")
+	assert.Equal(t, 1, len(sessions.Running()))
 }
 
 func TestSessionArgs(t *testing.T) {
+	os.RemoveAll(".test")
+	defer os.RemoveAll(".test")
+
 	cmd := exec.Command(os.Args[0])
 	cmd.Env = append(os.Environ(), "TEST_MAIN=run", "SCOPE_HOME=.test")
 	err := cmd.Run()
@@ -197,6 +226,4 @@ func TestSessionArgs(t *testing.T) {
 	r := sessions.Args()
 	assert.Len(t, r, 1)
 	assert.Equal(t, []string{"/bin/echo", "true"}, r[0].Args)
-
-	os.RemoveAll(".test")
 }

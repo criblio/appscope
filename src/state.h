@@ -9,11 +9,11 @@
 #include "report.h"
 #include "../contrib/tls/tls.h"
 
-#ifdef __MACOS__
+#ifdef __APPLE__
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
 #endif
-#endif // __MACOS__
+#endif // __APPLE__
 
 
 /**

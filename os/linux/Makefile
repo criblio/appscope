@@ -3,9 +3,9 @@
 CWD = $(shell pwd)
 OS=linux
 CC=gcc
-CFLAGS=-fPIC -g -Wall -Werror=implicit-function-declaration -Wno-nonnull -Wno-deprecated-declarations -D__LINUX__ -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG)
+CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -Werror=implicit-function-declaration -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG)
 SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
-TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -D__LINUX__
+TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 CJSON_DEFINES=-DENABLE_LOCALES
@@ -43,7 +43,7 @@ $(PCRE2_AR):
 
 $(LDSCOPEDYN): src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c
 	@echo "$${CI:+::group::}Building $@"
-	gcc -Wall -g -D__LINUX__ $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
+	gcc -Wall -g $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
 		-DSCOPE_VER=\"$(SCOPE_VER)\" \
 		src/fn.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c \
 		-ldl -lrt -o $@ -I./os/$(OS) $(INCLUDES)
@@ -57,7 +57,7 @@ $(LDSCOPE): src/scope_static.c src/libdir.c $(LDSCOPEDYN) $(LIBSCOPE)
 	cd $(dir $(LIBSCOPE)) && objcopy \
 		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
 		$(notdir $(LIBSCOPE)) $(notdir $(LIBSCOPE:.so=.o))
-	gcc -Wall -static -g -D__LINUX__ $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
+	gcc -Wall -static -g $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
 		-DSCOPE_VER=\"$(SCOPE_VER)\" \
 		src/scope_static.c src/libdir.c \
 		$(INCLUDES) \

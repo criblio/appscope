@@ -205,9 +205,9 @@ testNoInterposedSymbolIsUsed(void** state)
     // Get a list of all interposed functions
     char cmdbuf[1024];
     const char* os = "linux";
-#ifdef __MACOS__
+#ifdef __APPLE__
     os = "macOS";
-#endif // __MACOS__
+#endif // __APPLE__
 #if defined(__x86_64__)
     snprintf(cmdbuf, sizeof(cmdbuf), "nm ./lib/%s/x86_64/libscope.so", os);
 #elif defined(__aarch64__)
@@ -232,6 +232,13 @@ testNoInterposedSymbolIsUsed(void** state)
                    glob_obj.gl_pathv[i]);
             continue;
         }
+
+        if (strstr(glob_obj.gl_pathv[i], "api.o")) {
+            printf("Skipping %s because we are using g_fn functions and need to support the error case.\n",
+                   glob_obj.gl_pathv[i]);
+            continue;
+        }
+
         checkObjectFile(interpose_list, glob_obj.gl_pathv[i], &s);
     }
     globfree(&glob_obj);

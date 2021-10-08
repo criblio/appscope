@@ -40,6 +40,9 @@ func TestMain(m *testing.M) {
 // Passthrough sends environment directly to scope, rather
 // than clearing it and creating configuration files
 func TestRunPassthrough(t *testing.T) {
+	os.RemoveAll(".test")
+	defer os.RemoveAll(".test")
+
 	// Test Passthrough, read from Stderr
 	cmd := exec.Command(os.Args[0])
 	cmd.Env = append(os.Environ(), "TEST_MAIN=runpassthrough", "SCOPE_HOME=.test", "SCOPE_METRIC_DEST=file://stderr")
@@ -50,10 +53,12 @@ func TestRunPassthrough(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "true\n", outb.String())
 	assert.Contains(t, errb.String(), "proc.start")
-	os.RemoveAll(".test")
 }
 
 func TestRun(t *testing.T) {
+	os.RemoveAll(".test")
+	defer os.RemoveAll(".test")
+
 	// Test SetupWorkDir, successfully
 	cmd := exec.Command(os.Args[0])
 	cmd.Env = append(os.Environ(), "TEST_MAIN=run", "SCOPE_HOME=.test", "SCOPE_TEST=true")
@@ -87,10 +92,12 @@ func TestRun(t *testing.T) {
 
 	cmdDirExists := util.CheckFileExists(filepath.Join(wd, "cmd"))
 	assert.True(t, cmdDirExists)
-	os.RemoveAll(".test")
 }
 
 func TestSubprocess(t *testing.T) {
+	os.RemoveAll(".test")
+	defer os.RemoveAll(".test")
+
 	os.Setenv("SCOPE_HOME", ".test")
 	// Test SetupWorkDir, successfully
 	internal.InitConfig()
@@ -124,5 +131,4 @@ func TestSubprocess(t *testing.T) {
 
 	cmdDirExists := util.CheckFileExists(filepath.Join(wd, "cmd"))
 	assert.True(t, cmdDirExists)
-	os.RemoveAll(".test")
 }

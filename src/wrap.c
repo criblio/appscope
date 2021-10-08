@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <sys/poll.h>
 
-#ifdef __LINUX__
+#ifdef __linux__
 #include <sys/prctl.h>
 #ifdef __GO__
 #include <asm/prctl.h>
@@ -64,7 +64,7 @@ static void *periodic(void *);
 static void doConfig(config_t *);
 static void threadNow(int);
 
-#ifdef __LINUX__
+#ifdef __linux__
 extern int arch_prctl(int, unsigned long);
 extern unsigned long scope_fs;
 
@@ -346,7 +346,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
     retval;                                                            \
 })
 
-#endif // __LINUX__
+#endif // __linux__
 
 
 static void
@@ -1171,19 +1171,66 @@ findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
     return 0;
 }
 
-/**
+/*
+ * Iterate all shared objects and GOT hook as necessary.
+ * Return FALSE in all cases in order to interate all objects.
+ * Ignore a set of objects we know we don't want to hook.
+ */
+static int
+hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (!info || !data || !info->dlpi_name) return FALSE;
+
+    struct link_map *lm;
+    void *addr = NULL;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+    void *libscopeHandle = data;
+    const char *libname = NULL;
+
+    // don't attempt to hook libscope.so, libc*.so, ld-*.so
+    // where libc*.so is for example libc.so.6 or libc.musl-x86_64.so.1
+    // where ld-*.so is for example ld-linux-x86-64.so.2 or ld-musl-x86_64.so.1
+    // if opening the main exec, name is NULL, else use the full lib name
+    if (strstr(info->dlpi_name, ".so")) {
+        if (strstr(info->dlpi_name, "libc") ||
+            strstr(info->dlpi_name, "ld-") ||
+            strstr(info->dlpi_name, "libscope")) {
+            return FALSE;
+        }
+        libname = info->dlpi_name;
+    }
+
+    void *handle = g_fn.dlopen(libname, RTLD_LAZY);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            addr = dlsym(libscopeHandle, inject_hook_list[i].symbol);
+            inject_hook_list[i].func = addr;
+
+            if ((dlsym(handle, inject_hook_list[i].symbol)) &&
+                (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
+                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
+                             inject_hook_list[i].symbol, info->dlpi_name);
+            }
+        }
+    }
+
+    dlclose(handle);
+    return FALSE;
+}
+
+/*
  * Called when injected to perform GOT hooking.
  */ 
 static bool
 hookInject()
 {
     char *full_path;
-    void *addr = NULL;
-    Elf64_Sym *sym = NULL;
-    Elf64_Rela *rel = NULL;
-    char *str = NULL;
-    int rsz = 0;
-    struct link_map *lm;
 
     if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *libscopeHandle = g_fn.dlopen(full_path, RTLD_NOW);
@@ -1191,27 +1238,7 @@ hookInject()
             return FALSE;
         }
 
-        void *handle = g_fn.dlopen(0, RTLD_LAZY);
-        if (handle == NULL) {
-            dlclose(libscopeHandle);
-            return FALSE;
-        }
-
-        // Get the link map and ELF sections in advance of something matching
-        if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) &&
-            (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
-
-            for (int i=0; inject_hook_list[i].symbol; i++) {
-                addr = dlsym(libscopeHandle, inject_hook_list[i].symbol);
-                
-                inject_hook_list[i].func = addr;
-                if ((dlsym(handle, inject_hook_list[i].symbol)) &&
-                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
-                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s", inject_hook_list[i].symbol);
-                }
-            }
-        }
-        dlclose(handle);
+        dl_iterate_phdr(hookSharedObjs, libscopeHandle);
         dlclose(libscopeHandle);
         return TRUE;
     }
@@ -1310,7 +1337,7 @@ initHook(int attachedFlag)
         ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
         funchook = funchook_create();
 
-        if (logLevel(g_log) <= CFG_LOG_DEBUG) {
+        if (logLevel(g_log) <= CFG_LOG_TRACE) {
             // TODO: add some mechanism to get the config'd log file path
             funchook_set_debug_file(DEFAULT_LOG_PATH);
         }
@@ -1628,7 +1655,7 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
     return stream;
 }
 
-#ifdef __LINUX__
+#ifdef __linux__
 EXPORTON int
 nanosleep(const struct timespec *req, struct timespec *rem)
 {
@@ -3331,7 +3358,7 @@ _exit(int status)
     __builtin_unreachable();
 }
 
-#endif // __LINUX__
+#endif // __linux__
 
 EXPORTON int
 close(int fd)
@@ -3377,7 +3404,7 @@ fcloseall(void)
     return rc;
 }
 
-#ifdef __MACOS__
+#ifdef __APPLE__
 EXPORTON int
 close$NOCANCEL(int fd)
 {
@@ -3486,7 +3513,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
     return rc;
 }
 
-#endif // __MACOS__
+#endif // __APPLE__
 
 EXPORTON off_t
 lseek(int fd, off_t offset, int whence)
@@ -4369,7 +4396,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
     return rc;
 }
 
-#ifdef __LINUX__
+#ifdef __linux__
 static int
 internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
 {
@@ -4410,7 +4437,7 @@ sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
 {
     return internal_sendmmsg(sockfd, msgvec, vlen, flags);
 }
-#endif // __LINUX__
+#endif // __linux__
 
 EXPORTON ssize_t
 recv(int sockfd, void *buf, size_t len, int flags)
@@ -4538,7 +4565,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     return rc;
 }
 
-#ifdef __LINUX__
+#ifdef __linux__
 EXPORTON int
 recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
          int flags, struct timespec *timeout)
@@ -4573,7 +4600,7 @@ recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
 
     return rc;
 }
-#endif //__LINUX__
+#endif //__linux__
 
 EXPORTOFF struct hostent *
 gethostbyname(const char *name)

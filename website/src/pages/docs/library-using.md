@@ -86,7 +86,7 @@ Use the `ldscope` command with the `--help` option to obtain the information you
 - `ldscope --help all` shows the full set of help content. 
 - `ldscope --help configuration` lists the full set of library environment variables.
 
-For the default settings in the sample `scope.yml` configuration file, see [Config Files](/docs/config-files), or inspect the most-recent file on [GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).
+For the default settings in the sample `scope.yml` configuration file, see [Config File](/docs/config-file), or inspect the most-recent file on [GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).
 
 ### <span id="lambda">Deploying the Library in an AWS Lambda Function</span>
 

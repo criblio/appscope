@@ -277,5 +277,5 @@ event:
       value: .*
       headers:
         - (?i)X-Forwarded.*  # include forwarding headers (case insensitive)
-        - service: cribl.* # include "service" headers starting with "cribl"
+        - service: cribl.*   # include "service" headers starting with "cribl"
 ```

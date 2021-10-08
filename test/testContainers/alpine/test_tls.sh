@@ -185,7 +185,7 @@ sleep 1
 evaltest
 RUBY_HTTP_END=$(grep http- $EVT_FILE | grep 10101 | wc -l)
 
-if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 6 )); then
+if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 4 )); then
     ERR+=1
 fi
 
@@ -207,7 +207,7 @@ sleep 1
 evaltest
 
 COUNT=$(grep http- $EVT_FILE | wc -l)
-if (( $COUNT < 6 )); then
+if (( $COUNT < 4 )); then
     ERR+=1
 fi
 

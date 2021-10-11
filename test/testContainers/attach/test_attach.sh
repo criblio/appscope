@@ -86,9 +86,6 @@ ERR+=$?
 grep -q http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-metric $EVT_FILE > /dev/null
-ERR+=$?
-
 kill -9 `pidof python3` > /dev/null
 endtest
 
@@ -118,8 +115,6 @@ if [[ $(grep Ubuntu /etc/os-release) ]]; then
 grep -q http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-metric $EVT_FILE > /dev/null
-ERR+=$?
 fi
 
 grep -q fs.open $EVT_FILE > /dev/null

@@ -9,6 +9,6 @@ Once you're past those, take a look at these.
 
 - [RELEASE](./RELEASE.md) - Release Process
 - [BUILD](./BUILD.md) - Build System
-- [INTEGRATION](../test/testContainers/README.md) - Integration Testing
+- [INTEGRATION](../test/integration/README.md) - Integration Testing
 
 > We will be adding more docs over time.

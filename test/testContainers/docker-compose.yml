@@ -7,12 +7,6 @@ x-scope-common: &scope-common
   working_dir: /opt/appscope
   privileged: true
 
-networks:
-  fluentbit-net:
-
-volumes:
-  test_output:
-
 services:
 
   # These tests run on all platforms; x86_64 and aarch64

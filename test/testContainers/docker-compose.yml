@@ -3,7 +3,6 @@ version: '3.5'
 x-scope-common: &scope-common
   volumes:
     - ../..:/opt/appscope
-    - /var/run/docker.sock:/var/run/docker.sock
   working_dir: /opt/appscope
   privileged: true
 

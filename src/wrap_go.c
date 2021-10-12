@@ -505,6 +505,13 @@ initGoHook(elf_buf_t *ebuf)
         scopeLog(CFG_LOG_WARN, "%s was compiled with go version `%s`. Go1.17 or newer is not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version);
         return; // don't install our hooks
     }
+
+    if (g_go_static && (getGoSymbol(ebuf->buf, "os/signal.Notify") ||
+        getSymbol(ebuf->buf, "os/signal.Notify"))) {
+        scopeLog(CFG_LOG_WARN, "%s use signal API. Continuing without AppScope.", ebuf->cmd);
+        return; // don't install our hooks
+    }
+
     /*
      * Note: calling runtime.cgocall results in the Go error
      *       "fatal error: cgocall unavailable"

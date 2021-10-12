@@ -177,9 +177,11 @@ set_library(void)
                     char *depstr = (char *)(strtab + dyn->d_un.d_val);
                     if (depstr && strstr(depstr, "ld-linux")) {
                         char newdep[PATH_MAX];
+                        size_t newdep_len;
                         if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) break;
-                        if (strlen(depstr) >= (strlen(newdep) + 1)) {
-                            strncpy(depstr, newdep, strlen(newdep) + 1);
+                        newdep_len = strlen(newdep);
+                        if (strlen(depstr) >= newdep_len) {
+                            strncpy(depstr, newdep, newdep_len + 1);
                             found = 1;
                             break;
                         }
@@ -256,6 +258,7 @@ set_loader(char *exe)
             DIR *dirp;
             struct dirent *entry;
             char dir[PATH_MAX];
+            size_t dir_len;
 
             if (strstr(exld, "ld-musl") != NULL) {
                 close(fd);
@@ -279,10 +282,10 @@ set_loader(char *exe)
             }
 
             closedir(dirp);
-
-            if (name && (strlen(exld) > (strlen(dir) + 1))) {
+            dir_len = strlen(dir);
+            if (name && (strlen(exld) >= dir_len)) {
                 if (g_debug) printf("%s:%d exe ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, dir);
-                strncpy(exld, dir, strlen(dir) + 1);
+                strncpy(exld, dir, dir_len + 1);
                 found = 1;
                 break;
             }

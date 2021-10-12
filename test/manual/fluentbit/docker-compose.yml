@@ -2,15 +2,27 @@ version: '3'
 
 networks:
   fluentbit-net:
-    external:
-      name: testcontainers_fluentbit-net
 
 volumes:
   test_output:
-    external: 
-      name: testcontainers_test_output
 
 services:
+  fluentbit:
+    image: scopeci/scope-fluentbit
+    networks:
+      - fluentbit-net
+    build:
+      cache_from:
+        - scopeci/scope-fluentbit
+      context: .
+      dockerfile: ./Dockerfile
+    working_dir: /opt/test/fluentbit
+    volumes:
+      - ../../..:/opt/appscope
+      - /var/run/docker.sock:/var/run/docker.sock
+      - test_output:/test_output
+    privileged: true
+
   _service-fluentbit:
     build: services/fluentbit/
     networks:
@@ -35,7 +47,6 @@ services:
       - |
         chmod 666 /test_output/abstest
         ldscope nginx ${NGINX_ARGS}
-
   _service-logstream:
     build: services/logstream/
     networks:

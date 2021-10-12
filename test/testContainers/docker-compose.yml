@@ -132,22 +132,6 @@ services:
       - "9000:9000"
     <<: *scope-common
 
-  fluentbit:
-    image: scopeci/scope-fluentbit
-    networks:
-      - fluentbit-net
-    build:
-      cache_from:
-        - scopeci/scope-fluentbit
-      context: .
-      dockerfile: ./fluentbit/Dockerfile
-    <<: *scope-common
-    working_dir: /opt/test/fluentbit
-    volumes:
-      - ../..:/opt/appscope
-      - /var/run/docker.sock:/var/run/docker.sock
-      - test_output:/test_output
-
   http:
     image: ghcr.io/criblio/appscope-test-http:${TAG:?Missing TAG environment variable}
     build:

@@ -32,7 +32,7 @@ debug:
 	$(MAKE) scope BUILD_OPTS="-gcflags=all=\"-N -l\""
 
 ## all: build and compress \`scope\`
-all: scope compressscope
+all: scope #compressscope
 
 ## clean: remove the built binary
 clean:

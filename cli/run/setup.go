@@ -82,22 +82,59 @@ func CreateAll(path string) error {
 	return nil
 }
 
+// setupWorkDir sets up a working directory for a given set of args
+func (rc *Config) setupWorkDir(args []string, attach bool) {
+
+	// Override to CriblDest if specified
+	if rc.CriblDest != "" {
+		rc.EventsDest = rc.CriblDest
+		rc.MetricsDest = rc.CriblDest
+	}
+
+	// Create session directory
+	rc.createWorkDir(args, attach)
+
+	// Build or load config
+	if rc.UserConfig == "" {
+		err := rc.configFromRunOpts()
+		util.CheckErrSprintf(err, "%v", err)
+	} else {
+		err := rc.ConfigFromFile()
+		util.CheckErrSprintf(err, "%v", err)
+	}
+
+	// Update paths to absolute for file transports
+	if rc.sc.Metric.Transport.TransportType == "file" {
+		newPath, err := filepath.Abs(rc.sc.Metric.Transport.Path)
+		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Metric.Transport.Path, err)
+		rc.sc.Metric.Transport.Path = newPath
+	}
+	if rc.sc.Event.Transport.TransportType == "file" {
+		newPath, err := filepath.Abs(rc.sc.Event.Transport.Path)
+		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Event.Transport.Path, err)
+		rc.sc.Event.Transport.Path = newPath
+	}
+
+	// Populate session directory
+	rc.populateWorkDir(args, attach)
+}
+
 // createWorkDir creates a working directory
 func (rc *Config) createWorkDir(args []string, attach bool) {
-	filePerms := os.FileMode(0644)
 	dirPerms := os.FileMode(0755)
 	if attach {
-		filePerms = 0777
 		dirPerms = 0777
 		oldmask := syscall.Umask(0)
 		defer syscall.Umask(oldmask)
 	}
+
 	if rc.WorkDir != "" {
 		if util.CheckDirExists(rc.WorkDir) {
 			// Directory exists, exit
 			return
 		}
 	}
+
 	if rc.now == nil {
 		rc.now = time.Now
 	}
@@ -127,7 +164,7 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 
 		// Create working directory in /tmp (0777 permissions)
 		rc.WorkDir = filepath.Join("/tmp", tmpDirName)
-		err := os.Mkdir(rc.WorkDir, filePerms)
+		err := os.Mkdir(rc.WorkDir, dirPerms)
 		util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
 
 		// Symbolic link between /tmp/tmpDirName and /history/tmpDirName
@@ -149,6 +186,17 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 	payloadsDir := filepath.Join(rc.WorkDir, "payloads")
 	err = os.MkdirAll(payloadsDir, dirPerms)
 	util.CheckErrSprintf(err, "error creating payloads dir: %v", err)
+
+	log.Info().Str("workDir", rc.WorkDir).Msg("created working directory")
+}
+
+func (rc *Config) populateWorkDir(args []string, attach bool) {
+	filePerms := os.FileMode(0644)
+	if attach {
+		filePerms = 0777
+		oldmask := syscall.Umask(0)
+		defer syscall.Umask(oldmask)
+	}
 
 	// Create Log file
 	internal.CreateLogFile(filepath.Join(rc.WorkDir, "scope.log"), filePerms)
@@ -172,7 +220,7 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 	}
 
 	// Create event_dest file
-	err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "event_dest"), []byte(rc.buildEventsDest()), filePerms)
+	err := ioutil.WriteFile(filepath.Join(rc.WorkDir, "event_dest"), []byte(rc.buildEventsDest()), filePerms)
 	util.CheckErrSprintf(err, "error writing event_dest: %v", err)
 
 	// Create metrics_dest file
@@ -205,8 +253,6 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 	argsBytes, err := json.Marshal(args)
 	util.CheckErrSprintf(err, "error marshaling JSON: %v", err)
 	err = ioutil.WriteFile(argsJSONPath, argsBytes, filePerms)
-
-	log.Info().Str("workDir", rc.WorkDir).Msg("created working directory")
 }
 
 // Open to race conditions, but having a duplicate ID is only a UX bug rather than breaking
@@ -229,37 +275,6 @@ func getSessionID() string {
 // HistoryDir returns the history directory
 func HistoryDir() string {
 	return filepath.Join(util.ScopeHome(), "history")
-}
-
-// setupWorkDir sets up a working directory for a given set of args
-func (rc *Config) setupWorkDir(args []string, attach bool) {
-
-	if rc.UserConfig == "" {
-		// Override to CriblDest if specified
-		if rc.CriblDest != "" {
-			rc.EventsDest = rc.CriblDest
-			rc.MetricsDest = rc.CriblDest
-		}
-		err := rc.configFromRunOpts()
-		util.CheckErrSprintf(err, "%v", err)
-	} else {
-		err := rc.ConfigFromFile()
-		util.CheckErrSprintf(err, "%v", err)
-	}
-
-	// Update paths to absolute for file transports
-	if rc.sc.Metric.Transport.TransportType == "file" {
-		newPath, err := filepath.Abs(rc.sc.Metric.Transport.Path)
-		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Metric.Transport.Path, err)
-		rc.sc.Metric.Transport.Path = newPath
-	}
-	if rc.sc.Event.Transport.TransportType == "file" {
-		newPath, err := filepath.Abs(rc.sc.Event.Transport.Path)
-		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Event.Transport.Path, err)
-		rc.sc.Event.Transport.Path = newPath
-	}
-
-	rc.createWorkDir(args, attach)
 }
 
 func (rc *Config) buildMetricsDest() string {

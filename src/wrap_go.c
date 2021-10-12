@@ -287,6 +287,9 @@ patchClone()
 
 #define UNKNOWN_GO_VER (-1)
 #define MIN_SUPPORTED_GO_VER (8)
+// Go change passing parameters from stack to register
+// Ref: https://golang.org/doc/go1.17#compile
+#define PARAM_ON_REG_GO_VER (17)
 
 static int
 go_major_version(const char *go_runtime_version)
@@ -497,6 +500,9 @@ initGoHook(elf_buf_t *ebuf)
         } else {
             scopeLog(CFG_LOG_WARN, "%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
         }
+        return; // don't install our hooks
+    } else if (go_major_ver >= PARAM_ON_REG_GO_VER) {
+        scopeLog(CFG_LOG_WARN, "%s was compiled with go version `%s`. Go1.17 or newer is not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version);
         return; // don't install our hooks
     }
     /*

@@ -376,6 +376,33 @@ ERR+=$?
 
 endtest
 
+#
+# signalHandlerDynamic
+#
+starttest signalHandlerDynamic
+cd /go/signals
+ldscope ./signalHandlerDynamic &
+ERR+=$?
+
+sleep 0.5
+
+kill -SIGCHLD `pidof signalHandlerDynamic`
+
+kill -SIGINT `pidof signalHandlerDynamic`
+
+sleep 0.5
+
+grep "Got signal: child exited" $EVT_FILE > /dev/null
+ERR+=$?
+
+grep "Got signal: interrupt" $EVT_FILE > /dev/null
+ERR+=$?
+
+grep "exiting" $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
 
 #
 # cgoDynamic

@@ -996,8 +996,8 @@ doHttp2Frame(protocol_info *proto)
     //        proto->uid, fStream, fType, fFlags);
 
     if (fType == 0x05) {
-        // PUSH_PROMISE frames are analgous to unsolicited request messages for
-        // future responses the client didn't directly ask for. They are
+        // PUSH_PROMISE frames are analogous to unsolicited request messages
+        // for future responses the client didn't directly ask for. They are
         // typically sent by the server when it's smart enough to identify
         // assets the client will need or for async messaging.
         //
@@ -1148,7 +1148,7 @@ doHttp2Frame(protocol_info *proto)
             // become the body.data element in the JSON event. Some are stashed
             // into the state object for use later.
             if (!strcasecmp(":method", name)) {
-                // We use the presense of the :method header to indicate we're
+                // We use the presence of the :method header to indicate we're
                 // processing a request message.
                 stream->msgType = 1;
                 addHttp2NumField(stream->jsonData, "http_stream", fStream);
@@ -1166,7 +1166,7 @@ doHttp2Frame(protocol_info *proto)
                     addHttp2StrFieldLN(stream->jsonData, "http_frame", "PUSH_PROMISE");
                 }
             } else if (!strcasecmp(":status", name)) {
-                // We use the presense of the :status header to indicate we're
+                // We use the presence of the :status header to indicate we're
                 // processing a response message.
                 stream->msgType = 2; // response
                 addHttp2NumField(stream->jsonData, "http_stream", fStream);
@@ -2744,8 +2744,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
     {
         // Cleanup the per-channel state data for HTTP processing when the
         // channel is closed. We're not checking the results here because it's
-        // possible, even likely, these operatons will fail to find an entry
-        // for the channel. Instead of searching first and then deleteing, just
+        // possible, even likely, these operations will fail to find an entry
+        // for the channel. Instead of searching first and then deleting, just
         // delete and let it fail if it's not there.
         lstDelete(g_maplist, net->uid);        // HTTP/1 saved state
         lstDelete(g_http2_channels, net->uid); // HTTP/2 saved state

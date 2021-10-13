@@ -205,7 +205,7 @@ typedef unsigned int bool;
 // record header and not the handshake header that follows.
 //
 // If you end up here because you're tracking down a partial payload issue in
-// the future, consider adding some buffering of intitial payload data on a
+// the future, consider adding some buffering of initial payload data on a
 // channel until you have enough to satisfy TLS and other protocol detection.
 //
 //#define PAYLOAD_BYTESRC 5

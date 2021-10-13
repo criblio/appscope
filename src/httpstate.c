@@ -782,8 +782,9 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
             state->hasUpgrade = FALSE;
             state->hasConnectionUpgrade = FALSE;
 
-            // XXX We're ignoring the posibility that there is an HTTP/2 frame
-            //     tacked to the end of the HTTP/1.x response here. It happens!
+            // See Issue #601.
+            //   We're ignoring the possibility that there is an HTTP/2 frame
+            //   tacked to the end of the HTTP/1.x response here. It happens!
         }
 
         return ret;

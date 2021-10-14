@@ -154,6 +154,12 @@ func (c *Config) SetDefault() error {
 					Field:     ".*",
 					Value:     ".*",
 				},
+				{
+					WatchType: "http",
+					Name:      ".*",
+					Field:     ".*",
+					Value:     ".*",
+				},
 				// {
 				// 	WatchType: "metric",
 				// 	Name:      ".*",
@@ -174,15 +180,6 @@ func (c *Config) SetDefault() error {
 				},
 			},
 		},
-	}
-
-	if c.CriblDest == "" {
-		c.sc.Event.Watch = append(c.sc.Event.Watch, ScopeWatchConfig{
-			WatchType: "http",
-			Name:      ".*",
-			Field:     ".*",
-			Value:     ".*",
-		})
 	}
 
 	return nil

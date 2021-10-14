@@ -102,8 +102,6 @@ grep plainServerDynamic $EVT_FILE | grep http-req > /dev/null
 ERR+=$?
 grep plainServerDynamic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
-grep plainServerDynamic $EVT_FILE | grep http-metrics > /dev/null
-ERR+=$?
 grep plainServerDynamic $EVT_FILE | grep http-resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
@@ -139,8 +137,6 @@ grep plainServerStatic $EVT_FILE | grep http-req > /dev/null
 ERR+=$?
 grep plainServerStatic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
-grep plainServerStatic $EVT_FILE | grep http-metrics > /dev/null
-ERR+=$?
 grep plainServerStatic $EVT_FILE | grep http-resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
@@ -175,8 +171,6 @@ evaltest
 grep tlsServerDynamic $EVT_FILE | grep http-req > /dev/null
 ERR+=$?
 grep tlsServerDynamic $EVT_FILE | grep http-resp > /dev/null
-ERR+=$?
-grep tlsServerDynamic $EVT_FILE | grep http-metrics > /dev/null
 ERR+=$?
 grep tlsServerDynamic $EVT_FILE | grep http-resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
@@ -214,8 +208,6 @@ grep tlsServerStatic $EVT_FILE | grep http-req > /dev/null
 ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
-grep tlsServerStatic $EVT_FILE | grep http-metrics > /dev/null
-ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep http-resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
@@ -242,8 +234,6 @@ grep plainClientDynamic $EVT_FILE | grep http-req > /dev/null
 ERR+=$?
 grep plainClientDynamic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
-grep plainClientDynamic $EVT_FILE | grep http-metrics > /dev/null
-ERR+=$?
 
 evalPayload
 ERR+=$?
@@ -267,8 +257,6 @@ evaltest
 grep plainClientStatic $EVT_FILE | grep http-req > /dev/null
 ERR+=$?
 grep plainClientStatic $EVT_FILE | grep http-resp > /dev/null
-ERR+=$?
-grep plainClientStatic $EVT_FILE | grep http-metrics > /dev/null
 ERR+=$?
 
 evalPayload
@@ -294,8 +282,6 @@ grep tlsClientDynamic $EVT_FILE | grep http-req > /dev/null
 ERR+=$?
 grep tlsClientDynamic $EVT_FILE | grep http-resp > /dev/null
 ERR+=$?
-grep tlsClientDynamic $EVT_FILE | grep http-metrics > /dev/null
-ERR+=$?
 
 evalPayload
 ERR+=$?
@@ -319,8 +305,6 @@ evaltest
 grep tlsClientStatic $EVT_FILE | grep http-req > /dev/null
 ERR+=$?
 grep tlsClientStatic $EVT_FILE | grep http-resp > /dev/null
-ERR+=$?
-grep tlsClientStatic $EVT_FILE | grep http-metrics > /dev/null
 ERR+=$?
 
 evalPayload

@@ -1,0 +1,10 @@
+# AppScope `ls-hpack` Contrib Package
+
+This directory contains a copy of the `litespeedtech/ls-hpack` package. It was
+added during work on \#543 to parse HTTP/2 HEADERS frames.
+
+* Project: https://github.com/litespeedtech/ls-hpack
+* Release: v2.3.0 2021-09-14
+
+We downloaded `ls-hpack-2.3.0.tar.gz`, unpacked it here, and added this file.
+We build it using [`contrib/Makefile`](../Makefile).

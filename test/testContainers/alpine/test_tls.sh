@@ -88,14 +88,13 @@ ERR+=$?
 grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-metric $EVT_FILE > /dev/null
-ERR+=$?
-
 grep net.dns.req $EVT_FILE > /dev/null
 ERR+=$?
 
 grep net.dns.resp $EVT_FILE > /dev/null
 ERR+=$?
+
+cat $EVT_FILE
 
 evalPayload
 ERR+=$?
@@ -114,9 +113,6 @@ grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
 grep http-resp $EVT_FILE > /dev/null
-ERR+=$?
-
-grep http-metric $EVT_FILE > /dev/null
 ERR+=$?
 
 grep net.dns.req $EVT_FILE > /dev/null
@@ -144,9 +140,6 @@ ERR+=$?
 grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-metric $EVT_FILE > /dev/null
-ERR+=$?
-
 grep net.dns.req $EVT_FILE > /dev/null
 ERR+=$?
 
@@ -172,9 +165,6 @@ ERR+=$?
 grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-metric $EVT_FILE > /dev/null
-ERR+=$?
-
 evalPayload
 ERR+=$?
 
@@ -195,7 +185,7 @@ sleep 1
 evaltest
 RUBY_HTTP_END=$(grep http- $EVT_FILE | grep 10101 | wc -l)
 
-if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 6 )); then
+if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 4 )); then
     ERR+=1
 fi
 
@@ -217,7 +207,7 @@ sleep 1
 evaltest
 
 COUNT=$(grep http- $EVT_FILE | wc -l)
-if (( $COUNT < 6 )); then
+if (( $COUNT < 4 )); then
     ERR+=1
 fi
 
@@ -240,9 +230,6 @@ ERR+=$?
 grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-metric $EVT_FILE > /dev/null
-ERR+=$?
-
 evalPayload
 ERR+=$?
 
@@ -259,7 +246,7 @@ evaltest
 
 PHP_HTTP_END=$(grep http- $EVT_FILE | grep sslclient.php | wc -l)
 
-if (( $PHP_HTTP_END - $PHP_HTTP_START < 3 )); then
+if (( $PHP_HTTP_END - $PHP_HTTP_START < 2 )); then
     ERR+=1
 fi
 
@@ -280,7 +267,7 @@ ldscope httpd -k stop
 evaltest
 APACHE_HTTP_END=$(grep http- $EVT_FILE | grep httpd | wc -l)
 
-if (( $APACHE_HTTP_END - $APACHE_HTTP_START < 3 )); then
+if (( $APACHE_HTTP_END - $APACHE_HTTP_START < 2 )); then
     ERR+=1
 fi
 

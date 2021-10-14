@@ -82,9 +82,6 @@ ERR+=$?
 grep -q http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-metric $EVT_FILE > /dev/null
-ERR+=$?
-
 kill -9 `pidof python3` > /dev/null
 endtest
 
@@ -107,9 +104,6 @@ grep -q http-req $EVT_FILE > /dev/null
 ERR+=$?
 
 grep -q http-resp $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q http-metric $EVT_FILE > /dev/null
 ERR+=$?
 
 grep -q fs.open $EVT_FILE > /dev/null

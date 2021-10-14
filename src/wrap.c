@@ -1044,9 +1044,9 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
     if (rc > 0) {
         if (SYMBOL_LOADED(SSL_get_fd)) {
             int fd = g_fn.SSL_get_fd(ssl);
-            doProtocol((uint64_t)ssl, fd, buf, (size_t)num, TLSRX, BUF);
+            doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
         } else {
-            doProtocol((uint64_t)ssl, -1, buf, (size_t)num, TLSRX, BUF);
+            doProtocol((uint64_t)ssl, -1, buf, (size_t)rc, TLSRX, BUF);
         }
     }
 

@@ -1,5 +1,3 @@
-ARCH_CFLAGS=-D__FUNCHOOK__
-
 ARCH_LD_FLAGS=-lcapstone
 ARCH_BINARY=elf64-littleaarch64
 ARCH_OBJ=$(ARCH)
@@ -10,12 +8,12 @@ INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/
 $(LIBSCOPE): src/wrap.c src/state.c src/httpstate.c src/report.c src/httpagg.c src/plattime.c src/fn.c os/$(OS)/os.c src/cfgutils.c src/cfg.c src/transport.c src/log.c src/mtc.c src/circbuf.c src/linklist.c src/evtformat.c src/ctl.c src/mtcformat.c src/com.c src/dbg.c src/search.c src/scopeelf.c src/utils.c $(YAML_SRC) contrib/cJSON/cJSON.c src/javabci.c src/javaagent.c
 	@$(MAKE) -C contrib funchook pcre2 openssl ls-hpack
 	@echo "$${CI:+::group::}Building $@"
-	$(CC) $(CFLAGS) $(ARCH_CFLAGS) \
+	$(CC) $(CFLAGS) \
 		-shared -fvisibility=hidden -fno-stack-protector \
 		-DSCOPE_VER=\"$(SCOPE_VER)\" $(CJSON_DEFINES) $(YAML_DEFINES) \
 		-pthread -o $@ $(INCLUDES) $^ $(LD_FLAGS) ${OPENSSL_AR} \
 		-Wl,--version-script=libscope.map
-	$(CC) -c $(CFLAGS) $(ARCH_CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
+	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) $(INCLUDES) $^
 	$(RM) -r ./test/selfinterpose && \
 		mkdir ./test/selfinterpose && \
 		mv *.o ./test/selfinterpose/

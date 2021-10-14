@@ -86,6 +86,7 @@ destroyNetInfo(void *data)
     if (!data) return;
     net_info *net = (net_info *)data;
 
+    free(net->http.hdr);
     free(net->http.http2Buf[0].buf);
     free(net->http.http2Buf[1].buf);
 
@@ -1466,10 +1467,6 @@ addSock(int fd, int type, int family)
             }
         }
 */
-
-        // Release the HTTP/2 frame stashes
-        free(g_netinfo[fd].http.http2Buf[0].buf);
-        free(g_netinfo[fd].http.http2Buf[1].buf);
 
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].active = TRUE;

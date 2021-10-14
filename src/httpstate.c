@@ -45,6 +45,15 @@ setHttpState(http_state_t *httpstate, http_enum_t toState)
     if (!httpstate) return;
     switch (toState) {
         case HTTP_NONE:
+            // cleanup the stash for the RX and TX sides
+            for (int i = 0; i < 2; ++i) {
+                if (httpstate->http2Buf[i].buf) {
+                    free(httpstate->http2Buf[i].buf);
+                    httpstate->http2Buf[i].buf = 0;
+                }
+                httpstate->http2Buf[i].len = 0;
+                httpstate->http2Buf[i].size = 0;
+            }
             if (httpstate->hdr)
                 free(httpstate->hdr);
             httpstate->hdr = NULL;
@@ -894,16 +903,6 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
 void
 resetHttp(http_state_t *httpstate)
 {
-    // cleanup the stash for the RX and TX sides
-    for (int i = 0; i < 2; ++i) {
-        if (httpstate->http2Buf[0].buf) {
-            free(httpstate->http2Buf[i].buf);
-            httpstate->http2Buf[i].buf = 0;
-        }
-        httpstate->http2Buf[i].len = 0;
-        httpstate->http2Buf[i].size = 0;
-    }
-
     setHttpState(httpstate, HTTP_NONE);
 }
 

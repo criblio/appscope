@@ -116,6 +116,8 @@ static list_t *g_maplist;
 static search_t *g_http_status = NULL;
 static http_agg_t *g_http_agg;
 
+#define DEFAULT_MIN_DURATION_TIME (1)
+
 static void
 destroyHttpMap(void *data)
 {
@@ -1518,6 +1520,11 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         if (cachedDurationNum >= 1) {
             // factor of 1000 converts ns to us.
             dur = fs->totalDuration.evt / ( 1000 * cachedDurationNum);
+            // with small value of totalDuration.evt we miss the fs.duration event
+            // TODO handle the precision with floating point in future
+            if (dur == 0ULL) {
+                dur = DEFAULT_MIN_DURATION_TIME;
+            }
         }
 
         // Don't report zeros.

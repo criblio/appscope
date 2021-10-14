@@ -42,91 +42,36 @@ endtest(){
 }
 
 #
-# Top
+# fwrite binary
 #
-starttest Top
+starttest fwrite
 
-top -b -d 1 > /dev/null &
-sleep 1
-ldscope --attach `pidof top`
-sleep 1
-evaltest
-
-grep -q '"proc":"top"' $EVT_FILE || grep -q fs.close
+ldscope /opt/fwrite/fwrite
 ERR+=$?
 
-grep -q '"proc":"top"' $EVT_FILE || grep -q fs.close
-ERR+=$?
+sleep 0.5
+count=$(grep '"source":"fs.op.open"' $EVT_FILE | wc -l)
+if [ $count -ne 1 ] ; then 
+    ERR+=1
+fi
 
-kill -9 `pidof top`
+count=$(grep '"source":"fs.duration"' $EVT_FILE | wc -l)
+if [ $count -ne 1 ] ; then 
+    ERR+=1
+fi
+
+count=$(grep '"source":"fs.write"' $EVT_FILE | wc -l)
+if [ $count -ne 1 ] ; then 
+    ERR+=1
+fi
+
+count=$(grep '"source":"fs.op.close"' $EVT_FILE | wc -l)
+if [ $count -ne 1 ] ; then 
+    ERR+=1
+fi
 
 endtest
 
-#
-# Python3 Web Server
-#
-starttest Python3
-
-python3 -m http.server 2> /dev/null &
-sleep 1
-ldscope --attach `pidof python3`
-curl http://localhost:8000
-evaltest
-
-grep -q '"proc":"python3"' $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q http-req $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q http-resp $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q http-metric $EVT_FILE > /dev/null
-ERR+=$?
-
-kill -9 `pidof python3` > /dev/null
-endtest
-
-#
-# Java HTTP Server
-#
-starttest java
-cd /opt/java_http
-java SimpleHttpServer 2> /dev/null &
-sleep 1
-ldscope --attach `pidof java`
-curl http://localhost:8000/status
-sleep 1
-evaltest
-
-grep -q '"proc":"java"' $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q http-req $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q http-resp $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q http-metric $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q fs.open $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q fs.close $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q net.conn.open $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q net.conn.close $EVT_FILE > /dev/null
-ERR+=$?
-
-kill -9 `pidof java`
-
-endtest
 
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""

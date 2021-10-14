@@ -1033,7 +1033,6 @@ memcpy(void *dest, const void *src, size_t n)
     return memmove(dest, src, n);
 }
 
-#ifdef __FUNCHOOK__
 static int
 ssl_read_hook(SSL *ssl, void *buf, int num)
 {
@@ -1127,7 +1126,6 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
     }
     return 0;
 }
-#endif // __FUNCHOOK__
 
 /*
  * There are 3x SSL_read functions to consider:
@@ -1154,9 +1152,7 @@ static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
 static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
 static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
-#ifdef __FUNCHOOK__  // TODO: remove when funchook is working with ARM64, just keeping warnings at bay
 static long scope_syscall(long, ...);
-#endif
 
 static int 
 findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
@@ -1248,11 +1244,9 @@ hookInject()
 static void
 initHook(int attachedFlag)
 {
-#ifdef __FUNCHOOK__
     int rc;
     funchook_t *funchook;
     bool should_we_patch = FALSE;
-#endif
     char *full_path = NULL;
     elf_buf_t *ebuf = NULL;
 
@@ -1293,7 +1287,6 @@ initHook(int attachedFlag)
         hookInject();
     }
 
-#ifdef __FUNCHOOK__
     if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
         if (handle == NULL) {
@@ -1417,7 +1410,6 @@ initHook(int attachedFlag)
             return;
         }
     }
-#endif  // __FUNCHOOK__
 }
 
 static void
@@ -2541,10 +2533,13 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     return -1;
 }
 
-EXPORTOFF int // EXPORTOFF because it's redundant with __write
+EXPORTON int
 __overflow(FILE *stream, int ch)
 {
     WRAP_CHECK(__overflow, EOF);
+    if (g_ismusl == FALSE) {
+        return g_fn.__overflow(stream, ch);
+    }
     uint64_t initialTime = getTime();
 
     int rc = g_fn.__overflow(stream, ch);
@@ -2602,7 +2597,6 @@ isAnAppScopeConnection(int fd)
  * do any dynamic memory allocation while this executes. Be careful.
  * The DBG() output is ignored until after the constructor runs.
  */
-#ifdef __FUNCHOOK__  // TODO: remove when funchook is working with ARM64, just keeping warnings at bay
 static long
 scope_syscall(long number, ...)
 {
@@ -2710,12 +2704,14 @@ scope_open(const char* pathname)
 
 #define scope_close(fd) g_fn.close(fd)
 
-#endif // __FUNCHOOK__
-
-VAREXPORT size_t // EXPORTOFF because it's redundant with __write
+EXPORTON size_t
 fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 {
     WRAP_CHECK(fwrite_unlocked, 0);
+    if (g_ismusl == FALSE) {
+        return g_fn.fwrite_unlocked(ptr, size, nitems, stream);
+    }
+
     uint64_t initialTime = getTime();
 
     size_t rc = g_fn.fwrite_unlocked(ptr, size, nitems, stream);
@@ -3672,11 +3668,13 @@ __stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
     return rc;
 }
 
-EXPORTOFF ssize_t // EXPORTOFF because it's redundant with __write
-
+EXPORTON ssize_t
 write(int fd, const void *buf, size_t count)
 {
     WRAP_CHECK(write, -1);
+    if (g_ismusl == FALSE) {
+        return __write_libc(fd, buf, count);
+    }
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.write(fd, buf, count);
@@ -3712,10 +3710,13 @@ writev(int fd, const struct iovec *iov, int iovcnt)
     return rc;
 }
 
-VAREXPORT size_t  // EXPORTOFF because it's redundant with __write
+EXPORTON size_t
 fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 {
     WRAP_CHECK(fwrite, 0);
+    if (g_ismusl == FALSE) {
+        return g_fn.fwrite(ptr, size, nitems, stream);
+    }
     uint64_t initialTime = getTime();
 
     size_t rc = g_fn.fwrite(ptr, size, nitems, stream);
@@ -3725,10 +3726,13 @@ fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
     return rc;
 }
 
-VAREXPORT int // EXPORTOFF because it's redundant with __write
+EXPORTON int
 puts(const char *s)
 {
     WRAP_CHECK(puts, EOF);
+    if (g_ismusl == FALSE) {
+        return g_fn.puts(s);
+    }
     uint64_t initialTime = getTime();
 
     int rc = g_fn.puts(s);
@@ -3743,10 +3747,13 @@ puts(const char *s)
     return rc;
 }
 
-VAREXPORT int // EXPORTOFF because it's redundant with __write
+EXPORTON int
 putchar(int c)
 {
     WRAP_CHECK(putchar, EOF);
+    if (g_ismusl == FALSE) {
+        return g_fn.putchar(c);
+    }
     uint64_t initialTime = getTime();
 
     int rc = g_fn.putchar(c);
@@ -3756,10 +3763,13 @@ putchar(int c)
     return rc;
 }
 
-VAREXPORT int // EXPORTOFF because it's redundant with __write
+EXPORTON int
 fputs(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs, EOF);
+    if (g_ismusl == FALSE) {
+        return g_fn.fputs(s, stream);
+    }
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fputs(s, stream);
@@ -3769,10 +3779,13 @@ fputs(const char *s, FILE *stream)
     return rc;
 }
 
-EXPORTOFF int // EXPORTOFF because it's redundant with __write
+EXPORTON int
 fputs_unlocked(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs_unlocked, EOF);
+    if (g_ismusl == FALSE) {
+        return g_fn.fputs_unlocked(s, stream);
+    }
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fputs_unlocked(s, stream);
@@ -3954,10 +3967,13 @@ fgetc(FILE *stream)
     return rc;
 }
 
-VAREXPORT int // EXPORTOFF because it's redundant with __write
+EXPORTON int
 fputc(int c, FILE *stream)
 {
     WRAP_CHECK(fputc, EOF);
+    if(g_ismusl == FALSE) {
+        return g_fn.fputc(c, stream);
+    }
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fputc(c, stream);
@@ -3967,10 +3983,13 @@ fputc(int c, FILE *stream)
     return rc;
 }
 
-VAREXPORT int // EXPORTOFF because it's redundant with __write
+EXPORTON int
 fputc_unlocked(int c, FILE *stream)
 {
     WRAP_CHECK(fputc_unlocked, EOF);
+    if (g_ismusl == FALSE) {
+        return g_fn.fputc_unlocked(c, stream);
+    }
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fputc_unlocked(c, stream);
@@ -3980,10 +3999,13 @@ fputc_unlocked(int c, FILE *stream)
     return rc;
 }
 
-VAREXPORT wint_t // EXPORTOFF because it's redundant with __write
+EXPORTON wint_t
 putwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(putwc, WEOF);
+    if (g_ismusl == FALSE) {
+        return g_fn.putwc(wc, stream);
+    }
     uint64_t initialTime = getTime();
 
     wint_t rc = g_fn.putwc(wc, stream);
@@ -3993,10 +4015,13 @@ putwc(wchar_t wc, FILE *stream)
     return rc;
 }
 
-VAREXPORT wint_t // EXPORTOFF because it's redundant with __write
+EXPORTON wint_t
 fputwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(fputwc, WEOF);
+    if (g_ismusl == FALSE) {
+        return g_fn.fputwc(wc, stream);
+    }
     uint64_t initialTime = getTime();
 
     wint_t rc = g_fn.fputwc(wc, stream);

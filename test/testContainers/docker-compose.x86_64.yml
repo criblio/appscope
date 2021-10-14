@@ -150,6 +150,18 @@ services:
       args:
         GO_IMAGE_VER: golang:1.7
     <<: *scope-common
+  # golang 1.17 introduces new way of passing function arguments and results using registers instead of the stack.
+  # we need to update scope to handle this version
+  go_17:
+    image: ghcr.io/criblio/appscope-test-go_17:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-go_17:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./go/unsupported/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.17
+    <<: *scope-common
 
   # golang:1.8 is available for arm64 but some Debian dependencies aren't
   go_8:

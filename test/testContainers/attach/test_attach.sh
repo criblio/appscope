@@ -44,9 +44,6 @@ endtest(){
 #
 # Top
 #
-# TODO: Ref: https://github.com/criblio/appscope/issues/586
-# After fixing issue above remove the if condition below
-if [[ $(grep Ubuntu /etc/os-release) ]]; then 
 starttest Top
 
 top -b -d 1 > /dev/null &
@@ -64,7 +61,6 @@ ERR+=$?
 kill -9 `pidof top`
 
 endtest
-fi
 
 #
 # Python3 Web Server

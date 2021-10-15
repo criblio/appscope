@@ -8,6 +8,9 @@ FAILED_TEST_COUNT=0
 EVT_FILE="/go/events.log"
 touch $EVT_FILE
 
+LOG_FILE="/tmp/scope.log"
+touch $LOG_FILE
+
 starttest(){
     CURRENT_TEST=$1
     echo "==============================================="
@@ -40,6 +43,13 @@ endtest(){
     fi
 
     rm $EVT_FILE
+
+    # copy the LOG_FILE to help with debugging
+    if (( $DEBUG )) || [ $RESULT == "FAILED" ]; then
+        cp $LOG_FILE $LOG_FILE.$CURRENT_TEST
+    fi
+
+    rm $LOG_FILE
 }
 
 export SCOPE_PAYLOAD_ENABLE=true
@@ -357,6 +367,172 @@ ERR+=$?
 
 evalPayload
 ERR+=$?
+
+endtest
+
+#
+# signalDummyStatic
+#
+starttest signalDummyStatic
+cd /go/signals
+ldscope ./signalDummyStatic
+ERR+=$?
+
+evaltest
+
+count=$(grep "Continuing without AppScope." $LOG_FILE | wc -l)
+if [ $count -ne 0 ] ; then 
+    ERR+=1
+fi
+
+grep "Dummy signal application" $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# signalDummyStaticStripped
+#
+starttest signalDummyStaticStripped
+cd /go/signals
+ldscope ./signalDummyStaticStripped
+ERR+=$?
+
+evaltest
+
+count=$(grep "Continuing without AppScope." $LOG_FILE | wc -l)
+if [ $count -ne 0 ] ; then 
+    ERR+=1
+fi
+
+grep "Dummy signal application" $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# signalDummyDynamic
+#
+starttest signalDummyDynamic
+cd /go/signals
+ldscope ./signalDummyDynamic
+ERR+=$?
+
+evaltest
+
+count=$(grep "Continuing without AppScope." $LOG_FILE | wc -l)
+if [ $count -ne 0 ] ; then 
+    ERR+=1
+fi
+
+grep "Dummy signal application" $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# signalHandlerDynamic
+#
+starttest signalHandlerDynamic
+cd /go/signals
+ldscope ./signalHandlerDynamic &
+ERR+=$?
+
+sleep 0.5
+
+kill -SIGUSR1 `pidof signalHandlerDynamic`
+
+kill -SIGINT `pidof signalHandlerDynamic`
+
+sleep 0.5
+
+grep "Got signal: child exited" $EVT_FILE > /dev/null
+ERR+=$?
+
+grep "Got signal: child exited" $EVT_FILE > /dev/null
+ERR+=$?
+
+grep "Got signal: interrupt" $EVT_FILE > /dev/null
+ERR+=$?
+
+grep "exiting" $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# signalHandlerStatic
+#
+starttest signalHandlerStatic
+cd /go/signals
+ldscope ./signalHandlerStatic &
+SCOPE_PID=$!
+ERR+=$?
+
+sleep 0.5
+
+kill -SIGCHLD `pidof signalHandlerDynamic`
+
+kill -SIGINT `pidof signalHandlerDynamic`
+
+sleep 0.5
+
+grep "Got signal: child exited" $EVT_FILE > /dev/null
+ERR+=$?
+
+grep "Got signal: interrupt" $EVT_FILE > /dev/null
+ERR+=$?
+
+grep "exiting" $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# signalHandlerStaticStripped
+#
+starttest signalHandlerStaticStripped
+cd /go/signals
+ldscope ./signalHandlerStaticStripped &
+SCOPE_PID=$!
+ERR+=$?
+
+sleep 2
+
+kill -2 ${SCOPE_PID}
+
+sleep 2
+
+evaltest
+
+count=$(grep "Continuing without AppScope." $LOG_FILE | wc -l)
+if [ $count -ne 1 ] ; then 
+    ERR+=1
+fi
+
+endtest
+
+#
+# signalHandlerDynamic
+#
+starttest signalHandlerDynamic
+cd /go/signals
+ldscope ./signalHandlerDynamic &
+SCOPE_PID=$!
+ERR+=$?
+
+sleep 2
+
+kill -2 ${SCOPE_PID}
+
+sleep 2
+
+evaltest
+
+count=$(grep "Continuing without AppScope." $LOG_FILE | wc -l)
+if [ $count -ne 0 ] ; then 
+    ERR+=1
+fi
 
 endtest
 

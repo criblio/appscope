@@ -41,6 +41,17 @@ RUN cd /go/net && \
 RUN cd /go/net && \
     CGO_ENABLED=0 go build -o tlsClientStatic tlsClient.go
 
+RUN mkdir /go/signals
+COPY ./go/signals/signalHandler.go /go/signals
+COPY ./go/signals/signalDummy.go /go/signals
+RUN cd /go/signals && \
+    go build -o signalHandlerDynamic signalHandler.go && \
+    CGO_ENABLED=0 go build -o signalHandlerStatic signalHandler.go && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o signalHandlerStaticStripped signalHandler.go && \
+    go build -o signalDummyDynamic signalDummy.go && \
+    CGO_ENABLED=0 go build -o signalDummyStatic signalDummy.go && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o signalDummyStaticStripped signalDummy.go
+
 RUN mkdir /go/cgo
 COPY ./go/cgo/Makefile /go/cgo
 COPY ./go/cgo/myc.c /go/cgo
@@ -60,6 +71,8 @@ ENV SCOPE_EVENT_CONSOLE=true
 ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
 ENV SCOPE_EVENT_DEST=file:///go/events.log
+ENV SCOPE_LOG_DEST=file:///tmp/scope.log
+ENV SCOPE_ALLOW_CONSTRUCT_DBG=true
 
 RUN echo "export PATH=/usr/local/scope:/usr/local/scope/bin:${PATH}" >/etc/profile.d/path.sh
 COPY scope-profile.sh /etc/profile.d/scope.sh

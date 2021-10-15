@@ -68,17 +68,17 @@ get_file_size(const char *path)
     struct stat sbuf;
 
     if (g_fn.open && (fd = g_fn.open(path, O_RDONLY)) == -1) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: get_file_size:open");
+        scopeLogError("ERROR: get_file_size:open");
         return -1;
     }
 
     if (fstat(fd, &sbuf) == -1) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: get_file_size:fstat");
+        scopeLogError("ERROR: get_file_size:fstat");
         return -1;
     }
 
     if (g_fn.close && g_fn.close(fd) == -1) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: get_file_size:close");
+        scopeLogError("ERROR: get_file_size:close");
         return -1;        
     }
 
@@ -151,19 +151,19 @@ map_segment(char *buf, Elf64_Phdr *phead)
                      prot | PROT_WRITE,
                      MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED,
                      -1, (off_t)NULL)) == MAP_FAILED) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: load_segment:mmap");
+        scopeLogError("ERROR: load_segment:mmap");
         return -1;
     }
 
     if (laddr != addr) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: load_segment:mmap:laddr mismatch");
+        scopeLogError("ERROR: load_segment:mmap:laddr mismatch");
         return -1;
     }
 
     load_sections(buf, (char *)phead->p_vaddr, (size_t)lsize);
 
     if (((prot & PROT_WRITE) == 0) && (mprotect(laddr, lsize, prot) == -1)) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: load_segment:mprotect");
+        scopeLogError("ERROR: load_segment:mprotect");
         return -1;
     }
 
@@ -186,7 +186,7 @@ load_elf(char *buf)
                           PROT_READ | PROT_WRITE,
                           MAP_PRIVATE | MAP_ANONYMOUS,
                           -1, (off_t)NULL)) == MAP_FAILED) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: load_elf:mmap");
+        scopeLogError("ERROR: load_elf:mmap");
         return (Elf64_Addr)NULL;
     }
 
@@ -207,7 +207,7 @@ unmap_all(char *buf, const char **argv)
 
     int flen;
     if ((flen = get_file_size(argv[1])) == -1) {
-        scopeLog(CFG_LOG_ERROR, "ERROR:unmap_all: file size");
+        scopeLogError("ERROR:unmap_all: file size");
         return -1;
     }
 
@@ -238,7 +238,7 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
         if (&argv[i] && spp) {
             *spp++ = (char *)argv[i];
         } else {
-            scopeLog(CFG_LOG_ERROR, "ERROR:copy_strings: arg entry is not correct");
+            scopeLogError("ERROR:copy_strings: arg entry is not correct");
             return -1;
         }
     }
@@ -267,7 +267,7 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
         if ((&environ[i]) && spp) {
             *spp++ = (char *)environ[i];
         } else {
-            scopeLog(CFG_LOG_ERROR, "ERROR:copy_strings: environ string is not correct");
+            scopeLogError("ERROR:copy_strings: environ string is not correct");
             return -1;
         }
     }
@@ -341,7 +341,7 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phad
                    PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN,
                    -1, (off_t)NULL)) == MAP_FAILED) {
-        scopeLog(CFG_LOG_ERROR, "set_go:mmap");
+        scopeLogError("set_go:mmap");
         return -1;
     }
 
@@ -350,7 +350,7 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phad
     start = ehdr->e_entry;
 
     if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
-        scopeLog(CFG_LOG_ERROR, "set_go:arch_prctl");
+        scopeLogError("set_go:arch_prctl");
         return -1;
     }
 

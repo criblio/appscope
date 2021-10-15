@@ -19,7 +19,7 @@ freeElf(char *buf, size_t len)
     if (!buf) return;
 
     if (munmap(buf, len) == -1) {
-        scopeLog(CFG_LOG_ERROR, "freeElf: munmap failed");
+        scopeLogError("freeElf: munmap failed");
     }
 }
 
@@ -100,22 +100,22 @@ getElf(char *path)
     int get_elf_successful = FALSE;
 
     if (!g_fn.open || !g_fn.close) {
-        scopeLog(CFG_LOG_ERROR, "getElf: open/close can't be found");
+        scopeLogError("getElf: open/close can't be found");
         goto out;
     }
 
     if ((ebuf = calloc(1, sizeof(elf_buf_t))) == NULL) {
-        scopeLog(CFG_LOG_ERROR, "getElf: memory alloc failed");
+        scopeLogError("getElf: memory alloc failed");
         goto out;
     }
 
     if ((fd = g_fn.open(path, O_RDONLY)) == -1) {
-        scopeLog(CFG_LOG_ERROR, "getElf: open failed");
+        scopeLogError("getElf: open failed");
         goto out;
     }
 
     if (fstat(fd, &sbuf) == -1) {
-        scopeLog(CFG_LOG_ERROR, "fd:%d getElf: fstat failed", fd);
+        scopeLogError("fd:%d getElf: fstat failed", fd);
         goto out;
     }
 
@@ -123,7 +123,7 @@ getElf(char *path)
     char * mmap_rv = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
                           PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
     if (mmap_rv == MAP_FAILED) {
-        scopeLog(CFG_LOG_ERROR, "fd:%d getElf: mmap failed", fd);
+        scopeLogError("fd:%d getElf: mmap failed", fd);
         goto out;
     }
 
@@ -136,13 +136,13 @@ getElf(char *path)
        strncmp((char *)&elf->e_ident[EI_MAG1], "ELF", 3) ||
        (elf->e_ident[EI_CLASS] != ELFCLASS64) ||
        (elf->e_ident[EI_DATA] != ELFDATA2LSB)) {
-        scopeLog(CFG_LOG_ERROR, "fd:%d %s:%d ERROR: %s is not a viable ELF file\n",
+        scopeLogError("fd:%d %s:%d ERROR: %s is not a viable ELF file\n",
                     fd, __FUNCTION__, __LINE__, path);
         goto out;
     }
 
     if ((elf->e_type != ET_EXEC) && (elf->e_type != ET_DYN)) {
-        scopeLog(CFG_LOG_ERROR, "fd:%d %s:%d %s with type %d is not an executable\n",
+        scopeLogError("fd:%d %s:%d %s with type %d is not an executable\n",
                     fd, __FUNCTION__, __LINE__, path, elf->e_type);
         goto out;
     }

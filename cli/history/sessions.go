@@ -54,7 +54,6 @@ func GetSessions() (ret SessionList) {
 		id, _ := strconv.Atoi(vals[2])
 		pid, _ := strconv.Atoi(vals[3])
 		ts, _ := strconv.ParseInt(vals[4], 10, 64)
-
 		workDir := filepath.Join(histDir, f.Name())
 
 		ret = append(ret, Session{

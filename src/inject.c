@@ -1,11 +1,17 @@
 
 #define _GNU_SOURCE
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ptrace.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <sys/user.h>
+#include <sys/un.h>
+#include <sys/wait.h>
+#include <syscall.h>
+#include <time.h>
 #include <unistd.h>
 #include <string.h>
 #include <link.h>
@@ -305,3 +311,140 @@ injectScope(int pid, char* path)
     return inject(pid, (uint64_t) dlopenAddr, path, glibc);
 }
 
+static int
+checkJavaUnixSSocket(int pid)
+{
+    char path[100];
+    snprintf(path, sizeof(path), "/proc/%d/root/tmp/.java_pid%d", pid, pid);
+
+    struct stat stats;
+    return stat(path, &stats) == 0 && S_ISSOCK(stats.st_mode) ? 0 : -1;
+}
+
+static int
+startAttachListener(int pid)
+{
+    char path[100];
+    snprintf(path, sizeof(path), "/proc/%d/cwd/.attach_pid%d", pid, pid);
+
+    // Create attach_pid file to trigger the Attach listener
+    int fd = creat(path, 0660);
+    if (fd == -1) {
+        fprintf(stderr, "ERROR: creat %s failed\n", path);
+        return -1;
+    }
+
+    // Send SIGQUIT to trigger socket creation
+    kill(pid, SIGQUIT);
+
+    // Wait for JVM to create socket
+    struct timespec ts = {0, 20000000};
+    int result;
+    do {
+        nanosleep(&ts, NULL);
+        result = checkJavaUnixSSocket(pid);
+    } while (result != 0 && (ts.tv_nsec += 20000000) < 500000000);
+
+    unlink(path);
+    return result;
+}
+
+static int
+connectJavaUnixSocket(int pid)
+{
+    int sockfd = socket(PF_UNIX, SOCK_STREAM, 0);
+    if (sockfd == -1) {
+        return -1;
+    }
+
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+    int bytes = snprintf(addr.sun_path, sizeof(addr.sun_path), "/proc/%d/root/tmp/.java_pid%d", pid, pid);
+    if (bytes >= sizeof(addr.sun_path)) {
+        addr.sun_path[sizeof(addr.sun_path) - 1] = 0;
+    }
+
+    if (connect(sockfd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        close(sockfd);
+        return -1;
+    }
+
+    return sockfd;
+}
+
+#define ATTACH_PROTOCOL_VERSION ("1")
+#define LOAD_AGENT_PATH_CMD ("load")
+#define LOAD_AGENT_PATH_ABSOLUTE_PARAM ("true")
+#define LOAD_AGENT_PATH_OPT ("")
+
+static int
+loadAgentPathRequest(int sockfd, const char *agentPath)
+{
+    if (write(sockfd, ATTACH_PROTOCOL_VERSION, sizeof(ATTACH_PROTOCOL_VERSION)) <= 0) {
+        return EXIT_FAILURE;
+    }
+
+    if (write(sockfd, LOAD_AGENT_PATH_CMD, sizeof(LOAD_AGENT_PATH_CMD)) <= 0) {
+        return -1;
+    }
+
+    if (write(sockfd, agentPath, strlen(agentPath) + 1) <= 0) {
+        return -1;
+    }
+
+    if (write(sockfd, LOAD_AGENT_PATH_ABSOLUTE_PARAM, sizeof(LOAD_AGENT_PATH_ABSOLUTE_PARAM)) <= 0) {
+        return -1;
+    }
+
+    if (write(sockfd, LOAD_AGENT_PATH_OPT, sizeof(LOAD_AGENT_PATH_OPT)) <= 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+loadAgentPathResponse(int sockfd)
+{
+    char buf[8192];
+    if (read(sockfd, buf, sizeof(buf) - 1) <= 0) {
+        return -1;
+    }
+    return 0;
+}
+
+int
+injectJavaAgent(int pid, const char *agentPath)
+{
+    signal(SIGPIPE, SIG_IGN);
+
+    int res = checkJavaUnixSSocket(pid);
+    if (res != 0) {
+        res = startAttachListener(pid);
+        if (res != 0) {
+            fprintf(stderr, "ERROR: Could not set start_attach_mechanism mechanism\n");
+            return EXIT_FAILURE;
+        }
+    }
+    int sockfd = connectJavaUnixSocket(pid);
+    if (sockfd == -1) {
+        fprintf(stderr, "ERROR: Could not connect to socket\n");
+        return EXIT_FAILURE;
+    }
+
+    res = loadAgentPathRequest(sockfd, agentPath);
+    if (res != 0) {
+        fprintf(stderr, "ERROR: Load Agent path request failed\n");
+        goto out;
+    }
+
+    res = loadAgentPathResponse(sockfd);
+    if (res != 0) {
+        fprintf(stderr, "ERROR: Load Agent path response failed\n");
+        goto out;
+    }
+
+out:
+    close(sockfd);
+    return (res == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+}

@@ -187,6 +187,7 @@ main(int argc, char **argv, char **env)
     setPidEnv(getpid());
 
     if (attachArg) {
+        int ret = -1;
         int pid = atoi(attachArg);
         if (pid < 1) {
             fprintf(stderr, "error: invalid PID for --attach\n");
@@ -194,7 +195,13 @@ main(int argc, char **argv, char **env)
         }
 
         printf("Attaching to process %d\n", pid);
-        int ret = injectScope(pid, scopeLibPath);
+        if (isJavaProc(pid) == 0) {
+            ret = injectJavaAgent(pid, scopeLibPath);
+        }
+
+        if (ret != 0) {
+            ret = injectScope(pid, scopeLibPath);
+        }
 
         // remove the config that `ldscope`
         char path[PATH_MAX];

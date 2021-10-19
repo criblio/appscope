@@ -637,6 +637,12 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
     return JNI_OK;
 }
 
+JNIEXPORT jint JNICALL 
+Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) 
+{
+    return Agent_OnLoad(jvm, options, reserved);
+}
+
 // This overrides a weak definition in src/linux/os.c
 void
 initJavaAgent() {

@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
@@ -78,6 +79,30 @@ setPidEnv(int pid)
     if (fullSetenv(SCOPE_PID_ENV, val, 1) == -1) {
         scopeLog(CFG_LOG_DEBUG, "setPidEnv: %s:%s", SCOPE_PID_ENV, val);
     }
+}
+
+int
+isJavaProc(pid_t pid)
+{
+    int fd;
+    char buf[64];
+
+    if (!g_fn.open || !g_fn.close || !g_fn.read) {
+        DBG(NULL);
+        return -1;
+    }
+
+    snprintf(buf, sizeof(buf), "/proc/%d/comm", pid);
+    if ((fd = g_fn.open(buf, O_RDONLY)) != -1) {
+        if (g_fn.read(fd, buf, sizeof(buf)) <= 0) {
+            g_fn.close(fd);
+            DBG(NULL);
+            return -1;
+        }
+        g_fn.close(fd);
+        return strstr(buf, "java") ? 0 : -1;
+    }
+    return -1;
 }
 
 #ifdef __APPLE__

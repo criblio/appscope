@@ -15,6 +15,7 @@ int checkEnv(char *, char *);
 int fullSetenv(const char *, const char *, int);
 void setPidEnv(int);
 char *getpath(const char *);
+int isJavaProc(pid_t);
 
 int startsWith(const char *string, const char *substring);
 int endsWith(const char *string, const char *substring);

@@ -20,6 +20,7 @@
 #define HTTP_END "\r\n"
 static search_t* g_http_start = NULL;
 static search_t* g_http_end = NULL;
+static search_t* g_http_clen = NULL;
 
 #define HTTP_CLENGTH "(?i)\\r\\ncontent-length: (\\d+)"
 #define HTTP_UPGRADE "(?i)\\r\\nupgrade: h2"
@@ -115,31 +116,23 @@ appendHeader(http_state_t *httpstate, char* buf, size_t len)
 static size_t
 getContentLength(char *header, size_t len)
 {
-    if (!g_http_clength) return -1;
+    size_t ix;
+    size_t rc;
+    char *val;
 
-    pcre2_match_data *matches = pcre2_match_data_create_from_pattern(g_http_clength, NULL);
-    if (!matches) return -1;
+    // ex: Content-Length: 559\r\n
+    if ((ix = searchExec(g_http_clen, header, len)) == -1) return -1;
 
-    int rc = pcre2_match_wrapper(g_http_clength,
-            (PCRE2_SPTR)header, (PCRE2_SIZE)len,
-            0, 0, matches, NULL);
-    if (rc != 2) {
-        pcre2_match_data_free(matches);
-        return -1;
-    }
+    if ((ix <= 0) || (ix > len) || ((ix + searchLen(g_http_clen)) > len)) return -1;
 
-    PCRE2_UCHAR *cLen; PCRE2_SIZE cLenLen;
-    pcre2_substring_get_bynumber(matches, 1, &cLen, &cLenLen);
+    val = &header[ix + searchLen(g_http_clen)];
 
     errno = 0;
-    size_t ret = strtoull((const char *)cLen, NULL, 0);
-    if ((errno != 0) || (ret == 0)) {
-        ret = -1;
+    rc = strtoull(val, NULL, 0);
+    if ((errno != 0) || (rc == 0)) {
+        return -1;
     }
-
-    pcre2_match_data_free(matches);
-
-    return ret;
+    return rc;
 }
 
 // Returns TRUE if header block contains an "upgrade: h2" header
@@ -452,8 +445,10 @@ parseHttp1(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId)
 
         httpstate->isResponse =
             (searchExec(g_http_start, httpstate->hdr, searchLen(g_http_start)) != -1);
-        httpstate->hasUpgrade = hasUpgrade(httpstate->hdr, httpstate->hdrlen);
-        httpstate->hasConnectionUpgrade = hasConnectionUpgrade(httpstate->hdr, httpstate->hdrlen);
+        httpstate->hasUpgrade = FALSE;
+        httpstate->hasConnectionUpgrade = FALSE;
+//        httpstate->hasUpgrade = hasUpgrade(httpstate->hdr, httpstate->hdrlen);
+//        httpstate->hasConnectionUpgrade = hasConnectionUpgrade(httpstate->hdr, httpstate->hdrlen);
 
         // post and event containing the header we found
         reportHttp1(httpstate);
@@ -475,6 +470,7 @@ initHttpState(void)
 {
     g_http_start = searchComp(HTTP_START);
     g_http_end = searchComp(HTTP_END);
+    g_http_clen = searchComp("Content-Length:");
 
     int        errNum;
     PCRE2_SIZE errPos;
@@ -739,6 +735,7 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
 
     // detect HTTP version
     if (state->version[isTx] == 0) {
+#if 0
         // Detect HTTP/2 by looking for the "magic" string at the start
         if (len >= HTTP2_MAGIC_LEN && !strncmp(buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
             state->version[isTx] = 2;
@@ -754,10 +751,11 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
                 return FALSE;
             }
         }
+#endif
 
         // Detect HTTP/1.x by looking for "HTTP/" which appears as the start
         // of a response and after method and URI in a request.
-        else if (searchExec(g_http_start, buf, len) != -1) {
+        if (searchExec(g_http_start, buf, len) != -1) {
             state->version[isTx] = 1;
             // fall through to continue processing
         }

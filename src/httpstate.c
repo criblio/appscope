@@ -20,18 +20,13 @@
 #define HTTP_END "\r\n"
 static search_t* g_http_start = NULL;
 static search_t* g_http_end = NULL;
-static search_t* g_http_clen = NULL;
 
-#define HTTP_CLENGTH "(?i)\\r\\ncontent-length: (\\d+)"
-#define HTTP_UPGRADE "(?i)\\r\\nupgrade: h2"
-#define HTTP_CONNECT "(?i)\\r\\nconnection: upgrade"
-static pcre2_code *g_http_clength = NULL;
-static pcre2_code *g_http_upgrade = NULL;
-static pcre2_code *g_http_connect = NULL;
+// For perf reasons, we're scanning for all these at once
+#define HTTP_REGEX "(?i)(connection: upgrade)|(upgrade: h2c)|(content-length: (\\d+))"
+static pcre2_code *g_http_regex = NULL;
 
 static void setHttpState(http_state_t *httpstate, http_enum_t toState);
 static void appendHeader(http_state_t *httpstate, char* buf, size_t len);
-static size_t getContentLength(char *header, size_t len);
 static size_t bytesToSkipForContentLength(http_state_t *httpstate, size_t len);
 static bool setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src);
 static int reportHttp1(http_state_t *httpstate);
@@ -111,64 +106,66 @@ appendHeader(http_state_t *httpstate, char* buf, size_t len)
     httpstate->hdrlen += len;
 }
 
-// Returns the integer value if header block contains a "content-length" header
-// or -1 if not
-static size_t
-getContentLength(char *header, size_t len)
+static void
+updateHttpStatePerHeaderFields(http_state_t *httpstate)
 {
-    size_t ix;
-    size_t rc;
-    char *val;
+    if (!g_http_regex || !httpstate) return;
 
-    // ex: Content-Length: 559\r\n
-    if ((ix = searchExec(g_http_clen, header, len)) == -1) return -1;
+    // provide defaults
+    httpstate->clen = -1;
+    httpstate->hasUpgrade = FALSE;
+    httpstate->hasConnectionUpgrade = FALSE;
 
-    if ((ix <= 0) || (ix > len) || ((ix + searchLen(g_http_clen)) > len)) return -1;
+    pcre2_match_data *matches = pcre2_match_data_create_from_pattern(g_http_regex, NULL);
+    if (!matches) return;
 
-    val = &header[ix + searchLen(g_http_clen)];
+    // start at the very beginning, it's the very best place to start
+    PCRE2_SPTR str_ptr = (PCRE2_SPTR)httpstate->hdr;
+    PCRE2_SIZE str_len = (PCRE2_SIZE)httpstate->hdrlen;
 
-    errno = 0;
-    rc = strtoull(val, NULL, 0);
-    if ((errno != 0) || (rc == 0)) {
-        return -1;
+    // loop until no match is found
+    while (1) {
+
+        int rc = pcre2_match(g_http_regex, str_ptr, str_len, 0, 0, matches, NULL);
+        if (rc <= 0) break;
+
+        // go to the last matched group
+        rc--;
+
+        // grab the matching substring
+        PCRE2_UCHAR *cLen = NULL;
+        PCRE2_SIZE cLenLen = 0;
+        pcre2_substring_get_bynumber(matches, rc, &cLen, &cLenLen);
+
+        // extract the information we care about
+        switch (rc) {
+            case 4: // (\d+) of (content-length: (\d+))
+                errno = 0;
+                size_t val = strtoull((const char *)cLen, NULL, 0);
+                if ((errno != 0) || (val == 0)) {
+                    val = -1;
+                }
+                httpstate->clen = val;
+                break;
+            case 2: // (upgrade: +h2c)
+                httpstate->hasUpgrade = TRUE;
+                break;
+            case 1: // (connection: +upgrade)
+                httpstate->hasConnectionUpgrade = TRUE;
+                break;
+            default:
+                DBG(NULL);
+        }
+
+        pcre2_substring_free(cLen);
+
+        // advance to look for another match
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(matches);
+        str_ptr = &str_ptr[ovector[1]];
+        str_len = str_len - ovector[1];
     }
-    return rc;
-}
-
-// Returns TRUE if header block contains an "upgrade: h2" header
-static bool
-hasUpgrade(const char *header, size_t len)
-{
-    if (!g_http_upgrade) return FALSE;
-
-    pcre2_match_data *matches = pcre2_match_data_create_from_pattern(g_http_upgrade, NULL);
-    if (!matches) return FALSE;
-
-    int rc = pcre2_match_wrapper(g_http_upgrade,
-            (PCRE2_SPTR)header, (PCRE2_SIZE)len,
-            0, 0, matches, NULL);
 
     pcre2_match_data_free(matches);
-
-    return rc == 1;
-}
-
-// Returns TRUE if header block contains an "connection: upgrade" header
-static bool
-hasConnectionUpgrade(const char *header, size_t len)
-{
-    if (!g_http_connect) return FALSE;
-
-    pcre2_match_data *matches = pcre2_match_data_create_from_pattern(g_http_connect, NULL);
-    if (!matches) return FALSE;
-
-    int rc = pcre2_match_wrapper(g_http_connect,
-            (PCRE2_SPTR)header, (PCRE2_SIZE)len,
-            0, 0, matches, NULL);
-
-    pcre2_match_data_free(matches);
-
-    return rc == 1;
 }
 
 static size_t
@@ -439,21 +436,18 @@ parseHttp1(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId)
         // append a null terminator to allow us to treat it as a string
         appendHeader(httpstate, "\0", 1);
 
-        // check to see if there is a Content-Length in the header
-        size_t clen = getContentLength(httpstate->hdr, httpstate->hdrlen);
-        size_t content_in_this_buf = len - header_end;
+        // Update clen, hasUpgrade, and hasConnectionUpgrade httpstate fields
+        updateHttpStatePerHeaderFields(httpstate);
 
         httpstate->isResponse =
             (searchExec(g_http_start, httpstate->hdr, searchLen(g_http_start)) != -1);
-        httpstate->hasUpgrade = FALSE;
-        httpstate->hasConnectionUpgrade = FALSE;
-//        httpstate->hasUpgrade = hasUpgrade(httpstate->hdr, httpstate->hdrlen);
-//        httpstate->hasConnectionUpgrade = hasConnectionUpgrade(httpstate->hdr, httpstate->hdrlen);
 
         // post and event containing the header we found
         reportHttp1(httpstate);
 
         // change httpstate to HTTP_DATA per Content-Length or HTTP_NONE
+        size_t content_in_this_buf = len - header_end;
+        size_t clen = httpstate->clen;
         if ((clen != -1) && (clen >= content_in_this_buf)) {
             httpstate->clen = clen - content_in_this_buf;
             setHttpState(httpstate, HTTP_DATA);
@@ -470,24 +464,13 @@ initHttpState(void)
 {
     g_http_start = searchComp(HTTP_START);
     g_http_end = searchComp(HTTP_END);
-    g_http_clen = searchComp("Content-Length:");
 
     int        errNum;
     PCRE2_SIZE errPos;
 
-    if (!(g_http_clength = pcre2_compile((PCRE2_SPTR)HTTP_CLENGTH,
+    if (!(g_http_regex = pcre2_compile((PCRE2_SPTR)HTTP_REGEX ,
             PCRE2_ZERO_TERMINATED, 0, &errNum, &errPos, NULL))) {
-        scopeLogError("ERROR: HTTP/1 content-length regex failed; err=%d, pos=%ld",
-                errNum, errPos);
-    }
-    if (!(g_http_upgrade = pcre2_compile((PCRE2_SPTR)HTTP_UPGRADE,
-            PCRE2_ZERO_TERMINATED, 0, &errNum, &errPos, NULL))) {
-        scopeLogError("ERROR: HTTP/1 upgrade regex failed; err=%d, pos=%ld",
-                errNum, errPos);
-    }
-    if (!(g_http_connect = pcre2_compile((PCRE2_SPTR)HTTP_CONNECT,
-            PCRE2_ZERO_TERMINATED, 0, &errNum, &errPos, NULL))) {
-        scopeLogError("ERROR: HTTP/1 connection regex failed; err=%d, pos=%ld",
+        scopeLogError("ERROR: HTTP/1 regex failed; err=%d, pos=%ld",
                 errNum, errPos);
     }
 }

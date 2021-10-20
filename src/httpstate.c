@@ -718,7 +718,6 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
 
     // detect HTTP version
     if (state->version[isTx] == 0) {
-#if 0
         // Detect HTTP/2 by looking for the "magic" string at the start
         if (len >= HTTP2_MAGIC_LEN && !strncmp(buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
             state->version[isTx] = 2;
@@ -734,11 +733,10 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
                 return FALSE;
             }
         }
-#endif
 
         // Detect HTTP/1.x by looking for "HTTP/" which appears as the start
         // of a response and after method and URI in a request.
-        if (searchExec(g_http_start, buf, len) != -1) {
+        else if (searchExec(g_http_start, buf, len) != -1) {
             state->version[isTx] = 1;
             // fall through to continue processing
         }

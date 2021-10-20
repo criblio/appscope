@@ -207,8 +207,8 @@ typedef unsigned int bool;
 // the future, consider adding some buffering of initial payload data on a
 // channel until you have enough to satisfy TLS and other protocol detection.
 //
-#define PAYLOAD_BYTESRC 5
-#define PAYLOAD_REGEX "^16030[0-3].{4}"
+//#define PAYLOAD_BYTESRC 5
+//#define PAYLOAD_REGEX "^16030[0-3].{4}"
 //
 // Another iteration after finding the Java SSLSocketClient program in our
 // oracle-java integration tests was connecting to the server using SSL2
@@ -219,8 +219,8 @@ typedef unsigned int bool;
 // The updated regex is also now using non-capturing groups to improve
 // performance of TLS detection.
 //
-//#define PAYLOAD_BYTESRC 5
-//#define PAYLOAD_REGEX "^(?:(?:16030[0-3].{4})|(?:8[0-9a-fA-F]{3}01))"
+#define PAYLOAD_BYTESRC 5
+#define PAYLOAD_REGEX "^(?:(?:16030[0-3].{4})|(?:8[0-9a-fA-F]{3}01))"
 
 // libmusl requires LD_LIBRARY_PATH
 #define LD_LIB_ENV "LD_LIBRARY_PATH"

@@ -137,6 +137,48 @@ ERR+=$?
 endtest
 
 /opt/tomcat/bin/catalina.sh stop
+sleep 3
+
+
+if [ "x86_64" = "$(uname -m)" ]; then # x86_64 only
+#
+# Java HTTP Server
+#
+starttest java_http
+cd /opt/java_http
+java SimpleHttpServer 2> /dev/null &
+HTTP_SERVER_PID=$!
+sleep 1
+evaltest
+ldscope --attach ${HTTP_SERVER_PID}
+curl http://localhost:8000/status
+sleep 5
+
+grep -q '"proc":"java"' $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q http-req $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q http-resp $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q fs.open $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q fs.close $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q net.conn.open $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q net.conn.close $EVT_FILE > /dev/null
+ERR+=$?
+
+kill -9 ${HTTP_SERVER_PID}
+
+endtest
+fi # x86_64 only
 
 unset SCOPE_PAYLOAD_ENABLE
 unset SCOPE_PAYLOAD_HEADER

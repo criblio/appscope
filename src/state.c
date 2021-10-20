@@ -1108,6 +1108,21 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
 static void
 detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
+#if 1
+    unsigned char *data = buf;
+    if (len >= 5 && data[0] == 0x16 && data[1] == 0x03 && data[2] >= 0x00 && data[2] <= 0x03) {
+        // it's TLS
+        net->tlsDetect = DETECT_TRUE;
+        net->tlsProtoDef = g_tls_protocol_def;
+    } else if (len >= 5 && (data[0]&0xf0) == 0x80 && data[2] == 0x01) {
+        // it SSL2
+        net->tlsDetect = DETECT_TRUE;
+        net->tlsProtoDef = g_tls_protocol_def;
+    } else {
+        // not TLS/SSL
+        net->tlsDetect = DETECT_FALSE;
+    }
+#else
     int rc;
     unsigned char *data = buf;
     unsigned int ptype;
@@ -1160,6 +1175,7 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
         }
     }
     pcre2_match_data_free(match_data);
+#endif
 }
 
 static void

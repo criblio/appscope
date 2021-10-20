@@ -58,11 +58,13 @@ typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
 
 __thread int g_getdelim = 0;
+__thread int g_ssl_fd = -1;
 
 // Forward declaration
 static void *periodic(void *);
 static void doConfig(config_t *);
 static void threadNow(int);
+static void uv__read_hook(void *);
 
 #ifdef __linux__
 extern int arch_prctl(int, unsigned long);
@@ -1043,12 +1045,10 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
     if (rc > 0) {
-        if (SYMBOL_LOADED(SSL_get_fd)) {
-            int fd = g_fn.SSL_get_fd(ssl);
-            doProtocol((uint64_t)ssl, fd, buf, (size_t)num, TLSRX, BUF);
-        } else {
-            doProtocol((uint64_t)ssl, -1, buf, (size_t)num, TLSRX, BUF);
-        }
+        int fd = -1;
+        if (SYMBOL_LOADED(SSL_get_fd)) fd = g_fn.SSL_get_fd(ssl);
+        if ((fd == -1) && (g_ssl_fd != -1)) fd = g_ssl_fd;
+        doProtocol((uint64_t)ssl, fd, buf, (size_t)num, TLSRX, BUF);
     }
 
     return rc;
@@ -1063,12 +1063,10 @@ ssl_write_hook(SSL *ssl, void *buf, int num)
     WRAP_CHECK(SSL_write, -1);
     rc = g_fn.SSL_write(ssl, buf, num);
     if (rc > 0) {
-        if (SYMBOL_LOADED(SSL_get_fd)) {
-            int fd = g_fn.SSL_get_fd(ssl);
-            doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
-        } else {
-            doProtocol((uint64_t)ssl, -1, (void *)buf, (size_t)rc, TLSTX, BUF);
-        }
+        int fd = -1;
+        if (SYMBOL_LOADED(SSL_get_fd)) fd = g_fn.SSL_get_fd(ssl);
+        if ((fd == -1) && (g_ssl_fd != -1)) fd = g_ssl_fd;
+        doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
     }
 
     return rc;
@@ -1286,6 +1284,11 @@ initHook(int attachedFlag)
         g_ismusl = is_musl(ebuf->buf);
     }
 
+    if (ebuf && ebuf->buf) {
+        g_fn.uv__read = getSymbol(ebuf->buf, "uv__read");
+        scopeLog(CFG_LOG_ERROR, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
+    }
+
     if (full_path) free(full_path);
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
@@ -1368,6 +1371,9 @@ initHook(int attachedFlag)
         if ((g_ismusl == TRUE) && g_fn.recvfrom) {
             rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
         }
+
+        // used for mapping SSL IDs to fds with libuv
+        if (g_fn.uv__read) rc = funchook_prepare(funchook, (void**)&g_fn.uv__read, uv__read_hook);
 
         // libmusl
         // Note that both stdout & stderr objects point to the same write function.
@@ -4881,6 +4887,16 @@ __fdelt_chk(long int fdelt)
     }
 
     return fdelt / __NFDBITS;
+}
+
+static void
+uv__read_hook(void *stream)
+{
+    //scopeLog(CFG_LOG_TRACE, "%s", __FUNCTION__);
+
+    if (g_fn.uv_fileno) g_fn.uv_fileno(stream, &g_ssl_fd);
+    //scopeLog(CFG_LOG_ERROR, "%s: fd %d", __FUNCTION__, g_ssl_fd);
+    if (g_fn.uv__read) return g_fn.uv__read(stream);
 }
 
 EXPORTWEAK int

@@ -233,6 +233,8 @@ typedef struct {
     int (*getentropy)(void *, size_t);
     void (*__ctype_init)(void);
     int (*__register_atfork)(void (*) (void), void (*) (void), void (*) (void), void *);
+    void (*uv__read)(void *);
+    int (*uv_fileno)(void *, int *);
 #endif // __linux__
 
 #if defined(__linux__) && defined(__STATX__)

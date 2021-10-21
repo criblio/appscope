@@ -1278,6 +1278,9 @@ initHook(int attachedFlag)
 
     if (ebuf && ebuf->buf && (strstr(full_path, "ldscope") == NULL)) {
         g_ismusl = is_musl(ebuf->buf);
+
+        // reinitialize things
+        if (g_ismusl) initFn(g_ismusl);
     }
 
     if (full_path) free(full_path);
@@ -1468,7 +1471,7 @@ __attribute__((constructor)) void
 init(void)
 {
     // Use dlsym to get addresses for everything in g_fn
-    initFn();
+    initFn(g_ismusl);
 
 // TODO: will want to see if this is needed for bash built on ARM...
 #ifndef __aarch64__

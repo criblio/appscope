@@ -9,6 +9,8 @@
 #include "utils.h"
 #include "fn.h"
 
+int g_ismusl = FALSE;
+
 /*
  * We need to adjust to how ld.so, libdl, dlopen, dlsym together
  * resolve symbols. Several use cases have revealed different
@@ -91,7 +93,7 @@
     } else if ((val = dlsym(RTLD_NEXT, sym))) {          \
         DBG(NULL);                                       \
         /* musl ld.so when attaching */                  \
-    } else if ((val = dlsym(RTLD_DEFAULT, sym))) {       \
+    } else if (g_ismusl && (val = dlsym(RTLD_DEFAULT, sym))) {       \
         DBG(NULL);                                       \
     } else {                                             \
         val = NULL;                                      \
@@ -132,7 +134,7 @@ getAddr(struct dl_phdr_info *info, size_t size, void *data)
 }
 
 void
-initFn(void)
+initFn(int isMusl)
 {
     addresult_t ares;
 
@@ -142,6 +144,9 @@ initFn(void)
     g_fn.SSL_read = dlsym(RTLD_NEXT, "SSL_read");
     g_fn.SSL_write = dlsym(RTLD_NEXT, "SSL_write");
     g_fn.SSL_get_fd = dlsym(RTLD_NEXT, "SSL_get_fd");
+
+    // For use in GETADDR macro...
+    g_ismusl = isMusl;
 
     GETADDR(g_fn.vsyslog, "vsyslog");
     GETADDR(g_fn.fork, "fork");

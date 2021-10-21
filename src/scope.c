@@ -183,7 +183,7 @@ main(int argc, char **argv, char **env)
     void *handle = NULL;
 
     // Use dlsym to get addresses for everything in g_fn
-    initFn();
+    initFn(FALSE);
     setPidEnv(getpid());
 
     if (attachArg) {

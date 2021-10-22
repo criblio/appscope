@@ -788,7 +788,7 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
-    initFn();
+    initFn(FALSE);
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(ctlParseRxMsgNullReturnsParseError),

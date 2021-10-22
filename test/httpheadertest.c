@@ -27,7 +27,7 @@ static int
 needleTestSetup(void** state)
 {
     initTime();
-    initFn();
+    initFn(FALSE);
     initState();
 
     strcpy(g_proc.hostname, "thisHostName");

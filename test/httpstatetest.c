@@ -43,7 +43,7 @@ static int
 needleTestSetup(void** state)
 {
     initTime();
-    initFn();
+    initFn(FALSE);
     initHttpState();
     memset(g_http_guard, 0, sizeof(g_http_guard));
 

@@ -144,7 +144,7 @@ countTestSetup(void** state)
 {
     // init objects unique to this test that are external to count
     initTime();
-    initFn();
+    initFn(FALSE);
 
     // init objects that count has
     init_g_proc();

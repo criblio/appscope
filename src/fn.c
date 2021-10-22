@@ -9,7 +9,7 @@
 #include "utils.h"
 #include "fn.h"
 
-int g_ismusl = FALSE;
+static int g_ismusl = FALSE;
 
 /*
  * We need to adjust to how ld.so, libdl, dlopen, dlsym together

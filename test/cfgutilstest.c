@@ -2477,7 +2477,7 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
-    initFn();
+    initFn(FALSE);
 
     source_state_t log = {"SCOPE_EVENT_LOGFILE", CFG_SRC_FILE, DEFAULT_SRC_FILE};
     source_state_t con = {"SCOPE_EVENT_CONSOLE", CFG_SRC_CONSOLE, DEFAULT_SRC_CONSOLE};

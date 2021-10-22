@@ -93,6 +93,13 @@ mtcConnection(mtc_t *mtc)
     return transportConnection(mtc->transport);
 }
 
+uint64_t
+mtcConnectAttempts(mtc_t *mtc)
+{
+    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return -1;
+    return transportConnectAttempts(mtc->transport);
+}
+
 int
 mtcDisconnect(mtc_t *mtc)
 {

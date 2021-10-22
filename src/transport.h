@@ -1,5 +1,6 @@
 #ifndef __TRANSPORT_H__
 #define __TRANSPORT_H__
+#include <stdint.h>
 #include "scopetypes.h"
 
 typedef struct _transport_t transport_t;
@@ -24,6 +25,7 @@ int                 transportDisconnect(transport_t *);
 int                 transportReconnect(transport_t *);
 cfg_transport_t     transportType(transport_t *);
 int                 transportSetFD(int, transport_t *);
+uint64_t            transportConnectAttempts(transport_t *);
 
 // Misc
 void                transportRegisterForExitNotification(void (*fn)(void));

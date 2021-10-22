@@ -40,6 +40,7 @@ struct _transport_t
         struct {
             int sock;
             int pending_connect;
+            uint64_t connect_attempts;
             char *host;
             char *port;
             struct sockaddr_storage gai_addr;
@@ -664,6 +665,7 @@ checkPendingSocketStatus(transport_t *trans)
     }
 
     // We have a connection
+    trans->net.connect_attempts = 0;
     scopeLog(CFG_LOG_INFO, "fd:%d connect successful", trans->net.pending_connect);
 
     // Move this descriptor up out of the way
@@ -760,6 +762,8 @@ getNextAddressListEntry(transport_t *trans)
 static int
 socketConnectionStart(transport_t *trans)
 {
+    trans->net.connect_attempts++;
+
     // Get a list of addresses to try if we don't have a current list
     // or have exhausted the entries in a current list.
     if (!trans->net.addr.list || !trans->net.addr.next) {
@@ -1332,3 +1336,8 @@ transportFlush(transport_t* t)
     return 0;
 }
 
+uint64_t
+transportConnectAttempts(transport_t* t)
+{
+    return t->net.connect_attempts;
+}

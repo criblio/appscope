@@ -1128,6 +1128,16 @@ ctlConnect(ctl_t *ctl, which_transport_t who)
         transportConnect(ctl->transport);
 }
 
+uint64_t
+ctlConnectAttempts(ctl_t *ctl, which_transport_t who)
+{
+    if (!ctl) return 0;
+
+    return ((who == CFG_LS) && (ctl->paytrans)) ?
+        transportConnectAttempts(ctl->paytrans) :
+        transportConnectAttempts(ctl->transport);
+}
+
 int
 ctlDisconnect(ctl_t *ctl, which_transport_t who)
 {

@@ -59,6 +59,7 @@ cbufPut(cbuf_handle_t cbuf, uint64_t data)
         head = cbuf->head;
         head_next = (head + 1) % cbuf->maxlen;
         if (head_next == cbuf->tail) {
+            g_cbuf_drop_count++;
             // Note: we commented this out as it caused a
             // double free error when running with 100,000
             // Go routines. We should determine why.

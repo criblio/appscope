@@ -1,6 +1,7 @@
 #ifndef __DBG_H__
 #define __DBG_H__
 
+#include <stdint.h>
 #include <stdio.h>
 #include "log.h"
 #include "scopetypes.h"
@@ -20,6 +21,9 @@ void                 dbgDumpAll(FILE*);
 
 // Setters
 void                 dbgAddLine(const char* key, const char* fmt, ...);
+
+// Variables
+extern uint64_t g_cbuf_drop_count;
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)

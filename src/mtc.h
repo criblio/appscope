@@ -20,6 +20,7 @@ void                mtcFlush(mtc_t*);
 int                 mtcNeedsConnection(mtc_t *);
 int                 mtcConnect(mtc_t *);
 int                 mtcConnection(mtc_t*);
+uint64_t            mtcConnectAttempts(mtc_t*);
 int                 mtcDisconnect(mtc_t *);
 int                 mtcReconnect(mtc_t *);
 void                mtcEnabledSet(mtc_t*, unsigned);

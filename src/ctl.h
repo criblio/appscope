@@ -120,6 +120,7 @@ int     ctlPostEvent(ctl_t *, char *);
 int              ctlNeedsConnection(ctl_t *, which_transport_t);
 int              ctlConnection(ctl_t *, which_transport_t);
 int              ctlConnect(ctl_t *, which_transport_t);
+uint64_t         ctlConnectAttempts(ctl_t *, which_transport_t);
 int              ctlDisconnect(ctl_t *, which_transport_t);
 int              ctlReconnect(ctl_t *, which_transport_t);
 void             ctlTransportSet(ctl_t *, transport_t *, which_transport_t);

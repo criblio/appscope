@@ -980,11 +980,11 @@ periodic(void *arg)
     sigfillset(&mask);
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
     bool perf;
-    static time_t summaryTime;
+    static time_t summaryTime, logReportTime;
 
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    summaryTime = tv.tv_sec + g_thread.interval;
+    logReportTime = summaryTime = tv.tv_sec + g_thread.interval;
 
     perf = checkEnv(PRESERVE_PERF_REPORTING, "true");
 
@@ -1013,6 +1013,21 @@ periodic(void *arg)
 
             gettimeofday(&tv, NULL);
             summaryTime = tv.tv_sec + g_thread.interval;
+
+            if (tv.tv_sec >= logReportTime) {
+                if (ctlNeedsConnection(g_ctl, CFG_CTL)) {
+                    scopeLog(CFG_LOG_WARN, "event destination not connected. messages dropped: "
+                            "%"PRIu64 " connection attempts: %"PRIu64, g_cbuf_drop_count, \
+                            ctlConnectAttempts(g_ctl, CFG_CTL));
+                }
+                if (mtcNeedsConnection(g_mtc)) {
+                    scopeLog(CFG_LOG_WARN, "metric destination not connected. messages dropped: "
+                            "%"PRIu64 " connection attempts: %"PRIu64, g_cbuf_drop_count, \
+                            mtcConnectAttempts(g_mtc));
+                }
+                logReportTime = tv.tv_sec + CONN_LOG_INTERVAL; 
+            }
+
         } else if (perf == FALSE) {
             if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
                 doEvent();

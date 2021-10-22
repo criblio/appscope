@@ -1047,7 +1047,7 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
         int fd = -1;
         if (SYMBOL_LOADED(SSL_get_fd)) fd = g_fn.SSL_get_fd(ssl);
         if ((fd == -1) && (g_ssl_fd != -1)) fd = g_ssl_fd;
-        doProtocol((uint64_t)ssl, fd, buf, (size_t)num, TLSRX, BUF);
+        doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
     }
 
     return rc;
@@ -2778,7 +2778,7 @@ SSL_read(SSL *ssl, void *buf, int num)
         int fd = -1;
         if (SYMBOL_LOADED(SSL_get_fd)) fd = g_fn.SSL_get_fd(ssl);
         if ((fd == -1) && (g_ssl_fd != -1)) fd = g_ssl_fd;
-        doProtocol((uint64_t)ssl, fd, buf, (size_t)num, TLSRX, BUF);
+        doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
     }
     return rc;
 }

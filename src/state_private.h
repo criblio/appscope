@@ -191,7 +191,6 @@ typedef struct net_info_t {
     counters_element_t numDuration;
     counters_element_t totalDuration;
     uint64_t uid;
-    uint64_t sslid;
     uint64_t lnode;
     uint64_t rnode;
     char dnsName[MAX_HOSTNAME];
@@ -205,6 +204,7 @@ typedef struct net_info_t {
 
     detect_type_t protoDetect;     // state for protocol detection on this channel
     protocol_def_t* protoProtoDef; // The protocol-detector that matched
+
 } net_info;
 
 typedef struct fs_info_t {

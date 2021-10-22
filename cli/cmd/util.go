@@ -57,5 +57,6 @@ func runCmdFlags(cmd *cobra.Command, rc *run.Config) {
 	cmd.Flags().BoolVarP(&rc.Payloads, "payloads", "p", false, "Capture payloads of network transactions")
 	cmd.Flags().StringVar(&rc.Loglevel, "loglevel", "", "Set ldscope log level (debug, warning, info, error, none)")
 	cmd.Flags().StringVarP(&rc.LibraryPath, "librarypath", "l", "", "Set path for dynamic libraries")
+	cmd.Flags().StringVarP(&rc.UserConfig, "userconfig", "u", "", "Run ldscope with a user specified config file. Overrides all other settings.")
 	metricAndEventDestFlags(cmd, rc)
 }

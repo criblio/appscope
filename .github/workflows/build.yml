@@ -229,6 +229,15 @@ jobs:
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-openssl-${{ hashFiles('contrib/Makefile', 'contrib/openssl/**') }}
           upload-chunk-size: 1000000
 
+      # Cache the ls-hpack build. Use a key based on a hash of all the files
+      # used in the build.
+      - name: Setup ls-hpack Cache
+        uses: actions/cache@v2
+        with:
+          path: contrib/build/ls-hpack
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-ls-hpack-${{ hashFiles('contrib/Makefile', 'contrib/ls-hpack/**') }}
+          upload-chunk-size: 1000000
+
       # Build our `appscope-builder` image. This should only end up using the
       # cached image but because it needs to transfer the results from the
       # builder container into the local Docker registry, it stills take more

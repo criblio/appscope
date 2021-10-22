@@ -154,6 +154,12 @@ func (c *Config) SetDefault() error {
 					Field:     ".*",
 					Value:     ".*",
 				},
+				{
+					WatchType: "http",
+					Name:      ".*",
+					Field:     ".*",
+					Value:     ".*",
+				},
 				// {
 				// 	WatchType: "metric",
 				// 	Name:      ".*",
@@ -176,19 +182,25 @@ func (c *Config) SetDefault() error {
 		},
 	}
 
-	if c.CriblDest == "" {
-		c.sc.Event.Watch = append(c.sc.Event.Watch, ScopeWatchConfig{
-			WatchType: "http",
-			Name:      ".*",
-			Field:     ".*",
-			Value:     ".*",
-		})
+	return nil
+}
+
+// ConfigFromFile loads a configuration from a yml file
+func (c *Config) ConfigFromFile() error {
+	c.sc = &ScopeConfig{}
+
+	yamlFile, err := ioutil.ReadFile(c.UserConfig)
+	if err != nil {
+		return err
+	}
+	if err = yaml.Unmarshal(yamlFile, c.sc); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// configFromRunOpts writes the scope configuration to the workdir
+// configFromRunOpts creates a configuration from run options
 func (c *Config) configFromRunOpts() error {
 	err := c.SetDefault()
 	if err != nil {

@@ -44,9 +44,6 @@ endtest(){
 #
 # Top
 #
-# TODO: Ref: https://github.com/criblio/appscope/issues/586
-# After fixing issue above remove the if condition below
-if [[ $(grep Ubuntu /etc/os-release) ]]; then 
 starttest Top
 
 top -b -d 1 > /dev/null &
@@ -64,7 +61,6 @@ ERR+=$?
 kill -9 `pidof top`
 
 endtest
-fi
 
 #
 # Python3 Web Server
@@ -84,9 +80,6 @@ grep -q http-req $EVT_FILE > /dev/null
 ERR+=$?
 
 grep -q http-resp $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q http-metric $EVT_FILE > /dev/null
 ERR+=$?
 
 kill -9 `pidof python3` > /dev/null
@@ -110,17 +103,8 @@ ERR+=$?
 grep -q http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-# TODO check why these events are missed in musl
-# https://github.com/criblio/appscope/issues/575
-# After fixing issue above remove the if condition below
-if [[ $(grep Ubuntu /etc/os-release) ]]; then 
-
 grep -q http-resp $EVT_FILE > /dev/null
 ERR+=$?
-
-grep -q http-metric $EVT_FILE > /dev/null
-ERR+=$?
-fi
 
 grep -q fs.open $EVT_FILE > /dev/null
 ERR+=$?

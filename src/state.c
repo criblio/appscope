@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 #include "atomic.h"
 #include "com.h"
@@ -49,6 +50,10 @@ static search_t* g_http_redirect = NULL;
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
 
+// Linked list, indexed by channel ID, of net_info pointers used in
+// doProtocol() when it's not provided with a valid file descriptor.
+static list_t *g_extra_net_info_list = NULL;
+
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
 
@@ -73,6 +78,19 @@ static protocol_def_t *g_http_protocol_def = NULL;
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
+
+static void
+destroyNetInfo(void *data)
+{
+    if (!data) return;
+    net_info *net = (net_info *)data;
+
+    free(net->http.hdr);
+    free(net->http.http2Buf[0].buf);
+    free(net->http.http2Buf[1].buf);
+
+    free(net);
+}
 
 int
 get_port(int fd, int type, control_type_t which) {
@@ -210,7 +228,6 @@ initPayloadDetect()
     g_http_protocol_def->protname = "HTTP";
     g_http_protocol_def->regex = "(?: HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n)";
     g_http_protocol_def->detect = TRUE;
-    g_http_protocol_def->payload = TRUE;
     g_http_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_http_protocol_def->regex,
                                             PCRE2_ZERO_TERMINATED, 0,
                                             &errornumber, &erroroffset, NULL);
@@ -259,6 +276,8 @@ initState()
 
     g_protlist = lstCreate(destroyProtEntry);
     initPayloadDetect();
+
+    g_extra_net_info_list = lstCreate(destroyNetInfo);
 
     initReporting();
 }
@@ -484,8 +503,13 @@ postNetState(int fd, metric_t type, net_info *net)
     // Bail if we don't need to post
     int mtc_needs_reporting = summarize && !*summarize;
     int need_to_post =
+        // if raw metrics are enabled
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        // if NET events are enabled
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
+        // if it's a closed HTTP channel (so we can cleanup)
+        (type==CONNECTION_DURATION && net && (net->http.version[0] || net->http.version[1])) ||
+        // if metrics are enabled and it's one we report
         (mtcEnabled(g_mtc) && mtc_needs_reporting);
     if (!need_to_post) return FALSE;
 
@@ -839,6 +863,33 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
     protocol_info *proto;
     bool ret = FALSE;
 
+    // HACK: See issue #600.
+    //   We see what appear to be invalid "runt" payloads sometimes from our
+    //   interpositions of Java's SSL/TLS routines. In the example log below,
+    //   notice the first payload is a single `H` byte while the second is the
+    //   actual request.
+    //
+    //   DEBUG: Java_sun_security_ssl_SSLEngineImpl_unwrap
+    //   DEBUG: doProtocol(id=-63, fd=93, len=1, src=TLSRX, dtyp=BUF) TLS=TRUE PROTO=PENDING (1 bytes)
+    //     0000:  48                                                H
+    //   DEBUG: fd:93 Protocol detection result is FALSE
+    //   DEBUG: Java_sun_security_ssl_SSLEngineImpl_unwrap
+    //   DEBUG: doProtocol(id=-63, fd=93, len=79, src=TLSRX, dtyp=BUF) TLS=TRUE PROTO=FALSE (64 bytes)
+    //     0000:  48 45 41 44 20 2f 20 48  54 54 50 2f 31 2e 31 0d  HEAD / HTTP/1.1.
+    //     0010:  0a 55 73 65 72 2d 41 67  65 6e 74 3a 20 63 75 72  .User-Agent: cur
+    //     0020:  6c 2f 37 2e 32 39 2e 30  0d 0a 48 6f 73 74 3a 20  l/7.29.0..Host:
+    //     0030:  6c 6f 63 61 6c 68 6f 73  74 3a 38 34 34 33 0d 0a  localhost:8443..
+    //
+    // In this case, as a temporary hack until we can fix the Java
+    // interpositions, we're leaving protocol detection PENDING if we don't get
+    // enough buffer to match. If we're not doing binary matching (as is the
+    // case with HTTP) then we don't get a length to use here. As a complete
+    // hack, we simply require more than one byte. Ugly...
+    if ((protoDef->len > 0 && protoDef->len > len) || (protoDef->len <= 0 && len < 2)) {
+        scopeLogDebug("DEBUG: skipping protocol detection on runt payload");
+        return FALSE;
+    }
+
     // nothing we can do; don't risk reading past end of a buffer
     size_t cvlen = (len < MAX_CONVERT) ? len : MAX_CONVERT;
     if (((len <= 0) && (protoDef->len <= 0)) ||   // no len
@@ -879,7 +930,7 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
     match_data = pcre2_match_data_create_from_pattern(protoDef->re, NULL);
     if (pcre2_match_wrapper(protoDef->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0,
                             match_data, NULL) > 0) {
-        scopeLog(CFG_LOG_DEBUG, "fd:%d protocol detected", sockfd);
+        scopeLog(CFG_LOG_DEBUG, "fd:%d detected %s", sockfd, protoDef->protname);
 
         if (net) {
             net->protoDetect = DETECT_TRUE;
@@ -1031,7 +1082,13 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     pinfo->sockfd = sockfd;
     pinfo->len = len;
 
-    scopeLog(CFG_LOG_DEBUG, "fd:%d posting payload", sockfd);
+    if (net && net->tlsDetect) {
+        scopeLog(CFG_LOG_DEBUG, "fd:%d posting TLS payload", sockfd);
+    } else if (net && net->protoProtoDef) {
+        scopeLog(CFG_LOG_DEBUG, "fd:%d posting %s payload", sockfd, net->protoProtoDef->protname);
+    } else {
+        scopeLog(CFG_LOG_DEBUG, "fd:%d posting payload", sockfd);
+    }
 
     if (cmdPostPayload(g_ctl, (char *)pinfo) == -1) {
         if (pinfo->data) free(pinfo->data);
@@ -1120,7 +1177,7 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     // Check first against the protocol entries in the configs.
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((protoDef = lstFind(g_protlist, ptype)) != NULL) {
-            if (strcmp(protoDef->protname, "HTTP") == 0) {
+            if (strcasecmp(protoDef->protname, "HTTP") == 0) {
                 // Remember we saw an HTTP entry in the configs.
                 sawHTTP = TRUE;
             }
@@ -1131,56 +1188,125 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         }
     }
 
-    // Try our HTTP detection if we've not seen one and LogStream is enabled
-    if (!sawHTTP && cfgLogStream(g_cfg.staticfg)) {
+    // Try our HTTP detection if we've not seen one 
+    if (!sawHTTP) {
         setProtocolByType(sockfd, g_http_protocol_def, net, buf, len, dtype);
     }
+}
+
+// Alternative to getNetEntry() that returns a net_info for the given channel
+// ID instead of for a socket descriptor. We fallback to using this when we
+// can't get the descriptor in TLS/SSL read/write operations.
+static net_info *
+getChannelNetEntry(uint64_t id)
+{
+    net_info *net = lstFind(g_extra_net_info_list, id);
+    if (!net) {
+        net = calloc(1, sizeof(net_info));
+        if (!net) {
+            scopeLogError("ERROR: failed to allocate channel's net_info");
+            DBG(NULL);
+        } else {
+            if (lstInsert(g_extra_net_info_list, id, net) != TRUE) {
+                free(net);
+                net = NULL;
+                scopeLogError("ERROR: failed to save channel's net_info");
+                DBG(NULL);
+            } else {
+                // populate the new net_info
+                net->active = TRUE;
+                net->type = SOCK_STREAM; // assumption needed for doHttp()
+                //net->localConn.ss_family = ???;
+                net->uid = id;
+            }
+        }
+    }
+    return net;
 }
 
 int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
-    net_info *net = getNetEntry(sockfd);
+    // HACK: See issue #600
+    //   We're ignoring payloads where we don't get a reasonable ID or FD which
+    //   seems to happen with the interpositions of Java's SSL operations.
+    if ((int64_t)id <= 0 && sockfd < 0) {
+        return 0;
+    }
+
+    // Find the net_info for the channel
+    net_info *net = getNetEntry(sockfd);    // first try by descriptor
+    if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
+
+    scopeLogHexDebug(buf, len > 64 ? 64 : len, // limit hexdump to 64
+            "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s",
+            id, sockfd, len,
+            src == NETRX ? "NETRX" :
+            src == NETTX ? "NETTX" :
+            src == TLSRX ? "TLSRX" :
+            src == TLSTX ? "TLSTX" : "?",
+            dtype == BUF  ? "BUF" :
+            dtype == MSG  ? "MSG" :
+            dtype == IOV  ? "IOV" :
+            dtype == NONE ? "NONE" : "?",
+            net == NULL ? "NULL" :
+            net->tlsDetect == DETECT_PENDING ? "PENDING" :
+            net->tlsDetect == DETECT_TRUE    ? "TRUE" :
+            net->tlsDetect == DETECT_FALSE   ? "FALSE" : "INVALID",
+            net == NULL ? "NULL" :
+            net->protoDetect == DETECT_PENDING ? "PENDING" :
+            net->protoDetect == DETECT_TRUE    ? "TRUE" :
+            net->protoDetect == DETECT_FALSE   ? "FALSE" : "INVALID"
+            );
+
+    // Ignore empty payloads that should have been blocked by our interpositions
+    if (!len) {
+        scopeLogDebug("DEBUG: fd:%d ignoring empty payload", sockfd);
+        return 0;
+    }
+
+    // HACK: See issue #600
+    //   We ignore all-zeros payloads we get from our intepositions of Java's
+    //   SSL operations.
+    if (net && net->protoDetect == DETECT_PENDING) {
+        bool foundNonZero = FALSE;
+        for (size_t n = 0; n < len; ++n) {
+            if (((char*)buf)[n] != 0) {
+                foundNonZero = TRUE;
+                break;
+            }
+        }
+        if (!foundNonZero) {
+            scopeLogDebug("DEBUG: fd:%d ignoring all-zero payload", sockfd);
+            return 0;
+        }
+    }
+
     // Do TLS detection if not already done
     if (net && net->tlsDetect == DETECT_PENDING) {
         detectTLS(sockfd, net, buf, len, src, dtype);
     }
 
-    // Do protocol-detection if not already done on the channel
-    if (net && net->protoDetect == DETECT_PENDING) {
-        detectProtocol(sockfd, net, buf, len, src, dtype);
-    }
+    // Only process unencrypted payloads
+    if ((net && net->tlsDetect == DETECT_FALSE) || (src == TLSTX || src == TLSRX)) {
 
-    // Payload handling depends first on whether it's encrypted or not.
-    if (net && net->tlsDetect == DETECT_TRUE && (src == NETTX || src == NETRX)) {
-        // It's an encrypted TLS payload so we only want to process it if 
-        // LogStream is enabled and TLS negotiation is still in progress.
-        // 
-        // This addresses a couple requirements. First, never send encrypted
-        // payloads to disk. Second, only send encrypted payloads to LogStream
-        // during the TLS negotiation.
-        if (cfgLogStream(g_cfg.staticfg) && net->protoDetect == DETECT_PENDING) {
-            extractPayload(sockfd, net, buf, len, src, dtype);
+        // Do protocol-detection if not already done
+        if (net && net->protoDetect == DETECT_PENDING) {
+            detectProtocol(sockfd, net, buf, len, src, dtype);
         }
-    } else {
-        // This is NOT an encrypted TLS payload so we only process it if
-        // payloads are enabled globally, or for the detected protocol.
-        //
-        // We have a requirement that HTTP payloads be sent when LogStream is
-        // enabled but we don't need to explicitly check for that here. If this
-        // has been detected as HTTP then net->protoProtoDef will point either
-        // to our g_http_protocol_def (which has payload set) or to another one
-        // that came from the config file and the user will have set it as they
-        // wanted. Either way, we can just use that flag here.
+
+        // Send payloads if enabled globally or by the detected protocol
         if (cfgPayEnable(g_cfg.staticfg)
             || (net && net->protoProtoDef && net->protoProtoDef->payload)) {
             extractPayload(sockfd, net, buf, len, src, dtype);
         }
-    }
 
-    // Crack HTTP/1.x into events if HTTP source/watch is enabled
-    if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
-        doHttp(id, sockfd, net, buf, len, src, dtype);
+        // Process HTTP if detected and events are enabled
+        if (net && net->protoProtoDef
+                && !strcasecmp(net->protoProtoDef->protname, "HTTP")
+                && cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
+            doHttp(id, sockfd, net, buf, len, src, dtype);
+        }
     }
 
     return 0;
@@ -1340,6 +1466,7 @@ addSock(int fd, int type, int family)
             }
         }
 */
+
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].active = TRUE;
         g_netinfo[fd].type = type;
@@ -2158,6 +2285,10 @@ doDupSock(int oldfd, int newfd)
     g_netinfo[newfd].startTime = 0ULL;
     g_netinfo[newfd].totalDuration = (counters_element_t){.mtc=0, .evt=0};
     g_netinfo[newfd].numDuration = (counters_element_t){.mtc=0, .evt=0};
+
+    // don't dup the HTTP/2 frame stashes
+    memset(&g_netinfo[newfd].http.http2Buf[0], 0, sizeof(http_buf_t));
+    memset(&g_netinfo[newfd].http.http2Buf[1], 0, sizeof(http_buf_t));
 
     doUpdateState(CONNECTION_OPEN, newfd, 1, "dup", NULL);
     return 0;

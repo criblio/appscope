@@ -1,3 +1,11 @@
+# AppScope Library Version Script
+# 
+# This file is used with the linker's --version-script option to control the
+# symbols that are visible to the program our libscope.so is loaded into. If
+# you are here because the selfinterpose test is failing, it's most likely that
+# you have recently added a new library and its symbols need to be included in
+# the `local` section below so they are hidden.
+#
 {
   global:
     SSL_read;
@@ -9,6 +17,7 @@
     SCOPE_SSL_*;   # hides our renamed SSL symbols
     a2d_*;         # the beginning of libssl, libcrypto symbols
     a2i_*;
+    lshpack_*;     # hides ls-hpack symbols
     ACCESS_*;
     ADMISSIONS_*;
     ADMISSION_*;

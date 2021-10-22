@@ -3,10 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/criblio/scope/events"
@@ -61,8 +63,18 @@ func init() {
 
 func readMetrics(workDir string, w *widgets) {
 	metricsPath := filepath.Join(workDir, "metrics.json")
+	metricsDestPath := filepath.Join(workDir, "metric_dest")
 	file, err := os.Open(metricsPath)
-	util.CheckErrSprintf(err, "%v", err)
+	if err != nil && strings.Contains(err.Error(), "metrics.json: no such file or directory") {
+		if util.CheckFileExists(metricsDestPath) {
+			dest, _ := ioutil.ReadFile(metricsDestPath)
+			fmt.Printf("Cannot run dash: Metrics were output to %s\n", dest)
+			os.Exit(0)
+		}
+	} else {
+		util.CheckErrSprintf(err, "%v", err)
+	}
+
 	tr := util.NewTailReader(file)
 	in := make(chan metrics.Metric)
 	go metrics.Reader(tr, util.MatchAlways, in)
@@ -164,8 +176,18 @@ func readMetrics(workDir string, w *widgets) {
 
 func readEvents(workDir string, w *widgets) {
 	eventsPath := filepath.Join(workDir, "events.json")
+	eventsDestPath := filepath.Join(workDir, "event_dest")
 	file, err := os.Open(eventsPath)
-	util.CheckErrSprintf(err, "%v", err)
+	if err != nil && strings.Contains(err.Error(), "events.json: no such file or directory") {
+		if util.CheckFileExists(eventsDestPath) {
+			dest, _ := ioutil.ReadFile(eventsDestPath)
+			fmt.Printf("Cannot run dash: Events were output to %s\n", dest)
+			os.Exit(0)
+		}
+	} else {
+		util.CheckErrSprintf(err, "error opening events file: %v", err)
+	}
+
 	tr := util.NewTailReader(file)
 	in := make(chan map[string]interface{})
 	eventCount, _ := util.CountLines(eventsPath)

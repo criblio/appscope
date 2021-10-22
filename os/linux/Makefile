@@ -3,7 +3,7 @@
 CWD = $(shell pwd)
 OS=linux
 CC=gcc
-CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations
+CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -Werror=implicit-function-declaration -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG)
 SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage
 TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
@@ -14,10 +14,11 @@ YAML_AR=contrib/build/libyaml/src/.libs/libyaml.a
 JSON_AR=contrib/cJSON/libcjson.a
 PCRE2_AR=contrib/build/pcre2/libpcre2-posix.a contrib/build/pcre2/libpcre2-8.a
 OPENSSL_AR=contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a
-TEST_AR=$(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR}
+LS_HPACK_AR=contrib/build/ls-hpack/libls-hpack.a
+TEST_AR=$(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} $(LS_HPACK_AR)
 #TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
 TEST_LIB=contrib/build/cmocka/src/libcmocka.so
-TEST_INCLUDES=-I./src -I./contrib/cmocka/include
+TEST_INCLUDES=-I./src -I./contrib/cmocka/include -I contrib/ls-hpack
 TEST_LD_FLAGS=-Lcontrib/build/cmocka/src -lcmocka -ldl -lresolv -lrt -lpthread
 
 ARCH=$(shell uname -m)
@@ -94,7 +95,7 @@ coretest: $(C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/mtctest mtctest.o mtc.o log.o transport.o mtcformat.o com.o ctl.o evtformat.o cfg.o cfgutils.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o report.o search.o httpagg.o state.o httpstate.o plattime.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/evtformattest evtformattest.o evtformat.o log.o transport.o mtcformat.o dbg.o cfg.o com.o ctl.o mtc.o circbuf.o cfgutils.o linklist.o fn.o utils.o os.o test.o report.o search.o httpagg.o state.o httpstate.o plattime.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ctltest ctltest.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o com.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o fn.o utils.o os.o test.o report.o search.o httpagg.o state.o httpstate.o plattime.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=cbufGet
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/httpstatetest httpstatetest.o httpstate.o plattime.o search.o fn.o utils.o os.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -lrt
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/httpstatetest httpstatetest.o httpstate.o plattime.o search.o fn.o utils.o os.o dbg.o test.o com.o cfg.o cfgutils.o mtc.o mtcformat.o ctl.o transport.o linklist.o log.o evtformat.o circbuf.o state.o report.o httpagg.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=cmdPostEvent -lrt
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/httpheadertest httpheadertest.o report.o httpagg.o state.o com.o httpstate.o plattime.o fn.o utils.o os.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o search.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=cmdSendHttp -Wl,--wrap=cmdPostEvent
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/httpaggtest httpaggtest.o httpagg.o fn.o utils.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/reporttest reporttest.o report.o httpagg.o state.o httpstate.o com.o plattime.o fn.o utils.o os.o ctl.o log.o transport.o dbg.o cfgutils.o cfg.o mtc.o evtformat.o mtcformat.o circbuf.o linklist.o search.o test.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=cmdSendEvent -Wl,--wrap=cmdSendMetric

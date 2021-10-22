@@ -1191,6 +1191,12 @@ ctlEvtSet(ctl_t *ctl, evt_fmt_t *evt)
     ctl->evt = evt;
 }
 
+evt_fmt_t *
+ctlEvtGet(ctl_t *ctl)
+{
+    return ctl ? ctl->evt : NULL;
+}
+
 bool
 ctlEvtSourceEnabled(ctl_t *ctl, watch_t src)
 {

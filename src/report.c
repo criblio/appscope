@@ -8,6 +8,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <sys/time.h>
+#include <lshpack.h>
 
 #include "atomic.h"
 #include "com.h"
@@ -116,6 +117,41 @@ static list_t *g_maplist;
 static search_t *g_http_status = NULL;
 static http_agg_t *g_http_agg;
 
+// saved state for an HTTP/2 channel
+typedef struct http2Channel {
+    // HPAC decoder
+    struct lshpack_dec decoder;
+
+    // list of http2Stream_t indexed by stream
+    list_t *streams;
+} http2Channel_t;
+
+// saved state for an HTTP/2 stream within a channel
+typedef struct http2Stream {
+    // type of the current message being processed
+    uint8_t msgType; // 0=unset, 1=request, 2=response
+
+    // cJSON node for the content for the event's body.data
+    cJSON *jsonData;
+
+    // data from the last HTTP/2 request on the stream
+    uint64_t lastRequestAt;       // hi-res timer value (nsecs)
+    int      lastStatus;          // ":status" integer value; 200, 404
+    char     lastHost[256];       // ":authority" value; server's hostname
+    char     lastMethod[8];       // ":method" value; GET, POST, etc.
+    char     lastTarget[2048];    // ":target" value; the URI
+    char     lastUserAgent[1024]; // "user-agent" value"; mozilla
+
+    // req/resp content-length values
+    int lastReqLen;
+    int lastRespLen;
+} http2Stream_t;
+
+// list of http2Channel_t indexed by channel
+static list_t *g_http2_channels = NULL;
+
+#define DEFAULT_MIN_DURATION_TIME (1)
+
 static void
 destroyHttpMap(void *data)
 {
@@ -127,10 +163,41 @@ destroyHttpMap(void *data)
     if (map) free(map);
 }
 
+static void
+destroyHttp2Channel(void *data)
+{
+    if (!data) return;
+    http2Channel_t *info = (http2Channel_t *)data;
+
+    lshpack_dec_cleanup(&info->decoder);
+    if (info->streams) {
+        lstDestroy(&info->streams);
+    }
+
+    free(info);
+}
+
+static void
+destroyHttp2Stream(void *data)
+{
+    if (!data) return;
+    http2Stream_t *info = (http2Stream_t *)data;
+
+    if (info->jsonData) {
+        cJSON_Delete(info->jsonData);
+    }
+
+    free(info);
+}
+
 void
 initReporting()
 {
+    // NB: Each of these does a dynamic allocation that we are not releasing.
+    //     They don't grow and would ideally be released when the reporting
+    //     thread exits but we've not gotten to it yet. 
     g_maplist = lstCreate(destroyHttpMap);
+    g_http2_channels = lstCreate(destroyHttp2Channel);
     g_http_status = searchComp(HTTP_STATUS);
     g_http_agg = httpAggCreate();
 }
@@ -162,7 +229,14 @@ destroyProto(protocol_info *proto)
      * post->data is the http header and is freed in destroyHttpMap()
      * when the list entry is deleted.
      */
-    if (proto->data) free (proto->data);
+    if (proto->data) {
+        // comment above doesn't apply to HTTP/2 protocol events
+        if (proto->ptype == EVT_H2FRAME) {
+            http_post *post = (http_post *)proto->data;
+            free(post->hdr);
+        }
+        free(proto->data);
+    }
 }
 
 static int
@@ -454,7 +528,7 @@ httpFieldsInternal(event_field_t *fields, http_report *hreport, protocol_info *p
 }
 
 static void
-doHttpHeader(protocol_info *proto)
+doHttp1Header(protocol_info *proto)
 {
     if (!proto || !proto->data) {
         destroyProto(proto);
@@ -489,7 +563,6 @@ doHttpHeader(protocol_info *proto)
         map->req_len = 0;
     }
 
-    map->frequency++;
     ssl = (post->ssl) ? "https" : "http";
     hreport.ix = 0;
     hreport.hreq = NULL;
@@ -513,7 +586,7 @@ doHttpHeader(protocol_info *proto)
     // we're either building a new req or we have a previous req
     if (map->req) {
         if ((hreport.hreq = calloc(1, map->req_len)) == NULL) {
-            scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doHttpHeader: hreq memory allocation failure", proto->fd);
+            scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doHttp1Header: hreq memory allocation failure", proto->fd);
             return;
         }
 
@@ -523,7 +596,7 @@ doHttpHeader(protocol_info *proto)
         char *headertok = strtok_r(header, "\r\n", &savea);
         if (!headertok) {
             free(hreport.hreq);
-            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttpHeader: parse an http request header", proto->fd);
+            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttp1Header: parse an http request header", proto->fd);
             return;
         }
 
@@ -533,7 +606,7 @@ doHttpHeader(protocol_info *proto)
             H_ATTRIB(fields[hreport.ix], "http_method", method_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
-            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttpHeader: no method in an http request header", proto->fd);
+            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttp1Header: no method in an http request header", proto->fd);
         }
 
         char *target_str = strtok_r(NULL, " ", &savea);
@@ -541,7 +614,7 @@ doHttpHeader(protocol_info *proto)
             H_ATTRIB(fields[hreport.ix], "http_target", target_str, 4);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
-            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttpHeader: no target in an http request header", proto->fd);
+            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttp1Header: no target in an http request header", proto->fd);
         }
 
         char *flavor_str = strtok_r(NULL, " ", &savea);
@@ -553,7 +626,7 @@ doHttpHeader(protocol_info *proto)
                 HTTP_NEXT_FLD(hreport.ix);
             }
         } else {
-            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttpHeader: no http version in an http request header", proto->fd);
+            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttp1Header: no http version in an http request header", proto->fd);
         }
 
         H_ATTRIB(fields[hreport.ix], "http_scheme", ssl, 1);
@@ -593,18 +666,12 @@ doHttpHeader(protocol_info *proto)
     */
     if (proto->ptype == EVT_HRES) {
         if ((hreport.hres = calloc(1, proto->len)) == NULL) {
-            scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doHttpHeader: hres memory allocation failure", proto->fd);
+            scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doHttp1Header: hres memory allocation failure", proto->fd);
             return;
         }
 
         struct timeval tv;
         gettimeofday(&tv, NULL);
-
-        int rps = map->frequency;
-        int sec = (map->first_time > 0) ? (int)tv.tv_sec - map->first_time : 1;
-        if (sec > 0) {
-            rps = map->frequency / sec;
-        }
 
         map->resp = (char *)post->hdr;
 
@@ -631,7 +698,7 @@ doHttpHeader(protocol_info *proto)
             H_ATTRIB(fields[hreport.ix], "http_flavor", flavor_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
-            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttpHeader: no version string in an http request header", proto->fd);
+            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttp1Header: no version string in an http request header", proto->fd);
         }
 
         H_VALUE(fields[hreport.ix], "http_status_code", status, 1);
@@ -671,21 +738,6 @@ doHttpHeader(protocol_info *proto)
         event_t hevent = INT_EVENT("http-resp", proto->len, SET, fields);
         cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
 
-        // Are we doing a metric event?
-        event_field_t mfields[] = {
-            DURATION_FIELD(map->duration),
-            RATE_FIELD(rps),
-            HTTPSTAT_FIELD(status),
-            PROC_FIELD(g_proc.procname),
-            FD_FIELD(proto->fd),
-            PID_FIELD(g_proc.pid),
-            UNIT_FIELD("byte"),
-            FIELDEND
-        };
-
-        event_t mevent = INT_EVENT("http-metrics", proto->len, SET, mfields);
-        cmdSendHttp(g_ctl, &mevent, map->id, &g_proc);
-
         // emit statsd metrics, if enabled.
         if (mtcEnabled(g_mtc)) {
 
@@ -714,6 +766,616 @@ doHttpHeader(protocol_info *proto)
 
     if (hreport.hreq) free(hreport.hreq);
     if (hreport.hres) free(hreport.hres);
+    destroyProto(proto);
+}
+
+static const char *
+httpStatusCode2Text(int code)
+{
+    switch (code) {
+        case 100:
+            return "Continue";
+        case 101:
+            return "Switching Protocols";
+        case 102:
+            return "Processing";
+        case 200:
+            return "OK";
+        case 201:
+            return "Created";
+        case 202:
+            return "Accepted";
+        case 203:
+            return "Non-authoritative Information";
+        case 204:
+            return "No Content";
+        case 205:
+            return "Reset Content";
+        case 206:
+            return "Partial Content";
+        case 207:
+            return "Multi-Status";
+        case 208:
+            return "Already Reported";
+        case 226:
+            return "IM Used";
+        case 300:
+            return "Multiple Choices";
+        case 301:
+            return "Moved Permanently";
+        case 302:
+            return "Found";
+        case 303:
+            return "See Other";
+        case 304:
+            return "Not Modified";
+        case 305:
+            return "Use Proxy";
+        case 307:
+            return "Temporary Redirect";
+        case 308:
+            return "Permanent Redirect";
+        case 400:
+            return "Bad Request";
+        case 401:
+            return "Unauthorized";
+        case 402:
+            return "Payment Required";
+        case 403:
+            return "Forbidden";
+        case 404:
+            return "Not Found";
+        case 405:
+            return "Method Not Allowed";
+        case 406:
+            return "Not Acceptable";
+        case 407:
+            return "Proxy Authentication Required";
+        case 408:
+            return "Request Timeout";
+        case 409:
+            return "Conflict";
+        case 410:
+            return "Gone";
+        case 411:
+            return "Length Required";
+        case 412:
+            return "Precondition Failed";
+        case 413:
+            return "Payload Too Large";
+        case 414:
+            return "Request-URI Too Long";
+        case 415:
+            return "Unsupported Media Type";
+        case 416:
+            return "Requested Range Not Satisfiable";
+        case 417:
+            return "Expectation Failed";
+        case 418:
+            return "I'm a teapot";
+        case 421:
+            return "Misdirected Request";
+        case 422:
+            return "Unprocessable Entity";
+        case 423:
+            return "Locked";
+        case 424:
+            return "Failed Dependency";
+        case 426:
+            return "Upgrade Required";
+        case 428:
+            return "Precondition Required";
+        case 429:
+            return "Too Many Requests";
+        case 431:
+            return "Request Header Fields Too Large";
+        case 444:
+            return "Connection Closed Without Response";
+        case 451:
+            return "Unavailable For Legal Reasons";
+        case 499:
+            return "Client Closed Request";
+        case 500:
+            return "Internal Server Error";
+        case 501:
+            return "Not Implemented";
+        case 502:
+            return "Bad Gateway";
+        case 503:
+            return "Service Unavailable";
+        case 504:
+            return "Gateway Timeout";
+        case 505:
+            return "HTTP Version Not Supported";
+        case 506:
+            return "Variant Also Negotiates";
+        case 507:
+            return "Insufficient Storage";
+    }
+
+    return "UNKNOWN";
+}
+
+static bool
+isHttp2NameEnabled(const char* name)
+{
+    regex_t *nameRe = evtFormatNameFilter(ctlEvtGet(g_ctl), CFG_SRC_HTTP);
+    if (!nameRe) {
+        scopeLogError("ERROR: missing name filter for HTTP watch");
+        DBG("Missing name filter for HTTP watch");
+        return FALSE;
+    }
+    return headerMatch(nameRe, name);
+}
+
+static bool
+isHttp2FieldEnabled(const char* field, const char *value)
+{
+    regex_t *fieldRe = evtFormatFieldFilter(ctlEvtGet(g_ctl), CFG_SRC_HTTP);
+    if (!fieldRe) {
+        scopeLogError("ERROR: missing field filter for HTTP watch");
+        DBG("Missing field filter for HTTP watch");
+        return FALSE;
+    }
+    regex_t *valueRe = evtFormatValueFilter(ctlEvtGet(g_ctl), CFG_SRC_HTTP);
+    if (!valueRe) {
+        scopeLogError("ERROR: missing value filter for HTTP watch");
+        DBG("Missing value filter for HTTP watch");
+        return FALSE;
+    }
+    return headerMatch(fieldRe, field) && headerMatch(valueRe, value);
+}
+
+static void
+addHttp2NumField(cJSON *jsonData, const char* field, uint32_t value)
+{
+    char buf[16];
+    if (snprintf(buf, sizeof(buf), "%d", value) >= sizeof(buf)) {
+        scopeLogError("ERROR: failed to convert int to string");
+        DBG("buf too small for uint32");
+        return;
+    }
+    if (isHttp2FieldEnabled(field, buf)) {
+        cJSON_AddNumberToObject(jsonData, field, value);
+    }
+}
+
+static void
+addHttp2StrField(cJSON *jsonData, const char* field, const char *value)
+{
+    if (isHttp2FieldEnabled(field, value)) {
+        cJSON_AddStringToObject(jsonData, field, value);
+    }
+}
+
+static void
+addHttp2StrFieldLN(cJSON *jsonData, const char* field, const char *value)
+{
+    if (isHttp2FieldEnabled(field, value)) {
+        cJSON_AddStringToObjLN(jsonData, field, value);
+    }
+}
+
+static void
+doHttp2Frame(protocol_info *proto)
+{
+    // require the protocol object and it's data pointer to be set
+    if (!proto || !proto->data) {
+        scopeLogError("ERROR: null proto or proto->data");
+        destroyProto(proto);
+        return;
+    }
+
+    // require the post's hdr pointer to be set
+    http_post *post = (http_post *)proto->data;
+    if (!post->hdr) {
+        scopeLogError("ERROR: null post->hdr");
+        destroyProto(proto);
+        return;
+    }
+
+    // extract the HTTP/2 frame header
+    const uint8_t *frame = (uint8_t *)post->hdr;
+    if (proto->len < 9) {
+        scopeLogHexError(frame, proto->len,
+                "ERROR: runt HTTP/2 frame; only %ld bytes long", proto->len);
+        DBG(NULL);
+        goto cleanup;
+    }
+    uint32_t fLen    = (frame[0]<<16) + (frame[1]<<8) + (frame[2]);
+    uint8_t  fType   = frame[3];
+    uint8_t  fFlags  = frame[4];
+    uint32_t fStream = ((frame[5]&0x7F)<<24) + (frame[6]<<16) + (frame[7]<<8) + (frame[8]);
+    if (proto->len != 9 + fLen) {
+        scopeLogHexError(frame, proto->len,
+                "ERROR: bad HTTP/2 frame size; got %ld/%d bytes", proto->len, 9+fLen);
+        DBG(NULL);
+        goto cleanup;
+    }
+
+    //scopeLogHexDebug(frame, proto->len,
+    //        "DEBUG: HTTP/2 frame; chan=0x%lx, stream=%d, type=0x%02x, flags=0x%02x",
+    //        proto->uid, fStream, fType, fFlags);
+
+    if (fType == 0x05) {
+        // PUSH_PROMISE frames are analogous to unsolicited request messages
+        // for future responses the client didn't directly ask for. They are
+        // typically sent by the server when it's smart enough to identify
+        // assets the client will need or for async messaging.
+        //
+        // They will be sent in the stream that triggered them but the HEADERS
+        // and DATA frames for the pushed response will be on a separate stream
+        // identified in the PUSH_PROMISE frame. We're overriding fStream here
+        // so the header block in the PUSH_PROMISE are processed as if it were
+        // a request on the stream where the response will come later.
+        //
+        // The stream ID to use is right after the headers or one byte further if
+        // the PADDED flag is set.
+        size_t offset = (fFlags & 0x08) ? 10 : 9;
+        fStream = ((frame[offset+0]&0x7F) << 24) // first bit is reserved
+                + ( frame[offset+1]       << 16)
+                + ( frame[offset+2]       <<  8)
+                + ( frame[offset+3]            );
+    }
+
+    if (fType == 0x01 || fType == 0x05 || fType == 0x09) {
+        // Process HEADERS(1), PUSH_PROMISE(5), or CONTINUATION(9) frames. All
+        // three contain a header block; an HPACK-encoded lists of key/value
+        // headers.
+        //
+        // HEADERS frames correspond to a request or response depending on the
+        // fields in the header block; ":method" indicates request, ":status"
+        // indicates a response.
+        //
+        // PUSH_PROMISE frames are like request message headers except they are
+        // sent by the server when it decides to push a message without a
+        // request from the client. See the notes earlier about how the stream
+        // ID in the frame header and the one in the body differ.
+        //
+        // If the END_HEADERS flag in any of these three frame types IS NOT
+        // set, they are followied immediately but a CONTINUATION frame that
+        // contains additional headers. These are used when the headers don't
+        // fit in the earlier frame(s). When the flag is set, it's the end of 
+        // the message.
+
+        // get/create the channel info
+        http2Channel_t *channel = lstFind(g_http2_channels, proto->uid);
+        if (!channel) {
+            channel = calloc(1, sizeof(http2Channel_t));
+            if (!channel) {
+                scopeLogError("ERROR: failed to create channel info");
+                DBG(NULL);
+                goto cleanup;
+            }
+
+            lshpack_dec_init(&channel->decoder);
+            lshpack_dec_set_max_capacity(&channel->decoder, 0x4000);
+            channel->streams = lstCreate(destroyHttp2Stream);
+
+            if (lstInsert(g_http2_channels, proto->uid, channel) != TRUE) {
+                destroyHttp2Channel(channel);
+                scopeLogError("ERROR: failed to insert channel");
+                DBG(NULL);
+                goto cleanup;
+            }
+        }
+
+        // get/create the stream info
+        http2Stream_t *stream = lstFind(channel->streams, fStream);
+        if (!stream) {
+            stream = calloc(1, sizeof(http2Stream_t));
+            if (!stream) {
+                scopeLogError("ERROR: failed to create http2Stream");
+                DBG(NULL);
+                goto cleanup;
+            }
+
+            if (lstInsert(channel->streams, fStream, stream) != TRUE) {
+                destroyHttp2Stream(stream);
+                scopeLogError("ERROR: failed to insert decoder");
+                DBG(NULL);
+                goto cleanup;
+            }
+        }
+
+        // Rather than keep an event_field_t array like the HTTP/1 logic does,
+        // we're building the cJSON object for the event directly. The way the
+        // headers are unpacked one at a time here makes it combersome to save
+        // off the results so we're skipping the extra layer. It means we need
+        // to reproduce the watch filter logic and the http.* metrics updates
+        // ourselves though. This is the cJSON object we're building.
+        if (!stream->jsonData) {
+            stream->jsonData = cJSON_CreateObject();
+            if (!stream->jsonData) {
+                scopeLogError("ERROR: failed to create jsonData");
+                DBG(NULL);
+                goto cleanup;
+            }
+
+            // Hard coding 2.0 for now
+            cJSON_AddStringToObjLN(stream->jsonData, "http_flavor", "2.0");
+        }
+
+        // The position in the frame where the header data is depends on the
+        // type and flags. Initially, we start just after the frame header and
+        // end at the end of the frame then adjust. See below.
+        const uint8_t *decPos = frame + 9;
+        const uint8_t *decEnd = decPos + fLen;
+        if (fFlags & 0x08) {
+            // When the PADDED flag is set, we need to skip over one byte at
+            // the start. The value of that byte is the number at the end to
+            // skip too.
+            decPos += 1;
+            decEnd -= frame[9];
+        }
+        if (fFlags & 0x20) {
+            // When the PRIORITY flag is set, we need to skip over 5 bytes
+            // at the start.
+            decPos += 5;
+        }
+        if (fType == 0x05) {
+            // We skip the stream ID at the start of PUSH_PROMISE frames.
+            decPos += 4;
+        }
+
+        // Now loop through the header data letting the HPACK decoder put the
+        // field name and value into the buffer we provide. The size of the
+        // buffer is taken from examples in the lshpack package. Not sure
+        // exactly what it should be.
+        char out[2048];
+        lsxpack_header_t hdr;
+        while (decPos < decEnd) {
+            lsxpack_header_prepare_decode(&hdr, out, 0, sizeof(out));
+            int rc = lshpack_dec_decode(&channel->decoder, &decPos, decEnd, &hdr);
+            if (rc != 0) {
+                scopeLogError("ERROR: HTTP/2 decoder failed; err=%d", rc);
+                scopeLogHexError(frame, proto->len,
+                        "  chan=0x%lx, stream=%d, type=0x%02x, flags=0x%02x",
+                        proto->uid, fStream, fType, fFlags);
+                scopeLogHexError(decPos, decEnd-decPos,
+                        "  decoder failed here");
+                DBG(NULL);
+                break;
+            }
+
+            // get the field name and value as null-terminated strings
+            out[hdr.name_offset + hdr.name_len] = '\0';
+            out[hdr.val_offset  + hdr.val_len ] = '\0';
+            char *name = out + hdr.name_offset;
+            char *val  = out + hdr.val_offset;
+            //scopeLogDebug("DEBUG: HTTP/2 decoded header: name=\"%s\", value=\"%s\"", name, val);
+
+            // Update the state of the stream for the given header field. Most
+            // of these become entries in the cJSON object that will eventually
+            // become the body.data element in the JSON event. Some are stashed
+            // into the state object for use later.
+            if (!strcasecmp(":method", name)) {
+                // We use the presence of the :method header to indicate we're
+                // processing a request message.
+                stream->msgType = 1;
+                addHttp2NumField(stream->jsonData, "http_stream", fStream);
+
+                addHttp2StrField(stream->jsonData, "http_method", val);
+                strncpy(stream->lastMethod, val, sizeof(stream->lastMethod));
+
+                // record the start timestamp for duration calculations
+                stream->lastRequestAt = post->start_duration;
+
+                // record the frame type in request events so we can see Server Push
+                if (fType == 0x01) {
+                    addHttp2StrFieldLN(stream->jsonData, "http_frame", "HEADERS");
+                } else if (fType == 0x05) {
+                    addHttp2StrFieldLN(stream->jsonData, "http_frame", "PUSH_PROMISE");
+                }
+            } else if (!strcasecmp(":status", name)) {
+                // We use the presence of the :status header to indicate we're
+                // processing a response message.
+                stream->msgType = 2; // response
+                addHttp2NumField(stream->jsonData, "http_stream", fStream);
+
+                stream->lastStatus = atoi(val);
+                addHttp2StrField(stream->jsonData, "http_status_code", val);
+                addHttp2StrField(stream->jsonData, "http_status_text", httpStatusCode2Text(stream->lastStatus));
+            } else if (!strcasecmp(":authority", name)) {
+                addHttp2StrField(stream->jsonData, "http_host", val);
+                strncpy(stream->lastHost, val, sizeof(stream->lastHost));
+            } else if (!strcasecmp(":path", name)) {
+                addHttp2StrField(stream->jsonData, "http_target", val);
+                strncpy(stream->lastTarget, val, sizeof(stream->lastTarget));
+            } else if (!strcasecmp(":scheme", name)) {
+                addHttp2StrField(stream->jsonData, "http_scheme", val);
+            } else if (!strcasecmp("user-agent", name)) {
+                addHttp2StrField(stream->jsonData, "http_user_agent", val);
+                strncpy(stream->lastUserAgent, val, sizeof(stream->lastUserAgent));
+            } else if (!strcasecmp("x-appscope", name)) {
+                addHttp2StrField(stream->jsonData, "x-appscope", val);
+            } else if (!strcasecmp("x-forwarded-for", name)) {
+                addHttp2StrField(stream->jsonData, "http_client_ip", val);
+            } else if (!strcasecmp("content-length", name)) {
+                if (stream->msgType == 1) {
+                    stream->lastReqLen = atoi(val);
+                    addHttp2NumField(stream->jsonData, "http_request_content_length", stream->lastReqLen);
+                } else if (stream->msgType == 2) {
+                    stream->lastRespLen = atoi(val);
+                    addHttp2NumField(stream->jsonData, "http_response_content_length", stream->lastRespLen);
+                } else {
+                    scopeLogError("ERROR: invalid msgType; %d", stream->msgType);
+                    DBG(NULL);
+                }
+            } else {
+                // All other header fields need to match a regex in the
+                // event.watch[name=http].headers array in the runtime config.
+                //
+                // Note that the filter is applied to the header's `name:
+                // value` form, not the name and value separately. We're munging the
+                // buffer temporarily here.
+                out[hdr.name_offset + hdr.name_len] = ':';
+                size_t i;
+                size_t numHeaders = cfgEvtFormatNumHeaders(g_cfg.staticfg);
+                for (i = 0; i < numHeaders; ++i) {
+                    regex_t *re = cfgEvtFormatHeaderRe(g_cfg.staticfg, i);
+                    if (re) {
+                        if (!regexec_wrapper(re, out, 0, NULL, 0)) {
+                            // matched, add it and skip the rest of the filters
+                            out[hdr.name_offset + hdr.name_len] = '\0';
+                            cJSON_AddStringToObject(stream->jsonData, name, val);
+                            break;
+                        }
+                    }
+                }
+                out[hdr.name_offset + hdr.name_len] = '\0';
+            }
+        }
+
+        // The END_HEADERS flag is set when there are no (more) CONTINUATION
+        // frames coming. It indicates to us that we've got the whole message
+        // so now we need to generate the event.
+        if (fFlags & 0x04) {
+
+            // The isServer value in the protocol object is only half of the
+            // answer here. See reportHttp2() in httpstate.c for details. We're
+            // recreating the isServer value that the HTTP/1 logic produces
+            // because we don't crack the headers on the data side and
+            // therefore don't know if it's a request or response.
+            bool isSend     = proto->isServer;
+            bool isResponse = stream->msgType == 2;
+            bool isServer   = (isSend && isResponse) || (!isSend && !isResponse);
+
+            // Add the socket info fields
+            if (addrIsNetDomain(&proto->localConn)) {
+                switch (proto->sock_type) {
+                    case SOCK_STREAM:
+                        addHttp2StrFieldLN(stream->jsonData, "net_transport", "IP.TCP");
+                        break;
+                    case SOCK_DGRAM:
+                        addHttp2StrFieldLN(stream->jsonData, "net_transport", "IP.UDP");
+                        break;
+                    case SOCK_RAW:
+                        addHttp2StrFieldLN(stream->jsonData, "net_transport", "IP.RAW");
+                        break;
+                    case SOCK_RDM:
+                        addHttp2StrFieldLN(stream->jsonData, "net_transport", "IP.RDM");
+                        break;
+                    case SOCK_SEQPACKET:
+                        addHttp2StrFieldLN(stream->jsonData, "net_transport", "IP.SEQPACKET");
+                        break;
+                }
+
+                char addr[INET6_ADDRSTRLEN];
+                if (inet_ntop(proto->remoteConn.ss_family,
+                            &((struct sockaddr_in*)&proto->remoteConn)->sin_addr, addr, sizeof(addr))) {
+                    addHttp2StrField(stream->jsonData, "net_peer_ip", addr);
+                }
+                if (inet_ntop(proto->localConn.ss_family,
+                            &((struct sockaddr_in*)&proto->localConn)->sin_addr, addr, sizeof(addr))) {
+                    addHttp2StrField(stream->jsonData, "net_host_ip", addr);
+                }
+
+                char port[8];
+                snprintf(port, sizeof(port), "%d",
+                        htons(((struct sockaddr_in*)&proto->remoteConn)->sin_port));
+                addHttp2StrField(stream->jsonData, "net_peer_port", port);
+                snprintf(port, sizeof(port), "%d",
+                        htons(((struct sockaddr_in*)&proto->localConn)->sin_port));
+                addHttp2StrField(stream->jsonData, "net_host_port", port);
+            }
+
+            // If it's a request message...
+            if (stream->msgType == 1) {
+                if (isHttp2NameEnabled("http-req")) {
+                    // send the request event
+                    event_t event = INT_EVENT("http-req", proto->len, SET, NULL);
+                    event.data = stream->jsonData;
+                    cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
+                }
+            } 
+
+            // if it's a response message...
+            else if (stream->msgType == 2) {
+                // we may need the HTTP/1 state 
+                http_map *map = lstFind(g_maplist, post->id);
+
+                // add duration from request
+                unsigned duration; // msecs
+                if (stream->lastRequestAt) {
+                    duration = (post->start_duration - stream->lastRequestAt) / 1000000;
+                } else if (map && map->start_time) {
+                    duration = (post->start_duration - map->start_time) / 1000000;
+                }
+                addHttp2NumField(stream->jsonData, isServer ?  "http_server_duration" : "http_client_duration", duration);
+
+                // add host from request
+                if (stream->lastHost[0]) {
+                    addHttp2StrField(stream->jsonData, "http_host", stream->lastHost);
+                } else if (map) {
+                    // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
+                }
+
+                // add method from request
+                if (stream->lastMethod[0]) {
+                    addHttp2StrField(stream->jsonData, "http_method", stream->lastMethod);
+                } else if (map) {
+                    // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
+                }
+
+                // add target URL from request
+                if (stream->lastTarget[0]) {
+                    addHttp2StrField(stream->jsonData, "http_target", stream->lastTarget);
+                } else if (map) {
+                    // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
+                }
+
+                // add user-agent from request
+                if (stream->lastUserAgent[0]) {
+                    addHttp2StrField(stream->jsonData, "http_user_agent", stream->lastUserAgent);
+                } else if (map) {
+                    // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
+                }
+
+                if (isHttp2NameEnabled("http-resp")) {
+                    // send the response event
+                    event_t event = INT_EVENT("http-resp", proto->len, SET, NULL);
+                    event.data = stream->jsonData;
+                    cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
+                }
+
+                // if metrics are enabled...
+                if (mtcEnabled(g_mtc)) {
+                    // update HTTP metrics
+                    event_field_t fields[] = {
+                        STRFIELD("http_target", stream->lastTarget, 4, TRUE),
+                        NUMFIELD("http_status_code", stream->lastStatus, 1, TRUE),
+                        FIELDEND
+                    };
+                    event_t httpMetric = INT_EVENT(
+                            isServer ? "http_server_duration" : "http_client_duration",
+                            duration, DELTA_MS, fields);
+                    httpAggAddMetric(g_http_agg, &httpMetric, 
+                            (stream->lastReqLen > 0) ? stream->lastReqLen : -1,
+                            (stream->lastRespLen > 0) ? stream->lastRespLen : -1);
+                }
+            }
+
+            // otherwise, the message type is invalid
+            else {
+                scopeLogError("ERROR: HTTP/2 invalid msgType; %d", stream->msgType);
+                DBG(NULL);
+            }
+
+            // reset
+            stream->msgType = 0;
+            if (stream->jsonData) {
+                // jsonData was deleted for us down in cmdSendHttp()
+                //cJSON_Delete(stream->jsonData);
+                stream->jsonData = NULL;
+            }
+        }
+    } else {
+        scopeLogError("ERROR: HTTP/2 unexpected frame type; type=0x%02d", fType);
+        DBG(NULL);
+    }
+
+cleanup:
     destroyProto(proto);
 }
 
@@ -750,7 +1412,9 @@ doProtocolMetric(protocol_info *proto)
 {
     if (!proto) return;
     if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
-        doHttpHeader(proto);
+        doHttp1Header(proto);
+    } else if (proto->ptype == EVT_H2FRAME) {
+        doHttp2Frame(proto);
     } else if (proto->ptype == EVT_DETECT) {
         doDetection(proto);
     }
@@ -1518,6 +2182,11 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         if (cachedDurationNum >= 1) {
             // factor of 1000 converts ns to us.
             dur = fs->totalDuration.evt / ( 1000 * cachedDurationNum);
+            // with small value of totalDuration.evt we miss the fs.duration event
+            // TODO handle the precision with floating point in future
+            if (dur == 0ULL) {
+                dur = DEFAULT_MIN_DURATION_TIME;
+            }
         }
 
         // Don't report zeros.
@@ -2080,6 +2749,23 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
 
     case CONNECTION_DURATION:
     {
+        // Cleanup the per-channel state data for HTTP processing when the
+        // channel is closed. We're not checking the results here because it's
+        // possible, even likely, these operations will fail to find an entry
+        // for the channel. Instead of searching first and then deleting, just
+        // delete and let it fail if it's not there.
+        lstDelete(g_maplist, net->uid);        // HTTP/1 saved state
+        lstDelete(g_http2_channels, net->uid); // HTTP/2 saved state
+
+        // Most NET events get blocked on the data side when the watch/source
+        // is disabled but logic added in postNetState() will send this one
+        // when it occurs on an HTTP channel even when the events are disabled
+        // so we can cleanup on the reporting side. So, we still need to check
+        // the config here.
+        if (!ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
+            return;
+        }
+
         uint64_t dur = 0ULL;
         int cachedDurationNum = net->numDuration.evt; // avoid div by zero
         if (cachedDurationNum >= 1 ) {
@@ -2104,13 +2790,12 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             cmdSendEvent(g_ctl, &evt, net->uid, &g_proc);
             atomicSwapU64(&net->numDuration.evt, 0);
             atomicSwapU64(&net->totalDuration.evt, 0);
-         }
-
-        if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
-            doNetCloseEvent(net, dur);
         }
 
-        // Only report if enabled
+        // report the close
+        doNetCloseEvent(net, dur);
+
+        // Only report metric if enabled
         if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
             return;
         }

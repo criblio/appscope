@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	linq "github.com/ahmetb/go-linq/v3"
@@ -60,7 +63,18 @@ scope flows --out 124x3c   # Displays the outbound payload of that flow
 
 		// Open events.json file
 		file, err := os.Open(sessions[0].EventsPath)
-		util.CheckErrSprintf(err, "error opening events file: %v", err)
+
+		if err != nil && strings.Contains(err.Error(), "events.json: no such file or directory") {
+			if util.CheckFileExists(sessions[0].EventsDestPath) {
+				dest, _ := ioutil.ReadFile(sessions[0].EventsDestPath)
+				fmt.Printf("Cannot run flows: Events were output to %s\n", dest)
+				os.Exit(0)
+			}
+			promptClean(sessions[0:1])
+		} else {
+			util.CheckErrSprintf(err, "error opening events file: %v", err)
+		}
+
 		fm, err := flows.GetFlows(sessions[0].PayloadsPath, file)
 		util.CheckErrSprintf(err, "error getting flows: %v", err)
 		flowsList := fm.List()

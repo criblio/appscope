@@ -264,3 +264,57 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
 {
     return;
 }
+
+void
+scopeLogHex(cfg_log_level_t level, const void *data, size_t size, const char *format, ...)
+{
+    unsigned i; // current index into data
+
+    char hex[16*3 + 5]; // one line of hex dump (+5 for 2x 2-byte pads plus \0)
+    char txt[16 + 1];   // one line of ascii text (+1 for \0)
+
+    const unsigned char *pdata = (const unsigned char *)data; // pos in data
+    char *phex;                                               // pos in hex
+
+    char buf[4096];
+    va_list args;
+    va_start(args, format);
+    int buflen = vsnprintf(buf, sizeof(buf), format, args);
+    va_end(args);
+    if (buflen == -1) {
+        scopeLog(level, "%s (format too long!) (%ld bytes)", format, size);
+    } else {
+        scopeLog(level, "%s (%ld bytes)", buf, size);
+    }
+
+    if (!size) return;
+
+    hex[0] = '\0'; txt[0] = '\0'; phex = hex; // reset
+
+    for (i = 0; i < size; ++i) {
+        if (i && (i % 16) == 0) {
+            scopeLog(level, "  %04x: %s %s", i-16, hex, txt);
+            hex[0] = '\0'; txt[0] = '\0'; phex = hex; // reset
+        }
+
+        sprintf(phex, " %02x", pdata[i]); phex += 3;
+        if ((i % 8) == 7) {
+            *phex++ = ' '; *phex = '\0';
+        }
+
+        if ((pdata[i] < 0x20) || (pdata[i] > 0x7e))
+            txt[i % 16] = '.';
+        else
+            txt[i % 16] = pdata[i];
+        txt[(i % 16) + 1] = '\0';
+    }
+
+    while ((i % 16) != 0) {
+        *phex++ = ' '; *phex++ = ' '; *phex++ = ' '; *phex = '\0';
+        if ((i % 8) == 7) {
+            *phex++ = ' '; *phex = '\0';
+        }
+        i++;
+    }
+    scopeLog(level, "  %04x: %s %s", i-16, hex, txt);
+}

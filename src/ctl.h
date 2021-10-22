@@ -125,6 +125,7 @@ int              ctlReconnect(ctl_t *, which_transport_t);
 void             ctlTransportSet(ctl_t *, transport_t *, which_transport_t);
 cfg_transport_t  ctlTransportType(ctl_t *, which_transport_t);
 transport_t *    ctlTransport(ctl_t *, which_transport_t);
+evt_fmt_t *      ctlEvtGet(ctl_t *);
 void             ctlEvtSet(ctl_t *, evt_fmt_t *);
 
 // Accessor for performance

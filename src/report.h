@@ -64,8 +64,9 @@ typedef enum {
     EVT_ERR,
     EVT_DNS,
     EVT_PROTO,
-    EVT_HREQ,
-    EVT_HRES,
+    EVT_HREQ,    // HTTP/1.x request
+    EVT_HRES,    // HTTP/1.x response
+    EVT_H2FRAME, // HTTP/2 frame
     EVT_DETECT,
     EVT_PAYLOAD,
     TLSRX,

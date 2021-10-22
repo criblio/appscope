@@ -1,17 +1,10 @@
 #ifndef __WRAP_H__
 #define __WRAP_H__
 
-#define DEBUG 0
 #define EXPORT __attribute__((visibility("default")))
 #define EXPORTOFF  __attribute__((visibility("hidden")))
 #define EXPORTON __attribute__((visibility("default")))
 #define EXPORTWEAK __attribute__((weak))
-
-#ifdef __FUNCHOOK__
-#define VAREXPORT __attribute__((visibility("hidden")))
-#else
-#define VAREXPORT __attribute__((visibility("default")))
-#endif
 
 #define DYN_CONFIG_PREFIX "scope"
 #define MAXTRIES 10

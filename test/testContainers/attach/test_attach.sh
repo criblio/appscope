@@ -52,7 +52,7 @@ ldscope --attach `pidof top`
 sleep 1
 evaltest
 
-grep -q '"proc":"top"' $EVT_FILE || grep -q fs.close
+grep -q '"proc":"top"' $EVT_FILE || grep -q fs.open
 ERR+=$?
 
 grep -q '"proc":"top"' $EVT_FILE || grep -q fs.close

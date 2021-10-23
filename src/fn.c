@@ -134,7 +134,16 @@ getAddr(struct dl_phdr_info *info, size_t size, void *data)
 }
 
 void
-initFn(int isMusl)
+initFn_musl(void)
+{
+    // For use in GETADDR macro...
+    g_ismusl = TRUE;
+
+    initFn();
+}
+
+void
+initFn(void)
 {
     addresult_t ares;
 
@@ -144,9 +153,6 @@ initFn(int isMusl)
     g_fn.SSL_read = dlsym(RTLD_NEXT, "SSL_read");
     g_fn.SSL_write = dlsym(RTLD_NEXT, "SSL_write");
     g_fn.SSL_get_fd = dlsym(RTLD_NEXT, "SSL_get_fd");
-
-    // For use in GETADDR macro...
-    g_ismusl = isMusl;
 
     GETADDR(g_fn.vsyslog, "vsyslog");
     GETADDR(g_fn.fork, "fork");

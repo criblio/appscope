@@ -6,6 +6,7 @@ FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
 EVT_FILE="/opt/test-runner/logs/events.log"
+touch $EVT_FILE
 
 starttest(){
     CURRENT_TEST=$1
@@ -52,10 +53,10 @@ ldscope --attach `pidof top`
 sleep 1
 evaltest
 
-grep -q '"proc":"top"' $EVT_FILE || grep -q fs.open
+grep '"proc":"top"' $EVT_FILE | grep fs.open > /dev/null
 ERR+=$?
 
-grep -q '"proc":"top"' $EVT_FILE || grep -q fs.close
+grep '"proc":"top"' $EVT_FILE | grep fs.close > /dev/null
 ERR+=$?
 
 kill -9 `pidof top`

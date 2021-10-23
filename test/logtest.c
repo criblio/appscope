@@ -169,7 +169,7 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
-    initFn(FALSE);
+    initFn();
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(logCreateReturnsValidPtr),

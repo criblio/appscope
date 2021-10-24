@@ -6,7 +6,7 @@ title: Cool, but What Can I do with It?
 
 AppScope offers APM-like, black-box instrumentation of any unmodified Linux executable and application. You can use AppScope in single-user troubleshooting, or in a distributed production deployment, with little extra tooling infrastructure. Especially when paired with [Cribl LogStream](https://cribl.io/product/), AppScope can deliver just the data you need to your existing tools.
 
-### Instrument, Collect and Observe
+### Instrument, Collect, and Observe
 
 - Metrics about process and application performance.
 - Logs emitted from an application – with zero configuration – delivered to log files or to the console.
@@ -19,7 +19,7 @@ AppScope works with static or dynamic binaries, and can instrument anything runn
 
 AppScope collects and forwards StatsD-style metrics about running applications. With HTTP-level visibility, any web server or application can be instantly observable. AppScope's output allows you to use general-purpose tools instead of specialized APM tools and agents.
 
-### Basic Example Use Cases:
+### Basic Example Use Cases
 
 - Send HTTP events from Slack to a specified Splunk server.
 - Send metrics from nginx to a specified Datadog server.

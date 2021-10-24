@@ -22,6 +22,9 @@ For example:
 
 * TBD example 3
 
+
+TBD decision tree
+
 ### The Command Line Interface (CLI)
 
 The AppScope CLI (`scope`) [provides](/docs/cli-using) a quick and convenient way to explore capabilities, and to obtain insight into application behavior. No installation or configuration is required to get started exploring application behavior.
@@ -62,12 +65,3 @@ The library is loaded using a number of mechanisms, depending on the type of exe
 Child processes are created with the library present, if the library was present in the parent. In this manner, a single executable is able to start, daemonize, and create any number of children, all of which include interposed functions.
 
 You use an environment variable to load the library independent of any executable. Whether you use this option or the AppScope loader, you get full control of the data source, formats, and transports.
-
-
-## System-Level Design 
-
-![AppScope system-level design](./images/AppScope_SysLvlDesign.png)
-
-
-### Performance Overhead
-AppScope collects data with around 2% CPU overhead and **minimal** latency penalty. In most cases, the overhead is markedly less than 2%, which is significantly more efficient than legacy and current monitoring systems.

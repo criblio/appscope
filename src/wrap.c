@@ -1274,16 +1274,16 @@ initHook(int attachedFlag)
 #endif  // __GO__
     }
 
-    if (ebuf && ebuf->buf && (strstr(full_path, "ldscope") == NULL)) {
-        g_ismusl = is_musl(ebuf->buf);
-    }
-
-    // This is in support of a libuv specific extension to map an SSL ID to a fd.
-    // The symbol uv__read is not public. Therefore, we don't resolve it with dlsym.
-    // So, while we have the exec open, we look to see if we can dig it out.
     if (ebuf && ebuf->buf) {
+        if (strstr(full_path, "ldscope") == NULL) {
+            g_ismusl = is_musl(ebuf->buf);
+        }
+
+        // This is in support of a libuv specific extension to map an SSL ID to a fd.
+        // The symbol uv__read is not public. Therefore, we don't resolve it with dlsym.
+        // So, while we have the exec open, we look to see if we can dig it out.
         g_fn.uv__read = getSymbol(ebuf->buf, "uv__read");
-        scopeLog(CFG_LOG_ERROR, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
+        scopeLog(CFG_LOG_TRACE, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
     }
 
     if (full_path) free(full_path);

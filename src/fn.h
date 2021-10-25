@@ -265,5 +265,6 @@ typedef struct {
 extern interposed_funcs_t g_fn;
 
 void initFn(void);
+void initFn_musl(void);
 
 #endif // __FN_H__

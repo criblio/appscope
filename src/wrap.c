@@ -1275,9 +1275,6 @@ initHook(int attachedFlag)
     }
 
     if (ebuf && ebuf->buf) {
-        if (strstr(full_path, "ldscope") == NULL) {
-            g_ismusl = is_musl(ebuf->buf);
-        }
 
         // This is in support of a libuv specific extension to map an SSL ID to a fd.
         // The symbol uv__read is not public. Therefore, we don't resolve it with dlsym.
@@ -1476,8 +1473,37 @@ initEnv(int *attachedFlag)
 __attribute__((constructor)) void
 init(void)
 {
+
+    // Bootstrapping...  we need to know if we're in musl so we can
+    // call the right initFn function...
+    {
+        char *full_path = NULL;
+        elf_buf_t *ebuf = NULL;
+
+        // Needed for getElf()
+        g_fn.open = dlsym(RTLD_NEXT, "open");
+        if (!g_fn.open) g_fn.open = dlsym(RTLD_DEFAULT, "open");
+        g_fn.close = dlsym(RTLD_NEXT, "close");
+        if (!g_fn.close) g_fn.close = dlsym(RTLD_DEFAULT, "close");
+
+        g_ismusl =
+            ((osGetExePath(&full_path) != -1) &&
+            !strstr(full_path, "ldscope") &&
+            ((ebuf = getElf(full_path))) &&
+            !is_static(ebuf->buf) &&
+            !is_go(ebuf->buf) &&
+            is_musl(ebuf->buf));
+
+        if (full_path) free(full_path);
+        if (ebuf) freeElf(ebuf->buf, ebuf->len);
+    }
+
     // Use dlsym to get addresses for everything in g_fn
-    initFn();
+    if (g_ismusl) {
+        initFn_musl();
+    } else {
+        initFn();
+    }
 
 // TODO: will want to see if this is needed for bash built on ARM...
 #ifndef __aarch64__

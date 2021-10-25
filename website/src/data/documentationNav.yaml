@@ -5,6 +5,9 @@
 
     - name: How AppScope Works
       path: /docs/how-works
+
+    - name: Working With AppScope
+      path: /docs/working-with
       
     - name: Cool, but What Can I Do with It?
       path: /docs/what-do-with-scope
@@ -14,8 +17,8 @@
     - name: Requirements 
       path: /docs/requirements
 
-    - name: Installing
-      path: /docs/installing
+    - name: Getting
+      path: /docs/getting
 
     - name: Updating
       path: /docs/updating
@@ -28,20 +31,11 @@
     - name: Using the CLI
       path: /docs/quick-start-guide
 
-    - name: Scoping a Running Process
-      path: /docs/attach-running
-
-    - name: Using TLS for Secure Connections 
-      path: /docs/tls
-
-    - name: Loader and Library
-      path: /docs/loader-library
-
     - name: Using the Library
       path: /docs/library-using
 
-    - name: Examples and Use Cases
-      path: /docs/examples-use-cases
+    - name: Using TLS for Secure Connections 
+      path: /docs/tls
 
     - name: Integrating with LogStream
       path: /docs/logstream-integration

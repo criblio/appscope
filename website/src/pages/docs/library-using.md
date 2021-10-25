@@ -136,3 +136,41 @@ or:
 - `SCOPE_EVENT_DEST=tcp://host:port`
 or:
 - `SCOPE_CRIBL=tcp://host:port`
+
+
+### TBD Where does this fit Library
+
+To use the library for the first time in a given environment, complete this quick procedure:
+
+1. Download AppScope. 
+
+2. Choose a directory in your environment that you want to serve as the AppScope home directory (`SCOPE_HOME`), i.e., the directory from which AppScope runs.
+
+3. Extract (`scope extract`) the contents of the AppScope binary into the AppScope home directory.
+
+For example, you could create an AppScope home directory called `assets`:
+
+```
+# mkdir assets && scope extract assets
+Successfully extracted to assets.
+
+
+# ll assets/
+total 3404
+drwxr-xr-x 2 root root    4096 Jan 31 22:32 ./
+drwxr-xr-x 1 root root    4096 Jan 31 22:32 ../
+-rwxr-xr-x 1 root root 1806600 Jan 31 22:32 ldscope*
+-rwxr-xr-x 1 root root 1654608 Jan 31 22:32 libscope.so*
+-rw-r--r-- 1 root root    4783 Jan 31 22:32 scope.yml
+
+```
+
+Now you are ready to configure AppScope to instrument any application and output data to any existing tool via simple TCP protocols.
+
+Depending on your use case and preferred way of working, this usually entails editing `scope.yml`, and then either running `ldscope` or setting environment variables while invoking the library.
+
+How the library is loaded depends on the type of executable. A dynamic loader can preload the library (where supported), while AppScope can load static executables. Regardless of how the library is loaded, you get full control of the data source, formats, and transports.
+
+The following examples provide an overview of how to use the library.
+
+Let's go on to [Using the Library](/docs/library-using).

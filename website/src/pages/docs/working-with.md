@@ -16,11 +16,11 @@ What matters most is whether the command you want to scope can or should be chan
 
 For example:
 
-* If you are developing some code, and you want to see how its behavior changes as you iterate, use the CLI.
+* You are developing code, and you want to see how its behavior changes as you iterate. **Use the CLI.**
 
-* If you are running curl commands against a website, and want to see what changes when you switch between HTTP/1.1 and HTTP/2.2 and/or HTTP and HTTPS, use the CLI. 
+* You are running curl commands against a website, and want to see what changes when you switch between HTTP/1.1 and HTTP/2.2 and/or HTTP and HTTPS. **Use the CLI.** 
 
-* If you are running Nginx in a specific, unchanging way dictated by the requirements of your organization, and you want to see metrics, use the library.
+* You are running Nginx in a specific, unchanging way dictated by the requirements of your organization, and you want to see metrics. **Use the library.**
 
 
 Here's a decision tree to help you determine whether to use the CLI or the library.

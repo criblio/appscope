@@ -47,7 +47,6 @@ fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
 static search_t* g_http_redirect = NULL;
-
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
 
@@ -1156,7 +1155,7 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
         if (rc != PCRE2_ERROR_NOMATCH)
         {
             DBG(NULL);
-            scopeLog(CFG_LOG_DEBUG, "fd:%d doProtocol: TLS regex failed", sockfd);
+            scopeLog(CFG_LOG_DEBUG, "%s: fd:%d TLS regex failed", __FUNCTION__, sockfd);
         }
     }
     pcre2_match_data_free(match_data);

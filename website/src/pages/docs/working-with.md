@@ -34,10 +34,10 @@ AppScope's ease of use stems from its flexible set of controls:
 
 * The AppScope library provides an extensive set of environment variables which control settings like TBD foo and bar.
 
-* Although you cannot set environment variables in the CLI, the CLI does provide flags which override or substitute for certain environment variables. 
+* Although you cannot set environment variables in the CLI, the CLI provides flags which override or substitute for certain environment variables. 
 
 * AppScope's configuration file, `scope.yml`, can be invoked from either the CLI or the library.
 
 * Finally, AppScope provides the `ldscope` utility, which offers a more convenient way to work with the library in some situations.
 
-Let's see how to use these methods in their respective contexts, namely CLI and library usage.
+We'll see how to use these methods in their respective contexts, namely [CLI](/docs/cli-using) and [library](/docs/library-using) usage.

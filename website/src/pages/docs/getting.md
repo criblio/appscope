@@ -45,5 +45,5 @@ That's it!
 Now you are ready to explore the CLI:
 
 - Run `scope --help` or `scope -h` to view CLI options.
-- Try some basic CLI commands in [Using the CLI](/docs/quick-start-guide).
+- Try some basic CLI commands in [Using the CLI](/docs/cli-using).
 - See the complete [CLI Reference](/docs/cli-reference).

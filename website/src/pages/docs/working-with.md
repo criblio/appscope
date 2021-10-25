@@ -25,7 +25,7 @@ For example:
 
 Here's a decision tree to help you determine whether to use the CLI or the library.
 
-TBD insert graphic
+![CLI vs. Library Decision Tree](./images/decision-tree.png)
 
 
 ### Env Vars, Flags, `ldscope`, and the Config File

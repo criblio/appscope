@@ -8,7 +8,7 @@
 
 #define DYN_CONFIG_PREFIX "scope"
 #define MAXTRIES 10
-#define CONN_LOG_INTERVAL 10
+#define CONN_LOG_INTERVAL 60
 
 typedef struct nss_list_t {
     uint64_t id;

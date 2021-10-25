@@ -12,15 +12,15 @@ AppScope offers two ways to work:
 
 This is a guiding principle, not a strict rule. Sometimes you may prefer to plan out a CLI session, or, conversely, explore using the library.
 
-What matters most is whether the command you want to scope can be changed while it is running. If it can, try the CLI; if not, go for the library.
+What matters most is whether the command you want to scope can or should be changed or varied. If it can, try the CLI; if not, go for the library.
 
 For example:
 
-* TBD example 1
+* If you are developing some code, and you want to see how its behavior changes as you iterate, use the CLI.
 
-* TBD example 2
+* If you are running curl commands against a website, and want to see what changes when you switch between HTTP/1.1 and HTTP/2.2 and/or HTTP and HTTPS, use the CLI. 
 
-* TBD example 3
+* If you are running Nginx in a specific, unchanging way dictated by the requirements of your organization, and you want to see metrics, use the library.
 
 
 Here's a decision tree to help you determine whether to use the CLI or the library.
@@ -28,16 +28,14 @@ Here's a decision tree to help you determine whether to use the CLI or the libra
 ![CLI vs. Library Decision Tree](./images/decision-tree.png)
 
 
-### Env Vars, Flags, `ldscope`, and the Config File
+### The Config File, Env Vars, Flags, and `ldscope`
 
 AppScope's ease of use stems from its flexible set of controls:
 
-* The AppScope library provides an extensive set of environment variables which control settings like TBD foo and bar.
-
-* Although you cannot set environment variables in the CLI, the CLI provides flags which override or substitute for certain environment variables. 
-
 * AppScope's configuration file, `scope.yml`, can be invoked from either the CLI or the library.
 
-* Finally, AppScope provides the `ldscope` utility, which offers a more convenient way to work with the library in some situations.
+* The AppScope library provides an extensive set of environment variables which control settings like metric verbosity and event destinations. Environment variables override config file settings.
+
+* Finally, AppScope provides the `ldscope` utility, whose uses include loading the AppScope library into Go executables.
 
 We'll see how to use these methods in their respective contexts, namely [CLI](/docs/cli-using) and [library](/docs/library-using) usage.

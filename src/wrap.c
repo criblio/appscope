@@ -1366,6 +1366,7 @@ initHook(int attachedFlag)
         }
 
         // Used for mapping SSL IDs to fds with libuv. Must be funchooked since it's internal to libuv
+        if (!g_fn.uv_fileno) g_fn.uv_fileno = load_func(NULL, "uv_fileno");
         if (g_fn.uv__read) rc = funchook_prepare(funchook, (void**)&g_fn.uv__read, uv__read_hook);
 
         // libmusl
@@ -4947,7 +4948,7 @@ __fdelt_chk(long int fdelt)
 static void
 uv__read_hook(void *stream)
 {
-    if (g_fn.uv_fileno) g_fn.uv_fileno(stream, &g_ssl_fd);
+    if (SYMBOL_LOADED(uv_fileno)) g_fn.uv_fileno(stream, &g_ssl_fd);
     //scopeLog(CFG_LOG_TRACE, "%s: fd %d", __FUNCTION__, g_ssl_fd);
     if (g_fn.uv__read) return g_fn.uv__read(stream);
 }

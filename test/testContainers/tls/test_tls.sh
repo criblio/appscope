@@ -140,10 +140,10 @@ starttest "node.js"
 ldscope node /opt/test-runner/bin/nodehttp.ts > /dev/null
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http-req $EVT_FILE | grep net_peer_ip | grep net_peer_port | grep net_host_ip | grep net_host_port > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http-resp $EVT_FILE | grep net_peer_ip | grep net_peer_port | grep net_host_ip | grep net_host_port > /dev/null
 ERR+=$?
 
 evalPayload

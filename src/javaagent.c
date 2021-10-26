@@ -608,6 +608,34 @@ Java_com_sun_net_ssl_internal_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, 
 }
 
 static jint
+RetransformLoadedClasses(jvmtiEnv *env, JavaVM *jvm) {
+    jint class_count = 0;
+    jclass *classes;
+
+    jvmtiError error = (*env)->GetLoadedClasses(env, &class_count, &classes);
+    if (error != JVMTI_ERROR_NONE) {
+        logJvmtiError(env, error, "GetLoadedClasses() failed");
+        return JNI_ERR;
+    }
+
+    //iterate over loaded classes
+    for (jint i = 0; i < class_count; ++i) {
+        char *sig = NULL;
+        error = (*env)->GetClassSignature(env, classes[i], &sig, NULL);
+        if (error != JVMTI_ERROR_NONE) {
+            (*env)->Deallocate(env, (unsigned char*)classes);
+            logJvmtiError(env, error, "GetClassSignature() failed");
+            return JNI_ERR;
+        }
+        (*env)->Deallocate(env, (unsigned char*)sig);
+    }
+
+    (*env)->Deallocate(env, (unsigned char*)classes);
+
+    return JNI_OK;
+}
+
+static jint
 initAgent(JavaVM *jvm, int is_attaching)
 {
     jvmtiError error;
@@ -623,6 +651,21 @@ initAgent(JavaVM *jvm, int is_attaching)
     memset(&capabilities,0, sizeof(capabilities));
 
     capabilities.can_generate_all_class_hook_events = 1;
+
+    if (is_attaching == TRUE) {
+        jvmtiCapabilities initialCapabilities;
+        error = (*env)->GetPotentialCapabilities(env, &initialCapabilities);
+	    if (error != JVMTI_ERROR_NONE) {
+            logJvmtiError(env, error, "GetPotentialCapabilities");
+            return JNI_ERR;
+        }
+        if (initialCapabilities.can_retransform_classes != 1) {
+            logJvmtiError(env, error, "Missing retransform capability");
+            return JNI_ERR;
+        }
+        capabilities.can_retransform_classes = 1;
+    }
+
     error = (*env)->AddCapabilities(env, &capabilities);
     if (error != JVMTI_ERROR_NONE) {
         logJvmtiError(env, error, "AddCapabilities");
@@ -644,7 +687,7 @@ initAgent(JavaVM *jvm, int is_attaching)
         return JNI_ERR;
     }
 
-    return JNI_OK;
+    return (is_attaching == TRUE) ? RetransformLoadedClasses(env, jvm) : JNI_OK;
 }
 
 JNIEXPORT jint JNICALL 

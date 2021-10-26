@@ -242,6 +242,37 @@ initSSLEngineImplGlobals(JNIEnv *jni)
     }
 }
 
+static jclass defineCopyClass(jvmtiEnv *jvmti_env, JNIEnv* jni, jobject loader, jint class_data_len, const unsigned char* class_data, const char* class_name_base)
+{
+    int originalNameIndex;
+    jclass localClassCopy = NULL;
+
+    unsigned char *copy_class_data = (unsigned char *)malloc(class_data_len);
+    memcpy(copy_class_data, class_data, class_data_len);
+    java_class_t *copyClassInfo = javaReadClass(copy_class_data);
+    if (!copyClassInfo) {
+        scopeLog(CFG_LOG_ERROR, "ERROR: Cannot read class %s", class_name_base);
+        return localClassCopy;
+    }
+    originalNameIndex = javaFindClassNameIndex(copyClassInfo, class_name_base);
+    javaModifyUtf8String(copyClassInfo, originalNameIndex);
+    char *class_name_copy = javaGetUtf8String(copyClassInfo, originalNameIndex);
+
+    unsigned char *dest_copy;
+    (*jvmti_env)->Allocate(jvmti_env, copyClassInfo->length, &dest_copy);
+    javaWriteClass(dest_copy, copyClassInfo);
+
+    localClassCopy = (*jni)->DefineClass(jni, class_name_copy, loader, (const signed char *)dest_copy, copyClassInfo->length);
+    if (!localClassCopy) {
+        scopeLog(CFG_LOG_ERROR, "ERROR: Cannot define copy of class %s", class_name_copy);
+    }
+
+    free(class_name_copy);
+    javaDestroy(&copyClassInfo);
+    free(copy_class_data);
+    return localClassCopy;
+}
+
 void JNICALL 
 ClassFileLoadHook(jvmtiEnv *jvmti_env,
     JNIEnv* jni,

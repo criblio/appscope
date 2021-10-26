@@ -65,7 +65,7 @@ This example requires some preparation, as explained in [Scoping a Running Proce
 scope run -u cloud.yml -- echo foo
 ```
 
-This example requires some preparation, as explained in the Configuration File [page](/docs/config-file).
+Why create a custom configuration file? One popular reason is to change the destination to which AppScope sends captured data to someplace other than the local filesystem (the default). To learn about the possibilities, read the comments in the default [Configuration File](/docs/config-file).
 
 <span id="scope-running"></span>
 
@@ -158,7 +158,7 @@ fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60
 - Use the `-v` flag to increase verbosity of the metrics displayed. Settomg verbosity to 7 disables aggregation of filesystem stat and network connect metrics:
 
 ```
-`scope metrics -v 7`
+scope metrics -v 7
 
 ```
 

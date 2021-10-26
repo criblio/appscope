@@ -12,13 +12,13 @@
     - name: Cool, but What Can I Do with It?
       path: /docs/what-do-with-scope
 
-- name: Installing AppScope
+- name: Getting AppScope
   child: 
     - name: Requirements 
       path: /docs/requirements
 
-    - name: Getting
-      path: /docs/getting
+    - name: Downloading
+      path: /docs/downloading
 
     - name: Updating
       path: /docs/updating

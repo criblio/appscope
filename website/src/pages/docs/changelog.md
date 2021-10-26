@@ -14,7 +14,7 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 - **Improvement**: [#572](https://github.com/criblio/appscope/issues/572) The CLI now supports invoking a configuration file, using the syntax `scope run -u scope.yml -- foo` where `scope.yml` is the configuration file and `foo` is the command being scoped.
 
-- **Improvement**: [#241](https://github.com/criblio/appscope/issues/241),[#271](https://github.com/criblio/appscope/issues/271),[#379](https://github.com/criblio/appscope/issues/379) The ARM64 limitations described in [#241](https://github.com/criblio/appscope/issues/241) have now been resolved and no longer apply.
+- **Improvement**: [#241](https://github.com/criblio/appscope/issues/241),[#271](https://github.com/criblio/appscope/issues/271),[#379](https://github.com/criblio/appscope/issues/379) The ARM64 limitations described in [#241](https://github.com/criblio/appscope/issues/241) are resolved and no longer apply, except that Go executables remain unsupported on ARM64.
 
 
 - **Fix**: [#598](https://github.com/criblio/appscope/issues/598) Attempting to scope an executable that is Go version 1.17 or newer no longer causes AppScope to crash. AppScope does not support Go 1.17 yet, but now recognizes these executables and displays an informative message. 

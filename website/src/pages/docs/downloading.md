@@ -1,8 +1,8 @@
 ---
-title: Getting AppScope
+title: Downloading AppScope
 ---
 
-## Getting AppScope
+## Downloading AppScope
 
 Download AppScope, then explore its CLI. Getting started is that easy.
 

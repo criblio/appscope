@@ -50,16 +50,33 @@ typedef struct {
 static java_global_t g_java = {0};
 
 #define SOCKET_CHANNEL_CLASS ("sun/nio/ch/SocketChannelImpl")
+#define SOCKET_CHANNEL_CLASS_L ("Lsun/nio/ch/SocketChannelImpl;")
+static jclass socketChannelClassCopy = NULL;
 #define SSL_ENGINE_CLASS ("sun/security/ssl/SSLEngineImpl")
+#define SSL_ENGINE_CLASS_L ("Lsun/security/ssl/SSLEngineImpl;")
 #define SSL_ENGINE_ORACLE_CLASS ("com/sun/net/ssl/internal/ssl/SSLEngineImpl")
+#define SSL_ENGINE_ORACLE_CLASS_L ("Lcom/sun/net/ssl/internal/ssl/SSLEngineImpl;")
+static jclass sslEngineImplClassCopy = NULL;
 #define APP_INPUT_STREAM_CLASS ("sun/security/ssl/AppInputStream")
+#define APP_INPUT_STREAM_CLASS_L ("Lsun/security/ssl/AppInputStream;")
 #define APP_INPUT_STREAM_ORACLE_CLASS ("com/sun/net/ssl/internal/ssl/AppInputStream")
+#define APP_INPUT_STREAM_ORACLE_CLASS_L ("Lcom/sun/net/ssl/internal/ssl/AppInputStream;")
 #define APP_INPUT_STREAM_JDK11_CLASS ("sun/security/ssl/SSLSocketImpl$AppInputStream")
+#define APP_INPUT_STREAM_JDK11_CLASS_L ("Lsun/security/ssl/SSLSocketImpl$AppInputStream;")
+static jclass appInputStreamClassCopy = NULL;
 #define APP_OUTPUT_STREAM_CLASS ("sun/security/ssl/AppOutputStream")
+#define APP_OUTPUT_STREAM_CLASS_L ("Lsun/security/ssl/AppOutputStream;")
 #define APP_OUTPUT_STREAM_ORACLE_CLASS ("com/sun/net/ssl/internal/ssl/AppOutputStream")
+#define APP_OUTPUT_STREAM_ORACLE_CLASS_L ("Lcom/sun/net/ssl/internal/ssl/AppOutputStream;")
 #define APP_OUTPUT_STREAM_JDK11_CLASS ("sun/security/ssl/SSLSocketImpl$AppOutputStream")
+#define APP_OUTPUT_STREAM_JDK11_CLASS_L ("Lsun/security/ssl/SSLSocketImpl$AppOutputStream;")
+static jclass appOutputStreamClassCopy = NULL;
 #define DIRECT_BYTE_BUFFER_CLASS ("java/nio/DirectByteBuffer")
+#define DIRECT_BYTE_BUFFER_CLASS_L ("Ljava/nio/DirectByteBuffer;")
 #define DIRECT_BYTE_BUFFER_R_CLASS ("java/nio/DirectByteBufferR")
+#define DIRECT_BYTE_BUFFER_R_CLASS_L ("Ljava/nio/DirectByteBufferR;")
+
+static list_t *g_fd_HashTable = NULL;
 
 static void 
 logJvmtiError(jvmtiEnv *jvmti, jvmtiError errnum, const char *str) 
@@ -80,10 +97,12 @@ static int
 getFdFromSocket(JNIEnv *jni, jobject socket)
 {
     int fd = -1;
+    scopeLog(CFG_LOG_ERROR, "getFdFromSocket start");
     jobject socketImpl = (*jni)->CallObjectMethod(jni, socket, g_java.mid_Socket_getImp);
     jobject fdObj = (*jni)->CallObjectMethod(jni, socketImpl, g_java.mid_SocketImpl_getFileDescriptor);
     if (fdObj) {
         fd = (*jni)->GetIntField(jni, fdObj, g_java.fid_FileDescriptor_fd);
+        scopeLog(CFG_LOG_ERROR, "getFdFromSocket GetIntField fd %d", fd);
     }
     return fd;
 }
@@ -131,7 +150,11 @@ initAppOutputStreamGlobals(JNIEnv *jni)
         // JDK 11
         appOutputStreamClass = (*jni)->FindClass(jni, APP_OUTPUT_STREAM_JDK11_CLASS);
     }
-    g_java.mid_AppOutputStream___write = (*jni)->GetMethodID(jni, appOutputStreamClass, "__write", "([BII)V");
+    if (appOutputStreamClassCopy) {
+      g_java.mid_AppOutputStream___write = (*jni)->GetMethodID(jni, appOutputStreamClassCopy, "write", "([BII)V");
+    } else {
+      g_java.mid_AppOutputStream___write = (*jni)->GetMethodID(jni, appOutputStreamClass, "__write", "([BII)V");
+    }
     /*
     We are trying to find a private field of type SSLSocketImpl which holds a reference to the socket object.
     - in JDK 6-8 the field is called "c"
@@ -171,7 +194,11 @@ initAppInputStreamGlobals(JNIEnv *jni)
         // JDK 11
         appInputStreamClass  = (*jni)->FindClass(jni, APP_INPUT_STREAM_JDK11_CLASS);
     }
-    g_java.mid_AppInputStream___read = (*jni)->GetMethodID(jni, appInputStreamClass, "__read", "([BII)I");
+    if (appInputStreamClassCopy) {
+        g_java.mid_AppInputStream___read = (*jni)->GetMethodID(jni, appInputStreamClassCopy, "read", "([BII)I");
+    } else {
+        g_java.mid_AppInputStream___read = (*jni)->GetMethodID(jni, appInputStreamClass, "__read", "([BII)I");
+    }
     /*
     We are trying to find a private field of type SSLSocketImpl which holds a reference to the socket object.
     - in JDK 6-8 the field is called "c"
@@ -208,16 +235,26 @@ initSSLEngineImplGlobals(JNIEnv *jni)
         sslEngineImplClass  = (*jni)->FindClass(jni, SSL_ENGINE_ORACLE_CLASS);
         clearJniException(jni);
     }
-    g_java.mid_SSLEngineImpl___unwrap    = (*jni)->GetMethodID(jni, sslEngineImplClass, "__unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
-    g_java.mid_SSLEngineImpl___wrap      = (*jni)->GetMethodID(jni, sslEngineImplClass, "__wrap", "([Ljava/nio/ByteBuffer;IILjava/nio/ByteBuffer;)Ljavax/net/ssl/SSLEngineResult;");
+    if (sslEngineImplClassCopy) {
+        g_java.mid_SSLEngineImpl___unwrap    = (*jni)->GetMethodID(jni, sslEngineImplClassCopy, "unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
+        g_java.mid_SSLEngineImpl___wrap      = (*jni)->GetMethodID(jni, sslEngineImplClassCopy, "wrap", "([Ljava/nio/ByteBuffer;IILjava/nio/ByteBuffer;)Ljavax/net/ssl/SSLEngineResult;");
+    } else {
+        g_java.mid_SSLEngineImpl___unwrap    = (*jni)->GetMethodID(jni, sslEngineImplClass, "__unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
+        g_java.mid_SSLEngineImpl___wrap      = (*jni)->GetMethodID(jni, sslEngineImplClass, "__wrap", "([Ljava/nio/ByteBuffer;IILjava/nio/ByteBuffer;)Ljavax/net/ssl/SSLEngineResult;");
+    }
     g_java.mid_SSLEngineImpl_getSession  = (*jni)->GetMethodID(jni, sslEngineImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
     jclass sslEngineResultClass    = (*jni)->FindClass(jni, "javax/net/ssl/SSLEngineResult");
     g_java.mid_SSLEngineResult_bytesConsumed = (*jni)->GetMethodID(jni, sslEngineResultClass, "bytesConsumed", "()I");
     g_java.mid_SSLEngineResult_bytesProduced = (*jni)->GetMethodID(jni, sslEngineResultClass, "bytesProduced", "()I");
 
     jclass socketChannelClass = (*jni)->FindClass(jni, SOCKET_CHANNEL_CLASS);
-    g_java.mid_SocketChannelImpl___read  = (*jni)->GetMethodID(jni, socketChannelClass, "__read", "(Ljava/nio/ByteBuffer;)I");
-    g_java.mid_SocketChannelImpl___write = (*jni)->GetMethodID(jni, socketChannelClass, "__write", "(Ljava/nio/ByteBuffer;)I");
+    if (socketChannelClassCopy) {
+        g_java.mid_SocketChannelImpl___read  = (*jni)->GetMethodID(jni, socketChannelClassCopy, "read", "(Ljava/nio/ByteBuffer;)I");
+        g_java.mid_SocketChannelImpl___write = (*jni)->GetMethodID(jni, socketChannelClassCopy, "write", "(Ljava/nio/ByteBuffer;)I");
+    } else {
+        g_java.mid_SocketChannelImpl___read  = (*jni)->GetMethodID(jni, socketChannelClass, "__read", "(Ljava/nio/ByteBuffer;)I");
+        g_java.mid_SocketChannelImpl___write = (*jni)->GetMethodID(jni, socketChannelClass, "__write", "(Ljava/nio/ByteBuffer;)I");
+    }
     g_java.mid_SocketChannelImpl_getRemoteAddress  = (*jni)->GetMethodID(jni, socketChannelClass, "getRemoteAddress", "()Ljava/net/SocketAddress;");
     if (g_java.mid_SocketChannelImpl_getRemoteAddress == NULL) {
         // Open JDK 6
@@ -232,13 +269,17 @@ initSSLEngineImplGlobals(JNIEnv *jni)
     g_java.mid_ByteBuffer_position = (*jni)->GetMethodID(jni, bufferClass, "position", "()I");
     g_java.mid_ByteBuffer_limit    = (*jni)->GetMethodID(jni, bufferClass, "limit", "()I");
 
-    jclass dbbClass                = (*jni)->FindClass(jni, DIRECT_BYTE_BUFFER_CLASS);
-    g_java.fid_ByteBuffer___fd     = (*jni)->GetFieldID(jni, dbbClass, "__fd", "I");
-    if (g_java.fid_ByteBuffer___fd == NULL) {
-        // Open JDK 9
-        dbbClass                   = (*jni)->FindClass(jni, DIRECT_BYTE_BUFFER_R_CLASS);
-        g_java.fid_ByteBuffer___fd = (*jni)->GetFieldID(jni, dbbClass, "__fd", "I");
-        clearJniException(jni);
+    if (!g_fd_HashTable) {
+        jclass dbbClass                = (*jni)->FindClass(jni, DIRECT_BYTE_BUFFER_CLASS);
+        g_java.fid_ByteBuffer___fd     = (*jni)->GetFieldID(jni, dbbClass, "__fd", "I");
+        scopeLog(CFG_LOG_ERROR, "initSSLEngineImplGlobals set g_java.fid_ByteBuffer___fd");
+        if (g_java.fid_ByteBuffer___fd == NULL) {
+            // Open JDK 9
+            dbbClass                   = (*jni)->FindClass(jni, DIRECT_BYTE_BUFFER_R_CLASS);
+            g_java.fid_ByteBuffer___fd = (*jni)->GetFieldID(jni, dbbClass, "__fd", "I");
+            scopeLog(CFG_LOG_ERROR, "initSSLEngineImplGlobals set g_java.fid_ByteBuffer___fd");
+            clearJniException(jni);
+        }
     }
 }
 
@@ -295,13 +336,24 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
 
         java_class_t *classInfo = javaReadClass(class_data);
 
+        if (class_being_redefined) {
+            appOutputStreamClassCopy = defineCopyClass(jvmti_env, jni, loader, class_data_len, class_data, name);
+            if (!appOutputStreamClassCopy) {
+                javaDestroy(&classInfo);
+                return;
+            }
+        }
+
         int methodIndex = javaFindMethodIndex(classInfo, "write", "([BII)V");
         if (methodIndex == -1) {
             javaDestroy(&classInfo);
             scopeLog(CFG_LOG_ERROR, "ERROR: 'write' method not found in AppOutputStream class\n");
             return;
         }
-        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__write");
+
+        if (!class_being_redefined) {
+            javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__write");
+        }
         javaConvertMethodToNative(classInfo, methodIndex);
 
         unsigned char *dest;
@@ -320,6 +372,13 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for AppInputStream class...");
 
         java_class_t *classInfo = javaReadClass(class_data);
+        if (class_being_redefined) {
+            appInputStreamClassCopy = defineCopyClass(jvmti_env, jni, loader, class_data_len, class_data, name);
+            if (!appInputStreamClassCopy) {
+                javaDestroy(&classInfo);
+                return;
+            }
+        }
 
         int methodIndex = javaFindMethodIndex(classInfo, "read", "([BII)I");
         if (methodIndex == -1) {
@@ -327,7 +386,9 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
             scopeLog(CFG_LOG_ERROR, "ERROR: 'read' method not found in AppInputStream class\n");
             return;
         }
-        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__read");
+        if (!class_being_redefined) {
+            javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__read");
+        }
         javaConvertMethodToNative(classInfo, methodIndex);
 
         unsigned char *dest;
@@ -346,13 +407,24 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
 
         java_class_t *classInfo = javaReadClass(class_data);
 
+        if (class_being_redefined) {
+            sslEngineImplClassCopy = defineCopyClass(jvmti_env, jni, loader, class_data_len, class_data, name);
+            if (!sslEngineImplClassCopy) {
+                javaDestroy(&classInfo);
+                return;
+            }
+        }
+
         int methodIndex = javaFindMethodIndex(classInfo, "wrap", "([Ljava/nio/ByteBuffer;IILjava/nio/ByteBuffer;)Ljavax/net/ssl/SSLEngineResult;");
         if (methodIndex == -1) {
             javaDestroy(&classInfo);
             scopeLog(CFG_LOG_ERROR, "ERROR: 'wrap' method not found in SSLEngineImpl class\n");
             return;
         }
-        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__wrap");
+
+        if (!class_being_redefined) {
+            javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__wrap");
+        }
         javaConvertMethodToNative(classInfo, methodIndex);
 
         methodIndex = javaFindMethodIndex(classInfo, "unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
@@ -361,7 +433,10 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
             scopeLog(CFG_LOG_ERROR, "ERROR: 'unwrap' method not found in SSLEngineImpl class\n");
             return;
         }
-        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__unwrap");
+
+        if (!class_being_redefined) {
+            javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__unwrap");
+        }
         javaConvertMethodToNative(classInfo, methodIndex);
         
         unsigned char *dest;
@@ -378,13 +453,23 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for SocketChannelImpl class...");
         java_class_t *classInfo = javaReadClass(class_data);
 
+        if (class_being_redefined) {
+            socketChannelClassCopy = defineCopyClass(jvmti_env, jni, loader, class_data_len, class_data, name);
+            if (!socketChannelClassCopy) {
+                javaDestroy(&classInfo);
+                return;
+            }
+        }
+
         int methodIndex = javaFindMethodIndex(classInfo, "read", "(Ljava/nio/ByteBuffer;)I");
         if (methodIndex == -1) {
             javaDestroy(&classInfo);
             scopeLog(CFG_LOG_ERROR, "ERROR: 'read' method not found in SocketChannelImpl class\n");
             return;
         }
-        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__read");
+        if (!class_being_redefined) {
+            javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__read");
+        }
         javaConvertMethodToNative(classInfo, methodIndex);
 
         methodIndex = javaFindMethodIndex(classInfo, "write", "(Ljava/nio/ByteBuffer;)I");
@@ -393,7 +478,9 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
             scopeLog(CFG_LOG_ERROR, "ERROR: 'write' method not found in SocketChannelImpl class\n");
             return;
         }
-        javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__write");
+        if (!class_being_redefined) {
+            javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__write");
+        }
         javaConvertMethodToNative(classInfo, methodIndex);
 
         unsigned char *dest;
@@ -411,8 +498,10 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for java.nio.DirectByteBuffer class...");
         java_class_t *classInfo = javaReadClass(class_data);
 
-        // add a private field which will hold the fd used to read/write data for that buffer
-        javaAddField(classInfo, "__fd", "I", ACC_PRIVATE);
+        if (!class_being_redefined) {
+            // add a private field which will hold the fd used to read/write data for that buffer
+            javaAddField(classInfo, "__fd", "I", ACC_PRIVATE);
+        }
 
         unsigned char *dest;
         (*jvmti_env)->Allocate(jvmti_env, classInfo->length, &dest);
@@ -439,7 +528,17 @@ saveSocketChannel(JNIEnv *jni, jobject socketChannel, jobject buf)
 {
     jint fd = (*jni)->CallIntMethod(jni, socketChannel, g_java.mid_SocketChannelImpl_getFDVal);
     //store the file descriptor in the internal byte buffer's field
-    (*jni)->SetIntField(jni, buf, g_java.fid_ByteBuffer___fd, fd);
+    if (!g_fd_HashTable) {
+        (*jni)->SetIntField(jni, buf, g_java.fid_ByteBuffer___fd, fd);
+    } else {
+        lstInsert(g_fd_HashTable, (list_key_t)buf, &fd);
+    }
+}
+
+static jint
+getFdValFromByteBuffer(JNIEnv *jni, jobject obj) {
+    jint fd = (uint64_t) (*jni)->GetIntField(jni, obj, g_java.fid_ByteBuffer___fd);
+    return fd;
 }
 
 JNIEXPORT jint JNICALL
@@ -461,7 +560,7 @@ Java_sun_nio_ch_SocketChannelImpl_write(JNIEnv *jni, jobject obj, jobject buf)
     initSSLEngineImplGlobals(jni);
     
     saveSocketChannel(jni, obj, buf);
-    
+
     jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_SocketChannelImpl___write, buf);
     return res;
 }
@@ -474,7 +573,7 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
 
-    jint fdVal = (uint64_t) (*jni)->GetIntField(jni, src, g_java.fid_ByteBuffer___fd);
+    jint fdVal = getFdValFromByteBuffer(jni, src);
     if (fdVal) {
         fd = fdVal;
     }
@@ -511,8 +610,7 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
 
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
-
-    jint fdVal = (uint64_t) (*jni)->GetIntField(jni, dst, g_java.fid_ByteBuffer___fd);
+    jint fdVal = getFdValFromByteBuffer(jni, dst);
     if (fdVal) {
         fd = fdVal;
     }
@@ -649,6 +747,7 @@ RetransformLoadedClasses(jvmtiEnv *env, JavaVM *jvm) {
         return JNI_ERR;
     }
 
+    g_fd_HashTable = lstCreate(NULL);
     //iterate over loaded classes
     for (jint i = 0; i < class_count; ++i) {
         char *sig = NULL;
@@ -656,8 +755,33 @@ RetransformLoadedClasses(jvmtiEnv *env, JavaVM *jvm) {
         if (error != JVMTI_ERROR_NONE) {
             (*env)->Deallocate(env, (unsigned char*)classes);
             logJvmtiError(env, error, "GetClassSignature() failed");
+            lstDestroy(&g_fd_HashTable);
             return JNI_ERR;
         }
+        if (strcmp(sig, SOCKET_CHANNEL_CLASS_L) == 0 ||
+            strcmp(sig, SSL_ENGINE_CLASS_L) == 0 ||
+            strcmp(sig, SSL_ENGINE_ORACLE_CLASS_L) == 0 ||
+            strcmp(sig, APP_INPUT_STREAM_CLASS_L) == 0 ||
+            strcmp(sig, APP_INPUT_STREAM_ORACLE_CLASS_L) == 0 ||
+            strcmp(sig, APP_INPUT_STREAM_JDK11_CLASS_L) == 0 ||
+            strcmp(sig, APP_OUTPUT_STREAM_CLASS_L) == 0 ||
+            strcmp(sig, APP_OUTPUT_STREAM_ORACLE_CLASS_L) == 0 ||
+            strcmp(sig, APP_OUTPUT_STREAM_JDK11_CLASS_L) == 0 ||
+            strcmp(sig, DIRECT_BYTE_BUFFER_CLASS_L) == 0 ||
+            strcmp(sig, DIRECT_BYTE_BUFFER_R_CLASS_L) == 0)
+        {
+            error = (*env)->RetransformClasses(env, 1, &classes[i]);
+            if (error != JVMTI_ERROR_NONE) {
+                //TODO handle print format in logJvmtiError
+                logJvmtiError(env, error, "RetransformClasses() failed");
+                scopeLog(CFG_LOG_ERROR, "RetransformClasses() failed on %s", sig);
+                lstDestroy(&g_fd_HashTable);
+                (*env)->Deallocate(env, (unsigned char*)sig);
+                (*env)->Deallocate(env, (unsigned char*)classes);
+                return JNI_ERR;
+            }
+        }
+
         (*env)->Deallocate(env, (unsigned char*)sig);
     }
 
@@ -691,7 +815,7 @@ initAgent(JavaVM *jvm, int is_attaching)
             return JNI_ERR;
         }
         if (initialCapabilities.can_retransform_classes != 1) {
-            logJvmtiError(env, error, "Missing retransform capability");
+            logJvmtiError(env, error, "Missing retransform classes capability");
             return JNI_ERR;
         }
         capabilities.can_retransform_classes = 1;

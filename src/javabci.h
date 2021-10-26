@@ -71,6 +71,7 @@ java_class_t*   javaReadClass(const unsigned char* classData);
 void            javaWriteClass(unsigned char *dest, java_class_t *info);
 void            javaDestroy(java_class_t **info);
 
+int             javaFindClassNameIndex(java_class_t *info, const char *className);
 int             javaFindClassIndex(java_class_t *info, const char *className);
 int             javaFindMethodIndex(java_class_t *info, const char *method, const char *signature);
 void            javaCopyMethod(java_class_t *info, unsigned char *method, const char *newName);
@@ -83,7 +84,7 @@ void            javaInjectCode(java_class_t *info, unsigned char *method, uint8_
 uint16_t        javaAddStringTag(java_class_t *info, const char* str);
 uint16_t        javaAddNameAndTypeTag(java_class_t *info, const char *name, const char *desc);
 uint16_t        javaAddMethodRefTag(java_class_t *info, uint16_t classIndex, uint16_t nameAndTypeIndex);
-
+void            javaModifyUtf8String(java_class_t *info, int tagIndex);
 char*           javaGetUtf8String(java_class_t *info, int tagIndex);
 uint16_t        javaGetTagLength(unsigned char *addr);
 uint32_t        javaGetMethodLength(unsigned char *addr);

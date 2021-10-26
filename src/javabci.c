@@ -40,7 +40,7 @@ static char cp_tag_size[] = {
 };
 
 char* 
-javaGetUtf8String(java_class_t *info, int tagIndex) 
+javaGetUtf8String(java_class_t *info, int tagIndex)
 {
     unsigned char *cp = info->constant_pool[tagIndex - 1];
     uint16_t len = be16toh(*((uint16_t *)(cp + 1)));
@@ -48,6 +48,14 @@ javaGetUtf8String(java_class_t *info, int tagIndex)
     memcpy(buf, cp + 3, len);
     buf[len] = 0;
     return buf;
+}
+
+void
+javaModifyUtf8String(java_class_t *info, int tagIndex)
+{
+    unsigned char *cp = info->constant_pool[tagIndex - 1];
+    uint16_t len = be16toh(*((uint16_t *)(cp + 1)));
+    memcpy(cp + 3 + len - 3, "___", 3);
 }
 
 uint16_t 
@@ -179,6 +187,29 @@ getCodeAttributeAddress(java_class_t *info, unsigned char *method)
         off += attr_length + 6;
     }
     return code;
+}
+
+int 
+javaFindClassNameIndex(java_class_t *info, const char *className) 
+{
+    int idx = -1;
+    int i;
+    for(i=1; i<info->constant_pool_count ;i++) {
+        unsigned char *cp_info = info->constant_pool[i - 1];
+        if (cp_info) {
+            uint8_t tag = *((uint8_t *)cp_info);
+            if(tag == CONSTANT_Class) {
+                uint16_t name_index = be16toh(*((uint16_t *)(cp_info + 1)));
+                char *name = javaGetUtf8String(info, name_index);
+                if (strcmp(name, className) == 0) {
+                    idx = name_index;
+                }
+                free(name);
+            }
+        }
+        if (idx != -1) break;
+    }
+    return idx;
 }
 
 int 

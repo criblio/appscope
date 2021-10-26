@@ -8,7 +8,7 @@ AppScope is an open source, runtime-agnostic instrumentation utility for any Lin
 
 AppScope provides the fine-grained observability of a proxy/service mesh, without the latency of a sidecar. It emits APM-like metric and event data, in open formats, to existing log and metric tools.
 
-It’s like [strace](https://strace.io/) meets [tcpdump](https://www.tcpdump.org/) – but with consumable output for events like file access, DNS, and network activity, and StatsD-style metrics for applications. AppScope can also look inside encrypted payloads, offering WAF-like visibility without proxying traffic. 
+It’s like [strace](https://strace.io/) meets [tcpdump](https://www.tcpdump.org/) – but with consumable output for events like file access, DNS, and network activity, and StatsD-style metrics for applications. AppScope can also look inside encrypted payloads, offering [WAF](https://en.wikipedia.org/wiki/Web_application_firewall)-like visibility without proxying traffic. 
 </br>
 </br>
 

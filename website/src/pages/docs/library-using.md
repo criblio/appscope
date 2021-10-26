@@ -8,7 +8,7 @@ To use the library for the first time in a given environment, complete this quic
 
 1. Download AppScope. 
 
-2. Choose a directory in your environment that you want to serve as the AppScope home directory (`SCOPE_HOME`), i.e., the directory from which AppScope runs.
+2. Choose an AppScope home directory (`SCOPE_HOME`), i.e., the directory from which AppScope should run in your environment.
 
 3. Extract (`scope extract`) the contents of the AppScope binary into the AppScope home directory.
 

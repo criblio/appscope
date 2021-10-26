@@ -17,11 +17,11 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 - **Improvement**: [#241](https://github.com/criblio/appscope/issues/241),[#271](https://github.com/criblio/appscope/issues/271),[#379](https://github.com/criblio/appscope/issues/379) The ARM64 limitations described in [#241](https://github.com/criblio/appscope/issues/241) have now been resolved and no longer apply.
 
 
-- **Fix**: [#598](https://github.com/criblio/appscope/issues/598) Attempting to scope an executable that is Go version 1.17 or newer no longer causes AppScope to crash. AppScope does not support Go 1.17 yet, but now recognizes these executables and issues an informative message. 
+- **Fix**: [#598](https://github.com/criblio/appscope/issues/598) Attempting to scope an executable that is Go version 1.17 or newer no longer causes AppScope to crash. AppScope does not support Go 1.17 yet, but now recognizes these executables and displays an informative message. 
 
-- **Fix**: [#481](https://github.com/criblio/appscope/issues/481),[#575](https://github.com/criblio/appscope/issues/575) Previous limitations on file system write events in distributions based on musl libc have now been resolved no longer apply.
+- **Fix**: [#481](https://github.com/criblio/appscope/issues/481),[#575](https://github.com/criblio/appscope/issues/575) With musl libc-based distros, previous limitations on file system write events are now resolved, and no longer apply.
 
-- **Fix**: [#397](https://github.com/criblio/appscope/issues/397),[#403](https://github.com/criblio/appscope/issues/403),[#567](https://github.com/criblio/appscope/issues/567),[#586](https://github.com/criblio/appscope/issues/586) Previous limitations on `scope attach` on musl libc and Java have now been resolved and no longer apply.
+- **Fix**: [#397](https://github.com/criblio/appscope/issues/397),[#403](https://github.com/criblio/appscope/issues/403),[#567](https://github.com/criblio/appscope/issues/567),[#586](https://github.com/criblio/appscope/issues/586) With musl libc-based distros and Java, previous limitations on `scope attach` are now resolved and no longer apply.
 
 
 ## AppScope 0.7.5

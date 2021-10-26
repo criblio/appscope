@@ -6,13 +6,13 @@ title: Working With AppScope
 
 AppScope offers two ways to work:
 
-* Use the CLI when you want to explore in real-time, in an ad hoc way.
+* Use the CLI when you want to explore in real time, in an ad hoc way.
 
 * Use the AppScope library (`libscope`) for longer-running, planned procedures. 
 
 This is a guiding principle, not a strict rule. Sometimes you may prefer to plan out a CLI session, or, conversely, explore using the library.
 
-What matters most is whether the command you want to scope can or should be changed or varied. If it can, try the CLI; if not, go for the library.
+Ask yourself whether, as you work, you will vary the options or arguments to the command you want to scope. If you plan to make these kinds of iterative changes, try the CLI; if not, go for the library.
 
 For example:
 
@@ -20,7 +20,7 @@ For example:
 
 * You are running curl commands against a website, and want to see what changes when you switch between HTTP/1.1 and HTTP/2.2 and/or HTTP and HTTPS. **Use the CLI.** 
 
-* You are running Nginx in a specific, unchanging way dictated by the requirements of your organization, and you want to see metrics. **Use the library.**
+* You are running nginx in a specific, unchanging way dictated by the requirements of your organization, and you want to see metrics. **Use the library.**
 
 
 Here's a decision tree to help you determine whether to use the CLI or the library.
@@ -34,7 +34,7 @@ AppScope's ease of use stems from its flexible set of controls:
 
 * AppScope's configuration file, `scope.yml`, can be invoked from either the CLI or the library.
 
-* The AppScope library provides an extensive set of environment variables which control settings like metric verbosity and event destinations. Environment variables override config file settings.
+* The AppScope library provides an extensive set of environment variables, which control settings like metric verbosity and event destinations. Environment variables override config file settings.
 
 * Finally, AppScope provides the `ldscope` utility, whose uses include loading the AppScope library into Go executables.
 

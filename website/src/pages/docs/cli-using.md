@@ -6,7 +6,7 @@ title: Using the CLI
 
 As soon as you download AppScope, you can start using the CLI to explore and gain insight into application behavior. No installation or configuration is required.
 
-The CLI provides a rich set of capabilities for capturing and managing data from single applications. Data is captured in the local file system.
+The CLI provides a rich set of capabilities for capturing and managing data from single applications. Data is captured in the local filesystem.
 
 To learn more, see the [CLI Reference](/docs/cli-reference), and/or run `scope --help` or `scope -h`.
 
@@ -88,7 +88,7 @@ ubuntu@ip-127-0-0-1:~/someusername/appscope3$ sudo bin/linux/scope attach 1820
 
 #### Attaching by Process Name
 
-In this example, we try to attach to a LogStream process by its name, which will be `cribl`. Since there's more than one, AppScope lists them and prompts us to choose one:
+In this example, we try to attach to a LogStream process by its name, which will be `cribl`. Since there's more than one process, AppScope lists them and prompts us to choose one:
 
 ```
 $ sudo bin/linux/scope attach cribl
@@ -119,7 +119,7 @@ You cannot attach to a musl libc process or a static executable's process.
 
 No HTTP/1.1 events and headers are emitted when AppScope attaches to a Go process that uses the `azure-sdk-for-go` package.
 
-No events are emitted from files or sockets that exists before AppScope attaches to a process.
+No events are emitted from files or sockets that exist before AppScope attaches to a process.
 
 - After AppScope attaches to a process, whatever file descriptors and/or socket descriptors that the process had already opened before that,
 AppScope will not report any **new** activity on those file or socket descriptors.
@@ -155,7 +155,7 @@ fs.duration  	83   	Count	microsecond	525	class: summary,host: 771f60292e26,proc
 fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60292e26,op: summary,proc: ps
 ```
 
-- Use the `-v` flag to increase verbosity of the metrics displayed, specifically disabling aggregation of filesystem stat and network connect metrics:
+- Use the `-v` flag to increase verbosity of the metrics displayed. Settomg verbosity to 7 disables aggregation of filesystem stat and network connect metrics:
 
 ```
 `scope metrics -v 7`

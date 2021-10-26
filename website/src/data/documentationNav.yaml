@@ -29,7 +29,7 @@
 - name: Using AppScope
   child: 
     - name: Using the CLI
-      path: /docs/quick-start-guide
+      path: /docs/cli-using
 
     - name: Using the Library
       path: /docs/library-using

@@ -358,6 +358,8 @@ services:
         JRE_TGZ: jre/jre-8u251-linux-x64.tar.gz
     <<: *scope-common
   oracle-java9:
+    environment:
+        SKIP_LDSCOPE_TEST: 'true'
     image: ghcr.io/criblio/appscope-test-oracle-java9:${TAG:?Missing TAG environment variable}
     build:
       cache_from:

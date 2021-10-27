@@ -144,7 +144,10 @@ if [ "x86_64" = "$(uname -m)" ]; then # x86_64 only
 #
 # Java HTTP Server
 #
-starttest java_http
+
+
+starttest java_http_attach_curl
+
 cd /opt/java_http
 java SimpleHttpServer 2> /dev/null &
 HTTP_SERVER_PID=$!
@@ -178,6 +181,85 @@ ERR+=$?
 kill -9 ${HTTP_SERVER_PID}
 
 endtest
+
+starttest java_http_curl_attach_curl
+
+cd /opt/java_http
+java SimpleHttpServer 2> /dev/null &
+HTTP_SERVER_PID=$!
+sleep 1
+evaltest
+curl http://localhost:8000/status
+ldscope --attach ${HTTP_SERVER_PID}
+curl http://localhost:8000/status
+sleep 5
+
+grep -q '"proc":"java"' $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q http-req $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q http-resp $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q fs.open $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q fs.close $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q net.conn.open $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q net.conn.close $EVT_FILE > /dev/null
+ERR+=$?
+
+kill -9 ${HTTP_SERVER_PID}
+
+endtest
+
+# TODO: Java9 fails see issue #630
+# remove if condition below after fixing the issue
+if [[ -z "${SKIP_LDSCOPE_TEST}" ]]; then
+starttest java_http_ldscope
+
+cd /opt/java_http
+ldscope java SimpleHttpServer 2> /dev/null &
+HTTP_SERVER_PID=$!
+evaltest
+sleep 1
+curl http://localhost:8000/status
+sleep 5
+
+grep -q '"proc":"java"' $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q http-req $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q http-resp $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q fs.open $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q fs.close $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q net.conn.open $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q net.conn.close $EVT_FILE > /dev/null
+ERR+=$?
+
+kill -9 ${HTTP_SERVER_PID}
+sleep 1
+
+endtest
+
+fi
+
 fi # x86_64 only
 
 unset SCOPE_PAYLOAD_ENABLE

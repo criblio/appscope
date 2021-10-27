@@ -607,13 +607,11 @@ Java_com_sun_net_ssl_internal_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, 
     return Java_sun_security_ssl_AppInputStream_read(jni, obj, buf, offset, len);
 }
 
-JNIEXPORT jint JNICALL 
-Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) 
+static jint
+initAgent(JavaVM *jvm, int is_attaching)
 {
     jvmtiError error;
     jvmtiEnv *env;
-
-    scopeLog(CFG_LOG_INFO, "Initializing Java agent");
 
     jint result = (*jvm)->GetEnv(jvm, (void **) &env, JVMTI_VERSION_1_0);
     if (result != 0) {
@@ -650,9 +648,17 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
 }
 
 JNIEXPORT jint JNICALL 
+Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) 
+{
+    scopeLog(CFG_LOG_INFO, "Initializing Java agent - Agent_OnLoad");
+    return initAgent(jvm, FALSE);
+}
+
+JNIEXPORT jint JNICALL 
 Agent_OnAttach(JavaVM *jvm, char *options, void *reserved) 
 {
-    return Agent_OnLoad(jvm, options, reserved);
+    scopeLog(CFG_LOG_INFO, "Initializing Java agent - Agent_OnAttach");
+    return initAgent(jvm, TRUE);
 }
 
 // This overrides a weak definition in src/linux/os.c

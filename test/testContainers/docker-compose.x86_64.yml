@@ -325,18 +325,6 @@ services:
 
 
   # Pulls x86 RPM from Cribl CDN
-  oracle-java6:
-    image: ghcr.io/criblio/appscope-test-oracle-java6:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from:
-        - ghcr.io/criblio/appscope-test-oracle-java6:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./java/Dockerfile.oracle6
-      args:
-        TOMCAT_MAJOR_VERSION: 7
-        TOMCAT_MINOR_VERSION: 7.0.10
-        KEYTOOL: /usr/java/jre1.6.0_45/bin/keytool
-    <<: *scope-common
   oracle-java7:
     image: ghcr.io/criblio/appscope-test-oracle-java7:${TAG:?Missing TAG environment variable}
     build:

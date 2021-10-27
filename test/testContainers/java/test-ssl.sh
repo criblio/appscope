@@ -243,33 +243,35 @@ ERR+=$?
 sleep 3
 
 endtest
+# TODO uncomment this with full support for attach
+# when attach will work for already loaded libraries
 
-starttest java_https_curl_attach_curl
-/opt/tomcat/bin/catalina.sh run &
-TOMCAT_PID=$!
-sleep 3
-curl -k https://localhost:8443
-sleep 5
-evaltest
+# starttest java_https_curl_attach_curl
+# /opt/tomcat/bin/catalina.sh run &
+# TOMCAT_PID=$!
+# sleep 3
+# curl -k https://localhost:8443
+# sleep 5
+# evaltest
 
-ldscope --attach ${TOMCAT_PID}
+# ldscope --attach ${TOMCAT_PID}
 
-curl -k https://localhost:8443
-sleep 5
+# curl -k https://localhost:8443
+# sleep 5
 
-grep http-req $EVT_FILE > /dev/null
-ERR+=$?
+# grep http-req $EVT_FILE > /dev/null
+# ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
-ERR+=$?
+# grep http-resp $EVT_FILE > /dev/null
+# ERR+=$?
 
-evalPayload
-ERR+=$?
+# evalPayload
+# ERR+=$?
 
-/opt/tomcat/bin/catalina.sh stop
-sleep 3
+# /opt/tomcat/bin/catalina.sh stop
+# sleep 3
 
-endtest
+# endtest
 
 # TODO: Java9 fails see issue #630
 # remove if condition below after fixing the issue

@@ -89,7 +89,7 @@ endtest
 #
 # Java HTTP Server
 #
-starttest java
+starttest java_http
 cd /opt/java_http
 java SimpleHttpServer 2> /dev/null &
 sleep 1

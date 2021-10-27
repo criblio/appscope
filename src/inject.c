@@ -82,7 +82,10 @@ freeSpaceAddr(pid_t pid)
 
     while(fgets(line, 850, fd) != NULL) {
         sscanf(line, "%lx-%*x %s %*s %s %*d", &addr, perms, str);
-        if (strstr(perms, "x") != NULL) break;
+        if ((strstr(perms, "x") != NULL) &&
+            (strstr(perms, "w") == NULL)) {
+            break;
+        }
     }
 
     fclose(fd);
@@ -175,7 +178,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     ptrace(PTRACE_GETREGS, pid, NULL, &oldregs);
     memcpy(&regs, &oldregs, sizeof(struct user_regs_struct));
 
-    // find free space
+    // find free space in text section
     freeAddr = freeSpaceAddr(pid);
     if (!freeAddr) {
         return EXIT_FAILURE;

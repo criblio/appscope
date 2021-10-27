@@ -32,6 +32,10 @@ RUN mkdir -p /opt/javassl
 COPY ./java/SSLSocketClient.java /opt/javassl/SSLSocketClient.java
 RUN javac -d /opt/javassl/ /opt/javassl/SSLSocketClient.java
 
+RUN mkdir -p /opt/java_http
+COPY ./java/SimpleHttpServer.java /opt/java_http/SimpleHttpServer.java
+RUN javac -d /opt/java_http/ /opt/java_http/SimpleHttpServer.java
+
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=false

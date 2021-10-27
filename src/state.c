@@ -863,33 +863,6 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
     protocol_info *proto;
     bool ret = FALSE;
 
-    // HACK: See issue #600.
-    //   We see what appear to be invalid "runt" payloads sometimes from our
-    //   interpositions of Java's SSL/TLS routines. In the example log below,
-    //   notice the first payload is a single `H` byte while the second is the
-    //   actual request.
-    //
-    //   DEBUG: Java_sun_security_ssl_SSLEngineImpl_unwrap
-    //   DEBUG: doProtocol(id=-63, fd=93, len=1, src=TLSRX, dtyp=BUF) TLS=TRUE PROTO=PENDING (1 bytes)
-    //     0000:  48                                                H
-    //   DEBUG: fd:93 Protocol detection result is FALSE
-    //   DEBUG: Java_sun_security_ssl_SSLEngineImpl_unwrap
-    //   DEBUG: doProtocol(id=-63, fd=93, len=79, src=TLSRX, dtyp=BUF) TLS=TRUE PROTO=FALSE (64 bytes)
-    //     0000:  48 45 41 44 20 2f 20 48  54 54 50 2f 31 2e 31 0d  HEAD / HTTP/1.1.
-    //     0010:  0a 55 73 65 72 2d 41 67  65 6e 74 3a 20 63 75 72  .User-Agent: cur
-    //     0020:  6c 2f 37 2e 32 39 2e 30  0d 0a 48 6f 73 74 3a 20  l/7.29.0..Host:
-    //     0030:  6c 6f 63 61 6c 68 6f 73  74 3a 38 34 34 33 0d 0a  localhost:8443..
-    //
-    // In this case, as a temporary hack until we can fix the Java
-    // interpositions, we're leaving protocol detection PENDING if we don't get
-    // enough buffer to match. If we're not doing binary matching (as is the
-    // case with HTTP) then we don't get a length to use here. As a complete
-    // hack, we simply require more than one byte. Ugly...
-    if ((protoDef->len > 0 && protoDef->len > len) || (protoDef->len <= 0 && len < 2)) {
-        scopeLogDebug("DEBUG: skipping protocol detection on runt payload");
-        return FALSE;
-    }
-
     // nothing we can do; don't risk reading past end of a buffer
     size_t cvlen = (len < MAX_CONVERT) ? len : MAX_CONVERT;
     if (((len <= 0) && (protoDef->len <= 0)) ||   // no len
@@ -1227,13 +1200,6 @@ getChannelNetEntry(uint64_t id)
 int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
-    // HACK: See issue #600
-    //   We're ignoring payloads where we don't get a reasonable ID or FD which
-    //   seems to happen with the interpositions of Java's SSL operations.
-    if ((int64_t)id <= 0 && sockfd < 0) {
-        return 0;
-    }
-
     // Find the net_info for the channel
     net_info *net = getNetEntry(sockfd);    // first try by descriptor
     if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
@@ -1263,23 +1229,6 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     if (!len) {
         scopeLogDebug("DEBUG: fd:%d ignoring empty payload", sockfd);
         return 0;
-    }
-
-    // HACK: See issue #600
-    //   We ignore all-zeros payloads we get from our intepositions of Java's
-    //   SSL operations.
-    if (net && net->protoDetect == DETECT_PENDING) {
-        bool foundNonZero = FALSE;
-        for (size_t n = 0; n < len; ++n) {
-            if (((char*)buf)[n] != 0) {
-                foundNonZero = TRUE;
-                break;
-            }
-        }
-        if (!foundNonZero) {
-            scopeLogDebug("DEBUG: fd:%d ignoring all-zero payload", sockfd);
-            return 0;
-        }
     }
 
     // Do TLS detection if not already done

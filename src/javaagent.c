@@ -42,6 +42,9 @@ typedef struct {
     jmethodID mid_SocketChannelImpl_getRemoteAddress;
     jmethodID mid_SocketChannelImpl___close;
     jmethodID mid_SocketChannelImpl_getFDVal;
+
+    jmethodID mid_SSLEngineResult_bytesConsumed;
+    jmethodID mid_SSLEngineResult_bytesProduced;
 } java_global_t;
 
 static java_global_t g_java = {0};
@@ -196,6 +199,9 @@ initSSLEngineImplGlobals(JNIEnv *jni)
     g_java.mid_SSLEngineImpl___unwrap    = (*jni)->GetMethodID(jni, sslEngineImplClass, "__unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
     g_java.mid_SSLEngineImpl___wrap      = (*jni)->GetMethodID(jni, sslEngineImplClass, "__wrap", "([Ljava/nio/ByteBuffer;IILjava/nio/ByteBuffer;)Ljavax/net/ssl/SSLEngineResult;");
     g_java.mid_SSLEngineImpl_getSession  = (*jni)->GetMethodID(jni, sslEngineImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
+    jclass sslEngineResultClass    = (*jni)->FindClass(jni, "javax/net/ssl/SSLEngineResult");
+    g_java.mid_SSLEngineResult_bytesConsumed = (*jni)->GetMethodID(jni, sslEngineResultClass, "bytesConsumed", "()I");
+    g_java.mid_SSLEngineResult_bytesProduced = (*jni)->GetMethodID(jni, sslEngineResultClass, "bytesProduced", "()I");
 
     jclass socketChannelClass = (*jni)->FindClass(jni, "sun/nio/ch/SocketChannelImpl");
     g_java.mid_SocketChannelImpl___read  = (*jni)->GetMethodID(jni, socketChannelClass, "__read", "(Ljava/nio/ByteBuffer;)I");
@@ -381,6 +387,7 @@ doJavaProtocol(JNIEnv *jni, jobject session, jbyteArray buf, jint offset, jint l
     jint  hash      = (*jni)->CallIntMethod(jni, session, g_java.mid_Object_hashCode);
     jbyte *byteBuf  = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
     doProtocol((uint64_t)hash, fd, &byteBuf[offset], (size_t)(len - offset), src, BUF);
+    //scopeLogHex(CFG_LOG_ERROR, &byteBuf[offset], (len - offset), "doJavaProtocol");
     (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
 }
 
@@ -432,14 +439,19 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
     //call the original method
     jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___unwrap, src, dsts, offset, len);
 
-    jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
-    int i;
-    for(i=offset;i<len - offset;i++) {
-        jobject bufEl  = (*jni)->GetObjectArrayElement(jni, dsts, i);
-        jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
-        jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-        doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd);
+    jint bytesProduced = (*jni)->CallIntMethod(jni, res, g_java.mid_SSLEngineResult_bytesProduced);
+    if (bytesProduced) {
+        jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
+        int i;
+        for(i=offset;i<len - offset;i++) {
+            jobject bufEl  = (*jni)->GetObjectArrayElement(jni, dsts, i);
+            jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
+            jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
+            //scopeLog(CFG_LOG_ERROR, "Java_sun_security_ssl_SSLEngineImpl_unwrap before");
+            doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd);
+        }
     }
+
     return res;
 }
 
@@ -461,19 +473,33 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
     if (fdVal) {
         fd = fdVal;
     }
-    
-    jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
+
+    // Record the position before the original method is called.
+    // The original method can change it's value.
+    jint initialpos[len];
     int i;
-    for(i=offset;i<len - offset;i++) {
+    for (i=offset; i<len - offset; i++) {
         jobject bufEl  = (*jni)->GetObjectArrayElement(jni, srcs, i);
         jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
-        jint limit     = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_limit);
-        jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-        doJavaProtocol(jni, session, buf, pos, limit, TLSTX, fd);
+        initialpos[i] = pos;
     }
     
     //call the original method
     jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___wrap, srcs, offset, len, dst);
+
+    jint bytesConsumed = (*jni)->CallIntMethod(jni, res, g_java.mid_SSLEngineResult_bytesConsumed);
+    if (bytesConsumed) {
+        jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
+        for(i=offset;i<len - offset;i++) {
+            jobject bufEl  = (*jni)->GetObjectArrayElement(jni, srcs, i);
+            jint pos       = initialpos[i]; // initial position was saved above
+            jint limit     = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_limit);
+            jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
+            //scopeLog(CFG_LOG_ERROR, "Java_sun_security_ssl_SSLEngineImpl_wrap before");
+            doJavaProtocol(jni, session, buf, pos, limit, TLSTX, fd);
+        }
+    }
+
     return res;
 }
 
@@ -499,11 +525,20 @@ Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray
     } else {
         session = obj;
     }
-    
-    doJavaProtocol(jni, session, buf, offset, len, TLSTX, fd);
+
+    jboolean exception_before_call = (*jni)->ExceptionCheck(jni);
     
     //call the original method
     (*jni)->CallVoidMethod(jni, obj, g_java.mid_AppOutputStream___write, buf, offset, len);
+
+    // This void method doesn't return status.  Using the exception
+    // status as a proxy seems reasonable.
+    jboolean exception_after_call = (*jni)->ExceptionCheck(jni);
+    int original_method_caused_exception = !exception_before_call && exception_after_call;
+    if (!original_method_caused_exception) {
+        //scopeLog(CFG_LOG_ERROR, "Java_sun_security_ssl_AppOutputStream_write before");
+        doJavaProtocol(jni, session, buf, offset, len, TLSTX, fd);
+    }
 }
 
  //support for JDK 11 - 14 where AppOutputStream in a nested class defined inside SSLSocketImpl
@@ -539,7 +574,10 @@ Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray b
     //call the original method
     jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_AppInputStream___read, buf, offset, len);
 
-    doJavaProtocol(jni, session, buf, offset, res, TLSRX, fd);
+    if (res != -1) {
+        //scopeLog(CFG_LOG_ERROR, "Java_sun_security_ssl_AppInputStream_read before");
+        doJavaProtocol(jni, session, buf, offset, res, TLSRX, fd);
+    }
 
     return res;
 }

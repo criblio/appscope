@@ -49,6 +49,18 @@ typedef struct {
 
 static java_global_t g_java = {0};
 
+#define SOCKET_CHANNEL_CLASS ("sun/nio/ch/SocketChannelImpl")
+#define SSL_ENGINE_CLASS ("sun/security/ssl/SSLEngineImpl")
+#define SSL_ENGINE_ORACLE_CLASS ("com/sun/net/ssl/internal/ssl/SSLEngineImpl")
+#define APP_INPUT_STREAM_CLASS ("sun/security/ssl/AppInputStream")
+#define APP_INPUT_STREAM_ORACLE_CLASS ("com/sun/net/ssl/internal/ssl/AppInputStream")
+#define APP_INPUT_STREAM_JDK11_CLASS ("sun/security/ssl/SSLSocketImpl$AppInputStream")
+#define APP_OUTPUT_STREAM_CLASS ("sun/security/ssl/AppOutputStream")
+#define APP_OUTPUT_STREAM_ORACLE_CLASS ("com/sun/net/ssl/internal/ssl/AppOutputStream")
+#define APP_OUTPUT_STREAM_JDK11_CLASS ("sun/security/ssl/SSLSocketImpl$AppOutputStream")
+#define DIRECT_BYTE_BUFFER_CLASS ("java/nio/DirectByteBuffer")
+#define DIRECT_BYTE_BUFFER_R_CLASS ("java/nio/DirectByteBufferR")
+
 static void 
 logJvmtiError(jvmtiEnv *jvmti, jvmtiError errnum, const char *str) 
 {
@@ -110,14 +122,14 @@ static void
 initAppOutputStreamGlobals(JNIEnv *jni)
 {
     if (g_java.mid_AppOutputStream___write != NULL) return;
-    jclass appOutputStreamClass = (*jni)->FindClass(jni, "sun/security/ssl/AppOutputStream");
+    jclass appOutputStreamClass = (*jni)->FindClass(jni, APP_OUTPUT_STREAM_CLASS);
     if (appOutputStreamClass == NULL) {
         // Oracle JDK 6
-        appOutputStreamClass = (*jni)->FindClass(jni, "com/sun/net/ssl/internal/ssl/AppOutputStream");
+        appOutputStreamClass = (*jni)->FindClass(jni, APP_OUTPUT_STREAM_ORACLE_CLASS);
     }
     if (appOutputStreamClass == NULL) {
         // JDK 11
-        appOutputStreamClass = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl$AppOutputStream");
+        appOutputStreamClass = (*jni)->FindClass(jni, APP_OUTPUT_STREAM_JDK11_CLASS);
     }
     g_java.mid_AppOutputStream___write = (*jni)->GetMethodID(jni, appOutputStreamClass, "__write", "([BII)V");
     /*
@@ -150,14 +162,14 @@ static void
 initAppInputStreamGlobals(JNIEnv *jni)
 {
     if (g_java.mid_AppInputStream___read != NULL) return;
-    jclass appInputStreamClass = (*jni)->FindClass(jni, "sun/security/ssl/AppInputStream");
+    jclass appInputStreamClass = (*jni)->FindClass(jni, APP_INPUT_STREAM_CLASS);
     if (appInputStreamClass == NULL) {
         // Oracle JDK 6
-        appInputStreamClass  = (*jni)->FindClass(jni, "com/sun/net/ssl/internal/ssl/AppInputStream");
+        appInputStreamClass  = (*jni)->FindClass(jni, APP_INPUT_STREAM_ORACLE_CLASS);
     }
     if (appInputStreamClass == NULL) {
         // JDK 11
-        appInputStreamClass  = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl$AppInputStream");
+        appInputStreamClass  = (*jni)->FindClass(jni, APP_INPUT_STREAM_JDK11_CLASS);
     }
     g_java.mid_AppInputStream___read = (*jni)->GetMethodID(jni, appInputStreamClass, "__read", "([BII)I");
     /*
@@ -190,10 +202,10 @@ static void
 initSSLEngineImplGlobals(JNIEnv *jni) 
 {
     if (g_java.mid_SSLEngineImpl___unwrap != NULL) return;
-    jclass sslEngineImplClass = (*jni)->FindClass(jni, "sun/security/ssl/SSLEngineImpl");
+    jclass sslEngineImplClass = (*jni)->FindClass(jni, SSL_ENGINE_CLASS);
     if (sslEngineImplClass == NULL) {
         // Oracle JDK 6
-        sslEngineImplClass  = (*jni)->FindClass(jni, "com/sun/net/ssl/internal/ssl/SSLEngineImpl");
+        sslEngineImplClass  = (*jni)->FindClass(jni, SSL_ENGINE_ORACLE_CLASS);
         clearJniException(jni);
     }
     g_java.mid_SSLEngineImpl___unwrap    = (*jni)->GetMethodID(jni, sslEngineImplClass, "__unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
@@ -203,7 +215,7 @@ initSSLEngineImplGlobals(JNIEnv *jni)
     g_java.mid_SSLEngineResult_bytesConsumed = (*jni)->GetMethodID(jni, sslEngineResultClass, "bytesConsumed", "()I");
     g_java.mid_SSLEngineResult_bytesProduced = (*jni)->GetMethodID(jni, sslEngineResultClass, "bytesProduced", "()I");
 
-    jclass socketChannelClass = (*jni)->FindClass(jni, "sun/nio/ch/SocketChannelImpl");
+    jclass socketChannelClass = (*jni)->FindClass(jni, SOCKET_CHANNEL_CLASS);
     g_java.mid_SocketChannelImpl___read  = (*jni)->GetMethodID(jni, socketChannelClass, "__read", "(Ljava/nio/ByteBuffer;)I");
     g_java.mid_SocketChannelImpl___write = (*jni)->GetMethodID(jni, socketChannelClass, "__write", "(Ljava/nio/ByteBuffer;)I");
     g_java.mid_SocketChannelImpl_getRemoteAddress  = (*jni)->GetMethodID(jni, socketChannelClass, "getRemoteAddress", "()Ljava/net/SocketAddress;");
@@ -220,11 +232,11 @@ initSSLEngineImplGlobals(JNIEnv *jni)
     g_java.mid_ByteBuffer_position = (*jni)->GetMethodID(jni, bufferClass, "position", "()I");
     g_java.mid_ByteBuffer_limit    = (*jni)->GetMethodID(jni, bufferClass, "limit", "()I");
 
-    jclass dbbClass                = (*jni)->FindClass(jni, "java/nio/DirectByteBuffer");
+    jclass dbbClass                = (*jni)->FindClass(jni, DIRECT_BYTE_BUFFER_CLASS);
     g_java.fid_ByteBuffer___fd     = (*jni)->GetFieldID(jni, dbbClass, "__fd", "I");
     if (g_java.fid_ByteBuffer___fd == NULL) {
         // Open JDK 9
-        dbbClass                   = (*jni)->FindClass(jni, "java/nio/DirectByteBufferR");
+        dbbClass                   = (*jni)->FindClass(jni, DIRECT_BYTE_BUFFER_R_CLASS);
         g_java.fid_ByteBuffer___fd = (*jni)->GetFieldID(jni, dbbClass, "__fd", "I");
         clearJniException(jni);
     }
@@ -244,9 +256,9 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
 {
     if (name == NULL) return;
     
-    if (strcmp(name, "sun/security/ssl/AppOutputStream") == 0 || 
-        strcmp(name, "com/sun/net/ssl/internal/ssl/AppOutputStream") == 0 ||
-        strcmp(name, "sun/security/ssl/SSLSocketImpl$AppOutputStream") == 0) {
+    if (strcmp(name, APP_OUTPUT_STREAM_CLASS) == 0 || 
+        strcmp(name, APP_OUTPUT_STREAM_ORACLE_CLASS) == 0 ||
+        strcmp(name, APP_OUTPUT_STREAM_JDK11_CLASS) == 0) {
 
         scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for AppOutputStream class...");
 
@@ -270,9 +282,9 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (strcmp(name, "sun/security/ssl/AppInputStream") == 0 ||
-        strcmp(name, "com/sun/net/ssl/internal/ssl/AppInputStream") == 0 ||
-        strcmp(name, "sun/security/ssl/SSLSocketImpl$AppInputStream") == 0) {
+    if (strcmp(name, APP_INPUT_STREAM_CLASS) == 0 ||
+        strcmp(name, APP_INPUT_STREAM_ORACLE_CLASS) == 0 ||
+        strcmp(name, APP_INPUT_STREAM_JDK11_CLASS) == 0) {
 
         scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for AppInputStream class...");
 
@@ -296,8 +308,8 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (strcmp(name, "sun/security/ssl/SSLEngineImpl") == 0 || 
-        strcmp(name, "com/sun/net/ssl/internal/ssl/SSLEngineImpl") == 0) {
+    if (strcmp(name, SSL_ENGINE_CLASS) == 0 || 
+        strcmp(name, SSL_ENGINE_ORACLE_CLASS) == 0) {
         
         scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for SSLEngineImpl class...");
 
@@ -330,7 +342,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (strcmp(name, "sun/nio/ch/SocketChannelImpl") == 0) {
+    if (strcmp(name, SOCKET_CHANNEL_CLASS) == 0) {
 
         scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for SocketChannelImpl class...");
         java_class_t *classInfo = javaReadClass(class_data);
@@ -362,8 +374,8 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (strcmp(name, "java/nio/DirectByteBuffer") == 0 ||
-        strcmp(name, "java/nio/DirectByteBufferR") == 0) {
+    if (strcmp(name, DIRECT_BYTE_BUFFER_CLASS) == 0 ||
+        strcmp(name, DIRECT_BYTE_BUFFER_R_CLASS) == 0) {
 
         scopeLog(CFG_LOG_INFO, "installing Java SSL hooks for java.nio.DirectByteBuffer class...");
         java_class_t *classInfo = javaReadClass(class_data);

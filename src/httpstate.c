@@ -406,10 +406,6 @@ parseHttp1(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId)
 
     // Look for start of http header
     if (httpstate->state == HTTP_NONE) {
-
-        // find the start of http header data
-        if (searchExec(g_http_start, buf, len) == -1) return FALSE;
-
         setHttpState(httpstate, HTTP_HDR);
         httpstate->id = *httpId;
     }
@@ -456,8 +452,6 @@ parseHttp1(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId)
 
         httpstate->isResponse =
             (searchExec(g_http_start, httpstate->hdr, searchLen(g_http_start)) != -1);
-        httpstate->isRequest = !httpstate->isResponse &&
-            (searchExec(g_http_start, httpstate->hdr, httpstate->hdrlen) != -1);
         httpstate->hasUpgrade = hasUpgrade(httpstate->hdr, httpstate->hdrlen);
         httpstate->hasConnectionUpgrade = hasConnectionUpgrade(httpstate->hdr, httpstate->hdrlen);
 
@@ -763,7 +757,7 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
 
         // Detect HTTP/1.x by looking for "HTTP/" which appears as the start
         // of a response and after method and URI in a request.
-        else if (strstr(buf, HTTP_START)) {
+        else if (searchExec(g_http_start, buf, len) != -1) {
             state->version[isTx] = 1;
             // fall through to continue processing
         }
@@ -786,7 +780,6 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
             state->version[!isTx] = 2;
 
             // clear state
-            state->isRequest = FALSE;
             state->isResponse = FALSE;
             state->hasUpgrade = FALSE;
             state->hasConnectionUpgrade = FALSE;

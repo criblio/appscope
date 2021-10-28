@@ -160,7 +160,6 @@ typedef struct {
     size_t version[2]; // rx=[0] and tx=[1]
 
     // These will be TRUE if `hdr` ...
-    bool isRequest;            // ... contains a complete request header
     bool isResponse;           // ... contains a complete response header
     bool hasUpgrade;           // ... has `Upgrade: h2c` header
     bool hasConnectionUpgrade; // ... has `Connection: upgrade` header

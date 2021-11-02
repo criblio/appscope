@@ -1035,8 +1035,9 @@ periodic(void *arg)
                 }
                 if (mtcNeedsConnection(g_mtc)) {
                     scopeLog(CFG_LOG_WARN, "metric destination not connected. messages dropped: "
-                            "%"PRIu64 " connection attempts: %"PRIu64, g_cbuf_drop_count, \
-                            mtcConnectAttempts(g_mtc));
+                            "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s", \
+                            g_cbuf_drop_count, mtcConnectAttempts(g_mtc), \
+                            valToStr(netFailMap, mtcTransportFailureReason(g_mtc)));
                 }
                 logReportTime = tv.tv_sec + CONN_LOG_INTERVAL; 
             }

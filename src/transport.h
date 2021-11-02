@@ -2,7 +2,6 @@
 #define __TRANSPORT_H__
 #include <stdint.h>
 #include "scopetypes.h"
-#include "dbg.h"
 
 typedef struct _transport_t transport_t;
 

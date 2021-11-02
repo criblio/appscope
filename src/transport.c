@@ -672,8 +672,6 @@ checkPendingSocketStatus(transport_t *trans)
     }
 
     // We have a connection
-    trans->net.connect_attempts = 0;
-    trans->net.failure_reason = NO_FAIL;
     scopeLog(CFG_LOG_INFO, "fd:%d connect successful", trans->net.pending_connect);
 
     // Move this descriptor up out of the way
@@ -691,6 +689,9 @@ checkPendingSocketStatus(transport_t *trans)
     }
 
     // We have a connected socket!  Woot!
+    trans->net.connect_attempts = 0;
+    trans->net.failure_reason = NO_FAIL;
+    
     // Do the tls stuff for this connection as needed.
     if (trans->net.tls.enable) {
         // when successful, we'll have a connected tls socket.
@@ -837,6 +838,7 @@ socketConnectionStart(transport_t *trans)
             }
 
             scopeLog(CFG_LOG_INFO, "fd:%d connect to %s:%d is pending", sock, addrstr, port);
+            trans->net.failure_reason = CONN_FAIL;
 
             trans->net.pending_connect = sock;
             break;  // replace w/continue for a shotgun start.

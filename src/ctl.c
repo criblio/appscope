@@ -1158,6 +1158,16 @@ ctlReconnect(ctl_t *ctl, which_transport_t who)
         transportReconnect(ctl->transport);
 }
 
+net_fail_t
+ctlTransportFailureReason(ctl_t *ctl, which_transport_t who)
+{
+    if (!ctl) return 0;
+
+    return ((who == CFG_LS) && (ctl->paytrans)) ?
+        transportFailureReason(ctl->paytrans) :
+        transportFailureReason(ctl->transport);
+}
+
 void
 ctlTransportSet(ctl_t *ctl, transport_t *transport, which_transport_t who)
 {

@@ -121,6 +121,13 @@ mtcEnabledSet(mtc_t *mtc, unsigned val)
     mtc->enable = val;
 }
 
+net_fail_t 
+mtcTransportFailureReason(mtc_t *mtc)
+{
+    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
+    return transportConnectAttempts(mtc->transport);
+}
+
 void
 mtcTransportSet(mtc_t *mtc, transport_t *transport)
 {

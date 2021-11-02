@@ -24,6 +24,7 @@ uint64_t            mtcConnectAttempts(mtc_t*);
 int                 mtcDisconnect(mtc_t *);
 int                 mtcReconnect(mtc_t *);
 void                mtcEnabledSet(mtc_t*, unsigned);
+net_fail_t          mtcTransportFailureReason(mtc_t *);
 void                mtcTransportSet(mtc_t*, transport_t*);
 void                mtcFormatSet(mtc_t*, mtc_fmt_t*);
 

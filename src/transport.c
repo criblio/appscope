@@ -41,6 +41,7 @@ struct _transport_t
             int sock;
             int pending_connect;
             uint64_t connect_attempts;
+            net_fail_t failure_reason;
             char *host;
             char *port;
             struct sockaddr_storage gai_addr;
@@ -362,6 +363,7 @@ establishTlsSession(transport_t *trans)
         char err[256] = {0};
         ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
         scopeLog(CFG_LOG_INFO, "fd:%d error creating tls context: %s", trans->net.sock, err);
+        trans->net.failure_reason = TLS_CONTEXT_FAIL;
         goto err;
     }
 
@@ -385,6 +387,7 @@ establishTlsSession(transport_t *trans)
         char err[256] = {0};
         ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
         scopeLog(CFG_LOG_INFO, "fd:%d error creating tls session: %s", trans->net.sock, err);
+            trans->net.failure_reason = TLS_SESSION_FAIL;
         goto err;
     }
 
@@ -392,6 +395,7 @@ establishTlsSession(transport_t *trans)
         char err[256] = {0};
         ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
         scopeLog(CFG_LOG_INFO, "fd:%d error setting tls on socket: %d : %s", trans->net.sock, trans->net.sock, err);
+            trans->net.failure_reason = TLS_SOCKET_FAIL;
         goto err;
     }
 
@@ -405,6 +409,7 @@ establishTlsSession(transport_t *trans)
         if (ssl_err == SSL_ERROR_SSL || ssl_err == SSL_ERROR_SYSCALL) {
             ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
             scopeLog(CFG_LOG_INFO, "fd:%d error establishing tls connection: %s %d", trans->net.sock, err, errno);
+            trans->net.failure_reason = TLS_CONN_FAIL;
         }
         goto err;
     }
@@ -417,6 +422,7 @@ establishTlsSession(transport_t *trans)
         } else {
             scopeLog(CFG_LOG_INFO, "fd:%d error accessing peer certificate for tls server validation",
                                                   trans->net.sock);
+            trans->net.failure_reason = TLS_CERT_FAIL;
             goto err;
         }
 
@@ -424,6 +430,7 @@ establishTlsSession(transport_t *trans)
         if (ver_rc != X509_V_OK) {
             const char *err = X509_verify_cert_error_string(ver_rc);
             scopeLog(CFG_LOG_INFO, "fd:%d tls server validation failed : \"%s\"", trans->net.sock, err);
+            trans->net.failure_reason = TLS_VERIFY_FAIL;
             goto err;
         }
     }
@@ -666,6 +673,7 @@ checkPendingSocketStatus(transport_t *trans)
 
     // We have a connection
     trans->net.connect_attempts = 0;
+    trans->net.failure_reason = NO_FAIL;
     scopeLog(CFG_LOG_INFO, "fd:%d connect successful", trans->net.pending_connect);
 
     // Move this descriptor up out of the way
@@ -821,6 +829,7 @@ socketConnectionStart(transport_t *trans)
 
             if (errno != EINPROGRESS) {
                 scopeLog(CFG_LOG_INFO, "fd:%d connect to %s:%d failed", sock, addrstr, port);
+                trans->net.failure_reason = CONN_FAIL;
 
                 // We could create a sock, but not connect.  Clean up.
                 g_fn.close(sock);
@@ -1341,3 +1350,10 @@ transportConnectAttempts(transport_t* t)
 {
     return t->net.connect_attempts;
 }
+
+net_fail_t
+transportFailureReason(transport_t *t)
+{
+    return t->net.failure_reason;
+}
+

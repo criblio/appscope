@@ -36,6 +36,20 @@ RUN mkdir -p /opt/java_http
 COPY ./java/SimpleHttpServer.java /opt/java_http/SimpleHttpServer.java
 RUN javac -d /opt/java_http/ /opt/java_http/SimpleHttpServer.java
 
+RUN mkdir -p /opt/java_test
+COPY ./java/JavaTest.java /opt/java_test/JavaTest.java
+RUN cd /opt/java_test/ && javac JavaTest.java && javac -d . JavaTest.java
+
+COPY ./java/AttachTest.java /opt/java_test/AttachTest.java
+RUN cd /opt/java_test/ && javac AttachTest.java && javac -d . AttachTest.java
+
+COPY ./java/InjectTest.java /opt/java_test/InjectTest.java
+RUN cd /opt/java_test/ && javac InjectTest.java && javac -d . InjectTest.java
+
+RUN mkdir -p /opt/java_native_test
+COPY ./java/JavaTestNative.java /opt/java_native_test/JavaTest.java
+RUN cd /opt/java_native_test/ && javac JavaTest.java && javac -d . JavaTest.java
+
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=false
@@ -51,6 +65,22 @@ ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 RUN echo "export PATH=${PATH}" >> /etc/profile.d/path.sh
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit
+
+
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 04EE7237B7D453EC
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 648ACFD622F3D138
+# cd /tmp
+# apt update
+# apt -y download libcrypt1
+# dpkg-deb -x libcrypt1_1%3a4.4.25-2_amd64.deb  .
+# cp -av lib/x86_64-linux-gnu/* /lib/x86_64-linux-gnu/
+# apt -y --fix-broken install
+# apt update && DEBIAN_FRONTEND=noninteractive apt install -y gdb wget libcrypt1 python3-pip
+
+# python3-pip wget
+# RUN wget -O ~/.gdbinit-gef.py -q https://github.com/hugsy/gef/raw/master/gef.py && echo source ~/.gdbinit-gef.py >> /root/.gdbinit
+# RUN pip3 install capstone unicorn ropper
+ENV LC_CTYPE=C.UTF-8
 
 RUN  mkdir /usr/local/scope && \
      mkdir /usr/local/scope/bin && \

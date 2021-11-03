@@ -928,7 +928,7 @@ custom:
   #   ancestor: string
   #
   #     Matches if given string matches the basename of the scoped process's
-  #     partent, parent's parent, etc.
+  #     parent, parent's parent, etc.
   #
   # The `config` section specifies the settings that should be overridden when
   # the filter matches. Entries under `config` use the same schema as the

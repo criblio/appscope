@@ -541,6 +541,8 @@ static jclass defineCopyClass(jvmtiEnv *jvmti_env, JNIEnv* jni, jobject loader, 
     if (!localClassCopy) {
         scopeLog(CFG_LOG_ERROR, "ERROR: Cannot define copy of class %s", class_name_copy);
     }
+    scopeLog(CFG_LOG_INFO, "\t\tCOPY OF THE CLASS STRUCTURE");
+    javaPrintClassInfo(copyClassInfo);
 
     scopeLog(CFG_LOG_ERROR, "SUCCESS: Copy class was created %s", class_name_copy);
     free(class_name_copy);
@@ -713,6 +715,9 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
             // javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__firstprint");
         }
         javaConvertMethodToNative(classInfo, methodIndex);
+
+        scopeLog(CFG_LOG_INFO, "\t\tORIGINAL OF THE CLASS STRUCTURE");
+        javaPrintClassInfo(classInfo);
 
         unsigned char *dest;
         (*jvmti_env)->Allocate(jvmti_env, classInfo->length, &dest);

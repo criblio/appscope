@@ -70,7 +70,7 @@ typedef struct {
 java_class_t*   javaReadClass(const unsigned char* classData);
 void            javaWriteClass(unsigned char *dest, java_class_t *info);
 void            javaDestroy(java_class_t **info);
-
+void            javaPrintClassInfo(java_class_t *info);
 int             javaFindClassNameIndex(java_class_t *info, const char *className);
 int             javaFindClassIndex(java_class_t *info, const char *className);
 int             javaFindMethodIndex(java_class_t *info, const char *method, const char *signature);

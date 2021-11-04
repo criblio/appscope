@@ -918,7 +918,6 @@ static struct option opts[] = {
 int
 main(int argc, char **argv, char **env)
 {
-    int is_musl;
     char *attachArg = 0;
     char path[PATH_MAX] = {0};
 
@@ -1002,12 +1001,11 @@ main(int argc, char **argv, char **env)
 
     // setup for musl libc if detected
     char *loader = (char *)libdirGetLoader();
-    if (loader) {
-        is_musl = setup_loader(EXE_TEST_FILE, loader);
-    } else {
+    if (!loader) {
         fprintf(stderr, "error: failed to get a loader path\n");
         return EXIT_FAILURE;
     }
+    setup_loader(EXE_TEST_FILE, loader);
 
     // set SCOPE_EXEC_PATH to path to `ldscope` if not set already
     if (getenv("SCOPE_EXEC_PATH") == 0) {
@@ -1096,17 +1094,7 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    if (is_musl && ubuf.machine && (strstr(ubuf.machine, "aarch64") != NULL)) {
-        strncpy(path, "/lib/", 8);
-        if (get_dir("/lib/ld-", path + strlen(path), sizeof(path) - strlen(path)) == -1) {
-            fprintf(stderr, "ERROR: can't get the path for ld-musl");
-            return EXIT_FAILURE;
-        }
-
-        execve(path, execArgv, environ);
-    } else {
-        execve(libdirGetLoader(), execArgv, environ);
-    }
+    execve(libdirGetLoader(), execArgv, environ);
 
     free(execArgv);
     perror("execve failed");

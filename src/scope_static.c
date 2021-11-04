@@ -402,10 +402,8 @@ do_musl(char *exld, char *ldscope)
         return;
     }
 
-#ifdef __x86_64__
     set_loader(ldscope);
     set_library();
-#endif
 
     if (ldso) free(ldso);
     if (lpath) free(lpath);

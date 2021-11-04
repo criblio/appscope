@@ -219,7 +219,7 @@ set_library(void)
 
 // modify the loader string in the .interp section of ldscope
 static int
-set_loader(char *exe)
+set_loader(const char *exe)
 {
     int i, fd, found, name;
     struct stat sbuf;
@@ -318,7 +318,7 @@ set_loader(char *exe)
 }
 
 static char *
-get_loader(char *exe)
+get_loader(const char *exe)
 {
     int i, fd;
     struct stat sbuf;
@@ -417,7 +417,7 @@ do_musl(char *exld, char *ldscope)
  * Returns 0 if musl was not detected and 1 if it was.
  */
 static int
-setup_loader(char *exe, char *ldscope)
+setup_loader(const char *exe, char *ldscope)
 {
     int ret = 0; // not musl
 

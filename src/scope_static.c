@@ -373,10 +373,11 @@ do_musl(char *exld, char *ldscope)
     char *lpath = NULL;
     char *ldso = NULL;
     char *path;
-    char dir[strlen(ldscope) + 2];
+    size_t ldscope_len = strlen(ldscope);
+    char dir[ldscope_len + 2];
 
     // always set the env var
-    strncpy(dir, ldscope, strlen(ldscope) + 1);
+    strncpy(dir, ldscope, ldscope_len + 1);
     path = dirname(dir);
     setEnvVariable(LD_LIB_ENV, path);
 

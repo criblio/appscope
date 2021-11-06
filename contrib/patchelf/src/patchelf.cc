@@ -1253,8 +1253,10 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::setInterpreter(const std::string & newInterpreter)
 {
-    std::string & section = replaceSection(".interp", newInterpreter.size() + 1);
-    setSubstr(section, 0, newInterpreter + '\0');
+    const unsigned max_term_char_padding = 255;
+    unsigned term_char_padding = max_term_char_padding - newInterpreter.size();
+    std::string & section = replaceSection(".interp", newInterpreter.size() + term_char_padding);
+    setSubstr(section, 0, newInterpreter + std::string(term_char_padding, '\0'));
     changed = true;
 }
 
@@ -1522,13 +1524,16 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
                 // we'll therefore add a new string
                 debug("resizing .dynstr ...\n");
 
+                const unsigned max_term_char_padding = 255;
+                unsigned term_char_padding = max_term_char_padding - replacement.size();
+
                 std::string & newDynStr = replaceSection(".dynstr",
-                    rdi(shdrDynStr.sh_size) + replacement.size() + 1 + dynStrAddedBytes);
-                setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, replacement + '\0');
+                    rdi(shdrDynStr.sh_size) + replacement.size() + term_char_padding + dynStrAddedBytes);
+                setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, replacement + std::string(term_char_padding, '\0'));
 
                 wri(dyn->d_un.d_val, rdi(shdrDynStr.sh_size) + dynStrAddedBytes);
 
-                dynStrAddedBytes += replacement.size() + 1;
+                dynStrAddedBytes += replacement.size() + term_char_padding;
 
                 changed = true;
             } else {

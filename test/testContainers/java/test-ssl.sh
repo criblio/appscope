@@ -90,11 +90,18 @@ starttest Tomcat
 ldscope /opt/tomcat/bin/catalina.sh run &
 evaltest
 
-until [ "`curl $CURL_PARAMS  -k --silent --connect-timeout 1 -I https://localhost:8443 | grep 'Coyote'`" != "" ];
+CURL_MAX_RETRY=10
+until [[ "`curl $CURL_PARAMS -k --silent --connect-timeout 1 -I https://localhost:8443 | grep 'Coyote'`" != "" ]] || [[ "$CURL_MAX_RETRY" -lt 0 ]];
 do
     echo waiting for tomcat...
     sleep 1
+    let CURL_MAX_RETRY-=1
 done
+
+if [[ "$CURL_MAX_RETRY" -lt 0 ]]; then
+    echo "Error: timed out waiting for tomcat"
+    ERR+=$?
+fi
 
 sleep 2
 grep http-req $EVT_FILE > /dev/null

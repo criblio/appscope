@@ -4795,7 +4795,7 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
     char *local_buf;
     char time_buf[LOG_TIME_SIZE];
     int msec;
-    struct tm* tm_info;
+    struct tm tm_info;
     struct timeval tv;
 
     if (!g_log) {
@@ -4842,8 +4842,8 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
         tv.tv_sec++;
         msec = 0;
     }
-    tm_info = localtime(&tv.tv_sec);
-    strftime(time_buf, LOG_TIME_SIZE, "%Y-%m-%d %H:%M:%S", tm_info);
+    localtime_r(&tv.tv_sec, &tm_info);
+    strftime(time_buf, LOG_TIME_SIZE, "%Y-%m-%d %H:%M:%S", &tm_info);
 
     local_buf = scope_log_var_buf + snprintf(scope_log_var_buf, LOG_BUF_SIZE, "Scope: %s(pid:%d): [%s.%03d] ", g_proc.procname, g_proc.pid, time_buf, msec);
     size_t local_buf_len = sizeof(scope_log_var_buf) + (scope_log_var_buf - local_buf) - 1;

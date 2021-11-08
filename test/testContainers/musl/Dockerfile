@@ -2,9 +2,17 @@ FROM alpine:latest
 
 RUN apk add bash curl gcc gdb musl-dev
 
+RUN mkdir -p /opt/musl && \
+    cd /opt/musl/ && \
+    wget https://musl.libc.org/releases/musl-1.2.2.tar.gz -O - | tar -xz --strip-components=1 && \
+    ./configure --syslibdir=/opt/linker_alternative_path && \
+    make && \
+    make install
+
 RUN mkdir -p /opt/fwrite
 COPY ./musl/fwrite.c /opt/fwrite/fwrite.c
 RUN gcc -o /opt/fwrite/fwrite /opt/fwrite/fwrite.c
+RUN gcc -Wl,--dynamic-linker=/opt/linker_alternative_path/ld-musl-x86_64.so.1 -o /opt/fwrite/fwrite_alternative /opt/fwrite/fwrite.c
 
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4

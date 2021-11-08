@@ -323,6 +323,42 @@ services:
         DNLD_HEXDUMP: microdnf install util-linux
     <<: *scope-common
 
+  java15:
+    image: ghcr.io/criblio/appscope-test-java15:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-java15:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: openjdk:15
+        DNLD_HEXDUMP: microdnf install util-linux
+    <<: *scope-common
+
+  java16:
+    image: ghcr.io/criblio/appscope-test-java16:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-java16:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: openjdk:16
+        DNLD_HEXDUMP: microdnf install util-linux
+    <<: *scope-common
+
+  java17:
+    image: ghcr.io/criblio/appscope-test-java17:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-java17:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./java/Dockerfile
+      args:
+        JDK_IMAGE: openjdk:17
+        DNLD_HEXDUMP: microdnf install util-linux
+    <<: *scope-common
+
 
   # Pulls x86 RPM from Cribl CDN
   oracle-java7:
@@ -406,6 +442,36 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-14.0.2_linux-x64_bin.tar.gz
+    <<: *scope-common
+  oracle-java15:
+    image: ghcr.io/criblio/appscope-test-oracle-java15:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-oracle-java15:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./java/Dockerfile.oracle
+      args:
+        JRE_TGZ: jdk/jdk-15.0.2_linux-x64_bin.tar.gz
+    <<: *scope-common
+  oracle-java16:
+    image: ghcr.io/criblio/appscope-test-oracle-java16:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-oracle-java16:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./java/Dockerfile.oracle
+      args:
+        JRE_TGZ: jdk/jdk-16.0.2_linux-x64_bin.tar.gz
+    <<: *scope-common
+  oracle-java17:
+    image: ghcr.io/criblio/appscope-test-oracle-java17:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-oracle-java17:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./java/Dockerfile.oracle
+      args:
+        JRE_TGZ: jdk/jdk-17.0.1_linux-x64_bin.tar.gz
     <<: *scope-common
   # skipped on ARM - no attach support yet
   attach-glibc:

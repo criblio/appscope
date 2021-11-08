@@ -16,7 +16,6 @@ ENV SCOPE_EVENT_NET=true
 ENV SCOPE_EVENT_FS=false
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
-ENV SCOPE_ALLOW_MUSL_ATTACH=true
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh

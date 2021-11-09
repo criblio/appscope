@@ -9,7 +9,8 @@ name: Build & Test
 on: 
   # Run on pushes to any branch
   push:
-
+  # Run on manually triggered workflow
+  workflow_dispatch:
   # Run on PRs targeting the default branch or a release branche
   pull_request:
     branches:

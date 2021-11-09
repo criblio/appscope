@@ -220,8 +220,6 @@ set_library(const char* libpath)
         if (rc < sbuf.st_size) {
             perror("set_library:write");
         }
-    } else {
-        fprintf(stderr, "WARNING: can't locate or set the loader string in %s\n", libpath);
     }
 
     close(fd);

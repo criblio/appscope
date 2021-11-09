@@ -150,6 +150,18 @@ set_library(const char* libpath)
 
     // get the elf header, section table and string table
     elf = (Elf64_Ehdr *)buf;
+
+    if (elf->e_ident[EI_MAG0] != ELFMAG0
+        || elf->e_ident[EI_MAG1] != ELFMAG1
+        || elf->e_ident[EI_MAG2] != ELFMAG2
+        || elf->e_ident[EI_MAG3] != ELFMAG3
+        || elf->e_ident[EI_VERSION] != EV_CURRENT) {
+        fprintf(stderr, "ERROR:%s: is not valid ELF file", libpath);
+        close(fd);
+        munmap(buf, sbuf.st_size);
+        return -1;
+    }
+
     sections = (Elf64_Shdr *)((char *)buf + elf->e_shoff);
     section_strtab = (char *)buf + sections[elf->e_shstrndx].sh_offset;
     found = name = 0;

@@ -23,10 +23,6 @@ We have moved some of the test service definitions out of `docker-compose.yml`
 into separate arch-specific configs; `docker-compose.$(uname -m).yml`. This
 was done because the base images for some of them are not available on ARM.
 
-We have an additional config named `docker-compose.privileged.yml` that sets
-the privileged option in each container when run with `make ${TEST}-shell` so
-we can use `gdb` and other restricted tools.
-
 ## Images
 
 We're trying to make all of the images as consistent as we can so we can hit

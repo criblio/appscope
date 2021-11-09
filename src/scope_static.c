@@ -114,11 +114,10 @@ setEnvVariable(char *env, char *value)
 
 // modify NEEDED entries in libscope.so to avoid dependencies
 static int
-set_library(void)
+set_library(const char* libpath)
 {
     int i, fd, found, name;
     struct stat sbuf;
-    const char *libpath;
     char *buf;
     Elf64_Ehdr *elf;
     Elf64_Shdr *sections;
@@ -127,7 +126,8 @@ set_library(void)
     const char *strtab = NULL;
     const char *sec_name = NULL;
 
-    if ((libpath = libdirGetLibrary()) == NULL) return -1;
+    if (libpath == NULL)
+        return -1;
 
     if ((fd = open(libpath, O_RDONLY)) == -1) {
         perror("set_library:open");
@@ -403,7 +403,7 @@ do_musl(char *exld, char *ldscope)
     }
 
     set_loader(ldscope);
-    set_library();
+    set_library(libdirGetLibrary());
 
     if (ldso) free(ldso);
     if (lpath) free(lpath);
@@ -431,6 +431,19 @@ setup_loader(char *exe, char *ldscope)
     if (ldso) free(ldso);
 
     return ret;
+}
+
+static int
+patch_library(const char* so_path) {
+    int result = EXIT_FAILURE;
+
+    char *ldso = get_loader(EXE_TEST_FILE);
+    if (ldso && strstr(ldso, LIBMUSL) != NULL) {
+        result = set_library(optarg);
+    }
+    free(ldso);
+
+    return result;
 }
 
 /* 
@@ -892,6 +905,7 @@ showUsage(char *prog)
       "  -l, --libbasedir DIR  specify parent for the library directory (default: /tmp)\n"
       "  -f DIR                alias for \"-l DIR\" for backward compatibility\n"
       "  -a, --attach PID      attach to the specified process ID\n"
+      "  -p, --patch SO_FILE   patch specified libscope.so \n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"
       "\n"
@@ -912,6 +926,7 @@ static struct option opts[] = {
     { "help",       optional_argument, 0, 'h' },
     { "attach",     required_argument, 0, 'a' },
     { "libbasedir", required_argument, 0, 'l' },
+    { "patch",      required_argument, 0, 'p' },
     { 0, 0, 0, 0 }
 };
 
@@ -932,7 +947,7 @@ main(int argc, char **argv, char **env)
         // The initial `:` lets us handle options with optional values like
         // `-h` and `-h SECTION`.
         //
-        int opt = getopt_long(argc, argv, "+:uh:a:l:f:", opts, &index);
+        int opt = getopt_long(argc, argv, "+:uh:a:l:f:p:", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -955,6 +970,8 @@ main(int argc, char **argv, char **env)
             case 'l':
                 libdirSetBase(optarg);
                 break;
+            case 'p':
+                return patch_library(optarg);
             case ':':
                 // options missing their value end up here
                 switch (optopt) {

@@ -172,7 +172,7 @@ set_library(const char* libpath)
     // locate the .dynamic section
     for (i = 0; i < elf->e_shnum; i++) {
         if (sections[i].sh_type == SHT_DYNAMIC) {
-            for (dyn = (Elf64_Dyn *)((char *)buf + sections[i].sh_offset); dyn != DT_NULL; dyn++) {
+            for (dyn = (Elf64_Dyn *)((char *)buf + sections[i].sh_offset); dyn != NULL && dyn->d_tag != DT_NULL; dyn++) {
                 if (dyn->d_tag == DT_NEEDED) {
                     char *depstr = (char *)(strtab + dyn->d_un.d_val);
                     if (depstr && strstr(depstr, "ld-linux")) {

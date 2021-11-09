@@ -79,6 +79,7 @@ evalPayload(){
 # OpenSSL
 #
 starttest OpenSSL
+cd /opt/test
 ldscope /opt/test/curl-ssl --http1.1 --head https://cribl.io
 evaltest
 

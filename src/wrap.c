@@ -272,14 +272,14 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
          if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
-             scopeLog(CFG_LOG_ERROR, "ERROR: "#func":NULL\n");         \
+             scopeLogError("ERROR: "#func":NULL\n");         \
              return rc;                                                \
          }                                                             \
        } else {                                                        \
         param_t param = {.in_symbol = #func, .out_addr = NULL,         \
                          .after_scope = FALSE};                        \
         if (!dl_iterate_phdr(findSymbol, &param)) {                    \
-            scopeLog(CFG_LOG_ERROR, "ERROR: "#func":NULL\n");          \
+            scopeLogError("ERROR: "#func":NULL\n");          \
             return rc;                                                 \
         }                                                              \
         g_fn.func = param.out_addr;                                    \
@@ -291,14 +291,14 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
          if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
-             scopeLog(CFG_LOG_ERROR, "ERROR: "#func":NULL\n");         \
+             scopeLogError("ERROR: "#func":NULL\n");         \
              return;                                                   \
          }                                                             \
        } else {                                                        \
         param_t param = {.in_symbol = #func, .out_addr = NULL,         \
                          .after_scope = FALSE};                        \
         if (!dl_iterate_phdr(findSymbol, &param)) {                    \
-            scopeLog(CFG_LOG_ERROR, "ERROR: "#func":NULL\n");          \
+            scopeLogError("ERROR: "#func":NULL\n");          \
             return;                                                    \
         }                                                              \
         g_fn.func = param.out_addr;                                    \
@@ -324,7 +324,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 #define WRAP_CHECK(func, rc)                                           \
     if (g_fn.func == NULL ) {                                          \
         if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
-            scopeLog(CFG_LOG_ERROR, "ERROR: "#func":NULL\n");          \
+            scopeLogError("ERROR: "#func":NULL\n");          \
             return rc;                                                 \
        }                                                               \
     }                                                                  \
@@ -333,7 +333,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
         if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
-            scopeLog(CFG_LOG_ERROR, "ERROR: "#func":NULL\n");          \
+            scopeLogError("ERROR: "#func":NULL\n");          \
             return;                                                    \
        }                                                               \
     }                                                                  \
@@ -438,7 +438,7 @@ remoteConfig()
     snprintf(path, sizeof(path), "/tmp/cfg.%d", g_proc.pid);
     if ((fs = g_fn.fopen(path, "a+")) == NULL) {
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: remoteConfig:fopen");
+        scopeLogError("ERROR: remoteConfig:fopen");
         return;
     }
 
@@ -673,7 +673,7 @@ threadNow(int sig)
 
     if (g_fn.pthread_create &&
         (g_fn.pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0)) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: threadNow:pthread_create");
+        scopeLogError("ERROR: threadNow:pthread_create");
         if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
         return;
     }
@@ -743,7 +743,7 @@ threadInit()
     if (getenv("SCOPE_NO_SIGNAL")) return;
 
     if (osThreadInit(threadNow, g_thread.interval) == FALSE) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: threadInit:osThreadInit");
+        scopeLogError("ERROR: threadInit:osThreadInit");
     }
 }
 
@@ -807,7 +807,7 @@ setProcId(proc_id_t *proc)
     proc->pid = getpid();
     proc->ppid = getppid();
     if (gethostname(proc->hostname, sizeof(proc->hostname)) != 0) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: gethostname");
+        scopeLogError("ERROR: gethostname");
     }
     osGetProcname(proc->procname, sizeof(proc->procname));
 
@@ -1078,7 +1078,7 @@ load_func(const char *module, const char *func)
     
     void *handle = g_fn.dlopen(module, RTLD_LAZY | RTLD_NOLOAD);
     if (handle == NULL) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: Could not open file %s.\n", module ? module : "(null)");
+        scopeLogError("ERROR: Could not open file %s.\n", module ? module : "(null)");
         return NULL;
     }
 
@@ -1086,11 +1086,11 @@ load_func(const char *module, const char *func)
     dlclose(handle);
 
     if (addr == NULL) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: Could not get function address of %s.\n", func);
+        scopeLogError("ERROR: Could not get function address of %s.\n", func);
         return NULL;
     }
 
-    scopeLog(CFG_LOG_ERROR, "%s:%d %s found at %p\n", __FUNCTION__, __LINE__, func, addr);
+    scopeLogError("%s:%d %s found at %p\n", __FUNCTION__, __LINE__, func, addr);
     return addr;
 }
 
@@ -1257,7 +1257,7 @@ initHook(int attachedFlag)
         initGoHook(ebuf);
         threadNow(0);
         if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
-            scopeLog(CFG_LOG_ERROR, "initHook:arch_prctl");
+            scopeLogError("initHook:arch_prctl");
         }
 
         __asm__ volatile (
@@ -1412,7 +1412,7 @@ initHook(int attachedFlag)
         // hook 'em
         rc = funchook_install(funchook, 0);
         if (rc != 0) {
-            scopeLog(CFG_LOG_ERROR, "ERROR: failed to install SSL_read hook. (%s)\n",
+            scopeLogError("ERROR: failed to install SSL_read hook. (%s)\n",
                         funchook_error_message(funchook));
             return;
         }
@@ -2542,7 +2542,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
         ((scopexec = getpath("ldscope")) == NULL)) {
 
         // can't find the scope executable
-        scopeLog(CFG_LOG_WARN, "execve: can't find a scope executable for %s", pathname);
+        scopeLogWarn("execve: can't find a scope executable for %s", pathname);
         return g_fn.execve(pathname, argv, envp);
     }
 
@@ -2797,7 +2797,7 @@ SSL_read(SSL *ssl, void *buf, int num)
 {
     int rc;
     
-    //scopeLog(CFG_LOG_ERROR, "SSL_read");
+    //scopeLogError("SSL_read");
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
 
@@ -2815,7 +2815,7 @@ SSL_write(SSL *ssl, const void *buf, int num)
 {
     int rc;
     
-    //scopeLog(CFG_LOG_ERROR, "SSL_write");
+    //scopeLogError("SSL_write");
     WRAP_CHECK(SSL_write, -1);
 
     rc = g_fn.SSL_write(ssl, buf, num);
@@ -2868,7 +2868,7 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_recv");
+    //scopeLogError("gnutls_record_recv");
     WRAP_CHECK(gnutls_record_recv, -1);
     rc = g_fn.gnutls_record_recv(session, data, data_size);
 
@@ -2884,7 +2884,7 @@ gnutls_record_recv_early_data(gnutls_session_t session, void *data, size_t data_
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_recv_early_data");
+    //scopeLogError("gnutls_record_recv_early_data");
     WRAP_CHECK(gnutls_record_recv_early_data, -1);
     rc = g_fn.gnutls_record_recv_early_data(session, data, data_size);
 
@@ -2900,7 +2900,7 @@ gnutls_record_recv_packet(gnutls_session_t session, gnutls_packet_t *packet)
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_recv_packet");
+    //scopeLogError("gnutls_record_recv_packet");
     WRAP_CHECK(gnutls_record_recv_packet, -1);
     rc = g_fn.gnutls_record_recv_packet(session, packet);
 
@@ -2915,7 +2915,7 @@ gnutls_record_recv_seq(gnutls_session_t session, void *data, size_t data_size, u
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_recv_seq");
+    //scopeLogError("gnutls_record_recv_seq");
     WRAP_CHECK(gnutls_record_recv_seq, -1);
     rc = g_fn.gnutls_record_recv_seq(session, data, data_size, seq);
 
@@ -2931,7 +2931,7 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_send");
+    //scopeLogError("gnutls_record_send");
     WRAP_CHECK(gnutls_record_send, -1);
     rc = g_fn.gnutls_record_send(session, data, data_size);
 
@@ -2948,7 +2948,7 @@ gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_send2");
+    //scopeLogError("gnutls_record_send2");
     WRAP_CHECK(gnutls_record_send2, -1);
     rc = g_fn.gnutls_record_send2(session, data, data_size, pad, flags);
 
@@ -2964,7 +2964,7 @@ gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_send_early_data");
+    //scopeLogError("gnutls_record_send_early_data");
     WRAP_CHECK(gnutls_record_send_early_data, -1);
     rc = g_fn.gnutls_record_send_early_data(session, data, data_size);
 
@@ -2981,7 +2981,7 @@ gnutls_record_send_range(gnutls_session_t session, const void *data, size_t data
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_send_range");
+    //scopeLogError("gnutls_record_send_range");
     WRAP_CHECK(gnutls_record_send_range, -1);
     rc = g_fn.gnutls_record_send_range(session, data, data_size, range);
 
@@ -3001,13 +3001,13 @@ nss_close(PRFileDesc *fd)
     // Note: NSS docs don't define that PR_GetError should be called on failure
     if (!fd) return PR_FAILURE;
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_close", (uint64_t)fd->methods);
+    //scopeLogError("fd:%d nss_close", (uint64_t)fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->close(fd);
     } else {
         rc = PR_FAILURE;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_close no list entry");
+        scopeLogError("ERROR: nss_close no list entry");
         return rc;
     }
 
@@ -3036,13 +3036,13 @@ nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRInterv
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_send", (uint64_t)fd->methods);
+    //scopeLogError("fd:%d nss_send", (uint64_t)fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->send(fd, buf, amount, flags, timeout);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_send no list entry");
+        scopeLogError("ERROR: nss_send no list entry");
     }
 
     if (rc > 0) {
@@ -3072,13 +3072,13 @@ nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_recv", (uint64_t)fd->methods);
+    //scopeLogError("fd:%d nss_recv", (uint64_t)fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->recv(fd, buf, amount, flags, timeout);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_recv no list entry");
+        scopeLogError("ERROR: nss_recv no list entry");
     }
 
     if (rc > 0) {
@@ -3108,13 +3108,13 @@ nss_read(PRFileDesc *fd, void *buf, PRInt32 amount)
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_read", (uint64_t)fd->methods);
+    //scopeLogError("fd:%d nss_read", (uint64_t)fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->read(fd, buf, amount);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_read no list entry");
+        scopeLogError("ERROR: nss_read no list entry");
     }
 
     if (rc > 0) {
@@ -3144,13 +3144,13 @@ nss_write(PRFileDesc *fd, const void *buf, PRInt32 amount)
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_write", fd->methods);
+    //scopeLogError("fd:%d nss_write", fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->write(fd, buf, amount);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_write no list entry");
+        scopeLogError("ERROR: nss_write no list entry");
     }
 
     if (rc > 0) {
@@ -3180,13 +3180,13 @@ nss_writev(PRFileDesc *fd, const PRIOVec *iov, PRInt32 iov_size, PRIntervalTime 
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_writev", fd->methods);
+    //scopeLogError("fd:%d nss_writev", fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->writev(fd, iov, iov_size, timeout);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_writev no list entry");
+        scopeLogError("ERROR: nss_writev no list entry");
     }
 
     if (rc > 0) {
@@ -3217,13 +3217,13 @@ nss_sendto(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags,
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_sendto", fd->methods);
+    //scopeLogError("fd:%d nss_sendto", fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->sendto(fd, (void *)buf, amount, flags, addr, timeout);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_sendto no list entry");
+        scopeLogError("ERROR: nss_sendto no list entry");
     }
 
     if (rc > 0) {
@@ -3254,13 +3254,13 @@ nss_recvfrom(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags,
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_recvfrom", fd->methods);
+    //scopeLogError("fd:%d nss_recvfrom", fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->recvfrom(fd, buf, amount, flags, addr, timeout);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_recvfrom no list entry");
+        scopeLogError("ERROR: nss_recvfrom no list entry");
     }
 
     if (rc > 0) {
@@ -3294,7 +3294,7 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
             memmove(nssentry->ssl_methods, result->methods, sizeof(PRIOMethods));
             memmove(nssentry->ssl_int_methods, result->methods, sizeof(PRIOMethods));
             nssentry->id = (uint64_t)nssentry->ssl_int_methods;
-            //scopeLog(CFG_LOG_INFO, "fd:%d SSL_ImportFD", (uint64_t)nssentry->id);
+            //scopeLogInfo("fd:%d SSL_ImportFD", (uint64_t)nssentry->id);
 
             // ref contrib/tls/nss/prio.h struct PRIOMethods
             // read ... todo? read, recvfrom, acceptread

@@ -253,12 +253,12 @@ initState()
 {
     // Per a Read Update & Change (RUC) model; now that the object is ready assign the global
     if ((g_netinfo = (net_info *)calloc(1, sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: Constructor:Calloc");
+        scopeLogError("ERROR: Constructor:Calloc");
     }
 
     // Per RUC...
     if ((g_fsinfo = (fs_info *)calloc(1, sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: Constructor:Calloc");
+        scopeLogError("ERROR: Constructor:Calloc");
     }
 
     initHttpState();
@@ -1406,7 +1406,7 @@ addSock(int fd, int type, int family)
 
             // Need to realloc
             if ((temp = realloc(g_netinfo, sizeof(struct net_info_t) * increase)) == NULL) {
-                scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: addSock:realloc", fd);
+                scopeLogError("fd:%d ERROR: addSock:realloc", fd);
                 DBG("re-alloc on Net table failed");
             } else {
                 memset(&temp[g_numNinfo], 0, sizeof(struct net_info_t) * (increase - g_numNinfo));
@@ -1458,7 +1458,7 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
     }
 
     if (g_cfg.blockconn == htons(port)) {
-        scopeLog(CFG_LOG_INFO, "fd:%d doBlockConnection: blocked connection", fd);
+        scopeLogInfo("fd:%d doBlockConnection: blocked connection", fd);
         return 1;
     }
 
@@ -1562,7 +1562,7 @@ doAddNewSock(int sockfd)
                 addSock(sockfd, type, addr.ss_family);
             } else {
                 // Really can't add the socket at this point
-                scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doAddNewSock:getsockopt", sockfd);
+                scopeLogError("fd:%d ERROR: doAddNewSock:getsockopt", sockfd);
             }
         } else {
             // is RAW a viable default?
@@ -1746,7 +1746,7 @@ getNSFuncs(void)
 
     void *handle = g_fn.dlopen("libresolv.so", RTLD_LAZY | RTLD_NODELETE);
     if (handle == NULL) {
-        scopeLog(CFG_LOG_WARN,
+        scopeLogWarn(
                     "WARNING: could not locate libresolv, DNS events will be affected");
         return FALSE;
     }
@@ -1756,7 +1756,7 @@ getNSFuncs(void)
     dlclose(handle);
 
     if (!g_fn.ns_initparse || !g_fn.ns_parserr) {
-        scopeLog(CFG_LOG_WARN,
+        scopeLogWarn(
                     "WARNING: could not locate name server functions, DNS events will be affected");
         return FALSE;
     }
@@ -1779,7 +1779,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
 
     // init ns lib
     if (g_fn.ns_initparse((const unsigned char *)buf, len, &handle) == -1) {
-        scopeLog(CFG_LOG_ERROR, "ERROR:init parse");
+        scopeLogError("ERROR:init parse");
         return FALSE;
     }
 
@@ -1791,7 +1791,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
             //char dispbuf[4096];
 
             if (g_fn.ns_parserr(&handle, ns_s_an, i, &rr) == -1) {
-                scopeLog(CFG_LOG_ERROR, "ERROR:parse rr");
+                scopeLogError("ERROR:parse rr");
                 return FALSE;
             }
 
@@ -2358,7 +2358,7 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
 
             // Need to realloc
             if ((temp = realloc(g_fsinfo, sizeof(struct fs_info_t) * increase)) == NULL) {
-                scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doOpen:realloc", fd);
+                scopeLogError("fd:%d ERROR: doOpen:realloc", fd);
                 DBG("re-alloc on FS table failed");
             } else {
                 memset(&temp[g_numFSinfo], 0, sizeof(struct fs_info_t) * (increase - g_numFSinfo));

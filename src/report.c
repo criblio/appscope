@@ -214,7 +214,7 @@ sendEvent(mtc_t *mtc, event_t *event)
     cmdSendEvent(g_ctl, event, getTime(), &g_proc);
 
     if (cmdSendMetric(mtc, event) == -1) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: sendEvent:cmdSendMetric");
+        scopeLogError("ERROR: sendEvent:cmdSendMetric");
     }
 }
 
@@ -440,13 +440,13 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr,
         strncpy(hreport->hres, hdr, hdr_len);
         header = hreport->hres;
     } else {
-        scopeLog(CFG_LOG_WARN, "fd:%d WARN: httpFields: proto ptype is not req or resp", proto->fd);
+        scopeLogWarn("fd:%d WARN: httpFields: proto ptype is not req or resp", proto->fd);
         return FALSE;
     }
 
     char *thishdr = strtok_r(header, "\r\n", &savea);
     if (!thishdr) {
-        scopeLog(CFG_LOG_WARN, "fd:%d WARN: httpFields: parse an http header", proto->fd);
+        scopeLogWarn("fd:%d WARN: httpFields: parse an http header", proto->fd);
         return FALSE;
     }
 
@@ -586,7 +586,7 @@ doHttp1Header(protocol_info *proto)
     // we're either building a new req or we have a previous req
     if (map->req) {
         if ((hreport.hreq = calloc(1, map->req_len)) == NULL) {
-            scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doHttp1Header: hreq memory allocation failure", proto->fd);
+            scopeLogError("fd:%d ERROR: doHttp1Header: hreq memory allocation failure", proto->fd);
             return;
         }
 
@@ -596,7 +596,7 @@ doHttp1Header(protocol_info *proto)
         char *headertok = strtok_r(header, "\r\n", &savea);
         if (!headertok) {
             free(hreport.hreq);
-            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttp1Header: parse an http request header", proto->fd);
+            scopeLogWarn("fd:%d WARN: doHttp1Header: parse an http request header", proto->fd);
             return;
         }
 
@@ -606,7 +606,7 @@ doHttp1Header(protocol_info *proto)
             H_ATTRIB(fields[hreport.ix], "http_method", method_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
-            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttp1Header: no method in an http request header", proto->fd);
+            scopeLogWarn("fd:%d WARN: doHttp1Header: no method in an http request header", proto->fd);
         }
 
         char *target_str = strtok_r(NULL, " ", &savea);
@@ -614,7 +614,7 @@ doHttp1Header(protocol_info *proto)
             H_ATTRIB(fields[hreport.ix], "http_target", target_str, 4);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
-            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttp1Header: no target in an http request header", proto->fd);
+            scopeLogWarn("fd:%d WARN: doHttp1Header: no target in an http request header", proto->fd);
         }
 
         char *flavor_str = strtok_r(NULL, " ", &savea);
@@ -626,7 +626,7 @@ doHttp1Header(protocol_info *proto)
                 HTTP_NEXT_FLD(hreport.ix);
             }
         } else {
-            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttp1Header: no http version in an http request header", proto->fd);
+            scopeLogWarn("fd:%d WARN: doHttp1Header: no http version in an http request header", proto->fd);
         }
 
         H_ATTRIB(fields[hreport.ix], "http_scheme", ssl, 1);
@@ -666,7 +666,7 @@ doHttp1Header(protocol_info *proto)
     */
     if (proto->ptype == EVT_HRES) {
         if ((hreport.hres = calloc(1, proto->len)) == NULL) {
-            scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doHttp1Header: hres memory allocation failure", proto->fd);
+            scopeLogError("fd:%d ERROR: doHttp1Header: hres memory allocation failure", proto->fd);
             return;
         }
 
@@ -698,7 +698,7 @@ doHttp1Header(protocol_info *proto)
             H_ATTRIB(fields[hreport.ix], "http_flavor", flavor_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
-            scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttp1Header: no version string in an http request header", proto->fd);
+            scopeLogWarn("fd:%d WARN: doHttp1Header: no version string in an http request header", proto->fd);
         }
 
         H_VALUE(fields[hreport.ix], "http_status_code", status, 1);
@@ -1503,7 +1503,7 @@ doErrorMetric(metric_t type, control_type_t source,
 
         event_t netErrMetric = INT_EVENT("net.error", value->mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &netErrMetric)) {
-            scopeLog(CFG_LOG_ERROR, "ERROR: doErrorMetric:NET:cmdSendMetric");
+            scopeLogError("ERROR: doErrorMetric:NET:cmdSendMetric");
         }
         atomicSwapU64(&value->mtc, 0);
         break;
@@ -1583,14 +1583,14 @@ doErrorMetric(metric_t type, control_type_t source,
 
         event_t fsErrMetric = INT_EVENT(metric, value->mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &fsErrMetric)) {
-            scopeLog(CFG_LOG_ERROR, "ERROR: doErrorMetric:FS_ERR:cmdSendMetric");
+            scopeLogError("ERROR: doErrorMetric:FS_ERR:cmdSendMetric");
         }
         atomicSwapU64(&value->mtc, 0);
         break;
     }
 
     default:
-        scopeLog(CFG_LOG_ERROR, "ERROR: doErrorMetric:metric type");
+        scopeLogError("ERROR: doErrorMetric:metric type");
     }
 }
 
@@ -1673,7 +1673,7 @@ doDNSMetricName(metric_t type, net_info *net)
         };
         event_t dnsMetric = INT_EVENT("net.dns", ctrs->numDNS.mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &dnsMetric)) {
-            scopeLog(CFG_LOG_ERROR, "ERROR: doDNSMetricName:DNS:cmdSendMetric");
+            scopeLogError("ERROR: doDNSMetricName:DNS:cmdSendMetric");
         }
         break;
     }
@@ -1739,7 +1739,7 @@ doDNSMetricName(metric_t type, net_info *net)
         };
         event_t dnsDurMetric = INT_EVENT("net.dns.duration", dur, DELTA_MS, fields);
         if (cmdSendMetric(g_mtc, &dnsDurMetric)) {
-            scopeLog(CFG_LOG_ERROR, "ERROR: doDNSMetricName:DNS_DURATION:cmdSendMetric");
+            scopeLogError("ERROR: doDNSMetricName:DNS_DURATION:cmdSendMetric");
         }
         atomicSwapU64(&ctrs->dnsDurationNum.mtc, 0);
         atomicSwapU64(&ctrs->dnsDurationTotal.mtc, 0);
@@ -1747,7 +1747,7 @@ doDNSMetricName(metric_t type, net_info *net)
     }
 
     default:
-        scopeLog(CFG_LOG_ERROR, "ERROR: doDNSMetric:metric type");
+        scopeLogError("ERROR: doDNSMetric:metric type");
     }
 }
 
@@ -1849,7 +1849,7 @@ doProcMetric(metric_t type, long long measurement)
     }
 
     default:
-        scopeLog(CFG_LOG_ERROR, "ERROR: doProcMetric:metric type");
+        scopeLogError("ERROR: doProcMetric:metric type");
     }
 }
 
@@ -1884,7 +1884,7 @@ doStatMetric(const char *op, const char *pathname, void* ctr)
 
     event_t evt = INT_EVENT("fs.op.stat", ctrs->numStat.mtc, DELTA, fields);
     if (cmdSendMetric(g_mtc, &evt)) {
-        scopeLog(CFG_LOG_ERROR, "doStatMetric");
+        scopeLogError("doStatMetric");
     }
 }
 
@@ -2239,7 +2239,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         };
         event_t evt = INT_EVENT("fs.duration", dur, HISTOGRAM, fields);
         if (cmdSendMetric(g_mtc, &evt)) {
-            scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doFSMetric:FS_DURATION:cmdSendMetric", fs->fd);
+            scopeLogError("fd:%d ERROR: doFSMetric:FS_DURATION:cmdSendMetric", fs->fd);
         }
 
         // Reset the info if we tried to report
@@ -2322,7 +2322,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         event_t rwMetric = INT_EVENT(metric, sizebytes->mtc, HISTOGRAM, fields);
 
         if (cmdSendMetric(g_mtc, &rwMetric)) {
-            scopeLog(CFG_LOG_ERROR, "fd:%d %s", fs->fd, err_str);
+            scopeLogError("fd:%d %s", fs->fd, err_str);
         }
         subFromInterfaceCounts(global_counter, sizebytes->mtc);
         atomicSwapU64(&numops->mtc, 0);
@@ -2413,7 +2413,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
 
         event_t evt = INT_EVENT(metric, numops->mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &evt)) {
-            scopeLog(CFG_LOG_ERROR, "fd:%d %s", fs->fd, err_str);
+            scopeLogError("fd:%d %s", fs->fd, err_str);
         }
         subFromInterfaceCounts(global_counter, numops->mtc);
         atomicSwapU64(&numops->mtc, 0);
@@ -2475,7 +2475,7 @@ doTotalNetRxTx(metric_t type)
             };
             event_t evt = INT_EVENT(metric, (*value)[bucket].mtc, DELTA, fields);
             if (cmdSendMetric(g_mtc, &evt)) {
-                scopeLog(CFG_LOG_ERROR, "%s", err_str);
+                scopeLogError("%s", err_str);
             }
         }
 
@@ -2583,7 +2583,7 @@ doTotal(metric_t type)
     };
     event_t evt = INT_EVENT(metric, value->mtc, aggregation_type, fields);
     if (cmdSendMetric(g_mtc, &evt)) {
-        scopeLog(CFG_LOG_ERROR, "%s", err_str);
+        scopeLogError("%s", err_str);
     }
 
     // Reset the info we tried to report (if it's not a gauge)
@@ -2653,7 +2653,7 @@ doTotalDuration(metric_t type)
     };
     event_t evt = INT_EVENT(metric, dur, aggregation_type, fields);
     if (cmdSendMetric(g_mtc, &evt)) {
-        scopeLog(CFG_LOG_ERROR, "%s", err_str);
+        scopeLogError("%s", err_str);
     }
 
     // Reset the info we tried to report
@@ -2733,7 +2733,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
 
         event_t evt = INT_EVENT(metric, value->mtc, CURRENT, fields);
         if (cmdSendMetric(g_mtc, &evt)) {
-            scopeLog(CFG_LOG_ERROR, "fd:%d %s", net->fd, err_str);
+            scopeLogError("fd:%d %s", net->fd, err_str);
         }
         // Don't reset the info if we tried to report.  It's a gauge.
         // atomicSwapU64(value, 0);
@@ -2823,7 +2823,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         };
         event_t evt = INT_EVENT("net.conn_duration", dur, DELTA_MS, fields);
         if (cmdSendMetric(g_mtc, &evt)) {
-            scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doNetMetric:CONNECTION_DURATION:cmdSendMetric", net->fd);
+            scopeLogError("fd:%d ERROR: doNetMetric:CONNECTION_DURATION:cmdSendMetric", net->fd);
         }
         atomicSwapU64(&net->numDuration.mtc, 0);
         atomicSwapU64(&net->totalDuration.mtc, 0);
@@ -2952,7 +2952,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         event_t rxNetMetric = INT_EVENT("net.rx", net->rxBytes.mtc, DELTA, rxFields);
         memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
         if (cmdSendMetric(g_mtc, &rxMetric)) {
-            scopeLog(CFG_LOG_ERROR, "ERROR: doNetMetric:NETRX:cmdSendMetric");
+            scopeLogError("ERROR: doNetMetric:NETRX:cmdSendMetric");
         }
 
         // Reset the info if we tried to report
@@ -3079,7 +3079,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         event_t txNetMetric = INT_EVENT("net.tx", net->txBytes.mtc, DELTA, txFields);
         memmove(&txMetric, &txNetMetric, sizeof(event_t));
         if (cmdSendMetric(g_mtc, &txMetric)) {
-            scopeLog(CFG_LOG_ERROR, "ERROR: doNetMetric:NETTX:cmdSendMetric");
+            scopeLogError("ERROR: doNetMetric:NETTX:cmdSendMetric");
         }
 
         // Reset the info if we tried to report
@@ -3106,7 +3106,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
     }
 
     default:
-        scopeLog(CFG_LOG_ERROR, "ERROR: doNetMetric:metric type");
+        scopeLogError("ERROR: doNetMetric:metric type");
     }
 }
 
@@ -3286,7 +3286,7 @@ doPayload()
                 hlen = rc + 1;
             } else {
                 hlen--;
-                scopeLog(CFG_LOG_WARN, "fd:%d WARN: payload header was truncated", pinfo->sockfd);
+                scopeLogWarn("fd:%d WARN: payload header was truncated", pinfo->sockfd);
             }
 
             char *bdata = NULL;

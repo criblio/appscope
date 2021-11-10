@@ -293,7 +293,7 @@ mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
             char *temp = realloc(msg, strsize+2); // room for "\n\0"
             if (!temp) {
                 DBG(NULL);
-                scopeLog(CFG_LOG_INFO, "mtcFormat realloc error");
+                scopeLogInfo("mtcFormat realloc error");
                 free(msg);
                 msg = NULL;
             } else {

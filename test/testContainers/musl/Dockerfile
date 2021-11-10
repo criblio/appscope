@@ -1,10 +1,13 @@
 FROM alpine:latest
 
-RUN apk add bash curl gcc gdb musl-dev
+RUN apk add bash binutils curl gcc gdb musl-dev
 
 RUN mkdir -p /opt/fwrite
 COPY ./musl/fwrite.c /opt/fwrite/fwrite.c
 RUN gcc -o /opt/fwrite/fwrite /opt/fwrite/fwrite.c
+
+RUN mkdir -p /opt/extract_scope && \
+    mkdir -p /opt/patch_libscope
 
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4

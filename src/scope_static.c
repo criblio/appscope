@@ -55,8 +55,9 @@ get_dir(const char *path, char *fres, size_t len)
     DIR *dirp;
     struct dirent *entry;
     char *dcopy, *pcopy, *dname, *fname;
+    int res = -1;
 
-    if (!path || !fres || (len <= 0)) return -1;
+    if (!path || !fres || (len <= 0)) return res;
 
     pcopy = strdup(path);
     dname = dirname(pcopy);
@@ -64,7 +65,7 @@ get_dir(const char *path, char *fres, size_t len)
     if ((dirp = opendir(dname)) == NULL) {
         perror("get_dir:opendir");
         if (pcopy) free(pcopy);
-        return -1;
+        return res;
     }
 
     dcopy = strdup(path);
@@ -74,6 +75,7 @@ get_dir(const char *path, char *fres, size_t len)
         if ((entry->d_type != DT_DIR) &&
             (strstr(entry->d_name, fname))) {
             strncpy(fres, entry->d_name, len);
+            res = 0;
             break;
         }
     }
@@ -81,7 +83,7 @@ get_dir(const char *path, char *fres, size_t len)
     closedir(dirp);
     if (pcopy) free(pcopy);
     if (dcopy) free(dcopy);
-    return 0;
+    return res;
 }
 
 static void

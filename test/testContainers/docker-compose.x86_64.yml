@@ -36,16 +36,6 @@ services:
       CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
     <<: *scope-common
 
-  # requires "privileged" on ARM but not on x86
-  syscalls:
-    image: ghcr.io/criblio/appscope-test-syscalls:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from:
-        - ghcr.io/criblio/appscope-test-syscalls:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./syscalls/Dockerfile
-    <<: *scope-common
-
   # There are no arm64 splunk/splunk images at Docker Hub
   splunk:
     image: ghcr.io/criblio/appscope-test-splunk:${TAG:?Missing TAG environment variable}

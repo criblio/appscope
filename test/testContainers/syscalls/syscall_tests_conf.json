@@ -127,7 +127,9 @@
         "fcntl38_64"
       ],
       "exclude_x86_64_tests": [],
-      "exclude_aarch64_tests": []
+      "exclude_aarch64_tests": [],
+      "exclude_musl_tests": [],
+      "exclude_glibc_tests": []
     },
     {
       "home": "/opt/test/altp/tests",
@@ -147,7 +149,9 @@
         "__xstat_01",
         "__xstat64_01",
         "__fxstat_01"
-      ]
+      ],
+      "exclude_musl_tests": [],
+      "exclude_glibc_tests": []
     }
   ]
 }

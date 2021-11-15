@@ -427,13 +427,13 @@ do_musl(char *exld, char *ldscope)
  * Returns 0 if musl was not detected and 1 if it was.
  */
 static int
-setup_loader(char *exe, char *ldscope)
+setup_loader(char *ldscope)
 {
     int ret = 0; // not musl
 
     char *ldso = NULL;
 
-    if (((ldso = get_loader(exe)) != NULL) &&
+    if (((ldso = get_loader(EXE_TEST_FILE)) != NULL) &&
         (strstr(ldso, LIBMUSL) != NULL)) {
             // we are using the musl ld.so
             do_musl(ldso, ldscope);
@@ -1034,7 +1034,7 @@ main(int argc, char **argv, char **env)
         fprintf(stderr, "error: failed to get a loader path\n");
         return EXIT_FAILURE;
     }
-    setup_loader(EXE_TEST_FILE, loader);
+    setup_loader(loader);
 
     // set SCOPE_EXEC_PATH to path to `ldscope` if not set already
     if (getenv("SCOPE_EXEC_PATH") == 0) {

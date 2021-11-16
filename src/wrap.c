@@ -4427,6 +4427,10 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
     WRAP_CHECK(sendmsg, -1);
     rc = g_fn.sendmsg(sockfd, msg, flags);
     if (rc != -1) {
+        size_t msg_iovlen_orig;
+        size_t msg_controllen_orig;
+        struct msghdr *msg_modify = (struct msghdr *)msg;
+
         scopeLog(CFG_LOG_TRACE, "fd:%d sendmsg", sockfd);
 
         // For UDP connections the msg is a remote addr
@@ -4440,11 +4444,23 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
             }
         }
 
+        if (g_ismusl == TRUE) {
+            msg_iovlen_orig = msg->msg_iovlen;
+            msg_modify->msg_iovlen &= 0xFFFFFFFF;
+            msg_controllen_orig = msg->msg_controllen;
+            msg_modify->msg_controllen &= 0xFFFFFFFF;
+        }
+
         if (remotePortIsDNS(sockfd)) {
             getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
         }
 
         doSend(sockfd, rc, msg, rc, MSG);
+
+        if (g_ismusl == TRUE) {
+            msg_modify->msg_iovlen = msg_iovlen_orig;
+            msg_modify->msg_controllen = msg_controllen_orig;
+        }
     } else {
         setRemoteClose(sockfd, errno);
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendmsg", "nopath");
@@ -4596,6 +4612,8 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     WRAP_CHECK(recvmsg, -1);
     rc = g_fn.recvmsg(sockfd, msg, flags);
     if (rc != -1) {
+        size_t msg_iovlen_orig;
+        size_t msg_controllen_orig;
         scopeLog(CFG_LOG_TRACE, "fd:%d recvmsg", sockfd);
 
         // For UDP connections the msg is a remote addr
@@ -4609,12 +4627,24 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
             }
         }
 
+        if (g_ismusl == TRUE) {
+            msg_iovlen_orig = msg->msg_iovlen;
+            msg->msg_iovlen &= 0xFFFFFFFF;
+            msg_controllen_orig = msg->msg_controllen;
+            msg->msg_controllen &= 0xFFFFFFFF;
+        }
+
         if (remotePortIsDNS(sockfd)) {
             getDNSAnswer(sockfd, (char *)msg, rc, MSG);
         }
 
         doRecv(sockfd, rc, msg, rc, MSG);
         doAccessRights(msg);
+
+        if (g_ismusl == TRUE) {
+            msg->msg_iovlen = msg_iovlen_orig;
+            msg->msg_controllen = msg_controllen_orig;
+        }
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmsg", "nopath");
     }

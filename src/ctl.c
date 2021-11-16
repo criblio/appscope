@@ -12,6 +12,7 @@
 #include "com.h"
 #include "fn.h"
 #include "state.h"
+#include "libc.h"
 
 #define FS_ENTRIES 1024
 #define DEFAULT_LOG_MAX_AGG_BYTES 32768

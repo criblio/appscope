@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
-#include <errno.h>
+//#include <errno.h>
 #include <limits.h>
 #include <netinet/in.h>
 #include <stdlib.h>
@@ -25,6 +25,7 @@
 #include "fn.h"
 #include "os.h"
 #include "utils.h"
+#include "libc.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
@@ -2143,14 +2144,14 @@ doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t byte
 
                 for (i = 0; i < cnt; i++) {
                     if (iov[i].iov_base && (iov[i].iov_len > 0)) {
-                        ctlSendLog(g_ctl, fd, fs->path, iov[i].iov_base, iov[i].iov_len, fs->uid, &g_proc);
+                        //ctlSendLog(g_ctl, fd, fs->path, iov[i].iov_base, iov[i].iov_len, fs->uid, &g_proc);
                     }
                 }
 
                 return;
             }
 
-            ctlSendLog(g_ctl, fd, fs->path, buf, bytes, fs->uid, &g_proc);
+            //ctlSendLog(g_ctl, fd, fs->path, buf, bytes, fs->uid, &g_proc);
         }
     } else {
         if (fs) {
@@ -2322,6 +2323,7 @@ doClose(int fd, const char *func)
     }
 
     // report everything before the info is lost
+    //DR:
     reportFD(fd, EVENT_BASED);
 
     if (ninfo) memset(ninfo, 0, sizeof(struct net_info_t));

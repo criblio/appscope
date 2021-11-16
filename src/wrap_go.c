@@ -14,6 +14,7 @@
 #include "utils.h"
 #include "fn.h"
 #include "capstone/capstone.h"
+#include "libc.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
@@ -665,7 +666,8 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
     unsigned long *go_v;
     char *go_g = NULL;
 
-    if (g_go_static) {
+    //if (g_go_static) {
+    if (0) {
         // Get the Go routine's struct g
         __asm__ volatile (
             "mov %%fs:-8, %0"
@@ -809,7 +811,8 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
     int newThread = FALSE;
     unsigned long rsp;
 
-    if (g_go_static) {
+    //if (g_go_static) {
+    if (0) {
         // Get the Go routine's struct g
         __asm__ volatile (
             "mov %%fs:-8, %0"
@@ -991,7 +994,12 @@ c_write(char *stackaddr)
 EXPORTON void *
 go_write(char *stackptr)
 {
-    return go_switch(stackptr, c_write, go_hook_write);
+    //return go_switch(stackptr, c_write, go_hook_write);
+    uint32_t frame_offset = frame_size(go_hook_write);
+    if (!frame_offset) return NULL;
+    stackptr += frame_offset;
+    c_write(stackptr);
+    return return_addr(go_hook_write);
 }
 
 static void
@@ -1016,7 +1024,12 @@ c_open(char *stackaddr)
 EXPORTON void *
 go_open(char *stackptr)
 {
-    return go_switch(stackptr, c_open, go_hook_open);
+    //return go_switch(stackptr, c_open, go_hook_open);
+    uint32_t frame_offset = frame_size(go_hook_open);
+    if (!frame_offset) return NULL;
+    stackptr += frame_offset;
+    c_open(stackptr);
+    return return_addr(go_hook_open);
 }
 
 static void
@@ -1032,7 +1045,12 @@ c_close(char *stackaddr)
 EXPORTON void *
 go_close(char *stackptr)
 {
-    return go_switch(stackptr, c_close, go_hook_close);
+    //return go_switch(stackptr, c_close, go_hook_close);
+    uint32_t frame_offset = frame_size(go_hook_close);
+    if (!frame_offset) return NULL;
+    stackptr += frame_offset;
+    c_close(stackptr);
+    return return_addr(go_hook_close);
 }
 
 static void
@@ -1052,7 +1070,16 @@ c_read(char *stackaddr)
 EXPORTON void *
 go_read(char *stackptr)
 {
+#if 0
     return go_switch(stackptr, c_read, go_hook_read);
+#else
+    uint32_t frame_offset = frame_size(go_hook_read);
+    if (!frame_offset) return NULL;
+    stackptr += frame_offset;
+    c_read(stackptr);
+    return return_addr(go_hook_read);
+#endif
+
 }
 
 static void
@@ -1071,7 +1098,12 @@ c_socket(char *stackaddr)
 EXPORTON void *
 go_socket(char *stackptr)
 {
-    return go_switch(stackptr, c_socket, go_hook_socket);
+    //return go_switch(stackptr, c_socket, go_hook_socket);
+    uint32_t frame_offset = frame_size(go_hook_socket);
+    if (!frame_offset) return NULL;
+    stackptr += frame_offset;
+    c_socket(stackptr);
+    return return_addr(go_hook_socket);
 }
 
 static void
@@ -1266,7 +1298,15 @@ c_http_client_write(char *stackaddr)
 EXPORTON void *
 go_pc_write(char *stackptr)
 {
+#if 0
     return go_switch(stackptr, c_http_client_write, go_hook_pc_write);
+#else
+    uint32_t frame_offset = frame_size(go_hook_pc_write);
+    if (!frame_offset) return NULL;
+    stackptr += frame_offset;
+    c_http_client_write(stackptr);
+    return return_addr(go_hook_pc_write);
+#endif
 }
 
 /*
@@ -1325,7 +1365,15 @@ c_http_client_read(char *stackaddr)
 EXPORTON void *
 go_readResponse(char *stackptr)
 {
+#if 0
     return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
+#else
+    uint32_t frame_offset = frame_size(go_hook_readResponse);
+    if (!frame_offset) return NULL;
+    stackptr += frame_offset;
+    c_http_client_read(stackptr);
+    return return_addr(go_hook_readResponse);
+#endif
 }
 
 extern void handleExit(void);
@@ -1337,7 +1385,7 @@ c_exit(char *stackaddr)
     funcprint("c_exit");
 
     int i;
-    struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
+    struct timespec ts = {.tv_sec = 0, .tv_nsec = 100000}; // 100 us
 
     // ensure the circular buffer is empty
     for (i = 0; i < 100; i++) {
@@ -1345,7 +1393,7 @@ c_exit(char *stackaddr)
         sigSafeNanosleep(&ts);
     }
 
-    handleExit();
+    //handleExit();
     // flush the data
     sigSafeNanosleep(&ts);
 }

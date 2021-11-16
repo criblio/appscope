@@ -1,5 +1,5 @@
 #define _GNU_SOURCE
-#include <errno.h>
+//#include <errno.h>
 #include <string.h>
 //#include <lshpack.h>
 
@@ -9,6 +9,7 @@
 #include "plattime.h"
 #include "search.h"
 #include "atomic.h"
+#include "libc.h"
 
 #define MIN_HDR_ALLOC (4  * 1024)
 #define MAX_HDR_ALLOC (16 * 1024)
@@ -132,6 +133,7 @@ getContentLength(char *header, size_t len)
     pcre2_substring_get_bynumber(matches, 1, &cLen, &cLenLen);
 
     errno = 0;
+    //scope___errno_location = 0;
     size_t ret = strtoull((const char *)cLen, NULL, 0);
     if ((errno != 0) || (ret == 0)) {
         ret = -1;

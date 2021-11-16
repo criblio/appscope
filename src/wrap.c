@@ -38,6 +38,7 @@
 #include "javaagent.h"
 #include "inject.h"
 #include "../contrib/libmusl/musl.h"
+#include "libc.h"
 
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
@@ -71,6 +72,7 @@ extern int arch_prctl(int, unsigned long);
 extern unsigned long scope_fs;
 
 extern void initGoHook(elf_buf_t*);
+extern void scope___init_libc(char **, char *);
 
 static got_list_t hook_list[] = {
     {"SSL_read", SSL_read, &g_fn.SSL_read},
@@ -659,6 +661,9 @@ dynConfig(void)
 static void
 threadNow(int sig)
 {
+    // DR
+    //return;
+
     static uint64_t serialize;
 
     if (!atomicCasU64(&serialize, 0ULL, 1ULL)) return;
@@ -1471,10 +1476,15 @@ initEnv(int *attachedFlag)
     g_fn.fclose(fd);
 }
 
+//extern void *scope_malloc(size_t);
+//extern void scope_free(void *);
+
 __attribute__((constructor)) void
 init(void)
 {
 
+    scope___init_libc(environ, NULL);
+#if 1
     // Bootstrapping...  we need to know if we're in musl so we can
     // call the right initFn function...
     {
@@ -1498,7 +1508,9 @@ init(void)
         if (full_path) free(full_path);
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
     }
-
+#else
+    g_ismusl = 0;
+#endif
     // Use dlsym to get addresses for everything in g_fn
     if (g_ismusl) {
         initFn_musl();
@@ -3703,6 +3715,13 @@ __stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
 EXPORTON ssize_t
 write(int fd, const void *buf, size_t count)
 {
+    //static int ionce = 0;
+    //if (!ionce) scope___init_libc(environ, NULL);
+    //ionce = 1;
+
+    //void *tst = scope_malloc(1024*1024);
+    //scope_free(tst);
+
     WRAP_CHECK(write, -1);
     if (g_ismusl == FALSE) {
         return __write_libc(fd, buf, count);

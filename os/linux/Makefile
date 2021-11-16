@@ -15,6 +15,7 @@ JSON_AR=contrib/cJSON/libcjson.a
 PCRE2_AR=contrib/build/pcre2/libpcre2-posix.a contrib/build/pcre2/libpcre2-8.a
 OPENSSL_AR=contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a
 LS_HPACK_AR=contrib/build/ls-hpack/libls-hpack.a
+MUSL_AR=contrib/libmusl/libc.a
 TEST_AR=$(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} $(LS_HPACK_AR)
 #TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
 TEST_LIB=contrib/build/cmocka/src/libcmocka.so

@@ -128,7 +128,18 @@
       ],
       "exclude_x86_64_tests": [],
       "exclude_aarch64_tests": [],
-      "exclude_musl_tests": [],
+      "Notes for exclude musl tests" : [
+        "the musl exclusions are tests that fail on musl unscoped",
+        "revisit these to see if we can fix them instead of excluding them"
+      ],
+      "exclude_musl_tests": [
+        "fstatfs02_64",
+        "fstatfs02",
+        "gethostbyname_r01",
+        "open13",
+        "statfs02_64",
+        "statfs02"
+      ],
       "exclude_glibc_tests": []
     },
     {
@@ -137,7 +148,7 @@
       "exclude_tests": [],
       "Notes for exclude arch tests" : [
         "the aarch64 exclusions are tests that fail on ARM unscoped",
-	"revisit these to see if we can fix them instead of excluding them"
+        "revisit these to see if we can fix them instead of excluding them"
       ],
       "exclude_x86_64_tests": [],
       "exclude_aarch64_tests": [

@@ -121,7 +121,7 @@ jobs:
 
       # Attempt to prune any orphaned docker resources on the EC2 ARM runners
       - name: Prune Docker Resources
-        if: ${{ matrix.on == 'self-hosted,ARM64' }}
+        if: ${{ matrix.on == 'ARM64' }}
         run: |
             docker rm --force $(docker ps -a -q) || exit 0
             docker network prune --force || exit 0

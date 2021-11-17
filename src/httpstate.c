@@ -138,6 +138,7 @@ getContentLength(char *header, size_t len)
     }
 
     pcre2_match_data_free(matches);
+    pcre2_substring_free(cLen);
 
     return ret;
 }

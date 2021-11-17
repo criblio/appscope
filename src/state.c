@@ -16,6 +16,7 @@
 #include "dbg.h"
 #include "dns.h"
 #include "httpstate.h"
+#include "metriccapture.h"
 #include "mtcformat.h"
 #include "plattime.h"
 #include "search.h"
@@ -262,6 +263,8 @@ initState()
     }
 
     initHttpState();
+    initMetricCapture();
+
     // the http guard array is static while the net fs array is dynamically allocated
     // will need to change if we want to re-size at runtime
     memset(g_http_guard, 0, sizeof(g_http_guard));
@@ -1255,6 +1258,12 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
                 && !strcasecmp(net->protoProtoDef->protname, "HTTP")
                 && cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
             doHttp(id, sockfd, net, buf, len, src, dtype);
+        }
+
+        if (net && net->protoProtoDef
+                && (!strcasecmp(net->protoProtoDef->protname, "StatsD_Extended")
+                ||  !strcasecmp(net->protoProtoDef->protname, "StatsD"))) {
+            doMetricCapture(id, sockfd, net, buf, len, src, dtype);
         }
     }
 

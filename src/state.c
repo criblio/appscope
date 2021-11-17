@@ -50,6 +50,7 @@ int g_mtc_addr_output = TRUE;
 static search_t* g_http_redirect = NULL;
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
+static protocol_def_t *g_statsd_protocol_def = NULL;
 
 // Linked list, indexed by channel ID, of net_info pointers used in
 // doProtocol() when it's not provided with a valid file descriptor.
@@ -240,6 +241,24 @@ initPayloadDetect()
         goto error;
     }
 
+    // Setup the StatsD protocol-detect regex
+    errornumber = 0;
+    erroroffset = 0;
+    if ((g_statsd_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+    g_statsd_protocol_def->protname = "STATSD";
+    g_statsd_protocol_def->regex = "^([^:]+):([\\d.]+)\\|(c|g|ms|s|h)";
+    g_statsd_protocol_def->detect = TRUE;
+    g_statsd_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_statsd_protocol_def->regex,
+                                            PCRE2_ZERO_TERMINATED, 0,
+                                            &errornumber, &erroroffset, NULL);
+    if (g_statsd_protocol_def->re == NULL) {
+        goto error;
+    }
+    g_statsd_protocol_def->match_data = pcre2_match_data_create_from_pattern(g_statsd_protocol_def->re, NULL);
+    if (g_statsd_protocol_def->match_data == NULL) {
+        goto error;
+    }
+
     return;
 
 error:
@@ -247,6 +266,8 @@ error:
     g_tls_protocol_def = NULL;
     destroyProtEntry(g_http_protocol_def);
     g_http_protocol_def = NULL;
+    destroyProtEntry(g_statsd_protocol_def);
+    g_statsd_protocol_def = NULL;
 }
 
 void
@@ -1143,6 +1164,7 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     unsigned int ptype;
     protocol_def_t *protoDef;
     bool sawHTTP = FALSE;
+    bool sawSTATSD = FALSE;
 
     // No need to try protocol detection in raw TLS data
     if (net && net->tlsDetect == DETECT_TRUE     // TLS detected already
@@ -1153,10 +1175,9 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     // Check first against the protocol entries in the configs.
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((protoDef = lstFind(g_protlist, ptype)) != NULL) {
-            if (strcasecmp(protoDef->protname, "HTTP") == 0) {
-                // Remember we saw an HTTP entry in the configs.
-                sawHTTP = TRUE;
-            }
+            // Remember if we see a protocol definition we have a default for.
+            sawHTTP   |= !strcasecmp(protoDef->protname, "HTTP");
+            sawSTATSD |= !strcasecmp(protoDef->protname, "STATSD");
             if (setProtocolByType(sockfd, protoDef, net, buf, len, dtype)) {
                 // We're done since it matched.
                 return;
@@ -1164,9 +1185,12 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         }
     }
 
-    // Try our HTTP detection if we've not seen one 
-    if (!sawHTTP) {
-        setProtocolByType(sockfd, g_http_protocol_def, net, buf, len, dtype);
+    // Try default protocol definitions if they haven't been overridden.
+    if (!sawHTTP && setProtocolByType(sockfd, g_http_protocol_def, net, buf, len, dtype)) {
+            return;
+    }
+    if (!sawSTATSD && setProtocolByType(sockfd, g_statsd_protocol_def, net, buf, len, dtype)) {
+            return;
     }
 }
 
@@ -1261,8 +1285,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
         }
 
         if (net && net->protoProtoDef
-                && (!strcasecmp(net->protoProtoDef->protname, "StatsD_Extended")
-                ||  !strcasecmp(net->protoProtoDef->protname, "StatsD"))) {
+                && (!strcasecmp(net->protoProtoDef->protname, "STATSD"))) {
             doMetricCapture(id, sockfd, net, buf, len, src, dtype);
         }
     }

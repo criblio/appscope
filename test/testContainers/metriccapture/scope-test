@@ -1,0 +1,25 @@
+#!/bin/bash
+
+cd /usr/local/scope
+
+
+# Note that this is *not* an effective test at this point...
+# it only ensures that node isn't *crashing*.
+#
+# At a minimum, we also need to ensure that appscope's metric output
+# includes data intercepted from the execution of hotshot.ts.
+
+echo "Executing node hotshot.ts"
+LD_PRELOAD=/usr/local/scope/lib/libscope.so node hotshot.ts
+if [ $? -ne 0 ]; then
+    echo "node hotshot.ts failed"
+    exit 1
+fi
+
+echo "node hotshot.ts passed"
+echo ""
+
+
+
+echo "All metriccapture tests passed"
+exit 0

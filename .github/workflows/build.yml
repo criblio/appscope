@@ -11,8 +11,9 @@ on:
   push:
   # Run on manually triggered workflow
   workflow_dispatch:
-  # Run on PRs targeting the default branch or a release branche
+  # Run on PRs targeting the default branch or a release branches
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - 'main'
       - 'master'

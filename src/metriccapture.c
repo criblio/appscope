@@ -51,7 +51,7 @@ createCapturedMetric(unsigned char *name, unsigned char *value,
     if (!name || !value || !type) goto err;
 
     // Alloc space
-    base = calloc(1, sizeof(captured_metric_t));
+    base = malloc(sizeof(captured_metric_t));
     if (!base) goto err;
 
     // Copy in field values
@@ -85,7 +85,7 @@ destroyCapturedMetric(captured_metric_t **metric)
 }
 
 // defined in report.c
-extern void reportCapturedMetric(captured_metric_t *metric);
+extern void reportCapturedMetric(const captured_metric_t *metric);
 
 void
 reportAllCapturedMetrics(void)
@@ -106,7 +106,7 @@ reportAllCapturedMetrics(void)
 static bool
 doMetricBuffer(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src)
 {
-    int is_successful = FALSE;
+    bool is_successful = FALSE;
     pcre2_match_data *matches = NULL;
     captured_metric_t *metric = NULL;
 
@@ -161,14 +161,14 @@ out:
     return is_successful;
 }
 
-static bool
-doMetricByType(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
+bool
+doMetricCapture(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
 {
     bool ret = FALSE;
 
     if (dtype == BUF) {
         // simple buffer, pass it through
-        ret = ret || doMetricBuffer(id, sockfd, net, buf, len, src);
+        ret = doMetricBuffer(id, sockfd, net, buf, len, src);
     } else if (dtype == MSG) {
         // buffer is a msghdr for sendmsg/recvmsg
         int i;
@@ -196,11 +196,4 @@ doMetricByType(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, me
     }
 
     return ret;
-}
-
-
-bool
-doMetricCapture(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
-{
-    return doMetricByType(id, sockfd, net, buf, len, src, dtype);
 }

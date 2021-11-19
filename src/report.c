@@ -3173,7 +3173,7 @@ createFieldsForCapturedMetrics(const unsigned char *alldims)
 }
 
 void
-reportCapturedMetric(captured_metric_t *metric)
+reportCapturedMetric(const captured_metric_t *metric)
 {
     if (!metric) return;
 

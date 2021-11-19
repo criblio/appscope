@@ -207,7 +207,7 @@ initPayloadDetect()
     // Setup the TLS protocol-detect regex
     errornumber = 0;
     erroroffset = 0;
-    if ((g_tls_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+    if ((g_tls_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
     g_tls_protocol_def->protname = "TLS";
     g_tls_protocol_def->binary = TRUE;
     g_tls_protocol_def->len = PAYLOAD_BYTESRC;
@@ -226,7 +226,7 @@ initPayloadDetect()
     // Setup the HTTP protocol-detect regex
     errornumber = 0;
     erroroffset = 0;
-    if ((g_http_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+    if ((g_http_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
     g_http_protocol_def->protname = "HTTP";
     g_http_protocol_def->regex = "(?: HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n)";
     g_http_protocol_def->detect = TRUE;
@@ -244,7 +244,7 @@ initPayloadDetect()
     // Setup the StatsD protocol-detect regex
     errornumber = 0;
     erroroffset = 0;
-    if ((g_statsd_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+    if ((g_statsd_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
     g_statsd_protocol_def->protname = "STATSD";
     g_statsd_protocol_def->regex = "^([^:]+):([\\d.]+)\\|(c|g|ms|s|h)";
     g_statsd_protocol_def->detect = TRUE;
@@ -262,6 +262,8 @@ initPayloadDetect()
     return;
 
 error:
+    DBG("g_tls_protocol_def = %p, g_http_protocol_def = %p, g_statsd_protocol_def = %p",
+         g_tls_protocol_def, g_http_protocol_def, g_statsd_protocol_def);
     destroyProtEntry(g_tls_protocol_def);
     g_tls_protocol_def = NULL;
     destroyProtEntry(g_http_protocol_def);
@@ -972,7 +974,7 @@ setProtocolByType(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf
 
     if (dtype == BUF) {
         // simple buffer, pass it through
-        ret = ret || setProtocol(sockfd, protoDef, net, buf, len);
+        ret = setProtocol(sockfd, protoDef, net, buf, len);
     } else if (dtype == MSG) {
         // buffer is a msghdr for sendmsg/recvmsg
         int i;
@@ -1277,16 +1279,16 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
             extractPayload(sockfd, net, buf, len, src, dtype);
         }
 
-        // Process HTTP if detected and events are enabled
-        if (net && net->protoProtoDef
-                && !strcasecmp(net->protoProtoDef->protname, "HTTP")
-                && cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
-            doHttp(id, sockfd, net, buf, len, src, dtype);
-        }
+        if (net && net->protoProtoDef) {
+            // Process HTTP if detected and events are enabled
+            if (!strcasecmp(net->protoProtoDef->protname, "HTTP") &&
+                cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
+                doHttp(id, sockfd, net, buf, len, src, dtype);
+            }
 
-        if (net && net->protoProtoDef
-                && (!strcasecmp(net->protoProtoDef->protname, "STATSD"))) {
-            doMetricCapture(id, sockfd, net, buf, len, src, dtype);
+            if (!strcasecmp(net->protoProtoDef->protname, "STATSD")) {
+                doMetricCapture(id, sockfd, net, buf, len, src, dtype);
+            }
         }
     }
 

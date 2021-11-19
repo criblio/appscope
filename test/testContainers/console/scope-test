@@ -74,7 +74,6 @@ ERR+=$?
 
 endtest
 
-
 #
 # curl png
 #
@@ -101,6 +100,68 @@ if [ $? -ne 0 ]; then
 fi
 
 evaltest
+
+endtest
+
+#
+# ls with color - including ASCII ESC character (negative test)
+#
+
+starttest ls_with_color
+
+ldscope ls --color=always > /dev/null
+evaltest
+grep "$BINARY_MSG" $EVT_FILE > /dev/null
+if [ $? -eq 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# hexdump (negative test)
+#
+
+starttest hexdump
+
+ldscope hexdump /usr/local/scope/lib/libscope.so > /dev/null
+evaltest
+grep "$BINARY_MSG" $EVT_FILE > /dev/null
+if [ $? -eq 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# xxd (negative test)
+#
+
+starttest xxd
+
+ldscope xxd /usr/local/scope/lib/libscope.so > /dev/null
+evaltest
+grep "$BINARY_MSG" $EVT_FILE > /dev/null
+if [ $? -eq 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# tar
+#
+
+starttest tar_to_stdout
+
+cd /opt/tar_test
+tar -Pczvf test.tar.gz /usr/bin > /dev/null
+
+ldscope tar -PxOzf test.tar.gz > /dev/null
+evaltest
+
+grep "$BINARY_MSG" $EVT_FILE > /dev/null
+ERR+=$?
 
 endtest
 

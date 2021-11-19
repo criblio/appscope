@@ -54,6 +54,8 @@ sendProcessStartMetric()
     event_field_t fields[] = {
         STRFIELD("proc", (g_proc.procname), 4, TRUE),
         NUMFIELD("pid", (g_proc.pid), 4, TRUE),
+        NUMFIELD("gid", (g_proc.gid), 4, TRUE),
+        NUMFIELD("uid", (g_proc.uid), 4, TRUE),
         STRFIELD("host", (g_proc.hostname), 4, TRUE),
         STRFIELD("args", (command), 7, TRUE),
         STRFIELD("unit", ("process"), 1, TRUE),

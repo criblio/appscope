@@ -44,7 +44,7 @@ endtest(){
 #
 # extract on glibc
 #
-starttest extract_musl
+starttest extract_glibc
 
 scope extract /opt/extract_scope
 ERR+=$?
@@ -64,7 +64,8 @@ endtest
 #
 # ldscope patch
 #
-starttest patch_on_musl
+starttest patch_on_glibc
+
 cp /usr/local/scope/lib/libscope.so /opt/patch_libscope
 cp /usr/local/scope/bin/ldscope /opt/patch_libscope
 
@@ -93,7 +94,7 @@ fi
 
 endtest
 
-starttest patch_on_musl_dummy_file
+starttest patch_on_glibc_dummy_file
 
 echo "Lorem ipsum" >> /opt/patch_libscope/dummy_file
 /opt/patch_libscope/ldscope --patch /opt/patch_libscope/dummy_file

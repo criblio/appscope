@@ -116,7 +116,7 @@ setEnvVariable(char *env, char *value)
 
 // modify NEEDED entries in libscope.so to avoid dependencies
 static int
-set_library(const char* libpath)
+set_library(const char *libpath)
 {
     int i, fd, found, name;
     struct stat sbuf;
@@ -446,7 +446,7 @@ setup_loader(char *ldscope)
 }
 
 static int
-patch_library(const char* so_path) {
+patch_library(const char *so_path) {
     int result = EXIT_FAILURE;
 
     char *ldso = get_loader(EXE_TEST_FILE);

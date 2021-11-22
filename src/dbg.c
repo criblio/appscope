@@ -146,8 +146,9 @@ dbgOutputHeaderLine(FILE *f)
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
+    struct tm t;
     char buf[128] = {0};
-    strftime(buf, sizeof(buf), "%FT%TZ", gmtime(&tv.tv_sec));
+    strftime(buf, sizeof(buf), "%FT%TZ", gmtime_r(&tv.tv_sec, &t));
     fprintf(f, "Scope Version: %s   Dump From: %s\n", SCOPE_VER, buf);
 }
 

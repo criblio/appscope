@@ -49,6 +49,7 @@ scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:100
 			err = rc.WriteScopeConfig(path.Join(outPath, "scope.yml"), 0644)
 			util.CheckErrSprintf(err, "error writing scope.yml: %v", err)
 		}
+		rc.Patch(outPath)
 		fmt.Printf("Successfully extracted to %s.\n", outPath)
 	},
 }

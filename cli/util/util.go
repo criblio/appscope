@@ -245,8 +245,10 @@ func CountLines(path string) (int, error) {
 	}
 }
 
-// Copy pasta from https://codereview.stackexchange.com/questions/71272/convert-int64-to-custom-base64-number-string
-var codes = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ%^"
+// Modified Copy pasta from https://codereview.stackexchange.com/questions/71272/convert-int64-to-custom-base64-number-string
+var codes = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+const codes_len = 62
 
 func EncodeOffset(offset int64) string {
 	str := make([]byte, 0, 12)
@@ -254,9 +256,9 @@ func EncodeOffset(offset int64) string {
 		return "0"
 	}
 	for offset > 0 {
-		ch := codes[offset%64]
+		ch := codes[offset%codes_len]
 		str = append(str, ch)
-		offset /= 64
+		offset /= codes_len
 	}
 	return string(str)
 }
@@ -266,7 +268,7 @@ func DecodeOffset(encoded string) (int64, error) {
 
 	for i := len(encoded); i > 0; i-- {
 		ch := encoded[i-1]
-		res *= 64
+		res *= codes_len
 		mod := strings.IndexRune(codes, rune(ch))
 		if mod == -1 {
 			return -1, fmt.Errorf("Invalid encoded character: '%c'", ch)

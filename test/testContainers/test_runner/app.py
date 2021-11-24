@@ -44,7 +44,7 @@ def main():
 
     scope_version = get_scope_version(args.scope_path)
     logging.info(f"Scope Version: {scope_version}")
-    test_watcher = TestWatcher(execution_id, scope_version)
+    test_watcher = TestWatcher(execution_id)
     test_watcher.start()
     scope_data_collector = ScopeDataCollector()
 

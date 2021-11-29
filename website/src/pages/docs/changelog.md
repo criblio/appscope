@@ -34,7 +34,7 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 - **Improvement**: [#489](https://github.com/criblio/appscope/issues/489) Streamline configuration file structure by eliminating `scope_protocol.yml` and merging its content into `scope.yml`.
 
-- **Improvement**: [#503](https://github.com/criblio/appscope/issues/503) Promote the `tags` section of `config.yml` to top level, removing it from the `metric` > `format` section.  
+- **Improvement**: [#503](https://github.com/criblio/appscope/issues/503) Promote the `tags` section of `scope.yml` to top level, removing it from the `metric` > `format` section. This change is **not** backwards-compatible. 
 
 ## AppScope 0.7.4
 

@@ -50,6 +50,8 @@ typedef struct
     char *cmd;
     char id[MAX_ID];
     char cgroup[MAX_CGROUP];
+    char *username;
+    char *groupname;
 } proc_id_t;
 
 #define TRUE 1

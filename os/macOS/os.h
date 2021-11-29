@@ -44,3 +44,5 @@ extern bool osTimerStop(void);
 extern bool osGetCgroup(pid_t, char *, size_t);
 extern char *osGetFileMode(mode_t);
 extern int osNeedsConnect(int);
+extern const char *osGetUserName(unsigned);
+extern const char *osGetGroupName(unsigned);

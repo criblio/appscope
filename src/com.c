@@ -3,6 +3,7 @@
 
 #include "com.h"
 #include "dbg.h"
+#include "os.h"
 #include "utils.h"
 
 bool g_need_stack_expand = FALSE;
@@ -192,7 +193,13 @@ jsonProcessObject(proc_id_t *proc)
     if (!(cJSON_AddNumberToObjLN(root, "pid", proc->pid))) goto err;
     if (!(cJSON_AddNumberToObjLN(root, "ppid", proc->ppid))) goto err;
     if (!(cJSON_AddNumberToObjLN(root, "gid", proc->gid))) goto err;
+    if (proc->groupname) {
+        if (!(cJSON_AddStringToObjLN(root, "groupname", proc->groupname))) goto err;
+    }
     if (!(cJSON_AddNumberToObjLN(root, "uid", proc->uid))) goto err;
+    if (proc->username) {
+        if (!(cJSON_AddStringToObjLN(root, "username", proc->username))) goto err;
+    }
     if (!(cJSON_AddStringToObjLN(root, "hostname", proc->hostname))) goto err;
     if (!(cJSON_AddStringToObjLN(root, "procname", proc->procname))) goto err;
     if (proc->cmd) {

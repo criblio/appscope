@@ -1,5 +1,8 @@
 #define _GNU_SOURCE
 #include <sys/param.h>
+#include <sys/types.h>
+#include <grp.h>
+#include <pwd.h>
 #include <time.h>
 #include "os.h"
 #include "../../src/dbg.h"
@@ -757,3 +760,28 @@ osGetFileMode(mode_t perm)
     return mode;
 }
 
+char *
+osGetUserName(unsigned uid)
+{
+    struct passwd pwd;
+    struct passwd *pwd_res = NULL;
+    char buf[4096];
+
+    int ret = getpwuid_r(uid, &pwd, buf, sizeof(buf), &pwd_res);
+    if (ret)
+        return NULL;
+    return strdup(pwd.pw_name);
+}
+
+char *
+osGetGroupName(unsigned gid)
+{
+    struct group grp;
+    struct group *grp_res = NULL;
+    char buf[4096];
+
+    int ret = getgrgid_r(gid, &grp, buf, sizeof(buf), &grp_res);
+    if (ret)
+        return NULL;
+    return strdup(grp.gr_name);
+}

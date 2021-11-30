@@ -2120,7 +2120,6 @@ doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t byte
     struct net_info_t *net = getNetEntry(fd);
 
     if (success) {
-        scopeLog(CFG_LOG_TRACE, "fd:%d %s", fd, func);
         if (net) {
             // This is a network descriptor
             doSetAddrs(fd);

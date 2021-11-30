@@ -89,6 +89,21 @@ ERR+=$?
 
 endtest
 
+#
+# trace log level
+#
+
+starttest trace_level_test
+
+SCOPE_LOG_LEVEL=trace ldscope ps -ef
+if [ $? -ne 0 ]; then
+    ERR+=1
+fi
+
+evaltest
+
+endtest
+
 unset SCOPE_PAYLOAD_ENABLE
 unset SCOPE_PAYLOAD_HEADER
 
